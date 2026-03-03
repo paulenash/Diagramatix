@@ -1,0 +1,1925 @@
+WEBVTT
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/7-0
+00:00:03.235 --> 00:00:08.127
+<v Paul Nash>Set up in the early days,
+set up Dear Watson processes,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/7-1
+00:00:08.127 --> 00:00:14.941
+<v Paul Nash>so one of the simplest ones would be what
+I'd call a process context diagram,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/5-0
+00:00:09.195 --> 00:00:09.675
+<v Greg Nash>Mhm.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/7-2
+00:00:14.941 --> 00:00:21.405
+<v Paul Nash>which is you've got a group of processes
+that you represent as use cases,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/7-3
+00:00:21.405 --> 00:00:22.715
+<v Paul Nash>and you have...</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/6-0
+00:00:22.155 --> 00:00:22.715
+<v Greg Nash>Mhm.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/10-0
+00:00:23.035 --> 00:00:27.351
+<v Paul Nash>The actors in the use case diagram are
+the participants in the process,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/10-1
+00:00:27.351 --> 00:00:31.246
+<v Paul Nash>and you can sort of show which
+participants participate in which</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/10-2
+00:00:31.246 --> 00:00:35.442
+<v Paul Nash>processes in the process group. So,
+and you have multiple of those to</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/9-0
+00:00:34.955 --> 00:00:35.115
+<v Greg Nash>Mm.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/10-3
+00:00:35.442 --> 00:00:39.398
+<v Paul Nash>describe the process groups,
+so that they give you an overview of</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/10-4
+00:00:39.398 --> 00:00:41.915
+<v Paul Nash>who's involved in the different processes.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/12-0
+00:00:42.235 --> 00:00:48.388
+<v Paul Nash>Teams, what systems, and so on,
+and they're a relatively simple diagram,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/12-1
+00:00:48.388 --> 00:00:52.096
+<v Paul Nash>actually,
+much simpler than a BPMN diagram,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/11-0
+00:00:50.955 --> 00:00:51.115
+<v Greg Nash>Mm.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/12-2
+00:00:52.096 --> 00:00:56.900
+<v Paul Nash>because all the connectors are just
+straight connectors.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/12-3
+00:00:56.900 --> 00:01:02.715
+<v Paul Nash>The only complication is that use cases
+are represented by ellipses.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/16-0
+00:01:03.035 --> 00:01:08.117
+<v Paul Nash>And even in Enterprise Architect,
+it connects to the rectangle that</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/16-1
+00:01:08.117 --> 00:01:13.498
+<v Paul Nash>inscribe, you know, the ellipse,
+like it doesn't connect to the edge of</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/13-0
+00:01:10.155 --> 00:01:10.315
+<v Greg Nash>Mm.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/16-2
+00:01:13.498 --> 00:01:18.730
+<v Paul Nash>the ellipse, right? You know, like,
+because that's a little bit hard.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/14-0
+00:01:15.275 --> 00:01:16.715
+<v Greg Nash>No, that's annoying. Oh, well, yeah.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/16-3
+00:01:18.730 --> 00:01:22.915
+<v Paul Nash>But whereas in Magic Draw UML,
+it connects to the edge.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/18-0
+00:01:23.355 --> 00:01:26.006
+<v Paul Nash>you know,
+like to the proper edge and you can move</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/15-0
+00:01:24.475 --> 00:01:24.635
+<v Greg Nash>Mm.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/18-1
+00:01:26.006 --> 00:01:28.761
+<v Paul Nash>it around the edge.
+That's a little bit complicated,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/18-2
+00:01:28.761 --> 00:01:31.619
+<v Paul Nash>but I presume I could just get Claude
+code to say, oh,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/18-3
+00:01:31.619 --> 00:01:33.958
+<v Paul Nash>I don't want it to connect to the
+rectangle,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/18-4
+00:01:33.958 --> 00:01:36.245
+<v Paul Nash>I want it to connect to the edge.
+You know,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/17-0
+00:01:35.955 --> 00:01:36.875
+<v Greg Nash>No, absolutely.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/18-5
+00:01:36.245 --> 00:01:38.688
+<v Paul Nash>like it may well be able to generate the
+code.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/18-6
+00:01:38.688 --> 00:01:40.715
+<v Paul Nash>So all these complications may well be.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/22-0
+00:01:42.075 --> 00:01:45.318
+<v Paul Nash>The other thing,
+when I was asking Claude about this a few</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/22-1
+00:01:45.318 --> 00:01:47.736
+<v Paul Nash>weeks ago, like,
+how would I approach this,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/22-2
+00:01:47.736 --> 00:01:52.187
+<v Paul Nash>and I want to do it from scratch, it said,
+well, what are all the, I said, well,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/19-0
+00:01:49.595 --> 00:01:49.755
+<v Greg Nash>Mm.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/22-3
+00:01:52.187 --> 00:01:55.979
+<v Paul Nash>what are all the difficulties?
+One of them is routing of connectors,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/22-4
+00:01:55.979 --> 00:01:59.551
+<v Paul Nash>you know, to avoid things,
+you've got to have them so they avoid</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/20-0
+00:01:57.355 --> 00:01:57.515
+<v Greg Nash>Mm.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/21-0
+00:01:59.115 --> 00:02:00.235
+<v Greg Nash>That's right, yeah, yeah.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/22-5
+00:01:59.551 --> 00:02:01.035
+<v Paul Nash>things. That's complicated.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/24-0
+00:02:01.595 --> 00:02:04.721
+<v Paul Nash>But see,
+all of this I sort of know more or less</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/24-1
+00:02:04.721 --> 00:02:08.613
+<v Paul Nash>how to do manually,
+but so I'm more than happy to delve into</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/24-2
+00:02:08.613 --> 00:02:13.590
+<v Paul Nash>the complications of that so that you
+move a symbol around in the diagram and</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/24-3
+00:02:13.590 --> 00:02:16.716
+<v Paul Nash>all the connectors move around it kind of
+thing.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/24-4
+00:02:16.716 --> 00:02:19.715
+<v Paul Nash>And then you've got some that actually
+have to</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/23-0
+00:02:18.555 --> 00:02:18.795
+<v Greg Nash>MMM.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/26-0
+00:02:19.995 --> 00:02:23.742
+<v Paul Nash>have to not have to actually,
+like this is one of the problems with</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/26-1
+00:02:23.742 --> 00:02:27.820
+<v Paul Nash>Visio. Some things when you move them,
+you want the connectors to just go</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/26-2
+00:02:27.820 --> 00:02:30.410
+<v Paul Nash>straight through them as if they're
+invisible.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/26-3
+00:02:30.410 --> 00:02:34.102
+<v Paul Nash>Like messages should never try and route
+themselves around things.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/26-4
+00:02:34.102 --> 00:02:37.464
+<v Paul Nash>Whereas you can't do that in Visio's
+implementation of BPMN.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/26-5
+00:02:37.464 --> 00:02:40.715
+<v Paul Nash>They have to go straight through.
+The whole reason they're</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/25-0
+00:02:37.595 --> 00:02:39.115
+<v Greg Nash>Ah, interesting.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/29-0
+00:02:40.755 --> 00:02:44.975
+<v Paul Nash>dotted or dashed lines is they should go,
+they should be in a lighter,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/27-0
+00:02:43.835 --> 00:02:45.435
+<v Greg Nash>They go, they go straight through.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/29-1
+00:02:44.975 --> 00:02:48.839
+<v Paul Nash>they go straight through.
+Whereas connectors that are to do with</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/29-2
+00:02:48.839 --> 00:02:53.713
+<v Paul Nash>the sequencing, they must, they must go,
+they can never go through. So, you know,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/29-3
+00:02:53.713 --> 00:02:56.447
+<v Paul Nash>there's rules about the different
+connectors.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/28-0
+00:02:55.915 --> 00:02:56.075
+<v Greg Nash>Mm.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/29-4
+00:02:56.447 --> 00:03:01.321
+<v Paul Nash>And I know all these things and I've sort
+of got this idea that I'm going to have</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/29-5
+00:03:01.321 --> 00:03:01.915
+<v Paul Nash>quite a...</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/31-0
+00:03:02.155 --> 00:03:04.684
+<v Paul Nash>Anyway,
+so there's the first type of diagram.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/31-1
+00:03:04.684 --> 00:03:07.817
+<v Paul Nash>The second type is,
+this is the one I talked to the head</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/31-2
+00:03:07.817 --> 00:03:12.325
+<v Paul Nash>developer of Savaglio that came out from
+Germany when we're negotiating with them</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/30-0
+00:03:11.755 --> 00:03:11.915
+<v Greg Nash>Mm.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/31-3
+00:03:12.325 --> 00:03:15.568
+<v Paul Nash>to do Australian Unity's implementation.
+And I said, well,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/31-4
+00:03:15.568 --> 00:03:19.856
+<v Paul Nash>the diagram type you don't have is a
+state machine diagram because everything</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/31-5
+00:03:19.856 --> 00:03:21.835
+<v Paul Nash>goes through these different states.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/33-0
+00:03:21.915 --> 00:03:25.964
+<v Paul Nash>And you need to be able to do a state
+machine diagram and attach it to the</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/33-1
+00:03:25.964 --> 00:03:29.689
+<v Paul Nash>end-to-end process. So, you know,
+you think of virtually everything,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/33-2
+00:03:29.689 --> 00:03:33.306
+<v Paul Nash>like in that case we were doing employees,
+they go from, you know,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/33-3
+00:03:33.306 --> 00:03:36.761
+<v Paul Nash>they're a possible employee to their
+engagement, not confirmed,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/33-4
+00:03:36.761 --> 00:03:39.784
+<v Paul Nash>and then they're confirmed,
+and then they're, you know,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/33-5
+00:03:39.784 --> 00:03:43.509
+<v Paul Nash>vetted or whatever, you know,
+like they go through the state machine</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/32-0
+00:03:42.955 --> 00:03:43.115
+<v Greg Nash>Mm.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/33-6
+00:03:43.509 --> 00:03:43.995
+<v Paul Nash>actually.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/35-0
+00:03:44.475 --> 00:03:48.585
+<v Paul Nash>And it would be really handy to be able
+to show the concept,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/35-1
+00:03:48.585 --> 00:03:53.233
+<v Paul Nash>understand the state machine before you
+do the process, if you want,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/35-2
+00:03:53.233 --> 00:03:58.083
+<v Paul Nash>and link it to all these. Anyway,
+so that's the second type of diagram,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/35-3
+00:03:58.083 --> 00:04:03.136
+<v Paul Nash>the process context diagram. The rest are,
+and then a state machine, then,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/35-4
+00:04:03.136 --> 00:04:04.955
+<v Paul Nash>if you like, BPMN diagrams.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/37-0
+00:04:05.195 --> 00:04:11.353
+<v Paul Nash>But it's got to be configurable so that
+you can add and subtract all the symbols</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/34-0
+00:04:06.155 --> 00:04:06.315
+<v Greg Nash>Mm.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/37-1
+00:04:11.353 --> 00:04:15.839
+<v Paul Nash>you want. So normally if I'm doing,
+it's about 27 symbols,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/37-2
+00:04:15.839 --> 00:04:21.617
+<v Paul Nash>about 110 possible symbols in BPMN that I
+use for business process mapping,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/37-3
+00:04:21.617 --> 00:04:25.875
+<v Paul Nash>and that needs to be configurable and
+blah, blah, blah.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/36-0
+00:04:23.995 --> 00:04:24.395
+<v Greg Nash>Yep.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/40-0
+00:04:25.955 --> 00:04:29.723
+<v Paul Nash>The other thing is,
+the other idea I've talked to you about</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/40-1
+00:04:29.723 --> 00:04:33.680
+<v Paul Nash>is, most things just,
+the complication with BPMN diagrams that</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/40-2
+00:04:33.680 --> 00:04:37.636
+<v Paul Nash>are used in business is they are,
+if you look at the standard,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/40-3
+00:04:37.636 --> 00:04:42.347
+<v Paul Nash>they're what's called a hybrid diagram
+because they have both the process,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/40-4
+00:04:42.347 --> 00:04:45.675
+<v Paul Nash>which is the boxes and arrows and that
+within lines.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/38-0
+00:04:42.955 --> 00:04:43.115
+<v Greg Nash>Mm.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/41-0
+00:04:46.235 --> 00:04:50.162
+<v Paul Nash>But also they have messages going to
+these other,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/39-0
+00:04:46.715 --> 00:04:46.875
+<v Greg Nash>Mm.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/41-1
+00:04:50.162 --> 00:04:56.366
+<v Paul Nash>that's called a communication diagram.
+So there's four types of diagram in the</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/41-2
+00:04:56.366 --> 00:05:01.235
+<v Paul Nash>BPMN specification. Process diagrams,
+communication diagrams,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/41-3
+00:05:01.235 --> 00:05:03.355
+<v Paul Nash>I forget the other two, but</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/44-0
+00:05:05.515 --> 00:05:10.135
+<v Paul Nash>two others which I don't use, right?
+So when you're doing a BPMN diagram,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/42-0
+00:05:08.155 --> 00:05:08.715
+<v Greg Nash>Okay.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/44-1
+00:05:10.135 --> 00:05:14.192
+<v Paul Nash>it's actually a hybrid,
+but you've got to set it up so that they</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/44-2
+00:05:14.192 --> 00:05:17.938
+<v Paul Nash>are all... Anyway,
+I'm just doing a bit of background in my</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/44-3
+00:05:17.938 --> 00:05:21.496
+<v Paul Nash>thinking, okay?
+And the thing that I'd like to implement</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/43-0
+00:05:20.795 --> 00:05:20.955
+<v Greg Nash>Mm.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/44-4
+00:05:21.496 --> 00:05:24.555
+<v Paul Nash>eventually is layers.
+So you can show a diagram.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/49-0
+00:05:24.755 --> 00:05:29.041
+<v Paul Nash>And it's just the process.
+Then you show the next layer and it's all</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/45-0
+00:05:27.115 --> 00:05:27.275
+<v Greg Nash>Mm.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/49-1
+00:05:29.041 --> 00:05:33.575
+<v Paul Nash>the things it's communicating with.
+That's the communication part of the</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/49-2
+00:05:33.575 --> 00:05:38.296
+<v Paul Nash>diagram, if you like, all the messages.
+And then there's all the inputs and</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/46-0
+00:05:34.795 --> 00:05:35.035
+<v Greg Nash>Yeah.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/49-3
+00:05:38.296 --> 00:05:41.588
+<v Paul Nash>outputs, you know,
+they spring to life and you show,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/49-4
+00:05:41.588 --> 00:05:45.998
+<v Paul Nash>there's a task with its, you know,
+various inputs and various outputs.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/47-0
+00:05:43.595 --> 00:05:44.075
+<v Greg Nash>Yep.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/48-0
+00:05:45.235 --> 00:05:45.435
+<v Greg Nash>St.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/49-5
+00:05:45.998 --> 00:05:47.675
+<v Paul Nash>So you can highlight those.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/50-0
+00:05:47.995 --> 00:05:48.715
+<v Paul Nash>And...</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/53-0
+00:05:50.635 --> 00:05:56.326
+<v Paul Nash>And then the other thing is that most
+diagrammatic tools have the idea of when</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/53-1
+00:05:56.326 --> 00:06:01.728
+<v Paul Nash>you click on a, let's say, a task,
+it has an associated set of attributes,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/53-2
+00:06:01.728 --> 00:06:06.698
+<v Paul Nash>like how long does it take,
+and all the metadata associated with the</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/51-0
+00:06:04.075 --> 00:06:04.235
+<v Greg Nash>Mm.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/53-3
+00:06:06.698 --> 00:06:08.715
+<v Paul Nash>symbol. The only other thing</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/52-0
+00:06:07.275 --> 00:06:07.435
+<v Greg Nash>Mm.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/54-0
+00:06:08.875 --> 00:06:14.503
+<v Paul Nash>To just that I've thought about is
+everything you see is in a hierarchy,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/54-1
+00:06:14.503 --> 00:06:17.355
+<v Paul Nash>so you might see a symbol and it has.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/57-0
+00:06:18.475 --> 00:06:24.396
+<v Paul Nash>It could have three icons inside the
+symbol, like whether it's a manual task,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/57-1
+00:06:24.396 --> 00:06:27.812
+<v Paul Nash>whether it's a subtask,
+whether it's ad hoc.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/57-2
+00:06:27.812 --> 00:06:34.189
+<v Paul Nash>These are the symbols that can be within
+the rounded square rectangle, if you like,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/55-0
+00:06:32.475 --> 00:06:32.955
+<v Greg Nash>Mhm.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/57-3
+00:06:34.189 --> 00:06:39.275
+<v Paul Nash>so they're within, and the text is within,
+if you like, and the...</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/56-0
+00:06:39.995 --> 00:06:40.155
+<v Greg Nash>Mm.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/61-0
+00:06:40.235 --> 00:06:44.181
+<v Paul Nash>And then you've got where that sits,
+that could sit in a lane,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/61-1
+00:06:44.181 --> 00:06:49.003
+<v Paul Nash>and that lane could be part of a pool,
+and then that pool could be part of a</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/58-0
+00:06:48.235 --> 00:06:48.715
+<v Greg Nash>Mhm.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/61-2
+00:06:49.003 --> 00:06:52.072
+<v Paul Nash>diagram.
+So you've got diagram and then the high</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/61-3
+00:06:52.072 --> 00:06:55.705
+<v Paul Nash>level elements, and then,
+but some of these are optional.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/59-0
+00:06:54.555 --> 00:06:54.715
+<v Greg Nash>Mm.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/61-4
+00:06:55.705 --> 00:06:59.275
+<v Paul Nash>So for instance,
+you can have a diagram that just has...</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/60-0
+00:06:55.835 --> 00:06:55.955
+<v Greg Nash>Yeah.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/65-0
+00:06:59.435 --> 00:07:04.415
+<v Paul Nash>symbols with arrows and blah, blah, blah.
+There are no lanes, no pools, no,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/62-0
+00:07:03.035 --> 00:07:03.195
+<v Greg Nash>Mm.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/65-1
+00:07:04.415 --> 00:07:08.740
+<v Paul Nash>but you could also have them so they're
+in a hierarchy. Now also,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/63-0
+00:07:07.755 --> 00:07:07.915
+<v Greg Nash>Mm.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/65-2
+00:07:08.740 --> 00:07:13.785
+<v Paul Nash>there's what's called an expanded
+subprocess, which is like a giant squound,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/65-3
+00:07:13.785 --> 00:07:18.307
+<v Paul Nash>you know, rectangles, rounded corners,
+but there's things inside it,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/64-0
+00:07:15.835 --> 00:07:16.355
+<v Greg Nash>Mhm.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/66-0
+00:07:17.755 --> 00:07:24.235
+<v Greg Nash>Squound, that's a great. So, yeah,
+it's a visual term, a visual term.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/65-4
+00:07:18.307 --> 00:07:19.355
+<v Paul Nash>the old squound.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/70-0
+00:07:19.435 --> 00:07:22.817
+<v Paul Nash>Yeah,
+that's that's the that's the official,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/70-1
+00:07:22.817 --> 00:07:26.275
+<v Paul Nash>yeah,
+that's the thing I I well I that I used</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/67-0
+00:07:25.755 --> 00:07:26.155
+<v Greg Nash>Yeah.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/70-2
+00:07:26.275 --> 00:07:31.010
+<v Paul Nash>to call them right anyway,
+so it's a rounded rectangle anyway,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/68-0
+00:07:28.235 --> 00:07:28.475
+<v Greg Nash>Yeah.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/69-0
+00:07:30.715 --> 00:07:30.875
+<v Greg Nash>Mm.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/70-3
+00:07:31.010 --> 00:07:35.520
+<v Paul Nash>so you can have expand and so then it has
+things inside it,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/70-4
+00:07:35.520 --> 00:07:38.075
+<v Paul Nash>which is like a sub-process shown.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/72-0
+00:07:38.875 --> 00:07:42.231
+<v Paul Nash>And in BPMN,
+you've got this little square with a plus,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/72-1
+00:07:42.231 --> 00:07:45.048
+<v Paul Nash>and you can have,
+when it's actually expanded,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/72-2
+00:07:45.048 --> 00:07:49.124
+<v Paul Nash>a little square with a minus,
+and you click the minus and it ching,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/72-3
+00:07:49.124 --> 00:07:53.679
+<v Paul Nash>it shrinks back to the subprocess.
+And when you click the plus, it expands,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/71-0
+00:07:50.075 --> 00:07:50.235
+<v Greg Nash>Mm.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/72-4
+00:07:53.679 --> 00:07:57.515
+<v Paul Nash>it comes up over the top. Now,
+nobody implements that properly.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/74-0
+00:07:57.755 --> 00:08:00.861
+<v Paul Nash>right?
+What they do is they push all the symbols</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/73-0
+00:07:59.595 --> 00:07:59.755
+<v Greg Nash>Mm.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/74-1
+00:08:00.861 --> 00:08:03.841
+<v Paul Nash>aside,
+but what you should do is actually just</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/74-2
+00:08:03.841 --> 00:08:06.884
+<v Paul Nash>put it,
+everything should go into another layer</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/74-3
+00:08:06.884 --> 00:08:11.132
+<v Paul Nash>and the expanded process should come up
+like it's another diagram,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/74-4
+00:08:11.132 --> 00:08:14.555
+<v Paul Nash>which it is actually.
+It is actually another diagram.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/75-0
+00:08:12.195 --> 00:08:16.737
+<v Greg Nash>No, okay. So it's like a light box,
+if I use the web term,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/75-1
+00:08:16.737 --> 00:08:19.355
+<v Greg Nash>a light box being a popover, yeah.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/77-0
+00:08:17.755 --> 00:08:21.379
+<v Paul Nash>Yeah, that's right.
+The pop over and you get the layer effect.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/77-1
+00:08:21.379 --> 00:08:24.140
+<v Paul Nash>And that's,
+so that's another way that layering</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/77-2
+00:08:24.140 --> 00:08:28.512
+<v Paul Nash>should really be implemented. Now,
+that extension of being able to click on</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/77-3
+00:08:28.512 --> 00:08:33.172
+<v Paul Nash>the plus and click on the square with a
+minus in it is actually not described in</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/77-4
+00:08:33.172 --> 00:08:36.163
+<v Paul Nash>the BPMN standard.
+And there's a bit of discussion,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/77-5
+00:08:36.163 --> 00:08:40.075
+<v Paul Nash>there was a bit of discussion at times
+whether they should do that.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/76-0
+00:08:37.195 --> 00:08:37.355
+<v Greg Nash>Mm.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/80-0
+00:08:40.115 --> 00:08:43.582
+<v Paul Nash>or whether they shouldn't.
+They sort of had the idea, you know,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/80-1
+00:08:43.582 --> 00:08:46.886
+<v Paul Nash>had a little box with a plus in it.
+You sort of think, well,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/80-2
+00:08:46.886 --> 00:08:50.298
+<v Paul Nash>why not click on that so you can have a
+look at the, you know,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/78-0
+00:08:48.315 --> 00:08:48.475
+<v Greg Nash>Mm.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/80-3
+00:08:50.298 --> 00:08:53.548
+<v Paul Nash>what the process is?
+And they decided not necessarily, see,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/80-4
+00:08:53.548 --> 00:08:57.718
+<v Paul Nash>that's part of how the diagram works,
+which isn't what the standard's about,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/80-5
+00:08:57.718 --> 00:08:59.235
+<v Paul Nash>it's just about the symbols.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/83-0
+00:08:59.515 --> 00:09:02.376
+<v Paul Nash>you know.
+So A diagrammatic tool can do that.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/79-0
+00:09:00.555 --> 00:09:00.715
+<v Greg Nash>Mm.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/83-1
+00:09:02.376 --> 00:09:06.170
+<v Paul Nash>And there is one online tool that sort of
+attempts to do it,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/83-2
+00:09:06.170 --> 00:09:11.207
+<v Paul Nash>but what it does is it pushes everything
+out of the way and then brings them all</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/81-0
+00:09:10.315 --> 00:09:10.475
+<v Greg Nash>Mm.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/83-3
+00:09:11.207 --> 00:09:15.623
+<v Paul Nash>back in, you know, which is a bit silly,
+quite frankly, but, you know,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/82-0
+00:09:12.235 --> 00:09:14.995
+<v Greg Nash>Yeah, yeah, yeah, yeah, that's not good.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/83-4
+00:09:15.623 --> 00:09:18.235
+<v Paul Nash>it's sort of a good attempt at doing that.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/85-0
+00:09:18.635 --> 00:09:21.339
+<v Paul Nash>I used to use,
+I used to show people that when I was</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/85-1
+00:09:21.339 --> 00:09:24.655
+<v Paul Nash>training them in BPM and to show them
+different implementations,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/85-2
+00:09:24.655 --> 00:09:28.379
+<v Paul Nash>so they could sort of see, well,
+we might be using Enterprise Architect,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/85-3
+00:09:28.379 --> 00:09:31.645
+<v Paul Nash>but there are other things that do it a
+slightly different way,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/85-4
+00:09:31.645 --> 00:09:34.961
+<v Paul Nash>so they could sort of see, you know,
+other ways of doing things,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/85-5
+00:09:34.961 --> 00:09:39.144
+<v Paul Nash>but so that would be my venture aim to
+have this diagrammatic tool, and I think..</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/84-0
+00:09:35.915 --> 00:09:36.075
+<v Greg Nash>Mm.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/85-6
+00:09:39.144 --> 00:09:39.195
+<v Paul Nash>.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/89-0
+00:09:39.755 --> 00:09:42.513
+<v Paul Nash>Obviously, let's say we get to that,
+we call that,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/89-1
+00:09:42.513 --> 00:09:46.083
+<v Paul Nash>that's probably stage 4 or something,
+anyway, but we get to that,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/89-2
+00:09:46.083 --> 00:09:50.410
+<v Paul Nash>then you've got the whole idea of you
+subscribe and you've got users and you've</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/86-0
+00:09:46.315 --> 00:09:46.475
+<v Greg Nash>Mm.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/89-3
+00:09:50.410 --> 00:09:52.898
+<v Paul Nash>got an enterprise,
+like you as an enterprise,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/87-0
+00:09:52.635 --> 00:09:52.795
+<v Greg Nash>Mm.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/89-4
+00:09:52.898 --> 00:09:56.467
+<v Paul Nash>you've got all that layer,
+which I think once you've got the base</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/88-0
+00:09:54.395 --> 00:09:54.955
+<v Greg Nash>That's right.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/89-5
+00:09:56.467 --> 00:09:58.955
+<v Paul Nash>going, you then say to Claude, now I want.
+..</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/90-0
+00:10:04.315 --> 00:10:05.927
+<v Greg Nash>Yeah,
+you could add all that functionality.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/90-1
+00:10:05.927 --> 00:10:07.355
+<v Greg Nash>That won't be a problem, I don't think.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/91-0
+00:10:07.395 --> 00:10:11.007
+<v Paul Nash>Yeah, so, okay,
+so that's kind of what I'd love to do.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/91-1
+00:10:11.007 --> 00:10:14.028
+<v Paul Nash>And initially,
+when you get it to that state,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/91-2
+00:10:14.028 --> 00:10:18.298
+<v Paul Nash>you can sort of say to business analysts,
+hey, use this product,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/91-3
+00:10:18.298 --> 00:10:21.975
+<v Paul Nash>this is the best product for you to map
+your processes,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/91-4
+00:10:21.975 --> 00:10:25.456
+<v Paul Nash>and then just export them and put them in,
+you know,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/91-5
+00:10:25.456 --> 00:10:27.755
+<v Paul Nash>or have them available dynamically.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/92-0
+00:10:26.715 --> 00:10:30.315
+<v Greg Nash>whatever you need, yeah.
+So super efficient.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/94-0
+00:10:28.075 --> 00:10:31.784
+<v Paul Nash>Yeah, whatever you need.
+It'll help you do these things much</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/94-1
+00:10:31.784 --> 00:10:35.128
+<v Paul Nash>quicker. You know,
+another thing in Visio that takes a</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/94-2
+00:10:35.128 --> 00:10:39.201
+<v Paul Nash>shitload of time is if you move,
+if you move a symbol and it's got</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/94-3
+00:10:39.201 --> 00:10:42.059
+<v Paul Nash>messages, they all go diagonally.
+You're like,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/94-4
+00:10:42.059 --> 00:10:47.045
+<v Paul Nash>they're supposed to be like curtain rail.
+The messages are supposed to be like on</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/94-5
+00:10:47.045 --> 00:10:47.835
+<v Paul Nash>curtain rails</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/99-0
+00:10:48.035 --> 00:10:52.032
+<v Paul Nash>on the edge of the black box pool,
+so they just move along.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/99-1
+00:10:52.032 --> 00:10:56.163
+<v Paul Nash>When you move the symbol,
+they all move along like they're on</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/95-0
+00:10:53.355 --> 00:10:53.515
+<v Greg Nash>Mm.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/99-2
+00:10:56.163 --> 00:10:59.227
+<v Paul Nash>curtain rails up the top and down the
+bottom.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/96-0
+00:10:56.235 --> 00:10:56.395
+<v Greg Nash>Mm.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/99-3
+00:10:59.227 --> 00:11:04.623
+<v Paul Nash>That saves you a shitload of time if it
+does that. And Magic Draw UML does that,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/97-0
+00:10:59.755 --> 00:10:59.995
+<v Greg Nash>Mm.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/99-4
+00:11:04.623 --> 00:11:06.955
+<v Paul Nash>but it's 3000 a seat, right? But...</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/102-0
+00:11:07.035 --> 00:11:11.471
+<v Paul Nash>Vizio doesn't, and so you know,
+and like you move anything in Vizio,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/98-0
+00:11:07.115 --> 00:11:07.275
+<v Greg Nash>Mm.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/102-1
+00:11:11.471 --> 00:11:16.935
+<v Paul Nash>then the things reroute themselves around
+the pool, and then they're all a diagonal,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/102-2
+00:11:16.935 --> 00:11:21.692
+<v Paul Nash>and you have to manually realign them all.
+It's just absolutely horrible,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/100-0
+00:11:17.035 --> 00:11:19.075
+<v Greg Nash>Yeah, and it's horrible, yeah.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/102-3
+00:11:21.692 --> 00:11:26.835
+<v Paul Nash>and so that takes more time than doing
+the like the maintenance of the diagram.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/101-0
+00:11:25.915 --> 00:11:28.155
+<v Greg Nash>Then, if you were building the diagram,
+yeah.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/103-0
+00:11:28.075 --> 00:11:31.943
+<v Paul Nash>Yeah, so if you can get,
+my idea is to make it as easy to use.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/103-1
+00:11:31.943 --> 00:11:35.566
+<v Paul Nash>I know this is a,
+whether I ever get with or Robert to get</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/103-2
+00:11:35.566 --> 00:11:39.496
+<v Paul Nash>there, I don't know,
+but you make it as easy to use so you can,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/103-3
+00:11:39.496 --> 00:11:43.364
+<v Paul Nash>you know, move things out of the way,
+put stuff in the middle,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/103-4
+00:11:43.364 --> 00:11:47.355
+<v Paul Nash>everything just moves properly and you
+can do it really quickly.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/104-0
+00:11:47.515 --> 00:11:50.395
+<v Paul Nash>You know, if you try and do that in Visio.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/106-0
+00:11:48.235 --> 00:11:51.926
+<v Greg Nash>Yeah, yeah. So, Lucidchart,
+Lucidchart have an interesting</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/106-1
+00:11:51.926 --> 00:11:55.930
+<v Greg Nash>implementation of that.
+I don't know if you've played much with</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/105-0
+00:11:54.635 --> 00:11:56.235
+<v Paul Nash>No, no I haven't actually.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/106-2
+00:11:55.930 --> 00:11:58.870
+<v Greg Nash>Lucidchart with the with the diagrammatic.
+So,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/106-3
+00:11:58.870 --> 00:12:03.249
+<v Greg Nash>the way that they do it is they have they
+have an underlying grid of,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/106-4
+00:12:03.249 --> 00:12:07.315
+<v Greg Nash>and they they kind of display it as a
+series of like greyed out.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/111-0
+00:12:07.995 --> 00:12:11.752
+<v Greg Nash>layout symbols,
+and they're laid out in a grid,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/111-1
+00:12:11.752 --> 00:12:17.231
+<v Greg Nash>so they're standard areas apart. Now,
+if you click and drag a symbol,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/108-0
+00:12:14.395 --> 00:12:15.515
+<v Paul Nash>Alright, are you?</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/111-2
+00:12:17.231 --> 00:12:23.179
+<v Greg Nash>it actually snaps to that location,
+and then everything reroutes associated</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/109-0
+00:12:17.435 --> 00:12:17.755
+<v Paul Nash>Are you?</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/111-3
+00:12:23.179 --> 00:12:29.284
+<v Greg Nash>to that. So, I'll show you it later.
+It's an interesting way to kind of think</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/110-0
+00:12:25.075 --> 00:12:28.435
+<v Paul Nash>Okay, that's interesting, yeah, yeah,
+yeah.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/111-4
+00:12:29.284 --> 00:12:29.675
+<v Greg Nash>about</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/112-0
+00:12:30.315 --> 00:12:32.555
+<v Greg Nash>The things that do it, so, OK, so just...</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/114-0
+00:12:30.315 --> 00:12:33.693
+<v Paul Nash>Yeah,
+that would be more than possible because</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/114-1
+00:12:33.693 --> 00:12:37.934
+<v Paul Nash>you do want some,
+like the layout that you don't just want</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/113-0
+00:12:34.715 --> 00:12:34.875
+<v Greg Nash>Mm.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/114-2
+00:12:37.934 --> 00:12:43.828
+<v Paul Nash>them anywhere, which a lot of the tools,
+so for instance in Enterprise Architect,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/114-3
+00:12:43.828 --> 00:12:47.638
+<v Paul Nash>you take,
+you surround a set of symbols and you say,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/114-4
+00:12:47.638 --> 00:12:49.435
+<v Paul Nash>align these horizontally.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/117-0
+00:12:49.515 --> 00:12:54.810
+<v Paul Nash>And all the centres of them align and all
+the connectors line up, you know,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/115-0
+00:12:54.155 --> 00:12:54.435
+<v Greg Nash>Yeah.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/117-1
+00:12:54.810 --> 00:13:00.593
+<v Paul Nash>so it has a way of regularising it after
+you put them wherever you like, you know,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/116-0
+00:12:58.795 --> 00:13:00.475
+<v Greg Nash>Yeah, OK.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/117-2
+00:13:00.593 --> 00:13:05.958
+<v Paul Nash>but yeah, anyway, so all these things are,
+if I had a code base that I could</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/117-3
+00:13:05.958 --> 00:13:08.675
+<v Paul Nash>gradually interact by Claude code with.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/118-0
+00:13:09.035 --> 00:13:13.649
+<v Paul Nash>and I have all the presentation layers
+sorted and blah, blah, blah.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/118-1
+00:13:13.649 --> 00:13:19.144
+<v Paul Nash>Then now I have done the very simplest of
+things and have an HTML site that does</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/118-2
+00:13:19.144 --> 00:13:23.486
+<v Paul Nash>have a BPMN diagram.
+It allows you to put a BPMN diagram on it,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/118-3
+00:13:23.486 --> 00:13:26.539
+<v Paul Nash>but it's pretty,
+I realised when I did that,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/118-4
+00:13:26.539 --> 00:13:28.235
+<v Paul Nash>it's using what's called.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/122-0
+00:13:28.555 --> 00:13:32.260
+<v Paul Nash>bmckennamicrosoftcom,
+the JavaScript library. And yeah,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/119-0
+00:13:31.115 --> 00:13:34.075
+<v Greg Nash>Oh, okay, the JavaScript. Yeah, yeah,
+it's probably not good enough.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/122-1
+00:13:32.260 --> 00:13:37.685
+<v Paul Nash>and it's just not, it's not good enough.
+And I need minute control because I want</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/120-0
+00:13:36.555 --> 00:13:36.715
+<v Greg Nash>Mm.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/122-2
+00:13:37.685 --> 00:13:40.993
+<v Paul Nash>to be able to have a different font for
+the head.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/122-3
+00:13:40.993 --> 00:13:45.360
+<v Paul Nash>I want a size of font for things is very
+important in the layout,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/121-0
+00:13:44.875 --> 00:13:45.035
+<v Greg Nash>Mm.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/122-4
+00:13:45.360 --> 00:13:47.675
+<v Paul Nash>like the size of font for comments.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/123-0
+00:13:48.395 --> 00:13:53.723
+<v Paul Nash>And also for the things attached to
+gateways, you know, like, for instance,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/123-1
+00:13:53.723 --> 00:13:57.229
+<v Paul Nash>in Visio, if you've got a big sentence,
+you know,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/123-2
+00:13:57.229 --> 00:14:03.118
+<v Paul Nash>do you want to describe what the gateway
+is? If it's too big, you don't see it all.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/123-3
+00:14:03.118 --> 00:14:07.395
+<v Paul Nash>You have to expand the symbol because the
+comments are sized</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/127-0
+00:14:07.475 --> 00:14:12.321
+<v Paul Nash>depending on the size of the diamond,
+you know, and all that, that's just silly,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/124-0
+00:14:10.555 --> 00:14:12.595
+<v Greg Nash>Yeah, yeah, yeah.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/127-1
+00:14:12.321 --> 00:14:15.910
+<v Paul Nash>you know, like, so it's,
+so you need all those independent.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/125-0
+00:14:14.155 --> 00:14:14.475
+<v Greg Nash>Yeah.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/127-2
+00:14:15.910 --> 00:14:19.380
+<v Paul Nash>So anyway, okay,
+so what have I thought of? So I thought,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/127-3
+00:14:19.380 --> 00:14:22.551
+<v Paul Nash>I know that I need quite a complex model
+underneath,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/127-4
+00:14:22.551 --> 00:14:26.499
+<v Paul Nash>it's like a configuration model for the
+diagram, like what fonts,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/127-5
+00:14:26.499 --> 00:14:27.995
+<v Paul Nash>how many fonts are there?</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/128-0
+00:14:28.315 --> 00:14:34.983
+<v Paul Nash>you know, what colour scheme, you know,
+there needs to be configuration stuff and</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/126-0
+00:14:28.955 --> 00:14:29.435
+<v Greg Nash>Mhm.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/128-1
+00:14:34.983 --> 00:14:41.488
+<v Paul Nash>also sizing stuff like, so I can say,
+here's the basic size of the main symbol,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/128-2
+00:14:41.488 --> 00:14:45.472
+<v Paul Nash>which is a task really,
+I guess the main symbol.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/128-3
+00:14:45.472 --> 00:14:48.155
+<v Paul Nash>And then the gateways need to be.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/130-0
+00:14:48.315 --> 00:14:52.186
+<v Paul Nash>approximately 1/3 the height of the,
+they need to be,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/130-1
+00:14:52.186 --> 00:14:57.492
+<v Paul Nash>and I need to be able to vary that,
+the size of a diamond compared to the</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/130-2
+00:14:57.492 --> 00:15:01.937
+<v Paul Nash>standard size of a rector,
+so that I can make everything look</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/129-0
+00:15:00.635 --> 00:15:00.875
+<v Greg Nash>Yeah.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/130-3
+00:15:01.937 --> 00:15:06.955
+<v Paul Nash>reasonable. In some implementations,
+they are the same size and it...</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/131-0
+00:15:06.955 --> 00:15:10.555
+<v Greg Nash>Yeah, yeah, they like that in Lucidchart,
+and it's annoying, yeah.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/134-0
+00:15:07.195 --> 00:15:10.944
+<v Paul Nash>for instance, Savaglio is a bit like that.
+Yeah, it's annoying.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/134-1
+00:15:10.944 --> 00:15:14.869
+<v Paul Nash>They shouldn't be that size.
+And they're the sort of things that I</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/134-2
+00:15:14.869 --> 00:15:19.087
+<v Paul Nash>think can make the diagram much more,
+you know, understandable. Anyway,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/134-3
+00:15:19.087 --> 00:15:22.602
+<v Paul Nash>so other than that,
+there's probably that the whole idea of</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/132-0
+00:15:21.595 --> 00:15:21.755
+<v Greg Nash>Mm.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/134-4
+00:15:22.602 --> 00:15:26.995
+<v Paul Nash>being able to drag and drop symbols is
+probably what you want. You want to</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/136-0
+00:15:27.355 --> 00:15:31.598
+<v Paul Nash>want a palette. But, you know, okay,
+so that's where we're heading.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/133-0
+00:15:29.195 --> 00:15:29.675
+<v Greg Nash>Mhm.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/136-1
+00:15:31.598 --> 00:15:34.905
+<v Paul Nash>What I was thinking was,
+if we were just setting up,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/136-2
+00:15:34.905 --> 00:15:37.837
+<v Paul Nash>if we just said,
+let's set it up so we do this</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/136-3
+00:15:37.837 --> 00:15:41.581
+<v Paul Nash>unbelievably simple,
+just has squares with text and connect</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/136-4
+00:15:41.581 --> 00:15:44.950
+<v Paul Nash>and arrows.
+That's all it allows you to do, you know,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/136-5
+00:15:44.950 --> 00:15:46.635
+<v Paul Nash>like something very simple.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/135-0
+00:15:45.835 --> 00:15:46.315
+<v Greg Nash>Mhm.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/140-0
+00:15:46.875 --> 00:15:50.755
+<v Paul Nash>Or even just boxes with text in them.
+In other words,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/140-1
+00:15:50.755 --> 00:15:56.072
+<v Paul Nash>just a very simple diagram type.
+This will be a test diagram type will be</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/140-2
+00:15:56.072 --> 00:16:01.173
+<v Paul Nash>the first diagram type will do.
+And get that all working end to end so</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/137-0
+00:15:58.315 --> 00:15:58.475
+<v Greg Nash>Mm.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/138-0
+00:15:59.835 --> 00:16:00.155
+<v Greg Nash>Yeah.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/140-3
+00:16:01.173 --> 00:16:05.915
+<v Paul Nash>that you can create them,
+you can edit them and blah, blah, blah.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/139-0
+00:16:04.155 --> 00:16:04.635
+<v Greg Nash>Mhm.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/143-0
+00:16:06.115 --> 00:16:08.796
+<v Paul Nash>There's nothing that complicated in the
+diagram.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/143-1
+00:16:08.796 --> 00:16:11.477
+<v Paul Nash>We're not that worried about what it
+looks like,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/143-2
+00:16:11.477 --> 00:16:15.636
+<v Paul Nash>but it is a diagram that we're able to
+reproduce, you know, like redisplay,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/143-3
+00:16:15.636 --> 00:16:20.232
+<v Paul Nash>and then we can start fiddling with that,
+add more, you know, like say, okay, well,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/141-0
+00:16:15.675 --> 00:16:16.075
+<v Greg Nash>Yep.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/143-4
+00:16:20.232 --> 00:16:24.555
+<v Paul Nash>now the next diagram type has actually
+got more symbols. It has a, you know...</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/145-0
+00:16:25.035 --> 00:16:28.815
+<v Paul Nash>I can start mucking about with it.
+So that's what I'm thinking. Anyway,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/142-0
+00:16:25.115 --> 00:16:25.515
+<v Greg Nash>Yeah.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/144-0
+00:16:28.395 --> 00:16:28.795
+<v Greg Nash>Okay.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/145-1
+00:16:28.815 --> 00:16:30.075
+<v Paul Nash>that's it in a nutshell.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/146-0
+00:16:31.035 --> 00:16:31.995
+<v Greg Nash>And so...</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/147-0
+00:16:33.195 --> 00:16:38.555
+<v Greg Nash>For the for that MVP diagram.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/148-0
+00:16:40.475 --> 00:16:41.115
+<v Greg Nash>Um...</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/149-0
+00:16:43.915 --> 00:16:45.195
+<v Paul Nash>MVib, sorry.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/151-0
+00:16:45.435 --> 00:16:48.315
+<v Greg Nash>Yeah,
+so you'll be your very first of the MVP</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/151-1
+00:16:48.315 --> 00:16:53.136
+<v Greg Nash>being that very simple diagram, right?
+The minimum viable product. So, yeah,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/150-0
+00:16:51.275 --> 00:16:53.675
+<v Paul Nash>Oh, I see, yeah, yeah, yeah, yeah, okay,
+yeah, yeah.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/151-2
+00:16:53.136 --> 00:16:54.075
+<v Greg Nash>yeah, yeah, so.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/152-0
+00:16:55.275 --> 00:16:55.755
+<v Greg Nash>Um...</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/155-0
+00:16:58.955 --> 00:17:02.958
+<v Greg Nash>So is the, so let's, you know,
+let's talk about the MVP.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/153-0
+00:16:59.035 --> 00:17:01.595
+<v Paul Nash>I want to be drawing that from scratch,
+though.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/155-1
+00:17:02.958 --> 00:17:07.523
+<v Greg Nash>So is the MVP for this,
+for this product then user logs into the</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/155-2
+00:17:07.523 --> 00:17:12.298
+<v Greg Nash>service, they're able to,
+they say create new diagram of type basic</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/155-3
+00:17:12.298 --> 00:17:14.475
+<v Greg Nash>or whatever this thing we call.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/154-0
+00:17:13.915 --> 00:17:15.355
+<v Paul Nash>Yep, yep.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/156-0
+00:17:15.595 --> 00:17:19.302
+<v Greg Nash>Then that that expand that that then
+expands out the diagram. Now,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/156-1
+00:17:19.302 --> 00:17:21.515
+<v Greg Nash>what's the experience for actually like?</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/157-0
+00:17:22.395 --> 00:17:26.203
+<v Greg Nash>Creating the the like,
+are you is it are we having an agentic</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/157-1
+00:17:26.203 --> 00:17:29.274
+<v Greg Nash>experience where it's asking them
+questions, hey,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/157-2
+00:17:29.274 --> 00:17:33.267
+<v Greg Nash>upload your process or or what's the
+first step in your process?</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/157-3
+00:17:33.267 --> 00:17:37.075
+<v Greg Nash>How are you kind of envisaging the thing
+being created? Yeah.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/158-0
+00:17:34.795 --> 00:17:38.431
+<v Paul Nash>Oh, okay. Okay, the whole interaction.
+Okay. Well,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/158-1
+00:17:38.431 --> 00:17:44.276
+<v Paul Nash>I was envisaging that it's an interactive
+diagrammatic tool that you do yourself,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/158-2
+00:17:44.276 --> 00:17:48.767
+<v Paul Nash>but I think that may be old thinking,
+quite frankly. You know,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/158-3
+00:17:48.767 --> 00:17:53.115
+<v Paul Nash>that at least the first draught of it
+needs to be generated.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/159-0
+00:17:53.995 --> 00:17:57.195
+<v Paul Nash>But unless I can manually create it...</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/161-0
+00:17:56.235 --> 00:17:59.648
+<v Greg Nash>But then you need to be able to
+manipulate each piece after it,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/160-0
+00:17:58.795 --> 00:17:59.475
+<v Paul Nash>Yeah.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/161-1
+00:17:59.648 --> 00:18:01.195
+<v Greg Nash>after the initial generation.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/163-0
+00:18:01.355 --> 00:18:05.257
+<v Paul Nash>Yeah, I think, though,
+an agentic approach,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/163-1
+00:18:05.257 --> 00:18:11.908
+<v Paul Nash>if you know how hard it is to get any
+kind of diagram with current agentic</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/162-0
+00:18:10.155 --> 00:18:10.315
+<v Greg Nash>Mm.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/163-2
+00:18:11.908 --> 00:18:17.406
+<v Paul Nash>approaches or whatever,
+but if you could do that, by the way,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/163-3
+00:18:17.406 --> 00:18:20.155
+<v Paul Nash>what's the word, not lucid, BP?</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/167-0
+00:18:21.035 --> 00:18:24.363
+<v Paul Nash>You know, the, you know,
+years ago we had this,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/167-1
+00:18:24.363 --> 00:18:29.702
+<v Paul Nash>we were going to be a partner with some
+kind of BPMN diagramming tool. Yeah,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/164-0
+00:18:27.915 --> 00:18:32.307
+<v Greg Nash>Oh yeah, yeah, yeah, yeah.
+I paid the money, I think. Prime.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/167-2
+00:18:29.702 --> 00:18:33.307
+<v Paul Nash>I forget what Prime Prime, but yeah,
+Prime, we pay,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/164-1
+00:18:32.307 --> 00:18:34.395
+<v Greg Nash>I paid them some money, yeah.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/167-3
+00:18:33.307 --> 00:18:37.675
+<v Paul Nash>you pay good money for this,
+you know what I mean? Yeah, yeah.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/165-0
+00:18:36.635 --> 00:18:37.035
+<v Greg Nash>Yeah.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/166-0
+00:18:38.155 --> 00:18:38.395
+<v Greg Nash>Yeah.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/172-0
+00:18:39.755 --> 00:18:44.195
+<v Paul Nash>And used to, you know,
+curse under your breath every time you</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/172-1
+00:18:44.195 --> 00:18:48.921
+<v Paul Nash>thought of it, but the, the, you know,
+bloody dad and his bloody,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/168-0
+00:18:44.635 --> 00:18:44.875
+<v Greg Nash>Yeah.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/169-0
+00:18:48.075 --> 00:18:51.355
+<v Greg Nash>Yeah, bloody 2 charlatan friends that he.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/172-2
+00:18:48.921 --> 00:18:53.933
+<v Paul Nash>bloody baby cost a *******,
+got a cost a ******* thought. Anyway, so,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/172-3
+00:18:53.933 --> 00:18:58.301
+<v Paul Nash>yeah, well, anyway,
+one of the jobs I went for that I got an</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/170-0
+00:18:54.315 --> 00:18:54.715
+<v Greg Nash>Nash.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/172-4
+00:18:58.301 --> 00:19:01.595
+<v Paul Nash>interview for, I forget who that was now,
+but</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/171-0
+00:19:01.035 --> 00:19:02.235
+<v Greg Nash>They used Prime, did they?</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/176-0
+00:19:02.635 --> 00:19:07.225
+<v Paul Nash>They use Prime. You know, unfortunately,
+the guy representing, you know, like me,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/173-0
+00:19:04.795 --> 00:19:05.555
+<v Greg Nash>Yeah, yeah.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/176-1
+00:19:07.225 --> 00:19:10.416
+<v Paul Nash>had told me, oh, bone up on Signavio,
+they use Signavio.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/176-2
+00:19:10.416 --> 00:19:14.950
+<v Paul Nash>So I get into the interview and say, oh,
+I believe you use Signavio. Oh, no, no,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/176-3
+00:19:14.950 --> 00:19:17.917
+<v Paul Nash>no, we don't. We use Prime.
+And I'm thinking, Prime,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/176-4
+00:19:17.917 --> 00:19:20.604
+<v Paul Nash>I've heard of that.
+And if I'd been pre-warned,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/174-0
+00:19:20.475 --> 00:19:20.635
+<v Greg Nash>Mm.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/176-5
+00:19:20.604 --> 00:19:22.395
+<v Paul Nash>I could have looked up my stuff.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/178-0
+00:19:23.035 --> 00:19:29.110
+<v Paul Nash>that we did with them. Yeah, but anyway,
+that was a bit unfortunate. Okay, yeah,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/175-0
+00:19:23.195 --> 00:19:24.155
+<v Greg Nash>Yeah, yeah.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/177-0
+00:19:26.075 --> 00:19:26.875
+<v Greg Nash>No, it doesn't matter.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/178-1
+00:19:29.110 --> 00:19:30.235
+<v Paul Nash>so Prime, what?</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/180-0
+00:19:29.435 --> 00:19:33.067
+<v Greg Nash>All right, okay, so that, okay,
+so we have a bit of a project brief.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/180-1
+00:19:33.067 --> 00:19:36.173
+<v Greg Nash>So the audience,
+let's just quickly round out some project</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/179-0
+00:19:33.355 --> 00:19:33.755
+<v Paul Nash>Yeah.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/180-2
+00:19:36.173 --> 00:19:38.857
+<v Greg Nash>brief stuff.
+So the audience is obviously business</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/180-3
+00:19:38.857 --> 00:19:41.278
+<v Greg Nash>analysts.
+These are people who are looking to</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/180-4
+00:19:41.278 --> 00:19:44.384
+<v Greg Nash>create their own processes.
+We're creating a process tool,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/180-5
+00:19:44.384 --> 00:19:47.858
+<v Greg Nash>a process mapping tool to help them do
+that significantly better,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/180-6
+00:19:47.858 --> 00:19:49.595
+<v Greg Nash>adhering to all of the standards.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/181-0
+00:19:50.235 --> 00:19:53.919
+<v Greg Nash>You know,
+based on your expertise in that thing, OK,</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/182-0
+00:19:51.515 --> 00:19:55.875
+<v Paul Nash>Yeah, yeah, yeah, yeah,
+that's it in a nutshell, yeah.</v>
+
+43c96ac8-0522-49b2-9791-6b9f6709f380/181-1
+00:19:53.919 --> 00:19:54.475
+<v Greg Nash>alright.</v>

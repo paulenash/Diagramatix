@@ -1,0 +1,3835 @@
+Claude’s Plan
+Diagramatix — Implementation Plan
+Context
+Paul Nash and Greg Nash (conversation in Product Creation using Claude.vtt) want to build Diagramatix, a web-based process diagramming tool aimed at business analysts. It is positioned as a smarter, cheaper alternative to Visio, Magic Draw UML, Enterprise Architect, and Lucidchart. The product focuses on superior connector routing, proper BPMN standards compliance, and configurability. This is a greenfield project — no code exists yet.
+
+Technology Stack
+Layer	Technology
+Framework	Next.js 15 (App Router) + TypeScript
+Styling	Tailwind CSS + shadcn/ui
+Diagram Canvas	SVG (rendered inside React, event-driven)
+Database	PostgreSQL + Prisma ORM
+Auth	Auth.js v5 (credentials / email+password)
+Deployment	Vercel (or any Node host)
+Phased Implementation
+Stage 1 — MVP: Basic Diagram (Boxes + Arrows)
+Goal: End-to-end create/edit/save/view flow with the simplest diagram type.
+
+1.1 Project Bootstrap
+npx create-next-app@latest diagramatix --typescript --tailwind --app
+Install dependencies: prisma, @prisma/client, next-auth, bcryptjs, @auth/prisma-adapter
+Install UI: shadcn-ui init, core components (Button, Input, Dialog, Card)
+Configure eslint, prettier
+1.2 Database Schema (prisma/schema.prisma)
+
+model User {
+  id        String    @id @default(cuid())
+  email     String    @unique
+  name      String?
+  password  String
+  diagrams  Diagram[]
+  createdAt DateTime  @default(now())
+}
+
+model Diagram {
+  id        String   @id @default(cuid())
+  name      String
+  type      String   // "basic" | "process-context" | "state-machine" | "bpmn"
+  data      Json     // diagram content (elements + connectors)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+1.3 Auth (email + password)
+src/auth.ts — Auth.js config with Prisma adapter + CredentialsProvider
+src/app/(auth)/login/page.tsx — login form
+src/app/(auth)/register/page.tsx — registration form
+src/middleware.ts — protect /dashboard and /diagram routes
+1.4 Dashboard
+src/app/(dashboard)/dashboard/page.tsx
+Lists user's diagrams (cards with name, type, last edited)
+"New Diagram" button → dialog to choose type + enter name
+Redirects to /diagram/[id] on create
+1.5 Core Diagram Data Model (src/lib/diagram/types.ts)
+
+interface DiagramData {
+  elements: DiagramElement[]
+  connectors: Connector[]
+  viewport: Viewport
+}
+
+interface DiagramElement {
+  id: string
+  type: SymbolType           // "task" | "gateway" | "event" | "pool" | "lane" | ...
+  x: number
+  y: number
+  width: number
+  height: number
+  label: string
+  properties: Record<string, unknown>
+  parentId?: string          // for pool/lane containment
+}
+
+interface Connector {
+  id: string
+  sourceId: string
+  targetId: string
+  type: ConnectorType        // "sequence" | "message" | "association"
+  waypoints: Point[]         // computed routing points
+  label?: string
+}
+
+interface Point { x: number; y: number }
+interface Viewport { x: number; y: number; zoom: number }
+1.6 Diagram Editor Page (src/app/(dashboard)/diagram/[id]/page.tsx)
+Layout: three-column
+
+Left panel: Symbol palette (drag sources)
+Center: SVG canvas
+Right panel: Properties panel (selected element)
+1.7 SVG Canvas Engine (src/components/canvas/)
+Key files:
+
+Canvas.tsx — root SVG element, handles pan/zoom, drop target
+SymbolRenderer.tsx — renders each element type as SVG shapes
+ConnectorRenderer.tsx — renders connectors as SVG <path> elements
+SelectionBox.tsx — dashed selection outline
+DragHandle.tsx — resize handles on selected elements
+Interaction model:
+
+Pan: mouse drag on empty canvas
+Zoom: scroll wheel → transform viewBox
+Select: click element → show properties panel
+Move: drag selected element → update x/y → reroute connected connectors
+Create element: drag from palette → drop on canvas
+Create connector: hover over element → click connection point → drag to target
+Edit label: double-click element → inline text input
+1.8 Connector Routing (src/lib/diagram/routing.ts)
+MVP: orthogonal routing (right-angle paths)
+
+Input: source element bounds, target element bounds, all other element bounds
+Output: array of Point[] waypoints
+Algorithm: Manhattan routing with obstacle avoidance
+Two routing modes:
+Sequence (type: "sequence"): route around all elements (never pass through)
+Message (type: "message"): straight line, ignores obstacles (dashed)
+On element move: recompute waypoints for all connected connectors
+1.9 Symbol Palette (src/components/canvas/Palette.tsx)
+MVP symbols (Basic diagram type):
+
+Rectangle (Task)
+Arrow connector
+Palette renders draggable items. On drop to canvas: canvas.createElement(type, dropPosition).
+
+1.10 Persistence API (src/app/api/diagrams/)
+GET /api/diagrams — list user's diagrams
+POST /api/diagrams — create new diagram
+GET /api/diagrams/[id] — load diagram data
+PUT /api/diagrams/[id] — save diagram data (auto-save on edit, debounced 1s)
+DELETE /api/diagrams/[id] — delete diagram
+1.11 Export (basic)
+SVG export: serialize the SVG DOM node to string → download as .svg
+Stage 2 — Process Context Diagram
+Adds: Use case ellipses, Actor stick figures, containment groups
+
+New symbol types: UseCase (ellipse), Actor (stick figure SVG), ProcessGroup (rectangle container)
+Connection points on ellipse edge (true geometric edge, not bounding box)
+Ellipse edge calculation: x = cx + rx*cos(θ), y = cy + ry*sin(θ) where θ is angle toward target
+Symbol palette updated to show Process Context symbols
+Stage 3 — State Machine Diagram
+Adds: State boxes, transitions with guard labels, initial/final state markers
+
+New symbol types: State, InitialState (filled circle), FinalState (bullseye)
+Transition connectors with guard condition labels
+Transition label editing (appears along connector midpoint)
+Stage 4 — Full BPMN
+Adds: Events, Gateways, Pools, Lanes, Sub-processes, Message Flows
+
+Full symbol library (~27 commonly-used BPMN symbols)
+Pool/Lane containment model (elements belong to lanes, lanes belong to pools)
+Curtain rail message routing: messages travel along pool edges, not diagonally
+Sub-process expand/collapse: popover/lightbox overlay (not push-aside)
+Multiple icon overlays within task symbols (manual task, sub-task, ad-hoc markers)
+Configurable symbol palette per diagram type
+Independent typography control (font size per element type via diagram config)
+Stage 5 — Enterprise Features
+Multi-tenant organizations (Organization model, invite system)
+Subscription tiers (Stripe integration)
+Sharing & collaboration (read-only share links)
+Comment threads on diagram elements
+Version history
+File Structure
+
+diagramatix/
+├── prisma/
+│   └── schema.prisma
+├── src/
+│   ├── app/
+│   │   ├── (auth)/
+│   │   │   ├── login/page.tsx
+│   │   │   └── register/page.tsx
+│   │   ├── (dashboard)/
+│   │   │   ├── dashboard/page.tsx
+│   │   │   └── diagram/[id]/page.tsx
+│   │   └── api/
+│   │       └── diagrams/
+│   │           ├── route.ts         (GET list, POST create)
+│   │           └── [id]/route.ts    (GET, PUT, DELETE)
+│   ├── auth.ts                      (Auth.js config)
+│   ├── middleware.ts                 (route protection)
+│   ├── components/
+│   │   ├── canvas/
+│   │   │   ├── Canvas.tsx
+│   │   │   ├── SymbolRenderer.tsx
+│   │   │   ├── ConnectorRenderer.tsx
+│   │   │   ├── Palette.tsx
+│   │   │   └── PropertiesPanel.tsx
+│   │   └── ui/                      (shadcn components)
+│   ├── lib/
+│   │   ├── diagram/
+│   │   │   ├── types.ts
+│   │   │   ├── routing.ts
+│   │   │   └── symbols/
+│   │   │       └── definitions.ts   (symbol shape configs)
+│   │   ├── db.ts                    (Prisma client singleton)
+│   │   └── utils.ts
+│   └── hooks/
+│       ├── useDiagram.ts            (diagram state management)
+│       └── useCanvas.ts             (pan/zoom/interaction state)
+└── package.json
+Key Design Decisions
+Diagram data stored as JSON in the Diagram.data field — avoids complex relational queries for the diagram graph; entire diagram loads in one query.
+Client-side state managed with useReducer + Context (no extra state library for MVP) — keeps the canvas rendering fast and avoids over-engineering.
+Connector routing is pure functional (routing.ts) — given element positions and bounds, deterministically returns waypoints. Makes it easy to test and iterate.
+SVG over Canvas — React renders SVG elements directly into the DOM, so drag/click event handling is per-element and idiomatic. No custom hit-testing needed.
+No existing BPMN libraries (as explicitly rejected in the design discussion) — full custom implementation for maximum control over rendering and routing behavior.
+Verification / Testing Plan
+Auth flow: Register → login → protected dashboard accessible → logout → redirect to login
+Create diagram: Dashboard → "New Diagram" → select "Basic" type → enter name → redirected to editor
+Add elements: Drag rectangle from palette → drops on canvas at cursor position
+Move elements: Click element → drag → element moves, canvas re-renders
+Connect elements: Hover element → click connection point → drag to second element → connector appears with orthogonal routing
+Label editing: Double-click element → type label → click away → label saved
+Persist: Refresh page → diagram loads with same elements, positions, connectors
+Export: Click Export SVG → .svg file downloads with current diagram contents
+
+The plan is approved. Let me start building Stage 1 — the MVP.
+
+Update Todos
+
+Bootstrap Next.js project with TypeScript, Tailwind, and dependencies
+
+Set up Prisma schema and database models
+
+Implement Auth.js with email/password credentials
+
+Build login and register pages
+
+Build dashboard page with diagram list and create flow
+
+Define core diagram TypeScript types
+
+Build SVG Canvas engine (Canvas, SymbolRenderer, ConnectorRenderer)
+
+Build Symbol Palette with drag-to-canvas
+
+Implement connector routing algorithm
+
+Build diagram API routes (CRUD)
+
+Build Properties Panel and label editing
+
+Implement SVG export
+Bash Create Next.js 15 app with TypeScript and Tailwind
+IN
+cd /c/Git/Diagramatix && npx create-next-app@latest diagramatix --typescript --tailwind --app --no-src-dir --no-eslint --no-import-alias 2>&1
+
+OUT
+Exit code 127
+/usr/bin/bash: line 1: npx: command not found
+
+/usr/bin/bash: line 1: npx: command not found
+Bash Check for Node.js installation
+IN
+which node || which npm || where node 2>/dev/null || echo "Node not found in path"
+
+OUT
+which: no node in (/mingw64/bin:/usr/bin:/c/Users/paul/bin:/c/WINDOWS/system32:/c/WINDOWS:/c/WINDOWS/System32/Wbem:/c/WINDOWS/System32/WindowsPowerShell/v1.0:/c/WINDOWS/System32/OpenSSH:/c/Program Files/dotnet:/c/Program Files (x86)/Common Files/Propellerhead Software/ReWire:/c/Program Files/Common Files/Propellerhead Software/ReWire:/c/Program Files (x86)/Microsoft SQL Server/160/DTS/Binn:/c/Program Files (x86)/Microsoft SQL Server/160/Tools/Binn:/c/Program Files/Microsoft SQL Server/160/Tools/Binn:/c/Program Files/Microsoft SQL Server/Client SDK/ODBC/170/Tools/Binn:/c/Program Files/Microsoft SQL Server/160/DTS/Binn:/cmd:/c/Users/paul/AppData/Local/Microsoft/WindowsApps:/c/Users/paul/AppData/Local/Programs/Microsoft VS Code/bin)
+which: no npm in (/mingw64/bin:/usr/bin:/c/Users/paul/bin:/c/WINDOWS/system32:/c/WINDOWS:/c/WINDOWS/System32/Wbem:/c/WINDOWS/System32/WindowsPowerShell/v1.0:/c/WINDOWS/System32/OpenSSH:/c/Program Files/dotnet:/c/Program Files (x86)/Common Files/Propellerhead Software/ReWire:/c/Program Files/Common Files/Propellerhead Software/ReWire:/c/Program Files (x86)/Microsoft SQL Server/160/DTS/Binn:/c/Program Files (x86)/Microsoft SQL Server/160/Tools/Binn:/c/Program Files/Microsoft SQL Server/160/Tools/Binn:/c/Program Files/Microsoft SQL Server/Client SDK/ODBC/170/Tools/Binn:/c/Program Files/Microsoft SQL Server/160/DTS/Binn:/cmd:/c/Users/paul/AppData/Local/Microsoft/WindowsApps:/c/Users/paul/AppData/Local/Programs/Microsoft VS Code/bin)
+Node not found in path
+Bash Look for Node.js in common Windows install paths
+IN
+ls /c/Program\ Files/nodejs/ 2>/dev/null || ls /c/Program\ Files\ \(x86\)/nodejs/ 2>/dev/null || ls /c/Users/paul/AppData/Roaming/nvm/ 2>/dev/null || echo "Not found in common locations"
+
+OUT
+Not found in common locations
+Bash Check Node.js via cmd where command
+IN
+cmd /c "where node 2>&1" && cmd /c "where npm 2>&1" && cmd /c "node --version 2>&1"
+
+OUT
+Command running in background with ID: bvflqh1tq. Output is being written to: C:\Users\paul\AppData\Local\Temp\claude\c--Git-Diagramatix\tasks\bvflqh1tq.output
+TaskOutput task: "bvflqh1tq"
+OUT
+<retrieval_status>timeout</retrieval_status>
+
+<task_id>bvflqh1tq</task_id>
+
+<task_type>local_bash</task_type>
+
+<status>running</status>
+
+<output>
+Microsoft Windows [Version 10.0.26200.7922]
+(c) Microsoft Corporation. All rights reserved.
+
+C:\Git\Diagramatix>
+</output>
+TaskStop
+IN
+{
+  "task_id": "bvflqh1tq"
+}
+OUT
+{"message":"Successfully stopped task: bvflqh1tq (cmd /c \"where node 2>&1\" && cmd /c \"where npm 2>&1\" && cmd /c \"node --version 2>&1\")","task_id":"bvflqh1tq","task_type":"local_bash","command":"cmd /c \"where node 2>&1\" && cmd /c \"where npm 2>&1\" && cmd /c \"node --version 2>&1\""}
+Bash Search for node.exe on the system
+IN
+ls /c/Users/paul/AppData/Local/nvs/ 2>/dev/null; ls /c/nvm/ 2>/dev/null; ls /c/nodejs/ 2>/dev/null; find /c/Users/paul -name "node.exe" 2>/dev/null | head -5; find /c/Program\ Files -name "node.exe" 2>/dev/null | head -5
+
+OUT
+Command running in background with ID: b1fn1uxxf. Output is being written to: C:\Users\paul\AppData\Local\Temp\claude\c--Git-Diagramatix\tasks\b1fn1uxxf.output
+TaskOutput task: "b1fn1uxxf"
+OUT
+<retrieval_status>timeout</retrieval_status>
+
+<task_id>b1fn1uxxf</task_id>
+
+<task_type>local_bash</task_type>
+
+<status>running</status>
+TaskStop
+IN
+{
+  "task_id": "b1fn1uxxf"
+}
+OUT
+{"message":"Successfully stopped task: b1fn1uxxf (ls /c/Users/paul/AppData/Local/nvs/ 2>/dev/null; ls /c/nvm/ 2>/dev/null; ls /c/nodejs/ 2>/dev/null; find /c/Users/paul -name \"node.exe\" 2>/dev/null | head -5; find /c/Program\\ Files -name \"node.exe\" 2>/dev/null | head -5)","task_id":"b1fn1uxxf","task_type":"local_bash","command":"ls /c/Users/paul/AppData/Local/nvs/ 2>/dev/null; ls /c/nvm/ 2>/dev/null; ls /c/nodejs/ 2>/dev/null; find /c/Users/paul -name \"node.exe\" 2>/dev/null | head -5; find /c/Program\\ Files -name \"node.exe\" 2>/dev/null | head -5"}
+Bash Check specific Node.js path
+IN
+ls "/c/Program Files/nodejs/node.exe" 2>/dev/null && echo "Found" || echo "Not in Program Files/nodejs"
+
+OUT
+/c/Program Files/nodejs/node.exe
+Found
+Bash Verify Node.js version with updated PATH
+IN
+export PATH="$PATH:/c/Program Files/nodejs" && node --version && npm --version
+
+OUT
+v24.14.0
+11.9.0
+Node.js v24 and npm v11 are available. Now let's bootstrap the project.
+
+Bash Create Next.js 15 app scaffold
+IN
+export PATH="$PATH:/c/Program Files/nodejs" && cd /c/Git/Diagramatix && npx create-next-app@latest diagramatix --typescript --tailwind --app --no-eslint --import-alias "@/*" --yes 2>&1
+
+OUT
+npm warn exec The following package was not found and will be installed: create-next-app@16.1.6
+Creating a new Next.js app in [32mC:\Git\Diagramatix\diagramatix[39m.
+
+[1mUsing npm.[22m
+
+Initializing project with template: app-tw 
+
+
+Installing dependencies:
+- [36mnext[39m
+- [36mreact[39m
+- [36mreact-dom[39m
+
+Installing devDependencies:
+- [36m@tailwindcss/postcss[39m
+- [36m@types/node[39m
+- [36m@types/react[39m
+- [36m@types/react-dom[39m
+- [36mtailwindcss[39m
+- [36mtypescript[39m
+
+
+added 47 packages, and audited 48 packages in 34s
+
+10 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+
+Generating route types...
+✓ Types generated successfully
+
+[32mSuccess![39m Created diagramatix at C:\Git\Diagramatix\diagramatix
+
+npm notice
+npm notice New minor version of npm available! 11.9.0 -> 11.11.0
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.11.0
+npm notice To update run: npm install -g npm@11.11.0
+npm notice
+Project created. Now install all the additional dependencies.
+
+Bash Install Prisma, Auth.js, bcrypt
+IN
+export PATH="$PATH:/c/Program Files/nodejs" && cd /c/Git/Diagramatix/diagramatix && npm install prisma @prisma/client next-auth@beta @auth/prisma-adapter bcryptjs 2>&1
+
+OUT
+added 97 packages, and audited 145 packages in 31s
+
+25 packages are looking for funding
+  run `npm fund` for details
+
+8 moderate severity vulnerabilities
+
+To address all issues, run:
+  npm audit fix
+
+Run `npm audit` for details.
+Bash Install bcryptjs types and init Prisma
+IN
+export PATH="$PATH:/c/Program Files/nodejs" && cd /c/Git/Diagramatix/diagramatix && npm install -D @types/bcryptjs 2>&1 && npx prisma init --datasource-provider postgresql 2>&1
+
+OUT
+added 1 package, and audited 146 packages in 2s
+
+25 packages are looking for funding
+  run `npm fund` for details
+
+8 moderate severity vulnerabilities
+
+To address issues that do not require attention, run:
+  npm audit fix
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+
+Run `npm audit` for details.
+
+Initialized Prisma in your project
+
+  prisma/
+    schema.prisma
+  prisma.config.ts
+  .env
+
+warn You already have a .gitignore file. Don't forget to add .env in it to not commit any private information.
+
+Next, choose how you want to set up your database:
+
+CONNECT EXISTING DATABASE:
+  1. Configure your DATABASE_URL in prisma.config.ts
+  2. Run prisma db pull to introspect your database.
+
+CREATE NEW DATABASE:
+  Local: npx prisma dev (runs Postgres locally in your terminal)
+  Cloud: npx create-db (creates a free Prisma Postgres database)
+
+Then, define your models in prisma/schema.prisma and run prisma migrate dev to apply your schema.
+
+Learn more: https://pris.ly/getting-started
+Good. Now let me look at the generated structure and start building out all the files systematically.
+
+Bash List project structure
+IN
+find /c/Git/Diagramatix/diagramatix -not -path "*/node_modules/*" -not -path "*/.git/*" | sort
+
+OUT
+/c/Git/Diagramatix/diagramatix
+/c/Git/Diagramatix/diagramatix/.env
+/c/Git/Diagramatix/diagramatix/.gitignore
+/c/Git/Diagramatix/diagramatix/.next
+/c/Git/Diagramatix/diagramatix/.next/types
+/c/Git/Diagramatix/diagramatix/.next/types/cache-life.d.ts
+/c/Git/Diagramatix/diagramatix/.next/types/routes.d.ts
+/c/Git/Diagramatix/diagramatix/.next/types/validator.ts
+/c/Git/Diagramatix/diagramatix/README.md
+/c/Git/Diagramatix/diagramatix/app
+/c/Git/Diagramatix/diagramatix/app/favicon.ico
+/c/Git/Diagramatix/diagramatix/app/globals.css
+/c/Git/Diagramatix/diagramatix/app/layout.tsx
+/c/Git/Diagramatix/diagramatix/app/page.tsx
+/c/Git/Diagramatix/diagramatix/next-env.d.ts
+/c/Git/Diagramatix/diagramatix/next.config.ts
+/c/Git/Diagramatix/diagramatix/node_modules
+/c/Git/Diagramatix/diagramatix/package-lock.json
+/c/Git/Diagramatix/diagramatix/package.json
+/c/Git/Diagramatix/diagramatix/postcss.config.mjs
+/c/Git/Diagramatix/diagramatix/prisma
+/c/Git/Diagramatix/diagramatix/prisma.config.ts
+/c/Git/Diagramatix/diagramatix/prisma/schema.prisma
+/c/Git/Diagramatix/diagramatix/public
+/c/Git/Diagramatix/diagramatix/public/file.svg
+/c/Git/Diagramatix/diagramatix/public/globe.svg
+/c/Git/Diagramatix/diagramatix/public/next.svg
+/c/Git/Diagramatix/diagramatix/public/vercel.svg
+/c/Git/Diagramatix/diagramatix/public/window.svg
+/c/Git/Diagramatix/diagramatix/tsconfig.json
+Read schema.prisma
+Read tsconfig.json
+Read package.json
+Read prisma.config.ts
+Read .env
+Now I have a clear picture of the setup. Let me read the current app files to understand what needs to change.
+
+Read globals.css
+Read layout.tsx
+Good. Now let me build out the entire project. Starting with the foundation files.
+
+Write schema.prisma
+30 lines
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String    @id @default(cuid())
+  email     String    @unique
+  name      String?
+  password  String
+  diagrams  Diagram[]
+  createdAt DateTime  @default(now())
+}
+
+model Diagram {
+  id        String   @id @default(cuid())
+  name      String
+  type      String   @default("basic")
+  data      Json     @default("{}")
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+Write .env
+4 lines
+DATABASE_URL="postgresql://johndoe:randompassword@localhost:5432/diagramatix?schema=public"
+AUTH_SECRET="your-secret-key-change-this-in-production"
+NEXTAUTH_URL="http://localhost:3000"
+Now let me write the core library files — db client, types, routing, and symbol definitions:
+
+Bash Create directory structure
+IN
+mkdir -p /c/Git/Diagramatix/diagramatix/app/lib/diagram/symbols && mkdir -p /c/Git/Diagramatix/diagramatix/app/components/canvas && mkdir -p /c/Git/Diagramatix/diagramatix/app/hooks && mkdir -p /c/Git/Diagramatix/diagramatix/app/\(auth\)/login && mkdir -p /c/Git/Diagramatix/diagramatix/app/\(auth\)/register && mkdir -p /c/Git/Diagramatix/diagramatix/app/\(dashboard\)/dashboard && mkdir -p /c/Git/Diagramatix/diagramatix/app/\(dashboard\)/diagram/\[id\] && mkdir -p /c/Git/Diagramatix/diagramatix/app/api/diagrams/\[id\] && mkdir -p /c/Git/Diagramatix/diagramatix/app/api/auth/\[...nextauth\] && echo "Directories created"
+
+OUT
+Directories created
+Write db.ts
+14 lines
+import { PrismaClient } from "../generated/prisma";
+
+const globalForPrisma = globalThis as unknown as {
+  prisma: PrismaClient | undefined;
+};
+
+export const prisma =
+  globalForPrisma.prisma ??
+  new PrismaClient({
+    log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
+  });
+
+if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+Write types.ts
+83 lines
+export type DiagramType = "basic" | "process-context" | "state-machine" | "bpmn";
+
+export type SymbolType =
+  | "task"
+  | "gateway"
+  | "start-event"
+  | "end-event"
+  | "use-case"
+  | "actor"
+  | "state"
+  | "initial-state"
+  | "final-state"
+  | "pool"
+  | "lane"
+  | "subprocess";
+
+export type ConnectorType = "sequence" | "message" | "association";
+
+export interface Point {
+  x: number;
+  y: number;
+}
+
+export interface Bounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface DiagramElement {
+  id: string;
+  type: SymbolType;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  label: string;
+  properties: Record<string, unknown>;
+  parentId?: string;
+}
+
+export interface Connector {
+  id: string;
+  sourceId: string;
+  targetId: string;
+  type: ConnectorType;
+  waypoints: Point[];
+  label?: string;
+}
+
+export interface Viewport {
+  x: number;
+  y: number;
+  zoom: number;
+}
+
+export interface DiagramData {
+  elements: DiagramElement[];
+  connectors: Connector[];
+  viewport: Viewport;
+}
+
+export const EMPTY_DIAGRAM: DiagramData = {
+  elements: [],
+  connectors: [],
+  viewport: { x: 0, y: 0, zoom: 1 },
+};
+
+export type InteractionMode =
+  | "select"
+  | "connecting"
+  | "panning"
+  | "drawing";
+
+export interface CanvasState {
+  selectedElementId: string | null;
+  selectedConnectorId: string | null;
+  mode: InteractionMode;
+  connectingFromId: string | null;
+  mousePos: Point;
+}
+Write routing.ts
+117 lines
+import type { Bounds, Connector, ConnectorType, DiagramElement, Point } from "./types";
+
+function getBounds(el: DiagramElement): Bounds {
+  return { x: el.x, y: el.y, width: el.width, height: el.height };
+}
+
+function center(b: Bounds): Point {
+  return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
+}
+
+function closestEdgePoint(from: Point, b: Bounds): Point {
+  const cx = b.x + b.width / 2;
+  const cy = b.y + b.height / 2;
+  const dx = from.x - cx;
+  const dy = from.y - cy;
+
+  if (Math.abs(dx) === 0 && Math.abs(dy) === 0) {
+    return { x: cx, y: b.y };
+  }
+
+  const scaleX = Math.abs(dx) > 0 ? b.width / 2 / Math.abs(dx) : Infinity;
+  const scaleY = Math.abs(dy) > 0 ? b.height / 2 / Math.abs(dy) : Infinity;
+  const scale = Math.min(scaleX, scaleY);
+
+  return {
+    x: cx + dx * scale,
+    y: cy + dy * scale,
+  };
+}
+
+function boundsOverlapWithMargin(b: Bounds, margin: number): (p: Point) => boolean {
+  return (p: Point) =>
+    p.x > b.x - margin &&
+    p.x < b.x + b.width + margin &&
+    p.y > b.y - margin &&
+    p.y < b.y + b.height + margin;
+}
+
+function buildOrthogonalPath(
+  start: Point,
+  end: Point,
+  obstacles: Bounds[]
+): Point[] {
+  // Prefer a two-segment L-shaped path; try horizontal-then-vertical first
+  const mid1: Point = { x: end.x, y: start.y };
+  const mid2: Point = { x: start.x, y: end.y };
+
+  const pathA = [start, mid1, end];
+  const pathB = [start, mid2, end];
+
+  const hitsMid = (mid: Point) =>
+    obstacles.some(boundsOverlapWithMargin(mid, 8));
+
+  if (!hitsMid(mid1)) return pathA;
+  if (!hitsMid(mid2)) return pathB;
+
+  // Fallback: route via the average midpoint at a safe Y offset
+  const bypassY = start.y - 40;
+  return [
+    start,
+    { x: start.x, y: bypassY },
+    { x: end.x, y: bypassY },
+    end,
+  ];
+}
+
+export function computeWaypoints(
+  source: DiagramElement,
+  target: DiagramElement,
+  allElements: DiagramElement[],
+  connectorType: ConnectorType
+): Point[] {
+  const sc = center(getBounds(source));
+  const tc = center(getBounds(target));
+
+  if (connectorType === "message") {
+    // Messages go straight through — no obstacle avoidance
+    const startPt = closestEdgePoint(tc, getBounds(source));
+    const endPt = closestEdgePoint(sc, getBounds(target));
+    return [startPt, endPt];
+  }
+
+  // Sequence connectors: orthogonal with obstacle avoidance
+  const startPt = closestEdgePoint(tc, getBounds(source));
+  const endPt = closestEdgePoint(sc, getBounds(target));
+
+  const obstacles = allElements
+    .filter((el) => el.id !== source.id && el.id !== target.id)
+    .map(getBounds);
+
+  return buildOrthogonalPath(startPt, endPt, obstacles);
+}
+
+export function waypointsToSvgPath(waypoints: Point[]): string {
+  if (waypoints.length === 0) return "";
+  const [first, ...rest] = waypoints;
+  const d = [`M ${first.x} ${first.y}`];
+  for (const pt of rest) {
+    d.push(`L ${pt.x} ${pt.y}`);
+  }
+  return d.join(" ");
+}
+
+export function recomputeAllConnectors(
+  connectors: Connector[],
+  elements: DiagramElement[]
+): Connector[] {
+  const elementMap = new Map(elements.map((el) => [el.id, el]));
+  return connectors.map((conn) => {
+    const source = elementMap.get(conn.sourceId);
+    const target = elementMap.get(conn.targetId);
+    if (!source || !target) return conn;
+    const waypoints = computeWaypoints(source, target, elements, conn.type);
+    return { ...conn, waypoints };
+  });
+}
+Write definitions.ts
+104 lines
+import type { DiagramType, SymbolType } from "../types";
+
+export interface SymbolDefinition {
+  type: SymbolType;
+  label: string;
+  defaultWidth: number;
+  defaultHeight: number;
+  description: string;
+}
+
+export const ALL_SYMBOLS: SymbolDefinition[] = [
+  {
+    type: "task",
+    label: "Task",
+    defaultWidth: 120,
+    defaultHeight: 60,
+    description: "A work item or activity",
+  },
+  {
+    type: "gateway",
+    label: "Gateway",
+    defaultWidth: 50,
+    defaultHeight: 50,
+    description: "A decision point",
+  },
+  {
+    type: "start-event",
+    label: "Start",
+    defaultWidth: 36,
+    defaultHeight: 36,
+    description: "Start of process",
+  },
+  {
+    type: "end-event",
+    label: "End",
+    defaultWidth: 36,
+    defaultHeight: 36,
+    description: "End of process",
+  },
+  {
+    type: "use-case",
+    label: "Use Case",
+    defaultWidth: 120,
+    defaultHeight: 60,
+    description: "A process use case",
+  },
+  {
+    type: "actor",
+    label: "Actor",
+    defaultWidth: 40,
+    defaultHeight: 80,
+    description: "A participant in the process",
+  },
+  {
+    type: "state",
+    label: "State",
+    defaultWidth: 120,
+    defaultHeight: 60,
+    description: "A state in a state machine",
+  },
+  {
+    type: "initial-state",
+    label: "Initial State",
+    defaultWidth: 30,
+    defaultHeight: 30,
+    description: "Starting state",
+  },
+  {
+    type: "final-state",
+    label: "Final State",
+    defaultWidth: 30,
+    defaultHeight: 30,
+    description: "Ending state",
+  },
+];
+
+export const PALETTE_BY_DIAGRAM_TYPE: Record<DiagramType, SymbolType[]> = {
+  basic: ["task"],
+  "process-context": ["use-case", "actor", "task"],
+  "state-machine": ["state", "initial-state", "final-state"],
+  bpmn: [
+    "task",
+    "gateway",
+    "start-event",
+    "end-event",
+    "subprocess",
+    "pool",
+    "lane",
+  ],
+};
+
+export function getSymbolDefinition(type: SymbolType): SymbolDefinition {
+  const def = ALL_SYMBOLS.find((s) => s.type === type);
+  return (
+    def ?? {
+      type,
+      label: type,
+      defaultWidth: 120,
+      defaultHeight: 60,
+      description: "",
+    }
+  );
+}
+Now the auth configuration and middleware:
+
+Write auth.ts
+53 lines
+import NextAuth from "next-auth";
+import CredentialsProvider from "next-auth/providers/credentials";
+import { prisma } from "@/app/lib/db";
+import bcrypt from "bcryptjs";
+
+export const { handlers, signIn, signOut, auth } = NextAuth({
+  providers: [
+    CredentialsProvider({
+      name: "credentials",
+      credentials: {
+        email: { label: "Email", type: "email" },
+        password: { label: "Password", type: "password" },
+      },
+      async authorize(credentials) {
+        if (!credentials?.email || !credentials?.password) return null;
+
+        const user = await prisma.user.findUnique({
+          where: { email: credentials.email as string },
+        });
+
+        if (!user) return null;
+
+        const passwordMatch = await bcrypt.compare(
+          credentials.password as string,
+          user.password
+        );
+
+        if (!passwordMatch) return null;
+
+        return {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+        };
+      },
+    }),
+  ],
+  session: { strategy: "jwt" },
+  pages: {
+    signIn: "/login",
+  },
+  callbacks: {
+    jwt({ token, user }) {
+      if (user) token.id = user.id;
+      return token;
+    },
+    session({ session, token }) {
+      if (token?.id) session.user.id = token.id as string;
+      return session;
+    },
+  },
+});
+Write middleware.ts
+6 lines
+export { auth as middleware } from "@/auth";
+
+export const config = {
+  matcher: ["/dashboard/:path*", "/diagram/:path*"],
+};
+Write route.ts
+4 lines
+import { handlers } from "@/auth";
+
+export const { GET, POST } = handlers;
+Now the diagram API routes:
+
+Write route.ts
+51 lines
+import { NextResponse } from "next/server";
+import { auth } from "@/auth";
+import { prisma } from "@/app/lib/db";
+import { EMPTY_DIAGRAM } from "@/app/lib/diagram/types";
+
+export async function GET() {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const diagrams = await prisma.diagram.findMany({
+    where: { userId: session.user.id },
+    orderBy: { updatedAt: "desc" },
+    select: {
+      id: true,
+      name: true,
+      type: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  });
+
+  return NextResponse.json(diagrams);
+}
+
+export async function POST(req: Request) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const body = await req.json();
+  const { name, type = "basic" } = body;
+
+  if (!name?.trim()) {
+    return NextResponse.json({ error: "Name is required" }, { status: 400 });
+  }
+
+  const diagram = await prisma.diagram.create({
+    data: {
+      name: name.trim(),
+      type,
+      data: EMPTY_DIAGRAM,
+      userId: session.user.id,
+    },
+  });
+
+  return NextResponse.json(diagram, { status: 201 });
+}
+Write route.ts
+67 lines
+import { NextResponse } from "next/server";
+import { auth } from "@/auth";
+import { prisma } from "@/app/lib/db";
+
+type Params = { params: Promise<{ id: string }> };
+
+async function getAuthorizedDiagram(id: string, userId: string) {
+  return prisma.diagram.findFirst({ where: { id, userId } });
+}
+
+export async function GET(_req: Request, { params }: Params) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { id } = await params;
+  const diagram = await getAuthorizedDiagram(id, session.user.id);
+  if (!diagram) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  return NextResponse.json(diagram);
+}
+
+export async function PUT(req: Request, { params }: Params) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { id } = await params;
+  const existing = await getAuthorizedDiagram(id, session.user.id);
+  if (!existing) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  const body = await req.json();
+  const { name, data } = body;
+
+  const updated = await prisma.diagram.update({
+    where: { id },
+    data: {
+      ...(name !== undefined && { name }),
+      ...(data !== undefined && { data }),
+    },
+  });
+
+  return NextResponse.json(updated);
+}
+
+export async function DELETE(_req: Request, { params }: Params) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { id } = await params;
+  const existing = await getAuthorizedDiagram(id, session.user.id);
+  if (!existing) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  await prisma.diagram.delete({ where: { id } });
+  return NextResponse.json({ success: true });
+}
+Now the registration API and auth pages:
+
+Bash Create register API directory
+IN
+mkdir -p /c/Git/Diagramatix/diagramatix/app/api/register && echo "done"
+
+OUT
+done
+Write route.ts
+33 lines
+import { NextResponse } from "next/server";
+import bcrypt from "bcryptjs";
+import { prisma } from "@/app/lib/db";
+
+export async function POST(req: Request) {
+  const body = await req.json();
+  const { email, name, password } = body;
+
+  if (!email || !password) {
+    return NextResponse.json(
+      { error: "Email and password are required" },
+      { status: 400 }
+    );
+  }
+
+  const existing = await prisma.user.findUnique({ where: { email } });
+  if (existing) {
+    return NextResponse.json(
+      { error: "Email already registered" },
+      { status: 409 }
+    );
+  }
+
+  const hashedPassword = await bcrypt.hash(password, 12);
+
+  const user = await prisma.user.create({
+    data: { email, name: name || null, password: hashedPassword },
+    select: { id: true, email: true, name: true },
+  });
+
+  return NextResponse.json(user, { status: 201 });
+}
+Now the auth pages — login and register:
+
+Write page.tsx
+96 lines
+"use client";
+
+import { useState } from "react";
+import { signIn } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+
+export default function LoginPage() {
+  const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+
+    const result = await signIn("credentials", {
+      email,
+      password,
+      redirect: false,
+    });
+
+    setLoading(false);
+
+    if (result?.error) {
+      setError("Invalid email or password");
+    } else {
+      router.push("/dashboard");
+    }
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-sm">
+        <h1 className="text-2xl font-bold text-gray-900 mb-6">
+          Sign in to Diagramatix
+        </h1>
+
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded text-sm">
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Email
+            </label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              placeholder="you@example.com"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Password
+            </label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              placeholder="••••••••"
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full py-2 px-4 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 font-medium text-sm"
+          >
+            {loading ? "Signing in..." : "Sign in"}
+          </button>
+        </form>
+
+        <p className="mt-4 text-center text-sm text-gray-600">
+          Don&apos;t have an account?{" "}
+          <Link href="/register" className="text-blue-600 hover:underline">
+            Register
+          </Link>
+        </p>
+      </div>
+    </div>
+  );
+}
+Write page.tsx
+111 lines
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+
+export default function RegisterPage() {
+  const router = useRouter();
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+
+    const res = await fetch("/api/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, name, password }),
+    });
+
+    setLoading(false);
+
+    if (!res.ok) {
+      const data = await res.json();
+      setError(data.error || "Registration failed");
+    } else {
+      router.push("/login?registered=1");
+    }
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-sm">
+        <h1 className="text-2xl font-bold text-gray-900 mb-6">
+          Create your account
+        </h1>
+
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded text-sm">
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Name (optional)
+            </label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              placeholder="Your name"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Email
+            </label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              placeholder="you@example.com"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Password
+            </label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              minLength={8}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              placeholder="At least 8 characters"
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full py-2 px-4 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 font-medium text-sm"
+          >
+            {loading ? "Creating account..." : "Create account"}
+          </button>
+        </form>
+
+        <p className="mt-4 text-center text-sm text-gray-600">
+          Already have an account?{" "}
+          <Link href="/login" className="text-blue-600 hover:underline">
+            Sign in
+          </Link>
+        </p>
+      </div>
+    </div>
+  );
+}
+Now the hooks for diagram state management:
+
+Write useDiagram.ts
+197 lines
+"use client";
+
+import { useCallback, useReducer } from "react";
+import type {
+  Connector,
+  DiagramData,
+  DiagramElement,
+  Point,
+  SymbolType,
+  ConnectorType,
+} from "@/app/lib/diagram/types";
+import { recomputeAllConnectors } from "@/app/lib/diagram/routing";
+import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
+
+type Action =
+  | { type: "SET_DATA"; payload: DiagramData }
+  | { type: "ADD_ELEMENT"; payload: { symbolType: SymbolType; position: Point } }
+  | { type: "MOVE_ELEMENT"; payload: { id: string; x: number; y: number } }
+  | { type: "UPDATE_LABEL"; payload: { id: string; label: string } }
+  | { type: "UPDATE_PROPERTIES"; payload: { id: string; properties: Record<string, unknown> } }
+  | { type: "DELETE_ELEMENT"; payload: { id: string } }
+  | { type: "ADD_CONNECTOR"; payload: { sourceId: string; targetId: string; connectorType: ConnectorType } }
+  | { type: "DELETE_CONNECTOR"; payload: { id: string } }
+  | { type: "SET_VIEWPORT"; payload: { x: number; y: number; zoom: number } };
+
+function nanoid(): string {
+  return Math.random().toString(36).slice(2, 10);
+}
+
+function reducer(state: DiagramData, action: Action): DiagramData {
+  switch (action.type) {
+    case "SET_DATA":
+      return action.payload;
+
+    case "ADD_ELEMENT": {
+      const def = getSymbolDefinition(action.payload.symbolType);
+      const newEl: DiagramElement = {
+        id: nanoid(),
+        type: action.payload.symbolType,
+        x: action.payload.position.x - def.defaultWidth / 2,
+        y: action.payload.position.y - def.defaultHeight / 2,
+        width: def.defaultWidth,
+        height: def.defaultHeight,
+        label: def.label,
+        properties: {},
+      };
+      return { ...state, elements: [...state.elements, newEl] };
+    }
+
+    case "MOVE_ELEMENT": {
+      const elements = state.elements.map((el) =>
+        el.id === action.payload.id
+          ? { ...el, x: action.payload.x, y: action.payload.y }
+          : el
+      );
+      const connectors = recomputeAllConnectors(state.connectors, elements);
+      return { ...state, elements, connectors };
+    }
+
+    case "UPDATE_LABEL":
+      return {
+        ...state,
+        elements: state.elements.map((el) =>
+          el.id === action.payload.id
+            ? { ...el, label: action.payload.label }
+            : el
+        ),
+      };
+
+    case "UPDATE_PROPERTIES":
+      return {
+        ...state,
+        elements: state.elements.map((el) =>
+          el.id === action.payload.id
+            ? { ...el, properties: { ...el.properties, ...action.payload.properties } }
+            : el
+        ),
+      };
+
+    case "DELETE_ELEMENT": {
+      const elements = state.elements.filter(
+        (el) => el.id !== action.payload.id
+      );
+      const connectors = state.connectors.filter(
+        (c) =>
+          c.sourceId !== action.payload.id &&
+          c.targetId !== action.payload.id
+      );
+      return { ...state, elements, connectors };
+    }
+
+    case "ADD_CONNECTOR": {
+      const { sourceId, targetId, connectorType } = action.payload;
+      const source = state.elements.find((el) => el.id === sourceId);
+      const target = state.elements.find((el) => el.id === targetId);
+      if (!source || !target) return state;
+
+      const { computeWaypoints } = require("@/app/lib/diagram/routing");
+      const waypoints = computeWaypoints(
+        source,
+        target,
+        state.elements,
+        connectorType
+      );
+
+      const newConnector: Connector = {
+        id: nanoid(),
+        sourceId,
+        targetId,
+        type: connectorType,
+        waypoints,
+      };
+
+      return { ...state, connectors: [...state.connectors, newConnector] };
+    }
+
+    case "DELETE_CONNECTOR":
+      return {
+        ...state,
+        connectors: state.connectors.filter(
+          (c) => c.id !== action.payload.id
+        ),
+      };
+
+    case "SET_VIEWPORT":
+      return {
+        ...state,
+        viewport: action.payload,
+      };
+
+    default:
+      return state;
+  }
+}
+
+export function useDiagram(initialData: DiagramData) {
+  const [data, dispatch] = useReducer(reducer, initialData);
+
+  const addElement = useCallback(
+    (symbolType: SymbolType, position: Point) => {
+      dispatch({ type: "ADD_ELEMENT", payload: { symbolType, position } });
+    },
+    []
+  );
+
+  const moveElement = useCallback((id: string, x: number, y: number) => {
+    dispatch({ type: "MOVE_ELEMENT", payload: { id, x, y } });
+  }, []);
+
+  const updateLabel = useCallback((id: string, label: string) => {
+    dispatch({ type: "UPDATE_LABEL", payload: { id, label } });
+  }, []);
+
+  const updateProperties = useCallback(
+    (id: string, properties: Record<string, unknown>) => {
+      dispatch({ type: "UPDATE_PROPERTIES", payload: { id, properties } });
+    },
+    []
+  );
+
+  const deleteElement = useCallback((id: string) => {
+    dispatch({ type: "DELETE_ELEMENT", payload: { id } });
+  }, []);
+
+  const addConnector = useCallback(
+    (sourceId: string, targetId: string, connectorType: ConnectorType = "sequence") => {
+      dispatch({ type: "ADD_CONNECTOR", payload: { sourceId, targetId, connectorType } });
+    },
+    []
+  );
+
+  const deleteConnector = useCallback((id: string) => {
+    dispatch({ type: "DELETE_CONNECTOR", payload: { id } });
+  }, []);
+
+  const setData = useCallback((newData: DiagramData) => {
+    dispatch({ type: "SET_DATA", payload: newData });
+  }, []);
+
+  const setViewport = useCallback((x: number, y: number, zoom: number) => {
+    dispatch({ type: "SET_VIEWPORT", payload: { x, y, zoom } });
+  }, []);
+
+  return {
+    data,
+    addElement,
+    moveElement,
+    updateLabel,
+    updateProperties,
+    deleteElement,
+    addConnector,
+    deleteConnector,
+    setData,
+    setViewport,
+  };
+}
+Now the canvas components — the core of the diagram editor:
+
+Write SymbolRenderer.tsx
+297 lines
+"use client";
+
+import type { DiagramElement } from "@/app/lib/diagram/types";
+
+interface Props {
+  element: DiagramElement;
+  selected: boolean;
+  onSelect: () => void;
+  onMove: (x: number, y: number) => void;
+  onDoubleClick: () => void;
+  onConnectionPointClick: (side: "top" | "right" | "bottom" | "left") => void;
+  showConnectionPoints: boolean;
+}
+
+const CONNECTION_POINT_SIDES = ["top", "right", "bottom", "left"] as const;
+
+function getConnectionPointPos(
+  el: DiagramElement,
+  side: (typeof CONNECTION_POINT_SIDES)[number]
+): { cx: number; cy: number } {
+  switch (side) {
+    case "top":
+      return { cx: el.x + el.width / 2, cy: el.y };
+    case "right":
+      return { cx: el.x + el.width, cy: el.y + el.height / 2 };
+    case "bottom":
+      return { cx: el.x + el.width / 2, cy: el.y + el.height };
+    case "left":
+      return { cx: el.x, cy: el.y + el.height / 2 };
+  }
+}
+
+function TaskShape({ el }: { el: DiagramElement }) {
+  return (
+    <rect
+      x={el.x}
+      y={el.y}
+      width={el.width}
+      height={el.height}
+      rx={4}
+      ry={4}
+      fill="white"
+      stroke="#374151"
+      strokeWidth={1.5}
+    />
+  );
+}
+
+function GatewayShape({ el }: { el: DiagramElement }) {
+  const cx = el.x + el.width / 2;
+  const cy = el.y + el.height / 2;
+  const hw = el.width / 2;
+  const hh = el.height / 2;
+  const points = `${cx},${el.y} ${el.x + el.width},${cy} ${cx},${el.y + el.height} ${el.x},${cy}`;
+  return (
+    <polygon
+      points={points}
+      fill="white"
+      stroke="#374151"
+      strokeWidth={1.5}
+    />
+  );
+}
+
+function StartEventShape({ el }: { el: DiagramElement }) {
+  return (
+    <circle
+      cx={el.x + el.width / 2}
+      cy={el.y + el.height / 2}
+      r={el.width / 2}
+      fill="white"
+      stroke="#16a34a"
+      strokeWidth={2}
+    />
+  );
+}
+
+function EndEventShape({ el }: { el: DiagramElement }) {
+  return (
+    <circle
+      cx={el.x + el.width / 2}
+      cy={el.y + el.height / 2}
+      r={el.width / 2}
+      fill="white"
+      stroke="#dc2626"
+      strokeWidth={3}
+    />
+  );
+}
+
+function UseCaseShape({ el }: { el: DiagramElement }) {
+  return (
+    <ellipse
+      cx={el.x + el.width / 2}
+      cy={el.y + el.height / 2}
+      rx={el.width / 2}
+      ry={el.height / 2}
+      fill="white"
+      stroke="#374151"
+      strokeWidth={1.5}
+    />
+  );
+}
+
+function ActorShape({ el }: { el: DiagramElement }) {
+  const cx = el.x + el.width / 2;
+  const headR = 8;
+  const headCy = el.y + headR + 2;
+  const bodyTop = headCy + headR;
+  const bodyBot = el.y + el.height - 16;
+  const armY = bodyTop + (bodyBot - bodyTop) * 0.35;
+  return (
+    <g>
+      <circle cx={cx} cy={headCy} r={headR} fill="white" stroke="#374151" strokeWidth={1.5} />
+      <line x1={cx} y1={bodyTop} x2={cx} y2={bodyBot} stroke="#374151" strokeWidth={1.5} />
+      <line x1={el.x + 4} y1={armY} x2={el.x + el.width - 4} y2={armY} stroke="#374151" strokeWidth={1.5} />
+      <line x1={cx} y1={bodyBot} x2={el.x + 4} y2={el.y + el.height - 2} stroke="#374151" strokeWidth={1.5} />
+      <line x1={cx} y1={bodyBot} x2={el.x + el.width - 4} y2={el.y + el.height - 2} stroke="#374151" strokeWidth={1.5} />
+    </g>
+  );
+}
+
+function StateShape({ el }: { el: DiagramElement }) {
+  return (
+    <rect
+      x={el.x}
+      y={el.y}
+      width={el.width}
+      height={el.height}
+      rx={12}
+      ry={12}
+      fill="white"
+      stroke="#374151"
+      strokeWidth={1.5}
+    />
+  );
+}
+
+function InitialStateShape({ el }: { el: DiagramElement }) {
+  return (
+    <circle
+      cx={el.x + el.width / 2}
+      cy={el.y + el.height / 2}
+      r={el.width / 2}
+      fill="#374151"
+    />
+  );
+}
+
+function FinalStateShape({ el }: { el: DiagramElement }) {
+  const cx = el.x + el.width / 2;
+  const cy = el.y + el.height / 2;
+  const r = el.width / 2;
+  return (
+    <g>
+      <circle cx={cx} cy={cy} r={r} fill="white" stroke="#374151" strokeWidth={2} />
+      <circle cx={cx} cy={cy} r={r - 5} fill="#374151" />
+    </g>
+  );
+}
+
+function SymbolShape({ el }: { el: DiagramElement }) {
+  switch (el.type) {
+    case "gateway": return <GatewayShape el={el} />;
+    case "start-event": return <StartEventShape el={el} />;
+    case "end-event": return <EndEventShape el={el} />;
+    case "use-case": return <UseCaseShape el={el} />;
+    case "actor": return <ActorShape el={el} />;
+    case "state": return <StateShape el={el} />;
+    case "initial-state": return <InitialStateShape el={el} />;
+    case "final-state": return <FinalStateShape el={el} />;
+    default: return <TaskShape el={el} />;
+  }
+}
+
+function getLabelPos(el: DiagramElement): { x: number; y: number } {
+  if (el.type === "actor") {
+    return { x: el.x + el.width / 2, y: el.y + el.height + 12 };
+  }
+  return { x: el.x + el.width / 2, y: el.y + el.height / 2 };
+}
+
+export function SymbolRenderer({
+  element,
+  selected,
+  onSelect,
+  onMove,
+  onDoubleClick,
+  onConnectionPointClick,
+  showConnectionPoints,
+}: Props) {
+  let dragStart: { mouseX: number; mouseY: number; elX: number; elY: number } | null = null;
+
+  function handleMouseDown(e: React.MouseEvent) {
+    e.stopPropagation();
+    onSelect();
+    dragStart = {
+      mouseX: e.clientX,
+      mouseY: e.clientY,
+      elX: element.x,
+      elY: element.y,
+    };
+
+    function onMouseMove(ev: MouseEvent) {
+      if (!dragStart) return;
+      const dx = ev.clientX - dragStart.mouseX;
+      const dy = ev.clientY - dragStart.mouseY;
+      onMove(dragStart.elX + dx, dragStart.elY + dy);
+    }
+
+    function onMouseUp() {
+      dragStart = null;
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    }
+
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+  }
+
+  const labelPos = getLabelPos(element);
+
+  return (
+    <g
+      onMouseDown={handleMouseDown}
+      onDoubleClick={(e) => { e.stopPropagation(); onDoubleClick(); }}
+      style={{ cursor: "move" }}
+    >
+      <SymbolShape el={element} />
+
+      {element.type !== "initial-state" && element.type !== "actor" && (
+        <text
+          x={labelPos.x}
+          y={labelPos.y}
+          textAnchor="middle"
+          dominantBaseline="middle"
+          fontSize={12}
+          fill="#111827"
+          style={{ userSelect: "none", pointerEvents: "none" }}
+        >
+          {element.label}
+        </text>
+      )}
+
+      {element.type === "actor" && (
+        <text
+          x={labelPos.x}
+          y={labelPos.y}
+          textAnchor="middle"
+          dominantBaseline="hanging"
+          fontSize={11}
+          fill="#111827"
+          style={{ userSelect: "none", pointerEvents: "none" }}
+        >
+          {element.label}
+        </text>
+      )}
+
+      {selected && (
+        <rect
+          x={element.x - 3}
+          y={element.y - 3}
+          width={element.width + 6}
+          height={element.height + 6}
+          fill="none"
+          stroke="#2563eb"
+          strokeWidth={1.5}
+          strokeDasharray="4 2"
+          rx={4}
+          style={{ pointerEvents: "none" }}
+        />
+      )}
+
+      {showConnectionPoints &&
+        CONNECTION_POINT_SIDES.map((side) => {
+          const pos = getConnectionPointPos(element, side);
+          return (
+            <circle
+              key={side}
+              cx={pos.cx}
+              cy={pos.cy}
+              r={5}
+              fill="#2563eb"
+              stroke="white"
+              strokeWidth={1.5}
+              style={{ cursor: "crosshair" }}
+              onMouseDown={(e) => {
+                e.stopPropagation();
+                onConnectionPointClick(side);
+              }}
+            />
+          );
+        })}
+    </g>
+  );
+}
+Write ConnectorRenderer.tsx
+83 lines
+"use client";
+
+import type { Connector } from "@/app/lib/diagram/types";
+import { waypointsToSvgPath } from "@/app/lib/diagram/routing";
+
+interface Props {
+  connector: Connector;
+  selected: boolean;
+  onSelect: () => void;
+}
+
+function ArrowMarker({ id, color }: { id: string; color: string }) {
+  return (
+    <marker
+      id={id}
+      markerWidth={10}
+      markerHeight={7}
+      refX={9}
+      refY={3.5}
+      orient="auto"
+    >
+      <polygon points="0 0, 10 3.5, 0 7" fill={color} />
+    </marker>
+  );
+}
+
+export function ConnectorRenderer({ connector, selected, onSelect }: Props) {
+  const d = waypointsToSvgPath(connector.waypoints);
+  if (!d) return null;
+
+  const isMessage = connector.type === "message";
+  const strokeColor = selected ? "#2563eb" : "#6b7280";
+  const markerId = `arrow-${connector.id}`;
+
+  return (
+    <>
+      <defs>
+        <ArrowMarker id={markerId} color={strokeColor} />
+      </defs>
+
+      {/* Invisible wider hit area for easier selection */}
+      <path
+        d={d}
+        fill="none"
+        stroke="transparent"
+        strokeWidth={12}
+        style={{ cursor: "pointer" }}
+        onClick={(e) => { e.stopPropagation(); onSelect(); }}
+      />
+
+      <path
+        d={d}
+        fill="none"
+        stroke={strokeColor}
+        strokeWidth={selected ? 2 : 1.5}
+        strokeDasharray={isMessage ? "6 3" : undefined}
+        markerEnd={`url(#${markerId})`}
+        style={{ pointerEvents: "none" }}
+      />
+
+      {connector.label && connector.waypoints.length >= 2 && (() => {
+        const mid = Math.floor(connector.waypoints.length / 2);
+        const p1 = connector.waypoints[mid - 1];
+        const p2 = connector.waypoints[mid];
+        const lx = (p1.x + p2.x) / 2;
+        const ly = (p1.y + p2.y) / 2;
+        return (
+          <text
+            x={lx}
+            y={ly - 6}
+            textAnchor="middle"
+            fontSize={10}
+            fill="#374151"
+            style={{ pointerEvents: "none", userSelect: "none" }}
+          >
+            {connector.label}
+          </text>
+        );
+      })()}
+    </>
+  );
+}
+Write Palette.tsx
+108 lines
+"use client";
+
+import type { DiagramType, SymbolType } from "@/app/lib/diagram/types";
+import {
+  ALL_SYMBOLS,
+  PALETTE_BY_DIAGRAM_TYPE,
+} from "@/app/lib/diagram/symbols/definitions";
+
+interface Props {
+  diagramType: DiagramType;
+  onDragStart: (symbolType: SymbolType) => void;
+}
+
+function PaletteSymbolPreview({ type }: { type: SymbolType }) {
+  switch (type) {
+    case "gateway":
+      return (
+        <svg width={32} height={32} viewBox="0 0 32 32">
+          <polygon points="16,2 30,16 16,30 2,16" fill="white" stroke="#374151" strokeWidth={1.5} />
+        </svg>
+      );
+    case "start-event":
+      return (
+        <svg width={28} height={28} viewBox="0 0 28 28">
+          <circle cx={14} cy={14} r={12} fill="white" stroke="#16a34a" strokeWidth={2} />
+        </svg>
+      );
+    case "end-event":
+      return (
+        <svg width={28} height={28} viewBox="0 0 28 28">
+          <circle cx={14} cy={14} r={12} fill="white" stroke="#dc2626" strokeWidth={3} />
+        </svg>
+      );
+    case "use-case":
+      return (
+        <svg width={48} height={28} viewBox="0 0 48 28">
+          <ellipse cx={24} cy={14} rx={22} ry={12} fill="white" stroke="#374151" strokeWidth={1.5} />
+        </svg>
+      );
+    case "actor":
+      return (
+        <svg width={24} height={40} viewBox="0 0 24 40">
+          <circle cx={12} cy={6} r={5} fill="white" stroke="#374151" strokeWidth={1.5} />
+          <line x1={12} y1={11} x2={12} y2={28} stroke="#374151" strokeWidth={1.5} />
+          <line x1={4} y1={18} x2={20} y2={18} stroke="#374151" strokeWidth={1.5} />
+          <line x1={12} y1={28} x2={4} y2={38} stroke="#374151" strokeWidth={1.5} />
+          <line x1={12} y1={28} x2={20} y2={38} stroke="#374151" strokeWidth={1.5} />
+        </svg>
+      );
+    case "state":
+      return (
+        <svg width={48} height={28} viewBox="0 0 48 28">
+          <rect x={2} y={2} width={44} height={24} rx={8} fill="white" stroke="#374151" strokeWidth={1.5} />
+        </svg>
+      );
+    case "initial-state":
+      return (
+        <svg width={24} height={24} viewBox="0 0 24 24">
+          <circle cx={12} cy={12} r={10} fill="#374151" />
+        </svg>
+      );
+    case "final-state":
+      return (
+        <svg width={24} height={24} viewBox="0 0 24 24">
+          <circle cx={12} cy={12} r={10} fill="white" stroke="#374151" strokeWidth={2} />
+          <circle cx={12} cy={12} r={6} fill="#374151" />
+        </svg>
+      );
+    default:
+      return (
+        <svg width={48} height={28} viewBox="0 0 48 28">
+          <rect x={2} y={2} width={44} height={24} rx={3} fill="white" stroke="#374151" strokeWidth={1.5} />
+        </svg>
+      );
+  }
+}
+
+export function Palette({ diagramType, onDragStart }: Props) {
+  const paletteTypes = PALETTE_BY_DIAGRAM_TYPE[diagramType] ?? ["task"];
+  const symbols = ALL_SYMBOLS.filter((s) => paletteTypes.includes(s.type));
+
+  return (
+    <div className="w-48 border-r border-gray-200 bg-white flex flex-col">
+      <div className="px-3 py-2 border-b border-gray-200">
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+          Symbols
+        </p>
+      </div>
+      <div className="flex-1 overflow-y-auto p-2 space-y-1">
+        {symbols.map((sym) => (
+          <div
+            key={sym.type}
+            draggable
+            onDragStart={() => onDragStart(sym.type)}
+            className="flex items-center gap-3 px-2 py-2 rounded hover:bg-gray-50 cursor-grab active:cursor-grabbing select-none"
+            title={sym.description}
+          >
+            <div className="flex items-center justify-center w-12 h-8">
+              <PaletteSymbolPreview type={sym.type} />
+            </div>
+            <span className="text-xs text-gray-700">{sym.label}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+Write PropertiesPanel.tsx
+104 lines
+"use client";
+
+import { useState, useEffect } from "react";
+import type { Connector, DiagramElement } from "@/app/lib/diagram/types";
+
+interface Props {
+  element: DiagramElement | null;
+  connector: Connector | null;
+  onUpdateLabel: (id: string, label: string) => void;
+  onUpdateProperties: (id: string, props: Record<string, unknown>) => void;
+  onDeleteElement: (id: string) => void;
+  onDeleteConnector: (id: string) => void;
+}
+
+export function PropertiesPanel({
+  element,
+  connector,
+  onUpdateLabel,
+  onUpdateProperties,
+  onDeleteElement,
+  onDeleteConnector,
+}: Props) {
+  const [labelDraft, setLabelDraft] = useState("");
+
+  useEffect(() => {
+    if (element) setLabelDraft(element.label);
+  }, [element]);
+
+  if (!element && !connector) {
+    return (
+      <div className="w-56 border-l border-gray-200 bg-white p-4">
+        <p className="text-xs text-gray-400">Select an element to see properties</p>
+      </div>
+    );
+  }
+
+  if (connector) {
+    return (
+      <div className="w-56 border-l border-gray-200 bg-white p-4 space-y-4">
+        <div>
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+            Connector
+          </p>
+          <p className="text-xs text-gray-600">Type: {connector.type}</p>
+        </div>
+        <button
+          onClick={() => onDeleteConnector(connector.id)}
+          className="w-full px-3 py-1.5 text-xs bg-red-50 text-red-600 border border-red-200 rounded hover:bg-red-100"
+        >
+          Delete connector
+        </button>
+      </div>
+    );
+  }
+
+  if (!element) return null;
+
+  return (
+    <div className="w-56 border-l border-gray-200 bg-white p-4 space-y-4">
+      <div>
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+          Properties
+        </p>
+        <p className="text-xs text-gray-400 mb-3">Type: {element.type}</p>
+      </div>
+
+      <div>
+        <label className="block text-xs font-medium text-gray-700 mb-1">
+          Label
+        </label>
+        <input
+          type="text"
+          value={labelDraft}
+          onChange={(e) => setLabelDraft(e.target.value)}
+          onBlur={() => onUpdateLabel(element.id, labelDraft)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") onUpdateLabel(element.id, labelDraft);
+          }}
+          className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+        />
+      </div>
+
+      <div>
+        <label className="block text-xs font-medium text-gray-700 mb-1">
+          Position
+        </label>
+        <p className="text-xs text-gray-500">
+          X: {Math.round(element.x)}, Y: {Math.round(element.y)}
+        </p>
+        <p className="text-xs text-gray-500">
+          {element.width} × {element.height}
+        </p>
+      </div>
+
+      <button
+        onClick={() => onDeleteElement(element.id)}
+        className="w-full px-3 py-1.5 text-xs bg-red-50 text-red-600 border border-red-200 rounded hover:bg-red-100"
+      >
+        Delete element
+      </button>
+    </div>
+  );
+}
+Now the main Canvas component:
+
+Write Canvas.tsx
+273 lines
+"use client";
+
+import { useRef, useState, useCallback } from "react";
+import type {
+  ConnectorType,
+  DiagramData,
+  DiagramElement,
+  Point,
+  SymbolType,
+} from "@/app/lib/diagram/types";
+import { SymbolRenderer } from "./SymbolRenderer";
+import { ConnectorRenderer } from "./ConnectorRenderer";
+
+interface Props {
+  data: DiagramData;
+  onAddElement: (type: SymbolType, position: Point) => void;
+  onMoveElement: (id: string, x: number, y: number) => void;
+  onUpdateLabel: (id: string, label: string) => void;
+  onDeleteElement: (id: string) => void;
+  onAddConnector: (sourceId: string, targetId: string, type: ConnectorType) => void;
+  onDeleteConnector: (id: string) => void;
+  selectedElementId: string | null;
+  selectedConnectorId: string | null;
+  onSelectElement: (id: string | null) => void;
+  onSelectConnector: (id: string | null) => void;
+  pendingDragSymbol: SymbolType | null;
+}
+
+interface EditingLabel {
+  elementId: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  value: string;
+}
+
+export function Canvas({
+  data,
+  onAddElement,
+  onMoveElement,
+  onUpdateLabel,
+  onDeleteElement,
+  onAddConnector,
+  onDeleteConnector,
+  selectedElementId,
+  selectedConnectorId,
+  onSelectElement,
+  onSelectConnector,
+  pendingDragSymbol,
+}: Props) {
+  const svgRef = useRef<SVGSVGElement>(null);
+
+  // Pan/zoom state
+  const [pan, setPan] = useState<Point>({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+
+  // Inline label editing
+  const [editingLabel, setEditingLabel] = useState<EditingLabel | null>(null);
+
+  // Connector drawing
+  const [connectingFrom, setConnectingFrom] = useState<string | null>(null);
+  const [hoverElementId, setHoverElementId] = useState<string | null>(null);
+
+  const svgToWorld = useCallback(
+    (svgX: number, svgY: number): Point => ({
+      x: (svgX - pan.x) / zoom,
+      y: (svgY - pan.y) / zoom,
+    }),
+    [pan, zoom]
+  );
+
+  function getSvgCoords(e: React.MouseEvent): Point {
+    const rect = svgRef.current!.getBoundingClientRect();
+    return svgToWorld(e.clientX - rect.left, e.clientY - rect.top);
+  }
+
+  // ---- Pan handling ----
+  const panStart = useRef<{ mouseX: number; mouseY: number; panX: number; panY: number } | null>(null);
+
+  function handleBackgroundMouseDown(e: React.MouseEvent) {
+    if (e.button !== 0) return;
+    onSelectElement(null);
+    onSelectConnector(null);
+    panStart.current = {
+      mouseX: e.clientX,
+      mouseY: e.clientY,
+      panX: pan.x,
+      panY: pan.y,
+    };
+
+    function onMouseMove(ev: MouseEvent) {
+      if (!panStart.current) return;
+      setPan({
+        x: panStart.current.panX + ev.clientX - panStart.current.mouseX,
+        y: panStart.current.panY + ev.clientY - panStart.current.mouseY,
+      });
+    }
+
+    function onMouseUp() {
+      panStart.current = null;
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    }
+
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+  }
+
+  // ---- Zoom ----
+  function handleWheel(e: React.WheelEvent) {
+    e.preventDefault();
+    const rect = svgRef.current!.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    const delta = e.deltaY > 0 ? 0.9 : 1.1;
+    const newZoom = Math.min(4, Math.max(0.2, zoom * delta));
+
+    // Keep mouse position fixed during zoom
+    setPan((prev) => ({
+      x: mouseX - (mouseX - prev.x) * (newZoom / zoom),
+      y: mouseY - (mouseY - prev.y) * (newZoom / zoom),
+    }));
+    setZoom(newZoom);
+  }
+
+  // ---- Drop from palette ----
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    if (!pendingDragSymbol) return;
+    const rect = svgRef.current!.getBoundingClientRect();
+    const worldPos = svgToWorld(e.clientX - rect.left, e.clientY - rect.top);
+    onAddElement(pendingDragSymbol, worldPos);
+  }
+
+  // ---- Inline label editing ----
+  function startEditingLabel(el: DiagramElement) {
+    setEditingLabel({
+      elementId: el.id,
+      x: el.x * zoom + pan.x,
+      y: el.y * zoom + pan.y,
+      width: el.width * zoom,
+      height: el.height * zoom,
+      value: el.label,
+    });
+  }
+
+  function commitLabel() {
+    if (!editingLabel) return;
+    onUpdateLabel(editingLabel.elementId, editingLabel.value);
+    setEditingLabel(null);
+  }
+
+  // ---- Connection points ----
+  function handleConnectionPointClick(elementId: string) {
+    if (connectingFrom === null) {
+      setConnectingFrom(elementId);
+    } else if (connectingFrom !== elementId) {
+      onAddConnector(connectingFrom, elementId, "sequence");
+      setConnectingFrom(null);
+    } else {
+      setConnectingFrom(null);
+    }
+  }
+
+  // ---- Keyboard ----
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (e.key === "Escape") {
+      setConnectingFrom(null);
+      setEditingLabel(null);
+    }
+    if (e.key === "Delete" || e.key === "Backspace") {
+      if (editingLabel) return;
+      if (selectedElementId) onDeleteElement(selectedElementId);
+      if (selectedConnectorId) onDeleteConnector(selectedConnectorId);
+    }
+  }
+
+  const transform = `translate(${pan.x}, ${pan.y}) scale(${zoom})`;
+
+  return (
+    <div className="relative flex-1 overflow-hidden bg-gray-50" style={{ backgroundImage: "radial-gradient(#d1d5db 1px, transparent 1px)", backgroundSize: "20px 20px" }}>
+      <svg
+        ref={svgRef}
+        className="w-full h-full outline-none"
+        tabIndex={0}
+        onMouseDown={handleBackgroundMouseDown}
+        onWheel={handleWheel}
+        onDrop={handleDrop}
+        onDragOver={(e) => e.preventDefault()}
+        onKeyDown={handleKeyDown}
+        style={{ cursor: connectingFrom ? "crosshair" : "default" }}
+      >
+        <g transform={transform}>
+          {data.connectors.map((conn) => (
+            <ConnectorRenderer
+              key={conn.id}
+              connector={conn}
+              selected={conn.id === selectedConnectorId}
+              onSelect={() => {
+                onSelectConnector(conn.id);
+                onSelectElement(null);
+              }}
+            />
+          ))}
+
+          {data.elements.map((el) => (
+            <SymbolRenderer
+              key={el.id}
+              element={el}
+              selected={el.id === selectedElementId}
+              onSelect={() => {
+                onSelectElement(el.id);
+                onSelectConnector(null);
+              }}
+              onMove={(x, y) => onMoveElement(el.id, x, y)}
+              onDoubleClick={() => startEditingLabel(el)}
+              onConnectionPointClick={() => handleConnectionPointClick(el.id)}
+              showConnectionPoints={
+                el.id === selectedElementId ||
+                el.id === hoverElementId ||
+                connectingFrom !== null
+              }
+            />
+          ))}
+        </g>
+      </svg>
+
+      {/* Inline label editor overlay */}
+      {editingLabel && (
+        <input
+          autoFocus
+          type="text"
+          value={editingLabel.value}
+          onChange={(e) =>
+            setEditingLabel((prev) =>
+              prev ? { ...prev, value: e.target.value } : null
+            )
+          }
+          onBlur={commitLabel}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") commitLabel();
+            if (e.key === "Escape") setEditingLabel(null);
+          }}
+          style={{
+            position: "absolute",
+            left: editingLabel.x,
+            top: editingLabel.y + editingLabel.height / 2 - 12,
+            width: editingLabel.width,
+            height: 24,
+            fontSize: 12 * zoom,
+            textAlign: "center",
+            background: "white",
+            border: "2px solid #2563eb",
+            borderRadius: 4,
+            outline: "none",
+            padding: "0 4px",
+          }}
+        />
+      )}
+
+      {/* Status bar */}
+      <div className="absolute bottom-2 left-2 text-xs text-gray-400 bg-white/80 px-2 py-1 rounded">
+        {connectingFrom
+          ? "Click a connection point on another symbol to connect"
+          : "Drag to pan · Scroll to zoom · Double-click to edit label · Delete to remove"}
+        {" · "}
+        {Math.round(zoom * 100)}%
+      </div>
+    </div>
+  );
+}
+Now the dashboard and diagram editor pages:
+
+Write page.tsx
+29 lines
+import { redirect } from "next/navigation";
+import { auth } from "@/auth";
+import { prisma } from "@/app/lib/db";
+import { DashboardClient } from "./DashboardClient";
+
+export default async function DashboardPage() {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+
+  const diagrams = await prisma.diagram.findMany({
+    where: { userId: session.user.id },
+    orderBy: { updatedAt: "desc" },
+    select: {
+      id: true,
+      name: true,
+      type: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  });
+
+  return (
+    <DashboardClient
+      diagrams={diagrams}
+      userName={session.user.name ?? session.user.email ?? "User"}
+    />
+  );
+}
+Write DashboardClient.tsx
+264 lines
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { signOut } from "next-auth/react";
+import type { DiagramType } from "@/app/lib/diagram/types";
+
+interface DiagramSummary {
+  id: string;
+  name: string;
+  type: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface Props {
+  diagrams: DiagramSummary[];
+  userName: string;
+}
+
+const DIAGRAM_TYPE_LABELS: Record<string, string> = {
+  basic: "Basic",
+  "process-context": "Process Context",
+  "state-machine": "State Machine",
+  bpmn: "BPMN",
+};
+
+const DIAGRAM_TYPES: { value: DiagramType; label: string; description: string }[] = [
+  {
+    value: "basic",
+    label: "Basic Diagram",
+    description: "Simple boxes and arrows — the best starting point",
+  },
+  {
+    value: "process-context",
+    label: "Process Context",
+    description: "Use cases with actors showing process participants",
+  },
+  {
+    value: "state-machine",
+    label: "State Machine",
+    description: "States and transitions for entity lifecycle",
+  },
+  {
+    value: "bpmn",
+    label: "BPMN",
+    description: "Full Business Process Model and Notation",
+  },
+];
+
+export function DashboardClient({ diagrams: initialDiagrams, userName }: Props) {
+  const router = useRouter();
+  const [diagrams, setDiagrams] = useState(initialDiagrams);
+  const [showNewDialog, setShowNewDialog] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newType, setNewType] = useState<DiagramType>("basic");
+  const [creating, setCreating] = useState(false);
+  const [error, setError] = useState("");
+
+  async function handleCreate() {
+    if (!newName.trim()) {
+      setError("Please enter a name");
+      return;
+    }
+    setCreating(true);
+    setError("");
+
+    const res = await fetch("/api/diagrams", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: newName.trim(), type: newType }),
+    });
+
+    setCreating(false);
+
+    if (!res.ok) {
+      setError("Failed to create diagram");
+      return;
+    }
+
+    const diagram = await res.json();
+    router.push(`/diagram/${diagram.id}`);
+  }
+
+  async function handleDelete(id: string, e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!confirm("Delete this diagram?")) return;
+
+    await fetch(`/api/diagrams/${id}`, { method: "DELETE" });
+    setDiagrams((prev) => prev.filter((d) => d.id !== id));
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-7 h-7 bg-blue-600 rounded flex items-center justify-center">
+            <svg width={14} height={14} viewBox="0 0 14 14" fill="none">
+              <rect x={1} y={1} width={5} height={5} rx={1} fill="white" />
+              <rect x={8} y={1} width={5} height={5} rx={1} fill="white" />
+              <rect x={1} y={8} width={5} height={5} rx={1} fill="white" />
+              <rect x={8} y={8} width={5} height={5} rx={1} fill="white" />
+            </svg>
+          </div>
+          <span className="font-semibold text-gray-900">Diagramatix</span>
+        </div>
+        <div className="flex items-center gap-4">
+          <span className="text-sm text-gray-600">{userName}</span>
+          <button
+            onClick={() => signOut({ callbackUrl: "/login" })}
+            className="text-sm text-gray-500 hover:text-gray-700"
+          >
+            Sign out
+          </button>
+        </div>
+      </header>
+
+      <main className="max-w-5xl mx-auto px-6 py-8">
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-xl font-semibold text-gray-900">My Diagrams</h1>
+          <button
+            onClick={() => setShowNewDialog(true)}
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm font-medium"
+          >
+            + New Diagram
+          </button>
+        </div>
+
+        {diagrams.length === 0 ? (
+          <div className="text-center py-16 bg-white rounded-lg border border-gray-200">
+            <p className="text-gray-500 mb-4">No diagrams yet</p>
+            <button
+              onClick={() => setShowNewDialog(true)}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
+            >
+              Create your first diagram
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {diagrams.map((d) => (
+              <div
+                key={d.id}
+                onClick={() => router.push(`/diagram/${d.id}`)}
+                className="bg-white border border-gray-200 rounded-lg p-4 hover:border-blue-300 hover:shadow-sm cursor-pointer group transition-all"
+              >
+                <div className="flex items-start justify-between mb-2">
+                  <div className="w-8 h-8 bg-blue-50 rounded flex items-center justify-center">
+                    <svg width={16} height={16} viewBox="0 0 16 16" fill="none">
+                      <rect x={1} y={4} width={6} height={4} rx={1} stroke="#2563eb" strokeWidth={1.2} />
+                      <rect x={9} y={4} width={6} height={4} rx={1} stroke="#2563eb" strokeWidth={1.2} />
+                      <line x1={7} y1={6} x2={9} y2={6} stroke="#2563eb" strokeWidth={1.2} />
+                    </svg>
+                  </div>
+                  <button
+                    onClick={(e) => handleDelete(d.id, e)}
+                    className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 text-xs px-1"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <h3 className="font-medium text-gray-900 text-sm mb-1">{d.name}</h3>
+                <p className="text-xs text-gray-500 mb-2">
+                  {DIAGRAM_TYPE_LABELS[d.type] ?? d.type}
+                </p>
+                <p className="text-xs text-gray-400">
+                  {new Date(d.updatedAt).toLocaleDateString()}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+      </main>
+
+      {/* New diagram dialog */}
+      {showNewDialog && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">
+              New Diagram
+            </h2>
+
+            {error && (
+              <p className="mb-3 text-sm text-red-600 bg-red-50 px-3 py-2 rounded">
+                {error}
+              </p>
+            )}
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Name
+              </label>
+              <input
+                autoFocus
+                type="text"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleCreate()}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="My diagram"
+              />
+            </div>
+
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Type
+              </label>
+              <div className="space-y-2">
+                {DIAGRAM_TYPES.map((dt) => (
+                  <label
+                    key={dt.value}
+                    className={`flex items-start gap-3 p-3 border rounded-lg cursor-pointer ${
+                      newType === dt.value
+                        ? "border-blue-500 bg-blue-50"
+                        : "border-gray-200 hover:border-gray-300"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="type"
+                      value={dt.value}
+                      checked={newType === dt.value}
+                      onChange={() => setNewType(dt.value)}
+                      className="mt-0.5"
+                    />
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">
+                        {dt.label}
+                      </p>
+                      <p className="text-xs text-gray-500">{dt.description}</p>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => {
+                  setShowNewDialog(false);
+                  setNewName("");
+                  setError("");
+                }}
+                className="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreate}
+                disabled={creating}
+                className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+              >
+                {creating ? "Creating..." : "Create"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+Now the diagram editor page:
+
+Write page.tsx
+36 lines
+import { redirect, notFound } from "next/navigation";
+import { auth } from "@/auth";
+import { prisma } from "@/app/lib/db";
+import { DiagramEditor } from "./DiagramEditor";
+import type { DiagramData, DiagramType } from "@/app/lib/diagram/types";
+import { EMPTY_DIAGRAM } from "@/app/lib/diagram/types";
+
+type Props = { params: Promise<{ id: string }> };
+
+export default async function DiagramPage({ params }: Props) {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+
+  const { id } = await params;
+
+  const diagram = await prisma.diagram.findFirst({
+    where: { id, userId: session.user.id },
+  });
+
+  if (!diagram) notFound();
+
+  const data: DiagramData =
+    diagram.data && typeof diagram.data === "object" && !Array.isArray(diagram.data)
+      ? (diagram.data as DiagramData)
+      : EMPTY_DIAGRAM;
+
+  return (
+    <DiagramEditor
+      diagramId={diagram.id}
+      diagramName={diagram.name}
+      diagramType={diagram.type as DiagramType}
+      initialData={data}
+    />
+  );
+}
+Write DiagramEditor.tsx
+200 lines
+"use client";
+
+import { useState, useCallback, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
+import type { ConnectorType, DiagramData, DiagramType, SymbolType } from "@/app/lib/diagram/types";
+import { useDiagram } from "@/app/hooks/useDiagram";
+import { Canvas } from "@/app/components/canvas/Canvas";
+import { Palette } from "@/app/components/canvas/Palette";
+import { PropertiesPanel } from "@/app/components/canvas/PropertiesPanel";
+
+interface Props {
+  diagramId: string;
+  diagramName: string;
+  diagramType: DiagramType;
+  initialData: DiagramData;
+}
+
+function useAutoSave(
+  diagramId: string,
+  data: DiagramData,
+  delay = 1500
+) {
+  const saveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "unsaved">("saved");
+  const lastSaved = useRef<string>(JSON.stringify(data));
+
+  useEffect(() => {
+    const current = JSON.stringify(data);
+    if (current === lastSaved.current) return;
+
+    setSaveStatus("unsaved");
+
+    if (saveTimeout.current) clearTimeout(saveTimeout.current);
+
+    saveTimeout.current = setTimeout(async () => {
+      setSaveStatus("saving");
+      try {
+        await fetch(`/api/diagrams/${diagramId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ data }),
+        });
+        lastSaved.current = current;
+        setSaveStatus("saved");
+      } catch {
+        setSaveStatus("unsaved");
+      }
+    }, delay);
+
+    return () => {
+      if (saveTimeout.current) clearTimeout(saveTimeout.current);
+    };
+  }, [data, diagramId, delay]);
+
+  return saveStatus;
+}
+
+function exportSvg(svgEl: SVGSVGElement, name: string) {
+  const clone = svgEl.cloneNode(true) as SVGSVGElement;
+  clone.removeAttribute("tabindex");
+  const serializer = new XMLSerializer();
+  const svgStr = serializer.serializeToString(clone);
+  const blob = new Blob([svgStr], { type: "image/svg+xml" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${name}.svg`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+export function DiagramEditor({
+  diagramId,
+  diagramName,
+  diagramType,
+  initialData,
+}: Props) {
+  const router = useRouter();
+  const svgRef = useRef<SVGSVGElement | null>(null);
+
+  const {
+    data,
+    addElement,
+    moveElement,
+    updateLabel,
+    deleteElement,
+    addConnector,
+    deleteConnector,
+  } = useDiagram(initialData);
+
+  const saveStatus = useAutoSave(diagramId, data);
+
+  const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
+  const [selectedConnectorId, setSelectedConnectorId] = useState<string | null>(null);
+  const [pendingDragSymbol, setPendingDragSymbol] = useState<SymbolType | null>(null);
+
+  const selectedElement = data.elements.find((el) => el.id === selectedElementId) ?? null;
+  const selectedConnector = data.connectors.find((c) => c.id === selectedConnectorId) ?? null;
+
+  const handleAddConnector = useCallback(
+    (sourceId: string, targetId: string, type: ConnectorType = "sequence") => {
+      addConnector(sourceId, targetId, type);
+    },
+    [addConnector]
+  );
+
+  function handleExport() {
+    const svgEl = document.querySelector("svg");
+    if (svgEl) exportSvg(svgEl as SVGSVGElement, diagramName);
+  }
+
+  return (
+    <div className="flex flex-col h-screen bg-white">
+      {/* Top bar */}
+      <header className="h-12 border-b border-gray-200 flex items-center px-4 gap-4 flex-shrink-0">
+        <button
+          onClick={() => router.push("/dashboard")}
+          className="text-gray-500 hover:text-gray-700 text-sm"
+        >
+          ← Dashboard
+        </button>
+
+        <div className="flex items-center gap-2">
+          <div className="w-5 h-5 bg-blue-600 rounded flex items-center justify-center">
+            <svg width={10} height={10} viewBox="0 0 10 10" fill="none">
+              <rect x={0.5} y={0.5} width={3.5} height={3.5} rx={0.5} fill="white" />
+              <rect x={6} y={0.5} width={3.5} height={3.5} rx={0.5} fill="white" />
+              <rect x={0.5} y={6} width={3.5} height={3.5} rx={0.5} fill="white" />
+              <rect x={6} y={6} width={3.5} height={3.5} rx={0.5} fill="white" />
+            </svg>
+          </div>
+          <span className="font-semibold text-gray-900 text-sm">{diagramName}</span>
+          <span className="text-xs text-gray-400 px-1.5 py-0.5 bg-gray-100 rounded">
+            {diagramType}
+          </span>
+        </div>
+
+        <div className="flex-1" />
+
+        <span className="text-xs text-gray-400">
+          {saveStatus === "saving" && "Saving…"}
+          {saveStatus === "saved" && "Saved"}
+          {saveStatus === "unsaved" && "Unsaved changes"}
+        </span>
+
+        <button
+          onClick={handleExport}
+          className="px-3 py-1.5 text-xs text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
+        >
+          Export SVG
+        </button>
+      </header>
+
+      {/* Main editor area */}
+      <div className="flex flex-1 overflow-hidden">
+        <Palette
+          diagramType={diagramType}
+          onDragStart={(type) => setPendingDragSymbol(type)}
+        />
+
+        <Canvas
+          data={data}
+          onAddElement={addElement}
+          onMoveElement={moveElement}
+          onUpdateLabel={updateLabel}
+          onDeleteElement={(id) => {
+            deleteElement(id);
+            setSelectedElementId(null);
+          }}
+          onAddConnector={handleAddConnector}
+          onDeleteConnector={(id) => {
+            deleteConnector(id);
+            setSelectedConnectorId(null);
+          }}
+          selectedElementId={selectedElementId}
+          selectedConnectorId={selectedConnectorId}
+          onSelectElement={setSelectedElementId}
+          onSelectConnector={setSelectedConnectorId}
+          pendingDragSymbol={pendingDragSymbol}
+        />
+
+        <PropertiesPanel
+          element={selectedElement}
+          connector={selectedConnector}
+          onUpdateLabel={updateLabel}
+          onUpdateProperties={() => {}}
+          onDeleteElement={(id) => {
+            deleteElement(id);
+            setSelectedElementId(null);
+          }}
+          onDeleteConnector={(id) => {
+            deleteConnector(id);
+            setSelectedConnectorId(null);
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+Now update the root layout and home page:
+
+Write layout.tsx
+26 lines
+import type { Metadata } from "next";
+import { Geist } from "next/font/google";
+import "./globals.css";
+
+const geist = Geist({
+  variable: "--font-geist",
+  subsets: ["latin"],
+});
+
+export const metadata: Metadata = {
+  title: "Diagramatix",
+  description: "Professional process diagramming for business analysts",
+};
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html lang="en">
+      <body className={`${geist.variable} antialiased`}>{children}</body>
+    </html>
+  );
+}
+Write page.tsx
+Write failed
+import { redirect } from "next/navigation";
+import { auth } from "@/auth";
+
+export default async function HomePage() {
+  const session = await auth();
+  if (session?.user) {
+    redirect("/dashboard");
+  } else {
+    redirect("/login");
+  }
+}
+Read page.tsx
+Write page.tsx
+12 lines
+import { redirect } from "next/navigation";
+import { auth } from "@/auth";
+
+export default async function HomePage() {
+  const session = await auth();
+  if (session?.user) {
+    redirect("/dashboard");
+  } else {
+    redirect("/login");
+  }
+}
+Now fix the useDiagram hook — it has a require() which is not ideal in a reducer. Let me refactor that:
+
+Edit useDiagram.ts
+Edit failed
+Read useDiagram.ts
+Edit useDiagram.ts
+Modified
+Edit useDiagram.ts
+Removed 1 line
+Now let's also fix the unused variable warning in SymbolRenderer.tsx — the GatewayShape uses hw and hh which are unused:
+
+Edit SymbolRenderer.tsx
+Edit failed
+Read SymbolRenderer.tsx (lines 56-85)
+Read SymbolRenderer.tsx (lines 47-56)
+Edit SymbolRenderer.tsx
+Removed 2 lines
+Now let's also add a SessionProvider wrapper for Auth.js client components. The signIn and signOut from next-auth/react need the session provider:
+
+Bash Ensure components directory exists
+IN
+mkdir -p /c/Git/Diagramatix/diagramatix/app/components && echo "done"
+
+OUT
+done
+Write SessionProvider.tsx
+8 lines
+"use client";
+
+import { SessionProvider as NextAuthSessionProvider } from "next-auth/react";
+
+export function SessionProvider({ children }: { children: React.ReactNode }) {
+  return <NextAuthSessionProvider>{children}</NextAuthSessionProvider>;
+}
+Edit layout.tsx
+Edit failed
+Read layout.tsx
+Edit layout.tsx
+Added 1 line
+Edit layout.tsx
+Added 2 lines
+Now let's run a TypeScript check to catch any issues before trying to run:
+
+Bash TypeScript type check
+IN
+export PATH="$PATH:/c/Program Files/nodejs" && cd /c/Git/Diagramatix/diagramatix && npx tsc --noEmit 2>&1 | head -60
+
+OUT
+Exit code 127
+/usr/bin/bash: line 1: head: command not found
+
+/usr/bin/bash: line 1: head: command not found
+Bash TypeScript type check
+IN
+export PATH="$PATH:/c/Program Files/nodejs" && cd /c/Git/Diagramatix/diagramatix && npx tsc --noEmit 2>&1
+
+OUT
+Exit code 2
+app/lib/db.ts(1,30): error TS2307: Cannot find module '../generated/prisma' or its corresponding type declarations.
+app/lib/diagram/routing.ts(52,44): error TS2345: Argument of type 'Point' is not assignable to parameter of type 'Bounds'.
+  Type 'Point' is missing the following properties from type 'Bounds': width, height
+
+app/lib/db.ts(1,30): error TS2307: Cannot find module '../generated/prisma' or its corresponding type declarations.
+app/lib/diagram/routing.ts(52,44): error TS2345: Argument of type 'Point' is not assignable to parameter of type 'Bounds'.
+  Type 'Point' is missing the following properties from type 'Bounds': width, height
+Two errors to fix — let me address both:
+
+Read routing.ts (lines 46-65)
+Edit routing.ts
+Modified
+Now generate the Prisma client:
+
+Bash Generate Prisma client
+IN
+export PATH="$PATH:/c/Program Files/nodejs" && cd /c/Git/Diagramatix/diagramatix && npx prisma generate 2>&1
+
+OUT
+Exit code 1
+Loaded Prisma config from prisma.config.ts.
+
+Prisma schema loaded from prisma\schema.prisma.
+Error: Prisma schema validation - (get-config wasm)
+Error code: P1012
+error: The datasource property `url` is no longer supported in schema files. Move connection URLs for Migrate to `prisma.config.ts` and pass either `adapter` for a direct database connection or `accelerateUrl` for Accelerate to the `PrismaClient` constructor. See https://pris.ly/d/config-datasource and https://pris.ly/d/prisma7-client-config
+  -->  prisma\schema.prisma:8
+   | 
+ 7 |   provider = "postgresql"
+ 8 |   url      = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+[Context: getConfig]
+
+Prisma CLI Version : 7.4.2
+
+Loaded Prisma config from prisma.config.ts.
+
+Prisma schema loaded from prisma\schema.prisma.
+Error: Prisma schema validation - (get-config wasm)
+Error code: P1012
+error: The datasource property `url` is no longer supported in schema files. Move connection URLs for Migrate to `prisma.config.ts` and pass either `adapter` for a direct database connection or `accelerateUrl` for Accelerate to the `PrismaClient` constructor. See https://pris.ly/d/config-datasource and https://pris.ly/d/prisma7-client-config
+  -->  prisma\schema.prisma:8
+   | 
+ 7 |   provider = "postgresql"
+ 8 |   url      = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+[Context: getConfig]
+
+Prisma CLI Version : 7.4.2
+Prisma 7 changed how database URLs work — need to use adapters. Let me fix this:
+
+Bash Install Prisma PostgreSQL adapter
+IN
+export PATH="$PATH:/c/Program Files/nodejs" && cd /c/Git/Diagramatix/diagramatix && npm install @prisma/adapter-pg pg && npm install -D @types/pg 2>&1
+
+OUT
+added 17 packages, and audited 163 packages in 6s
+
+25 packages are looking for funding
+  run `npm fund` for details
+
+8 moderate severity vulnerabilities
+
+To address issues that do not require attention, run:
+  npm audit fix
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+
+Run `npm audit` for details.
+
+added 1 package, and audited 164 packages in 2s
+
+25 packages are looking for funding
+  run `npm fund` for details
+
+8 moderate severity vulnerabilities
+
+To address issues that do not require attention, run:
+  npm audit fix
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+
+Run `npm audit` for details.
+Edit schema.prisma
+Edit failed
+Read schema.prisma
+Edit schema.prisma
+Removed 1 line
+Now update db.ts to use the pg adapter:
+
+Write db.ts
+Write failed
+import { PrismaClient } from "../generated/prisma";
+import { PrismaPg } from "@prisma/adapter-pg";
+
+const globalForPrisma = globalThis as unknown as {
+  prisma: PrismaClient | undefined;
+};
+
+function createPrismaClient() {
+  const connectionString = process.env.DATABASE_URL!;
+  const adapter = new PrismaPg({ connectionString });
+  return new PrismaClient({
+    adapter,
+    log:
+      process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
+  });
+}
+
+export const prisma = globalForPrisma.prisma ?? createPrismaClient();
+
+if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+Read db.ts
+Write db.ts
+21 lines
+import { PrismaClient } from "../generated/prisma";
+import { PrismaPg } from "@prisma/adapter-pg";
+
+const globalForPrisma = globalThis as unknown as {
+  prisma: PrismaClient | undefined;
+};
+
+function createPrismaClient() {
+  const connectionString = process.env.DATABASE_URL!;
+  const adapter = new PrismaPg({ connectionString });
+  return new PrismaClient({
+    adapter,
+    log:
+      process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
+  });
+}
+
+export const prisma = globalForPrisma.prisma ?? createPrismaClient();
+
+if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+Bash Generate Prisma client again
+IN
+export PATH="$PATH:/c/Program Files/nodejs" && cd /c/Git/Diagramatix/diagramatix && npx prisma generate 2>&1
+
+OUT
+Loaded Prisma config from prisma.config.ts.
+
+Prisma schema loaded from prisma\schema.prisma.
+
+✔ Generated Prisma Client (7.4.2) to .\app\generated\prisma in 109ms
+Prisma client generated. Now run TypeScript check again:
+
+Bash TypeScript type check
+IN
+export PATH="$PATH:/c/Program Files/nodejs" && cd /c/Git/Diagramatix/diagramatix && npx tsc --noEmit 2>&1
+
+OUT
+Exit code 2
+app/lib/db.ts(1,30): error TS2307: Cannot find module '../generated/prisma' or its corresponding type declarations.
+
+app/lib/db.ts(1,30): error TS2307: Cannot find module '../generated/prisma' or its corresponding type declarations.
+Bash Check generated prisma output
+IN
+ls /c/Git/Diagramatix/diagramatix/app/generated/prisma/ 2>/dev/null && echo "exists" || echo "missing"
+
+OUT
+browser.ts
+client.ts
+commonInputTypes.ts
+enums.ts
+internal
+models
+models.ts
+exists
+Bash List generated prisma files
+IN
+ls /c/Git/Diagramatix/diagramatix/app/generated/prisma/*.ts 2>/dev/null
+
+OUT
+/c/Git/Diagramatix/diagramatix/app/generated/prisma/browser.ts
+/c/Git/Diagramatix/diagramatix/app/generated/prisma/client.ts
+/c/Git/Diagramatix/diagramatix/app/generated/prisma/commonInputTypes.ts
+/c/Git/Diagramatix/diagramatix/app/generated/prisma/enums.ts
+/c/Git/Diagramatix/diagramatix/app/generated/prisma/models.ts
+Bash Check Prisma client exports
+IN
+export PATH="$PATH:/c/Program Files/nodejs" && grep -n "export" /c/Git/Diagramatix/diagramatix/app/generated/prisma/client.ts 2>/dev/null | tr -d '\r'
+
+OUT
+Exit code 127
+/usr/bin/bash: line 1: tr: command not found
+
+/usr/bin/bash: line 1: tr: command not found
+Read client.ts
+The Prisma 7 generated file is client.ts, not an index. Update the import:
+
+Edit db.ts
+Modified
+Bash TypeScript type check
+IN
+export PATH="$PATH:/c/Program Files/nodejs" && cd /c/Git/Diagramatix/diagramatix && npx tsc --noEmit 2>&1
+
+OUT
+Exit code 2
+app/(dashboard)/diagram/[id]/page.tsx(24,10): error TS2352: Conversion of type 'JsonObject' to type 'DiagramData' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type 'JsonObject' is missing the following properties from type 'DiagramData': elements, connectors, viewport
+app/api/diagrams/route.ts(44,7): error TS2322: Type 'DiagramData' is not assignable to type 'JsonNullClass | InputJsonValue | undefined'.
+  Type 'DiagramData' is not assignable to type 'InputJsonObject'.
+    Index signature for type 'string' is missing in type 'DiagramData'.
+
+app/(dashboard)/diagram/[id]/page.tsx(24,10): error TS2352: Conversion of type 'JsonObject' to type 'DiagramData' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type 'JsonObject' is missing the following properties from type 'DiagramData': elements, connectors, viewport
+app/api/diagrams/route.ts(44,7): error TS2322: Type 'DiagramData' is not assignable to type 'JsonNullClass | InputJsonValue | undefined'.
+  Type 'DiagramData' is not assignable to type 'InputJsonObject'.
+    Index signature for type 'string' is missing in type 'DiagramData'.
+Two JSON type cast issues. Let me fix them:
+
+Read page.tsx
+Edit page.tsx
+Modified
+Read route.ts
+Edit route.ts
+Modified
+Let me use a simpler, cleaner cast approach:
+
+Edit route.ts
+Added 1 line
+Also fix the PUT route in [id]/route.ts:
+
+Read route.ts
+Edit route.ts
+Added 1 line
+Bash TypeScript type check again
+IN
+export PATH="$PATH:/c/Program Files/nodejs" && cd /c/Git/Diagramatix/diagramatix && npx tsc --noEmit 2>&1
+
+OUT
+0
+TypeScript passes cleanly. Now let me update the todos and try a build to ensure everything compiles end-to-end:
+
+Update Todos
+
+Bootstrap Next.js project with TypeScript, Tailwind, and dependencies
+
+Set up Prisma schema and database models
+
+Implement Auth.js with email/password credentials
+
+Build login and register pages
+
+Build dashboard page with diagram list and create flow
+
+Define core diagram TypeScript types
+
+Build SVG Canvas engine (Canvas, SymbolRenderer, ConnectorRenderer)
+
+Build Symbol Palette with drag-to-canvas
+
+Implement connector routing algorithm
+
+Build diagram API routes (CRUD)
+
+Build Properties Panel and label editing
+
+Implement SVG export
+
+Run next build to verify full compilation
+Bash Run Next.js production build
+IN
+export PATH="$PATH:/c/Program Files/nodejs" && cd /c/Git/Diagramatix/diagramatix && npm run build 2>&1
+
+OUT
+> diagramatix@0.1.0 build
+> next build
+
+Attention: Next.js now collects completely anonymous telemetry regarding usage.
+This information is used to shape Next.js' roadmap and prioritize features.
+You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
+https://nextjs.org/telemetry
+
+▲ Next.js 16.1.6 (Turbopack)
+- Environments: .env
+
+⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+  Creating an optimized production build ...
+Turbopack build encountered 3 warnings:
+./app/generated/prisma/client.ts:14:1
+Ecmascript file had an error
+[0m [90m 12 |[39m
+ [90m 13 |[39m [36mimport[39m [33m*[39m [36mas[39m process [36mfrom[39m [32m'node:process'[39m
+[31m[1m>[22m[39m[90m 14 |[39m [36mimport[39m [33m*[39m [36mas[39m path [36mfrom[39m [32m'node:path'[39m
+ [90m    |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m
+ [90m 15 |[39m [36mimport[39m { fileURLToPath } [36mfrom[39m [32m'node:url'[39m
+ [90m 16 |[39m globalThis[[32m'__dirname'[39m] [33m=[39m path[33m.[39mdirname(fileURLToPath([36mimport[39m[33m.[39mmeta[33m.[39murl))
+ [90m 17 |[39m[0m
+
+A Node.js module is loaded ('node:path' at line 14) which is not supported in the Edge Runtime.
+Learn More: https://nextjs.org/docs/messages/node-module-in-edge-runtime
+
+Import traces:
+  App Route:
+    ./app/generated/prisma/client.ts
+    ./app/lib/db.ts
+    ./app/api/diagrams/[id]/route.ts
+
+  Server Component:
+    ./app/generated/prisma/client.ts
+    ./app/lib/db.ts
+    ./app/(dashboard)/dashboard/page.tsx
+
+  Edge Middleware:
+    ./app/generated/prisma/client.ts
+    ./app/lib/db.ts
+    ./auth.ts
+    ./middleware.ts
+
+
+./app/generated/prisma/client.ts:15:1
+Ecmascript file had an error
+[0m [90m 13 |[39m [36mimport[39m [33m*[39m [36mas[39m process [36mfrom[39m [32m'node:process'[39m
+ [90m 14 |[39m [36mimport[39m [33m*[39m [36mas[39m path [36mfrom[39m [32m'node:path'[39m
+[31m[1m>[22m[39m[90m 15 |[39m [36mimport[39m { fileURLToPath } [36mfrom[39m [32m'node:url'[39m
+ [90m    |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m
+ [90m 16 |[39m globalThis[[32m'__dirname'[39m] [33m=[39m path[33m.[39mdirname(fileURLToPath([36mimport[39m[33m.[39mmeta[33m.[39murl))
+ [90m 17 |[39m
+ [90m 18 |[39m [36mimport[39m [33m*[39m [36mas[39m runtime [36mfrom[39m [32m"@prisma/client/runtime/client"[39m[0m
+
+A Node.js module is loaded ('node:url' at line 15) which is not supported in the Edge Runtime.
+Learn More: https://nextjs.org/docs/messages/node-module-in-edge-runtime
+
+Import traces:
+  App Route:
+    ./app/generated/prisma/client.ts
+    ./app/lib/db.ts
+    ./app/api/diagrams/[id]/route.ts
+
+  Server Component:
+    ./app/generated/prisma/client.ts
+    ./app/lib/db.ts
+    ./app/(dashboard)/dashboard/page.tsx
+
+  Edge Middleware:
+    ./app/generated/prisma/client.ts
+    ./app/lib/db.ts
+    ./auth.ts
+    ./middleware.ts
+
+
+./app/generated/prisma/internal/class.ts:42:28
+Ecmascript file had an error
+[0m [90m 40 |[39m
+ [90m 41 |[39m [36masync[39m [36mfunction[39m decodeBase64AsWasm(wasmBase64[33m:[39m string)[33m:[39m [33mPromise[39m[33m<[39m[33mWebAssembly[39m[33m.[39m[33mModule[39m[33m>[39m {
+[31m[1m>[22m[39m[90m 42 |[39m   [36mconst[39m { [33mBuffer[39m } [33m=[39m [36mawait[39m [36mimport[39m([32m'node:buffer'[39m)
+ [90m    |[39m                            [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m
+ [90m 43 |[39m   [36mconst[39m wasmArray [33m=[39m [33mBuffer[39m[33m.[39m[36mfrom[39m(wasmBase64[33m,[39m [32m'base64'[39m)
+ [90m 44 |[39m   [36mreturn[39m [36mnew[39m [33mWebAssembly[39m[33m.[39m[33mModule[39m(wasmArray)
+ [90m 45 |[39m }[0m
+
+A Node.js module is loaded ('node:buffer' at line 42) which is not supported in the Edge Runtime.
+Learn More: https://nextjs.org/docs/messages/node-module-in-edge-runtime
+
+Import traces:
+  App Route:
+    ./app/generated/prisma/internal/class.ts
+    ./app/generated/prisma/client.ts
+    ./app/lib/db.ts
+    ./app/api/diagrams/[id]/route.ts
+
+  Server Component:
+    ./app/generated/prisma/internal/class.ts
+    ./app/generated/prisma/client.ts
+    ./app/lib/db.ts
+    ./app/(dashboard)/dashboard/page.tsx
+
+  Edge Middleware:
+    ./app/generated/prisma/internal/class.ts
+    ./app/generated/prisma/client.ts
+    ./app/lib/db.ts
+    ./auth.ts
+    ./middleware.ts
+
+
+✓ Compiled successfully in 8.2s
+  Running TypeScript ...
+  Collecting page data using 15 workers ...
+  Generating static pages using 15 workers (0/9) ...
+  Generating static pages using 15 workers (2/9) 
+  Generating static pages using 15 workers (4/9) 
+  Generating static pages using 15 workers (6/9) 
+✓ Generating static pages using 15 workers (9/9) in 1065.0ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ƒ /
+├ ○ /_not-found
+├ ƒ /api/auth/[...nextauth]
+├ ƒ /api/diagrams
+├ ƒ /api/diagrams/[id]
+├ ƒ /api/register
+├ ƒ /dashboard
+├ ƒ /diagram/[id]
+├ ○ /login
+└ ○ /register
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+Build succeeded! Let me fix the two warnings — the Next.js 16 middleware deprecation and the Edge runtime Prisma issue:
+
+Write auth.config.ts
+27 lines
+import type { NextAuthConfig } from "next-auth";
+
+// Minimal auth config used by the proxy (middleware) — no Prisma imports
+export const authConfig = {
+  pages: { signIn: "/login" },
+  session: { strategy: "jwt" as const },
+  callbacks: {
+    authorized({ auth, request: { nextUrl } }) {
+      const isLoggedIn = !!auth?.user;
+      const isProtected =
+        nextUrl.pathname.startsWith("/dashboard") ||
+        nextUrl.pathname.startsWith("/diagram");
+      if (isProtected) return isLoggedIn;
+      return true;
+    },
+    jwt({ token, user }) {
+      if (user) token.id = user.id;
+      return token;
+    },
+    session({ session, token }) {
+      if (token?.id) session.user.id = token.id as string;
+      return session;
+    },
+  },
+  providers: [],
+} satisfies NextAuthConfig;
+Write auth.ts
+Write failed
+import NextAuth from "next-auth";
+import CredentialsProvider from "next-auth/providers/credentials";
+import { authConfig } from "./auth.config";
+import { prisma } from "@/app/lib/db";
+import bcrypt from "bcryptjs";
+
+export const { handlers, signIn, signOut, auth } = NextAuth({
+  ...authConfig,
+  providers: [
+    CredentialsProvider({
+      name: "credentials",
+      credentials: {
+        email: { label: "Email", type: "email" },
+        password: { label: "Password", type: "password" },
+      },
+      async authorize(credentials) {
+        if (!credentials?.email || !credentials?.password) return null;
+
+        const user = await prisma.user.findUnique({
+          where: { email: credentials.email as string },
+        });
+
+        if (!user) return null;
+
+        const passwordMatch = await bcrypt.compare(
+          credentials.password as string,
+          user.password
+        );
+
+        if (!passwordMatch) return null;
+
+        return {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+        };
+      },
+    }),
+  ],
+});
+Read auth.ts
+Write auth.ts
+41 lines
+import NextAuth from "next-auth";
+import CredentialsProvider from "next-auth/providers/credentials";
+import { authConfig } from "./auth.config";
+import { prisma } from "@/app/lib/db";
+import bcrypt from "bcryptjs";
+
+export const { handlers, signIn, signOut, auth } = NextAuth({
+  ...authConfig,
+  providers: [
+    CredentialsProvider({
+      name: "credentials",
+      credentials: {
+        email: { label: "Email", type: "email" },
+        password: { label: "Password", type: "password" },
+      },
+      async authorize(credentials) {
+        if (!credentials?.email || !credentials?.password) return null;
+
+        const user = await prisma.user.findUnique({
+          where: { email: credentials.email as string },
+        });
+
+        if (!user) return null;
+
+        const passwordMatch = await bcrypt.compare(
+          credentials.password as string,
+          user.password
+        );
+
+        if (!passwordMatch) return null;
+
+        return {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+        };
+      },
+    }),
+  ],
+});
+Now create the proxy.ts (Next.js 16 replacement for middleware) that uses the lightweight auth config:
+
+Write proxy.ts
+9 lines
+import NextAuth from "next-auth";
+import { authConfig } from "./auth.config";
+
+export const { auth: middleware } = NextAuth(authConfig);
+
+export const config = {
+  matcher: ["/dashboard/:path*", "/diagram/:path*"],
+};
+Bash Run Next.js build after proxy fix
+IN
+export PATH="$PATH:/c/Program Files/nodejs" && cd /c/Git/Diagramatix/diagramatix && npm run build 2>&1
+
+OUT
+Exit code 1
+
+> diagramatix@0.1.0 build
+> next build
+
+▲ Next.js 16.1.6 (Turbopack)
+- Environments: .env
+
+
+> Build error occurred
+Error: Both middleware file "./middleware.ts" and proxy file "./proxy.ts" are detected. Please use "./proxy.ts" only. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+    at ignore-listed frames
+
+
+> diagramatix@0.1.0 build
+> next build
+
+▲ Next.js 16.1.6 (Turbopack)
+- Environments: .env
+
+
+> Build error occurred
+Error: Both middleware file "./middleware.ts" and proxy file "./proxy.ts" are detected. Please use "./proxy.ts" only. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+    at ignore-listed frames
+Need to delete the old middleware.ts:
+
+Bash Remove deprecated middleware.ts
+IN
+rm /c/Git/Diagramatix/diagramatix/middleware.ts && echo "Deleted middleware.ts"
+
+OUT
+Deleted middleware.ts
+Bash Run Next.js build with proxy.ts
+IN
+export PATH="$PATH:/c/Program Files/nodejs" && cd /c/Git/Diagramatix/diagramatix && npm run build 2>&1
+
+OUT
+Exit code 1
+
+> diagramatix@0.1.0 build
+> next build
+
+▲ Next.js 16.1.6 (Turbopack)
+- Environments: .env
+
+  Creating an optimized production build ...
+
+> Build error occurred
+Error: Turbopack build failed with 1 errors:
+./proxy.ts
+Proxy is missing expected function export name
+This function is what Next.js runs for every request handled by this proxy (previously called middleware).
+
+Why this happens:
+- You are migrating from `middleware` to `proxy`, but haven't updated the exported function.
+- The file exists but doesn't export a function.
+- The export is not a function (e.g., an object or constant).
+- There's a syntax error preventing the export from being recognized.
+
+To fix it:
+- Ensure this file has either a default or "proxy" function export.
+
+Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+
+
+    at ignore-listed frames
+
+
+> diagramatix@0.1.0 build
+> next build
+
+▲ Next.js 16.1.6 (Turbopack)
+- Environments: .env
+
+  Creating an optimized production build ...
+
+> Build error occurred
+Error: Turbopack build failed with 1 errors:
+./proxy.ts
+Proxy is missing expected function export name
+This function is what Next.js runs for every request handled by this proxy (previously called middleware).
+
+Why this happens:
+- You are migrating from `middleware` to `proxy`, but haven't updated the exported function.
+- The file exists but doesn't export a function.
+- The export is not a function (e.g., an object or constant).
+- There's a syntax error preventing the export from being recognized.
+
+To fix it:
+- Ensure this file has either a default or "proxy" function export.
+
+Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+
+
+    at ignore-listed frames
+Next.js 16 requires the proxy export to be named proxy or default:
+
+Read proxy.ts
+Write proxy.ts
+11 lines
+import NextAuth from "next-auth";
+import { authConfig } from "./auth.config";
+
+const { auth } = NextAuth(authConfig);
+
+export const proxy = auth;
+
+export const config = {
+  matcher: ["/dashboard/:path*", "/diagram/:path*"],
+};
+Bash Run Next.js build again
+IN
+export PATH="$PATH:/c/Program Files/nodejs" && cd /c/Git/Diagramatix/diagramatix && npm run build 2>&1
+
+OUT
+> diagramatix@0.1.0 build
+> next build
+
+▲ Next.js 16.1.6 (Turbopack)
+- Environments: .env
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 6.4s
+  Running TypeScript ...
+  Collecting page data using 15 workers ...
+  Generating static pages using 15 workers (0/9) ...
+  Generating static pages using 15 workers (2/9) 
+  Generating static pages using 15 workers (4/9) 
+  Generating static pages using 15 workers (6/9) 
+✓ Generating static pages using 15 workers (9/9) in 1044.0ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ƒ /
+├ ○ /_not-found
+├ ƒ /api/auth/[...nextauth]
+├ ƒ /api/diagrams
+├ ƒ /api/diagrams/[id]
+├ ƒ /api/register
+├ ƒ /dashboard
+├ ƒ /diagram/[id]
+├ ○ /login
+└ ○ /register
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+Clean build with zero warnings. Let me update the memory file and mark everything complete:
+
+Update Todos
+
+Bootstrap Next.js project with TypeScript, Tailwind, and dependencies
+
+Set up Prisma schema and database models
+
+Implement Auth.js with email/password credentials
+
+Build login and register pages
+
+Build dashboard page with diagram list and create flow
+
+Define core diagram TypeScript types
+
+Build SVG Canvas engine (Canvas, SymbolRenderer, ConnectorRenderer)
+
+Build Symbol Palette with drag-to-canvas
+
+Implement connector routing algorithm
+
+Build diagram API routes (CRUD)
+
+Build Properties Panel and label editing
+
+Implement SVG export
+
+Run next build to verify full compilation
+Write C:\Users\paul\.claude\projects\c--Git-Diagramatix\memory\MEMORY.md
+61 lines
+# Diagramatix Memory
+
+## Project Overview
+Web-based BPMN/process diagramming tool built for Paul Nash and Greg Nash.
+See transcript: `c:\Git\Diagramatix\Product Creation using Claude.vtt`
+
+## App Location
+`c:\Git\Diagramatix\diagramatix\` — Next.js 15/16 app (no `src/` prefix, `app/` at root)
+
+## Tech Stack
+- **Framework**: Next.js 16.1.6 + TypeScript (App Router)
+- **Styling**: Tailwind CSS v4
+- **Database**: PostgreSQL + Prisma 7 (via `@prisma/adapter-pg`)
+- **Auth**: Auth.js v5 beta (next-auth@beta), JWT strategy, email+password
+- **Canvas**: SVG-based, custom implementation (no bpmn-js)
+- Node.js: v24.14.0 at `/c/Program Files/nodejs/` — not on default PATH, use `export PATH="$PATH:/c/Program Files/nodejs"`
+
+## Critical Prisma 7 Differences
+- Schema `datasource` has NO `url` field (Prisma 7 breaking change)
+- URL passed via `PrismaPg` adapter in `app/lib/db.ts`
+- Generated client is at `app/generated/prisma/client` (NOT `app/generated/prisma`)
+- JSON fields need `as any` cast for writes; `as unknown as T` for reads
+
+## Next.js 16 Differences
+- `middleware.ts` → `proxy.ts` (must export `proxy` named function)
+- Auth proxy uses `auth.config.ts` (no Prisma) to avoid Edge runtime issue
+- Full auth with Prisma in `auth.ts`
+
+## Key Files
+- `app/lib/diagram/types.ts` — all TypeScript types
+- `app/lib/diagram/routing.ts` — orthogonal connector routing
+- `app/lib/diagram/symbols/definitions.ts` — symbol definitions per diagram type
+- `app/hooks/useDiagram.ts` — useReducer-based diagram state
+- `app/components/canvas/Canvas.tsx` — SVG canvas (pan/zoom/drop)
+- `app/components/canvas/SymbolRenderer.tsx` — per-symbol SVG shapes
+- `app/components/canvas/ConnectorRenderer.tsx` — connector paths + arrows
+- `app/components/canvas/Palette.tsx` — drag-from palette
+- `app/components/canvas/PropertiesPanel.tsx` — right-side properties
+- `app/(dashboard)/diagram/[id]/DiagramEditor.tsx` — editor shell + auto-save
+
+## Build Commands
+```
+export PATH="$PATH:/c/Program Files/nodejs"
+cd /c/Git/Diagramatix/diagramatix
+npm run dev       # development
+npm run build     # production build
+npx prisma generate   # after schema changes
+npx prisma migrate dev  # create migrations
+```
+
+## Stage Roadmap
+1. ✅ MVP — basic boxes + arrows (complete)
+2. ⬜ Process Context Diagram — ellipses, actors, edge connection points
+3. ⬜ State Machine — rounded states, initial/final, guard labels
+4. ⬜ Full BPMN — pools, lanes, gateways, curtain-rail message routing, subprocess popovers
+5. ⬜ Enterprise — orgs, Stripe subscriptions, sharing, version history
+
+## User Preferences
+- Paul prefers building incrementally with Claude
+- Product should differentiate on: smart connector routing, proper ellipse edge connection, configurable symbol palettes, independent typography control
+The Stage 1 MVP is complete and the build compiles cleanly. Here's a summary of what was built:
+
+What's Been Built — Stage 1 MVP
+Project Structure
+diagramatix/ — full Next.js 16 app at c:\Git\Diagramatix\diagramatix\
+
+Files Created
+File	Purpose
+prisma/schema.prisma	User + Diagram models
+auth.config.ts	Lightweight JWT auth (edge-safe)
+auth.ts	Full auth with Prisma + bcrypt
+proxy.ts	Next.js 16 route protection proxy
+app/lib/db.ts	Prisma singleton with pg adapter
+app/lib/diagram/types.ts	All TypeScript diagram types
+app/lib/diagram/routing.ts	Orthogonal connector routing
+app/lib/diagram/symbols/definitions.ts	Symbol configs per diagram type
+app/hooks/useDiagram.ts	useReducer diagram state management
+app/components/canvas/Canvas.tsx	SVG canvas with pan/zoom/drop
+app/components/canvas/SymbolRenderer.tsx	All symbol shapes + drag/connect
+app/components/canvas/ConnectorRenderer.tsx	Arrow paths with hit areas
+app/components/canvas/Palette.tsx	Drag-to-canvas symbol palette
+app/components/canvas/PropertiesPanel.tsx	Right-panel properties editor
+app/(dashboard)/dashboard/	Diagram list + create dialog
+app/(dashboard)/diagram/[id]/	Diagram editor + auto-save
+app/api/diagrams/	CRUD API routes
+app/api/register/route.ts	User registration API
+app/(auth)/login/page.tsx	Login page
+app/(auth)/register/page.tsx	Register page
+
+To Run
+Set up a PostgreSQL database and update DATABASE_URL in .env
+Generate AUTH_SECRET: openssl rand -base64 32
+Run migrations: npx prisma migrate dev
+Start dev server: npm run dev
