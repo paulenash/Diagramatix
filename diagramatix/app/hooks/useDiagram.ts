@@ -79,6 +79,9 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       } else if (action.payload.symbolType === "team") {
         const count = state.elements.filter((e) => e.type === "team").length;
         label = `Team ${count + 1}`;
+      } else if (action.payload.symbolType === "system") {
+        const count = state.elements.filter((e) => e.type === "system").length;
+        label = `System ${count + 1}`;
       }
       const newEl: DiagramElement = {
         id: nanoid(),

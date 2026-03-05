@@ -48,14 +48,14 @@ export const ALL_SYMBOLS: SymbolDefinition[] = [
     type: "actor",
     label: "Participant",
     defaultWidth: 40,
-    defaultHeight: 80,
+    defaultHeight: 52,
     description: "A participant in the process",
   },
   {
     type: "team",
     label: "Team",
-    defaultWidth: 140,
-    defaultHeight: 90,
+    defaultWidth: 96,
+    defaultHeight: 52,
     description: "A group of three participants",
   },
   {

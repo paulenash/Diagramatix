@@ -179,7 +179,6 @@ function StickFigure({
 function ActorShape({ el }: { el: DiagramElement }) {
   const headR = 10;
   const bodyLen = 16;
-  const legLen = Math.max((el.height - 4 - headR * 2 - bodyLen) * 0.4, 5);
   return (
     <StickFigure
       cx={el.x + el.width / 2}
@@ -188,7 +187,7 @@ function ActorShape({ el }: { el: DiagramElement }) {
       bodyLen={bodyLen}
       armHalfSpan={el.width / 2 - 4}
       legSpread={el.width / 2 - 6}
-      legLen={legLen}
+      legLen={12}
     />
   );
 }
@@ -196,13 +195,11 @@ function ActorShape({ el }: { el: DiagramElement }) {
 function TeamShape({ el }: { el: DiagramElement }) {
   const cx = el.x + el.width / 2;
   const top = el.y + 4;
-  const legLen_central = Math.max((el.height - 40) * 0.4, 5);
-  const legLen_side = Math.max(Math.round(0.7 * legLen_central), 3);
   return (
     <g>
-      <StickFigure cx={cx - 30} top={top} headR={6} bodyLen={10} armHalfSpan={14} legSpread={12} legLen={legLen_side} />
-      <StickFigure cx={cx + 30} top={top} headR={6} bodyLen={10} armHalfSpan={14} legSpread={12} legLen={legLen_side} />
-      <StickFigure cx={cx}      top={top} headR={9} bodyLen={14} armHalfSpan={14} legSpread={12} legLen={legLen_central} />
+      <StickFigure cx={cx - 30} top={top} headR={6} bodyLen={10} armHalfSpan={14} legSpread={12} legLen={8} />
+      <StickFigure cx={cx + 30} top={top} headR={6} bodyLen={10} armHalfSpan={14} legSpread={12} legLen={8} />
+      <StickFigure cx={cx}      top={top} headR={9} bodyLen={14} armHalfSpan={14} legSpread={12} legLen={12} />
     </g>
   );
 }
@@ -210,12 +207,14 @@ function TeamShape({ el }: { el: DiagramElement }) {
 function SystemShape({ el }: { el: DiagramElement }) {
   const lineAreaEnd = el.y + el.height / 3;
   const lineSpacing = (lineAreaEnd - el.y - 8) / 2;
+  const midY = el.y + 8 + lineSpacing;
+  const gap = lineSpacing / 2;
   return (
     <g>
       <rect x={el.x} y={el.y} width={el.width} height={el.height} rx={3} fill="white" stroke="#374151" strokeWidth={1.5} />
-      <line x1={el.x + 4} y1={el.y + 8}                   x2={el.x + el.width - 4} y2={el.y + 8}                   stroke="#374151" strokeWidth={1.5} />
-      <line x1={el.x + 4} y1={el.y + 8 + lineSpacing}     x2={el.x + el.width - 4} y2={el.y + 8 + lineSpacing}     stroke="#374151" strokeWidth={1.5} />
-      <line x1={el.x + 4} y1={el.y + 8 + lineSpacing * 2} x2={el.x + el.width - 4} y2={el.y + 8 + lineSpacing * 2} stroke="#374151" strokeWidth={1.5} />
+      <line x1={el.x + 4} y1={midY - gap} x2={el.x + el.width - 4} y2={midY - gap} stroke="#374151" strokeWidth={1.5} />
+      <line x1={el.x + 4} y1={midY}       x2={el.x + el.width - 4} y2={midY}       stroke="#374151" strokeWidth={1.5} />
+      <line x1={el.x + 4} y1={midY + gap} x2={el.x + el.width - 4} y2={midY + gap} stroke="#374151" strokeWidth={1.5} />
     </g>
   );
 }
