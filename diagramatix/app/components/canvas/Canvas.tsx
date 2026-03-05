@@ -35,6 +35,12 @@ interface EditingLabel {
   value: string;
 }
 
+interface DraggingConnector {
+  fromId: string;
+  fromPos: Point;    // world coords — the connection point where drag started
+  currentPos: Point; // world coords — tracks the mouse
+}
+
 export function Canvas({
   data,
   onAddElement,
@@ -58,9 +64,8 @@ export function Canvas({
   // Inline label editing
   const [editingLabel, setEditingLabel] = useState<EditingLabel | null>(null);
 
-  // Connector drawing
-  const [connectingFrom, setConnectingFrom] = useState<string | null>(null);
-  const [hoverElementId, setHoverElementId] = useState<string | null>(null);
+  // Connector drag state
+  const [draggingConnector, setDraggingConnector] = useState<DraggingConnector | null>(null);
 
   const svgToWorld = useCallback(
     (svgX: number, svgY: number): Point => ({
@@ -70,9 +75,55 @@ export function Canvas({
     [pan, zoom]
   );
 
-  function getSvgCoords(e: React.MouseEvent): Point {
+  function clientToWorld(clientX: number, clientY: number): Point {
     const rect = svgRef.current!.getBoundingClientRect();
-    return svgToWorld(e.clientX - rect.left, e.clientY - rect.top);
+    return svgToWorld(clientX - rect.left, clientY - rect.top);
+  }
+
+  // ---- Hit test: find which element the mouse is over (excluding source) ----
+  function findDropTarget(pos: Point, fromId: string): string | null {
+    const MARGIN = 30; // world units of tolerance around the element bounds
+    for (const el of data.elements) {
+      if (el.id === fromId) continue;
+      if (
+        pos.x >= el.x - MARGIN &&
+        pos.x <= el.x + el.width + MARGIN &&
+        pos.y >= el.y - MARGIN &&
+        pos.y <= el.y + el.height + MARGIN
+      ) {
+        return el.id;
+      }
+    }
+    return null;
+  }
+
+  // ---- Connection point drag start ----
+  function handleConnectionPointDragStart(elementId: string, worldPos: Point) {
+    const drag: DraggingConnector = {
+      fromId: elementId,
+      fromPos: worldPos,
+      currentPos: worldPos,
+    };
+    setDraggingConnector(drag);
+
+    function onMouseMove(ev: MouseEvent) {
+      const pos = clientToWorld(ev.clientX, ev.clientY);
+      setDraggingConnector((prev) => prev ? { ...prev, currentPos: pos } : null);
+    }
+
+    function onMouseUp(ev: MouseEvent) {
+      const pos = clientToWorld(ev.clientX, ev.clientY);
+      const targetId = findDropTarget(pos, elementId);
+      if (targetId) {
+        onAddConnector(elementId, targetId, "sequence");
+      }
+      setDraggingConnector(null);
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    }
+
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
   }
 
   // ---- Pan handling ----
@@ -116,7 +167,6 @@ export function Canvas({
     const delta = e.deltaY > 0 ? 0.9 : 1.1;
     const newZoom = Math.min(4, Math.max(0.2, zoom * delta));
 
-    // Keep mouse position fixed during zoom
     setPan((prev) => ({
       x: mouseX - (mouseX - prev.x) * (newZoom / zoom),
       y: mouseY - (mouseY - prev.y) * (newZoom / zoom),
@@ -151,22 +201,10 @@ export function Canvas({
     setEditingLabel(null);
   }
 
-  // ---- Connection points ----
-  function handleConnectionPointClick(elementId: string) {
-    if (connectingFrom === null) {
-      setConnectingFrom(elementId);
-    } else if (connectingFrom !== elementId) {
-      onAddConnector(connectingFrom, elementId, "sequence");
-      setConnectingFrom(null);
-    } else {
-      setConnectingFrom(null);
-    }
-  }
-
   // ---- Keyboard ----
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === "Escape") {
-      setConnectingFrom(null);
+      setDraggingConnector(null);
       setEditingLabel(null);
     }
     if (e.key === "Delete" || e.key === "Backspace") {
@@ -177,9 +215,16 @@ export function Canvas({
   }
 
   const transform = `translate(${pan.x}, ${pan.y}) scale(${zoom})`;
+  const isDraggingConnector = draggingConnector !== null;
 
   return (
-    <div className="relative flex-1 overflow-hidden bg-gray-50" style={{ backgroundImage: "radial-gradient(#d1d5db 1px, transparent 1px)", backgroundSize: "20px 20px" }}>
+    <div
+      className="relative flex-1 overflow-hidden bg-gray-50"
+      style={{
+        backgroundImage: "radial-gradient(#d1d5db 1px, transparent 1px)",
+        backgroundSize: "20px 20px",
+      }}
+    >
       <svg
         ref={svgRef}
         className="w-full h-full outline-none"
@@ -189,7 +234,7 @@ export function Canvas({
         onDrop={handleDrop}
         onDragOver={(e) => e.preventDefault()}
         onKeyDown={handleKeyDown}
-        style={{ cursor: connectingFrom ? "crosshair" : "default" }}
+        style={{ cursor: isDraggingConnector ? "crosshair" : "default" }}
       >
         <g transform={transform}>
           {data.connectors.map((conn) => (
@@ -209,20 +254,36 @@ export function Canvas({
               key={el.id}
               element={el}
               selected={el.id === selectedElementId}
+              isDropTarget={isDraggingConnector && el.id !== draggingConnector!.fromId}
               onSelect={() => {
                 onSelectElement(el.id);
                 onSelectConnector(null);
               }}
               onMove={(x, y) => onMoveElement(el.id, x, y)}
               onDoubleClick={() => startEditingLabel(el)}
-              onConnectionPointClick={() => handleConnectionPointClick(el.id)}
+              onConnectionPointDragStart={(worldPos) =>
+                handleConnectionPointDragStart(el.id, worldPos)
+              }
               showConnectionPoints={
                 el.id === selectedElementId ||
-                el.id === hoverElementId ||
-                connectingFrom !== null
+                isDraggingConnector
               }
             />
           ))}
+
+          {/* Rubber-band line during connector drag */}
+          {draggingConnector && (
+            <line
+              x1={draggingConnector.fromPos.x}
+              y1={draggingConnector.fromPos.y}
+              x2={draggingConnector.currentPos.x}
+              y2={draggingConnector.currentPos.y}
+              stroke="#2563eb"
+              strokeWidth={1.5}
+              strokeDasharray="6 3"
+              style={{ pointerEvents: "none" }}
+            />
+          )}
         </g>
       </svg>
 
@@ -261,9 +322,9 @@ export function Canvas({
 
       {/* Status bar */}
       <div className="absolute bottom-2 left-2 text-xs text-gray-400 bg-white/80 px-2 py-1 rounded">
-        {connectingFrom
-          ? "Click a connection point on another symbol to connect"
-          : "Drag to pan · Scroll to zoom · Double-click to edit label · Delete to remove"}
+        {isDraggingConnector
+          ? "Release over an element to connect · Esc to cancel"
+          : "Drag to pan · Scroll to zoom · Double-click label · Delete to remove · Drag connection point to connect"}
         {" · "}
         {Math.round(zoom * 100)}%
       </div>

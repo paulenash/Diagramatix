@@ -1,14 +1,15 @@
 "use client";
 
-import type { DiagramElement } from "@/app/lib/diagram/types";
+import type { DiagramElement, Point } from "@/app/lib/diagram/types";
 
 interface Props {
   element: DiagramElement;
   selected: boolean;
+  isDropTarget: boolean;
   onSelect: () => void;
   onMove: (x: number, y: number) => void;
   onDoubleClick: () => void;
-  onConnectionPointClick: (side: "top" | "right" | "bottom" | "left") => void;
+  onConnectionPointDragStart: (worldPos: Point) => void;
   showConnectionPoints: boolean;
 }
 
@@ -181,10 +182,11 @@ function getLabelPos(el: DiagramElement): { x: number; y: number } {
 export function SymbolRenderer({
   element,
   selected,
+  isDropTarget,
   onSelect,
   onMove,
   onDoubleClick,
-  onConnectionPointClick,
+  onConnectionPointDragStart,
   showConnectionPoints,
 }: Props) {
   let dragStart: { mouseX: number; mouseY: number; elX: number; elY: number } | null = null;
@@ -254,6 +256,7 @@ export function SymbolRenderer({
         </text>
       )}
 
+      {/* Selection outline */}
       {selected && (
         <rect
           x={element.x - 3}
@@ -269,6 +272,22 @@ export function SymbolRenderer({
         />
       )}
 
+      {/* Drop target highlight — green ring shown while a connector is being dragged toward this element */}
+      {isDropTarget && (
+        <rect
+          x={element.x - 4}
+          y={element.y - 4}
+          width={element.width + 8}
+          height={element.height + 8}
+          fill="none"
+          stroke="#16a34a"
+          strokeWidth={2}
+          rx={6}
+          style={{ pointerEvents: "none" }}
+        />
+      )}
+
+      {/* Connection points — shown on hover/select and during any connector drag */}
       {showConnectionPoints &&
         CONNECTION_POINT_SIDES.map((side) => {
           const pos = getConnectionPointPos(element, side);
@@ -284,7 +303,7 @@ export function SymbolRenderer({
               style={{ cursor: "crosshair" }}
               onMouseDown={(e) => {
                 e.stopPropagation();
-                onConnectionPointClick(side);
+                onConnectionPointDragStart({ x: pos.cx, y: pos.cy });
               }}
             />
           );
