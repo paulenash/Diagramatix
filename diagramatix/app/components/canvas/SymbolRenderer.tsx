@@ -1,6 +1,6 @@
 "use client";
 
-import type { DiagramElement, Point } from "@/app/lib/diagram/types";
+import type { DiagramElement, Point, Side } from "@/app/lib/diagram/types";
 
 interface Props {
   element: DiagramElement;
@@ -9,15 +9,15 @@ interface Props {
   onSelect: () => void;
   onMove: (x: number, y: number) => void;
   onDoubleClick: () => void;
-  onConnectionPointDragStart: (worldPos: Point) => void;
+  onConnectionPointDragStart: (side: Side, worldPos: Point) => void;
   showConnectionPoints: boolean;
 }
 
-const CONNECTION_POINT_SIDES = ["top", "right", "bottom", "left"] as const;
+const CONNECTION_POINT_SIDES: Side[] = ["top", "right", "bottom", "left"];
 
 function getConnectionPointPos(
   el: DiagramElement,
-  side: (typeof CONNECTION_POINT_SIDES)[number]
+  side: Side
 ): { cx: number; cy: number } {
   switch (side) {
     case "top":
@@ -101,20 +101,68 @@ function UseCaseShape({ el }: { el: DiagramElement }) {
   );
 }
 
-function ActorShape({ el }: { el: DiagramElement }) {
-  const cx = el.x + el.width / 2;
-  const headR = 8;
-  const headCy = el.y + headR + 2;
+// Reusable stick figure. cx = centre-x, top = y of top of head.
+function StickFigure({
+  cx,
+  top,
+  headR = 8,
+  bodyLen = 16,
+  armHalfSpan = 18,
+  legSpread = 16,
+  legLen = 20,
+}: {
+  cx: number;
+  top: number;
+  headR?: number;
+  bodyLen?: number;
+  armHalfSpan?: number;
+  legSpread?: number;
+  legLen?: number;
+}) {
+  const headCy = top + headR;
   const bodyTop = headCy + headR;
-  const bodyBot = el.y + el.height - 16;
-  const armY = bodyTop + (bodyBot - bodyTop) * 0.35;
+  const bodyBot = bodyTop + bodyLen;
+  const armY = bodyTop + bodyLen * 0.5;
   return (
     <g>
       <circle cx={cx} cy={headCy} r={headR} fill="white" stroke="#374151" strokeWidth={1.5} />
       <line x1={cx} y1={bodyTop} x2={cx} y2={bodyBot} stroke="#374151" strokeWidth={1.5} />
-      <line x1={el.x + 4} y1={armY} x2={el.x + el.width - 4} y2={armY} stroke="#374151" strokeWidth={1.5} />
-      <line x1={cx} y1={bodyBot} x2={el.x + 4} y2={el.y + el.height - 2} stroke="#374151" strokeWidth={1.5} />
-      <line x1={cx} y1={bodyBot} x2={el.x + el.width - 4} y2={el.y + el.height - 2} stroke="#374151" strokeWidth={1.5} />
+      <line x1={cx - armHalfSpan} y1={armY} x2={cx + armHalfSpan} y2={armY} stroke="#374151" strokeWidth={1.5} />
+      <line x1={cx} y1={bodyBot} x2={cx - legSpread} y2={bodyBot + legLen} stroke="#374151" strokeWidth={1.5} />
+      <line x1={cx} y1={bodyBot} x2={cx + legSpread} y2={bodyBot + legLen} stroke="#374151" strokeWidth={1.5} />
+    </g>
+  );
+}
+
+function ActorShape({ el }: { el: DiagramElement }) {
+  const headR = 8;
+  const bodyLen = 16;
+  // Remaining height after head (headR*2) + body + 2px top margin → legs fill the rest
+  const legLen = el.height - 2 - headR * 2 - bodyLen - 4;
+  return (
+    <StickFigure
+      cx={el.x + el.width / 2}
+      top={el.y + 2}
+      headR={headR}
+      bodyLen={bodyLen}
+      armHalfSpan={el.width / 2 - 4}
+      legSpread={el.width / 2 - 6}
+      legLen={Math.max(legLen, 8)}
+    />
+  );
+}
+
+function TeamShape({ el }: { el: DiagramElement }) {
+  const cx = el.x + el.width / 2;
+  const top = el.y + 4;
+  return (
+    <g>
+      {/* Left figure */}
+      <StickFigure cx={cx - 40} top={top + 12} headR={6} bodyLen={12} armHalfSpan={12} legSpread={10} legLen={14} />
+      {/* Right figure */}
+      <StickFigure cx={cx + 40} top={top + 12} headR={6} bodyLen={12} armHalfSpan={12} legSpread={10} legLen={14} />
+      {/* Central figure */}
+      <StickFigure cx={cx} top={top} headR={7} bodyLen={14} armHalfSpan={14} legSpread={12} legLen={16} />
     </g>
   );
 }
@@ -165,6 +213,7 @@ function SymbolShape({ el }: { el: DiagramElement }) {
     case "end-event": return <EndEventShape el={el} />;
     case "use-case": return <UseCaseShape el={el} />;
     case "actor": return <ActorShape el={el} />;
+    case "team": return <TeamShape el={el} />;
     case "state": return <StateShape el={el} />;
     case "initial-state": return <InitialStateShape el={el} />;
     case "final-state": return <FinalStateShape el={el} />;
@@ -173,7 +222,7 @@ function SymbolShape({ el }: { el: DiagramElement }) {
 }
 
 function getLabelPos(el: DiagramElement): { x: number; y: number } {
-  if (el.type === "actor") {
+  if (el.type === "actor" || el.type === "team") {
     return { x: el.x + el.width / 2, y: el.y + el.height + 12 };
   }
   return { x: el.x + el.width / 2, y: el.y + el.height / 2 };
@@ -219,6 +268,7 @@ export function SymbolRenderer({
   }
 
   const labelPos = getLabelPos(element);
+  const isActorOrTeam = element.type === "actor" || element.type === "team";
 
   return (
     <g
@@ -228,7 +278,7 @@ export function SymbolRenderer({
     >
       <SymbolShape el={element} />
 
-      {element.type !== "initial-state" && element.type !== "actor" && (
+      {element.type !== "initial-state" && !isActorOrTeam && (
         <text
           x={labelPos.x}
           y={labelPos.y}
@@ -242,7 +292,7 @@ export function SymbolRenderer({
         </text>
       )}
 
-      {element.type === "actor" && (
+      {isActorOrTeam && (
         <text
           x={labelPos.x}
           y={labelPos.y}
@@ -272,7 +322,7 @@ export function SymbolRenderer({
         />
       )}
 
-      {/* Drop target highlight — green ring shown while a connector is being dragged toward this element */}
+      {/* Drop target highlight */}
       {isDropTarget && (
         <rect
           x={element.x - 4}
@@ -287,10 +337,13 @@ export function SymbolRenderer({
         />
       )}
 
-      {/* Connection points — shown on hover/select and during any connector drag */}
+      {/* Connection points — on bounding rect edges; drag anchors at center for actor/team */}
       {showConnectionPoints &&
         CONNECTION_POINT_SIDES.map((side) => {
           const pos = getConnectionPointPos(element, side);
+          const dragWorldPos: Point = isActorOrTeam
+            ? { x: element.x + element.width / 2, y: element.y + element.height / 2 }
+            : { x: pos.cx, y: pos.cy };
           return (
             <circle
               key={side}
@@ -303,7 +356,7 @@ export function SymbolRenderer({
               style={{ cursor: "crosshair" }}
               onMouseDown={(e) => {
                 e.stopPropagation();
-                onConnectionPointDragStart({ x: pos.cx, y: pos.cy });
+                onConnectionPointDragStart(side, dragWorldPos);
               }}
             />
           );

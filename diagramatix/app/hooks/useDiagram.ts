@@ -3,11 +3,14 @@
 import { useCallback, useReducer } from "react";
 import type {
   Connector,
+  ConnectorType,
   DiagramData,
   DiagramElement,
+  DirectionType,
   Point,
+  RoutingType,
+  Side,
   SymbolType,
-  ConnectorType,
 } from "@/app/lib/diagram/types";
 import { computeWaypoints, recomputeAllConnectors } from "@/app/lib/diagram/routing";
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
@@ -19,7 +22,15 @@ type Action =
   | { type: "UPDATE_LABEL"; payload: { id: string; label: string } }
   | { type: "UPDATE_PROPERTIES"; payload: { id: string; properties: Record<string, unknown> } }
   | { type: "DELETE_ELEMENT"; payload: { id: string } }
-  | { type: "ADD_CONNECTOR"; payload: { sourceId: string; targetId: string; connectorType: ConnectorType } }
+  | { type: "ADD_CONNECTOR"; payload: {
+      sourceId: string;
+      targetId: string;
+      connectorType: ConnectorType;
+      directionType: DirectionType;
+      routingType: RoutingType;
+      sourceSide: Side;
+      targetSide: Side;
+    }}
   | { type: "DELETE_CONNECTOR"; payload: { id: string } }
   | { type: "SET_VIEWPORT"; payload: { x: number; y: number; zoom: number } };
 
@@ -34,6 +45,11 @@ function reducer(state: DiagramData, action: Action): DiagramData {
 
     case "ADD_ELEMENT": {
       const def = getSymbolDefinition(action.payload.symbolType);
+      let label = def.label;
+      if (action.payload.symbolType === "use-case") {
+        const count = state.elements.filter((e) => e.type === "use-case").length;
+        label = `Process ${count + 1}`;
+      }
       const newEl: DiagramElement = {
         id: nanoid(),
         type: action.payload.symbolType,
@@ -41,7 +57,7 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         y: action.payload.position.y - def.defaultHeight / 2,
         width: def.defaultWidth,
         height: def.defaultHeight,
-        label: def.label,
+        label,
         properties: {},
       };
       return { ...state, elements: [...state.elements, newEl] };
@@ -90,23 +106,31 @@ function reducer(state: DiagramData, action: Action): DiagramData {
     }
 
     case "ADD_CONNECTOR": {
-      const { sourceId, targetId, connectorType } = action.payload;
+      const { sourceId, targetId, connectorType, directionType, routingType, sourceSide, targetSide } = action.payload;
       const source = state.elements.find((el) => el.id === sourceId);
       const target = state.elements.find((el) => el.id === targetId);
       if (!source || !target) return state;
 
-      const waypoints = computeWaypoints(
+      const { waypoints, sourceInvisibleLeader, targetInvisibleLeader } = computeWaypoints(
         source,
         target,
         state.elements,
-        connectorType
+        sourceSide,
+        targetSide,
+        routingType
       );
 
       const newConnector: Connector = {
         id: nanoid(),
         sourceId,
         targetId,
+        sourceSide,
+        targetSide,
         type: connectorType,
+        directionType,
+        routingType,
+        sourceInvisibleLeader,
+        targetInvisibleLeader,
         waypoints,
       };
 
@@ -162,8 +186,19 @@ export function useDiagram(initialData: DiagramData) {
   }, []);
 
   const addConnector = useCallback(
-    (sourceId: string, targetId: string, connectorType: ConnectorType = "sequence") => {
-      dispatch({ type: "ADD_CONNECTOR", payload: { sourceId, targetId, connectorType } });
+    (
+      sourceId: string,
+      targetId: string,
+      connectorType: ConnectorType = "sequence",
+      directionType: DirectionType = "directed",
+      routingType: RoutingType = "rectilinear",
+      sourceSide: Side = "right",
+      targetSide: Side = "left"
+    ) => {
+      dispatch({
+        type: "ADD_CONNECTOR",
+        payload: { sourceId, targetId, connectorType, directionType, routingType, sourceSide, targetSide },
+      });
     },
     []
   );

@@ -1,11 +1,7 @@
-import type { Bounds, Connector, ConnectorType, DiagramElement, Point } from "./types";
+import type { Bounds, Connector, DiagramElement, Point, RoutingType, Side } from "./types";
 
 function getBounds(el: DiagramElement): Bounds {
   return { x: el.x, y: el.y, width: el.width, height: el.height };
-}
-
-function center(b: Bounds): Point {
-  return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
 }
 
 function closestEdgePoint(from: Point, b: Bounds): Point {
@@ -41,7 +37,6 @@ function buildOrthogonalPath(
   end: Point,
   obstacles: Bounds[]
 ): Point[] {
-  // Prefer a two-segment L-shaped path; try horizontal-then-vertical first
   const mid1: Point = { x: end.x, y: start.y };
   const mid2: Point = { x: start.x, y: end.y };
 
@@ -54,7 +49,6 @@ function buildOrthogonalPath(
   if (!hitsMid(mid1)) return pathA;
   if (!hitsMid(mid2)) return pathB;
 
-  // Fallback: route via the average midpoint at a safe Y offset
   const bypassY = start.y - 40;
   return [
     start,
@@ -64,31 +58,122 @@ function buildOrthogonalPath(
   ];
 }
 
+const PERP_OFFSET = 24;
+
+function perpendicularExit(pt: Point, side: Side): Point {
+  switch (side) {
+    case "right":  return { x: pt.x + PERP_OFFSET, y: pt.y };
+    case "left":   return { x: pt.x - PERP_OFFSET, y: pt.y };
+    case "top":    return { x: pt.x, y: pt.y - PERP_OFFSET };
+    case "bottom": return { x: pt.x, y: pt.y + PERP_OFFSET };
+  }
+}
+
+function perpendicularApproach(pt: Point, side: Side): Point {
+  switch (side) {
+    case "right":  return { x: pt.x + PERP_OFFSET, y: pt.y };
+    case "left":   return { x: pt.x - PERP_OFFSET, y: pt.y };
+    case "top":    return { x: pt.x, y: pt.y - PERP_OFFSET };
+    case "bottom": return { x: pt.x, y: pt.y + PERP_OFFSET };
+  }
+}
+
+export function getConnectionPointBySide(el: DiagramElement, side: Side): Point {
+  // actor/team always use center as connection anchor
+  if (el.type === "actor" || el.type === "team") {
+    return { x: el.x + el.width / 2, y: el.y + el.height / 2 };
+  }
+  switch (side) {
+    case "top":    return { x: el.x + el.width / 2, y: el.y };
+    case "right":  return { x: el.x + el.width, y: el.y + el.height / 2 };
+    case "bottom": return { x: el.x + el.width / 2, y: el.y + el.height };
+    case "left":   return { x: el.x, y: el.y + el.height / 2 };
+  }
+}
+
+function isActorOrTeam(el: DiagramElement): boolean {
+  return el.type === "actor" || el.type === "team";
+}
+
 export function computeWaypoints(
   source: DiagramElement,
   target: DiagramElement,
   allElements: DiagramElement[],
-  connectorType: ConnectorType
-): Point[] {
-  const sc = center(getBounds(source));
-  const tc = center(getBounds(target));
+  sourceSide: Side,
+  targetSide: Side,
+  routingType: RoutingType
+): { waypoints: Point[]; sourceInvisibleLeader: boolean; targetInvisibleLeader: boolean } {
+  const sourceIsAT = isActorOrTeam(source);
+  const targetIsAT = isActorOrTeam(target);
 
-  if (connectorType === "message") {
-    // Messages go straight through — no obstacle avoidance
-    const startPt = closestEdgePoint(tc, getBounds(source));
-    const endPt = closestEdgePoint(sc, getBounds(target));
-    return [startPt, endPt];
+  const startPt = getConnectionPointBySide(source, sourceSide);
+  const endPt = getConnectionPointBySide(target, targetSide);
+
+  if (routingType === "direct") {
+    if (!sourceIsAT && !targetIsAT) {
+      return { waypoints: [startPt, endPt], sourceInvisibleLeader: false, targetInvisibleLeader: false };
+    }
+
+    const waypoints: Point[] = [];
+    let sourceInvisibleLeader = false;
+    let targetInvisibleLeader = false;
+
+    if (sourceIsAT) {
+      const edgePt = closestEdgePoint(endPt, getBounds(source));
+      waypoints.push(startPt, edgePt);
+      sourceInvisibleLeader = true;
+    } else {
+      waypoints.push(startPt);
+    }
+
+    if (targetIsAT) {
+      const edgePt = closestEdgePoint(startPt, getBounds(target));
+      waypoints.push(edgePt, endPt);
+      targetInvisibleLeader = true;
+    } else {
+      waypoints.push(endPt);
+    }
+
+    return { waypoints, sourceInvisibleLeader, targetInvisibleLeader };
   }
 
-  // Sequence connectors: orthogonal with obstacle avoidance
-  const startPt = closestEdgePoint(tc, getBounds(source));
-  const endPt = closestEdgePoint(sc, getBounds(target));
-
+  // Rectilinear with perpendicular first/last segments
   const obstacles = allElements
     .filter((el) => el.id !== source.id && el.id !== target.id)
     .map(getBounds);
 
-  return buildOrthogonalPath(startPt, endPt, obstacles);
+  let sourceInvisibleLeader = false;
+  let targetInvisibleLeader = false;
+  const prefix: Point[] = [];
+  const suffix: Point[] = [];
+
+  if (sourceIsAT) {
+    const edgePt = closestEdgePoint(endPt, getBounds(source));
+    const exitPt = perpendicularExit(edgePt, sourceSide);
+    prefix.push(startPt, edgePt, exitPt);
+    sourceInvisibleLeader = true;
+  } else {
+    const exitPt = perpendicularExit(startPt, sourceSide);
+    prefix.push(startPt, exitPt);
+  }
+
+  if (targetIsAT) {
+    const edgePt = closestEdgePoint(startPt, getBounds(target));
+    const approachPt = perpendicularApproach(edgePt, targetSide);
+    suffix.push(approachPt, edgePt, endPt);
+    targetInvisibleLeader = true;
+  } else {
+    const approachPt = perpendicularApproach(endPt, targetSide);
+    suffix.push(approachPt, endPt);
+  }
+
+  const exitPt = prefix[prefix.length - 1];
+  const approachPt = suffix[0];
+  const midPath = buildOrthogonalPath(exitPt, approachPt, obstacles);
+  // merge: prefix (without last) + midPath + suffix (without first)
+  const waypoints = [...prefix.slice(0, -1), ...midPath, ...suffix.slice(1)];
+
+  return { waypoints, sourceInvisibleLeader, targetInvisibleLeader };
 }
 
 export function waypointsToSvgPath(waypoints: Point[]): string {
@@ -110,7 +195,14 @@ export function recomputeAllConnectors(
     const source = elementMap.get(conn.sourceId);
     const target = elementMap.get(conn.targetId);
     if (!source || !target) return conn;
-    const waypoints = computeWaypoints(source, target, elements, conn.type);
-    return { ...conn, waypoints };
+    const { waypoints, sourceInvisibleLeader, targetInvisibleLeader } = computeWaypoints(
+      source,
+      target,
+      elements,
+      conn.sourceSide,
+      conn.targetSide,
+      conn.routingType
+    );
+    return { ...conn, waypoints, sourceInvisibleLeader, targetInvisibleLeader };
   });
 }

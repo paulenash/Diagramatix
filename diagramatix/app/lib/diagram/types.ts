@@ -7,6 +7,7 @@ export type SymbolType =
   | "end-event"
   | "use-case"
   | "actor"
+  | "team"
   | "state"
   | "initial-state"
   | "final-state"
@@ -15,6 +16,12 @@ export type SymbolType =
   | "subprocess";
 
 export type ConnectorType = "sequence" | "message" | "association";
+
+export type Side = "top" | "right" | "bottom" | "left";
+
+export type DirectionType = "directed" | "non-directed";
+
+export type RoutingType = "direct" | "rectilinear";
 
 export interface Point {
   x: number;
@@ -44,7 +51,13 @@ export interface Connector {
   id: string;
   sourceId: string;
   targetId: string;
+  sourceSide: Side;
+  targetSide: Side;
   type: ConnectorType;
+  directionType: DirectionType;
+  routingType: RoutingType;
+  sourceInvisibleLeader: boolean;
+  targetInvisibleLeader: boolean;
   waypoints: Point[];
   label?: string;
 }

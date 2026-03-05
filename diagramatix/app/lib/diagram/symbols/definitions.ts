@@ -39,10 +39,10 @@ export const ALL_SYMBOLS: SymbolDefinition[] = [
   },
   {
     type: "use-case",
-    label: "Use Case",
+    label: "Process",
     defaultWidth: 120,
     defaultHeight: 60,
-    description: "A process use case",
+    description: "A process in the context diagram",
   },
   {
     type: "actor",
@@ -50,6 +50,13 @@ export const ALL_SYMBOLS: SymbolDefinition[] = [
     defaultWidth: 40,
     defaultHeight: 80,
     description: "A participant in the process",
+  },
+  {
+    type: "team",
+    label: "Team",
+    defaultWidth: 140,
+    defaultHeight: 90,
+    description: "A group of three participants",
   },
   {
     type: "state",
@@ -76,7 +83,7 @@ export const ALL_SYMBOLS: SymbolDefinition[] = [
 
 export const PALETTE_BY_DIAGRAM_TYPE: Record<DiagramType, SymbolType[]> = {
   basic: ["task"],
-  "process-context": ["use-case", "actor", "task"],
+  "process-context": ["use-case", "actor", "team"],
   "state-machine": ["state", "initial-state", "final-state"],
   bpmn: [
     "task",

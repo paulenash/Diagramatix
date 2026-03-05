@@ -25,22 +25,35 @@ function ArrowMarker({ id, color }: { id: string; color: string }) {
 }
 
 export function ConnectorRenderer({ connector, selected, onSelect }: Props) {
-  const d = waypointsToSvgPath(connector.waypoints);
-  if (!d) return null;
+  const waypoints = connector.waypoints;
+  if (waypoints.length === 0) return null;
 
   const isMessage = connector.type === "message";
   const strokeColor = selected ? "#2563eb" : "#6b7280";
   const markerId = `arrow-${connector.id}`;
+  const showArrow = connector.directionType === "directed";
+
+  // Slice waypoints to hide invisible leader segments
+  const visStart = connector.sourceInvisibleLeader ? 1 : 0;
+  const visEnd = connector.targetInvisibleLeader ? waypoints.length - 2 : waypoints.length - 1;
+  const visibleWaypoints = waypoints.slice(visStart, visEnd + 1);
+  const visibleD = waypointsToSvgPath(visibleWaypoints);
+  // Full path for hit area (so you can click near the invisible portion too)
+  const fullD = waypointsToSvgPath(waypoints);
+
+  if (!visibleD) return null;
 
   return (
     <>
-      <defs>
-        <ArrowMarker id={markerId} color={strokeColor} />
-      </defs>
+      {showArrow && (
+        <defs>
+          <ArrowMarker id={markerId} color={strokeColor} />
+        </defs>
+      )}
 
-      {/* Invisible wider hit area for easier selection */}
+      {/* Invisible wider hit area */}
       <path
-        d={d}
+        d={fullD}
         fill="none"
         stroke="transparent"
         strokeWidth={12}
@@ -49,19 +62,19 @@ export function ConnectorRenderer({ connector, selected, onSelect }: Props) {
       />
 
       <path
-        d={d}
+        d={visibleD}
         fill="none"
         stroke={strokeColor}
         strokeWidth={selected ? 2 : 1.5}
         strokeDasharray={isMessage ? "6 3" : undefined}
-        markerEnd={`url(#${markerId})`}
+        markerEnd={showArrow ? `url(#${markerId})` : undefined}
         style={{ pointerEvents: "none" }}
       />
 
-      {connector.label && connector.waypoints.length >= 2 && (() => {
-        const mid = Math.floor(connector.waypoints.length / 2);
-        const p1 = connector.waypoints[mid - 1];
-        const p2 = connector.waypoints[mid];
+      {connector.label && visibleWaypoints.length >= 2 && (() => {
+        const mid = Math.floor(visibleWaypoints.length / 2);
+        const p1 = visibleWaypoints[mid - 1];
+        const p2 = visibleWaypoints[mid];
         const lx = (p1.x + p2.x) / 2;
         const ly = (p1.y + p2.y) / 2;
         return (

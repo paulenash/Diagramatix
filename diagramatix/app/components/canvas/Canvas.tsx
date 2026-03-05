@@ -5,7 +5,10 @@ import type {
   ConnectorType,
   DiagramData,
   DiagramElement,
+  DirectionType,
   Point,
+  RoutingType,
+  Side,
   SymbolType,
 } from "@/app/lib/diagram/types";
 import { SymbolRenderer } from "./SymbolRenderer";
@@ -17,13 +20,23 @@ interface Props {
   onMoveElement: (id: string, x: number, y: number) => void;
   onUpdateLabel: (id: string, label: string) => void;
   onDeleteElement: (id: string) => void;
-  onAddConnector: (sourceId: string, targetId: string, type: ConnectorType) => void;
+  onAddConnector: (
+    sourceId: string,
+    targetId: string,
+    type: ConnectorType,
+    directionType: DirectionType,
+    routingType: RoutingType,
+    sourceSide: Side,
+    targetSide: Side
+  ) => void;
   onDeleteConnector: (id: string) => void;
   selectedElementId: string | null;
   selectedConnectorId: string | null;
   onSelectElement: (id: string | null) => void;
   onSelectConnector: (id: string | null) => void;
   pendingDragSymbol: SymbolType | null;
+  defaultDirectionType: DirectionType;
+  defaultRoutingType: RoutingType;
 }
 
 interface EditingLabel {
@@ -37,8 +50,20 @@ interface EditingLabel {
 
 interface DraggingConnector {
   fromId: string;
-  fromPos: Point;    // world coords — the connection point where drag started
-  currentPos: Point; // world coords — tracks the mouse
+  fromSide: Side;
+  fromPos: Point;
+  currentPos: Point;
+}
+
+function getClosestSide(pos: Point, el: DiagramElement): Side {
+  const cx = el.x + el.width / 2;
+  const cy = el.y + el.height / 2;
+  const dx = pos.x - cx;
+  const dy = pos.y - cy;
+  const normX = Math.abs(dx) / (el.width / 2);
+  const normY = Math.abs(dy) / (el.height / 2);
+  if (normX > normY) return dx > 0 ? "right" : "left";
+  return dy > 0 ? "bottom" : "top";
 }
 
 export function Canvas({
@@ -54,17 +79,14 @@ export function Canvas({
   onSelectElement,
   onSelectConnector,
   pendingDragSymbol,
+  defaultDirectionType,
+  defaultRoutingType,
 }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
 
-  // Pan/zoom state
   const [pan, setPan] = useState<Point>({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
-
-  // Inline label editing
   const [editingLabel, setEditingLabel] = useState<EditingLabel | null>(null);
-
-  // Connector drag state
   const [draggingConnector, setDraggingConnector] = useState<DraggingConnector | null>(null);
 
   const svgToWorld = useCallback(
@@ -80,9 +102,8 @@ export function Canvas({
     return svgToWorld(clientX - rect.left, clientY - rect.top);
   }
 
-  // ---- Hit test: find which element the mouse is over (excluding source) ----
-  function findDropTarget(pos: Point, fromId: string): string | null {
-    const MARGIN = 30; // world units of tolerance around the element bounds
+  function findDropTarget(pos: Point, fromId: string): DiagramElement | null {
+    const MARGIN = 30;
     for (const el of data.elements) {
       if (el.id === fromId) continue;
       if (
@@ -91,16 +112,16 @@ export function Canvas({
         pos.y >= el.y - MARGIN &&
         pos.y <= el.y + el.height + MARGIN
       ) {
-        return el.id;
+        return el;
       }
     }
     return null;
   }
 
-  // ---- Connection point drag start ----
-  function handleConnectionPointDragStart(elementId: string, worldPos: Point) {
+  function handleConnectionPointDragStart(elementId: string, side: Side, worldPos: Point) {
     const drag: DraggingConnector = {
       fromId: elementId,
+      fromSide: side,
       fromPos: worldPos,
       currentPos: worldPos,
     };
@@ -113,9 +134,10 @@ export function Canvas({
 
     function onMouseUp(ev: MouseEvent) {
       const pos = clientToWorld(ev.clientX, ev.clientY);
-      const targetId = findDropTarget(pos, elementId);
-      if (targetId) {
-        onAddConnector(elementId, targetId, "sequence");
+      const targetEl = findDropTarget(pos, elementId);
+      if (targetEl) {
+        const targetSide = getClosestSide(pos, targetEl);
+        onAddConnector(elementId, targetEl.id, "sequence", defaultDirectionType, defaultRoutingType, side, targetSide);
       }
       setDraggingConnector(null);
       window.removeEventListener("mousemove", onMouseMove);
@@ -126,7 +148,6 @@ export function Canvas({
     window.addEventListener("mouseup", onMouseUp);
   }
 
-  // ---- Pan handling ----
   const panStart = useRef<{ mouseX: number; mouseY: number; panX: number; panY: number } | null>(null);
 
   function handleBackgroundMouseDown(e: React.MouseEvent) {
@@ -158,7 +179,6 @@ export function Canvas({
     window.addEventListener("mouseup", onMouseUp);
   }
 
-  // ---- Zoom ----
   function handleWheel(e: React.WheelEvent) {
     e.preventDefault();
     const rect = svgRef.current!.getBoundingClientRect();
@@ -174,7 +194,6 @@ export function Canvas({
     setZoom(newZoom);
   }
 
-  // ---- Drop from palette ----
   function handleDrop(e: React.DragEvent) {
     e.preventDefault();
     if (!pendingDragSymbol) return;
@@ -183,7 +202,6 @@ export function Canvas({
     onAddElement(pendingDragSymbol, worldPos);
   }
 
-  // ---- Inline label editing ----
   function startEditingLabel(el: DiagramElement) {
     setEditingLabel({
       elementId: el.id,
@@ -201,7 +219,6 @@ export function Canvas({
     setEditingLabel(null);
   }
 
-  // ---- Keyboard ----
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === "Escape") {
       setDraggingConnector(null);
@@ -261,8 +278,8 @@ export function Canvas({
               }}
               onMove={(x, y) => onMoveElement(el.id, x, y)}
               onDoubleClick={() => startEditingLabel(el)}
-              onConnectionPointDragStart={(worldPos) =>
-                handleConnectionPointDragStart(el.id, worldPos)
+              onConnectionPointDragStart={(side, worldPos) =>
+                handleConnectionPointDragStart(el.id, side, worldPos)
               }
               showConnectionPoints={
                 el.id === selectedElementId ||

@@ -2,7 +2,15 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import type { ConnectorType, DiagramData, DiagramType, SymbolType } from "@/app/lib/diagram/types";
+import type {
+  ConnectorType,
+  DiagramData,
+  DiagramType,
+  DirectionType,
+  RoutingType,
+  Side,
+  SymbolType,
+} from "@/app/lib/diagram/types";
 import { useDiagram } from "@/app/hooks/useDiagram";
 import { Canvas } from "@/app/components/canvas/Canvas";
 import { Palette } from "@/app/components/canvas/Palette";
@@ -76,7 +84,6 @@ export function DiagramEditor({
   initialData,
 }: Props) {
   const router = useRouter();
-  const svgRef = useRef<SVGSVGElement | null>(null);
 
   const {
     data,
@@ -97,9 +104,22 @@ export function DiagramEditor({
   const selectedElement = data.elements.find((el) => el.id === selectedElementId) ?? null;
   const selectedConnector = data.connectors.find((c) => c.id === selectedConnectorId) ?? null;
 
+  const defaultDirectionType: DirectionType =
+    diagramType === "process-context" ? "non-directed" : "directed";
+  const defaultRoutingType: RoutingType =
+    diagramType === "process-context" ? "direct" : "rectilinear";
+
   const handleAddConnector = useCallback(
-    (sourceId: string, targetId: string, type: ConnectorType = "sequence") => {
-      addConnector(sourceId, targetId, type);
+    (
+      sourceId: string,
+      targetId: string,
+      type: ConnectorType,
+      directionType: DirectionType,
+      routingType: RoutingType,
+      sourceSide: Side,
+      targetSide: Side
+    ) => {
+      addConnector(sourceId, targetId, type, directionType, routingType, sourceSide, targetSide);
     },
     [addConnector]
   );
@@ -177,6 +197,8 @@ export function DiagramEditor({
           onSelectElement={setSelectedElementId}
           onSelectConnector={setSelectedConnectorId}
           pendingDragSymbol={pendingDragSymbol}
+          defaultDirectionType={defaultDirectionType}
+          defaultRoutingType={defaultRoutingType}
         />
 
         <PropertiesPanel
