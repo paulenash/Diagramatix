@@ -88,7 +88,7 @@ export const ALL_SYMBOLS: SymbolDefinition[] = [
   },
   {
     type: "hourglass",
-    label: "Hourglass",
+    label: "AutoTimer",
     defaultWidth: 40,
     defaultHeight: 40,
     description: "An hourglass process symbol",

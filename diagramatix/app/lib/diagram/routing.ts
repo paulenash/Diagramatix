@@ -91,21 +91,9 @@ function perpendicularExitScaled(pt: Point, side: Side, offset: number): Point {
   }
 }
 
-export function getConnectionPointBySide(el: DiagramElement, side: Side): Point {
-  // actor/team always use center as connection anchor
-  if (el.type === "actor" || el.type === "team") {
-    return { x: el.x + el.width / 2, y: el.y + el.height / 2 };
-  }
-  switch (side) {
-    case "top":    return { x: el.x + el.width / 2, y: el.y };
-    case "right":  return { x: el.x + el.width, y: el.y + el.height / 2 };
-    case "bottom": return { x: el.x + el.width / 2, y: el.y + el.height };
-    case "left":   return { x: el.x, y: el.y + el.height / 2 };
-  }
-}
-
-function isActorOrTeam(el: DiagramElement): boolean {
-  return el.type === "actor" || el.type === "team";
+// All elements use centre as connection anchor; invisible leaders trim the interior segment
+export function getConnectionPointBySide(el: DiagramElement, _side: Side): Point {
+  return { x: el.x + el.width / 2, y: el.y + el.height / 2 };
 }
 
 export function computeWaypoints(
@@ -116,138 +104,53 @@ export function computeWaypoints(
   targetSide: Side,
   routingType: RoutingType
 ): { waypoints: Point[]; sourceInvisibleLeader: boolean; targetInvisibleLeader: boolean } {
-  const sourceIsAT = isActorOrTeam(source);
-  const targetIsAT = isActorOrTeam(target);
+  const startPt = getConnectionPointBySide(source, sourceSide); // source centre
+  const endPt   = getConnectionPointBySide(target, targetSide); // target centre
 
-  const startPt = getConnectionPointBySide(source, sourceSide);
-  const endPt = getConnectionPointBySide(target, targetSide);
+  const srcEdge = closestEdgePoint(endPt, getBounds(source));
+  const tgtEdge = closestEdgePoint(startPt, getBounds(target));
 
   if (routingType === "direct") {
-    if (!sourceIsAT && !targetIsAT) {
-      return { waypoints: [startPt, endPt], sourceInvisibleLeader: false, targetInvisibleLeader: false };
-    }
-
-    const waypoints: Point[] = [];
-    let sourceInvisibleLeader = false;
-    let targetInvisibleLeader = false;
-
-    if (sourceIsAT) {
-      const edgePt = closestEdgePoint(endPt, getBounds(source));
-      waypoints.push(startPt, edgePt);
-      sourceInvisibleLeader = true;
-    } else {
-      waypoints.push(startPt);
-    }
-
-    if (targetIsAT) {
-      const edgePt = closestEdgePoint(startPt, getBounds(target));
-      waypoints.push(edgePt, endPt);
-      targetInvisibleLeader = true;
-    } else {
-      waypoints.push(endPt);
-    }
-
-    return { waypoints, sourceInvisibleLeader, targetInvisibleLeader };
+    // [sourceCenter, srcEdge, tgtEdge, targetCenter]
+    // visible slice [1 .. length-2] = [srcEdge, tgtEdge] — straight line between edges
+    return {
+      waypoints: [startPt, srcEdge, tgtEdge, endPt],
+      sourceInvisibleLeader: true,
+      targetInvisibleLeader: true,
+    };
   }
 
   if (routingType === "curvilinear") {
-    // 4-point cubic bezier: [startPt, cp1, cp2, endPt]
-    // Control points are perpendicular exits scaled by max(60, dist/3)
-    const dist = euclideanDist(startPt, endPt);
+    // visible portion must be exactly 4 points for waypointsToCurvePath
+    // [sourceCenter, srcEdge, cp1, cp2, tgtEdge, targetCenter]
+    // visible slice [1..4] = [srcEdge, cp1, cp2, tgtEdge]
+    const dist   = euclideanDist(srcEdge, tgtEdge);
     const offset = Math.max(60, dist / 3);
-
-    let sourceInvisibleLeader = false;
-    let targetInvisibleLeader = false;
-
-    let s = startPt;
-    let e = endPt;
-    const prefix: Point[] = [];
-    const suffix: Point[] = [];
-
-    if (sourceIsAT) {
-      const edgePt = closestEdgePoint(endPt, getBounds(source));
-      prefix.push(startPt, edgePt);
-      s = edgePt;
-      sourceInvisibleLeader = true;
-    }
-
-    if (targetIsAT) {
-      const edgePt = closestEdgePoint(startPt, getBounds(target));
-      suffix.push(edgePt, endPt);
-      e = edgePt;
-      targetInvisibleLeader = true;
-    }
-
-    const cp1 = perpendicularExitScaled(s, sourceSide, offset);
-    const cp2 = perpendicularExitScaled(e, targetSide, offset);
-
-    const waypoints = [...prefix, s, cp1, cp2, e, ...suffix];
-    // For non-AT: waypoints = [startPt, cp1, cp2, endPt]
-    // For source-AT: [center, edgePt, edgePt, cp1, cp2, edgePt, ...suffix] — simplify
-    // Actually build cleanly:
-    if (!sourceIsAT && !targetIsAT) {
-      return { waypoints: [startPt, cp1, cp2, endPt], sourceInvisibleLeader: false, targetInvisibleLeader: false };
-    }
-
-    // With invisible leaders, the visible portion is still a 4-point bezier
-    if (sourceIsAT && !targetIsAT) {
-      const edgePt = closestEdgePoint(endPt, getBounds(source));
-      const cp1s = perpendicularExitScaled(edgePt, sourceSide, offset);
-      const cp2e = perpendicularExitScaled(endPt, targetSide, offset);
-      return { waypoints: [startPt, edgePt, cp1s, cp2e, endPt], sourceInvisibleLeader: true, targetInvisibleLeader: false };
-    }
-
-    if (!sourceIsAT && targetIsAT) {
-      const edgePt = closestEdgePoint(startPt, getBounds(target));
-      const cp1s = perpendicularExitScaled(startPt, sourceSide, offset);
-      const cp2e = perpendicularExitScaled(edgePt, targetSide, offset);
-      return { waypoints: [startPt, cp1s, cp2e, edgePt, endPt], sourceInvisibleLeader: false, targetInvisibleLeader: true };
-    }
-
-    // Both AT
-    const srcEdge = closestEdgePoint(endPt, getBounds(source));
-    const tgtEdge = closestEdgePoint(startPt, getBounds(target));
-    const cp1b = perpendicularExitScaled(srcEdge, sourceSide, offset);
-    const cp2b = perpendicularExitScaled(tgtEdge, targetSide, offset);
-    return { waypoints: [startPt, srcEdge, cp1b, cp2b, tgtEdge, endPt], sourceInvisibleLeader: true, targetInvisibleLeader: true };
+    const cp1 = perpendicularExitScaled(srcEdge, sourceSide, offset);
+    const cp2 = perpendicularExitScaled(tgtEdge, targetSide, offset);
+    return {
+      waypoints: [startPt, srcEdge, cp1, cp2, tgtEdge, endPt],
+      sourceInvisibleLeader: true,
+      targetInvisibleLeader: true,
+    };
   }
 
-  // Rectilinear with perpendicular first/last segments
+  // Rectilinear
+  // [sourceCenter, srcEdge, exitPt, ...mid..., approachPt, tgtEdge, targetCenter]
+  // visible slice [1..length-2] = [srcEdge, exitPt, ...mid..., approachPt, tgtEdge]
   const obstacles = allElements
     .filter((el) => el.id !== source.id && el.id !== target.id)
     .map(getBounds);
 
-  let sourceInvisibleLeader = false;
-  let targetInvisibleLeader = false;
-  const prefix: Point[] = [];
-  const suffix: Point[] = [];
+  const exitPt     = perpendicularExit(srcEdge, sourceSide);
+  const approachPt = perpendicularApproach(tgtEdge, targetSide);
+  const midPath    = buildOrthogonalPath(exitPt, approachPt, obstacles);
 
-  if (sourceIsAT) {
-    const edgePt = closestEdgePoint(endPt, getBounds(source));
-    const exitPt = perpendicularExit(edgePt, sourceSide);
-    prefix.push(startPt, edgePt, exitPt);
-    sourceInvisibleLeader = true;
-  } else {
-    const exitPt = perpendicularExit(startPt, sourceSide);
-    prefix.push(startPt, exitPt);
-  }
-
-  if (targetIsAT) {
-    const edgePt = closestEdgePoint(startPt, getBounds(target));
-    const approachPt = perpendicularApproach(edgePt, targetSide);
-    suffix.push(approachPt, edgePt, endPt);
-    targetInvisibleLeader = true;
-  } else {
-    const approachPt = perpendicularApproach(endPt, targetSide);
-    suffix.push(approachPt, endPt);
-  }
-
-  const exitPt = prefix[prefix.length - 1];
-  const approachPt = suffix[0];
-  const midPath = buildOrthogonalPath(exitPt, approachPt, obstacles);
-  const waypoints = [...prefix.slice(0, -1), ...midPath, ...suffix.slice(1)];
-
-  return { waypoints, sourceInvisibleLeader, targetInvisibleLeader };
+  return {
+    waypoints: [startPt, srcEdge, ...midPath, tgtEdge, endPt],
+    sourceInvisibleLeader: true,
+    targetInvisibleLeader: true,
+  };
 }
 
 export function waypointsToSvgPath(waypoints: Point[]): string {

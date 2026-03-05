@@ -140,8 +140,7 @@ function StickFigure({
 function ActorShape({ el }: { el: DiagramElement }) {
   const headR = 10;
   const bodyLen = 16;
-  const rawLegLen = el.height - 2 - headR * 2 - bodyLen - 4;
-  const legLen = Math.max(rawLegLen * 0.6, 5);
+  const legLen = Math.max(el.height - 4 - headR * 2 - bodyLen, 5);
   return (
     <StickFigure
       cx={el.x + el.width / 2}
@@ -158,11 +157,17 @@ function ActorShape({ el }: { el: DiagramElement }) {
 function TeamShape({ el }: { el: DiagramElement }) {
   const cx = el.x + el.width / 2;
   const top = el.y + 4;
+  // Dynamic leg lengths for equal top/bottom gaps
+  // Central (headR=9): top=el.y+4, figure height = 18+14+legLen → end at el.y+el.height-4
+  const legLen_central = Math.max(el.height - 40, 5);
+  // Side (headR=6): top=el.y+16, figure height = 12+12+legLen → end at el.y+el.height-4
+  const legLen_side = Math.max(el.height - 44, 5);
+  // x-offset 26 = armHalfSpan_central(14) + armHalfSpan_side(12) → arm tips touch, no gap
   return (
     <g>
-      <StickFigure cx={cx - 40} top={top + 12} headR={6} bodyLen={12} armHalfSpan={12} legSpread={10} legLen={8} />
-      <StickFigure cx={cx + 40} top={top + 12} headR={6} bodyLen={12} armHalfSpan={12} legSpread={10} legLen={8} />
-      <StickFigure cx={cx} top={top} headR={9} bodyLen={14} armHalfSpan={14} legSpread={12} legLen={10} />
+      <StickFigure cx={cx - 26} top={top + 12} headR={6} bodyLen={12} armHalfSpan={12} legSpread={10} legLen={legLen_side} />
+      <StickFigure cx={cx + 26} top={top + 12} headR={6} bodyLen={12} armHalfSpan={12} legSpread={10} legLen={legLen_side} />
+      <StickFigure cx={cx} top={top} headR={9} bodyLen={14} armHalfSpan={14} legSpread={12} legLen={legLen_central} />
     </g>
   );
 }
@@ -210,7 +215,7 @@ function SymbolShape({ el }: { el: DiagramElement }) {
 }
 
 function getLabelPos(el: DiagramElement): { x: number; y: number; baseline: string } {
-  if (el.type === "actor" || el.type === "team") {
+  if (el.type === "actor" || el.type === "team" || el.type === "hourglass") {
     return { x: el.x + el.width / 2, y: el.y + el.height + 12, baseline: "hanging" };
   }
   if (el.type === "system-boundary") {
@@ -362,8 +367,8 @@ export function SymbolRenderer({
         })
       }
 
-      {/* Actor/Team full-body connection overlay */}
-      {showConnectionPoints && isActorOrTeam && (
+      {/* Full-body connection overlay for all non-boundary elements */}
+      {showConnectionPoints && !isBoundary && (
         <rect
           x={element.x} y={element.y}
           width={element.width} height={element.height}
@@ -382,25 +387,6 @@ export function SymbolRenderer({
           }}
         />
       )}
-
-      {/* Connection point dots (non-actor/team, non-boundary) */}
-      {showConnectionPoints && !isActorOrTeam && !isBoundary &&
-        CONNECTION_POINT_SIDES.map((side) => {
-          const pos = getConnectionPointPos(element, side);
-          return (
-            <circle
-              key={side}
-              cx={pos.cx} cy={pos.cy} r={5}
-              fill="#2563eb" stroke="white" strokeWidth={1.5}
-              style={{ cursor: "crosshair" }}
-              onMouseDown={(e) => {
-                e.stopPropagation();
-                onConnectionPointDragStart(side, { x: pos.cx, y: pos.cy });
-              }}
-            />
-          );
-        })
-      }
     </g>
   );
 }
