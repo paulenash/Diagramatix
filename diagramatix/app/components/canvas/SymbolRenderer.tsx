@@ -196,17 +196,14 @@ function ActorShape({ el }: { el: DiagramElement }) {
 function TeamShape({ el }: { el: DiagramElement }) {
   const cx = el.x + el.width / 2;
   const top = el.y + 4;
-  // Dynamic leg lengths for equal top/bottom gaps
-  // Central (headR=9): top=el.y+4, figure height = 18+14+legLen → end at el.y+el.height-4
   const legLen_central = Math.max(el.height - 40, 5);
-  // Side (headR=6): top=el.y+16, figure height = 12+12+legLen → end at el.y+el.height-4
-  const legLen_side = Math.max(el.height - 44, 5);
-  // x-offset 26 = armHalfSpan_central(14) + armHalfSpan_side(12) → arm tips touch, no gap
+  // Side figures: 70% of central total height (el.height-8); fixed parts = 2×6+10 = 22
+  const legLen_side = Math.max(Math.round(0.7 * (el.height - 8) - 22), 3);
   return (
     <g>
-      <StickFigure cx={cx - 26} top={top + 12} headR={6} bodyLen={12} armHalfSpan={12} legSpread={10} legLen={legLen_side} />
-      <StickFigure cx={cx + 26} top={top + 12} headR={6} bodyLen={12} armHalfSpan={12} legSpread={10} legLen={legLen_side} />
-      <StickFigure cx={cx} top={top} headR={9} bodyLen={14} armHalfSpan={14} legSpread={12} legLen={legLen_central} />
+      <StickFigure cx={cx - 30} top={top} headR={6} bodyLen={10} armHalfSpan={14} legSpread={12} legLen={legLen_side} />
+      <StickFigure cx={cx + 30} top={top} headR={6} bodyLen={10} armHalfSpan={14} legSpread={12} legLen={legLen_side} />
+      <StickFigure cx={cx}      top={top} headR={9} bodyLen={14} armHalfSpan={14} legSpread={12} legLen={legLen_central} />
     </g>
   );
 }

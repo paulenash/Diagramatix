@@ -51,18 +51,18 @@ function PaletteSymbolPreview({ type }: { type: SymbolType }) {
     case "team":
       return (
         <svg width={64} height={44} viewBox="0 0 64 44">
-          {/* Left figure (smaller Participant) */}
-          <circle cx={10} cy={6} r={4} fill="white" stroke="#374151" strokeWidth={1.5} />
-          <line x1={10} y1={10} x2={10} y2={26} stroke="#374151" strokeWidth={1.5} />
-          <line x1={5}  y1={18} x2={15} y2={18} stroke="#374151" strokeWidth={1.5} />
-          <line x1={10} y1={26} x2={6}  y2={36} stroke="#374151" strokeWidth={1.5} />
-          <line x1={10} y1={26} x2={14} y2={36} stroke="#374151" strokeWidth={1.5} />
-          {/* Right figure (smaller Participant) */}
-          <circle cx={54} cy={6} r={4} fill="white" stroke="#374151" strokeWidth={1.5} />
-          <line x1={54} y1={10} x2={54} y2={26} stroke="#374151" strokeWidth={1.5} />
-          <line x1={49} y1={18} x2={59} y2={18} stroke="#374151" strokeWidth={1.5} />
-          <line x1={54} y1={26} x2={50} y2={36} stroke="#374151" strokeWidth={1.5} />
-          <line x1={54} y1={26} x2={58} y2={36} stroke="#374151" strokeWidth={1.5} />
+          {/* Left figure (70% height, same width as central) */}
+          <circle cx={15} cy={4.5} r={3.5} fill="white" stroke="#374151" strokeWidth={1.5} />
+          <line x1={15} y1={8}  x2={15} y2={19} stroke="#374151" strokeWidth={1.5} />
+          <line x1={7}  y1={14} x2={23} y2={14} stroke="#374151" strokeWidth={1.5} />
+          <line x1={15} y1={19} x2={8}  y2={26} stroke="#374151" strokeWidth={1.5} />
+          <line x1={15} y1={19} x2={22} y2={26} stroke="#374151" strokeWidth={1.5} />
+          {/* Right figure (70% height, same width as central) */}
+          <circle cx={49} cy={4.5} r={3.5} fill="white" stroke="#374151" strokeWidth={1.5} />
+          <line x1={49} y1={8}  x2={49} y2={19} stroke="#374151" strokeWidth={1.5} />
+          <line x1={41} y1={14} x2={57} y2={14} stroke="#374151" strokeWidth={1.5} />
+          <line x1={49} y1={19} x2={42} y2={26} stroke="#374151" strokeWidth={1.5} />
+          <line x1={49} y1={19} x2={56} y2={26} stroke="#374151" strokeWidth={1.5} />
           {/* Central figure (full-size Participant) */}
           <circle cx={32} cy={6} r={5} fill="white" stroke="#374151" strokeWidth={1.5} />
           <line x1={32} y1={11} x2={32} y2={27} stroke="#374151" strokeWidth={1.5} />
