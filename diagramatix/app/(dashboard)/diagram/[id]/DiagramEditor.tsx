@@ -94,6 +94,7 @@ export function DiagramEditor({
     deleteElement,
     addConnector,
     deleteConnector,
+    updateConnectorEndpoint,
   } = useDiagram(initialData);
 
   const saveStatus = useAutoSave(diagramId, data);
@@ -201,6 +202,7 @@ export function DiagramEditor({
             deleteConnector(id);
             setSelectedConnectorId(null);
           }}
+          onUpdateConnectorEndpoint={updateConnectorEndpoint}
           selectedElementId={selectedElementId}
           selectedConnectorId={selectedConnectorId}
           onSelectElement={setSelectedElementId}

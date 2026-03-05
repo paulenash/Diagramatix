@@ -106,6 +106,16 @@ function PaletteSymbolPreview({ type }: { type: SymbolType }) {
           <circle cx={12} cy={12} r={6} fill="#374151" />
         </svg>
       );
+    case "composite-state":
+      return (
+        <svg width={48} height={32} viewBox="0 0 48 32">
+          <rect x={2} y={2} width={44} height={28} rx={6}
+            fill="rgba(237,233,254,0.5)" stroke="#374151" strokeWidth={1.5} />
+          <rect x={2} y={2} width={44} height={10} fill="#ede9fe" rx={6} />
+          <rect x={2} y={10} width={44} height={2} fill="#ede9fe" />
+          <line x1={2} y1={12} x2={46} y2={12} stroke="#374151" strokeWidth={1} />
+        </svg>
+      );
     default:
       return (
         <svg width={48} height={28} viewBox="0 0 48 28">

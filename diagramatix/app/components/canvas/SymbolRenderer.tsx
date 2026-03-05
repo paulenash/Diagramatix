@@ -115,6 +115,24 @@ function SystemBoundaryShape({ el }: { el: DiagramElement }) {
   );
 }
 
+function CompositeStateShape({ el }: { el: DiagramElement }) {
+  return (
+    <g>
+      {/* Outer rounded rect with light lavender fill */}
+      <rect x={el.x} y={el.y} width={el.width} height={el.height}
+        fill="rgba(237,233,254,0.4)" stroke="#374151" strokeWidth={1.5} rx={12} />
+      {/* Header fill */}
+      <rect x={el.x} y={el.y} width={el.width} height={HEADER_H}
+        fill="#ede9fe" stroke="none" rx={12} />
+      {/* Clip bottom corners of header fill */}
+      <rect x={el.x} y={el.y + HEADER_H - 2} width={el.width} height={2} fill="#ede9fe" />
+      {/* Header bottom border */}
+      <line x1={el.x} y1={el.y + HEADER_H} x2={el.x + el.width} y2={el.y + HEADER_H}
+        stroke="#374151" strokeWidth={1} />
+    </g>
+  );
+}
+
 // Reusable stick figure
 function StickFigure({
   cx, top, headR = 8, bodyLen = 16, armHalfSpan = 18, legSpread = 16, legLen = 12,
@@ -209,8 +227,9 @@ function SymbolShape({ el }: { el: DiagramElement }) {
     case "state":         return <StateShape el={el} />;
     case "initial-state": return <InitialStateShape el={el} />;
     case "final-state":   return <FinalStateShape el={el} />;
-    case "system-boundary": return <SystemBoundaryShape el={el} />;
-    default:              return <TaskShape el={el} />;
+    case "system-boundary":   return <SystemBoundaryShape el={el} />;
+    case "composite-state":   return <CompositeStateShape el={el} />;
+    default:                  return <TaskShape el={el} />;
   }
 }
 
@@ -218,7 +237,7 @@ function getLabelPos(el: DiagramElement): { x: number; y: number; baseline: stri
   if (el.type === "actor" || el.type === "team" || el.type === "hourglass") {
     return { x: el.x + el.width / 2, y: el.y + el.height + 12, baseline: "hanging" };
   }
-  if (el.type === "system-boundary") {
+  if (el.type === "system-boundary" || el.type === "composite-state") {
     return { x: el.x + el.width / 2, y: el.y + HEADER_H / 2, baseline: "middle" };
   }
   return { x: el.x + el.width / 2, y: el.y + el.height / 2, baseline: "middle" };
@@ -294,7 +313,8 @@ export function SymbolRenderer({
 
   const labelInfo = getLabelPos(element);
   const isActorOrTeam = element.type === "actor" || element.type === "team";
-  const isBoundary = element.type === "system-boundary";
+  const isBoundary = element.type === "system-boundary";  // excluded from connection overlay
+  const isContainer = isBoundary || element.type === "composite-state"; // gets resize handles
   const showLabel = element.type !== "initial-state";
 
   return (
@@ -320,7 +340,7 @@ export function SymbolRenderer({
       )}
 
       {/* Selection outline */}
-      {selected && !isBoundary && (
+      {selected && !isContainer && (
         <rect
           x={element.x - 3} y={element.y - 3}
           width={element.width + 6} height={element.height + 6}
@@ -350,8 +370,8 @@ export function SymbolRenderer({
         />
       )}
 
-      {/* Resize handles (system-boundary only) */}
-      {selected && isBoundary && onResizeDragStart &&
+      {/* Resize handles (containers: system-boundary and composite-state) */}
+      {selected && isContainer && onResizeDragStart &&
         RESIZE_HANDLES.map(({ handle, cursor }) => {
           const { hx, hy } = getHandlePos(handle, element);
           return (

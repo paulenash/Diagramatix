@@ -2,6 +2,7 @@
 
 import { useRef, useState, useCallback } from "react";
 import type {
+  Connector,
   ConnectorType,
   DiagramData,
   DiagramElement,
@@ -35,6 +36,12 @@ interface Props {
     targetSide: Side
   ) => void;
   onDeleteConnector: (id: string) => void;
+  onUpdateConnectorEndpoint: (
+    connectorId: string,
+    endpoint: "source" | "target",
+    newElementId: string,
+    newSide: Side
+  ) => void;
   selectedElementId: string | null;
   selectedConnectorId: string | null;
   onSelectElement: (id: string | null) => void;
@@ -60,6 +67,13 @@ interface DraggingConnector {
   currentPos: Point;
 }
 
+interface DraggingEndpoint {
+  connectorId: string;
+  endpoint: "source" | "target";
+  startPos: Point;
+  currentPos: Point;
+}
+
 function getClosestSide(pos: Point, el: DiagramElement): Side {
   const cx = el.x + el.width / 2;
   const cy = el.y + el.height / 2;
@@ -80,6 +94,7 @@ export function Canvas({
   onDeleteElement,
   onAddConnector,
   onDeleteConnector,
+  onUpdateConnectorEndpoint,
   selectedElementId,
   selectedConnectorId,
   onSelectElement,
@@ -94,6 +109,7 @@ export function Canvas({
   const [zoom, setZoom] = useState(1);
   const [editingLabel, setEditingLabel] = useState<EditingLabel | null>(null);
   const [draggingConnector, setDraggingConnector] = useState<DraggingConnector | null>(null);
+  const [draggingEndpoint, setDraggingEndpoint] = useState<DraggingEndpoint | null>(null);
 
   const svgToWorld = useCallback(
     (svgX: number, svgY: number): Point => ({
@@ -115,6 +131,7 @@ export function Canvas({
     const MARGIN = 30;
     for (const el of data.elements) {
       if (el.id === fromId) continue;
+      if (el.type === "system-boundary") continue; // Process Group is not a connector target
       if (
         pos.x >= el.x - MARGIN &&
         pos.x <= el.x + el.width + MARGIN &&
@@ -149,6 +166,42 @@ export function Canvas({
         onAddConnector(elementId, targetEl.id, "sequence", defaultDirectionType, defaultRoutingType, side, targetSide);
       }
       setDraggingConnector(null);
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    }
+
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+  }
+
+  function handleEndpointDragStart(
+    connectorId: string,
+    endpoint: "source" | "target",
+    startPos: Point,
+    e: React.MouseEvent
+  ) {
+    e.stopPropagation();
+    // Find the connector's current source/target id to use as "from" exclusion
+    const conn = data.connectors.find((c) => c.id === connectorId);
+    const fromId = conn
+      ? endpoint === "source" ? conn.sourceId : conn.targetId
+      : connectorId;
+
+    setDraggingEndpoint({ connectorId, endpoint, startPos, currentPos: startPos });
+
+    function onMouseMove(ev: MouseEvent) {
+      const pos = clientToWorld(ev.clientX, ev.clientY);
+      setDraggingEndpoint((prev) => prev ? { ...prev, currentPos: pos } : null);
+    }
+
+    function onMouseUp(ev: MouseEvent) {
+      const pos = clientToWorld(ev.clientX, ev.clientY);
+      const targetEl = findDropTarget(pos, fromId);
+      if (targetEl) {
+        const newSide = getClosestSide(pos, targetEl);
+        onUpdateConnectorEndpoint(connectorId, endpoint, targetEl.id, newSide);
+      }
+      setDraggingEndpoint(null);
       window.removeEventListener("mousemove", onMouseMove);
       window.removeEventListener("mouseup", onMouseUp);
     }
@@ -253,14 +306,13 @@ export function Canvas({
   }
 
   function startEditingLabel(el: DiagramElement) {
+    const isContainer = el.type === "system-boundary" || el.type === "composite-state";
     setEditingLabel({
       elementId: el.id,
       x: el.x * zoom + pan.x,
-      y: el.type === "system-boundary"
-        ? el.y * zoom + pan.y
-        : el.y * zoom + pan.y,
+      y: el.y * zoom + pan.y,
       width: el.width * zoom,
-      height: el.type === "system-boundary" ? HEADER_H * zoom : el.height * zoom,
+      height: isContainer ? HEADER_H * zoom : el.height * zoom,
       value: el.label,
     });
   }
@@ -274,6 +326,7 @@ export function Canvas({
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === "Escape") {
       setDraggingConnector(null);
+      setDraggingEndpoint(null);
       setEditingLabel(null);
     }
     if (e.key === "Delete" || e.key === "Backspace") {
@@ -285,10 +338,28 @@ export function Canvas({
 
   const transform = `translate(${pan.x}, ${pan.y}) scale(${zoom})`;
   const isDraggingConnector = draggingConnector !== null;
+  const isDraggingEndpoint = draggingEndpoint !== null;
 
-  // Render system-boundary elements first (behind other elements)
-  const boundaries = data.elements.filter((el) => el.type === "system-boundary");
-  const nonBoundaries = data.elements.filter((el) => el.type !== "system-boundary");
+  // Render containers first (behind everything), then connectors, then other elements
+  const containers = data.elements.filter(
+    (el) => el.type === "system-boundary" || el.type === "composite-state"
+  );
+  const nonContainers = data.elements.filter(
+    (el) => el.type !== "system-boundary" && el.type !== "composite-state"
+  );
+
+  // Endpoint handle positions for selected connector
+  const selectedConnector: Connector | null =
+    selectedConnectorId
+      ? (data.connectors.find((c) => c.id === selectedConnectorId) ?? null)
+      : null;
+
+  const endpointHandles = selectedConnector && selectedConnector.waypoints.length >= 2
+    ? {
+        source: selectedConnector.waypoints[1],                                      // srcEdge
+        target: selectedConnector.waypoints[selectedConnector.waypoints.length - 2], // tgtEdge
+      }
+    : null;
 
   return (
     <div
@@ -307,11 +378,11 @@ export function Canvas({
         onDrop={handleDrop}
         onDragOver={(e) => e.preventDefault()}
         onKeyDown={handleKeyDown}
-        style={{ cursor: isDraggingConnector ? "crosshair" : "default" }}
+        style={{ cursor: isDraggingConnector || isDraggingEndpoint ? "crosshair" : "default" }}
       >
         <g transform={transform}>
-          {/* System boundaries render first (behind everything) */}
-          {boundaries.map((el) => (
+          {/* Containers render first (behind everything) */}
+          {containers.map((el) => (
             <SymbolRenderer
               key={el.id}
               element={el}
@@ -346,8 +417,8 @@ export function Canvas({
             />
           ))}
 
-          {/* Non-boundary elements */}
-          {nonBoundaries.map((el) => (
+          {/* Non-container elements */}
+          {nonContainers.map((el) => (
             <SymbolRenderer
               key={el.id}
               element={el}
@@ -369,6 +440,30 @@ export function Canvas({
             />
           ))}
 
+          {/* Connector endpoint handles when a connector is selected */}
+          {endpointHandles && (
+            <>
+              <rect
+                x={endpointHandles.source.x - 5} y={endpointHandles.source.y - 5}
+                width={10} height={10}
+                fill="#2563eb" stroke="white" strokeWidth={1.5}
+                style={{ cursor: "crosshair" }}
+                onMouseDown={(e) =>
+                  handleEndpointDragStart(selectedConnectorId!, "source", endpointHandles.source, e)
+                }
+              />
+              <rect
+                x={endpointHandles.target.x - 5} y={endpointHandles.target.y - 5}
+                width={10} height={10}
+                fill="#2563eb" stroke="white" strokeWidth={1.5}
+                style={{ cursor: "crosshair" }}
+                onMouseDown={(e) =>
+                  handleEndpointDragStart(selectedConnectorId!, "target", endpointHandles.target, e)
+                }
+              />
+            </>
+          )}
+
           {/* Rubber-band line during connector drag */}
           {draggingConnector && (
             <line
@@ -377,6 +472,20 @@ export function Canvas({
               x2={draggingConnector.currentPos.x}
               y2={draggingConnector.currentPos.y}
               stroke="#2563eb"
+              strokeWidth={1.5}
+              strokeDasharray="6 3"
+              style={{ pointerEvents: "none" }}
+            />
+          )}
+
+          {/* Rubber-band line during endpoint drag */}
+          {draggingEndpoint && (
+            <line
+              x1={draggingEndpoint.startPos.x}
+              y1={draggingEndpoint.startPos.y}
+              x2={draggingEndpoint.currentPos.x}
+              y2={draggingEndpoint.currentPos.y}
+              stroke="#f59e0b"
               strokeWidth={1.5}
               strokeDasharray="6 3"
               style={{ pointerEvents: "none" }}
@@ -420,9 +529,9 @@ export function Canvas({
 
       {/* Status bar */}
       <div className="absolute bottom-2 left-2 text-xs text-gray-400 bg-white/80 px-2 py-1 rounded">
-        {isDraggingConnector
+        {isDraggingConnector || isDraggingEndpoint
           ? "Release over an element to connect · Esc to cancel"
-          : "Drag to pan · Scroll to zoom · Double-click label · Delete to remove · Drag connection point to connect"}
+          : "Drag to pan · Scroll to zoom · Double-click label · Delete to remove · Drag element body to connect"}
         {" · "}
         {Math.round(zoom * 100)}%
       </div>

@@ -93,12 +93,19 @@ export const ALL_SYMBOLS: SymbolDefinition[] = [
     defaultHeight: 40,
     description: "An hourglass process symbol",
   },
+  {
+    type: "composite-state",
+    label: "Composite State",
+    defaultWidth: 360,
+    defaultHeight: 180,
+    description: "A composite state containing sub-states",
+  },
 ];
 
 export const PALETTE_BY_DIAGRAM_TYPE: Record<DiagramType, SymbolType[]> = {
   basic: ["task"],
   "process-context": ["use-case", "actor", "team", "hourglass", "system-boundary"],
-  "state-machine": ["state", "initial-state", "final-state"],
+  "state-machine": ["state", "initial-state", "final-state", "composite-state"],
   bpmn: [
     "task",
     "gateway",

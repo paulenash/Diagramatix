@@ -33,10 +33,26 @@ type Action =
       targetSide: Side;
     }}
   | { type: "DELETE_CONNECTOR"; payload: { id: string } }
+  | { type: "UPDATE_CONNECTOR_ENDPOINT"; payload: {
+      connectorId: string;
+      endpoint: "source" | "target";
+      newElementId: string;
+      newSide: Side;
+    }}
   | { type: "SET_VIEWPORT"; payload: { x: number; y: number; zoom: number } };
 
 function nanoid(): string {
   return Math.random().toString(36).slice(2, 10);
+}
+
+function isContainerType(type: SymbolType): boolean {
+  return type === "system-boundary" || type === "composite-state";
+}
+
+function containerAccepts(containerType: SymbolType, childType: SymbolType): boolean {
+  if (containerType === "system-boundary") return childType === "use-case" || childType === "hourglass";
+  if (containerType === "composite-state") return childType === "state" || childType === "initial-state" || childType === "final-state";
+  return false;
 }
 
 function reducer(state: DiagramData, action: Action): DiagramData {
@@ -50,6 +66,12 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       if (action.payload.symbolType === "use-case") {
         const count = state.elements.filter((e) => e.type === "use-case").length;
         label = `Process ${count + 1}`;
+      } else if (action.payload.symbolType === "state") {
+        const count = state.elements.filter((e) => e.type === "state").length;
+        label = `State ${count + 1}`;
+      } else if (action.payload.symbolType === "composite-state") {
+        const count = state.elements.filter((e) => e.type === "composite-state").length;
+        label = `Composite ${count + 1}`;
       }
       const newEl: DiagramElement = {
         id: nanoid(),
@@ -71,27 +93,27 @@ function reducer(state: DiagramData, action: Action): DiagramData {
 
       const dx = x - el.x;
       const dy = y - el.y;
-      const isBoundary = el.type === "system-boundary";
-      const isProcess = el.type === "use-case" || el.type === "hourglass";
+      const movingIsContainer = isContainerType(el.type);
 
       const elements = state.elements.map((e) => {
         if (e.id === id) {
           let parentId = e.parentId;
-          if (isProcess) {
-            const cx = x + e.width / 2;
-            const cy = y + e.height / 2;
-            const boundary = state.elements.find(
-              (b) =>
-                b.type === "system-boundary" &&
-                b.id !== id &&
-                cx >= b.x && cx <= b.x + b.width &&
-                cy >= b.y && cy <= b.y + b.height
-            );
-            parentId = boundary?.id;
+          // Check if this element can live inside a container
+          const potentialParent = state.elements.find(
+            (b) =>
+              isContainerType(b.type) &&
+              containerAccepts(b.type, e.type) &&
+              b.id !== id &&
+              (x + e.width / 2) >= b.x && (x + e.width / 2) <= b.x + b.width &&
+              (y + e.height / 2) >= b.y && (y + e.height / 2) <= b.y + b.height
+          );
+          if (potentialParent !== undefined || state.elements.some(b => isContainerType(b.type) && containerAccepts(b.type, e.type))) {
+            parentId = potentialParent?.id;
           }
           return { ...e, x, y, parentId };
         }
-        if (isBoundary && e.parentId === id) {
+        // If moving a container, move its children with it
+        if (movingIsContainer && e.parentId === id) {
           return { ...e, x: e.x + dx, y: e.y + dy };
         }
         return e;
@@ -133,11 +155,11 @@ function reducer(state: DiagramData, action: Action): DiagramData {
     case "DELETE_ELEMENT": {
       const { id } = action.payload;
       const el = state.elements.find((e) => e.id === id);
-      const isBoundary = el?.type === "system-boundary";
+      const deletingIsContainer = el ? isContainerType(el.type) : false;
       const elements = state.elements
         .filter((e) => e.id !== id)
         .map((e) =>
-          isBoundary && e.parentId === id ? { ...e, parentId: undefined } : e
+          deletingIsContainer && e.parentId === id ? { ...e, parentId: undefined } : e
         );
       const connectors = state.connectors.filter(
         (c) => c.sourceId !== id && c.targetId !== id
@@ -184,6 +206,24 @@ function reducer(state: DiagramData, action: Action): DiagramData {
           (c) => c.id !== action.payload.id
         ),
       };
+
+    case "UPDATE_CONNECTOR_ENDPOINT": {
+      const { connectorId, endpoint, newElementId, newSide } = action.payload;
+      const connectors = state.connectors.map((conn) => {
+        if (conn.id !== connectorId) return conn;
+        const updated = endpoint === "source"
+          ? { ...conn, sourceId: newElementId, sourceSide: newSide }
+          : { ...conn, targetId: newElementId, targetSide: newSide };
+        const source = state.elements.find((el) => el.id === updated.sourceId);
+        const target = state.elements.find((el) => el.id === updated.targetId);
+        if (!source || !target) return conn;
+        const { waypoints, sourceInvisibleLeader, targetInvisibleLeader } = computeWaypoints(
+          source, target, state.elements, updated.sourceSide, updated.targetSide, updated.routingType
+        );
+        return { ...updated, waypoints, sourceInvisibleLeader, targetInvisibleLeader };
+      });
+      return { ...state, connectors };
+    }
 
     case "SET_VIEWPORT":
       return {
@@ -251,6 +291,13 @@ export function useDiagram(initialData: DiagramData) {
     dispatch({ type: "DELETE_CONNECTOR", payload: { id } });
   }, []);
 
+  const updateConnectorEndpoint = useCallback(
+    (connectorId: string, endpoint: "source" | "target", newElementId: string, newSide: Side) => {
+      dispatch({ type: "UPDATE_CONNECTOR_ENDPOINT", payload: { connectorId, endpoint, newElementId, newSide } });
+    },
+    []
+  );
+
   const setData = useCallback((newData: DiagramData) => {
     dispatch({ type: "SET_DATA", payload: newData });
   }, []);
@@ -269,6 +316,7 @@ export function useDiagram(initialData: DiagramData) {
     deleteElement,
     addConnector,
     deleteConnector,
+    updateConnectorEndpoint,
     setData,
     setViewport,
   };

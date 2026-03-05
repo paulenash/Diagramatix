@@ -15,7 +15,8 @@ export type SymbolType =
   | "lane"
   | "subprocess"
   | "system-boundary"
-  | "hourglass";
+  | "hourglass"
+  | "composite-state";
 
 export type ConnectorType = "sequence" | "message" | "association";
 
