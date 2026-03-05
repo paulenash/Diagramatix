@@ -39,6 +39,7 @@ type Action =
       newElementId: string;
       newSide: Side;
     }}
+  | { type: "UPDATE_CONNECTOR"; payload: { id: string; directionType: DirectionType } }
   | { type: "SET_VIEWPORT"; payload: { x: number; y: number; zoom: number } };
 
 function nanoid(): string {
@@ -72,6 +73,12 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       } else if (action.payload.symbolType === "composite-state") {
         const count = state.elements.filter((e) => e.type === "composite-state").length;
         label = `Composite ${count + 1}`;
+      } else if (action.payload.symbolType === "actor") {
+        const count = state.elements.filter((e) => e.type === "actor").length;
+        label = `Participant ${count + 1}`;
+      } else if (action.payload.symbolType === "team") {
+        const count = state.elements.filter((e) => e.type === "team").length;
+        label = `Team ${count + 1}`;
       }
       const newEl: DiagramElement = {
         id: nanoid(),
@@ -207,6 +214,16 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         ),
       };
 
+    case "UPDATE_CONNECTOR":
+      return {
+        ...state,
+        connectors: state.connectors.map((c) =>
+          c.id === action.payload.id
+            ? { ...c, directionType: action.payload.directionType }
+            : c
+        ),
+      };
+
     case "UPDATE_CONNECTOR_ENDPOINT": {
       const { connectorId, endpoint, newElementId, newSide } = action.payload;
       const connectors = state.connectors.map((conn) => {
@@ -291,6 +308,13 @@ export function useDiagram(initialData: DiagramData) {
     dispatch({ type: "DELETE_CONNECTOR", payload: { id } });
   }, []);
 
+  const updateConnectorDirection = useCallback(
+    (id: string, directionType: DirectionType) => {
+      dispatch({ type: "UPDATE_CONNECTOR", payload: { id, directionType } });
+    },
+    []
+  );
+
   const updateConnectorEndpoint = useCallback(
     (connectorId: string, endpoint: "source" | "target", newElementId: string, newSide: Side) => {
       dispatch({ type: "UPDATE_CONNECTOR_ENDPOINT", payload: { connectorId, endpoint, newElementId, newSide } });
@@ -316,6 +340,7 @@ export function useDiagram(initialData: DiagramData) {
     deleteElement,
     addConnector,
     deleteConnector,
+    updateConnectorDirection,
     updateConnectorEndpoint,
     setData,
     setViewport,

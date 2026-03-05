@@ -22,7 +22,7 @@ export type ConnectorType = "sequence" | "message" | "association";
 
 export type Side = "top" | "right" | "bottom" | "left";
 
-export type DirectionType = "directed" | "non-directed";
+export type DirectionType = "directed" | "non-directed" | "open-directed";
 
 export type RoutingType = "direct" | "rectilinear" | "curvilinear";
 

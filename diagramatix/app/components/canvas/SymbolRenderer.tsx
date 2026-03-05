@@ -16,6 +16,7 @@ interface Props {
   showConnectionPoints: boolean;
   onResizeDragStart?: (handle: ResizeHandle, e: React.MouseEvent) => void;
   svgToWorld?: (clientX: number, clientY: number) => Point;
+  shouldSnapBack?: (x: number, y: number) => boolean;
 }
 
 const CONNECTION_POINT_SIDES: Side[] = ["top", "right", "bottom", "left"];
@@ -158,7 +159,7 @@ function StickFigure({
 function ActorShape({ el }: { el: DiagramElement }) {
   const headR = 10;
   const bodyLen = 16;
-  const legLen = Math.max(el.height - 4 - headR * 2 - bodyLen, 5);
+  const legLen = Math.max((el.height - 4 - headR * 2 - bodyLen) * 0.4, 5);
   return (
     <StickFigure
       cx={el.x + el.width / 2}
@@ -281,6 +282,7 @@ export function SymbolRenderer({
   showConnectionPoints,
   onResizeDragStart,
   svgToWorld,
+  shouldSnapBack,
 }: Props) {
   let dragStart: { mouseX: number; mouseY: number; elX: number; elY: number } | null = null;
 
@@ -293,18 +295,25 @@ export function SymbolRenderer({
       elX: element.x,
       elY: element.y,
     };
+    let lastX = element.x;
+    let lastY = element.y;
 
     function onMouseMove(ev: MouseEvent) {
       if (!dragStart) return;
-      const dx = ev.clientX - dragStart.mouseX;
-      const dy = ev.clientY - dragStart.mouseY;
-      onMove(dragStart.elX + dx, dragStart.elY + dy);
+      lastX = dragStart.elX + (ev.clientX - dragStart.mouseX);
+      lastY = dragStart.elY + (ev.clientY - dragStart.mouseY);
+      onMove(lastX, lastY);
     }
 
     function onMouseUp() {
+      const origX = dragStart!.elX;
+      const origY = dragStart!.elY;
       dragStart = null;
       window.removeEventListener("mousemove", onMouseMove);
       window.removeEventListener("mouseup", onMouseUp);
+      if (shouldSnapBack?.(lastX, lastY)) {
+        onMove(origX, origY);
+      }
     }
 
     window.addEventListener("mousemove", onMouseMove);

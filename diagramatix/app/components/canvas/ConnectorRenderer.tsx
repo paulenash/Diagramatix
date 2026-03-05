@@ -24,6 +24,14 @@ function ArrowMarker({ id, color }: { id: string; color: string }) {
   );
 }
 
+function OpenArrowMarker({ id, color }: { id: string; color: string }) {
+  return (
+    <marker id={id} markerWidth={10} markerHeight={7} refX={9} refY={3.5} orient="auto">
+      <polyline points="0,0 10,3.5 0,7" fill="none" stroke={color} strokeWidth={1.5} />
+    </marker>
+  );
+}
+
 export function ConnectorRenderer({ connector, selected, onSelect }: Props) {
   const waypoints = connector.waypoints;
   if (waypoints.length === 0) return null;
@@ -31,7 +39,9 @@ export function ConnectorRenderer({ connector, selected, onSelect }: Props) {
   const isMessage = connector.type === "message";
   const strokeColor = selected ? "#2563eb" : "#6b7280";
   const markerId = `arrow-${connector.id}`;
-  const showArrow = connector.directionType === "directed";
+  const openMarkerId = `arrow-open-${connector.id}`;
+  const showArrow = connector.directionType !== "non-directed";
+  const isOpenArrow = connector.directionType === "open-directed";
 
   // Trim invisible leader segments for visible rendering
   const visStart = connector.sourceInvisibleLeader ? 1 : 0;
@@ -50,7 +60,9 @@ export function ConnectorRenderer({ connector, selected, onSelect }: Props) {
     <>
       {showArrow && (
         <defs>
-          <ArrowMarker id={markerId} color={strokeColor} />
+          {isOpenArrow
+            ? <OpenArrowMarker id={openMarkerId} color={strokeColor} />
+            : <ArrowMarker id={markerId} color={strokeColor} />}
         </defs>
       )}
 
@@ -70,7 +82,7 @@ export function ConnectorRenderer({ connector, selected, onSelect }: Props) {
         stroke={strokeColor}
         strokeWidth={selected ? 2 : 1.5}
         strokeDasharray={isMessage ? "6 3" : undefined}
-        markerEnd={showArrow ? `url(#${markerId})` : undefined}
+        markerEnd={showArrow ? `url(#${isOpenArrow ? openMarkerId : markerId})` : undefined}
         style={{ pointerEvents: "none" }}
       />
 

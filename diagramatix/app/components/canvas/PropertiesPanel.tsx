@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import type { Connector, DiagramElement } from "@/app/lib/diagram/types";
+import type { Connector, DiagramElement, DirectionType } from "@/app/lib/diagram/types";
 
 interface Props {
   element: DiagramElement | null;
@@ -10,6 +10,7 @@ interface Props {
   onUpdateProperties: (id: string, props: Record<string, unknown>) => void;
   onDeleteElement: (id: string) => void;
   onDeleteConnector: (id: string) => void;
+  onUpdateConnectorDirection: (id: string, directionType: DirectionType) => void;
 }
 
 export function PropertiesPanel({
@@ -19,6 +20,7 @@ export function PropertiesPanel({
   onUpdateProperties,
   onDeleteElement,
   onDeleteConnector,
+  onUpdateConnectorDirection,
 }: Props) {
   const [labelDraft, setLabelDraft] = useState("");
 
@@ -42,6 +44,24 @@ export function PropertiesPanel({
             Connector
           </p>
           <p className="text-xs text-gray-600">Type: {connector.type}</p>
+        </div>
+        <div>
+          <p className="text-xs font-medium text-gray-700 mb-1">Direction</p>
+          <div className="flex gap-1">
+            {(["directed", "open-directed", "non-directed"] as DirectionType[]).map((dt) => (
+              <button
+                key={dt}
+                onClick={() => onUpdateConnectorDirection(connector.id, dt)}
+                className={`px-2 py-1 text-xs rounded border ${
+                  connector.directionType === dt
+                    ? "bg-blue-600 text-white border-blue-600"
+                    : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                }`}
+              >
+                {dt === "directed" ? "Filled" : dt === "open-directed" ? "Open" : "None"}
+              </button>
+            ))}
+          </div>
         </div>
         <button
           onClick={() => onDeleteConnector(connector.id)}

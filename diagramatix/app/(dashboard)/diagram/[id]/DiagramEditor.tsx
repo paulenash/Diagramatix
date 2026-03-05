@@ -94,6 +94,7 @@ export function DiagramEditor({
     deleteElement,
     addConnector,
     deleteConnector,
+    updateConnectorDirection,
     updateConnectorEndpoint,
   } = useDiagram(initialData);
 
@@ -217,6 +218,7 @@ export function DiagramEditor({
           connector={selectedConnector}
           onUpdateLabel={updateLabel}
           onUpdateProperties={() => {}}
+          onUpdateConnectorDirection={updateConnectorDirection}
           onDeleteElement={(id) => {
             deleteElement(id);
             setSelectedElementId(null);

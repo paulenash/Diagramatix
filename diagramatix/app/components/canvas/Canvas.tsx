@@ -437,6 +437,19 @@ export function Canvas({
                 el.id === selectedElementId || isDraggingConnector
               }
               svgToWorld={clientToWorld}
+              shouldSnapBack={(x, y) => {
+                const cx = x + el.width / 2;
+                const cy = y + el.height / 2;
+                return data.elements.some(
+                  (b) =>
+                    b.type === "system-boundary" &&
+                    b.id !== el.id &&
+                    el.type !== "use-case" &&
+                    el.type !== "hourglass" &&
+                    cx >= b.x && cx <= b.x + b.width &&
+                    cy >= b.y && cy <= b.y + b.height
+                );
+              }}
             />
           ))}
 
