@@ -22,20 +22,17 @@ interface Props {
 function wrapText(text: string, maxWidth: number, fontSize = 12): string[] {
   const avgCharWidth = fontSize * 0.55;
   const charsPerLine = Math.max(1, Math.floor(maxWidth / avgCharWidth));
-  const words = text.split(' ');
   const lines: string[] = [];
-  let current = '';
-  for (const word of words) {
-    if (!current) {
-      current = word;
-    } else if (current.length + 1 + word.length <= charsPerLine) {
-      current += ' ' + word;
-    } else {
-      lines.push(current);
-      current = word;
+  for (const segment of text.split('\n')) {
+    const words = segment.split(' ');
+    let current = '';
+    for (const word of words) {
+      if (!current) { current = word; }
+      else if (current.length + 1 + word.length <= charsPerLine) { current += ' ' + word; }
+      else { lines.push(current); current = word; }
     }
+    lines.push(current);
   }
-  if (current) lines.push(current);
   return lines.length ? lines : [''];
 }
 

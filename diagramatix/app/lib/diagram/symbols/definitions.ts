@@ -104,7 +104,7 @@ export const ALL_SYMBOLS: SymbolDefinition[] = [
     type: "system",
     label: "System",
     defaultWidth: 40,
-    defaultHeight: 120,
+    defaultHeight: 80,
     description: "A system or application",
   },
 ];

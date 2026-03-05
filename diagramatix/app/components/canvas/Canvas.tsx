@@ -27,20 +27,17 @@ const USE_CASE_LINE_H = 16;
 function wrapText(text: string, maxWidth: number, fontSize = 12): string[] {
   const avgCharWidth = fontSize * 0.55;
   const charsPerLine = Math.max(1, Math.floor(maxWidth / avgCharWidth));
-  const words = text.split(' ');
   const lines: string[] = [];
-  let current = '';
-  for (const word of words) {
-    if (!current) {
-      current = word;
-    } else if (current.length + 1 + word.length <= charsPerLine) {
-      current += ' ' + word;
-    } else {
-      lines.push(current);
-      current = word;
+  for (const segment of text.split('\n')) {
+    const words = segment.split(' ');
+    let current = '';
+    for (const word of words) {
+      if (!current) { current = word; }
+      else if (current.length + 1 + word.length <= charsPerLine) { current += ' ' + word; }
+      else { lines.push(current); current = word; }
     }
+    lines.push(current);
   }
-  if (current) lines.push(current);
   return lines.length ? lines : [''];
 }
 
@@ -549,37 +546,73 @@ export function Canvas({
       </svg>
 
       {/* Inline label editor overlay */}
-      {editingLabel && (
-        <input
-          autoFocus
-          type="text"
-          value={editingLabel.value}
-          onChange={(e) =>
-            setEditingLabel((prev) =>
-              prev ? { ...prev, value: e.target.value } : null
-            )
-          }
-          onBlur={commitLabel}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") commitLabel();
-            if (e.key === "Escape") setEditingLabel(null);
-          }}
-          style={{
-            position: "absolute",
-            left: editingLabel.x,
-            top: editingLabel.y + editingLabel.height / 2 - 12,
-            width: editingLabel.width,
-            height: 24,
-            fontSize: 12 * zoom,
-            textAlign: "center",
-            background: "white",
-            border: "2px solid #2563eb",
-            borderRadius: 4,
-            outline: "none",
-            padding: "0 4px",
-          }}
-        />
-      )}
+      {editingLabel && (() => {
+        const editingEl = data.elements.find(e => e.id === editingLabel.elementId);
+        const isUseCase = editingEl?.type === 'use-case';
+        const commonChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+          setEditingLabel(prev => prev ? { ...prev, value: e.target.value } : null);
+        if (isUseCase) {
+          return (
+            <textarea
+              autoFocus
+              value={editingLabel.value}
+              onChange={commonChange as React.ChangeEventHandler<HTMLTextAreaElement>}
+              onBlur={commitLabel}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  if (e.ctrlKey) return;
+                  e.preventDefault();
+                  commitLabel();
+                }
+                if (e.key === 'Escape') setEditingLabel(null);
+              }}
+              style={{
+                position: 'absolute',
+                left: editingLabel.x,
+                top: editingLabel.y,
+                width: editingLabel.width,
+                height: editingLabel.height,
+                fontSize: 12 * zoom,
+                textAlign: 'center',
+                background: 'white',
+                border: '2px solid #2563eb',
+                borderRadius: 4,
+                outline: 'none',
+                padding: '4px',
+                resize: 'none',
+                overflow: 'hidden',
+              }}
+            />
+          );
+        }
+        return (
+          <input
+            autoFocus
+            type="text"
+            value={editingLabel.value}
+            onChange={commonChange as React.ChangeEventHandler<HTMLInputElement>}
+            onBlur={commitLabel}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") commitLabel();
+              if (e.key === "Escape") setEditingLabel(null);
+            }}
+            style={{
+              position: "absolute",
+              left: editingLabel.x,
+              top: editingLabel.y + editingLabel.height / 2 - 12,
+              width: editingLabel.width,
+              height: 24,
+              fontSize: 12 * zoom,
+              textAlign: "center",
+              background: "white",
+              border: "2px solid #2563eb",
+              borderRadius: 4,
+              outline: "none",
+              padding: "0 4px",
+            }}
+          />
+        );
+      })()}
 
       {/* Status bar */}
       <div className="absolute bottom-2 left-2 text-xs text-gray-400 bg-white/80 px-2 py-1 rounded">
