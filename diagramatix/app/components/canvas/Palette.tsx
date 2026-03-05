@@ -73,7 +73,7 @@ function PaletteSymbolPreview({ type }: { type: SymbolType }) {
       );
     case "hourglass":
       return (
-        <svg width={32} height={36} viewBox="0 0 32 36">
+        <svg width={16} height={18} viewBox="0 0 32 36">
           <polygon points="2,2 30,2 16,18 30,34 2,34 16,18"
             fill="white" stroke="#374151" strokeWidth={1.5} />
         </svg>

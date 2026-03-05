@@ -46,7 +46,7 @@ export const ALL_SYMBOLS: SymbolDefinition[] = [
   },
   {
     type: "actor",
-    label: "Actor",
+    label: "Participant",
     defaultWidth: 40,
     defaultHeight: 80,
     description: "A participant in the process",
@@ -81,7 +81,7 @@ export const ALL_SYMBOLS: SymbolDefinition[] = [
   },
   {
     type: "system-boundary",
-    label: "System Boundary",
+    label: "Process Group",
     defaultWidth: 200,
     defaultHeight: 300,
     description: "A system context boundary",
@@ -89,8 +89,8 @@ export const ALL_SYMBOLS: SymbolDefinition[] = [
   {
     type: "hourglass",
     label: "Hourglass",
-    defaultWidth: 80,
-    defaultHeight: 80,
+    defaultWidth: 40,
+    defaultHeight: 40,
     description: "An hourglass process symbol",
   },
 ];

@@ -84,7 +84,7 @@ function UseCaseShape({ el }: { el: DiagramElement }) {
     <ellipse
       cx={el.x + el.width / 2} cy={el.y + el.height / 2}
       rx={el.width / 2} ry={el.height / 2}
-      fill="white" stroke="#374151" strokeWidth={1.5}
+      fill="#fef9c3" stroke="#374151" strokeWidth={1.5}
     />
   );
 }
@@ -138,7 +138,7 @@ function StickFigure({
 }
 
 function ActorShape({ el }: { el: DiagramElement }) {
-  const headR = 8;
+  const headR = 10;
   const bodyLen = 16;
   const rawLegLen = el.height - 2 - headR * 2 - bodyLen - 4;
   const legLen = Math.max(rawLegLen * 0.6, 5);
@@ -162,7 +162,7 @@ function TeamShape({ el }: { el: DiagramElement }) {
     <g>
       <StickFigure cx={cx - 40} top={top + 12} headR={6} bodyLen={12} armHalfSpan={12} legSpread={10} legLen={8} />
       <StickFigure cx={cx + 40} top={top + 12} headR={6} bodyLen={12} armHalfSpan={12} legSpread={10} legLen={8} />
-      <StickFigure cx={cx} top={top} headR={7} bodyLen={14} armHalfSpan={14} legSpread={12} legLen={10} />
+      <StickFigure cx={cx} top={top} headR={9} bodyLen={14} armHalfSpan={14} legSpread={12} legLen={10} />
     </g>
   );
 }
@@ -383,8 +383,8 @@ export function SymbolRenderer({
         />
       )}
 
-      {/* Connection point dots (non-actor/team) */}
-      {showConnectionPoints && !isActorOrTeam &&
+      {/* Connection point dots (non-actor/team, non-boundary) */}
+      {showConnectionPoints && !isActorOrTeam && !isBoundary &&
         CONNECTION_POINT_SIDES.map((side) => {
           const pos = getConnectionPointPos(element, side);
           return (

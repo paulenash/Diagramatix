@@ -317,11 +317,7 @@ export function Canvas({
               element={el}
               selected={el.id === selectedElementId}
               isDropTarget={false}
-              isDisallowedTarget={
-                pendingDragSymbol !== null &&
-                pendingDragSymbol !== "use-case" &&
-                pendingDragSymbol !== "hourglass"
-              }
+              isDisallowedTarget={false}
               onSelect={() => {
                 onSelectElement(el.id);
                 onSelectConnector(null);
