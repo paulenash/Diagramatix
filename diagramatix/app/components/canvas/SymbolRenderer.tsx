@@ -19,6 +19,26 @@ interface Props {
   shouldSnapBack?: (x: number, y: number) => boolean;
 }
 
+function wrapText(text: string, maxWidth: number, fontSize = 12): string[] {
+  const avgCharWidth = fontSize * 0.55;
+  const charsPerLine = Math.max(1, Math.floor(maxWidth / avgCharWidth));
+  const words = text.split(' ');
+  const lines: string[] = [];
+  let current = '';
+  for (const word of words) {
+    if (!current) {
+      current = word;
+    } else if (current.length + 1 + word.length <= charsPerLine) {
+      current += ' ' + word;
+    } else {
+      lines.push(current);
+      current = word;
+    }
+  }
+  if (current) lines.push(current);
+  return lines.length ? lines : [''];
+}
+
 const CONNECTION_POINT_SIDES: Side[] = ["top", "right", "bottom", "left"];
 
 const HEADER_H = 28;
@@ -334,7 +354,27 @@ export function SymbolRenderer({
     >
       <SymbolShape el={element} />
 
-      {showLabel && (
+      {showLabel && element.type === 'use-case' ? (() => {
+        const innerW = element.width * 0.7;
+        const lines = wrapText(element.label, innerW);
+        const lineH = 16;
+        const totalH = lines.length * lineH;
+        const startY = element.y + element.height / 2 - totalH / 2 + lineH * 0.5;
+        return (
+          <text
+            textAnchor="middle"
+            fontSize={12}
+            fill="#111827"
+            style={{ userSelect: "none", pointerEvents: "none" }}
+          >
+            {lines.map((line, i) => (
+              <tspan key={i} x={element.x + element.width / 2} y={startY + i * lineH}>
+                {line}
+              </tspan>
+            ))}
+          </text>
+        );
+      })() : showLabel && (
         <text
           x={labelInfo.x}
           y={labelInfo.y}

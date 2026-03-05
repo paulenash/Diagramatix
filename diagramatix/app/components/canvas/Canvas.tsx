@@ -19,6 +19,40 @@ const HEADER_H = 28;
 const MIN_BOUNDARY_W = 100;
 const MIN_BOUNDARY_H = HEADER_H + 40;
 
+const USE_CASE_DEFAULT_W = 120;
+const USE_CASE_DEFAULT_H = 60;
+const USE_CASE_ASPECT = USE_CASE_DEFAULT_W / USE_CASE_DEFAULT_H;
+const USE_CASE_LINE_H = 16;
+
+function wrapText(text: string, maxWidth: number, fontSize = 12): string[] {
+  const avgCharWidth = fontSize * 0.55;
+  const charsPerLine = Math.max(1, Math.floor(maxWidth / avgCharWidth));
+  const words = text.split(' ');
+  const lines: string[] = [];
+  let current = '';
+  for (const word of words) {
+    if (!current) {
+      current = word;
+    } else if (current.length + 1 + word.length <= charsPerLine) {
+      current += ' ' + word;
+    } else {
+      lines.push(current);
+      current = word;
+    }
+  }
+  if (current) lines.push(current);
+  return lines.length ? lines : [''];
+}
+
+function computeUseCaseSize(label: string, currentW: number): { w: number; h: number } {
+  const innerW = currentW * 0.7;
+  const lines = wrapText(label, innerW);
+  const neededH = lines.length * USE_CASE_LINE_H + 16;
+  const h = Math.max(USE_CASE_DEFAULT_H, Math.round(neededH));
+  const w = Math.max(USE_CASE_DEFAULT_W, Math.round(h * USE_CASE_ASPECT));
+  return { w, h };
+}
+
 interface Props {
   data: DiagramData;
   onAddElement: (type: SymbolType, position: Point) => void;
@@ -319,6 +353,13 @@ export function Canvas({
 
   function commitLabel() {
     if (!editingLabel) return;
+    const el = data.elements.find((e) => e.id === editingLabel.elementId);
+    if (el && el.type === 'use-case') {
+      const { w, h } = computeUseCaseSize(editingLabel.value, el.width);
+      if (w !== el.width || h !== el.height) {
+        onResizeElement(el.id, w, h);
+      }
+    }
     onUpdateLabel(editingLabel.elementId, editingLabel.value);
     setEditingLabel(null);
   }

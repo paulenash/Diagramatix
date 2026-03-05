@@ -50,25 +50,25 @@ function PaletteSymbolPreview({ type }: { type: SymbolType }) {
       );
     case "team":
       return (
-        <svg width={60} height={44} viewBox="0 0 60 44">
-          {/* Left figure */}
-          <circle cx={10} cy={16} r={4} fill="white" stroke="#374151" strokeWidth={1.2} />
-          <line x1={10} y1={20} x2={10} y2={30} stroke="#374151" strokeWidth={1.2} />
-          <line x1={5}  y1={24} x2={15} y2={24} stroke="#374151" strokeWidth={1.2} />
-          <line x1={10} y1={30} x2={6}  y2={37} stroke="#374151" strokeWidth={1.2} />
-          <line x1={10} y1={30} x2={14} y2={37} stroke="#374151" strokeWidth={1.2} />
-          {/* Right figure */}
-          <circle cx={50} cy={16} r={4} fill="white" stroke="#374151" strokeWidth={1.2} />
-          <line x1={50} y1={20} x2={50} y2={30} stroke="#374151" strokeWidth={1.2} />
-          <line x1={45} y1={24} x2={55} y2={24} stroke="#374151" strokeWidth={1.2} />
-          <line x1={50} y1={30} x2={46} y2={37} stroke="#374151" strokeWidth={1.2} />
-          <line x1={50} y1={30} x2={54} y2={37} stroke="#374151" strokeWidth={1.2} />
-          {/* Central figure (larger) */}
-          <circle cx={30} cy={8}  r={5} fill="white" stroke="#374151" strokeWidth={1.5} />
-          <line x1={30} y1={13} x2={30} y2={26} stroke="#374151" strokeWidth={1.5} />
-          <line x1={22} y1={19} x2={38} y2={19} stroke="#374151" strokeWidth={1.5} />
-          <line x1={30} y1={26} x2={24} y2={35} stroke="#374151" strokeWidth={1.5} />
-          <line x1={30} y1={26} x2={36} y2={35} stroke="#374151" strokeWidth={1.5} />
+        <svg width={64} height={44} viewBox="0 0 64 44">
+          {/* Left figure (smaller Participant) */}
+          <circle cx={10} cy={6} r={4} fill="white" stroke="#374151" strokeWidth={1.5} />
+          <line x1={10} y1={10} x2={10} y2={26} stroke="#374151" strokeWidth={1.5} />
+          <line x1={5}  y1={18} x2={15} y2={18} stroke="#374151" strokeWidth={1.5} />
+          <line x1={10} y1={26} x2={6}  y2={36} stroke="#374151" strokeWidth={1.5} />
+          <line x1={10} y1={26} x2={14} y2={36} stroke="#374151" strokeWidth={1.5} />
+          {/* Right figure (smaller Participant) */}
+          <circle cx={54} cy={6} r={4} fill="white" stroke="#374151" strokeWidth={1.5} />
+          <line x1={54} y1={10} x2={54} y2={26} stroke="#374151" strokeWidth={1.5} />
+          <line x1={49} y1={18} x2={59} y2={18} stroke="#374151" strokeWidth={1.5} />
+          <line x1={54} y1={26} x2={50} y2={36} stroke="#374151" strokeWidth={1.5} />
+          <line x1={54} y1={26} x2={58} y2={36} stroke="#374151" strokeWidth={1.5} />
+          {/* Central figure (full-size Participant) */}
+          <circle cx={32} cy={6} r={5} fill="white" stroke="#374151" strokeWidth={1.5} />
+          <line x1={32} y1={11} x2={32} y2={27} stroke="#374151" strokeWidth={1.5} />
+          <line x1={24} y1={19} x2={40} y2={19} stroke="#374151" strokeWidth={1.5} />
+          <line x1={32} y1={27} x2={25} y2={37} stroke="#374151" strokeWidth={1.5} />
+          <line x1={32} y1={27} x2={39} y2={37} stroke="#374151" strokeWidth={1.5} />
         </svg>
       );
     case "hourglass":
