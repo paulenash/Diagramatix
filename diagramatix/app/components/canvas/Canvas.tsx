@@ -11,13 +11,18 @@ import type {
   Side,
   SymbolType,
 } from "@/app/lib/diagram/types";
-import { SymbolRenderer } from "./SymbolRenderer";
+import { SymbolRenderer, type ResizeHandle } from "./SymbolRenderer";
 import { ConnectorRenderer } from "./ConnectorRenderer";
+
+const HEADER_H = 28;
+const MIN_BOUNDARY_W = 100;
+const MIN_BOUNDARY_H = HEADER_H + 40;
 
 interface Props {
   data: DiagramData;
   onAddElement: (type: SymbolType, position: Point) => void;
   onMoveElement: (id: string, x: number, y: number) => void;
+  onResizeElement: (id: string, width: number, height: number) => void;
   onUpdateLabel: (id: string, label: string) => void;
   onDeleteElement: (id: string) => void;
   onAddConnector: (
@@ -60,8 +65,8 @@ function getClosestSide(pos: Point, el: DiagramElement): Side {
   const cy = el.y + el.height / 2;
   const dx = pos.x - cx;
   const dy = pos.y - cy;
-  const normX = Math.abs(dx) / (el.width / 2);
-  const normY = Math.abs(dy) / (el.height / 2);
+  const normX = Math.abs(dx) / (el.width / 2 || 1);
+  const normY = Math.abs(dy) / (el.height / 2 || 1);
   if (normX > normY) return dx > 0 ? "right" : "left";
   return dy > 0 ? "bottom" : "top";
 }
@@ -70,6 +75,7 @@ export function Canvas({
   data,
   onAddElement,
   onMoveElement,
+  onResizeElement,
   onUpdateLabel,
   onDeleteElement,
   onAddConnector,
@@ -97,10 +103,13 @@ export function Canvas({
     [pan, zoom]
   );
 
-  function clientToWorld(clientX: number, clientY: number): Point {
-    const rect = svgRef.current!.getBoundingClientRect();
-    return svgToWorld(clientX - rect.left, clientY - rect.top);
-  }
+  const clientToWorld = useCallback(
+    (clientX: number, clientY: number): Point => {
+      const rect = svgRef.current!.getBoundingClientRect();
+      return svgToWorld(clientX - rect.left, clientY - rect.top);
+    },
+    [svgToWorld]
+  );
 
   function findDropTarget(pos: Point, fromId: string): DiagramElement | null {
     const MARGIN = 30;
@@ -140,6 +149,47 @@ export function Canvas({
         onAddConnector(elementId, targetEl.id, "sequence", defaultDirectionType, defaultRoutingType, side, targetSide);
       }
       setDraggingConnector(null);
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    }
+
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+  }
+
+  function handleResizeDragStart(elementId: string, handle: ResizeHandle, e: React.MouseEvent) {
+    e.stopPropagation();
+    const el = data.elements.find((el) => el.id === elementId);
+    if (!el) return;
+
+    const startMouse = { x: e.clientX, y: e.clientY };
+    const startBounds = { x: el.x, y: el.y, width: el.width, height: el.height };
+
+    function onMouseMove(ev: MouseEvent) {
+      const dx = (ev.clientX - startMouse.x) / zoom;
+      const dy = (ev.clientY - startMouse.y) / zoom;
+      let { x, y, width, height } = startBounds;
+
+      if (handle.includes("e")) width  = Math.max(MIN_BOUNDARY_W, width  + dx);
+      if (handle.includes("s")) height = Math.max(MIN_BOUNDARY_H, height + dy);
+      if (handle.includes("w")) {
+        const newW = Math.max(MIN_BOUNDARY_W, width - dx);
+        x = startBounds.x + startBounds.width - newW;
+        width = newW;
+      }
+      if (handle.includes("n")) {
+        const newH = Math.max(MIN_BOUNDARY_H, height - dy);
+        y = startBounds.y + startBounds.height - newH;
+        height = newH;
+      }
+
+      onResizeElement(elementId, width, height);
+      if (handle.includes("w") || handle.includes("n")) {
+        onMoveElement(elementId, x, y);
+      }
+    }
+
+    function onMouseUp() {
       window.removeEventListener("mousemove", onMouseMove);
       window.removeEventListener("mouseup", onMouseUp);
     }
@@ -206,9 +256,11 @@ export function Canvas({
     setEditingLabel({
       elementId: el.id,
       x: el.x * zoom + pan.x,
-      y: el.y * zoom + pan.y,
+      y: el.type === "system-boundary"
+        ? el.y * zoom + pan.y
+        : el.y * zoom + pan.y,
       width: el.width * zoom,
-      height: el.height * zoom,
+      height: el.type === "system-boundary" ? HEADER_H * zoom : el.height * zoom,
       value: el.label,
     });
   }
@@ -234,6 +286,10 @@ export function Canvas({
   const transform = `translate(${pan.x}, ${pan.y}) scale(${zoom})`;
   const isDraggingConnector = draggingConnector !== null;
 
+  // Render system-boundary elements first (behind other elements)
+  const boundaries = data.elements.filter((el) => el.type === "system-boundary");
+  const nonBoundaries = data.elements.filter((el) => el.type !== "system-boundary");
+
   return (
     <div
       className="relative flex-1 overflow-hidden bg-gray-50"
@@ -254,6 +310,34 @@ export function Canvas({
         style={{ cursor: isDraggingConnector ? "crosshair" : "default" }}
       >
         <g transform={transform}>
+          {/* System boundaries render first (behind everything) */}
+          {boundaries.map((el) => (
+            <SymbolRenderer
+              key={el.id}
+              element={el}
+              selected={el.id === selectedElementId}
+              isDropTarget={false}
+              isDisallowedTarget={
+                pendingDragSymbol !== null &&
+                pendingDragSymbol !== "use-case" &&
+                pendingDragSymbol !== "hourglass"
+              }
+              onSelect={() => {
+                onSelectElement(el.id);
+                onSelectConnector(null);
+              }}
+              onMove={(x, y) => onMoveElement(el.id, x, y)}
+              onDoubleClick={() => startEditingLabel(el)}
+              onConnectionPointDragStart={(side, worldPos) =>
+                handleConnectionPointDragStart(el.id, side, worldPos)
+              }
+              showConnectionPoints={el.id === selectedElementId || isDraggingConnector}
+              onResizeDragStart={(handle, e) => handleResizeDragStart(el.id, handle, e)}
+              svgToWorld={clientToWorld}
+            />
+          ))}
+
+          {/* Connectors */}
           {data.connectors.map((conn) => (
             <ConnectorRenderer
               key={conn.id}
@@ -266,7 +350,8 @@ export function Canvas({
             />
           ))}
 
-          {data.elements.map((el) => (
+          {/* Non-boundary elements */}
+          {nonBoundaries.map((el) => (
             <SymbolRenderer
               key={el.id}
               element={el}
@@ -282,9 +367,9 @@ export function Canvas({
                 handleConnectionPointDragStart(el.id, side, worldPos)
               }
               showConnectionPoints={
-                el.id === selectedElementId ||
-                isDraggingConnector
+                el.id === selectedElementId || isDraggingConnector
               }
+              svgToWorld={clientToWorld}
             />
           ))}
 

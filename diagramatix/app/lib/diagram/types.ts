@@ -13,7 +13,9 @@ export type SymbolType =
   | "final-state"
   | "pool"
   | "lane"
-  | "subprocess";
+  | "subprocess"
+  | "system-boundary"
+  | "hourglass";
 
 export type ConnectorType = "sequence" | "message" | "association";
 
@@ -21,7 +23,7 @@ export type Side = "top" | "right" | "bottom" | "left";
 
 export type DirectionType = "directed" | "non-directed";
 
-export type RoutingType = "direct" | "rectilinear";
+export type RoutingType = "direct" | "rectilinear" | "curvilinear";
 
 export interface Point {
   x: number;

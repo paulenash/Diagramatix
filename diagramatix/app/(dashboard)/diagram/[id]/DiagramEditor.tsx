@@ -89,6 +89,7 @@ export function DiagramEditor({
     data,
     addElement,
     moveElement,
+    resizeElement,
     updateLabel,
     deleteElement,
     addConnector,
@@ -106,8 +107,14 @@ export function DiagramEditor({
 
   const defaultDirectionType: DirectionType =
     diagramType === "process-context" ? "non-directed" : "directed";
+
   const defaultRoutingType: RoutingType =
-    diagramType === "process-context" ? "direct" : "rectilinear";
+    diagramType === "process-context" ? "direct" :
+    diagramType === "state-machine"   ? "curvilinear" :
+    "rectilinear";
+
+  const hasSystemBoundary = data.elements.some((e) => e.type === "system-boundary");
+  const disabledSymbols: SymbolType[] = hasSystemBoundary ? ["system-boundary"] : [];
 
   const handleAddConnector = useCallback(
     (
@@ -176,12 +183,14 @@ export function DiagramEditor({
         <Palette
           diagramType={diagramType}
           onDragStart={(type) => setPendingDragSymbol(type)}
+          disabledSymbols={disabledSymbols}
         />
 
         <Canvas
           data={data}
           onAddElement={addElement}
           onMoveElement={moveElement}
+          onResizeElement={resizeElement}
           onUpdateLabel={updateLabel}
           onDeleteElement={(id) => {
             deleteElement(id);

@@ -79,11 +79,25 @@ export const ALL_SYMBOLS: SymbolDefinition[] = [
     defaultHeight: 30,
     description: "Ending state",
   },
+  {
+    type: "system-boundary",
+    label: "System Boundary",
+    defaultWidth: 200,
+    defaultHeight: 300,
+    description: "A system context boundary",
+  },
+  {
+    type: "hourglass",
+    label: "Hourglass",
+    defaultWidth: 80,
+    defaultHeight: 80,
+    description: "An hourglass process symbol",
+  },
 ];
 
 export const PALETTE_BY_DIAGRAM_TYPE: Record<DiagramType, SymbolType[]> = {
   basic: ["task"],
-  "process-context": ["use-case", "actor", "team"],
+  "process-context": ["use-case", "actor", "team", "hourglass", "system-boundary"],
   "state-machine": ["state", "initial-state", "final-state"],
   bpmn: [
     "task",

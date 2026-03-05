@@ -19,6 +19,7 @@ type Action =
   | { type: "SET_DATA"; payload: DiagramData }
   | { type: "ADD_ELEMENT"; payload: { symbolType: SymbolType; position: Point } }
   | { type: "MOVE_ELEMENT"; payload: { id: string; x: number; y: number } }
+  | { type: "RESIZE_ELEMENT"; payload: { id: string; width: number; height: number } }
   | { type: "UPDATE_LABEL"; payload: { id: string; label: string } }
   | { type: "UPDATE_PROPERTIES"; payload: { id: string; properties: Record<string, unknown> } }
   | { type: "DELETE_ELEMENT"; payload: { id: string } }
@@ -64,10 +65,46 @@ function reducer(state: DiagramData, action: Action): DiagramData {
     }
 
     case "MOVE_ELEMENT": {
+      const { id, x, y } = action.payload;
+      const el = state.elements.find((e) => e.id === id);
+      if (!el) return state;
+
+      const dx = x - el.x;
+      const dy = y - el.y;
+      const isBoundary = el.type === "system-boundary";
+      const isProcess = el.type === "use-case" || el.type === "hourglass";
+
+      const elements = state.elements.map((e) => {
+        if (e.id === id) {
+          let parentId = e.parentId;
+          if (isProcess) {
+            const cx = x + e.width / 2;
+            const cy = y + e.height / 2;
+            const boundary = state.elements.find(
+              (b) =>
+                b.type === "system-boundary" &&
+                b.id !== id &&
+                cx >= b.x && cx <= b.x + b.width &&
+                cy >= b.y && cy <= b.y + b.height
+            );
+            parentId = boundary?.id;
+          }
+          return { ...e, x, y, parentId };
+        }
+        if (isBoundary && e.parentId === id) {
+          return { ...e, x: e.x + dx, y: e.y + dy };
+        }
+        return e;
+      });
+
+      const connectors = recomputeAllConnectors(state.connectors, elements);
+      return { ...state, elements, connectors };
+    }
+
+    case "RESIZE_ELEMENT": {
+      const { id, width, height } = action.payload;
       const elements = state.elements.map((el) =>
-        el.id === action.payload.id
-          ? { ...el, x: action.payload.x, y: action.payload.y }
-          : el
+        el.id === id ? { ...el, width, height } : el
       );
       const connectors = recomputeAllConnectors(state.connectors, elements);
       return { ...state, elements, connectors };
@@ -94,13 +131,16 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       };
 
     case "DELETE_ELEMENT": {
-      const elements = state.elements.filter(
-        (el) => el.id !== action.payload.id
-      );
+      const { id } = action.payload;
+      const el = state.elements.find((e) => e.id === id);
+      const isBoundary = el?.type === "system-boundary";
+      const elements = state.elements
+        .filter((e) => e.id !== id)
+        .map((e) =>
+          isBoundary && e.parentId === id ? { ...e, parentId: undefined } : e
+        );
       const connectors = state.connectors.filter(
-        (c) =>
-          c.sourceId !== action.payload.id &&
-          c.targetId !== action.payload.id
+        (c) => c.sourceId !== id && c.targetId !== id
       );
       return { ...state, elements, connectors };
     }
@@ -170,6 +210,10 @@ export function useDiagram(initialData: DiagramData) {
     dispatch({ type: "MOVE_ELEMENT", payload: { id, x, y } });
   }, []);
 
+  const resizeElement = useCallback((id: string, width: number, height: number) => {
+    dispatch({ type: "RESIZE_ELEMENT", payload: { id, width, height } });
+  }, []);
+
   const updateLabel = useCallback((id: string, label: string) => {
     dispatch({ type: "UPDATE_LABEL", payload: { id, label } });
   }, []);
@@ -219,6 +263,7 @@ export function useDiagram(initialData: DiagramData) {
     data,
     addElement,
     moveElement,
+    resizeElement,
     updateLabel,
     updateProperties,
     deleteElement,

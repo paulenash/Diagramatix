@@ -9,6 +9,7 @@ import {
 interface Props {
   diagramType: DiagramType;
   onDragStart: (symbolType: SymbolType) => void;
+  disabledSymbols?: SymbolType[];
 }
 
 function PaletteSymbolPreview({ type }: { type: SymbolType }) {
@@ -39,12 +40,51 @@ function PaletteSymbolPreview({ type }: { type: SymbolType }) {
       );
     case "actor":
       return (
-        <svg width={24} height={40} viewBox="0 0 24 40">
+        <svg width={24} height={44} viewBox="0 0 24 44">
           <circle cx={12} cy={6} r={5} fill="white" stroke="#374151" strokeWidth={1.5} />
-          <line x1={12} y1={11} x2={12} y2={28} stroke="#374151" strokeWidth={1.5} />
-          <line x1={4} y1={18} x2={20} y2={18} stroke="#374151" strokeWidth={1.5} />
-          <line x1={12} y1={28} x2={4} y2={38} stroke="#374151" strokeWidth={1.5} />
-          <line x1={12} y1={28} x2={20} y2={38} stroke="#374151" strokeWidth={1.5} />
+          <line x1={12} y1={11} x2={12} y2={27} stroke="#374151" strokeWidth={1.5} />
+          <line x1={4}  y1={19} x2={20} y2={19} stroke="#374151" strokeWidth={1.5} />
+          <line x1={12} y1={27} x2={5}  y2={37} stroke="#374151" strokeWidth={1.5} />
+          <line x1={12} y1={27} x2={19} y2={37} stroke="#374151" strokeWidth={1.5} />
+        </svg>
+      );
+    case "team":
+      return (
+        <svg width={60} height={44} viewBox="0 0 60 44">
+          {/* Left figure */}
+          <circle cx={10} cy={16} r={4} fill="white" stroke="#374151" strokeWidth={1.2} />
+          <line x1={10} y1={20} x2={10} y2={30} stroke="#374151" strokeWidth={1.2} />
+          <line x1={5}  y1={24} x2={15} y2={24} stroke="#374151" strokeWidth={1.2} />
+          <line x1={10} y1={30} x2={6}  y2={37} stroke="#374151" strokeWidth={1.2} />
+          <line x1={10} y1={30} x2={14} y2={37} stroke="#374151" strokeWidth={1.2} />
+          {/* Right figure */}
+          <circle cx={50} cy={16} r={4} fill="white" stroke="#374151" strokeWidth={1.2} />
+          <line x1={50} y1={20} x2={50} y2={30} stroke="#374151" strokeWidth={1.2} />
+          <line x1={45} y1={24} x2={55} y2={24} stroke="#374151" strokeWidth={1.2} />
+          <line x1={50} y1={30} x2={46} y2={37} stroke="#374151" strokeWidth={1.2} />
+          <line x1={50} y1={30} x2={54} y2={37} stroke="#374151" strokeWidth={1.2} />
+          {/* Central figure (larger) */}
+          <circle cx={30} cy={8}  r={5} fill="white" stroke="#374151" strokeWidth={1.5} />
+          <line x1={30} y1={13} x2={30} y2={26} stroke="#374151" strokeWidth={1.5} />
+          <line x1={22} y1={19} x2={38} y2={19} stroke="#374151" strokeWidth={1.5} />
+          <line x1={30} y1={26} x2={24} y2={35} stroke="#374151" strokeWidth={1.5} />
+          <line x1={30} y1={26} x2={36} y2={35} stroke="#374151" strokeWidth={1.5} />
+        </svg>
+      );
+    case "hourglass":
+      return (
+        <svg width={32} height={36} viewBox="0 0 32 36">
+          <polygon points="2,2 30,2 16,18 30,34 2,34 16,18"
+            fill="white" stroke="#374151" strokeWidth={1.5} />
+        </svg>
+      );
+    case "system-boundary":
+      return (
+        <svg width={40} height={52} viewBox="0 0 40 52">
+          <rect x={2} y={2} width={36} height={48} fill="rgba(219,234,254,0.5)" stroke="#374151" strokeWidth={1.5} rx={2} />
+          <rect x={2} y={2} width={36} height={12} fill="#dbeafe" stroke="none" rx={2} />
+          <rect x={2} y={12} width={36} height={2} fill="#dbeafe" />
+          <line x1={2} y1={14} x2={38} y2={14} stroke="#374151" strokeWidth={1} />
         </svg>
       );
     case "state":
@@ -75,7 +115,7 @@ function PaletteSymbolPreview({ type }: { type: SymbolType }) {
   }
 }
 
-export function Palette({ diagramType, onDragStart }: Props) {
+export function Palette({ diagramType, onDragStart, disabledSymbols = [] }: Props) {
   const paletteTypes = PALETTE_BY_DIAGRAM_TYPE[diagramType] ?? ["task"];
   const symbols = ALL_SYMBOLS.filter((s) => paletteTypes.includes(s.type));
 
@@ -87,20 +127,27 @@ export function Palette({ diagramType, onDragStart }: Props) {
         </p>
       </div>
       <div className="flex-1 overflow-y-auto p-2 space-y-1">
-        {symbols.map((sym) => (
-          <div
-            key={sym.type}
-            draggable
-            onDragStart={() => onDragStart(sym.type)}
-            className="flex items-center gap-3 px-2 py-2 rounded hover:bg-gray-50 cursor-grab active:cursor-grabbing select-none"
-            title={sym.description}
-          >
-            <div className="flex items-center justify-center w-12 h-8">
-              <PaletteSymbolPreview type={sym.type} />
+        {symbols.map((sym) => {
+          const disabled = disabledSymbols.includes(sym.type);
+          return (
+            <div
+              key={sym.type}
+              draggable={!disabled}
+              onDragStart={disabled ? undefined : () => onDragStart(sym.type)}
+              className={`flex items-center gap-3 px-2 py-2 rounded select-none ${
+                disabled
+                  ? "opacity-40 cursor-not-allowed"
+                  : "hover:bg-gray-50 cursor-grab active:cursor-grabbing"
+              }`}
+              title={disabled ? "Already placed on diagram" : sym.description}
+            >
+              <div className="flex items-center justify-center w-12 h-10">
+                <PaletteSymbolPreview type={sym.type} />
+              </div>
+              <span className="text-xs text-gray-700">{sym.label}</span>
             </div>
-            <span className="text-xs text-gray-700">{sym.label}</span>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

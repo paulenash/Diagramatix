@@ -1,7 +1,7 @@
 "use client";
 
 import type { Connector } from "@/app/lib/diagram/types";
-import { waypointsToSvgPath } from "@/app/lib/diagram/routing";
+import { waypointsToSvgPath, waypointsToCurvePath } from "@/app/lib/diagram/routing";
 
 interface Props {
   connector: Connector;
@@ -33,13 +33,16 @@ export function ConnectorRenderer({ connector, selected, onSelect }: Props) {
   const markerId = `arrow-${connector.id}`;
   const showArrow = connector.directionType === "directed";
 
-  // Slice waypoints to hide invisible leader segments
+  // Trim invisible leader segments for visible rendering
   const visStart = connector.sourceInvisibleLeader ? 1 : 0;
   const visEnd = connector.targetInvisibleLeader ? waypoints.length - 2 : waypoints.length - 1;
   const visibleWaypoints = waypoints.slice(visStart, visEnd + 1);
-  const visibleD = waypointsToSvgPath(visibleWaypoints);
-  // Full path for hit area (so you can click near the invisible portion too)
-  const fullD = waypointsToSvgPath(waypoints);
+
+  const visibleD = connector.routingType === "curvilinear"
+    ? waypointsToCurvePath(visibleWaypoints)
+    : waypointsToSvgPath(visibleWaypoints);
+
+  const fullD = waypointsToSvgPath(waypoints); // hit area always uses straight lines
 
   if (!visibleD) return null;
 
@@ -79,11 +82,8 @@ export function ConnectorRenderer({ connector, selected, onSelect }: Props) {
         const ly = (p1.y + p2.y) / 2;
         return (
           <text
-            x={lx}
-            y={ly - 6}
-            textAnchor="middle"
-            fontSize={10}
-            fill="#374151"
+            x={lx} y={ly - 6}
+            textAnchor="middle" fontSize={10} fill="#374151"
             style={{ pointerEvents: "none", userSelect: "none" }}
           >
             {connector.label}
