@@ -16,13 +16,14 @@ export type SymbolType =
   | "subprocess"
   | "system-boundary"
   | "hourglass"
-  | "composite-state";
+  | "composite-state"
+  | "system";
 
 export type ConnectorType = "sequence" | "message" | "association";
 
 export type Side = "top" | "right" | "bottom" | "left";
 
-export type DirectionType = "directed" | "non-directed" | "open-directed";
+export type DirectionType = "directed" | "non-directed" | "open-directed" | "both";
 
 export type RoutingType = "direct" | "rectilinear" | "curvilinear";
 

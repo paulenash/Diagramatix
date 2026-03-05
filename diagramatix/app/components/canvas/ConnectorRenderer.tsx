@@ -32,6 +32,14 @@ function OpenArrowMarker({ id, color }: { id: string; color: string }) {
   );
 }
 
+function OpenArrowMarkerStart({ id, color }: { id: string; color: string }) {
+  return (
+    <marker id={id} markerWidth={10} markerHeight={7} refX={9} refY={3.5} orient="auto-start-reverse">
+      <polyline points="0,0 10,3.5 0,7" fill="none" stroke={color} strokeWidth={1.5} />
+    </marker>
+  );
+}
+
 export function ConnectorRenderer({ connector, selected, onSelect }: Props) {
   const waypoints = connector.waypoints;
   if (waypoints.length === 0) return null;
@@ -40,8 +48,10 @@ export function ConnectorRenderer({ connector, selected, onSelect }: Props) {
   const strokeColor = selected ? "#2563eb" : "#6b7280";
   const markerId = `arrow-${connector.id}`;
   const openMarkerId = `arrow-open-${connector.id}`;
+  const openStartMarkerId = `arrow-open-start-${connector.id}`;
   const showArrow = connector.directionType !== "non-directed";
-  const isOpenArrow = connector.directionType === "open-directed";
+  const isBothArrow = connector.directionType === "both";
+  const isOpenArrow = connector.directionType === "open-directed" || isBothArrow;
 
   // Trim invisible leader segments for visible rendering
   const visStart = connector.sourceInvisibleLeader ? 1 : 0;
@@ -63,6 +73,7 @@ export function ConnectorRenderer({ connector, selected, onSelect }: Props) {
           {isOpenArrow
             ? <OpenArrowMarker id={openMarkerId} color={strokeColor} />
             : <ArrowMarker id={markerId} color={strokeColor} />}
+          {isBothArrow && <OpenArrowMarkerStart id={openStartMarkerId} color={strokeColor} />}
         </defs>
       )}
 
@@ -82,6 +93,7 @@ export function ConnectorRenderer({ connector, selected, onSelect }: Props) {
         stroke={strokeColor}
         strokeWidth={selected ? 2 : 1.5}
         strokeDasharray={isMessage ? "6 3" : undefined}
+        markerStart={isBothArrow ? `url(#${openStartMarkerId})` : undefined}
         markerEnd={showArrow ? `url(#${isOpenArrow ? openMarkerId : markerId})` : undefined}
         style={{ pointerEvents: "none" }}
       />

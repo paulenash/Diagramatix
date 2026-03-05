@@ -216,6 +216,7 @@ export function DiagramEditor({
         <PropertiesPanel
           element={selectedElement}
           connector={selectedConnector}
+          diagramType={diagramType}
           onUpdateLabel={updateLabel}
           onUpdateProperties={() => {}}
           onUpdateConnectorDirection={updateConnectorDirection}

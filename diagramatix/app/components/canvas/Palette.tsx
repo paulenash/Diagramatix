@@ -71,6 +71,15 @@ function PaletteSymbolPreview({ type }: { type: SymbolType }) {
           <line x1={32} y1={27} x2={39} y2={37} stroke="#374151" strokeWidth={1.5} />
         </svg>
       );
+    case "system":
+      return (
+        <svg width={20} height={48} viewBox="0 0 20 48">
+          <rect x={1} y={1} width={18} height={46} rx={2} fill="white" stroke="#374151" strokeWidth={1.5} />
+          <line x1={4} y1={7}  x2={16} y2={7}  stroke="#374151" strokeWidth={1.5} />
+          <line x1={4} y1={11} x2={16} y2={11} stroke="#374151" strokeWidth={1.5} />
+          <line x1={4} y1={15} x2={16} y2={15} stroke="#374151" strokeWidth={1.5} />
+        </svg>
+      );
     case "hourglass":
       return (
         <svg width={16} height={18} viewBox="0 0 32 36">

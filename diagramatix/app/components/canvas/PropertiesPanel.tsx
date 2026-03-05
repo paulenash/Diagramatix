@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import type { Connector, DiagramElement, DirectionType } from "@/app/lib/diagram/types";
+import type { Connector, DiagramElement, DiagramType, DirectionType } from "@/app/lib/diagram/types";
 
 interface Props {
   element: DiagramElement | null;
   connector: Connector | null;
+  diagramType?: DiagramType;
   onUpdateLabel: (id: string, label: string) => void;
   onUpdateProperties: (id: string, props: Record<string, unknown>) => void;
   onDeleteElement: (id: string) => void;
@@ -16,6 +17,7 @@ interface Props {
 export function PropertiesPanel({
   element,
   connector,
+  diagramType,
   onUpdateLabel,
   onUpdateProperties,
   onDeleteElement,
@@ -47,18 +49,23 @@ export function PropertiesPanel({
         </div>
         <div>
           <p className="text-xs font-medium text-gray-700 mb-1">Direction</p>
-          <div className="flex gap-1">
-            {(["directed", "open-directed", "non-directed"] as DirectionType[]).map((dt) => (
+          <div className="flex flex-wrap gap-1">
+            {([
+              { value: "directed" as DirectionType,      label: "Filled" },
+              { value: "open-directed" as DirectionType, label: "Open" },
+              { value: "both" as DirectionType,          label: "Both" },
+              { value: "non-directed" as DirectionType,  label: "None" },
+            ].filter(o => !(diagramType === "process-context" && o.value === "directed"))).map(({ value, label }) => (
               <button
-                key={dt}
-                onClick={() => onUpdateConnectorDirection(connector.id, dt)}
+                key={value}
+                onClick={() => onUpdateConnectorDirection(connector.id, value)}
                 className={`px-2 py-1 text-xs rounded border ${
-                  connector.directionType === dt
+                  connector.directionType === value
                     ? "bg-blue-600 text-white border-blue-600"
                     : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
                 }`}
               >
-                {dt === "directed" ? "Filled" : dt === "open-directed" ? "Open" : "None"}
+                {label}
               </button>
             ))}
           </div>

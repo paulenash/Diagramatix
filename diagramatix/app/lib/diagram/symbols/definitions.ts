@@ -100,11 +100,18 @@ export const ALL_SYMBOLS: SymbolDefinition[] = [
     defaultHeight: 180,
     description: "A composite state containing sub-states",
   },
+  {
+    type: "system",
+    label: "System",
+    defaultWidth: 40,
+    defaultHeight: 120,
+    description: "A system or application",
+  },
 ];
 
 export const PALETTE_BY_DIAGRAM_TYPE: Record<DiagramType, SymbolType[]> = {
   basic: ["task"],
-  "process-context": ["use-case", "actor", "team", "hourglass", "system-boundary"],
+  "process-context": ["use-case", "actor", "team", "system", "hourglass", "system-boundary"],
   "state-machine": ["state", "initial-state", "final-state", "composite-state"],
   bpmn: [
     "task",

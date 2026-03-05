@@ -196,14 +196,26 @@ function ActorShape({ el }: { el: DiagramElement }) {
 function TeamShape({ el }: { el: DiagramElement }) {
   const cx = el.x + el.width / 2;
   const top = el.y + 4;
-  const legLen_central = Math.max(el.height - 40, 5);
-  // Side figures: 70% of central total height (el.height-8); fixed parts = 2×6+10 = 22
-  const legLen_side = Math.max(Math.round(0.7 * (el.height - 8) - 22), 3);
+  const legLen_central = Math.max((el.height - 40) * 0.4, 5);
+  const legLen_side = Math.max(Math.round(0.7 * legLen_central), 3);
   return (
     <g>
       <StickFigure cx={cx - 30} top={top} headR={6} bodyLen={10} armHalfSpan={14} legSpread={12} legLen={legLen_side} />
       <StickFigure cx={cx + 30} top={top} headR={6} bodyLen={10} armHalfSpan={14} legSpread={12} legLen={legLen_side} />
       <StickFigure cx={cx}      top={top} headR={9} bodyLen={14} armHalfSpan={14} legSpread={12} legLen={legLen_central} />
+    </g>
+  );
+}
+
+function SystemShape({ el }: { el: DiagramElement }) {
+  const lineAreaEnd = el.y + el.height / 3;
+  const lineSpacing = (lineAreaEnd - el.y - 8) / 2;
+  return (
+    <g>
+      <rect x={el.x} y={el.y} width={el.width} height={el.height} rx={3} fill="white" stroke="#374151" strokeWidth={1.5} />
+      <line x1={el.x + 4} y1={el.y + 8}                   x2={el.x + el.width - 4} y2={el.y + 8}                   stroke="#374151" strokeWidth={1.5} />
+      <line x1={el.x + 4} y1={el.y + 8 + lineSpacing}     x2={el.x + el.width - 4} y2={el.y + 8 + lineSpacing}     stroke="#374151" strokeWidth={1.5} />
+      <line x1={el.x + 4} y1={el.y + 8 + lineSpacing * 2} x2={el.x + el.width - 4} y2={el.y + 8 + lineSpacing * 2} stroke="#374151" strokeWidth={1.5} />
     </g>
   );
 }
@@ -247,12 +259,13 @@ function SymbolShape({ el }: { el: DiagramElement }) {
     case "final-state":   return <FinalStateShape el={el} />;
     case "system-boundary":   return <SystemBoundaryShape el={el} />;
     case "composite-state":   return <CompositeStateShape el={el} />;
+    case "system":            return <SystemShape el={el} />;
     default:                  return <TaskShape el={el} />;
   }
 }
 
 function getLabelPos(el: DiagramElement): { x: number; y: number; baseline: string } {
-  if (el.type === "actor" || el.type === "team" || el.type === "hourglass") {
+  if (el.type === "actor" || el.type === "team" || el.type === "hourglass" || el.type === "system") {
     return { x: el.x + el.width / 2, y: el.y + el.height + 12, baseline: "hanging" };
   }
   if (el.type === "system-boundary" || el.type === "composite-state") {
@@ -338,7 +351,7 @@ export function SymbolRenderer({
   }
 
   const labelInfo = getLabelPos(element);
-  const isActorOrTeam = element.type === "actor" || element.type === "team";
+  const isActorOrTeam = element.type === "actor" || element.type === "team" || element.type === "system";
   const isBoundary = element.type === "system-boundary";  // excluded from connection overlay
   const isContainer = isBoundary || element.type === "composite-state"; // gets resize handles
   const showLabel = element.type !== "initial-state";
