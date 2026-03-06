@@ -4,8 +4,8 @@ import { prisma } from "@/app/lib/db";
 
 type Params = { params: Promise<{ id: string }> };
 
-async function getAuthorizedDiagram(id: string, userId: string) {
-  return prisma.diagram.findFirst({ where: { id, userId } });
+async function getAuthorizedProject(id: string, userId: string) {
+  return prisma.project.findFirst({ where: { id, userId } });
 }
 
 export async function GET(_req: Request, { params }: Params) {
@@ -15,12 +15,21 @@ export async function GET(_req: Request, { params }: Params) {
   }
 
   const { id } = await params;
-  const diagram = await getAuthorizedDiagram(id, session.user.id);
-  if (!diagram) {
+  const project = await prisma.project.findFirst({
+    where: { id, userId: session.user.id },
+    include: {
+      diagrams: {
+        orderBy: { updatedAt: "desc" },
+        select: { id: true, name: true, type: true, createdAt: true, updatedAt: true },
+      },
+    },
+  });
+
+  if (!project) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  return NextResponse.json(diagram);
+  return NextResponse.json(project);
 }
 
 export async function PUT(req: Request, { params }: Params) {
@@ -30,30 +39,21 @@ export async function PUT(req: Request, { params }: Params) {
   }
 
   const { id } = await params;
-  const existing = await getAuthorizedDiagram(id, session.user.id);
+  const existing = await getAuthorizedProject(id, session.user.id);
   if (!existing) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
   const body = await req.json();
-  const { name, data, projectId } = body;
+  const { name } = body;
 
-  // Validate project ownership if non-null projectId supplied
-  if (projectId !== undefined && projectId !== null) {
-    const project = await prisma.project.findFirst({ where: { id: projectId, userId: session.user.id } });
-    if (!project) {
-      return NextResponse.json({ error: "Project not found" }, { status: 404 });
-    }
+  if (!name?.trim()) {
+    return NextResponse.json({ error: "Name is required" }, { status: 400 });
   }
 
-  const updated = await prisma.diagram.update({
+  const updated = await prisma.project.update({
     where: { id },
-    data: {
-      ...(name !== undefined && { name }),
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ...(data !== undefined && { data: data as any }),
-      ...(projectId !== undefined && { projectId }),
-    },
+    data: { name: name.trim() },
   });
 
   return NextResponse.json(updated);
@@ -66,11 +66,12 @@ export async function DELETE(_req: Request, { params }: Params) {
   }
 
   const { id } = await params;
-  const existing = await getAuthorizedDiagram(id, session.user.id);
+  const existing = await getAuthorizedProject(id, session.user.id);
   if (!existing) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  await prisma.diagram.delete({ where: { id } });
+  // SetNull cascade handles moving diagrams to Unorganized
+  await prisma.project.delete({ where: { id } });
   return NextResponse.json({ success: true });
 }

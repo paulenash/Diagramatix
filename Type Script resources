@@ -1,0 +1,48 @@
+Here are the key official TypeScript resources:
+
+TypeScript Handbook (language syntax, types, interfaces, generics, etc.): typescriptlang.org/docs/handbook
+TypeScript Reference (utility types, decorators, declaration files): typescriptlang.org/docs
+TypeScript Playground (try code in-browser): typescriptlang.org/play
+DefinitelyTyped (community type definitions for JS libraries, @types/*): github.com/DefinitelyTyped/DefinitelyTyped
+For libraries used in this project specifically:
+
+React + TypeScript: react.dev/learn/typescript
+Next.js TypeScript docs: nextjs.org/docs/app/building-your-application/configuring/typescript
+
+What is the relationship between TypeScriprt and JavaScript?
+TypeScript is a superset of JavaScript — every valid JavaScript file is also valid TypeScript. Microsoft created it in 2012 to add static typing to JavaScript.
+
+Key relationships:
+
+TypeScript adds to JavaScript:
+
+Static type annotations (const x: number = 5)
+Interfaces and type aliases
+Enums
+Generics
+Access modifiers (public, private, protected)
+Compile-time error checking
+TypeScript compiles to JavaScript:
+
+The TypeScript compiler (tsc) strips all type information and outputs plain .js files
+Browsers and Node.js never see TypeScript — they only run the compiled JavaScript
+You choose which JavaScript version to target (ES5, ES2020, etc.)
+In practice:
+
+
+// TypeScript source (.ts)
+function greet(name: string): string {
+  return `Hello, ${name}`;
+}
+
+// Compiled JavaScript output (.js)
+function greet(name) {
+  return `Hello, ${name}`;
+}
+Why use it?
+
+Catches bugs at compile time rather than at runtime
+Better IDE autocomplete and refactoring support
+Makes large codebases easier to maintain (which is why this project uses it)
+The types only exist during development — at runtime it's just JavaScript.
+

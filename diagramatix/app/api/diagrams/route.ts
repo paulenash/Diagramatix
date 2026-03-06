@@ -31,10 +31,18 @@ export async function POST(req: Request) {
   }
 
   const body = await req.json();
-  const { name, type = "basic" } = body;
+  const { name, type = "basic", projectId } = body;
 
   if (!name?.trim()) {
     return NextResponse.json({ error: "Name is required" }, { status: 400 });
+  }
+
+  // Validate project ownership if supplied
+  if (projectId) {
+    const project = await prisma.project.findFirst({ where: { id: projectId, userId: session.user.id } });
+    if (!project) {
+      return NextResponse.json({ error: "Project not found" }, { status: 404 });
+    }
   }
 
   const diagram = await prisma.diagram.create({
@@ -44,6 +52,7 @@ export async function POST(req: Request) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       data: EMPTY_DIAGRAM as any,
       userId: session.user.id,
+      ...(projectId ? { projectId } : {}),
     },
   });
 
