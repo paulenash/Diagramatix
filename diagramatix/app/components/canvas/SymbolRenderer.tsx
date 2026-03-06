@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import type { BpmnTaskType, DiagramElement, Point, Side } from "@/app/lib/diagram/types";
 
 export type ResizeHandle = "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w";
@@ -17,6 +18,7 @@ interface Props {
   onResizeDragStart?: (handle: ResizeHandle, e: React.MouseEvent) => void;
   svgToWorld?: (clientX: number, clientY: number) => Point;
   shouldSnapBack?: (x: number, y: number) => boolean;
+  onUpdateProperties?: (id: string, props: Record<string, unknown>) => void;
 }
 
 function wrapText(text: string, maxWidth: number, fontSize = 12): string[] {
@@ -403,7 +405,9 @@ export function SymbolRenderer({
   onResizeDragStart,
   svgToWorld,
   shouldSnapBack,
+  onUpdateProperties,
 }: Props) {
+  const [isDraggingLabel, setIsDraggingLabel] = useState(false);
   let dragStart: { mouseX: number; mouseY: number; elX: number; elY: number } | null = null;
 
   function handleMouseDown(e: React.MouseEvent) {
@@ -459,22 +463,105 @@ export function SymbolRenderer({
         element.type === 'end-event' ||
         element.type === 'gateway'
       ) ? (() => {
-        const lines = wrapText(element.label, 80);
-        const lineH = 14;
-        const startY = element.y + element.height + 5;
+        const labelOffsetX = (element.properties.labelOffsetX as number) ?? 0;
+        const labelOffsetY = (element.properties.labelOffsetY as number) ?? 14;
+        const labelWidth   = (element.properties.labelWidth   as number) ?? 80;
+        const elCenterX    = element.x + element.width / 2;
+        const labelCenterX = elCenterX + labelOffsetX;
+        const labelTopY    = element.y + element.height + labelOffsetY;
+        const lines        = wrapText(element.label, labelWidth);
+        const lineH        = 14;
+        const totalLabelH  = lines.length * lineH;
+
+        function handleResizeMouseDown(e: React.MouseEvent) {
+          e.stopPropagation();
+          const startClientX = e.clientX;
+          const startWidth = labelWidth;
+          function onMove(ev: MouseEvent) {
+            const delta = ev.clientX - startClientX;
+            const newWidth = Math.max(40, startWidth + delta * 2);
+            onUpdateProperties?.(element.id, { labelWidth: newWidth });
+          }
+          function onUp() {
+            window.removeEventListener("mousemove", onMove);
+            window.removeEventListener("mouseup", onUp);
+          }
+          window.addEventListener("mousemove", onMove);
+          window.addEventListener("mouseup", onUp);
+        }
+
+        function handleLabelMouseDown(e: React.MouseEvent) {
+          e.stopPropagation();
+          if (!svgToWorld) return;
+          const startWorld = svgToWorld(e.clientX, e.clientY);
+          const startOffsetX = labelOffsetX;
+          const startOffsetY = labelOffsetY;
+          setIsDraggingLabel(true);
+          function onMove(ev: MouseEvent) {
+            const curWorld = svgToWorld!(ev.clientX, ev.clientY);
+            const dx = curWorld.x - startWorld.x;
+            const dy = curWorld.y - startWorld.y;
+            onUpdateProperties?.(element.id, {
+              labelOffsetX: startOffsetX + dx,
+              labelOffsetY: Math.max(4, startOffsetY + dy),
+            });
+          }
+          function onUp() {
+            setIsDraggingLabel(false);
+            window.removeEventListener("mousemove", onMove);
+            window.removeEventListener("mouseup", onUp);
+          }
+          window.addEventListener("mousemove", onMove);
+          window.addEventListener("mouseup", onUp);
+        }
+
+        const hitRectX = labelCenterX - labelWidth / 2;
+        const hitRectY = labelTopY;
+        const elCenter = { x: element.x + element.width / 2, y: element.y + element.height / 2 };
+        const labelMidY = labelTopY + totalLabelH / 2;
+
         return (
-          <text
-            textAnchor="middle"
-            fontSize={11}
-            fill="#111827"
-            style={{ userSelect: "none", pointerEvents: "none" }}
-          >
-            {lines.map((line, i) => (
-              <tspan key={i} x={element.x + element.width / 2} y={startY + i * lineH}>
-                {line}
-              </tspan>
-            ))}
-          </text>
+          <g>
+            {isDraggingLabel && (
+              <line
+                x1={elCenter.x} y1={elCenter.y}
+                x2={labelCenterX} y2={labelMidY}
+                stroke="#6b7280" strokeWidth={1} strokeDasharray="4 3"
+                style={{ pointerEvents: "none" }}
+              />
+            )}
+            <rect
+              x={hitRectX} y={hitRectY}
+              width={labelWidth} height={totalLabelH}
+              fill="transparent"
+              stroke={selected ? "#2563eb" : "none"}
+              strokeWidth={1}
+              strokeDasharray={selected ? "3 2" : undefined}
+              style={{ cursor: onUpdateProperties ? "move" : "default" }}
+              onMouseDown={handleLabelMouseDown}
+            />
+            <text
+              textAnchor="middle"
+              fontSize={11}
+              fill="#111827"
+              style={{ userSelect: "none", pointerEvents: "none" }}
+            >
+              {lines.map((line, i) => (
+                <tspan key={i} x={labelCenterX} y={labelTopY + i * lineH + lineH * 0.85}>
+                  {line}
+                </tspan>
+              ))}
+            </text>
+            {selected && onUpdateProperties && (
+              <rect
+                x={hitRectX + labelWidth - 3} y={labelTopY + totalLabelH / 2 - 5}
+                width={6} height={10}
+                fill="#2563eb" stroke="white" strokeWidth={1} rx={1}
+                style={{ cursor: "ew-resize" }}
+                onMouseDown={handleResizeMouseDown}
+              />
+            )}
+          </g>
         );
       })() : showLabel && element.type === 'use-case' ? (() => {
         const innerW = element.width * 0.7;

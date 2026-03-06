@@ -93,6 +93,7 @@ export function DiagramEditor({
     moveElement,
     resizeElement,
     updateLabel,
+    updateProperties,
     deleteElement,
     addConnector,
     deleteConnector,
@@ -216,6 +217,7 @@ export function DiagramEditor({
           pendingDragSymbol={pendingDragSymbol}
           defaultDirectionType={defaultDirectionType}
           defaultRoutingType={defaultRoutingType}
+          onUpdateProperties={updateProperties}
         />
 
         <PropertiesPanel

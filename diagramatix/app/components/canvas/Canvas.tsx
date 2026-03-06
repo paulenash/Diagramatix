@@ -100,6 +100,7 @@ interface Props {
   pendingDragSymbol: SymbolType | null;
   defaultDirectionType: DirectionType;
   defaultRoutingType: RoutingType;
+  onUpdateProperties?: (id: string, props: Record<string, unknown>) => void;
 }
 
 interface EditingLabel {
@@ -154,6 +155,7 @@ export function Canvas({
   pendingDragSymbol,
   defaultDirectionType,
   defaultRoutingType,
+  onUpdateProperties,
 }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
 
@@ -476,6 +478,7 @@ export function Canvas({
               showConnectionPoints={el.id === selectedElementId || isDraggingConnector}
               onResizeDragStart={(handle, e) => handleResizeDragStart(el.id, handle, e)}
               svgToWorld={clientToWorld}
+              onUpdateProperties={onUpdateProperties}
             />
           ))}
 
@@ -512,6 +515,7 @@ export function Canvas({
                 el.id === selectedElementId || isDraggingConnector
               }
               svgToWorld={clientToWorld}
+              onUpdateProperties={onUpdateProperties}
               shouldSnapBack={(x, y) => {
                 const cx = x + el.width / 2;
                 const cy = y + el.height / 2;
