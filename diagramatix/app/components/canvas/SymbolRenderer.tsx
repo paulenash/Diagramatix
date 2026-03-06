@@ -454,7 +454,29 @@ export function SymbolRenderer({
     >
       <SymbolShape el={element} />
 
-      {showLabel && element.type === 'use-case' ? (() => {
+      {showLabel && (
+        element.type === 'start-event' ||
+        element.type === 'end-event' ||
+        element.type === 'gateway'
+      ) ? (() => {
+        const lines = wrapText(element.label, 80);
+        const lineH = 14;
+        const startY = element.y + element.height + 5;
+        return (
+          <text
+            textAnchor="middle"
+            fontSize={11}
+            fill="#111827"
+            style={{ userSelect: "none", pointerEvents: "none" }}
+          >
+            {lines.map((line, i) => (
+              <tspan key={i} x={element.x + element.width / 2} y={startY + i * lineH}>
+                {line}
+              </tspan>
+            ))}
+          </text>
+        );
+      })() : showLabel && element.type === 'use-case' ? (() => {
         const innerW = element.width * 0.7;
         const lines = wrapText(element.label, innerW);
         const lineH = 16;

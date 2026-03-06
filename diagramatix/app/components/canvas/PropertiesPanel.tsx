@@ -47,29 +47,31 @@ export function PropertiesPanel({
           </p>
           <p className="text-xs text-gray-600">Type: {connector.type}</p>
         </div>
-        <div>
-          <p className="text-xs font-medium text-gray-700 mb-1">Direction</p>
-          <div className="flex flex-wrap gap-1">
-            {([
-              { value: "directed" as DirectionType,      label: "Filled" },
-              { value: "open-directed" as DirectionType, label: "Open" },
-              { value: "both" as DirectionType,          label: "Both" },
-              { value: "non-directed" as DirectionType,  label: "None" },
-            ].filter(o => !(diagramType === "process-context" && o.value === "directed"))).map(({ value, label }) => (
-              <button
-                key={value}
-                onClick={() => onUpdateConnectorDirection(connector.id, value)}
-                className={`px-2 py-1 text-xs rounded border ${
-                  connector.directionType === value
-                    ? "bg-blue-600 text-white border-blue-600"
-                    : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
+        {connector.type !== "sequence" && (
+          <div>
+            <p className="text-xs font-medium text-gray-700 mb-1">Direction</p>
+            <div className="flex flex-wrap gap-1">
+              {([
+                { value: "directed" as DirectionType,      label: "Filled" },
+                { value: "open-directed" as DirectionType, label: "Open" },
+                { value: "both" as DirectionType,          label: "Both" },
+                { value: "non-directed" as DirectionType,  label: "None" },
+              ].filter(o => !(diagramType === "process-context" && o.value === "directed"))).map(({ value, label }) => (
+                <button
+                  key={value}
+                  onClick={() => onUpdateConnectorDirection(connector.id, value)}
+                  className={`px-2 py-1 text-xs rounded border ${
+                    connector.directionType === value
+                      ? "bg-blue-600 text-white border-blue-600"
+                      : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
         <button
           onClick={() => onDeleteConnector(connector.id)}
           className="w-full px-3 py-1.5 text-xs bg-red-50 text-red-600 border border-red-200 rounded hover:bg-red-100"

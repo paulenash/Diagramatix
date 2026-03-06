@@ -30,6 +30,7 @@ export default async function DiagramPage({ params }: Props) {
       diagramName={diagram.name}
       diagramType={diagram.type as DiagramType}
       initialData={data}
+      projectId={diagram.projectId ?? null}
     />
   );
 }

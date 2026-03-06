@@ -96,6 +96,18 @@ export function getConnectionPointBySide(el: DiagramElement, _side: Side): Point
   return { x: el.x + el.width / 2, y: el.y + el.height / 2 };
 }
 
+// Returns the midpoint of the specified side — used for rectilinear routing to guarantee perpendicular exit/entry
+function sidePoint(el: DiagramElement, side: Side): Point {
+  const cx = el.x + el.width / 2;
+  const cy = el.y + el.height / 2;
+  switch (side) {
+    case "right":  return { x: el.x + el.width, y: cy };
+    case "left":   return { x: el.x, y: cy };
+    case "top":    return { x: cx, y: el.y };
+    case "bottom": return { x: cx, y: el.y + el.height };
+  }
+}
+
 export function computeWaypoints(
   source: DiagramElement,
   target: DiagramElement,
@@ -107,12 +119,11 @@ export function computeWaypoints(
   const startPt = getConnectionPointBySide(source, sourceSide); // source centre
   const endPt   = getConnectionPointBySide(target, targetSide); // target centre
 
-  const srcEdge = closestEdgePoint(endPt, getBounds(source));
-  const tgtEdge = closestEdgePoint(startPt, getBounds(target));
-
   if (routingType === "direct") {
     // [sourceCenter, srcEdge, tgtEdge, targetCenter]
     // visible slice [1 .. length-2] = [srcEdge, tgtEdge] — straight line between edges
+    const srcEdge = closestEdgePoint(endPt, getBounds(source));
+    const tgtEdge = closestEdgePoint(startPt, getBounds(target));
     return {
       waypoints: [startPt, srcEdge, tgtEdge, endPt],
       sourceInvisibleLeader: true,
@@ -124,6 +135,8 @@ export function computeWaypoints(
     // visible portion must be exactly 4 points for waypointsToCurvePath
     // [sourceCenter, srcEdge, cp1, cp2, tgtEdge, targetCenter]
     // visible slice [1..4] = [srcEdge, cp1, cp2, tgtEdge]
+    const srcEdge = closestEdgePoint(endPt, getBounds(source));
+    const tgtEdge = closestEdgePoint(startPt, getBounds(target));
     const dist   = euclideanDist(srcEdge, tgtEdge);
     const offset = Math.max(60, dist / 3);
     const cp1 = perpendicularExitScaled(srcEdge, sourceSide, offset);
@@ -135,9 +148,11 @@ export function computeWaypoints(
     };
   }
 
-  // Rectilinear
+  // Rectilinear: use side midpoints to guarantee perpendicular exit/entry
   // [sourceCenter, srcEdge, exitPt, ...mid..., approachPt, tgtEdge, targetCenter]
   // visible slice [1..length-2] = [srcEdge, exitPt, ...mid..., approachPt, tgtEdge]
+  const srcEdge = sidePoint(source, sourceSide);
+  const tgtEdge = sidePoint(target, targetSide);
   const obstacles = allElements
     .filter((el) => el.id !== source.id && el.id !== target.id)
     .map(getBounds);

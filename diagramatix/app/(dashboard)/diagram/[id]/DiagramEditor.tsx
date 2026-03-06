@@ -21,6 +21,7 @@ interface Props {
   diagramName: string;
   diagramType: DiagramType;
   initialData: DiagramData;
+  projectId: string | null;
 }
 
 function useAutoSave(
@@ -82,6 +83,7 @@ export function DiagramEditor({
   diagramName,
   diagramType,
   initialData,
+  projectId,
 }: Props) {
   const router = useRouter();
 
@@ -143,10 +145,12 @@ export function DiagramEditor({
       {/* Top bar */}
       <header className="h-12 border-b border-gray-200 flex items-center px-4 gap-4 flex-shrink-0">
         <button
-          onClick={() => router.push("/dashboard")}
+          onClick={() =>
+            router.push(projectId ? `/dashboard/projects/${projectId}` : "/dashboard")
+          }
           className="text-gray-500 hover:text-gray-700 text-sm"
         >
-          ← Dashboard
+          ← {projectId ? "Project" : "Dashboard"}
         </button>
 
         <div className="flex items-center gap-2">

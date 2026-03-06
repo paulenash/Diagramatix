@@ -65,7 +65,10 @@ function reducer(state: DiagramData, action: Action): DiagramData {
     case "ADD_ELEMENT": {
       const def = getSymbolDefinition(action.payload.symbolType);
       let label = def.label;
-      if (action.payload.symbolType === "use-case") {
+      if (action.payload.symbolType === "task") {
+        const count = state.elements.filter((e) => e.type === "task").length;
+        label = `Task ${count + 1}`;
+      } else if (action.payload.symbolType === "use-case") {
         const count = state.elements.filter((e) => e.type === "use-case").length;
         label = `Process ${count + 1}`;
       } else if (action.payload.symbolType === "state") {
