@@ -115,6 +115,82 @@ function PaletteSymbolPreview({ type }: { type: SymbolType }) {
           <circle cx={12} cy={12} r={6} fill="#374151" />
         </svg>
       );
+    case "task-user":
+      return (
+        <svg width={48} height={28} viewBox="0 0 48 28">
+          <rect x={1} y={1} width={46} height={26} rx={3} fill="white" stroke="#374151" strokeWidth={1.5} />
+          <circle cx={9} cy={7.5} r={3} fill="white" stroke="#374151" strokeWidth={1.2} />
+          <path d="M4 18 C4 13 14 13 14 18" fill="white" stroke="#374151" strokeWidth={1.2} strokeLinejoin="round" />
+        </svg>
+      );
+    case "task-service": {
+      const gcx = 9, gcy = 11, outerR = 6, innerR = 4.5, holeR = 2.2, teeth = 8;
+      const gpts: string[] = [];
+      for (let i = 0; i < teeth; i++) {
+        const base = (i / teeth) * Math.PI * 2;
+        const span = (Math.PI / teeth) * 0.55;
+        gpts.push(`${gcx + outerR * Math.cos(base - span)},${gcy + outerR * Math.sin(base - span)}`);
+        gpts.push(`${gcx + outerR * Math.cos(base + span)},${gcy + outerR * Math.sin(base + span)}`);
+        const gap = base + Math.PI / teeth;
+        gpts.push(`${gcx + innerR * Math.cos(gap)},${gcy + innerR * Math.sin(gap)}`);
+      }
+      return (
+        <svg width={48} height={28} viewBox="0 0 48 28">
+          <rect x={1} y={1} width={46} height={26} rx={3} fill="white" stroke="#374151" strokeWidth={1.5} />
+          <polygon points={gpts.join(" ")} fill="white" stroke="#374151" strokeWidth={1.2} />
+          <circle cx={gcx} cy={gcy} r={holeR} fill="white" stroke="#374151" strokeWidth={1.2} />
+        </svg>
+      );
+    }
+    case "task-script":
+      return (
+        <svg width={48} height={28} viewBox="0 0 48 28">
+          <rect x={1} y={1} width={46} height={26} rx={3} fill="white" stroke="#374151" strokeWidth={1.5} />
+          <rect x={4} y={4} width={9} height={11} rx={1} fill="white" stroke="#374151" strokeWidth={1.1} />
+          <line x1={5.5} y1={6.5}  x2={11.5} y2={6.5}  stroke="#374151" strokeWidth={0.9} />
+          <line x1={5.5} y1={9}    x2={11.5} y2={9}    stroke="#374151" strokeWidth={0.9} />
+          <line x1={5.5} y1={11.5} x2={11.5} y2={11.5} stroke="#374151" strokeWidth={0.9} />
+        </svg>
+      );
+    case "task-send":
+      return (
+        <svg width={48} height={28} viewBox="0 0 48 28">
+          <rect x={1} y={1} width={46} height={26} rx={3} fill="white" stroke="#374151" strokeWidth={1.5} />
+          <rect x={4} y={5} width={12} height={8} rx={1} fill="#374151" />
+          <polyline points="4,5 10,11 16,5" fill="none" stroke="white" strokeWidth={1.2} />
+        </svg>
+      );
+    case "task-receive":
+      return (
+        <svg width={48} height={28} viewBox="0 0 48 28">
+          <rect x={1} y={1} width={46} height={26} rx={3} fill="white" stroke="#374151" strokeWidth={1.5} />
+          <rect x={4} y={5} width={12} height={8} rx={1} fill="white" stroke="#374151" strokeWidth={1.2} />
+          <polyline points="4,5 10,11 16,5" fill="none" stroke="#374151" strokeWidth={1.2} />
+        </svg>
+      );
+    case "task-manual":
+      return (
+        <svg width={48} height={28} viewBox="0 0 48 28">
+          <rect x={1} y={1} width={46} height={26} rx={3} fill="white" stroke="#374151" strokeWidth={1.5} />
+          <rect x={4}   y={12} width={8}   height={6}   rx={1}   fill="white" stroke="#374151" strokeWidth={1.1} />
+          <rect x={5}   y={7}  width={1.5} height={5.5} rx={0.7} fill="white" stroke="#374151" strokeWidth={0.9} />
+          <rect x={7}   y={6}  width={1.5} height={6}   rx={0.7} fill="white" stroke="#374151" strokeWidth={0.9} />
+          <rect x={9}   y={7}  width={1.5} height={5.5} rx={0.7} fill="white" stroke="#374151" strokeWidth={0.9} />
+          <rect x={11}  y={8}  width={1.5} height={4.5} rx={0.7} fill="white" stroke="#374151" strokeWidth={0.9} />
+          <rect x={3.5} y={13} width={1.2} height={3.5} rx={0.6} fill="white" stroke="#374151" strokeWidth={0.9} />
+        </svg>
+      );
+    case "task-business-rule":
+      return (
+        <svg width={48} height={28} viewBox="0 0 48 28">
+          <rect x={1} y={1} width={46} height={26} rx={3} fill="white" stroke="#374151" strokeWidth={1.5} />
+          <rect x={4} y={4} width={12} height={12} rx={1} fill="white" stroke="#374151" strokeWidth={1.1} />
+          <rect x={4} y={4} width={12} height={4}  fill="#e5e7eb" />
+          <rect x={4} y={6} width={12} height={2}  fill="#e5e7eb" />
+          <line x1={4}  y1={8}  x2={16} y2={8}  stroke="#374151" strokeWidth={0.9} />
+          <line x1={9}  y1={4}  x2={9}  y2={16} stroke="#374151" strokeWidth={0.9} />
+        </svg>
+      );
     case "composite-state":
       return (
         <svg width={48} height={32} viewBox="0 0 48 32">

@@ -241,6 +241,96 @@ function FinalStateShape({ el }: { el: DiagramElement }) {
   );
 }
 
+function BpmnTaskMarker({ type, x, y }: { type: string; x: number; y: number }) {
+  const cx = x + 7;
+  const cy = y + 7;
+  switch (type) {
+    case "task-user":
+      return (
+        <g>
+          <circle cx={cx} cy={y + 4.5} r={2.8} fill="white" stroke="#374151" strokeWidth={1.2} />
+          <path d={`M${x + 1} ${y + 14} C${x + 1} ${y + 9} ${x + 13} ${y + 9} ${x + 13} ${y + 14}`}
+            fill="white" stroke="#374151" strokeWidth={1.2} strokeLinejoin="round" />
+        </g>
+      );
+    case "task-service": {
+      const outerR = 6, innerR = 4.5, holeR = 2.2, teeth = 8;
+      const pts: string[] = [];
+      for (let i = 0; i < teeth; i++) {
+        const base = (i / teeth) * Math.PI * 2;
+        const span = (Math.PI / teeth) * 0.55;
+        pts.push(`${cx + outerR * Math.cos(base - span)},${cy + outerR * Math.sin(base - span)}`);
+        pts.push(`${cx + outerR * Math.cos(base + span)},${cy + outerR * Math.sin(base + span)}`);
+        const gap = base + Math.PI / teeth;
+        pts.push(`${cx + innerR * Math.cos(gap)},${cy + innerR * Math.sin(gap)}`);
+      }
+      return (
+        <g>
+          <polygon points={pts.join(" ")} fill="white" stroke="#374151" strokeWidth={1.2} />
+          <circle cx={cx} cy={cy} r={holeR} fill="white" stroke="#374151" strokeWidth={1.2} />
+        </g>
+      );
+    }
+    case "task-script":
+      return (
+        <g>
+          <rect x={x + 2} y={y + 1} width={10} height={12} rx={1} fill="white" stroke="#374151" strokeWidth={1.2} />
+          <line x1={x + 4} y1={y + 4}  x2={x + 10} y2={y + 4}  stroke="#374151" strokeWidth={1} />
+          <line x1={x + 4} y1={y + 7}  x2={x + 10} y2={y + 7}  stroke="#374151" strokeWidth={1} />
+          <line x1={x + 4} y1={y + 10} x2={x + 10} y2={y + 10} stroke="#374151" strokeWidth={1} />
+        </g>
+      );
+    case "task-send":
+      return (
+        <g>
+          <rect x={x + 1} y={y + 3} width={12} height={8} rx={1} fill="#374151" stroke="#374151" strokeWidth={1} />
+          <polyline points={`${x + 1},${y + 3} ${cx},${y + 8} ${x + 13},${y + 3}`}
+            fill="none" stroke="white" strokeWidth={1.2} />
+        </g>
+      );
+    case "task-receive":
+      return (
+        <g>
+          <rect x={x + 1} y={y + 3} width={12} height={8} rx={1} fill="white" stroke="#374151" strokeWidth={1.2} />
+          <polyline points={`${x + 1},${y + 3} ${cx},${y + 8} ${x + 13},${y + 3}`}
+            fill="none" stroke="#374151" strokeWidth={1.2} />
+        </g>
+      );
+    case "task-manual":
+      return (
+        <g>
+          <rect x={x + 2}   y={y + 7}  width={8}   height={6}   rx={1}    fill="white" stroke="#374151" strokeWidth={1.2} />
+          <rect x={x + 3}   y={y + 2}  width={1.6} height={5.5} rx={0.8}  fill="white" stroke="#374151" strokeWidth={1} />
+          <rect x={x + 5.2} y={y + 1}  width={1.6} height={6.5} rx={0.8}  fill="white" stroke="#374151" strokeWidth={1} />
+          <rect x={x + 7.4} y={y + 2}  width={1.6} height={5.5} rx={0.8}  fill="white" stroke="#374151" strokeWidth={1} />
+          <rect x={x + 9.6} y={y + 3}  width={1.4} height={4.5} rx={0.7}  fill="white" stroke="#374151" strokeWidth={1} />
+          <rect x={x + 1}   y={y + 8}  width={1.4} height={3.5} rx={0.7}  fill="white" stroke="#374151" strokeWidth={1} />
+        </g>
+      );
+    case "task-business-rule":
+      return (
+        <g>
+          <rect x={x + 1} y={y + 1} width={12} height={12} rx={1} fill="white" stroke="#374151" strokeWidth={1.2} />
+          <rect x={x + 1} y={y + 1} width={12} height={4}  fill="#e5e7eb" />
+          <rect x={x + 1} y={y + 3} width={12} height={2}  fill="#e5e7eb" />
+          <line x1={x + 1} y1={y + 5} x2={x + 13} y2={y + 5} stroke="#374151" strokeWidth={1} />
+          <line x1={x + 6} y1={y + 1} x2={x + 6}  y2={y + 13} stroke="#374151" strokeWidth={1} />
+        </g>
+      );
+    default: return null;
+  }
+}
+
+function BpmnTaskShape({ el }: { el: DiagramElement }) {
+  return (
+    <g>
+      <rect x={el.x} y={el.y} width={el.width} height={el.height}
+        rx={4} ry={4} fill="white" stroke="#374151" strokeWidth={1.5} />
+      <BpmnTaskMarker type={el.type} x={el.x + 4} y={el.y + 4} />
+    </g>
+  );
+}
+
 function SymbolShape({ el }: { el: DiagramElement }) {
   switch (el.type) {
     case "gateway":        return <GatewayShape el={el} />;
@@ -256,6 +346,13 @@ function SymbolShape({ el }: { el: DiagramElement }) {
     case "system-boundary":   return <SystemBoundaryShape el={el} />;
     case "composite-state":   return <CompositeStateShape el={el} />;
     case "system":            return <SystemShape el={el} />;
+    case "task-user":
+    case "task-service":
+    case "task-script":
+    case "task-send":
+    case "task-receive":
+    case "task-manual":
+    case "task-business-rule": return <BpmnTaskShape el={el} />;
     default:                  return <TaskShape el={el} />;
   }
 }

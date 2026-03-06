@@ -17,7 +17,14 @@ export type SymbolType =
   | "system-boundary"
   | "hourglass"
   | "composite-state"
-  | "system";
+  | "system"
+  | "task-user"
+  | "task-service"
+  | "task-script"
+  | "task-send"
+  | "task-receive"
+  | "task-manual"
+  | "task-business-rule";
 
 export type ConnectorType = "sequence" | "message" | "association";
 

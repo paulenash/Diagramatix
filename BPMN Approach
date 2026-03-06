@@ -1,0 +1,21 @@
+Yes, you can use a BPMN SVG icon library as the visual source and integrate it into the existing architecture. Here's how the options stack up:
+
+Option 1 — Inline SVG paths from bpmn-font (recommended)
+The bpmn-io/bpmn-font library (from the makers of bpmn.io) has SVG path data for every BPMN 2.0 symbol. You copy the relevant <path d="..."> elements into your SymbolRenderer.tsx cases — no external dependency, works perfectly with the existing architecture. Each symbol is then a React component you fully control for sizing, colour, selection highlight, etc.
+
+Option 2 — Load external SVG sprite
+Reference an SVG sprite file with <use href="bpmn-icons.svg#task-user" />. Simpler to add new icons but harder to control fill/stroke dynamically and doesn't integrate as cleanly with the existing hit-testing and selection model.
+
+Option 1 is the right fit here because:
+
+The current SymbolRenderer.tsx already renders per-element SVG shapes with dynamic size/position
+Marker icons (e.g. the loop arrow, the lightning bolt for events, the gear for service tasks) are drawn as sub-elements at fixed offsets inside the element bounds — exactly the pattern the existing code already handles
+Label position, resize handles, and connector ports all work off the element's x/y/width/height without caring what shape is inside
+What BPMN 2.0 symbols do you want to add? The full spec is large — typical priority order is:
+
+Task types — User (person icon), Service (gear), Script (lines), Send/Receive (envelope), Manual (hand), Business Rule (table)
+Gateway types — Exclusive (×), Inclusive (○), Parallel (+), Event-based (⬠)
+Event types — Start/Intermediate/End with markers: Message, Timer, Error, Signal, Terminate, Conditional
+Subprocess — rounded rect with [+] marker
+Pools & Lanes — horizontal/vertical partitions with label headers
+Data — Data Object, Data Store (drum)
