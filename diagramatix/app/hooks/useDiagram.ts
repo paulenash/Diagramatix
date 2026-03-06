@@ -2,6 +2,7 @@
 
 import { useCallback, useReducer } from "react";
 import type {
+  BpmnTaskType,
   Connector,
   ConnectorType,
   DiagramData,
@@ -17,7 +18,7 @@ import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
 
 type Action =
   | { type: "SET_DATA"; payload: DiagramData }
-  | { type: "ADD_ELEMENT"; payload: { symbolType: SymbolType; position: Point } }
+  | { type: "ADD_ELEMENT"; payload: { symbolType: SymbolType; position: Point; taskType?: BpmnTaskType } }
   | { type: "MOVE_ELEMENT"; payload: { id: string; x: number; y: number } }
   | { type: "RESIZE_ELEMENT"; payload: { id: string; width: number; height: number } }
   | { type: "UPDATE_LABEL"; payload: { id: string; label: string } }
@@ -95,6 +96,7 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         height: def.defaultHeight,
         label,
         properties: {},
+        taskType: action.payload.taskType,
       };
       return { ...state, elements: [...state.elements, newEl] };
     }
@@ -263,8 +265,8 @@ export function useDiagram(initialData: DiagramData) {
   const [data, dispatch] = useReducer(reducer, initialData);
 
   const addElement = useCallback(
-    (symbolType: SymbolType, position: Point) => {
-      dispatch({ type: "ADD_ELEMENT", payload: { symbolType, position } });
+    (symbolType: SymbolType, position: Point, taskType?: BpmnTaskType) => {
+      dispatch({ type: "ADD_ELEMENT", payload: { symbolType, position, taskType } });
     },
     []
   );

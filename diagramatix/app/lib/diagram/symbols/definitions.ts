@@ -107,13 +107,6 @@ export const ALL_SYMBOLS: SymbolDefinition[] = [
     defaultHeight: 80,
     description: "A system or application",
   },
-  { type: "task-user",          label: "User Task",          defaultWidth: 120, defaultHeight: 60, description: "Task performed by a person" },
-  { type: "task-service",       label: "Service Task",       defaultWidth: 120, defaultHeight: 60, description: "Automated service task" },
-  { type: "task-script",        label: "Script Task",        defaultWidth: 120, defaultHeight: 60, description: "Executed script" },
-  { type: "task-send",          label: "Send Task",          defaultWidth: 120, defaultHeight: 60, description: "Sends a message" },
-  { type: "task-receive",       label: "Receive Task",       defaultWidth: 120, defaultHeight: 60, description: "Waits for a message" },
-  { type: "task-manual",        label: "Manual Task",        defaultWidth: 120, defaultHeight: 60, description: "Manual work item" },
-  { type: "task-business-rule", label: "Business Rule Task", defaultWidth: 120, defaultHeight: 60, description: "Evaluates a business rule" },
 ];
 
 export const PALETTE_BY_DIAGRAM_TYPE: Record<DiagramType, SymbolType[]> = {
@@ -121,8 +114,7 @@ export const PALETTE_BY_DIAGRAM_TYPE: Record<DiagramType, SymbolType[]> = {
   "process-context": ["use-case", "actor", "team", "system", "hourglass", "system-boundary"],
   "state-machine": ["state", "initial-state", "final-state", "composite-state"],
   bpmn: [
-    "task", "task-user", "task-service", "task-script",
-    "task-send", "task-receive", "task-manual", "task-business-rule",
+    "task",
     "gateway", "start-event", "end-event",
     "subprocess", "pool", "lane",
   ],

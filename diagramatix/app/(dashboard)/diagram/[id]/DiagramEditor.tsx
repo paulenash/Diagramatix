@@ -190,6 +190,7 @@ export function DiagramEditor({
 
         <Canvas
           data={data}
+          diagramType={diagramType}
           onAddElement={addElement}
           onMoveElement={moveElement}
           onResizeElement={resizeElement}

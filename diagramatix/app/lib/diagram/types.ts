@@ -17,14 +17,17 @@ export type SymbolType =
   | "system-boundary"
   | "hourglass"
   | "composite-state"
-  | "system"
-  | "task-user"
-  | "task-service"
-  | "task-script"
-  | "task-send"
-  | "task-receive"
-  | "task-manual"
-  | "task-business-rule";
+  | "system";
+
+export type BpmnTaskType =
+  | "none"
+  | "user"
+  | "service"
+  | "script"
+  | "send"
+  | "receive"
+  | "manual"
+  | "business-rule";
 
 export type ConnectorType = "sequence" | "message" | "association";
 
@@ -56,6 +59,7 @@ export interface DiagramElement {
   label: string;
   properties: Record<string, unknown>;
   parentId?: string;
+  taskType?: BpmnTaskType;
 }
 
 export interface Connector {

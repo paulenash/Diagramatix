@@ -1,6 +1,6 @@
 "use client";
 
-import type { DiagramElement, Point, Side } from "@/app/lib/diagram/types";
+import type { BpmnTaskType, DiagramElement, Point, Side } from "@/app/lib/diagram/types";
 
 export type ResizeHandle = "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w";
 
@@ -241,11 +241,11 @@ function FinalStateShape({ el }: { el: DiagramElement }) {
   );
 }
 
-function BpmnTaskMarker({ type, x, y }: { type: string; x: number; y: number }) {
+function BpmnTaskMarker({ taskType, x, y }: { taskType: BpmnTaskType; x: number; y: number }) {
   const cx = x + 7;
   const cy = y + 7;
-  switch (type) {
-    case "task-user":
+  switch (taskType) {
+    case "user":
       return (
         <g>
           <circle cx={cx} cy={y + 4.5} r={2.8} fill="white" stroke="#374151" strokeWidth={1.2} />
@@ -253,7 +253,7 @@ function BpmnTaskMarker({ type, x, y }: { type: string; x: number; y: number }) 
             fill="white" stroke="#374151" strokeWidth={1.2} strokeLinejoin="round" />
         </g>
       );
-    case "task-service": {
+    case "service": {
       const outerR = 6, innerR = 4.5, holeR = 2.2, teeth = 8;
       const pts: string[] = [];
       for (let i = 0; i < teeth; i++) {
@@ -271,7 +271,7 @@ function BpmnTaskMarker({ type, x, y }: { type: string; x: number; y: number }) 
         </g>
       );
     }
-    case "task-script":
+    case "script":
       return (
         <g>
           <rect x={x + 2} y={y + 1} width={10} height={12} rx={1} fill="white" stroke="#374151" strokeWidth={1.2} />
@@ -280,7 +280,7 @@ function BpmnTaskMarker({ type, x, y }: { type: string; x: number; y: number }) 
           <line x1={x + 4} y1={y + 10} x2={x + 10} y2={y + 10} stroke="#374151" strokeWidth={1} />
         </g>
       );
-    case "task-send":
+    case "send":
       return (
         <g>
           <rect x={x + 1} y={y + 3} width={12} height={8} rx={1} fill="#374151" stroke="#374151" strokeWidth={1} />
@@ -288,7 +288,7 @@ function BpmnTaskMarker({ type, x, y }: { type: string; x: number; y: number }) 
             fill="none" stroke="white" strokeWidth={1.2} />
         </g>
       );
-    case "task-receive":
+    case "receive":
       return (
         <g>
           <rect x={x + 1} y={y + 3} width={12} height={8} rx={1} fill="white" stroke="#374151" strokeWidth={1.2} />
@@ -296,7 +296,7 @@ function BpmnTaskMarker({ type, x, y }: { type: string; x: number; y: number }) 
             fill="none" stroke="#374151" strokeWidth={1.2} />
         </g>
       );
-    case "task-manual":
+    case "manual":
       return (
         <g>
           <rect x={x + 2}   y={y + 7}  width={8}   height={6}   rx={1}    fill="white" stroke="#374151" strokeWidth={1.2} />
@@ -307,7 +307,7 @@ function BpmnTaskMarker({ type, x, y }: { type: string; x: number; y: number }) 
           <rect x={x + 1}   y={y + 8}  width={1.4} height={3.5} rx={0.7}  fill="white" stroke="#374151" strokeWidth={1} />
         </g>
       );
-    case "task-business-rule":
+    case "business-rule":
       return (
         <g>
           <rect x={x + 1} y={y + 1} width={12} height={12} rx={1} fill="white" stroke="#374151" strokeWidth={1.2} />
@@ -326,7 +326,9 @@ function BpmnTaskShape({ el }: { el: DiagramElement }) {
     <g>
       <rect x={el.x} y={el.y} width={el.width} height={el.height}
         rx={4} ry={4} fill="white" stroke="#374151" strokeWidth={1.5} />
-      <BpmnTaskMarker type={el.type} x={el.x + 4} y={el.y + 4} />
+      {el.taskType && el.taskType !== "none" && (
+        <BpmnTaskMarker taskType={el.taskType} x={el.x + 4} y={el.y + 4} />
+      )}
     </g>
   );
 }
@@ -346,13 +348,8 @@ function SymbolShape({ el }: { el: DiagramElement }) {
     case "system-boundary":   return <SystemBoundaryShape el={el} />;
     case "composite-state":   return <CompositeStateShape el={el} />;
     case "system":            return <SystemShape el={el} />;
-    case "task-user":
-    case "task-service":
-    case "task-script":
-    case "task-send":
-    case "task-receive":
-    case "task-manual":
-    case "task-business-rule": return <BpmnTaskShape el={el} />;
+    case "task":
+      return el.taskType !== undefined ? <BpmnTaskShape el={el} /> : <TaskShape el={el} />;
     default:                  return <TaskShape el={el} />;
   }
 }

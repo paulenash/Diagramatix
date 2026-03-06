@@ -2,10 +2,12 @@
 
 import { useRef, useState, useCallback } from "react";
 import type {
+  BpmnTaskType,
   Connector,
   ConnectorType,
   DiagramData,
   DiagramElement,
+  DiagramType,
   DirectionType,
   Point,
   RoutingType,
@@ -50,9 +52,27 @@ function computeUseCaseSize(label: string, currentW: number): { w: number; h: nu
   return { w, h };
 }
 
+const TASK_TYPE_OPTIONS: { value: BpmnTaskType; label: string }[] = [
+  { value: "none",          label: "None" },
+  { value: "user",          label: "User Task" },
+  { value: "service",       label: "Service Task" },
+  { value: "script",        label: "Script Task" },
+  { value: "send",          label: "Send Task" },
+  { value: "receive",       label: "Receive Task" },
+  { value: "manual",        label: "Manual Task" },
+  { value: "business-rule", label: "Business Rule Task" },
+];
+
+interface PendingDrop {
+  worldPos: Point;
+  containerX: number;
+  containerY: number;
+}
+
 interface Props {
   data: DiagramData;
-  onAddElement: (type: SymbolType, position: Point) => void;
+  diagramType: DiagramType;
+  onAddElement: (type: SymbolType, position: Point, taskType?: BpmnTaskType) => void;
   onMoveElement: (id: string, x: number, y: number) => void;
   onResizeElement: (id: string, width: number, height: number) => void;
   onUpdateLabel: (id: string, label: string) => void;
@@ -118,6 +138,7 @@ function getClosestSide(pos: Point, el: DiagramElement): Side {
 
 export function Canvas({
   data,
+  diagramType,
   onAddElement,
   onMoveElement,
   onResizeElement,
@@ -141,6 +162,7 @@ export function Canvas({
   const [editingLabel, setEditingLabel] = useState<EditingLabel | null>(null);
   const [draggingConnector, setDraggingConnector] = useState<DraggingConnector | null>(null);
   const [draggingEndpoint, setDraggingEndpoint] = useState<DraggingEndpoint | null>(null);
+  const [pendingDrop, setPendingDrop] = useState<PendingDrop | null>(null);
 
   const svgToWorld = useCallback(
     (svgX: number, svgY: number): Point => ({
@@ -286,6 +308,10 @@ export function Canvas({
 
   function handleBackgroundMouseDown(e: React.MouseEvent) {
     if (e.button !== 0) return;
+    if (pendingDrop) {
+      setPendingDrop(null);
+      return;
+    }
     onSelectElement(null);
     onSelectConnector(null);
     panStart.current = {
@@ -333,7 +359,17 @@ export function Canvas({
     if (!pendingDragSymbol) return;
     const rect = svgRef.current!.getBoundingClientRect();
     const worldPos = svgToWorld(e.clientX - rect.left, e.clientY - rect.top);
-    onAddElement(pendingDragSymbol, worldPos);
+
+    if (pendingDragSymbol === "task" && diagramType === "bpmn") {
+      const containerRect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+      setPendingDrop({
+        worldPos,
+        containerX: e.clientX - containerRect.left,
+        containerY: e.clientY - containerRect.top,
+      });
+    } else {
+      onAddElement(pendingDragSymbol, worldPos);
+    }
   }
 
   function startEditingLabel(el: DiagramElement) {
@@ -366,6 +402,7 @@ export function Canvas({
       setDraggingConnector(null);
       setDraggingEndpoint(null);
       setEditingLabel(null);
+      setPendingDrop(null);
     }
     if (e.key === "Delete" || e.key === "Backspace") {
       if (editingLabel) return;
@@ -613,6 +650,31 @@ export function Canvas({
           />
         );
       })()}
+
+      {/* Task type picker — shown after dropping a task onto a BPMN canvas */}
+      {pendingDrop && (
+        <div
+          style={{ position: "absolute", left: pendingDrop.containerX, top: pendingDrop.containerY, zIndex: 50 }}
+          className="bg-white border border-gray-200 rounded shadow-lg py-1 min-w-[160px]"
+        >
+          <p className="px-3 py-1 text-xs font-semibold text-gray-400 uppercase tracking-wide border-b border-gray-100">
+            Task Type
+          </p>
+          {TASK_TYPE_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              className="w-full text-left px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                onAddElement("task", pendingDrop.worldPos, opt.value);
+                setPendingDrop(null);
+              }}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Status bar */}
       <div className="absolute bottom-2 left-2 text-xs text-gray-400 bg-white/80 px-2 py-1 rounded">
