@@ -99,6 +99,7 @@ export function DiagramEditor({
     deleteConnector,
     updateConnectorDirection,
     updateConnectorEndpoint,
+    updateConnectorWaypoints,
   } = useDiagram(initialData);
 
   const saveStatus = useAutoSave(diagramId, data);
@@ -218,6 +219,7 @@ export function DiagramEditor({
           defaultDirectionType={defaultDirectionType}
           defaultRoutingType={defaultRoutingType}
           onUpdateProperties={updateProperties}
+          onUpdateConnectorWaypoints={updateConnectorWaypoints}
         />
 
         <PropertiesPanel

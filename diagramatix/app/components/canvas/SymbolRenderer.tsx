@@ -464,7 +464,7 @@ export function SymbolRenderer({
         element.type === 'gateway'
       ) ? (() => {
         const labelOffsetX = (element.properties.labelOffsetX as number) ?? 0;
-        const labelOffsetY = (element.properties.labelOffsetY as number) ?? 14;
+        const labelOffsetY = (element.properties.labelOffsetY as number) ?? 7;
         const labelWidth   = (element.properties.labelWidth   as number) ?? 80;
         const elCenterX    = element.x + element.width / 2;
         const labelCenterX = elCenterX + labelOffsetX;
@@ -503,7 +503,7 @@ export function SymbolRenderer({
             const dy = curWorld.y - startWorld.y;
             onUpdateProperties?.(element.id, {
               labelOffsetX: startOffsetX + dx,
-              labelOffsetY: Math.max(4, startOffsetY + dy),
+              labelOffsetY: startOffsetY + dy,
             });
           }
           function onUp() {

@@ -1,12 +1,14 @@
 "use client";
 
-import type { Connector } from "@/app/lib/diagram/types";
+import type { Connector, Point } from "@/app/lib/diagram/types";
 import { waypointsToSvgPath, waypointsToCurvePath } from "@/app/lib/diagram/routing";
 
 interface Props {
   connector: Connector;
   selected: boolean;
   onSelect: () => void;
+  svgToWorld?: (clientX: number, clientY: number) => Point;
+  onUpdateWaypoints?: (id: string, waypoints: Point[]) => void;
 }
 
 function ArrowMarker({ id, color }: { id: string; color: string }) {
@@ -40,7 +42,7 @@ function OpenArrowMarkerStart({ id, color }: { id: string; color: string }) {
   );
 }
 
-export function ConnectorRenderer({ connector, selected, onSelect }: Props) {
+export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, onUpdateWaypoints }: Props) {
   const waypoints = connector.waypoints;
   if (waypoints.length === 0) return null;
 
@@ -65,6 +67,46 @@ export function ConnectorRenderer({ connector, selected, onSelect }: Props) {
   const fullD = waypointsToSvgPath(waypoints); // hit area always uses straight lines
 
   if (!visibleD) return null;
+
+  // Interior draggable segments for rectilinear connectors:
+  // skip first (index 0) and last (index M-2) segments — they connect to element sides
+  const M = visibleWaypoints.length;
+  const draggableSegments = connector.routingType === "rectilinear" && M >= 4
+    ? Array.from({ length: M - 3 }, (_, i) => i + 1)
+    : [];
+
+  function handleSegmentMouseDown(e: React.MouseEvent, segIdx: number) {
+    e.stopPropagation();
+    if (!svgToWorld || !onUpdateWaypoints) return;
+
+    const p1 = visibleWaypoints[segIdx];
+    const p2 = visibleWaypoints[segIdx + 1];
+    const isHorizontal = Math.abs(p1.y - p2.y) < 1;
+
+    const startWorld = svgToWorld(e.clientX, e.clientY);
+    const startCoord = isHorizontal ? p1.y : p1.x;
+    const wpi = visStart + segIdx;
+    const wpj = visStart + segIdx + 1;
+    const initialWaypoints = connector.waypoints.map((p) => ({ ...p }));
+
+    function onMove(ev: MouseEvent) {
+      const cur = svgToWorld!(ev.clientX, ev.clientY);
+      const delta = isHorizontal ? cur.y - startWorld.y : cur.x - startWorld.x;
+      const newVal = startCoord + delta;
+      const updated = initialWaypoints.map((p, i) => {
+        if (i === wpi || i === wpj)
+          return isHorizontal ? { ...p, y: newVal } : { ...p, x: newVal };
+        return p;
+      });
+      onUpdateWaypoints?.(connector.id, updated);
+    }
+    function onUp() {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    }
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  }
 
   return (
     <>
@@ -114,6 +156,33 @@ export function ConnectorRenderer({ connector, selected, onSelect }: Props) {
           </text>
         );
       })()}
+
+      {/* Segment drag handles (rectilinear, selected, interior segments only) */}
+      {selected && draggableSegments.map((segIdx) => {
+        const p1 = visibleWaypoints[segIdx];
+        const p2 = visibleWaypoints[segIdx + 1];
+        const isHorizontal = Math.abs(p1.y - p2.y) < 1;
+        const mx = (p1.x + p2.x) / 2;
+        const my = (p1.y + p2.y) / 2;
+        const hitW = isHorizontal ? Math.abs(p2.x - p1.x) * 0.6 : 12;
+        const hitH = isHorizontal ? 12 : Math.abs(p2.y - p1.y) * 0.6;
+        return (
+          <g key={segIdx}>
+            <rect
+              x={mx - hitW / 2} y={my - hitH / 2}
+              width={hitW} height={hitH}
+              fill="transparent"
+              style={{ cursor: isHorizontal ? "ns-resize" : "ew-resize" }}
+              onMouseDown={(e) => handleSegmentMouseDown(e, segIdx)}
+            />
+            <circle
+              cx={mx} cy={my} r={4}
+              fill="#2563eb" stroke="white" strokeWidth={1.5}
+              style={{ pointerEvents: "none" }}
+            />
+          </g>
+        );
+      })}
     </>
   );
 }

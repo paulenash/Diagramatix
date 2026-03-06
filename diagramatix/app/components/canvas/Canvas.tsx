@@ -101,6 +101,7 @@ interface Props {
   defaultDirectionType: DirectionType;
   defaultRoutingType: RoutingType;
   onUpdateProperties?: (id: string, props: Record<string, unknown>) => void;
+  onUpdateConnectorWaypoints?: (id: string, waypoints: Point[]) => void;
 }
 
 interface EditingLabel {
@@ -156,6 +157,7 @@ export function Canvas({
   defaultDirectionType,
   defaultRoutingType,
   onUpdateProperties,
+  onUpdateConnectorWaypoints,
 }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
 
@@ -400,6 +402,16 @@ export function Canvas({
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
+    const NUDGE = 5;
+    if (selectedElementId && !editingLabel) {
+      const el = data.elements.find((el) => el.id === selectedElementId);
+      if (el) {
+        if (e.key === "ArrowLeft")  { e.preventDefault(); onMoveElement(selectedElementId, el.x - NUDGE, el.y); return; }
+        if (e.key === "ArrowRight") { e.preventDefault(); onMoveElement(selectedElementId, el.x + NUDGE, el.y); return; }
+        if (e.key === "ArrowUp")    { e.preventDefault(); onMoveElement(selectedElementId, el.x, el.y - NUDGE); return; }
+        if (e.key === "ArrowDown")  { e.preventDefault(); onMoveElement(selectedElementId, el.x, el.y + NUDGE); return; }
+      }
+    }
     if (e.key === "Escape") {
       setDraggingConnector(null);
       setDraggingEndpoint(null);
@@ -492,6 +504,8 @@ export function Canvas({
                 onSelectConnector(conn.id);
                 onSelectElement(null);
               }}
+              svgToWorld={clientToWorld}
+              onUpdateWaypoints={onUpdateConnectorWaypoints}
             />
           ))}
 

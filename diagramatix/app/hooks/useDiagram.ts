@@ -41,6 +41,7 @@ type Action =
       newSide: Side;
     }}
   | { type: "UPDATE_CONNECTOR"; payload: { id: string; directionType: DirectionType } }
+  | { type: "UPDATE_CONNECTOR_WAYPOINTS"; payload: { id: string; waypoints: Point[] } }
   | { type: "SET_VIEWPORT"; payload: { x: number; y: number; zoom: number } };
 
 function nanoid(): string {
@@ -253,6 +254,14 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       return { ...state, connectors };
     }
 
+    case "UPDATE_CONNECTOR_WAYPOINTS":
+      return {
+        ...state,
+        connectors: state.connectors.map((c) =>
+          c.id === action.payload.id ? { ...c, waypoints: action.payload.waypoints } : c
+        ),
+      };
+
     case "SET_VIEWPORT":
       return {
         ...state,
@@ -333,6 +342,10 @@ export function useDiagram(initialData: DiagramData) {
     []
   );
 
+  const updateConnectorWaypoints = useCallback((id: string, waypoints: Point[]) => {
+    dispatch({ type: "UPDATE_CONNECTOR_WAYPOINTS", payload: { id, waypoints } });
+  }, []);
+
   const setData = useCallback((newData: DiagramData) => {
     dispatch({ type: "SET_DATA", payload: newData });
   }, []);
@@ -353,6 +366,7 @@ export function useDiagram(initialData: DiagramData) {
     deleteConnector,
     updateConnectorDirection,
     updateConnectorEndpoint,
+    updateConnectorWaypoints,
     setData,
     setViewport,
   };
