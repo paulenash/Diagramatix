@@ -583,25 +583,119 @@ export function SymbolRenderer({
             )}
           </g>
         );
-      })() : showLabel && element.type === 'use-case' ? (() => {
-        const innerW = element.width * 0.7;
-        const lines = wrapText(element.label, innerW);
-        const lineH = 16;
-        const totalH = lines.length * lineH;
-        const startY = element.y + element.height / 2 - totalH / 2 + lineH * 0.5;
+      })() : showLabel && (
+        element.type === 'task' ||
+        element.type === 'subprocess' ||
+        element.type === 'use-case'
+      ) ? (() => {
+        const PAD = 4;
+        const el = element;
+        const elCenterX = el.x + el.width / 2;
+        const elCenterY = el.y + el.height / 2;
+
+        // Default label width
+        const defaultW = el.type === 'use-case' ? el.width * 0.7 : el.width - 2 * PAD;
+        const labelOffsetX = (el.properties.labelOffsetX as number) ?? 0;
+        const labelOffsetY = (el.properties.labelOffsetY as number) ?? 0;
+        const labelWidth   = (el.properties.labelWidth   as number) ?? defaultW;
+
+        const labelCenterX = elCenterX + labelOffsetX;
+        const labelCenterY = elCenterY + labelOffsetY;
+
+        const lineH = 14;
+        const lines = wrapText(el.label, labelWidth);
+        const totalLabelH = lines.length * lineH;
+
+        const labelTopY  = labelCenterY - totalLabelH / 2;
+        const labelLeftX = labelCenterX - labelWidth / 2;
+
+        // Icon exclusion zones
+        const iconReserveTop = (el.type === 'task' && el.taskType && el.taskType !== 'none') ? 20 : 0;
+        const iconReserveBot = el.type === 'subprocess' ? 20 : 0;
+        const minY    = el.y + PAD + iconReserveTop;
+        const maxBotY = el.y + el.height - PAD - iconReserveBot;
+
+        function clamp(v: number, lo: number, hi: number) { return Math.max(lo, Math.min(hi, v)); }
+
+        function handleInteriorLabelMouseDown(ev: React.MouseEvent) {
+          ev.stopPropagation();
+          if (!svgToWorld) return;
+          const startWorld = svgToWorld(ev.clientX, ev.clientY);
+          const startOffX = labelOffsetX;
+          const startOffY = labelOffsetY;
+          const halfW = labelWidth / 2;
+          const halfH = totalLabelH / 2;
+          function onMove(e: MouseEvent) {
+            const curWorld = svgToWorld!(e.clientX, e.clientY);
+            const newCX = elCenterX + startOffX + (curWorld.x - startWorld.x);
+            const newCY = elCenterY + startOffY + (curWorld.y - startWorld.y);
+            const clampedCX = clamp(newCX, el.x + PAD + halfW, el.x + el.width - PAD - halfW);
+            const clampedCY = clamp(newCY, minY + halfH, maxBotY - halfH);
+            onUpdateProperties?.(el.id, {
+              labelOffsetX: clampedCX - elCenterX,
+              labelOffsetY: clampedCY - elCenterY,
+            });
+          }
+          function onUp() {
+            window.removeEventListener('mousemove', onMove);
+            window.removeEventListener('mouseup', onUp);
+          }
+          window.addEventListener('mousemove', onMove);
+          window.addEventListener('mouseup', onUp);
+        }
+
+        function handleInteriorResizeMouseDown(ev: React.MouseEvent) {
+          ev.stopPropagation();
+          const startClientX = ev.clientX;
+          const startWidth = labelWidth;
+          const maxW = el.type === 'use-case' ? el.width * 0.85 : el.width - 2 * PAD;
+          function onMove(e: MouseEvent) {
+            const newWidth = clamp(startWidth + (e.clientX - startClientX) * 2, 24, maxW);
+            onUpdateProperties?.(el.id, { labelWidth: newWidth });
+          }
+          function onUp() {
+            window.removeEventListener('mousemove', onMove);
+            window.removeEventListener('mouseup', onUp);
+          }
+          window.addEventListener('mousemove', onMove);
+          window.addEventListener('mouseup', onUp);
+        }
+
         return (
-          <text
-            textAnchor="middle"
-            fontSize={12}
-            fill="#111827"
-            style={{ userSelect: "none", pointerEvents: "none" }}
-          >
-            {lines.map((line, i) => (
-              <tspan key={i} x={element.x + element.width / 2} y={startY + i * lineH}>
-                {line}
-              </tspan>
-            ))}
-          </text>
+          <g>
+            <rect
+              x={labelLeftX} y={labelTopY}
+              width={labelWidth} height={totalLabelH}
+              fill="transparent"
+              stroke={selected ? "#2563eb" : "none"}
+              strokeWidth={1}
+              strokeDasharray={selected ? "3 2" : undefined}
+              style={{ cursor: onUpdateProperties ? "move" : "default" }}
+              onMouseDown={handleInteriorLabelMouseDown}
+              onDoubleClick={(e) => { e.stopPropagation(); onDoubleClick(); }}
+            />
+            <text
+              textAnchor="middle"
+              fontSize={12}
+              fill="#111827"
+              style={{ userSelect: "none", pointerEvents: "none" }}
+            >
+              {lines.map((line, i) => (
+                <tspan key={i} x={labelCenterX} y={labelTopY + i * lineH + lineH * 0.85}>
+                  {line}
+                </tspan>
+              ))}
+            </text>
+            {selected && onUpdateProperties && (
+              <rect
+                x={labelLeftX + labelWidth - 3} y={labelCenterY - 5}
+                width={6} height={10}
+                fill="#2563eb" stroke="white" strokeWidth={1} rx={1}
+                style={{ cursor: "ew-resize" }}
+                onMouseDown={handleInteriorResizeMouseDown}
+              />
+            )}
+          </g>
         );
       })() : showLabel && (
         <text

@@ -105,24 +105,46 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
         return p;
       });
 
-      // Snap first visible segment: exitPt must stay aligned with srcEdge
-      if (updated.length > visStart + 1) {
-        if (seg0Horiz) {
-          updated[visStart + 1] = { ...updated[visStart + 1], y: updated[visStart].y };
-        } else {
-          updated[visStart + 1] = { ...updated[visStart + 1], x: updated[visStart].x };
-        }
-      }
-      // Snap last visible segment: approachPt must stay aligned with tgtEdge
-      if (updated.length > visEnd) {
-        if (segLastHoriz) {
-          updated[visEnd - 1] = { ...updated[visEnd - 1], y: updated[visEnd].y };
-        } else {
-          updated[visEnd - 1] = { ...updated[visEnd - 1], x: updated[visEnd].x };
-        }
+      // Determine whether inserting a bridging corner is needed to keep boundary segments orthogonal.
+      // A violation occurs when wpi/wpj is the boundary waypoint AND the drag axis matches
+      // the constrained axis of the adjacent fixed segment (srcEdge→exitPt or approachPt→tgtEdge).
+      const needStartInsert = wpi === visStart + 1 && (isHorizontal === seg0Horiz);
+      const needEndInsert   = wpj === visEnd - 1   && (isHorizontal === segLastHoriz);
+
+      if (!needStartInsert && !needEndInsert) {
+        onUpdateWaypoints?.(connector.id, updated);
+        return;
       }
 
-      onUpdateWaypoints?.(connector.id, updated);
+      const origExitPt     = { ...initialWaypoints[visStart + 1] };
+      const origApproachPt = { ...initialWaypoints[visEnd - 1] };
+      // Corner bridges the fixed boundary waypoint to the moved segment
+      const startCorner = seg0Horiz
+        ? { x: origExitPt.x, y: newVal }
+        : { x: newVal, y: origExitPt.y };
+      const endCorner = segLastHoriz
+        ? { x: origApproachPt.x, y: newVal }
+        : { x: newVal, y: origApproachPt.y };
+
+      let finalWaypoints: Point[];
+      if (needStartInsert && needEndInsert) {
+        // Single segment spanning exitPt→approachPt (M=4)
+        finalWaypoints = [
+          ...updated.slice(0, wpi), origExitPt, startCorner,
+          endCorner, origApproachPt, ...updated.slice(wpj + 1),
+        ];
+      } else if (needStartInsert) {
+        finalWaypoints = [
+          ...updated.slice(0, wpi), origExitPt, startCorner,
+          ...updated.slice(wpj),
+        ];
+      } else {
+        finalWaypoints = [
+          ...updated.slice(0, wpi + 1), endCorner, origApproachPt,
+          ...updated.slice(wpj + 1),
+        ];
+      }
+      onUpdateWaypoints?.(connector.id, finalWaypoints);
     }
     function onUp() {
       window.removeEventListener("mousemove", onMove);
