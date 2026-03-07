@@ -198,11 +198,12 @@ export function Canvas({
     [svgToWorld]
   );
 
-  function findDropTarget(pos: Point, fromId: string): DiagramElement | null {
+  function findDropTarget(pos: Point, fromId: string, filter?: (el: DiagramElement) => boolean): DiagramElement | null {
     const MARGIN = 30;
     for (const el of data.elements) {
       if (el.id === fromId) continue;
       if (el.type === "system-boundary") continue; // Process Group is not a connector target
+      if (filter && !filter(el)) continue;
       if (
         pos.x >= el.x - MARGIN &&
         pos.x <= el.x + el.width + MARGIN &&
@@ -234,7 +235,12 @@ export function Canvas({
       const targetEl = findDropTarget(pos, elementId);
       if (targetEl) {
         const targetSide = getClosestSide(pos, targetEl);
-        onAddConnector(elementId, targetEl.id, "sequence", defaultDirectionType, defaultRoutingType, side, targetSide);
+        const sourceEl = data.elements.find((e) => e.id === elementId);
+        const actorLike = ["actor", "team"];
+        const connType = (sourceEl && actorLike.includes(sourceEl.type)) || actorLike.includes(targetEl.type)
+          ? "association" as const
+          : "sequence" as const;
+        onAddConnector(elementId, targetEl.id, connType, defaultDirectionType, defaultRoutingType, side, targetSide);
       }
       setDraggingConnector(null);
       window.removeEventListener("mousemove", onMouseMove);
@@ -278,7 +284,10 @@ export function Canvas({
         onSelectConnector(null);
       } else {
         // Dropped elsewhere — reconnect to a different element
-        const targetEl = findDropTarget(pos, fromId);
+        const epFilter = conn?.routingType === "direct"
+          ? (el: DiagramElement) => el.type === "use-case"
+          : undefined;
+        const targetEl = findDropTarget(pos, fromId, epFilter);
         if (targetEl) {
           const newSide = getClosestSide(pos, targetEl);
           onUpdateConnectorEndpoint(connectorId, endpoint, targetEl.id, newSide, 0.5);
@@ -301,8 +310,10 @@ export function Canvas({
     if (!el) return;
 
     const isTaskLike = el.type === "task" || el.type === "subprocess";
-    const minW = isTaskLike ? 60 : MIN_BOUNDARY_W;
-    const minH = isTaskLike ? 36 : MIN_BOUNDARY_H;
+    const isUseCase = el.type === "use-case";
+    const ar = isUseCase ? el.width / el.height : 0;
+    const minW = isUseCase ? 60 : (isTaskLike ? 60 : MIN_BOUNDARY_W);
+    const minH = isUseCase ? 30 : (isTaskLike ? 36 : MIN_BOUNDARY_H);
 
     const startMouse = { x: e.clientX, y: e.clientY };
     const startBounds = { x: el.x, y: el.y, width: el.width, height: el.height };
@@ -325,8 +336,22 @@ export function Canvas({
         height = newH;
       }
 
+      if (isUseCase && ar > 0) {
+        if (handle.includes("e") || handle.includes("w")) {
+          // Width is primary — derive height to preserve aspect ratio
+          height = width / ar;
+          if (handle.includes("n")) y = startBounds.y + startBounds.height - height;
+        } else {
+          // n or s only — height is primary, derive width and re-center x
+          width = height * ar;
+          x = startBounds.x + (startBounds.width - width) / 2;
+        }
+      }
+
       onResizeElement(elementId, width, height);
-      if (handle.includes("w") || handle.includes("n")) {
+      const needsMoveX = handle.includes("w") || (isUseCase && (handle === "n" || handle === "s"));
+      const needsMoveY = handle.includes("n");
+      if (needsMoveX || needsMoveY) {
         onMoveElement(elementId, x, y);
       }
     }

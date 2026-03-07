@@ -593,7 +593,7 @@ export function SymbolRenderer({
   const isActorOrTeam = element.type === "actor" || element.type === "team" || element.type === "system";
   const isBoundary = element.type === "system-boundary";  // excluded from connection overlay
   const isContainer = isBoundary || element.type === "composite-state"; // gets resize handles
-  const canResize = isContainer || element.type === "task" || element.type === "subprocess";
+  const canResize = isContainer || element.type === "task" || element.type === "subprocess" || element.type === "use-case";
   const showLabel = element.type !== "initial-state" && element.type !== "final-state";
 
   return (
