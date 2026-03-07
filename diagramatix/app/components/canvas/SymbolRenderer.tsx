@@ -239,11 +239,11 @@ function DataObjectShape({ el }: { el: DiagramElement }) {
     <g>
       <polygon
         points={`${x},${y} ${x+w-fold},${y} ${x+w},${y+fold} ${x+w},${y+h} ${x},${y+h}`}
-        fill="white" stroke="#374151" strokeWidth={1.5}
+        fill="#bfdbfe" stroke="#374151" strokeWidth={1.5}
       />
       <polygon
         points={`${x+w-fold},${y} ${x+w},${y+fold} ${x+w-fold},${y+fold}`}
-        fill="#e5e7eb" stroke="#374151" strokeWidth={1.5}
+        fill="#93c5fd" stroke="#374151" strokeWidth={1.5}
       />
     </g>
   );
@@ -256,9 +256,9 @@ function DataStoreShape({ el }: { el: DiagramElement }) {
   const ry = Math.max(4, Math.round(h * 0.18));
   return (
     <g>
-      <rect x={x} y={y + ry} width={w} height={h - ry} fill="white" stroke="#374151" strokeWidth={1.5} />
-      <ellipse cx={cx} cy={y + h} rx={rx} ry={ry} fill="white" stroke="#374151" strokeWidth={1.5} />
-      <ellipse cx={cx} cy={y + ry} rx={rx} ry={ry} fill="white" stroke="#374151" strokeWidth={1.5} />
+      <rect x={x} y={y + ry} width={w} height={h - ry} fill="#60a5fa" stroke="#374151" strokeWidth={1.5} />
+      <ellipse cx={cx} cy={y + h} rx={rx} ry={ry} fill="#60a5fa" stroke="#374151" strokeWidth={1.5} />
+      <ellipse cx={cx} cy={y + ry} rx={rx} ry={ry} fill="#60a5fa" stroke="#374151" strokeWidth={1.5} />
     </g>
   );
 }

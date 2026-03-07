@@ -151,17 +151,17 @@ function PaletteSymbolPreview({ type }: { type: SymbolType }) {
       return (
         <svg width={22} height={28} viewBox="0 0 28 36">
           <polygon points="2,2 20,2 26,8 26,34 2,34"
-            fill="white" stroke="#374151" strokeWidth={1.5} />
+            fill="#bfdbfe" stroke="#374151" strokeWidth={1.5} />
           <polygon points="20,2 26,8 20,8"
-            fill="#e5e7eb" stroke="#374151" strokeWidth={1.5} />
+            fill="#93c5fd" stroke="#374151" strokeWidth={1.5} />
         </svg>
       );
     case "data-store":
       return (
         <svg width={32} height={28} viewBox="0 0 32 28">
-          <rect x={2} y={7} width={28} height={16} fill="white" stroke="#374151" strokeWidth={1.5} />
-          <ellipse cx={16} cy={7}  rx={14} ry={4} fill="white" stroke="#374151" strokeWidth={1.5} />
-          <ellipse cx={16} cy={23} rx={14} ry={4} fill="white" stroke="#374151" strokeWidth={1.5} />
+          <rect x={2} y={7} width={28} height={16} fill="#60a5fa" stroke="#374151" strokeWidth={1.5} />
+          <ellipse cx={16} cy={7}  rx={14} ry={4} fill="#60a5fa" stroke="#374151" strokeWidth={1.5} />
+          <ellipse cx={16} cy={23} rx={14} ry={4} fill="#60a5fa" stroke="#374151" strokeWidth={1.5} />
         </svg>
       );
     default:
