@@ -192,8 +192,11 @@ export function computeWaypoints(
   const approachPt = perpendicularExitScaled(tgtEdge, targetSide, perpOff);
 
   let midPath: Point[];
-  if (sourceSide === "right" && targetSide === "left") {
-    // Center the vertical segment midway between the two elements
+  if (
+    (sourceSide === "right" && targetSide === "left") ||
+    (sourceSide === "left"  && targetSide === "right")
+  ) {
+    // Center the vertical segment midway between the two facing edges
     const midX = (exitPt.x + approachPt.x) / 2;
     midPath = Math.abs(exitPt.y - approachPt.y) < 1
       ? [exitPt, approachPt]

@@ -154,13 +154,20 @@ function EventMarker({ type, cx, cy, r, filled }: {
           <line x1={cx} y1={cy} x2={cx + s * 0.5} y2={cy + s * 0.4} stroke="#374151" strokeWidth={1.2} strokeLinecap="round" />
         </g>
       );
-    case "error":
+    case "error": {
+      const pts = [
+        `${cx + s * 0.3},${cy - s * 0.85}`,   // top-right tip
+        `${cx - s * 0.1},${cy - s * 0.05}`,   // centre-left (upper kink)
+        `${cx + s * 0.2},${cy - s * 0.05}`,   // centre-right (upper step)
+        `${cx - s * 0.3},${cy + s * 0.85}`,   // bottom-left tip
+        `${cx + s * 0.1},${cy + s * 0.05}`,   // centre-right (lower kink)
+        `${cx - s * 0.2},${cy + s * 0.05}`,   // centre-left (lower step)
+      ].join(" ");
       return (
-        <polyline
-          points={`${cx - s * 0.4},${cy + s * 0.6} ${cx + s * 0.1},${cy - s * 0.1} ${cx - s * 0.1},${cy + s * 0.1} ${cx + s * 0.4},${cy - s * 0.6}`}
-          fill="none" stroke="#374151" strokeWidth={1.5} strokeLinejoin="round"
-        />
+        <polygon points={pts} fill={filled ? "#374151" : "white"}
+          stroke="#374151" strokeWidth={1.2} strokeLinejoin="round" />
       );
+    }
     case "signal":
       return (
         <polygon
@@ -672,7 +679,7 @@ export function SymbolRenderer({
 
         return (
           <g>
-            {isEditingGatewayLabel && (
+            {(selected || isEditingGatewayLabel) && (
               <line
                 x1={elCenter.x} y1={elCenter.y}
                 x2={labelCenterX} y2={labelMidY}
