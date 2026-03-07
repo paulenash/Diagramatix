@@ -191,6 +191,51 @@ export function waypointsToSvgPath(waypoints: Point[]): string {
   return d.join(" ");
 }
 
+export function waypointsToRoundedPath(waypoints: Point[], r = 8): string {
+  if (waypoints.length < 2) return "";
+  if (waypoints.length === 2)
+    return `M ${waypoints[0].x} ${waypoints[0].y} L ${waypoints[1].x} ${waypoints[1].y}`;
+
+  const parts: string[] = [`M ${waypoints[0].x} ${waypoints[0].y}`];
+
+  for (let i = 1; i < waypoints.length - 1; i++) {
+    const prev = waypoints[i - 1];
+    const curr = waypoints[i];
+    const next = waypoints[i + 1];
+
+    const d1x = curr.x - prev.x;
+    const d1y = curr.y - prev.y;
+    const len1 = Math.sqrt(d1x * d1x + d1y * d1y);
+
+    const d2x = next.x - curr.x;
+    const d2y = next.y - curr.y;
+    const len2 = Math.sqrt(d2x * d2x + d2y * d2y);
+
+    if (len1 < 1 || len2 < 1) {
+      parts.push(`L ${curr.x} ${curr.y}`);
+      continue;
+    }
+
+    // Clamp radius to half the shorter neighbouring segment
+    const ar = Math.min(r, len1 / 2, len2 / 2);
+
+    // Approach point (on incoming segment, r before corner)
+    const ax = curr.x - (d1x / len1) * ar;
+    const ay = curr.y - (d1y / len1) * ar;
+
+    // Departure point (on outgoing segment, r after corner)
+    const bx = curr.x + (d2x / len2) * ar;
+    const by = curr.y + (d2y / len2) * ar;
+
+    parts.push(`L ${ax} ${ay}`);
+    parts.push(`Q ${curr.x} ${curr.y} ${bx} ${by}`);
+  }
+
+  const last = waypoints[waypoints.length - 1];
+  parts.push(`L ${last.x} ${last.y}`);
+  return parts.join(" ");
+}
+
 export function waypointsToCurvePath(waypoints: Point[]): string {
   if (waypoints.length < 4) return waypointsToSvgPath(waypoints);
   // Expects [P0, CP1, CP2, P3] — cubic bezier

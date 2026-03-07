@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { Connector, Point } from "@/app/lib/diagram/types";
-import { waypointsToSvgPath, waypointsToCurvePath } from "@/app/lib/diagram/routing";
+import { waypointsToSvgPath, waypointsToCurvePath, waypointsToRoundedPath } from "@/app/lib/diagram/routing";
 
 interface Props {
   connector: Connector;
@@ -230,7 +230,9 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
 
   const visibleD = connector.routingType === "curvilinear"
     ? waypointsToCurvePath(visibleWaypoints)
-    : waypointsToSvgPath(visibleWaypoints);
+    : connector.routingType === "rectilinear"
+      ? waypointsToRoundedPath(visibleWaypoints)
+      : waypointsToSvgPath(visibleWaypoints);
 
   const fullD = waypointsToSvgPath(waypoints);
   // For curvilinear, use the actual curve for the hit area so clicks near the arc are detected
