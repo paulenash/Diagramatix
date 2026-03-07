@@ -202,6 +202,7 @@ export function Canvas({
 
   function findDropTarget(pos: Point, fromId: string, filter?: (el: DiagramElement) => boolean): DiagramElement | null {
     const MARGIN = 30;
+    const matches: DiagramElement[] = [];
     for (const el of data.elements) {
       if (el.id === fromId) continue;
       if (el.type === "system-boundary") continue; // Process Group is not a connector target
@@ -212,10 +213,14 @@ export function Canvas({
         pos.y >= el.y - MARGIN &&
         pos.y <= el.y + el.height + MARGIN
       ) {
-        return el;
+        matches.push(el);
       }
     }
-    return null;
+    if (matches.length === 0) return null;
+    // Prefer non-container elements (child states) over composite-state containers so that
+    // dropping onto a state inside a composite returns the child state, not the composite.
+    const nonContainer = matches.find(el => el.type !== "composite-state");
+    return nonContainer ?? matches[0];
   }
 
   function handleConnectionPointDragStart(elementId: string, side: Side, worldPos: Point) {

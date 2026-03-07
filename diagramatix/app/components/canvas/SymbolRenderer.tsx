@@ -345,7 +345,7 @@ function SystemShape({ el }: { el: DiagramElement }) {
 function StateShape({ el }: { el: DiagramElement }) {
   return (
     <rect x={el.x} y={el.y} width={el.width} height={el.height}
-      rx={12} ry={12} fill="white" stroke="#374151" strokeWidth={1.5} />
+      rx={12} ry={12} fill="#dbeafe" stroke="#374151" strokeWidth={1.5} />
   );
 }
 

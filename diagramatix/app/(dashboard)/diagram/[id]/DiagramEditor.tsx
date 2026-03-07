@@ -244,6 +244,7 @@ export function DiagramEditor({
           onUpdateLabel={updateLabel}
           onUpdateProperties={updateProperties}
           onUpdateConnectorDirection={updateConnectorDirection}
+          onUpdateConnectorLabel={(id, label) => updateConnectorLabel(id, label)}
           onDeleteElement={(id) => {
             deleteElement(id);
             setSelectedElementId(null);

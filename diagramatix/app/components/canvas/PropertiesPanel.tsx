@@ -20,6 +20,7 @@ interface Props {
   onDeleteElement: (id: string) => void;
   onDeleteConnector: (id: string) => void;
   onUpdateConnectorDirection: (id: string, directionType: DirectionType) => void;
+  onUpdateConnectorLabel?: (id: string, label: string) => void;
 }
 
 const TASK_TYPE_OPTIONS: { value: BpmnTaskType; label: string }[] = [
@@ -59,6 +60,7 @@ export function PropertiesPanel({
   onDeleteElement,
   onDeleteConnector,
   onUpdateConnectorDirection,
+  onUpdateConnectorLabel,
 }: Props) {
   const [labelDraft, setLabelDraft] = useState("");
 
@@ -112,6 +114,25 @@ export function PropertiesPanel({
                 </button>
               ))}
             </div>
+          </div>
+        )}
+        {connector.type === "interaction" && onUpdateConnectorLabel && (
+          <div>
+            <p className="text-xs font-medium text-gray-700 mb-1">Label</p>
+            <textarea
+              key={connector.id}
+              className="w-full text-xs border border-gray-300 rounded px-2 py-1 resize-y"
+              rows={3}
+              defaultValue={connector.label ?? ""}
+              onBlur={(e) => onUpdateConnectorLabel(connector.id, e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  (e.target as HTMLTextAreaElement).blur();
+                }
+              }}
+            />
+            <p className="text-xs text-gray-400 mt-0.5">Shift+Enter for new line</p>
           </div>
         )}
         <button

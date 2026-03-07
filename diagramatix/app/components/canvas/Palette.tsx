@@ -121,7 +121,7 @@ function PaletteSymbolPreview({ type }: { type: SymbolType }) {
     case "state":
       return (
         <svg width={48} height={28} viewBox="0 0 48 28">
-          <rect x={2} y={2} width={44} height={24} rx={8} fill="white" stroke="#374151" strokeWidth={1.5} />
+          <rect x={2} y={2} width={44} height={24} rx={8} fill="#dbeafe" stroke="#374151" strokeWidth={1.5} />
         </svg>
       );
     case "initial-state":
