@@ -89,6 +89,12 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
     const wpj = visStart + segIdx + 1;
     const initialWaypoints = connector.waypoints.map((p) => ({ ...p }));
 
+    // Capture first/last visible segment directions at drag start to enforce orthogonality
+    const seg0Horiz = initialWaypoints.length > visStart + 1 &&
+      Math.abs(initialWaypoints[visStart].y - initialWaypoints[visStart + 1].y) < 1;
+    const segLastHoriz = initialWaypoints.length > visEnd &&
+      Math.abs(initialWaypoints[visEnd - 1].y - initialWaypoints[visEnd].y) < 1;
+
     function onMove(ev: MouseEvent) {
       const cur = svgToWorld!(ev.clientX, ev.clientY);
       const delta = isHorizontal ? cur.y - startWorld.y : cur.x - startWorld.x;
@@ -98,6 +104,24 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
           return isHorizontal ? { ...p, y: newVal } : { ...p, x: newVal };
         return p;
       });
+
+      // Snap first visible segment: exitPt must stay aligned with srcEdge
+      if (updated.length > visStart + 1) {
+        if (seg0Horiz) {
+          updated[visStart + 1] = { ...updated[visStart + 1], y: updated[visStart].y };
+        } else {
+          updated[visStart + 1] = { ...updated[visStart + 1], x: updated[visStart].x };
+        }
+      }
+      // Snap last visible segment: approachPt must stay aligned with tgtEdge
+      if (updated.length > visEnd) {
+        if (segLastHoriz) {
+          updated[visEnd - 1] = { ...updated[visEnd - 1], y: updated[visEnd].y };
+        } else {
+          updated[visEnd - 1] = { ...updated[visEnd - 1], x: updated[visEnd].x };
+        }
+      }
+
       onUpdateWaypoints?.(connector.id, updated);
     }
     function onUp() {

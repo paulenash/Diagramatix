@@ -107,6 +107,13 @@ export const ALL_SYMBOLS: SymbolDefinition[] = [
     defaultHeight: 80,
     description: "A system or application",
   },
+  {
+    type: "subprocess",
+    label: "Subprocess",
+    defaultWidth: 120,
+    defaultHeight: 80,
+    description: "A collapsed subprocess activity",
+  },
 ];
 
 export const PALETTE_BY_DIAGRAM_TYPE: Record<DiagramType, SymbolType[]> = {

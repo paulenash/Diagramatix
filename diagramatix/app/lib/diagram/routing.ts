@@ -96,15 +96,13 @@ export function getConnectionPointBySide(el: DiagramElement, _side: Side): Point
   return { x: el.x + el.width / 2, y: el.y + el.height / 2 };
 }
 
-// Returns the midpoint of the specified side — used for rectilinear routing to guarantee perpendicular exit/entry
-function sidePoint(el: DiagramElement, side: Side): Point {
-  const cx = el.x + el.width / 2;
-  const cy = el.y + el.height / 2;
+// Returns a point along the specified side at a fractional offset (0=start, 0.5=midpoint, 1=end)
+function sidePoint(el: DiagramElement, side: Side, offset = 0.5): Point {
   switch (side) {
-    case "right":  return { x: el.x + el.width, y: cy };
-    case "left":   return { x: el.x, y: cy };
-    case "top":    return { x: cx, y: el.y };
-    case "bottom": return { x: cx, y: el.y + el.height };
+    case "right":  return { x: el.x + el.width,         y: el.y + el.height * offset };
+    case "left":   return { x: el.x,                    y: el.y + el.height * offset };
+    case "top":    return { x: el.x + el.width * offset, y: el.y };
+    case "bottom": return { x: el.x + el.width * offset, y: el.y + el.height };
   }
 }
 
@@ -114,16 +112,17 @@ export function computeWaypoints(
   allElements: DiagramElement[],
   sourceSide: Side,
   targetSide: Side,
-  routingType: RoutingType
+  routingType: RoutingType,
+  sourceOffsetAlong = 0.5,
+  targetOffsetAlong = 0.5,
 ): { waypoints: Point[]; sourceInvisibleLeader: boolean; targetInvisibleLeader: boolean } {
   const startPt = getConnectionPointBySide(source, sourceSide); // source centre
   const endPt   = getConnectionPointBySide(target, targetSide); // target centre
 
   if (routingType === "direct") {
     // [sourceCenter, srcEdge, tgtEdge, targetCenter]
-    // visible slice [1 .. length-2] = [srcEdge, tgtEdge] — straight line between edges
-    const srcEdge = closestEdgePoint(endPt, getBounds(source));
-    const tgtEdge = closestEdgePoint(startPt, getBounds(target));
+    const srcEdge = sidePoint(source, sourceSide, sourceOffsetAlong);
+    const tgtEdge = sidePoint(target, targetSide, targetOffsetAlong);
     return {
       waypoints: [startPt, srcEdge, tgtEdge, endPt],
       sourceInvisibleLeader: true,
@@ -132,15 +131,13 @@ export function computeWaypoints(
   }
 
   if (routingType === "curvilinear") {
-    // visible portion must be exactly 4 points for waypointsToCurvePath
     // [sourceCenter, srcEdge, cp1, cp2, tgtEdge, targetCenter]
-    // visible slice [1..4] = [srcEdge, cp1, cp2, tgtEdge]
-    const srcEdge = closestEdgePoint(endPt, getBounds(source));
-    const tgtEdge = closestEdgePoint(startPt, getBounds(target));
+    const srcEdge = sidePoint(source, sourceSide, sourceOffsetAlong);
+    const tgtEdge = sidePoint(target, targetSide, targetOffsetAlong);
     const dist   = euclideanDist(srcEdge, tgtEdge);
-    const offset = Math.max(60, dist / 3);
-    const cp1 = perpendicularExitScaled(srcEdge, sourceSide, offset);
-    const cp2 = perpendicularExitScaled(tgtEdge, targetSide, offset);
+    const curveOffset = Math.max(60, dist / 3);
+    const cp1 = perpendicularExitScaled(srcEdge, sourceSide, curveOffset);
+    const cp2 = perpendicularExitScaled(tgtEdge, targetSide, curveOffset);
     return {
       waypoints: [startPt, srcEdge, cp1, cp2, tgtEdge, endPt],
       sourceInvisibleLeader: true,
@@ -148,11 +145,9 @@ export function computeWaypoints(
     };
   }
 
-  // Rectilinear: use side midpoints to guarantee perpendicular exit/entry
-  // [sourceCenter, srcEdge, exitPt, ...mid..., approachPt, tgtEdge, targetCenter]
-  // visible slice [1..length-2] = [srcEdge, exitPt, ...mid..., approachPt, tgtEdge]
-  const srcEdge = sidePoint(source, sourceSide);
-  const tgtEdge = sidePoint(target, targetSide);
+  // Rectilinear: use offset-aware side points for perpendicular exit/entry
+  const srcEdge = sidePoint(source, sourceSide, sourceOffsetAlong);
+  const tgtEdge = sidePoint(target, targetSide, targetOffsetAlong);
   const obstacles = allElements
     .filter((el) => el.id !== source.id && el.id !== target.id)
     .map(getBounds);
@@ -200,7 +195,9 @@ export function recomputeAllConnectors(
       elements,
       conn.sourceSide,
       conn.targetSide,
-      conn.routingType
+      conn.routingType,
+      conn.sourceOffsetAlong ?? 0.5,
+      conn.targetOffsetAlong ?? 0.5,
     );
     return { ...conn, waypoints, sourceInvisibleLeader, targetInvisibleLeader };
   });

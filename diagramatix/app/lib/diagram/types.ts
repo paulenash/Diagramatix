@@ -75,6 +75,8 @@ export interface Connector {
   targetInvisibleLeader: boolean;
   waypoints: Point[];
   label?: string;
+  sourceOffsetAlong?: number;
+  targetOffsetAlong?: number;
 }
 
 export interface Viewport {

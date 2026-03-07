@@ -243,6 +243,25 @@ function FinalStateShape({ el }: { el: DiagramElement }) {
   );
 }
 
+function SubprocessShape({ el }: { el: DiagramElement }) {
+  const markerW = 14;
+  const markerH = 14;
+  const mx = el.x + el.width / 2 - markerW / 2;
+  const my = el.y + el.height - markerH - 3;
+  return (
+    <g>
+      <rect x={el.x} y={el.y} width={el.width} height={el.height}
+        rx={4} ry={4} fill="white" stroke="#374151" strokeWidth={1.5} />
+      <rect x={mx} y={my} width={markerW} height={markerH}
+        rx={2} fill="white" stroke="#374151" strokeWidth={1} />
+      <line x1={mx + markerW / 2} y1={my + 3} x2={mx + markerW / 2} y2={my + markerH - 3}
+        stroke="#374151" strokeWidth={1} />
+      <line x1={mx + 3} y1={my + markerH / 2} x2={mx + markerW - 3} y2={my + markerH / 2}
+        stroke="#374151" strokeWidth={1} />
+    </g>
+  );
+}
+
 function BpmnTaskMarker({ taskType, x, y }: { taskType: BpmnTaskType; x: number; y: number }) {
   const cx = x + 7;
   const cy = y + 7;
@@ -352,6 +371,7 @@ function SymbolShape({ el }: { el: DiagramElement }) {
     case "system":            return <SystemShape el={el} />;
     case "task":
       return el.taskType !== undefined ? <BpmnTaskShape el={el} /> : <TaskShape el={el} />;
+    case "subprocess":        return <SubprocessShape el={el} />;
     default:                  return <TaskShape el={el} />;
   }
 }

@@ -91,7 +91,8 @@ interface Props {
     connectorId: string,
     endpoint: "source" | "target",
     newElementId: string,
-    newSide: Side
+    newSide: Side,
+    newOffsetAlong?: number,
   ) => void;
   selectedElementId: string | null;
   selectedConnectorId: string | null;
@@ -136,6 +137,19 @@ function getClosestSide(pos: Point, el: DiagramElement): Side {
   const normY = Math.abs(dy) / (el.height / 2 || 1);
   if (normX > normY) return dx > 0 ? "right" : "left";
   return dy > 0 ? "bottom" : "top";
+}
+
+function pointToBoundaryOffset(p: Point, el: DiagramElement): { side: Side; offsetAlong: number } {
+  const clamp = (v: number) => Math.max(0, Math.min(1, v));
+  const distTop    = Math.abs(p.y - el.y);
+  const distBottom = Math.abs(p.y - (el.y + el.height));
+  const distLeft   = Math.abs(p.x - el.x);
+  const distRight  = Math.abs(p.x - (el.x + el.width));
+  const min = Math.min(distTop, distBottom, distLeft, distRight);
+  if (min === distTop)    return { side: "top",    offsetAlong: clamp((p.x - el.x) / el.width) };
+  if (min === distBottom) return { side: "bottom", offsetAlong: clamp((p.x - el.x) / el.width) };
+  if (min === distLeft)   return { side: "left",   offsetAlong: clamp((p.y - el.y) / el.height) };
+  return                         { side: "right",  offsetAlong: clamp((p.y - el.y) / el.height) };
 }
 
 export function Canvas({
@@ -253,11 +267,25 @@ export function Canvas({
 
     function onMouseUp(ev: MouseEvent) {
       const pos = clientToWorld(ev.clientX, ev.clientY);
-      const targetEl = findDropTarget(pos, fromId);
-      if (targetEl) {
-        const newSide = getClosestSide(pos, targetEl);
-        onUpdateConnectorEndpoint(connectorId, endpoint, targetEl.id, newSide);
+
+      // Check if dropped on the same element — reposition along its boundary
+      const currentEl = data.elements.find((e) => e.id === fromId);
+      if (currentEl &&
+        pos.x >= currentEl.x && pos.x <= currentEl.x + currentEl.width &&
+        pos.y >= currentEl.y && pos.y <= currentEl.y + currentEl.height) {
+        const { side, offsetAlong } = pointToBoundaryOffset(pos, currentEl);
+        onUpdateConnectorEndpoint(connectorId, endpoint, currentEl.id, side, offsetAlong);
+        onSelectConnector(null);
+      } else {
+        // Dropped elsewhere — reconnect to a different element
+        const targetEl = findDropTarget(pos, fromId);
+        if (targetEl) {
+          const newSide = getClosestSide(pos, targetEl);
+          onUpdateConnectorEndpoint(connectorId, endpoint, targetEl.id, newSide, 0.5);
+        }
+        onSelectConnector(null);
       }
+
       setDraggingEndpoint(null);
       window.removeEventListener("mousemove", onMouseMove);
       window.removeEventListener("mouseup", onMouseUp);

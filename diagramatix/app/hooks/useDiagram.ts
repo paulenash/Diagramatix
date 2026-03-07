@@ -39,6 +39,7 @@ type Action =
       endpoint: "source" | "target";
       newElementId: string;
       newSide: Side;
+      newOffsetAlong?: number;
     }}
   | { type: "UPDATE_CONNECTOR"; payload: { id: string; directionType: DirectionType } }
   | { type: "UPDATE_CONNECTOR_WAYPOINTS"; payload: { id: string; waypoints: Point[] } }
@@ -90,6 +91,9 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       } else if (action.payload.symbolType === "hourglass") {
         const count = state.elements.filter((e) => e.type === "hourglass").length;
         label = `AutoTimer ${count + 1}`;
+      } else if (action.payload.symbolType === "subprocess") {
+        const count = state.elements.filter((e) => e.type === "subprocess").length;
+        label = `Subprocess ${count + 1}`;
       }
       const newEl: DiagramElement = {
         id: nanoid(),
@@ -237,17 +241,19 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       };
 
     case "UPDATE_CONNECTOR_ENDPOINT": {
-      const { connectorId, endpoint, newElementId, newSide } = action.payload;
+      const { connectorId, endpoint, newElementId, newSide, newOffsetAlong } = action.payload;
       const connectors = state.connectors.map((conn) => {
         if (conn.id !== connectorId) return conn;
         const updated = endpoint === "source"
-          ? { ...conn, sourceId: newElementId, sourceSide: newSide }
-          : { ...conn, targetId: newElementId, targetSide: newSide };
+          ? { ...conn, sourceId: newElementId, sourceSide: newSide, sourceOffsetAlong: newOffsetAlong ?? 0.5 }
+          : { ...conn, targetId: newElementId, targetSide: newSide, targetOffsetAlong: newOffsetAlong ?? 0.5 };
         const source = state.elements.find((el) => el.id === updated.sourceId);
         const target = state.elements.find((el) => el.id === updated.targetId);
         if (!source || !target) return conn;
         const { waypoints, sourceInvisibleLeader, targetInvisibleLeader } = computeWaypoints(
-          source, target, state.elements, updated.sourceSide, updated.targetSide, updated.routingType
+          source, target, state.elements,
+          updated.sourceSide, updated.targetSide, updated.routingType,
+          updated.sourceOffsetAlong ?? 0.5, updated.targetOffsetAlong ?? 0.5,
         );
         return { ...updated, waypoints, sourceInvisibleLeader, targetInvisibleLeader };
       });
@@ -336,8 +342,8 @@ export function useDiagram(initialData: DiagramData) {
   );
 
   const updateConnectorEndpoint = useCallback(
-    (connectorId: string, endpoint: "source" | "target", newElementId: string, newSide: Side) => {
-      dispatch({ type: "UPDATE_CONNECTOR_ENDPOINT", payload: { connectorId, endpoint, newElementId, newSide } });
+    (connectorId: string, endpoint: "source" | "target", newElementId: string, newSide: Side, newOffsetAlong?: number) => {
+      dispatch({ type: "UPDATE_CONNECTOR_ENDPOINT", payload: { connectorId, endpoint, newElementId, newSide, newOffsetAlong } });
     },
     []
   );
