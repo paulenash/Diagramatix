@@ -172,7 +172,17 @@ export function computeWaypoints(
 
   const exitPt     = perpendicularExit(srcEdge, sourceSide);
   const approachPt = perpendicularApproach(tgtEdge, targetSide);
-  const midPath    = buildOrthogonalPath(exitPt, approachPt, obstacles);
+
+  let midPath: Point[];
+  if (sourceSide === "right" && targetSide === "left") {
+    // Center the vertical segment midway between the two elements
+    const midX = (exitPt.x + approachPt.x) / 2;
+    midPath = Math.abs(exitPt.y - approachPt.y) < 1
+      ? [exitPt, approachPt]
+      : [exitPt, { x: midX, y: exitPt.y }, { x: midX, y: approachPt.y }, approachPt];
+  } else {
+    midPath = buildOrthogonalPath(exitPt, approachPt, obstacles);
+  }
 
   return {
     waypoints: [startPt, srcEdge, ...midPath, tgtEdge, endPt],

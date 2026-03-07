@@ -19,6 +19,7 @@ interface Props {
   svgToWorld?: (clientX: number, clientY: number) => Point;
   shouldSnapBack?: (x: number, y: number) => boolean;
   onUpdateProperties?: (id: string, props: Record<string, unknown>) => void;
+  onUpdateLabel?: (id: string, label: string) => void;
 }
 
 function ellipseOctagonPoints(cx: number, cy: number, rx: number, ry: number): string {
@@ -551,8 +552,11 @@ export function SymbolRenderer({
   svgToWorld,
   shouldSnapBack,
   onUpdateProperties,
+  onUpdateLabel,
 }: Props) {
   const [isDraggingLabel, setIsDraggingLabel] = useState(false);
+  const [isEditingGatewayLabel, setIsEditingGatewayLabel] = useState(false);
+  const [editGatewayLabelValue, setEditGatewayLabelValue] = useState("");
   let dragStart: { mouseX: number; mouseY: number; elX: number; elY: number } | null = null;
 
   function handleMouseDown(e: React.MouseEvent) {
@@ -643,6 +647,7 @@ export function SymbolRenderer({
           const startOffsetX = labelOffsetX;
           const startOffsetY = labelOffsetY;
           setIsDraggingLabel(true);
+          document.body.style.cursor = "grabbing";
           function onMove(ev: MouseEvent) {
             const curWorld = svgToWorld!(ev.clientX, ev.clientY);
             const dx = curWorld.x - startWorld.x;
@@ -654,6 +659,7 @@ export function SymbolRenderer({
           }
           function onUp() {
             setIsDraggingLabel(false);
+            document.body.style.cursor = "";
             window.removeEventListener("mousemove", onMove);
             window.removeEventListener("mouseup", onUp);
           }
@@ -668,36 +674,67 @@ export function SymbolRenderer({
 
         return (
           <g>
-            {isDraggingLabel && (
-              <line
-                x1={elCenter.x} y1={elCenter.y}
-                x2={labelCenterX} y2={labelMidY}
-                stroke="#6b7280" strokeWidth={1} strokeDasharray="4 3"
-                style={{ pointerEvents: "none" }}
-              />
-            )}
+            <line
+              x1={elCenter.x} y1={elCenter.y}
+              x2={labelCenterX} y2={labelMidY}
+              stroke="#6b7280" strokeWidth={1} strokeDasharray="4 3"
+              style={{ pointerEvents: "none" }}
+            />
             <rect
               x={hitRectX} y={hitRectY}
-              width={labelWidth} height={totalLabelH}
+              width={labelWidth} height={Math.max(totalLabelH, 16)}
               fill="transparent"
               stroke={selected ? "#2563eb" : "none"}
               strokeWidth={1}
               strokeDasharray={selected ? "3 2" : undefined}
-              style={{ cursor: onUpdateProperties ? "move" : "default" }}
+              style={{ cursor: onUpdateProperties ? "grab" : "default" }}
               onMouseDown={handleLabelMouseDown}
+              onDoubleClick={(e) => {
+                e.stopPropagation();
+                setEditGatewayLabelValue(element.label);
+                setIsEditingGatewayLabel(true);
+              }}
             />
-            <text
-              textAnchor="middle"
-              fontSize={11}
-              fill="#111827"
-              style={{ userSelect: "none", pointerEvents: "none" }}
-            >
-              {lines.map((line, i) => (
-                <tspan key={i} x={labelCenterX} y={labelTopY + i * lineH + lineH * 0.85}>
-                  {line}
-                </tspan>
-              ))}
-            </text>
+            {!isEditingGatewayLabel && (
+              <text
+                textAnchor="middle"
+                fontSize={11}
+                fill="#111827"
+                style={{ userSelect: "none", pointerEvents: "none" }}
+              >
+                {lines.map((line, i) => (
+                  <tspan key={i} x={labelCenterX} y={labelTopY + i * lineH + lineH * 0.85}>
+                    {line}
+                  </tspan>
+                ))}
+              </text>
+            )}
+            {isEditingGatewayLabel && (
+              <foreignObject x={hitRectX} y={hitRectY} width={labelWidth} height={Math.max(totalLabelH, 28)}>
+                <textarea
+                  autoFocus
+                  value={editGatewayLabelValue}
+                  onChange={(e) => setEditGatewayLabelValue(e.target.value)}
+                  onBlur={(e) => {
+                    setIsEditingGatewayLabel(false);
+                    onUpdateLabel?.(element.id, e.target.value);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") setIsEditingGatewayLabel(false);
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      (e.target as HTMLTextAreaElement).blur();
+                    }
+                  }}
+                  style={{
+                    width: "100%", height: "100%", fontSize: 11, fontFamily: "inherit",
+                    resize: "none", border: "none", outline: "none",
+                    background: "white", padding: "1px 2px",
+                    textAlign: "center", lineHeight: "14px", boxSizing: "border-box",
+                  }}
+                />
+              </foreignObject>
+            )}
             {selected && onUpdateProperties && (
               <rect
                 x={hitRectX + labelWidth - 3} y={labelTopY + totalLabelH / 2 - 5}

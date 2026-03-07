@@ -9,6 +9,7 @@ import type {
   DiagramElement,
   DiagramType,
   DirectionType,
+  EventType,
   Point,
   RoutingType,
   Side,
@@ -52,6 +53,15 @@ function computeUseCaseSize(label: string, currentW: number): { w: number; h: nu
   return { w, h };
 }
 
+const INTERMEDIATE_EVENT_TYPE_OPTIONS: { value: EventType; label: string }[] = [
+  { value: "none",        label: "None" },
+  { value: "message",     label: "Message" },
+  { value: "timer",       label: "Timer" },
+  { value: "error",       label: "Error" },
+  { value: "signal",      label: "Signal" },
+  { value: "conditional", label: "Conditional" },
+];
+
 const TASK_TYPE_OPTIONS: { value: BpmnTaskType; label: string }[] = [
   { value: "none",          label: "None" },
   { value: "user",          label: "User Task" },
@@ -66,13 +76,14 @@ const TASK_TYPE_OPTIONS: { value: BpmnTaskType; label: string }[] = [
 interface PendingDrop {
   worldPos: Point;
   containerX: number;
+  symbolType: SymbolType;
   containerY: number;
 }
 
 interface Props {
   data: DiagramData;
   diagramType: DiagramType;
-  onAddElement: (type: SymbolType, position: Point, taskType?: BpmnTaskType) => void;
+  onAddElement: (type: SymbolType, position: Point, taskType?: BpmnTaskType, eventType?: EventType) => void;
   onMoveElement: (id: string, x: number, y: number) => void;
   onResizeElement: (id: string, width: number, height: number) => void;
   onUpdateLabel: (id: string, label: string) => void;
@@ -431,12 +442,13 @@ export function Canvas({
     const rect = svgRef.current!.getBoundingClientRect();
     const worldPos = svgToWorld(e.clientX - rect.left, e.clientY - rect.top);
 
-    if (pendingDragSymbol === "task" && diagramType === "bpmn") {
+    if ((pendingDragSymbol === "task" || pendingDragSymbol === "intermediate-event") && diagramType === "bpmn") {
       const containerRect = (e.currentTarget as HTMLElement).getBoundingClientRect();
       setPendingDrop({
         worldPos,
         containerX: e.clientX - containerRect.left,
         containerY: e.clientY - containerRect.top,
+        symbolType: pendingDragSymbol,
       });
     } else {
       onAddElement(pendingDragSymbol, worldPos);
@@ -558,6 +570,7 @@ export function Canvas({
               onResizeDragStart={(handle, e) => handleResizeDragStart(el.id, handle, e)}
               svgToWorld={clientToWorld}
               onUpdateProperties={onUpdateProperties}
+              onUpdateLabel={onUpdateLabel}
             />
           ))}
 
@@ -605,6 +618,7 @@ export function Canvas({
               }
               svgToWorld={clientToWorld}
               onUpdateProperties={onUpdateProperties}
+              onUpdateLabel={onUpdateLabel}
               shouldSnapBack={(x, y) => {
                 const cx = x + el.width / 2;
                 const cy = y + el.height / 2;
@@ -746,7 +760,7 @@ export function Canvas({
       })()}
 
       {/* Task type picker — shown after dropping a task onto a BPMN canvas */}
-      {pendingDrop && (
+      {pendingDrop && pendingDrop.symbolType === "task" && (
         <div
           style={{ position: "absolute", left: pendingDrop.containerX, top: pendingDrop.containerY, zIndex: 50 }}
           className="bg-white border border-gray-200 rounded shadow-lg py-1 min-w-[160px]"
@@ -761,6 +775,30 @@ export function Canvas({
               onMouseDown={(e) => {
                 e.preventDefault();
                 onAddElement("task", pendingDrop.worldPos, opt.value);
+                setPendingDrop(null);
+              }}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      )}
+      {/* Intermediate Event type picker */}
+      {pendingDrop && pendingDrop.symbolType === "intermediate-event" && (
+        <div
+          style={{ position: "absolute", left: pendingDrop.containerX, top: pendingDrop.containerY, zIndex: 50 }}
+          className="bg-white border border-gray-200 rounded shadow-lg py-1 min-w-[160px]"
+        >
+          <p className="px-3 py-1 text-xs font-semibold text-gray-400 uppercase tracking-wide border-b border-gray-100">
+            Event Type
+          </p>
+          {INTERMEDIATE_EVENT_TYPE_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              className="w-full text-left px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                onAddElement("intermediate-event", pendingDrop.worldPos, undefined, opt.value);
                 setPendingDrop(null);
               }}
             >
