@@ -13,7 +13,7 @@ import type {
   Side,
   SymbolType,
 } from "@/app/lib/diagram/types";
-import { computeWaypoints, recomputeAllConnectors } from "@/app/lib/diagram/routing";
+import { computeWaypoints, recomputeAllConnectors, consolidateWaypoints } from "@/app/lib/diagram/routing";
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
 
 type Action =
@@ -264,7 +264,7 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       return {
         ...state,
         connectors: state.connectors.map((c) =>
-          c.id === action.payload.id ? { ...c, waypoints: action.payload.waypoints } : c
+          c.id === action.payload.id ? { ...c, waypoints: consolidateWaypoints(action.payload.waypoints) } : c
         ),
       };
 

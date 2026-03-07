@@ -300,6 +300,10 @@ export function Canvas({
     const el = data.elements.find((el) => el.id === elementId);
     if (!el) return;
 
+    const isTaskLike = el.type === "task" || el.type === "subprocess";
+    const minW = isTaskLike ? 60 : MIN_BOUNDARY_W;
+    const minH = isTaskLike ? 36 : MIN_BOUNDARY_H;
+
     const startMouse = { x: e.clientX, y: e.clientY };
     const startBounds = { x: el.x, y: el.y, width: el.width, height: el.height };
 
@@ -308,15 +312,15 @@ export function Canvas({
       const dy = (ev.clientY - startMouse.y) / zoom;
       let { x, y, width, height } = startBounds;
 
-      if (handle.includes("e")) width  = Math.max(MIN_BOUNDARY_W, width  + dx);
-      if (handle.includes("s")) height = Math.max(MIN_BOUNDARY_H, height + dy);
+      if (handle.includes("e")) width  = Math.max(minW, width  + dx);
+      if (handle.includes("s")) height = Math.max(minH, height + dy);
       if (handle.includes("w")) {
-        const newW = Math.max(MIN_BOUNDARY_W, width - dx);
+        const newW = Math.max(minW, width - dx);
         x = startBounds.x + startBounds.width - newW;
         width = newW;
       }
       if (handle.includes("n")) {
-        const newH = Math.max(MIN_BOUNDARY_H, height - dy);
+        const newH = Math.max(minH, height - dy);
         y = startBounds.y + startBounds.height - newH;
         height = newH;
       }
@@ -555,6 +559,11 @@ export function Canvas({
               }
               showConnectionPoints={
                 el.id === selectedElementId || isDraggingConnector
+              }
+              onResizeDragStart={
+                (el.type === "task" || el.type === "subprocess")
+                  ? (handle, e) => handleResizeDragStart(el.id, handle, e)
+                  : undefined
               }
               svgToWorld={clientToWorld}
               onUpdateProperties={onUpdateProperties}

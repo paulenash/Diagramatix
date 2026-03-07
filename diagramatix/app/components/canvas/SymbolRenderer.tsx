@@ -73,7 +73,7 @@ function TaskShape({ el }: { el: DiagramElement }) {
   return (
     <rect
       x={el.x} y={el.y} width={el.width} height={el.height}
-      rx={4} ry={4} fill="white" stroke="#374151" strokeWidth={1.5}
+      rx={4} ry={4} fill="#fef9c3" stroke="#374151" strokeWidth={1.5}
     />
   );
 }
@@ -82,20 +82,20 @@ function GatewayShape({ el }: { el: DiagramElement }) {
   const cx = el.x + el.width / 2;
   const cy = el.y + el.height / 2;
   const points = `${cx},${el.y} ${el.x + el.width},${cy} ${cx},${el.y + el.height} ${el.x},${cy}`;
-  return <polygon points={points} fill="white" stroke="#374151" strokeWidth={1.5} />;
+  return <polygon points={points} fill="#f3e8ff" stroke="#374151" strokeWidth={1.5} />;
 }
 
 function StartEventShape({ el }: { el: DiagramElement }) {
   return (
     <circle cx={el.x + el.width / 2} cy={el.y + el.height / 2} r={el.width / 2}
-      fill="white" stroke="#16a34a" strokeWidth={2} />
+      fill="#dcfce7" stroke="#374151" strokeWidth={2} />
   );
 }
 
 function EndEventShape({ el }: { el: DiagramElement }) {
   return (
     <circle cx={el.x + el.width / 2} cy={el.y + el.height / 2} r={el.width / 2}
-      fill="white" stroke="#dc2626" strokeWidth={3} />
+      fill="#fee2e2" stroke="#374151" strokeWidth={3} />
   );
 }
 
@@ -251,7 +251,7 @@ function SubprocessShape({ el }: { el: DiagramElement }) {
   return (
     <g>
       <rect x={el.x} y={el.y} width={el.width} height={el.height}
-        rx={4} ry={4} fill="white" stroke="#374151" strokeWidth={1.5} />
+        rx={4} ry={4} fill="#fef08a" stroke="#374151" strokeWidth={1.5} />
       <rect x={mx} y={my} width={markerW} height={markerH}
         rx={2} fill="white" stroke="#374151" strokeWidth={1} />
       <line x1={mx + markerW / 2} y1={my + 3} x2={mx + markerW / 2} y2={my + markerH - 3}
@@ -346,7 +346,7 @@ function BpmnTaskShape({ el }: { el: DiagramElement }) {
   return (
     <g>
       <rect x={el.x} y={el.y} width={el.width} height={el.height}
-        rx={4} ry={4} fill="white" stroke="#374151" strokeWidth={1.5} />
+        rx={4} ry={4} fill="#fef9c3" stroke="#374151" strokeWidth={1.5} />
       {el.taskType && el.taskType !== "none" && (
         <BpmnTaskMarker taskType={el.taskType} x={el.x + 4} y={el.y + 4} />
       )}
@@ -468,6 +468,7 @@ export function SymbolRenderer({
   const isActorOrTeam = element.type === "actor" || element.type === "team" || element.type === "system";
   const isBoundary = element.type === "system-boundary";  // excluded from connection overlay
   const isContainer = isBoundary || element.type === "composite-state"; // gets resize handles
+  const canResize = isContainer || element.type === "task" || element.type === "subprocess";
   const showLabel = element.type !== "initial-state" && element.type !== "final-state";
 
   return (
@@ -742,8 +743,8 @@ export function SymbolRenderer({
         />
       )}
 
-      {/* Resize handles (containers: system-boundary and composite-state) */}
-      {selected && isContainer && onResizeDragStart &&
+      {/* Resize handles (containers + task/subprocess) */}
+      {selected && canResize && onResizeDragStart &&
         RESIZE_HANDLES.map(({ handle, cursor }) => {
           const { hx, hy } = getHandlePos(handle, element);
           return (

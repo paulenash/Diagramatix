@@ -180,6 +180,21 @@ export function waypointsToCurvePath(waypoints: Point[]): string {
   return `M ${p0.x} ${p0.y} C ${cp1.x} ${cp1.y}, ${cp2.x} ${cp2.y}, ${p3.x} ${p3.y}`;
 }
 
+// Removes interior waypoints that are within 8px of the previous point.
+// Always preserves the 4 boundary points (srcCenter, srcEdge, tgtEdge, tgtCenter).
+export function consolidateWaypoints(wps: Point[]): Point[] {
+  const THRESHOLD = 8;
+  if (wps.length <= 4) return wps;
+  const result = [wps[0], wps[1]];
+  for (let i = 2; i < wps.length - 2; i++) {
+    const prev = result[result.length - 1];
+    if (Math.hypot(wps[i].x - prev.x, wps[i].y - prev.y) >= THRESHOLD)
+      result.push(wps[i]);
+  }
+  result.push(wps[wps.length - 2], wps[wps.length - 1]);
+  return result;
+}
+
 export function recomputeAllConnectors(
   connectors: Connector[],
   elements: DiagramElement[]
@@ -189,15 +204,35 @@ export function recomputeAllConnectors(
     const source = elementMap.get(conn.sourceId);
     const target = elementMap.get(conn.targetId);
     if (!source || !target) return conn;
+
+    // For rectilinear connectors with enough waypoints, preserve user's interior routing.
+    // Only the 6 boundary waypoints (srcCenter, srcEdge, exitPt, approachPt, tgtEdge, tgtCenter)
+    // are updated; interior turns (indices 3..N-4) are kept as-is.
+    if (conn.routingType === "rectilinear") {
+      const wp = conn.waypoints;
+      const N = wp.length;
+      if (N >= 7) {
+        const newSrcCenter  = getConnectionPointBySide(source, conn.sourceSide);
+        const newTgtCenter  = getConnectionPointBySide(target, conn.targetSide);
+        const newSrcEdge    = sidePoint(source, conn.sourceSide, conn.sourceOffsetAlong ?? 0.5);
+        const newTgtEdge    = sidePoint(target, conn.targetSide, conn.targetOffsetAlong ?? 0.5);
+        const newExitPt     = perpendicularExit(newSrcEdge, conn.sourceSide);
+        const newApproachPt = perpendicularApproach(newTgtEdge, conn.targetSide);
+        const interior = wp.slice(3, N - 3);
+        const newWaypoints = [
+          newSrcCenter, newSrcEdge, newExitPt,
+          ...interior,
+          newApproachPt, newTgtEdge, newTgtCenter,
+        ];
+        return { ...conn, waypoints: consolidateWaypoints(newWaypoints) };
+      }
+    }
+
+    // Full recompute for non-rectilinear or connectors with fewer than 7 waypoints
     const { waypoints, sourceInvisibleLeader, targetInvisibleLeader } = computeWaypoints(
-      source,
-      target,
-      elements,
-      conn.sourceSide,
-      conn.targetSide,
-      conn.routingType,
-      conn.sourceOffsetAlong ?? 0.5,
-      conn.targetOffsetAlong ?? 0.5,
+      source, target, elements,
+      conn.sourceSide, conn.targetSide, conn.routingType,
+      conn.sourceOffsetAlong ?? 0.5, conn.targetOffsetAlong ?? 0.5,
     );
     return { ...conn, waypoints, sourceInvisibleLeader, targetInvisibleLeader };
   });

@@ -14,22 +14,37 @@ interface Props {
 
 function PaletteSymbolPreview({ type }: { type: SymbolType }) {
   switch (type) {
+    case "task":
+      return (
+        <svg width={48} height={28} viewBox="0 0 48 28">
+          <rect x={2} y={2} width={44} height={24} rx={3} fill="#fef9c3" stroke="#374151" strokeWidth={1.5} />
+        </svg>
+      );
+    case "subprocess":
+      return (
+        <svg width={48} height={28} viewBox="0 0 48 28">
+          <rect x={2} y={2} width={44} height={24} rx={3} fill="#fef08a" stroke="#374151" strokeWidth={1.5} />
+          <rect x={18} y={17} width={12} height={10} rx={2} fill="white" stroke="#374151" strokeWidth={1} />
+          <line x1={24} y1={19} x2={24} y2={25} stroke="#374151" strokeWidth={1} />
+          <line x1={21} y1={22} x2={27} y2={22} stroke="#374151" strokeWidth={1} />
+        </svg>
+      );
     case "gateway":
       return (
         <svg width={32} height={32} viewBox="0 0 32 32">
-          <polygon points="16,2 30,16 16,30 2,16" fill="white" stroke="#374151" strokeWidth={1.5} />
+          <polygon points="16,2 30,16 16,30 2,16" fill="#f3e8ff" stroke="#374151" strokeWidth={1.5} />
         </svg>
       );
     case "start-event":
       return (
         <svg width={28} height={28} viewBox="0 0 28 28">
-          <circle cx={14} cy={14} r={12} fill="white" stroke="#16a34a" strokeWidth={2} />
+          <circle cx={14} cy={14} r={12} fill="#dcfce7" stroke="#374151" strokeWidth={2} />
         </svg>
       );
     case "end-event":
       return (
         <svg width={28} height={28} viewBox="0 0 28 28">
-          <circle cx={14} cy={14} r={12} fill="white" stroke="#dc2626" strokeWidth={3} />
+          <circle cx={14} cy={14} r={12} fill="#fee2e2" stroke="#374151" strokeWidth={3} />
         </svg>
       );
     case "use-case":
