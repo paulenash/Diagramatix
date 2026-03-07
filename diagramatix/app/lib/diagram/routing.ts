@@ -120,9 +120,14 @@ export function computeWaypoints(
   const endPt   = getConnectionPointBySide(target, targetSide); // target centre
 
   if (routingType === "direct") {
-    // [sourceCenter, srcEdge, tgtEdge, targetCenter]
-    const srcEdge = sidePoint(source, sourceSide, sourceOffsetAlong);
-    const tgtEdge = sidePoint(target, targetSide, targetOffsetAlong);
+    // Actor/team elements connect from their centre, not a side edge
+    const actorTypes: string[] = ["actor", "team"];
+    const srcEdge = actorTypes.includes(source.type)
+      ? { x: source.x + source.width / 2, y: source.y + source.height / 2 }
+      : sidePoint(source, sourceSide, sourceOffsetAlong);
+    const tgtEdge = actorTypes.includes(target.type)
+      ? { x: target.x + target.width / 2, y: target.y + target.height / 2 }
+      : sidePoint(target, targetSide, targetOffsetAlong);
     return {
       waypoints: [startPt, srcEdge, tgtEdge, endPt],
       sourceInvisibleLeader: true,
