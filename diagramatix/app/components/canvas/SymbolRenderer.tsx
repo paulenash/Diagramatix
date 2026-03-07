@@ -21,6 +21,16 @@ interface Props {
   onUpdateProperties?: (id: string, props: Record<string, unknown>) => void;
 }
 
+function ellipseOctagonPoints(cx: number, cy: number, rx: number, ry: number): string {
+  const k = Math.SQRT2 - 1;
+  return [
+    `${cx+rx},${cy-ry*k}`,  `${cx+rx*k},${cy-ry}`,
+    `${cx-rx*k},${cy-ry}`,  `${cx-rx},${cy-ry*k}`,
+    `${cx-rx},${cy+ry*k}`,  `${cx-rx*k},${cy+ry}`,
+    `${cx+rx*k},${cy+ry}`,  `${cx+rx},${cy+ry*k}`,
+  ].join(" ");
+}
+
 function wrapText(text: string, maxWidth: number, fontSize = 12): string[] {
   const avgCharWidth = fontSize * 0.55;
   const charsPerLine = Math.max(1, Math.floor(maxWidth / avgCharWidth));
@@ -766,7 +776,25 @@ export function SymbolRenderer({
       }
 
       {/* Full-body connection overlay for all non-boundary elements */}
-      {showConnectionPoints && !isBoundary && (
+      {showConnectionPoints && !isBoundary && element.type === "use-case" && (() => {
+        const cx = element.x + element.width / 2;
+        const cy = element.y + element.height / 2;
+        const handler = (e: React.MouseEvent) => {
+          e.stopPropagation();
+          const worldPt = svgToWorld ? svgToWorld(e.clientX, e.clientY) : { x: cx, y: cy };
+          const side = getClosestSideFromPoint(worldPt, element);
+          onConnectionPointDragStart(side, { x: cx, y: cy });
+        };
+        return (
+          <polygon
+            points={ellipseOctagonPoints(cx, cy, element.width / 2, element.height / 2)}
+            fill="transparent" stroke="none"
+            style={{ cursor: "crosshair" }}
+            onMouseDown={handler}
+          />
+        );
+      })()}
+      {showConnectionPoints && !isBoundary && element.type !== "use-case" && (
         <rect
           x={element.x} y={element.y}
           width={element.width} height={element.height}

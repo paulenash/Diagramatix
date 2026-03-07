@@ -83,16 +83,22 @@ export function PropertiesPanel({
           </p>
           <p className="text-xs text-gray-600">Type: {connector.type}</p>
         </div>
-        {connector.type !== "sequence" && (
+        {(connector.type !== "sequence" || connector.routingType === "direct") && (
           <div>
             <p className="text-xs font-medium text-gray-700 mb-1">Direction</p>
             <div className="flex flex-wrap gap-1">
-              {([
-                { value: "directed" as DirectionType,      label: "Filled" },
-                { value: "open-directed" as DirectionType, label: "Open" },
-                { value: "both" as DirectionType,          label: "Both" },
-                { value: "non-directed" as DirectionType,  label: "None" },
-              ].filter(o => !(diagramType === "process-context" && o.value === "directed"))).map(({ value, label }) => (
+              {(connector.routingType === "direct"
+                ? [
+                    { value: "open-directed" as DirectionType, label: "Directed" },
+                    { value: "both"          as DirectionType, label: "Both" },
+                  ]
+                : [
+                    { value: "directed"      as DirectionType, label: "Filled" },
+                    { value: "open-directed" as DirectionType, label: "Open" },
+                    { value: "both"          as DirectionType, label: "Both" },
+                    { value: "non-directed"  as DirectionType, label: "None" },
+                  ].filter(o => !(diagramType === "process-context" && o.value === "directed"))
+              ).map(({ value, label }) => (
                 <button
                   key={value}
                   onClick={() => onUpdateConnectorDirection(connector.id, value)}

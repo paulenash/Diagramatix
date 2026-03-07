@@ -28,6 +28,18 @@ function closestEdgePoint(from: Point, b: Bounds): Point {
   };
 }
 
+function ellipseEdgePoint(from: Point, el: { x: number; y: number; width: number; height: number }): Point {
+  const cx = el.x + el.width / 2;
+  const cy = el.y + el.height / 2;
+  const rx = el.width / 2;
+  const ry = el.height / 2;
+  const dx = from.x - cx;
+  const dy = from.y - cy;
+  if (dx === 0 && dy === 0) return { x: cx, y: cy - ry };
+  const t = 1 / Math.sqrt((dx / rx) ** 2 + (dy / ry) ** 2);
+  return { x: cx + dx * t, y: cy + dy * t };
+}
+
 function boundsOverlapWithMargin(b: Bounds, margin: number): (p: Point) => boolean {
   return (p: Point) =>
     p.x > b.x - margin &&
@@ -120,14 +132,15 @@ export function computeWaypoints(
   const endPt   = getConnectionPointBySide(target, targetSide); // target centre
 
   if (routingType === "direct") {
-    // Actor/team elements connect from their centre, not a side edge
-    const actorTypes: string[] = ["actor", "team"];
-    const srcEdge = actorTypes.includes(source.type)
-      ? { x: source.x + source.width / 2, y: source.y + source.height / 2 }
-      : sidePoint(source, sourceSide, sourceOffsetAlong);
-    const tgtEdge = actorTypes.includes(target.type)
-      ? { x: target.x + target.width / 2, y: target.y + target.height / 2 }
-      : sidePoint(target, targetSide, targetOffsetAlong);
+    // Use closest boundary point on each element, along the line between their centres.
+    // Use-case elements use the exact ellipse boundary; all others use the bounding rectangle.
+    // The invisible leaders hide center→edge; the visible segment is edge→edge.
+    const srcEdge = source.type === "use-case"
+      ? ellipseEdgePoint(endPt, source)
+      : closestEdgePoint(endPt, getBounds(source));
+    const tgtEdge = target.type === "use-case"
+      ? ellipseEdgePoint(startPt, target)
+      : closestEdgePoint(startPt, getBounds(target));
     return {
       waypoints: [startPt, srcEdge, tgtEdge, endPt],
       sourceInvisibleLeader: true,
