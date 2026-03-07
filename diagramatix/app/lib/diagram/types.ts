@@ -35,7 +35,7 @@ export type GatewayType = "exclusive" | "inclusive" | "parallel" | "event-based"
 export type EventType =
   | "none" | "message" | "timer" | "error" | "signal" | "terminate" | "conditional";
 
-export type ConnectorType = "sequence" | "message" | "association";
+export type ConnectorType = "sequence" | "message" | "association" | "interaction";
 
 export type Side = "top" | "right" | "bottom" | "left";
 
@@ -83,6 +83,9 @@ export interface Connector {
   targetInvisibleLeader: boolean;
   waypoints: Point[];
   label?: string;
+  labelOffsetX?: number;
+  labelOffsetY?: number;
+  labelWidth?: number;
   sourceOffsetAlong?: number;
   targetOffsetAlong?: number;
 }

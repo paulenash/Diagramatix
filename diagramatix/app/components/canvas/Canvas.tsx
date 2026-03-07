@@ -103,6 +103,7 @@ interface Props {
   defaultRoutingType: RoutingType;
   onUpdateProperties?: (id: string, props: Record<string, unknown>) => void;
   onUpdateConnectorWaypoints?: (id: string, waypoints: Point[]) => void;
+  onUpdateConnectorLabel?: (id: string, label?: string, offsetX?: number, offsetY?: number, width?: number) => void;
 }
 
 interface EditingLabel {
@@ -172,12 +173,14 @@ export function Canvas({
   defaultRoutingType,
   onUpdateProperties,
   onUpdateConnectorWaypoints,
+  onUpdateConnectorLabel,
 }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
 
   const [pan, setPan] = useState<Point>({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [editingLabel, setEditingLabel] = useState<EditingLabel | null>(null);
+  const [editingConnectorLabel, setEditingConnectorLabel] = useState<{ connectorId: string; anchorX: number; anchorY: number; value: string; width: number } | null>(null);
   const [draggingConnector, setDraggingConnector] = useState<DraggingConnector | null>(null);
   const [draggingEndpoint, setDraggingEndpoint] = useState<DraggingEndpoint | null>(null);
   const [pendingDrop, setPendingDrop] = useState<PendingDrop | null>(null);
@@ -237,9 +240,12 @@ export function Canvas({
         const targetSide = getClosestSide(pos, targetEl);
         const sourceEl = data.elements.find((e) => e.id === elementId);
         const actorLike = ["actor", "team"];
-        const connType = (sourceEl && actorLike.includes(sourceEl.type)) || actorLike.includes(targetEl.type)
-          ? "association" as const
-          : "sequence" as const;
+        const connType: ConnectorType =
+          defaultRoutingType === "curvilinear"
+            ? "interaction"
+            : (sourceEl && actorLike.includes(sourceEl.type)) || actorLike.includes(targetEl.type)
+              ? "association"
+              : "sequence";
         onAddConnector(elementId, targetEl.id, connType, defaultDirectionType, defaultRoutingType, side, targetSide);
       }
       setDraggingConnector(null);
@@ -563,6 +569,12 @@ export function Canvas({
               }}
               svgToWorld={clientToWorld}
               onUpdateWaypoints={onUpdateConnectorWaypoints}
+              onUpdateLabel={onUpdateConnectorLabel
+                ? (label, ox, oy, w) => onUpdateConnectorLabel(conn.id, label, ox, oy, w)
+                : undefined}
+              onLabelDoubleClick={(ax, ay, label, w) =>
+                setEditingConnectorLabel({ connectorId: conn.id, anchorX: ax, anchorY: ay, value: label, width: w })
+              }
             />
           ))}
 
@@ -659,6 +671,28 @@ export function Canvas({
               style={{ pointerEvents: "none" }}
             />
           )}
+
+          {/* Connector label inline editor */}
+          {editingConnectorLabel && (() => {
+            const { anchorX, anchorY, value, width } = editingConnectorLabel;
+            return (
+              <foreignObject x={anchorX - width / 2} y={anchorY - 60} width={width} height={80}>
+                <textarea
+                  // eslint-disable-next-line jsx-a11y/no-autofocus
+                  autoFocus
+                  defaultValue={value}
+                  style={{ width: "100%", height: "100%", fontSize: 10, resize: "none", border: "1px solid #2563eb", borderRadius: 2, padding: 2, boxSizing: "border-box" }}
+                  onBlur={(e) => {
+                    onUpdateConnectorLabel?.(editingConnectorLabel.connectorId, e.target.value);
+                    setEditingConnectorLabel(null);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") setEditingConnectorLabel(null);
+                  }}
+                />
+              </foreignObject>
+            );
+          })()}
         </g>
       </svg>
 

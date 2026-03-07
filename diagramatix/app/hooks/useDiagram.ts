@@ -45,6 +45,7 @@ type Action =
     }}
   | { type: "UPDATE_CONNECTOR"; payload: { id: string; directionType: DirectionType } }
   | { type: "UPDATE_CONNECTOR_WAYPOINTS"; payload: { id: string; waypoints: Point[] } }
+  | { type: "UPDATE_CONNECTOR_LABEL"; payload: { id: string; label?: string; labelOffsetX?: number; labelOffsetY?: number; labelWidth?: number } }
   | { type: "CORRECT_ALL_CONNECTORS" }
   | { type: "SET_VIEWPORT"; payload: { x: number; y: number; zoom: number } };
 
@@ -230,6 +231,10 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         sourceInvisibleLeader,
         targetInvisibleLeader,
         waypoints,
+        label:        connectorType === "interaction" ? "interaction label" : undefined,
+        labelOffsetX: connectorType === "interaction" ? 0   : undefined,
+        labelOffsetY: connectorType === "interaction" ? -30 : undefined,
+        labelWidth:   connectorType === "interaction" ? 80  : undefined,
       };
 
       return { ...state, connectors: [...state.connectors, newConnector] };
@@ -278,6 +283,14 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         ...state,
         connectors: state.connectors.map((c) =>
           c.id === action.payload.id ? { ...c, waypoints: consolidateWaypoints(action.payload.waypoints) } : c
+        ),
+      };
+
+    case "UPDATE_CONNECTOR_LABEL":
+      return {
+        ...state,
+        connectors: state.connectors.map((c) =>
+          c.id === action.payload.id ? { ...c, ...action.payload } : c
         ),
       };
 
@@ -374,6 +387,12 @@ export function useDiagram(initialData: DiagramData) {
     dispatch({ type: "UPDATE_CONNECTOR_WAYPOINTS", payload: { id, waypoints } });
   }, []);
 
+  const updateConnectorLabel = useCallback(
+    (id: string, label?: string, labelOffsetX?: number, labelOffsetY?: number, labelWidth?: number) => {
+      dispatch({ type: "UPDATE_CONNECTOR_LABEL", payload: { id, label, labelOffsetX, labelOffsetY, labelWidth } });
+    }, []
+  );
+
   const setData = useCallback((newData: DiagramData) => {
     dispatch({ type: "SET_DATA", payload: newData });
   }, []);
@@ -399,6 +418,7 @@ export function useDiagram(initialData: DiagramData) {
     updateConnectorDirection,
     updateConnectorEndpoint,
     updateConnectorWaypoints,
+    updateConnectorLabel,
     setData,
     setViewport,
     correctAllConnectors,

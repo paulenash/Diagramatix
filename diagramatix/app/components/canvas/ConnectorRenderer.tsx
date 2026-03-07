@@ -9,6 +9,33 @@ interface Props {
   onSelect: () => void;
   svgToWorld?: (clientX: number, clientY: number) => Point;
   onUpdateWaypoints?: (id: string, waypoints: Point[]) => void;
+  onUpdateLabel?: (label: string, offsetX: number, offsetY: number, width: number) => void;
+  onLabelDoubleClick?: (anchorX: number, anchorY: number, label: string, width: number) => void;
+}
+
+function wrapText(text: string, maxWidth: number, fontSize = 10): string[] {
+  const avgCharWidth = fontSize * 0.6;
+  const charsPerLine = Math.max(1, Math.floor(maxWidth / avgCharWidth));
+  const lines: string[] = [];
+  for (const segment of text.split('\n')) {
+    const words = segment.split(' ');
+    let current = '';
+    for (const word of words) {
+      if (!current) { current = word; }
+      else if (current.length + 1 + word.length <= charsPerLine) { current += ' ' + word; }
+      else { lines.push(current); current = word; }
+    }
+    lines.push(current);
+  }
+  return lines.length ? lines : [''];
+}
+
+function cubicBezierPoint(p0: Point, cp1: Point, cp2: Point, p3: Point, t: number): Point {
+  const mt = 1 - t;
+  return {
+    x: mt**3*p0.x + 3*mt**2*t*cp1.x + 3*mt*t**2*cp2.x + t**3*p3.x,
+    y: mt**3*p0.y + 3*mt**2*t*cp1.y + 3*mt*t**2*cp2.y + t**3*p3.y,
+  };
 }
 
 function ArrowMarker({ id, color }: { id: string; color: string }) {
@@ -42,7 +69,7 @@ function OpenArrowMarkerStart({ id, color }: { id: string; color: string }) {
   );
 }
 
-export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, onUpdateWaypoints }: Props) {
+export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, onUpdateWaypoints, onUpdateLabel, onLabelDoubleClick }: Props) {
   const waypoints = connector.waypoints;
   if (waypoints.length === 0) return null;
 
@@ -64,7 +91,9 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
     ? waypointsToCurvePath(visibleWaypoints)
     : waypointsToSvgPath(visibleWaypoints);
 
-  const fullD = waypointsToSvgPath(waypoints); // hit area always uses straight lines
+  const fullD = waypointsToSvgPath(waypoints);
+  // For curvilinear, use the actual curve for the hit area so clicks near the arc are detected
+  const hitD = connector.routingType === "curvilinear" ? visibleD : fullD;
 
   if (!visibleD) return null;
 
@@ -165,9 +194,9 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
         </defs>
       )}
 
-      {/* Invisible wider hit area */}
+      {/* Invisible wider hit area — follows curve for curvilinear */}
       <path
-        d={fullD}
+        d={hitD}
         fill="none"
         stroke="transparent"
         strokeWidth={12}
@@ -186,20 +215,90 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
         style={{ pointerEvents: "none" }}
       />
 
-      {connector.label && visibleWaypoints.length >= 2 && (() => {
-        const mid = Math.floor(visibleWaypoints.length / 2);
-        const p1 = visibleWaypoints[mid - 1];
-        const p2 = visibleWaypoints[mid];
-        const lx = (p1.x + p2.x) / 2;
-        const ly = (p1.y + p2.y) / 2;
+      {/* Floating interaction label with dotted tether */}
+      {connector.type === "interaction" && visibleWaypoints.length === 4 && (() => {
+        const [p0, cp1, cp2, p3] = visibleWaypoints;
+        const anchor = cubicBezierPoint(p0, cp1, cp2, p3, 0.5);
+        const offsetX = connector.labelOffsetX ?? 0;
+        const offsetY = connector.labelOffsetY ?? -30;
+        const lWidth  = connector.labelWidth ?? 80;
+        const label   = connector.label ?? "interaction label";
+        const lines   = wrapText(label, lWidth);
+        const lineH   = 14;
+        const lHeight = Math.max(lineH, lines.length * lineH);
+        const lCx     = anchor.x + offsetX;
+        const lTy     = anchor.y + offsetY;
+        const lMidY   = lTy + lHeight / 2;
+
+        function handleLabelMouseDown(e: React.MouseEvent) {
+          if (!svgToWorld || !onUpdateLabel) return;
+          e.stopPropagation();
+          const startWorld = svgToWorld(e.clientX, e.clientY);
+          const startOX = offsetX;
+          const startOY = offsetY;
+          function onMove(ev: MouseEvent) {
+            if (!svgToWorld) return;
+            const cur = svgToWorld(ev.clientX, ev.clientY);
+            onUpdateLabel!(label, startOX + (cur.x - startWorld.x), startOY + (cur.y - startWorld.y), lWidth);
+          }
+          function onUp() {
+            window.removeEventListener("mousemove", onMove);
+            window.removeEventListener("mouseup", onUp);
+          }
+          window.addEventListener("mousemove", onMove);
+          window.addEventListener("mouseup", onUp);
+        }
+
+        function handleResizeMouseDown(e: React.MouseEvent) {
+          if (!svgToWorld || !onUpdateLabel) return;
+          e.stopPropagation();
+          const startWorld = svgToWorld(e.clientX, e.clientY);
+          const startW = lWidth;
+          function onMove(ev: MouseEvent) {
+            if (!svgToWorld) return;
+            const cur = svgToWorld(ev.clientX, ev.clientY);
+            onUpdateLabel!(label, offsetX, offsetY, Math.max(40, startW + (cur.x - startWorld.x) * 2));
+          }
+          function onUp() {
+            window.removeEventListener("mousemove", onMove);
+            window.removeEventListener("mouseup", onUp);
+          }
+          window.addEventListener("mousemove", onMove);
+          window.addEventListener("mouseup", onUp);
+        }
+
         return (
-          <text
-            x={lx} y={ly - 6}
-            textAnchor="middle" fontSize={10} fill="#374151"
-            style={{ pointerEvents: "none", userSelect: "none" }}
-          >
-            {connector.label}
-          </text>
+          <g>
+            <line
+              x1={anchor.x} y1={anchor.y} x2={lCx} y2={lMidY}
+              stroke="#6b7280" strokeWidth={1} strokeDasharray="4 3"
+              style={{ pointerEvents: "none" }}
+            />
+            <rect
+              x={lCx - lWidth / 2} y={lTy} width={lWidth} height={lHeight}
+              fill="white" fillOpacity={0.9}
+              stroke={selected ? "#2563eb" : "#9ca3af"} strokeWidth={1} strokeDasharray="3 2"
+              style={{ cursor: onUpdateLabel ? "move" : "default" }}
+              onMouseDown={handleLabelMouseDown}
+              onDoubleClick={(e) => {
+                e.stopPropagation();
+                onLabelDoubleClick?.(anchor.x + offsetX, anchor.y + offsetY, label, lWidth);
+              }}
+            />
+            <text textAnchor="middle" fontSize={10} fill="#374151" style={{ pointerEvents: "none", userSelect: "none" }}>
+              {lines.map((ln, i) => (
+                <tspan key={i} x={lCx} y={lTy + i * lineH + lineH * 0.85}>{ln}</tspan>
+              ))}
+            </text>
+            {selected && onUpdateLabel && (
+              <rect
+                x={lCx + lWidth / 2 - 3} y={lMidY - 5} width={6} height={10}
+                fill="#2563eb" stroke="white" strokeWidth={1} rx={1}
+                style={{ cursor: "ew-resize" }}
+                onMouseDown={handleResizeMouseDown}
+              />
+            )}
+          </g>
         );
       })()}
 

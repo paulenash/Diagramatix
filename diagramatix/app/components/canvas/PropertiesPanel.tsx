@@ -83,7 +83,7 @@ export function PropertiesPanel({
           </p>
           <p className="text-xs text-gray-600">Type: {connector.type}</p>
         </div>
-        {(connector.type !== "sequence" || connector.routingType === "direct") && (
+        {((connector.type !== "sequence" && connector.type !== "interaction") || connector.routingType === "direct") && (
           <div>
             <p className="text-xs font-medium text-gray-700 mb-1">Direction</p>
             <div className="flex flex-wrap gap-1">

@@ -100,6 +100,7 @@ export function DiagramEditor({
     updateConnectorDirection,
     updateConnectorEndpoint,
     updateConnectorWaypoints,
+    updateConnectorLabel,
     correctAllConnectors,
   } = useDiagram(initialData);
 
@@ -229,6 +230,7 @@ export function DiagramEditor({
           defaultRoutingType={defaultRoutingType}
           onUpdateProperties={updateProperties}
           onUpdateConnectorWaypoints={updateConnectorWaypoints}
+          onUpdateConnectorLabel={updateConnectorLabel}
         />
 
         <PropertiesPanel
