@@ -78,6 +78,26 @@ interface PendingDrop {
   containerX: number;
   symbolType: SymbolType;
   containerY: number;
+  splitConnectorId?: string;
+}
+
+function distToSegment(p: Point, a: Point, b: Point): number {
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq < 1) return Math.hypot(p.x - a.x, p.y - a.y);
+  const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / lenSq));
+  return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
+}
+
+function findConnectorNearPoint(connectors: Connector[], pos: Point, margin = 15): Connector | null {
+  for (const c of connectors) {
+    if (c.type !== "sequence") continue;
+    const pts = c.waypoints;
+    for (let i = 0; i < pts.length - 1; i++) {
+      if (distToSegment(pos, pts[i], pts[i + 1]) <= margin) return c;
+    }
+  }
+  return null;
 }
 
 interface Props {
@@ -115,6 +135,7 @@ interface Props {
   onUpdateProperties?: (id: string, props: Record<string, unknown>) => void;
   onUpdateConnectorWaypoints?: (id: string, waypoints: Point[]) => void;
   onUpdateConnectorLabel?: (id: string, label?: string, offsetX?: number, offsetY?: number, width?: number) => void;
+  onSplitConnector?: (symbolType: SymbolType, position: Point, connectorId: string, taskType?: BpmnTaskType, eventType?: EventType) => void;
 }
 
 interface EditingLabel {
@@ -185,6 +206,7 @@ export function Canvas({
   onUpdateProperties,
   onUpdateConnectorWaypoints,
   onUpdateConnectorLabel,
+  onSplitConnector,
 }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
 
@@ -441,6 +463,30 @@ export function Canvas({
     if (!pendingDragSymbol) return;
     const rect = svgRef.current!.getBoundingClientRect();
     const worldPos = svgToWorld(e.clientX - rect.left, e.clientY - rect.top);
+
+    // Check if dropped on a sequence connector (split connector feature)
+    if (diagramType === "bpmn" && onSplitConnector &&
+        (pendingDragSymbol === "gateway" || pendingDragSymbol === "intermediate-event")) {
+      const hit = findConnectorNearPoint(data.connectors, worldPos);
+      if (hit) {
+        if (pendingDragSymbol === "gateway") {
+          // Gateways have no type picker — split immediately with default type
+          onSplitConnector("gateway", worldPos, hit.id);
+          return;
+        } else {
+          // Intermediate event: show type picker, then split
+          const containerRect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+          setPendingDrop({
+            worldPos,
+            containerX: e.clientX - containerRect.left,
+            containerY: e.clientY - containerRect.top,
+            symbolType: "intermediate-event",
+            splitConnectorId: hit.id,
+          });
+          return;
+        }
+      }
+    }
 
     if ((pendingDragSymbol === "task" || pendingDragSymbol === "intermediate-event") && diagramType === "bpmn") {
       const containerRect = (e.currentTarget as HTMLElement).getBoundingClientRect();
@@ -798,7 +844,11 @@ export function Canvas({
               className="w-full text-left px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
               onMouseDown={(e) => {
                 e.preventDefault();
-                onAddElement("intermediate-event", pendingDrop.worldPos, undefined, opt.value);
+                if (pendingDrop.splitConnectorId && onSplitConnector) {
+                  onSplitConnector("intermediate-event", pendingDrop.worldPos, pendingDrop.splitConnectorId, undefined, opt.value);
+                } else {
+                  onAddElement("intermediate-event", pendingDrop.worldPos, undefined, opt.value);
+                }
                 setPendingDrop(null);
               }}
             >

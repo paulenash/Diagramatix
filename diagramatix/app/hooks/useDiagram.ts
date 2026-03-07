@@ -47,7 +47,14 @@ type Action =
   | { type: "UPDATE_CONNECTOR_WAYPOINTS"; payload: { id: string; waypoints: Point[] } }
   | { type: "UPDATE_CONNECTOR_LABEL"; payload: { id: string; label?: string; labelOffsetX?: number; labelOffsetY?: number; labelWidth?: number } }
   | { type: "CORRECT_ALL_CONNECTORS" }
-  | { type: "SET_VIEWPORT"; payload: { x: number; y: number; zoom: number } };
+  | { type: "SET_VIEWPORT"; payload: { x: number; y: number; zoom: number } }
+  | { type: "SPLIT_CONNECTOR"; payload: {
+      symbolType: SymbolType;
+      position: Point;
+      taskType?: BpmnTaskType;
+      eventType?: EventType;
+      connectorId: string;
+    }};
 
 function nanoid(): string {
   return Math.random().toString(36).slice(2, 10);
@@ -310,6 +317,69 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         viewport: action.payload,
       };
 
+    case "SPLIT_CONNECTOR": {
+      const { symbolType, position, taskType, eventType, connectorId } = action.payload;
+      const orig = state.connectors.find(c => c.id === connectorId);
+      if (!orig) return state;
+
+      // Build new element (same labelling logic as ADD_ELEMENT)
+      const def = getSymbolDefinition(symbolType);
+      let label = def.label;
+      if (symbolType === "intermediate-event") {
+        const count = state.elements.filter(e => e.type === "intermediate-event").length;
+        label = `Event ${count + 1}`;
+      }
+      const newEl: DiagramElement = {
+        id: nanoid(),
+        type: symbolType,
+        x: position.x - def.defaultWidth / 2,
+        y: position.y - def.defaultHeight / 2,
+        width: def.defaultWidth,
+        height: def.defaultHeight,
+        label,
+        properties: {},
+        ...(taskType  !== undefined ? { taskType  } : {}),
+        ...(eventType !== undefined ? { eventType } : {}),
+      };
+
+      const elementsWithNew = [...state.elements, newEl];
+
+      const oppSide = (s: Side): Side =>
+        ({ left: "right", right: "left", top: "bottom", bottom: "top" } as const)[s];
+
+      const srcA = elementsWithNew.find(e => e.id === orig.sourceId);
+      const tgtB = elementsWithNew.find(e => e.id === orig.targetId);
+      if (!srcA || !tgtB) return state;
+
+      const cASide = oppSide(orig.sourceSide);
+      const cBSide = oppSide(orig.targetSide);
+
+      const { waypoints: wA, sourceInvisibleLeader: sIA, targetInvisibleLeader: tIA } =
+        computeWaypoints(srcA, newEl, elementsWithNew, orig.sourceSide, cASide, orig.routingType, orig.sourceOffsetAlong ?? 0.5, 0.5);
+
+      const { waypoints: wB, sourceInvisibleLeader: sIB, targetInvisibleLeader: tIB } =
+        computeWaypoints(newEl, tgtB, elementsWithNew, cBSide, orig.targetSide, orig.routingType, 0.5, orig.targetOffsetAlong ?? 0.5);
+
+      const filtered = state.connectors.filter(c => c.id !== connectorId);
+      return {
+        ...state,
+        elements: elementsWithNew,
+        connectors: [
+          ...filtered,
+          { id: nanoid(), type: orig.type, sourceId: orig.sourceId, targetId: newEl.id,
+            sourceSide: orig.sourceSide, targetSide: cASide,
+            directionType: orig.directionType, routingType: orig.routingType,
+            sourceOffsetAlong: orig.sourceOffsetAlong, targetOffsetAlong: 0.5,
+            waypoints: wA, sourceInvisibleLeader: sIA, targetInvisibleLeader: tIA },
+          { id: nanoid(), type: orig.type, sourceId: newEl.id, targetId: orig.targetId,
+            sourceSide: cBSide, targetSide: orig.targetSide,
+            directionType: orig.directionType, routingType: orig.routingType,
+            sourceOffsetAlong: 0.5, targetOffsetAlong: orig.targetOffsetAlong,
+            waypoints: wB, sourceInvisibleLeader: sIB, targetInvisibleLeader: tIB },
+        ],
+      };
+    }
+
     default:
       return state;
   }
@@ -394,6 +464,16 @@ export function useDiagram(initialData: DiagramData) {
     }, []
   );
 
+  const splitConnector = useCallback((
+    symbolType: SymbolType,
+    position: Point,
+    connectorId: string,
+    taskType?: BpmnTaskType,
+    eventType?: EventType,
+  ) => {
+    dispatch({ type: "SPLIT_CONNECTOR", payload: { symbolType, position, connectorId, taskType, eventType } });
+  }, []);
+
   const setData = useCallback((newData: DiagramData) => {
     dispatch({ type: "SET_DATA", payload: newData });
   }, []);
@@ -420,6 +500,7 @@ export function useDiagram(initialData: DiagramData) {
     updateConnectorEndpoint,
     updateConnectorWaypoints,
     updateConnectorLabel,
+    splitConnector,
     setData,
     setViewport,
     correctAllConnectors,
