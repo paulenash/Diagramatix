@@ -196,11 +196,20 @@ export function computeWaypoints(
     (sourceSide === "right" && targetSide === "left") ||
     (sourceSide === "left"  && targetSide === "right")
   ) {
-    // Center the vertical segment midway between the two facing edges
+    // Center the vertical segment midway between the two facing horizontal edges
     const midX = (exitPt.x + approachPt.x) / 2;
     midPath = Math.abs(exitPt.y - approachPt.y) < 1
       ? [exitPt, approachPt]
       : [exitPt, { x: midX, y: exitPt.y }, { x: midX, y: approachPt.y }, approachPt];
+  } else if (
+    (sourceSide === "bottom" && targetSide === "top") ||
+    (sourceSide === "top"    && targetSide === "bottom")
+  ) {
+    // Center the horizontal segment midway between the two facing vertical edges
+    const midY = (exitPt.y + approachPt.y) / 2;
+    midPath = Math.abs(exitPt.x - approachPt.x) < 1
+      ? [exitPt, approachPt]
+      : [exitPt, { x: exitPt.x, y: midY }, { x: approachPt.x, y: midY }, approachPt];
   } else {
     midPath = buildOrthogonalPath(exitPt, approachPt, obstacles);
   }

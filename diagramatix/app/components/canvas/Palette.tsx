@@ -44,8 +44,8 @@ function PaletteSymbolPreview({ type }: { type: SymbolType }) {
     case "intermediate-event":
       return (
         <svg width={28} height={28} viewBox="0 0 28 28">
-          <circle cx={14} cy={14} r={12} fill="white" stroke="#374151" strokeWidth={2} />
-          <circle cx={14} cy={14} r={9} fill="white" stroke="#374151" strokeWidth={1.5} />
+          <circle cx={14} cy={14} r={12} fill="#fed7aa" stroke="#374151" strokeWidth={2} />
+          <circle cx={14} cy={14} r={9} fill="#fed7aa" stroke="#374151" strokeWidth={1.5} />
         </svg>
       );
     case "end-event":

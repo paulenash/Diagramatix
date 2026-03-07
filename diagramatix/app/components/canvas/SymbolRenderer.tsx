@@ -156,12 +156,12 @@ function EventMarker({ type, cx, cy, r, filled }: {
       );
     case "error": {
       const pts = [
-        `${cx + s * 0.3},${cy - s * 0.85}`,   // top-right tip
-        `${cx - s * 0.1},${cy - s * 0.05}`,   // centre-left (upper kink)
-        `${cx + s * 0.2},${cy - s * 0.05}`,   // centre-right (upper step)
-        `${cx - s * 0.3},${cy + s * 0.85}`,   // bottom-left tip
-        `${cx + s * 0.1},${cy + s * 0.05}`,   // centre-right (lower kink)
-        `${cx - s * 0.2},${cy + s * 0.05}`,   // centre-left (lower step)
+        `${cx + s * 0.35},${cy - s * 0.85}`,  // top-right tip
+        `${cx - s * 0.1},${cy - s * 0.2}`,    // upper-left kink
+        `${cx + s * 0.25},${cy - s * 0.2}`,   // upper-right step
+        `${cx - s * 0.35},${cy + s * 0.85}`,  // bottom-left tip
+        `${cx + s * 0.1},${cy + s * 0.2}`,    // lower-right kink
+        `${cx - s * 0.25},${cy + s * 0.2}`,   // lower-left step
       ].join(" ");
       return (
         <polygon points={pts} fill={filled ? "#374151" : "white"}
@@ -223,8 +223,8 @@ function IntermediateEventShape({ el }: { el: DiagramElement }) {
   const r  = el.width / 2;
   return (
     <g>
-      <circle cx={cx} cy={cy} r={r} fill="white" stroke="#374151" strokeWidth={2} />
-      <circle cx={cx} cy={cy} r={r - 3} fill="white" stroke="#374151" strokeWidth={1.5} />
+      <circle cx={cx} cy={cy} r={r} fill="#fed7aa" stroke="#374151" strokeWidth={2} />
+      <circle cx={cx} cy={cy} r={r - 3} fill="#fed7aa" stroke="#374151" strokeWidth={1.5} />
       {el.eventType && el.eventType !== "none" &&
         <EventMarker type={el.eventType} cx={cx} cy={cy} r={r - 4} />}
     </g>
