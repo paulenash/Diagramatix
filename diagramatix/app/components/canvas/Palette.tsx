@@ -41,10 +41,17 @@ function PaletteSymbolPreview({ type }: { type: SymbolType }) {
           <circle cx={14} cy={14} r={12} fill="#dcfce7" stroke="#374151" strokeWidth={2} />
         </svg>
       );
+    case "intermediate-event":
+      return (
+        <svg width={28} height={28} viewBox="0 0 28 28">
+          <circle cx={14} cy={14} r={12} fill="white" stroke="#374151" strokeWidth={2} />
+          <circle cx={14} cy={14} r={9} fill="white" stroke="#374151" strokeWidth={1.5} />
+        </svg>
+      );
     case "end-event":
       return (
         <svg width={28} height={28} viewBox="0 0 28 28">
-          <circle cx={14} cy={14} r={12} fill="#fee2e2" stroke="#374151" strokeWidth={3} />
+          <circle cx={14} cy={14} r={12} fill="#fca5a5" stroke="#374151" strokeWidth={3} />
         </svg>
       );
     case "use-case":

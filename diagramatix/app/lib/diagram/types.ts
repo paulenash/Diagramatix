@@ -4,6 +4,7 @@ export type SymbolType =
   | "task"
   | "gateway"
   | "start-event"
+  | "intermediate-event"
   | "end-event"
   | "use-case"
   | "actor"
@@ -28,6 +29,11 @@ export type BpmnTaskType =
   | "receive"
   | "manual"
   | "business-rule";
+
+export type GatewayType = "exclusive" | "inclusive" | "parallel" | "event-based";
+
+export type EventType =
+  | "none" | "message" | "timer" | "error" | "signal" | "terminate" | "conditional";
 
 export type ConnectorType = "sequence" | "message" | "association";
 
@@ -60,6 +66,8 @@ export interface DiagramElement {
   properties: Record<string, unknown>;
   parentId?: string;
   taskType?: BpmnTaskType;
+  gatewayType?: GatewayType;
+  eventType?: EventType;
 }
 
 export interface Connector {

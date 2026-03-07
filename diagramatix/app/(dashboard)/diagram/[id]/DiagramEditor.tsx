@@ -100,6 +100,7 @@ export function DiagramEditor({
     updateConnectorDirection,
     updateConnectorEndpoint,
     updateConnectorWaypoints,
+    correctAllConnectors,
   } = useDiagram(initialData);
 
   const saveStatus = useAutoSave(diagramId, data);
@@ -179,6 +180,14 @@ export function DiagramEditor({
         </span>
 
         <button
+          onClick={correctAllConnectors}
+          className="px-3 py-1.5 text-xs text-gray-600 border border-gray-300 rounded hover:bg-gray-50"
+          title="Make all connector segments strictly horizontal or vertical"
+        >
+          Correct Connectors
+        </button>
+
+        <button
           onClick={handleExport}
           className="px-3 py-1.5 text-xs text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
         >
@@ -227,7 +236,7 @@ export function DiagramEditor({
           connector={selectedConnector}
           diagramType={diagramType}
           onUpdateLabel={updateLabel}
-          onUpdateProperties={() => {}}
+          onUpdateProperties={updateProperties}
           onUpdateConnectorDirection={updateConnectorDirection}
           onDeleteElement={(id) => {
             deleteElement(id);

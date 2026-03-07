@@ -114,6 +114,13 @@ export const ALL_SYMBOLS: SymbolDefinition[] = [
     defaultHeight: 80,
     description: "A collapsed subprocess activity",
   },
+  {
+    type: "intermediate-event",
+    label: "Intermediate",
+    defaultWidth: 36,
+    defaultHeight: 36,
+    description: "Intermediate event in process",
+  },
 ];
 
 export const PALETTE_BY_DIAGRAM_TYPE: Record<DiagramType, SymbolType[]> = {
@@ -122,7 +129,7 @@ export const PALETTE_BY_DIAGRAM_TYPE: Record<DiagramType, SymbolType[]> = {
   "state-machine": ["state", "initial-state", "final-state", "composite-state"],
   bpmn: [
     "task",
-    "gateway", "start-event", "end-event",
+    "gateway", "start-event", "intermediate-event", "end-event",
     "subprocess", "pool", "lane",
   ],
 };

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { BpmnTaskType, DiagramElement, Point, Side } from "@/app/lib/diagram/types";
+import type { BpmnTaskType, GatewayType, EventType, DiagramElement, Point, Side } from "@/app/lib/diagram/types";
 
 export type ResizeHandle = "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w";
 
@@ -78,24 +78,138 @@ function TaskShape({ el }: { el: DiagramElement }) {
   );
 }
 
+function GatewayMarker({ type, cx, cy }: { type: GatewayType; cx: number; cy: number }) {
+  const s = 9;
+  switch (type) {
+    case "exclusive":
+      return (
+        <g stroke="#374151" strokeWidth={2.5} strokeLinecap="round">
+          <line x1={cx - s * 0.6} y1={cy - s * 0.6} x2={cx + s * 0.6} y2={cy + s * 0.6} />
+          <line x1={cx + s * 0.6} y1={cy - s * 0.6} x2={cx - s * 0.6} y2={cy + s * 0.6} />
+        </g>
+      );
+    case "inclusive":
+      return <circle cx={cx} cy={cy} r={s * 0.7} fill="none" stroke="#374151" strokeWidth={2} />;
+    case "parallel":
+      return (
+        <g stroke="#374151" strokeWidth={2.5} strokeLinecap="round">
+          <line x1={cx - s * 0.7} y1={cy} x2={cx + s * 0.7} y2={cy} />
+          <line x1={cx} y1={cy - s * 0.7} x2={cx} y2={cy + s * 0.7} />
+        </g>
+      );
+    case "event-based": {
+      const pts: string[] = [];
+      for (let i = 0; i < 5; i++) {
+        const a = (i * 2 * Math.PI / 5) - Math.PI / 2;
+        pts.push(`${cx + s * 0.75 * Math.cos(a)},${cy + s * 0.75 * Math.sin(a)}`);
+      }
+      return <polygon points={pts.join(" ")} fill="none" stroke="#374151" strokeWidth={1.5} />;
+    }
+    default: return null;
+  }
+}
+
 function GatewayShape({ el }: { el: DiagramElement }) {
   const cx = el.x + el.width / 2;
   const cy = el.y + el.height / 2;
   const points = `${cx},${el.y} ${el.x + el.width},${cy} ${cx},${el.y + el.height} ${el.x},${cy}`;
-  return <polygon points={points} fill="#f3e8ff" stroke="#374151" strokeWidth={1.5} />;
+  return (
+    <g>
+      <polygon points={points} fill="#f3e8ff" stroke="#374151" strokeWidth={1.5} />
+      {el.gatewayType && <GatewayMarker type={el.gatewayType} cx={cx} cy={cy} />}
+    </g>
+  );
+}
+
+function EventMarker({ type, cx, cy, r, filled }: {
+  type: EventType; cx: number; cy: number; r: number; filled?: boolean;
+}) {
+  const s = r * 0.55;
+  switch (type) {
+    case "message":
+      return (
+        <g>
+          <rect x={cx - s} y={cy - s * 0.65} width={s * 2} height={s * 1.3}
+            rx={1} fill={filled ? "#374151" : "white"} stroke="#374151" strokeWidth={1.2} />
+          <polyline points={`${cx - s},${cy - s * 0.65} ${cx},${cy} ${cx + s},${cy - s * 0.65}`}
+            fill="none" stroke={filled ? "white" : "#374151"} strokeWidth={1.2} />
+        </g>
+      );
+    case "timer":
+      return (
+        <g>
+          <circle cx={cx} cy={cy} r={s} fill="white" stroke="#374151" strokeWidth={1.2} />
+          <line x1={cx} y1={cy - s * 0.7} x2={cx} y2={cy} stroke="#374151" strokeWidth={1.2} strokeLinecap="round" />
+          <line x1={cx} y1={cy} x2={cx + s * 0.5} y2={cy + s * 0.4} stroke="#374151" strokeWidth={1.2} strokeLinecap="round" />
+        </g>
+      );
+    case "error":
+      return (
+        <polyline
+          points={`${cx - s * 0.4},${cy + s * 0.6} ${cx + s * 0.1},${cy - s * 0.1} ${cx - s * 0.1},${cy + s * 0.1} ${cx + s * 0.4},${cy - s * 0.6}`}
+          fill="none" stroke="#374151" strokeWidth={1.5} strokeLinejoin="round"
+        />
+      );
+    case "signal":
+      return (
+        <polygon
+          points={`${cx},${cy - s * 0.8} ${cx - s * 0.7},${cy + s * 0.5} ${cx + s * 0.7},${cy + s * 0.5}`}
+          fill={filled ? "#374151" : "white"} stroke="#374151" strokeWidth={1.2}
+        />
+      );
+    case "terminate":
+      return <circle cx={cx} cy={cy} r={s * 0.65} fill="#374151" />;
+    case "conditional":
+      return (
+        <g>
+          <rect x={cx - s * 0.65} y={cy - s * 0.75} width={s * 1.3} height={s * 1.5}
+            rx={1} fill="white" stroke="#374151" strokeWidth={1.2} />
+          <line x1={cx - s * 0.4} y1={cy - s * 0.35} x2={cx + s * 0.4} y2={cy - s * 0.35} stroke="#374151" strokeWidth={1} />
+          <line x1={cx - s * 0.4} y1={cy} x2={cx + s * 0.4} y2={cy} stroke="#374151" strokeWidth={1} />
+          <line x1={cx - s * 0.4} y1={cy + s * 0.35} x2={cx + s * 0.4} y2={cy + s * 0.35} stroke="#374151" strokeWidth={1} />
+        </g>
+      );
+    default: return null;
+  }
 }
 
 function StartEventShape({ el }: { el: DiagramElement }) {
+  const cx = el.x + el.width / 2;
+  const cy = el.y + el.height / 2;
+  const r  = el.width / 2;
   return (
-    <circle cx={el.x + el.width / 2} cy={el.y + el.height / 2} r={el.width / 2}
-      fill="#dcfce7" stroke="#374151" strokeWidth={2} />
+    <g>
+      <circle cx={cx} cy={cy} r={r} fill="#dcfce7" stroke="#374151" strokeWidth={2} />
+      {el.eventType && el.eventType !== "none" &&
+        <EventMarker type={el.eventType} cx={cx} cy={cy} r={r} />}
+    </g>
   );
 }
 
 function EndEventShape({ el }: { el: DiagramElement }) {
+  const cx = el.x + el.width / 2;
+  const cy = el.y + el.height / 2;
+  const r  = el.width / 2;
   return (
-    <circle cx={el.x + el.width / 2} cy={el.y + el.height / 2} r={el.width / 2}
-      fill="#fee2e2" stroke="#374151" strokeWidth={3} />
+    <g>
+      <circle cx={cx} cy={cy} r={r} fill="#fca5a5" stroke="#374151" strokeWidth={3} />
+      {el.eventType && el.eventType !== "none" &&
+        <EventMarker type={el.eventType} cx={cx} cy={cy} r={r} filled />}
+    </g>
+  );
+}
+
+function IntermediateEventShape({ el }: { el: DiagramElement }) {
+  const cx = el.x + el.width / 2;
+  const cy = el.y + el.height / 2;
+  const r  = el.width / 2;
+  return (
+    <g>
+      <circle cx={cx} cy={cy} r={r} fill="white" stroke="#374151" strokeWidth={2} />
+      <circle cx={cx} cy={cy} r={r - 3} fill="white" stroke="#374151" strokeWidth={1.5} />
+      {el.eventType && el.eventType !== "none" &&
+        <EventMarker type={el.eventType} cx={cx} cy={cy} r={r - 4} />}
+    </g>
   );
 }
 
@@ -356,9 +470,10 @@ function BpmnTaskShape({ el }: { el: DiagramElement }) {
 
 function SymbolShape({ el }: { el: DiagramElement }) {
   switch (el.type) {
-    case "gateway":        return <GatewayShape el={el} />;
-    case "start-event":   return <StartEventShape el={el} />;
-    case "end-event":     return <EndEventShape el={el} />;
+    case "gateway":              return <GatewayShape el={el} />;
+    case "start-event":          return <StartEventShape el={el} />;
+    case "intermediate-event":   return <IntermediateEventShape el={el} />;
+    case "end-event":            return <EndEventShape el={el} />;
     case "use-case":      return <UseCaseShape el={el} />;
     case "hourglass":     return <HourglassShape el={el} />;
     case "actor":         return <ActorShape el={el} />;
@@ -584,121 +699,11 @@ export function SymbolRenderer({
             )}
           </g>
         );
-      })() : showLabel && (
+      })() : showLabel && !(
         element.type === 'task' ||
         element.type === 'subprocess' ||
         element.type === 'use-case'
-      ) ? (() => {
-        const PAD = 4;
-        const el = element;
-        const elCenterX = el.x + el.width / 2;
-        const elCenterY = el.y + el.height / 2;
-
-        // Default label width
-        const defaultW = el.type === 'use-case' ? el.width * 0.7 : el.width - 2 * PAD;
-        const labelOffsetX = (el.properties.labelOffsetX as number) ?? 0;
-        const labelOffsetY = (el.properties.labelOffsetY as number) ?? 0;
-        const labelWidth   = (el.properties.labelWidth   as number) ?? defaultW;
-
-        const labelCenterX = elCenterX + labelOffsetX;
-        const labelCenterY = elCenterY + labelOffsetY;
-
-        const lineH = 14;
-        const lines = wrapText(el.label, labelWidth);
-        const totalLabelH = lines.length * lineH;
-
-        const labelTopY  = labelCenterY - totalLabelH / 2;
-        const labelLeftX = labelCenterX - labelWidth / 2;
-
-        // Icon exclusion zones
-        const iconReserveTop = (el.type === 'task' && el.taskType && el.taskType !== 'none') ? 20 : 0;
-        const iconReserveBot = el.type === 'subprocess' ? 20 : 0;
-        const minY    = el.y + PAD + iconReserveTop;
-        const maxBotY = el.y + el.height - PAD - iconReserveBot;
-
-        function clamp(v: number, lo: number, hi: number) { return Math.max(lo, Math.min(hi, v)); }
-
-        function handleInteriorLabelMouseDown(ev: React.MouseEvent) {
-          ev.stopPropagation();
-          if (!svgToWorld) return;
-          const startWorld = svgToWorld(ev.clientX, ev.clientY);
-          const startOffX = labelOffsetX;
-          const startOffY = labelOffsetY;
-          const halfW = labelWidth / 2;
-          const halfH = totalLabelH / 2;
-          function onMove(e: MouseEvent) {
-            const curWorld = svgToWorld!(e.clientX, e.clientY);
-            const newCX = elCenterX + startOffX + (curWorld.x - startWorld.x);
-            const newCY = elCenterY + startOffY + (curWorld.y - startWorld.y);
-            const clampedCX = clamp(newCX, el.x + PAD + halfW, el.x + el.width - PAD - halfW);
-            const clampedCY = clamp(newCY, minY + halfH, maxBotY - halfH);
-            onUpdateProperties?.(el.id, {
-              labelOffsetX: clampedCX - elCenterX,
-              labelOffsetY: clampedCY - elCenterY,
-            });
-          }
-          function onUp() {
-            window.removeEventListener('mousemove', onMove);
-            window.removeEventListener('mouseup', onUp);
-          }
-          window.addEventListener('mousemove', onMove);
-          window.addEventListener('mouseup', onUp);
-        }
-
-        function handleInteriorResizeMouseDown(ev: React.MouseEvent) {
-          ev.stopPropagation();
-          const startClientX = ev.clientX;
-          const startWidth = labelWidth;
-          const maxW = el.type === 'use-case' ? el.width * 0.85 : el.width - 2 * PAD;
-          function onMove(e: MouseEvent) {
-            const newWidth = clamp(startWidth + (e.clientX - startClientX) * 2, 24, maxW);
-            onUpdateProperties?.(el.id, { labelWidth: newWidth });
-          }
-          function onUp() {
-            window.removeEventListener('mousemove', onMove);
-            window.removeEventListener('mouseup', onUp);
-          }
-          window.addEventListener('mousemove', onMove);
-          window.addEventListener('mouseup', onUp);
-        }
-
-        return (
-          <g>
-            <rect
-              x={labelLeftX} y={labelTopY}
-              width={labelWidth} height={totalLabelH}
-              fill="transparent"
-              stroke={selected ? "#2563eb" : "none"}
-              strokeWidth={1}
-              strokeDasharray={selected ? "3 2" : undefined}
-              style={{ cursor: onUpdateProperties ? "move" : "default" }}
-              onMouseDown={handleInteriorLabelMouseDown}
-              onDoubleClick={(e) => { e.stopPropagation(); onDoubleClick(); }}
-            />
-            <text
-              textAnchor="middle"
-              fontSize={12}
-              fill="#111827"
-              style={{ userSelect: "none", pointerEvents: "none" }}
-            >
-              {lines.map((line, i) => (
-                <tspan key={i} x={labelCenterX} y={labelTopY + i * lineH + lineH * 0.85}>
-                  {line}
-                </tspan>
-              ))}
-            </text>
-            {selected && onUpdateProperties && (
-              <rect
-                x={labelLeftX + labelWidth - 3} y={labelCenterY - 5}
-                width={6} height={10}
-                fill="#2563eb" stroke="white" strokeWidth={1} rx={1}
-                style={{ cursor: "ew-resize" }}
-                onMouseDown={handleInteriorResizeMouseDown}
-              />
-            )}
-          </g>
-        );
-      })() : showLabel && (
+      ) && (
         <text
           x={labelInfo.x}
           y={labelInfo.y}
@@ -780,6 +785,113 @@ export function SymbolRenderer({
           }}
         />
       )}
+
+      {/* Interior label for task/subprocess/use-case — rendered AFTER connection overlay so it is on top */}
+      {showLabel && (
+        element.type === 'task' ||
+        element.type === 'subprocess' ||
+        element.type === 'use-case'
+      ) && (() => {
+        const PAD = 4;
+        const el = element;
+        const elCenterX = el.x + el.width / 2;
+        const elCenterY = el.y + el.height / 2;
+        const defaultW = el.type === 'use-case' ? el.width * 0.7 : el.width - 2 * PAD;
+        const labelOffsetX = (el.properties.labelOffsetX as number) ?? 0;
+        const labelOffsetY = (el.properties.labelOffsetY as number) ?? 0;
+        const labelWidth   = (el.properties.labelWidth   as number) ?? defaultW;
+        const labelCenterX = elCenterX + labelOffsetX;
+        const labelCenterY = elCenterY + labelOffsetY;
+        const lineH = 14;
+        const lines = wrapText(el.label, labelWidth);
+        const totalLabelH = lines.length * lineH;
+        const labelTopY  = labelCenterY - totalLabelH / 2;
+        const labelLeftX = labelCenterX - labelWidth / 2;
+        const iconReserveTop = (el.type === 'task' && el.taskType && el.taskType !== 'none') ? 20 : 0;
+        const iconReserveBot = el.type === 'subprocess' ? 20 : 0;
+        const minY    = el.y + PAD + iconReserveTop;
+        const maxBotY = el.y + el.height - PAD - iconReserveBot;
+        function clamp(v: number, lo: number, hi: number) { return Math.max(lo, Math.min(hi, v)); }
+        function handleInteriorLabelMouseDown(ev: React.MouseEvent) {
+          ev.stopPropagation();
+          onSelect();
+          if (!svgToWorld) return;
+          const startWorld = svgToWorld(ev.clientX, ev.clientY);
+          const startOffX = labelOffsetX;
+          const startOffY = labelOffsetY;
+          const halfW = labelWidth / 2;
+          const halfH = totalLabelH / 2;
+          function onMove(e: MouseEvent) {
+            const curWorld = svgToWorld!(e.clientX, e.clientY);
+            const newCX = elCenterX + startOffX + (curWorld.x - startWorld.x);
+            const newCY = elCenterY + startOffY + (curWorld.y - startWorld.y);
+            const clampedCX = clamp(newCX, el.x + PAD + halfW, el.x + el.width - PAD - halfW);
+            const clampedCY = clamp(newCY, minY + halfH, maxBotY - halfH);
+            onUpdateProperties?.(el.id, {
+              labelOffsetX: clampedCX - elCenterX,
+              labelOffsetY: clampedCY - elCenterY,
+            });
+          }
+          function onUp() {
+            window.removeEventListener('mousemove', onMove);
+            window.removeEventListener('mouseup', onUp);
+          }
+          window.addEventListener('mousemove', onMove);
+          window.addEventListener('mouseup', onUp);
+        }
+        function handleInteriorResizeMouseDown(ev: React.MouseEvent) {
+          ev.stopPropagation();
+          const startClientX = ev.clientX;
+          const startWidth = labelWidth;
+          const maxW = el.type === 'use-case' ? el.width * 0.85 : el.width - 2 * PAD;
+          function onMove(e: MouseEvent) {
+            const newWidth = clamp(startWidth + (e.clientX - startClientX) * 2, 24, maxW);
+            onUpdateProperties?.(el.id, { labelWidth: newWidth });
+          }
+          function onUp() {
+            window.removeEventListener('mousemove', onMove);
+            window.removeEventListener('mouseup', onUp);
+          }
+          window.addEventListener('mousemove', onMove);
+          window.addEventListener('mouseup', onUp);
+        }
+        return (
+          <g>
+            <rect
+              x={labelLeftX} y={labelTopY}
+              width={labelWidth} height={totalLabelH}
+              fill="transparent"
+              stroke={selected ? "#2563eb" : "none"}
+              strokeWidth={1}
+              strokeDasharray={selected ? "3 2" : undefined}
+              style={{ cursor: onUpdateProperties ? "move" : "default" }}
+              onMouseDown={handleInteriorLabelMouseDown}
+              onDoubleClick={(e) => { e.stopPropagation(); onDoubleClick(); }}
+            />
+            <text
+              textAnchor="middle"
+              fontSize={12}
+              fill="#111827"
+              style={{ userSelect: "none", pointerEvents: "none" }}
+            >
+              {lines.map((line, i) => (
+                <tspan key={i} x={labelCenterX} y={labelTopY + i * lineH + lineH * 0.85}>
+                  {line}
+                </tspan>
+              ))}
+            </text>
+            {selected && onUpdateProperties && (
+              <rect
+                x={labelLeftX + labelWidth - 3} y={labelCenterY - 5}
+                width={6} height={10}
+                fill="#2563eb" stroke="white" strokeWidth={1} rx={1}
+                style={{ cursor: "ew-resize" }}
+                onMouseDown={handleInteriorResizeMouseDown}
+              />
+            )}
+          </g>
+        );
+      })()}
     </g>
   );
 }

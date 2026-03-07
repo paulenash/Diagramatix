@@ -180,6 +180,41 @@ export function waypointsToCurvePath(waypoints: Point[]): string {
   return `M ${p0.x} ${p0.y} C ${cp1.x} ${cp1.y}, ${cp2.x} ${cp2.y}, ${p3.x} ${p3.y}`;
 }
 
+// Returns true if the segment at segIdx (0 = exitPt→interior[0]) should be horizontal.
+function segIsHoriz(sourceSide: Side, segIdx: number): boolean {
+  const startHoriz = sourceSide === "right" || sourceSide === "left";
+  return startHoriz ? segIdx % 2 === 0 : segIdx % 2 !== 0;
+}
+
+// Ensures every segment in a rectilinear waypoint array is strictly horizontal or vertical.
+// Boundary points (0,1,2 and N-3,N-2,N-1) are left unchanged.
+// Interior points are snapped via forward sweep + one backward fix for the approach segment.
+export function rectifyWaypoints(waypoints: Point[], sourceSide: Side): Point[] {
+  const N = waypoints.length;
+  if (N < 7) return waypoints;
+  const result = waypoints.map((p) => ({ ...p }));
+
+  for (let i = 3; i <= N - 4; i++) {
+    const segIdx = i - 3; // 0 = exitPt→interior[0]
+    if (segIsHoriz(sourceSide, segIdx)) {
+      result[i].y = result[i - 1].y;
+    } else {
+      result[i].x = result[i - 1].x;
+    }
+  }
+
+  // Snap last interior → approachPt; uses the opposite axis from the forward sweep, no conflict.
+  const lastInterior = N - 4;
+  const approachSegIdx = lastInterior - 2; // = N - 6
+  if (segIsHoriz(sourceSide, approachSegIdx)) {
+    result[lastInterior].y = result[N - 3].y;
+  } else {
+    result[lastInterior].x = result[N - 3].x;
+  }
+
+  return result;
+}
+
 // Removes interior waypoints that are within 8px of the previous point.
 // Always preserves the 4 boundary points (srcCenter, srcEdge, tgtEdge, tgtCenter).
 export function consolidateWaypoints(wps: Point[]): Point[] {
@@ -219,12 +254,13 @@ export function recomputeAllConnectors(
         const newExitPt     = perpendicularExit(newSrcEdge, conn.sourceSide);
         const newApproachPt = perpendicularApproach(newTgtEdge, conn.targetSide);
         const interior = wp.slice(3, N - 3);
-        const newWaypoints = [
+        const merged = [
           newSrcCenter, newSrcEdge, newExitPt,
           ...interior,
           newApproachPt, newTgtEdge, newTgtCenter,
         ];
-        return { ...conn, waypoints: consolidateWaypoints(newWaypoints) };
+        const rectified = rectifyWaypoints(merged, conn.sourceSide);
+        return { ...conn, waypoints: consolidateWaypoints(rectified) };
       }
     }
 

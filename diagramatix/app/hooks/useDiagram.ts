@@ -3,6 +3,8 @@
 import { useCallback, useReducer } from "react";
 import type {
   BpmnTaskType,
+  GatewayType,
+  EventType,
   Connector,
   ConnectorType,
   DiagramData,
@@ -13,7 +15,7 @@ import type {
   Side,
   SymbolType,
 } from "@/app/lib/diagram/types";
-import { computeWaypoints, recomputeAllConnectors, consolidateWaypoints } from "@/app/lib/diagram/routing";
+import { computeWaypoints, recomputeAllConnectors, consolidateWaypoints, rectifyWaypoints } from "@/app/lib/diagram/routing";
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
 
 type Action =
@@ -43,6 +45,7 @@ type Action =
     }}
   | { type: "UPDATE_CONNECTOR"; payload: { id: string; directionType: DirectionType } }
   | { type: "UPDATE_CONNECTOR_WAYPOINTS"; payload: { id: string; waypoints: Point[] } }
+  | { type: "CORRECT_ALL_CONNECTORS" }
   | { type: "SET_VIEWPORT"; payload: { x: number; y: number; zoom: number } };
 
 function nanoid(): string {
@@ -94,6 +97,9 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       } else if (action.payload.symbolType === "subprocess") {
         const count = state.elements.filter((e) => e.type === "subprocess").length;
         label = `Subprocess ${count + 1}`;
+      } else if (action.payload.symbolType === "intermediate-event") {
+        const count = state.elements.filter((e) => e.type === "intermediate-event").length;
+        label = `Event ${count + 1}`;
       }
       const newEl: DiagramElement = {
         id: nanoid(),
@@ -165,15 +171,22 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         ),
       };
 
-    case "UPDATE_PROPERTIES":
+    case "UPDATE_PROPERTIES": {
       return {
         ...state,
-        elements: state.elements.map((el) =>
-          el.id === action.payload.id
-            ? { ...el, properties: { ...el.properties, ...action.payload.properties } }
-            : el
-        ),
+        elements: state.elements.map((el) => {
+          if (el.id !== action.payload.id) return el;
+          const { taskType, gatewayType, eventType, ...rest } = action.payload.properties;
+          return {
+            ...el,
+            ...(taskType !== undefined ? { taskType: taskType as BpmnTaskType } : {}),
+            ...(gatewayType !== undefined ? { gatewayType: gatewayType as GatewayType } : {}),
+            ...(eventType !== undefined ? { eventType: eventType as EventType } : {}),
+            properties: { ...el.properties, ...rest },
+          };
+        }),
       };
+    }
 
     case "DELETE_ELEMENT": {
       const { id } = action.payload;
@@ -268,6 +281,15 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         ),
       };
 
+    case "CORRECT_ALL_CONNECTORS": {
+      const connectors = state.connectors.map((conn) => {
+        if (conn.routingType !== "rectilinear" || conn.waypoints.length < 7) return conn;
+        const rectified = rectifyWaypoints(conn.waypoints, conn.sourceSide);
+        return { ...conn, waypoints: consolidateWaypoints(rectified) };
+      });
+      return { ...state, connectors };
+    }
+
     case "SET_VIEWPORT":
       return {
         ...state,
@@ -360,6 +382,10 @@ export function useDiagram(initialData: DiagramData) {
     dispatch({ type: "SET_VIEWPORT", payload: { x, y, zoom } });
   }, []);
 
+  const correctAllConnectors = useCallback(() => {
+    dispatch({ type: "CORRECT_ALL_CONNECTORS" });
+  }, []);
+
   return {
     data,
     addElement,
@@ -375,5 +401,6 @@ export function useDiagram(initialData: DiagramData) {
     updateConnectorWaypoints,
     setData,
     setViewport,
+    correctAllConnectors,
   };
 }
