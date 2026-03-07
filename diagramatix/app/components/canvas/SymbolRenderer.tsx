@@ -232,6 +232,37 @@ function IntermediateEventShape({ el }: { el: DiagramElement }) {
   );
 }
 
+function DataObjectShape({ el }: { el: DiagramElement }) {
+  const fold = Math.round(el.width * 0.28);
+  const { x, y, width: w, height: h } = el;
+  return (
+    <g>
+      <polygon
+        points={`${x},${y} ${x+w-fold},${y} ${x+w},${y+fold} ${x+w},${y+h} ${x},${y+h}`}
+        fill="white" stroke="#374151" strokeWidth={1.5}
+      />
+      <polygon
+        points={`${x+w-fold},${y} ${x+w},${y+fold} ${x+w-fold},${y+fold}`}
+        fill="#e5e7eb" stroke="#374151" strokeWidth={1.5}
+      />
+    </g>
+  );
+}
+
+function DataStoreShape({ el }: { el: DiagramElement }) {
+  const { x, y, width: w, height: h } = el;
+  const cx = x + w / 2;
+  const rx = w / 2;
+  const ry = Math.max(4, Math.round(h * 0.18));
+  return (
+    <g>
+      <rect x={x} y={y + ry} width={w} height={h - ry} fill="white" stroke="#374151" strokeWidth={1.5} />
+      <ellipse cx={cx} cy={y + h} rx={rx} ry={ry} fill="white" stroke="#374151" strokeWidth={1.5} />
+      <ellipse cx={cx} cy={y + ry} rx={rx} ry={ry} fill="white" stroke="#374151" strokeWidth={1.5} />
+    </g>
+  );
+}
+
 function UseCaseShape({ el }: { el: DiagramElement }) {
   return (
     <ellipse
@@ -493,6 +524,8 @@ function SymbolShape({ el }: { el: DiagramElement }) {
     case "start-event":          return <StartEventShape el={el} />;
     case "intermediate-event":   return <IntermediateEventShape el={el} />;
     case "end-event":            return <EndEventShape el={el} />;
+    case "data-object":          return <DataObjectShape el={el} />;
+    case "data-store":           return <DataStoreShape el={el} />;
     case "use-case":      return <UseCaseShape el={el} />;
     case "hourglass":     return <HourglassShape el={el} />;
     case "actor":         return <ActorShape el={el} />;
@@ -622,7 +655,9 @@ export function SymbolRenderer({
         element.type === 'start-event'        ||
         element.type === 'end-event'          ||
         element.type === 'intermediate-event' ||
-        element.type === 'gateway'
+        element.type === 'gateway'            ||
+        element.type === 'data-object'        ||
+        element.type === 'data-store'
       ) ? (() => {
         const labelOffsetX = (element.properties.labelOffsetX as number) ?? 0;
         const labelOffsetY = (element.properties.labelOffsetY as number) ?? 7;

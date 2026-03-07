@@ -115,6 +115,20 @@ export const ALL_SYMBOLS: SymbolDefinition[] = [
     description: "A collapsed subprocess activity",
   },
   {
+    type: "data-object",
+    label: "Data Object",
+    defaultWidth: 36,
+    defaultHeight: 46,
+    description: "A data object referenced by the process",
+  },
+  {
+    type: "data-store",
+    label: "Data Store",
+    defaultWidth: 50,
+    defaultHeight: 40,
+    description: "A persistent data store or database",
+  },
+  {
     type: "intermediate-event",
     label: "Intermediate",
     defaultWidth: 36,
@@ -128,9 +142,14 @@ export const PALETTE_BY_DIAGRAM_TYPE: Record<DiagramType, SymbolType[]> = {
   "process-context": ["use-case", "actor", "team", "system", "hourglass", "system-boundary"],
   "state-machine": ["state", "initial-state", "final-state", "composite-state"],
   bpmn: [
+    "start-event",
     "task",
-    "gateway", "start-event", "intermediate-event", "end-event",
-    "subprocess", "pool", "lane",
+    "subprocess",
+    "gateway",
+    "intermediate-event",
+    "data-object",
+    "data-store",
+    "end-event",
   ],
 };
 

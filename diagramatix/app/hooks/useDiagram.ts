@@ -152,6 +152,12 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       } else if (action.payload.symbolType === "intermediate-event") {
         const count = state.elements.filter((e) => e.type === "intermediate-event").length;
         label = `Event ${count + 1}`;
+      } else if (action.payload.symbolType === "data-object") {
+        const count = state.elements.filter((e) => e.type === "data-object").length;
+        label = `Data Object ${count + 1}`;
+      } else if (action.payload.symbolType === "data-store") {
+        const count = state.elements.filter((e) => e.type === "data-store").length;
+        label = `Data Store ${count + 1}`;
       }
       const newEl: DiagramElement = {
         id: nanoid(),

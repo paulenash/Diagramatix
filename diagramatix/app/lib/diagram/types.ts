@@ -18,7 +18,9 @@ export type SymbolType =
   | "system-boundary"
   | "hourglass"
   | "composite-state"
-  | "system";
+  | "system"
+  | "data-object"
+  | "data-store";
 
 export type BpmnTaskType =
   | "none"
