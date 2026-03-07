@@ -103,6 +103,23 @@ function perpendicularExitScaled(pt: Point, side: Side, offset: number): Point {
   }
 }
 
+// For aligned side pairs (right→left etc.), shrink the stub when elements are close
+// so exitPt and approachPt never cross. Non-aligned pairs keep PERP_OFFSET.
+function adaptedPerpOffset(
+  srcEdge: Point, srcSide: Side,
+  tgtEdge: Point, tgtSide: Side
+): number {
+  let gap: number;
+  if      (srcSide === "right"  && tgtSide === "left")   gap = tgtEdge.x - srcEdge.x;
+  else if (srcSide === "left"   && tgtSide === "right")  gap = srcEdge.x - tgtEdge.x;
+  else if (srcSide === "bottom" && tgtSide === "top")    gap = tgtEdge.y - srcEdge.y;
+  else if (srcSide === "top"    && tgtSide === "bottom") gap = srcEdge.y - tgtEdge.y;
+  else return PERP_OFFSET;
+
+  if (gap <= 8) return 4;
+  return Math.min(PERP_OFFSET, Math.max(4, Math.floor((gap - 4) / 2)));
+}
+
 // All elements use centre as connection anchor; invisible leaders trim the interior segment
 export function getConnectionPointBySide(el: DiagramElement, _side: Side): Point {
   return { x: el.x + el.width / 2, y: el.y + el.height / 2 };
@@ -170,8 +187,9 @@ export function computeWaypoints(
     .filter((el) => el.id !== source.id && el.id !== target.id)
     .map(getBounds);
 
-  const exitPt     = perpendicularExit(srcEdge, sourceSide);
-  const approachPt = perpendicularApproach(tgtEdge, targetSide);
+  const perpOff    = adaptedPerpOffset(srcEdge, sourceSide, tgtEdge, targetSide);
+  const exitPt     = perpendicularExitScaled(srcEdge, sourceSide, perpOff);
+  const approachPt = perpendicularExitScaled(tgtEdge, targetSide, perpOff);
 
   let midPath: Point[];
   if (sourceSide === "right" && targetSide === "left") {
@@ -324,8 +342,9 @@ export function recomputeAllConnectors(
         const newTgtCenter  = getConnectionPointBySide(target, conn.targetSide);
         const newSrcEdge    = sidePoint(source, conn.sourceSide, conn.sourceOffsetAlong ?? 0.5);
         const newTgtEdge    = sidePoint(target, conn.targetSide, conn.targetOffsetAlong ?? 0.5);
-        const newExitPt     = perpendicularExit(newSrcEdge, conn.sourceSide);
-        const newApproachPt = perpendicularApproach(newTgtEdge, conn.targetSide);
+        const perpOff       = adaptedPerpOffset(newSrcEdge, conn.sourceSide, newTgtEdge, conn.targetSide);
+        const newExitPt     = perpendicularExitScaled(newSrcEdge, conn.sourceSide, perpOff);
+        const newApproachPt = perpendicularExitScaled(newTgtEdge, conn.targetSide, perpOff);
         const interior = wp.slice(3, N - 3);
         const merged = [
           newSrcCenter, newSrcEdge, newExitPt,

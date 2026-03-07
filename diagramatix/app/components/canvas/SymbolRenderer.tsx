@@ -554,7 +554,6 @@ export function SymbolRenderer({
   onUpdateProperties,
   onUpdateLabel,
 }: Props) {
-  const [isDraggingLabel, setIsDraggingLabel] = useState(false);
   const [isEditingGatewayLabel, setIsEditingGatewayLabel] = useState(false);
   const [editGatewayLabelValue, setEditGatewayLabelValue] = useState("");
   let dragStart: { mouseX: number; mouseY: number; elX: number; elY: number } | null = null;
@@ -609,8 +608,9 @@ export function SymbolRenderer({
       <SymbolShape el={element} />
 
       {showLabel && (
-        element.type === 'start-event' ||
-        element.type === 'end-event' ||
+        element.type === 'start-event'        ||
+        element.type === 'end-event'          ||
+        element.type === 'intermediate-event' ||
         element.type === 'gateway'
       ) ? (() => {
         const labelOffsetX = (element.properties.labelOffsetX as number) ?? 0;
@@ -646,7 +646,6 @@ export function SymbolRenderer({
           const startWorld = svgToWorld(e.clientX, e.clientY);
           const startOffsetX = labelOffsetX;
           const startOffsetY = labelOffsetY;
-          setIsDraggingLabel(true);
           document.body.style.cursor = "grabbing";
           function onMove(ev: MouseEvent) {
             const curWorld = svgToWorld!(ev.clientX, ev.clientY);
@@ -658,7 +657,6 @@ export function SymbolRenderer({
             });
           }
           function onUp() {
-            setIsDraggingLabel(false);
             document.body.style.cursor = "";
             window.removeEventListener("mousemove", onMove);
             window.removeEventListener("mouseup", onUp);
@@ -674,12 +672,14 @@ export function SymbolRenderer({
 
         return (
           <g>
-            <line
-              x1={elCenter.x} y1={elCenter.y}
-              x2={labelCenterX} y2={labelMidY}
-              stroke="#6b7280" strokeWidth={1} strokeDasharray="4 3"
-              style={{ pointerEvents: "none" }}
-            />
+            {isEditingGatewayLabel && (
+              <line
+                x1={elCenter.x} y1={elCenter.y}
+                x2={labelCenterX} y2={labelMidY}
+                stroke="#6b7280" strokeWidth={1} strokeDasharray="4 3"
+                style={{ pointerEvents: "none" }}
+              />
+            )}
             <rect
               x={hitRectX} y={hitRectY}
               width={labelWidth} height={Math.max(totalLabelH, 16)}

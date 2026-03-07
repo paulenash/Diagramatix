@@ -165,7 +165,7 @@ export function PropertiesPanel({
         <label className="block text-xs font-medium text-gray-700 mb-1">
           Label
         </label>
-        {element.type === "gateway" ? (
+        {(element.type === "gateway" || isEventElement) ? (
           <>
             <textarea
               key={element.id}
