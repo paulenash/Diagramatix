@@ -48,6 +48,7 @@ type Action =
   | { type: "UPDATE_CONNECTOR_LABEL"; payload: { id: string; label?: string; labelOffsetX?: number; labelOffsetY?: number; labelWidth?: number } }
   | { type: "CORRECT_ALL_CONNECTORS" }
   | { type: "SET_VIEWPORT"; payload: { x: number; y: number; zoom: number } }
+  | { type: "MOVE_END"; payload: { id: string } }
   | { type: "SPLIT_CONNECTOR"; payload: {
       symbolType: SymbolType;
       position: Point;
@@ -68,6 +69,49 @@ function containerAccepts(containerType: SymbolType, childType: SymbolType): boo
   if (containerType === "system-boundary") return childType === "use-case" || childType === "hourglass";
   if (containerType === "composite-state") return childType === "state" || childType === "initial-state" || childType === "final-state";
   return false;
+}
+
+function segmentIntersectsRect(
+  a: Point, b: Point,
+  rx: number, ry: number, rw: number, rh: number
+): boolean {
+  const inside = (p: Point) =>
+    p.x >= rx && p.x <= rx + rw && p.y >= ry && p.y <= ry + rh;
+  if (inside(a) || inside(b)) return true;
+
+  function cross2d(p1: Point, p2: Point, p3: Point, p4: Point): boolean {
+    const dx = p2.x - p1.x, dy = p2.y - p1.y;
+    const dx2 = p4.x - p3.x, dy2 = p4.y - p3.y;
+    const denom = dx * dy2 - dy * dx2;
+    if (Math.abs(denom) < 1e-10) return false;
+    const t = ((p3.x - p1.x) * dy2 - (p3.y - p1.y) * dx2) / denom;
+    const u = ((p3.x - p1.x) * dy  - (p3.y - p1.y) * dx)  / denom;
+    return t >= 0 && t <= 1 && u >= 0 && u <= 1;
+  }
+
+  const tl = { x: rx,      y: ry      };
+  const tr = { x: rx + rw, y: ry      };
+  const br = { x: rx + rw, y: ry + rh };
+  const bl = { x: rx,      y: ry + rh };
+  return cross2d(a, b, tl, tr) || cross2d(a, b, tr, br) ||
+         cross2d(a, b, br, bl) || cross2d(a, b, bl, tl);
+}
+
+function findConnectorOverlappingElement(
+  connectors: Connector[],
+  el: DiagramElement
+): Connector | null {
+  for (const c of connectors) {
+    if (c.type !== "sequence") continue;
+    if (c.sourceId === el.id || c.targetId === el.id) continue;
+    // Skip invisible leader endpoints (first and last point); check only visible segments
+    const pts = c.waypoints.slice(1, -1);
+    for (let i = 0; i < pts.length - 1; i++) {
+      if (segmentIntersectsRect(pts[i], pts[i + 1], el.x, el.y, el.width, el.height))
+        return c;
+    }
+  }
+  return null;
 }
 
 function reducer(state: DiagramData, action: Action): DiagramData {
@@ -317,6 +361,52 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         viewport: action.payload,
       };
 
+    case "MOVE_END": {
+      const { id } = action.payload;
+      const el = state.elements.find(e => e.id === id);
+      if (!el) return state;
+      if (el.type !== "gateway" && el.type !== "intermediate-event") return state;
+
+      const orig = findConnectorOverlappingElement(state.connectors, el);
+      if (!orig) return state;
+
+      const oppSide = (s: Side): Side =>
+        ({ left: "right", right: "left", top: "bottom", bottom: "top" } as const)[s];
+
+      const srcA = state.elements.find(e => e.id === orig.sourceId);
+      const tgtB = state.elements.find(e => e.id === orig.targetId);
+      if (!srcA || !tgtB) return state;
+
+      const cASide = oppSide(orig.sourceSide);
+      const cBSide = oppSide(orig.targetSide);
+
+      const { waypoints: wA, sourceInvisibleLeader: sIA, targetInvisibleLeader: tIA } =
+        computeWaypoints(srcA, el, state.elements, orig.sourceSide, cASide, orig.routingType,
+          orig.sourceOffsetAlong ?? 0.5, 0.5);
+
+      const { waypoints: wB, sourceInvisibleLeader: sIB, targetInvisibleLeader: tIB } =
+        computeWaypoints(el, tgtB, state.elements, cBSide, orig.targetSide, orig.routingType,
+          0.5, orig.targetOffsetAlong ?? 0.5);
+
+      const filtered = state.connectors.filter(c => c.id !== orig.id);
+      return {
+        ...state,
+        connectors: [
+          ...filtered,
+          { id: nanoid(), type: orig.type, sourceId: orig.sourceId, targetId: el.id,
+            sourceSide: orig.sourceSide, targetSide: cASide,
+            directionType: orig.directionType, routingType: orig.routingType,
+            sourceOffsetAlong: orig.sourceOffsetAlong, targetOffsetAlong: 0.5,
+            waypoints: wA, sourceInvisibleLeader: sIA, targetInvisibleLeader: tIA },
+          { id: nanoid(), type: orig.type, sourceId: el.id, targetId: orig.targetId,
+            sourceSide: cBSide, targetSide: orig.targetSide,
+            directionType: orig.directionType, routingType: orig.routingType,
+            sourceOffsetAlong: 0.5, targetOffsetAlong: orig.targetOffsetAlong,
+            waypoints: wB, sourceInvisibleLeader: sIB, targetInvisibleLeader: tIB },
+        ],
+      };
+    }
+
     case "SPLIT_CONNECTOR": {
       const { symbolType, position, taskType, eventType, connectorId } = action.payload;
       const orig = state.connectors.find(c => c.id === connectorId);
@@ -464,6 +554,10 @@ export function useDiagram(initialData: DiagramData) {
     }, []
   );
 
+  const elementMoveEnd = useCallback((id: string) => {
+    dispatch({ type: "MOVE_END", payload: { id } });
+  }, []);
+
   const splitConnector = useCallback((
     symbolType: SymbolType,
     position: Point,
@@ -500,6 +594,7 @@ export function useDiagram(initialData: DiagramData) {
     updateConnectorEndpoint,
     updateConnectorWaypoints,
     updateConnectorLabel,
+    elementMoveEnd,
     splitConnector,
     setData,
     setViewport,

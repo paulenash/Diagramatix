@@ -101,6 +101,7 @@ export function DiagramEditor({
     updateConnectorEndpoint,
     updateConnectorWaypoints,
     updateConnectorLabel,
+    elementMoveEnd,
     splitConnector,
     correctAllConnectors,
   } = useDiagram(initialData);
@@ -237,6 +238,7 @@ export function DiagramEditor({
           onUpdateConnectorWaypoints={updateConnectorWaypoints}
           onUpdateConnectorLabel={updateConnectorLabel}
           onSplitConnector={splitConnector}
+          onElementMoveEnd={elementMoveEnd}
         />
 
         <PropertiesPanel

@@ -136,6 +136,7 @@ interface Props {
   onUpdateConnectorWaypoints?: (id: string, waypoints: Point[]) => void;
   onUpdateConnectorLabel?: (id: string, label?: string, offsetX?: number, offsetY?: number, width?: number) => void;
   onSplitConnector?: (symbolType: SymbolType, position: Point, connectorId: string, taskType?: BpmnTaskType, eventType?: EventType) => void;
+  onElementMoveEnd?: (id: string) => void;
 }
 
 interface EditingLabel {
@@ -207,6 +208,7 @@ export function Canvas({
   onUpdateConnectorWaypoints,
   onUpdateConnectorLabel,
   onSplitConnector,
+  onElementMoveEnd,
 }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
 
@@ -617,6 +619,11 @@ export function Canvas({
               svgToWorld={clientToWorld}
               onUpdateProperties={onUpdateProperties}
               onUpdateLabel={onUpdateLabel}
+              onMoveEnd={
+                (el.type === "gateway" || el.type === "intermediate-event")
+                  ? () => onElementMoveEnd?.(el.id)
+                  : undefined
+              }
             />
           ))}
 
@@ -665,6 +672,11 @@ export function Canvas({
               svgToWorld={clientToWorld}
               onUpdateProperties={onUpdateProperties}
               onUpdateLabel={onUpdateLabel}
+              onMoveEnd={
+                (el.type === "gateway" || el.type === "intermediate-event")
+                  ? () => onElementMoveEnd?.(el.id)
+                  : undefined
+              }
               shouldSnapBack={(x, y) => {
                 const cx = x + el.width / 2;
                 const cy = y + el.height / 2;

@@ -18,6 +18,7 @@ interface Props {
   onResizeDragStart?: (handle: ResizeHandle, e: React.MouseEvent) => void;
   svgToWorld?: (clientX: number, clientY: number) => Point;
   shouldSnapBack?: (x: number, y: number) => boolean;
+  onMoveEnd?: () => void;
   onUpdateProperties?: (id: string, props: Record<string, unknown>) => void;
   onUpdateLabel?: (id: string, label: string) => void;
 }
@@ -558,6 +559,7 @@ export function SymbolRenderer({
   onResizeDragStart,
   svgToWorld,
   shouldSnapBack,
+  onMoveEnd,
   onUpdateProperties,
   onUpdateLabel,
 }: Props) {
@@ -592,6 +594,8 @@ export function SymbolRenderer({
       window.removeEventListener("mouseup", onMouseUp);
       if (shouldSnapBack?.(lastX, lastY)) {
         onMove(origX, origY);
+      } else {
+        onMoveEnd?.();
       }
     }
 
