@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import type { Connector, Point } from "@/app/lib/diagram/types";
 import { waypointsToSvgPath, waypointsToCurvePath } from "@/app/lib/diagram/routing";
 
@@ -10,7 +11,6 @@ interface Props {
   svgToWorld?: (clientX: number, clientY: number) => Point;
   onUpdateWaypoints?: (id: string, waypoints: Point[]) => void;
   onUpdateLabel?: (label: string, offsetX: number, offsetY: number, width: number) => void;
-  onLabelDoubleClick?: (anchorX: number, anchorY: number, label: string, width: number) => void;
 }
 
 function wrapText(text: string, maxWidth: number, fontSize = 10): string[] {
@@ -69,7 +69,148 @@ function OpenArrowMarkerStart({ id, color }: { id: string; color: string }) {
   );
 }
 
-export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, onUpdateWaypoints, onUpdateLabel, onLabelDoubleClick }: Props) {
+interface InteractionLabelProps {
+  connector: Connector;
+  selected: boolean;
+  visibleWaypoints: Point[];
+  svgToWorld?: (clientX: number, clientY: number) => Point;
+  onUpdateLabel?: (label: string, offsetX: number, offsetY: number, width: number) => void;
+}
+
+function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, onUpdateLabel }: InteractionLabelProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState("");
+
+  if (visibleWaypoints.length !== 4) return null;
+
+  const [p0, cp1, cp2, p3] = visibleWaypoints;
+  const anchor = cubicBezierPoint(p0, cp1, cp2, p3, 0.5);
+  const offsetX = connector.labelOffsetX ?? 0;
+  const offsetY = connector.labelOffsetY ?? -30;
+  const lWidth  = connector.labelWidth ?? 80;
+  const label   = connector.label ?? "";
+  const lines   = wrapText(label || " ", lWidth);
+  const lineH   = 14;
+  const lHeight = Math.max(lineH, lines.length * lineH);
+  const lCx     = anchor.x + offsetX;
+  const lTy     = anchor.y + offsetY;
+  const lMidY   = lTy + lHeight / 2;
+
+  const hasLabel = label.trim().length > 0;
+  if (!hasLabel && !isEditing) return null;
+
+  function handleLabelMouseDown(e: React.MouseEvent) {
+    if (!svgToWorld || !onUpdateLabel) return;
+    e.stopPropagation();
+    const startWorld = svgToWorld(e.clientX, e.clientY);
+    const startOX = offsetX;
+    const startOY = offsetY;
+    document.body.style.cursor = "grabbing";
+
+    function onMove(ev: MouseEvent) {
+      const cur = svgToWorld!(ev.clientX, ev.clientY);
+      onUpdateLabel!(label, startOX + (cur.x - startWorld.x), startOY + (cur.y - startWorld.y), lWidth);
+    }
+    function onUp() {
+      document.body.style.cursor = "";
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    }
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  }
+
+  function handleResizeMouseDown(e: React.MouseEvent) {
+    if (!svgToWorld || !onUpdateLabel) return;
+    e.stopPropagation();
+    const startWorld = svgToWorld(e.clientX, e.clientY);
+    const startW = lWidth;
+    document.body.style.cursor = "ew-resize";
+    function onMove(ev: MouseEvent) {
+      const cur = svgToWorld!(ev.clientX, ev.clientY);
+      onUpdateLabel!(label, offsetX, offsetY, Math.max(40, startW + (cur.x - startWorld.x) * 2));
+    }
+    function onUp() {
+      document.body.style.cursor = "";
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    }
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  }
+
+  function handleDoubleClick(e: React.MouseEvent) {
+    e.stopPropagation();
+    setEditValue(label);
+    setIsEditing(true);
+  }
+
+  function commitEdit(newText: string) {
+    setIsEditing(false);
+    onUpdateLabel?.(newText, offsetX, offsetY, lWidth);
+  }
+
+  return (
+    <g>
+      {/* Dotted tether: curve midpoint → label centre */}
+      <line
+        x1={anchor.x} y1={anchor.y} x2={lCx} y2={lMidY}
+        stroke="#6b7280" strokeWidth={1} strokeDasharray="4 3"
+        style={{ pointerEvents: "none" }}
+      />
+      {/* Label background — no border, just white fill */}
+      <rect
+        x={lCx - lWidth / 2} y={lTy} width={lWidth} height={lHeight}
+        fill="white" fillOpacity={0.9}
+        style={{ cursor: onUpdateLabel ? "grab" : "default" }}
+        onMouseDown={handleLabelMouseDown}
+        onDoubleClick={handleDoubleClick}
+      />
+      {/* Label text (hidden while editing) */}
+      {!isEditing && (
+        <text textAnchor="middle" fontSize={10} fill="#374151" style={{ pointerEvents: "none", userSelect: "none" }}>
+          {lines.map((ln, i) => (
+            <tspan key={i} x={lCx} y={lTy + i * lineH + lineH * 0.85}>{ln}</tspan>
+          ))}
+        </text>
+      )}
+      {/* Inline textarea — positioned exactly over the label area */}
+      {isEditing && (
+        <foreignObject x={lCx - lWidth / 2} y={lTy} width={lWidth} height={Math.max(lHeight, 28)}>
+          <textarea
+            autoFocus
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            onBlur={(e) => commitEdit(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") setIsEditing(false);
+              if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); commitEdit(editValue); }
+            }}
+            style={{
+              width: "100%", height: "100%",
+              fontSize: 10, fontFamily: "inherit",
+              resize: "none", border: "none", outline: "none",
+              background: "white", padding: "1px 2px",
+              textAlign: "center", lineHeight: "14px",
+              boxSizing: "border-box",
+            }}
+          />
+        </foreignObject>
+      )}
+      {/* Width resize handle (visible when selected) */}
+      {selected && onUpdateLabel && (
+        <rect
+          x={lCx + lWidth / 2 - 3} y={lMidY - 5} width={6} height={10}
+          fill="#2563eb" stroke="white" strokeWidth={1} rx={1}
+          style={{ cursor: "ew-resize" }}
+          onMouseDown={handleResizeMouseDown}
+        />
+      )}
+    </g>
+  );
+}
+
+export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, onUpdateWaypoints, onUpdateLabel }: Props) {
   const waypoints = connector.waypoints;
   if (waypoints.length === 0) return null;
 
@@ -215,92 +356,16 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
         style={{ pointerEvents: "none" }}
       />
 
-      {/* Floating interaction label with dotted tether */}
-      {connector.type === "interaction" && visibleWaypoints.length === 4 && (() => {
-        const [p0, cp1, cp2, p3] = visibleWaypoints;
-        const anchor = cubicBezierPoint(p0, cp1, cp2, p3, 0.5);
-        const offsetX = connector.labelOffsetX ?? 0;
-        const offsetY = connector.labelOffsetY ?? -30;
-        const lWidth  = connector.labelWidth ?? 80;
-        const label   = connector.label ?? "interaction label";
-        const lines   = wrapText(label, lWidth);
-        const lineH   = 14;
-        const lHeight = Math.max(lineH, lines.length * lineH);
-        const lCx     = anchor.x + offsetX;
-        const lTy     = anchor.y + offsetY;
-        const lMidY   = lTy + lHeight / 2;
-
-        function handleLabelMouseDown(e: React.MouseEvent) {
-          if (!svgToWorld || !onUpdateLabel) return;
-          e.stopPropagation();
-          const startWorld = svgToWorld(e.clientX, e.clientY);
-          const startOX = offsetX;
-          const startOY = offsetY;
-          function onMove(ev: MouseEvent) {
-            if (!svgToWorld) return;
-            const cur = svgToWorld(ev.clientX, ev.clientY);
-            onUpdateLabel!(label, startOX + (cur.x - startWorld.x), startOY + (cur.y - startWorld.y), lWidth);
-          }
-          function onUp() {
-            window.removeEventListener("mousemove", onMove);
-            window.removeEventListener("mouseup", onUp);
-          }
-          window.addEventListener("mousemove", onMove);
-          window.addEventListener("mouseup", onUp);
-        }
-
-        function handleResizeMouseDown(e: React.MouseEvent) {
-          if (!svgToWorld || !onUpdateLabel) return;
-          e.stopPropagation();
-          const startWorld = svgToWorld(e.clientX, e.clientY);
-          const startW = lWidth;
-          function onMove(ev: MouseEvent) {
-            if (!svgToWorld) return;
-            const cur = svgToWorld(ev.clientX, ev.clientY);
-            onUpdateLabel!(label, offsetX, offsetY, Math.max(40, startW + (cur.x - startWorld.x) * 2));
-          }
-          function onUp() {
-            window.removeEventListener("mousemove", onMove);
-            window.removeEventListener("mouseup", onUp);
-          }
-          window.addEventListener("mousemove", onMove);
-          window.addEventListener("mouseup", onUp);
-        }
-
-        return (
-          <g>
-            <line
-              x1={anchor.x} y1={anchor.y} x2={lCx} y2={lMidY}
-              stroke="#6b7280" strokeWidth={1} strokeDasharray="4 3"
-              style={{ pointerEvents: "none" }}
-            />
-            <rect
-              x={lCx - lWidth / 2} y={lTy} width={lWidth} height={lHeight}
-              fill="white" fillOpacity={0.9}
-              stroke={selected ? "#2563eb" : "#9ca3af"} strokeWidth={1} strokeDasharray="3 2"
-              style={{ cursor: onUpdateLabel ? "move" : "default" }}
-              onMouseDown={handleLabelMouseDown}
-              onDoubleClick={(e) => {
-                e.stopPropagation();
-                onLabelDoubleClick?.(anchor.x + offsetX, anchor.y + offsetY, label, lWidth);
-              }}
-            />
-            <text textAnchor="middle" fontSize={10} fill="#374151" style={{ pointerEvents: "none", userSelect: "none" }}>
-              {lines.map((ln, i) => (
-                <tspan key={i} x={lCx} y={lTy + i * lineH + lineH * 0.85}>{ln}</tspan>
-              ))}
-            </text>
-            {selected && onUpdateLabel && (
-              <rect
-                x={lCx + lWidth / 2 - 3} y={lMidY - 5} width={6} height={10}
-                fill="#2563eb" stroke="white" strokeWidth={1} rx={1}
-                style={{ cursor: "ew-resize" }}
-                onMouseDown={handleResizeMouseDown}
-              />
-            )}
-          </g>
-        );
-      })()}
+      {/* Floating interaction label */}
+      {connector.type === "interaction" && (
+        <InteractionLabel
+          connector={connector}
+          selected={selected}
+          visibleWaypoints={visibleWaypoints}
+          svgToWorld={svgToWorld}
+          onUpdateLabel={onUpdateLabel}
+        />
+      )}
 
       {/* Segment drag handles (rectilinear, selected, interior segments only) */}
       {selected && draggableSegments.map((segIdx) => {

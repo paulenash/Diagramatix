@@ -180,7 +180,6 @@ export function Canvas({
   const [pan, setPan] = useState<Point>({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [editingLabel, setEditingLabel] = useState<EditingLabel | null>(null);
-  const [editingConnectorLabel, setEditingConnectorLabel] = useState<{ connectorId: string; anchorX: number; anchorY: number; value: string; width: number } | null>(null);
   const [draggingConnector, setDraggingConnector] = useState<DraggingConnector | null>(null);
   const [draggingEndpoint, setDraggingEndpoint] = useState<DraggingEndpoint | null>(null);
   const [pendingDrop, setPendingDrop] = useState<PendingDrop | null>(null);
@@ -572,9 +571,6 @@ export function Canvas({
               onUpdateLabel={onUpdateConnectorLabel
                 ? (label, ox, oy, w) => onUpdateConnectorLabel(conn.id, label, ox, oy, w)
                 : undefined}
-              onLabelDoubleClick={(ax, ay, label, w) =>
-                setEditingConnectorLabel({ connectorId: conn.id, anchorX: ax, anchorY: ay, value: label, width: w })
-              }
             />
           ))}
 
@@ -672,27 +668,6 @@ export function Canvas({
             />
           )}
 
-          {/* Connector label inline editor */}
-          {editingConnectorLabel && (() => {
-            const { anchorX, anchorY, value, width } = editingConnectorLabel;
-            return (
-              <foreignObject x={anchorX - width / 2} y={anchorY - 60} width={width} height={80}>
-                <textarea
-                  // eslint-disable-next-line jsx-a11y/no-autofocus
-                  autoFocus
-                  defaultValue={value}
-                  style={{ width: "100%", height: "100%", fontSize: 10, resize: "none", border: "1px solid #2563eb", borderRadius: 2, padding: 2, boxSizing: "border-box" }}
-                  onBlur={(e) => {
-                    onUpdateConnectorLabel?.(editingConnectorLabel.connectorId, e.target.value);
-                    setEditingConnectorLabel(null);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Escape") setEditingConnectorLabel(null);
-                  }}
-                />
-              </foreignObject>
-            );
-          })()}
         </g>
       </svg>
 

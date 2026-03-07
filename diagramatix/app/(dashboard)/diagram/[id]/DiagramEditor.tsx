@@ -114,7 +114,9 @@ export function DiagramEditor({
   const selectedConnector = data.connectors.find((c) => c.id === selectedConnectorId) ?? null;
 
   const defaultDirectionType: DirectionType =
-    diagramType === "process-context" ? "non-directed" : "directed";
+    diagramType === "process-context" ? "non-directed" :
+    diagramType === "state-machine"   ? "open-directed" :
+    "directed";
 
   const defaultRoutingType: RoutingType =
     diagramType === "process-context" ? "direct" :
@@ -180,13 +182,15 @@ export function DiagramEditor({
           {saveStatus === "unsaved" && "Unsaved changes"}
         </span>
 
-        <button
-          onClick={correctAllConnectors}
-          className="px-3 py-1.5 text-xs text-gray-600 border border-gray-300 rounded hover:bg-gray-50"
-          title="Make all connector segments strictly horizontal or vertical"
-        >
-          Correct Connectors
-        </button>
+        {diagramType === "bpmn" && (
+          <button
+            onClick={correctAllConnectors}
+            className="px-3 py-1.5 text-xs text-gray-600 border border-gray-300 rounded hover:bg-gray-50"
+            title="Make all connector segments strictly horizontal or vertical"
+          >
+            Correct Connectors
+          </button>
+        )}
 
         <button
           onClick={handleExport}
