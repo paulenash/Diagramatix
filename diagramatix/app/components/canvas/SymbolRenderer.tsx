@@ -610,10 +610,12 @@ function PoolShape({ el }: { el: DiagramElement }) {
   const cy = y + h / 2;
   const lines = el.label.split('\n');
   const lineH = 13;
+  const isWhiteBox = ((el.properties.poolType as string | undefined) ?? "black-box") === "white-box";
   return (
     <g>
       <rect x={x} y={y} width={w} height={h} fill="#f9fafb" stroke="#374151" strokeWidth={1.5} />
-      <rect x={x} y={y} width={LW} height={h} fill="#c8956a" stroke="#374151" strokeWidth={1.5} />
+      <rect x={x} y={y} width={LW} height={h} fill="#c8956a" stroke="#374151" strokeWidth={1.5}
+        style={isWhiteBox ? { cursor: "pointer" } : undefined} />
       <text textAnchor="middle" fontSize={11} fill="#3b1a08" fontWeight="500"
             transform={`rotate(-90,${cx},${cy})`}
             style={{ userSelect: "none", pointerEvents: "none" }}>
@@ -736,6 +738,17 @@ export function SymbolRenderer({
 
   function handleMouseDown(e: React.MouseEvent) {
     e.stopPropagation();
+
+    // White-box pool: only the 30px header sidebar accepts interaction
+    const isWhiteBoxPool = element.type === "pool" &&
+      ((element.properties.poolType as string | undefined) ?? "black-box") === "white-box";
+    if (isWhiteBoxPool) {
+      const POOL_LW = 30;
+      const worldPos = svgToWorld ? svgToWorld(e.clientX, e.clientY) : null;
+      if (worldPos && worldPos.x > element.x + POOL_LW) return; // body click — ignore
+      if (selected) { onSelect(); return; }                      // header re-click — deselect, no drag
+    }
+
     onSelect();
     dragStart = {
       mouseX: e.clientX,
@@ -774,6 +787,8 @@ export function SymbolRenderer({
   const isActorOrTeam = element.type === "actor" || element.type === "team" || element.type === "system";
   const isBoundary = element.type === "system-boundary";  // excluded from connection overlay
   const isPoolLane = element.type === "pool" || element.type === "lane";
+  const isWhiteBoxPool = element.type === "pool" &&
+    ((element.properties.poolType as string | undefined) ?? "black-box") === "white-box";
   const isContainer = isBoundary || element.type === "composite-state" || isPoolLane; // gets resize handles
   const canResize = isContainer || element.type === "task" || element.type === "subprocess" ||
     element.type === "subprocess-expanded" || element.type === "use-case";
@@ -783,7 +798,7 @@ export function SymbolRenderer({
     <g
       onMouseDown={handleMouseDown}
       onDoubleClick={(e) => { e.stopPropagation(); onDoubleClick(); }}
-      style={{ cursor: isBoundary ? "default" : "move" }}
+      style={{ cursor: (isBoundary || isWhiteBoxPool) ? "default" : "move" }}
     >
       <SymbolShape el={element} />
 

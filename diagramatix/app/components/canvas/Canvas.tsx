@@ -792,6 +792,8 @@ export function Canvas({
             const isMsgTarget = isDraggingConnector && isBpmnSource &&
               el.type === "pool" && el.id !== draggingSourcePoolId &&
               ((el.properties.poolType as string | undefined) ?? "black-box") === "black-box";
+            const isWhiteBoxPool = el.type === "pool" &&
+              ((el.properties.poolType as string | undefined) ?? "black-box") === "white-box";
             return (
               <SymbolRenderer
                 key={el.id}
@@ -801,15 +803,20 @@ export function Canvas({
                 isDisallowedTarget={false}
                 isMessageBpmnTarget={isMsgTarget}
                 onSelect={() => {
-                  onSelectElement(el.id);
+                  if (isWhiteBoxPool && el.id === selectedElementId) {
+                    onSelectElement(null); // toggle deselect for white-box pools
+                  } else {
+                    onSelectElement(el.id);
+                  }
                   onSelectConnector(null);
                 }}
                 onMove={(x, y) => onMoveElement(el.id, x, y)}
                 onDoubleClick={() => startEditingLabel(el)}
-                onConnectionPointDragStart={(side, worldPos) =>
-                  handleConnectionPointDragStart(el.id, side, worldPos)
-                }
-                showConnectionPoints={el.id === selectedElementId || isDraggingConnector}
+                onConnectionPointDragStart={(side, worldPos) => {
+                  if (isWhiteBoxPool) return; // no connectors from white-box pools
+                  handleConnectionPointDragStart(el.id, side, worldPos);
+                }}
+                showConnectionPoints={!isWhiteBoxPool && (el.id === selectedElementId || isDraggingConnector)}
                 onResizeDragStart={(handle, e) => handleResizeDragStart(el.id, handle, e)}
                 svgToWorld={clientToWorld}
                 onUpdateProperties={onUpdateProperties}
