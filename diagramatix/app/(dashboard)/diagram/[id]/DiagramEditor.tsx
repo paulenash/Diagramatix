@@ -126,6 +126,10 @@ export function DiagramEditor({
     diagramType === "state-machine"   ? "curvilinear" :
     "rectilinear";
 
+  const poolHasContent = selectedElement?.type === "pool"
+    ? data.elements.some((e) => e.parentId === selectedElement.id)
+    : false;
+
   const hasSystemBoundary = data.elements.some((e) => e.type === "system-boundary");
   const disabledSymbols: SymbolType[] = hasSystemBoundary ? ["system-boundary"] : [];
 
@@ -259,6 +263,7 @@ export function DiagramEditor({
             setSelectedConnectorId(null);
           }}
           onAddLane={addLane}
+          poolHasContent={poolHasContent}
         />
       </div>
     </div>

@@ -561,17 +561,21 @@ function BpmnTaskShape({ el }: { el: DiagramElement }) {
 function PoolShape({ el }: { el: DiagramElement }) {
   const { x, y, width: w, height: h } = el;
   const LW = 30;
+  const cx = x + LW / 2;
+  const cy = y + h / 2;
+  const lines = el.label.split('\n');
+  const lineH = 13;
   return (
     <g>
       <rect x={x} y={y} width={w} height={h} fill="#f9fafb" stroke="#374151" strokeWidth={1.5} />
-      <rect x={x} y={y} width={LW} height={h} fill="#dbeafe" stroke="#374151" strokeWidth={1.5} />
-      <text
-        x={x + LW / 2} y={y + h / 2}
-        textAnchor="middle" dominantBaseline="middle"
-        transform={`rotate(-90,${x + LW / 2},${y + h / 2})`}
-        fontSize={11} fill="#1e3a5f" fontWeight="500"
-        style={{ userSelect: "none", pointerEvents: "none" }}
-      >{el.label}</text>
+      <rect x={x} y={y} width={LW} height={h} fill="#7c3a2a" stroke="#374151" strokeWidth={1.5} />
+      <text textAnchor="middle" fontSize={11} fill="white" fontWeight="500"
+            transform={`rotate(-90,${cx},${cy})`}
+            style={{ userSelect: "none", pointerEvents: "none" }}>
+        {lines.map((line, i) => (
+          <tspan key={i} x={cx} y={cy + (i - (lines.length - 1) / 2) * lineH}>{line}</tspan>
+        ))}
+      </text>
     </g>
   );
 }
@@ -579,17 +583,21 @@ function PoolShape({ el }: { el: DiagramElement }) {
 function LaneShape({ el }: { el: DiagramElement }) {
   const { x, y, width: w, height: h } = el;
   const LW = 24;
+  const cx = x + LW / 2;
+  const cy = y + h / 2;
+  const lines = el.label.split('\n');
+  const lineH = 12;
   return (
     <g>
       <rect x={x} y={y} width={w} height={h} fill="none" stroke="#374151" strokeWidth={1} />
-      <rect x={x} y={y} width={LW} height={h} fill="#ede9fe" stroke="#374151" strokeWidth={1} />
-      <text
-        x={x + LW / 2} y={y + h / 2}
-        textAnchor="middle" dominantBaseline="middle"
-        transform={`rotate(-90,${x + LW / 2},${y + h / 2})`}
-        fontSize={10} fill="#374151"
-        style={{ userSelect: "none", pointerEvents: "none" }}
-      >{el.label}</text>
+      <rect x={x} y={y} width={LW} height={h} fill="#c8956a" stroke="#374151" strokeWidth={1} />
+      <text textAnchor="middle" fontSize={10} fill="#3b1a08"
+            transform={`rotate(-90,${cx},${cy})`}
+            style={{ userSelect: "none", pointerEvents: "none" }}>
+        {lines.map((line, i) => (
+          <tspan key={i} x={cx} y={cy + (i - (lines.length - 1) / 2) * lineH}>{line}</tspan>
+        ))}
+      </text>
     </g>
   );
 }
@@ -888,7 +896,9 @@ export function SymbolRenderer({
       })() : showLabel && !(
         element.type === 'task' ||
         element.type === 'subprocess' ||
-        element.type === 'use-case'
+        element.type === 'use-case' ||
+        element.type === 'pool' ||
+        element.type === 'lane'
       ) && (
         <text
           x={labelInfo.x}

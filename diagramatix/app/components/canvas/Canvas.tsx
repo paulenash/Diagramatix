@@ -523,15 +523,27 @@ export function Canvas({
   }
 
   function startEditingLabel(el: DiagramElement) {
-    const isContainer = el.type === "system-boundary" || el.type === "composite-state";
-    setEditingLabel({
-      elementId: el.id,
-      x: el.x * zoom + pan.x,
-      y: el.y * zoom + pan.y,
-      width: el.width * zoom,
-      height: isContainer ? HEADER_H * zoom : el.height * zoom,
-      value: el.label,
-    });
+    const isOldContainer = el.type === "system-boundary" || el.type === "composite-state";
+    if (el.type === "pool" || el.type === "lane") {
+      const lw = el.type === "pool" ? 30 : 24;
+      setEditingLabel({
+        elementId: el.id,
+        x: (el.x + lw) * zoom + pan.x,
+        y: el.y * zoom + pan.y,
+        width: Math.min(180, (el.width - lw) * zoom),
+        height: Math.min(80, el.height * zoom),
+        value: el.label,
+      });
+    } else {
+      setEditingLabel({
+        elementId: el.id,
+        x: el.x * zoom + pan.x,
+        y: el.y * zoom + pan.y,
+        width: el.width * zoom,
+        height: isOldContainer ? HEADER_H * zoom : el.height * zoom,
+        value: el.label,
+      });
+    }
   }
 
   function commitLabel() {
@@ -792,6 +804,7 @@ export function Canvas({
       {editingLabel && (() => {
         const editingEl = data.elements.find(e => e.id === editingLabel.elementId);
         const isUseCase = editingEl?.type === 'use-case';
+        const isPoolLane = editingEl?.type === 'pool' || editingEl?.type === 'lane';
         const commonChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
           setEditingLabel(prev => prev ? { ...prev, value: e.target.value } : null);
         if (isUseCase) {
@@ -825,6 +838,36 @@ export function Canvas({
                 resize: 'none',
                 overflow: 'hidden',
               }}
+            />
+          );
+        }
+        if (isPoolLane) {
+          return (
+            <textarea
+              autoFocus
+              value={editingLabel.value}
+              onChange={commonChange as React.ChangeEventHandler<HTMLTextAreaElement>}
+              onBlur={commitLabel}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') setEditingLabel(null);
+                if (e.key === 'Enter' && e.ctrlKey) { e.preventDefault(); commitLabel(); }
+              }}
+              style={{
+                position: 'absolute',
+                left: editingLabel.x,
+                top: editingLabel.y,
+                width: editingLabel.width,
+                height: editingLabel.height,
+                fontSize: 11 * zoom,
+                textAlign: 'left',
+                background: 'white',
+                border: '2px solid #7c3a2a',
+                borderRadius: 4,
+                outline: 'none',
+                padding: '4px',
+                resize: 'none',
+              }}
+              placeholder="Enter name (Ctrl+Enter to confirm)"
             />
           );
         }

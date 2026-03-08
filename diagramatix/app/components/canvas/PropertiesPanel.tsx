@@ -22,6 +22,7 @@ interface Props {
   onUpdateConnectorDirection: (id: string, directionType: DirectionType) => void;
   onUpdateConnectorLabel?: (id: string, label: string) => void;
   onAddLane?: (poolId: string) => void;
+  poolHasContent?: boolean;
 }
 
 const TASK_TYPE_OPTIONS: { value: BpmnTaskType; label: string }[] = [
@@ -63,6 +64,7 @@ export function PropertiesPanel({
   onUpdateConnectorDirection,
   onUpdateConnectorLabel,
   onAddLane,
+  poolHasContent,
 }: Props) {
   const [labelDraft, setLabelDraft] = useState("");
 
@@ -207,13 +209,36 @@ export function PropertiesPanel({
         )}
       </div>
 
-      {element.type === "pool" && onAddLane && (
-        <button
-          onClick={() => onAddLane(element.id)}
-          className="w-full px-3 py-1.5 text-xs bg-blue-50 text-blue-700 border border-blue-200 rounded hover:bg-blue-100"
-        >
-          + Add Lane
-        </button>
+      {element.type === "pool" && (
+        <>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Type</label>
+            <div className="flex flex-wrap gap-1">
+              {(["black-box", "white-box"] as const).map((v) => (
+                <button
+                  key={v}
+                  onClick={() => onUpdateProperties(element.id, { poolType: v })}
+                  className={`px-2 py-1 text-xs rounded border ${
+                    ((element.properties.poolType as string | undefined) ?? "black-box") === v
+                      ? "bg-blue-600 text-white border-blue-600"
+                      : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                  }`}
+                >
+                  {v === "black-box" ? "Black-box" : "White-box"}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {onAddLane && (
+            <button
+              onClick={() => onAddLane(element.id)}
+              className="w-full px-3 py-1.5 text-xs bg-blue-50 text-blue-700 border border-blue-200 rounded hover:bg-blue-100"
+            >
+              + Add Lane
+            </button>
+          )}
+        </>
       )}
 
       {element.type === "data-object" && (
@@ -346,12 +371,33 @@ export function PropertiesPanel({
         </p>
       </div>
 
-      <button
-        onClick={() => onDeleteElement(element.id)}
-        className="w-full px-3 py-1.5 text-xs bg-red-50 text-red-600 border border-red-200 rounded hover:bg-red-100"
-      >
-        Delete element
-      </button>
+      {element.type === "pool" ? (
+        poolHasContent ? (
+          <div>
+            <p className="text-xs text-orange-600 mb-1">Remove all lanes and elements first</p>
+            <button
+              disabled
+              className="w-full px-3 py-1.5 text-xs bg-gray-50 text-gray-400 border border-gray-200 rounded cursor-not-allowed"
+            >
+              Delete pool
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => onDeleteElement(element.id)}
+            className="w-full px-3 py-1.5 text-xs bg-red-50 text-red-600 border border-red-200 rounded hover:bg-red-100"
+          >
+            Delete pool
+          </button>
+        )
+      ) : (
+        <button
+          onClick={() => onDeleteElement(element.id)}
+          className="w-full px-3 py-1.5 text-xs bg-red-50 text-red-600 border border-red-200 rounded hover:bg-red-100"
+        >
+          Delete element
+        </button>
+      )}
     </div>
   );
 }

@@ -137,6 +137,17 @@ function findConnectorOverlappingElement(
   return null;
 }
 
+function updatePoolTypes(elements: DiagramElement[]): DiagramElement[] {
+  return elements.map((el) => {
+    if (el.type !== "pool") return el;
+    const hasContent = elements.some((e) => e.parentId === el.id);
+    const current = (el.properties.poolType as string | undefined) ?? "black-box";
+    const next = hasContent ? "white-box" : "black-box";
+    if (current === next) return el;
+    return { ...el, properties: { ...el.properties, poolType: next } };
+  });
+}
+
 function reducer(state: DiagramData, action: Action): DiagramData {
   switch (action.type) {
     case "SET_DATA":
@@ -196,7 +207,7 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         width: def.defaultWidth,
         height: def.defaultHeight,
         label,
-        properties: {},
+        properties: action.payload.symbolType === "pool" ? { poolType: "black-box" } : {},
         taskType:  action.payload.taskType,
         eventType: action.payload.eventType,
       };
@@ -238,7 +249,7 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       });
 
       const connectors = recomputeAllConnectors(state.connectors, elements);
-      return { ...state, elements, connectors };
+      return { ...state, elements: updatePoolTypes(elements), connectors };
     }
 
     case "RESIZE_ELEMENT": {
@@ -280,6 +291,10 @@ function reducer(state: DiagramData, action: Action): DiagramData {
     case "DELETE_ELEMENT": {
       const { id } = action.payload;
       const el = state.elements.find((e) => e.id === id);
+      // Prevent deleting a pool that still has lanes or elements inside
+      if (el?.type === "pool" && state.elements.some((e) => e.parentId === id)) {
+        return state;
+      }
       const deletingIsContainer = el ? isContainerType(el.type) : false;
       const elements = state.elements
         .filter((e) => e.id !== id)
@@ -289,7 +304,7 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       const connectors = state.connectors.filter(
         (c) => c.sourceId !== id && c.targetId !== id
       );
-      return { ...state, elements, connectors };
+      return { ...state, elements: updatePoolTypes(elements), connectors };
     }
 
     case "ADD_CONNECTOR": {
@@ -534,7 +549,7 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       const elements = state.elements.map((e) =>
         e.id === poolId && neededH > e.height ? { ...e, height: neededH } : e
       );
-      return { ...state, elements: [...elements, newLane] };
+      return { ...state, elements: updatePoolTypes([...elements, newLane]) };
     }
 
     default:
