@@ -141,7 +141,7 @@ export function PropertiesPanel({
             </div>
           </div>
         )}
-        {connector.type === "interaction" && onUpdateConnectorLabel && (
+        {(connector.type === "interaction" || connector.type === "messageBPMN") && onUpdateConnectorLabel && (
           <div>
             <p className="text-xs font-medium text-gray-700 mb-1">Label</p>
             <textarea

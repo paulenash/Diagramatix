@@ -749,7 +749,7 @@ export function Canvas({
           ))}
 
           {/* Regular connectors — rendered behind elements */}
-          {data.connectors.filter(c => c.type !== "associationBPMN").map((conn) => (
+          {data.connectors.filter(c => c.type !== "associationBPMN" && c.type !== "messageBPMN").map((conn) => (
             <ConnectorRenderer
               key={conn.id}
               connector={conn}
@@ -815,7 +815,7 @@ export function Canvas({
           ))}
 
           {/* Association connectors — rendered above all elements */}
-          {data.connectors.filter(c => c.type === "associationBPMN").map((conn) => (
+          {data.connectors.filter(c => c.type === "associationBPMN" || c.type === "messageBPMN").map((conn) => (
             <ConnectorRenderer
               key={conn.id}
               connector={conn}

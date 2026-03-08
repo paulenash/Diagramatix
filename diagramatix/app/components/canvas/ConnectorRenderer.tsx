@@ -196,7 +196,7 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
       {/* Label background — no border, just white fill */}
       <rect
         x={lCx - lWidth / 2} y={lTy} width={lWidth} height={lHeight}
-        fill="white" fillOpacity={0.9}
+        fill="white" fillOpacity={1}
         style={{ cursor: onUpdateLabel ? "grab" : "default" }}
         onMouseDown={handleLabelMouseDown}
         onDoubleClick={handleDoubleClick}
@@ -252,7 +252,7 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
   const isMessage = connector.type === "message";
   const isAssocBPMN = connector.type === "associationBPMN";
   const isMessageBPMN = connector.type === "messageBPMN";
-  const strokeColor = selected ? "#2563eb" : "#6b7280";
+  const strokeColor = selected ? "#2563eb" : isMessageBPMN ? "#b0b7c3" : "#6b7280";
   const markerId = `arrow-${connector.id}`;
   const openMarkerId = `arrow-open-${connector.id}`;
   const openStartMarkerId = `arrow-open-start-${connector.id}`;
@@ -408,7 +408,7 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
       />
 
       {/* Floating interaction label */}
-      {connector.type === "interaction" && (
+      {(connector.type === "interaction" || connector.type === "messageBPMN") && (
         <InteractionLabel
           connector={connector}
           selected={selected}

@@ -409,6 +409,11 @@ function reducer(state: DiagramData, action: Action): DiagramData {
           ? messageBpmnWaypoints(source, target, sourceSide, targetSide, 0.5)
           : computeWaypoints(source, target, state.elements, sourceSide, targetSide, routingType);
 
+      const isMsgBpmn = connectorType === "messageBPMN";
+      const msgBpmnCount = isMsgBpmn
+        ? state.connectors.filter((c) => c.type === "messageBPMN").length
+        : 0;
+
       const newConnector: Connector = {
         id: nanoid(),
         sourceId,
@@ -421,10 +426,12 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         sourceInvisibleLeader,
         targetInvisibleLeader,
         waypoints,
-        label:        connectorType === "interaction" ? "interaction label" : undefined,
-        labelOffsetX: connectorType === "interaction" ? 0   : undefined,
-        labelOffsetY: connectorType === "interaction" ? -30 : undefined,
-        labelWidth:   connectorType === "interaction" ? 80  : undefined,
+        label:        connectorType === "interaction" ? "interaction label"
+                    : isMsgBpmn                       ? `message ${msgBpmnCount + 1}`
+                    : undefined,
+        labelOffsetX: connectorType === "interaction" ? 0   : isMsgBpmn ? 20  : undefined,
+        labelOffsetY: connectorType === "interaction" ? -30 : isMsgBpmn ? 0   : undefined,
+        labelWidth:   connectorType === "interaction" ? 80  : isMsgBpmn ? 80  : undefined,
       };
 
       return { ...state, connectors: [...state.connectors, newConnector] };
