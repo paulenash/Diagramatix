@@ -22,6 +22,8 @@ const HEADER_H = 28;
 const MIN_BOUNDARY_W = 100;
 const MIN_BOUNDARY_H = HEADER_H + 40;
 
+const DATA_ELEMENT_TYPES = new Set<SymbolType>(["data-object", "data-store"]);
+
 const USE_CASE_DEFAULT_W = 120;
 const USE_CASE_DEFAULT_H = 60;
 const USE_CASE_ASPECT = USE_CASE_DEFAULT_W / USE_CASE_DEFAULT_H;
@@ -279,13 +281,22 @@ export function Canvas({
         const targetSide = getClosestSide(pos, targetEl);
         const sourceEl = data.elements.find((e) => e.id === elementId);
         const actorLike = ["actor", "team"];
-        const connType: ConnectorType =
-          defaultRoutingType === "curvilinear"
+
+        const isDataConn =
+          (sourceEl && DATA_ELEMENT_TYPES.has(sourceEl.type)) ||
+          DATA_ELEMENT_TYPES.has(targetEl.type);
+
+        const connType: ConnectorType = isDataConn
+          ? "associationBPMN"
+          : defaultRoutingType === "curvilinear"
             ? "interaction"
             : (sourceEl && actorLike.includes(sourceEl.type)) || actorLike.includes(targetEl.type)
               ? "association"
               : "sequence";
-        onAddConnector(elementId, targetEl.id, connType, defaultDirectionType, defaultRoutingType, side, targetSide);
+        const connRouting: RoutingType = isDataConn ? "direct" : defaultRoutingType;
+        const connDirection: DirectionType = isDataConn ? "open-directed" : defaultDirectionType;
+
+        onAddConnector(elementId, targetEl.id, connType, connDirection, connRouting, side, targetSide);
       }
       setDraggingConnector(null);
       window.removeEventListener("mousemove", onMouseMove);
@@ -329,13 +340,21 @@ export function Canvas({
         onSelectConnector(null);
       } else {
         // Dropped elsewhere — reconnect to a different element
-        const epFilter = conn?.routingType === "direct"
-          ? (el: DiagramElement) => el.type === "use-case"
-          : undefined;
+        const isAssocBPMN = conn?.type === "associationBPMN";
+        const epFilter = isAssocBPMN
+          ? undefined  // associationBPMN can connect to any element
+          : conn?.routingType === "direct"
+            ? (el: DiagramElement) => el.type === "use-case"
+            : undefined;
         const targetEl = findDropTarget(pos, fromId, epFilter);
         if (targetEl) {
-          const newSide = getClosestSide(pos, targetEl);
-          onUpdateConnectorEndpoint(connectorId, endpoint, targetEl.id, newSide, 0.5);
+          // Block: non-associationBPMN connectors cannot connect to data elements
+          if (!isAssocBPMN && DATA_ELEMENT_TYPES.has(targetEl.type)) {
+            // silently abort
+          } else {
+            const newSide = getClosestSide(pos, targetEl);
+            onUpdateConnectorEndpoint(connectorId, endpoint, targetEl.id, newSide, 0.5);
+          }
         }
         onSelectConnector(null);
       }
@@ -627,8 +646,8 @@ export function Canvas({
             />
           ))}
 
-          {/* Connectors */}
-          {data.connectors.map((conn) => (
+          {/* Regular connectors — rendered behind elements */}
+          {data.connectors.filter(c => c.type !== "associationBPMN").map((conn) => (
             <ConnectorRenderer
               key={conn.id}
               connector={conn}
@@ -690,6 +709,24 @@ export function Canvas({
                     cy >= b.y && cy <= b.y + b.height
                 );
               }}
+            />
+          ))}
+
+          {/* Association connectors — rendered above all elements */}
+          {data.connectors.filter(c => c.type === "associationBPMN").map((conn) => (
+            <ConnectorRenderer
+              key={conn.id}
+              connector={conn}
+              selected={conn.id === selectedConnectorId}
+              onSelect={() => {
+                onSelectConnector(conn.id);
+                onSelectElement(null);
+              }}
+              svgToWorld={clientToWorld}
+              onUpdateWaypoints={onUpdateConnectorWaypoints}
+              onUpdateLabel={onUpdateConnectorLabel
+                ? (label, ox, oy, w) => onUpdateConnectorLabel(conn.id, label, ox, oy, w)
+                : undefined}
             />
           ))}
 

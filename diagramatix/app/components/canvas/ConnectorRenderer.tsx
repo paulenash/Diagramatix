@@ -215,13 +215,16 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
   if (waypoints.length === 0) return null;
 
   const isMessage = connector.type === "message";
+  const isAssocBPMN = connector.type === "associationBPMN";
   const strokeColor = selected ? "#2563eb" : "#6b7280";
   const markerId = `arrow-${connector.id}`;
   const openMarkerId = `arrow-open-${connector.id}`;
   const openStartMarkerId = `arrow-open-start-${connector.id}`;
   const showArrow = connector.directionType !== "non-directed";
   const isBothArrow = connector.directionType === "both";
-  const isOpenArrow = connector.directionType === "open-directed" || isBothArrow;
+  // associationBPMN always uses open arrowheads (never filled)
+  const isOpenArrow = connector.directionType === "open-directed" || isBothArrow ||
+    (isAssocBPMN && connector.directionType === "directed");
 
   // Trim invisible leader segments for visible rendering
   const visStart = connector.sourceInvisibleLeader ? 1 : 0;
@@ -351,8 +354,9 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
         d={visibleD}
         fill="none"
         stroke={strokeColor}
-        strokeWidth={selected ? 2 : 1.5}
-        strokeDasharray={isMessage ? "6 3" : undefined}
+        strokeWidth={isAssocBPMN ? (selected ? 2.5 : 2) : (selected ? 2 : 1.5)}
+        strokeDasharray={isAssocBPMN ? "1 7" : (isMessage ? "6 3" : undefined)}
+        strokeLinecap={isAssocBPMN ? "round" : undefined}
         markerStart={isBothArrow ? `url(#${openStartMarkerId})` : undefined}
         markerEnd={showArrow ? `url(#${isOpenArrow ? openMarkerId : markerId})` : undefined}
         style={{ pointerEvents: "none" }}

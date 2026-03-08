@@ -755,6 +755,20 @@ export function SymbolRenderer({
                 ))}
               </text>
             )}
+            {!isEditingGatewayLabel &&
+              element.type === "data-object" &&
+              !!(element.properties.state as string | undefined) && (
+              <text
+                textAnchor="middle"
+                x={labelCenterX}
+                y={labelTopY + lines.length * lineH + lineH * 0.85}
+                fontSize={10}
+                fill="#374151"
+                style={{ userSelect: "none", pointerEvents: "none" }}
+              >
+                {`[${element.properties.state as string}]`}
+              </text>
+            )}
             {isEditingGatewayLabel && (
               <foreignObject x={hitRectX} y={hitRectY} width={labelWidth} height={Math.max(totalLabelH, 28)}>
                 <textarea

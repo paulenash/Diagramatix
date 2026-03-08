@@ -85,21 +85,29 @@ export function PropertiesPanel({
           </p>
           <p className="text-xs text-gray-600">Type: {connector.type}</p>
         </div>
-        {((connector.type !== "sequence" && connector.type !== "interaction") || connector.routingType === "direct") && (
+        {(connector.type === "associationBPMN" ||
+          (connector.type !== "sequence" && connector.type !== "interaction") ||
+          connector.routingType === "direct") && (
           <div>
             <p className="text-xs font-medium text-gray-700 mb-1">Direction</p>
             <div className="flex flex-wrap gap-1">
-              {(connector.routingType === "direct"
+              {(connector.type === "associationBPMN"
                 ? [
+                    { value: "non-directed"  as DirectionType, label: "None"     },
                     { value: "open-directed" as DirectionType, label: "Directed" },
-                    { value: "both"          as DirectionType, label: "Both" },
+                    { value: "both"          as DirectionType, label: "Both"     },
                   ]
-                : [
-                    { value: "directed"      as DirectionType, label: "Filled" },
-                    { value: "open-directed" as DirectionType, label: "Open" },
-                    { value: "both"          as DirectionType, label: "Both" },
-                    { value: "non-directed"  as DirectionType, label: "None" },
-                  ].filter(o => !(diagramType === "process-context" && o.value === "directed"))
+                : connector.routingType === "direct"
+                  ? [
+                      { value: "open-directed" as DirectionType, label: "Directed" },
+                      { value: "both"          as DirectionType, label: "Both" },
+                    ]
+                  : [
+                      { value: "directed"      as DirectionType, label: "Filled" },
+                      { value: "open-directed" as DirectionType, label: "Open" },
+                      { value: "both"          as DirectionType, label: "Both" },
+                      { value: "non-directed"  as DirectionType, label: "None" },
+                    ].filter(o => !(diagramType === "process-context" && o.value === "directed"))
               ).map(({ value, label }) => (
                 <button
                   key={value}
@@ -165,7 +173,8 @@ export function PropertiesPanel({
         <label className="block text-xs font-medium text-gray-700 mb-1">
           Label
         </label>
-        {(element.type === "gateway" || isEventElement) ? (
+        {(element.type === "gateway" || isEventElement ||
+          element.type === "data-object" || element.type === "data-store") ? (
           <>
             <textarea
               key={element.id}
@@ -195,6 +204,19 @@ export function PropertiesPanel({
           />
         )}
       </div>
+
+      {element.type === "data-object" && (
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1">State</label>
+          <input
+            type="text"
+            className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+            placeholder="optional"
+            value={(element.properties.state as string) ?? ""}
+            onChange={(e) => onUpdateProperties(element.id, { state: e.target.value })}
+          />
+        </div>
+      )}
 
       {element.type === "task" && (
         <div>

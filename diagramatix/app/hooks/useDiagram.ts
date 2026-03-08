@@ -61,6 +61,8 @@ function nanoid(): string {
   return Math.random().toString(36).slice(2, 10);
 }
 
+const DATA_ELEMENT_TYPES = new Set<SymbolType>(["data-object", "data-store"]);
+
 function isContainerType(type: SymbolType): boolean {
   return type === "system-boundary" || type === "composite-state";
 }
@@ -267,6 +269,11 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       const source = state.elements.find((el) => el.id === sourceId);
       const target = state.elements.find((el) => el.id === targetId);
       if (!source || !target) return state;
+
+      // Data elements may only use associationBPMN connectors
+      const isDataConn = DATA_ELEMENT_TYPES.has(source.type) || DATA_ELEMENT_TYPES.has(target.type);
+      if (isDataConn && connectorType !== "associationBPMN") return state;
+      if (!isDataConn && connectorType === "associationBPMN") return state;
 
       const { waypoints, sourceInvisibleLeader, targetInvisibleLeader } = computeWaypoints(
         source,
