@@ -651,7 +651,7 @@ export function Canvas({
   }
 
   function startEditingLabel(el: DiagramElement) {
-    const isOldContainer = el.type === "system-boundary" || el.type === "composite-state";
+    const isOldContainer = el.type === "system-boundary" || el.type === "composite-state" || el.type === "subprocess-expanded";
     if (el.type === "pool" || el.type === "lane") {
       const lw = el.type === "pool" ? 30 : 24;
       setEditingLabel({

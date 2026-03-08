@@ -201,12 +201,13 @@ export function PropertiesPanel({
               key={element.id}
               className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 resize-y"
               rows={3}
-              defaultValue={element.label}
-              onBlur={(e) => onUpdateLabel(element.id, e.target.value)}
+              value={labelDraft}
+              onChange={(e) => setLabelDraft(e.target.value)}
+              onBlur={() => onUpdateLabel(element.id, labelDraft)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
-                  (e.target as HTMLTextAreaElement).blur();
+                  onUpdateLabel(element.id, labelDraft);
                 }
               }}
             />

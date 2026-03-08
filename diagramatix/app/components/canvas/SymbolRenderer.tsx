@@ -460,9 +460,9 @@ function FinalStateShape({ el }: { el: DiagramElement }) {
 function SubprocessShape({ el }: { el: DiagramElement }) {
   const hasLoop = el.repeatType === "loop";
   const markerW = 14, markerH = 14;
-  // When loop present, group (loop + "+") is centered: each 14px, 4px gap = 32px total
-  const plusCX = hasLoop ? el.x + el.width / 2 + 9 : el.x + el.width / 2;
-  const loopCX = el.x + el.width / 2 - 9;
+  // "+" always stays centred; loop marker sits to the right with 4px gap
+  const plusCX = el.x + el.width / 2;
+  const loopCX = plusCX + markerW / 2 + 4 + 5; // right edge of "+" + 4px gap + arc radius
   const mx = plusCX - markerW / 2;
   const my = el.y + el.height - markerH - 3;
   return (
@@ -945,6 +945,7 @@ export function SymbolRenderer({
       })() : showLabel && !(
         element.type === 'task' ||
         element.type === 'subprocess' ||
+        element.type === 'subprocess-expanded' ||
         element.type === 'use-case' ||
         element.type === 'pool' ||
         element.type === 'lane'
@@ -1089,8 +1090,8 @@ export function SymbolRenderer({
         const lineH = 14;
         const lines = wrapText(el.label, labelWidth);
         const totalLabelH = lines.length * lineH;
-        const labelTopY  = el.type === 'subprocess-expanded'
-          ? el.y + PAD  // top-aligned for expanded subprocess
+        const labelTopY = el.type === 'subprocess-expanded'
+          ? el.y + PAD   // pin to top of element
           : labelCenterY - totalLabelH / 2;
         const labelLeftX = labelCenterX - labelWidth / 2;
         const iconReserveTop = (el.type === 'task' && el.taskType && el.taskType !== 'none') ? 20 : 0;
@@ -1168,7 +1169,7 @@ export function SymbolRenderer({
             </text>
             {selected && onUpdateProperties && (
               <rect
-                x={labelLeftX + labelWidth - 3} y={labelCenterY - 5}
+                x={labelLeftX + labelWidth - 3} y={labelTopY + totalLabelH / 2 - 5}
                 width={6} height={10}
                 fill="#2563eb" stroke="white" strokeWidth={1} rx={1}
                 style={{ cursor: "ew-resize" }}
