@@ -255,7 +255,7 @@ export function Canvas({
     const matches: DiagramElement[] = [];
     for (const el of data.elements) {
       if (el.id === fromId) continue;
-      if (el.type === "system-boundary" || el.type === "pool" || el.type === "lane") continue; // containers are not connector targets
+      if (el.type === "system-boundary" || el.type === "lane") continue; // containers are not connector targets (pools allowed for messageBPMN)
       if (filter && !filter(el)) continue;
       if (
         pos.x >= el.x - MARGIN &&
@@ -269,7 +269,7 @@ export function Canvas({
     if (matches.length === 0) return null;
     // Prefer non-container elements (child states) over composite-state containers so that
     // dropping onto a state inside a composite returns the child state, not the composite.
-    const nonContainer = matches.find(el => el.type !== "composite-state");
+    const nonContainer = matches.find(el => el.type !== "composite-state" && el.type !== "pool");
     return nonContainer ?? matches[0];
   }
 

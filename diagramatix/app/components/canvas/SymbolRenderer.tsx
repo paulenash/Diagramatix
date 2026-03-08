@@ -968,7 +968,7 @@ export function SymbolRenderer({
       }
 
       {/* Full-body connection overlay for all non-boundary elements */}
-      {showConnectionPoints && !isBoundary && !isPoolLane && element.type === "use-case" && (() => {
+      {showConnectionPoints && !isBoundary && element.type !== "lane" && element.type === "use-case" && (() => {
         const cx = element.x + element.width / 2;
         const cy = element.y + element.height / 2;
         const handler = (e: React.MouseEvent) => {
@@ -986,7 +986,7 @@ export function SymbolRenderer({
           />
         );
       })()}
-      {showConnectionPoints && !isBoundary && !isPoolLane && element.type !== "use-case" && (
+      {showConnectionPoints && !isBoundary && element.type !== "lane" && element.type !== "use-case" && (
         <rect
           x={element.x} y={element.y}
           width={element.width} height={element.height}
