@@ -55,7 +55,8 @@ type Action =
       taskType?: BpmnTaskType;
       eventType?: EventType;
       connectorId: string;
-    }};
+    }}
+  | { type: "ADD_LANE"; payload: { poolId: string } };
 
 function nanoid(): string {
   return Math.random().toString(36).slice(2, 10);
@@ -63,14 +64,34 @@ function nanoid(): string {
 
 const DATA_ELEMENT_TYPES = new Set<SymbolType>(["data-object", "data-store"]);
 
+const BPMN_CONTENT_TYPES = new Set<SymbolType>([
+  "task", "gateway", "start-event", "end-event", "intermediate-event",
+  "subprocess", "data-object", "data-store",
+]);
+
 function isContainerType(type: SymbolType): boolean {
-  return type === "system-boundary" || type === "composite-state";
+  return type === "system-boundary" || type === "composite-state"
+      || type === "pool" || type === "lane";
 }
 
 function containerAccepts(containerType: SymbolType, childType: SymbolType): boolean {
   if (containerType === "system-boundary") return childType === "use-case" || childType === "hourglass";
   if (containerType === "composite-state") return childType === "state" || childType === "initial-state" || childType === "final-state";
+  if (containerType === "pool") return childType === "lane" || BPMN_CONTENT_TYPES.has(childType);
+  if (containerType === "lane") return BPMN_CONTENT_TYPES.has(childType);
   return false;
+}
+
+function getAllDescendantIds(elements: DiagramElement[], containerId: string): Set<string> {
+  const result = new Set<string>();
+  const queue = [containerId];
+  while (queue.length) {
+    const id = queue.shift()!;
+    for (const e of elements) {
+      if (e.parentId === id) { result.add(e.id); queue.push(e.id); }
+    }
+  }
+  return result;
 }
 
 function segmentIntersectsRect(
@@ -160,6 +181,12 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       } else if (action.payload.symbolType === "data-store") {
         const count = state.elements.filter((e) => e.type === "data-store").length;
         label = `Data Store ${count + 1}`;
+      } else if (action.payload.symbolType === "pool") {
+        const count = state.elements.filter((e) => e.type === "pool").length;
+        label = `Pool ${count + 1}`;
+      } else if (action.payload.symbolType === "lane") {
+        const count = state.elements.filter((e) => e.type === "lane").length;
+        label = `Lane ${count + 1}`;
       }
       const newEl: DiagramElement = {
         id: nanoid(),
@@ -184,6 +211,7 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       const dx = x - el.x;
       const dy = y - el.y;
       const movingIsContainer = isContainerType(el.type);
+      const descendantIds = movingIsContainer ? getAllDescendantIds(state.elements, id) : new Set<string>();
 
       const elements = state.elements.map((e) => {
         if (e.id === id) {
@@ -202,8 +230,8 @@ function reducer(state: DiagramData, action: Action): DiagramData {
           }
           return { ...e, x, y, parentId };
         }
-        // If moving a container, move its children with it
-        if (movingIsContainer && e.parentId === id) {
+        // If moving a container, move all descendants (handles multi-level: pool → lane → elements)
+        if (movingIsContainer && (e.parentId === id || descendantIds.has(e.id))) {
           return { ...e, x: e.x + dx, y: e.y + dy };
         }
         return e;
@@ -483,6 +511,32 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       };
     }
 
+    case "ADD_LANE": {
+      const { poolId } = action.payload;
+      const pool = state.elements.find((e) => e.id === poolId && e.type === "pool");
+      if (!pool) return state;
+      const POOL_LABEL_W = 30;
+      const DEFAULT_LANE_H = 150;
+      const existingLanes = state.elements.filter((e) => e.type === "lane" && e.parentId === poolId);
+      const stackedH = existingLanes.reduce((s, l) => s + l.height, 0);
+      const laneY = pool.y + stackedH;
+      const laneCount = state.elements.filter((e) => e.type === "lane").length;
+      const newLane: DiagramElement = {
+        id: nanoid(), type: "lane",
+        x: pool.x + POOL_LABEL_W,
+        y: laneY,
+        width: pool.width - POOL_LABEL_W,
+        height: DEFAULT_LANE_H,
+        label: `Lane ${laneCount + 1}`,
+        properties: {}, parentId: poolId,
+      };
+      const neededH = laneY + DEFAULT_LANE_H - pool.y;
+      const elements = state.elements.map((e) =>
+        e.id === poolId && neededH > e.height ? { ...e, height: neededH } : e
+      );
+      return { ...state, elements: [...elements, newLane] };
+    }
+
     default:
       return state;
   }
@@ -593,6 +647,10 @@ export function useDiagram(initialData: DiagramData) {
     dispatch({ type: "CORRECT_ALL_CONNECTORS" });
   }, []);
 
+  const addLane = useCallback((poolId: string) => {
+    dispatch({ type: "ADD_LANE", payload: { poolId } });
+  }, []);
+
   return {
     data,
     addElement,
@@ -612,5 +670,6 @@ export function useDiagram(initialData: DiagramData) {
     setData,
     setViewport,
     correctAllConnectors,
+    addLane,
   };
 }

@@ -164,6 +164,13 @@ function PaletteSymbolPreview({ type }: { type: SymbolType }) {
           <ellipse cx={16} cy={23} rx={14} ry={4} fill="#60a5fa" stroke="#374151" strokeWidth={1.5} />
         </svg>
       );
+    case "pool":
+      return (
+        <svg width={48} height={28} viewBox="0 0 48 28">
+          <rect x={1} y={1} width={46} height={26} fill="#f9fafb" stroke="#374151" strokeWidth={1.5} />
+          <rect x={1} y={1} width={10} height={26} fill="#dbeafe" stroke="#374151" strokeWidth={1.5} />
+        </svg>
+      );
     default:
       return (
         <svg width={48} height={28} viewBox="0 0 48 28">

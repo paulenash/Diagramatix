@@ -21,6 +21,7 @@ interface Props {
   onDeleteConnector: (id: string) => void;
   onUpdateConnectorDirection: (id: string, directionType: DirectionType) => void;
   onUpdateConnectorLabel?: (id: string, label: string) => void;
+  onAddLane?: (poolId: string) => void;
 }
 
 const TASK_TYPE_OPTIONS: { value: BpmnTaskType; label: string }[] = [
@@ -61,6 +62,7 @@ export function PropertiesPanel({
   onDeleteConnector,
   onUpdateConnectorDirection,
   onUpdateConnectorLabel,
+  onAddLane,
 }: Props) {
   const [labelDraft, setLabelDraft] = useState("");
 
@@ -204,6 +206,15 @@ export function PropertiesPanel({
           />
         )}
       </div>
+
+      {element.type === "pool" && onAddLane && (
+        <button
+          onClick={() => onAddLane(element.id)}
+          className="w-full px-3 py-1.5 text-xs bg-blue-50 text-blue-700 border border-blue-200 rounded hover:bg-blue-100"
+        >
+          + Add Lane
+        </button>
+      )}
 
       {element.type === "data-object" && (
         <>

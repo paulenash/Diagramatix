@@ -558,6 +558,42 @@ function BpmnTaskShape({ el }: { el: DiagramElement }) {
   );
 }
 
+function PoolShape({ el }: { el: DiagramElement }) {
+  const { x, y, width: w, height: h } = el;
+  const LW = 30;
+  return (
+    <g>
+      <rect x={x} y={y} width={w} height={h} fill="#f9fafb" stroke="#374151" strokeWidth={1.5} />
+      <rect x={x} y={y} width={LW} height={h} fill="#dbeafe" stroke="#374151" strokeWidth={1.5} />
+      <text
+        x={x + LW / 2} y={y + h / 2}
+        textAnchor="middle" dominantBaseline="middle"
+        transform={`rotate(-90,${x + LW / 2},${y + h / 2})`}
+        fontSize={11} fill="#1e3a5f" fontWeight="500"
+        style={{ userSelect: "none", pointerEvents: "none" }}
+      >{el.label}</text>
+    </g>
+  );
+}
+
+function LaneShape({ el }: { el: DiagramElement }) {
+  const { x, y, width: w, height: h } = el;
+  const LW = 24;
+  return (
+    <g>
+      <rect x={x} y={y} width={w} height={h} fill="none" stroke="#374151" strokeWidth={1} />
+      <rect x={x} y={y} width={LW} height={h} fill="#ede9fe" stroke="#374151" strokeWidth={1} />
+      <text
+        x={x + LW / 2} y={y + h / 2}
+        textAnchor="middle" dominantBaseline="middle"
+        transform={`rotate(-90,${x + LW / 2},${y + h / 2})`}
+        fontSize={10} fill="#374151"
+        style={{ userSelect: "none", pointerEvents: "none" }}
+      >{el.label}</text>
+    </g>
+  );
+}
+
 function SymbolShape({ el }: { el: DiagramElement }) {
   switch (el.type) {
     case "gateway":              return <GatewayShape el={el} />;
@@ -576,6 +612,8 @@ function SymbolShape({ el }: { el: DiagramElement }) {
     case "system-boundary":   return <SystemBoundaryShape el={el} />;
     case "composite-state":   return <CompositeStateShape el={el} />;
     case "system":            return <SystemShape el={el} />;
+    case "pool":              return <PoolShape el={el} />;
+    case "lane":              return <LaneShape el={el} />;
     case "task":
       return el.taskType !== undefined ? <BpmnTaskShape el={el} /> : <TaskShape el={el} />;
     case "subprocess":        return <SubprocessShape el={el} />;
@@ -679,7 +717,8 @@ export function SymbolRenderer({
   const labelInfo = getLabelPos(element);
   const isActorOrTeam = element.type === "actor" || element.type === "team" || element.type === "system";
   const isBoundary = element.type === "system-boundary";  // excluded from connection overlay
-  const isContainer = isBoundary || element.type === "composite-state"; // gets resize handles
+  const isPoolLane = element.type === "pool" || element.type === "lane";
+  const isContainer = isBoundary || element.type === "composite-state" || isPoolLane; // gets resize handles
   const canResize = isContainer || element.type === "task" || element.type === "subprocess" || element.type === "use-case";
   const showLabel = element.type !== "initial-state" && element.type !== "final-state";
 
@@ -913,7 +952,7 @@ export function SymbolRenderer({
       }
 
       {/* Full-body connection overlay for all non-boundary elements */}
-      {showConnectionPoints && !isBoundary && element.type === "use-case" && (() => {
+      {showConnectionPoints && !isBoundary && !isPoolLane && element.type === "use-case" && (() => {
         const cx = element.x + element.width / 2;
         const cy = element.y + element.height / 2;
         const handler = (e: React.MouseEvent) => {
@@ -931,7 +970,7 @@ export function SymbolRenderer({
           />
         );
       })()}
-      {showConnectionPoints && !isBoundary && element.type !== "use-case" && (
+      {showConnectionPoints && !isBoundary && !isPoolLane && element.type !== "use-case" && (
         <rect
           x={element.x} y={element.y}
           width={element.width} height={element.height}

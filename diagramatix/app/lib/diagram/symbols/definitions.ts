@@ -135,6 +135,13 @@ export const ALL_SYMBOLS: SymbolDefinition[] = [
     defaultHeight: 36,
     description: "Intermediate event in process",
   },
+  {
+    type: "pool",
+    label: "Pool",
+    defaultWidth: 600,
+    defaultHeight: 200,
+    description: "A BPMN pool (swimlane container)",
+  },
 ];
 
 export const PALETTE_BY_DIAGRAM_TYPE: Record<DiagramType, SymbolType[]> = {
@@ -142,6 +149,7 @@ export const PALETTE_BY_DIAGRAM_TYPE: Record<DiagramType, SymbolType[]> = {
   "process-context": ["use-case", "actor", "team", "system", "hourglass", "system-boundary"],
   "state-machine": ["state", "initial-state", "final-state", "composite-state"],
   bpmn: [
+    "pool",
     "start-event",
     "task",
     "subprocess",

@@ -242,7 +242,7 @@ export function Canvas({
     const matches: DiagramElement[] = [];
     for (const el of data.elements) {
       if (el.id === fromId) continue;
-      if (el.type === "system-boundary") continue; // Process Group is not a connector target
+      if (el.type === "system-boundary" || el.type === "pool" || el.type === "lane") continue; // containers are not connector targets
       if (filter && !filter(el)) continue;
       if (
         pos.x >= el.x - MARGIN &&
@@ -575,12 +575,15 @@ export function Canvas({
   const isDraggingConnector = draggingConnector !== null;
   const isDraggingEndpoint = draggingEndpoint !== null;
 
-  // Render containers first (behind everything), then connectors, then other elements
-  const containers = data.elements.filter(
+  // Render pools first (deepest), then other containers, then lanes, then regular elements
+  const pools = data.elements.filter((el) => el.type === "pool");
+  const lanes = data.elements.filter((el) => el.type === "lane");
+  const otherContainers = data.elements.filter(
     (el) => el.type === "system-boundary" || el.type === "composite-state"
   );
   const nonContainers = data.elements.filter(
     (el) => el.type !== "system-boundary" && el.type !== "composite-state"
+              && el.type !== "pool" && el.type !== "lane"
   );
 
   // Endpoint handle positions for selected connector
@@ -616,8 +619,8 @@ export function Canvas({
         style={{ cursor: isDraggingConnector || isDraggingEndpoint ? "crosshair" : "default" }}
       >
         <g transform={transform}>
-          {/* Containers render first (behind everything) */}
-          {containers.map((el) => (
+          {/* Pools render first (deepest layer) */}
+          {[...pools, ...otherContainers, ...lanes].map((el) => (
             <SymbolRenderer
               key={el.id}
               element={el}

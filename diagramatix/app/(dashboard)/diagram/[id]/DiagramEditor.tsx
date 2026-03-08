@@ -104,6 +104,7 @@ export function DiagramEditor({
     elementMoveEnd,
     splitConnector,
     correctAllConnectors,
+    addLane,
   } = useDiagram(initialData);
 
   const saveStatus = useAutoSave(diagramId, data);
@@ -257,6 +258,7 @@ export function DiagramEditor({
             deleteConnector(id);
             setSelectedConnectorId(null);
           }}
+          onAddLane={addLane}
         />
       </div>
     </div>
