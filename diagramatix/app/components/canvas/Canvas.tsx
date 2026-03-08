@@ -324,10 +324,11 @@ export function Canvas({
           // messageBPMN: always vertical
           // pool→element: source=pool, target=specific element
           // element→pool or pool→pool: source=element/pool, target=pool
-          const targetPool = data.elements.find((e) => e.id === targetPoolId);
-          const attachToElement = sourceEl?.type === "pool" && targetEl.type !== "pool";
-          const tgtAttach = attachToElement ? targetEl : targetPool;
-          const tgtId     = attachToElement ? targetEl.id : targetPoolId!;
+          // targetEl is already the correct target:
+          //   • element inside white-box pool → targetEl = that element
+          //   • black-box pool or pool-to-pool → targetEl = the pool itself
+          const tgtAttach = targetEl;
+          const tgtId     = targetEl.id;
 
           const srcCy = sourceEl ? sourceEl.y + sourceEl.height / 2 : 0;
           const tgtCy = tgtAttach ? tgtAttach.y + tgtAttach.height / 2 : 0;
@@ -731,6 +732,24 @@ export function Canvas({
     ? getElementPoolId(draggingSourceEl, data.elements)
     : null;
 
+  // Compute misaligned messageBPMN connectors (no x-overlap between source and target)
+  const misalignedConnectorIds = new Set<string>();
+  const errorTargetIds = new Set<string>();
+  data.connectors
+    .filter((c) => c.type === "messageBPMN")
+    .forEach((c) => {
+      const src = data.elements.find((e) => e.id === c.sourceId);
+      const tgt = data.elements.find((e) => e.id === c.targetId);
+      if (src && tgt) {
+        const overlapMax = Math.min(src.x + src.width, tgt.x + tgt.width);
+        const overlapMin = Math.max(src.x, tgt.x);
+        if (overlapMax <= overlapMin) {
+          misalignedConnectorIds.add(c.id);
+          errorTargetIds.add(c.targetId);
+        }
+      }
+    });
+
   // Endpoint handle positions for selected connector
   const selectedConnector: Connector | null =
     selectedConnectorId
@@ -890,6 +909,7 @@ export function Canvas({
               selected={el.id === selectedElementId}
               isDropTarget={elIsDropTarget}
               isMessageBpmnTarget={elIsMsgTarget}
+              isErrorTarget={errorTargetIds.has(el.id)}
               onSelect={() => {
                 onSelectElement(el.id);
                 onSelectConnector(null);
@@ -950,6 +970,7 @@ export function Canvas({
               key={conn.id}
               connector={conn}
               selected={conn.id === selectedConnectorId}
+              misaligned={misalignedConnectorIds.has(conn.id)}
               onSelect={() => {
                 onSelectConnector(conn.id);
                 onSelectElement(null);

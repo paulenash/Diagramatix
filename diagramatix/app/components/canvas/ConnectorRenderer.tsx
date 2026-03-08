@@ -11,6 +11,7 @@ interface Props {
   svgToWorld?: (clientX: number, clientY: number) => Point;
   onUpdateWaypoints?: (id: string, waypoints: Point[]) => void;
   onUpdateLabel?: (label: string, offsetX: number, offsetY: number, width: number) => void;
+  misaligned?: boolean;
 }
 
 function wrapText(text: string, maxWidth: number, fontSize = 10): string[] {
@@ -115,6 +116,7 @@ interface InteractionLabelProps {
 function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, onUpdateLabel }: InteractionLabelProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState("");
+  const [isLabelFocused, setIsLabelFocused] = useState(false);
 
   if (visibleWaypoints.length < 2) return null;
 
@@ -146,6 +148,14 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
   function handleLabelMouseDown(e: React.MouseEvent) {
     if (!svgToWorld || !onUpdateLabel) return;
     e.stopPropagation();
+    setIsLabelFocused(true);
+    // Clear focus when user clicks elsewhere
+    function onWindowMouseDown() {
+      setIsLabelFocused(false);
+      window.removeEventListener("mousedown", onWindowMouseDown);
+    }
+    window.addEventListener("mousedown", onWindowMouseDown);
+
     const startWorld = svgToWorld(e.clientX, e.clientY);
     const startOX = offsetX;
     const startOY = offsetY;
@@ -241,8 +251,8 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
           />
         </foreignObject>
       )}
-      {/* Width resize handle (visible when selected) */}
-      {selected && onUpdateLabel && (
+      {/* Width resize handle (visible when label focused or connector selected) */}
+      {(selected || isLabelFocused) && onUpdateLabel && (
         <rect
           x={lCx + lWidth / 2 - 3} y={lMidY - 5} width={6} height={10}
           fill="#2563eb" stroke="white" strokeWidth={1} rx={1}
@@ -254,14 +264,17 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
   );
 }
 
-export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, onUpdateWaypoints, onUpdateLabel }: Props) {
+export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, onUpdateWaypoints, onUpdateLabel, misaligned }: Props) {
   const waypoints = connector.waypoints;
   if (waypoints.length === 0) return null;
 
   const isMessage = connector.type === "message";
   const isAssocBPMN = connector.type === "associationBPMN";
   const isMessageBPMN = connector.type === "messageBPMN";
-  const strokeColor = selected ? "#2563eb" : isMessageBPMN ? "#b0b7c3" : "#6b7280";
+  const strokeColor = selected ? "#2563eb"
+    : (isMessageBPMN && misaligned) ? "#dc2626"
+    : isMessageBPMN ? "#b0b7c3"
+    : "#6b7280";
   const markerId = `arrow-${connector.id}`;
   const openMarkerId = `arrow-open-${connector.id}`;
   const openStartMarkerId = `arrow-open-start-${connector.id}`;
