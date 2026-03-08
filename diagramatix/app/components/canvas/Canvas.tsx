@@ -321,6 +321,10 @@ export function Canvas({
           sourcePoolId !== null && targetPoolId !== null && sourcePoolId !== targetPoolId;
 
         if (isCrossPool) {
+          // Start events cannot send messageBPMN
+          if (sourceEl?.type === "start-event") return;
+          // End events cannot receive messageBPMN
+          if (targetEl.type === "end-event") return;
           // messageBPMN: always vertical
           // pool→element: source=pool, target=specific element
           // element→pool or pool→pool: source=element/pool, target=pool
@@ -723,7 +727,7 @@ export function Canvas({
   );
 
   // Precompute messageBPMN highlight context
-  const BPMN_TRIGGER_TYPES = new Set<string>(["task", "subprocess", "start-event", "intermediate-event", "end-event"]);
+  const BPMN_TRIGGER_TYPES = new Set<string>(["task", "subprocess", "intermediate-event", "end-event"]);
   const draggingSourceEl = draggingConnector
     ? (data.elements.find((e) => e.id === draggingConnector.fromId) ?? null)
     : null;
@@ -898,7 +902,7 @@ export function Canvas({
                   const elPool = data.elements.find((p) => p.id === elPoolId);
                   const elPoolIsWhiteBox =
                     ((elPool?.properties.poolType as string | undefined) ?? "black-box") === "white-box";
-                  if (elPoolIsWhiteBox) elIsMsgTarget = true;
+                  if (elPoolIsWhiteBox && el.type !== "end-event") elIsMsgTarget = true;
                 }
               }
             }

@@ -437,8 +437,16 @@ function reducer(state: DiagramData, action: Action): DiagramData {
 
       const updatedElements = isMsgBpmn
         ? state.elements.map((el) => {
-            if (el.id === sourceId && el.type === "task") return { ...el, taskType: "send" as BpmnTaskType };
-            if (el.id === targetId && el.type === "task") return { ...el, taskType: "receive" as BpmnTaskType };
+            if (el.id === sourceId) {
+              if (el.type === "task")               return { ...el, taskType: "send" as BpmnTaskType };
+              if (el.type === "end-event")          return { ...el, eventType: "message" as EventType };
+              if (el.type === "intermediate-event") return { ...el, eventType: "message" as EventType, taskType: "send" as BpmnTaskType };
+            }
+            if (el.id === targetId) {
+              if (el.type === "task")               return { ...el, taskType: "receive" as BpmnTaskType };
+              if (el.type === "start-event")        return { ...el, eventType: "message" as EventType };
+              if (el.type === "intermediate-event") return { ...el, eventType: "message" as EventType };
+            }
             return el;
           })
         : state.elements;
