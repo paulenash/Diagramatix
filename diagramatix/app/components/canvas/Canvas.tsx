@@ -330,6 +330,7 @@ export function Canvas({
             msgSrcSide, msgTgtSide
           );
         } else {
+          if (targetEl.type === "pool" || targetEl.type === "lane") return;
           const targetSide = getClosestSide(pos, targetEl);
           let connType: ConnectorType;
           let connRouting: RoutingType;

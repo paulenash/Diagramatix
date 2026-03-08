@@ -434,7 +434,15 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         labelWidth:   connectorType === "interaction" ? 80  : isMsgBpmn ? 80  : undefined,
       };
 
-      return { ...state, connectors: [...state.connectors, newConnector] };
+      const updatedElements = isMsgBpmn
+        ? state.elements.map((el) => {
+            if (el.id === sourceId && el.type === "task") return { ...el, taskType: "send" as BpmnTaskType };
+            if (el.id === targetId && el.type === "task") return { ...el, taskType: "receive" as BpmnTaskType };
+            return el;
+          })
+        : state.elements;
+
+      return { ...state, elements: updatedElements, connectors: [...state.connectors, newConnector] };
     }
 
     case "DELETE_CONNECTOR":
@@ -627,16 +635,17 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       const stackedH = existingLanes.reduce((s, l) => s + l.height, 0);
       const laneY = pool.y + stackedH;
       const laneCount = state.elements.filter((e) => e.type === "lane").length;
+      const laneH = existingLanes.length === 0 ? pool.height : DEFAULT_LANE_H;
       const newLane: DiagramElement = {
         id: nanoid(), type: "lane",
         x: pool.x + POOL_LABEL_W,
         y: laneY,
         width: pool.width - POOL_LABEL_W,
-        height: DEFAULT_LANE_H,
+        height: laneH,
         label: `Lane ${laneCount + 1}`,
         properties: {}, parentId: poolId,
       };
-      const neededH = laneY + DEFAULT_LANE_H - pool.y;
+      const neededH = laneY + laneH - pool.y;
       const elements = state.elements.map((e) =>
         e.id === poolId && neededH > e.height ? { ...e, height: neededH } : e
       );
