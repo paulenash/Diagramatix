@@ -312,15 +312,14 @@ export function Canvas({
           sourcePoolId !== null && targetPoolId !== null && sourcePoolId !== targetPoolId;
 
         if (isCrossPool) {
-          // messageBPMN: always pool-to-pool, always vertical
-          const sourcePool = data.elements.find((e) => e.id === sourcePoolId);
+          // messageBPMN: element-to-pool, always vertical
           const targetPool = data.elements.find((e) => e.id === targetPoolId);
-          const sourceCy = sourcePool ? sourcePool.y + sourcePool.height / 2 : 0;
-          const targetCy = targetPool ? targetPool.y + targetPool.height / 2 : 0;
-          const msgSrcSide: Side = sourceCy <= targetCy ? "bottom" : "top";
-          const msgTgtSide: Side = sourceCy <= targetCy ? "top"    : "bottom";
+          const srcCy = sourceEl ? sourceEl.y + sourceEl.height / 2 : 0;
+          const tgtCy = targetPool ? targetPool.y + targetPool.height / 2 : 0;
+          const msgSrcSide: Side = srcCy <= tgtCy ? "bottom" : "top";
+          const msgTgtSide: Side = srcCy <= tgtCy ? "top"    : "bottom";
           onAddConnector(
-            sourcePoolId!, targetPoolId!,
+            elementId, targetPoolId!,
             "messageBPMN", "directed", "direct",
             msgSrcSide, msgTgtSide
           );

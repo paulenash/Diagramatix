@@ -89,7 +89,7 @@ function OpenArrowMarkerStartThin({ id, color }: { id: string; color: string }) 
 /** Unfilled equilateral triangle (messageBPMN target end) */
 function UnfilledTriangleMarker({ id, color }: { id: string; color: string }) {
   return (
-    <marker id={id} markerWidth={10} markerHeight={10} refX={8} refY={5} orient="auto">
+    <marker id={id} markerWidth={10} markerHeight={10} refX={8} refY={5} orient="auto" overflow="visible">
       <polygon points="0,0.5 0,9.5 7.8,5" fill="white" stroke={color} strokeWidth={1.5} />
     </marker>
   );
@@ -99,7 +99,7 @@ function UnfilledTriangleMarker({ id, color }: { id: string; color: string }) {
 function CircleMarker({ id, color }: { id: string; color: string }) {
   return (
     <marker id={id} markerWidth={8} markerHeight={8} refX={4} refY={4} orient="auto-start-reverse">
-      <circle cx={4} cy={4} r={3} fill={color} stroke={color} />
+      <circle cx={4} cy={4} r={3} fill="white" stroke={color} strokeWidth={1.5} />
     </marker>
   );
 }
