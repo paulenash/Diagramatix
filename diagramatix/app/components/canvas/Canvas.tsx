@@ -412,6 +412,50 @@ export function Canvas({
     window.addEventListener("mouseup", onMouseUp);
   }
 
+  function handleMessageBpmnDrag(connectorId: string, startX: number, e: React.MouseEvent) {
+    e.stopPropagation();
+    const conn = data.connectors.find((c) => c.id === connectorId);
+    if (!conn) return;
+    const sourceEl = data.elements.find((el) => el.id === conn.sourceId);
+    const targetEl = data.elements.find((el) => el.id === conn.targetId);
+    if (!sourceEl || !targetEl) return;
+
+    const startClientX = e.clientX;
+    const minX = Math.max(sourceEl.x, targetEl.x);
+    const maxX = Math.min(sourceEl.x + sourceEl.width, targetEl.x + targetEl.width);
+
+    function clampX(raw: number) { return maxX > minX ? Math.max(minX, Math.min(maxX, raw)) : raw; }
+
+    function buildWaypoints(x: number): Point[] {
+      const srcEdge: Point = conn!.sourceSide === "bottom"
+        ? { x, y: sourceEl!.y + sourceEl!.height } : { x, y: sourceEl!.y };
+      const tgtEdge: Point = conn!.targetSide === "top"
+        ? { x, y: targetEl!.y } : { x, y: targetEl!.y + targetEl!.height };
+      return [
+        { x: sourceEl!.x + sourceEl!.width / 2, y: sourceEl!.y + sourceEl!.height / 2 },
+        srcEdge, tgtEdge,
+        { x: targetEl!.x + targetEl!.width / 2, y: targetEl!.y + targetEl!.height / 2 },
+      ];
+    }
+
+    function onMouseMove(ev: MouseEvent) {
+      const dx = (ev.clientX - startClientX) / zoom;
+      onUpdateConnectorWaypoints?.(connectorId, buildWaypoints(clampX(startX + dx)));
+    }
+
+    function onMouseUp(ev: MouseEvent) {
+      const dx = (ev.clientX - startClientX) / zoom;
+      const newX = clampX(startX + dx);
+      const newOffsetAlong = sourceEl!.width > 0 ? (newX - sourceEl!.x) / sourceEl!.width : 0.5;
+      onUpdateConnectorEndpoint(connectorId, "source", conn!.sourceId, conn!.sourceSide, newOffsetAlong);
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    }
+
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+  }
+
   function handleResizeDragStart(elementId: string, handle: ResizeHandle, e: React.MouseEvent) {
     e.stopPropagation();
     const el = data.elements.find((el) => el.id === elementId);
@@ -789,8 +833,29 @@ export function Canvas({
             />
           ))}
 
-          {/* Connector endpoint handles when a connector is selected */}
-          {endpointHandles && (
+          {/* messageBPMN drag handle — drag left/right along pool boundaries */}
+          {selectedConnector?.type === "messageBPMN" && selectedConnector.waypoints.length === 4 && (() => {
+            const wp = selectedConnector.waypoints;
+            const x = wp[1].x;
+            const midY = (wp[1].y + wp[2].y) / 2;
+            return (
+              <g>
+                <line x1={x} y1={wp[1].y} x2={x} y2={wp[2].y}
+                  stroke="#2563eb" strokeWidth={8} strokeOpacity={0.15}
+                  style={{ cursor: "ew-resize" }}
+                  onMouseDown={(e) => handleMessageBpmnDrag(selectedConnectorId!, x, e)}
+                />
+                <circle cx={x} cy={midY} r={7}
+                  fill="#2563eb" fillOpacity={0.25} stroke="#2563eb" strokeWidth={1.5}
+                  style={{ cursor: "ew-resize" }}
+                  onMouseDown={(e) => handleMessageBpmnDrag(selectedConnectorId!, x, e)}
+                />
+              </g>
+            );
+          })()}
+
+          {/* Connector endpoint handles when a non-messageBPMN connector is selected */}
+          {endpointHandles && selectedConnector?.type !== "messageBPMN" && (
             <>
               <rect
                 x={endpointHandles.source.x - 5} y={endpointHandles.source.y - 5}

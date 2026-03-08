@@ -18,6 +18,29 @@ import type {
 import { computeWaypoints, recomputeAllConnectors, consolidateWaypoints, rectifyWaypoints } from "@/app/lib/diagram/routing";
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
 
+function messageBpmnWaypoints(
+  source: DiagramElement, target: DiagramElement,
+  sourceSide: Side, targetSide: Side, offsetAlong: number
+): { waypoints: Point[]; sourceInvisibleLeader: true; targetInvisibleLeader: true } {
+  const srcX = source.x + source.width * offsetAlong;
+  const minX = Math.max(source.x, target.x);
+  const maxX = Math.min(source.x + source.width, target.x + target.width);
+  const x = maxX > minX ? Math.max(minX, Math.min(maxX, srcX)) : srcX;
+  const srcEdge: Point = sourceSide === "bottom"
+    ? { x, y: source.y + source.height } : { x, y: source.y };
+  const tgtEdge: Point = targetSide === "top"
+    ? { x, y: target.y } : { x, y: target.y + target.height };
+  return {
+    waypoints: [
+      { x: source.x + source.width / 2, y: source.y + source.height / 2 },
+      srcEdge, tgtEdge,
+      { x: target.x + target.width / 2, y: target.y + target.height / 2 },
+    ],
+    sourceInvisibleLeader: true,
+    targetInvisibleLeader: true,
+  };
+}
+
 type Action =
   | { type: "SET_DATA"; payload: DiagramData }
   | { type: "ADD_ELEMENT"; payload: { symbolType: SymbolType; position: Point; taskType?: BpmnTaskType; eventType?: EventType } }
@@ -381,14 +404,10 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       if (isDataConn && connectorType !== "associationBPMN") return state;
       if (!isDataConn && connectorType === "associationBPMN") return state;
 
-      const { waypoints, sourceInvisibleLeader, targetInvisibleLeader } = computeWaypoints(
-        source,
-        target,
-        state.elements,
-        sourceSide,
-        targetSide,
-        routingType
-      );
+      const { waypoints, sourceInvisibleLeader, targetInvisibleLeader } =
+        connectorType === "messageBPMN"
+          ? messageBpmnWaypoints(source, target, sourceSide, targetSide, 0.5)
+          : computeWaypoints(source, target, state.elements, sourceSide, targetSide, routingType);
 
       const newConnector: Connector = {
         id: nanoid(),
@@ -439,11 +458,13 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         const source = state.elements.find((el) => el.id === updated.sourceId);
         const target = state.elements.find((el) => el.id === updated.targetId);
         if (!source || !target) return conn;
-        const { waypoints, sourceInvisibleLeader, targetInvisibleLeader } = computeWaypoints(
-          source, target, state.elements,
-          updated.sourceSide, updated.targetSide, updated.routingType,
-          updated.sourceOffsetAlong ?? 0.5, updated.targetOffsetAlong ?? 0.5,
-        );
+        const { waypoints, sourceInvisibleLeader, targetInvisibleLeader } =
+          updated.type === "messageBPMN"
+            ? messageBpmnWaypoints(source, target, updated.sourceSide, updated.targetSide,
+                updated.sourceOffsetAlong ?? 0.5)
+            : computeWaypoints(source, target, state.elements,
+                updated.sourceSide, updated.targetSide, updated.routingType,
+                updated.sourceOffsetAlong ?? 0.5, updated.targetOffsetAlong ?? 0.5);
         return { ...updated, waypoints, sourceInvisibleLeader, targetInvisibleLeader };
       });
       return { ...state, connectors };

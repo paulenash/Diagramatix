@@ -89,7 +89,20 @@ export function PropertiesPanel({
           </p>
           <p className="text-xs text-gray-600">Type: {connector.type}</p>
         </div>
-        {(connector.type === "associationBPMN" ||
+        {connector.type === "messageBPMN" && connector.waypoints.length >= 4 && (
+          <div className="mt-2 space-y-0.5">
+            <p className="text-xs font-medium text-gray-700">Connection Points</p>
+            <p className="text-xs text-gray-500">
+              Source: x={Math.round(connector.waypoints[1].x)}, y={Math.round(connector.waypoints[1].y)}
+            </p>
+            <p className="text-xs text-gray-500">
+              Target: x={Math.round(connector.waypoints[2].x)}, y={Math.round(connector.waypoints[2].y)}
+            </p>
+            <p className="text-xs text-gray-400 italic">x-coords always equal</p>
+          </div>
+        )}
+        {connector.type !== "messageBPMN" &&
+          (connector.type === "associationBPMN" ||
           (connector.type !== "sequence" && connector.type !== "interaction") ||
           connector.routingType === "direct") && (
           <div>

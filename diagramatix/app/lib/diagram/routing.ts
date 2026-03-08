@@ -126,7 +126,7 @@ export function getConnectionPointBySide(el: DiagramElement, _side: Side): Point
 }
 
 // Returns a point along the specified side at a fractional offset (0=start, 0.5=midpoint, 1=end)
-function sidePoint(el: DiagramElement, side: Side, offset = 0.5): Point {
+export function sidePoint(el: DiagramElement, side: Side, offset = 0.5): Point {
   switch (side) {
     case "right":  return { x: el.x + el.width,         y: el.y + el.height * offset };
     case "left":   return { x: el.x,                    y: el.y + el.height * offset };
@@ -342,6 +342,23 @@ export function recomputeAllConnectors(
     const source = elementMap.get(conn.sourceId);
     const target = elementMap.get(conn.targetId);
     if (!source || !target) return conn;
+
+    // messageBPMN: always vertical, x derived from sourceOffsetAlong (fraction of source width)
+    if (conn.type === "messageBPMN") {
+      const offsetAlong = conn.sourceOffsetAlong ?? 0.5;
+      const srcX = source.x + source.width * offsetAlong;
+      const minX = Math.max(source.x, target.x);
+      const maxX = Math.min(source.x + source.width, target.x + target.width);
+      const x = maxX > minX ? Math.max(minX, Math.min(maxX, srcX)) : srcX;
+      const srcEdge: Point = conn.sourceSide === "bottom"
+        ? { x, y: source.y + source.height } : { x, y: source.y };
+      const tgtEdge: Point = conn.targetSide === "top"
+        ? { x, y: target.y } : { x, y: target.y + target.height };
+      const startPt = { x: source.x + source.width / 2, y: source.y + source.height / 2 };
+      const endPt   = { x: target.x + target.width / 2, y: target.y + target.height / 2 };
+      return { ...conn, waypoints: [startPt, srcEdge, tgtEdge, endPt],
+        sourceInvisibleLeader: true, targetInvisibleLeader: true };
+    }
 
     // For rectilinear connectors with enough waypoints, preserve user's interior routing.
     // Only the 6 boundary waypoints (srcCenter, srcEdge, exitPt, approachPt, tgtEdge, tgtCenter)
