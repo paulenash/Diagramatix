@@ -721,6 +721,16 @@ export function Canvas({
               && el.type !== "pool" && el.type !== "lane"
   );
 
+  // Precompute messageBPMN highlight context
+  const BPMN_TRIGGER_TYPES = new Set<string>(["task", "subprocess", "start-event", "intermediate-event", "end-event"]);
+  const draggingSourceEl = draggingConnector
+    ? (data.elements.find((e) => e.id === draggingConnector.fromId) ?? null)
+    : null;
+  const isBpmnSource = draggingSourceEl ? BPMN_TRIGGER_TYPES.has(draggingSourceEl.type) : false;
+  const draggingSourcePoolId = draggingSourceEl
+    ? getElementPoolId(draggingSourceEl, data.elements)
+    : null;
+
   // Endpoint handle positions for selected connector
   const selectedConnector: Connector | null =
     selectedConnectorId
@@ -755,34 +765,40 @@ export function Canvas({
       >
         <g transform={transform}>
           {/* Pools render first (deepest layer) */}
-          {[...pools, ...otherContainers].map((el) => (
-            <SymbolRenderer
-              key={el.id}
-              element={el}
-              selected={el.id === selectedElementId}
-              isDropTarget={false}
-              isDisallowedTarget={false}
-              onSelect={() => {
-                onSelectElement(el.id);
-                onSelectConnector(null);
-              }}
-              onMove={(x, y) => onMoveElement(el.id, x, y)}
-              onDoubleClick={() => startEditingLabel(el)}
-              onConnectionPointDragStart={(side, worldPos) =>
-                handleConnectionPointDragStart(el.id, side, worldPos)
-              }
-              showConnectionPoints={el.id === selectedElementId || isDraggingConnector}
-              onResizeDragStart={(handle, e) => handleResizeDragStart(el.id, handle, e)}
-              svgToWorld={clientToWorld}
-              onUpdateProperties={onUpdateProperties}
-              onUpdateLabel={onUpdateLabel}
-              onMoveEnd={
-                (el.type === "gateway" || el.type === "intermediate-event")
-                  ? () => onElementMoveEnd?.(el.id)
-                  : undefined
-              }
-            />
-          ))}
+          {[...pools, ...otherContainers].map((el) => {
+            const isMsgTarget = isDraggingConnector && isBpmnSource &&
+              el.type === "pool" && el.id !== draggingSourcePoolId &&
+              ((el.properties.poolType as string | undefined) ?? "black-box") === "black-box";
+            return (
+              <SymbolRenderer
+                key={el.id}
+                element={el}
+                selected={el.id === selectedElementId}
+                isDropTarget={false}
+                isDisallowedTarget={false}
+                isMessageBpmnTarget={isMsgTarget}
+                onSelect={() => {
+                  onSelectElement(el.id);
+                  onSelectConnector(null);
+                }}
+                onMove={(x, y) => onMoveElement(el.id, x, y)}
+                onDoubleClick={() => startEditingLabel(el)}
+                onConnectionPointDragStart={(side, worldPos) =>
+                  handleConnectionPointDragStart(el.id, side, worldPos)
+                }
+                showConnectionPoints={el.id === selectedElementId || isDraggingConnector}
+                onResizeDragStart={(handle, e) => handleResizeDragStart(el.id, handle, e)}
+                svgToWorld={clientToWorld}
+                onUpdateProperties={onUpdateProperties}
+                onUpdateLabel={onUpdateLabel}
+                onMoveEnd={
+                  (el.type === "gateway" || el.type === "intermediate-event")
+                    ? () => onElementMoveEnd?.(el.id)
+                    : undefined
+                }
+              />
+            );
+          })}
 
           {/* Lanes — selectable (for deletion) but not draggable */}
           {lanes.map((el) => (
@@ -849,12 +865,31 @@ export function Canvas({
           ))}
 
           {/* Non-container elements */}
-          {nonContainers.map((el) => (
+          {nonContainers.map((el) => {
+            let elIsDropTarget = false;
+            let elIsMsgTarget = false;
+            if (isDraggingConnector && el.id !== draggingConnector!.fromId) {
+              if (!isBpmnSource || !draggingSourcePoolId) {
+                elIsDropTarget = true;
+              } else {
+                const elPoolId = getElementPoolId(el, data.elements);
+                if (elPoolId === draggingSourcePoolId) {
+                  elIsDropTarget = true;
+                } else if (elPoolId && elPoolId !== draggingSourcePoolId) {
+                  const elPool = data.elements.find((p) => p.id === elPoolId);
+                  const elPoolIsWhiteBox =
+                    ((elPool?.properties.poolType as string | undefined) ?? "black-box") === "white-box";
+                  if (elPoolIsWhiteBox) elIsMsgTarget = true;
+                }
+              }
+            }
+            return (
             <SymbolRenderer
               key={el.id}
               element={el}
               selected={el.id === selectedElementId}
-              isDropTarget={isDraggingConnector && el.id !== draggingConnector!.fromId}
+              isDropTarget={elIsDropTarget}
+              isMessageBpmnTarget={elIsMsgTarget}
               onSelect={() => {
                 onSelectElement(el.id);
                 onSelectConnector(null);
@@ -906,7 +941,8 @@ export function Canvas({
                 return false;
               }}
             />
-          ))}
+            );
+          })}
 
           {/* Association connectors — rendered above all elements */}
           {data.connectors.filter(c => c.type === "associationBPMN" || c.type === "messageBPMN").map((conn) => (

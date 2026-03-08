@@ -10,6 +10,7 @@ interface Props {
   selected: boolean;
   isDropTarget: boolean;
   isDisallowedTarget?: boolean;
+  isMessageBpmnTarget?: boolean;
   onSelect: () => void;
   onMove: (x: number, y: number) => void;
   onDoubleClick: () => void;
@@ -676,6 +677,7 @@ export function SymbolRenderer({
   selected,
   isDropTarget,
   isDisallowedTarget,
+  isMessageBpmnTarget,
   onSelect,
   onMove,
   onDoubleClick,
@@ -936,6 +938,16 @@ export function SymbolRenderer({
           x={element.x - 4} y={element.y - 4}
           width={element.width + 8} height={element.height + 8}
           fill="none" stroke="#16a34a" strokeWidth={2} rx={6}
+          style={{ pointerEvents: "none" }}
+        />
+      )}
+
+      {/* messageBPMN target highlight (darker green) */}
+      {isMessageBpmnTarget && (
+        <rect
+          x={element.x - 4} y={element.y - 4}
+          width={element.width + 8} height={element.height + 8}
+          fill="none" stroke="#166534" strokeWidth={2} rx={6}
           style={{ pointerEvents: "none" }}
         />
       )}

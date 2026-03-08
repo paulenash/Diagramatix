@@ -632,11 +632,12 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       if (!pool) return state;
       const POOL_LABEL_W = 30;
       const DEFAULT_LANE_H = 150;
+      const LANE_HEADER_H = 28;
       const existingLanes = state.elements.filter((e) => e.type === "lane" && e.parentId === poolId);
       const stackedH = existingLanes.reduce((s, l) => s + l.height, 0);
       const laneY = pool.y + stackedH;
       const laneCount = state.elements.filter((e) => e.type === "lane").length;
-      const laneH = existingLanes.length === 0 ? pool.height : DEFAULT_LANE_H;
+      const laneH = existingLanes.length === 0 ? pool.height : LANE_HEADER_H;
       const newLane: DiagramElement = {
         id: nanoid(), type: "lane",
         x: pool.x + POOL_LABEL_W,
