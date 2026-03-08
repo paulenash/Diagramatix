@@ -116,10 +116,19 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState("");
 
-  if (visibleWaypoints.length !== 4) return null;
+  if (visibleWaypoints.length < 2) return null;
 
-  const [p0, cp1, cp2, p3] = visibleWaypoints;
-  const anchor = cubicBezierPoint(p0, cp1, cp2, p3, 0.5);
+  let anchor: Point;
+  if (visibleWaypoints.length === 4) {
+    // Cubic bezier (curvilinear / interaction connector)
+    const [p0, cp1, cp2, p3] = visibleWaypoints;
+    anchor = cubicBezierPoint(p0, cp1, cp2, p3, 0.5);
+  } else {
+    // Straight or rectilinear — midpoint of first and last visible waypoint
+    const p0 = visibleWaypoints[0];
+    const pN = visibleWaypoints[visibleWaypoints.length - 1];
+    anchor = { x: (p0.x + pN.x) / 2, y: (p0.y + pN.y) / 2 };
+  }
   const offsetX = connector.labelOffsetX ?? 0;
   const offsetY = connector.labelOffsetY ?? -30;
   const lWidth  = connector.labelWidth ?? 80;
