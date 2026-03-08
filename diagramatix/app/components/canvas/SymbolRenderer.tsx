@@ -235,6 +235,14 @@ function IntermediateEventShape({ el }: { el: DiagramElement }) {
 function DataObjectShape({ el }: { el: DiagramElement }) {
   const fold = Math.round(el.width * 0.28);
   const { x, y, width: w, height: h } = el;
+  const multiplicity = (el.properties.multiplicity as string | undefined) ?? "single";
+
+  const lineH   = Math.round(h * 0.14);
+  const lineGap = 3;
+  const cx  = x + w / 2;
+  const ly2 = y + h - 3;
+  const ly1 = ly2 - lineH;
+
   return (
     <g>
       <polygon
@@ -245,6 +253,13 @@ function DataObjectShape({ el }: { el: DiagramElement }) {
         points={`${x+w-fold},${y} ${x+w},${y+fold} ${x+w-fold},${y+fold}`}
         fill="#93c5fd" stroke="#374151" strokeWidth={1.5}
       />
+      {multiplicity === "collection" && (
+        <g stroke="#374151" strokeWidth={1.5}>
+          <line x1={cx - lineGap} y1={ly1} x2={cx - lineGap} y2={ly2} />
+          <line x1={cx}           y1={ly1} x2={cx}           y2={ly2} />
+          <line x1={cx + lineGap} y1={ly1} x2={cx + lineGap} y2={ly2} />
+        </g>
+      )}
     </g>
   );
 }
