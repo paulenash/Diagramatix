@@ -235,7 +235,26 @@ function IntermediateEventShape({ el }: { el: DiagramElement }) {
 function DataObjectShape({ el }: { el: DiagramElement }) {
   const fold = Math.round(el.width * 0.28);
   const { x, y, width: w, height: h } = el;
+  const role         = (el.properties.role         as string | undefined) ?? "none";
   const multiplicity = (el.properties.multiplicity as string | undefined) ?? "single";
+
+  const arrowW = Math.round(w * 0.28);
+  const arrowH = Math.round(h * 0.18);
+  const ax = x + 3;
+  const ay = y + 4;
+  const triW  = Math.round(arrowW * 0.7);
+  const rectW = Math.round(triW   * 0.5);
+  const rectH = Math.round(arrowH * 0.35);
+  const ry    = ay + (arrowH - rectH) / 2;
+  const markerPts = [
+    `${ax},${ry}`,
+    `${ax + rectW},${ry}`,
+    `${ax + rectW},${ay}`,
+    `${ax + rectW + triW},${ay + arrowH / 2}`,
+    `${ax + rectW},${ay + arrowH}`,
+    `${ax + rectW},${ry + rectH}`,
+    `${ax},${ry + rectH}`,
+  ].join(" ");
 
   const lineH   = Math.round(h * 0.14);
   const lineGap = 3;
@@ -253,6 +272,12 @@ function DataObjectShape({ el }: { el: DiagramElement }) {
         points={`${x+w-fold},${y} ${x+w},${y+fold} ${x+w-fold},${y+fold}`}
         fill="#93c5fd" stroke="#374151" strokeWidth={1.5}
       />
+      {role === "output" && (
+        <polygon points={markerPts} fill="#374151" />
+      )}
+      {role === "input" && (
+        <polygon points={markerPts} fill="white" stroke="#374151" strokeWidth={1.2} />
+      )}
       {multiplicity === "collection" && (
         <g stroke="#374151" strokeWidth={1.5}>
           <line x1={cx - lineGap} y1={ly1} x2={cx - lineGap} y2={ly2} />
