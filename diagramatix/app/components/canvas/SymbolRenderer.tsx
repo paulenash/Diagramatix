@@ -475,7 +475,7 @@ function SubprocessShape({ el }: { el: DiagramElement }) {
         stroke="#374151" strokeWidth={1} />
       <line x1={mx + 3} y1={my + markerH / 2} x2={mx + markerW - 3} y2={my + markerH / 2}
         stroke="#374151" strokeWidth={1} />
-      {hasLoop && <LoopMarker cx={loopCX} cy={my} />}
+      {hasLoop && <LoopMarker cx={loopCX} cy={my + markerH * 0.55} />}
     </g>
   );
 }
