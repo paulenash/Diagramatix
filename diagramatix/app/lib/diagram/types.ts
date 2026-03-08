@@ -37,7 +37,7 @@ export type GatewayType = "exclusive" | "inclusive" | "parallel" | "event-based"
 export type EventType =
   | "none" | "message" | "timer" | "error" | "signal" | "terminate" | "conditional";
 
-export type ConnectorType = "sequence" | "message" | "association" | "interaction" | "associationBPMN";
+export type ConnectorType = "sequence" | "message" | "association" | "interaction" | "associationBPMN" | "messageBPMN";
 
 export type Side = "top" | "right" | "bottom" | "left";
 

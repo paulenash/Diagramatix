@@ -24,6 +24,19 @@ const MIN_BOUNDARY_H = HEADER_H + 40;
 
 const DATA_ELEMENT_TYPES = new Set<SymbolType>(["data-object", "data-store"]);
 
+function getElementPoolId(el: DiagramElement, elements: DiagramElement[]): string | null {
+  if (el.type === "pool") return el.id;
+  if (!el.parentId) return null;
+  const parent = elements.find((e) => e.id === el.parentId);
+  if (!parent) return null;
+  if (parent.type === "pool") return parent.id;
+  if (parent.type === "lane") {
+    const gp = elements.find((e) => e.id === parent.parentId);
+    return gp?.type === "pool" ? gp.id : null;
+  }
+  return null;
+}
+
 const USE_CASE_DEFAULT_W = 120;
 const USE_CASE_DEFAULT_H = 60;
 const USE_CASE_ASPECT = USE_CASE_DEFAULT_W / USE_CASE_DEFAULT_H;
@@ -286,15 +299,25 @@ export function Canvas({
           (sourceEl && DATA_ELEMENT_TYPES.has(sourceEl.type)) ||
           DATA_ELEMENT_TYPES.has(targetEl.type);
 
-        const connType: ConnectorType = isDataConn
-          ? "associationBPMN"
-          : defaultRoutingType === "curvilinear"
-            ? "interaction"
-            : (sourceEl && actorLike.includes(sourceEl.type)) || actorLike.includes(targetEl.type)
-              ? "association"
-              : "sequence";
-        const connRouting: RoutingType = isDataConn ? "direct" : defaultRoutingType;
-        const connDirection: DirectionType = isDataConn ? "open-directed" : defaultDirectionType;
+        const sourcePoolId = sourceEl ? getElementPoolId(sourceEl, data.elements) : null;
+        const targetPoolId = getElementPoolId(targetEl, data.elements);
+        const isCrossPool = sourcePoolId !== null && targetPoolId !== null && sourcePoolId !== targetPoolId;
+
+        let connType: ConnectorType;
+        let connRouting: RoutingType;
+        let connDirection: DirectionType;
+
+        if (isCrossPool) {
+          connType = "messageBPMN"; connRouting = "direct"; connDirection = "directed";
+        } else if (isDataConn) {
+          connType = "associationBPMN"; connRouting = "direct"; connDirection = "open-directed";
+        } else if (defaultRoutingType === "curvilinear") {
+          connType = "interaction"; connRouting = defaultRoutingType; connDirection = defaultDirectionType;
+        } else if ((sourceEl && actorLike.includes(sourceEl.type)) || actorLike.includes(targetEl.type)) {
+          connType = "association"; connRouting = defaultRoutingType; connDirection = defaultDirectionType;
+        } else {
+          connType = "sequence"; connRouting = defaultRoutingType; connDirection = defaultDirectionType;
+        }
 
         onAddConnector(elementId, targetEl.id, connType, connDirection, connRouting, side, targetSide);
       }

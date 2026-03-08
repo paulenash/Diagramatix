@@ -293,12 +293,18 @@ function DataStoreShape({ el }: { el: DiagramElement }) {
   const { x, y, width: w, height: h } = el;
   const cx = x + w / 2;
   const rx = w / 2;
-  const ry = Math.max(4, Math.round(h * 0.18));
+  const ry = Math.max(4, Math.round(h * 0.15));
+  const ringGap = ry + 3;
+  // Front arc (bottom half of ellipse): clockwise from left to right, sweep=1
+  const frontArc = (cy: number) =>
+    `M ${x} ${cy} A ${rx} ${ry} 0 0 1 ${x + w} ${cy}`;
   return (
     <g>
       <rect x={x} y={y + ry} width={w} height={h - ry} fill="#60a5fa" stroke="#374151" strokeWidth={1.5} />
-      <ellipse cx={cx} cy={y + h} rx={rx} ry={ry} fill="#60a5fa" stroke="#374151" strokeWidth={1.5} />
       <ellipse cx={cx} cy={y + ry} rx={rx} ry={ry} fill="#60a5fa" stroke="#374151" strokeWidth={1.5} />
+      <path d={frontArc(y + ry + ringGap)}     fill="none" stroke="#374151" strokeWidth={1.5} />
+      <path d={frontArc(y + ry + ringGap * 2)} fill="none" stroke="#374151" strokeWidth={1.5} />
+      <path d={frontArc(y + h)}               fill="none" stroke="#374151" strokeWidth={1.5} />
     </g>
   );
 }
@@ -568,8 +574,8 @@ function PoolShape({ el }: { el: DiagramElement }) {
   return (
     <g>
       <rect x={x} y={y} width={w} height={h} fill="#f9fafb" stroke="#374151" strokeWidth={1.5} />
-      <rect x={x} y={y} width={LW} height={h} fill="#7c3a2a" stroke="#374151" strokeWidth={1.5} />
-      <text textAnchor="middle" fontSize={11} fill="white" fontWeight="500"
+      <rect x={x} y={y} width={LW} height={h} fill="#c8956a" stroke="#374151" strokeWidth={1.5} />
+      <text textAnchor="middle" fontSize={11} fill="#3b1a08" fontWeight="500"
             transform={`rotate(-90,${cx},${cy})`}
             style={{ userSelect: "none", pointerEvents: "none" }}>
         {lines.map((line, i) => (
@@ -590,7 +596,7 @@ function LaneShape({ el }: { el: DiagramElement }) {
   return (
     <g>
       <rect x={x} y={y} width={w} height={h} fill="none" stroke="#374151" strokeWidth={1} />
-      <rect x={x} y={y} width={LW} height={h} fill="#c8956a" stroke="#374151" strokeWidth={1} />
+      <rect x={x} y={y} width={LW} height={h} fill="#e8c4a0" stroke="#374151" strokeWidth={1} />
       <text textAnchor="middle" fontSize={10} fill="#3b1a08"
             transform={`rotate(-90,${cx},${cy})`}
             style={{ userSelect: "none", pointerEvents: "none" }}>

@@ -86,6 +86,24 @@ function OpenArrowMarkerStartThin({ id, color }: { id: string; color: string }) 
   );
 }
 
+/** Unfilled equilateral triangle (messageBPMN target end) */
+function UnfilledTriangleMarker({ id, color }: { id: string; color: string }) {
+  return (
+    <marker id={id} markerWidth={10} markerHeight={10} refX={8} refY={5} orient="auto">
+      <polygon points="0,0.5 0,9.5 7.8,5" fill="white" stroke={color} strokeWidth={1.5} />
+    </marker>
+  );
+}
+
+/** Small filled circle (messageBPMN source end) */
+function CircleMarker({ id, color }: { id: string; color: string }) {
+  return (
+    <marker id={id} markerWidth={8} markerHeight={8} refX={4} refY={4} orient="auto-start-reverse">
+      <circle cx={4} cy={4} r={3} fill={color} stroke={color} />
+    </marker>
+  );
+}
+
 interface InteractionLabelProps {
   connector: Connector;
   selected: boolean;
@@ -233,6 +251,7 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
 
   const isMessage = connector.type === "message";
   const isAssocBPMN = connector.type === "associationBPMN";
+  const isMessageBPMN = connector.type === "messageBPMN";
   const strokeColor = selected ? "#2563eb" : "#6b7280";
   const markerId = `arrow-${connector.id}`;
   const openMarkerId = `arrow-open-${connector.id}`;
@@ -348,7 +367,12 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
 
   return (
     <>
-      {showArrow && (
+      {isMessageBPMN ? (
+        <defs>
+          <UnfilledTriangleMarker id={`msg-end-${connector.id}`}   color={strokeColor} />
+          <CircleMarker           id={`msg-start-${connector.id}`} color={strokeColor} />
+        </defs>
+      ) : showArrow && (
         <defs>
           {isAssocBPMN
             ? <OpenArrowMarkerThin id={openMarkerId} color={strokeColor} />
@@ -376,10 +400,10 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
         fill="none"
         stroke={strokeColor}
         strokeWidth={isAssocBPMN ? (selected ? 2.5 : 2) : (selected ? 2 : 1.5)}
-        strokeDasharray={isAssocBPMN ? "1 7" : (isMessage ? "6 3" : undefined)}
+        strokeDasharray={isMessageBPMN ? "10 5" : isAssocBPMN ? "1 7" : (isMessage ? "6 3" : undefined)}
         strokeLinecap={isAssocBPMN ? "round" : undefined}
-        markerStart={isBothArrow ? `url(#${openStartMarkerId})` : undefined}
-        markerEnd={showArrow ? `url(#${isOpenArrow ? openMarkerId : markerId})` : undefined}
+        markerStart={isMessageBPMN ? `url(#msg-start-${connector.id})` : isBothArrow ? `url(#${openStartMarkerId})` : undefined}
+        markerEnd={isMessageBPMN ? `url(#msg-end-${connector.id})` : showArrow ? `url(#${isOpenArrow ? openMarkerId : markerId})` : undefined}
         style={{ pointerEvents: "none" }}
       />
 

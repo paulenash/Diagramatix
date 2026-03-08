@@ -148,6 +148,20 @@ function updatePoolTypes(elements: DiagramElement[]): DiagramElement[] {
   });
 }
 
+function clampChildrenToLane(elements: DiagramElement[], lane: DiagramElement): DiagramElement[] {
+  const LANE_LW = 24;
+  const minX = lane.x + LANE_LW;
+  const minY = lane.y;
+  const maxX = lane.x + lane.width;
+  const maxY = lane.y + lane.height;
+  return elements.map((el) => {
+    if (el.parentId !== lane.id) return el;
+    const cx = Math.max(minX, Math.min(el.x, maxX - el.width));
+    const cy = Math.max(minY, Math.min(el.y, maxY - el.height));
+    return (cx === el.x && cy === el.y) ? el : { ...el, x: cx, y: cy };
+  });
+}
+
 function reducer(state: DiagramData, action: Action): DiagramData {
   switch (action.type) {
     case "SET_DATA":
@@ -253,9 +267,37 @@ function reducer(state: DiagramData, action: Action): DiagramData {
     }
 
     case "RESIZE_ELEMENT": {
-      const { id, width, height } = action.payload;
+      const { id, width: newW, height: newH } = action.payload;
+      const target = state.elements.find((e) => e.id === id);
+
+      if (target?.type === "pool") {
+        const POOL_LW = 30;
+        const sortedLanes = state.elements
+          .filter((e) => e.type === "lane" && e.parentId === id)
+          .sort((a, b) => a.y - b.y);
+        const totalLaneH = sortedLanes.reduce((s, l) => s + l.height, 0) || 1;
+        let stackY = target.y;
+        const laneUpdates = new Map<string, DiagramElement>();
+        for (const lane of sortedLanes) {
+          const newLaneH = Math.max(40, Math.round(newH * (lane.height / totalLaneH)));
+          const updated = { ...lane, x: target.x + POOL_LW, y: stackY, width: newW - POOL_LW, height: newLaneH };
+          laneUpdates.set(lane.id, updated);
+          stackY += newLaneH;
+        }
+        let elements = state.elements.map((e) =>
+          e.id === id ? { ...e, width: newW, height: newH }
+          : laneUpdates.has(e.id) ? laneUpdates.get(e.id)!
+          : e
+        );
+        for (const updatedLane of laneUpdates.values()) {
+          elements = clampChildrenToLane(elements, updatedLane);
+        }
+        const connectors = recomputeAllConnectors(state.connectors, elements);
+        return { ...state, elements, connectors };
+      }
+
       const elements = state.elements.map((el) =>
-        el.id === id ? { ...el, width, height } : el
+        el.id === id ? { ...el, width: newW, height: newH } : el
       );
       const connectors = recomputeAllConnectors(state.connectors, elements);
       return { ...state, elements, connectors };
@@ -296,11 +338,32 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         return state;
       }
       const deletingIsContainer = el ? isContainerType(el.type) : false;
-      const elements = state.elements
+      let elements = state.elements
         .filter((e) => e.id !== id)
         .map((e) =>
           deletingIsContainer && e.parentId === id ? { ...e, parentId: undefined } : e
         );
+
+      // If deleting a lane, reflow remaining sibling lanes to fill the pool height
+      if (el?.type === "lane" && el.parentId) {
+        const pool = elements.find((e) => e.id === el.parentId);
+        if (pool) {
+          const POOL_LW = 30;
+          const siblings = elements
+            .filter((e) => e.type === "lane" && e.parentId === pool.id)
+            .sort((a, b) => a.y - b.y);
+          const totalSibH = siblings.reduce((s, l) => s + l.height, 0) || 1;
+          let stackY = pool.y;
+          for (const sib of siblings) {
+            const newH = Math.max(40, Math.round(pool.height * (sib.height / totalSibH)));
+            const updated = { ...sib, x: pool.x + POOL_LW, y: stackY, width: pool.width - POOL_LW, height: newH };
+            elements = elements.map((e) => e.id === sib.id ? updated : e);
+            elements = clampChildrenToLane(elements, updated);
+            stackY += newH;
+          }
+        }
+      }
+
       const connectors = state.connectors.filter(
         (c) => c.sourceId !== id && c.targetId !== id
       );
