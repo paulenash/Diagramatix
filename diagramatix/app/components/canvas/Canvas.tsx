@@ -987,8 +987,12 @@ export function Canvas({
             />
           ))}
 
-          {/* messageBPMN drag handle — drag left/right along pool boundaries */}
+          {/* messageBPMN drag handle — drag left/right along pool boundaries (hidden for event endpoints) */}
           {selectedConnector?.type === "messageBPMN" && selectedConnector.waypoints.length === 4 && (() => {
+            const BPMN_EVENT_TYPES = new Set(["start-event", "intermediate-event", "end-event"]);
+            const msgSrcEl = data.elements.find((e) => e.id === selectedConnector.sourceId);
+            const msgTgtEl = data.elements.find((e) => e.id === selectedConnector.targetId);
+            if ((msgSrcEl && BPMN_EVENT_TYPES.has(msgSrcEl.type)) || (msgTgtEl && BPMN_EVENT_TYPES.has(msgTgtEl.type))) return null;
             const wp = selectedConnector.waypoints;
             const x = wp[1].x;
             const midY = (wp[1].y + wp[2].y) / 2;

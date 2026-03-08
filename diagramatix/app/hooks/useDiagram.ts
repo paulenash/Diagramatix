@@ -18,11 +18,14 @@ import type {
 import { computeWaypoints, recomputeAllConnectors, consolidateWaypoints, rectifyWaypoints } from "@/app/lib/diagram/routing";
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
 
+const BPMN_EVENT_TYPES = new Set(["start-event", "intermediate-event", "end-event"]);
+
 function messageBpmnWaypoints(
   source: DiagramElement, target: DiagramElement,
   sourceSide: Side, targetSide: Side, offsetAlong: number
 ): { waypoints: Point[]; sourceInvisibleLeader: true; targetInvisibleLeader: true } {
-  const srcX = source.x + source.width * offsetAlong;
+  const effectiveAlong = BPMN_EVENT_TYPES.has(source.type) ? 0.5 : offsetAlong;
+  const srcX = source.x + source.width * effectiveAlong;
   const minX = Math.max(source.x, target.x);
   const maxX = Math.min(source.x + source.width, target.x + target.width);
   const x = maxX > minX ? Math.max(minX, Math.min(maxX, srcX)) : srcX;
@@ -435,21 +438,27 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         labelWidth:   connectorType === "interaction" ? 80  : isMsgBpmn ? 80  : undefined,
       };
 
-      const updatedElements = isMsgBpmn
-        ? state.elements.map((el) => {
-            if (el.id === sourceId) {
-              if (el.type === "task")               return { ...el, taskType: "send" as BpmnTaskType };
-              if (el.type === "end-event")          return { ...el, eventType: "message" as EventType };
-              if (el.type === "intermediate-event") return { ...el, eventType: "message" as EventType, taskType: "send" as BpmnTaskType };
-            }
-            if (el.id === targetId) {
-              if (el.type === "task")               return { ...el, taskType: "receive" as BpmnTaskType };
-              if (el.type === "start-event")        return { ...el, eventType: "message" as EventType };
-              if (el.type === "intermediate-event") return { ...el, eventType: "message" as EventType };
-            }
-            return el;
-          })
-        : state.elements;
+      const isSeq = connectorType === "sequence";
+      const updatedElements = state.elements.map((el) => {
+        if (isMsgBpmn) {
+          if (el.id === sourceId) {
+            if (el.type === "task")               return { ...el, taskType: "send" as BpmnTaskType };
+            if (el.type === "end-event")          return { ...el, eventType: "message" as EventType };
+            if (el.type === "intermediate-event") return { ...el, eventType: "message" as EventType, taskType: "send" as BpmnTaskType };
+          }
+          if (el.id === targetId) {
+            if (el.type === "task")               return { ...el, taskType: "receive" as BpmnTaskType };
+            if (el.type === "start-event")        return { ...el, eventType: "message" as EventType };
+            if (el.type === "intermediate-event") return { ...el, eventType: "message" as EventType };
+          }
+        } else if (isSeq) {
+          // Start events cannot be sequence targets → convert to intermediate
+          if (el.id === targetId && el.type === "start-event") return { ...el, type: "intermediate-event" as SymbolType };
+          // End events cannot be sequence sources → convert to intermediate
+          if (el.id === sourceId && el.type === "end-event")   return { ...el, type: "intermediate-event" as SymbolType };
+        }
+        return el;
+      });
 
       return { ...state, elements: updatedElements, connectors: [...state.connectors, newConnector] };
     }
