@@ -5,6 +5,7 @@ import type {
   BpmnTaskType,
   GatewayType,
   EventType,
+  RepeatType,
   Connector,
   ConnectorType,
   DiagramData,
@@ -348,12 +349,13 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         ...state,
         elements: state.elements.map((el) => {
           if (el.id !== action.payload.id) return el;
-          const { taskType, gatewayType, eventType, ...rest } = action.payload.properties;
+          const { taskType, gatewayType, eventType, repeatType, ...rest } = action.payload.properties;
           return {
             ...el,
             ...(taskType !== undefined ? { taskType: taskType as BpmnTaskType } : {}),
             ...(gatewayType !== undefined ? { gatewayType: gatewayType as GatewayType } : {}),
             ...(eventType !== undefined ? { eventType: eventType as EventType } : {}),
+            ...(repeatType !== undefined ? { repeatType: repeatType as RepeatType } : {}),
             properties: { ...el.properties, ...rest },
           };
         }),

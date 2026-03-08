@@ -84,11 +84,13 @@ function getClosestSideFromPoint(pt: Point, el: DiagramElement): Side {
 }
 
 function TaskShape({ el }: { el: DiagramElement }) {
+  const hasLoop = el.repeatType === "loop";
   return (
-    <rect
-      x={el.x} y={el.y} width={el.width} height={el.height}
-      rx={4} ry={4} fill="#fef9c3" stroke="#374151" strokeWidth={1.5}
-    />
+    <g>
+      <rect x={el.x} y={el.y} width={el.width} height={el.height}
+        rx={4} ry={4} fill="#fef9c3" stroke="#374151" strokeWidth={1.5} />
+      {hasLoop && <LoopMarker cx={el.x + el.width / 2} cy={el.y + el.height - 10} />}
+    </g>
   );
 }
 
@@ -456,9 +458,12 @@ function FinalStateShape({ el }: { el: DiagramElement }) {
 }
 
 function SubprocessShape({ el }: { el: DiagramElement }) {
-  const markerW = 14;
-  const markerH = 14;
-  const mx = el.x + el.width / 2 - markerW / 2;
+  const hasLoop = el.repeatType === "loop";
+  const markerW = 14, markerH = 14;
+  // When loop present, group (loop + "+") is centered: each 14px, 4px gap = 32px total
+  const plusCX = hasLoop ? el.x + el.width / 2 + 9 : el.x + el.width / 2;
+  const loopCX = el.x + el.width / 2 - 9;
+  const mx = plusCX - markerW / 2;
   const my = el.y + el.height - markerH - 3;
   return (
     <g>
@@ -470,14 +475,19 @@ function SubprocessShape({ el }: { el: DiagramElement }) {
         stroke="#374151" strokeWidth={1} />
       <line x1={mx + 3} y1={my + markerH / 2} x2={mx + markerW - 3} y2={my + markerH / 2}
         stroke="#374151" strokeWidth={1} />
+      {hasLoop && <LoopMarker cx={loopCX} cy={my} />}
     </g>
   );
 }
 
 function ExpandedSubprocessShape({ el }: { el: DiagramElement }) {
+  const hasLoop = el.repeatType === "loop";
   return (
-    <rect x={el.x} y={el.y} width={el.width} height={el.height}
-      rx={4} ry={4} fill="#fef08a" stroke="#374151" strokeWidth={1.5} />
+    <g>
+      <rect x={el.x} y={el.y} width={el.width} height={el.height}
+        rx={4} ry={4} fill="#fef08a" stroke="#374151" strokeWidth={1.5} />
+      {hasLoop && <LoopMarker cx={el.x + el.width / 2} cy={el.y + el.height - 10} />}
+    </g>
   );
 }
 
@@ -561,7 +571,26 @@ function BpmnTaskMarker({ taskType, x, y }: { taskType: BpmnTaskType; x: number;
   }
 }
 
+function LoopMarker({ cx, cy }: { cx: number; cy: number }) {
+  // Counter-clockwise arc: from right (cx+r, cy) going up/left/down to bottom (cx, cy+r) — 270° sweep
+  // At the endpoint (cx, cy+r), CCW tangent points right (+x), so arrowhead points right
+  const r = 5;
+  return (
+    <g>
+      <path
+        d={`M ${cx + r} ${cy} A ${r} ${r} 0 1 0 ${cx} ${cy + r}`}
+        fill="none" stroke="#374151" strokeWidth={1.5} strokeLinecap="round"
+      />
+      <polygon
+        points={`${cx + 3},${cy + r} ${cx},${cy + r - 2.5} ${cx},${cy + r + 2.5}`}
+        fill="#374151"
+      />
+    </g>
+  );
+}
+
 function BpmnTaskShape({ el }: { el: DiagramElement }) {
+  const hasLoop = el.repeatType === "loop";
   return (
     <g>
       <rect x={el.x} y={el.y} width={el.width} height={el.height}
@@ -569,6 +598,7 @@ function BpmnTaskShape({ el }: { el: DiagramElement }) {
       {el.taskType && el.taskType !== "none" && (
         <BpmnTaskMarker taskType={el.taskType} x={el.x + 4} y={el.y + 4} />
       )}
+      {hasLoop && <LoopMarker cx={el.x + el.width / 2} cy={el.y + el.height - 10} />}
     </g>
   );
 }
@@ -1039,10 +1069,11 @@ export function SymbolRenderer({
         />
       )}
 
-      {/* Interior label for task/subprocess/use-case — rendered AFTER connection overlay so it is on top */}
+      {/* Interior label for task/subprocess/subprocess-expanded/use-case — rendered AFTER connection overlay so it is on top */}
       {showLabel && (
         element.type === 'task' ||
         element.type === 'subprocess' ||
+        element.type === 'subprocess-expanded' ||
         element.type === 'use-case'
       ) && (() => {
         const PAD = 4;
@@ -1058,10 +1089,12 @@ export function SymbolRenderer({
         const lineH = 14;
         const lines = wrapText(el.label, labelWidth);
         const totalLabelH = lines.length * lineH;
-        const labelTopY  = labelCenterY - totalLabelH / 2;
+        const labelTopY  = el.type === 'subprocess-expanded'
+          ? el.y + PAD  // top-aligned for expanded subprocess
+          : labelCenterY - totalLabelH / 2;
         const labelLeftX = labelCenterX - labelWidth / 2;
         const iconReserveTop = (el.type === 'task' && el.taskType && el.taskType !== 'none') ? 20 : 0;
-        const iconReserveBot = el.type === 'subprocess' ? 20 : 0;
+        const iconReserveBot = (el.type === 'subprocess' || el.repeatType === 'loop') ? 20 : 0;
         const minY    = el.y + PAD + iconReserveTop;
         const maxBotY = el.y + el.height - PAD - iconReserveBot;
         function clamp(v: number, lo: number, hi: number) { return Math.max(lo, Math.min(hi, v)); }
