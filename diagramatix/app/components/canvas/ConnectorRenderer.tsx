@@ -69,6 +69,23 @@ function OpenArrowMarkerStart({ id, color }: { id: string; color: string }) {
   );
 }
 
+// Thinner, shorter open arrowhead for associationBPMN connectors
+function OpenArrowMarkerThin({ id, color }: { id: string; color: string }) {
+  return (
+    <marker id={id} markerWidth={8} markerHeight={5} refX={7} refY={2.5} orient="auto">
+      <polyline points="0,0.5 7,2.5 0,4.5" fill="none" stroke={color} strokeWidth={1} />
+    </marker>
+  );
+}
+
+function OpenArrowMarkerStartThin({ id, color }: { id: string; color: string }) {
+  return (
+    <marker id={id} markerWidth={8} markerHeight={5} refX={7} refY={2.5} orient="auto-start-reverse">
+      <polyline points="0,0.5 7,2.5 0,4.5" fill="none" stroke={color} strokeWidth={1} />
+    </marker>
+  );
+}
+
 interface InteractionLabelProps {
   connector: Connector;
   selected: boolean;
@@ -333,10 +350,14 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
     <>
       {showArrow && (
         <defs>
-          {isOpenArrow
-            ? <OpenArrowMarker id={openMarkerId} color={strokeColor} />
-            : <ArrowMarker id={markerId} color={strokeColor} />}
-          {isBothArrow && <OpenArrowMarkerStart id={openStartMarkerId} color={strokeColor} />}
+          {isAssocBPMN
+            ? <OpenArrowMarkerThin id={openMarkerId} color={strokeColor} />
+            : isOpenArrow
+              ? <OpenArrowMarker id={openMarkerId} color={strokeColor} />
+              : <ArrowMarker id={markerId} color={strokeColor} />}
+          {isBothArrow && (isAssocBPMN
+            ? <OpenArrowMarkerStartThin id={openStartMarkerId} color={strokeColor} />
+            : <OpenArrowMarkerStart id={openStartMarkerId} color={strokeColor} />)}
         </defs>
       )}
 
