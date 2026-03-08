@@ -23,6 +23,7 @@ interface Props {
   onUpdateConnectorLabel?: (id: string, label: string) => void;
   onAddLane?: (poolId: string) => void;
   poolHasContent?: boolean;
+  laneHasContent?: boolean;
 }
 
 const TASK_TYPE_OPTIONS: { value: BpmnTaskType; label: string }[] = [
@@ -65,6 +66,7 @@ export function PropertiesPanel({
   onUpdateConnectorLabel,
   onAddLane,
   poolHasContent,
+  laneHasContent,
 }: Props) {
   const [labelDraft, setLabelDraft] = useState("");
 
@@ -401,6 +403,25 @@ export function PropertiesPanel({
             className="w-full px-3 py-1.5 text-xs bg-red-50 text-red-600 border border-red-200 rounded hover:bg-red-100"
           >
             Delete pool
+          </button>
+        )
+      ) : element.type === "lane" ? (
+        laneHasContent ? (
+          <div>
+            <p className="text-xs text-orange-600 mb-1">Remove all elements from this lane first</p>
+            <button
+              disabled
+              className="w-full px-3 py-1.5 text-xs bg-gray-50 text-gray-400 border border-gray-200 rounded cursor-not-allowed"
+            >
+              Delete lane
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => onDeleteElement(element.id)}
+            className="w-full px-3 py-1.5 text-xs bg-red-50 text-red-600 border border-red-200 rounded hover:bg-red-100"
+          >
+            Delete lane
           </button>
         )
       ) : (

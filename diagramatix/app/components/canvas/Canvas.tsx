@@ -784,14 +784,17 @@ export function Canvas({
             />
           ))}
 
-          {/* Lanes — rendered but not selectable or draggable */}
+          {/* Lanes — selectable (for deletion) but not draggable */}
           {lanes.map((el) => (
             <SymbolRenderer
               key={el.id}
               element={el}
-              selected={false}
+              selected={el.id === selectedElementId}
               isDropTarget={false}
-              onSelect={() => {}}
+              onSelect={() => {
+                onSelectElement(el.id);
+                onSelectConnector(null);
+              }}
               onMove={() => {}}
               onDoubleClick={() => startEditingLabel(el)}
               onConnectionPointDragStart={() => {}}

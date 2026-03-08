@@ -131,6 +131,10 @@ export function DiagramEditor({
     ? data.elements.some((e) => e.parentId === selectedElement.id)
     : false;
 
+  const laneHasContent = selectedElement?.type === "lane"
+    ? data.elements.some((e) => e.parentId === selectedElement.id)
+    : false;
+
   const hasSystemBoundary = data.elements.some((e) => e.type === "system-boundary");
   const disabledSymbols: SymbolType[] = hasSystemBoundary ? ["system-boundary"] : [];
 
@@ -256,6 +260,7 @@ export function DiagramEditor({
           }}
           onAddLane={addLane}
           poolHasContent={poolHasContent}
+          laneHasContent={laneHasContent}
         />
       </div>
     </div>
