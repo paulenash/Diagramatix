@@ -46,6 +46,13 @@ function getElementPoolId(el: DiagramElement, elements: DiagramElement[]): strin
   return pool?.id ?? null;
 }
 
+function getContainingPool(el: DiagramElement, elements: DiagramElement[]): DiagramElement | null {
+  if (el.type === "pool") return null;
+  const poolId = getElementPoolId(el, elements);
+  if (!poolId) return null;
+  return elements.find((p) => p.id === poolId && p.type === "pool") ?? null;
+}
+
 const USE_CASE_DEFAULT_W = 120;
 const USE_CASE_DEFAULT_H = 60;
 const USE_CASE_ASPECT = USE_CASE_DEFAULT_W / USE_CASE_DEFAULT_H;
@@ -161,6 +168,7 @@ interface Props {
   onUpdateConnectorLabel?: (id: string, label?: string, offsetX?: number, offsetY?: number, width?: number) => void;
   onSplitConnector?: (symbolType: SymbolType, position: Point, connectorId: string, taskType?: BpmnTaskType, eventType?: EventType) => void;
   onElementMoveEnd?: (id: string) => void;
+  onMoveLaneBoundary?: (aboveLaneId: string, belowLaneId: string, dy: number) => void;
 }
 
 interface EditingLabel {
@@ -233,6 +241,7 @@ export function Canvas({
   onUpdateConnectorLabel,
   onSplitConnector,
   onElementMoveEnd,
+  onMoveLaneBoundary,
 }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
 
@@ -410,6 +419,26 @@ export function Canvas({
       }
 
       setDraggingEndpoint(null);
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    }
+
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+  }
+
+  function handleLaneBoundaryDrag(e: React.MouseEvent, aboveLaneId: string, belowLaneId: string) {
+    e.stopPropagation();
+    let lastClientY = e.clientY;
+
+    function onMouseMove(ev: MouseEvent) {
+      const rawDy = ev.clientY - lastClientY;
+      lastClientY = ev.clientY;
+      const dy = rawDy / zoom;
+      onMoveLaneBoundary?.(aboveLaneId, belowLaneId, dy);
+    }
+
+    function onMouseUp() {
       window.removeEventListener("mousemove", onMouseMove);
       window.removeEventListener("mouseup", onMouseUp);
     }
@@ -726,7 +755,7 @@ export function Canvas({
       >
         <g transform={transform}>
           {/* Pools render first (deepest layer) */}
-          {[...pools, ...otherContainers, ...lanes].map((el) => (
+          {[...pools, ...otherContainers].map((el) => (
             <SymbolRenderer
               key={el.id}
               element={el}
@@ -754,6 +783,49 @@ export function Canvas({
               }
             />
           ))}
+
+          {/* Lanes — rendered but not selectable or draggable */}
+          {lanes.map((el) => (
+            <SymbolRenderer
+              key={el.id}
+              element={el}
+              selected={false}
+              isDropTarget={false}
+              onSelect={() => {}}
+              onMove={() => {}}
+              onDoubleClick={() => startEditingLabel(el)}
+              onConnectionPointDragStart={() => {}}
+              showConnectionPoints={false}
+              svgToWorld={clientToWorld}
+              onUpdateProperties={onUpdateProperties}
+              onUpdateLabel={onUpdateLabel}
+            />
+          ))}
+
+          {/* Lane boundary drag handles — shown between adjacent lanes in multi-lane pools */}
+          {pools.flatMap((pool) => {
+            const poolLanes = lanes
+              .filter((l) => l.parentId === pool.id)
+              .sort((a, b) => a.y - b.y);
+            if (poolLanes.length < 2) return [];
+            const POOL_LW = 30;
+            return poolLanes.slice(0, -1).map((lane, i) => {
+              const nextLane = poolLanes[i + 1];
+              const boundaryY = lane.y + lane.height;
+              return (
+                <rect
+                  key={`boundary-${lane.id}`}
+                  x={pool.x + POOL_LW}
+                  y={boundaryY - 4}
+                  width={pool.width - POOL_LW}
+                  height={8}
+                  fill="transparent"
+                  style={{ cursor: "ns-resize" }}
+                  onMouseDown={(e) => handleLaneBoundaryDrag(e, lane.id, nextLane.id)}
+                />
+              );
+            });
+          })}
 
           {/* Regular connectors — rendered behind elements */}
           {data.connectors.filter(c => c.type !== "associationBPMN" && c.type !== "messageBPMN").map((conn) => (
@@ -808,7 +880,7 @@ export function Canvas({
               shouldSnapBack={(x, y) => {
                 const cx = x + el.width / 2;
                 const cy = y + el.height / 2;
-                return data.elements.some(
+                const inBoundary = data.elements.some(
                   (b) =>
                     b.type === "system-boundary" &&
                     b.id !== el.id &&
@@ -817,6 +889,18 @@ export function Canvas({
                     cx >= b.x && cx <= b.x + b.width &&
                     cy >= b.y && cy <= b.y + b.height
                 );
+                if (inBoundary) return true;
+                const containingPool = getContainingPool(el, data.elements);
+                if (containingPool) {
+                  const POOL_LW = 30;
+                  return (
+                    x < containingPool.x + POOL_LW ||
+                    y < containingPool.y ||
+                    x + el.width > containingPool.x + containingPool.width ||
+                    y + el.height > containingPool.y + containingPool.height
+                  );
+                }
+                return false;
               }}
             />
           ))}

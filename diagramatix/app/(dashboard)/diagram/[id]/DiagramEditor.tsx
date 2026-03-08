@@ -105,6 +105,7 @@ export function DiagramEditor({
     splitConnector,
     correctAllConnectors,
     addLane,
+    moveLaneBoundary,
   } = useDiagram(initialData);
 
   const saveStatus = useAutoSave(diagramId, data);
@@ -189,16 +190,6 @@ export function DiagramEditor({
           {saveStatus === "unsaved" && "Unsaved changes"}
         </span>
 
-        {diagramType === "bpmn" && (
-          <button
-            onClick={correctAllConnectors}
-            className="px-3 py-1.5 text-xs text-gray-600 border border-gray-300 rounded hover:bg-gray-50"
-            title="Make all connector segments strictly horizontal or vertical"
-          >
-            Correct Connectors
-          </button>
-        )}
-
         <button
           onClick={handleExport}
           className="px-3 py-1.5 text-xs text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
@@ -244,6 +235,7 @@ export function DiagramEditor({
           onUpdateConnectorLabel={updateConnectorLabel}
           onSplitConnector={splitConnector}
           onElementMoveEnd={elementMoveEnd}
+          onMoveLaneBoundary={moveLaneBoundary}
         />
 
         <PropertiesPanel

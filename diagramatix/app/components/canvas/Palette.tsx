@@ -168,7 +168,7 @@ function PaletteSymbolPreview({ type }: { type: SymbolType }) {
       return (
         <svg width={48} height={28} viewBox="0 0 48 28">
           <rect x={1} y={1} width={46} height={26} fill="#f9fafb" stroke="#374151" strokeWidth={1.5} />
-          <rect x={1} y={1} width={10} height={26} fill="#dbeafe" stroke="#374151" strokeWidth={1.5} />
+          <rect x={1} y={1} width={10} height={26} fill="#c8956a" stroke="#374151" strokeWidth={1.5} />
         </svg>
       );
     default:

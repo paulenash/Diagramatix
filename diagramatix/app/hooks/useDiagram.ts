@@ -79,7 +79,8 @@ type Action =
       eventType?: EventType;
       connectorId: string;
     }}
-  | { type: "ADD_LANE"; payload: { poolId: string } };
+  | { type: "ADD_LANE"; payload: { poolId: string } }
+  | { type: "MOVE_LANE_BOUNDARY"; payload: { aboveLaneId: string; belowLaneId: string; dy: number } };
 
 function nanoid(): string {
   return Math.random().toString(36).slice(2, 10);
@@ -652,6 +653,23 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       return { ...state, elements: updatePoolTypes([...elements, newLane]) };
     }
 
+    case "MOVE_LANE_BOUNDARY": {
+      const { aboveLaneId, belowLaneId, dy } = action.payload;
+      const MIN_H = 40;
+      const above = state.elements.find((e) => e.id === aboveLaneId);
+      const below = state.elements.find((e) => e.id === belowLaneId);
+      if (!above || !below) return state;
+      const newAboveH = Math.max(MIN_H, above.height + dy);
+      const actualDy = newAboveH - above.height;
+      const newBelowH = Math.max(MIN_H, below.height - actualDy);
+      const elements = state.elements.map((e) => {
+        if (e.id === aboveLaneId) return { ...e, height: newAboveH };
+        if (e.id === belowLaneId) return { ...e, y: e.y + actualDy, height: newBelowH };
+        return e;
+      });
+      return { ...state, elements };
+    }
+
     default:
       return state;
   }
@@ -766,6 +784,12 @@ export function useDiagram(initialData: DiagramData) {
     dispatch({ type: "ADD_LANE", payload: { poolId } });
   }, []);
 
+  const moveLaneBoundary = useCallback(
+    (aboveLaneId: string, belowLaneId: string, dy: number) =>
+      dispatch({ type: "MOVE_LANE_BOUNDARY", payload: { aboveLaneId, belowLaneId, dy } }),
+    []
+  );
+
   return {
     data,
     addElement,
@@ -786,5 +810,6 @@ export function useDiagram(initialData: DiagramData) {
     setViewport,
     correctAllConnectors,
     addLane,
+    moveLaneBoundary,
   };
 }
