@@ -26,15 +26,24 @@ const DATA_ELEMENT_TYPES = new Set<SymbolType>(["data-object", "data-store"]);
 
 function getElementPoolId(el: DiagramElement, elements: DiagramElement[]): string | null {
   if (el.type === "pool") return el.id;
-  if (!el.parentId) return null;
-  const parent = elements.find((e) => e.id === el.parentId);
-  if (!parent) return null;
-  if (parent.type === "pool") return parent.id;
-  if (parent.type === "lane") {
-    const gp = elements.find((e) => e.id === parent.parentId);
-    return gp?.type === "pool" ? gp.id : null;
+  // Try parentId chain first (fast path)
+  if (el.parentId) {
+    const parent = elements.find((e) => e.id === el.parentId);
+    if (parent?.type === "pool") return parent.id;
+    if (parent?.type === "lane") {
+      const gp = elements.find((e) => e.id === parent.parentId);
+      if (gp?.type === "pool") return gp.id;
+    }
   }
-  return null;
+  // Fallback: position check — is this element's centre inside any pool?
+  const cx = el.x + el.width / 2;
+  const cy = el.y + el.height / 2;
+  const pool = elements.find(
+    (p) => p.type === "pool" &&
+      cx >= p.x && cx <= p.x + p.width &&
+      cy >= p.y && cy <= p.y + p.height
+  );
+  return pool?.id ?? null;
 }
 
 const USE_CASE_DEFAULT_W = 120;
@@ -291,35 +300,47 @@ export function Canvas({
       const pos = clientToWorld(ev.clientX, ev.clientY);
       const targetEl = findDropTarget(pos, elementId);
       if (targetEl) {
-        const targetSide = getClosestSide(pos, targetEl);
         const sourceEl = data.elements.find((e) => e.id === elementId);
         const actorLike = ["actor", "team"];
-
         const isDataConn =
           (sourceEl && DATA_ELEMENT_TYPES.has(sourceEl.type)) ||
           DATA_ELEMENT_TYPES.has(targetEl.type);
 
         const sourcePoolId = sourceEl ? getElementPoolId(sourceEl, data.elements) : null;
         const targetPoolId = getElementPoolId(targetEl, data.elements);
-        const isCrossPool = sourcePoolId !== null && targetPoolId !== null && sourcePoolId !== targetPoolId;
-
-        let connType: ConnectorType;
-        let connRouting: RoutingType;
-        let connDirection: DirectionType;
+        const isCrossPool =
+          sourcePoolId !== null && targetPoolId !== null && sourcePoolId !== targetPoolId;
 
         if (isCrossPool) {
-          connType = "messageBPMN"; connRouting = "direct"; connDirection = "directed";
-        } else if (isDataConn) {
-          connType = "associationBPMN"; connRouting = "direct"; connDirection = "open-directed";
-        } else if (defaultRoutingType === "curvilinear") {
-          connType = "interaction"; connRouting = defaultRoutingType; connDirection = defaultDirectionType;
-        } else if ((sourceEl && actorLike.includes(sourceEl.type)) || actorLike.includes(targetEl.type)) {
-          connType = "association"; connRouting = defaultRoutingType; connDirection = defaultDirectionType;
+          // messageBPMN: always pool-to-pool, always vertical
+          const sourcePool = data.elements.find((e) => e.id === sourcePoolId);
+          const targetPool = data.elements.find((e) => e.id === targetPoolId);
+          const sourceCy = sourcePool ? sourcePool.y + sourcePool.height / 2 : 0;
+          const targetCy = targetPool ? targetPool.y + targetPool.height / 2 : 0;
+          const msgSrcSide: Side = sourceCy <= targetCy ? "bottom" : "top";
+          const msgTgtSide: Side = sourceCy <= targetCy ? "top"    : "bottom";
+          onAddConnector(
+            sourcePoolId!, targetPoolId!,
+            "messageBPMN", "directed", "direct",
+            msgSrcSide, msgTgtSide
+          );
         } else {
-          connType = "sequence"; connRouting = defaultRoutingType; connDirection = defaultDirectionType;
-        }
+          const targetSide = getClosestSide(pos, targetEl);
+          let connType: ConnectorType;
+          let connRouting: RoutingType;
+          let connDirection: DirectionType;
 
-        onAddConnector(elementId, targetEl.id, connType, connDirection, connRouting, side, targetSide);
+          if (isDataConn) {
+            connType = "associationBPMN"; connRouting = "direct"; connDirection = "open-directed";
+          } else if (defaultRoutingType === "curvilinear") {
+            connType = "interaction"; connRouting = defaultRoutingType; connDirection = defaultDirectionType;
+          } else if ((sourceEl && actorLike.includes(sourceEl.type)) || actorLike.includes(targetEl.type)) {
+            connType = "association"; connRouting = defaultRoutingType; connDirection = defaultDirectionType;
+          } else {
+            connType = "sequence"; connRouting = defaultRoutingType; connDirection = defaultDirectionType;
+          }
+          onAddConnector(elementId, targetEl.id, connType, connDirection, connRouting, side, targetSide);
+        }
       }
       setDraggingConnector(null);
       window.removeEventListener("mousemove", onMouseMove);
