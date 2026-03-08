@@ -501,7 +501,7 @@ export function Canvas({
     const el = data.elements.find((el) => el.id === elementId);
     if (!el) return;
 
-    const isTaskLike = el.type === "task" || el.type === "subprocess";
+    const isTaskLike = el.type === "task" || el.type === "subprocess" || el.type === "subprocess-expanded";
     const isUseCase = el.type === "use-case";
     const ar = isUseCase ? el.width / el.height : 0;
     const minW = isUseCase ? 60 : (isTaskLike ? 60 : MIN_BOUNDARY_W);
@@ -727,7 +727,7 @@ export function Canvas({
   );
 
   // Precompute messageBPMN highlight context
-  const BPMN_TRIGGER_TYPES = new Set<string>(["task", "subprocess", "intermediate-event", "end-event"]);
+  const BPMN_TRIGGER_TYPES = new Set<string>(["task", "subprocess", "subprocess-expanded", "intermediate-event", "end-event"]);
   const draggingSourceEl = draggingConnector
     ? (data.elements.find((e) => e.id === draggingConnector.fromId) ?? null)
     : null;
@@ -927,7 +927,7 @@ export function Canvas({
                 el.id === selectedElementId || isDraggingConnector
               }
               onResizeDragStart={
-                (el.type === "task" || el.type === "subprocess")
+                (el.type === "task" || el.type === "subprocess" || el.type === "subprocess-expanded")
                   ? (handle, e) => handleResizeDragStart(el.id, handle, e)
                   : undefined
               }

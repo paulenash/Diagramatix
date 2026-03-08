@@ -193,7 +193,9 @@ export function PropertiesPanel({
           Label
         </label>
         {(element.type === "gateway" || isEventElement ||
-          element.type === "data-object" || element.type === "data-store") ? (
+          element.type === "data-object" || element.type === "data-store" ||
+          element.type === "task" || element.type === "subprocess" ||
+          element.type === "subprocess-expanded" || element.type === "use-case") ? (
           <>
             <textarea
               key={element.id}

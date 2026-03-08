@@ -115,6 +115,13 @@ export const ALL_SYMBOLS: SymbolDefinition[] = [
     description: "A collapsed subprocess activity",
   },
   {
+    type: "subprocess-expanded",
+    label: "Expanded Sub",
+    defaultWidth: 180,
+    defaultHeight: 120,
+    description: "An expanded subprocess activity",
+  },
+  {
     type: "data-object",
     label: "Data Object",
     defaultWidth: 36,
@@ -153,6 +160,7 @@ export const PALETTE_BY_DIAGRAM_TYPE: Record<DiagramType, SymbolType[]> = {
     "start-event",
     "task",
     "subprocess",
+    "subprocess-expanded",
     "gateway",
     "intermediate-event",
     "data-object",

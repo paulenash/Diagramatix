@@ -39,6 +39,15 @@ function cubicBezierPoint(p0: Point, cp1: Point, cp2: Point, p3: Point, t: numbe
   };
 }
 
+function closestPointOnSegment(p1: Point, p2: Point, q: Point): Point {
+  const dx = p2.x - p1.x;
+  const dy = p2.y - p1.y;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq === 0) return p1;
+  const t = Math.max(0, Math.min(1, ((q.x - p1.x) * dx + (q.y - p1.y) * dy) / lenSq));
+  return { x: p1.x + t * dx, y: p1.y + t * dy };
+}
+
 function ArrowMarker({ id, color }: { id: string; color: string }) {
   return (
     <marker
@@ -142,6 +151,24 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
   const lTy     = anchor.y + offsetY;
   const lMidY   = lTy + lHeight / 2;
 
+  // Tether attaches at the nearest point on the visible connector to the label centre
+  const labelCenter: Point = { x: lCx, y: lMidY };
+  let tetherPoint: Point;
+  if (visibleWaypoints.length === 4) {
+    // Curvilinear bezier — tether from curve midpoint (anchor)
+    tetherPoint = anchor;
+  } else {
+    // Straight or rectilinear: find closest point across all segments
+    let bestPoint = visibleWaypoints[0];
+    let bestDist = Infinity;
+    for (let i = 0; i < visibleWaypoints.length - 1; i++) {
+      const pt = closestPointOnSegment(visibleWaypoints[i], visibleWaypoints[i + 1], labelCenter);
+      const d = Math.hypot(pt.x - labelCenter.x, pt.y - labelCenter.y);
+      if (d < bestDist) { bestDist = d; bestPoint = pt; }
+    }
+    tetherPoint = bestPoint;
+  }
+
   const hasLabel = label.trim().length > 0;
   if (!hasLabel && !isEditing) return null;
 
@@ -206,9 +233,9 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
 
   return (
     <g>
-      {/* Dotted tether: curve midpoint → label centre */}
+      {/* Dotted tether: nearest connector point → label centre */}
       <line
-        x1={anchor.x} y1={anchor.y} x2={lCx} y2={lMidY}
+        x1={tetherPoint.x} y1={tetherPoint.y} x2={lCx} y2={lMidY}
         stroke="#6b7280" strokeWidth={1} strokeDasharray="4 3"
         style={{ pointerEvents: "none" }}
       />

@@ -15,6 +15,7 @@ export type SymbolType =
   | "pool"
   | "lane"
   | "subprocess"
+  | "subprocess-expanded"
   | "system-boundary"
   | "hourglass"
   | "composite-state"

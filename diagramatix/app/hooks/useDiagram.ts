@@ -224,6 +224,9 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       } else if (action.payload.symbolType === "subprocess") {
         const count = state.elements.filter((e) => e.type === "subprocess").length;
         label = `Subprocess ${count + 1}`;
+      } else if (action.payload.symbolType === "subprocess-expanded") {
+        const count = state.elements.filter((e) => e.type === "subprocess-expanded").length;
+        label = `Subprocess ${count + 1}`;
       } else if (action.payload.symbolType === "intermediate-event") {
         const count = state.elements.filter((e) => e.type === "intermediate-event").length;
         label = `Event ${count + 1}`;

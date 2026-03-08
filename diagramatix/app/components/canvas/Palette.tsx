@@ -29,6 +29,12 @@ function PaletteSymbolPreview({ type }: { type: SymbolType }) {
           <line x1={21} y1={22} x2={27} y2={22} stroke="#374151" strokeWidth={1} />
         </svg>
       );
+    case "subprocess-expanded":
+      return (
+        <svg width={48} height={28} viewBox="0 0 48 28">
+          <rect x={2} y={2} width={44} height={24} rx={3} fill="#fef08a" stroke="#374151" strokeWidth={1.5} />
+        </svg>
+      );
     case "gateway":
       return (
         <svg width={32} height={32} viewBox="0 0 32 32">

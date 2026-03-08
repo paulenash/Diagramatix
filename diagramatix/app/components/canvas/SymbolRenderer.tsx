@@ -474,6 +474,13 @@ function SubprocessShape({ el }: { el: DiagramElement }) {
   );
 }
 
+function ExpandedSubprocessShape({ el }: { el: DiagramElement }) {
+  return (
+    <rect x={el.x} y={el.y} width={el.width} height={el.height}
+      rx={4} ry={4} fill="#fef08a" stroke="#374151" strokeWidth={1.5} />
+  );
+}
+
 function BpmnTaskMarker({ taskType, x, y }: { taskType: BpmnTaskType; x: number; y: number }) {
   const cx = x + 7;
   const cy = y + 7;
@@ -632,7 +639,8 @@ function SymbolShape({ el }: { el: DiagramElement }) {
     case "lane":              return <LaneShape el={el} />;
     case "task":
       return el.taskType !== undefined ? <BpmnTaskShape el={el} /> : <TaskShape el={el} />;
-    case "subprocess":        return <SubprocessShape el={el} />;
+    case "subprocess":          return <SubprocessShape el={el} />;
+    case "subprocess-expanded": return <ExpandedSubprocessShape el={el} />;
     default:                  return <TaskShape el={el} />;
   }
 }
@@ -737,7 +745,8 @@ export function SymbolRenderer({
   const isBoundary = element.type === "system-boundary";  // excluded from connection overlay
   const isPoolLane = element.type === "pool" || element.type === "lane";
   const isContainer = isBoundary || element.type === "composite-state" || isPoolLane; // gets resize handles
-  const canResize = isContainer || element.type === "task" || element.type === "subprocess" || element.type === "use-case";
+  const canResize = isContainer || element.type === "task" || element.type === "subprocess" ||
+    element.type === "subprocess-expanded" || element.type === "use-case";
   const showLabel = element.type !== "initial-state" && element.type !== "final-state";
 
   return (
