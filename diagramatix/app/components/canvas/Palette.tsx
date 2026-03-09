@@ -165,9 +165,11 @@ function PaletteSymbolPreview({ type }: { type: SymbolType }) {
     case "data-store":
       return (
         <svg width={32} height={28} viewBox="0 0 32 28">
-          <rect x={2} y={7} width={28} height={16} fill="#60a5fa" stroke="#374151" strokeWidth={1.5} />
-          <ellipse cx={16} cy={7}  rx={14} ry={4} fill="#60a5fa" stroke="#374151" strokeWidth={1.5} />
-          <ellipse cx={16} cy={23} rx={14} ry={4} fill="#60a5fa" stroke="#374151" strokeWidth={1.5} />
+          <path d="M 1 5 L 1 24 A 15 4 0 0 1 31 24 L 31 5"
+            fill="#60a5fa" stroke="#374151" strokeWidth={1.5} />
+          <ellipse cx={16} cy={5} rx={15} ry={4} fill="#60a5fa" stroke="#374151" strokeWidth={1.5} />
+          <path d="M 1 10 A 15 4 0 0 1 31 10" fill="none" stroke="#374151" strokeWidth={1.5} />
+          <path d="M 1 15 A 15 4 0 0 1 31 15" fill="none" stroke="#374151" strokeWidth={1.5} />
         </svg>
       );
     case "pool":

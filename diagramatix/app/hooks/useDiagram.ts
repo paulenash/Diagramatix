@@ -293,7 +293,11 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         return e;
       });
 
-      const connectors = recomputeAllConnectors(state.connectors, elements);
+      const affectedIds = new Set([id, ...descendantIds]);
+      const connectors = state.connectors.map(conn => {
+        if (!affectedIds.has(conn.sourceId) && !affectedIds.has(conn.targetId)) return conn;
+        return recomputeAllConnectors([conn], elements)[0] ?? conn;
+      });
       return { ...state, elements: updatePoolTypes(elements), connectors };
     }
 

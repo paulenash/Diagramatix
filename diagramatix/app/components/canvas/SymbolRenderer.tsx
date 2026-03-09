@@ -296,24 +296,21 @@ function DataObjectShape({ el }: { el: DiagramElement }) {
 
 function DataStoreShape({ el }: { el: DiagramElement }) {
   const { x, y, width: w, height: h } = el;
-  const cx = x + w / 2;
   const rx = w / 2;
   const ry = Math.max(4, Math.round(h * 0.15));
-  const bodyTop = y + ry;
-  const bodyH = h - ry;
-  // bpmn-js proportions: rings at 7/45 and 14/45 of body height from top
-  const ring1Y = bodyTop + bodyH * (7 / 45);
-  const ring2Y = bodyTop + bodyH * (14 / 45);
-  // Front arc (bottom half of ellipse): clockwise from left to right, sweep=1
-  const frontArc = (cy: number) =>
-    `M ${x} ${cy} A ${rx} ${ry} 0 0 1 ${x + w} ${cy}`;
+  const ellipseSep = 5;
+  const cy1 = y + ry;
+  const cy2 = cy1 + ellipseSep;
+  const cy3 = cy2 + ellipseSep;
+  const cyBot = y + h - ry;
+  const bottomHalf = (cy: number) => `M ${x} ${cy} A ${rx} ${ry} 0 0 1 ${x + w} ${cy}`;
+  const bodyPath = `M ${x} ${cy1} L ${x} ${cyBot} A ${rx} ${ry} 0 0 1 ${x + w} ${cyBot} L ${x + w} ${cy1}`;
   return (
     <g>
-      <rect x={x} y={bodyTop} width={w} height={bodyH} fill="white" stroke="#374151" strokeWidth={1.5} />
-      <ellipse cx={cx} cy={bodyTop} rx={rx} ry={ry} fill="white" stroke="#374151" strokeWidth={1.5} />
-      <path d={frontArc(ring1Y)} fill="none" stroke="#374151" strokeWidth={1.5} />
-      <path d={frontArc(ring2Y)} fill="none" stroke="#374151" strokeWidth={1.5} />
-      <path d={frontArc(y + h)}  fill="none" stroke="#374151" strokeWidth={1.5} />
+      <path d={bodyPath} fill="#60a5fa" stroke="#374151" strokeWidth={1.5} />
+      <ellipse cx={x + rx} cy={cy1} rx={rx} ry={ry} fill="#60a5fa" stroke="#374151" strokeWidth={1.5} />
+      <path d={bottomHalf(cy2)} fill="none" stroke="#374151" strokeWidth={1.5} />
+      <path d={bottomHalf(cy3)} fill="none" stroke="#374151" strokeWidth={1.5} />
     </g>
   );
 }
@@ -742,16 +739,17 @@ export function SymbolRenderer({
   let dragStart: { mouseX: number; mouseY: number; elX: number; elY: number } | null = null;
 
   function handleMouseDown(e: React.MouseEvent) {
-    e.stopPropagation();
-
     // White-box pool: only the 30px header sidebar accepts interaction
     const isWhiteBoxPool = element.type === "pool" &&
       ((element.properties.poolType as string | undefined) ?? "black-box") === "white-box";
     if (isWhiteBoxPool) {
       const POOL_LW = 30;
       const worldPos = svgToWorld ? svgToWorld(e.clientX, e.clientY) : null;
-      if (worldPos && worldPos.x > element.x + POOL_LW) return; // body click — ignore
+      if (worldPos && worldPos.x > element.x + POOL_LW) return; // body click — bubble to bg handler to deselect
+      e.stopPropagation();
       if (selected) { onSelect(); return; }                      // header re-click — deselect, no drag
+    } else {
+      e.stopPropagation();
     }
 
     onSelect();
