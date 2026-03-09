@@ -139,7 +139,7 @@ function containerAccepts(containerType: SymbolType, childType: SymbolType): boo
   if (containerType === "composite-state") return childType === "state" || childType === "initial-state" || childType === "final-state";
   if (containerType === "pool") return childType === "lane" || BPMN_CONTENT_TYPES.has(childType);
   if (containerType === "lane") return BPMN_CONTENT_TYPES.has(childType);
-  if (containerType === "subprocess-expanded") return childType === "task" || childType === "subprocess";
+  if (containerType === "subprocess-expanded") return BPMN_CONTENT_TYPES.has(childType);
   return false;
 }
 
@@ -309,6 +309,19 @@ function reducer(state: DiagramData, action: Action): DiagramData {
           };
         }
       }
+      // Check if newly dropped element is fully inside a subprocess-expanded
+      if (!newEl.boundaryHostId) {
+        const container = state.elements.find(
+          (b) =>
+            b.type === "subprocess-expanded" &&
+            containerAccepts(b.type, newEl.type) &&
+            newEl.x >= b.x && newEl.x + newEl.width <= b.x + b.width &&
+            newEl.y >= b.y && newEl.y + newEl.height <= b.y + b.height
+        );
+        if (container) {
+          newEl = { ...newEl, parentId: container.id };
+        }
+      }
       return { ...state, elements: [...state.elements, newEl] };
     }
 
@@ -368,8 +381,11 @@ function reducer(state: DiagramData, action: Action): DiagramData {
               isContainerType(b.type) &&
               containerAccepts(b.type, e.type) &&
               b.id !== id &&
-              (x + e.width / 2) >= b.x && (x + e.width / 2) <= b.x + b.width &&
-              (y + e.height / 2) >= b.y && (y + e.height / 2) <= b.y + b.height
+              (b.type === "subprocess-expanded"
+                ? x >= b.x && x + e.width <= b.x + b.width &&
+                  y >= b.y && y + e.height <= b.y + b.height
+                : (x + e.width / 2) >= b.x && (x + e.width / 2) <= b.x + b.width &&
+                  (y + e.height / 2) >= b.y && (y + e.height / 2) <= b.y + b.height)
           );
           if (potentialParent !== undefined || state.elements.some(b => isContainerType(b.type) && containerAccepts(b.type, e.type))) {
             parentId = potentialParent?.id;
