@@ -968,7 +968,7 @@ export function Canvas({
                   const elPool = data.elements.find((p) => p.id === elPoolId);
                   const elPoolIsWhiteBox =
                     ((elPool?.properties.poolType as string | undefined) ?? "black-box") === "white-box";
-                  if (elPoolIsWhiteBox && el.type !== "end-event") elIsMsgTarget = true;
+                  if (elPoolIsWhiteBox) elIsMsgTarget = true;
                 }
               }
             }
@@ -990,9 +990,7 @@ export function Canvas({
               onConnectionPointDragStart={(side, worldPos) =>
                 handleConnectionPointDragStart(el.id, side, worldPos)
               }
-              showConnectionPoints={
-                el.id === selectedElementId || isDraggingConnector
-              }
+              showConnectionPoints={(el.id === selectedElementId && el.type !== "end-event") || isDraggingConnector}
               onResizeDragStart={
                 (el.type === "task" || el.type === "subprocess" || el.type === "subprocess-expanded")
                   ? (handle, e) => handleResizeDragStart(el.id, handle, e)
