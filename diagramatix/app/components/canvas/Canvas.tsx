@@ -374,9 +374,18 @@ export function Canvas({
           if (targetEl.parentId !== sourceEl.boundaryHostId) return;
         }
 
-        // Rule 3: Edge-mounted intermediate event — cannot connect to children of its parent subprocess
+        // Rules 3 & 5: Edge-mounted intermediate event
         if (sourceEl?.type === "intermediate-event" && sourceEl.boundaryHostId) {
-          if (targetEl.parentId === sourceEl.boundaryHostId) return;
+          // Rule 5: cannot connect to boundary events of the same parent subprocess
+          if (targetEl.boundaryHostId === sourceEl.boundaryHostId) return;
+
+          if (sourceEl.taskType === "send") {
+            // Rule 3 (send): cannot connect to children of parent subprocess
+            if (targetEl.parentId === sourceEl.boundaryHostId) return;
+          } else {
+            // Rule 3 (receive): can ONLY connect to children of parent subprocess
+            if (targetEl.parentId !== sourceEl.boundaryHostId) return;
+          }
         }
 
         // Rule 4: Child of subprocess cannot connect to its own parent subprocess
@@ -805,8 +814,16 @@ export function Canvas({
     draggingSourceEl?.type === "end-event" && !!draggingSourceEl.boundaryHostId;
   const draggingFromEdgeMountedStartEvent =
     draggingSourceEl?.type === "start-event" && !!draggingSourceEl.boundaryHostId;
+  const draggingFromEdgeMountedIntermediateSendEvent =
+    draggingSourceEl?.type === "intermediate-event" &&
+    !!draggingSourceEl.boundaryHostId &&
+    draggingSourceEl.taskType === "send";
+  const draggingFromEdgeMountedIntermediateReceiveEvent =
+    draggingSourceEl?.type === "intermediate-event" &&
+    !!draggingSourceEl.boundaryHostId &&
+    draggingSourceEl.taskType !== "send";
   const draggingFromEdgeMountedIntermediateEvent =
-    draggingSourceEl?.type === "intermediate-event" && !!draggingSourceEl.boundaryHostId;
+    draggingFromEdgeMountedIntermediateSendEvent || draggingFromEdgeMountedIntermediateReceiveEvent;
   const draggingSourceBoundaryHostId = draggingSourceEl?.boundaryHostId ?? null;
 
   // Compute misaligned messageBPMN connectors (no x-overlap between source and target)
@@ -866,14 +883,16 @@ export function Canvas({
               el.type === "pool" && el.id !== draggingSourcePoolId &&
               ((el.properties.poolType as string | undefined) ?? "black-box") === "black-box" &&
               !draggingFromEdgeMountedEndEvent &&
-              !draggingFromEdgeMountedStartEvent; // edge-mounted start can only target subprocess children
+              !draggingFromEdgeMountedStartEvent &&
+              !draggingFromEdgeMountedIntermediateReceiveEvent; // receive can only target subprocess children
             const isWhiteBoxPool = el.type === "pool" &&
               ((el.properties.poolType as string | undefined) ?? "black-box") === "white-box";
             const isSubExpDropTarget = isDraggingConnector && !draggingSourceIsData &&
               el.type === "subprocess-expanded" &&
               el.id !== draggingConnector!.fromId &&
               el.id !== (draggingSourceEl?.parentId ?? "") && // rule 4: child cannot target its own parent subprocess
-              !draggingFromEdgeMountedStartEvent; // edge-mounted start can't target subprocess containers
+              !draggingFromEdgeMountedStartEvent &&
+              !draggingFromEdgeMountedIntermediateReceiveEvent; // receive can only target subprocess children
             const isSubExpAssocTarget = isDraggingConnector && draggingSourceIsData &&
               el.type === "subprocess-expanded" &&
               el.id !== draggingConnector!.fromId;
@@ -1017,8 +1036,8 @@ export function Canvas({
               } else if (draggingFromEdgeMountedStartEvent) {
                 // Rule 2: edge-mounted start event — only children of its parent subprocess
                 if (el.parentId === draggingSourceBoundaryHostId) elIsDropTarget = true;
-              } else if (draggingFromEdgeMountedIntermediateEvent) {
-                // Rule 3: any element except children of its parent subprocess
+              } else if (draggingFromEdgeMountedIntermediateSendEvent) {
+                // Rule 3 (send): any element except children of its parent subprocess
                 if (el.parentId !== draggingSourceBoundaryHostId) {
                   const elPoolId = getElementPoolId(el, data.elements);
                   if (elPoolId === draggingSourcePoolId) {
@@ -1030,6 +1049,9 @@ export function Canvas({
                     elIsDropTarget = true;
                   }
                 }
+              } else if (draggingFromEdgeMountedIntermediateReceiveEvent) {
+                // Rule 3 (receive): only children of its parent subprocess
+                if (el.parentId === draggingSourceBoundaryHostId) elIsDropTarget = true;
               } else if (!isBpmnSource || !draggingSourcePoolId) {
                 elIsDropTarget = true;
               } else {
@@ -1128,17 +1150,24 @@ export function Canvas({
               } else if (draggingFromEdgeMountedStartEvent) {
                 // Rule 2: edge-mounted start event — boundary events are not inside the subprocess, so not targets
                 // (no action — elIsDropTarget stays false)
-              } else if (draggingFromEdgeMountedIntermediateEvent) {
-                // Rule 3: boundary events whose host is NOT a child of the parent subprocess are valid targets
-                const hostEl = data.elements.find((e) => e.id === el.boundaryHostId);
-                if (!hostEl || hostEl.parentId !== draggingSourceBoundaryHostId) {
-                  const elPoolId = getElementPoolId(el, data.elements);
-                  if (elPoolId === draggingSourcePoolId) elIsDropTarget = true;
-                  else if (elPoolId && elPoolId !== draggingSourcePoolId && el.type === "intermediate-event") {
-                    const elPool = data.elements.find((p) => p.id === elPoolId);
-                    if (((elPool?.properties.poolType as string | undefined) ?? "black-box") === "white-box") elIsMsgTarget = true;
+              } else if (draggingFromEdgeMountedIntermediateSendEvent) {
+                // Rule 5: exclude boundary events on the same parent subprocess
+                // Rule 3 (send): also exclude those whose host is a child of the parent subprocess
+                if (el.boundaryHostId !== draggingSourceBoundaryHostId) {
+                  const hostEl = data.elements.find((e) => e.id === el.boundaryHostId);
+                  if (!hostEl || hostEl.parentId !== draggingSourceBoundaryHostId) {
+                    const elPoolId = getElementPoolId(el, data.elements);
+                    if (elPoolId === draggingSourcePoolId) elIsDropTarget = true;
+                    else if (elPoolId && elPoolId !== draggingSourcePoolId && el.type === "intermediate-event") {
+                      const elPool = data.elements.find((p) => p.id === elPoolId);
+                      if (((elPool?.properties.poolType as string | undefined) ?? "black-box") === "white-box") elIsMsgTarget = true;
+                    }
                   }
                 }
+              } else if (draggingFromEdgeMountedIntermediateReceiveEvent) {
+                // Rule 3 (receive): boundary events are not subprocess children, not valid targets
+                // Rule 5: also not targets for receive events
+                // (no action — elIsDropTarget stays false)
               } else if (!isBpmnSource || !draggingSourcePoolId) {
                 elIsDropTarget = true;
               } else {
