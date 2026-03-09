@@ -724,7 +724,9 @@ export function Canvas({
   const nonContainers = data.elements.filter(
     (el) => el.type !== "system-boundary" && el.type !== "composite-state"
               && el.type !== "pool" && el.type !== "lane"
+              && !el.boundaryHostId
   );
+  const boundaryEvents = data.elements.filter((el) => !!el.boundaryHostId);
 
   // Precompute messageBPMN highlight context
   const BPMN_TRIGGER_TYPES = new Set<string>(["task", "subprocess", "subprocess-expanded", "intermediate-event", "end-event"]);
@@ -974,6 +976,27 @@ export function Canvas({
             />
             );
           })}
+
+          {/* Boundary events — rendered on top of their hosts */}
+          {boundaryEvents.map((el) => (
+            <SymbolRenderer
+              key={el.id}
+              element={el}
+              selected={el.id === selectedElementId}
+              isDropTarget={false}
+              isDisallowedTarget={false}
+              isMessageBpmnTarget={false}
+              onSelect={() => { onSelectElement(el.id); onSelectConnector(null); }}
+              onMove={(x, y) => onMoveElement(el.id, x, y)}
+              onDoubleClick={() => startEditingLabel(el)}
+              onConnectionPointDragStart={(side, worldPos) =>
+                handleConnectionPointDragStart(el.id, side, worldPos)}
+              showConnectionPoints={el.id === selectedElementId || isDraggingConnector}
+              svgToWorld={clientToWorld}
+              onUpdateProperties={onUpdateProperties}
+              onUpdateLabel={onUpdateLabel}
+            />
+          ))}
 
           {/* Association connectors — rendered above all elements */}
           {data.connectors.filter(c => c.type === "associationBPMN" || c.type === "messageBPMN").map((conn) => (

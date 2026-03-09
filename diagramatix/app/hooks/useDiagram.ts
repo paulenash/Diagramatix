@@ -21,6 +21,32 @@ import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
 
 const BPMN_EVENT_TYPES = new Set(["start-event", "intermediate-event", "end-event"]);
 
+// ── Boundary-event geometry ───────────────────────────────────────────────────
+const BOUNDARY_HOST_TYPES = new Set<SymbolType>(["task", "subprocess", "subprocess-expanded"]);
+const BOUNDARY_EVENT_TYPES = new Set<SymbolType>(["start-event", "intermediate-event", "end-event"]);
+const BOUNDARY_SNAP_THRESHOLD = 25; // world px
+const BOUNDARY_W = 27;              // 75% of standard 36
+const BOUNDARY_H = 27;
+
+function nearestPointOnRectBoundary(
+  rect: { x: number; y: number; width: number; height: number },
+  point: { x: number; y: number }
+): { x: number; y: number } {
+  const { x: rx, y: ry, width: rw, height: rh } = rect;
+  const cx = Math.max(rx, Math.min(point.x, rx + rw));
+  const cy = Math.max(ry, Math.min(point.y, ry + rh));
+  if (cx !== point.x || cy !== point.y) return { x: cx, y: cy };
+  // Inside rect → project to nearest edge
+  const dL = point.x - rx, dR = rx + rw - point.x,
+        dT = point.y - ry, dB = ry + rh - point.y;
+  const m = Math.min(dL, dR, dT, dB);
+  if (m === dL) return { x: rx,      y: point.y };
+  if (m === dR) return { x: rx + rw, y: point.y };
+  if (m === dT) return { x: point.x, y: ry       };
+                return { x: point.x, y: ry + rh  };
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 function messageBpmnWaypoints(
   source: DiagramElement, target: DiagramElement,
   sourceSide: Side, targetSide: Side, offsetAlong: number
@@ -183,7 +209,7 @@ function clampChildrenToLane(elements: DiagramElement[], lane: DiagramElement): 
   const maxX = lane.x + lane.width;
   const maxY = lane.y + lane.height;
   return elements.map((el) => {
-    if (el.parentId !== lane.id) return el;
+    if (el.parentId !== lane.id || el.boundaryHostId) return el;
     const cx = Math.max(minX, Math.min(el.x, maxX - el.width));
     const cy = Math.max(minY, Math.min(el.y, maxY - el.height));
     return (cx === el.x && cy === el.y) ? el : { ...el, x: cx, y: cy };
@@ -244,7 +270,7 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         const count = state.elements.filter((e) => e.type === "lane").length;
         label = `Lane ${count + 1}`;
       }
-      const newEl: DiagramElement = {
+      let newEl: DiagramElement = {
         id: nanoid(),
         type: action.payload.symbolType,
         x: action.payload.position.x - def.defaultWidth / 2,
@@ -256,6 +282,26 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         taskType:  action.payload.taskType,
         eventType: action.payload.eventType,
       };
+      // Snap event to host boundary on drop
+      if (BOUNDARY_EVENT_TYPES.has(newEl.type)) {
+        const centre = { x: newEl.x + newEl.width / 2, y: newEl.y + newEl.height / 2 };
+        let bestDist = BOUNDARY_SNAP_THRESHOLD, bestHost: DiagramElement | null = null, bestPt = centre;
+        for (const candidate of state.elements) {
+          if (!BOUNDARY_HOST_TYPES.has(candidate.type)) continue;
+          const pt = nearestPointOnRectBoundary(candidate, centre);
+          const dist = Math.hypot(pt.x - centre.x, pt.y - centre.y);
+          if (dist < bestDist) { bestDist = dist; bestHost = candidate; bestPt = pt; }
+        }
+        if (bestHost) {
+          newEl = {
+            ...newEl,
+            x: bestPt.x - BOUNDARY_W / 2, y: bestPt.y - BOUNDARY_H / 2,
+            width: BOUNDARY_W, height: BOUNDARY_H,
+            boundaryHostId: bestHost.id,
+            parentId: bestHost.parentId,
+          };
+        }
+      }
       return { ...state, elements: [...state.elements, newEl] };
     }
 
@@ -264,15 +310,52 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       const el = state.elements.find((e) => e.id === id);
       if (!el) return state;
 
-      const dx = x - el.x;
-      const dy = y - el.y;
+      // CASE A: Moving a boundary event — constrain centre to host boundary
+      if (el.boundaryHostId) {
+        const host = state.elements.find((e) => e.id === el.boundaryHostId);
+        if (host) {
+          const desired = { x: x + el.width / 2, y: y + el.height / 2 };
+          const snapped = nearestPointOnRectBoundary(host, desired);
+          const nx = snapped.x - el.width / 2, ny = snapped.y - el.height / 2;
+          const elements = state.elements.map((e) => e.id === id ? { ...e, x: nx, y: ny } : e);
+          const connectors = state.connectors.map(conn => {
+            if (conn.sourceId !== id && conn.targetId !== id) return conn;
+            return recomputeAllConnectors([conn], elements)[0] ?? conn;
+          });
+          return { ...state, elements, connectors };
+        }
+      }
+
+      // CASE B + C: Normal move (host elements also carry their boundary events)
+      const dx = x - el.x, dy = y - el.y;
       const movingIsContainer = isContainerType(el.type);
       const descendantIds = movingIsContainer ? getAllDescendantIds(state.elements, id) : new Set<string>();
+      const attachedBoundaryIds = new Set(state.elements.filter(e => e.boundaryHostId === id).map(e => e.id));
+
+      // Event proximity snap (free events only — not already boundary-mounted)
+      let snapResult: { hostId: string; cx: number; cy: number } | null = null;
+      if (BOUNDARY_EVENT_TYPES.has(el.type) && !el.boundaryHostId) {
+        const centre = { x: x + el.width / 2, y: y + el.height / 2 };
+        let bestDist = BOUNDARY_SNAP_THRESHOLD;
+        for (const candidate of state.elements) {
+          if (!BOUNDARY_HOST_TYPES.has(candidate.type) || candidate.id === id) continue;
+          const pt = nearestPointOnRectBoundary(candidate, centre);
+          const dist = Math.hypot(pt.x - centre.x, pt.y - centre.y);
+          if (dist < bestDist) { bestDist = dist; snapResult = { hostId: candidate.id, cx: pt.x, cy: pt.y }; }
+        }
+      }
 
       const elements = state.elements.map((e) => {
         if (e.id === id) {
+          if (snapResult) {
+            const host = state.elements.find(h => h.id === snapResult!.hostId)!;
+            return {
+              ...e, width: BOUNDARY_W, height: BOUNDARY_H,
+              x: snapResult.cx - BOUNDARY_W / 2, y: snapResult.cy - BOUNDARY_H / 2,
+              boundaryHostId: snapResult.hostId, parentId: host.parentId,
+            };
+          }
           let parentId = e.parentId;
-          // Check if this element can live inside a container
           const potentialParent = state.elements.find(
             (b) =>
               isContainerType(b.type) &&
@@ -286,14 +369,21 @@ function reducer(state: DiagramData, action: Action): DiagramData {
           }
           return { ...e, x, y, parentId };
         }
-        // If moving a container, move all descendants (handles multi-level: pool → lane → elements)
+        // If moving a container, move all descendants
         if (movingIsContainer && (e.parentId === id || descendantIds.has(e.id))) {
           return { ...e, x: e.x + dx, y: e.y + dy };
+        }
+        // Carry boundary events when their host moves
+        if (attachedBoundaryIds.has(e.id)) {
+          const newHost = { x, y, width: el.width, height: el.height };
+          const centre  = { x: e.x + e.width / 2 + dx, y: e.y + e.height / 2 + dy };
+          const snapped = nearestPointOnRectBoundary(newHost, centre);
+          return { ...e, x: snapped.x - e.width / 2, y: snapped.y - e.height / 2 };
         }
         return e;
       });
 
-      const affectedIds = new Set([id, ...descendantIds]);
+      const affectedIds = new Set([id, ...descendantIds, ...attachedBoundaryIds]);
       const connectors = state.connectors.map(conn => {
         if (!affectedIds.has(conn.sourceId) && !affectedIds.has(conn.targetId)) return conn;
         return recomputeAllConnectors([conn], elements)[0] ?? conn;
@@ -376,6 +466,7 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       const deletingIsContainer = el ? isContainerType(el.type) : false;
       let elements = state.elements
         .filter((e) => e.id !== id)
+        .filter((e) => e.boundaryHostId !== id)
         .map((e) =>
           deletingIsContainer && e.parentId === id ? { ...e, parentId: undefined } : e
         );
@@ -461,10 +552,10 @@ function reducer(state: DiagramData, action: Action): DiagramData {
             if (el.type === "intermediate-event") return { ...el, eventType: "message" as EventType };
           }
         } else if (isSeq) {
-          // Start events cannot be sequence targets → convert to intermediate
-          if (el.id === targetId && el.type === "start-event") return { ...el, type: "intermediate-event" as SymbolType };
-          // End events cannot be sequence sources → convert to intermediate
-          if (el.id === sourceId && el.type === "end-event")   return { ...el, type: "intermediate-event" as SymbolType };
+          // Start events cannot be sequence targets → convert to intermediate (unless boundary-mounted)
+          if (el.id === targetId && el.type === "start-event" && !el.boundaryHostId) return { ...el, type: "intermediate-event" as SymbolType };
+          // End events cannot be sequence sources → convert to intermediate (unless boundary-mounted)
+          if (el.id === sourceId && el.type === "end-event"   && !el.boundaryHostId) return { ...el, type: "intermediate-event" as SymbolType };
         }
         return el;
       });

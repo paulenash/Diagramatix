@@ -70,6 +70,7 @@ export interface DiagramElement {
   label: string;
   properties: Record<string, unknown>;
   parentId?: string;
+  boundaryHostId?: string;  // if set → event is boundary-mounted on this element's edge
   taskType?: BpmnTaskType;
   gatewayType?: GatewayType;
   eventType?: EventType;
