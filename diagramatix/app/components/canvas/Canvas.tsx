@@ -322,7 +322,6 @@ export function Canvas({
 
   function handleConnectionPointDragStart(elementId: string, side: Side, worldPos: Point) {
     const sourceEl = data.elements.find(e => e.id === elementId);
-    if (sourceEl?.type === "end-event") return;
     const outerSide = sourceEl ? getBoundaryEventOuterSide(sourceEl, data.elements) : null;
     const effectiveSide = outerSide ?? side;
     const effectiveWorldPos = (outerSide && sourceEl) ? sideMidpoint(sourceEl, outerSide) : worldPos;
@@ -355,11 +354,15 @@ export function Canvas({
           sourcePoolId !== null && targetPoolId !== null && sourcePoolId !== targetPoolId;
         const involvesPool = sourceEl?.type === "pool" || targetEl.type === "pool";
 
+        // End-event source restrictions
+        if (sourceEl?.type === "end-event") {
+          if (!sourceEl.boundaryHostId && !isCrossPool && !involvesPool) return; // free-standing: only messageBPMN
+          if (sourceEl.boundaryHostId && (isCrossPool || involvesPool)) return;  // edge-mounted: no cross-pool
+        }
+
         if (isCrossPool || involvesPool) {
           // Start events cannot send messageBPMN
           if (sourceEl?.type === "start-event") return;
-          // End events cannot receive messageBPMN
-          if (targetEl.type === "end-event") return;
           const srcCy = sourceEl ? sourceEl.y + sourceEl.height / 2 : 0;
           const tgtCy = targetEl.y + targetEl.height / 2;
           const msgSrcSide: Side = srcCy <= tgtCy ? "bottom" : "top";
@@ -772,6 +775,10 @@ export function Canvas({
     ? getElementPoolId(draggingSourceEl, data.elements)
     : null;
   const draggingSourceIsData = draggingSourceEl ? DATA_ELEMENT_TYPES.has(draggingSourceEl.type) : false;
+  const draggingFromFreeEndEvent =
+    draggingSourceEl?.type === "end-event" && !draggingSourceEl.boundaryHostId;
+  const draggingFromEdgeMountedEndEvent =
+    draggingSourceEl?.type === "end-event" && !!draggingSourceEl.boundaryHostId;
 
   // Compute misaligned messageBPMN connectors (no x-overlap between source and target)
   const misalignedConnectorIds = new Set<string>();
@@ -828,7 +835,8 @@ export function Canvas({
           {[...pools, ...otherContainers].map((el) => {
             const isMsgTarget = isDraggingConnector && isBpmnSource &&
               el.type === "pool" && el.id !== draggingSourcePoolId &&
-              ((el.properties.poolType as string | undefined) ?? "black-box") === "black-box";
+              ((el.properties.poolType as string | undefined) ?? "black-box") === "black-box" &&
+              !draggingFromEdgeMountedEndEvent;
             const isWhiteBoxPool = el.type === "pool" &&
               ((el.properties.poolType as string | undefined) ?? "black-box") === "white-box";
             const isSubExpDropTarget = isDraggingConnector && !draggingSourceIsData &&
@@ -958,6 +966,21 @@ export function Canvas({
                 elIsAssocTarget = true;
               } else if (!draggingSourceIsData && elIsData) {
                 elIsAssocTarget = true;
+              } else if (draggingFromFreeEndEvent) {
+                // Free-standing end-event: messageBPMN targets only in white-box pools
+                const elPoolId = getElementPoolId(el, data.elements);
+                if (elPoolId) {
+                  const elPool = data.elements.find((p) => p.id === elPoolId);
+                  if (((elPool?.properties.poolType as string | undefined) ?? "black-box") === "white-box") {
+                    elIsMsgTarget = true;
+                  }
+                }
+              } else if (draggingFromEdgeMountedEndEvent) {
+                // Edge-mounted end-event: sequence targets within same pool OR uncontained
+                const elPoolId = getElementPoolId(el, data.elements);
+                if (elPoolId === draggingSourcePoolId || !elPoolId) {
+                  elIsDropTarget = true;
+                }
               } else if (!isBpmnSource || !draggingSourcePoolId) {
                 elIsDropTarget = true;
               } else {
@@ -990,7 +1013,7 @@ export function Canvas({
               onConnectionPointDragStart={(side, worldPos) =>
                 handleConnectionPointDragStart(el.id, side, worldPos)
               }
-              showConnectionPoints={(el.id === selectedElementId && el.type !== "end-event") || isDraggingConnector}
+              showConnectionPoints={el.id === selectedElementId || isDraggingConnector}
               onResizeDragStart={
                 (el.type === "task" || el.type === "subprocess" || el.type === "subprocess-expanded")
                   ? (handle, e) => handleResizeDragStart(el.id, handle, e)
@@ -1037,6 +1060,21 @@ export function Canvas({
             if (isDraggingConnector && el.id !== draggingConnector!.fromId) {
               if (draggingSourceIsData) {
                 elIsAssocTarget = true;
+              } else if (draggingFromFreeEndEvent) {
+                // Free-standing end-event: boundary intermediate-events in other white-box pools are messageBPMN targets
+                const elPoolId = getElementPoolId(el, data.elements);
+                if (elPoolId && el.type === "intermediate-event") {
+                  const elPool = data.elements.find((p) => p.id === elPoolId);
+                  if (((elPool?.properties.poolType as string | undefined) ?? "black-box") === "white-box") {
+                    elIsMsgTarget = true;
+                  }
+                }
+              } else if (draggingFromEdgeMountedEndEvent) {
+                // Edge-mounted end-event: boundary events in same pool only
+                const elPoolId = getElementPoolId(el, data.elements);
+                if (elPoolId === draggingSourcePoolId) {
+                  elIsDropTarget = true;
+                }
               } else if (!isBpmnSource || !draggingSourcePoolId) {
                 elIsDropTarget = true;
               } else {
@@ -1065,7 +1103,7 @@ export function Canvas({
                 onDoubleClick={() => {}}
                 onConnectionPointDragStart={(side, worldPos) =>
                   handleConnectionPointDragStart(el.id, side, worldPos)}
-                showConnectionPoints={(el.id === selectedElementId && el.type !== "end-event") || isDraggingConnector}
+                showConnectionPoints={el.id === selectedElementId || isDraggingConnector}
                 svgToWorld={clientToWorld}
                 onUpdateProperties={onUpdateProperties}
                 onUpdateLabel={onUpdateLabel}
