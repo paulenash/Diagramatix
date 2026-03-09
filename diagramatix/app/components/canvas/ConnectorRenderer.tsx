@@ -10,6 +10,7 @@ interface Props {
   onSelect: () => void;
   svgToWorld?: (clientX: number, clientY: number) => Point;
   onUpdateWaypoints?: (id: string, waypoints: Point[]) => void;
+  onWaypointsDragEnd?: () => void;
   onUpdateLabel?: (label: string, offsetX: number, offsetY: number, width: number) => void;
   misaligned?: boolean;
 }
@@ -291,7 +292,7 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
   );
 }
 
-export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, onUpdateWaypoints, onUpdateLabel, misaligned }: Props) {
+export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, onUpdateWaypoints, onWaypointsDragEnd, onUpdateLabel, misaligned }: Props) {
   const waypoints = connector.waypoints;
   if (waypoints.length === 0) return null;
 
@@ -409,6 +410,7 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
     function onUp() {
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
+      onWaypointsDragEnd?.();
     }
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);

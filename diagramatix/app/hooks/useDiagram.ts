@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useReducer } from "react";
+import { useCallback, useReducer, useRef, useState } from "react";
 import type {
   BpmnTaskType,
   GatewayType,
@@ -826,33 +826,86 @@ function reducer(state: DiagramData, action: Action): DiagramData {
 export function useDiagram(initialData: DiagramData) {
   const [data, dispatch] = useReducer(reducer, initialData);
 
+  // ── Undo / Redo infrastructure ──────────────────────────────────────────────
+  type Snapshot = { elements: DiagramElement[]; connectors: Connector[] };
+  const dataRef      = useRef(data);
+  dataRef.current    = data;   // always fresh — updated every render
+
+  const pastRef   = useRef<Snapshot[]>([]);
+  const futureRef = useRef<Snapshot[]>([]);
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
+
+  // Drag-coalescing refs — capture snapshot at drag start, push at drag end
+  const preMoveRef        = useRef<Snapshot | null>(null);
+  const draggingRef       = useRef<string | null>(null);
+  const preResizeRef      = useRef<Snapshot | null>(null);
+  const resizingRef       = useRef<string | null>(null);
+  const preLaneRef        = useRef<Snapshot | null>(null);
+  const preWaypointRef    = useRef<Snapshot | null>(null);
+  const waypointConnIdRef = useRef<string | null>(null);
+
+  function snapshotData(): Snapshot {
+    return { elements: dataRef.current.elements, connectors: dataRef.current.connectors };
+  }
+
+  function pushHistory(snap: Snapshot) {
+    const next = [...pastRef.current, snap];
+    if (next.length > 100) next.shift();
+    pastRef.current = next;
+    futureRef.current = [];
+    setCanUndo(true);
+    setCanRedo(false);
+  }
+  // ────────────────────────────────────────────────────────────────────────────
+
   const addElement = useCallback(
     (symbolType: SymbolType, position: Point, taskType?: BpmnTaskType, eventType?: EventType) => {
+      pushHistory(snapshotData());
       dispatch({ type: "ADD_ELEMENT", payload: { symbolType, position, taskType, eventType } });
     },
     []
   );
 
   const moveElement = useCallback((id: string, x: number, y: number) => {
+    if (draggingRef.current !== id) {
+      draggingRef.current = id;
+      preMoveRef.current = snapshotData(); // snapshot before drag starts
+    }
     dispatch({ type: "MOVE_ELEMENT", payload: { id, x, y } });
   }, []);
 
   const resizeElement = useCallback((id: string, width: number, height: number) => {
+    if (resizingRef.current !== id) {
+      resizingRef.current = id;
+      preResizeRef.current = snapshotData(); // snapshot before resize starts
+    }
     dispatch({ type: "RESIZE_ELEMENT", payload: { id, width, height } });
   }, []);
 
+  const resizeElementEnd = useCallback((id: string) => {
+    if (resizingRef.current === id && preResizeRef.current) {
+      pushHistory(preResizeRef.current);
+      preResizeRef.current = null;
+      resizingRef.current = null;
+    }
+  }, []);
+
   const updateLabel = useCallback((id: string, label: string) => {
+    pushHistory(snapshotData());
     dispatch({ type: "UPDATE_LABEL", payload: { id, label } });
   }, []);
 
   const updateProperties = useCallback(
     (id: string, properties: Record<string, unknown>) => {
+      pushHistory(snapshotData());
       dispatch({ type: "UPDATE_PROPERTIES", payload: { id, properties } });
     },
     []
   );
 
   const deleteElement = useCallback((id: string) => {
+    pushHistory(snapshotData());
     dispatch({ type: "DELETE_ELEMENT", payload: { id } });
   }, []);
 
@@ -866,6 +919,7 @@ export function useDiagram(initialData: DiagramData) {
       sourceSide: Side = "right",
       targetSide: Side = "left"
     ) => {
+      pushHistory(snapshotData());
       dispatch({
         type: "ADD_CONNECTOR",
         payload: { sourceId, targetId, connectorType, directionType, routingType, sourceSide, targetSide },
@@ -875,11 +929,13 @@ export function useDiagram(initialData: DiagramData) {
   );
 
   const deleteConnector = useCallback((id: string) => {
+    pushHistory(snapshotData());
     dispatch({ type: "DELETE_CONNECTOR", payload: { id } });
   }, []);
 
   const updateConnectorDirection = useCallback(
     (id: string, directionType: DirectionType) => {
+      pushHistory(snapshotData());
       dispatch({ type: "UPDATE_CONNECTOR", payload: { id, directionType } });
     },
     []
@@ -887,22 +943,45 @@ export function useDiagram(initialData: DiagramData) {
 
   const updateConnectorEndpoint = useCallback(
     (connectorId: string, endpoint: "source" | "target", newElementId: string, newSide: Side, newOffsetAlong?: number) => {
+      // Clear any pending waypoint snapshot (messageBPMN drag commits via endpoint, not waypointDragEnd)
+      preWaypointRef.current = null;
+      waypointConnIdRef.current = null;
+      pushHistory(snapshotData());
       dispatch({ type: "UPDATE_CONNECTOR_ENDPOINT", payload: { connectorId, endpoint, newElementId, newSide, newOffsetAlong } });
     },
     []
   );
 
   const updateConnectorWaypoints = useCallback((id: string, waypoints: Point[]) => {
+    // Capture snapshot on first waypoint update for this connector (drag-coalescing)
+    if (waypointConnIdRef.current !== id) {
+      waypointConnIdRef.current = id;
+      preWaypointRef.current = snapshotData();
+    }
     dispatch({ type: "UPDATE_CONNECTOR_WAYPOINTS", payload: { id, waypoints } });
+  }, []);
+
+  const connectorWaypointDragEnd = useCallback((id: string) => {
+    if (waypointConnIdRef.current === id && preWaypointRef.current) {
+      pushHistory(preWaypointRef.current);
+      preWaypointRef.current = null;
+      waypointConnIdRef.current = null;
+    }
   }, []);
 
   const updateConnectorLabel = useCallback(
     (id: string, label?: string, labelOffsetX?: number, labelOffsetY?: number, labelWidth?: number) => {
+      pushHistory(snapshotData());
       dispatch({ type: "UPDATE_CONNECTOR_LABEL", payload: { id, label, labelOffsetX, labelOffsetY, labelWidth } });
     }, []
   );
 
   const elementMoveEnd = useCallback((id: string) => {
+    if (draggingRef.current === id && preMoveRef.current) {
+      pushHistory(preMoveRef.current);
+      preMoveRef.current = null;
+      draggingRef.current = null;
+    }
     dispatch({ type: "MOVE_END", payload: { id } });
   }, []);
 
@@ -913,10 +992,16 @@ export function useDiagram(initialData: DiagramData) {
     taskType?: BpmnTaskType,
     eventType?: EventType,
   ) => {
+    pushHistory(snapshotData());
     dispatch({ type: "SPLIT_CONNECTOR", payload: { symbolType, position, connectorId, taskType, eventType } });
   }, []);
 
   const setData = useCallback((newData: DiagramData) => {
+    // Clear history on full state replacement (e.g. initial DB load)
+    pastRef.current = [];
+    futureRef.current = [];
+    setCanUndo(false);
+    setCanRedo(false);
     dispatch({ type: "SET_DATA", payload: newData });
   }, []);
 
@@ -929,20 +1014,49 @@ export function useDiagram(initialData: DiagramData) {
   }, []);
 
   const addLane = useCallback((poolId: string) => {
+    pushHistory(snapshotData());
     dispatch({ type: "ADD_LANE", payload: { poolId } });
   }, []);
 
   const moveLaneBoundary = useCallback(
-    (aboveLaneId: string, belowLaneId: string, dy: number) =>
-      dispatch({ type: "MOVE_LANE_BOUNDARY", payload: { aboveLaneId, belowLaneId, dy } }),
+    (aboveLaneId: string, belowLaneId: string, dy: number) => {
+      if (!preLaneRef.current) preLaneRef.current = snapshotData();
+      dispatch({ type: "MOVE_LANE_BOUNDARY", payload: { aboveLaneId, belowLaneId, dy } });
+    },
     []
   );
+
+  const laneBoundaryMoveEnd = useCallback(() => {
+    if (preLaneRef.current) {
+      pushHistory(preLaneRef.current);
+      preLaneRef.current = null;
+    }
+  }, []);
+
+  const undo = useCallback(() => {
+    if (pastRef.current.length === 0) return;
+    const snap = pastRef.current.pop()!;
+    futureRef.current.push(snapshotData());
+    dispatch({ type: "SET_DATA", payload: { ...snap, viewport: dataRef.current.viewport } });
+    setCanUndo(pastRef.current.length > 0);
+    setCanRedo(true);
+  }, []);
+
+  const redo = useCallback(() => {
+    if (futureRef.current.length === 0) return;
+    const snap = futureRef.current.pop()!;
+    pastRef.current.push(snapshotData());
+    dispatch({ type: "SET_DATA", payload: { ...snap, viewport: dataRef.current.viewport } });
+    setCanRedo(futureRef.current.length > 0);
+    setCanUndo(true);
+  }, []);
 
   return {
     data,
     addElement,
     moveElement,
     resizeElement,
+    resizeElementEnd,
     updateLabel,
     updateProperties,
     deleteElement,
@@ -951,6 +1065,7 @@ export function useDiagram(initialData: DiagramData) {
     updateConnectorDirection,
     updateConnectorEndpoint,
     updateConnectorWaypoints,
+    connectorWaypointDragEnd,
     updateConnectorLabel,
     elementMoveEnd,
     splitConnector,
@@ -959,5 +1074,10 @@ export function useDiagram(initialData: DiagramData) {
     correctAllConnectors,
     addLane,
     moveLaneBoundary,
+    laneBoundaryMoveEnd,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
   };
 }

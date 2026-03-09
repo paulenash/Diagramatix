@@ -169,6 +169,9 @@ interface Props {
   onSplitConnector?: (symbolType: SymbolType, position: Point, connectorId: string, taskType?: BpmnTaskType, eventType?: EventType) => void;
   onElementMoveEnd?: (id: string) => void;
   onMoveLaneBoundary?: (aboveLaneId: string, belowLaneId: string, dy: number) => void;
+  onResizeElementEnd?: (id: string) => void;
+  onLaneBoundaryMoveEnd?: () => void;
+  onConnectorWaypointDragEnd?: (id: string) => void;
 }
 
 interface EditingLabel {
@@ -270,6 +273,9 @@ export function Canvas({
   onSplitConnector,
   onElementMoveEnd,
   onMoveLaneBoundary,
+  onResizeElementEnd,
+  onLaneBoundaryMoveEnd,
+  onConnectorWaypointDragEnd,
 }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
 
@@ -479,6 +485,7 @@ export function Canvas({
     function onMouseUp() {
       window.removeEventListener("mousemove", onMouseMove);
       window.removeEventListener("mouseup", onMouseUp);
+      onLaneBoundaryMoveEnd?.();
     }
 
     window.addEventListener("mousemove", onMouseMove);
@@ -584,6 +591,7 @@ export function Canvas({
     function onMouseUp() {
       window.removeEventListener("mousemove", onMouseMove);
       window.removeEventListener("mouseup", onMouseUp);
+      onResizeElementEnd?.(elementId);
     }
 
     window.addEventListener("mousemove", onMouseMove);
@@ -949,6 +957,7 @@ export function Canvas({
               }}
               svgToWorld={clientToWorld}
               onUpdateWaypoints={onUpdateConnectorWaypoints}
+              onWaypointsDragEnd={onConnectorWaypointDragEnd ? () => onConnectorWaypointDragEnd(conn.id) : undefined}
               onUpdateLabel={onUpdateConnectorLabel
                 ? (label, ox, oy, w) => onUpdateConnectorLabel(conn.id, label, ox, oy, w)
                 : undefined}
@@ -1124,6 +1133,7 @@ export function Canvas({
               }}
               svgToWorld={clientToWorld}
               onUpdateWaypoints={onUpdateConnectorWaypoints}
+              onWaypointsDragEnd={onConnectorWaypointDragEnd ? () => onConnectorWaypointDragEnd(conn.id) : undefined}
               onUpdateLabel={onUpdateConnectorLabel
                 ? (label, ox, oy, w) => onUpdateConnectorLabel(conn.id, label, ox, oy, w)
                 : undefined}

@@ -92,6 +92,7 @@ export function DiagramEditor({
     addElement,
     moveElement,
     resizeElement,
+    resizeElementEnd,
     updateLabel,
     updateProperties,
     deleteElement,
@@ -100,15 +101,38 @@ export function DiagramEditor({
     updateConnectorDirection,
     updateConnectorEndpoint,
     updateConnectorWaypoints,
+    connectorWaypointDragEnd,
     updateConnectorLabel,
     elementMoveEnd,
     splitConnector,
     correctAllConnectors,
     addLane,
     moveLaneBoundary,
+    laneBoundaryMoveEnd,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
   } = useDiagram(initialData);
 
   const saveStatus = useAutoSave(diagramId, data);
+
+  useEffect(() => {
+    function handleKeyDown(e: globalThis.KeyboardEvent) {
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      if ((e.ctrlKey || e.metaKey) && e.key === "z") {
+        e.preventDefault();
+        e.shiftKey ? redo() : undo();
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === "y") {
+        e.preventDefault();
+        redo();
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [undo, redo]);
 
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
   const [selectedConnectorId, setSelectedConnectorId] = useState<string | null>(null);
@@ -194,6 +218,31 @@ export function DiagramEditor({
           {saveStatus === "unsaved" && "Unsaved changes"}
         </span>
 
+        <div className="flex items-center gap-1">
+          <button
+            onClick={undo}
+            disabled={!canUndo}
+            title="Undo (Ctrl+Z)"
+            className="p-1.5 rounded hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            <svg width={14} height={14} viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M2 5h6a4 4 0 0 1 0 8H5" />
+              <path d="M2 5L5 2M2 5l3 3" />
+            </svg>
+          </button>
+          <button
+            onClick={redo}
+            disabled={!canRedo}
+            title="Redo (Ctrl+Shift+Z)"
+            className="p-1.5 rounded hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            <svg width={14} height={14} viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 5H6a4 4 0 0 0 0 8h3" />
+              <path d="M12 5L9 2m3 3-3 3" />
+            </svg>
+          </button>
+        </div>
+
         <button
           onClick={handleExport}
           className="px-3 py-1.5 text-xs text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
@@ -240,6 +289,9 @@ export function DiagramEditor({
           onSplitConnector={splitConnector}
           onElementMoveEnd={elementMoveEnd}
           onMoveLaneBoundary={moveLaneBoundary}
+          onResizeElementEnd={resizeElementEnd}
+          onLaneBoundaryMoveEnd={laneBoundaryMoveEnd}
+          onConnectorWaypointDragEnd={connectorWaypointDragEnd}
         />
 
         <PropertiesPanel
