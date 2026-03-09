@@ -376,7 +376,7 @@ function reducer(state: DiagramData, action: Action): DiagramData {
             };
           }
           let parentId = e.parentId;
-          const potentialParent = state.elements.find(
+          const potentialParents = state.elements.filter(
             (b) =>
               isContainerType(b.type) &&
               containerAccepts(b.type, e.type) &&
@@ -384,6 +384,12 @@ function reducer(state: DiagramData, action: Action): DiagramData {
               (x + e.width / 2) >= b.x && (x + e.width / 2) <= b.x + b.width &&
               (y + e.height / 2) >= b.y && (y + e.height / 2) <= b.y + b.height
           );
+          // Prefer innermost container: subprocess-expanded > lane > pool > other
+          const potentialParent =
+            potentialParents.find(b => b.type === "subprocess-expanded") ??
+            potentialParents.find(b => b.type === "lane") ??
+            potentialParents.find(b => b.type === "pool") ??
+            potentialParents[0];
           if (potentialParent !== undefined || state.elements.some(b => isContainerType(b.type) && containerAccepts(b.type, e.type))) {
             parentId = potentialParent?.id;
           }

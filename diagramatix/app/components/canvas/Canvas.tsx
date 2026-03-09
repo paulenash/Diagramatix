@@ -279,6 +279,7 @@ export function Canvas({
   const [draggingConnector, setDraggingConnector] = useState<DraggingConnector | null>(null);
   const [draggingEndpoint, setDraggingEndpoint] = useState<DraggingEndpoint | null>(null);
   const [pendingDrop, setPendingDrop] = useState<PendingDrop | null>(null);
+  const [draggingElementId, setDraggingElementId] = useState<string | null>(null);
 
   const svgToWorld = useCallback(
     (svgX: number, svgY: number): Point => ({
@@ -769,6 +770,7 @@ export function Canvas({
   const draggingSourcePoolId = draggingSourceEl
     ? getElementPoolId(draggingSourceEl, data.elements)
     : null;
+  const draggingSourceIsData = draggingSourceEl ? DATA_ELEMENT_TYPES.has(draggingSourceEl.type) : false;
 
   // Compute misaligned messageBPMN connectors (no x-overlap between source and target)
   const misalignedConnectorIds = new Set<string>();
@@ -828,9 +830,20 @@ export function Canvas({
               ((el.properties.poolType as string | undefined) ?? "black-box") === "black-box";
             const isWhiteBoxPool = el.type === "pool" &&
               ((el.properties.poolType as string | undefined) ?? "black-box") === "white-box";
-            const isSubExpDropTarget = isDraggingConnector &&
+            const isSubExpDropTarget = isDraggingConnector && !draggingSourceIsData &&
               el.type === "subprocess-expanded" &&
               el.id !== draggingConnector!.fromId;
+            const isSubExpAssocTarget = isDraggingConnector && draggingSourceIsData &&
+              el.type === "subprocess-expanded" &&
+              el.id !== draggingConnector!.fromId;
+            // Orange border when element is being dragged into this subprocess-expanded
+            const draggingEl = draggingElementId ? data.elements.find(e => e.id === draggingElementId) : null;
+            const isElementDragTarget = el.type === "subprocess-expanded" &&
+              draggingEl != null &&
+              (draggingEl.x + draggingEl.width / 2) >= el.x &&
+              (draggingEl.x + draggingEl.width / 2) <= el.x + el.width &&
+              (draggingEl.y + draggingEl.height / 2) >= el.y &&
+              (draggingEl.y + draggingEl.height / 2) <= el.y + el.height;
             return (
               <SymbolRenderer
                 key={el.id}
@@ -839,6 +852,8 @@ export function Canvas({
                 isDropTarget={isSubExpDropTarget}
                 isDisallowedTarget={false}
                 isMessageBpmnTarget={isMsgTarget}
+                isAssocBpmnTarget={isSubExpAssocTarget}
+                isElementDragTarget={isElementDragTarget}
                 onSelect={() => {
                   if (isWhiteBoxPool && el.id === selectedElementId) {
                     onSelectElement(null); // toggle deselect for white-box pools
@@ -935,8 +950,14 @@ export function Canvas({
           {nonContainers.map((el) => {
             let elIsDropTarget = false;
             let elIsMsgTarget = false;
+            let elIsAssocTarget = false;
             if (isDraggingConnector && el.id !== draggingConnector!.fromId) {
-              if (!isBpmnSource || !draggingSourcePoolId) {
+              const elIsData = DATA_ELEMENT_TYPES.has(el.type);
+              if (draggingSourceIsData && !elIsData) {
+                elIsAssocTarget = true;
+              } else if (!draggingSourceIsData && elIsData) {
+                elIsAssocTarget = true;
+              } else if (!isBpmnSource || !draggingSourcePoolId) {
                 elIsDropTarget = true;
               } else {
                 const elPoolId = getElementPoolId(el, data.elements);
@@ -957,12 +978,13 @@ export function Canvas({
               selected={el.id === selectedElementId}
               isDropTarget={elIsDropTarget}
               isMessageBpmnTarget={elIsMsgTarget}
+              isAssocBpmnTarget={elIsAssocTarget}
               isErrorTarget={errorTargetIds.has(el.id)}
               onSelect={() => {
                 onSelectElement(el.id);
                 onSelectConnector(null);
               }}
-              onMove={(x, y) => onMoveElement(el.id, x, y)}
+              onMove={(x, y) => { setDraggingElementId(el.id); onMoveElement(el.id, x, y); }}
               onDoubleClick={() => startEditingLabel(el)}
               onConnectionPointDragStart={(side, worldPos) =>
                 handleConnectionPointDragStart(el.id, side, worldPos)
@@ -978,11 +1000,7 @@ export function Canvas({
               svgToWorld={clientToWorld}
               onUpdateProperties={onUpdateProperties}
               onUpdateLabel={onUpdateLabel}
-              onMoveEnd={
-                (el.type === "gateway" || el.type === "intermediate-event")
-                  ? () => onElementMoveEnd?.(el.id)
-                  : undefined
-              }
+              onMoveEnd={() => { setDraggingElementId(null); onElementMoveEnd?.(el.id); }}
               shouldSnapBack={(x, y) => {
                 const cx = x + el.width / 2;
                 const cy = y + el.height / 2;
@@ -1016,8 +1034,11 @@ export function Canvas({
           {boundaryEvents.map((el) => {
             let elIsDropTarget = false;
             let elIsMsgTarget = false;
+            let elIsAssocTarget = false;
             if (isDraggingConnector && el.id !== draggingConnector!.fromId) {
-              if (!isBpmnSource || !draggingSourcePoolId) {
+              if (draggingSourceIsData) {
+                elIsAssocTarget = true;
+              } else if (!isBpmnSource || !draggingSourcePoolId) {
                 elIsDropTarget = true;
               } else {
                 const elPoolId = getElementPoolId(el, data.elements);
@@ -1039,9 +1060,10 @@ export function Canvas({
                 isDropTarget={elIsDropTarget}
                 isDisallowedTarget={false}
                 isMessageBpmnTarget={elIsMsgTarget}
+                isAssocBpmnTarget={elIsAssocTarget}
                 onSelect={() => { onSelectElement(el.id); onSelectConnector(null); }}
                 onMove={(x, y) => onMoveElement(el.id, x, y)}
-                onDoubleClick={() => startEditingLabel(el)}
+                onDoubleClick={() => {}}
                 onConnectionPointDragStart={(side, worldPos) =>
                   handleConnectionPointDragStart(el.id, side, worldPos)}
                 showConnectionPoints={el.id === selectedElementId || isDraggingConnector}

@@ -11,7 +11,9 @@ interface Props {
   isDropTarget: boolean;
   isDisallowedTarget?: boolean;
   isMessageBpmnTarget?: boolean;
+  isAssocBpmnTarget?: boolean;
   isErrorTarget?: boolean;
+  isElementDragTarget?: boolean;
   onSelect: () => void;
   onMove: (x: number, y: number) => void;
   onDoubleClick: () => void;
@@ -721,7 +723,9 @@ export function SymbolRenderer({
   isDropTarget,
   isDisallowedTarget,
   isMessageBpmnTarget,
+  isAssocBpmnTarget,
   isErrorTarget,
+  isElementDragTarget,
   onSelect,
   onMove,
   onDoubleClick,
@@ -791,6 +795,7 @@ export function SymbolRenderer({
       window.removeEventListener("mouseup", onMouseUp);
       window.removeEventListener("keydown", onKeyDown);
       onMove(elX, elY);
+      onMoveEnd?.();
     }
 
     window.addEventListener("mousemove", onMouseMove);
@@ -807,7 +812,8 @@ export function SymbolRenderer({
   const isContainer = isBoundary || element.type === "composite-state" || isPoolLane; // gets resize handles
   const canResize = isContainer || element.type === "task" || element.type === "subprocess" ||
     element.type === "subprocess-expanded" || element.type === "use-case";
-  const showLabel = element.type !== "initial-state" && element.type !== "final-state";
+  const showLabel = element.type !== "initial-state" && element.type !== "final-state"
+    && !element.boundaryHostId;
 
   return (
     <g
@@ -1004,22 +1010,32 @@ export function SymbolRenderer({
         />
       )}
 
-      {/* Drop target highlight */}
+      {/* Drop target highlight — light green for sequence connectors */}
       {isDropTarget && !isDisallowedTarget && (
         <rect
           x={element.x - 4} y={element.y - 4}
           width={element.width + 8} height={element.height + 8}
-          fill="none" stroke="#16a34a" strokeWidth={2} rx={6}
+          fill="none" stroke="#4ade80" strokeWidth={2} rx={6}
           style={{ pointerEvents: "none" }}
         />
       )}
 
-      {/* messageBPMN target highlight (darker green) */}
+      {/* messageBPMN target highlight — light blue */}
       {isMessageBpmnTarget && (
         <rect
           x={element.x - 4} y={element.y - 4}
           width={element.width + 8} height={element.height + 8}
-          fill="none" stroke="#166534" strokeWidth={2} rx={6}
+          fill="none" stroke="#60a5fa" strokeWidth={2} rx={6}
+          style={{ pointerEvents: "none" }}
+        />
+      )}
+
+      {/* associationBPMN target highlight — light purple */}
+      {isAssocBpmnTarget && (
+        <rect
+          x={element.x - 4} y={element.y - 4}
+          width={element.width + 8} height={element.height + 8}
+          fill="none" stroke="#c084fc" strokeWidth={2} rx={6}
           style={{ pointerEvents: "none" }}
         />
       )}
@@ -1040,6 +1056,16 @@ export function SymbolRenderer({
           x={element.x - 4} y={element.y - 4}
           width={element.width + 8} height={element.height + 8}
           fill="none" stroke="#dc2626" strokeWidth={2} strokeDasharray="4 2" rx={6}
+          style={{ pointerEvents: "none" }}
+        />
+      )}
+
+      {/* Element drag target — orange when element being dragged will become a child */}
+      {isElementDragTarget && (
+        <rect
+          x={element.x - 4} y={element.y - 4}
+          width={element.width + 8} height={element.height + 8}
+          fill="none" stroke="#fb923c" strokeWidth={2} rx={6}
           style={{ pointerEvents: "none" }}
         />
       )}
