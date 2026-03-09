@@ -105,7 +105,7 @@ export function PropertiesPanel({
         )}
         {connector.type !== "messageBPMN" &&
           (connector.type === "associationBPMN" ||
-          (connector.type !== "sequence" && connector.type !== "interaction") ||
+          (connector.type !== "sequence" && connector.type !== "transition") ||
           connector.routingType === "direct") && (
           <div>
             <p className="text-xs font-medium text-gray-700 mb-1">Direction</p>
@@ -143,7 +143,7 @@ export function PropertiesPanel({
             </div>
           </div>
         )}
-        {(connector.type === "interaction" || connector.type === "messageBPMN") && onUpdateConnectorLabel && (
+        {(connector.type === "transition" || connector.type === "messageBPMN") && onUpdateConnectorLabel && (
           <div>
             <p className="text-xs font-medium text-gray-700 mb-1">Label</p>
             <textarea

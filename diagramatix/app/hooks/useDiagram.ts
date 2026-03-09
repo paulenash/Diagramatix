@@ -537,6 +537,10 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       const msgBpmnCount = isMsgBpmn
         ? state.connectors.filter((c) => c.type === "messageBPMN").length
         : 0;
+      const isTransition = connectorType === "transition";
+      const transitionCount = isTransition
+        ? state.connectors.filter((c) => c.type === "transition").length
+        : 0;
 
       const newConnector: Connector = {
         id: nanoid(),
@@ -550,12 +554,12 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         sourceInvisibleLeader,
         targetInvisibleLeader,
         waypoints,
-        label:        connectorType === "interaction" ? "interaction label"
-                    : isMsgBpmn                       ? `message ${msgBpmnCount + 1}`
+        label:        isTransition ? `transition ${transitionCount + 1}`
+                    : isMsgBpmn   ? `message ${msgBpmnCount + 1}`
                     : undefined,
-        labelOffsetX: connectorType === "interaction" ? 0   : isMsgBpmn ? 20  : undefined,
-        labelOffsetY: connectorType === "interaction" ? -30 : isMsgBpmn ? 0   : undefined,
-        labelWidth:   connectorType === "interaction" ? 80  : isMsgBpmn ? 80  : undefined,
+        labelOffsetX: isTransition ? 0   : isMsgBpmn ? 20  : undefined,
+        labelOffsetY: isTransition ? -30 : isMsgBpmn ? 0   : undefined,
+        labelWidth:   isTransition ? 80  : isMsgBpmn ? 80  : undefined,
       };
 
       const isSeq = connectorType === "sequence";

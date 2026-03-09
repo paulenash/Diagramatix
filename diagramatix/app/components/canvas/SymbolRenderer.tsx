@@ -775,6 +775,7 @@ export function SymbolRenderer({
       dragStart = null;
       window.removeEventListener("mousemove", onMouseMove);
       window.removeEventListener("mouseup", onMouseUp);
+      window.removeEventListener("keydown", onKeyDown);
       if (shouldSnapBack?.(lastX, lastY)) {
         onMove(origX, origY);
       } else {
@@ -782,8 +783,19 @@ export function SymbolRenderer({
       }
     }
 
+    function onKeyDown(ev: KeyboardEvent) {
+      if (ev.key !== "Escape" || !dragStart) return;
+      const { elX, elY } = dragStart;
+      dragStart = null;
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+      window.removeEventListener("keydown", onKeyDown);
+      onMove(elX, elY);
+    }
+
     window.addEventListener("mousemove", onMouseMove);
     window.addEventListener("mouseup", onMouseUp);
+    window.addEventListener("keydown", onKeyDown);
   }
 
   const labelInfo = getLabelPos(element);

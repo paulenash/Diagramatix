@@ -40,7 +40,7 @@ export type EventType =
 
 export type RepeatType = "none" | "loop";
 
-export type ConnectorType = "sequence" | "message" | "association" | "interaction" | "associationBPMN" | "messageBPMN";
+export type ConnectorType = "sequence" | "message" | "association" | "transition" | "associationBPMN" | "messageBPMN";
 
 export type Side = "top" | "right" | "bottom" | "left";
 

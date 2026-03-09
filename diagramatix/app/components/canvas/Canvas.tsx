@@ -353,7 +353,7 @@ export function Canvas({
           if (isDataConn) {
             connType = "associationBPMN"; connRouting = "direct"; connDirection = "open-directed";
           } else if (defaultRoutingType === "curvilinear") {
-            connType = "interaction"; connRouting = defaultRoutingType; connDirection = defaultDirectionType;
+            connType = "transition"; connRouting = defaultRoutingType; connDirection = defaultDirectionType;
           } else if ((sourceEl && actorLike.includes(sourceEl.type)) || actorLike.includes(targetEl.type)) {
             connType = "association"; connRouting = defaultRoutingType; connDirection = defaultDirectionType;
           } else {
@@ -703,6 +703,8 @@ export function Canvas({
       setDraggingEndpoint(null);
       setEditingLabel(null);
       setPendingDrop(null);
+      onSelectElement(null);
+      onSelectConnector(null);
     }
     if (e.key === "Delete" || e.key === "Backspace") {
       if (editingLabel) return;
@@ -798,12 +800,15 @@ export function Canvas({
               ((el.properties.poolType as string | undefined) ?? "black-box") === "black-box";
             const isWhiteBoxPool = el.type === "pool" &&
               ((el.properties.poolType as string | undefined) ?? "black-box") === "white-box";
+            const isSubExpDropTarget = isDraggingConnector &&
+              el.type === "subprocess-expanded" &&
+              el.id !== draggingConnector!.fromId;
             return (
               <SymbolRenderer
                 key={el.id}
                 element={el}
                 selected={el.id === selectedElementId}
-                isDropTarget={false}
+                isDropTarget={isSubExpDropTarget}
                 isDisallowedTarget={false}
                 isMessageBpmnTarget={isMsgTarget}
                 onSelect={() => {

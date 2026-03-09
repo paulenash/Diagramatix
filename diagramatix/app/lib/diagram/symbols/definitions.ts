@@ -19,8 +19,8 @@ export const ALL_SYMBOLS: SymbolDefinition[] = [
   {
     type: "gateway",
     label: "Gateway",
-    defaultWidth: 50,
-    defaultHeight: 50,
+    defaultWidth: 40,
+    defaultHeight: 40,
     description: "A decision point",
   },
   {

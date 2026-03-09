@@ -131,7 +131,7 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
 
   let anchor: Point;
   if (visibleWaypoints.length === 4) {
-    // Cubic bezier (curvilinear / interaction connector)
+    // Cubic bezier (curvilinear / transition connector)
     const [p0, cp1, cp2, p3] = visibleWaypoints;
     anchor = cubicBezierPoint(p0, cp1, cp2, p3, 0.5);
   } else {
@@ -456,8 +456,8 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
         style={{ pointerEvents: "none" }}
       />
 
-      {/* Floating interaction label */}
-      {(connector.type === "interaction" || connector.type === "messageBPMN") && (
+      {/* Floating transition label */}
+      {(connector.type === "transition" || connector.type === "messageBPMN") && (
         <InteractionLabel
           connector={connector}
           selected={selected}
