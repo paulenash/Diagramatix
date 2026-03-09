@@ -287,7 +287,7 @@ export function Canvas({
     if (matches.length === 0) return null;
     // Prefer non-container elements (child states) over composite-state containers so that
     // dropping onto a state inside a composite returns the child state, not the composite.
-    const nonContainer = matches.find(el => el.type !== "composite-state" && el.type !== "pool");
+    const nonContainer = matches.find(el => el.type !== "composite-state" && el.type !== "pool" && el.type !== "subprocess-expanded");
     return nonContainer ?? matches[0];
   }
 

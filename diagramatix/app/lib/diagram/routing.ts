@@ -184,7 +184,12 @@ export function computeWaypoints(
   const srcEdge = sidePoint(source, sourceSide, sourceOffsetAlong);
   const tgtEdge = sidePoint(target, targetSide, targetOffsetAlong);
   const obstacles = allElements
-    .filter((el) => el.id !== source.id && el.id !== target.id)
+    .filter((el) => {
+      if (el.id === source.id || el.id === target.id) return false;
+      // Don't treat the target's parent subprocess-expanded as an obstacle
+      if (target.parentId && el.id === target.parentId && el.type === "subprocess-expanded") return false;
+      return true;
+    })
     .map(getBounds);
 
   const perpOff    = adaptedPerpOffset(srcEdge, sourceSide, tgtEdge, targetSide);

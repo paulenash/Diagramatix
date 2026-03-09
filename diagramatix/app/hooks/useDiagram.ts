@@ -131,7 +131,7 @@ const BPMN_CONTENT_TYPES = new Set<SymbolType>([
 
 function isContainerType(type: SymbolType): boolean {
   return type === "system-boundary" || type === "composite-state"
-      || type === "pool" || type === "lane";
+      || type === "pool" || type === "lane" || type === "subprocess-expanded";
 }
 
 function containerAccepts(containerType: SymbolType, childType: SymbolType): boolean {
@@ -139,6 +139,7 @@ function containerAccepts(containerType: SymbolType, childType: SymbolType): boo
   if (containerType === "composite-state") return childType === "state" || childType === "initial-state" || childType === "final-state";
   if (containerType === "pool") return childType === "lane" || BPMN_CONTENT_TYPES.has(childType);
   if (containerType === "lane") return BPMN_CONTENT_TYPES.has(childType);
+  if (containerType === "subprocess-expanded") return childType === "task" || childType === "subprocess";
   return false;
 }
 
