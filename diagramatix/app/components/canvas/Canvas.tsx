@@ -218,6 +218,34 @@ function pointToBoundaryOffset(p: Point, el: DiagramElement): { side: Side; offs
   return                         { side: "right",  offsetAlong: clamp((p.y - el.y) / el.height) };
 }
 
+/** Returns the side of the host subprocess that this boundary event is mounted on (= its outer side), or null. */
+function getBoundaryEventOuterSide(el: DiagramElement, allElements: DiagramElement[]): Side | null {
+  if (!el.boundaryHostId) return null;
+  const host = allElements.find(h => h.id === el.boundaryHostId);
+  if (!host) return null;
+  const ecx = el.x + el.width / 2;
+  const ecy = el.y + el.height / 2;
+  const distTop    = Math.abs(ecy - host.y);
+  const distBottom = Math.abs(ecy - (host.y + host.height));
+  const distLeft   = Math.abs(ecx - host.x);
+  const distRight  = Math.abs(ecx - (host.x + host.width));
+  const min = Math.min(distTop, distBottom, distLeft, distRight);
+  if (min === distTop)    return "top";
+  if (min === distBottom) return "bottom";
+  if (min === distLeft)   return "left";
+  return "right";
+}
+
+/** Returns the midpoint of the specified outer face of an element. */
+function sideMidpoint(el: DiagramElement, side: Side): Point {
+  switch (side) {
+    case "top":    return { x: el.x + el.width / 2, y: el.y };
+    case "bottom": return { x: el.x + el.width / 2, y: el.y + el.height };
+    case "left":   return { x: el.x,                y: el.y + el.height / 2 };
+    case "right":  return { x: el.x + el.width,     y: el.y + el.height / 2 };
+  }
+}
+
 export function Canvas({
   data,
   diagramType,
@@ -292,11 +320,15 @@ export function Canvas({
   }
 
   function handleConnectionPointDragStart(elementId: string, side: Side, worldPos: Point) {
+    const sourceEl = data.elements.find(e => e.id === elementId);
+    const outerSide = sourceEl ? getBoundaryEventOuterSide(sourceEl, data.elements) : null;
+    const effectiveSide = outerSide ?? side;
+    const effectiveWorldPos = (outerSide && sourceEl) ? sideMidpoint(sourceEl, outerSide) : worldPos;
     const drag: DraggingConnector = {
       fromId: elementId,
-      fromSide: side,
-      fromPos: worldPos,
-      currentPos: worldPos,
+      fromSide: effectiveSide,
+      fromPos: effectiveWorldPos,
+      currentPos: effectiveWorldPos,
     };
     setDraggingConnector(drag);
 
@@ -319,33 +351,26 @@ export function Canvas({
         const targetPoolId = getElementPoolId(targetEl, data.elements);
         const isCrossPool =
           sourcePoolId !== null && targetPoolId !== null && sourcePoolId !== targetPoolId;
+        const involvesPool = sourceEl?.type === "pool" || targetEl.type === "pool";
 
-        if (isCrossPool) {
+        if (isCrossPool || involvesPool) {
           // Start events cannot send messageBPMN
           if (sourceEl?.type === "start-event") return;
           // End events cannot receive messageBPMN
           if (targetEl.type === "end-event") return;
-          // messageBPMN: always vertical
-          // pool→element: source=pool, target=specific element
-          // element→pool or pool→pool: source=element/pool, target=pool
-          // targetEl is already the correct target:
-          //   • element inside white-box pool → targetEl = that element
-          //   • black-box pool or pool-to-pool → targetEl = the pool itself
-          const tgtAttach = targetEl;
-          const tgtId     = targetEl.id;
-
           const srcCy = sourceEl ? sourceEl.y + sourceEl.height / 2 : 0;
-          const tgtCy = tgtAttach ? tgtAttach.y + tgtAttach.height / 2 : 0;
+          const tgtCy = targetEl.y + targetEl.height / 2;
           const msgSrcSide: Side = srcCy <= tgtCy ? "bottom" : "top";
           const msgTgtSide: Side = srcCy <= tgtCy ? "top"    : "bottom";
           onAddConnector(
-            elementId, tgtId,
+            elementId, targetEl.id,
             "messageBPMN", "directed", "direct",
             msgSrcSide, msgTgtSide
           );
         } else {
-          if (targetEl.type === "pool" || targetEl.type === "lane") return;
-          const targetSide = getClosestSide(pos, targetEl);
+          if (targetEl.type === "lane") return;  // pool already handled above
+          const targetOuterSide = getBoundaryEventOuterSide(targetEl, data.elements);
+          const targetSide = targetOuterSide ?? getClosestSide(pos, targetEl);
           let connType: ConnectorType;
           let connRouting: RoutingType;
           let connDirection: DirectionType;
@@ -359,7 +384,7 @@ export function Canvas({
           } else {
             connType = "sequence"; connRouting = defaultRoutingType; connDirection = defaultDirectionType;
           }
-          onAddConnector(elementId, targetEl.id, connType, connDirection, connRouting, side, targetSide);
+          onAddConnector(elementId, targetEl.id, connType, connDirection, connRouting, effectiveSide, targetSide);
         }
       }
       setDraggingConnector(null);
@@ -415,8 +440,11 @@ export function Canvas({
           // Block: non-associationBPMN connectors cannot connect to data elements
           if (!isAssocBPMN && DATA_ELEMENT_TYPES.has(targetEl.type)) {
             // silently abort
+          } else if (targetEl.type === "pool" && conn?.type !== "messageBPMN") {
+            // silently abort — only messageBPMN connectors may attach to a pool
           } else {
-            const newSide = getClosestSide(pos, targetEl);
+            const targetOuterSide = getBoundaryEventOuterSide(targetEl, data.elements);
+            const newSide = targetOuterSide ?? getClosestSide(pos, targetEl);
             onUpdateConnectorEndpoint(connectorId, endpoint, targetEl.id, newSide, 0.5);
           }
         }
