@@ -978,25 +978,44 @@ export function Canvas({
           })}
 
           {/* Boundary events — rendered on top of their hosts */}
-          {boundaryEvents.map((el) => (
-            <SymbolRenderer
-              key={el.id}
-              element={el}
-              selected={el.id === selectedElementId}
-              isDropTarget={false}
-              isDisallowedTarget={false}
-              isMessageBpmnTarget={false}
-              onSelect={() => { onSelectElement(el.id); onSelectConnector(null); }}
-              onMove={(x, y) => onMoveElement(el.id, x, y)}
-              onDoubleClick={() => startEditingLabel(el)}
-              onConnectionPointDragStart={(side, worldPos) =>
-                handleConnectionPointDragStart(el.id, side, worldPos)}
-              showConnectionPoints={el.id === selectedElementId || isDraggingConnector}
-              svgToWorld={clientToWorld}
-              onUpdateProperties={onUpdateProperties}
-              onUpdateLabel={onUpdateLabel}
-            />
-          ))}
+          {boundaryEvents.map((el) => {
+            let elIsDropTarget = false;
+            let elIsMsgTarget = false;
+            if (isDraggingConnector && el.id !== draggingConnector!.fromId) {
+              if (!isBpmnSource || !draggingSourcePoolId) {
+                elIsDropTarget = true;
+              } else {
+                const elPoolId = getElementPoolId(el, data.elements);
+                if (elPoolId === draggingSourcePoolId) {
+                  elIsDropTarget = true;
+                } else if (elPoolId && elPoolId !== draggingSourcePoolId && el.type === "intermediate-event") {
+                  const elPool = data.elements.find((p) => p.id === elPoolId);
+                  const elPoolIsWhiteBox =
+                    ((elPool?.properties.poolType as string | undefined) ?? "black-box") === "white-box";
+                  if (elPoolIsWhiteBox) elIsMsgTarget = true;
+                }
+              }
+            }
+            return (
+              <SymbolRenderer
+                key={el.id}
+                element={el}
+                selected={el.id === selectedElementId}
+                isDropTarget={elIsDropTarget}
+                isDisallowedTarget={false}
+                isMessageBpmnTarget={elIsMsgTarget}
+                onSelect={() => { onSelectElement(el.id); onSelectConnector(null); }}
+                onMove={(x, y) => onMoveElement(el.id, x, y)}
+                onDoubleClick={() => startEditingLabel(el)}
+                onConnectionPointDragStart={(side, worldPos) =>
+                  handleConnectionPointDragStart(el.id, side, worldPos)}
+                showConnectionPoints={el.id === selectedElementId || isDraggingConnector}
+                svgToWorld={clientToWorld}
+                onUpdateProperties={onUpdateProperties}
+                onUpdateLabel={onUpdateLabel}
+              />
+            );
+          })}
 
           {/* Association connectors — rendered above all elements */}
           {data.connectors.filter(c => c.type === "associationBPMN" || c.type === "messageBPMN").map((conn) => (

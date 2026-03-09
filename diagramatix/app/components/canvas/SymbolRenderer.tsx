@@ -618,7 +618,7 @@ function PoolShape({ el }: { el: DiagramElement }) {
       <rect x={x} y={y} width={w} height={h} fill="#f9fafb" stroke="#374151" strokeWidth={1.5} />
       <rect x={x} y={y} width={LW} height={h} fill="#c8956a" stroke="#374151" strokeWidth={1.5}
         style={isWhiteBox ? { cursor: "pointer" } : undefined} />
-      <text textAnchor="middle" fontSize={11} fill="#3b1a08" fontWeight="500"
+      <text textAnchor="middle" fontSize={11} fill="#3b1a08" fontWeight="bold"
             transform={`rotate(-90,${cx},${cy})`}
             style={{ userSelect: "none", pointerEvents: "none" }}>
         {lines.map((line, i) => (
@@ -640,7 +640,7 @@ function LaneShape({ el }: { el: DiagramElement }) {
     <g>
       <rect x={x} y={y} width={w} height={h} fill="none" stroke="#374151" strokeWidth={1} />
       <rect x={x} y={y} width={LW} height={h} fill="#e8c4a0" stroke="#374151" strokeWidth={1} />
-      <text textAnchor="middle" fontSize={10} fill="#3b1a08"
+      <text textAnchor="middle" fontSize={10} fill="#3b1a08" fontWeight="bold"
             transform={`rotate(-90,${cx},${cy})`}
             style={{ userSelect: "none", pointerEvents: "none" }}>
         {lines.map((line, i) => (
