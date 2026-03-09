@@ -720,10 +720,12 @@ export function Canvas({
   const lanes = data.elements.filter((el) => el.type === "lane");
   const otherContainers = data.elements.filter(
     (el) => el.type === "system-boundary" || el.type === "composite-state"
+         || el.type === "subprocess-expanded"
   );
   const nonContainers = data.elements.filter(
     (el) => el.type !== "system-boundary" && el.type !== "composite-state"
               && el.type !== "pool" && el.type !== "lane"
+              && el.type !== "subprocess-expanded"
               && !el.boundaryHostId
   );
   const boundaryEvents = data.elements.filter((el) => !!el.boundaryHostId);

@@ -381,11 +381,8 @@ function reducer(state: DiagramData, action: Action): DiagramData {
               isContainerType(b.type) &&
               containerAccepts(b.type, e.type) &&
               b.id !== id &&
-              (b.type === "subprocess-expanded"
-                ? x >= b.x && x + e.width <= b.x + b.width &&
-                  y >= b.y && y + e.height <= b.y + b.height
-                : (x + e.width / 2) >= b.x && (x + e.width / 2) <= b.x + b.width &&
-                  (y + e.height / 2) >= b.y && (y + e.height / 2) <= b.y + b.height)
+              (x + e.width / 2) >= b.x && (x + e.width / 2) <= b.x + b.width &&
+              (y + e.height / 2) >= b.y && (y + e.height / 2) <= b.y + b.height
           );
           if (potentialParent !== undefined || state.elements.some(b => isContainerType(b.type) && containerAccepts(b.type, e.type))) {
             parentId = potentialParent?.id;
