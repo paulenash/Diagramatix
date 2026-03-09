@@ -322,6 +322,7 @@ export function Canvas({
 
   function handleConnectionPointDragStart(elementId: string, side: Side, worldPos: Point) {
     const sourceEl = data.elements.find(e => e.id === elementId);
+    if (sourceEl?.type === "end-event") return;
     const outerSide = sourceEl ? getBoundaryEventOuterSide(sourceEl, data.elements) : null;
     const effectiveSide = outerSide ?? side;
     const effectiveWorldPos = (outerSide && sourceEl) ? sideMidpoint(sourceEl, outerSide) : worldPos;
@@ -1066,7 +1067,7 @@ export function Canvas({
                 onDoubleClick={() => {}}
                 onConnectionPointDragStart={(side, worldPos) =>
                   handleConnectionPointDragStart(el.id, side, worldPos)}
-                showConnectionPoints={el.id === selectedElementId || isDraggingConnector}
+                showConnectionPoints={(el.id === selectedElementId && el.type !== "end-event") || isDraggingConnector}
                 svgToWorld={clientToWorld}
                 onUpdateProperties={onUpdateProperties}
                 onUpdateLabel={onUpdateLabel}
