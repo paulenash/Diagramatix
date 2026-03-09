@@ -160,13 +160,14 @@ function EventMarker({ type, cx, cy, r, filled }: {
         </g>
       );
     case "error": {
+      // Asymmetric diagonal lightning bolt per bpmn-js EVENT_ERROR path proportions
       const pts = [
-        `${cx + s * 0.35},${cy - s * 0.85}`,  // top-right tip
-        `${cx - s * 0.1},${cy - s * 0.2}`,    // upper-left kink
-        `${cx + s * 0.25},${cy - s * 0.2}`,   // upper-right step
-        `${cx - s * 0.35},${cy + s * 0.85}`,  // bottom-left tip
-        `${cx + s * 0.1},${cy + s * 0.2}`,    // lower-right kink
-        `${cx - s * 0.25},${cy + s * 0.2}`,   // lower-left step
+        `${cx - s},${cy + s * 0.95}`,          // P0: bottom-left
+        `${cx - s * 0.25},${cy}`,              // P1: left kink
+        `${cx + s * 0.53},${cy + s * 0.89}`,   // P2: inner bottom-right
+        `${cx + s},${cy - s * 0.95}`,          // P3: top-right tip
+        `${cx + s * 0.40},${cy + s * 0.22}`,   // P4: inner right kink
+        `${cx - s * 0.33},${cy - s * 0.74}`,   // P5: upper-left inner
       ].join(" ");
       return (
         <polygon points={pts} fill={filled ? "#374151" : "white"}
@@ -298,17 +299,21 @@ function DataStoreShape({ el }: { el: DiagramElement }) {
   const cx = x + w / 2;
   const rx = w / 2;
   const ry = Math.max(4, Math.round(h * 0.15));
-  const ringGap = ry + 3;
+  const bodyTop = y + ry;
+  const bodyH = h - ry;
+  // bpmn-js proportions: rings at 7/45 and 14/45 of body height from top
+  const ring1Y = bodyTop + bodyH * (7 / 45);
+  const ring2Y = bodyTop + bodyH * (14 / 45);
   // Front arc (bottom half of ellipse): clockwise from left to right, sweep=1
   const frontArc = (cy: number) =>
     `M ${x} ${cy} A ${rx} ${ry} 0 0 1 ${x + w} ${cy}`;
   return (
     <g>
-      <rect x={x} y={y + ry} width={w} height={h - ry} fill="#60a5fa" stroke="#374151" strokeWidth={1.5} />
-      <ellipse cx={cx} cy={y + ry} rx={rx} ry={ry} fill="#60a5fa" stroke="#374151" strokeWidth={1.5} />
-      <path d={frontArc(y + ry + ringGap)}     fill="none" stroke="#374151" strokeWidth={1.5} />
-      <path d={frontArc(y + ry + ringGap * 2)} fill="none" stroke="#374151" strokeWidth={1.5} />
-      <path d={frontArc(y + h)}               fill="none" stroke="#374151" strokeWidth={1.5} />
+      <rect x={x} y={bodyTop} width={w} height={bodyH} fill="white" stroke="#374151" strokeWidth={1.5} />
+      <ellipse cx={cx} cy={bodyTop} rx={rx} ry={ry} fill="white" stroke="#374151" strokeWidth={1.5} />
+      <path d={frontArc(ring1Y)} fill="none" stroke="#374151" strokeWidth={1.5} />
+      <path d={frontArc(ring2Y)} fill="none" stroke="#374151" strokeWidth={1.5} />
+      <path d={frontArc(y + h)}  fill="none" stroke="#374151" strokeWidth={1.5} />
     </g>
   );
 }
