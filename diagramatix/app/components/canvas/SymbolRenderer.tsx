@@ -1095,7 +1095,28 @@ export function SymbolRenderer({
           e.stopPropagation();
           const worldPt = svgToWorld ? svgToWorld(e.clientX, e.clientY) : { x: cx, y: cy };
           const side = getClosestSideFromPoint(worldPt, element);
-          onConnectionPointDragStart(side, { x: cx, y: cy });
+          const centerPos = { x: cx, y: cy };
+
+          let fired = false;
+          function activate() {
+            if (fired) return;
+            fired = true;
+            clearTimeout(holdTimer);
+            window.removeEventListener("mouseup", onUp);
+            window.removeEventListener("mousemove", onMove);
+            onConnectionPointDragStart(side, centerPos);
+          }
+          const holdTimer = setTimeout(activate, 300);
+          function onMove(ev: MouseEvent) {
+            if (Math.abs(ev.clientX - e.clientX) > 5 || Math.abs(ev.clientY - e.clientY) > 5) activate();
+          }
+          function onUp() {
+            clearTimeout(holdTimer);
+            window.removeEventListener("mouseup", onUp);
+            window.removeEventListener("mousemove", onMove);
+          }
+          window.addEventListener("mouseup", onUp);
+          window.addEventListener("mousemove", onMove);
         };
         return (
           <polygon
@@ -1118,10 +1139,28 @@ export function SymbolRenderer({
               ? svgToWorld(e.clientX, e.clientY)
               : { x: element.x + element.width / 2, y: element.y + element.height / 2 };
             const side = getClosestSideFromPoint(worldPt, element);
-            onConnectionPointDragStart(side, {
-              x: element.x + element.width / 2,
-              y: element.y + element.height / 2,
-            });
+            const centerPos = { x: element.x + element.width / 2, y: element.y + element.height / 2 };
+
+            let fired = false;
+            function activate() {
+              if (fired) return;
+              fired = true;
+              clearTimeout(holdTimer);
+              window.removeEventListener("mouseup", onUp);
+              window.removeEventListener("mousemove", onMove);
+              onConnectionPointDragStart(side, centerPos);
+            }
+            const holdTimer = setTimeout(activate, 300);
+            function onMove(ev: MouseEvent) {
+              if (Math.abs(ev.clientX - e.clientX) > 5 || Math.abs(ev.clientY - e.clientY) > 5) activate();
+            }
+            function onUp() {
+              clearTimeout(holdTimer);
+              window.removeEventListener("mouseup", onUp);
+              window.removeEventListener("mousemove", onMove);
+            }
+            window.addEventListener("mouseup", onUp);
+            window.addEventListener("mousemove", onMove);
           }}
         />
       )}
