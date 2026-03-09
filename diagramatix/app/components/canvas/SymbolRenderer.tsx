@@ -303,8 +303,8 @@ function DataStoreShape({ el }: { el: DiagramElement }) {
   const cy2 = cy1 + ellipseSep;
   const cy3 = cy2 + ellipseSep;
   const cyBot = y + h - ry;
-  const bottomHalf = (cy: number) => `M ${x} ${cy} A ${rx} ${ry} 0 0 1 ${x + w} ${cy}`;
-  const bodyPath = `M ${x} ${cy1} L ${x} ${cyBot} A ${rx} ${ry} 0 0 1 ${x + w} ${cyBot} L ${x + w} ${cy1}`;
+  const bottomHalf = (cy: number) => `M ${x} ${cy} A ${rx} ${ry} 0 0 0 ${x + w} ${cy}`;
+  const bodyPath = `M ${x} ${cy1} L ${x} ${cyBot} A ${rx} ${ry} 0 0 0 ${x + w} ${cyBot} L ${x + w} ${cy1}`;
   return (
     <g>
       <path d={bodyPath} fill="#60a5fa" stroke="#374151" strokeWidth={1.5} />
