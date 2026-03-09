@@ -346,12 +346,18 @@ export function recomputeAllConnectors(
     // messageBPMN: always vertical, x derived from sourceOffsetAlong (fraction of source width)
     if (conn.type === "messageBPMN") {
       const BPMN_EVENT_TYPES = new Set(["start-event", "intermediate-event", "end-event"]);
-      const rawOffset = conn.sourceOffsetAlong ?? 0.5;
-      const offsetAlong = BPMN_EVENT_TYPES.has(source.type) ? 0.5 : rawOffset;
-      const srcX = source.x + source.width * offsetAlong;
-      const minX = Math.max(source.x, target.x);
-      const maxX = Math.min(source.x + source.width, target.x + target.width);
-      const x = maxX > minX ? Math.max(minX, Math.min(maxX, srcX)) : srcX;
+      const tgtIsEvent = target.type === "start-event" || target.type === "intermediate-event";
+      let x: number;
+      if (tgtIsEvent) {
+        x = target.x + target.width / 2;
+      } else {
+        const rawOffset = conn.sourceOffsetAlong ?? 0.5;
+        const offsetAlong = BPMN_EVENT_TYPES.has(source.type) ? 0.5 : rawOffset;
+        const srcX = source.x + source.width * offsetAlong;
+        const minX = Math.max(source.x, target.x);
+        const maxX = Math.min(source.x + source.width, target.x + target.width);
+        x = maxX > minX ? Math.max(minX, Math.min(maxX, srcX)) : srcX;
+      }
       const srcEdge: Point = conn.sourceSide === "bottom"
         ? { x, y: source.y + source.height } : { x, y: source.y };
       const tgtEdge: Point = conn.targetSide === "top"

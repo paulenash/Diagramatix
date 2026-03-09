@@ -51,11 +51,17 @@ function messageBpmnWaypoints(
   source: DiagramElement, target: DiagramElement,
   sourceSide: Side, targetSide: Side, offsetAlong: number
 ): { waypoints: Point[]; sourceInvisibleLeader: true; targetInvisibleLeader: true } {
-  const effectiveAlong = BPMN_EVENT_TYPES.has(source.type) ? 0.5 : offsetAlong;
-  const srcX = source.x + source.width * effectiveAlong;
-  const minX = Math.max(source.x, target.x);
-  const maxX = Math.min(source.x + source.width, target.x + target.width);
-  const x = maxX > minX ? Math.max(minX, Math.min(maxX, srcX)) : srcX;
+  const tgtIsEvent = target.type === "start-event" || target.type === "intermediate-event";
+  let x: number;
+  if (tgtIsEvent) {
+    x = target.x + target.width / 2;
+  } else {
+    const effectiveAlong = BPMN_EVENT_TYPES.has(source.type) ? 0.5 : offsetAlong;
+    const srcX = source.x + source.width * effectiveAlong;
+    const minX = Math.max(source.x, target.x);
+    const maxX = Math.min(source.x + source.width, target.x + target.width);
+    x = maxX > minX ? Math.max(minX, Math.min(maxX, srcX)) : srcX;
+  }
   const srcEdge: Point = sourceSide === "bottom"
     ? { x, y: source.y + source.height } : { x, y: source.y };
   const tgtEdge: Point = targetSide === "top"
