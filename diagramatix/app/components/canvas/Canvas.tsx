@@ -401,6 +401,8 @@ export function Canvas({
 
         // Rule 4: Child of subprocess cannot connect to its own parent subprocess
         if (sourceEl?.parentId && targetEl.id === sourceEl.parentId && targetEl.type === "subprocess-expanded") return;
+        // Rule 4b: Child state cannot connect to its own parent composite-state
+        if (sourceEl?.parentId && targetEl.id === sourceEl.parentId && targetEl.type === "composite-state") return;
 
         if (isCrossPool || involvesPool) {
           // Start events cannot send messageBPMN
@@ -952,6 +954,12 @@ export function Canvas({
             const isSubExpAssocTarget = isDraggingConnector && draggingSourceIsData &&
               el.type === "subprocess-expanded" &&
               el.id !== draggingConnector!.fromId;
+            const isCompositeDropTarget =
+              isDraggingConnector &&
+              !draggingSourceIsData &&
+              el.type === "composite-state" &&
+              el.id !== draggingConnector!.fromId &&
+              draggingSourceEl?.parentId !== el.id; // source must be outside this composite-state
             // Orange border when element is being dragged into this subprocess-expanded
             const draggingEl = draggingElementId ? data.elements.find(e => e.id === draggingElementId) : null;
             const isElementDragTarget = el.type === "subprocess-expanded" &&
@@ -965,7 +973,7 @@ export function Canvas({
                 key={el.id}
                 element={el}
                 selected={el.id === selectedElementId}
-                isDropTarget={isSubExpDropTarget}
+                isDropTarget={isSubExpDropTarget || isCompositeDropTarget}
                 isDisallowedTarget={false}
                 isMessageBpmnTarget={isMsgTarget}
                 isAssocBpmnTarget={isSubExpAssocTarget}
