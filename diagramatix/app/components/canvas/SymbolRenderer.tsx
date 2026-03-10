@@ -307,12 +307,25 @@ function DataStoreShape({ el }: { el: DiagramElement }) {
   const cyBot = y + h - ry;
   const bottomHalf = (cy: number) => `M ${x} ${cy} A ${rx} ${ry} 0 0 0 ${x + w} ${cy}`;
   const bodyPath = `M ${x} ${cy1} L ${x} ${cyBot} A ${rx} ${ry} 0 0 0 ${x + w} ${cyBot} L ${x + w} ${cy1}`;
+  const multiplicity = (el.properties.multiplicity as string | undefined) ?? "single";
+  const mLineH   = Math.round(h * 0.14);
+  const mLineGap = 3;
+  const mcx      = x + w / 2;
+  const mly2     = y + h - 3;
+  const mly1     = mly2 - mLineH;
   return (
     <g>
       <path d={bodyPath} fill="#60a5fa" stroke="#374151" strokeWidth={1.5} />
       <ellipse cx={x + rx} cy={cy1} rx={rx} ry={ry} fill="#60a5fa" stroke="#374151" strokeWidth={1.5} />
       <path d={bottomHalf(cy2)} fill="none" stroke="#374151" strokeWidth={1.5} />
       <path d={bottomHalf(cy3)} fill="none" stroke="#374151" strokeWidth={1.5} />
+      {multiplicity === "collection" && (
+        <g stroke="#374151" strokeWidth={1.5}>
+          <line x1={mcx - mLineGap} y1={mly1} x2={mcx - mLineGap} y2={mly2} />
+          <line x1={mcx}            y1={mly1} x2={mcx}            y2={mly2} />
+          <line x1={mcx + mLineGap} y1={mly1} x2={mcx + mLineGap} y2={mly2} />
+        </g>
+      )}
     </g>
   );
 }
@@ -615,6 +628,12 @@ function PoolShape({ el }: { el: DiagramElement }) {
   const lines = el.label.split('\n');
   const lineH = 13;
   const isWhiteBox = ((el.properties.poolType as string | undefined) ?? "black-box") === "white-box";
+  const multiplicity = (el.properties.multiplicity as string | undefined) ?? "single";
+  const mLineH   = 18;
+  const mLineGap = 6;
+  const mcx      = x + LW + (w - LW) / 2;
+  const mly2     = y + h - 3;
+  const mly1     = mly2 - mLineH;
   return (
     <g>
       <rect x={x} y={y} width={w} height={h} fill="#f9fafb" stroke="#374151" strokeWidth={1.5} />
@@ -627,6 +646,13 @@ function PoolShape({ el }: { el: DiagramElement }) {
           <tspan key={i} x={cx} y={cy + (i - (lines.length - 1) / 2) * lineH}>{line}</tspan>
         ))}
       </text>
+      {multiplicity === "collection" && (
+        <g stroke="#374151" strokeWidth={1.5}>
+          <line x1={mcx - mLineGap} y1={mly1} x2={mcx - mLineGap} y2={mly2} />
+          <line x1={mcx}            y1={mly1} x2={mcx}            y2={mly2} />
+          <line x1={mcx + mLineGap} y1={mly1} x2={mcx + mLineGap} y2={mly2} />
+        </g>
+      )}
     </g>
   );
 }

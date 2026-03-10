@@ -268,37 +268,41 @@ export function PropertiesPanel({
         </>
       )}
 
-      {element.type === "data-object" && (
+      {(element.type === "data-object" || element.type === "pool" || element.type === "data-store") && (
         <>
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">State</label>
-            <input
-              type="text"
-              className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
-              placeholder="optional"
-              value={(element.properties.state as string) ?? ""}
-              onChange={(e) => onUpdateProperties(element.id, { state: e.target.value })}
-            />
-          </div>
+          {element.type === "data-object" && (
+            <>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">State</label>
+                <input
+                  type="text"
+                  className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  placeholder="optional"
+                  value={(element.properties.state as string) ?? ""}
+                  onChange={(e) => onUpdateProperties(element.id, { state: e.target.value })}
+                />
+              </div>
 
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Role</label>
-            <div className="flex flex-wrap gap-1">
-              {(["none", "input", "output"] as const).map((v) => (
-                <button
-                  key={v}
-                  onClick={() => onUpdateProperties(element.id, { role: v })}
-                  className={`px-2 py-1 text-xs rounded border ${
-                    ((element.properties.role as string | undefined) ?? "none") === v
-                      ? "bg-blue-600 text-white border-blue-600"
-                      : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                  }`}
-                >
-                  {v === "none" ? "None" : v === "input" ? "Input" : "Output"}
-                </button>
-              ))}
-            </div>
-          </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Role</label>
+                <div className="flex flex-wrap gap-1">
+                  {(["none", "input", "output"] as const).map((v) => (
+                    <button
+                      key={v}
+                      onClick={() => onUpdateProperties(element.id, { role: v })}
+                      className={`px-2 py-1 text-xs rounded border ${
+                        ((element.properties.role as string | undefined) ?? "none") === v
+                          ? "bg-blue-600 text-white border-blue-600"
+                          : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                      }`}
+                    >
+                      {v === "none" ? "None" : v === "input" ? "Input" : "Output"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
 
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">Multiplicity</label>
