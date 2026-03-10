@@ -12,7 +12,7 @@ export const ALL_SYMBOLS: SymbolDefinition[] = [
   {
     type: "task",
     label: "Task",
-    defaultWidth: 120,
+    defaultWidth: 102,
     defaultHeight: 60,
     description: "A work item or activity",
   },
@@ -110,15 +110,15 @@ export const ALL_SYMBOLS: SymbolDefinition[] = [
   {
     type: "subprocess",
     label: "Subprocess",
-    defaultWidth: 120,
-    defaultHeight: 80,
+    defaultWidth: 108,
+    defaultHeight: 72,
     description: "A collapsed subprocess activity",
   },
   {
     type: "subprocess-expanded",
     label: "Expanded Sub",
     defaultWidth: 180,
-    defaultHeight: 120,
+    defaultHeight: 108,
     description: "An expanded subprocess activity",
   },
   {
