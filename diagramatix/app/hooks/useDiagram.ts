@@ -3,6 +3,7 @@
 import { useCallback, useReducer, useRef, useState } from "react";
 import type {
   BpmnTaskType,
+  FlowType,
   GatewayType,
   EventType,
   RepeatType,
@@ -469,13 +470,14 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         ...state,
         elements: state.elements.map((el) => {
           if (el.id !== action.payload.id) return el;
-          const { taskType, gatewayType, eventType, repeatType, ...rest } = action.payload.properties;
+          const { taskType, gatewayType, eventType, repeatType, flowType, ...rest } = action.payload.properties;
           return {
             ...el,
             ...(taskType !== undefined ? { taskType: taskType as BpmnTaskType } : {}),
             ...(gatewayType !== undefined ? { gatewayType: gatewayType as GatewayType } : {}),
             ...(eventType !== undefined ? { eventType: eventType as EventType } : {}),
             ...(repeatType !== undefined ? { repeatType: repeatType as RepeatType } : {}),
+            ...(flowType !== undefined ? { flowType: flowType as FlowType } : {}),
             properties: { ...el.properties, ...rest },
           };
         }),
@@ -573,13 +575,13 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         if (isMsgBpmn) {
           if (el.id === sourceId) {
             if (el.type === "task")               return { ...el, taskType: "send" as BpmnTaskType };
-            if (el.type === "end-event")          return { ...el, eventType: "message" as EventType };
-            if (el.type === "intermediate-event") return { ...el, eventType: "message" as EventType, taskType: "send" as BpmnTaskType };
+            if (el.type === "end-event")          return { ...el, eventType: "message" as EventType, flowType: "throwing" as FlowType };
+            if (el.type === "intermediate-event") return { ...el, eventType: "message" as EventType, taskType: "send" as BpmnTaskType, flowType: "throwing" as FlowType };
           }
           if (el.id === targetId) {
             if (el.type === "task")               return { ...el, taskType: "receive" as BpmnTaskType };
-            if (el.type === "start-event")        return { ...el, eventType: "message" as EventType };
-            if (el.type === "intermediate-event") return { ...el, eventType: "message" as EventType };
+            if (el.type === "start-event")        return { ...el, eventType: "message" as EventType, flowType: "catching" as FlowType };
+            if (el.type === "intermediate-event") return { ...el, eventType: "message" as EventType, flowType: "catching" as FlowType };
           }
         } else if (isSeq) {
           // Start events cannot be sequence targets → convert to intermediate (unless boundary-mounted)
@@ -593,13 +595,35 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       return { ...state, elements: updatedElements, connectors: [...state.connectors, newConnector] };
     }
 
-    case "DELETE_CONNECTOR":
-      return {
-        ...state,
-        connectors: state.connectors.filter(
-          (c) => c.id !== action.payload.id
-        ),
-      };
+    case "DELETE_CONNECTOR": {
+      const conn = state.connectors.find((c) => c.id === action.payload.id);
+      const updatedConnectors = state.connectors.filter((c) => c.id !== action.payload.id);
+
+      if (conn?.type === "messageBPMN") {
+        // Count remaining messageBPMN connections for source and target after removal
+        const remainingForSource = updatedConnectors.filter(
+          (c) => c.type === "messageBPMN" && (c.sourceId === conn.sourceId || c.targetId === conn.sourceId)
+        ).length;
+        const remainingForTarget = updatedConnectors.filter(
+          (c) => c.type === "messageBPMN" && (c.sourceId === conn.targetId || c.targetId === conn.targetId)
+        ).length;
+
+        const updatedElements = state.elements.map((el) => {
+          if (!BPMN_EVENT_TYPES.has(el.type)) return el;
+          if (el.id === conn.sourceId && remainingForSource === 0) {
+            return { ...el, flowType: "none" as FlowType, eventType: "none" as EventType };
+          }
+          if (el.id === conn.targetId && remainingForTarget === 0) {
+            return { ...el, flowType: "none" as FlowType, eventType: "none" as EventType };
+          }
+          return el;
+        });
+
+        return { ...state, elements: updatedElements, connectors: updatedConnectors };
+      }
+
+      return { ...state, connectors: updatedConnectors };
+    }
 
     case "UPDATE_CONNECTOR":
       return {

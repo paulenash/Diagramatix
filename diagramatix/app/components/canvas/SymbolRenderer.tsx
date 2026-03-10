@@ -234,7 +234,7 @@ function IntermediateEventShape({ el }: { el: DiagramElement }) {
       <circle cx={cx} cy={cy} r={r} fill="#fed7aa" stroke="#374151" strokeWidth={2} />
       <circle cx={cx} cy={cy} r={r - 3} fill="#fed7aa" stroke="#374151" strokeWidth={1.5} />
       {el.eventType && el.eventType !== "none" &&
-        <EventMarker type={el.eventType} cx={cx} cy={cy} r={r - 4} filled={el.taskType === "send"} />}
+        <EventMarker type={el.eventType} cx={cx} cy={cy} r={r - 4} filled={el.flowType === "throwing" || (el.flowType == null && el.taskType === "send")} />}
     </g>
   );
 }

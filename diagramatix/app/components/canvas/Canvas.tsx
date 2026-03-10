@@ -817,11 +817,11 @@ export function Canvas({
   const draggingFromEdgeMountedIntermediateSendEvent =
     draggingSourceEl?.type === "intermediate-event" &&
     !!draggingSourceEl.boundaryHostId &&
-    draggingSourceEl.taskType === "send";
+    (draggingSourceEl.flowType === "throwing" || (draggingSourceEl.flowType == null && draggingSourceEl.taskType === "send"));
   const draggingFromEdgeMountedIntermediateReceiveEvent =
     draggingSourceEl?.type === "intermediate-event" &&
     !!draggingSourceEl.boundaryHostId &&
-    draggingSourceEl.taskType !== "send";
+    draggingSourceEl.flowType === "catching";
   const draggingFromEdgeMountedIntermediateEvent =
     draggingFromEdgeMountedIntermediateSendEvent || draggingFromEdgeMountedIntermediateReceiveEvent;
   const draggingSourceBoundaryHostId = draggingSourceEl?.boundaryHostId ?? null;

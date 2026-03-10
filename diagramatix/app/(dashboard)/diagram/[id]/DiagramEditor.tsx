@@ -159,6 +159,15 @@ export function DiagramEditor({
     ? data.elements.some((e) => e.parentId === selectedElement.id)
     : false;
 
+  const EVENT_TYPES_SET = new Set(["start-event", "intermediate-event", "end-event"]);
+  const hasMessageBpmnConnection =
+    selectedElement !== null &&
+    EVENT_TYPES_SET.has(selectedElement.type) &&
+    data.connectors.some(
+      (c) => c.type === "messageBPMN" &&
+        (c.sourceId === selectedElement.id || c.targetId === selectedElement.id)
+    );
+
   const hasSystemBoundary = data.elements.some((e) => e.type === "system-boundary");
   const disabledSymbols: SymbolType[] = hasSystemBoundary ? ["system-boundary"] : [];
 
@@ -313,6 +322,7 @@ export function DiagramEditor({
           onAddLane={addLane}
           poolHasContent={poolHasContent}
           laneHasContent={laneHasContent}
+          hasMessageBpmnConnection={hasMessageBpmnConnection}
         />
       </div>
     </div>

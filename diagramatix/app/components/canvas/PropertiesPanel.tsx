@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import type {
   BpmnTaskType,
+  FlowType,
   GatewayType,
   EventType,
   Connector,
@@ -24,6 +25,7 @@ interface Props {
   onAddLane?: (poolId: string) => void;
   poolHasContent?: boolean;
   laneHasContent?: boolean;
+  hasMessageBpmnConnection?: boolean;
 }
 
 const TASK_TYPE_OPTIONS: { value: BpmnTaskType; label: string }[] = [
@@ -42,6 +44,12 @@ const GATEWAY_TYPE_OPTIONS: { value: GatewayType; label: string }[] = [
   { value: "inclusive",   label: "Inclusive ○" },
   { value: "parallel",    label: "Parallel +" },
   { value: "event-based", label: "Event-based ⬠" },
+];
+
+const FLOW_TYPE_OPTIONS: { value: FlowType; label: string }[] = [
+  { value: "none",     label: "None" },
+  { value: "catching", label: "Catching" },
+  { value: "throwing", label: "Throwing" },
 ];
 
 const EVENT_TYPE_OPTIONS: { value: EventType; label: string }[] = [
@@ -67,6 +75,7 @@ export function PropertiesPanel({
   onAddLane,
   poolHasContent,
   laneHasContent,
+  hasMessageBpmnConnection,
 }: Props) {
   const [labelDraft, setLabelDraft] = useState("");
 
@@ -394,6 +403,33 @@ export function PropertiesPanel({
                   {label}
                 </button>
               ))}
+          </div>
+        </div>
+      )}
+
+      {isEventElement && (
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1">Flow Type</label>
+          {hasMessageBpmnConnection && (
+            <p className="text-xs text-gray-400 mb-1">Cannot change while messageBPMN connections exist</p>
+          )}
+          <div className="flex flex-col gap-1">
+            {FLOW_TYPE_OPTIONS.map(({ value, label }) => (
+              <button
+                key={value}
+                disabled={hasMessageBpmnConnection}
+                onClick={() => { if (!hasMessageBpmnConnection) onUpdateProperties(element.id, { flowType: value }); }}
+                className={`px-2 py-1 text-xs rounded border text-left ${
+                  (element.flowType ?? "none") === value
+                    ? "bg-blue-600 text-white border-blue-600"
+                    : hasMessageBpmnConnection
+                    ? "bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed"
+                    : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
           </div>
         </div>
       )}

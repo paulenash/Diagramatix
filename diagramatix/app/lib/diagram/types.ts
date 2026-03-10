@@ -40,6 +40,8 @@ export type EventType =
 
 export type RepeatType = "none" | "loop";
 
+export type FlowType = "none" | "catching" | "throwing";
+
 export type ConnectorType = "sequence" | "message" | "association" | "transition" | "associationBPMN" | "messageBPMN";
 
 export type Side = "top" | "right" | "bottom" | "left";
@@ -75,6 +77,7 @@ export interface DiagramElement {
   gatewayType?: GatewayType;
   eventType?: EventType;
   repeatType?: RepeatType;
+  flowType?: FlowType;
 }
 
 export interface Connector {
