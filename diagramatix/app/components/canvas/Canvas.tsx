@@ -172,6 +172,7 @@ interface Props {
   onResizeElementEnd?: (id: string) => void;
   onLaneBoundaryMoveEnd?: () => void;
   onConnectorWaypointDragEnd?: (id: string) => void;
+  onUpdateCurveHandles?: (id: string, waypoints: Point[], cp1Rel: Point, cp2Rel: Point) => void;
 }
 
 interface EditingLabel {
@@ -284,6 +285,7 @@ export function Canvas({
   onResizeElementEnd,
   onLaneBoundaryMoveEnd,
   onConnectorWaypointDragEnd,
+  onUpdateCurveHandles,
 }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
 
@@ -1058,6 +1060,7 @@ export function Canvas({
               onUpdateLabel={onUpdateConnectorLabel
                 ? (label, ox, oy, w) => onUpdateConnectorLabel(conn.id, label, ox, oy, w)
                 : undefined}
+              onUpdateCurveHandles={onUpdateCurveHandles}
             />
           ))}
 
@@ -1284,6 +1287,7 @@ export function Canvas({
               onUpdateLabel={onUpdateConnectorLabel
                 ? (label, ox, oy, w) => onUpdateConnectorLabel(conn.id, label, ox, oy, w)
                 : undefined}
+              onUpdateCurveHandles={onUpdateCurveHandles}
             />
           ))}
 

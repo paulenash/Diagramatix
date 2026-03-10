@@ -373,6 +373,17 @@ export function recomputeAllConnectors(
         sourceInvisibleLeader: true, targetInvisibleLeader: true };
     }
 
+    // Curvilinear: if the user has adjusted handles, preserve control points relative to edges
+    if (conn.routingType === "curvilinear" && conn.cp1RelOffset && conn.cp2RelOffset) {
+      const srcEdge = sidePoint(source, conn.sourceSide, conn.sourceOffsetAlong ?? 0.5);
+      const tgtEdge = sidePoint(target, conn.targetSide, conn.targetOffsetAlong ?? 0.5);
+      const startPt = { x: source.x + source.width / 2, y: source.y + source.height / 2 };
+      const endPt   = { x: target.x + target.width / 2, y: target.y + target.height / 2 };
+      const cp1 = { x: srcEdge.x + conn.cp1RelOffset.x, y: srcEdge.y + conn.cp1RelOffset.y };
+      const cp2 = { x: tgtEdge.x + conn.cp2RelOffset.x, y: tgtEdge.y + conn.cp2RelOffset.y };
+      return { ...conn, waypoints: [startPt, srcEdge, cp1, cp2, tgtEdge, endPt] };
+    }
+
     // For rectilinear connectors with enough waypoints, preserve user's interior routing.
     // Only the 6 boundary waypoints (srcCenter, srcEdge, exitPt, approachPt, tgtEdge, tgtCenter)
     // are updated; interior turns (indices 3..N-4) are kept as-is.

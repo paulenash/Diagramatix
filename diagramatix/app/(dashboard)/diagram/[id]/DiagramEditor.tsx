@@ -101,6 +101,7 @@ export function DiagramEditor({
     updateConnectorDirection,
     updateConnectorEndpoint,
     updateConnectorWaypoints,
+    updateCurveHandles,
     connectorWaypointDragEnd,
     updateConnectorLabel,
     elementMoveEnd,
@@ -301,6 +302,7 @@ export function DiagramEditor({
           onResizeElementEnd={resizeElementEnd}
           onLaneBoundaryMoveEnd={laneBoundaryMoveEnd}
           onConnectorWaypointDragEnd={connectorWaypointDragEnd}
+          onUpdateCurveHandles={updateCurveHandles}
         />
 
         <PropertiesPanel

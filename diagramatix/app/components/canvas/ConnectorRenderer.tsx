@@ -12,7 +12,17 @@ interface Props {
   onUpdateWaypoints?: (id: string, waypoints: Point[]) => void;
   onWaypointsDragEnd?: () => void;
   onUpdateLabel?: (label: string, offsetX: number, offsetY: number, width: number) => void;
+  onUpdateCurveHandles?: (id: string, waypoints: Point[], cp1Rel: Point, cp2Rel: Point) => void;
   misaligned?: boolean;
+}
+
+function inverseBezierCPs(P0: Point, P3: Point, Q1: Point, Q2: Point): [Point, Point] {
+  const A = { x: Q1.x - (8/27)*P0.x - (1/27)*P3.x, y: Q1.y - (8/27)*P0.y - (1/27)*P3.y };
+  const B = { x: Q2.x - (1/27)*P0.x - (8/27)*P3.x, y: Q2.y - (1/27)*P0.y - (8/27)*P3.y };
+  return [
+    { x: 3*A.x - 1.5*B.x, y: 3*A.y - 1.5*B.y },
+    { x: 3*B.x - 1.5*A.x, y: 3*B.y - 1.5*A.y },
+  ];
 }
 
 function wrapText(text: string, maxWidth: number, fontSize = 10): string[] {
@@ -293,7 +303,7 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
   );
 }
 
-export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, onUpdateWaypoints, onWaypointsDragEnd, onUpdateLabel, misaligned }: Props) {
+export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, onUpdateWaypoints, onWaypointsDragEnd, onUpdateLabel, onUpdateCurveHandles, misaligned }: Props) {
   const waypoints = connector.waypoints;
   if (waypoints.length === 0) return null;
 
@@ -469,6 +479,60 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
           onUpdateLabel={onUpdateLabel}
         />
       )}
+
+      {/* Curvature handles for selected transition connectors (state machine) */}
+      {selected && connector.type === "transition" && connector.routingType === "curvilinear"
+       && visibleWaypoints.length === 4 && onUpdateCurveHandles && svgToWorld && (() => {
+        const [P0, P1, P2, P3] = visibleWaypoints;
+        const srcEdge = waypoints[1];
+        const tgtEdge = waypoints[waypoints.length - 2];
+        const H1 = cubicBezierPoint(P0, P1, P2, P3, 1/3);
+        const H2 = cubicBezierPoint(P0, P1, P2, P3, 2/3);
+
+        const makeHandleDrag = (whichHandle: 1 | 2) => (e: React.MouseEvent) => {
+          e.stopPropagation();
+          const currentH1 = H1;
+          const currentH2 = H2;
+          function onMove(me: MouseEvent) {
+            const cur = svgToWorld!(me.clientX, me.clientY);
+            const Q1 = whichHandle === 1 ? cur : currentH1;
+            const Q2 = whichHandle === 2 ? cur : currentH2;
+            const [newP1, newP2] = inverseBezierCPs(P0, P3, Q1, Q2);
+            const newWaypoints = [
+              waypoints[0], srcEdge, newP1, newP2, tgtEdge, waypoints[waypoints.length - 1],
+            ];
+            onUpdateCurveHandles!(
+              connector.id,
+              newWaypoints,
+              { x: newP1.x - srcEdge.x, y: newP1.y - srcEdge.y },
+              { x: newP2.x - tgtEdge.x, y: newP2.y - tgtEdge.y },
+            );
+          }
+          function onUp() {
+            window.removeEventListener("mousemove", onMove);
+            window.removeEventListener("mouseup", onUp);
+          }
+          window.addEventListener("mousemove", onMove);
+          window.addEventListener("mouseup", onUp);
+        };
+
+        return (
+          <g key="curve-handles">
+            <line x1={P0.x} y1={P0.y} x2={H1.x} y2={H1.y}
+              stroke="#93c5fd" strokeWidth={1} strokeDasharray="3 2" pointerEvents="none" />
+            <line x1={P3.x} y1={P3.y} x2={H2.x} y2={H2.y}
+              stroke="#93c5fd" strokeWidth={1} strokeDasharray="3 2" pointerEvents="none" />
+            <circle cx={H1.x} cy={H1.y} r={6}
+              fill="white" stroke="#2563eb" strokeWidth={1.5}
+              style={{ cursor: "grab" }}
+              onMouseDown={makeHandleDrag(1)} />
+            <circle cx={H2.x} cy={H2.y} r={6}
+              fill="white" stroke="#2563eb" strokeWidth={1.5}
+              style={{ cursor: "grab" }}
+              onMouseDown={makeHandleDrag(2)} />
+          </g>
+        );
+      })()}
 
       {/* Segment drag handles (rectilinear, selected, interior segments only) */}
       {selected && draggableSegments.map((segIdx) => {

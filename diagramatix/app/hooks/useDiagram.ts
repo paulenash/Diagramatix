@@ -121,6 +121,12 @@ type Action =
     }}
   | { type: "UPDATE_CONNECTOR"; payload: { id: string; directionType: DirectionType } }
   | { type: "UPDATE_CONNECTOR_WAYPOINTS"; payload: { id: string; waypoints: Point[] } }
+  | { type: "UPDATE_CURVE_HANDLES"; payload: {
+      id: string;
+      waypoints: Point[];
+      cp1RelOffset: Point;
+      cp2RelOffset: Point;
+    }}
   | { type: "UPDATE_CONNECTOR_LABEL"; payload: { id: string; label?: string; labelOffsetX?: number; labelOffsetY?: number; labelWidth?: number } }
   | { type: "CORRECT_ALL_CONNECTORS" }
   | { type: "SET_VIEWPORT"; payload: { x: number; y: number; zoom: number } }
@@ -702,6 +708,20 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         ),
       };
 
+    case "UPDATE_CURVE_HANDLES":
+      return {
+        ...state,
+        connectors: state.connectors.map((c) =>
+          c.id === action.payload.id
+            ? { ...c,
+                waypoints:    action.payload.waypoints,
+                cp1RelOffset: action.payload.cp1RelOffset,
+                cp2RelOffset: action.payload.cp2RelOffset,
+              }
+            : c
+        ),
+      };
+
     case "UPDATE_CONNECTOR_LABEL":
       return {
         ...state,
@@ -1022,6 +1042,16 @@ export function useDiagram(initialData: DiagramData) {
     dispatch({ type: "UPDATE_CONNECTOR_WAYPOINTS", payload: { id, waypoints } });
   }, []);
 
+  const updateCurveHandles = useCallback((
+    id: string, waypoints: Point[], cp1RelOffset: Point, cp2RelOffset: Point
+  ) => {
+    if (waypointConnIdRef.current !== id) {
+      waypointConnIdRef.current = id;
+      preWaypointRef.current = snapshotData();
+    }
+    dispatch({ type: "UPDATE_CURVE_HANDLES", payload: { id, waypoints, cp1RelOffset, cp2RelOffset } });
+  }, []);
+
   const connectorWaypointDragEnd = useCallback((id: string) => {
     if (waypointConnIdRef.current === id && preWaypointRef.current) {
       pushHistory(preWaypointRef.current);
@@ -1126,6 +1156,7 @@ export function useDiagram(initialData: DiagramData) {
     updateConnectorDirection,
     updateConnectorEndpoint,
     updateConnectorWaypoints,
+    updateCurveHandles,
     connectorWaypointDragEnd,
     updateConnectorLabel,
     elementMoveEnd,

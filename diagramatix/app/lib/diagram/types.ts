@@ -98,6 +98,8 @@ export interface Connector {
   labelWidth?: number;
   sourceOffsetAlong?: number;
   targetOffsetAlong?: number;
+  cp1RelOffset?: Point;   // cp1 offset from srcEdge — preserved across element moves
+  cp2RelOffset?: Point;   // cp2 offset from tgtEdge — preserved across element moves
 }
 
 export interface Viewport {
