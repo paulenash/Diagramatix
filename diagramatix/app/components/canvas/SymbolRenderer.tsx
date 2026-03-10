@@ -983,6 +983,7 @@ export function SymbolRenderer({
               <foreignObject x={hitRectX} y={hitRectY} width={labelWidth} height={Math.max(totalLabelH, 28)}>
                 <textarea
                   autoFocus
+                  onFocus={(e) => { const t = e.target; setTimeout(() => { t.setSelectionRange(t.value.length, t.value.length); }, 0); }}
                   value={editGatewayLabelValue}
                   onChange={(e) => setEditGatewayLabelValue(e.target.value)}
                   onBlur={(e) => {
