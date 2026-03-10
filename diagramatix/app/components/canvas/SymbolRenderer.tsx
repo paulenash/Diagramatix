@@ -488,9 +488,9 @@ function FinalStateShape({ el }: { el: DiagramElement }) {
 function SubprocessShape({ el }: { el: DiagramElement }) {
   const hasLoop = el.repeatType === "loop";
   const markerW = 14, markerH = 14;
-  // "+" always stays centred; loop marker sits to the right with 4px gap
+  // "+" always stays centred; loop marker sits to the left with 4px gap
   const plusCX = el.x + el.width / 2;
-  const loopCX = plusCX + markerW / 2 + 4 + 5; // right edge of "+" + 4px gap + arc radius
+  const loopCX = plusCX - markerW / 2 - 4 - 5; // left edge of "+" - 4px gap - arc radius
   const mx = plusCX - markerW / 2;
   const my = el.y + el.height - markerH - 3;
   return (
