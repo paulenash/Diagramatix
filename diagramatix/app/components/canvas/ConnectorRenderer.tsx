@@ -163,7 +163,12 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
   const offsetY = connector.labelOffsetY ?? -30;
   const lWidth  = connector.labelWidth ?? 80;
   const label   = connector.label ?? "";
-  const lines   = wrapText(label || " ", lWidth);
+  const isMessageBPMN = connector.type === "messageBPMN";
+  // For messageBPMN, auto-size width to text + 4px; for others use stored labelWidth
+  const effectiveLWidth = isMessageBPMN
+    ? Math.max(30, Math.ceil((label || "").length * 6) + 4)
+    : lWidth;
+  const lines   = wrapText(label || " ", effectiveLWidth);
   const lineH   = 14;
   const lHeight = Math.max(lineH, lines.length * lineH);
   const lCx     = anchor.x + offsetX;
@@ -258,10 +263,10 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
         stroke="#6b7280" strokeWidth={1} strokeDasharray="4 3"
         style={{ pointerEvents: "none" }}
       />
-      {/* Label background — no border, just white fill */}
+      {/* Label background — transparent for messageBPMN, white for others */}
       <rect
-        x={lCx - lWidth / 2} y={lTy} width={lWidth} height={lHeight}
-        fill="white" fillOpacity={1}
+        x={lCx - effectiveLWidth / 2} y={lTy} width={effectiveLWidth} height={lHeight}
+        fill={isMessageBPMN ? "transparent" : "white"} fillOpacity={isMessageBPMN ? 0 : 1}
         style={{ cursor: onUpdateLabel ? "grab" : "default" }}
         onMouseDown={handleLabelMouseDown}
         onDoubleClick={handleDoubleClick}
@@ -276,7 +281,7 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
       )}
       {/* Inline textarea — positioned exactly over the label area */}
       {isEditing && (
-        <foreignObject x={lCx - lWidth / 2} y={lTy} width={lWidth} height={Math.max(lHeight, 28)}>
+        <foreignObject x={lCx - effectiveLWidth / 2} y={lTy} width={effectiveLWidth} height={Math.max(lHeight, 28)}>
           <textarea
             autoFocus
             value={editValue}
@@ -298,10 +303,10 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
           />
         </foreignObject>
       )}
-      {/* Width resize handle (visible when label focused or connector selected) */}
-      {(selected || isLabelFocused) && onUpdateLabel && (
+      {/* Width resize handle — hidden for messageBPMN (auto-sized) */}
+      {(selected || isLabelFocused) && onUpdateLabel && !isMessageBPMN && (
         <rect
-          x={lCx + lWidth / 2 - 3} y={lMidY - 5} width={6} height={10}
+          x={lCx + effectiveLWidth / 2 - 3} y={lMidY - 5} width={6} height={10}
           fill="#2563eb" stroke="white" strokeWidth={1} rx={1}
           style={{ cursor: "ew-resize" }}
           onMouseDown={handleResizeMouseDown}
