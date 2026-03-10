@@ -262,6 +262,7 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
           <textarea
             autoFocus
             value={editValue}
+            onFocus={(e) => { const t = e.target; setTimeout(() => { t.setSelectionRange(t.value.length, t.value.length); }, 0); }}
             onChange={(e) => setEditValue(e.target.value)}
             onBlur={(e) => commitEdit(e.target.value)}
             onKeyDown={(e) => {

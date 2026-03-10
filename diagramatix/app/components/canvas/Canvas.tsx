@@ -1380,7 +1380,7 @@ export function Canvas({
             <textarea
               autoFocus
               value={editingLabel.value}
-              onFocus={(e) => { const l = e.target.value.length; e.target.setSelectionRange(l, l); }}
+              onFocus={(e) => { const t = e.target; setTimeout(() => { t.setSelectionRange(t.value.length, t.value.length); }, 0); }}
               onChange={commonChange as React.ChangeEventHandler<HTMLTextAreaElement>}
               onBlur={commitLabel}
               onKeyDown={(e) => {
@@ -1415,7 +1415,7 @@ export function Canvas({
             <textarea
               autoFocus
               value={editingLabel.value}
-              onFocus={(e) => { const l = e.target.value.length; e.target.setSelectionRange(l, l); }}
+              onFocus={(e) => { const t = e.target; setTimeout(() => { t.setSelectionRange(t.value.length, t.value.length); }, 0); }}
               onChange={commonChange as React.ChangeEventHandler<HTMLTextAreaElement>}
               onBlur={commitLabel}
               onKeyDown={(e) => {
@@ -1446,7 +1446,7 @@ export function Canvas({
             autoFocus
             type="text"
             value={editingLabel.value}
-            onFocus={(e) => { const l = e.target.value.length; e.target.setSelectionRange(l, l); }}
+            onFocus={(e) => { const t = e.target; setTimeout(() => { t.setSelectionRange(t.value.length, t.value.length); }, 0); }}
             onChange={commonChange as React.ChangeEventHandler<HTMLInputElement>}
             onBlur={commitLabel}
             onKeyDown={(e) => {
