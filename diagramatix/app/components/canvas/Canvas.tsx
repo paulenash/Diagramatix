@@ -239,6 +239,14 @@ function getBoundaryEventOuterSide(el: DiagramElement, allElements: DiagramEleme
   return "right";
 }
 
+/** Returns the opposite of a Side (used to get the inward-facing side of a boundary event). */
+function oppositeSide(s: Side): Side {
+  if (s === "top")    return "bottom";
+  if (s === "bottom") return "top";
+  if (s === "left")   return "right";
+  return "left";
+}
+
 /** Returns the midpoint of the specified outer face of an element. */
 function sideMidpoint(el: DiagramElement, side: Side): Point {
   switch (side) {
@@ -379,13 +387,14 @@ export function Canvas({
           // Rule 5: cannot connect to boundary events of the same parent subprocess
           if (targetEl.boundaryHostId === sourceEl.boundaryHostId) return;
 
-          if (sourceEl.taskType === "send") {
+          if (sourceEl.taskType === "send" || sourceEl.flowType === "throwing") {
             // Rule 3 (send): cannot connect to children of parent subprocess
             if (targetEl.parentId === sourceEl.boundaryHostId) return;
-          } else {
+          } else if (sourceEl.taskType === "receive" || sourceEl.flowType === "catching") {
             // Rule 3 (receive): can ONLY connect to children of parent subprocess
             if (targetEl.parentId !== sourceEl.boundaryHostId) return;
           }
+          // Generic intermediate boundary event: only Rule 5 above applies
         }
 
         // Rule 4: Child of subprocess cannot connect to its own parent subprocess
@@ -406,7 +415,9 @@ export function Canvas({
         } else {
           if (targetEl.type === "lane") return;  // pool already handled above
           const targetOuterSide = getBoundaryEventOuterSide(targetEl, data.elements);
-          const targetSide = targetOuterSide ?? getClosestSide(pos, targetEl);
+          // Sequence connectors connect to the INNER (subprocess-facing) side of boundary events
+          const seqSourceSide = outerSide ? oppositeSide(outerSide) : effectiveSide;
+          const seqTargetSide = targetOuterSide ? oppositeSide(targetOuterSide) : getClosestSide(pos, targetEl);
           let connType: ConnectorType;
           let connRouting: RoutingType;
           let connDirection: DirectionType;
@@ -420,7 +431,7 @@ export function Canvas({
           } else {
             connType = "sequence"; connRouting = defaultRoutingType; connDirection = defaultDirectionType;
           }
-          onAddConnector(elementId, targetEl.id, connType, connDirection, connRouting, effectiveSide, targetSide);
+          onAddConnector(elementId, targetEl.id, connType, connDirection, connRouting, seqSourceSide, seqTargetSide);
         }
       }
       setDraggingConnector(null);
