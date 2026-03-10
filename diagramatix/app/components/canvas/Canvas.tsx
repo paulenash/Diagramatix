@@ -795,7 +795,7 @@ export function Canvas({
       onSelectElement(null);
       onSelectConnector(null);
     }
-    if (e.key === "Delete" || e.key === "Backspace") {
+    if (e.key === "Delete") {
       if (editingLabel) return;
       if (selectedElementId) onDeleteElement(selectedElementId);
       if (selectedConnectorId) onDeleteConnector(selectedConnectorId);
@@ -1369,6 +1369,7 @@ export function Canvas({
             <textarea
               autoFocus
               value={editingLabel.value}
+              onFocus={(e) => { const l = e.target.value.length; e.target.setSelectionRange(l, l); }}
               onChange={commonChange as React.ChangeEventHandler<HTMLTextAreaElement>}
               onBlur={commitLabel}
               onKeyDown={(e) => {
@@ -1403,6 +1404,7 @@ export function Canvas({
             <textarea
               autoFocus
               value={editingLabel.value}
+              onFocus={(e) => { const l = e.target.value.length; e.target.setSelectionRange(l, l); }}
               onChange={commonChange as React.ChangeEventHandler<HTMLTextAreaElement>}
               onBlur={commitLabel}
               onKeyDown={(e) => {
@@ -1433,6 +1435,7 @@ export function Canvas({
             autoFocus
             type="text"
             value={editingLabel.value}
+            onFocus={(e) => { const l = e.target.value.length; e.target.setSelectionRange(l, l); }}
             onChange={commonChange as React.ChangeEventHandler<HTMLInputElement>}
             onBlur={commitLabel}
             onKeyDown={(e) => {
