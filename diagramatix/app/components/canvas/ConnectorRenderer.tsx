@@ -16,14 +16,6 @@ interface Props {
   misaligned?: boolean;
 }
 
-function inverseBezierCPs(P0: Point, P3: Point, Q1: Point, Q2: Point): [Point, Point] {
-  const A = { x: Q1.x - (8/27)*P0.x - (1/27)*P3.x, y: Q1.y - (8/27)*P0.y - (1/27)*P3.y };
-  const B = { x: Q2.x - (1/27)*P0.x - (8/27)*P3.x, y: Q2.y - (1/27)*P0.y - (8/27)*P3.y };
-  return [
-    { x: 3*A.x - 1.5*B.x, y: 3*A.y - 1.5*B.y },
-    { x: 3*B.x - 1.5*A.x, y: 3*B.y - 1.5*A.y },
-  ];
-}
 
 function wrapText(text: string, maxWidth: number, fontSize = 10): string[] {
   const avgCharWidth = fontSize * 0.6;
@@ -48,6 +40,22 @@ function cubicBezierPoint(p0: Point, cp1: Point, cp2: Point, p3: Point, t: numbe
     x: mt**3*p0.x + 3*mt**2*t*cp1.x + 3*mt*t**2*cp2.x + t**3*p3.x,
     y: mt**3*p0.y + 3*mt**2*t*cp1.y + 3*mt*t**2*cp2.y + t**3*p3.y,
   };
+}
+
+function sideNormal(side: string): Point {
+  if (side === "right") return { x:  1, y:  0 };
+  if (side === "left")  return { x: -1, y:  0 };
+  if (side === "top")   return { x:  0, y: -1 };
+  return                       { x:  0, y:  1 }; // bottom
+}
+
+function inverseBezierCPs(P0: Point, P3: Point, Q1: Point, Q2: Point): [Point, Point] {
+  const A = { x: Q1.x - (8/27)*P0.x - (1/27)*P3.x, y: Q1.y - (8/27)*P0.y - (1/27)*P3.y };
+  const B = { x: Q2.x - (1/27)*P0.x - (8/27)*P3.x, y: Q2.y - (1/27)*P0.y - (8/27)*P3.y };
+  return [
+    { x: 3*A.x - 1.5*B.x, y: 3*A.y - 1.5*B.y },
+    { x: 3*B.x - 1.5*A.x, y: 3*B.y - 1.5*A.y },
+  ];
 }
 
 function closestPointOnSegment(p1: Point, p2: Point, q: Point): Point {
@@ -328,11 +336,21 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
   const visEnd = connector.targetInvisibleLeader ? waypoints.length - 2 : waypoints.length - 1;
   const visibleWaypoints = waypoints.slice(visStart, visEnd + 1);
 
-  const visibleD = connector.routingType === "curvilinear"
-    ? waypointsToCurvePath(visibleWaypoints)
-    : connector.routingType === "rectilinear"
-      ? waypointsToRoundedPath(visibleWaypoints)
-      : waypointsToSvgPath(visibleWaypoints);
+  const visibleD = (() => {
+    if (connector.type === "transition" && connector.routingType === "curvilinear"
+        && visibleWaypoints.length === 4) {
+      const [P0, P1, P2, P3] = visibleWaypoints;
+      const STUB = 4;
+      const u1 = sideNormal(connector.sourceSide);
+      const u2 = sideNormal(connector.targetSide);
+      const s1 = { x: P0.x + STUB * u1.x, y: P0.y + STUB * u1.y };
+      const s2 = { x: P3.x + STUB * u2.x, y: P3.y + STUB * u2.y };
+      return `M ${P0.x} ${P0.y} L ${s1.x} ${s1.y} C ${P1.x} ${P1.y}, ${P2.x} ${P2.y}, ${s2.x} ${s2.y} L ${P3.x} ${P3.y}`;
+    }
+    if (connector.routingType === "curvilinear") return waypointsToCurvePath(visibleWaypoints);
+    if (connector.routingType === "rectilinear") return waypointsToRoundedPath(visibleWaypoints);
+    return waypointsToSvgPath(visibleWaypoints);
+  })();
 
   const fullD = waypointsToSvgPath(waypoints);
   // For curvilinear, use the actual curve for the hit area so clicks near the arc are detected
@@ -486,8 +504,13 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
         const [P0, P1, P2, P3] = visibleWaypoints;
         const srcEdge = waypoints[1];
         const tgtEdge = waypoints[waypoints.length - 2];
-        const H1 = cubicBezierPoint(P0, P1, P2, P3, 1/3);
-        const H2 = cubicBezierPoint(P0, P1, P2, P3, 2/3);
+        const STUB = 4;
+        const u1 = sideNormal(connector.sourceSide);
+        const u2 = sideNormal(connector.targetSide);
+        const s1 = { x: srcEdge.x + STUB * u1.x, y: srcEdge.y + STUB * u1.y };
+        const s2 = { x: tgtEdge.x + STUB * u2.x, y: tgtEdge.y + STUB * u2.y };
+        const H1 = cubicBezierPoint(s1, P1, P2, s2, 1/3);
+        const H2 = cubicBezierPoint(s1, P1, P2, s2, 2/3);
 
         const makeHandleDrag = (whichHandle: 1 | 2) => (e: React.MouseEvent) => {
           e.stopPropagation();
@@ -497,7 +520,7 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
             const cur = svgToWorld!(me.clientX, me.clientY);
             const Q1 = whichHandle === 1 ? cur : currentH1;
             const Q2 = whichHandle === 2 ? cur : currentH2;
-            const [newP1, newP2] = inverseBezierCPs(P0, P3, Q1, Q2);
+            const [newP1, newP2] = inverseBezierCPs(s1, s2, Q1, Q2);
             const newWaypoints = [
               waypoints[0], srcEdge, newP1, newP2, tgtEdge, waypoints[waypoints.length - 1],
             ];
@@ -518,9 +541,9 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
 
         return (
           <g key="curve-handles">
-            <line x1={P0.x} y1={P0.y} x2={H1.x} y2={H1.y}
+            <line x1={s1.x} y1={s1.y} x2={H1.x} y2={H1.y}
               stroke="#93c5fd" strokeWidth={1} strokeDasharray="3 2" pointerEvents="none" />
-            <line x1={P3.x} y1={P3.y} x2={H2.x} y2={H2.y}
+            <line x1={s2.x} y1={s2.y} x2={H2.x} y2={H2.y}
               stroke="#93c5fd" strokeWidth={1} strokeDasharray="3 2" pointerEvents="none" />
             <circle cx={H1.x} cy={H1.y} r={6}
               fill="white" stroke="#2563eb" strokeWidth={1.5}
