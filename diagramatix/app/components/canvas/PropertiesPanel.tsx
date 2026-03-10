@@ -160,6 +160,7 @@ export function PropertiesPanel({
               className="w-full text-xs border border-gray-300 rounded px-2 py-1 resize-y"
               rows={3}
               defaultValue={connector.label ?? ""}
+              onFocus={(e) => { const l = e.target.value.length; e.target.setSelectionRange(l, l); }}
               onBlur={(e) => onUpdateConnectorLabel(connector.id, e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
@@ -211,6 +212,7 @@ export function PropertiesPanel({
               className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 resize-y"
               rows={3}
               value={labelDraft}
+              onFocus={(e) => { const l = e.target.value.length; e.target.setSelectionRange(l, l); }}
               onChange={(e) => setLabelDraft(e.target.value)}
               onBlur={() => onUpdateLabel(element.id, labelDraft)}
               onKeyDown={(e) => {
@@ -226,6 +228,7 @@ export function PropertiesPanel({
           <input
             type="text"
             value={labelDraft}
+            onFocus={(e) => { const l = e.target.value.length; e.target.setSelectionRange(l, l); }}
             onChange={(e) => setLabelDraft(e.target.value)}
             onBlur={() => onUpdateLabel(element.id, labelDraft)}
             onKeyDown={(e) => {

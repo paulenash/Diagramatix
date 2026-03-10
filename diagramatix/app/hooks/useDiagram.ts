@@ -283,10 +283,10 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         label = `Event ${count + 1}`;
       } else if (action.payload.symbolType === "data-object") {
         const count = state.elements.filter((e) => e.type === "data-object").length;
-        label = `Data Object ${count + 1}`;
+        label = `Data ${count + 1}`;
       } else if (action.payload.symbolType === "data-store") {
         const count = state.elements.filter((e) => e.type === "data-store").length;
-        label = `Data Store ${count + 1}`;
+        label = `Store ${count + 1}`;
       } else if (action.payload.symbolType === "pool") {
         const count = state.elements.filter((e) => e.type === "pool").length;
         label = `Pool ${count + 1}`;
