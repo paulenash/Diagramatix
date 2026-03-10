@@ -136,7 +136,7 @@ interface Props {
   diagramType: DiagramType;
   onAddElement: (type: SymbolType, position: Point, taskType?: BpmnTaskType, eventType?: EventType) => void;
   onMoveElement: (id: string, x: number, y: number) => void;
-  onResizeElement: (id: string, width: number, height: number) => void;
+  onResizeElement: (id: string, x: number, y: number, width: number, height: number) => void;
   onUpdateLabel: (id: string, label: string) => void;
   onDeleteElement: (id: string) => void;
   onAddConnector: (
@@ -605,12 +605,7 @@ export function Canvas({
         }
       }
 
-      onResizeElement(elementId, width, height);
-      const needsMoveX = handle.includes("w") || (isUseCase && (handle === "n" || handle === "s"));
-      const needsMoveY = handle.includes("n");
-      if (needsMoveX || needsMoveY) {
-        onMoveElement(elementId, x, y);
-      }
+      onResizeElement(elementId, x, y, width, height);
     }
 
     function onMouseUp() {
@@ -746,7 +741,7 @@ export function Canvas({
     if (el && el.type === 'use-case') {
       const { w, h } = computeUseCaseSize(editingLabel.value, el.width);
       if (w !== el.width || h !== el.height) {
-        onResizeElement(el.id, w, h);
+        onResizeElement(el.id, el.x, el.y, w, h);
       }
     }
     onUpdateLabel(editingLabel.elementId, editingLabel.value);

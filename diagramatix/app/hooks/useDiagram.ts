@@ -48,6 +48,22 @@ function nearestPointOnRectBoundary(
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
+function boundaryEdgeOf(
+  evCenter: { x: number; y: number },
+  host: { x: number; y: number; width: number; height: number }
+): { side: "top" | "bottom" | "left" | "right"; frac: number } {
+  const { x, y, width, height } = host;
+  const dTop    = Math.abs(evCenter.y - y);
+  const dBottom = Math.abs(evCenter.y - (y + height));
+  const dLeft   = Math.abs(evCenter.x - x);
+  const dRight  = Math.abs(evCenter.x - (x + width));
+  const min     = Math.min(dTop, dBottom, dLeft, dRight);
+  if (min === dTop)    return { side: "top",    frac: (evCenter.x - x) / width  };
+  if (min === dBottom) return { side: "bottom", frac: (evCenter.x - x) / width  };
+  if (min === dLeft)   return { side: "left",   frac: (evCenter.y - y) / height };
+                       return { side: "right",  frac: (evCenter.y - y) / height };
+}
+
 function messageBpmnWaypoints(
   source: DiagramElement, target: DiagramElement,
   sourceSide: Side, targetSide: Side, offsetAlong: number
@@ -82,7 +98,7 @@ type Action =
   | { type: "SET_DATA"; payload: DiagramData }
   | { type: "ADD_ELEMENT"; payload: { symbolType: SymbolType; position: Point; taskType?: BpmnTaskType; eventType?: EventType } }
   | { type: "MOVE_ELEMENT"; payload: { id: string; x: number; y: number } }
-  | { type: "RESIZE_ELEMENT"; payload: { id: string; width: number; height: number } }
+  | { type: "RESIZE_ELEMENT"; payload: { id: string; x: number; y: number; width: number; height: number } }
   | { type: "UPDATE_LABEL"; payload: { id: string; label: string } }
   | { type: "UPDATE_PROPERTIES"; payload: { id: string; properties: Record<string, unknown> } }
   | { type: "DELETE_ELEMENT"; payload: { id: string } }
@@ -412,14 +428,20 @@ function reducer(state: DiagramData, action: Action): DiagramData {
 
       const affectedIds = new Set([id, ...descendantIds, ...attachedBoundaryIds]);
       const connectors = state.connectors.map(conn => {
-        if (!affectedIds.has(conn.sourceId) && !affectedIds.has(conn.targetId)) return conn;
+        const srcIn = affectedIds.has(conn.sourceId);
+        const tgtIn = affectedIds.has(conn.targetId);
+        if (!srcIn && !tgtIn) return conn;
+        if (srcIn && tgtIn) return {
+          ...conn,
+          waypoints: conn.waypoints.map(pt => ({ x: pt.x + dx, y: pt.y + dy })),
+        };
         return recomputeAllConnectors([conn], elements)[0] ?? conn;
       });
       return { ...state, elements: updatePoolTypes(elements), connectors };
     }
 
     case "RESIZE_ELEMENT": {
-      const { id, width: newW, height: newH } = action.payload;
+      const { id, x: newX, y: newY, width: newW, height: newH } = action.payload;
       const target = state.elements.find((e) => e.id === id);
 
       if (target?.type === "pool") {
@@ -428,16 +450,16 @@ function reducer(state: DiagramData, action: Action): DiagramData {
           .filter((e) => e.type === "lane" && e.parentId === id)
           .sort((a, b) => a.y - b.y);
         const totalLaneH = sortedLanes.reduce((s, l) => s + l.height, 0) || 1;
-        let stackY = target.y;
+        let stackY = newY;
         const laneUpdates = new Map<string, DiagramElement>();
         for (const lane of sortedLanes) {
           const newLaneH = Math.max(40, Math.round(newH * (lane.height / totalLaneH)));
-          const updated = { ...lane, x: target.x + POOL_LW, y: stackY, width: newW - POOL_LW, height: newLaneH };
+          const updated = { ...lane, x: newX + POOL_LW, y: stackY, width: newW - POOL_LW, height: newLaneH };
           laneUpdates.set(lane.id, updated);
           stackY += newLaneH;
         }
         let elements = state.elements.map((e) =>
-          e.id === id ? { ...e, width: newW, height: newH }
+          e.id === id ? { ...e, x: newX, y: newY, width: newW, height: newH }
           : laneUpdates.has(e.id) ? laneUpdates.get(e.id)!
           : e
         );
@@ -448,9 +470,24 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         return { ...state, elements, connectors };
       }
 
-      const elements = state.elements.map((el) =>
-        el.id === id ? { ...el, width: newW, height: newH } : el
-      );
+      const elements = state.elements.map((el) => {
+        if (el.id === id) return { ...el, x: newX, y: newY, width: newW, height: newH };
+        if (el.boundaryHostId === id && target) {
+          const evCx = el.x + el.width / 2;
+          const evCy = el.y + el.height / 2;
+          const { side, frac } = boundaryEdgeOf({ x: evCx, y: evCy }, target);
+          const f = Math.max(0, Math.min(1, frac));
+          let ncx: number, ncy: number;
+          switch (side) {
+            case "top":    ncx = newX + f * newW;  ncy = newY;          break;
+            case "bottom": ncx = newX + f * newW;  ncy = newY + newH;   break;
+            case "left":   ncx = newX;             ncy = newY + f * newH; break;
+            default:       ncx = newX + newW;      ncy = newY + f * newH; break;
+          }
+          return { ...el, x: ncx - el.width / 2, y: ncy - el.height / 2 };
+        }
+        return el;
+      });
       const connectors = recomputeAllConnectors(state.connectors, elements);
       return { ...state, elements, connectors };
     }
@@ -899,12 +936,12 @@ export function useDiagram(initialData: DiagramData) {
     dispatch({ type: "MOVE_ELEMENT", payload: { id, x, y } });
   }, []);
 
-  const resizeElement = useCallback((id: string, width: number, height: number) => {
+  const resizeElement = useCallback((id: string, x: number, y: number, width: number, height: number) => {
     if (resizingRef.current !== id) {
       resizingRef.current = id;
       preResizeRef.current = snapshotData(); // snapshot before resize starts
     }
-    dispatch({ type: "RESIZE_ELEMENT", payload: { id, width, height } });
+    dispatch({ type: "RESIZE_ELEMENT", payload: { id, x, y, width, height } });
   }, []);
 
   const resizeElementEnd = useCallback((id: string) => {

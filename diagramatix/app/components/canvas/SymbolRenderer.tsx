@@ -489,7 +489,7 @@ function ExpandedSubprocessShape({ el }: { el: DiagramElement }) {
   return (
     <g>
       <rect x={el.x} y={el.y} width={el.width} height={el.height}
-        rx={4} ry={4} fill="#fef08a" stroke="#374151" strokeWidth={1.5} />
+        rx={4} ry={4} fill="#fef4a7" stroke="#374151" strokeWidth={1.5} />
       {hasLoop && <LoopMarker cx={el.x + el.width / 2} cy={el.y + el.height - 10} />}
     </g>
   );

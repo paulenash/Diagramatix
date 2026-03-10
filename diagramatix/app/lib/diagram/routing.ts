@@ -193,7 +193,7 @@ export function computeWaypoints(
     .map(getBounds);
 
   const perpOff    = adaptedPerpOffset(srcEdge, sourceSide, tgtEdge, targetSide);
-  const exitPt     = perpendicularExitScaled(srcEdge, sourceSide, perpOff);
+  const exitPt     = perpendicularExitScaled(srcEdge, sourceSide, 2);
   const approachPt = perpendicularExitScaled(tgtEdge, targetSide, perpOff);
 
   let midPath: Point[];
