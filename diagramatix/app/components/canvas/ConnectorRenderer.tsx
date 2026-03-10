@@ -163,11 +163,7 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
   const offsetY = connector.labelOffsetY ?? -30;
   const lWidth  = connector.labelWidth ?? 80;
   const label   = connector.label ?? "";
-  const isMessageBPMN = connector.type === "messageBPMN";
-  // For messageBPMN, auto-size width to text + 4px; for others use stored labelWidth
-  const effectiveLWidth = isMessageBPMN
-    ? Math.max(30, Math.ceil((label || "").length * 6) + 4)
-    : lWidth;
+  const effectiveLWidth = lWidth;
   const lines   = wrapText(label || " ", effectiveLWidth);
   const lineH   = 14;
   const lHeight = Math.max(lineH, lines.length * lineH);
@@ -309,8 +305,8 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
           />
         </foreignObject>
       )}
-      {/* Width resize handle — hidden for messageBPMN (auto-sized) */}
-      {(selected || isLabelFocused) && onUpdateLabel && !isMessageBPMN && (
+      {/* Width resize handle */}
+      {(selected || isLabelFocused) && onUpdateLabel && (
         <rect
           x={lCx + effectiveLWidth / 2 - 3} y={lMidY - 5} width={6} height={10}
           fill="#2563eb" stroke="white" strokeWidth={1} rx={1}
