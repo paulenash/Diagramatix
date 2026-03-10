@@ -384,6 +384,17 @@ function CompositeStateShape({ el }: { el: DiagramElement }) {
   );
 }
 
+function GroupShape({ el }: { el: DiagramElement }) {
+  return (
+    <g>
+      {/* Dashed-dotted rounded rect — near-transparent so contents show through */}
+      <rect x={el.x} y={el.y} width={el.width} height={el.height}
+        rx={8} fill="rgba(249,250,251,0.15)" stroke="#374151" strokeWidth={1.5}
+        strokeDasharray="10 3.5 2 3.5" />
+    </g>
+  );
+}
+
 // Reusable stick figure
 function StickFigure({
   cx, top, headR = 8, bodyLen = 16, armHalfSpan = 18, legSpread = 16, legLen = 12,
@@ -696,6 +707,7 @@ function SymbolShape({ el }: { el: DiagramElement }) {
     case "final-state":   return <FinalStateShape el={el} />;
     case "system-boundary":   return <SystemBoundaryShape el={el} />;
     case "composite-state":   return <CompositeStateShape el={el} />;
+    case "group":             return <GroupShape el={el} />;
     case "system":            return <SystemShape el={el} />;
     case "pool":              return <PoolShape el={el} />;
     case "lane":              return <LaneShape el={el} />;
@@ -711,7 +723,7 @@ function getLabelPos(el: DiagramElement): { x: number; y: number; baseline: "han
   if (el.type === "actor" || el.type === "team" || el.type === "hourglass" || el.type === "system") {
     return { x: el.x + el.width / 2, y: el.y + el.height + 12, baseline: "hanging" };
   }
-  if (el.type === "system-boundary" || el.type === "composite-state") {
+  if (el.type === "system-boundary" || el.type === "composite-state" || el.type === "group") {
     return { x: el.x + el.width / 2, y: el.y + HEADER_H / 2, baseline: "middle" };
   }
   return { x: el.x + el.width / 2, y: el.y + el.height / 2, baseline: "middle" };
@@ -837,7 +849,7 @@ export function SymbolRenderer({
     ((element.properties.poolType as string | undefined) ?? "black-box") === "white-box";
   const isContainer = isBoundary || element.type === "composite-state" || isPoolLane; // gets resize handles
   const canResize = isContainer || element.type === "task" || element.type === "subprocess" ||
-    element.type === "subprocess-expanded" || element.type === "use-case";
+    element.type === "subprocess-expanded" || element.type === "use-case" || element.type === "group";
   const showLabel = element.type !== "initial-state" && element.type !== "final-state"
     && !element.boundaryHostId;
 

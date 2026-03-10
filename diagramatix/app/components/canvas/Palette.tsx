@@ -179,6 +179,14 @@ function PaletteSymbolPreview({ type }: { type: SymbolType }) {
           <rect x={1} y={1} width={10} height={26} fill="#c8956a" stroke="#374151" strokeWidth={1.5} />
         </svg>
       );
+    case "group":
+      return (
+        <svg width={36} height={24} viewBox="0 0 48 32">
+          <rect x={2} y={2} width={44} height={28} rx={6}
+            fill="none" stroke="#374151" strokeWidth={1.5}
+            strokeDasharray="6 2.5 1.5 2.5" />
+        </svg>
+      );
     default:
       return (
         <svg width={36} height={21} viewBox="0 0 48 28">

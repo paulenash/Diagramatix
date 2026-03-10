@@ -318,7 +318,7 @@ export function Canvas({
     const matches: DiagramElement[] = [];
     for (const el of data.elements) {
       if (el.id === fromId) continue;
-      if (el.type === "system-boundary" || el.type === "lane") continue; // containers are not connector targets (pools allowed for messageBPMN)
+      if (el.type === "system-boundary" || el.type === "lane" || el.type === "group") continue; // containers are not connector targets (pools allowed for messageBPMN)
       if (filter && !filter(el)) continue;
       if (
         pos.x >= el.x - MARGIN &&
@@ -755,7 +755,7 @@ export function Canvas({
   }
 
   function startEditingLabel(el: DiagramElement) {
-    const isOldContainer = el.type === "system-boundary" || el.type === "composite-state" || el.type === "subprocess-expanded";
+    const isOldContainer = el.type === "system-boundary" || el.type === "composite-state" || el.type === "subprocess-expanded" || el.type === "group";
     if (el.type === "pool" || el.type === "lane") {
       const lw = el.type === "pool" ? 30 : 24;
       setEditingLabel({
@@ -828,10 +828,12 @@ export function Canvas({
     (el) => el.type === "system-boundary" || el.type === "composite-state"
          || el.type === "subprocess-expanded"
   );
+  const groupElements = data.elements.filter((el) => el.type === "group");
   const nonContainers = data.elements.filter(
     (el) => el.type !== "system-boundary" && el.type !== "composite-state"
               && el.type !== "pool" && el.type !== "lane"
               && el.type !== "subprocess-expanded"
+              && el.type !== "group"
               && !el.boundaryHostId
   );
   const boundaryEvents = data.elements.filter((el) => !!el.boundaryHostId);
@@ -1277,6 +1279,26 @@ export function Canvas({
               />
             );
           })}
+
+          {/* Group elements — rendered on top of all other elements */}
+          {groupElements.map((el) => (
+            <SymbolRenderer
+              key={el.id}
+              element={el}
+              selected={el.id === selectedElementId}
+              isDropTarget={false}
+              isDisallowedTarget={false}
+              onSelect={() => { onSelectElement(el.id); onSelectConnector(null); }}
+              onMove={(x, y) => onMoveElement(el.id, x, y)}
+              onDoubleClick={() => startEditingLabel(el)}
+              onConnectionPointDragStart={() => {}}
+              showConnectionPoints={false}
+              onResizeDragStart={(handle, e) => handleResizeDragStart(el.id, handle, e)}
+              svgToWorld={clientToWorld}
+              onUpdateLabel={onUpdateLabel}
+              onMoveEnd={() => { setDraggingElementId(null); onElementMoveEnd?.(el.id); }}
+            />
+          ))}
 
           {/* Association connectors — rendered above all elements */}
           {data.connectors.filter(c => c.type === "associationBPMN" || c.type === "messageBPMN").map((conn) => (

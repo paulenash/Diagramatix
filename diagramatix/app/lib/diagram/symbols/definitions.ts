@@ -149,6 +149,13 @@ export const ALL_SYMBOLS: SymbolDefinition[] = [
     defaultHeight: 50,
     description: "A BPMN pool (swimlane container)",
   },
+  {
+    type: "group",
+    label: "",
+    defaultWidth: 240,
+    defaultHeight: 160,
+    description: "A BPMN group annotation container",
+  },
 ];
 
 export const PALETTE_BY_DIAGRAM_TYPE: Record<DiagramType, SymbolType[]> = {
@@ -166,6 +173,7 @@ export const PALETTE_BY_DIAGRAM_TYPE: Record<DiagramType, SymbolType[]> = {
     "data-object",
     "data-store",
     "end-event",
+    "group",
   ],
 };
 

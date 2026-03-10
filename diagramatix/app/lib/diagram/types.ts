@@ -21,7 +21,8 @@ export type SymbolType =
   | "composite-state"
   | "system"
   | "data-object"
-  | "data-store";
+  | "data-store"
+  | "group";
 
 export type BpmnTaskType =
   | "none"
