@@ -151,7 +151,7 @@ export const ALL_SYMBOLS: SymbolDefinition[] = [
   },
   {
     type: "group",
-    label: "",
+    label: "Group",
     defaultWidth: 240,
     defaultHeight: 160,
     description: "A BPMN group annotation container",
