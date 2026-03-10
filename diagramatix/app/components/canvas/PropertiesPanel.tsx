@@ -441,17 +441,6 @@ export function PropertiesPanel({
         </div>
       )}
 
-      <div>
-        <label className="block text-xs font-medium text-gray-700 mb-1">
-          Position
-        </label>
-        <p className="text-xs text-gray-500">
-          X: {Math.round(element.x)}, Y: {Math.round(element.y)}
-        </p>
-        <p className="text-xs text-gray-500">
-          {element.width} × {element.height}
-        </p>
-      </div>
 
       {element.type === "pool" ? (
         poolHasContent ? (
