@@ -385,7 +385,7 @@ export function recomputeAllConnectors(
         const newSrcEdge    = sidePoint(source, conn.sourceSide, conn.sourceOffsetAlong ?? 0.5);
         const newTgtEdge    = sidePoint(target, conn.targetSide, conn.targetOffsetAlong ?? 0.5);
         const perpOff       = adaptedPerpOffset(newSrcEdge, conn.sourceSide, newTgtEdge, conn.targetSide);
-        const newExitPt     = perpendicularExitScaled(newSrcEdge, conn.sourceSide, perpOff);
+        const newExitPt     = perpendicularExitScaled(newSrcEdge, conn.sourceSide, 2);
         const newApproachPt = perpendicularExitScaled(newTgtEdge, conn.targetSide, perpOff);
         const interior = wp.slice(3, N - 3);
         const merged = [
