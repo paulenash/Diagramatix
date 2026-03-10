@@ -193,13 +193,13 @@ export function Palette({ diagramType, onDragStart, disabledSymbols = [] }: Prop
   const symbols = ALL_SYMBOLS.filter((s) => paletteTypes.includes(s.type));
 
   return (
-    <div className="w-24 border-r border-gray-200 bg-white flex flex-col">
+    <div className="w-48 border-r border-gray-200 bg-white flex flex-col">
       <div className="px-2 py-1.5 border-b border-gray-200">
         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
           Symbols
         </p>
       </div>
-      <div className="flex-1 overflow-y-auto p-1 grid grid-cols-2 gap-1 content-start">
+      <div className="flex-1 overflow-y-auto p-1 space-y-0.5">
         {symbols.map((sym) => {
           const disabled = disabledSymbols.includes(sym.type);
           return (
@@ -207,14 +207,16 @@ export function Palette({ diagramType, onDragStart, disabledSymbols = [] }: Prop
               key={sym.type}
               draggable={!disabled}
               onDragStart={disabled ? undefined : () => onDragStart(sym.type)}
-              className={`flex items-center justify-center p-1 rounded select-none ${
+              className={`flex items-center gap-2 px-2 py-1 rounded select-none ${
                 disabled
                   ? "opacity-40 cursor-not-allowed"
                   : "hover:bg-gray-50 cursor-grab active:cursor-grabbing"
               }`}
-              title={sym.label}
             >
-              <PaletteSymbolPreview type={sym.type} />
+              <div className="flex items-center justify-center w-9 shrink-0">
+                <PaletteSymbolPreview type={sym.type} />
+              </div>
+              <span className="text-xs text-gray-700 leading-tight">{sym.label}</span>
             </div>
           );
         })}
