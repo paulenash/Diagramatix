@@ -1304,6 +1304,7 @@ export function Canvas({
         const editingEl = data.elements.find(e => e.id === editingLabel.elementId);
         const isUseCase = editingEl?.type === 'use-case';
         const isPoolLane = editingEl?.type === 'pool' || editingEl?.type === 'lane';
+        const hasTaskMarker = editingEl?.type === 'task' && !!editingEl?.taskType && editingEl?.taskType !== 'none';
         const commonChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
           setEditingLabel(prev => prev ? { ...prev, value: e.target.value } : null);
         if (isUseCase) {
@@ -1384,7 +1385,7 @@ export function Canvas({
             style={{
               position: "absolute",
               left: editingLabel.x,
-              top: editingLabel.y + editingLabel.height / 2 - 12,
+              top: editingLabel.y + (hasTaskMarker ? 20 * zoom : editingLabel.height / 2 - 12),
               width: editingLabel.width,
               height: 24,
               fontSize: 12 * zoom,

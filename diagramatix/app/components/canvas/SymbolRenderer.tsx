@@ -1185,13 +1185,16 @@ export function SymbolRenderer({
         const lineH = 14;
         const lines = wrapText(el.label, labelWidth);
         const totalLabelH = lines.length * lineH;
+        const hasTaskMarker = el.type === 'task' && !!el.taskType && el.taskType !== 'none';
         const labelTopY = el.type === 'subprocess-expanded'
           ? el.y + PAD   // pin to top of element
-          : labelCenterY - totalLabelH / 2;
+          : hasTaskMarker
+            ? el.y + 20  // 2px below marker bottom (el.y + 4 offset + 14px icon + 2px gap)
+            : labelCenterY - totalLabelH / 2;
         const labelLeftX = labelCenterX - labelWidth / 2;
-        const iconReserveTop = (el.type === 'task' && el.taskType && el.taskType !== 'none') ? 20 : 0;
+        const iconReserveTop = hasTaskMarker ? 20 : 0;
         const iconReserveBot = (el.type === 'subprocess' || el.repeatType === 'loop') ? 20 : 0;
-        const minY    = el.y + PAD + iconReserveTop;
+        const minY    = hasTaskMarker ? el.y + 20 : el.y + PAD + iconReserveTop;
         const maxBotY = el.y + el.height - PAD - iconReserveBot;
         function clamp(v: number, lo: number, hi: number) { return Math.max(lo, Math.min(hi, v)); }
         function handleInteriorLabelMouseDown(ev: React.MouseEvent) {
