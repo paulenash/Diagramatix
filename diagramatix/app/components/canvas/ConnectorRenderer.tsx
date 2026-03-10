@@ -257,16 +257,22 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
 
   return (
     <g>
-      {/* Dotted tether: nearest connector point → label centre */}
-      <line
-        x1={tetherPoint.x} y1={tetherPoint.y} x2={lCx} y2={lMidY}
-        stroke="#6b7280" strokeWidth={1} strokeDasharray="4 3"
-        style={{ pointerEvents: "none" }}
-      />
-      {/* Label background — transparent for messageBPMN, white for others */}
+      {/* Dotted tether: only visible when connector is selected or label is being moved */}
+      {(selected || isLabelFocused) && (
+        <line
+          x1={tetherPoint.x} y1={tetherPoint.y} x2={lCx} y2={lMidY}
+          stroke="#6b7280" strokeWidth={1} strokeDasharray="4 3"
+          style={{ pointerEvents: "none" }}
+        />
+      )}
+      {/* Hit area + dashed blue highlight when active — transparent fill keeps it clickable */}
       <rect
-        x={lCx - effectiveLWidth / 2} y={lTy} width={effectiveLWidth} height={lHeight}
-        fill={isMessageBPMN ? "transparent" : "white"} fillOpacity={isMessageBPMN ? 0 : 1}
+        x={lCx - effectiveLWidth / 2 - 5} y={lTy - 2}
+        width={effectiveLWidth + 25} height={lHeight + 4}
+        fill="transparent"
+        stroke={(selected || isLabelFocused) ? "#2563eb" : "none"}
+        strokeWidth={1} strokeDasharray={(selected || isLabelFocused) ? "4 3" : undefined}
+        rx={3}
         style={{ cursor: onUpdateLabel ? "grab" : "default" }}
         onMouseDown={handleLabelMouseDown}
         onDoubleClick={handleDoubleClick}
@@ -281,7 +287,7 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
       )}
       {/* Inline textarea — positioned exactly over the label area */}
       {isEditing && (
-        <foreignObject x={lCx - effectiveLWidth / 2} y={lTy} width={effectiveLWidth} height={Math.max(lHeight, 28)}>
+        <foreignObject x={lCx - effectiveLWidth / 2 - 5} y={lTy} width={effectiveLWidth + 25} height={Math.max(lHeight, 28)}>
           <textarea
             autoFocus
             value={editValue}
