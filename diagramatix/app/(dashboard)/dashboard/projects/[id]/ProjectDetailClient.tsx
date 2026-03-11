@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import type { DiagramType } from "@/app/lib/diagram/types";
+import type { DiagramType, DiagramData } from "@/app/lib/diagram/types";
 import type { SymbolColorConfig } from "@/app/lib/diagram/colors";
 import { DiagramMaintenanceModal } from "./DiagramMaintenanceModal";
 
@@ -12,6 +12,7 @@ interface DiagramSummary {
   type: string;
   createdAt: Date;
   updatedAt: Date;
+  data?: unknown;
 }
 
 interface ProjectDetail {
@@ -235,6 +236,60 @@ export function ProjectDetailClient({ project, otherProjects }: Props) {
   );
 }
 
+function DiagramThumbnail({ data }: { data: unknown }) {
+  if (!data || typeof data !== "object" || Array.isArray(data)) return null;
+  const d = data as DiagramData;
+  if (!d.elements?.length) return null;
+
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const el of d.elements) {
+    minX = Math.min(minX, el.x);
+    minY = Math.min(minY, el.y);
+    maxX = Math.max(maxX, el.x + el.width);
+    maxY = Math.max(maxY, el.y + el.height);
+  }
+
+  const PAD = 10;
+  const vw = maxX - minX + PAD * 2;
+  const vh = maxY - minY + PAD * 2;
+  const viewBox = `${minX - PAD} ${minY - PAD} ${vw} ${vh}`;
+
+  return (
+    <svg viewBox={viewBox} className="w-full h-full" preserveAspectRatio="xMidYMid meet">
+      {d.connectors?.map((c) => {
+        if (!c.waypoints?.length) return null;
+        const pts = c.waypoints.map((p) => `${p.x},${p.y}`).join(" ");
+        return <polyline key={c.id} points={pts} fill="none" stroke="#9ca3af" strokeWidth={1} />;
+      })}
+      {d.elements.map((el) => {
+        const { x, y, width: w, height: h, type } = el;
+        if (type === "gateway") {
+          const cx = x + w / 2, cy = y + h / 2;
+          return <polygon key={el.id}
+            points={`${cx},${y} ${x + w},${cy} ${cx},${y + h} ${x},${cy}`}
+            fill="#e5e7eb" stroke="#9ca3af" strokeWidth={1} />;
+        }
+        if (type === "start-event" || type === "end-event" || type === "intermediate-event"
+            || type === "initial-state" || type === "final-state") {
+          return <circle key={el.id} cx={x + w / 2} cy={y + h / 2} r={w / 2}
+            fill="#e5e7eb" stroke="#9ca3af" strokeWidth={1} />;
+        }
+        if (type === "use-case") {
+          return <ellipse key={el.id} cx={x + w / 2} cy={y + h / 2} rx={w / 2} ry={h / 2}
+            fill="#e5e7eb" stroke="#9ca3af" strokeWidth={1} />;
+        }
+        if (type === "actor" || type === "team" || type === "hourglass" || type === "system") {
+          return <rect key={el.id} x={x} y={y} width={w} height={h}
+            fill="none" stroke="#9ca3af" strokeWidth={1} />;
+        }
+        const rx = type === "state" || type === "composite-state" ? 8 : 3;
+        return <rect key={el.id} x={x} y={y} width={w} height={h}
+          rx={rx} fill="#e5e7eb" stroke="#9ca3af" strokeWidth={1} />;
+      })}
+    </svg>
+  );
+}
+
 function DiagramCard({
   diagram,
   otherProjects,
@@ -307,6 +362,11 @@ function DiagramCard({
       <h3 className="font-medium text-gray-900 text-sm mb-1">{diagram.name}</h3>
       <p className="text-xs text-gray-500 mb-2">{DIAGRAM_TYPE_LABELS[diagram.type] ?? diagram.type}</p>
       <p className="text-xs text-gray-400">{new Date(diagram.updatedAt).toLocaleDateString()}</p>
+      {diagram.data && (
+        <div className="absolute bottom-2 right-2 w-24 h-16 opacity-40 group-hover:opacity-70 transition-opacity pointer-events-none">
+          <DiagramThumbnail data={diagram.data} />
+        </div>
+      )}
     </div>
   );
 }
