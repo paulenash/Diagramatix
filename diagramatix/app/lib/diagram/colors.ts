@@ -17,7 +17,7 @@ export const DEFAULT_SYMBOL_COLORS: Record<SymbolType, string> = {
   "lane":                "#e8c4a0",   // lane sidebar colour
   "data-object":         "#bfdbfe",
   "data-store":          "#60a5fa",
-  "group":               "#f9fafb",
+  "group":               "#374151",   // boundary line colour
   // Process Context
   "use-case":            "#fef9c3",
   "actor":               "#374151",   // stroke/line colour for stick figure

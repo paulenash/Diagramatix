@@ -97,6 +97,7 @@ export function DiagramMaintenanceModal({ projectId, initialColorConfig, onClose
           {symbols.map((symbolType) => {
             const def = getSymbolDefinition(symbolType);
             const currentColor = (workingColors[symbolType] ?? DEFAULT_SYMBOL_COLORS[symbolType]) as string;
+            const isDefault = currentColor === DEFAULT_SYMBOL_COLORS[symbolType];
             return (
               <div key={symbolType} className="flex items-center gap-3">
                 {/* Colour swatch */}
@@ -106,6 +107,15 @@ export function DiagramMaintenanceModal({ projectId, initialColorConfig, onClose
                 />
                 {/* Symbol label */}
                 <span className="text-sm text-gray-700 flex-1">{def.label}</span>
+                {/* Per-symbol revert button */}
+                <button
+                  onClick={() => handleColorChange(symbolType, DEFAULT_SYMBOL_COLORS[symbolType])}
+                  disabled={isDefault}
+                  className="text-xs text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-default px-1"
+                  title="Revert to default"
+                >
+                  ↺
+                </button>
                 {/* Colour picker */}
                 <input
                   type="color"

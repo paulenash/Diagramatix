@@ -412,16 +412,16 @@ function CompositeStateShape({ el }: { el: DiagramElement }) {
 
 function GroupShape({ el }: { el: DiagramElement }) {
   const colors = useContext(SymbolColorCtx);
-  const fill = resolveColor("group", colors);
+  const lineColor = resolveColor("group", colors);  // configurable boundary line colour
   return (
     <g>
       {/* Wide transparent stroke — border-only hit target (±8px of border) */}
       <rect x={el.x} y={el.y} width={el.width} height={el.height}
         rx={8} fill="none" stroke="rgba(0,0,0,0)" strokeWidth={16}
         style={{ pointerEvents: "stroke" }} />
-      {/* Visual dashed-dotted border — no pointer events */}
+      {/* Visual dashed-dotted border — interior always transparent */}
       <rect x={el.x} y={el.y} width={el.width} height={el.height}
-        rx={8} fill={fill} stroke="#374151" strokeWidth={1.5}
+        rx={8} fill="rgba(249,250,251,0.15)" stroke={lineColor} strokeWidth={1.5}
         strokeDasharray="10 3.5 2 3.5"
         style={{ pointerEvents: "none" }} />
     </g>
