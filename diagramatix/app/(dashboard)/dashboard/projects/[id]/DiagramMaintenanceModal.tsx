@@ -48,7 +48,8 @@ export function DiagramMaintenanceModal({ projectId, initialColorConfig, onClose
         body: JSON.stringify({ colorConfig: workingColors }),
       });
       if (!res.ok) {
-        setSaveError("Failed to save — please try again.");
+        const body = await res.json().catch(() => ({}));
+        setSaveError(`Save failed (${res.status})${body?.error ? ": " + body.error : ""}`);
         return;
       }
       onSaved(workingColors);

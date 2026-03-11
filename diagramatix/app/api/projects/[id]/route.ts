@@ -47,25 +47,25 @@ export async function PUT(req: Request, { params }: Params) {
   const body = await req.json();
   const { name, colorConfig } = body;
 
-  const updateData: Record<string, unknown> = {};
-
-  if (name !== undefined) {
-    if (!name?.trim()) {
-      return NextResponse.json({ error: "Name is required" }, { status: 400 });
-    }
-    updateData.name = name.trim();
+  if (name !== undefined && !name?.trim()) {
+    return NextResponse.json({ error: "Name is required" }, { status: 400 });
   }
 
-  if (colorConfig !== undefined) {
-    updateData.colorConfig = colorConfig as any;
+  try {
+    const updated = await prisma.project.update({
+      where: { id },
+      data: {
+        ...(name !== undefined && { name: name.trim() }),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ...(colorConfig !== undefined && { colorConfig: colorConfig as any }),
+      },
+    });
+    return NextResponse.json(updated);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("[PUT /api/projects] Prisma error:", message);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
-
-  const updated = await prisma.project.update({
-    where: { id },
-    data: updateData,
-  });
-
-  return NextResponse.json(updated);
 }
 
 export async function DELETE(_req: Request, { params }: Params) {
