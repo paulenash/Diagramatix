@@ -26,6 +26,7 @@ export function DiagramMaintenanceModal({ projectId, initialColorConfig, onClose
     ...initialColorConfig,
   });
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
 
   const symbols: SymbolType[] = PALETTE_BY_DIAGRAM_TYPE[activeTab];
 
@@ -39,14 +40,21 @@ export function DiagramMaintenanceModal({ projectId, initialColorConfig, onClose
 
   async function handleConfirm() {
     setSaving(true);
+    setSaveError("");
     try {
-      await fetch(`/api/projects/${projectId}`, {
+      const res = await fetch(`/api/projects/${projectId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ colorConfig: workingColors }),
       });
+      if (!res.ok) {
+        setSaveError("Failed to save — please try again.");
+        return;
+      }
       onSaved(workingColors);
       onClose();
+    } catch {
+      setSaveError("Network error — please try again.");
     } finally {
       setSaving(false);
     }
@@ -130,20 +138,27 @@ export function DiagramMaintenanceModal({ projectId, initialColorConfig, onClose
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-200 flex-shrink-0">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleConfirm}
-            disabled={saving}
-            className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
-          >
-            {saving ? "Saving…" : "Confirm Changes"}
-          </button>
+        <div className="flex items-center justify-between gap-3 px-6 py-4 border-t border-gray-200 flex-shrink-0">
+          {saveError ? (
+            <p className="text-sm text-red-600">{saveError}</p>
+          ) : (
+            <span />
+          )}
+          <div className="flex gap-3">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleConfirm}
+              disabled={saving}
+              className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+            >
+              {saving ? "Saving…" : "Confirm Changes"}
+            </button>
+          </div>
         </div>
       </div>
     </div>
