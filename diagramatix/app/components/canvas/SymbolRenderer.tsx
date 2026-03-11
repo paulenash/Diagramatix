@@ -387,10 +387,15 @@ function CompositeStateShape({ el }: { el: DiagramElement }) {
 function GroupShape({ el }: { el: DiagramElement }) {
   return (
     <g>
-      {/* Dashed-dotted rounded rect — near-transparent so contents show through */}
+      {/* Wide transparent stroke — border-only hit target (±8px of border) */}
+      <rect x={el.x} y={el.y} width={el.width} height={el.height}
+        rx={8} fill="none" stroke="rgba(0,0,0,0)" strokeWidth={16}
+        style={{ pointerEvents: "stroke" }} />
+      {/* Visual dashed-dotted border — no pointer events */}
       <rect x={el.x} y={el.y} width={el.width} height={el.height}
         rx={8} fill="rgba(249,250,251,0.15)" stroke="#374151" strokeWidth={1.5}
-        strokeDasharray="10 3.5 2 3.5" />
+        strokeDasharray="10 3.5 2 3.5"
+        style={{ pointerEvents: "none" }} />
     </g>
   );
 }
