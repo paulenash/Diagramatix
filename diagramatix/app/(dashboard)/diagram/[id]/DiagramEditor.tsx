@@ -277,6 +277,7 @@ export function DiagramEditor({
           diagramType={diagramType}
           onDragStart={(type) => setPendingDragSymbol(type)}
           disabledSymbols={disabledSymbols}
+          colorConfig={projectColorConfig}
         />
 
         <Canvas
