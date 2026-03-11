@@ -126,9 +126,9 @@ function PaletteSymbolPreview({ type, colorConfig }: { type: SymbolType; colorCo
     case "system-boundary":
       return (
         <svg width={30} height={39} viewBox="0 0 40 52">
-          <rect x={2} y={2} width={36} height={48} fill={resolveColor("system-boundary", colorConfig)} stroke="#374151" strokeWidth={1.5} rx={2} />
-          <rect x={2} y={2} width={36} height={12} fill="#dbeafe" stroke="none" rx={2} />
-          <rect x={2} y={12} width={36} height={2} fill="#dbeafe" />
+          <rect x={2} y={2} width={36} height={48} fill="white" stroke="#374151" strokeWidth={1.5} rx={2} />
+          <rect x={2} y={2} width={36} height={12} fill={resolveColor("system-boundary", colorConfig)} stroke="none" rx={2} />
+          <rect x={2} y={12} width={36} height={2} fill={resolveColor("system-boundary", colorConfig)} />
           <line x1={2} y1={14} x2={38} y2={14} stroke="#374151" strokeWidth={1} />
         </svg>
       );
@@ -157,9 +157,9 @@ function PaletteSymbolPreview({ type, colorConfig }: { type: SymbolType; colorCo
       return (
         <svg width={36} height={24} viewBox="0 0 48 32">
           <rect x={2} y={2} width={44} height={28} rx={6}
-            fill={resolveColor("composite-state", colorConfig)} stroke="#374151" strokeWidth={1.5} />
-          <rect x={2} y={2} width={44} height={10} fill="#ede9fe" rx={6} />
-          <rect x={2} y={10} width={44} height={2} fill="#ede9fe" />
+            fill="white" stroke="#374151" strokeWidth={1.5} />
+          <rect x={2} y={2} width={44} height={10} fill={resolveColor("composite-state", colorConfig)} rx={6} />
+          <rect x={2} y={10} width={44} height={2} fill={resolveColor("composite-state", colorConfig)} />
           <line x1={2} y1={12} x2={46} y2={12} stroke="#374151" strokeWidth={1} />
         </svg>
       );

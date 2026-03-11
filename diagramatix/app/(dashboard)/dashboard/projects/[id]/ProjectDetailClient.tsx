@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import type { DiagramType } from "@/app/lib/diagram/types";
 import type { SymbolColorConfig } from "@/app/lib/diagram/colors";
@@ -52,6 +52,20 @@ export function ProjectDetailClient({ project, otherProjects }: Props) {
   const [showNewDiagram, setShowNewDiagram] = useState(false);
   const [showMaintenance, setShowMaintenance] = useState(false);
   const [projectColorConfig, setProjectColorConfig] = useState<SymbolColorConfig>((project.colorConfig as SymbolColorConfig | null) ?? {});
+
+  // Fetch fresh colorConfig from API on mount — bypasses Next.js Router Cache which may serve
+  // stale server props after navigating away and back.
+  useEffect(() => {
+    fetch(`/api/projects/${project.id}`)
+      .then((r) => r.json())
+      .then((p) => {
+        if (p?.colorConfig && typeof p.colorConfig === "object" && !Array.isArray(p.colorConfig)) {
+          setProjectColorConfig(p.colorConfig as SymbolColorConfig);
+        }
+      })
+      .catch(() => {});
+  }, [project.id]);
+
   const [newName, setNewName] = useState("");
   const [newType, setNewType] = useState<DiagramType>("basic");
   const [creating, setCreating] = useState(false);
@@ -145,7 +159,7 @@ export function ProjectDetailClient({ project, otherProjects }: Props) {
           projectId={project.id}
           initialColorConfig={projectColorConfig}
           onClose={() => setShowMaintenance(false)}
-          onSaved={(config) => setProjectColorConfig(config)}
+          onSaved={(config) => { setProjectColorConfig(config); router.refresh(); }}
         />
       )}
 

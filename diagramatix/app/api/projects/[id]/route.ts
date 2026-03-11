@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { prisma, pgPool } from "@/app/lib/db";
+import { prisma } from "@/app/lib/db";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -59,9 +59,10 @@ export async function PUT(req: Request, { params }: Params) {
     // Update colorConfig via raw SQL — Prisma 7 parameterization schema
     // does not include JSON fields in the ProjectUpdateInput graph.
     if (colorConfig !== undefined) {
-      await pgPool.query(
+      await prisma.$executeRawUnsafe(
         'UPDATE "Project" SET "colorConfig" = $1::jsonb, "updatedAt" = NOW() WHERE id = $2',
-        [JSON.stringify(colorConfig), id]
+        JSON.stringify(colorConfig),
+        id
       );
     }
     const updated = await prisma.project.findFirst({ where: { id } });
