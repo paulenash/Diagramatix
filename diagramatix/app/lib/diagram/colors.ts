@@ -33,6 +33,36 @@ export const DEFAULT_SYMBOL_COLORS: Record<SymbolType, string> = {
   "composite-state":     "#ede9fe",   // header colour; body is a transparent tint
 };
 
+/** Black & white colour scheme: fills → white, lines/strokes → black. */
+export const BW_SYMBOL_COLORS: Record<SymbolType, string> = {
+  // BPMN
+  "task":                "#ffffff",
+  "gateway":             "#ffffff",
+  "start-event":         "#ffffff",
+  "intermediate-event":  "#ffffff",
+  "end-event":           "#ffffff",
+  "subprocess":          "#ffffff",
+  "subprocess-expanded": "#ffffff",
+  "pool":                "#000000",
+  "lane":                "#000000",
+  "data-object":         "#ffffff",
+  "data-store":          "#ffffff",
+  "group":               "#000000",
+  "text-annotation":     "#000000",
+  // Process Context
+  "use-case":            "#ffffff",
+  "actor":               "#000000",
+  "team":                "#000000",
+  "system":              "#ffffff",
+  "hourglass":           "#ffffff",
+  "system-boundary":     "#ffffff",
+  // State Machine
+  "state":               "#ffffff",
+  "initial-state":       "#000000",
+  "final-state":         "#000000",
+  "composite-state":     "#ffffff",
+};
+
 /** Return the effective colour for a symbol type, preferring the project config over defaults. */
 export function resolveColor(type: SymbolType, config?: SymbolColorConfig): string {
   return config?.[type] ?? DEFAULT_SYMBOL_COLORS[type] ?? "#e5e7eb";

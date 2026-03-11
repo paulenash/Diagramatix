@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { DiagramType, SymbolType } from "@/app/lib/diagram/types";
-import { DEFAULT_SYMBOL_COLORS, type SymbolColorConfig } from "@/app/lib/diagram/colors";
+import { DEFAULT_SYMBOL_COLORS, BW_SYMBOL_COLORS, type SymbolColorConfig } from "@/app/lib/diagram/colors";
 import { PALETTE_BY_DIAGRAM_TYPE, getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
 
 interface Props {
@@ -38,6 +38,10 @@ export function DiagramMaintenanceModal({ projectId, initialColorConfig, onClose
     setWorkingColors({ ...DEFAULT_SYMBOL_COLORS });
   }
 
+  function handleBlackAndWhite() {
+    setWorkingColors({ ...BW_SYMBOL_COLORS });
+  }
+
   async function handleConfirm() {
     setSaving(true);
     setSaveError("");
@@ -69,6 +73,12 @@ export function DiagramMaintenanceModal({ projectId, initialColorConfig, onClose
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 flex-shrink-0">
           <h2 className="text-lg font-semibold text-gray-900">Diagram Maintenance</h2>
           <div className="flex items-center gap-3">
+            <button
+              onClick={handleBlackAndWhite}
+              className="text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md px-3 py-1.5 hover:bg-gray-50"
+            >
+              Black &amp; White
+            </button>
             <button
               onClick={handleResetToDefaults}
               className="text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md px-3 py-1.5 hover:bg-gray-50"
