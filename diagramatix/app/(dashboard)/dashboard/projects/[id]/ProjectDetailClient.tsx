@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { DiagramType } from "@/app/lib/diagram/types";
+import type { SymbolColorConfig } from "@/app/lib/diagram/colors";
+import { DiagramMaintenanceModal } from "./DiagramMaintenanceModal";
 
 interface DiagramSummary {
   id: string;
@@ -15,6 +17,7 @@ interface DiagramSummary {
 interface ProjectDetail {
   id: string;
   name: string;
+  colorConfig?: unknown;
   diagrams: DiagramSummary[];
 }
 
@@ -47,6 +50,8 @@ export function ProjectDetailClient({ project, otherProjects }: Props) {
   const [diagrams, setDiagrams] = useState(project.diagrams);
 
   const [showNewDiagram, setShowNewDiagram] = useState(false);
+  const [showMaintenance, setShowMaintenance] = useState(false);
+  const [projectColorConfig, setProjectColorConfig] = useState<SymbolColorConfig>((project.colorConfig as SymbolColorConfig | null) ?? {});
   const [newName, setNewName] = useState("");
   const [newType, setNewType] = useState<DiagramType>("basic");
   const [creating, setCreating] = useState(false);
@@ -95,6 +100,12 @@ export function ProjectDetailClient({ project, otherProjects }: Props) {
         </button>
         <h1 className="text-lg font-semibold text-gray-900 flex-1">{project.name}</h1>
         <button
+          onClick={() => setShowMaintenance(true)}
+          className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50"
+        >
+          Diagram Maintenance
+        </button>
+        <button
           onClick={() => setShowNewDiagram(true)}
           className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm font-medium"
         >
@@ -127,6 +138,16 @@ export function ProjectDetailClient({ project, otherProjects }: Props) {
           </div>
         )}
       </main>
+
+      {/* Diagram Maintenance modal */}
+      {showMaintenance && (
+        <DiagramMaintenanceModal
+          projectId={project.id}
+          initialColorConfig={projectColorConfig}
+          onClose={() => setShowMaintenance(false)}
+          onSaved={(config) => setProjectColorConfig(config)}
+        />
+      )}
 
       {/* New Diagram dialog */}
       {showNewDiagram && (

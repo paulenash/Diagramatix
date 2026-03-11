@@ -173,6 +173,7 @@ interface Props {
   onLaneBoundaryMoveEnd?: () => void;
   onConnectorWaypointDragEnd?: (id: string) => void;
   onUpdateCurveHandles?: (id: string, waypoints: Point[], cp1Rel: Point, cp2Rel: Point) => void;
+  colorConfig?: import("@/app/lib/diagram/colors").SymbolColorConfig;
 }
 
 interface EditingLabel {
@@ -286,6 +287,7 @@ export function Canvas({
   onLaneBoundaryMoveEnd,
   onConnectorWaypointDragEnd,
   onUpdateCurveHandles,
+  colorConfig,
 }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
 
@@ -1004,6 +1006,7 @@ export function Canvas({
                     ? () => onElementMoveEnd?.(el.id)
                     : undefined
                 }
+                colorConfig={colorConfig}
               />
             );
           })}
@@ -1026,6 +1029,7 @@ export function Canvas({
               svgToWorld={clientToWorld}
               onUpdateProperties={onUpdateProperties}
               onUpdateLabel={onUpdateLabel}
+              colorConfig={colorConfig}
             />
           ))}
 
@@ -1170,6 +1174,7 @@ export function Canvas({
               onUpdateProperties={onUpdateProperties}
               onUpdateLabel={onUpdateLabel}
               onMoveEnd={() => { setDraggingElementId(null); onElementMoveEnd?.(el.id); }}
+              colorConfig={colorConfig}
               shouldSnapBack={(x, y) => {
                 const cx = x + el.width / 2;
                 const cy = y + el.height / 2;
@@ -1276,6 +1281,7 @@ export function Canvas({
                 svgToWorld={clientToWorld}
                 onUpdateProperties={onUpdateProperties}
                 onUpdateLabel={onUpdateLabel}
+                colorConfig={colorConfig}
               />
             );
           })}
@@ -1297,6 +1303,7 @@ export function Canvas({
               svgToWorld={clientToWorld}
               onUpdateLabel={onUpdateLabel}
               onMoveEnd={() => { setDraggingElementId(null); onElementMoveEnd?.(el.id); }}
+              colorConfig={colorConfig}
             />
           ))}
 

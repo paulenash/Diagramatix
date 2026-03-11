@@ -45,15 +45,24 @@ export async function PUT(req: Request, { params }: Params) {
   }
 
   const body = await req.json();
-  const { name } = body;
+  const { name, colorConfig } = body;
 
-  if (!name?.trim()) {
-    return NextResponse.json({ error: "Name is required" }, { status: 400 });
+  const updateData: Record<string, unknown> = {};
+
+  if (name !== undefined) {
+    if (!name?.trim()) {
+      return NextResponse.json({ error: "Name is required" }, { status: 400 });
+    }
+    updateData.name = name.trim();
+  }
+
+  if (colorConfig !== undefined) {
+    updateData.colorConfig = colorConfig as any;
   }
 
   const updated = await prisma.project.update({
     where: { id },
-    data: { name: name.trim() },
+    data: updateData,
   });
 
   return NextResponse.json(updated);

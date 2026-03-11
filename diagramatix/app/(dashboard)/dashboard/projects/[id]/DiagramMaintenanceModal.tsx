@@ -1,0 +1,141 @@
+"use client";
+
+import { useState } from "react";
+import type { DiagramType, SymbolType } from "@/app/lib/diagram/types";
+import { DEFAULT_SYMBOL_COLORS, type SymbolColorConfig } from "@/app/lib/diagram/colors";
+import { PALETTE_BY_DIAGRAM_TYPE, getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
+
+interface Props {
+  projectId: string;
+  initialColorConfig: SymbolColorConfig;
+  onClose: () => void;
+  onSaved: (config: SymbolColorConfig) => void;
+}
+
+const TABS: { type: DiagramType; label: string }[] = [
+  { type: "bpmn",            label: "BPMN" },
+  { type: "process-context", label: "Process Context" },
+  { type: "state-machine",   label: "State Machine" },
+  { type: "basic",           label: "Basic" },
+];
+
+export function DiagramMaintenanceModal({ projectId, initialColorConfig, onClose, onSaved }: Props) {
+  const [activeTab, setActiveTab] = useState<DiagramType>("bpmn");
+  const [workingColors, setWorkingColors] = useState<SymbolColorConfig>({
+    ...DEFAULT_SYMBOL_COLORS,
+    ...initialColorConfig,
+  });
+  const [saving, setSaving] = useState(false);
+
+  const symbols: SymbolType[] = PALETTE_BY_DIAGRAM_TYPE[activeTab];
+
+  function handleColorChange(type: SymbolType, color: string) {
+    setWorkingColors((prev) => ({ ...prev, [type]: color }));
+  }
+
+  function handleResetToDefaults() {
+    setWorkingColors({ ...DEFAULT_SYMBOL_COLORS });
+  }
+
+  async function handleConfirm() {
+    setSaving(true);
+    try {
+      await fetch(`/api/projects/${projectId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ colorConfig: workingColors }),
+      });
+      onSaved(workingColors);
+      onClose();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col">
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 flex-shrink-0">
+          <h2 className="text-lg font-semibold text-gray-900">Diagram Maintenance</h2>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleResetToDefaults}
+              className="text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md px-3 py-1.5 hover:bg-gray-50"
+            >
+              Reset to Defaults
+            </button>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 text-lg leading-none"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex border-b border-gray-200 px-6 flex-shrink-0">
+          {TABS.map((tab) => (
+            <button
+              key={tab.type}
+              onClick={() => setActiveTab(tab.type)}
+              className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                activeTab === tab.type
+                  ? "border-blue-500 text-blue-600"
+                  : "border-transparent text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Symbol colour rows */}
+        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
+          {symbols.map((symbolType) => {
+            const def = getSymbolDefinition(symbolType);
+            const currentColor = (workingColors[symbolType] ?? DEFAULT_SYMBOL_COLORS[symbolType]) as string;
+            return (
+              <div key={symbolType} className="flex items-center gap-3">
+                {/* Colour swatch */}
+                <div
+                  className="w-6 h-6 rounded border border-gray-300 flex-shrink-0"
+                  style={{ backgroundColor: currentColor }}
+                />
+                {/* Symbol label */}
+                <span className="text-sm text-gray-700 flex-1">{def.label}</span>
+                {/* Colour picker */}
+                <input
+                  type="color"
+                  value={currentColor.startsWith("#") ? currentColor : "#374151"}
+                  onChange={(e) => handleColorChange(symbolType, e.target.value)}
+                  className="w-8 h-8 cursor-pointer rounded border border-gray-200 p-0.5"
+                  title={`Change colour for ${def.label}`}
+                />
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Footer */}
+        <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-200 flex-shrink-0">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleConfirm}
+            disabled={saving}
+            className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+          >
+            {saving ? "Saving…" : "Confirm Changes"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -11,6 +11,7 @@ import type {
   Side,
   SymbolType,
 } from "@/app/lib/diagram/types";
+import type { SymbolColorConfig } from "@/app/lib/diagram/colors";
 import { useDiagram } from "@/app/hooks/useDiagram";
 import { Canvas } from "@/app/components/canvas/Canvas";
 import { Palette } from "@/app/components/canvas/Palette";
@@ -138,6 +139,15 @@ export function DiagramEditor({
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
   const [selectedConnectorId, setSelectedConnectorId] = useState<string | null>(null);
   const [pendingDragSymbol, setPendingDragSymbol] = useState<SymbolType | null>(null);
+  const [projectColorConfig, setProjectColorConfig] = useState<SymbolColorConfig | undefined>(undefined);
+
+  useEffect(() => {
+    if (!projectId) return;
+    fetch(`/api/projects/${projectId}`)
+      .then((r) => r.json())
+      .then((p) => { if (p?.colorConfig) setProjectColorConfig(p.colorConfig as SymbolColorConfig); })
+      .catch(() => {/* fall back to defaults */});
+  }, [projectId]);
 
   const selectedElement = data.elements.find((el) => el.id === selectedElementId) ?? null;
   const selectedConnector = data.connectors.find((c) => c.id === selectedConnectorId) ?? null;
@@ -303,6 +313,7 @@ export function DiagramEditor({
           onLaneBoundaryMoveEnd={laneBoundaryMoveEnd}
           onConnectorWaypointDragEnd={connectorWaypointDragEnd}
           onUpdateCurveHandles={updateCurveHandles}
+          colorConfig={projectColorConfig}
         />
 
         <PropertiesPanel

@@ -1,7 +1,12 @@
 "use client";
 
-import { useState } from "react";
-import type { BpmnTaskType, GatewayType, EventType, DiagramElement, Point, Side } from "@/app/lib/diagram/types";
+import { useState, createContext, useContext } from "react";
+import type { BpmnTaskType, GatewayType, EventType, DiagramElement, Point, Side, SymbolType } from "@/app/lib/diagram/types";
+import { type SymbolColorConfig, resolveColor } from "@/app/lib/diagram/colors";
+
+/** React context carrying the active project colour config.  Shape components
+ *  read from it; when undefined, resolveColor falls back to defaults. */
+const SymbolColorCtx = createContext<SymbolColorConfig | undefined>(undefined);
 
 export type ResizeHandle = "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w";
 
@@ -25,6 +30,7 @@ interface Props {
   onMoveEnd?: () => void;
   onUpdateProperties?: (id: string, props: Record<string, unknown>) => void;
   onUpdateLabel?: (id: string, label: string) => void;
+  colorConfig?: SymbolColorConfig;
 }
 
 function ellipseOctagonPoints(cx: number, cy: number, rx: number, ry: number): string {
@@ -86,11 +92,12 @@ function getClosestSideFromPoint(pt: Point, el: DiagramElement): Side {
 }
 
 function TaskShape({ el }: { el: DiagramElement }) {
+  const colors = useContext(SymbolColorCtx);
   const hasLoop = el.repeatType === "loop";
   return (
     <g>
       <rect x={el.x} y={el.y} width={el.width} height={el.height}
-        rx={4} ry={4} fill="#fef9c3" stroke="#374151" strokeWidth={1.5} />
+        rx={4} ry={4} fill={resolveColor("task", colors)} stroke="#374151" strokeWidth={1.5} />
       {hasLoop && <LoopMarker cx={el.x + el.width / 2} cy={el.y + el.height - 10} />}
     </g>
   );
@@ -128,12 +135,13 @@ function GatewayMarker({ type, cx, cy }: { type: GatewayType; cx: number; cy: nu
 }
 
 function GatewayShape({ el }: { el: DiagramElement }) {
+  const colors = useContext(SymbolColorCtx);
   const cx = el.x + el.width / 2;
   const cy = el.y + el.height / 2;
   const points = `${cx},${el.y} ${el.x + el.width},${cy} ${cx},${el.y + el.height} ${el.x},${cy}`;
   return (
     <g>
-      <polygon points={points} fill="#f3e8ff" stroke="#374151" strokeWidth={1.5} />
+      <polygon points={points} fill={resolveColor("gateway", colors)} stroke="#374151" strokeWidth={1.5} />
       {el.gatewayType && <GatewayMarker type={el.gatewayType} cx={cx} cy={cy} />}
     </g>
   );
@@ -200,12 +208,14 @@ function EventMarker({ type, cx, cy, r, filled }: {
 }
 
 function StartEventShape({ el }: { el: DiagramElement }) {
+  const colors = useContext(SymbolColorCtx);
   const cx = el.x + el.width / 2;
   const cy = el.y + el.height / 2;
   const r  = el.width / 2;
+  const fill = resolveColor("start-event", colors);
   return (
     <g>
-      <circle cx={cx} cy={cy} r={r} fill="#dcfce7" stroke="#374151" strokeWidth={2} />
+      <circle cx={cx} cy={cy} r={r} fill={fill} stroke="#374151" strokeWidth={2} />
       {el.eventType && el.eventType !== "none" &&
         <EventMarker type={el.eventType} cx={cx} cy={cy} r={r} />}
     </g>
@@ -213,12 +223,14 @@ function StartEventShape({ el }: { el: DiagramElement }) {
 }
 
 function EndEventShape({ el }: { el: DiagramElement }) {
+  const colors = useContext(SymbolColorCtx);
   const cx = el.x + el.width / 2;
   const cy = el.y + el.height / 2;
   const r  = el.width / 2;
+  const fill = resolveColor("end-event", colors);
   return (
     <g>
-      <circle cx={cx} cy={cy} r={r} fill="#fca5a5" stroke="#374151" strokeWidth={3} />
+      <circle cx={cx} cy={cy} r={r} fill={fill} stroke="#374151" strokeWidth={3} />
       {el.eventType && el.eventType !== "none" &&
         <EventMarker type={el.eventType} cx={cx} cy={cy} r={r} filled />}
     </g>
@@ -226,13 +238,15 @@ function EndEventShape({ el }: { el: DiagramElement }) {
 }
 
 function IntermediateEventShape({ el }: { el: DiagramElement }) {
+  const colors = useContext(SymbolColorCtx);
   const cx = el.x + el.width / 2;
   const cy = el.y + el.height / 2;
   const r  = el.width / 2;
+  const fill = resolveColor("intermediate-event", colors);
   return (
     <g>
-      <circle cx={cx} cy={cy} r={r} fill="#fed7aa" stroke="#374151" strokeWidth={2} />
-      <circle cx={cx} cy={cy} r={r - 3} fill="#fed7aa" stroke="#374151" strokeWidth={1.5} />
+      <circle cx={cx} cy={cy} r={r} fill={fill} stroke="#374151" strokeWidth={2} />
+      <circle cx={cx} cy={cy} r={r - 3} fill={fill} stroke="#374151" strokeWidth={1.5} />
       {el.eventType && el.eventType !== "none" &&
         <EventMarker type={el.eventType} cx={cx} cy={cy} r={r - 4} filled={el.flowType === "throwing" || (el.flowType == null && el.taskType === "send")} />}
     </g>
@@ -269,15 +283,19 @@ function DataObjectShape({ el }: { el: DiagramElement }) {
   const ly2 = y + h - 3;
   const ly1 = ly2 - lineH;
 
+  const colors = useContext(SymbolColorCtx);
+  const fill = resolveColor("data-object", colors);
+  // Derive fold colour as a slightly darker tint of the main fill
+  const foldFill = fill === "#bfdbfe" ? "#93c5fd" : fill;
   return (
     <g>
       <polygon
         points={`${x},${y} ${x+w-fold},${y} ${x+w},${y+fold} ${x+w},${y+h} ${x},${y+h}`}
-        fill="#bfdbfe" stroke="#374151" strokeWidth={1.5}
+        fill={fill} stroke="#374151" strokeWidth={1.5}
       />
       <polygon
         points={`${x+w-fold},${y} ${x+w},${y+fold} ${x+w-fold},${y+fold}`}
-        fill="#93c5fd" stroke="#374151" strokeWidth={1.5}
+        fill={foldFill} stroke="#374151" strokeWidth={1.5}
       />
       {role === "output" && (
         <polygon points={markerPts} fill="#374151" />
@@ -297,6 +315,8 @@ function DataObjectShape({ el }: { el: DiagramElement }) {
 }
 
 function DataStoreShape({ el }: { el: DiagramElement }) {
+  const colors = useContext(SymbolColorCtx);
+  const fill = resolveColor("data-store", colors);
   const { x, y, width: w, height: h } = el;
   const rx = w / 2;
   const ry = Math.max(4, Math.round(h * 0.15));
@@ -315,8 +335,8 @@ function DataStoreShape({ el }: { el: DiagramElement }) {
   const mly1     = mly2 - mLineH;
   return (
     <g>
-      <path d={bodyPath} fill="#60a5fa" stroke="#374151" strokeWidth={1.5} />
-      <ellipse cx={x + rx} cy={cy1} rx={rx} ry={ry} fill="#60a5fa" stroke="#374151" strokeWidth={1.5} />
+      <path d={bodyPath} fill={fill} stroke="#374151" strokeWidth={1.5} />
+      <ellipse cx={x + rx} cy={cy1} rx={rx} ry={ry} fill={fill} stroke="#374151" strokeWidth={1.5} />
       <path d={bottomHalf(cy2)} fill="none" stroke="#374151" strokeWidth={1.5} />
       <path d={bottomHalf(cy3)} fill="none" stroke="#374151" strokeWidth={1.5} />
       {multiplicity === "collection" && (
@@ -331,24 +351,28 @@ function DataStoreShape({ el }: { el: DiagramElement }) {
 }
 
 function UseCaseShape({ el }: { el: DiagramElement }) {
+  const colors = useContext(SymbolColorCtx);
   return (
     <ellipse
       cx={el.x + el.width / 2} cy={el.y + el.height / 2}
       rx={el.width / 2} ry={el.height / 2}
-      fill="#fef9c3" stroke="#374151" strokeWidth={1.5}
+      fill={resolveColor("use-case", colors)} stroke="#374151" strokeWidth={1.5}
     />
   );
 }
 
 function HourglassShape({ el }: { el: DiagramElement }) {
+  const colors = useContext(SymbolColorCtx);
   const { x, y, width: w, height: h } = el;
   const cx = x + w / 2;
   const cy = y + h / 2;
   const points = `${x},${y} ${x + w},${y} ${cx},${cy} ${x + w},${y + h} ${x},${y + h} ${cx},${cy}`;
-  return <polygon points={points} fill="white" stroke="#374151" strokeWidth={1.5} />;
+  return <polygon points={points} fill={resolveColor("hourglass", colors)} stroke="#374151" strokeWidth={1.5} />;
 }
 
 function SystemBoundaryShape({ el }: { el: DiagramElement }) {
+  const colors = useContext(SymbolColorCtx);
+  const headerColor = resolveColor("system-boundary", colors);
   return (
     <g>
       {/* Outer rect with light blue fill */}
@@ -356,9 +380,9 @@ function SystemBoundaryShape({ el }: { el: DiagramElement }) {
         fill="rgba(219,234,254,0.3)" stroke="#374151" strokeWidth={1.5} rx={2} />
       {/* Header fill */}
       <rect x={el.x} y={el.y} width={el.width} height={HEADER_H}
-        fill="#dbeafe" stroke="none" rx={2} />
+        fill={headerColor} stroke="none" rx={2} />
       {/* Clip bottom corners of header fill */}
-      <rect x={el.x} y={el.y + HEADER_H - 2} width={el.width} height={2} fill="#dbeafe" />
+      <rect x={el.x} y={el.y + HEADER_H - 2} width={el.width} height={2} fill={headerColor} />
       {/* Header bottom border */}
       <line x1={el.x} y1={el.y + HEADER_H} x2={el.x + el.width} y2={el.y + HEADER_H}
         stroke="#374151" strokeWidth={1} />
@@ -367,6 +391,8 @@ function SystemBoundaryShape({ el }: { el: DiagramElement }) {
 }
 
 function CompositeStateShape({ el }: { el: DiagramElement }) {
+  const colors = useContext(SymbolColorCtx);
+  const headerColor = resolveColor("composite-state", colors);
   return (
     <g>
       {/* Outer rounded rect with light lavender fill */}
@@ -374,9 +400,9 @@ function CompositeStateShape({ el }: { el: DiagramElement }) {
         fill="rgba(237,233,254,0.4)" stroke="#374151" strokeWidth={1.5} rx={12} />
       {/* Header fill */}
       <rect x={el.x} y={el.y} width={el.width} height={HEADER_H}
-        fill="#ede9fe" stroke="none" rx={12} />
+        fill={headerColor} stroke="none" rx={12} />
       {/* Clip bottom corners of header fill */}
-      <rect x={el.x} y={el.y + HEADER_H - 2} width={el.width} height={2} fill="#ede9fe" />
+      <rect x={el.x} y={el.y + HEADER_H - 2} width={el.width} height={2} fill={headerColor} />
       {/* Header bottom border */}
       <line x1={el.x} y1={el.y + HEADER_H} x2={el.x + el.width} y2={el.y + HEADER_H}
         stroke="#374151" strokeWidth={1} />
@@ -385,6 +411,8 @@ function CompositeStateShape({ el }: { el: DiagramElement }) {
 }
 
 function GroupShape({ el }: { el: DiagramElement }) {
+  const colors = useContext(SymbolColorCtx);
+  const fill = resolveColor("group", colors);
   return (
     <g>
       {/* Wide transparent stroke — border-only hit target (±8px of border) */}
@@ -393,7 +421,7 @@ function GroupShape({ el }: { el: DiagramElement }) {
         style={{ pointerEvents: "stroke" }} />
       {/* Visual dashed-dotted border — no pointer events */}
       <rect x={el.x} y={el.y} width={el.width} height={el.height}
-        rx={8} fill="rgba(249,250,251,0.15)" stroke="#374151" strokeWidth={1.5}
+        rx={8} fill={fill} stroke="#374151" strokeWidth={1.5}
         strokeDasharray="10 3.5 2 3.5"
         style={{ pointerEvents: "none" }} />
     </g>
@@ -402,10 +430,10 @@ function GroupShape({ el }: { el: DiagramElement }) {
 
 // Reusable stick figure
 function StickFigure({
-  cx, top, headR = 8, bodyLen = 16, armHalfSpan = 18, legSpread = 16, legLen = 12,
+  cx, top, headR = 8, bodyLen = 16, armHalfSpan = 18, legSpread = 16, legLen = 12, stroke = "#374151",
 }: {
   cx: number; top: number; headR?: number; bodyLen?: number;
-  armHalfSpan?: number; legSpread?: number; legLen?: number;
+  armHalfSpan?: number; legSpread?: number; legLen?: number; stroke?: string;
 }) {
   const headCy = top + headR;
   const bodyTop = headCy + headR;
@@ -413,16 +441,18 @@ function StickFigure({
   const armY = bodyTop + bodyLen * 0.5;
   return (
     <g>
-      <circle cx={cx} cy={headCy} r={headR} fill="white" stroke="#374151" strokeWidth={1.5} />
-      <line x1={cx} y1={bodyTop} x2={cx} y2={bodyBot} stroke="#374151" strokeWidth={1.5} />
-      <line x1={cx - armHalfSpan} y1={armY} x2={cx + armHalfSpan} y2={armY} stroke="#374151" strokeWidth={1.5} />
-      <line x1={cx} y1={bodyBot} x2={cx - legSpread} y2={bodyBot + legLen} stroke="#374151" strokeWidth={1.5} />
-      <line x1={cx} y1={bodyBot} x2={cx + legSpread} y2={bodyBot + legLen} stroke="#374151" strokeWidth={1.5} />
+      <circle cx={cx} cy={headCy} r={headR} fill="white" stroke={stroke} strokeWidth={1.5} />
+      <line x1={cx} y1={bodyTop} x2={cx} y2={bodyBot} stroke={stroke} strokeWidth={1.5} />
+      <line x1={cx - armHalfSpan} y1={armY} x2={cx + armHalfSpan} y2={armY} stroke={stroke} strokeWidth={1.5} />
+      <line x1={cx} y1={bodyBot} x2={cx - legSpread} y2={bodyBot + legLen} stroke={stroke} strokeWidth={1.5} />
+      <line x1={cx} y1={bodyBot} x2={cx + legSpread} y2={bodyBot + legLen} stroke={stroke} strokeWidth={1.5} />
     </g>
   );
 }
 
 function ActorShape({ el }: { el: DiagramElement }) {
+  const colors = useContext(SymbolColorCtx);
+  const stroke = resolveColor("actor", colors);
   const headR = 10;
   const bodyLen = 16;
   return (
@@ -434,30 +464,35 @@ function ActorShape({ el }: { el: DiagramElement }) {
       armHalfSpan={el.width / 2 - 4}
       legSpread={el.width / 2 - 6}
       legLen={12}
+      stroke={stroke}
     />
   );
 }
 
 function TeamShape({ el }: { el: DiagramElement }) {
+  const colors = useContext(SymbolColorCtx);
+  const stroke = resolveColor("team", colors);
   const cx = el.x + el.width / 2;
   const top = el.y + 4;
   return (
     <g>
-      <StickFigure cx={cx - 30} top={top} headR={6} bodyLen={10} armHalfSpan={14} legSpread={12} legLen={8} />
-      <StickFigure cx={cx + 30} top={top} headR={6} bodyLen={10} armHalfSpan={14} legSpread={12} legLen={8} />
-      <StickFigure cx={cx}      top={top} headR={9} bodyLen={14} armHalfSpan={14} legSpread={12} legLen={12} />
+      <StickFigure cx={cx - 30} top={top} headR={6} bodyLen={10} armHalfSpan={14} legSpread={12} legLen={8} stroke={stroke} />
+      <StickFigure cx={cx + 30} top={top} headR={6} bodyLen={10} armHalfSpan={14} legSpread={12} legLen={8} stroke={stroke} />
+      <StickFigure cx={cx}      top={top} headR={9} bodyLen={14} armHalfSpan={14} legSpread={12} legLen={12} stroke={stroke} />
     </g>
   );
 }
 
 function SystemShape({ el }: { el: DiagramElement }) {
+  const colors = useContext(SymbolColorCtx);
+  const fill = resolveColor("system", colors);
   const lineAreaEnd = el.y + el.height / 3;
   const lineSpacing = (lineAreaEnd - el.y - 8) / 2;
   const midY = el.y + 8 + lineSpacing;
   const gap = lineSpacing / 2;
   return (
     <g>
-      <rect x={el.x} y={el.y} width={el.width} height={el.height} rx={3} fill="white" stroke="#374151" strokeWidth={1.5} />
+      <rect x={el.x} y={el.y} width={el.width} height={el.height} rx={3} fill={fill} stroke="#374151" strokeWidth={1.5} />
       <line x1={el.x + 4} y1={midY - gap} x2={el.x + el.width - 4} y2={midY - gap} stroke="#374151" strokeWidth={1.5} />
       <line x1={el.x + 4} y1={midY}       x2={el.x + el.width - 4} y2={midY}       stroke="#374151" strokeWidth={1.5} />
       <line x1={el.x + 4} y1={midY + gap} x2={el.x + el.width - 4} y2={midY + gap} stroke="#374151" strokeWidth={1.5} />
@@ -466,31 +501,37 @@ function SystemShape({ el }: { el: DiagramElement }) {
 }
 
 function StateShape({ el }: { el: DiagramElement }) {
+  const colors = useContext(SymbolColorCtx);
   return (
     <rect x={el.x} y={el.y} width={el.width} height={el.height}
-      rx={12} ry={12} fill="#dbeafe" stroke="#374151" strokeWidth={1.5} />
+      rx={12} ry={12} fill={resolveColor("state", colors)} stroke="#374151" strokeWidth={1.5} />
   );
 }
 
 function InitialStateShape({ el }: { el: DiagramElement }) {
+  const colors = useContext(SymbolColorCtx);
   return (
-    <circle cx={el.x + el.width / 2} cy={el.y + el.height / 2} r={el.width / 2} fill="#374151" />
+    <circle cx={el.x + el.width / 2} cy={el.y + el.height / 2} r={el.width / 2}
+      fill={resolveColor("initial-state", colors)} />
   );
 }
 
 function FinalStateShape({ el }: { el: DiagramElement }) {
+  const colors = useContext(SymbolColorCtx);
+  const disc = resolveColor("final-state", colors);
   const cx = el.x + el.width / 2;
   const cy = el.y + el.height / 2;
   const r = el.width / 2;
   return (
     <g>
       <circle cx={cx} cy={cy} r={r} fill="white" stroke="#374151" strokeWidth={2} />
-      <circle cx={cx} cy={cy} r={r - 5} fill="#374151" />
+      <circle cx={cx} cy={cy} r={r - 5} fill={disc} />
     </g>
   );
 }
 
 function SubprocessShape({ el }: { el: DiagramElement }) {
+  const colors = useContext(SymbolColorCtx);
   const hasLoop = el.repeatType === "loop";
   const markerW = 14, markerH = 14;
   // "+" always stays centred; loop marker sits to the left with 4px gap
@@ -501,7 +542,7 @@ function SubprocessShape({ el }: { el: DiagramElement }) {
   return (
     <g>
       <rect x={el.x} y={el.y} width={el.width} height={el.height}
-        rx={4} ry={4} fill="#fef08a" stroke="#374151" strokeWidth={1.5} />
+        rx={4} ry={4} fill={resolveColor("subprocess", colors)} stroke="#374151" strokeWidth={1.5} />
       <rect x={mx} y={my} width={markerW} height={markerH}
         rx={2} fill="white" stroke="#374151" strokeWidth={1} />
       <line x1={mx + markerW / 2} y1={my + 3} x2={mx + markerW / 2} y2={my + markerH - 3}
@@ -514,11 +555,12 @@ function SubprocessShape({ el }: { el: DiagramElement }) {
 }
 
 function ExpandedSubprocessShape({ el }: { el: DiagramElement }) {
+  const colors = useContext(SymbolColorCtx);
   const hasLoop = el.repeatType === "loop";
   return (
     <g>
       <rect x={el.x} y={el.y} width={el.width} height={el.height}
-        rx={4} ry={4} fill="#fef4a7" stroke="#374151" strokeWidth={1.5} />
+        rx={4} ry={4} fill={resolveColor("subprocess-expanded", colors)} stroke="#374151" strokeWidth={1.5} />
       {hasLoop && <LoopMarker cx={el.x + el.width / 2} cy={el.y + el.height - 10} />}
     </g>
   );
@@ -623,11 +665,12 @@ function LoopMarker({ cx, cy }: { cx: number; cy: number }) {
 }
 
 function BpmnTaskShape({ el }: { el: DiagramElement }) {
+  const colors = useContext(SymbolColorCtx);
   const hasLoop = el.repeatType === "loop";
   return (
     <g>
       <rect x={el.x} y={el.y} width={el.width} height={el.height}
-        rx={4} ry={4} fill="#fef9c3" stroke="#374151" strokeWidth={1.5} />
+        rx={4} ry={4} fill={resolveColor("task", colors)} stroke="#374151" strokeWidth={1.5} />
       {el.taskType && el.taskType !== "none" && (
         <BpmnTaskMarker taskType={el.taskType} x={el.x + 4} y={el.y + 4} />
       )}
@@ -637,6 +680,7 @@ function BpmnTaskShape({ el }: { el: DiagramElement }) {
 }
 
 function PoolShape({ el }: { el: DiagramElement }) {
+  const colors = useContext(SymbolColorCtx);
   const { x, y, width: w, height: h } = el;
   const LW = 30;
   const cx = x + LW / 2;
@@ -653,7 +697,7 @@ function PoolShape({ el }: { el: DiagramElement }) {
   return (
     <g>
       <rect x={x} y={y} width={w} height={h} fill="#f9fafb" stroke="#374151" strokeWidth={1.5} />
-      <rect x={x} y={y} width={LW} height={h} fill="#c8956a" stroke="#374151" strokeWidth={1.5}
+      <rect x={x} y={y} width={LW} height={h} fill={resolveColor("pool", colors)} stroke="#374151" strokeWidth={1.5}
         style={isWhiteBox ? { cursor: "pointer" } : undefined} />
       <text textAnchor="middle" fontSize={11} fill="#3b1a08" fontWeight="bold"
             transform={`rotate(-90,${cx},${cy})`}
@@ -674,6 +718,7 @@ function PoolShape({ el }: { el: DiagramElement }) {
 }
 
 function LaneShape({ el }: { el: DiagramElement }) {
+  const colors = useContext(SymbolColorCtx);
   const { x, y, width: w, height: h } = el;
   const LW = 24;
   const cx = x + LW / 2;
@@ -683,7 +728,7 @@ function LaneShape({ el }: { el: DiagramElement }) {
   return (
     <g>
       <rect x={x} y={y} width={w} height={h} fill="none" stroke="#374151" strokeWidth={1} />
-      <rect x={x} y={y} width={LW} height={h} fill="#e8c4a0" stroke="#374151" strokeWidth={1} />
+      <rect x={x} y={y} width={LW} height={h} fill={resolveColor("lane", colors)} stroke="#374151" strokeWidth={1} />
       <text textAnchor="middle" fontSize={10} fill="#3b1a08" fontWeight="bold"
             transform={`rotate(-90,${cx},${cy})`}
             style={{ userSelect: "none", pointerEvents: "none" }}>
@@ -780,6 +825,7 @@ export function SymbolRenderer({
   onMoveEnd,
   onUpdateProperties,
   onUpdateLabel,
+  colorConfig,
 }: Props) {
   const [isEditingGatewayLabel, setIsEditingGatewayLabel] = useState(false);
   const [editGatewayLabelValue, setEditGatewayLabelValue] = useState("");
@@ -859,6 +905,7 @@ export function SymbolRenderer({
     && !element.boundaryHostId;
 
   return (
+    <SymbolColorCtx.Provider value={colorConfig}>
     <g
       onMouseDown={handleMouseDown}
       onDoubleClick={(e) => { e.stopPropagation(); onDoubleClick(); }}
@@ -1322,5 +1369,6 @@ export function SymbolRenderer({
         );
       })()}
     </g>
+    </SymbolColorCtx.Provider>
   );
 }
