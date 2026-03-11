@@ -145,7 +145,7 @@ function nanoid(): string {
   return Math.random().toString(36).slice(2, 10);
 }
 
-const DATA_ELEMENT_TYPES = new Set<SymbolType>(["data-object", "data-store"]);
+const DATA_ELEMENT_TYPES = new Set<SymbolType>(["data-object", "data-store", "text-annotation"]);
 
 const BPMN_CONTENT_TYPES = new Set<SymbolType>([
   "task", "gateway", "start-event", "end-event", "intermediate-event",

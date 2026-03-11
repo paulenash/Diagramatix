@@ -428,6 +428,27 @@ function GroupShape({ el }: { el: DiagramElement }) {
   );
 }
 
+function TextAnnotationShape({ el }: { el: DiagramElement }) {
+  const colors = useContext(SymbolColorCtx);
+  const lineColor = resolveColor("text-annotation", colors);
+  const capLen = 12;
+  return (
+    <g>
+      {/* Invisible hit target for the entire bounding box */}
+      <rect x={el.x} y={el.y} width={el.width} height={el.height}
+        fill="rgba(0,0,0,0)" stroke="none"
+        style={{ pointerEvents: "fill" }} />
+      {/* Left bracket: top cap, vertical line, bottom cap */}
+      <line x1={el.x + capLen} y1={el.y} x2={el.x} y2={el.y}
+        stroke={lineColor} strokeWidth={1.5} />
+      <line x1={el.x} y1={el.y} x2={el.x} y2={el.y + el.height}
+        stroke={lineColor} strokeWidth={1.5} />
+      <line x1={el.x} y1={el.y + el.height} x2={el.x + capLen} y2={el.y + el.height}
+        stroke={lineColor} strokeWidth={1.5} />
+    </g>
+  );
+}
+
 // Reusable stick figure
 function StickFigure({
   cx, top, headR = 8, bodyLen = 16, armHalfSpan = 18, legSpread = 16, legLen = 12, stroke = "#374151",
@@ -758,6 +779,7 @@ function SymbolShape({ el }: { el: DiagramElement }) {
     case "system-boundary":   return <SystemBoundaryShape el={el} />;
     case "composite-state":   return <CompositeStateShape el={el} />;
     case "group":             return <GroupShape el={el} />;
+    case "text-annotation":   return <TextAnnotationShape el={el} />;
     case "system":            return <SystemShape el={el} />;
     case "pool":              return <PoolShape el={el} />;
     case "lane":              return <LaneShape el={el} />;
@@ -900,7 +922,8 @@ export function SymbolRenderer({
     ((element.properties.poolType as string | undefined) ?? "black-box") === "white-box";
   const isContainer = isBoundary || element.type === "composite-state" || isPoolLane; // gets resize handles
   const canResize = isContainer || element.type === "task" || element.type === "subprocess" ||
-    element.type === "subprocess-expanded" || element.type === "use-case" || element.type === "group";
+    element.type === "subprocess-expanded" || element.type === "use-case" || element.type === "group" ||
+    element.type === "text-annotation";
   const showLabel = element.type !== "initial-state" && element.type !== "final-state"
     && !element.boundaryHostId;
 
@@ -1068,6 +1091,22 @@ export function SymbolRenderer({
               />
             )}
           </g>
+        );
+      })() : showLabel && element.type === 'text-annotation' ? (() => {
+        const PAD = 16;
+        const lines = wrapText(element.label, element.width - PAD - 4);
+        const lineH = 14;
+        const totalH = lines.length * lineH;
+        const topY = element.y + element.height / 2 - totalH / 2;
+        return (
+          <text textAnchor="start" fontSize={12} fill="#111827"
+            style={{ userSelect: "none", pointerEvents: "none" }}>
+            {lines.map((line, i) => (
+              <tspan key={i} x={element.x + PAD} y={topY + i * lineH + lineH * 0.85}>
+                {line}
+              </tspan>
+            ))}
+          </text>
         );
       })() : showLabel && !(
         element.type === 'task' ||

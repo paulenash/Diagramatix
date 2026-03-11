@@ -156,6 +156,13 @@ export const ALL_SYMBOLS: SymbolDefinition[] = [
     defaultHeight: 160,
     description: "A BPMN group annotation container",
   },
+  {
+    type: "text-annotation",
+    label: "Annotation",
+    defaultWidth: 100,
+    defaultHeight: 60,
+    description: "A text annotation comment",
+  },
 ];
 
 export const PALETTE_BY_DIAGRAM_TYPE: Record<DiagramType, SymbolType[]> = {
@@ -174,6 +181,7 @@ export const PALETTE_BY_DIAGRAM_TYPE: Record<DiagramType, SymbolType[]> = {
     "data-store",
     "end-event",
     "group",
+    "text-annotation",
   ],
 };
 

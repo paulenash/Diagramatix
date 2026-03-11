@@ -22,7 +22,8 @@ export type SymbolType =
   | "system"
   | "data-object"
   | "data-store"
-  | "group";
+  | "group"
+  | "text-annotation";
 
 export type BpmnTaskType =
   | "none"

@@ -197,6 +197,18 @@ function PaletteSymbolPreview({ type, colorConfig }: { type: SymbolType; colorCo
             strokeDasharray="6 2.5 1.5 2.5" />
         </svg>
       );
+    case "text-annotation": {
+      const c = resolveColor("text-annotation", colorConfig);
+      return (
+        <svg width={36} height={21} viewBox="0 0 48 28">
+          <line x1={12} y1={2} x2={4} y2={2} stroke={c} strokeWidth={1.5} />
+          <line x1={4} y1={2} x2={4} y2={26} stroke={c} strokeWidth={1.5} />
+          <line x1={4} y1={26} x2={12} y2={26} stroke={c} strokeWidth={1.5} />
+          <line x1={14} y1={10} x2={40} y2={10} stroke="#9ca3af" strokeWidth={1} />
+          <line x1={14} y1={16} x2={34} y2={16} stroke="#9ca3af" strokeWidth={1} />
+        </svg>
+      );
+    }
     default:
       return (
         <svg width={36} height={21} viewBox="0 0 48 28">

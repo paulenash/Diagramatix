@@ -18,6 +18,7 @@ export const DEFAULT_SYMBOL_COLORS: Record<SymbolType, string> = {
   "data-object":         "#bfdbfe",
   "data-store":          "#60a5fa",
   "group":               "#374151",   // boundary line colour
+  "text-annotation":     "#374151",   // bracket line colour
   // Process Context
   "use-case":            "#fef9c3",
   "actor":               "#374151",   // stroke/line colour for stick figure

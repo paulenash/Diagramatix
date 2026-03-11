@@ -22,7 +22,7 @@ const HEADER_H = 28;
 const MIN_BOUNDARY_W = 100;
 const MIN_BOUNDARY_H = HEADER_H + 40;
 
-const DATA_ELEMENT_TYPES = new Set<SymbolType>(["data-object", "data-store"]);
+const DATA_ELEMENT_TYPES = new Set<SymbolType>(["data-object", "data-store", "text-annotation"]);
 
 function getElementPoolId(el: DiagramElement, elements: DiagramElement[]): string | null {
   if (el.type === "pool") return el.id;
@@ -429,7 +429,10 @@ export function Canvas({
           let connDirection: DirectionType;
 
           if (isDataConn) {
-            connType = "associationBPMN"; connRouting = "direct"; connDirection = "open-directed";
+            const isAnnotationConn =
+              sourceEl?.type === "text-annotation" || targetEl.type === "text-annotation";
+            connType = "associationBPMN"; connRouting = "direct";
+            connDirection = isAnnotationConn ? "non-directed" : "open-directed";
           } else if (defaultRoutingType === "curvilinear") {
             connType = "transition"; connRouting = defaultRoutingType; connDirection = defaultDirectionType;
           } else if ((sourceEl && actorLike.includes(sourceEl.type)) || actorLike.includes(targetEl.type)) {
