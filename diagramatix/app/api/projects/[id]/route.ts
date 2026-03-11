@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { prisma } from "@/app/lib/db";
+import { prisma, pgPool } from "@/app/lib/db";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -52,18 +52,23 @@ export async function PUT(req: Request, { params }: Params) {
   }
 
   try {
-    const updated = await prisma.project.update({
-      where: { id },
-      data: {
-        ...(name !== undefined && { name: name.trim() }),
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        ...(colorConfig !== undefined && { colorConfig: colorConfig as any }),
-      },
-    });
+    // Update name via Prisma ORM if provided
+    if (name !== undefined) {
+      await prisma.project.update({ where: { id }, data: { name: name.trim() } });
+    }
+    // Update colorConfig via raw SQL — Prisma 7 parameterization schema
+    // does not include JSON fields in the ProjectUpdateInput graph.
+    if (colorConfig !== undefined) {
+      await pgPool.query(
+        'UPDATE "Project" SET "colorConfig" = $1::jsonb, "updatedAt" = NOW() WHERE id = $2',
+        [JSON.stringify(colorConfig), id]
+      );
+    }
+    const updated = await prisma.project.findFirst({ where: { id } });
     return NextResponse.json(updated);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error("[PUT /api/projects] Prisma error:", message);
+    console.error("[PUT /api/projects] error:", message);
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
