@@ -47,26 +47,18 @@ export async function PUT(req: Request, { params }: Params) {
   }
 
   try {
-    // Only call ORM update when there are actual fields to update
-    if (name !== undefined || data !== undefined || projectId !== undefined) {
+    if (name !== undefined || data !== undefined || projectId !== undefined || colorConfig !== undefined) {
       await prisma.diagram.update({
         where: { id },
         data: {
           ...(name !== undefined && { name }),
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           ...(data !== undefined && { data: data as any }),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          ...(colorConfig !== undefined && { colorConfig: colorConfig as any }),
           ...(projectId !== undefined && { projectId }),
         },
       });
-    }
-
-    // Update colorConfig via raw SQL (Prisma 7 JSON field limitation)
-    if (colorConfig !== undefined) {
-      await prisma.$executeRawUnsafe(
-        'UPDATE "Diagram" SET "colorConfig" = $1::jsonb, "updatedAt" = NOW() WHERE id = $2',
-        JSON.stringify(colorConfig),
-        id
-      );
     }
 
     const updated = await prisma.diagram.findFirst({ where: { id } });
