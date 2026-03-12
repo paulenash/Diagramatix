@@ -304,7 +304,7 @@ export function DiagramEditor({
           onClick={() => setShowDiagramMaintenance(true)}
           className="px-3 py-1.5 text-xs text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
         >
-          Maintenance
+          Diagram Maintenance
         </button>
 
         <button
