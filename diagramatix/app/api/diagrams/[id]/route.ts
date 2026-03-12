@@ -36,7 +36,7 @@ export async function PUT(req: Request, { params }: Params) {
   }
 
   const body = await req.json();
-  const { name, data, projectId, colorConfig } = body;
+  const { name, data, projectId, colorConfig, displayMode } = body;
 
   // Validate project ownership if non-null projectId supplied
   if (projectId !== undefined && projectId !== null) {
@@ -47,7 +47,7 @@ export async function PUT(req: Request, { params }: Params) {
   }
 
   try {
-    if (name !== undefined || data !== undefined || projectId !== undefined || colorConfig !== undefined) {
+    if (name !== undefined || data !== undefined || projectId !== undefined || colorConfig !== undefined || displayMode !== undefined) {
       await prisma.diagram.update({
         where: { id },
         data: {
@@ -57,6 +57,7 @@ export async function PUT(req: Request, { params }: Params) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           ...(colorConfig !== undefined && { colorConfig: colorConfig as any }),
           ...(projectId !== undefined && { projectId }),
+          ...(displayMode !== undefined && { displayMode }),
         },
       });
     }

@@ -11,7 +11,8 @@ import type {
   Side,
   SymbolType,
 } from "@/app/lib/diagram/types";
-import { DEFAULT_SYMBOL_COLORS, type SymbolColorConfig } from "@/app/lib/diagram/colors";
+import { BW_SYMBOL_COLORS, DEFAULT_SYMBOL_COLORS, type SymbolColorConfig } from "@/app/lib/diagram/colors";
+import type { DisplayMode } from "@/app/lib/diagram/displayMode";
 import { DiagramColorModal } from "./DiagramColorModal";
 import { useDiagram } from "@/app/hooks/useDiagram";
 import { Canvas } from "@/app/components/canvas/Canvas";
@@ -25,6 +26,7 @@ interface Props {
   initialData: DiagramData;
   projectId: string | null;
   initialDiagramColorConfig?: SymbolColorConfig;
+  initialDisplayMode?: DisplayMode;
 }
 
 function useAutoSave(
@@ -88,6 +90,7 @@ export function DiagramEditor({
   initialData,
   projectId,
   initialDiagramColorConfig,
+  initialDisplayMode,
 }: Props) {
   const router = useRouter();
 
@@ -144,6 +147,7 @@ export function DiagramEditor({
   const [pendingDragSymbol, setPendingDragSymbol] = useState<SymbolType | null>(null);
   const [projectColorConfig, setProjectColorConfig] = useState<SymbolColorConfig | undefined>(undefined);
   const [diagramColorConfig, setDiagramColorConfig] = useState<SymbolColorConfig>(initialDiagramColorConfig ?? {});
+  const [displayMode, setDisplayMode] = useState<DisplayMode>(initialDisplayMode ?? "normal");
   const [showDiagramMaintenance, setShowDiagramMaintenance] = useState(false);
 
   useEffect(() => {
@@ -161,14 +165,16 @@ export function DiagramEditor({
         if (d?.colorConfig && typeof d.colorConfig === "object" && !Array.isArray(d.colorConfig)) {
           setDiagramColorConfig(d.colorConfig as SymbolColorConfig);
         }
+        if (d?.displayMode) {
+          setDisplayMode(d.displayMode as DisplayMode);
+        }
       })
       .catch(() => {/* keep initial value */});
   }, [diagramId]);
 
-  const effectiveColorConfig: SymbolColorConfig = {
-    ...projectColorConfig,
-    ...diagramColorConfig,
-  };
+  const effectiveColorConfig: SymbolColorConfig = displayMode === "hand-drawn"
+    ? BW_SYMBOL_COLORS
+    : { ...projectColorConfig, ...diagramColorConfig };
 
   const selectedElement = data.elements.find((el) => el.id === selectedElementId) ?? null;
   const selectedConnector = data.connectors.find((c) => c.id === selectedConnectorId) ?? null;
@@ -217,6 +223,16 @@ export function DiagramEditor({
     },
     [addConnector]
   );
+
+  function handleToggleDisplayMode() {
+    const newMode: DisplayMode = displayMode === "hand-drawn" ? "normal" : "hand-drawn";
+    setDisplayMode(newMode);
+    fetch(`/api/diagrams/${diagramId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ displayMode: newMode }),
+    }).catch(() => {/* best-effort persist */});
+  }
 
   function handleExport() {
     const svgEl = document.querySelector("svg");
@@ -292,6 +308,22 @@ export function DiagramEditor({
         </button>
 
         <button
+          onClick={handleToggleDisplayMode}
+          className={`px-3 py-1.5 text-xs border rounded flex items-center gap-1.5 ${
+            displayMode === "hand-drawn"
+              ? "bg-gray-800 text-white border-gray-800"
+              : "text-gray-700 border-gray-300 hover:bg-gray-50"
+          }`}
+          title={displayMode === "hand-drawn" ? "Switch to Normal mode" : "Switch to Hand Drawn mode"}
+        >
+          <svg width={12} height={12} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+            <path d="M2 14l3-1L13.5 4.5a1.4 1.4 0 0 0-2-2L3 11l-1 3z" />
+            <path d="M11.5 2.5l2 2" />
+          </svg>
+          Hand Drawn
+        </button>
+
+        <button
           onClick={handleExport}
           className="px-3 py-1.5 text-xs text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
         >
@@ -343,6 +375,7 @@ export function DiagramEditor({
           onConnectorWaypointDragEnd={connectorWaypointDragEnd}
           onUpdateCurveHandles={updateCurveHandles}
           colorConfig={effectiveColorConfig}
+          displayMode={displayMode}
         />
 
         <PropertiesPanel

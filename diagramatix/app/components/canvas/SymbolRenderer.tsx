@@ -3,6 +3,7 @@
 import { useState, createContext, useContext } from "react";
 import type { BpmnTaskType, GatewayType, EventType, DiagramElement, Point, Side, SymbolType } from "@/app/lib/diagram/types";
 import { type SymbolColorConfig, resolveColor } from "@/app/lib/diagram/colors";
+import { DisplayModeCtx, sketchyFilter } from "@/app/lib/diagram/displayMode";
 
 /** React context carrying the active project colour config.  Shape components
  *  read from it; when undefined, resolveColor falls back to defaults. */
@@ -762,33 +763,37 @@ function LaneShape({ el }: { el: DiagramElement }) {
 }
 
 function SymbolShape({ el }: { el: DiagramElement }) {
-  switch (el.type) {
-    case "gateway":              return <GatewayShape el={el} />;
-    case "start-event":          return <StartEventShape el={el} />;
-    case "intermediate-event":   return <IntermediateEventShape el={el} />;
-    case "end-event":            return <EndEventShape el={el} />;
-    case "data-object":          return <DataObjectShape el={el} />;
-    case "data-store":           return <DataStoreShape el={el} />;
-    case "use-case":      return <UseCaseShape el={el} />;
-    case "hourglass":     return <HourglassShape el={el} />;
-    case "actor":         return <ActorShape el={el} />;
-    case "team":          return <TeamShape el={el} />;
-    case "state":         return <StateShape el={el} />;
-    case "initial-state": return <InitialStateShape el={el} />;
-    case "final-state":   return <FinalStateShape el={el} />;
-    case "system-boundary":   return <SystemBoundaryShape el={el} />;
-    case "composite-state":   return <CompositeStateShape el={el} />;
-    case "group":             return <GroupShape el={el} />;
-    case "text-annotation":   return <TextAnnotationShape el={el} />;
-    case "system":            return <SystemShape el={el} />;
-    case "pool":              return <PoolShape el={el} />;
-    case "lane":              return <LaneShape el={el} />;
-    case "task":
-      return el.taskType !== undefined ? <BpmnTaskShape el={el} /> : <TaskShape el={el} />;
-    case "subprocess":          return <SubprocessShape el={el} />;
-    case "subprocess-expanded": return <ExpandedSubprocessShape el={el} />;
-    default:                  return <TaskShape el={el} />;
-  }
+  const mode = useContext(DisplayModeCtx);
+  const shape = (() => {
+    switch (el.type) {
+      case "gateway":              return <GatewayShape el={el} />;
+      case "start-event":          return <StartEventShape el={el} />;
+      case "intermediate-event":   return <IntermediateEventShape el={el} />;
+      case "end-event":            return <EndEventShape el={el} />;
+      case "data-object":          return <DataObjectShape el={el} />;
+      case "data-store":           return <DataStoreShape el={el} />;
+      case "use-case":      return <UseCaseShape el={el} />;
+      case "hourglass":     return <HourglassShape el={el} />;
+      case "actor":         return <ActorShape el={el} />;
+      case "team":          return <TeamShape el={el} />;
+      case "state":         return <StateShape el={el} />;
+      case "initial-state": return <InitialStateShape el={el} />;
+      case "final-state":   return <FinalStateShape el={el} />;
+      case "system-boundary":   return <SystemBoundaryShape el={el} />;
+      case "composite-state":   return <CompositeStateShape el={el} />;
+      case "group":             return <GroupShape el={el} />;
+      case "text-annotation":   return <TextAnnotationShape el={el} />;
+      case "system":            return <SystemShape el={el} />;
+      case "pool":              return <PoolShape el={el} />;
+      case "lane":              return <LaneShape el={el} />;
+      case "task":
+        return el.taskType !== undefined ? <BpmnTaskShape el={el} /> : <TaskShape el={el} />;
+      case "subprocess":          return <SubprocessShape el={el} />;
+      case "subprocess-expanded": return <ExpandedSubprocessShape el={el} />;
+      default:                  return <TaskShape el={el} />;
+    }
+  })();
+  return <g filter={sketchyFilter(mode)}>{shape}</g>;
 }
 
 function getLabelPos(el: DiagramElement): { x: number; y: number; baseline: "hanging" | "middle" | "auto" } {

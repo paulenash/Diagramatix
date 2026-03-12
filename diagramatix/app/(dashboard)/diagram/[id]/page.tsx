@@ -5,6 +5,7 @@ import { DiagramEditor } from "./DiagramEditor";
 import type { DiagramData, DiagramType } from "@/app/lib/diagram/types";
 import { EMPTY_DIAGRAM } from "@/app/lib/diagram/types";
 import type { SymbolColorConfig } from "@/app/lib/diagram/colors";
+import type { DisplayMode } from "@/app/lib/diagram/displayMode";
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -38,6 +39,7 @@ export default async function DiagramPage({ params }: Props) {
       initialData={data}
       projectId={diagram.projectId ?? null}
       initialDiagramColorConfig={diagramColorConfig}
+      initialDisplayMode={(diagram.displayMode as DisplayMode) ?? "normal"}
     />
   );
 }

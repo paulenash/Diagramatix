@@ -16,6 +16,7 @@ import type {
   SymbolType,
 } from "@/app/lib/diagram/types";
 import { SymbolRenderer, type ResizeHandle } from "./SymbolRenderer";
+import { DisplayModeCtx, SketchyFilter } from "@/app/lib/diagram/displayMode";
 import { ConnectorRenderer } from "./ConnectorRenderer";
 
 const HEADER_H = 28;
@@ -174,6 +175,7 @@ interface Props {
   onConnectorWaypointDragEnd?: (id: string) => void;
   onUpdateCurveHandles?: (id: string, waypoints: Point[], cp1Rel: Point, cp2Rel: Point) => void;
   colorConfig?: import("@/app/lib/diagram/colors").SymbolColorConfig;
+  displayMode?: import("@/app/lib/diagram/displayMode").DisplayMode;
 }
 
 interface EditingLabel {
@@ -288,7 +290,9 @@ export function Canvas({
   onConnectorWaypointDragEnd,
   onUpdateCurveHandles,
   colorConfig,
+  displayMode: displayModeProp,
 }: Props) {
+  const displayMode = displayModeProp ?? "normal";
   const svgRef = useRef<SVGSVGElement>(null);
 
   const [pan, setPan] = useState<Point>({ x: 0, y: 0 });
@@ -923,6 +927,7 @@ export function Canvas({
         backgroundSize: "20px 20px",
       }}
     >
+      <DisplayModeCtx.Provider value={displayMode}>
       <svg
         ref={svgRef}
         className="w-full h-full outline-none"
@@ -934,6 +939,7 @@ export function Canvas({
         onKeyDown={handleKeyDown}
         style={{ cursor: isDraggingConnector || isDraggingEndpoint ? "crosshair" : "default" }}
       >
+        <SketchyFilter />
         <g transform={transform}>
           {/* Pools render first (deepest layer) */}
           {[...pools, ...otherContainers].map((el) => {
@@ -1410,6 +1416,7 @@ export function Canvas({
 
         </g>
       </svg>
+      </DisplayModeCtx.Provider>
 
       {/* Inline label editor overlay */}
       {editingLabel && (() => {
