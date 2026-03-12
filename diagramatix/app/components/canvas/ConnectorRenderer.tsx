@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useContext } from "react";
+import { useState } from "react";
 import type { Connector, Point } from "@/app/lib/diagram/types";
-import { DisplayModeCtx, sketchyFilter } from "@/app/lib/diagram/displayMode";
 import { waypointsToSvgPath, waypointsToCurvePath, waypointsToRoundedPath } from "@/app/lib/diagram/routing";
 
 interface Props {
@@ -320,7 +319,6 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
 }
 
 export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, onUpdateWaypoints, onWaypointsDragEnd, onUpdateLabel, onUpdateCurveHandles, misaligned }: Props) {
-  const mode = useContext(DisplayModeCtx);
   const waypoints = connector.waypoints;
   if (waypoints.length === 0) return null;
 
@@ -328,7 +326,6 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
   const isAssocBPMN = connector.type === "associationBPMN";
   const isMessageBPMN = connector.type === "messageBPMN";
   const strokeColor = selected ? "#2563eb"
-    : mode === "hand-drawn" ? "#000000"
     : (isMessageBPMN && misaligned) ? "#dc2626"
     : isMessageBPMN ? "#b0b7c3"
     : "#6b7280";
@@ -494,7 +491,6 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
         strokeLinecap={isAssocBPMN ? "round" : undefined}
         markerStart={isMessageBPMN ? `url(#msg-start-${connector.id})` : isBothArrow ? `url(#${openStartMarkerId})` : undefined}
         markerEnd={isMessageBPMN ? `url(#msg-end-${connector.id})` : showArrow ? `url(#${isOpenArrow ? openMarkerId : markerId})` : undefined}
-        filter={sketchyFilter(mode)}
         style={{ pointerEvents: "none" }}
       />
 

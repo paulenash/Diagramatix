@@ -10,7 +10,7 @@ export const DisplayModeCtx = createContext<DisplayMode>("normal");
 export function SketchyFilter() {
   return (
     <defs>
-      <filter id="sketchy" x="-5%" y="-5%" width="110%" height="110%">
+      <filter id="sketchy" x={"-5%"} y={"-5%"} width={"110%"} height={"110%"}>
         <feTurbulence
           type="turbulence"
           baseFrequency="0.015"
