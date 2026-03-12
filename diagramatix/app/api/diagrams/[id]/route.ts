@@ -36,7 +36,7 @@ export async function PUT(req: Request, { params }: Params) {
   }
 
   const body = await req.json();
-  const { name, data, projectId } = body;
+  const { name, data, projectId, colorConfig } = body;
 
   // Validate project ownership if non-null projectId supplied
   if (projectId !== undefined && projectId !== null) {
@@ -46,7 +46,7 @@ export async function PUT(req: Request, { params }: Params) {
     }
   }
 
-  const updated = await prisma.diagram.update({
+  await prisma.diagram.update({
     where: { id },
     data: {
       ...(name !== undefined && { name }),
@@ -56,6 +56,16 @@ export async function PUT(req: Request, { params }: Params) {
     },
   });
 
+  // Update colorConfig via raw SQL (Prisma 7 JSON field limitation)
+  if (colorConfig !== undefined) {
+    await prisma.$executeRawUnsafe(
+      'UPDATE "Diagram" SET "colorConfig" = $1::jsonb, "updatedAt" = NOW() WHERE id = $2',
+      JSON.stringify(colorConfig),
+      id
+    );
+  }
+
+  const updated = await prisma.diagram.findFirst({ where: { id } });
   return NextResponse.json(updated);
 }
 

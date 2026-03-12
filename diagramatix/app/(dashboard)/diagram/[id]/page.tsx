@@ -4,6 +4,7 @@ import { prisma } from "@/app/lib/db";
 import { DiagramEditor } from "./DiagramEditor";
 import type { DiagramData, DiagramType } from "@/app/lib/diagram/types";
 import { EMPTY_DIAGRAM } from "@/app/lib/diagram/types";
+import type { SymbolColorConfig } from "@/app/lib/diagram/colors";
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -24,6 +25,11 @@ export default async function DiagramPage({ params }: Props) {
       ? (diagram.data as unknown as DiagramData)
       : EMPTY_DIAGRAM;
 
+  const diagramColorConfig: SymbolColorConfig =
+    diagram.colorConfig && typeof diagram.colorConfig === "object" && !Array.isArray(diagram.colorConfig)
+      ? (diagram.colorConfig as unknown as SymbolColorConfig)
+      : {};
+
   return (
     <DiagramEditor
       diagramId={diagram.id}
@@ -31,6 +37,7 @@ export default async function DiagramPage({ params }: Props) {
       diagramType={diagram.type as DiagramType}
       initialData={data}
       projectId={diagram.projectId ?? null}
+      initialDiagramColorConfig={diagramColorConfig}
     />
   );
 }

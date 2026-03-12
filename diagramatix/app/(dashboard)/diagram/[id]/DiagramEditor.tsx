@@ -11,7 +11,8 @@ import type {
   Side,
   SymbolType,
 } from "@/app/lib/diagram/types";
-import type { SymbolColorConfig } from "@/app/lib/diagram/colors";
+import { DEFAULT_SYMBOL_COLORS, type SymbolColorConfig } from "@/app/lib/diagram/colors";
+import { DiagramColorModal } from "./DiagramColorModal";
 import { useDiagram } from "@/app/hooks/useDiagram";
 import { Canvas } from "@/app/components/canvas/Canvas";
 import { Palette } from "@/app/components/canvas/Palette";
@@ -23,6 +24,7 @@ interface Props {
   diagramType: DiagramType;
   initialData: DiagramData;
   projectId: string | null;
+  initialDiagramColorConfig?: SymbolColorConfig;
 }
 
 function useAutoSave(
@@ -85,6 +87,7 @@ export function DiagramEditor({
   diagramType,
   initialData,
   projectId,
+  initialDiagramColorConfig,
 }: Props) {
   const router = useRouter();
 
@@ -140,6 +143,8 @@ export function DiagramEditor({
   const [selectedConnectorId, setSelectedConnectorId] = useState<string | null>(null);
   const [pendingDragSymbol, setPendingDragSymbol] = useState<SymbolType | null>(null);
   const [projectColorConfig, setProjectColorConfig] = useState<SymbolColorConfig | undefined>(undefined);
+  const [diagramColorConfig, setDiagramColorConfig] = useState<SymbolColorConfig>(initialDiagramColorConfig ?? {});
+  const [showDiagramMaintenance, setShowDiagramMaintenance] = useState(false);
 
   useEffect(() => {
     if (!projectId) return;
@@ -148,6 +153,11 @@ export function DiagramEditor({
       .then((p) => { if (p?.colorConfig) setProjectColorConfig(p.colorConfig as SymbolColorConfig); })
       .catch(() => {/* fall back to defaults */});
   }, [projectId]);
+
+  const effectiveColorConfig: SymbolColorConfig = {
+    ...projectColorConfig,
+    ...diagramColorConfig,
+  };
 
   const selectedElement = data.elements.find((el) => el.id === selectedElementId) ?? null;
   const selectedConnector = data.connectors.find((c) => c.id === selectedConnectorId) ?? null;
@@ -264,6 +274,13 @@ export function DiagramEditor({
         </div>
 
         <button
+          onClick={() => setShowDiagramMaintenance(true)}
+          className="px-3 py-1.5 text-xs text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
+        >
+          Maintenance
+        </button>
+
+        <button
           onClick={handleExport}
           className="px-3 py-1.5 text-xs text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
         >
@@ -277,7 +294,7 @@ export function DiagramEditor({
           diagramType={diagramType}
           onDragStart={(type) => setPendingDragSymbol(type)}
           disabledSymbols={disabledSymbols}
-          colorConfig={projectColorConfig}
+          colorConfig={effectiveColorConfig}
         />
 
         <Canvas
@@ -314,7 +331,7 @@ export function DiagramEditor({
           onLaneBoundaryMoveEnd={laneBoundaryMoveEnd}
           onConnectorWaypointDragEnd={connectorWaypointDragEnd}
           onUpdateCurveHandles={updateCurveHandles}
-          colorConfig={projectColorConfig}
+          colorConfig={effectiveColorConfig}
         />
 
         <PropertiesPanel
@@ -339,6 +356,19 @@ export function DiagramEditor({
           hasMessageBpmnConnection={hasMessageBpmnConnection}
         />
       </div>
+
+      {showDiagramMaintenance && (
+        <DiagramColorModal
+          diagramId={diagramId}
+          projectColors={{ ...DEFAULT_SYMBOL_COLORS, ...projectColorConfig }}
+          initialColorConfig={diagramColorConfig}
+          onClose={() => setShowDiagramMaintenance(false)}
+          onSaved={(config) => {
+            setDiagramColorConfig(config);
+            setShowDiagramMaintenance(false);
+          }}
+        />
+      )}
     </div>
   );
 }
