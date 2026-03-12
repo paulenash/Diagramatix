@@ -46,27 +46,36 @@ export async function PUT(req: Request, { params }: Params) {
     }
   }
 
-  await prisma.diagram.update({
-    where: { id },
-    data: {
-      ...(name !== undefined && { name }),
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ...(data !== undefined && { data: data as any }),
-      ...(projectId !== undefined && { projectId }),
-    },
-  });
+  try {
+    // Only call ORM update when there are actual fields to update
+    if (name !== undefined || data !== undefined || projectId !== undefined) {
+      await prisma.diagram.update({
+        where: { id },
+        data: {
+          ...(name !== undefined && { name }),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          ...(data !== undefined && { data: data as any }),
+          ...(projectId !== undefined && { projectId }),
+        },
+      });
+    }
 
-  // Update colorConfig via raw SQL (Prisma 7 JSON field limitation)
-  if (colorConfig !== undefined) {
-    await prisma.$executeRawUnsafe(
-      'UPDATE "Diagram" SET "colorConfig" = $1::jsonb, "updatedAt" = NOW() WHERE id = $2',
-      JSON.stringify(colorConfig),
-      id
-    );
+    // Update colorConfig via raw SQL (Prisma 7 JSON field limitation)
+    if (colorConfig !== undefined) {
+      await prisma.$executeRawUnsafe(
+        'UPDATE "Diagram" SET "colorConfig" = $1::jsonb, "updatedAt" = NOW() WHERE id = $2',
+        JSON.stringify(colorConfig),
+        id
+      );
+    }
+
+    const updated = await prisma.diagram.findFirst({ where: { id } });
+    return NextResponse.json(updated);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("[PUT /api/diagrams] error:", message);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
-
-  const updated = await prisma.diagram.findFirst({ where: { id } });
-  return NextResponse.json(updated);
 }
 
 export async function DELETE(_req: Request, { params }: Params) {
