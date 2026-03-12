@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import type { DiagramType, DiagramData } from "@/app/lib/diagram/types";
-import type { SymbolColorConfig } from "@/app/lib/diagram/colors";
+import { resolveColor, DEFAULT_SYMBOL_COLORS, type SymbolColorConfig } from "@/app/lib/diagram/colors";
 import { DiagramMaintenanceModal } from "./DiagramMaintenanceModal";
 
 interface DiagramSummary {
@@ -148,6 +148,7 @@ export function ProjectDetailClient({ project, otherProjects }: Props) {
                 otherProjects={otherProjects}
                 onDelete={handleDeleteDiagram}
                 onMove={handleMoveDiagram}
+                colorConfig={projectColorConfig}
               />
             ))}
           </div>
@@ -236,10 +237,12 @@ export function ProjectDetailClient({ project, otherProjects }: Props) {
   );
 }
 
-function DiagramThumbnail({ data }: { data: unknown }) {
+function DiagramThumbnail({ data, colorConfig }: { data: unknown; colorConfig?: SymbolColorConfig }) {
   if (!data || typeof data !== "object" || Array.isArray(data)) return null;
   const d = data as DiagramData;
   if (!d.elements?.length) return null;
+
+  const colors = { ...DEFAULT_SYMBOL_COLORS, ...colorConfig };
 
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   for (const el of d.elements) {
@@ -263,28 +266,33 @@ function DiagramThumbnail({ data }: { data: unknown }) {
       })}
       {d.elements.map((el) => {
         const { x, y, width: w, height: h, type } = el;
+        const fill = resolveColor(type, colors);
         if (type === "gateway") {
           const cx = x + w / 2, cy = y + h / 2;
           return <polygon key={el.id}
             points={`${cx},${y} ${x + w},${cy} ${cx},${y + h} ${x},${cy}`}
-            fill="#e5e7eb" stroke="#9ca3af" strokeWidth={1} />;
+            fill={fill} stroke="#374151" strokeWidth={1} />;
         }
         if (type === "start-event" || type === "end-event" || type === "intermediate-event"
             || type === "initial-state" || type === "final-state") {
           return <circle key={el.id} cx={x + w / 2} cy={y + h / 2} r={w / 2}
-            fill="#e5e7eb" stroke="#9ca3af" strokeWidth={1} />;
+            fill={fill} stroke="#374151" strokeWidth={1} />;
         }
         if (type === "use-case") {
           return <ellipse key={el.id} cx={x + w / 2} cy={y + h / 2} rx={w / 2} ry={h / 2}
-            fill="#e5e7eb" stroke="#9ca3af" strokeWidth={1} />;
+            fill={fill} stroke="#374151" strokeWidth={1} />;
         }
         if (type === "actor" || type === "team" || type === "hourglass" || type === "system") {
           return <rect key={el.id} x={x} y={y} width={w} height={h}
-            fill="none" stroke="#9ca3af" strokeWidth={1} />;
+            fill="none" stroke={fill} strokeWidth={1} />;
+        }
+        if (type === "group" || type === "text-annotation") {
+          return <rect key={el.id} x={x} y={y} width={w} height={h}
+            fill="none" stroke={fill} strokeWidth={1} strokeDasharray="4 2" />;
         }
         const rx = type === "state" || type === "composite-state" ? 8 : 3;
         return <rect key={el.id} x={x} y={y} width={w} height={h}
-          rx={rx} fill="#e5e7eb" stroke="#9ca3af" strokeWidth={1} />;
+          rx={rx} fill={fill} stroke="#374151" strokeWidth={1} />;
       })}
     </svg>
   );
@@ -295,11 +303,13 @@ function DiagramCard({
   otherProjects,
   onDelete,
   onMove,
+  colorConfig,
 }: {
   diagram: DiagramSummary;
   otherProjects: OtherProject[];
   onDelete: (id: string) => void;
   onMove: (diagramId: string, projectId: string | null) => void;
+  colorConfig?: SymbolColorConfig;
 }) {
   const router = useRouter();
   const [showMove, setShowMove] = useState(false);
@@ -364,7 +374,7 @@ function DiagramCard({
       <p className="text-xs text-gray-400">{new Date(diagram.updatedAt).toLocaleDateString()}</p>
       {diagram.data && (
         <div className="absolute bottom-2 right-2 w-24 h-16 opacity-40 group-hover:opacity-70 transition-opacity pointer-events-none">
-          <DiagramThumbnail data={diagram.data} />
+          <DiagramThumbnail data={diagram.data} colorConfig={colorConfig} />
         </div>
       )}
     </div>
