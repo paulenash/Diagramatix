@@ -154,6 +154,17 @@ export function DiagramEditor({
       .catch(() => {/* fall back to defaults */});
   }, [projectId]);
 
+  useEffect(() => {
+    fetch(`/api/diagrams/${diagramId}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (d?.colorConfig && typeof d.colorConfig === "object" && !Array.isArray(d.colorConfig)) {
+          setDiagramColorConfig(d.colorConfig as SymbolColorConfig);
+        }
+      })
+      .catch(() => {/* keep initial value */});
+  }, [diagramId]);
+
   const effectiveColorConfig: SymbolColorConfig = {
     ...projectColorConfig,
     ...diagramColorConfig,
