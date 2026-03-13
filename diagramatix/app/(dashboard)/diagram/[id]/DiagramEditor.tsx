@@ -114,7 +114,7 @@ function getDiagramBounds(data: DiagramData, padding = 20) {
   };
 }
 
-async function exportPdf(svgEl: SVGSVGElement, name: string, data: DiagramData) {
+async function exportPdf(svgEl: SVGSVGElement, name: string, data: DiagramData, scale = 1) {
   const { jsPDF } = await import("jspdf");
   await import("svg2pdf.js");
 
@@ -123,15 +123,28 @@ async function exportPdf(svgEl: SVGSVGElement, name: string, data: DiagramData) 
   const clone = svgEl.cloneNode(true) as SVGSVGElement;
   clone.removeAttribute("tabindex");
   clone.removeAttribute("class");
+  clone.removeAttribute("data-canvas");
+  clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
 
   // Set viewBox to content bounds, stripping pan/zoom
   clone.setAttribute("viewBox", `${bounds.x} ${bounds.y} ${bounds.width} ${bounds.height}`);
   clone.setAttribute("width", String(bounds.width));
   clone.setAttribute("height", String(bounds.height));
 
-  // Remove only the top-level pan/zoom transform (not nested shape transforms)
+  // Strip unsupported SVG filters — svg2pdf.js silently skips groups with
+  // feTurbulence/feDisplacementMap, so remove all filter refs and the sketchy defs
+  clone.querySelectorAll("[filter]").forEach((el) => el.removeAttribute("filter"));
+  const sketchyDefs = clone.querySelector("#sketchy");
+  if (sketchyDefs) sketchyDefs.closest("defs")?.remove();
+
+  // Hoist nested <defs> (connector markers) to SVG root so refs resolve after transform removal
   const topGroup = clone.querySelector(":scope > g[transform]");
-  if (topGroup) topGroup.removeAttribute("transform");
+  if (topGroup) {
+    topGroup.querySelectorAll("defs").forEach((d) => {
+      clone.insertBefore(d, topGroup);
+    });
+    topGroup.removeAttribute("transform");
+  }
 
   // Remove interactive-only elements (selection handles, drag lines, etc.)
   clone.querySelectorAll("[data-interactive]").forEach((el) => el.remove());
@@ -142,17 +155,17 @@ async function exportPdf(svgEl: SVGSVGElement, name: string, data: DiagramData) 
   clone.style.top = "-9999px";
   document.body.appendChild(clone);
 
-  const landscape = bounds.width > bounds.height;
+  const scaledW = bounds.width * scale;
+  const scaledH = bounds.height * scale;
+  const landscape = scaledW > scaledH;
   const doc = new jsPDF({
     orientation: landscape ? "landscape" : "portrait",
     unit: "pt",
-    format: [bounds.width, bounds.height],
+    format: [scaledW, scaledH],
   });
 
-  // svg2pdf.js does not support feTurbulence/feDisplacementMap filters —
-  // hand-drawn mode shapes render with normal crisp edges in the PDF
   try {
-    await doc.svg(clone, { x: 0, y: 0, width: bounds.width, height: bounds.height });
+    await doc.svg(clone, { x: 0, y: 0, width: scaledW, height: scaledH });
     doc.save(`${name}.pdf`);
   } finally {
     document.body.removeChild(clone);
@@ -218,6 +231,7 @@ export function DiagramEditor({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [undo, redo]);
 
+  const [pdfScale, setPdfScale] = useState(100);
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
   const [selectedConnectorId, setSelectedConnectorId] = useState<string | null>(null);
   const [pendingDragSymbol, setPendingDragSymbol] = useState<SymbolType | null>(null);
@@ -311,13 +325,13 @@ export function DiagramEditor({
   }
 
   function handleExport() {
-    const svgEl = document.querySelector("svg");
-    if (svgEl) exportSvg(svgEl as SVGSVGElement, diagramName);
+    const svgEl = document.querySelector<SVGSVGElement>("svg[data-canvas]");
+    if (svgEl) exportSvg(svgEl, diagramName);
   }
 
   async function handleExportPdf() {
-    const svgEl = document.querySelector("svg");
-    if (svgEl) await exportPdf(svgEl as SVGSVGElement, diagramName, data);
+    const svgEl = document.querySelector<SVGSVGElement>("svg[data-canvas]");
+    if (svgEl) await exportPdf(svgEl, diagramName, data, pdfScale / 100);
   }
 
   return (
@@ -410,6 +424,16 @@ export function DiagramEditor({
         >
           Export SVG
         </button>
+        <select
+          value={pdfScale}
+          onChange={(e) => setPdfScale(Number(e.target.value))}
+          className="px-2 py-1.5 text-xs text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
+        >
+          <option value={100}>100%</option>
+          <option value={75}>75%</option>
+          <option value={50}>50%</option>
+          <option value={30}>30%</option>
+        </select>
         <button
           onClick={handleExportPdf}
           className="px-3 py-1.5 text-xs text-gray-700 border border-gray-300 rounded hover:bg-gray-50"

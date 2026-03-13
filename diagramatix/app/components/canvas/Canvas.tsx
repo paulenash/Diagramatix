@@ -930,6 +930,7 @@ export function Canvas({
       <DisplayModeCtx.Provider value={displayMode}>
       <svg
         ref={svgRef}
+        data-canvas
         className="w-full h-full outline-none"
         tabIndex={0}
         onMouseDown={handleBackgroundMouseDown}
