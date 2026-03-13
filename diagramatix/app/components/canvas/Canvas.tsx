@@ -313,7 +313,8 @@ export function Canvas({
 
   const clientToWorld = useCallback(
     (clientX: number, clientY: number): Point => {
-      const rect = svgRef.current!.getBoundingClientRect();
+      if (!svgRef.current) return { x: 0, y: 0 };
+      const rect = svgRef.current.getBoundingClientRect();
       return svgToWorld(clientX - rect.left, clientY - rect.top);
     },
     [svgToWorld]
