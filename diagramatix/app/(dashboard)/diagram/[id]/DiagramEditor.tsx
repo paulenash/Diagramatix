@@ -129,12 +129,18 @@ async function exportPdf(svgEl: SVGSVGElement, name: string, data: DiagramData) 
   clone.setAttribute("width", String(bounds.width));
   clone.setAttribute("height", String(bounds.height));
 
-  // Remove pan/zoom transform from the top-level <g>
-  const topGroup = clone.querySelector("g[transform]");
+  // Remove only the top-level pan/zoom transform (not nested shape transforms)
+  const topGroup = clone.querySelector(":scope > g[transform]");
   if (topGroup) topGroup.removeAttribute("transform");
 
   // Remove interactive-only elements (selection handles, drag lines, etc.)
   clone.querySelectorAll("[data-interactive]").forEach((el) => el.remove());
+
+  // Insert clone off-screen so svg2pdf.js can compute styles via getComputedStyle/getBBox
+  clone.style.position = "absolute";
+  clone.style.left = "-9999px";
+  clone.style.top = "-9999px";
+  document.body.appendChild(clone);
 
   const landscape = bounds.width > bounds.height;
   const doc = new jsPDF({
@@ -145,9 +151,12 @@ async function exportPdf(svgEl: SVGSVGElement, name: string, data: DiagramData) 
 
   // svg2pdf.js does not support feTurbulence/feDisplacementMap filters —
   // hand-drawn mode shapes render with normal crisp edges in the PDF
-  await doc.svg(clone, { x: 0, y: 0, width: bounds.width, height: bounds.height });
-
-  doc.save(`${name}.pdf`);
+  try {
+    await doc.svg(clone, { x: 0, y: 0, width: bounds.width, height: bounds.height });
+    doc.save(`${name}.pdf`);
+  } finally {
+    document.body.removeChild(clone);
+  }
 }
 
 export function DiagramEditor({
