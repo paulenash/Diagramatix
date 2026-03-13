@@ -316,8 +316,8 @@ export function DiagramEditor({
     [addConnector]
   );
 
-  function handleToggleDisplayMode() {
-    const newMode: DisplayMode = displayMode === "hand-drawn" ? "normal" : "hand-drawn";
+  function handleToggleDisplayMode(mode?: DisplayMode) {
+    const newMode: DisplayMode = mode ?? (displayMode === "hand-drawn" ? "normal" : "hand-drawn");
     setDisplayMode(newMode);
     fetch(`/api/diagrams/${diagramId}`, {
       method: "PUT",
@@ -402,22 +402,6 @@ export function DiagramEditor({
           className="px-3 py-1.5 text-xs text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
         >
           Diagram Maintenance
-        </button>
-
-        <button
-          onClick={handleToggleDisplayMode}
-          className={`px-3 py-1.5 text-xs border rounded flex items-center gap-1.5 ${
-            displayMode === "hand-drawn"
-              ? "bg-gray-800 text-white border-gray-800"
-              : "text-gray-700 border-gray-300 hover:bg-gray-50"
-          }`}
-          title={displayMode === "hand-drawn" ? "Switch to Normal mode" : "Switch to Hand Drawn mode"}
-        >
-          <svg width={12} height={12} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-            <path d="M2 14l3-1L13.5 4.5a1.4 1.4 0 0 0-2-2L3 11l-1 3z" />
-            <path d="M11.5 2.5l2 2" />
-          </svg>
-          Hand Drawn
         </button>
 
         <button
@@ -517,8 +501,11 @@ export function DiagramEditor({
       {showDiagramMaintenance && (
         <DiagramColorModal
           diagramId={diagramId}
+          diagramType={diagramType}
           projectColors={{ ...DEFAULT_SYMBOL_COLORS, ...projectColorConfig }}
           initialColorConfig={diagramColorConfig}
+          displayMode={displayMode}
+          onDisplayModeChange={handleToggleDisplayMode}
           onClose={() => setShowDiagramMaintenance(false)}
           onSaved={(config) => {
             setDiagramColorConfig(config);

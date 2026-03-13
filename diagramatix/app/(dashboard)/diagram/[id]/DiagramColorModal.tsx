@@ -4,24 +4,29 @@ import { useState } from "react";
 import type { DiagramType, SymbolType } from "@/app/lib/diagram/types";
 import { DEFAULT_SYMBOL_COLORS, BW_SYMBOL_COLORS, type SymbolColorConfig } from "@/app/lib/diagram/colors";
 import { COLOR_PALETTE_BY_DIAGRAM_TYPE, getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
+import type { DisplayMode } from "@/app/lib/diagram/displayMode";
 
 interface Props {
   diagramId: string;
+  diagramType: DiagramType;
   projectColors: SymbolColorConfig;
   initialColorConfig: SymbolColorConfig;
+  displayMode: DisplayMode;
+  onDisplayModeChange: (mode: DisplayMode) => void;
   onClose: () => void;
   onSaved: (config: SymbolColorConfig) => void;
 }
 
-const TABS: { type: DiagramType; label: string }[] = [
-  { type: "bpmn",            label: "BPMN" },
-  { type: "process-context", label: "Process Context" },
-  { type: "state-machine",   label: "State Machine" },
-  { type: "basic",           label: "Basic" },
-];
-
-export function DiagramColorModal({ diagramId, projectColors, initialColorConfig, onClose, onSaved }: Props) {
-  const [activeTab, setActiveTab] = useState<DiagramType>("bpmn");
+export function DiagramColorModal({
+  diagramId,
+  diagramType,
+  projectColors,
+  initialColorConfig,
+  displayMode,
+  onDisplayModeChange,
+  onClose,
+  onSaved,
+}: Props) {
   const [workingColors, setWorkingColors] = useState<SymbolColorConfig>({
     ...DEFAULT_SYMBOL_COLORS,
     ...projectColors,
@@ -30,7 +35,7 @@ export function DiagramColorModal({ diagramId, projectColors, initialColorConfig
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
 
-  const symbols: SymbolType[] = COLOR_PALETTE_BY_DIAGRAM_TYPE[activeTab];
+  const symbols: SymbolType[] = COLOR_PALETTE_BY_DIAGRAM_TYPE[diagramType];
 
   function handleColorChange(type: SymbolType, color: string) {
     setWorkingColors((prev) => ({ ...prev, [type]: color }));
@@ -73,44 +78,49 @@ export function DiagramColorModal({ diagramId, projectColors, initialColorConfig
 
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 flex-shrink-0">
-          <h2 className="text-lg font-semibold text-gray-900">Diagram Colours</h2>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={handleBlackAndWhite}
-              className="text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md px-3 py-1.5 hover:bg-gray-50"
-            >
-              Black &amp; White
-            </button>
-            <button
-              onClick={handleRevertToProject}
-              className="text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md px-3 py-1.5 hover:bg-gray-50"
-            >
-              Revert to Project Colours
-            </button>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 text-lg leading-none"
-            >
-              ✕
-            </button>
-          </div>
+          <h2 className="text-lg font-semibold text-gray-900">Diagram Maintenance</h2>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 text-lg leading-none"
+          >
+            ✕
+          </button>
         </div>
 
-        {/* Tabs */}
-        <div className="flex border-b border-gray-200 px-6 flex-shrink-0">
-          {TABS.map((tab) => (
-            <button
-              key={tab.type}
-              onClick={() => setActiveTab(tab.type)}
-              className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
-                activeTab === tab.type
-                  ? "border-blue-500 text-blue-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700"
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
+        {/* Display Mode */}
+        <div className="flex items-center justify-between px-6 py-3 border-b border-gray-200 flex-shrink-0">
+          <span className="text-sm font-medium text-gray-700">Display Mode</span>
+          <button
+            onClick={() => onDisplayModeChange(displayMode === "hand-drawn" ? "normal" : "hand-drawn")}
+            className={`px-3 py-1.5 text-sm border rounded flex items-center gap-1.5 ${
+              displayMode === "hand-drawn"
+                ? "bg-gray-800 text-white border-gray-800"
+                : "text-gray-700 border-gray-300 hover:bg-gray-50"
+            }`}
+          >
+            <svg width={12} height={12} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M2 14l3-1L13.5 4.5a1.4 1.4 0 0 0-2-2L3 11l-1 3z" />
+              <path d="M11.5 2.5l2 2" />
+            </svg>
+            {displayMode === "hand-drawn" ? "Hand Drawn" : "Normal"}
+          </button>
+        </div>
+
+        {/* Colour actions */}
+        <div className="flex items-center gap-3 px-6 py-3 border-b border-gray-200 flex-shrink-0">
+          <span className="text-sm font-medium text-gray-700 flex-1">Colours</span>
+          <button
+            onClick={handleBlackAndWhite}
+            className="text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md px-3 py-1.5 hover:bg-gray-50"
+          >
+            Black &amp; White
+          </button>
+          <button
+            onClick={handleRevertToProject}
+            className="text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md px-3 py-1.5 hover:bg-gray-50"
+          >
+            Revert to Project
+          </button>
         </div>
 
         {/* Symbol colour rows */}
