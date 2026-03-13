@@ -373,12 +373,14 @@ function HourglassShape({ el }: { el: DiagramElement }) {
 
 function SystemBoundaryShape({ el }: { el: DiagramElement }) {
   const colors = useContext(SymbolColorCtx);
+  const mode = useContext(DisplayModeCtx);
   const headerColor = resolveColor("system-boundary", colors);
+  const bodyFill = mode === "hand-drawn" ? "rgba(255,255,255,0.3)" : "rgba(219,234,254,0.3)";
   return (
     <g>
       {/* Outer rect with light blue fill */}
       <rect x={el.x} y={el.y} width={el.width} height={el.height}
-        fill="rgba(219,234,254,0.3)" stroke="#374151" strokeWidth={1.5} rx={2} />
+        fill={bodyFill} stroke="#374151" strokeWidth={1.5} rx={2} />
       {/* Header fill */}
       <rect x={el.x} y={el.y} width={el.width} height={HEADER_H}
         fill={headerColor} stroke="none" rx={2} />
@@ -393,12 +395,14 @@ function SystemBoundaryShape({ el }: { el: DiagramElement }) {
 
 function CompositeStateShape({ el }: { el: DiagramElement }) {
   const colors = useContext(SymbolColorCtx);
+  const mode = useContext(DisplayModeCtx);
   const headerColor = resolveColor("composite-state", colors);
+  const bodyFill = mode === "hand-drawn" ? "rgba(255,255,255,0.4)" : "rgba(237,233,254,0.4)";
   return (
     <g>
       {/* Outer rounded rect with light lavender fill */}
       <rect x={el.x} y={el.y} width={el.width} height={el.height}
-        fill="rgba(237,233,254,0.4)" stroke="#374151" strokeWidth={1.5} rx={12} />
+        fill={bodyFill} stroke="#374151" strokeWidth={1.5} rx={12} />
       {/* Header fill */}
       <rect x={el.x} y={el.y} width={el.width} height={HEADER_H}
         fill={headerColor} stroke="none" rx={12} />
@@ -413,7 +417,9 @@ function CompositeStateShape({ el }: { el: DiagramElement }) {
 
 function GroupShape({ el }: { el: DiagramElement }) {
   const colors = useContext(SymbolColorCtx);
+  const mode = useContext(DisplayModeCtx);
   const lineColor = resolveColor("group", colors);  // configurable boundary line colour
+  const bodyFill = mode === "hand-drawn" ? "rgba(255,255,255,0.15)" : "rgba(249,250,251,0.15)";
   return (
     <g>
       {/* Wide transparent stroke — border-only hit target (±8px of border) */}
@@ -422,7 +428,7 @@ function GroupShape({ el }: { el: DiagramElement }) {
         style={{ pointerEvents: "stroke" }} />
       {/* Visual dashed-dotted border — interior always transparent */}
       <rect x={el.x} y={el.y} width={el.width} height={el.height}
-        rx={8} fill="rgba(249,250,251,0.15)" stroke={lineColor} strokeWidth={1.5}
+        rx={8} fill={bodyFill} stroke={lineColor} strokeWidth={1.5}
         strokeDasharray="10 3.5 2 3.5"
         style={{ pointerEvents: "none" }} />
     </g>
