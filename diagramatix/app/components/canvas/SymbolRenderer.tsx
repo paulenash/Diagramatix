@@ -373,14 +373,13 @@ function HourglassShape({ el }: { el: DiagramElement }) {
 
 function SystemBoundaryShape({ el }: { el: DiagramElement }) {
   const colors = useContext(SymbolColorCtx);
-  const mode = useContext(DisplayModeCtx);
   const headerColor = resolveColor("system-boundary", colors);
-  const bodyFill = mode === "hand-drawn" ? "rgba(255,255,255,0.3)" : "rgba(219,234,254,0.3)";
+  const bodyColor = resolveColor("system-boundary-body", colors);
   return (
     <g>
-      {/* Outer rect with light blue fill */}
+      {/* Outer rect with body fill */}
       <rect x={el.x} y={el.y} width={el.width} height={el.height}
-        fill={bodyFill} stroke="#374151" strokeWidth={1.5} rx={2} />
+        fill={bodyColor} fillOpacity={0.3} stroke="#374151" strokeWidth={1.5} rx={2} />
       {/* Header fill */}
       <rect x={el.x} y={el.y} width={el.width} height={HEADER_H}
         fill={headerColor} stroke="none" rx={2} />
@@ -395,14 +394,13 @@ function SystemBoundaryShape({ el }: { el: DiagramElement }) {
 
 function CompositeStateShape({ el }: { el: DiagramElement }) {
   const colors = useContext(SymbolColorCtx);
-  const mode = useContext(DisplayModeCtx);
   const headerColor = resolveColor("composite-state", colors);
-  const bodyFill = mode === "hand-drawn" ? "rgba(255,255,255,0.4)" : "rgba(237,233,254,0.4)";
+  const bodyColor = resolveColor("composite-state-body", colors);
   return (
     <g>
-      {/* Outer rounded rect with light lavender fill */}
+      {/* Outer rounded rect with body fill */}
       <rect x={el.x} y={el.y} width={el.width} height={el.height}
-        fill={bodyFill} stroke="#374151" strokeWidth={1.5} rx={12} />
+        fill={bodyColor} fillOpacity={0.4} stroke="#374151" strokeWidth={1.5} rx={12} />
       {/* Header fill */}
       <rect x={el.x} y={el.y} width={el.width} height={HEADER_H}
         fill={headerColor} stroke="none" rx={12} />

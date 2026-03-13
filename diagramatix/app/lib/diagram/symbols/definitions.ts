@@ -81,10 +81,17 @@ export const ALL_SYMBOLS: SymbolDefinition[] = [
   },
   {
     type: "system-boundary",
-    label: "Process Group",
+    label: "Process Group Header",
     defaultWidth: 200,
     defaultHeight: 300,
     description: "A system context boundary",
+  },
+  {
+    type: "system-boundary-body",
+    label: "Process Group Body",
+    defaultWidth: 200,
+    defaultHeight: 300,
+    description: "Body fill for a process group",
   },
   {
     type: "hourglass",
@@ -95,10 +102,17 @@ export const ALL_SYMBOLS: SymbolDefinition[] = [
   },
   {
     type: "composite-state",
-    label: "Composite State",
+    label: "Composite State Header",
     defaultWidth: 360,
     defaultHeight: 180,
     description: "A composite state containing sub-states",
+  },
+  {
+    type: "composite-state-body",
+    label: "Composite State Body",
+    defaultWidth: 360,
+    defaultHeight: 180,
+    description: "Body fill for a composite state",
   },
   {
     type: "system",
@@ -171,6 +185,28 @@ export const PALETTE_BY_DIAGRAM_TYPE: Record<DiagramType, SymbolType[]> = {
   "state-machine": ["state", "initial-state", "final-state", "composite-state"],
   bpmn: [
     "pool",
+    "start-event",
+    "task",
+    "subprocess",
+    "subprocess-expanded",
+    "gateway",
+    "intermediate-event",
+    "data-object",
+    "data-store",
+    "end-event",
+    "group",
+    "text-annotation",
+  ],
+};
+
+/** Colour-picker palette — includes body colour entries and lane that aren't in the drag palette. */
+export const COLOR_PALETTE_BY_DIAGRAM_TYPE: Record<DiagramType, SymbolType[]> = {
+  basic: ["task"],
+  "process-context": ["use-case", "actor", "team", "system", "hourglass", "system-boundary", "system-boundary-body"],
+  "state-machine": ["state", "initial-state", "final-state", "composite-state", "composite-state-body"],
+  bpmn: [
+    "pool",
+    "lane",
     "start-event",
     "task",
     "subprocess",

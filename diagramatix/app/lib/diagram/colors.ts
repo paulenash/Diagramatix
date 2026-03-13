@@ -25,12 +25,14 @@ export const DEFAULT_SYMBOL_COLORS: Record<SymbolType, string> = {
   "team":                "#374151",
   "system":              "#f8fafc",
   "hourglass":           "#ffffff",
-  "system-boundary":     "#dbeafe",   // header colour; body is a transparent tint
+  "system-boundary":     "#dbeafe",   // header colour
+  "system-boundary-body": "#dbeafe",  // body fill colour (rendered with opacity)
   // State Machine
   "state":               "#dbeafe",
   "initial-state":       "#374151",   // disc colour
   "final-state":         "#374151",   // inner disc colour
-  "composite-state":     "#ede9fe",   // header colour; body is a transparent tint
+  "composite-state":     "#ede9fe",   // header colour
+  "composite-state-body": "#ede9fe",  // body fill colour (rendered with opacity)
 };
 
 /** Black & white colour scheme: fills → white, lines/strokes → black. */
@@ -56,11 +58,13 @@ export const BW_SYMBOL_COLORS: Record<SymbolType, string> = {
   "system":              "#ffffff",
   "hourglass":           "#ffffff",
   "system-boundary":     "#ffffff",
+  "system-boundary-body": "#ffffff",
   // State Machine
   "state":               "#ffffff",
   "initial-state":       "#000000",
   "final-state":         "#000000",
   "composite-state":     "#ffffff",
+  "composite-state-body": "#ffffff",
 };
 
 /** Return the effective colour for a symbol type, preferring the project config over defaults. */

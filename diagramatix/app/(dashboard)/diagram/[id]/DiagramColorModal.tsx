@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { DiagramType, SymbolType } from "@/app/lib/diagram/types";
 import { DEFAULT_SYMBOL_COLORS, BW_SYMBOL_COLORS, type SymbolColorConfig } from "@/app/lib/diagram/colors";
-import { PALETTE_BY_DIAGRAM_TYPE, getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
+import { COLOR_PALETTE_BY_DIAGRAM_TYPE, getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
 
 interface Props {
   diagramId: string;
@@ -30,7 +30,7 @@ export function DiagramColorModal({ diagramId, projectColors, initialColorConfig
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
 
-  const symbols: SymbolType[] = PALETTE_BY_DIAGRAM_TYPE[activeTab];
+  const symbols: SymbolType[] = COLOR_PALETTE_BY_DIAGRAM_TYPE[activeTab];
 
   function handleColorChange(type: SymbolType, color: string) {
     setWorkingColors((prev) => ({ ...prev, [type]: color }));
