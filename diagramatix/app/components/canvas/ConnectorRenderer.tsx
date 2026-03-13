@@ -307,7 +307,7 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
       )}
       {/* Width resize handle */}
       {(selected || isLabelFocused) && onUpdateLabel && (
-        <rect
+        <rect data-interactive
           x={lCx + effectiveLWidth / 2 - 3} y={lMidY - 5} width={6} height={10}
           fill="#2563eb" stroke="white" strokeWidth={1} rx={1}
           style={{ cursor: "ew-resize" }}
@@ -547,7 +547,7 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
         };
 
         return (
-          <g key="curve-handles">
+          <g key="curve-handles" data-interactive>
             <line x1={s1.x} y1={s1.y} x2={H1.x} y2={H1.y}
               stroke="#93c5fd" strokeWidth={1} strokeDasharray="3 2" pointerEvents="none" />
             <line x1={s2.x} y1={s2.y} x2={H2.x} y2={H2.y}
@@ -574,7 +574,7 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
         const hitW = isHorizontal ? Math.abs(p2.x - p1.x) * 0.6 : 12;
         const hitH = isHorizontal ? 12 : Math.abs(p2.y - p1.y) * 0.6;
         return (
-          <g key={segIdx}>
+          <g key={segIdx} data-interactive>
             <rect
               x={mx - hitW / 2} y={my - hitH / 2}
               width={hitW} height={hitH}

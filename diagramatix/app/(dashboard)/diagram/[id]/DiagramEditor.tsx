@@ -83,6 +83,73 @@ function exportSvg(svgEl: SVGSVGElement, name: string) {
   URL.revokeObjectURL(url);
 }
 
+function getDiagramBounds(data: DiagramData, padding = 20) {
+  if (data.elements.length === 0) {
+    return { x: 0, y: 0, width: 200, height: 200 };
+  }
+
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+  for (const el of data.elements) {
+    minX = Math.min(minX, el.x);
+    minY = Math.min(minY, el.y);
+    maxX = Math.max(maxX, el.x + el.width);
+    maxY = Math.max(maxY, el.y + el.height);
+  }
+
+  for (const conn of data.connectors) {
+    for (const wp of conn.waypoints) {
+      minX = Math.min(minX, wp.x);
+      minY = Math.min(minY, wp.y);
+      maxX = Math.max(maxX, wp.x);
+      maxY = Math.max(maxY, wp.y);
+    }
+  }
+
+  return {
+    x: minX - padding,
+    y: minY - padding,
+    width: maxX - minX + padding * 2,
+    height: maxY - minY + padding * 2,
+  };
+}
+
+async function exportPdf(svgEl: SVGSVGElement, name: string, data: DiagramData) {
+  const { jsPDF } = await import("jspdf");
+  await import("svg2pdf.js");
+
+  const bounds = getDiagramBounds(data);
+
+  const clone = svgEl.cloneNode(true) as SVGSVGElement;
+  clone.removeAttribute("tabindex");
+  clone.removeAttribute("class");
+
+  // Set viewBox to content bounds, stripping pan/zoom
+  clone.setAttribute("viewBox", `${bounds.x} ${bounds.y} ${bounds.width} ${bounds.height}`);
+  clone.setAttribute("width", String(bounds.width));
+  clone.setAttribute("height", String(bounds.height));
+
+  // Remove pan/zoom transform from the top-level <g>
+  const topGroup = clone.querySelector("g[transform]");
+  if (topGroup) topGroup.removeAttribute("transform");
+
+  // Remove interactive-only elements (selection handles, drag lines, etc.)
+  clone.querySelectorAll("[data-interactive]").forEach((el) => el.remove());
+
+  const landscape = bounds.width > bounds.height;
+  const doc = new jsPDF({
+    orientation: landscape ? "landscape" : "portrait",
+    unit: "pt",
+    format: [bounds.width, bounds.height],
+  });
+
+  // svg2pdf.js does not support feTurbulence/feDisplacementMap filters —
+  // hand-drawn mode shapes render with normal crisp edges in the PDF
+  await doc.svg(clone, { x: 0, y: 0, width: bounds.width, height: bounds.height });
+
+  doc.save(`${name}.pdf`);
+}
+
 export function DiagramEditor({
   diagramId,
   diagramName,
@@ -239,6 +306,11 @@ export function DiagramEditor({
     if (svgEl) exportSvg(svgEl as SVGSVGElement, diagramName);
   }
 
+  async function handleExportPdf() {
+    const svgEl = document.querySelector("svg");
+    if (svgEl) await exportPdf(svgEl as SVGSVGElement, diagramName, data);
+  }
+
   return (
     <div className="flex flex-col h-screen bg-white">
       {/* Top bar */}
@@ -328,6 +400,12 @@ export function DiagramEditor({
           className="px-3 py-1.5 text-xs text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
         >
           Export SVG
+        </button>
+        <button
+          onClick={handleExportPdf}
+          className="px-3 py-1.5 text-xs text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
+        >
+          Export PDF
         </button>
       </header>
 

@@ -1347,7 +1347,7 @@ export function Canvas({
             const x = wp[1].x;
             const midY = (wp[1].y + wp[2].y) / 2;
             return (
-              <g>
+              <g data-interactive>
                 <line x1={x} y1={wp[1].y} x2={x} y2={wp[2].y}
                   stroke="#2563eb" strokeWidth={8} strokeOpacity={0.15}
                   style={{ cursor: "ew-resize" }}
@@ -1364,7 +1364,7 @@ export function Canvas({
 
           {/* Connector endpoint handles when a non-messageBPMN connector is selected */}
           {endpointHandles && (
-            <>
+            <g data-interactive>
               <rect
                 x={endpointHandles.source.x - 5} y={endpointHandles.source.y - 5}
                 width={10} height={10}
@@ -1383,12 +1383,12 @@ export function Canvas({
                   handleEndpointDragStart(selectedConnectorId!, "target", endpointHandles.target, e)
                 }
               />
-            </>
+            </g>
           )}
 
           {/* Rubber-band line during connector drag */}
           {draggingConnector && (
-            <line
+            <line data-interactive
               x1={draggingConnector.fromPos.x}
               y1={draggingConnector.fromPos.y}
               x2={draggingConnector.currentPos.x}
@@ -1402,7 +1402,7 @@ export function Canvas({
 
           {/* Rubber-band line during endpoint drag */}
           {draggingEndpoint && (
-            <line
+            <line data-interactive
               x1={draggingEndpoint.startPos.x}
               y1={draggingEndpoint.startPos.y}
               x2={draggingEndpoint.currentPos.x}

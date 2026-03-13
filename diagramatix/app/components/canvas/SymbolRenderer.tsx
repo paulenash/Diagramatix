@@ -1140,7 +1140,7 @@ export function SymbolRenderer({
 
       {/* Selection outline */}
       {selected && !isContainer && (
-        <rect
+        <rect data-interactive
           x={element.x - 3} y={element.y - 3}
           width={element.width + 6} height={element.height + 6}
           fill="none" stroke="#2563eb" strokeWidth={1.5}
@@ -1151,7 +1151,7 @@ export function SymbolRenderer({
 
       {/* Drop target highlight — light green for sequence connectors */}
       {isDropTarget && !isDisallowedTarget && (
-        <rect
+        <rect data-interactive
           x={element.x - 4} y={element.y - 4}
           width={element.width + 8} height={element.height + 8}
           fill="none" stroke="#4ade80" strokeWidth={2} rx={6}
@@ -1161,7 +1161,7 @@ export function SymbolRenderer({
 
       {/* messageBPMN target highlight — light blue */}
       {isMessageBpmnTarget && (
-        <rect
+        <rect data-interactive
           x={element.x - 4} y={element.y - 4}
           width={element.width + 8} height={element.height + 8}
           fill="none" stroke="#60a5fa" strokeWidth={2} rx={6}
@@ -1171,7 +1171,7 @@ export function SymbolRenderer({
 
       {/* associationBPMN target highlight — light purple */}
       {isAssocBpmnTarget && (
-        <rect
+        <rect data-interactive
           x={element.x - 4} y={element.y - 4}
           width={element.width + 8} height={element.height + 8}
           fill="none" stroke="#c084fc" strokeWidth={2} rx={6}
@@ -1181,7 +1181,7 @@ export function SymbolRenderer({
 
       {/* Misaligned messageBPMN target highlight (red) */}
       {isErrorTarget && (
-        <rect
+        <rect data-interactive
           x={element.x - 4} y={element.y - 4}
           width={element.width + 8} height={element.height + 8}
           fill="none" stroke="#dc2626" strokeWidth={2} rx={6}
@@ -1191,7 +1191,7 @@ export function SymbolRenderer({
 
       {/* Disallow highlight */}
       {isDisallowedTarget && (
-        <rect
+        <rect data-interactive
           x={element.x - 4} y={element.y - 4}
           width={element.width + 8} height={element.height + 8}
           fill="none" stroke="#dc2626" strokeWidth={2} strokeDasharray="4 2" rx={6}
@@ -1201,7 +1201,7 @@ export function SymbolRenderer({
 
       {/* Element drag target — orange when element being dragged will become a child */}
       {isElementDragTarget && (
-        <rect
+        <rect data-interactive
           x={element.x - 4} y={element.y - 4}
           width={element.width + 8} height={element.height + 8}
           fill="none" stroke="#fb923c" strokeWidth={2} rx={6}
@@ -1214,7 +1214,7 @@ export function SymbolRenderer({
         RESIZE_HANDLES.map(({ handle, cursor }) => {
           const { hx, hy } = getHandlePos(handle, element);
           return (
-            <rect
+            <rect data-interactive
               key={handle}
               x={hx - 4} y={hy - 4}
               width={8} height={8}
@@ -1267,7 +1267,7 @@ export function SymbolRenderer({
         );
       })()}
       {showConnectionPoints && !isBoundary && element.type !== "lane" && element.type !== "use-case" && (
-        <rect
+        <rect data-interactive
           x={element.x} y={element.y}
           width={element.width} height={element.height}
           fill="transparent" stroke="none"
