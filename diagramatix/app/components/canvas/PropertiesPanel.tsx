@@ -373,7 +373,7 @@ export function PropertiesPanel({
 
       {element.type === "gateway" && (
         <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">Gateway Type</label>
+          <label className="block text-xs font-medium text-gray-700 mb-1">Type</label>
           <div className="flex flex-col gap-1">
             {GATEWAY_TYPE_OPTIONS.map(({ value, label }) => (
               <button

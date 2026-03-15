@@ -1123,7 +1123,7 @@ export function Canvas({
                   if (isWhiteBoxPool) return; // no connectors from white-box pools
                   handleConnectionPointDragStart(el.id, side, worldPos);
                 }}
-                showConnectionPoints={!isWhiteBoxPool && (selectedElementIds.has(el.id) || isDraggingConnector || isDraggingEndpoint)}
+                showConnectionPoints={selectedElementIds.size <= 1 && !isWhiteBoxPool && (selectedElementIds.has(el.id) || isDraggingConnector || isDraggingEndpoint)}
                 onResizeDragStart={(handle, e) => handleResizeDragStart(el.id, handle, e)}
                 svgToWorld={clientToWorld}
                 onUpdateProperties={onUpdateProperties}
@@ -1298,7 +1298,7 @@ export function Canvas({
               onConnectionPointDragStart={(side, worldPos) =>
                 handleConnectionPointDragStart(el.id, side, worldPos)
               }
-              showConnectionPoints={selectedElementIds.has(el.id) || isDraggingConnector || isDraggingEndpoint}
+              showConnectionPoints={selectedElementIds.size <= 1 && (selectedElementIds.has(el.id) || isDraggingConnector || isDraggingEndpoint)}
               onResizeDragStart={
                 (el.type === "task" || el.type === "subprocess" || el.type === "subprocess-expanded")
                   ? (handle, e) => handleResizeDragStart(el.id, handle, e)
@@ -1421,7 +1421,7 @@ export function Canvas({
                 onDoubleClick={() => {}}
                 onConnectionPointDragStart={(side, worldPos) =>
                   handleConnectionPointDragStart(el.id, side, worldPos)}
-                showConnectionPoints={selectedElementIds.has(el.id) || isDraggingConnector || isDraggingEndpoint}
+                showConnectionPoints={selectedElementIds.size <= 1 && (selectedElementIds.has(el.id) || isDraggingConnector || isDraggingEndpoint)}
                 svgToWorld={clientToWorld}
                 onUpdateProperties={onUpdateProperties}
                 onUpdateLabel={onUpdateLabel}

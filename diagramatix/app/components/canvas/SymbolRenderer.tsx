@@ -108,7 +108,7 @@ function TaskShape({ el }: { el: DiagramElement }) {
 }
 
 function GatewayMarker({ type, cx, cy }: { type: GatewayType; cx: number; cy: number }) {
-  const s = 9;
+  const s = 11.7;
   switch (type) {
     case "exclusive":
       return (
@@ -1063,7 +1063,7 @@ export function SymbolRenderer({
 
         return (
           <g>
-            {(selected || isEditingGatewayLabel) && (
+            {(selected && !multiSelected || isEditingGatewayLabel) && (
               <line
                 x1={elCenter.x} y1={elCenter.y}
                 x2={labelCenterX} y2={labelMidY}
@@ -1075,9 +1075,9 @@ export function SymbolRenderer({
               x={hitRectX} y={hitRectY}
               width={labelWidth} height={Math.max(totalLabelH, 16)}
               fill="transparent"
-              stroke={selected ? "#2563eb" : "none"}
+              stroke={selected && !multiSelected ? "#2563eb" : "none"}
               strokeWidth={1}
-              strokeDasharray={selected ? "3 2" : undefined}
+              strokeDasharray={selected && !multiSelected ? "3 2" : undefined}
               style={{ cursor: onUpdateProperties ? "grab" : "default" }}
               onMouseDown={handleLabelMouseDown}
               onDoubleClick={(e) => {
@@ -1141,7 +1141,7 @@ export function SymbolRenderer({
                 />
               </foreignObject>
             )}
-            {selected && onUpdateProperties && (
+            {selected && !multiSelected && onUpdateProperties && (
               <rect
                 x={hitRectX + labelWidth - 3} y={labelTopY + totalLabelH / 2 - 5}
                 width={6} height={10}
@@ -1261,7 +1261,7 @@ export function SymbolRenderer({
       )}
 
       {/* Resize handles (containers + task/subprocess) */}
-      {selected && canResize && onResizeDragStart &&
+      {selected && !multiSelected && canResize && onResizeDragStart &&
         RESIZE_HANDLES.map(({ handle, cursor }) => {
           const { hx, hy } = getHandlePos(handle, element);
           return (
@@ -1436,9 +1436,9 @@ export function SymbolRenderer({
               x={labelLeftX} y={labelTopY}
               width={labelWidth} height={totalLabelH}
               fill="transparent"
-              stroke={selected ? "#2563eb" : "none"}
+              stroke={selected && !multiSelected ? "#2563eb" : "none"}
               strokeWidth={1}
-              strokeDasharray={selected ? "3 2" : undefined}
+              strokeDasharray={selected && !multiSelected ? "3 2" : undefined}
               style={{ cursor: onUpdateProperties ? "move" : "default" }}
               onMouseDown={handleInteriorLabelMouseDown}
               onDoubleClick={(e) => { e.stopPropagation(); onDoubleClick(); }}
@@ -1455,7 +1455,7 @@ export function SymbolRenderer({
                 </tspan>
               ))}
             </text>
-            {selected && onUpdateProperties && (
+            {selected && !multiSelected && onUpdateProperties && (
               <rect
                 x={labelLeftX + labelWidth - 3} y={labelTopY + totalLabelH / 2 - 5}
                 width={6} height={10}
