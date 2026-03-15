@@ -37,7 +37,7 @@ export type BpmnTaskType =
   | "manual"
   | "business-rule";
 
-export type GatewayType = "exclusive" | "inclusive" | "parallel" | "event-based";
+export type GatewayType = "none" | "exclusive" | "inclusive" | "parallel" | "event-based";
 
 export type GatewayRole = "decision" | "merge";
 

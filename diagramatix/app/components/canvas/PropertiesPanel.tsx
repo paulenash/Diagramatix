@@ -41,6 +41,7 @@ const TASK_TYPE_OPTIONS: { value: BpmnTaskType; label: string }[] = [
 ];
 
 const GATEWAY_TYPE_OPTIONS: { value: GatewayType; label: string }[] = [
+  { value: "none",        label: "None" },
   { value: "exclusive",   label: "Exclusive ×" },
   { value: "inclusive",   label: "Inclusive ○" },
   { value: "parallel",    label: "Parallel +" },
@@ -151,7 +152,8 @@ export function PropertiesPanel({
             </div>
           </div>
         )}
-        {(connector.type === "transition" || connector.type === "messageBPMN") && onUpdateConnectorLabel && (
+        {(connector.type === "transition" || connector.type === "messageBPMN"
+          || (connector.type === "sequence" && connector.label !== undefined)) && onUpdateConnectorLabel && (
           <div>
             <p className="text-xs font-medium text-gray-700 mb-1">Label</p>
             <textarea
