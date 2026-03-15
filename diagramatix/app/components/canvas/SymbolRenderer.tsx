@@ -115,7 +115,7 @@ function GatewayMarker({ type, cx, cy }: { type: GatewayType; cx: number; cy: nu
         </g>
       );
     case "inclusive":
-      return <circle cx={cx} cy={cy} r={s * 0.7} fill="none" stroke="#374151" strokeWidth={2} />;
+      return <circle cx={cx} cy={cy} r={s * 0.7} fill="none" stroke="#374151" strokeWidth={2.5} />;
     case "parallel":
       return (
         <g stroke="#374151" strokeWidth={2.5} strokeLinecap="round">
@@ -127,9 +127,15 @@ function GatewayMarker({ type, cx, cy }: { type: GatewayType; cx: number; cy: nu
       const pts: string[] = [];
       for (let i = 0; i < 5; i++) {
         const a = (i * 2 * Math.PI / 5) - Math.PI / 2;
-        pts.push(`${cx + s * 0.75 * Math.cos(a)},${cy + s * 0.75 * Math.sin(a)}`);
+        pts.push(`${cx + s * 0.5 * Math.cos(a)},${cy + s * 0.5 * Math.sin(a)}`);
       }
-      return <polygon points={pts.join(" ")} fill="none" stroke="#374151" strokeWidth={1.5} />;
+      return (
+        <g>
+          <circle cx={cx} cy={cy} r={s * 0.95} fill="none" stroke="#374151" strokeWidth={1.5} />
+          <circle cx={cx} cy={cy} r={s * 0.75} fill="none" stroke="#374151" strokeWidth={1.5} />
+          <polygon points={pts.join(" ")} fill="none" stroke="#374151" strokeWidth={1.5} />
+        </g>
+      );
     }
     default: return null;
   }
@@ -598,37 +604,50 @@ function BpmnTaskMarker({ taskType, x, y }: { taskType: BpmnTaskType; x: number;
   switch (taskType) {
     case "user":
       return (
-        <g>
-          <circle cx={cx} cy={y + 4.5} r={2.8} fill="white" stroke="#374151" strokeWidth={1.2} />
-          <path d={`M${x + 1} ${y + 14} C${x + 1} ${y + 9} ${x + 13} ${y + 9} ${x + 13} ${y + 14}`}
-            fill="white" stroke="#374151" strokeWidth={1.2} strokeLinejoin="round" />
+        <g fill="none" stroke="#374151" strokeWidth={1.2}>
+          {/* Head */}
+          <circle cx={cx} cy={y + 3.2} r={2.6} fill="white" />
+          {/* Body — curved shoulders narrowing to waist */}
+          <path d={`M${cx} ${y + 5.8} C${cx - 4} ${y + 7} ${cx - 5} ${y + 9.5} ${cx - 4.5} ${y + 13.5} L${cx + 4.5} ${y + 13.5} C${cx + 5} ${y + 9.5} ${cx + 4} ${y + 7} ${cx} ${y + 5.8} Z`} fill="white" />
         </g>
       );
     case "service": {
-      const outerR = 6, innerR = 4.5, holeR = 2.2, teeth = 8;
-      const pts: string[] = [];
-      for (let i = 0; i < teeth; i++) {
-        const base = (i / teeth) * Math.PI * 2;
-        const span = (Math.PI / teeth) * 0.55;
-        pts.push(`${cx + outerR * Math.cos(base - span)},${cy + outerR * Math.sin(base - span)}`);
-        pts.push(`${cx + outerR * Math.cos(base + span)},${cy + outerR * Math.sin(base + span)}`);
-        const gap = base + Math.PI / teeth;
-        pts.push(`${cx + innerR * Math.cos(gap)},${cy + innerR * Math.sin(gap)}`);
+      // Two interlocking gears per BPMN 2.0 spec
+      function gearPoints(gx: number, gy: number, outerR: number, innerR: number, teeth: number) {
+        const pts: string[] = [];
+        for (let i = 0; i < teeth; i++) {
+          const base = (i / teeth) * Math.PI * 2;
+          const span = (Math.PI / teeth) * 0.55;
+          pts.push(`${gx + outerR * Math.cos(base - span)},${gy + outerR * Math.sin(base - span)}`);
+          pts.push(`${gx + outerR * Math.cos(base + span)},${gy + outerR * Math.sin(base + span)}`);
+          const gap = base + Math.PI / teeth;
+          pts.push(`${gx + innerR * Math.cos(gap)},${gy + innerR * Math.sin(gap)}`);
+        }
+        return pts.join(" ");
       }
+      const g1x = cx - 1.5, g1y = cy - 1.5;
+      const g2x = cx + 2.5, g2y = cy + 2.5;
       return (
         <g>
-          <polygon points={pts.join(" ")} fill="white" stroke="#374151" strokeWidth={1.2} />
-          <circle cx={cx} cy={cy} r={holeR} fill="white" stroke="#374151" strokeWidth={1.2} />
+          {/* Secondary gear (behind) */}
+          <polygon points={gearPoints(g2x, g2y, 3.8, 2.8, 6)} fill="white" stroke="#374151" strokeWidth={1.2} />
+          <circle cx={g2x} cy={g2y} r={1.3} fill="white" stroke="#374151" strokeWidth={1.2} />
+          {/* Primary gear (front) */}
+          <polygon points={gearPoints(g1x, g1y, 4.8, 3.6, 6)} fill="white" stroke="#374151" strokeWidth={1.2} />
+          <circle cx={g1x} cy={g1y} r={1.6} fill="white" stroke="#374151" strokeWidth={1.2} />
         </g>
       );
     }
     case "script":
       return (
         <g>
-          <rect x={x + 2} y={y + 1} width={10} height={12} rx={1} fill="white" stroke="#374151" strokeWidth={1.2} />
-          <line x1={x + 4} y1={y + 4}  x2={x + 10} y2={y + 4}  stroke="#374151" strokeWidth={1} />
-          <line x1={x + 4} y1={y + 7}  x2={x + 10} y2={y + 7}  stroke="#374151" strokeWidth={1} />
-          <line x1={x + 4} y1={y + 10} x2={x + 10} y2={y + 10} stroke="#374151" strokeWidth={1} />
+          <path
+            d={`M${x + 4} ${y + 1} L${x + 12} ${y + 1} C${x + 10} ${y + 4.5} ${x + 14} ${y + 8.5} ${x + 12} ${y + 13} L${x + 4} ${y + 13} C${x + 6} ${y + 8.5} ${x + 2} ${y + 4.5} ${x + 4} ${y + 1} Z`}
+            fill="white" stroke="#374151" strokeWidth={1.2}
+          />
+          <line x1={x + 5} y1={y + 4}  x2={x + 11} y2={y + 4}  stroke="#374151" strokeWidth={0.8} />
+          <line x1={x + 4.5} y1={y + 7}  x2={x + 11.5} y2={y + 7}  stroke="#374151" strokeWidth={0.8} />
+          <line x1={x + 5} y1={y + 10} x2={x + 11} y2={y + 10} stroke="#374151" strokeWidth={0.8} />
         </g>
       );
     case "send":
