@@ -39,6 +39,8 @@ export type BpmnTaskType =
 
 export type GatewayType = "exclusive" | "inclusive" | "parallel" | "event-based";
 
+export type GatewayRole = "decision" | "merge";
+
 export type EventType =
   | "none" | "message" | "timer" | "error" | "signal" | "terminate" | "conditional";
 
@@ -104,6 +106,7 @@ export interface Connector {
   targetOffsetAlong?: number;
   cp1RelOffset?: Point;   // cp1 offset from srcEdge — preserved across element moves
   cp2RelOffset?: Point;   // cp2 offset from tgtEdge — preserved across element moves
+  labelAnchor?: "midpoint" | "source";  // where the label tethers to; default "midpoint"
 }
 
 export interface Viewport {

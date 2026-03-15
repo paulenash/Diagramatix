@@ -630,6 +630,11 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         ? state.connectors.filter((c) => c.type === "transition").length
         : 0;
 
+      // Decision gateway outgoing sequence connectors get a source-anchored label
+      const isDecisionGatewayOutgoing = connectorType === "sequence"
+        && source.type === "gateway"
+        && ((source.properties.gatewayRole as string | undefined) ?? "decision") === "decision";
+
       const newConnector: Connector = {
         id: nanoid(),
         sourceId,
@@ -644,10 +649,12 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         waypoints,
         label:        isTransition ? `transition ${transitionCount + 1}`
                     : isMsgBpmn   ? `message ${msgBpmnCount + 1}`
+                    : isDecisionGatewayOutgoing ? ""
                     : undefined,
-        labelOffsetX: isTransition ? 0   : isMsgBpmn ? 20  : undefined,
-        labelOffsetY: isTransition ? -30 : isMsgBpmn ? 0   : undefined,
-        labelWidth:   isTransition ? 80  : isMsgBpmn ? 80  : undefined,
+        labelOffsetX: isTransition ? 0   : isMsgBpmn ? 20  : isDecisionGatewayOutgoing ? 5  : undefined,
+        labelOffsetY: isTransition ? -30 : isMsgBpmn ? 0   : isDecisionGatewayOutgoing ? -20 : undefined,
+        labelWidth:   isTransition ? 80  : isMsgBpmn ? 80  : isDecisionGatewayOutgoing ? 60  : undefined,
+        labelAnchor:  isDecisionGatewayOutgoing ? "source" : undefined,
       };
 
       const isSeq = connectorType === "sequence";

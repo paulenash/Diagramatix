@@ -149,7 +149,10 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
   if (visibleWaypoints.length < 2) return null;
 
   let anchor: Point;
-  if (visibleWaypoints.length === 4) {
+  if (connector.labelAnchor === "source") {
+    // Anchor near the source end of the connector
+    anchor = visibleWaypoints[0];
+  } else if (visibleWaypoints.length === 4) {
     // Cubic bezier (curvilinear / transition connector)
     const [p0, cp1, cp2, p3] = visibleWaypoints;
     anchor = cubicBezierPoint(p0, cp1, cp2, p3, 0.5);
@@ -190,7 +193,7 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
   }
 
   const hasLabel = label.trim().length > 0;
-  if (!hasLabel && !isEditing) return null;
+  if (!hasLabel && !isEditing && connector.labelAnchor !== "source") return null;
 
   function handleLabelMouseDown(e: React.MouseEvent) {
     if (!svgToWorld || !onUpdateLabel) return;
@@ -494,8 +497,9 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
         style={{ pointerEvents: "none" }}
       />
 
-      {/* Floating transition label */}
-      {(connector.type === "transition" || connector.type === "messageBPMN") && (
+      {/* Floating connector label */}
+      {(connector.type === "transition" || connector.type === "messageBPMN"
+        || (connector.type === "sequence" && connector.label !== undefined)) && (
         <InteractionLabel
           connector={connector}
           selected={selected}

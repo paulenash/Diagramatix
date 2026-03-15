@@ -390,6 +390,27 @@ export function PropertiesPanel({
         </div>
       )}
 
+      {element.type === "gateway" && (
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1">Role</label>
+          <div className="flex gap-1">
+            {([{ value: "decision", label: "Decision" }, { value: "merge", label: "Merge" }] as const).map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => onUpdateProperties(element.id, { gatewayRole: opt.value })}
+                className={`px-2 py-1 text-xs rounded border ${
+                  ((element.properties.gatewayRole as string | undefined) ?? "decision") === opt.value
+                    ? "bg-blue-600 text-white border-blue-600"
+                    : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {isEventElement && (
         <div>
           <label className="block text-xs font-medium text-gray-700 mb-1">Event Type</label>
