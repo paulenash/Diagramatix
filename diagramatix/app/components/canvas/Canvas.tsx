@@ -1525,57 +1525,69 @@ export function Canvas({
       })()}
 
       {/* Task type picker — shown after dropping a task onto a BPMN canvas */}
-      {pendingDrop && pendingDrop.symbolType === "task" && (
-        <div
-          style={{ position: "absolute", left: pendingDrop.containerX, top: pendingDrop.containerY, zIndex: 50 }}
-          className="bg-white border border-gray-200 rounded shadow-lg py-1 min-w-[160px]"
-        >
-          <p className="px-3 py-1 text-xs font-semibold text-gray-400 uppercase tracking-wide border-b border-gray-100">
-            Task Type
-          </p>
-          {TASK_TYPE_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              className="w-full text-left px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
-              onMouseDown={(e) => {
-                e.preventDefault();
-                onAddElement("task", pendingDrop.worldPos, opt.value);
-                setPendingDrop(null);
-              }}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-      )}
+      {pendingDrop && pendingDrop.symbolType === "task" && (() => {
+        const itemH = 20, headerH = 22, pad = 8;
+        const dropdownH = headerH + TASK_TYPE_OPTIONS.length * itemH + pad;
+        const containerH = svgRef.current?.parentElement?.getBoundingClientRect().height ?? window.innerHeight;
+        const top = Math.min(pendingDrop.containerY, containerH - dropdownH);
+        return (
+          <div
+            style={{ position: "absolute", left: pendingDrop.containerX, top, zIndex: 50 }}
+            className="bg-white border border-gray-200 rounded shadow-lg py-1 flex flex-col"
+          >
+            <p className="px-3 py-0.5 text-xs font-semibold text-gray-400 uppercase tracking-wide border-b border-gray-100">
+              Task Type
+            </p>
+            {TASK_TYPE_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                className="text-left px-3 py-0.5 text-sm text-gray-700 hover:bg-gray-50"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  onAddElement("task", pendingDrop.worldPos, opt.value);
+                  setPendingDrop(null);
+                }}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        );
+      })()}
       {/* Intermediate Event type picker */}
-      {pendingDrop && pendingDrop.symbolType === "intermediate-event" && (
-        <div
-          style={{ position: "absolute", left: pendingDrop.containerX, top: pendingDrop.containerY, zIndex: 50 }}
-          className="bg-white border border-gray-200 rounded shadow-lg py-1 min-w-[160px]"
-        >
-          <p className="px-3 py-1 text-xs font-semibold text-gray-400 uppercase tracking-wide border-b border-gray-100">
-            Event Type
-          </p>
-          {INTERMEDIATE_EVENT_TYPE_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              className="w-full text-left px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
-              onMouseDown={(e) => {
-                e.preventDefault();
-                if (pendingDrop.splitConnectorId && onSplitConnector) {
-                  onSplitConnector("intermediate-event", pendingDrop.worldPos, pendingDrop.splitConnectorId, undefined, opt.value);
-                } else {
-                  onAddElement("intermediate-event", pendingDrop.worldPos, undefined, opt.value);
-                }
-                setPendingDrop(null);
-              }}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-      )}
+      {pendingDrop && pendingDrop.symbolType === "intermediate-event" && (() => {
+        const itemH = 20, headerH = 22, pad = 8;
+        const dropdownH = headerH + INTERMEDIATE_EVENT_TYPE_OPTIONS.length * itemH + pad;
+        const containerH = svgRef.current?.parentElement?.getBoundingClientRect().height ?? window.innerHeight;
+        const top = Math.min(pendingDrop.containerY, containerH - dropdownH);
+        return (
+          <div
+            style={{ position: "absolute", left: pendingDrop.containerX, top, zIndex: 50 }}
+            className="bg-white border border-gray-200 rounded shadow-lg py-1 flex flex-col"
+          >
+            <p className="px-3 py-0.5 text-xs font-semibold text-gray-400 uppercase tracking-wide border-b border-gray-100">
+              Event Type
+            </p>
+            {INTERMEDIATE_EVENT_TYPE_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                className="text-left px-3 py-0.5 text-sm text-gray-700 hover:bg-gray-50"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  if (pendingDrop.splitConnectorId && onSplitConnector) {
+                    onSplitConnector("intermediate-event", pendingDrop.worldPos, pendingDrop.splitConnectorId, undefined, opt.value);
+                  } else {
+                    onAddElement("intermediate-event", pendingDrop.worldPos, undefined, opt.value);
+                  }
+                  setPendingDrop(null);
+                }}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        );
+      })()}
 
       {/* Status bar */}
       <div className="absolute bottom-2 left-2 text-xs text-gray-400 bg-white/80 px-2 py-1 rounded">
