@@ -193,7 +193,7 @@ export function computeWaypoints(
     .map(getBounds);
 
   const perpOff    = adaptedPerpOffset(srcEdge, sourceSide, tgtEdge, targetSide);
-  const exitPt     = perpendicularExitScaled(srcEdge, sourceSide, 2);
+  const exitPt     = perpendicularExitScaled(srcEdge, sourceSide, perpOff);
   const approachPt = perpendicularExitScaled(tgtEdge, targetSide, perpOff);
 
   let midPath: Point[];
@@ -396,7 +396,7 @@ export function recomputeAllConnectors(
         const newSrcEdge    = sidePoint(source, conn.sourceSide, conn.sourceOffsetAlong ?? 0.5);
         const newTgtEdge    = sidePoint(target, conn.targetSide, conn.targetOffsetAlong ?? 0.5);
         const perpOff       = adaptedPerpOffset(newSrcEdge, conn.sourceSide, newTgtEdge, conn.targetSide);
-        const newExitPt     = perpendicularExitScaled(newSrcEdge, conn.sourceSide, 2);
+        const newExitPt     = perpendicularExitScaled(newSrcEdge, conn.sourceSide, perpOff);
         const newApproachPt = perpendicularExitScaled(newTgtEdge, conn.targetSide, perpOff);
         const interior = wp.slice(3, N - 3);
         const merged = [

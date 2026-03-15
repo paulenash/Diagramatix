@@ -590,6 +590,16 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
           </g>
         );
       })}
+
+      {/* Waypoint vertex dots (selected connectors) */}
+      {selected && visibleWaypoints.map((pt, i) => (
+        <circle
+          key={`wp-${i}`}
+          cx={pt.x} cy={pt.y} r={3}
+          fill="#ef4444" stroke="white" strokeWidth={1}
+          style={{ pointerEvents: "none" }}
+        />
+      ))}
     </>
   );
 }
