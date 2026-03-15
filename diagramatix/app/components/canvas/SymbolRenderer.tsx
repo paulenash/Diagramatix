@@ -20,7 +20,7 @@ interface Props {
   isAssocBpmnTarget?: boolean;
   isErrorTarget?: boolean;
   isElementDragTarget?: boolean;
-  onSelect: () => void;
+  onSelect: (e?: React.MouseEvent) => void;
   onMove: (x: number, y: number) => void;
   onDoubleClick: () => void;
   onConnectionPointDragStart: (side: Side, worldPos: Point) => void;
@@ -32,6 +32,9 @@ interface Props {
   onUpdateProperties?: (id: string, props: Record<string, unknown>) => void;
   onUpdateLabel?: (id: string, label: string) => void;
   colorConfig?: SymbolColorConfig;
+  multiSelected?: boolean;
+  onGroupMove?: (dx: number, dy: number) => void;
+  onGroupMoveEnd?: () => void;
 }
 
 function ellipseOctagonPoints(cx: number, cy: number, rx: number, ry: number): string {
@@ -876,6 +879,9 @@ export function SymbolRenderer({
   onUpdateProperties,
   onUpdateLabel,
   colorConfig,
+  multiSelected,
+  onGroupMove,
+  onGroupMoveEnd,
 }: Props) {
   const [isEditingGatewayLabel, setIsEditingGatewayLabel] = useState(false);
   const [editGatewayLabelValue, setEditGatewayLabelValue] = useState("");
@@ -895,7 +901,33 @@ export function SymbolRenderer({
       e.stopPropagation();
     }
 
-    onSelect();
+    onSelect(e);
+
+    // Group drag mode: when multi-selected and clicking a selected element
+    if (multiSelected && onGroupMove) {
+      let lastClientX = e.clientX;
+      let lastClientY = e.clientY;
+
+      function onMouseMove(ev: MouseEvent) {
+        const dx = ev.clientX - lastClientX;
+        const dy = ev.clientY - lastClientY;
+        lastClientX = ev.clientX;
+        lastClientY = ev.clientY;
+        onGroupMove!(dx, dy);
+      }
+
+      function onMouseUp() {
+        window.removeEventListener("mousemove", onMouseMove);
+        window.removeEventListener("mouseup", onMouseUp);
+        onGroupMoveEnd?.();
+      }
+
+      window.addEventListener("mousemove", onMouseMove);
+      window.addEventListener("mouseup", onMouseUp);
+      return;
+    }
+
+    // Single element drag
     dragStart = {
       mouseX: e.clientX,
       mouseY: e.clientY,
@@ -960,7 +992,7 @@ export function SymbolRenderer({
     <g
       onMouseDown={handleMouseDown}
       onDoubleClick={(e) => { e.stopPropagation(); onDoubleClick(); }}
-      style={{ cursor: (isBoundary || isWhiteBoxPool) ? "default" : "move" }}
+      style={{ cursor: (isBoundary || isWhiteBoxPool) ? "default" : multiSelected ? "grab" : "move" }}
     >
       <SymbolShape el={element} />
 

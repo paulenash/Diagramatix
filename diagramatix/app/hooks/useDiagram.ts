@@ -139,7 +139,8 @@ type Action =
       connectorId: string;
     }}
   | { type: "ADD_LANE"; payload: { poolId: string } }
-  | { type: "MOVE_LANE_BOUNDARY"; payload: { aboveLaneId: string; belowLaneId: string; dy: number } };
+  | { type: "MOVE_LANE_BOUNDARY"; payload: { aboveLaneId: string; belowLaneId: string; dy: number } }
+  | { type: "MOVE_ELEMENTS"; payload: { ids: string[]; dx: number; dy: number } };
 
 function nanoid(): string {
   return Math.random().toString(36).slice(2, 10);
@@ -443,6 +444,42 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         };
         return recomputeAllConnectors([conn], elements)[0] ?? conn;
       });
+      return { ...state, elements: updatePoolTypes(elements), connectors };
+    }
+
+    case "MOVE_ELEMENTS": {
+      const { ids, dx, dy } = action.payload;
+      if (dx === 0 && dy === 0) return state;
+
+      // Expand selection to include container descendants and boundary events
+      const expandedIds = new Set(ids);
+      for (const id of ids) {
+        const el = state.elements.find(e => e.id === id);
+        if (!el) continue;
+        if (isContainerType(el.type)) {
+          for (const descId of getAllDescendantIds(state.elements, id)) expandedIds.add(descId);
+        }
+        for (const be of state.elements) {
+          if (be.boundaryHostId === id) expandedIds.add(be.id);
+        }
+      }
+
+      const elements = state.elements.map(e => {
+        if (!expandedIds.has(e.id)) return e;
+        return { ...e, x: e.x + dx, y: e.y + dy };
+      });
+
+      const connectors = state.connectors.map(conn => {
+        const srcIn = expandedIds.has(conn.sourceId);
+        const tgtIn = expandedIds.has(conn.targetId);
+        if (!srcIn && !tgtIn) return conn;
+        if (srcIn && tgtIn) return {
+          ...conn,
+          waypoints: conn.waypoints.map(pt => ({ x: pt.x + dx, y: pt.y + dy })),
+        };
+        return recomputeAllConnectors([conn], elements)[0] ?? conn;
+      });
+
       return { ...state, elements: updatePoolTypes(elements), connectors };
     }
 
@@ -922,6 +959,8 @@ export function useDiagram(initialData: DiagramData) {
   const draggingRef       = useRef<string | null>(null);
   const preResizeRef      = useRef<Snapshot | null>(null);
   const resizingRef       = useRef<string | null>(null);
+  const preGroupMoveRef   = useRef<Snapshot | null>(null);
+  const groupDraggingRef  = useRef<boolean>(false);
   const preLaneRef        = useRef<Snapshot | null>(null);
   const preWaypointRef    = useRef<Snapshot | null>(null);
   const waypointConnIdRef = useRef<string | null>(null);
@@ -954,6 +993,22 @@ export function useDiagram(initialData: DiagramData) {
       preMoveRef.current = snapshotData(); // snapshot before drag starts
     }
     dispatch({ type: "MOVE_ELEMENT", payload: { id, x, y } });
+  }, []);
+
+  const moveElements = useCallback((ids: string[], dx: number, dy: number) => {
+    if (!groupDraggingRef.current) {
+      groupDraggingRef.current = true;
+      preGroupMoveRef.current = snapshotData();
+    }
+    dispatch({ type: "MOVE_ELEMENTS", payload: { ids, dx, dy } });
+  }, []);
+
+  const elementsMoveEnd = useCallback(() => {
+    if (groupDraggingRef.current && preGroupMoveRef.current) {
+      pushHistory(preGroupMoveRef.current);
+      preGroupMoveRef.current = null;
+      groupDraggingRef.current = false;
+    }
   }, []);
 
   const resizeElement = useCallback((id: string, x: number, y: number, width: number, height: number) => {
@@ -1146,6 +1201,8 @@ export function useDiagram(initialData: DiagramData) {
     data,
     addElement,
     moveElement,
+    moveElements,
+    elementsMoveEnd,
     resizeElement,
     resizeElementEnd,
     updateLabel,

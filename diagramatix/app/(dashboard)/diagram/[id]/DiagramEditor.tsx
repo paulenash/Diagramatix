@@ -208,6 +208,8 @@ export function DiagramEditor({
     addLane,
     moveLaneBoundary,
     laneBoundaryMoveEnd,
+    moveElements,
+    elementsMoveEnd,
     undo,
     redo,
     canUndo,
@@ -234,7 +236,7 @@ export function DiagramEditor({
   }, [undo, redo]);
 
   const [pdfScale, setPdfScale] = useState(100);
-  const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
+  const [selectedElementIds, setSelectedElementIds] = useState<Set<string>>(new Set());
   const [selectedConnectorId, setSelectedConnectorId] = useState<string | null>(null);
   const [pendingDragSymbol, setPendingDragSymbol] = useState<SymbolType | null>(null);
   const [projectColorConfig, setProjectColorConfig] = useState<SymbolColorConfig | undefined>(undefined);
@@ -268,7 +270,9 @@ export function DiagramEditor({
     ? BW_SYMBOL_COLORS
     : { ...projectColorConfig, ...diagramColorConfig };
 
-  const selectedElement = data.elements.find((el) => el.id === selectedElementId) ?? null;
+  const selectedElement = selectedElementIds.size === 1
+    ? data.elements.find((el) => selectedElementIds.has(el.id)) ?? null
+    : null;
   const selectedConnector = data.connectors.find((c) => c.id === selectedConnectorId) ?? null;
 
   const defaultDirectionType: DirectionType =
@@ -446,7 +450,7 @@ export function DiagramEditor({
           onUpdateLabel={updateLabel}
           onDeleteElement={(id) => {
             deleteElement(id);
-            setSelectedElementId(null);
+            setSelectedElementIds((prev) => { const next = new Set(prev); next.delete(id); return next; });
           }}
           onAddConnector={handleAddConnector}
           onDeleteConnector={(id) => {
@@ -454,10 +458,12 @@ export function DiagramEditor({
             setSelectedConnectorId(null);
           }}
           onUpdateConnectorEndpoint={updateConnectorEndpoint}
-          selectedElementId={selectedElementId}
+          selectedElementIds={selectedElementIds}
           selectedConnectorId={selectedConnectorId}
-          onSelectElement={setSelectedElementId}
+          onSetSelectedElements={setSelectedElementIds}
           onSelectConnector={setSelectedConnectorId}
+          onMoveElements={moveElements}
+          onElementsMoveEnd={elementsMoveEnd}
           pendingDragSymbol={pendingDragSymbol}
           defaultDirectionType={defaultDirectionType}
           defaultRoutingType={defaultRoutingType}
@@ -479,13 +485,14 @@ export function DiagramEditor({
           element={selectedElement}
           connector={selectedConnector}
           diagramType={diagramType}
+          multiSelectionCount={selectedElementIds.size}
           onUpdateLabel={updateLabel}
           onUpdateProperties={updateProperties}
           onUpdateConnectorDirection={updateConnectorDirection}
           onUpdateConnectorLabel={(id, label) => updateConnectorLabel(id, label)}
           onDeleteElement={(id) => {
             deleteElement(id);
-            setSelectedElementId(null);
+            setSelectedElementIds((prev) => { const next = new Set(prev); next.delete(id); return next; });
           }}
           onDeleteConnector={(id) => {
             deleteConnector(id);

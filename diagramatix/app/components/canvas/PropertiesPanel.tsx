@@ -26,6 +26,7 @@ interface Props {
   poolHasContent?: boolean;
   laneHasContent?: boolean;
   hasMessageBpmnConnection?: boolean;
+  multiSelectionCount?: number;
 }
 
 const TASK_TYPE_OPTIONS: { value: BpmnTaskType; label: string }[] = [
@@ -76,12 +77,22 @@ export function PropertiesPanel({
   poolHasContent,
   laneHasContent,
   hasMessageBpmnConnection,
+  multiSelectionCount,
 }: Props) {
   const [labelDraft, setLabelDraft] = useState("");
 
   useEffect(() => {
     if (element) setLabelDraft(element.label);
   }, [element]);
+
+  if (multiSelectionCount && multiSelectionCount > 1) {
+    return (
+      <div className="w-56 border-l border-gray-200 bg-white p-4">
+        <p className="text-xs text-gray-500 font-medium">{multiSelectionCount} elements selected</p>
+        <p className="text-xs text-gray-400 mt-1">Drag any selected element to move the group</p>
+      </div>
+    );
+  }
 
   if (!element && !connector) {
     return (

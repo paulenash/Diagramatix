@@ -157,10 +157,12 @@ interface Props {
     newSide: Side,
     newOffsetAlong?: number,
   ) => void;
-  selectedElementId: string | null;
+  selectedElementIds: Set<string>;
   selectedConnectorId: string | null;
-  onSelectElement: (id: string | null) => void;
+  onSetSelectedElements: (ids: Set<string> | ((prev: Set<string>) => Set<string>)) => void;
   onSelectConnector: (id: string | null) => void;
+  onMoveElements?: (ids: string[], dx: number, dy: number) => void;
+  onElementsMoveEnd?: () => void;
   pendingDragSymbol: SymbolType | null;
   defaultDirectionType: DirectionType;
   defaultRoutingType: RoutingType;
@@ -272,10 +274,12 @@ export function Canvas({
   onAddConnector,
   onDeleteConnector,
   onUpdateConnectorEndpoint,
-  selectedElementId,
+  selectedElementIds,
   selectedConnectorId,
-  onSelectElement,
+  onSetSelectedElements,
   onSelectConnector,
+  onMoveElements,
+  onElementsMoveEnd,
   pendingDragSymbol,
   defaultDirectionType,
   defaultRoutingType,
@@ -321,6 +325,19 @@ export function Canvas({
   }, []);
 
   const [draggingElementId, setDraggingElementId] = useState<string | null>(null);
+
+  // Lasso selection state
+  const [lassoRect, setLassoRect] = useState<{ startX: number; startY: number; endX: number; endY: number } | null>(null);
+  const spaceHeldRef = useRef(false);
+
+  // Track Space key for pan-while-lasso
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) { if (e.code === "Space" && !e.repeat) spaceHeldRef.current = true; }
+    function onKeyUp(e: KeyboardEvent) { if (e.code === "Space") spaceHeldRef.current = false; }
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
+    return () => { window.removeEventListener("keydown", onKeyDown); window.removeEventListener("keyup", onKeyUp); };
+  }, []);
 
   const svgToWorld = useCallback(
     (svgX: number, svgY: number): Point => ({
@@ -698,31 +715,99 @@ export function Canvas({
       setPendingDrop(null);
       return;
     }
-    onSelectElement(null);
-    onSelectConnector(null);
-    panStart.current = {
-      mouseX: e.clientX,
-      mouseY: e.clientY,
-      panX: pan.x,
-      panY: pan.y,
-    };
 
-    function onMouseMove(ev: MouseEvent) {
-      if (!panStart.current) return;
-      setPan({
-        x: panStart.current.panX + ev.clientX - panStart.current.mouseX,
-        y: panStart.current.panY + ev.clientY - panStart.current.mouseY,
-      });
+    // Hold Space → pan; otherwise → lasso
+    if (spaceHeldRef.current) {
+      // --- Pan mode ---
+      onSetSelectedElements(new Set());
+      onSelectConnector(null);
+      panStart.current = {
+        mouseX: e.clientX,
+        mouseY: e.clientY,
+        panX: pan.x,
+        panY: pan.y,
+      };
+
+      function onMouseMove(ev: MouseEvent) {
+        if (!panStart.current) return;
+        setPan({
+          x: panStart.current.panX + ev.clientX - panStart.current.mouseX,
+          y: panStart.current.panY + ev.clientY - panStart.current.mouseY,
+        });
+      }
+
+      function onMouseUp() {
+        panStart.current = null;
+        window.removeEventListener("mousemove", onMouseMove);
+        window.removeEventListener("mouseup", onMouseUp);
+      }
+
+      window.addEventListener("mousemove", onMouseMove);
+      window.addEventListener("mouseup", onMouseUp);
+    } else {
+      // --- Lasso mode ---
+      const startWorld = clientToWorld(e.clientX, e.clientY);
+      const startClientX = e.clientX;
+      const startClientY = e.clientY;
+      let didDrag = false;
+
+      function onMouseMove(ev: MouseEvent) {
+        const dx = ev.clientX - startClientX;
+        const dy = ev.clientY - startClientY;
+        if (!didDrag && Math.abs(dx) < 5 && Math.abs(dy) < 5) return;
+        didDrag = true;
+        const endWorld = clientToWorld(ev.clientX, ev.clientY);
+        setLassoRect({
+          startX: startWorld.x, startY: startWorld.y,
+          endX: endWorld.x, endY: endWorld.y,
+        });
+      }
+
+      function onMouseUp(ev: MouseEvent) {
+        window.removeEventListener("mousemove", onMouseMove);
+        window.removeEventListener("mouseup", onMouseUp);
+        setLassoRect(null);
+
+        if (!didDrag) {
+          // Simple click on background — clear selection
+          if (!ev.shiftKey) {
+            onSetSelectedElements(new Set());
+            onSelectConnector(null);
+          }
+          return;
+        }
+
+        // Find all elements fully enclosed in lasso rectangle
+        const endWorld = clientToWorld(ev.clientX, ev.clientY);
+        const lx = Math.min(startWorld.x, endWorld.x);
+        const ly = Math.min(startWorld.y, endWorld.y);
+        const lx2 = Math.max(startWorld.x, endWorld.x);
+        const ly2 = Math.max(startWorld.y, endWorld.y);
+
+        const enclosed = new Set<string>();
+        for (const el of data.elements) {
+          if (el.x >= lx && el.y >= ly &&
+              el.x + el.width <= lx2 && el.y + el.height <= ly2) {
+            enclosed.add(el.id);
+          }
+        }
+
+        if (ev.shiftKey) {
+          // Shift+lasso: add to existing selection
+          onSetSelectedElements((prev) => {
+            const next = new Set(prev);
+            for (const id of enclosed) next.add(id);
+            return next;
+          });
+        } else {
+          onSetSelectedElements(enclosed);
+        }
+        onSelectConnector(null);
+      }
+
+      window.addEventListener("mousemove", onMouseMove);
+      window.addEventListener("mouseup", onMouseUp);
     }
-
-    function onMouseUp() {
-      panStart.current = null;
-      window.removeEventListener("mousemove", onMouseMove);
-      window.removeEventListener("mouseup", onMouseUp);
-    }
-
-    window.addEventListener("mousemove", onMouseMove);
-    window.addEventListener("mouseup", onMouseUp);
   }
 
   function handleWheel(e: React.WheelEvent) {
@@ -822,26 +907,36 @@ export function Canvas({
 
   function handleKeyDown(e: React.KeyboardEvent) {
     const NUDGE = 5;
-    if (selectedElementId && !editingLabel) {
-      const el = data.elements.find((el) => el.id === selectedElementId);
+    if (selectedElementIds.size === 1 && !editingLabel) {
+      const selId = [...selectedElementIds][0];
+      const el = data.elements.find((el) => el.id === selId);
       if (el) {
-        if (e.key === "ArrowLeft")  { e.preventDefault(); onMoveElement(selectedElementId, el.x - NUDGE, el.y); return; }
-        if (e.key === "ArrowRight") { e.preventDefault(); onMoveElement(selectedElementId, el.x + NUDGE, el.y); return; }
-        if (e.key === "ArrowUp")    { e.preventDefault(); onMoveElement(selectedElementId, el.x, el.y - NUDGE); return; }
-        if (e.key === "ArrowDown")  { e.preventDefault(); onMoveElement(selectedElementId, el.x, el.y + NUDGE); return; }
+        if (e.key === "ArrowLeft")  { e.preventDefault(); onMoveElement(selId, el.x - NUDGE, el.y); return; }
+        if (e.key === "ArrowRight") { e.preventDefault(); onMoveElement(selId, el.x + NUDGE, el.y); return; }
+        if (e.key === "ArrowUp")    { e.preventDefault(); onMoveElement(selId, el.x, el.y - NUDGE); return; }
+        if (e.key === "ArrowDown")  { e.preventDefault(); onMoveElement(selId, el.x, el.y + NUDGE); return; }
       }
+    } else if (selectedElementIds.size > 1 && !editingLabel && onMoveElements) {
+      const ids = [...selectedElementIds];
+      if (e.key === "ArrowLeft")  { e.preventDefault(); onMoveElements(ids, -NUDGE, 0); return; }
+      if (e.key === "ArrowRight") { e.preventDefault(); onMoveElements(ids, NUDGE, 0); return; }
+      if (e.key === "ArrowUp")    { e.preventDefault(); onMoveElements(ids, 0, -NUDGE); return; }
+      if (e.key === "ArrowDown")  { e.preventDefault(); onMoveElements(ids, 0, NUDGE); return; }
     }
     if (e.key === "Escape") {
       setDraggingConnector(null);
       setDraggingEndpoint(null);
       setEditingLabel(null);
       setPendingDrop(null);
-      onSelectElement(null);
+      onSetSelectedElements(new Set());
       onSelectConnector(null);
     }
     if (e.key === "Delete") {
       if (editingLabel) return;
-      if (selectedElementId) onDeleteElement(selectedElementId);
+      if (selectedElementIds.size > 0) {
+        for (const id of selectedElementIds) onDeleteElement(id);
+        onSetSelectedElements(new Set());
+      }
       if (selectedConnectorId) onDeleteConnector(selectedConnectorId);
     }
   }
@@ -1006,17 +1101,19 @@ export function Canvas({
               <SymbolRenderer
                 key={el.id}
                 element={el}
-                selected={el.id === selectedElementId}
+                selected={selectedElementIds.has(el.id)}
                 isDropTarget={isSubExpDropTarget || isCompositeDropTarget}
                 isDisallowedTarget={false}
                 isMessageBpmnTarget={isMsgTarget}
                 isAssocBpmnTarget={isSubExpAssocTarget}
                 isElementDragTarget={isElementDragTarget}
-                onSelect={() => {
-                  if (isWhiteBoxPool && el.id === selectedElementId) {
-                    onSelectElement(null); // toggle deselect for white-box pools
-                  } else {
-                    onSelectElement(el.id);
+                onSelect={(e) => {
+                  if (isWhiteBoxPool && selectedElementIds.has(el.id) && selectedElementIds.size === 1) {
+                    onSetSelectedElements(new Set()); // toggle deselect for white-box pools
+                  } else if (e?.shiftKey) {
+                    onSetSelectedElements((prev) => { const next = new Set(prev); if (next.has(el.id)) next.delete(el.id); else next.add(el.id); return next; });
+                  } else if (!selectedElementIds.has(el.id)) {
+                    onSetSelectedElements(new Set([el.id]));
                   }
                   onSelectConnector(null);
                 }}
@@ -1026,7 +1123,7 @@ export function Canvas({
                   if (isWhiteBoxPool) return; // no connectors from white-box pools
                   handleConnectionPointDragStart(el.id, side, worldPos);
                 }}
-                showConnectionPoints={!isWhiteBoxPool && (el.id === selectedElementId || isDraggingConnector || isDraggingEndpoint)}
+                showConnectionPoints={!isWhiteBoxPool && (selectedElementIds.has(el.id) || isDraggingConnector || isDraggingEndpoint)}
                 onResizeDragStart={(handle, e) => handleResizeDragStart(el.id, handle, e)}
                 svgToWorld={clientToWorld}
                 onUpdateProperties={onUpdateProperties}
@@ -1036,6 +1133,9 @@ export function Canvas({
                     ? () => onElementMoveEnd?.(el.id)
                     : undefined
                 }
+                multiSelected={selectedElementIds.size > 1 && selectedElementIds.has(el.id)}
+                onGroupMove={onMoveElements ? (dx, dy) => onMoveElements([...selectedElementIds], dx / zoom, dy / zoom) : undefined}
+                onGroupMoveEnd={onElementsMoveEnd}
                 colorConfig={colorConfig}
               />
             );
@@ -1046,10 +1146,10 @@ export function Canvas({
             <SymbolRenderer
               key={el.id}
               element={el}
-              selected={el.id === selectedElementId}
+              selected={selectedElementIds.has(el.id)}
               isDropTarget={false}
               onSelect={() => {
-                onSelectElement(el.id);
+                onSetSelectedElements(new Set([el.id]));
                 onSelectConnector(null);
               }}
               onMove={() => {}}
@@ -1096,7 +1196,7 @@ export function Canvas({
               selected={conn.id === selectedConnectorId}
               onSelect={() => {
                 onSelectConnector(conn.id);
-                onSelectElement(null);
+                onSetSelectedElements(new Set());
               }}
               svgToWorld={clientToWorld}
               onUpdateWaypoints={onUpdateConnectorWaypoints}
@@ -1180,13 +1280,17 @@ export function Canvas({
             <SymbolRenderer
               key={el.id}
               element={el}
-              selected={el.id === selectedElementId}
+              selected={selectedElementIds.has(el.id)}
               isDropTarget={elIsDropTarget}
               isMessageBpmnTarget={elIsMsgTarget}
               isAssocBpmnTarget={elIsAssocTarget}
               isErrorTarget={errorTargetIds.has(el.id)}
-              onSelect={() => {
-                onSelectElement(el.id);
+              onSelect={(ev) => {
+                if (ev?.shiftKey) {
+                  onSetSelectedElements((prev) => { const next = new Set(prev); if (next.has(el.id)) next.delete(el.id); else next.add(el.id); return next; });
+                } else if (!selectedElementIds.has(el.id)) {
+                  onSetSelectedElements(new Set([el.id]));
+                }
                 onSelectConnector(null);
               }}
               onMove={(x, y) => { setDraggingElementId(el.id); onMoveElement(el.id, x, y); }}
@@ -1194,7 +1298,7 @@ export function Canvas({
               onConnectionPointDragStart={(side, worldPos) =>
                 handleConnectionPointDragStart(el.id, side, worldPos)
               }
-              showConnectionPoints={el.id === selectedElementId || isDraggingConnector || isDraggingEndpoint}
+              showConnectionPoints={selectedElementIds.has(el.id) || isDraggingConnector || isDraggingEndpoint}
               onResizeDragStart={
                 (el.type === "task" || el.type === "subprocess" || el.type === "subprocess-expanded")
                   ? (handle, e) => handleResizeDragStart(el.id, handle, e)
@@ -1204,6 +1308,9 @@ export function Canvas({
               onUpdateProperties={onUpdateProperties}
               onUpdateLabel={onUpdateLabel}
               onMoveEnd={() => { setDraggingElementId(null); onElementMoveEnd?.(el.id); }}
+              multiSelected={selectedElementIds.size > 1 && selectedElementIds.has(el.id)}
+              onGroupMove={onMoveElements ? (dx, dy) => onMoveElements([...selectedElementIds], dx / zoom, dy / zoom) : undefined}
+              onGroupMoveEnd={onElementsMoveEnd}
               colorConfig={colorConfig}
               shouldSnapBack={(x, y) => {
                 const cx = x + el.width / 2;
@@ -1297,20 +1404,30 @@ export function Canvas({
               <SymbolRenderer
                 key={el.id}
                 element={el}
-                selected={el.id === selectedElementId}
+                selected={selectedElementIds.has(el.id)}
                 isDropTarget={elIsDropTarget}
                 isDisallowedTarget={false}
                 isMessageBpmnTarget={elIsMsgTarget}
                 isAssocBpmnTarget={elIsAssocTarget}
-                onSelect={() => { onSelectElement(el.id); onSelectConnector(null); }}
+                onSelect={(ev) => {
+                  if (ev?.shiftKey) {
+                    onSetSelectedElements((prev) => { const next = new Set(prev); if (next.has(el.id)) next.delete(el.id); else next.add(el.id); return next; });
+                  } else if (!selectedElementIds.has(el.id)) {
+                    onSetSelectedElements(new Set([el.id]));
+                  }
+                  onSelectConnector(null);
+                }}
                 onMove={(x, y) => onMoveElement(el.id, x, y)}
                 onDoubleClick={() => {}}
                 onConnectionPointDragStart={(side, worldPos) =>
                   handleConnectionPointDragStart(el.id, side, worldPos)}
-                showConnectionPoints={el.id === selectedElementId || isDraggingConnector || isDraggingEndpoint}
+                showConnectionPoints={selectedElementIds.has(el.id) || isDraggingConnector || isDraggingEndpoint}
                 svgToWorld={clientToWorld}
                 onUpdateProperties={onUpdateProperties}
                 onUpdateLabel={onUpdateLabel}
+                multiSelected={selectedElementIds.size > 1 && selectedElementIds.has(el.id)}
+                onGroupMove={onMoveElements ? (dx, dy) => onMoveElements([...selectedElementIds], dx / zoom, dy / zoom) : undefined}
+                onGroupMoveEnd={onElementsMoveEnd}
                 colorConfig={colorConfig}
               />
             );
@@ -1321,10 +1438,17 @@ export function Canvas({
             <SymbolRenderer
               key={el.id}
               element={el}
-              selected={el.id === selectedElementId}
+              selected={selectedElementIds.has(el.id)}
               isDropTarget={false}
               isDisallowedTarget={false}
-              onSelect={() => { onSelectElement(el.id); onSelectConnector(null); }}
+              onSelect={(ev) => {
+                if (ev?.shiftKey) {
+                  onSetSelectedElements((prev) => { const next = new Set(prev); if (next.has(el.id)) next.delete(el.id); else next.add(el.id); return next; });
+                } else if (!selectedElementIds.has(el.id)) {
+                  onSetSelectedElements(new Set([el.id]));
+                }
+                onSelectConnector(null);
+              }}
               onMove={(x, y) => onMoveElement(el.id, x, y)}
               onDoubleClick={() => startEditingLabel(el)}
               onConnectionPointDragStart={() => {}}
@@ -1333,6 +1457,9 @@ export function Canvas({
               svgToWorld={clientToWorld}
               onUpdateLabel={onUpdateLabel}
               onMoveEnd={() => { setDraggingElementId(null); onElementMoveEnd?.(el.id); }}
+              multiSelected={selectedElementIds.size > 1 && selectedElementIds.has(el.id)}
+              onGroupMove={onMoveElements ? (dx, dy) => onMoveElements([...selectedElementIds], dx / zoom, dy / zoom) : undefined}
+              onGroupMoveEnd={onElementsMoveEnd}
               colorConfig={colorConfig}
             />
           ))}
@@ -1346,7 +1473,7 @@ export function Canvas({
               misaligned={misalignedConnectorIds.has(conn.id)}
               onSelect={() => {
                 onSelectConnector(conn.id);
-                onSelectElement(null);
+                onSetSelectedElements(new Set());
               }}
               svgToWorld={clientToWorld}
               onUpdateWaypoints={onUpdateConnectorWaypoints}
@@ -1434,6 +1561,23 @@ export function Canvas({
               style={{ pointerEvents: "none" }}
             />
           )}
+
+          {/* Lasso selection rectangle */}
+          {lassoRect && (() => {
+            const lx = Math.min(lassoRect.startX, lassoRect.endX);
+            const ly = Math.min(lassoRect.startY, lassoRect.endY);
+            const lw = Math.abs(lassoRect.endX - lassoRect.startX);
+            const lh = Math.abs(lassoRect.endY - lassoRect.startY);
+            return (
+              <rect data-interactive
+                x={lx} y={ly} width={lw} height={lh}
+                fill="rgba(59,130,246,0.1)" stroke="#3b82f6"
+                strokeWidth={1 / zoom}
+                strokeDasharray={`${4 / zoom} ${4 / zoom}`}
+                style={{ pointerEvents: "none" }}
+              />
+            );
+          })()}
 
         </g>
       </svg>
