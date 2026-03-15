@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useCallback } from "react";
+import { useRef, useState, useCallback, useEffect } from "react";
 import type {
   BpmnTaskType,
   Connector,
@@ -301,6 +301,25 @@ export function Canvas({
   const [draggingConnector, setDraggingConnector] = useState<DraggingConnector | null>(null);
   const [draggingEndpoint, setDraggingEndpoint] = useState<DraggingEndpoint | null>(null);
   const [pendingDrop, setPendingDrop] = useState<PendingDrop | null>(null);
+  const [pickerOffset, setPickerOffset] = useState<Point>({ x: 0, y: 0 });
+  const pickerDragRef = useRef<{ startX: number; startY: number; origOffX: number; origOffY: number } | null>(null);
+
+  // Reset picker offset when a new pending drop appears
+  useEffect(() => { setPickerOffset({ x: 0, y: 0 }); }, [pendingDrop]);
+
+  // Picker drag: attach window listeners while dragging
+  useEffect(() => {
+    function onMove(e: MouseEvent) {
+      const d = pickerDragRef.current;
+      if (!d) return;
+      setPickerOffset({ x: d.origOffX + e.clientX - d.startX, y: d.origOffY + e.clientY - d.startY });
+    }
+    function onUp() { pickerDragRef.current = null; }
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => { window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); };
+  }, []);
+
   const [draggingElementId, setDraggingElementId] = useState<string | null>(null);
 
   const svgToWorld = useCallback(
@@ -1532,10 +1551,13 @@ export function Canvas({
         const top = Math.min(pendingDrop.containerY, containerH - dropdownH);
         return (
           <div
-            style={{ position: "absolute", left: pendingDrop.containerX, top, zIndex: 50 }}
+            style={{ position: "absolute", left: pendingDrop.containerX + pickerOffset.x, top: top + pickerOffset.y, zIndex: 50 }}
             className="bg-white border border-gray-200 rounded shadow-lg py-1 flex flex-col"
           >
-            <p className="px-3 py-0.5 text-xs font-semibold text-gray-400 uppercase tracking-wide border-b border-gray-100">
+            <p
+              className="px-3 py-0.5 text-xs font-semibold text-gray-400 uppercase tracking-wide border-b border-gray-100 cursor-grab active:cursor-grabbing select-none"
+              onMouseDown={(e) => { e.preventDefault(); pickerDragRef.current = { startX: e.clientX, startY: e.clientY, origOffX: pickerOffset.x, origOffY: pickerOffset.y }; }}
+            >
               Task Type
             </p>
             {TASK_TYPE_OPTIONS.map((opt) => (
@@ -1562,10 +1584,13 @@ export function Canvas({
         const top = Math.min(pendingDrop.containerY, containerH - dropdownH);
         return (
           <div
-            style={{ position: "absolute", left: pendingDrop.containerX, top, zIndex: 50 }}
+            style={{ position: "absolute", left: pendingDrop.containerX + pickerOffset.x, top: top + pickerOffset.y, zIndex: 50 }}
             className="bg-white border border-gray-200 rounded shadow-lg py-1 flex flex-col"
           >
-            <p className="px-3 py-0.5 text-xs font-semibold text-gray-400 uppercase tracking-wide border-b border-gray-100">
+            <p
+              className="px-3 py-0.5 text-xs font-semibold text-gray-400 uppercase tracking-wide border-b border-gray-100 cursor-grab active:cursor-grabbing select-none"
+              onMouseDown={(e) => { e.preventDefault(); pickerDragRef.current = { startX: e.clientX, startY: e.clientY, origOffX: pickerOffset.x, origOffY: pickerOffset.y }; }}
+            >
               Event Type
             </p>
             {INTERMEDIATE_EVENT_TYPE_OPTIONS.map((opt) => (
