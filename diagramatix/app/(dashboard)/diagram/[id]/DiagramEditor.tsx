@@ -413,6 +413,7 @@ export function DiagramEditor({
     setTemplateDropdownOpen(false);
     try {
       const res = await fetch(`/api/templates/${templateId}`);
+      if (!res.ok) { console.error("Failed to fetch template:", res.status); return; }
       const tmpl = await res.json();
       const templateData = tmpl.data as TemplateData;
       const center = getViewportCenterRef.current?.() ?? { x: 200, y: 200 };
@@ -420,8 +421,21 @@ export function DiagramEditor({
       applyTemplate(elements, connectors);
       setSelectedElementIds(newIds);
       setSelectedConnectorId(null);
-    } catch {
-      /* best-effort */
+    } catch (err) {
+      console.error("Failed to apply template:", err);
+    }
+  }
+
+  async function handleDeleteTemplate(templateId: string) {
+    try {
+      const res = await fetch(`/api/templates/${templateId}`, { method: "DELETE" });
+      if (res.ok) {
+        setTemplates((prev) => prev.filter((t) => t.id !== templateId));
+      } else {
+        console.error("Failed to delete template:", res.status);
+      }
+    } catch (err) {
+      console.error("Failed to delete template:", err);
     }
   }
 
@@ -504,13 +518,23 @@ export function DiagramEditor({
                 </button>
                 {templates.length > 0 && <div className="border-t border-gray-100" />}
                 {templates.map((t) => (
-                  <button
-                    key={t.id}
-                    onClick={() => handleApplyTemplate(t.id)}
-                    className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
-                  >
-                    {t.name}
-                  </button>
+                  <div key={t.id} className="flex items-center hover:bg-gray-50">
+                    <button
+                      onClick={() => handleApplyTemplate(t.id)}
+                      className="flex-1 text-left px-3 py-2 text-xs text-gray-700"
+                    >
+                      {t.name}
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleDeleteTemplate(t.id); }}
+                      className="px-2 py-2 text-gray-400 hover:text-red-500"
+                      title="Delete template"
+                    >
+                      <svg width={12} height={12} viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round">
+                        <path d="M2 3h8M4.5 3V2h3v1M3 3v7a1 1 0 001 1h4a1 1 0 001-1V3" />
+                      </svg>
+                    </button>
+                  </div>
                 ))}
               </div>
             )}
