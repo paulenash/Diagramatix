@@ -140,9 +140,10 @@ type Action =
     }}
   | { type: "ADD_LANE"; payload: { poolId: string } }
   | { type: "MOVE_LANE_BOUNDARY"; payload: { aboveLaneId: string; belowLaneId: string; dy: number } }
-  | { type: "MOVE_ELEMENTS"; payload: { ids: string[]; dx: number; dy: number } };
+  | { type: "MOVE_ELEMENTS"; payload: { ids: string[]; dx: number; dy: number } }
+  | { type: "APPLY_TEMPLATE"; payload: { elements: DiagramElement[]; connectors: Connector[] } };
 
-function nanoid(): string {
+export function nanoid(): string {
   return Math.random().toString(36).slice(2, 10);
 }
 
@@ -943,6 +944,13 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       return { ...state, elements };
     }
 
+    case "APPLY_TEMPLATE":
+      return {
+        ...state,
+        elements: [...state.elements, ...action.payload.elements],
+        connectors: [...state.connectors, ...action.payload.connectors],
+      };
+
     default:
       return state;
   }
@@ -1149,6 +1157,11 @@ export function useDiagram(initialData: DiagramData) {
     dispatch({ type: "SPLIT_CONNECTOR", payload: { symbolType, position, connectorId, taskType, eventType } });
   }, []);
 
+  const applyTemplate = useCallback((elements: DiagramElement[], connectors: Connector[]) => {
+    pushHistory(snapshotData());
+    dispatch({ type: "APPLY_TEMPLATE", payload: { elements, connectors } });
+  }, []);
+
   const setData = useCallback((newData: DiagramData) => {
     // Clear history on full state replacement (e.g. initial DB load)
     pastRef.current = [];
@@ -1225,6 +1238,7 @@ export function useDiagram(initialData: DiagramData) {
     updateConnectorLabel,
     elementMoveEnd,
     splitConnector,
+    applyTemplate,
     setData,
     setViewport,
     correctAllConnectors,

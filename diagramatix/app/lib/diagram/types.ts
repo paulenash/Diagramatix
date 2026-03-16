@@ -140,3 +140,8 @@ export interface CanvasState {
   connectingFromId: string | null;
   mousePos: Point;
 }
+
+export interface TemplateData {
+  elements: DiagramElement[];
+  connectors: Connector[];
+}

@@ -7,17 +7,21 @@ import type {
   DiagramData,
   DiagramType,
   DirectionType,
+  Point,
   RoutingType,
   Side,
   SymbolType,
+  TemplateData,
 } from "@/app/lib/diagram/types";
 import { BW_SYMBOL_COLORS, DEFAULT_SYMBOL_COLORS, type SymbolColorConfig } from "@/app/lib/diagram/colors";
 import type { DisplayMode } from "@/app/lib/diagram/displayMode";
 import { DiagramColorModal } from "./DiagramColorModal";
+import { TemplateNameModal } from "./TemplateNameModal";
 import { useDiagram } from "@/app/hooks/useDiagram";
 import { Canvas } from "@/app/components/canvas/Canvas";
 import { Palette } from "@/app/components/canvas/Palette";
 import { PropertiesPanel } from "@/app/components/canvas/PropertiesPanel";
+import { captureTemplate, instantiateTemplate } from "@/app/lib/diagram/templates";
 
 interface Props {
   diagramId: string;
@@ -204,6 +208,7 @@ export function DiagramEditor({
     updateConnectorLabel,
     elementMoveEnd,
     splitConnector,
+    applyTemplate,
     correctAllConnectors,
     addLane,
     moveLaneBoundary,
@@ -244,6 +249,15 @@ export function DiagramEditor({
   const [displayMode, setDisplayMode] = useState<DisplayMode>(initialDisplayMode ?? "normal");
   const [showDiagramMaintenance, setShowDiagramMaintenance] = useState(false);
 
+  // Template state (BPMN only)
+  const [templates, setTemplates] = useState<{ id: string; name: string }[]>([]);
+  const [templateMode, setTemplateMode] = useState<"idle" | "capturing">("idle");
+  const [templateDropdownOpen, setTemplateDropdownOpen] = useState(false);
+  const [showTemplateNameModal, setShowTemplateNameModal] = useState(false);
+  const [pendingTemplateData, setPendingTemplateData] = useState<TemplateData | null>(null);
+  const getViewportCenterRef = useRef<(() => Point) | null>(null);
+  const templateDropdownRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     if (!projectId) return;
     fetch(`/api/projects/${projectId}`)
@@ -265,6 +279,29 @@ export function DiagramEditor({
       })
       .catch(() => {/* keep initial value */});
   }, [diagramId]);
+
+  // Fetch templates on mount (BPMN only)
+  useEffect(() => {
+    if (diagramType !== "bpmn") return;
+    fetch("/api/templates")
+      .then((r) => r.json())
+      .then((list: { id: string; name: string; diagramType: string }[]) =>
+        setTemplates(list.filter((t) => t.diagramType === "bpmn"))
+      )
+      .catch(() => {});
+  }, [diagramType]);
+
+  // Close template dropdown on outside click
+  useEffect(() => {
+    if (!templateDropdownOpen) return;
+    function handleClick(e: MouseEvent) {
+      if (templateDropdownRef.current && !templateDropdownRef.current.contains(e.target as Node)) {
+        setTemplateDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [templateDropdownOpen]);
 
   const effectiveColorConfig: SymbolColorConfig = displayMode === "hand-drawn"
     ? BW_SYMBOL_COLORS
@@ -340,6 +377,47 @@ export function DiagramEditor({
     if (svgEl) await exportPdf(svgEl, diagramName, data, pdfScale / 100);
   }
 
+  function handleSaveAsTemplate() {
+    const captured = captureTemplate(data.elements, data.connectors, selectedElementIds);
+    if (captured.elements.length === 0) return;
+    setPendingTemplateData(captured);
+    setShowTemplateNameModal(true);
+  }
+
+  async function handleConfirmTemplateName(name: string) {
+    if (!pendingTemplateData) return;
+    try {
+      const res = await fetch("/api/templates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, diagramType: "bpmn", data: pendingTemplateData }),
+      });
+      const created = await res.json();
+      setTemplates((prev) => [{ id: created.id, name: created.name }, ...prev]);
+    } catch {
+      /* best-effort */
+    }
+    setPendingTemplateData(null);
+    setShowTemplateNameModal(false);
+    setTemplateMode("idle");
+  }
+
+  async function handleApplyTemplate(templateId: string) {
+    setTemplateDropdownOpen(false);
+    try {
+      const res = await fetch(`/api/templates/${templateId}`);
+      const tmpl = await res.json();
+      const templateData = tmpl.data as TemplateData;
+      const center = getViewportCenterRef.current?.() ?? { x: 200, y: 200 };
+      const { elements, connectors, newIds } = instantiateTemplate(templateData, center.x, center.y);
+      applyTemplate(elements, connectors);
+      setSelectedElementIds(newIds);
+      setSelectedConnectorId(null);
+    } catch {
+      /* best-effort */
+    }
+  }
+
   return (
     <div className="flex flex-col h-screen bg-white">
       {/* Top bar */}
@@ -400,6 +478,55 @@ export function DiagramEditor({
             </svg>
           </button>
         </div>
+
+        {diagramType === "bpmn" && templateMode === "idle" && (
+          <div className="relative" ref={templateDropdownRef}>
+            <button
+              onClick={() => setTemplateDropdownOpen((prev) => !prev)}
+              className="px-3 py-1.5 text-xs text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
+            >
+              Templates ▾
+            </button>
+            {templateDropdownOpen && (
+              <div className="absolute right-0 top-full mt-1 w-52 bg-white border border-gray-200 rounded shadow-lg z-50">
+                <button
+                  onClick={() => { setTemplateMode("capturing"); setTemplateDropdownOpen(false); }}
+                  className="w-full text-left px-3 py-2 text-xs text-blue-600 hover:bg-blue-50 font-medium"
+                >
+                  + Create New Template
+                </button>
+                {templates.length > 0 && <div className="border-t border-gray-100" />}
+                {templates.map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => handleApplyTemplate(t.id)}
+                    className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                  >
+                    {t.name}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+        {diagramType === "bpmn" && templateMode === "capturing" && (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-blue-600">Select elements for template</span>
+            <button
+              onClick={handleSaveAsTemplate}
+              disabled={selectedElementIds.size === 0}
+              className="px-3 py-1.5 text-xs text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Save as Template
+            </button>
+            <button
+              onClick={() => setTemplateMode("idle")}
+              className="px-3 py-1.5 text-xs text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+          </div>
+        )}
 
         <button
           onClick={() => setShowDiagramMaintenance(true)}
@@ -479,6 +606,7 @@ export function DiagramEditor({
           onUpdateCurveHandles={updateCurveHandles}
           colorConfig={effectiveColorConfig}
           displayMode={displayMode}
+          getViewportCenterRef={getViewportCenterRef}
         />
 
         <PropertiesPanel
@@ -504,6 +632,13 @@ export function DiagramEditor({
           hasMessageBpmnConnection={hasMessageBpmnConnection}
         />
       </div>
+
+      {showTemplateNameModal && (
+        <TemplateNameModal
+          onSave={handleConfirmTemplateName}
+          onClose={() => { setShowTemplateNameModal(false); setPendingTemplateData(null); }}
+        />
+      )}
 
       {showDiagramMaintenance && (
         <DiagramColorModal

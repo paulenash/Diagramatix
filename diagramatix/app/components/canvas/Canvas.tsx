@@ -178,6 +178,7 @@ interface Props {
   onUpdateCurveHandles?: (id: string, waypoints: Point[], cp1Rel: Point, cp2Rel: Point) => void;
   colorConfig?: import("@/app/lib/diagram/colors").SymbolColorConfig;
   displayMode?: import("@/app/lib/diagram/displayMode").DisplayMode;
+  getViewportCenterRef?: React.MutableRefObject<(() => Point) | null>;
 }
 
 interface EditingLabel {
@@ -295,6 +296,7 @@ export function Canvas({
   onUpdateCurveHandles,
   colorConfig,
   displayMode: displayModeProp,
+  getViewportCenterRef,
 }: Props) {
   const displayMode = displayModeProp ?? "normal";
   const svgRef = useRef<SVGSVGElement>(null);
@@ -338,6 +340,18 @@ export function Canvas({
     window.addEventListener("keyup", onKeyUp);
     return () => { window.removeEventListener("keydown", onKeyDown); window.removeEventListener("keyup", onKeyUp); };
   }, []);
+
+  // Expose viewport center to parent via ref
+  if (getViewportCenterRef) {
+    getViewportCenterRef.current = () => {
+      const rect = svgRef.current?.getBoundingClientRect();
+      if (!rect) return { x: 0, y: 0 };
+      return {
+        x: (-pan.x + rect.width / 2) / zoom,
+        y: (-pan.y + rect.height / 2) / zoom,
+      };
+    };
+  }
 
   const svgToWorld = useCallback(
     (svgX: number, svgY: number): Point => ({
