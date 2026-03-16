@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { prisma } from "@/app/lib/db";
+import { pgPool } from "@/app/lib/db";
+
+function cuid() {
+  const ts = Date.now().toString(36);
+  const rand = Math.random().toString(36).slice(2, 10);
+  return `c${ts}${rand}`;
+}
 
 export async function GET() {
   const session = await auth();
@@ -8,18 +14,20 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const templates = await prisma.diagramTemplate.findMany({
-    where: { userId: session.user.id },
-    orderBy: { updatedAt: "desc" },
-    select: {
-      id: true,
-      name: true,
-      diagramType: true,
-      createdAt: true,
-    },
-  });
-
-  return NextResponse.json(templates);
+  try {
+    const result = await pgPool.query(
+      `SELECT id, name, "diagramType", "createdAt"
+       FROM "DiagramTemplate"
+       WHERE "userId" = $1
+       ORDER BY "updatedAt" DESC`,
+      [session.user.id]
+    );
+    return NextResponse.json(result.rows);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("[GET /api/templates] error:", message);
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 }
 
 export async function POST(req: Request) {
@@ -35,15 +43,19 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Name is required" }, { status: 400 });
   }
 
-  const template = await prisma.diagramTemplate.create({
-    data: {
-      name: name.trim(),
-      diagramType,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      data: data as any,
-      userId: session.user.id,
-    },
-  });
+  try {
+    const id = cuid();
+    const now = new Date();
+    await pgPool.query(
+      `INSERT INTO "DiagramTemplate" (id, name, "diagramType", data, "userId", "createdAt", "updatedAt")
+       VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7)`,
+      [id, name.trim(), diagramType, JSON.stringify(data), session.user.id, now, now]
+    );
 
-  return NextResponse.json(template, { status: 201 });
+    return NextResponse.json({ id, name: name.trim(), diagramType, createdAt: now }, { status: 201 });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("[POST /api/templates] error:", message);
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 }

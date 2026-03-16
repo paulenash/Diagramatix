@@ -284,11 +284,14 @@ export function DiagramEditor({
   useEffect(() => {
     if (diagramType !== "bpmn") return;
     fetch("/api/templates")
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error(`GET /api/templates failed: ${r.status}`);
+        return r.json();
+      })
       .then((list: { id: string; name: string; diagramType: string }[]) =>
         setTemplates(list.filter((t) => t.diagramType === "bpmn"))
       )
-      .catch(() => {});
+      .catch((err) => console.error("Failed to fetch templates:", err));
   }, [diagramType]);
 
   // Close template dropdown on outside click
@@ -392,10 +395,14 @@ export function DiagramEditor({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, diagramType: "bpmn", data: pendingTemplateData }),
       });
-      const created = await res.json();
-      setTemplates((prev) => [{ id: created.id, name: created.name }, ...prev]);
-    } catch {
-      /* best-effort */
+      if (!res.ok) {
+        console.error("Failed to save template:", res.status, await res.text());
+      } else {
+        const created = await res.json();
+        setTemplates((prev) => [{ id: created.id, name: created.name }, ...prev]);
+      }
+    } catch (err) {
+      console.error("Failed to save template:", err);
     }
     setPendingTemplateData(null);
     setShowTemplateNameModal(false);
