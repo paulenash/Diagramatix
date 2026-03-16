@@ -194,13 +194,15 @@ function EventMarker({ type, cx, cy, r, filled }: {
           stroke="#374151" strokeWidth={1.2} strokeLinejoin="round" />
       );
     }
-    case "signal":
+    case "signal": {
+      const sg = s * 1.4;
       return (
         <polygon
-          points={`${cx},${cy - s * 0.8} ${cx - s * 0.7},${cy + s * 0.5} ${cx + s * 0.7},${cy + s * 0.5}`}
+          points={`${cx},${cy - sg * 0.8} ${cx - sg * 0.7},${cy + sg * 0.5} ${cx + sg * 0.7},${cy + sg * 0.5}`}
           fill={filled ? "#374151" : "white"} stroke="#374151" strokeWidth={1.2}
         />
       );
+    }
     case "terminate":
       return <circle cx={cx} cy={cy} r={s * 0.65} fill="#374151" />;
     case "conditional":
@@ -984,8 +986,7 @@ export function SymbolRenderer({
   const canResize = isContainer || element.type === "task" || element.type === "subprocess" ||
     element.type === "subprocess-expanded" || element.type === "use-case" || element.type === "group" ||
     element.type === "text-annotation";
-  const showLabel = element.type !== "initial-state" && element.type !== "final-state"
-    && !element.boundaryHostId;
+  const showLabel = element.type !== "initial-state" && element.type !== "final-state";
 
   return (
     <SymbolColorCtx.Provider value={colorConfig}>

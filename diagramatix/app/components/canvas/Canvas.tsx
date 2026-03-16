@@ -920,7 +920,7 @@ export function Canvas({
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
-    const NUDGE = 5;
+    const NUDGE = e.shiftKey ? 1 : 5;
     if (selectedElementIds.size === 1 && !editingLabel) {
       const selId = [...selectedElementIds][0];
       const el = data.elements.find((el) => el.id === selId);
