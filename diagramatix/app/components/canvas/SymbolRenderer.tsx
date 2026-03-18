@@ -986,7 +986,9 @@ export function SymbolRenderer({
   const canResize = isContainer || element.type === "task" || element.type === "subprocess" ||
     element.type === "subprocess-expanded" || element.type === "use-case" || element.type === "group" ||
     element.type === "text-annotation";
-  const showLabel = element.type !== "initial-state" && element.type !== "final-state";
+  const isBoundaryStartOrEnd = !!element.boundaryHostId &&
+    (element.type === "start-event" || element.type === "end-event");
+  const showLabel = element.type !== "initial-state" && element.type !== "final-state" && !isBoundaryStartOrEnd;
 
   return (
     <SymbolColorCtx.Provider value={colorConfig}>
