@@ -110,6 +110,8 @@ type Action =
       routingType: RoutingType;
       sourceSide: Side;
       targetSide: Side;
+      sourceOffsetAlong?: number;
+      targetOffsetAlong?: number;
     }}
   | { type: "DELETE_CONNECTOR"; payload: { id: string } }
   | { type: "UPDATE_CONNECTOR_ENDPOINT"; payload: {
@@ -608,7 +610,7 @@ function reducer(state: DiagramData, action: Action): DiagramData {
     }
 
     case "ADD_CONNECTOR": {
-      const { sourceId, targetId, connectorType, directionType, routingType, sourceSide, targetSide } = action.payload;
+      const { sourceId, targetId, connectorType, directionType, routingType, sourceSide, targetSide, sourceOffsetAlong, targetOffsetAlong } = action.payload;
       const source = state.elements.find((el) => el.id === sourceId);
       const target = state.elements.find((el) => el.id === targetId);
       if (!source || !target) return state;
@@ -621,7 +623,7 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       const { waypoints, sourceInvisibleLeader, targetInvisibleLeader } =
         connectorType === "messageBPMN"
           ? messageBpmnWaypoints(source, target, sourceSide, targetSide, 0.5)
-          : computeWaypoints(source, target, state.elements, sourceSide, targetSide, routingType);
+          : computeWaypoints(source, target, state.elements, sourceSide, targetSide, routingType, sourceOffsetAlong, targetOffsetAlong);
 
       const isMsgBpmn = connectorType === "messageBPMN";
       const msgBpmnCount = isMsgBpmn
@@ -643,6 +645,8 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         targetId,
         sourceSide,
         targetSide,
+        sourceOffsetAlong,
+        targetOffsetAlong,
         type: connectorType,
         directionType,
         routingType,
@@ -1245,12 +1249,14 @@ export function useDiagram(initialData: DiagramData) {
       directionType: DirectionType = "directed",
       routingType: RoutingType = "rectilinear",
       sourceSide: Side = "right",
-      targetSide: Side = "left"
+      targetSide: Side = "left",
+      sourceOffsetAlong?: number,
+      targetOffsetAlong?: number
     ) => {
       pushHistory(snapshotData());
       dispatch({
         type: "ADD_CONNECTOR",
-        payload: { sourceId, targetId, connectorType, directionType, routingType, sourceSide, targetSide },
+        payload: { sourceId, targetId, connectorType, directionType, routingType, sourceSide, targetSide, sourceOffsetAlong, targetOffsetAlong },
       });
     },
     []

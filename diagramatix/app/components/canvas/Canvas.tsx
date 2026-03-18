@@ -147,7 +147,9 @@ interface Props {
     directionType: DirectionType,
     routingType: RoutingType,
     sourceSide: Side,
-    targetSide: Side
+    targetSide: Side,
+    sourceOffsetAlong?: number,
+    targetOffsetAlong?: number
   ) => void;
   onDeleteConnector: (id: string) => void;
   onUpdateConnectorEndpoint: (
@@ -477,8 +479,34 @@ export function Canvas({
           if (targetEl.type === "lane") return;  // pool already handled above
           const targetOuterSide = getBoundaryEventOuterSide(targetEl, data.elements);
           // Sequence connectors connect to the INNER (subprocess-facing) side of boundary events
-          const seqSourceSide = outerSide ? oppositeSide(outerSide) : effectiveSide;
-          const seqTargetSide = targetOuterSide ? oppositeSide(targetOuterSide) : getClosestSide(pos, targetEl);
+          let seqSourceSide = outerSide ? oppositeSide(outerSide) : effectiveSide;
+          let seqTargetSide: Side = targetOuterSide ? oppositeSide(targetOuterSide) : getClosestSide(pos, targetEl);
+
+          // For expanded subprocess targets from external elements:
+          // Source connects from the midpoint of its closest edge;
+          // Target connects at the nearest perpendicular point on its boundary.
+          let seqSourceOffsetAlong: number | undefined;
+          let seqTargetOffsetAlong: number | undefined;
+          if (!targetOuterSide && targetEl.type === "subprocess-expanded" && sourceEl && sourceEl.parentId !== targetEl.id) {
+            const srcCenter = { x: sourceEl.x + sourceEl.width / 2, y: sourceEl.y + sourceEl.height / 2 };
+            const tgtCenter = { x: targetEl.x + targetEl.width / 2, y: targetEl.y + targetEl.height / 2 };
+            seqTargetSide = getClosestSide(srcCenter, targetEl);
+            if (!outerSide) seqSourceSide = getClosestSide(tgtCenter, sourceEl);
+
+            // Source always connects from midpoint (0.5) — no custom offset needed
+            // Target: project source edge midpoint onto the target side
+            const clamp01 = (v: number) => Math.max(0.05, Math.min(0.95, v));
+            // The source edge midpoint is at the midpoint of seqSourceSide
+            const srcMid = seqSourceSide === "right"  ? { x: sourceEl.x + sourceEl.width, y: srcCenter.y }
+                         : seqSourceSide === "left"   ? { x: sourceEl.x, y: srcCenter.y }
+                         : seqSourceSide === "bottom" ? { x: srcCenter.x, y: sourceEl.y + sourceEl.height }
+                         :                              { x: srcCenter.x, y: sourceEl.y };
+            if (seqTargetSide === "left" || seqTargetSide === "right") {
+              seqTargetOffsetAlong = clamp01((srcMid.y - targetEl.y) / targetEl.height);
+            } else {
+              seqTargetOffsetAlong = clamp01((srcMid.x - targetEl.x) / targetEl.width);
+            }
+          }
           let connType: ConnectorType;
           let connRouting: RoutingType;
           let connDirection: DirectionType;
@@ -495,7 +523,7 @@ export function Canvas({
           } else {
             connType = "sequence"; connRouting = defaultRoutingType; connDirection = defaultDirectionType;
           }
-          onAddConnector(elementId, targetEl.id, connType, connDirection, connRouting, seqSourceSide, seqTargetSide);
+          onAddConnector(elementId, targetEl.id, connType, connDirection, connRouting, seqSourceSide, seqTargetSide, seqSourceOffsetAlong, seqTargetOffsetAlong);
         }
       }
       setDraggingConnector(null);
@@ -1210,25 +1238,34 @@ export function Canvas({
             });
           })}
 
-          {/* Regular connectors — rendered behind elements */}
-          {data.connectors.filter(c => c.type !== "associationBPMN" && c.type !== "messageBPMN").map((conn) => (
-            <ConnectorRenderer
-              key={conn.id}
-              connector={conn}
-              selected={conn.id === selectedConnectorId}
-              onSelect={() => {
-                onSelectConnector(conn.id);
-                onSetSelectedElements(new Set());
-              }}
-              svgToWorld={clientToWorld}
-              onUpdateWaypoints={onUpdateConnectorWaypoints}
-              onWaypointsDragEnd={onConnectorWaypointDragEnd ? () => onConnectorWaypointDragEnd(conn.id) : undefined}
-              onUpdateLabel={onUpdateConnectorLabel
-                ? (label, ox, oy, w) => onUpdateConnectorLabel(conn.id, label, ox, oy, w)
-                : undefined}
-              onUpdateCurveHandles={onUpdateCurveHandles}
-            />
-          ))}
+          {/* Regular connectors — rendered behind elements (skip selected, rendered on top later) */}
+          {(() => {
+            const regularConns = data.connectors.filter(c => c.type !== "associationBPMN" && c.type !== "messageBPMN");
+            const seqConns = regularConns.filter(c => c.type === "sequence");
+            return regularConns.filter(c => c.id !== selectedConnectorId).map((conn) => (
+              <ConnectorRenderer
+                key={conn.id}
+                connector={conn}
+                selected={false}
+                onSelect={() => {
+                  onSelectConnector(conn.id);
+                  onSetSelectedElements(new Set());
+                }}
+                svgToWorld={clientToWorld}
+                onUpdateWaypoints={onUpdateConnectorWaypoints}
+                onWaypointsDragEnd={onConnectorWaypointDragEnd ? () => onConnectorWaypointDragEnd(conn.id) : undefined}
+                onUpdateLabel={onUpdateConnectorLabel
+                  ? (label, ox, oy, w) => onUpdateConnectorLabel(conn.id, label, ox, oy, w)
+                  : undefined}
+                onUpdateCurveHandles={onUpdateCurveHandles}
+                otherConnectorWaypoints={
+                  conn.type === "sequence"
+                    ? seqConns.slice(0, seqConns.indexOf(conn)).map(c => c.waypoints)
+                    : undefined
+                }
+              />
+            ));
+          })()}
 
           {/* Non-container elements */}
           {nonContainers.map((el) => {
@@ -1506,6 +1543,39 @@ export function Canvas({
               onUpdateCurveHandles={onUpdateCurveHandles}
             />
           ))}
+
+          {/* Selected regular connector — rendered on top of all elements */}
+          {selectedConnectorId && (() => {
+            const conn = data.connectors.find(c => c.id === selectedConnectorId && c.type !== "associationBPMN" && c.type !== "messageBPMN");
+            if (!conn) return null;
+            const allSeqConns = data.connectors.filter(c => c.type === "sequence");
+            const connIdx = allSeqConns.findIndex(c => c.id === conn.id);
+            // Only hump over connectors added before this one
+            const priorSeqConns = allSeqConns.slice(0, connIdx);
+            return (
+              <ConnectorRenderer
+                key={`sel-${conn.id}`}
+                connector={conn}
+                selected={true}
+                onSelect={() => {
+                  onSelectConnector(conn.id);
+                  onSetSelectedElements(new Set());
+                }}
+                svgToWorld={clientToWorld}
+                onUpdateWaypoints={onUpdateConnectorWaypoints}
+                onWaypointsDragEnd={onConnectorWaypointDragEnd ? () => onConnectorWaypointDragEnd(conn.id) : undefined}
+                onUpdateLabel={onUpdateConnectorLabel
+                  ? (label: string, ox: number, oy: number, w: number) => onUpdateConnectorLabel(conn.id, label, ox, oy, w)
+                  : undefined}
+                onUpdateCurveHandles={onUpdateCurveHandles}
+                otherConnectorWaypoints={
+                  conn.type === "sequence" && priorSeqConns.length > 0
+                    ? priorSeqConns.map(c => c.waypoints)
+                    : undefined
+                }
+              />
+            );
+          })()}
 
           {/* messageBPMN drag handle — drag left/right along pool boundaries (hidden for event endpoints) */}
           {selectedConnector?.type === "messageBPMN" && selectedConnector.waypoints.length === 4 && (() => {

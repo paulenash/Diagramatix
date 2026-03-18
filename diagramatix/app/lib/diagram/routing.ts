@@ -48,6 +48,35 @@ function boundsOverlapWithMargin(b: Bounds, margin: number): (p: Point) => boole
     p.y < b.y + b.height + margin;
 }
 
+// Check if an axis-aligned segment (horizontal or vertical) intersects an obstacle bounds
+function segmentHitsObstacle(p1: Point, p2: Point, obs: Bounds, margin = 8): boolean {
+  const left = obs.x - margin, right = obs.x + obs.width + margin;
+  const top = obs.y - margin, bottom = obs.y + obs.height + margin;
+  // Horizontal segment
+  if (Math.abs(p1.y - p2.y) < 1) {
+    if (p1.y < top || p1.y > bottom) return false;
+    const minX = Math.min(p1.x, p2.x), maxX = Math.max(p1.x, p2.x);
+    return maxX > left && minX < right;
+  }
+  // Vertical segment
+  if (Math.abs(p1.x - p2.x) < 1) {
+    if (p1.x < left || p1.x > right) return false;
+    const minY = Math.min(p1.y, p2.y), maxY = Math.max(p1.y, p2.y);
+    return maxY > top && minY < bottom;
+  }
+  return false;
+}
+
+// Check if any segment of a path hits any obstacle
+function pathHitsObstacles(path: Point[], obstacles: Bounds[]): boolean {
+  for (let i = 0; i < path.length - 1; i++) {
+    for (const obs of obstacles) {
+      if (segmentHitsObstacle(path[i], path[i + 1], obs)) return true;
+    }
+  }
+  return false;
+}
+
 function buildOrthogonalPath(
   start: Point,
   end: Point,
@@ -59,19 +88,43 @@ function buildOrthogonalPath(
   const pathA = [start, mid1, end];
   const pathB = [start, mid2, end];
 
-  const hitsMid = (mid: Point) =>
-    obstacles.some((obs) => boundsOverlapWithMargin(obs, 8)(mid));
+  if (!pathHitsObstacles(pathA, obstacles)) return pathA;
+  if (!pathHitsObstacles(pathB, obstacles)) return pathB;
 
-  if (!hitsMid(mid1)) return pathA;
-  if (!hitsMid(mid2)) return pathB;
+  // Both L-shaped paths blocked — try routing around obstacles
+  const MARGIN = 20;
+  // Collect all obstacle edges we might bypass around
+  const allObs = obstacles.filter(obs => {
+    // Only consider obstacles between start and end
+    const minX = Math.min(start.x, end.x) - MARGIN;
+    const maxX = Math.max(start.x, end.x) + MARGIN;
+    const minY = Math.min(start.y, end.y) - MARGIN;
+    const maxY = Math.max(start.y, end.y) + MARGIN;
+    return obs.x + obs.width > minX && obs.x < maxX && obs.y + obs.height > minY && obs.y < maxY;
+  });
 
-  const bypassY = start.y - 40;
-  return [
-    start,
-    { x: start.x, y: bypassY },
-    { x: end.x, y: bypassY },
-    end,
-  ];
+  // Try routing above all obstacles
+  const topY = Math.min(start.y, end.y, ...allObs.map(o => o.y)) - MARGIN;
+  const pathTop = [start, { x: start.x, y: topY }, { x: end.x, y: topY }, end];
+  if (!pathHitsObstacles(pathTop, obstacles)) return pathTop;
+
+  // Try routing below all obstacles
+  const bottomY = Math.max(start.y, end.y, ...allObs.map(o => o.y + o.height)) + MARGIN;
+  const pathBottom = [start, { x: start.x, y: bottomY }, { x: end.x, y: bottomY }, end];
+  if (!pathHitsObstacles(pathBottom, obstacles)) return pathBottom;
+
+  // Try routing left of all obstacles
+  const leftX = Math.min(start.x, end.x, ...allObs.map(o => o.x)) - MARGIN;
+  const pathLeft = [start, { x: leftX, y: start.y }, { x: leftX, y: end.y }, end];
+  if (!pathHitsObstacles(pathLeft, obstacles)) return pathLeft;
+
+  // Try routing right of all obstacles
+  const rightX = Math.max(start.x, end.x, ...allObs.map(o => o.x + o.width)) + MARGIN;
+  const pathRight = [start, { x: rightX, y: start.y }, { x: rightX, y: end.y }, end];
+  if (!pathHitsObstacles(pathRight, obstacles)) return pathRight;
+
+  // Fallback: route above with larger margin
+  return [start, { x: start.x, y: topY - MARGIN }, { x: end.x, y: topY - MARGIN }, end];
 }
 
 const PERP_OFFSET = 24;

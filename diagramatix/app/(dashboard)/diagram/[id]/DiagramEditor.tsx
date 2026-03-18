@@ -424,9 +424,11 @@ export function DiagramEditor({
       directionType: DirectionType,
       routingType: RoutingType,
       sourceSide: Side,
-      targetSide: Side
+      targetSide: Side,
+      sourceOffsetAlong?: number,
+      targetOffsetAlong?: number
     ) => {
-      addConnector(sourceId, targetId, type, directionType, routingType, sourceSide, targetSide);
+      addConnector(sourceId, targetId, type, directionType, routingType, sourceSide, targetSide, sourceOffsetAlong, targetOffsetAlong);
     },
     [addConnector]
   );

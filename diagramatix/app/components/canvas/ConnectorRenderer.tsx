@@ -14,6 +14,75 @@ interface Props {
   onUpdateLabel?: (label: string, offsetX: number, offsetY: number, width: number) => void;
   onUpdateCurveHandles?: (id: string, waypoints: Point[], cp1Rel: Point, cp2Rel: Point) => void;
   misaligned?: boolean;
+  otherConnectorWaypoints?: Point[][];
+}
+
+// Line segment intersection: returns the parameter t along segment (a1→a2) where it crosses (b1→b2), or null
+function segmentIntersection(a1: Point, a2: Point, b1: Point, b2: Point): number | null {
+  const dx = a2.x - a1.x, dy = a2.y - a1.y;
+  const ex = b2.x - b1.x, ey = b2.y - b1.y;
+  const denom = dx * ey - dy * ex;
+  if (Math.abs(denom) < 1e-10) return null; // parallel
+  const t = ((b1.x - a1.x) * ey - (b1.y - a1.y) * ex) / denom;
+  const u = ((b1.x - a1.x) * dy - (b1.y - a1.y) * dx) / denom;
+  if (t > 0.01 && t < 0.99 && u > 0.01 && u < 0.99) return t;
+  return null;
+}
+
+// Build SVG path with small semicircular humps at crossing points
+function pathWithHumps(waypoints: Point[], otherWaypoints: Point[][], radius = 6): string {
+  if (waypoints.length < 2) return "";
+
+  // Collect all crossing t-values per segment
+  const segCrossings: { segIdx: number; t: number }[] = [];
+  for (let i = 0; i < waypoints.length - 1; i++) {
+    const a1 = waypoints[i], a2 = waypoints[i + 1];
+    for (const other of otherWaypoints) {
+      for (let j = 0; j < other.length - 1; j++) {
+        const t = segmentIntersection(a1, a2, other[j], other[j + 1]);
+        if (t !== null) segCrossings.push({ segIdx: i, t });
+      }
+    }
+  }
+
+  if (segCrossings.length === 0) return "";
+
+  // Sort by segment then by t
+  segCrossings.sort((a, b) => a.segIdx - b.segIdx || a.t - b.t);
+
+  const d: string[] = [`M ${waypoints[0].x} ${waypoints[0].y}`];
+
+  for (let i = 0; i < waypoints.length - 1; i++) {
+    const a1 = waypoints[i], a2 = waypoints[i + 1];
+    const crossings = segCrossings.filter((c) => c.segIdx === i);
+
+    if (crossings.length === 0) {
+      d.push(`L ${a2.x} ${a2.y}`);
+      continue;
+    }
+
+    const segDx = a2.x - a1.x, segDy = a2.y - a1.y;
+    const segLen = Math.hypot(segDx, segDy);
+    if (segLen < 1) { d.push(`L ${a2.x} ${a2.y}`); continue; }
+    const ux = segDx / segLen, uy = segDy / segLen; // unit vector along segment
+
+    for (const cross of crossings) {
+      const cx = a1.x + segDx * cross.t;
+      const cy = a1.y + segDy * cross.t;
+      const r = Math.min(radius, segLen * cross.t * 0.4, segLen * (1 - cross.t) * 0.4);
+      if (r < 1) continue;
+      // Approach point: r before crossing
+      const ax = cx - ux * r, ay = cy - uy * r;
+      // Departure point: r after crossing
+      const bx = cx + ux * r, by = cy + uy * r;
+      d.push(`L ${ax} ${ay}`);
+      // Semicircular arc: sweep direction based on perpendicular direction
+      d.push(`A ${r} ${r} 0 0 1 ${bx} ${by}`);
+    }
+    d.push(`L ${a2.x} ${a2.y}`);
+  }
+
+  return d.join(" ");
 }
 
 
@@ -321,7 +390,7 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
   );
 }
 
-export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, onUpdateWaypoints, onWaypointsDragEnd, onUpdateLabel, onUpdateCurveHandles, misaligned }: Props) {
+export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, onUpdateWaypoints, onWaypointsDragEnd, onUpdateLabel, onUpdateCurveHandles, misaligned, otherConnectorWaypoints }: Props) {
   const waypoints = connector.waypoints;
   if (waypoints.length === 0) return null;
 
@@ -356,6 +425,12 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
       const s1 = { x: P0.x + STUB * u1.x, y: P0.y + STUB * u1.y };
       const s2 = { x: P3.x + STUB * u2.x, y: P3.y + STUB * u2.y };
       return `M ${P0.x} ${P0.y} L ${s1.x} ${s1.y} C ${P1.x} ${P1.y}, ${P2.x} ${P2.y}, ${s2.x} ${s2.y} L ${P3.x} ${P3.y}`;
+    }
+    // Crossing humps for the last sequence connector
+    if (otherConnectorWaypoints && otherConnectorWaypoints.length > 0
+        && connector.type === "sequence" && connector.routingType === "rectilinear") {
+      const humpPath = pathWithHumps(visibleWaypoints, otherConnectorWaypoints);
+      if (humpPath) return humpPath;
     }
     if (connector.routingType === "curvilinear") return waypointsToCurvePath(visibleWaypoints);
     if (connector.routingType === "rectilinear") return waypointsToRoundedPath(visibleWaypoints);
