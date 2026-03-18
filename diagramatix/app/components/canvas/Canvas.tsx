@@ -730,11 +730,12 @@ export function Canvas({
       return;
     }
 
-    // Hold Space → pan; otherwise → lasso
-    if (spaceHeldRef.current) {
+    // Default drag → pan; hold Space → lasso
+    if (!spaceHeldRef.current) {
       // --- Pan mode ---
-      onSetSelectedElements(new Set());
-      onSelectConnector(null);
+      const startCX = e.clientX;
+      const startCY = e.clientY;
+      let didPanDrag = false;
       panStart.current = {
         mouseX: e.clientX,
         mouseY: e.clientY,
@@ -744,6 +745,8 @@ export function Canvas({
 
       function onMouseMove(ev: MouseEvent) {
         if (!panStart.current) return;
+        if (!didPanDrag && Math.abs(ev.clientX - startCX) < 3 && Math.abs(ev.clientY - startCY) < 3) return;
+        didPanDrag = true;
         setPan({
           x: panStart.current.panX + ev.clientX - panStart.current.mouseX,
           y: panStart.current.panY + ev.clientY - panStart.current.mouseY,
@@ -754,6 +757,11 @@ export function Canvas({
         panStart.current = null;
         window.removeEventListener("mousemove", onMouseMove);
         window.removeEventListener("mouseup", onMouseUp);
+        // Simple click (no drag) — clear selection
+        if (!didPanDrag) {
+          onSetSelectedElements(new Set());
+          onSelectConnector(null);
+        }
       }
 
       window.addEventListener("mousemove", onMouseMove);
