@@ -887,6 +887,9 @@ export function SymbolRenderer({
 }: Props) {
   const [isEditingGatewayLabel, setIsEditingGatewayLabel] = useState(false);
   const [editGatewayLabelValue, setEditGatewayLabelValue] = useState("");
+  const [labelHighlighted, setLabelHighlighted] = useState(false);
+  // Clear label highlight when element is deselected
+  if (!selected && labelHighlighted) setLabelHighlighted(false);
   let dragStart: { mouseX: number; mouseY: number; elX: number; elY: number } | null = null;
 
   function handleMouseDown(e: React.MouseEvent) {
@@ -903,6 +906,7 @@ export function SymbolRenderer({
       e.stopPropagation();
     }
 
+    setLabelHighlighted(false);
     onSelect(e);
 
     // Group drag mode: when multi-selected and clicking a selected element
@@ -1036,6 +1040,7 @@ export function SymbolRenderer({
 
         function handleLabelMouseDown(e: React.MouseEvent) {
           e.stopPropagation();
+          onSelect(e);
           if (!svgToWorld) return;
           const startWorld = svgToWorld(e.clientX, e.clientY);
           const startOffsetX = labelOffsetX;
@@ -1199,6 +1204,16 @@ export function SymbolRenderer({
           width={element.width + 6} height={element.height + 6}
           fill="none" stroke="#2563eb" strokeWidth={1.5}
           strokeDasharray="4 2" rx={4}
+          style={{ pointerEvents: "none" }}
+        />
+      )}
+      {/* Lane/pool selection outline */}
+      {selected && isPoolLane && (
+        <rect data-interactive
+          x={element.x - 2} y={element.y - 2}
+          width={element.width + 4} height={element.height + 4}
+          fill="none" stroke="#2563eb" strokeWidth={2}
+          strokeDasharray="6 3" rx={2}
           style={{ pointerEvents: "none" }}
         />
       )}
@@ -1392,6 +1407,7 @@ export function SymbolRenderer({
         function clamp(v: number, lo: number, hi: number) { return Math.max(lo, Math.min(hi, v)); }
         function handleInteriorLabelMouseDown(ev: React.MouseEvent) {
           ev.stopPropagation();
+          setLabelHighlighted(true);
           onSelect();
           if (!svgToWorld) return;
           const startWorld = svgToWorld(ev.clientX, ev.clientY);
@@ -1439,9 +1455,9 @@ export function SymbolRenderer({
               x={labelLeftX} y={labelTopY}
               width={labelWidth} height={totalLabelH}
               fill="transparent"
-              stroke={selected && !multiSelected ? "#2563eb" : "none"}
+              stroke={labelHighlighted && selected && !multiSelected ? "#2563eb" : "none"}
               strokeWidth={1}
-              strokeDasharray={selected && !multiSelected ? "3 2" : undefined}
+              strokeDasharray={labelHighlighted && selected && !multiSelected ? "3 2" : undefined}
               style={{ cursor: onUpdateProperties ? "move" : "default" }}
               onMouseDown={handleInteriorLabelMouseDown}
               onDoubleClick={(e) => { e.stopPropagation(); onDoubleClick(); }}
@@ -1458,7 +1474,7 @@ export function SymbolRenderer({
                 </tspan>
               ))}
             </text>
-            {selected && !multiSelected && onUpdateProperties && (
+            {labelHighlighted && selected && !multiSelected && onUpdateProperties && (
               <rect
                 x={labelLeftX + labelWidth - 3} y={labelTopY + totalLabelH / 2 - 5}
                 width={6} height={10}

@@ -963,8 +963,11 @@ function reducer(state: DiagramData, action: Action): DiagramData {
 
       if (mode === "smart") {
         // Smart: per-element decision based on proximity to group average
-        // Exclude boundary (edge-mounted) events — they stay with their host
-        const movable = selected.filter((el) => !el.boundaryHostId);
+        // Exclude boundary intermediate events — they stay with their host
+        // Boundary start/end events ARE movable (they align with the group)
+        const movable = selected.filter((el) =>
+          !el.boundaryHostId || el.type === "start-event" || el.type === "end-event"
+        );
         if (movable.length < 2) return state;
 
         const avgCX = movable.reduce((s, el) => s + el.x + el.width / 2, 0) / movable.length;
@@ -1003,10 +1006,11 @@ function reducer(state: DiagramData, action: Action): DiagramData {
           }
         }
 
-        // Boundary events: follow their host's movement (if host is in selection)
+        // Boundary intermediate events: follow their host's movement (if host is in selection)
         // Otherwise stay put — never move independently
+        // (Boundary start/end events are already in the movable set and aligned normally)
         for (const el of selected) {
-          if (el.boundaryHostId) {
+          if (el.boundaryHostId && el.type === "intermediate-event") {
             const hostDelta = dxyMap.get(el.boundaryHostId);
             dxyMap.set(el.id, hostDelta ? { ...hostDelta } : { dx: 0, dy: 0 });
           }
