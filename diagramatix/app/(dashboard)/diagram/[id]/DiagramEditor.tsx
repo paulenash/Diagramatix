@@ -625,6 +625,31 @@ export function DiagramEditor({
                 </button>
                 <div className="border-t border-gray-100" />
                 <button
+                  onClick={() => { alignElements([...selectedElementIds], "vcenter"); setAlignDropdownOpen(false); }}
+                  className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                >
+                  Align Centres Vertically
+                </button>
+                <button
+                  onClick={() => { alignElements([...selectedElementIds], "left"); setAlignDropdownOpen(false); }}
+                  className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                >
+                  Align Lefts Vertically
+                </button>
+                <button
+                  onClick={() => { alignElements([...selectedElementIds], "right"); setAlignDropdownOpen(false); }}
+                  className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                >
+                  Align Rights Vertically
+                </button>
+                <div className="border-t border-gray-100" />
+                <button
+                  onClick={() => { alignElements([...selectedElementIds], "smart"); setAlignDropdownOpen(false); }}
+                  className="w-full text-left px-3 py-2 text-xs text-blue-600 hover:bg-blue-50 font-medium"
+                >
+                  Align Smart!
+                </button>
+                <button
                   onClick={() => setAlignDropdownOpen(false)}
                   className="w-full text-left px-3 py-2 text-xs text-gray-400 hover:bg-gray-50"
                 >

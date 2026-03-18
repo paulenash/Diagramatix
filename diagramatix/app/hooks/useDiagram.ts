@@ -142,7 +142,7 @@ type Action =
   | { type: "MOVE_LANE_BOUNDARY"; payload: { aboveLaneId: string; belowLaneId: string; dy: number } }
   | { type: "MOVE_ELEMENTS"; payload: { ids: string[]; dx: number; dy: number } }
   | { type: "APPLY_TEMPLATE"; payload: { elements: DiagramElement[]; connectors: Connector[] } }
-  | { type: "ALIGN_ELEMENTS"; payload: { ids: string[]; mode: "center" | "top" | "bottom" } };
+  | { type: "ALIGN_ELEMENTS"; payload: { ids: string[]; mode: "center" | "top" | "bottom" | "vcenter" | "left" | "right" | "smart" } };
 
 export function nanoid(): string {
   return Math.random().toString(36).slice(2, 10);
@@ -958,30 +958,109 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       const selected = state.elements.filter((el) => idSet.has(el.id));
       if (selected.length < 2) return state;
 
-      let targetY: number;
-      if (mode === "center") {
-        const avg = selected.reduce((sum, el) => sum + el.y + el.height / 2, 0) / selected.length;
-        targetY = avg; // this is the target centre Y
-      } else if (mode === "top") {
-        targetY = Math.min(...selected.map((el) => el.y));
-      } else {
-        targetY = Math.max(...selected.map((el) => el.y + el.height));
-      }
+      // Compute dx, dy per element
+      const dxyMap = new Map<string, { dx: number; dy: number }>();
 
-      // Build a map of dy per element
-      const dyMap = new Map<string, number>();
-      for (const el of selected) {
-        let newY: number;
-        if (mode === "center") newY = targetY - el.height / 2;
-        else if (mode === "top") newY = targetY;
-        else newY = targetY - el.height;
-        dyMap.set(el.id, newY - el.y);
+      if (mode === "smart") {
+        // Smart: per-element decision based on proximity to group average
+        // Exclude boundary (edge-mounted) events — they stay with their host
+        const movable = selected.filter((el) => !el.boundaryHostId);
+        if (movable.length < 2) return state;
+
+        const avgCX = movable.reduce((s, el) => s + el.x + el.width / 2, 0) / movable.length;
+        const avgCY = movable.reduce((s, el) => s + el.y + el.height / 2, 0) / movable.length;
+
+        // Classify each element as horizontal or vertical sub-group
+        const hGroup: DiagramElement[] = [];
+        const vGroup: DiagramElement[] = [];
+        for (const el of movable) {
+          const cx = el.x + el.width / 2;
+          const cy = el.y + el.height / 2;
+          const diffX = Math.abs(cx - avgCX);
+          const diffY = Math.abs(cy - avgCY);
+          if (diffY <= diffX) {
+            hGroup.push(el);
+          } else {
+            vGroup.push(el);
+          }
+        }
+
+        // Horizontal sub-group: align Y centres to median Y (minimises movement)
+        if (hGroup.length > 0) {
+          const yCentres = hGroup.map((el) => el.y + el.height / 2).sort((a, b) => a - b);
+          const medianY = yCentres[Math.floor(yCentres.length / 2)];
+          for (const el of hGroup) {
+            dxyMap.set(el.id, { dx: 0, dy: medianY - (el.y + el.height / 2) });
+          }
+        }
+
+        // Vertical sub-group: align X centres to median X (minimises movement)
+        if (vGroup.length > 0) {
+          const xCentres = vGroup.map((el) => el.x + el.width / 2).sort((a, b) => a - b);
+          const medianX = xCentres[Math.floor(xCentres.length / 2)];
+          for (const el of vGroup) {
+            dxyMap.set(el.id, { dx: medianX - (el.x + el.width / 2), dy: 0 });
+          }
+        }
+
+        // Boundary events: follow their host's movement (if host is in selection)
+        // Otherwise stay put — never move independently
+        for (const el of selected) {
+          if (el.boundaryHostId) {
+            const hostDelta = dxyMap.get(el.boundaryHostId);
+            dxyMap.set(el.id, hostDelta ? { ...hostDelta } : { dx: 0, dy: 0 });
+          }
+        }
+        // Also move boundary events NOT in selection but whose host IS moving
+        for (const el of state.elements) {
+          if (el.boundaryHostId && !idSet.has(el.id)) {
+            const hostDelta = dxyMap.get(el.boundaryHostId);
+            if (hostDelta && (hostDelta.dx !== 0 || hostDelta.dy !== 0)) {
+              dxyMap.set(el.id, { ...hostDelta });
+            }
+          }
+        }
+      } else {
+        const isVertical = mode === "vcenter" || mode === "left" || mode === "right";
+        if (isVertical) {
+          let targetX: number;
+          if (mode === "vcenter") {
+            targetX = selected.reduce((sum, el) => sum + el.x + el.width / 2, 0) / selected.length;
+          } else if (mode === "left") {
+            targetX = Math.min(...selected.map((el) => el.x));
+          } else {
+            targetX = Math.max(...selected.map((el) => el.x + el.width));
+          }
+          for (const el of selected) {
+            let newX: number;
+            if (mode === "vcenter") newX = targetX - el.width / 2;
+            else if (mode === "left") newX = targetX;
+            else newX = targetX - el.width;
+            dxyMap.set(el.id, { dx: newX - el.x, dy: 0 });
+          }
+        } else {
+          let targetY: number;
+          if (mode === "center") {
+            targetY = selected.reduce((sum, el) => sum + el.y + el.height / 2, 0) / selected.length;
+          } else if (mode === "top") {
+            targetY = Math.min(...selected.map((el) => el.y));
+          } else {
+            targetY = Math.max(...selected.map((el) => el.y + el.height));
+          }
+          for (const el of selected) {
+            let newY: number;
+            if (mode === "center") newY = targetY - el.height / 2;
+            else if (mode === "top") newY = targetY;
+            else newY = targetY - el.height;
+            dxyMap.set(el.id, { dx: 0, dy: newY - el.y });
+          }
+        }
       }
 
       const newElements = state.elements.map((el) => {
-        const dy = dyMap.get(el.id);
-        if (dy === undefined || dy === 0) return el;
-        return { ...el, y: el.y + dy };
+        const d = dxyMap.get(el.id);
+        if (!d || (d.dx === 0 && d.dy === 0)) return el;
+        return { ...el, x: el.x + d.dx, y: el.y + d.dy };
       });
 
       // Build a lookup of elements at their new positions
@@ -1027,18 +1106,17 @@ function reducer(state: DiagramData, action: Action): DiagramData {
           return { ...c, sourceSide, targetSide, waypoints: result.waypoints };
         }
 
-        // Only one endpoint in selection — translate waypoints by that element's dy
-        const dy = dyMap.get(srcInSet ? c.sourceId : c.targetId) ?? 0;
-        if (dy === 0 || !c.waypoints || c.waypoints.length === 0) return c;
+        // Only one endpoint in selection — interpolate waypoint shift
+        const d = dxyMap.get(srcInSet ? c.sourceId : c.targetId);
+        if (!d || (d.dx === 0 && d.dy === 0) || !c.waypoints || c.waypoints.length === 0) return c;
         const n = c.waypoints.length;
         return {
           ...c,
           waypoints: c.waypoints.map((wp, i) => {
-            // Shift more near the moved endpoint, less near the fixed one
             const t = srcInSet
               ? (n > 1 ? 1 - i / (n - 1) : 1)
               : (n > 1 ? i / (n - 1) : 1);
-            return { x: wp.x, y: wp.y + dy * t };
+            return { x: wp.x + d.dx * t, y: wp.y + d.dy * t };
           }),
         };
       });
@@ -1257,7 +1335,7 @@ export function useDiagram(initialData: DiagramData) {
     dispatch({ type: "APPLY_TEMPLATE", payload: { elements, connectors } });
   }, []);
 
-  const alignElements = useCallback((ids: string[], mode: "center" | "top" | "bottom") => {
+  const alignElements = useCallback((ids: string[], mode: "center" | "top" | "bottom" | "vcenter" | "left" | "right" | "smart") => {
     pushHistory(snapshotData());
     dispatch({ type: "ALIGN_ELEMENTS", payload: { ids, mode } });
   }, []);
