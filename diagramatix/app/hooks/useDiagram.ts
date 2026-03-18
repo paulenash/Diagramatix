@@ -141,7 +141,8 @@ type Action =
   | { type: "ADD_LANE"; payload: { poolId: string } }
   | { type: "MOVE_LANE_BOUNDARY"; payload: { aboveLaneId: string; belowLaneId: string; dy: number } }
   | { type: "MOVE_ELEMENTS"; payload: { ids: string[]; dx: number; dy: number } }
-  | { type: "APPLY_TEMPLATE"; payload: { elements: DiagramElement[]; connectors: Connector[] } };
+  | { type: "APPLY_TEMPLATE"; payload: { elements: DiagramElement[]; connectors: Connector[] } }
+  | { type: "ALIGN_ELEMENTS"; payload: { ids: string[]; mode: "center" | "top" | "bottom" } };
 
 export function nanoid(): string {
   return Math.random().toString(36).slice(2, 10);
@@ -951,6 +952,100 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         connectors: [...state.connectors, ...action.payload.connectors],
       };
 
+    case "ALIGN_ELEMENTS": {
+      const { ids, mode } = action.payload;
+      const idSet = new Set(ids);
+      const selected = state.elements.filter((el) => idSet.has(el.id));
+      if (selected.length < 2) return state;
+
+      let targetY: number;
+      if (mode === "center") {
+        const avg = selected.reduce((sum, el) => sum + el.y + el.height / 2, 0) / selected.length;
+        targetY = avg; // this is the target centre Y
+      } else if (mode === "top") {
+        targetY = Math.min(...selected.map((el) => el.y));
+      } else {
+        targetY = Math.max(...selected.map((el) => el.y + el.height));
+      }
+
+      // Build a map of dy per element
+      const dyMap = new Map<string, number>();
+      for (const el of selected) {
+        let newY: number;
+        if (mode === "center") newY = targetY - el.height / 2;
+        else if (mode === "top") newY = targetY;
+        else newY = targetY - el.height;
+        dyMap.set(el.id, newY - el.y);
+      }
+
+      const newElements = state.elements.map((el) => {
+        const dy = dyMap.get(el.id);
+        if (dy === undefined || dy === 0) return el;
+        return { ...el, y: el.y + dy };
+      });
+
+      // Build a lookup of elements at their new positions
+      const elMap = new Map<string, DiagramElement>();
+      for (const el of newElements) elMap.set(el.id, el);
+
+      // Helper: find the nearest pair of sides between two elements
+      function nearestSides(src: DiagramElement, tgt: DiagramElement): { sourceSide: Side; targetSide: Side } {
+        const sides: Side[] = ["top", "right", "bottom", "left"];
+        function midpoint(el: DiagramElement, side: Side): Point {
+          const cx = el.x + el.width / 2, cy = el.y + el.height / 2;
+          if (side === "top") return { x: cx, y: el.y };
+          if (side === "bottom") return { x: cx, y: el.y + el.height };
+          if (side === "left") return { x: el.x, y: cy };
+          return { x: el.x + el.width, y: cy };
+        }
+        let bestDist = Infinity, bestSrc: Side = "right", bestTgt: Side = "left";
+        for (const ss of sides) {
+          const sp = midpoint(src, ss);
+          for (const ts of sides) {
+            const tp = midpoint(tgt, ts);
+            const d = Math.hypot(sp.x - tp.x, sp.y - tp.y);
+            if (d < bestDist) { bestDist = d; bestSrc = ss; bestTgt = ts; }
+          }
+        }
+        return { sourceSide: bestSrc, targetSide: bestTgt };
+      }
+
+      // Re-route connectors between aligned elements with nearest connection points
+      const newConnectors = state.connectors.map((c) => {
+        const srcInSet = idSet.has(c.sourceId);
+        const tgtInSet = idSet.has(c.targetId);
+        if (!srcInSet && !tgtInSet) return c;
+
+        const srcEl = elMap.get(c.sourceId);
+        const tgtEl = elMap.get(c.targetId);
+        if (!srcEl || !tgtEl) return c;
+
+        if (srcInSet && tgtInSet) {
+          // Both in selection — find nearest sides and recompute waypoints
+          const { sourceSide, targetSide } = nearestSides(srcEl, tgtEl);
+          const result = computeWaypoints(srcEl, tgtEl, newElements, sourceSide, targetSide, c.routingType);
+          return { ...c, sourceSide, targetSide, waypoints: result.waypoints };
+        }
+
+        // Only one endpoint in selection — translate waypoints by that element's dy
+        const dy = dyMap.get(srcInSet ? c.sourceId : c.targetId) ?? 0;
+        if (dy === 0 || !c.waypoints || c.waypoints.length === 0) return c;
+        const n = c.waypoints.length;
+        return {
+          ...c,
+          waypoints: c.waypoints.map((wp, i) => {
+            // Shift more near the moved endpoint, less near the fixed one
+            const t = srcInSet
+              ? (n > 1 ? 1 - i / (n - 1) : 1)
+              : (n > 1 ? i / (n - 1) : 1);
+            return { x: wp.x, y: wp.y + dy * t };
+          }),
+        };
+      });
+
+      return { ...state, elements: newElements, connectors: newConnectors };
+    }
+
     default:
       return state;
   }
@@ -1162,6 +1257,11 @@ export function useDiagram(initialData: DiagramData) {
     dispatch({ type: "APPLY_TEMPLATE", payload: { elements, connectors } });
   }, []);
 
+  const alignElements = useCallback((ids: string[], mode: "center" | "top" | "bottom") => {
+    pushHistory(snapshotData());
+    dispatch({ type: "ALIGN_ELEMENTS", payload: { ids, mode } });
+  }, []);
+
   const setData = useCallback((newData: DiagramData) => {
     // Clear history on full state replacement (e.g. initial DB load)
     pastRef.current = [];
@@ -1239,6 +1339,7 @@ export function useDiagram(initialData: DiagramData) {
     elementMoveEnd,
     splitConnector,
     applyTemplate,
+    alignElements,
     setData,
     setViewport,
     correctAllConnectors,

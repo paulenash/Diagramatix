@@ -212,6 +212,7 @@ export function DiagramEditor({
     elementMoveEnd,
     splitConnector,
     applyTemplate,
+    alignElements,
     setData,
     correctAllConnectors,
     addLane,
@@ -269,6 +270,10 @@ export function DiagramEditor({
   const getViewportCenterRef = useRef<(() => Point) | null>(null);
   const templateDropdownRef = useRef<HTMLDivElement>(null);
 
+  // Alignment dropdown state
+  const [alignDropdownOpen, setAlignDropdownOpen] = useState(false);
+  const alignDropdownRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     if (!projectId) return;
     fetch(`/api/projects/${projectId}`)
@@ -316,6 +321,18 @@ export function DiagramEditor({
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, [templateDropdownOpen]);
+
+  // Close alignment dropdown on outside click
+  useEffect(() => {
+    if (!alignDropdownOpen) return;
+    function handleClick(e: MouseEvent) {
+      if (alignDropdownRef.current && !alignDropdownRef.current.contains(e.target as Node)) {
+        setAlignDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [alignDropdownOpen]);
 
   const effectiveColorConfig: SymbolColorConfig = displayMode === "hand-drawn"
     ? BW_SYMBOL_COLORS
@@ -577,6 +594,46 @@ export function DiagramEditor({
             </svg>
           </button>
         </div>
+
+        {selectedElementIds.size > 1 && templateMode !== "editing" && (
+          <div className="relative" ref={alignDropdownRef}>
+            <button
+              onClick={() => setAlignDropdownOpen((prev) => !prev)}
+              className="px-3 py-1.5 text-xs text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
+            >
+              Alignment ▾
+            </button>
+            {alignDropdownOpen && (
+              <div className="absolute right-0 top-full mt-1 w-56 bg-white border border-gray-200 rounded shadow-lg z-50">
+                <button
+                  onClick={() => { alignElements([...selectedElementIds], "center"); setAlignDropdownOpen(false); }}
+                  className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                >
+                  Align Centres Horizontally
+                </button>
+                <button
+                  onClick={() => { alignElements([...selectedElementIds], "top"); setAlignDropdownOpen(false); }}
+                  className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                >
+                  Align Tops Horizontally
+                </button>
+                <button
+                  onClick={() => { alignElements([...selectedElementIds], "bottom"); setAlignDropdownOpen(false); }}
+                  className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                >
+                  Align Bottoms Horizontally
+                </button>
+                <div className="border-t border-gray-100" />
+                <button
+                  onClick={() => setAlignDropdownOpen(false)}
+                  className="w-full text-left px-3 py-2 text-xs text-gray-400 hover:bg-gray-50"
+                >
+                  None
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         {diagramType === "bpmn" && templateMode === "idle" && (
           <div className="relative" ref={templateDropdownRef}>
