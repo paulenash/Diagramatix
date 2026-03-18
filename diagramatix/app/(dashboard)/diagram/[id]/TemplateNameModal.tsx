@@ -5,10 +5,12 @@ import { useState, useRef, useEffect } from "react";
 interface Props {
   onSave: (name: string) => void;
   onClose: () => void;
+  initialName?: string;
+  title?: string;
 }
 
-export function TemplateNameModal({ onSave, onClose }: Props) {
-  const [name, setName] = useState("");
+export function TemplateNameModal({ onSave, onClose, initialName, title }: Props) {
+  const [name, setName] = useState(initialName ?? "");
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -30,7 +32,7 @@ export function TemplateNameModal({ onSave, onClose }: Props) {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-4 py-3 border-b">
-          <h2 className="text-sm font-semibold text-gray-800">Save Template</h2>
+          <h2 className="text-sm font-semibold text-gray-800">{title ?? "Save Template"}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-lg leading-none">&times;</button>
         </div>
         <form onSubmit={handleSubmit} className="px-4 py-4">

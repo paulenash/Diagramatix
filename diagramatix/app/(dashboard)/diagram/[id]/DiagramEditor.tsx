@@ -36,13 +36,16 @@ interface Props {
 function useAutoSave(
   diagramId: string,
   data: DiagramData,
-  delay = 1500
+  delay = 1500,
+  disabled = false
 ) {
   const saveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "unsaved">("saved");
   const lastSaved = useRef<string>(JSON.stringify(data));
 
   useEffect(() => {
+    if (disabled) return;
+
     const current = JSON.stringify(data);
     if (current === lastSaved.current) return;
 
@@ -68,7 +71,7 @@ function useAutoSave(
     return () => {
       if (saveTimeout.current) clearTimeout(saveTimeout.current);
     };
-  }, [data, diagramId, delay]);
+  }, [data, diagramId, delay, disabled]);
 
   return saveStatus;
 }
@@ -209,6 +212,7 @@ export function DiagramEditor({
     elementMoveEnd,
     splitConnector,
     applyTemplate,
+    setData,
     correctAllConnectors,
     addLane,
     moveLaneBoundary,
@@ -221,7 +225,14 @@ export function DiagramEditor({
     canRedo,
   } = useDiagram(initialData);
 
-  const saveStatus = useAutoSave(diagramId, data);
+  // Template edit state
+  const [templateEditState, setTemplateEditState] = useState<{
+    templateId: string;
+    templateName: string;
+    originalData: DiagramData;
+  } | null>(null);
+
+  const saveStatus = useAutoSave(diagramId, data, 1500, templateEditState !== null);
 
   useEffect(() => {
     function handleKeyDown(e: globalThis.KeyboardEvent) {
@@ -251,7 +262,7 @@ export function DiagramEditor({
 
   // Template state (BPMN only)
   const [templates, setTemplates] = useState<{ id: string; name: string }[]>([]);
-  const [templateMode, setTemplateMode] = useState<"idle" | "capturing">("idle");
+  const [templateMode, setTemplateMode] = useState<"idle" | "capturing" | "editing">("idle");
   const [templateDropdownOpen, setTemplateDropdownOpen] = useState(false);
   const [showTemplateNameModal, setShowTemplateNameModal] = useState(false);
   const [pendingTemplateData, setPendingTemplateData] = useState<TemplateData | null>(null);
@@ -439,6 +450,73 @@ export function DiagramEditor({
     }
   }
 
+  async function handleEditTemplate(templateId: string, templateName: string) {
+    setTemplateDropdownOpen(false);
+    try {
+      const res = await fetch(`/api/templates/${templateId}`);
+      if (!res.ok) { console.error("Failed to fetch template:", res.status); return; }
+      const tmpl = await res.json();
+      const templateData = tmpl.data as TemplateData;
+
+      // Stash the current diagram so we can restore it later
+      const originalData: DiagramData = {
+        elements: [...data.elements],
+        connectors: [...data.connectors],
+        viewport: { ...data.viewport },
+      };
+
+      setTemplateEditState({ templateId, templateName, originalData });
+      setSelectedElementIds(new Set());
+      setSelectedConnectorId(null);
+
+      // Replace diagram with just the template elements
+      const center = getViewportCenterRef.current?.() ?? { x: 400, y: 300 };
+      const { elements, connectors } = instantiateTemplate(templateData, center.x, center.y);
+      setData({ elements, connectors, viewport: data.viewport });
+      setTemplateMode("editing");
+    } catch (err) {
+      console.error("Failed to start template edit:", err);
+    }
+  }
+
+  async function handleUpdateTemplate(newName: string) {
+    if (!templateEditState) return;
+
+    const captured = captureTemplate(data.elements, data.connectors, selectedElementIds);
+    if (captured.elements.length === 0) return;
+
+    try {
+      const res = await fetch(`/api/templates/${templateEditState.templateId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newName, data: captured }),
+      });
+      if (!res.ok) {
+        console.error("Failed to update template:", res.status, await res.text());
+      } else {
+        setTemplates((prev) =>
+          prev.map((t) =>
+            t.id === templateEditState.templateId ? { ...t, name: newName } : t
+          )
+        );
+      }
+    } catch (err) {
+      console.error("Failed to update template:", err);
+    }
+
+    handleCancelTemplateEdit();
+  }
+
+  function handleCancelTemplateEdit() {
+    if (!templateEditState) return;
+    setData(templateEditState.originalData);
+    setTemplateEditState(null);
+    setTemplateMode("idle");
+    setSelectedElementIds(new Set());
+    setSelectedConnectorId(null);
+    setShowTemplateNameModal(false);
+  }
+
   return (
     <div className="flex flex-col h-screen bg-white">
       {/* Top bar */}
@@ -526,6 +604,15 @@ export function DiagramEditor({
                       {t.name}
                     </button>
                     <button
+                      onClick={(e) => { e.stopPropagation(); handleEditTemplate(t.id, t.name); }}
+                      className="px-2 py-2 text-gray-400 hover:text-blue-500"
+                      title="Edit template"
+                    >
+                      <svg width={12} height={12} viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M7 2l3 3-7 7H0V9z" />
+                      </svg>
+                    </button>
+                    <button
                       onClick={(e) => { e.stopPropagation(); handleDeleteTemplate(t.id); }}
                       className="px-2 py-2 text-gray-400 hover:text-red-500"
                       title="Delete template"
@@ -558,7 +645,34 @@ export function DiagramEditor({
             </button>
           </div>
         )}
+        {diagramType === "bpmn" && templateMode === "editing" && templateEditState && (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-amber-600 font-medium">
+              Editing template: {templateEditState.templateName}
+            </span>
+            <button
+              onClick={() => {
+                const captured = captureTemplate(data.elements, data.connectors, selectedElementIds);
+                if (captured.elements.length === 0) return;
+                setPendingTemplateData(captured);
+                setShowTemplateNameModal(true);
+              }}
+              disabled={selectedElementIds.size === 0}
+              className="px-3 py-1.5 text-xs text-white bg-amber-600 rounded hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Update Template
+            </button>
+            <button
+              onClick={handleCancelTemplateEdit}
+              className="px-3 py-1.5 text-xs text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+          </div>
+        )}
 
+        {templateMode !== "editing" && (
+          <>
         <button
           onClick={() => setShowDiagramMaintenance(true)}
           className="px-3 py-1.5 text-xs text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
@@ -588,6 +702,8 @@ export function DiagramEditor({
         >
           Export PDF
         </button>
+          </>
+        )}
       </header>
 
       {/* Main editor area */}
@@ -666,8 +782,10 @@ export function DiagramEditor({
 
       {showTemplateNameModal && (
         <TemplateNameModal
-          onSave={handleConfirmTemplateName}
+          onSave={templateEditState ? handleUpdateTemplate : handleConfirmTemplateName}
           onClose={() => { setShowTemplateNameModal(false); setPendingTemplateData(null); }}
+          initialName={templateEditState?.templateName}
+          title={templateEditState ? "Update Template" : "Save Template"}
         />
       )}
 
