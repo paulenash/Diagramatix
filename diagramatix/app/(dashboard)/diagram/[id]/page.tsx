@@ -40,6 +40,7 @@ export default async function DiagramPage({ params }: Props) {
       projectId={diagram.projectId ?? null}
       initialDiagramColorConfig={diagramColorConfig}
       initialDisplayMode={(diagram.displayMode as DisplayMode) ?? "normal"}
+      userEmail={session.user.email ?? ""}
     />
   );
 }

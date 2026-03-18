@@ -31,6 +31,7 @@ interface Props {
   projectId: string | null;
   initialDiagramColorConfig?: SymbolColorConfig;
   initialDisplayMode?: DisplayMode;
+  userEmail?: string;
 }
 
 function useAutoSave(
@@ -189,6 +190,7 @@ export function DiagramEditor({
   projectId,
   initialDiagramColorConfig,
   initialDisplayMode,
+  userEmail,
 }: Props) {
   const router = useRouter();
 
@@ -262,13 +264,18 @@ export function DiagramEditor({
   const [showDiagramMaintenance, setShowDiagramMaintenance] = useState(false);
 
   // Template state (BPMN only)
-  const [templates, setTemplates] = useState<{ id: string; name: string }[]>([]);
-  const [templateMode, setTemplateMode] = useState<"idle" | "capturing" | "editing">("idle");
+  const isAdmin = userEmail === "paul@nashcc.com.au";
+  const [userTemplates, setUserTemplates] = useState<{ id: string; name: string }[]>([]);
+  const [builtInTemplates, setBuiltInTemplates] = useState<{ id: string; name: string }[]>([]);
+  const [templateMode, setTemplateMode] = useState<"idle" | "capturing" | "capturing-builtin" | "editing">("idle");
   const [templateDropdownOpen, setTemplateDropdownOpen] = useState(false);
+  const [builtInDropdownOpen, setBuiltInDropdownOpen] = useState(false);
   const [showTemplateNameModal, setShowTemplateNameModal] = useState(false);
+  const [showAdminPasswordModal, setShowAdminPasswordModal] = useState(false);
   const [pendingTemplateData, setPendingTemplateData] = useState<TemplateData | null>(null);
   const getViewportCenterRef = useRef<(() => Point) | null>(null);
   const templateDropdownRef = useRef<HTMLDivElement>(null);
+  const builtInDropdownRef = useRef<HTMLDivElement>(null);
 
   // Alignment dropdown state
   const [alignDropdownOpen, setAlignDropdownOpen] = useState(false);
@@ -299,18 +306,27 @@ export function DiagramEditor({
   // Fetch templates on mount (BPMN only)
   useEffect(() => {
     if (diagramType !== "bpmn") return;
-    fetch("/api/templates")
+    fetch("/api/templates?type=user")
       .then((r) => {
-        if (!r.ok) throw new Error(`GET /api/templates failed: ${r.status}`);
+        if (!r.ok) throw new Error(`GET /api/templates?type=user failed: ${r.status}`);
         return r.json();
       })
       .then((list: { id: string; name: string; diagramType: string }[]) =>
-        setTemplates(list.filter((t) => t.diagramType === "bpmn"))
+        setUserTemplates(list.filter((t) => t.diagramType === "bpmn"))
       )
-      .catch((err) => console.error("Failed to fetch templates:", err));
+      .catch((err) => console.error("Failed to fetch user templates:", err));
+    fetch("/api/templates?type=builtin")
+      .then((r) => {
+        if (!r.ok) throw new Error(`GET /api/templates?type=builtin failed: ${r.status}`);
+        return r.json();
+      })
+      .then((list: { id: string; name: string; diagramType: string }[]) =>
+        setBuiltInTemplates(list.filter((t) => t.diagramType === "bpmn"))
+      )
+      .catch((err) => console.error("Failed to fetch built-in templates:", err));
   }, [diagramType]);
 
-  // Close template dropdown on outside click
+  // Close template dropdowns on outside click
   useEffect(() => {
     if (!templateDropdownOpen) return;
     function handleClick(e: MouseEvent) {
@@ -321,6 +337,17 @@ export function DiagramEditor({
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, [templateDropdownOpen]);
+
+  useEffect(() => {
+    if (!builtInDropdownOpen) return;
+    function handleClick(e: MouseEvent) {
+      if (builtInDropdownRef.current && !builtInDropdownRef.current.contains(e.target as Node)) {
+        setBuiltInDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [builtInDropdownOpen]);
 
   // Close alignment dropdown on outside click
   useEffect(() => {
@@ -415,30 +442,44 @@ export function DiagramEditor({
     setShowTemplateNameModal(true);
   }
 
-  async function handleConfirmTemplateName(name: string) {
+  async function handleConfirmTemplateName(name: string, adminPassword?: string) {
     if (!pendingTemplateData) return;
+    const isBuiltIn = templateMode === "capturing-builtin";
     try {
+      const body: Record<string, unknown> = { name, diagramType: "bpmn", data: pendingTemplateData };
+      if (isBuiltIn) {
+        body.templateType = "builtin";
+        if (adminPassword) body.adminPassword = adminPassword;
+      }
       const res = await fetch("/api/templates", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, diagramType: "bpmn", data: pendingTemplateData }),
+        body: JSON.stringify(body),
       });
       if (!res.ok) {
-        console.error("Failed to save template:", res.status, await res.text());
+        const text = await res.text();
+        console.error("Failed to save template:", res.status, text);
+        if (res.status === 403) { alert("Invalid admin password"); return; }
       } else {
         const created = await res.json();
-        setTemplates((prev) => [{ id: created.id, name: created.name }, ...prev]);
+        if (isBuiltIn) {
+          setBuiltInTemplates((prev) => [{ id: created.id, name: created.name }, ...prev]);
+        } else {
+          setUserTemplates((prev) => [{ id: created.id, name: created.name }, ...prev]);
+        }
       }
     } catch (err) {
       console.error("Failed to save template:", err);
     }
     setPendingTemplateData(null);
     setShowTemplateNameModal(false);
+    setShowAdminPasswordModal(false);
     setTemplateMode("idle");
   }
 
   async function handleApplyTemplate(templateId: string) {
     setTemplateDropdownOpen(false);
+    setBuiltInDropdownOpen(false);
     try {
       const res = await fetch(`/api/templates/${templateId}`);
       if (!res.ok) { console.error("Failed to fetch template:", res.status); return; }
@@ -454,11 +495,15 @@ export function DiagramEditor({
     }
   }
 
-  async function handleDeleteTemplate(templateId: string) {
+  async function handleDeleteTemplate(templateId: string, isBuiltIn = false) {
     try {
       const res = await fetch(`/api/templates/${templateId}`, { method: "DELETE" });
       if (res.ok) {
-        setTemplates((prev) => prev.filter((t) => t.id !== templateId));
+        if (isBuiltIn) {
+          setBuiltInTemplates((prev) => prev.filter((t) => t.id !== templateId));
+        } else {
+          setUserTemplates((prev) => prev.filter((t) => t.id !== templateId));
+        }
       } else {
         console.error("Failed to delete template:", res.status);
       }
@@ -469,6 +514,7 @@ export function DiagramEditor({
 
   async function handleEditTemplate(templateId: string, templateName: string) {
     setTemplateDropdownOpen(false);
+    setBuiltInDropdownOpen(false);
     try {
       const res = await fetch(`/api/templates/${templateId}`);
       if (!res.ok) { console.error("Failed to fetch template:", res.status); return; }
@@ -511,11 +557,11 @@ export function DiagramEditor({
       if (!res.ok) {
         console.error("Failed to update template:", res.status, await res.text());
       } else {
-        setTemplates((prev) =>
-          prev.map((t) =>
-            t.id === templateEditState.templateId ? { ...t, name: newName } : t
-          )
-        );
+        // Update in whichever list contains this template
+        const updater = (prev: { id: string; name: string }[]) =>
+          prev.map((t) => t.id === templateEditState.templateId ? { ...t, name: newName } : t);
+        setUserTemplates(updater);
+        setBuiltInTemplates(updater);
       }
     } catch (err) {
       console.error("Failed to update template:", err);
@@ -661,12 +707,74 @@ export function DiagramEditor({
         )}
 
         {diagramType === "bpmn" && templateMode === "idle" && (
+          <>
+          {/* Built-In Templates dropdown */}
+          <div className="relative" ref={builtInDropdownRef}>
+            <button
+              onClick={() => setBuiltInDropdownOpen((prev) => !prev)}
+              className="px-3 py-1.5 text-xs text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
+            >
+              Built-In Templates ▾
+            </button>
+            {builtInDropdownOpen && (
+              <div className="absolute right-0 top-full mt-1 w-52 bg-white border border-gray-200 rounded shadow-lg z-50">
+                <button
+                  onClick={() => {
+                    setBuiltInDropdownOpen(false);
+                    if (isAdmin) {
+                      setTemplateMode("capturing-builtin");
+                    } else {
+                      setShowAdminPasswordModal(true);
+                    }
+                  }}
+                  className="w-full text-left px-3 py-2 text-xs text-blue-600 hover:bg-blue-50 font-medium"
+                >
+                  + Create Built-In Template
+                </button>
+                {builtInTemplates.length > 0 && <div className="border-t border-gray-100" />}
+                {builtInTemplates.map((t) => (
+                  <div key={t.id} className="flex items-center hover:bg-gray-50">
+                    <button
+                      onClick={() => handleApplyTemplate(t.id)}
+                      className="flex-1 text-left px-3 py-2 text-xs text-gray-700"
+                    >
+                      {t.name}
+                    </button>
+                    {isAdmin && (
+                      <>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleEditTemplate(t.id, t.name); }}
+                          className="px-2 py-2 text-gray-400 hover:text-blue-500"
+                          title="Edit template"
+                        >
+                          <svg width={12} height={12} viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M7 2l3 3-7 7H0V9z" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleDeleteTemplate(t.id, true); }}
+                          className="px-2 py-2 text-gray-400 hover:text-red-500"
+                          title="Delete template"
+                        >
+                          <svg width={12} height={12} viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round">
+                            <path d="M2 3h8M4.5 3V2h3v1M3 3v7a1 1 0 001 1h4a1 1 0 001-1V3" />
+                          </svg>
+                        </button>
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* User Templates dropdown */}
           <div className="relative" ref={templateDropdownRef}>
             <button
               onClick={() => setTemplateDropdownOpen((prev) => !prev)}
               className="px-3 py-1.5 text-xs text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
             >
-              Templates ▾
+              User Templates ▾
             </button>
             {templateDropdownOpen && (
               <div className="absolute right-0 top-full mt-1 w-52 bg-white border border-gray-200 rounded shadow-lg z-50">
@@ -674,10 +782,10 @@ export function DiagramEditor({
                   onClick={() => { setTemplateMode("capturing"); setTemplateDropdownOpen(false); }}
                   className="w-full text-left px-3 py-2 text-xs text-blue-600 hover:bg-blue-50 font-medium"
                 >
-                  + Create New Template
+                  + Create User Template
                 </button>
-                {templates.length > 0 && <div className="border-t border-gray-100" />}
-                {templates.map((t) => (
+                {userTemplates.length > 0 && <div className="border-t border-gray-100" />}
+                {userTemplates.map((t) => (
                   <div key={t.id} className="flex items-center hover:bg-gray-50">
                     <button
                       onClick={() => handleApplyTemplate(t.id)}
@@ -708,10 +816,13 @@ export function DiagramEditor({
               </div>
             )}
           </div>
+          </>
         )}
-        {diagramType === "bpmn" && templateMode === "capturing" && (
+        {diagramType === "bpmn" && (templateMode === "capturing" || templateMode === "capturing-builtin") && (
           <div className="flex items-center gap-2">
-            <span className="text-xs text-blue-600">Select elements for template</span>
+            <span className="text-xs text-blue-600">
+              Select elements for {templateMode === "capturing-builtin" ? "built-in" : "user"} template
+            </span>
             <button
               onClick={handleSaveAsTemplate}
               disabled={selectedElementIds.size === 0}
@@ -864,11 +975,74 @@ export function DiagramEditor({
 
       {showTemplateNameModal && (
         <TemplateNameModal
-          onSave={templateEditState ? handleUpdateTemplate : handleConfirmTemplateName}
-          onClose={() => { setShowTemplateNameModal(false); setPendingTemplateData(null); }}
+          onSave={templateEditState ? handleUpdateTemplate : (name: string) => handleConfirmTemplateName(name)}
+          onClose={() => { setShowTemplateNameModal(false); setPendingTemplateData(null); setTemplateMode("idle"); }}
           initialName={templateEditState?.templateName}
-          title={templateEditState ? "Update Template" : "Save Template"}
+          title={templateEditState ? "Update Template" : templateMode === "capturing-builtin" ? "Save Built-In Template" : "Save User Template"}
         />
+      )}
+
+      {showAdminPasswordModal && (
+        <div
+          className="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
+          onClick={() => setShowAdminPasswordModal(false)}
+        >
+          <div
+            className="bg-white rounded-lg shadow-xl w-full max-w-sm flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-4 py-3 border-b">
+              <h2 className="text-sm font-semibold text-gray-800">Admin Access Required</h2>
+              <button onClick={() => setShowAdminPasswordModal(false)} className="text-gray-400 hover:text-gray-600 text-lg leading-none">&times;</button>
+            </div>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const pwd = (e.currentTarget.elements.namedItem("adminPwd") as HTMLInputElement).value;
+                if (pwd === "!Aardwolf2026") {
+                  setShowAdminPasswordModal(false);
+                  setTemplateMode("capturing-builtin");
+                } else {
+                  alert("Invalid admin password");
+                }
+              }}
+              className="px-4 py-4"
+            >
+              <label className="block text-xs text-gray-600 mb-1">Enter admin password to create built-in templates</label>
+              <input
+                name="adminPwd"
+                type="password"
+                autoFocus
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Admin password..."
+              />
+            </form>
+            <div className="flex justify-end gap-2 px-4 py-3 border-t">
+              <button
+                type="button"
+                onClick={() => setShowAdminPasswordModal(false)}
+                className="px-3 py-1.5 text-xs text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const input = document.querySelector<HTMLInputElement>("input[name=adminPwd]");
+                  if (input?.value === "!Aardwolf2026") {
+                    setShowAdminPasswordModal(false);
+                    setTemplateMode("capturing-builtin");
+                  } else {
+                    alert("Invalid admin password");
+                  }
+                }}
+                className="px-3 py-1.5 text-xs text-white bg-blue-600 rounded hover:bg-blue-700"
+              >
+                Submit
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {showDiagramMaintenance && (

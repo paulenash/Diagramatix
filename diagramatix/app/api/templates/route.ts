@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { pgPool } from "@/app/lib/db";
+import { prisma } from "@/app/lib/db";
+
+const ADMIN_EMAIL = "paul@nashcc.com.au";
+const ADMIN_PASSWORD = "!Aardwolf2026";
 
 function cuid() {
   const ts = Date.now().toString(36);
@@ -8,20 +12,33 @@ function cuid() {
   return `c${ts}${rand}`;
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const { searchParams } = new URL(req.url);
+  const type = searchParams.get("type") || "user";
+
   try {
-    const result = await pgPool.query(
-      `SELECT id, name, "diagramType", "createdAt"
-       FROM "DiagramTemplate"
-       WHERE "userId" = $1
-       ORDER BY "updatedAt" DESC`,
-      [session.user.id]
-    );
+    let result;
+    if (type === "builtin") {
+      result = await pgPool.query(
+        `SELECT id, name, "diagramType", "createdAt"
+         FROM "DiagramTemplate"
+         WHERE "templateType" = 'builtin'
+         ORDER BY "updatedAt" DESC`
+      );
+    } else {
+      result = await pgPool.query(
+        `SELECT id, name, "diagramType", "createdAt"
+         FROM "DiagramTemplate"
+         WHERE "templateType" = 'user' AND "userId" = $1
+         ORDER BY "updatedAt" DESC`,
+        [session.user.id]
+      );
+    }
     return NextResponse.json(result.rows);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -37,19 +54,27 @@ export async function POST(req: Request) {
   }
 
   const body = await req.json();
-  const { name, diagramType = "bpmn", data } = body;
+  const { name, diagramType = "bpmn", data, templateType = "user", adminPassword } = body;
 
   if (!name?.trim()) {
     return NextResponse.json({ error: "Name is required" }, { status: 400 });
+  }
+
+  // Admin authorization for built-in templates
+  if (templateType === "builtin") {
+    const userEmail = await getUserEmail(session.user.id);
+    if (userEmail !== ADMIN_EMAIL && adminPassword !== ADMIN_PASSWORD) {
+      return NextResponse.json({ error: "Invalid admin password" }, { status: 403 });
+    }
   }
 
   try {
     const id = cuid();
     const now = new Date();
     await pgPool.query(
-      `INSERT INTO "DiagramTemplate" (id, name, "diagramType", data, "userId", "createdAt", "updatedAt")
-       VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7)`,
-      [id, name.trim(), diagramType, JSON.stringify(data), session.user.id, now, now]
+      `INSERT INTO "DiagramTemplate" (id, name, "diagramType", "templateType", data, "userId", "createdAt", "updatedAt")
+       VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8)`,
+      [id, name.trim(), diagramType, templateType, JSON.stringify(data), session.user.id, now, now]
     );
 
     return NextResponse.json({ id, name: name.trim(), diagramType, createdAt: now }, { status: 201 });
@@ -58,4 +83,9 @@ export async function POST(req: Request) {
     console.error("[POST /api/templates] error:", message);
     return NextResponse.json({ error: message }, { status: 500 });
   }
+}
+
+async function getUserEmail(userId: string): Promise<string | null> {
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
+  return user?.email ?? null;
 }

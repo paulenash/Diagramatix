@@ -49,8 +49,9 @@ model Diagram {
 model DiagramTemplate {
   id          String   @id @default(cuid())
   name        String
-  diagramType String   @default("bpmn")
-  data        Json     @default("{}")
+  diagramType  String   @default("bpmn")
+  templateType String   @default("user")
+  data         Json     @default("{}")
   userId      String
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt   DateTime @default(now())
