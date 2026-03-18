@@ -391,6 +391,14 @@ export function Canvas({
     if (matches.length === 0) return null;
     // Prefer non-container elements (child states) over composite-state containers so that
     // dropping onto a state inside a composite returns the child state, not the composite.
+    // But only prefer children that actually contain the drop point (not just within margin).
+    const directHit = matches.find(el =>
+      el.type !== "composite-state" && el.type !== "pool" && el.type !== "subprocess-expanded" &&
+      pos.x >= el.x && pos.x <= el.x + el.width &&
+      pos.y >= el.y && pos.y <= el.y + el.height
+    );
+    if (directHit) return directHit;
+    // No child directly under cursor — return the container (e.g. expanded subprocess boundary)
     const nonContainer = matches.find(el => el.type !== "composite-state" && el.type !== "pool" && el.type !== "subprocess-expanded");
     return nonContainer ?? matches[0];
   }
@@ -607,6 +615,17 @@ export function Canvas({
           // Block: non-associationBPMN connectors cannot connect to data elements
           if (!isAssocBPMN && DATA_ELEMENT_TYPES.has(targetEl.type)) {
             // silently abort
+          } else if (isAssocBPMN && DATA_ELEMENT_TYPES.has(targetEl.type)) {
+            // Block data-to-data: check if the fixed end is also a data element
+            const otherEndId = endpoint === "source" ? conn!.targetId : conn!.sourceId;
+            const otherEl = data.elements.find(e => e.id === otherEndId);
+            if (otherEl && DATA_ELEMENT_TYPES.has(otherEl.type)) {
+              // silently abort — data-to-data not allowed
+            } else {
+              const targetOuterSide = getBoundaryEventOuterSide(targetEl, data.elements);
+              const newSide = targetOuterSide ?? getClosestSide(pos, targetEl);
+              onUpdateConnectorEndpoint(connectorId, endpoint, targetEl.id, newSide, 0.5);
+            }
           } else if (targetEl.type === "pool") {
             // silently abort — only messageBPMN connectors may attach to a pool
           } else {
@@ -1084,6 +1103,13 @@ export function Canvas({
     : null;
   const epDragFixedPoolId = epDragFixedEl ? getElementPoolId(epDragFixedEl, data.elements) : null;
 
+  // Context for highlighting valid drop targets during associationBPMN endpoint drag
+  const isAssocBpmnEndpointDrag = draggingEndpointConn?.type === "associationBPMN";
+  const epDragMovingId = draggingEndpoint && draggingEndpointConn
+    ? (draggingEndpoint.endpoint === "source" ? draggingEndpointConn.sourceId : draggingEndpointConn.targetId)
+    : null;
+  const epDragFixedIsData = epDragFixedEl ? DATA_ELEMENT_TYPES.has(epDragFixedEl.type) : false;
+
   return (
     <div
       className="relative flex-1 overflow-hidden bg-gray-50"
@@ -1334,6 +1360,11 @@ export function Canvas({
                   elIsMsgTarget = true;
                 }
               }
+            } else if (isAssocBpmnEndpointDrag && el.id !== epDragMovingId) {
+              const elIsData = DATA_ELEMENT_TYPES.has(el.type);
+              // The fixed end determines what's valid: if fixed is data, targets must be non-data and vice versa
+              if (epDragFixedIsData && !elIsData) elIsAssocTarget = true;
+              else if (!epDragFixedIsData && elIsData) elIsAssocTarget = true;
             }
             return (
             <SymbolRenderer
