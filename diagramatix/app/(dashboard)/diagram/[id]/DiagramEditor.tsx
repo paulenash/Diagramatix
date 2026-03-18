@@ -281,6 +281,10 @@ export function DiagramEditor({
   const [alignDropdownOpen, setAlignDropdownOpen] = useState(false);
   const alignDropdownRef = useRef<HTMLDivElement>(null);
 
+  // Export dropdown state
+  const [exportDropdownOpen, setExportDropdownOpen] = useState(false);
+  const exportDropdownRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     if (!projectId) return;
     fetch(`/api/projects/${projectId}`)
@@ -360,6 +364,18 @@ export function DiagramEditor({
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, [alignDropdownOpen]);
+
+  // Close export dropdown on outside click
+  useEffect(() => {
+    if (!exportDropdownOpen) return;
+    function handleClick(e: MouseEvent) {
+      if (exportDropdownRef.current && !exportDropdownRef.current.contains(e.target as Node)) {
+        setExportDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [exportDropdownOpen]);
 
   const effectiveColorConfig: SymbolColorConfig = displayMode === "hand-drawn"
     ? BW_SYMBOL_COLORS
@@ -873,28 +889,46 @@ export function DiagramEditor({
           Diagram Maintenance
         </button>
 
-        <button
-          onClick={handleExport}
-          className="px-3 py-1.5 text-xs text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
-        >
-          Export SVG
-        </button>
-        <select
-          value={pdfScale}
-          onChange={(e) => setPdfScale(Number(e.target.value))}
-          className="px-2 py-1.5 text-xs text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
-        >
-          <option value={100}>100%</option>
-          <option value={75}>75%</option>
-          <option value={50}>50%</option>
-          <option value={30}>30%</option>
-        </select>
-        <button
-          onClick={handleExportPdf}
-          className="px-3 py-1.5 text-xs text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
-        >
-          Export PDF
-        </button>
+        <div className="relative" ref={exportDropdownRef}>
+          <button
+            onClick={() => setExportDropdownOpen((prev) => !prev)}
+            className="px-3 py-1.5 text-xs text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
+          >
+            Export ▾
+          </button>
+          {exportDropdownOpen && (
+            <div className="absolute right-0 top-full mt-1 w-44 bg-white border border-gray-200 rounded shadow-lg z-50">
+              <button
+                onClick={() => { handleExport(); setExportDropdownOpen(false); }}
+                className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+              >
+                Export SVG
+              </button>
+              <button
+                onClick={() => { handleExportPdf(); setExportDropdownOpen(false); }}
+                className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+              >
+                Export PDF
+              </button>
+              <div className="border-t border-gray-100" />
+              <div className="px-3 py-2">
+                <div className="text-xs text-gray-500 mb-1.5">PDF Scale</div>
+                {[100, 75, 50, 25].map((val) => (
+                  <label key={val} className="flex items-center gap-2 py-0.5 text-xs text-gray-700 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="pdfScale"
+                      checked={pdfScale === val}
+                      onChange={() => setPdfScale(val)}
+                      className="accent-blue-600"
+                    />
+                    {val}%
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
           </>
         )}
       </header>
