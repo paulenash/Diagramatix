@@ -389,6 +389,9 @@ export function Canvas({
       }
     }
     if (matches.length === 0) return null;
+    // Highest priority: boundary events (small elements on host edges) — check within margin
+    const boundaryHit = matches.find(el => !!el.boundaryHostId);
+    if (boundaryHit) return boundaryHit;
     // Prefer non-container elements (child states) over composite-state containers so that
     // dropping onto a state inside a composite returns the child state, not the composite.
     // But only prefer children that actually contain the drop point (not just within margin).
@@ -569,12 +572,36 @@ export function Canvas({
 
       // Check if dropped on the same element — reposition along its boundary
       // (skip for messageBPMN: it uses top/bottom sides only, not arbitrary boundary positions)
+      // For expanded subprocesses: check if a child element is under the cursor first
       const currentEl = data.elements.find((e) => e.id === fromId);
-      if (!isMsgBPMN && currentEl &&
+      const isCurrentExpanded = currentEl?.type === "subprocess-expanded";
+      const childUnderCursor = isCurrentExpanded
+        ? data.elements.find((el) =>
+            el.id !== fromId && el.parentId === fromId &&
+            pos.x >= el.x && pos.x <= el.x + el.width &&
+            pos.y >= el.y && pos.y <= el.y + el.height
+          )
+        : null;
+      // Also check for boundary events on the expanded subprocess
+      const boundaryUnderCursor = isCurrentExpanded
+        ? data.elements.find((el) =>
+            el.boundaryHostId === fromId &&
+            pos.x >= el.x - 15 && pos.x <= el.x + el.width + 15 &&
+            pos.y >= el.y - 15 && pos.y <= el.y + el.height + 15
+          )
+        : null;
+      const innerTarget = childUnderCursor ?? boundaryUnderCursor;
+      if (!isMsgBPMN && currentEl && !innerTarget &&
         pos.x >= currentEl.x && pos.x <= currentEl.x + currentEl.width &&
         pos.y >= currentEl.y && pos.y <= currentEl.y + currentEl.height) {
         const { side, offsetAlong } = pointToBoundaryOffset(pos, currentEl);
         onUpdateConnectorEndpoint(connectorId, endpoint, currentEl.id, side, offsetAlong);
+        onSelectConnector(null);
+      } else if (!isMsgBPMN && innerTarget) {
+        // Dropped on a child or boundary event inside an expanded subprocess
+        const targetOuterSide = getBoundaryEventOuterSide(innerTarget, data.elements);
+        const newSide = targetOuterSide ?? getClosestSide(pos, innerTarget);
+        onUpdateConnectorEndpoint(connectorId, endpoint, innerTarget.id, newSide, 0.5);
         onSelectConnector(null);
       } else if (isMsgBPMN) {
         // messageBPMN endpoint reconnection — must remain cross-pool
@@ -1489,6 +1516,10 @@ export function Canvas({
                   if (elPoolIsWhiteBox) elIsMsgTarget = true;
                 }
               }
+            } else if (isAssocBpmnEndpointDrag && el.id !== epDragMovingId) {
+              const elIsData = DATA_ELEMENT_TYPES.has(el.type);
+              if (epDragFixedIsData && !elIsData) elIsAssocTarget = true;
+              else if (!epDragFixedIsData && elIsData) elIsAssocTarget = true;
             }
             return (
               <SymbolRenderer
