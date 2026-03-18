@@ -23,6 +23,7 @@ interface Props {
   onUpdateConnectorDirection: (id: string, directionType: DirectionType) => void;
   onUpdateConnectorLabel?: (id: string, label: string) => void;
   onAddLane?: (poolId: string) => void;
+  parentName?: string;
   poolHasContent?: boolean;
   laneHasContent?: boolean;
   hasMessageBpmnConnection?: boolean;
@@ -75,6 +76,7 @@ export function PropertiesPanel({
   onUpdateConnectorDirection,
   onUpdateConnectorLabel,
   onAddLane,
+  parentName,
   poolHasContent,
   laneHasContent,
   hasMessageBpmnConnection,
@@ -196,7 +198,11 @@ export function PropertiesPanel({
         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
           Properties
         </p>
-        <p className="text-xs text-gray-400 mb-3">Type: {element.type}</p>
+        <p className="text-xs text-gray-400 mb-1">Type: {element.type}</p>
+        {parentName && (
+          <p className="text-xs text-gray-400 mb-3">Parent: {parentName}</p>
+        )}
+        {!parentName && <div className="mb-2" />}
       </div>
 
       <div>

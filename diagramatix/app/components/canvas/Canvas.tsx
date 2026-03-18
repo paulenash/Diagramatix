@@ -1044,18 +1044,51 @@ export function Canvas({
   // Render pools first (deepest), then other containers, then lanes, then regular elements
   const pools = data.elements.filter((el) => el.type === "pool");
   const lanes = data.elements.filter((el) => el.type === "lane");
-  const otherContainers = data.elements.filter(
+  const otherContainersUnsorted = data.elements.filter(
     (el) => el.type === "system-boundary" || el.type === "composite-state"
          || el.type === "subprocess-expanded"
   );
+  // Sort containers by nesting depth so parents render before (behind) children
+  const otherContainers = (() => {
+    const depthMap = new Map<string, number>();
+    const containerSet = new Set(otherContainersUnsorted.map(e => e.id));
+    function getDepth(el: DiagramElement, visited: Set<string>): number {
+      if (depthMap.has(el.id)) return depthMap.get(el.id)!;
+      if (!el.parentId || visited.has(el.id)) { depthMap.set(el.id, 0); return 0; }
+      visited.add(el.id);
+      const parent = containerSet.has(el.parentId) ? otherContainersUnsorted.find(p => p.id === el.parentId) : undefined;
+      const d = parent ? getDepth(parent, visited) + 1 : 0;
+      depthMap.set(el.id, d);
+      return d;
+    }
+    for (const el of otherContainersUnsorted) getDepth(el, new Set());
+    return [...otherContainersUnsorted].sort((a, b) => (depthMap.get(a.id) ?? 0) - (depthMap.get(b.id) ?? 0));
+  })();
   const groupElements = data.elements.filter((el) => el.type === "group");
-  const nonContainers = data.elements.filter(
-    (el) => el.type !== "system-boundary" && el.type !== "composite-state"
-              && el.type !== "pool" && el.type !== "lane"
-              && el.type !== "subprocess-expanded"
-              && el.type !== "group"
-              && !el.boundaryHostId
-  );
+  // Sort non-containers by parent nesting depth so children of deeper subprocesses render on top
+  const nonContainers = (() => {
+    const items = data.elements.filter(
+      (el) => el.type !== "system-boundary" && el.type !== "composite-state"
+                && el.type !== "pool" && el.type !== "lane"
+                && el.type !== "subprocess-expanded"
+                && el.type !== "group"
+                && !el.boundaryHostId
+    );
+    function getParentDepth(el: DiagramElement): number {
+      let depth = 0;
+      let current = el;
+      const visited = new Set<string>();
+      while (current.parentId && !visited.has(current.id)) {
+        visited.add(current.id);
+        const parent = data.elements.find(p => p.id === current.parentId);
+        if (!parent) break;
+        depth++;
+        current = parent;
+      }
+      return depth;
+    }
+    return items.sort((a, b) => getParentDepth(a) - getParentDepth(b));
+  })();
   const boundaryEvents = data.elements.filter((el) => !!el.boundaryHostId);
 
   // Precompute messageBPMN highlight context

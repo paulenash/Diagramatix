@@ -154,7 +154,7 @@ const DATA_ELEMENT_TYPES = new Set<SymbolType>(["data-object", "data-store", "te
 
 const BPMN_CONTENT_TYPES = new Set<SymbolType>([
   "task", "gateway", "start-event", "end-event", "intermediate-event",
-  "subprocess", "data-object", "data-store",
+  "subprocess", "subprocess-expanded", "data-object", "data-store",
 ]);
 
 function isContainerType(type: SymbolType): boolean {

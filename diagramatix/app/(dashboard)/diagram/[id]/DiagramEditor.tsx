@@ -404,6 +404,10 @@ export function DiagramEditor({
     ? data.elements.some((e) => e.parentId === selectedElement.id)
     : false;
 
+  const parentName = selectedElement?.parentId
+    ? data.elements.find((e) => e.id === selectedElement.parentId)?.label || undefined
+    : undefined;
+
   const EVENT_TYPES_SET = new Set(["start-event", "intermediate-event", "end-event"]);
   const hasMessageBpmnConnection =
     selectedElement !== null &&
@@ -1003,6 +1007,7 @@ export function DiagramEditor({
             setSelectedConnectorId(null);
           }}
           onAddLane={addLane}
+          parentName={parentName}
           poolHasContent={poolHasContent}
           laneHasContent={laneHasContent}
           hasMessageBpmnConnection={hasMessageBpmnConnection}
