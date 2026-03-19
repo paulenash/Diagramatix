@@ -218,6 +218,7 @@ export function DiagramEditor({
     setData,
     correctAllConnectors,
     addLane,
+    addSublane,
     moveLaneBoundary,
     laneBoundaryMoveEnd,
     moveElements,
@@ -1007,6 +1008,7 @@ export function DiagramEditor({
             setSelectedConnectorId(null);
           }}
           onAddLane={addLane}
+          onAddSublane={addSublane}
           parentName={parentName}
           poolHasContent={poolHasContent}
           laneHasContent={laneHasContent}

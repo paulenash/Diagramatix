@@ -1043,7 +1043,13 @@ export function Canvas({
 
   // Render pools first (deepest), then other containers, then lanes, then regular elements
   const pools = data.elements.filter((el) => el.type === "pool");
-  const lanes = data.elements.filter((el) => el.type === "lane");
+  const lanes = data.elements.filter((el) => el.type === "lane")
+    .sort((a, b) => {
+      // Parent lanes render before (behind) child lanes
+      const depthA = a.parentId && data.elements.find(e => e.id === a.parentId)?.type === "lane" ? 1 : 0;
+      const depthB = b.parentId && data.elements.find(e => e.id === b.parentId)?.type === "lane" ? 1 : 0;
+      return depthA - depthB;
+    });
   const otherContainersUnsorted = data.elements.filter(
     (el) => el.type === "system-boundary" || el.type === "composite-state"
          || el.type === "subprocess-expanded"
@@ -1319,6 +1325,31 @@ export function Canvas({
                   fill="transparent"
                   style={{ cursor: "ns-resize" }}
                   onMouseDown={(e) => handleLaneBoundaryDrag(e, lane.id, nextLane.id)}
+                />
+              );
+            });
+          })}
+
+          {/* Sublane boundary drag handles — between adjacent sublanes within a lane */}
+          {lanes.flatMap((parentLane) => {
+            const sublanes = lanes
+              .filter((l) => l.parentId === parentLane.id)
+              .sort((a, b) => a.y - b.y);
+            if (sublanes.length < 2) return [];
+            const LANE_LW = 24;
+            return sublanes.slice(0, -1).map((sub, i) => {
+              const nextSub = sublanes[i + 1];
+              const boundaryY = sub.y + sub.height;
+              return (
+                <rect
+                  key={`subboundary-${sub.id}`}
+                  x={parentLane.x + LANE_LW}
+                  y={boundaryY - 4}
+                  width={parentLane.width - LANE_LW}
+                  height={8}
+                  fill="transparent"
+                  style={{ cursor: "ns-resize" }}
+                  onMouseDown={(e) => handleLaneBoundaryDrag(e, sub.id, nextSub.id)}
                 />
               );
             });

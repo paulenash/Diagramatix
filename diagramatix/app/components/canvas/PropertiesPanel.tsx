@@ -23,6 +23,7 @@ interface Props {
   onUpdateConnectorDirection: (id: string, directionType: DirectionType) => void;
   onUpdateConnectorLabel?: (id: string, label: string) => void;
   onAddLane?: (poolId: string) => void;
+  onAddSublane?: (laneId: string) => void;
   parentName?: string;
   poolHasContent?: boolean;
   laneHasContent?: boolean;
@@ -80,6 +81,7 @@ export function PropertiesPanel({
   onUpdateConnectorDirection,
   onUpdateConnectorLabel,
   onAddLane,
+  onAddSublane,
   parentName,
   poolHasContent,
   laneHasContent,
@@ -280,6 +282,15 @@ export function PropertiesPanel({
             </button>
           )}
         </>
+      )}
+
+      {element.type === "lane" && onAddSublane && (
+        <button
+          onClick={() => onAddSublane(element.id)}
+          className="w-full px-3 py-1.5 text-xs bg-blue-50 text-blue-700 border border-blue-200 rounded hover:bg-blue-100"
+        >
+          + Add Sublane
+        </button>
       )}
 
       {(element.type === "data-object" || element.type === "pool" || element.type === "data-store") && (

@@ -141,6 +141,7 @@ type Action =
       connectorId: string;
     }}
   | { type: "ADD_LANE"; payload: { poolId: string } }
+  | { type: "ADD_SUBLANE"; payload: { laneId: string } }
   | { type: "MOVE_LANE_BOUNDARY"; payload: { aboveLaneId: string; belowLaneId: string; dy: number } }
   | { type: "MOVE_ELEMENTS"; payload: { ids: string[]; dx: number; dy: number } }
   | { type: "APPLY_TEMPLATE"; payload: { elements: DiagramElement[]; connectors: Connector[] } }
@@ -166,7 +167,7 @@ function containerAccepts(containerType: SymbolType, childType: SymbolType): boo
   if (containerType === "system-boundary") return childType === "use-case" || childType === "hourglass";
   if (containerType === "composite-state") return childType === "state" || childType === "initial-state" || childType === "final-state";
   if (containerType === "pool") return childType === "lane" || BPMN_CONTENT_TYPES.has(childType);
-  if (containerType === "lane") return BPMN_CONTENT_TYPES.has(childType);
+  if (containerType === "lane") return childType === "lane" || BPMN_CONTENT_TYPES.has(childType);
   if (containerType === "subprocess-expanded") return BPMN_CONTENT_TYPES.has(childType);
   return false;
 }
@@ -505,13 +506,35 @@ function reducer(state: DiagramData, action: Action): DiagramData {
           laneUpdates.set(lane.id, updated);
           stackY += newLaneH;
         }
+        // Also proportionally resize sub-lanes within each lane
+        const sublaneUpdates = new Map<string, DiagramElement>();
+        for (const [laneId, updatedLane] of laneUpdates) {
+          const LANE_LW = 24;
+          const sublanes = state.elements
+            .filter((e) => e.type === "lane" && e.parentId === laneId)
+            .sort((a, b) => a.y - b.y);
+          if (sublanes.length > 0) {
+            const totalSubH = sublanes.reduce((s, l) => s + l.height, 0) || 1;
+            let subStackY = updatedLane.y;
+            for (const sub of sublanes) {
+              const newSubH = Math.max(40, Math.round(updatedLane.height * (sub.height / totalSubH)));
+              const updatedSub = { ...sub, x: updatedLane.x + LANE_LW, y: subStackY, width: updatedLane.width - LANE_LW, height: newSubH };
+              sublaneUpdates.set(sub.id, updatedSub);
+              subStackY += newSubH;
+            }
+          }
+        }
         let elements = state.elements.map((e) =>
           e.id === id ? { ...e, x: newX, y: newY, width: newW, height: newH }
           : laneUpdates.has(e.id) ? laneUpdates.get(e.id)!
+          : sublaneUpdates.has(e.id) ? sublaneUpdates.get(e.id)!
           : e
         );
         for (const updatedLane of laneUpdates.values()) {
           elements = clampChildrenToLane(elements, updatedLane);
+        }
+        for (const updatedSub of sublaneUpdates.values()) {
+          elements = clampChildrenToLane(elements, updatedSub);
         }
         const connectors = recomputeAllConnectors(state.connectors, elements);
         return { ...state, elements, connectors };
@@ -583,22 +606,39 @@ function reducer(state: DiagramData, action: Action): DiagramData {
           deletingIsContainer && e.parentId === id ? { ...e, parentId: undefined } : e
         );
 
-      // If deleting a lane, reflow remaining sibling lanes to fill the pool height
+      // If deleting a lane, reflow remaining sibling lanes to fill the parent
       if (el?.type === "lane" && el.parentId) {
-        const pool = elements.find((e) => e.id === el.parentId);
-        if (pool) {
-          const POOL_LW = 30;
+        const parent = elements.find((e) => e.id === el.parentId);
+        if (parent) {
+          const parentIsPool = parent.type === "pool";
+          const headerW = parentIsPool ? 30 : 24;
           const siblings = elements
-            .filter((e) => e.type === "lane" && e.parentId === pool.id)
+            .filter((e) => e.type === "lane" && e.parentId === parent.id)
             .sort((a, b) => a.y - b.y);
           const totalSibH = siblings.reduce((s, l) => s + l.height, 0) || 1;
-          let stackY = pool.y;
+          let stackY = parent.y;
           for (const sib of siblings) {
-            const newH = Math.max(40, Math.round(pool.height * (sib.height / totalSibH)));
-            const updated = { ...sib, x: pool.x + POOL_LW, y: stackY, width: pool.width - POOL_LW, height: newH };
+            const newH = Math.max(40, Math.round(parent.height * (sib.height / totalSibH)));
+            const updated = { ...sib, x: parent.x + headerW, y: stackY, width: parent.width - headerW, height: newH };
             elements = elements.map((e) => e.id === sib.id ? updated : e);
             elements = clampChildrenToLane(elements, updated);
             stackY += newH;
+          }
+          // Also delete any sub-lanes of the deleted lane
+          const sublanesToDelete = new Set<string>();
+          function collectSublanes(parentId: string) {
+            for (const e of elements) {
+              if (e.type === "lane" && e.parentId === parentId) {
+                sublanesToDelete.add(e.id);
+                collectSublanes(e.id);
+              }
+            }
+          }
+          collectSublanes(id);
+          if (sublanesToDelete.size > 0) {
+            elements = elements
+              .filter((e) => !sublanesToDelete.has(e.id))
+              .map((e) => sublanesToDelete.has(e.parentId ?? "") ? { ...e, parentId: undefined } : e);
           }
         }
       }
@@ -932,6 +972,73 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       return { ...state, elements: updatePoolTypes([...elements, newLane]) };
     }
 
+    case "ADD_SUBLANE": {
+      const { laneId } = action.payload;
+      const parentLane = state.elements.find((e) => e.id === laneId && e.type === "lane");
+      if (!parentLane) return state;
+      const LANE_LW = 24;
+      const existingSublanes = state.elements.filter((e) => e.type === "lane" && e.parentId === laneId);
+      if (existingSublanes.length > 0) {
+        // Add one more sublane at the bottom
+        const stackedH = existingSublanes.reduce((s, l) => s + l.height, 0);
+        const sublaneCount = state.elements.filter((e) => e.type === "lane" && e.parentId).length;
+        const SUBLANE_HEADER_H = 28;
+        const newSublane: DiagramElement = {
+          id: nanoid(), type: "lane",
+          x: parentLane.x + LANE_LW,
+          y: parentLane.y + stackedH,
+          width: parentLane.width - LANE_LW,
+          height: SUBLANE_HEADER_H,
+          label: `Sublane ${sublaneCount + 1}`,
+          properties: {}, parentId: laneId,
+        };
+        const neededH = stackedH + SUBLANE_HEADER_H;
+        let elements = [...state.elements, newSublane];
+        if (neededH > parentLane.height) {
+          const growBy = neededH - parentLane.height;
+          elements = elements.map((e) => {
+            if (e.id === laneId) return { ...e, height: neededH };
+            // Shift sibling lanes below this one down
+            if (e.type === "lane" && e.parentId === parentLane.parentId && e.y > parentLane.y) {
+              return { ...e, y: e.y + growBy };
+            }
+            // Grow parent pool
+            if (e.id === parentLane.parentId && e.type === "pool") return { ...e, height: e.height + growBy };
+            return e;
+          });
+        }
+        return { ...state, elements };
+      } else {
+        // First time: split parent lane into 2 sublanes
+        const sublaneCount = state.elements.filter((e) => e.type === "lane").length;
+        const halfH = Math.max(40, Math.round(parentLane.height / 2));
+        const sublane1: DiagramElement = {
+          id: nanoid(), type: "lane",
+          x: parentLane.x + LANE_LW,
+          y: parentLane.y,
+          width: parentLane.width - LANE_LW,
+          height: halfH,
+          label: `Sublane ${sublaneCount + 1}`,
+          properties: {}, parentId: laneId,
+        };
+        const sublane2: DiagramElement = {
+          id: nanoid(), type: "lane",
+          x: parentLane.x + LANE_LW,
+          y: parentLane.y + halfH,
+          width: parentLane.width - LANE_LW,
+          height: parentLane.height - halfH,
+          label: `Sublane ${sublaneCount + 2}`,
+          properties: {}, parentId: laneId,
+        };
+        // Re-parent any existing children of the parent lane into sublane1
+        const elements = state.elements.map((e) => {
+          if (e.parentId === laneId && e.type !== "lane") return { ...e, parentId: sublane1.id };
+          return e;
+        });
+        return { ...state, elements: [...elements, sublane1, sublane2] };
+      }
+    }
+
     case "MOVE_LANE_BOUNDARY": {
       const { aboveLaneId, belowLaneId, dy } = action.payload;
       const MIN_H = 40;
@@ -941,11 +1048,28 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       const newAboveH = Math.max(MIN_H, above.height + dy);
       const actualDy = newAboveH - above.height;
       const newBelowH = Math.max(MIN_H, below.height - actualDy);
-      const elements = state.elements.map((e) => {
+      // Proportionally resize sub-lanes within the resized lanes
+      const LANE_LW = 24;
+      function resizeSublanes(elements: DiagramElement[], laneId: string, newLaneY: number, newLaneH: number, newLaneX: number, newLaneW: number): DiagramElement[] {
+        const subs = elements.filter((e) => e.type === "lane" && e.parentId === laneId).sort((a, b) => a.y - b.y);
+        if (subs.length === 0) return elements;
+        const totalSubH = subs.reduce((s, l) => s + l.height, 0) || 1;
+        let stackY = newLaneY;
+        for (const sub of subs) {
+          const newSubH = Math.max(40, Math.round(newLaneH * (sub.height / totalSubH)));
+          const updatedSub = { ...sub, x: newLaneX + LANE_LW, y: stackY, width: newLaneW - LANE_LW, height: newSubH };
+          elements = elements.map((e) => e.id === sub.id ? updatedSub : e);
+          stackY += newSubH;
+        }
+        return elements;
+      }
+      let elements = state.elements.map((e) => {
         if (e.id === aboveLaneId) return { ...e, height: newAboveH };
         if (e.id === belowLaneId) return { ...e, y: e.y + actualDy, height: newBelowH };
         return e;
       });
+      elements = resizeSublanes(elements, aboveLaneId, above.y, newAboveH, above.x, above.width);
+      elements = resizeSublanes(elements, belowLaneId, below.y + actualDy, newBelowH, below.x, below.width);
       return { ...state, elements };
     }
 
@@ -1372,6 +1496,11 @@ export function useDiagram(initialData: DiagramData) {
     dispatch({ type: "ADD_LANE", payload: { poolId } });
   }, []);
 
+  const addSublane = useCallback((laneId: string) => {
+    pushHistory(snapshotData());
+    dispatch({ type: "ADD_SUBLANE", payload: { laneId } });
+  }, []);
+
   const moveLaneBoundary = useCallback(
     (aboveLaneId: string, belowLaneId: string, dy: number) => {
       if (!preLaneRef.current) preLaneRef.current = snapshotData();
@@ -1432,6 +1561,7 @@ export function useDiagram(initialData: DiagramData) {
     setViewport,
     correctAllConnectors,
     addLane,
+    addSublane,
     moveLaneBoundary,
     laneBoundaryMoveEnd,
     undo,

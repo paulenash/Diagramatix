@@ -110,18 +110,22 @@ function TaskShape({ el }: { el: DiagramElement }) {
 function GatewayMarker({ type, cx, cy }: { type: GatewayType; cx: number; cy: number }) {
   const s = 11.7;
   switch (type) {
-    case "exclusive":
+    case "exclusive": {
+      // 70° top angle → half-angle 35° from vertical
+      const dx = s * 0.7 * Math.sin(35 * Math.PI / 180);
+      const dy = s * 0.7 * Math.cos(35 * Math.PI / 180);
       return (
-        <g stroke="#374151" strokeWidth={2.5} strokeLinecap="round">
-          <line x1={cx - s * 0.6} y1={cy - s * 0.6} x2={cx + s * 0.6} y2={cy + s * 0.6} />
-          <line x1={cx + s * 0.6} y1={cy - s * 0.6} x2={cx - s * 0.6} y2={cy + s * 0.6} />
+        <g stroke="#374151" strokeWidth={5} strokeLinecap="round">
+          <line x1={cx - dx} y1={cy - dy} x2={cx + dx} y2={cy + dy} />
+          <line x1={cx + dx} y1={cy - dy} x2={cx - dx} y2={cy + dy} />
         </g>
       );
+    }
     case "inclusive":
-      return <circle cx={cx} cy={cy} r={s * 0.7} fill="none" stroke="#374151" strokeWidth={2.5} />;
+      return <circle cx={cx} cy={cy} r={s * 0.7} fill="none" stroke="#374151" strokeWidth={3.75} />;
     case "parallel":
       return (
-        <g stroke="#374151" strokeWidth={2.5} strokeLinecap="round">
+        <g stroke="#374151" strokeWidth={5} strokeLinecap="round">
           <line x1={cx - s * 0.7} y1={cy} x2={cx + s * 0.7} y2={cy} />
           <line x1={cx} y1={cy - s * 0.7} x2={cx} y2={cy + s * 0.7} />
         </g>
@@ -839,7 +843,7 @@ function PoolShape({ el }: { el: DiagramElement }) {
   const colors = useContext(SymbolColorCtx);
   const { x, y, width: w, height: h } = el;
   const LW = 30;
-  const cx = x + LW / 2;
+  const cx = x + LW / 2 + 3;
   const cy = y + h / 2;
   const lines = el.label.split('\n');
   const lineH = 13;
@@ -877,7 +881,7 @@ function LaneShape({ el }: { el: DiagramElement }) {
   const colors = useContext(SymbolColorCtx);
   const { x, y, width: w, height: h } = el;
   const LW = 24;
-  const cx = x + LW / 2;
+  const cx = x + LW / 2 + 3;
   const cy = y + h / 2;
   const lines = el.label.split('\n');
   const lineH = 12;
