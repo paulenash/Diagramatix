@@ -522,7 +522,14 @@ export function Canvas({
           let connRouting: RoutingType;
           let connDirection: DirectionType;
 
-          if (isDataConn) {
+          // Child element ↔ boundary event on same expanded subprocess → always associationBPMN
+          const isChildToBoundary =
+            (sourceEl?.parentId && targetEl.boundaryHostId === sourceEl.parentId) ||
+            (targetEl.parentId && sourceEl?.boundaryHostId === targetEl.parentId);
+
+          if (isChildToBoundary) {
+            connType = "associationBPMN"; connRouting = "direct"; connDirection = "open-directed";
+          } else if (isDataConn) {
             const isAnnotationConn =
               sourceEl?.type === "text-annotation" || targetEl.type === "text-annotation";
             connType = "associationBPMN"; connRouting = "direct";
