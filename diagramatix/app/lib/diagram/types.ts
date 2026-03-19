@@ -42,7 +42,8 @@ export type GatewayType = "none" | "exclusive" | "inclusive" | "parallel" | "eve
 export type GatewayRole = "decision" | "merge";
 
 export type EventType =
-  | "none" | "message" | "timer" | "error" | "signal" | "terminate" | "conditional";
+  | "none" | "message" | "timer" | "error" | "signal" | "terminate" | "conditional"
+  | "escalation" | "cancel" | "compensation" | "link";
 
 export type RepeatType = "none" | "loop";
 

@@ -204,7 +204,51 @@ function EventMarker({ type, cx, cy, r, filled }: {
       );
     }
     case "terminate":
-      return <circle cx={cx} cy={cy} r={s * 0.65} fill="#374151" />;
+      return <circle cx={cx} cy={cy} r={s * 1.17} fill="#374151" />;
+    case "escalation": {
+      const es = s * 1.2;
+      return (
+        <polygon
+          points={`${cx},${cy - es * 0.9} ${cx - es * 0.63},${cy + es * 0.6} ${cx},${cy + es * 0.1} ${cx + es * 0.63},${cy + es * 0.6}`}
+          fill={filled ? "#374151" : "white"} stroke="#374151" strokeWidth={1.2} strokeLinejoin="round"
+        />
+      );
+    }
+    case "cancel": {
+      const cs = s * 0.975;
+      const pts = [
+        `${cx},${cy - cs * 0.3}`,
+        `${cx + cs * 0.7},${cy - cs}`,
+        `${cx + cs},${cy - cs * 0.7}`,
+        `${cx + cs * 0.3},${cy}`,
+        `${cx + cs},${cy + cs * 0.7}`,
+        `${cx + cs * 0.7},${cy + cs}`,
+        `${cx},${cy + cs * 0.3}`,
+        `${cx - cs * 0.7},${cy + cs}`,
+        `${cx - cs},${cy + cs * 0.7}`,
+        `${cx - cs * 0.3},${cy}`,
+        `${cx - cs},${cy - cs * 0.7}`,
+        `${cx - cs * 0.7},${cy - cs}`,
+      ].join(" ");
+      return (
+        <polygon points={pts} fill={filled ? "#374151" : "white"}
+          stroke="#374151" strokeWidth={1.2} strokeLinejoin="round" />
+      );
+    }
+    case "compensation": {
+      const cw = s * 0.7;
+      const ch = s * 0.85;
+      return (
+        <g>
+          <polygon
+            points={`${cx - cw * 0.1},${cy - ch} ${cx - cw * 2.1},${cy} ${cx - cw * 0.1},${cy + ch}`}
+            fill={filled ? "#374151" : "white"} stroke="#374151" strokeWidth={1.2} strokeLinejoin="round" />
+          <polygon
+            points={`${cx + cw * 1.1 + 3},${cy - ch} ${cx - cw * 0.9 + 3},${cy} ${cx + cw * 1.1 + 3},${cy + ch}`}
+            fill={filled ? "#374151" : "white"} stroke="#374151" strokeWidth={1.2} strokeLinejoin="round" />
+        </g>
+      );
+    }
     case "conditional":
       return (
         <g>
@@ -215,6 +259,25 @@ function EventMarker({ type, cx, cy, r, filled }: {
           <line x1={cx - s * 0.4} y1={cy + s * 0.35} x2={cx + s * 0.4} y2={cy + s * 0.35} stroke="#374151" strokeWidth={1} />
         </g>
       );
+    case "link": {
+      const lw = s * 1.1;
+      const lh = s * 0.525;
+      const th = s * 1.125;
+      const tw = s * 1.3;
+      const pts = [
+        `${cx - lw},${cy - lh}`,
+        `${cx},${cy - lh}`,
+        `${cx},${cy - th}`,
+        `${cx + tw},${cy}`,
+        `${cx},${cy + th}`,
+        `${cx},${cy + lh}`,
+        `${cx - lw},${cy + lh}`,
+      ].join(" ");
+      return (
+        <polygon points={pts} fill={filled ? "#374151" : "white"}
+          stroke="#374151" strokeWidth={1.2} strokeLinejoin="round" />
+      );
+    }
     default: return null;
   }
 }
@@ -225,9 +288,11 @@ function StartEventShape({ el }: { el: DiagramElement }) {
   const cy = el.y + el.height / 2;
   const r  = el.width / 2;
   const fill = resolveColor("start-event", colors);
+  const nonInterrupting = el.properties.interruptionType === "non-interrupting";
   return (
     <g>
-      <circle cx={cx} cy={cy} r={r} fill={fill} stroke="#374151" strokeWidth={2} />
+      <circle cx={cx} cy={cy} r={r} fill={fill} stroke="#374151" strokeWidth={2}
+        strokeDasharray={nonInterrupting ? "4 3" : undefined} />
       {el.eventType && el.eventType !== "none" &&
         <EventMarker type={el.eventType} cx={cx} cy={cy} r={r} />}
     </g>
@@ -255,10 +320,14 @@ function IntermediateEventShape({ el }: { el: DiagramElement }) {
   const cy = el.y + el.height / 2;
   const r  = el.width / 2;
   const fill = resolveColor("intermediate-event", colors);
+  const nonInterrupting = el.properties.interruptionType === "non-interrupting";
+  const dash = nonInterrupting ? "4 3" : undefined;
   return (
     <g>
-      <circle cx={cx} cy={cy} r={r} fill={fill} stroke="#374151" strokeWidth={2} />
-      <circle cx={cx} cy={cy} r={r - 3} fill={fill} stroke="#374151" strokeWidth={1.5} />
+      <circle cx={cx} cy={cy} r={r} fill={fill} stroke="#374151" strokeWidth={2}
+        strokeDasharray={dash} />
+      <circle cx={cx} cy={cy} r={r - 3} fill={fill} stroke="#374151" strokeWidth={1.5}
+        strokeDasharray={dash} />
       {el.eventType && el.eventType !== "none" &&
         <EventMarker type={el.eventType} cx={cx} cy={cy} r={r - 4} filled={el.flowType === "throwing" || (el.flowType == null && el.taskType === "send")} />}
     </g>
@@ -576,12 +645,18 @@ function SubprocessShape({ el }: { el: DiagramElement }) {
   const loopCX = plusCX - markerW / 2 - 4 - 5; // left edge of "+" - 4px gap - arc radius
   const mx = plusCX - markerW / 2;
   const my = el.y + el.height - markerH - 3;
-  const isCall = el.properties.subprocessType === "call";
+  const spType = (el.properties.subprocessType as string | undefined) ?? "normal";
   const fill = resolveColor("subprocess", colors);
   return (
     <g>
       <rect x={el.x} y={el.y} width={el.width} height={el.height}
-        rx={4} ry={4} fill={fill} stroke="#374151" strokeWidth={isCall ? 4 : 1.5} />
+        rx={4} ry={4} fill={fill} stroke="#374151"
+        strokeWidth={spType === "call" ? 4 : 1.5}
+        strokeDasharray={spType === "event" ? "2 3" : undefined} />
+      {spType === "transaction" && (
+        <rect x={el.x + 4} y={el.y + 4} width={el.width - 8} height={el.height - 8}
+          rx={3} ry={3} fill="none" stroke="#374151" strokeWidth={1.5} />
+      )}
       <rect x={mx} y={my} width={markerW} height={markerH}
         rx={2} fill="white" stroke="#374151" strokeWidth={1} />
       <line x1={mx + markerW / 2} y1={my + 3} x2={mx + markerW / 2} y2={my + markerH - 3}
@@ -596,12 +671,18 @@ function SubprocessShape({ el }: { el: DiagramElement }) {
 function ExpandedSubprocessShape({ el }: { el: DiagramElement }) {
   const colors = useContext(SymbolColorCtx);
   const hasLoop = el.repeatType === "loop";
-  const isCall = el.properties.subprocessType === "call";
+  const spType = (el.properties.subprocessType as string | undefined) ?? "normal";
   const fill = resolveColor("subprocess-expanded", colors);
   return (
     <g>
       <rect x={el.x} y={el.y} width={el.width} height={el.height}
-        rx={4} ry={4} fill={fill} stroke="#374151" strokeWidth={isCall ? 4 : 1.5} />
+        rx={4} ry={4} fill={fill} stroke="#374151"
+        strokeWidth={spType === "call" ? 4 : 1.5}
+        strokeDasharray={spType === "event" ? "2 3" : undefined} />
+      {spType === "transaction" && (
+        <rect x={el.x + 4} y={el.y + 4} width={el.width - 8} height={el.height - 8}
+          rx={3} ry={3} fill="none" stroke="#374151" strokeWidth={1.5} />
+      )}
       {hasLoop && <LoopMarker cx={el.x + el.width / 2} cy={el.y + el.height - 10} />}
     </g>
   );

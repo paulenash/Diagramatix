@@ -61,8 +61,12 @@ const EVENT_TYPE_OPTIONS: { value: EventType; label: string }[] = [
   { value: "timer",       label: "Timer" },
   { value: "error",       label: "Error" },
   { value: "signal",      label: "Signal" },
-  { value: "terminate",   label: "Terminate" },
-  { value: "conditional", label: "Conditional" },
+  { value: "terminate",    label: "Terminate" },
+  { value: "conditional",  label: "Conditional" },
+  { value: "escalation",   label: "Escalation" },
+  { value: "cancel",       label: "Cancel" },
+  { value: "compensation", label: "Compensation" },
+  { value: "link",         label: "Link" },
 ];
 
 export function PropertiesPanel({
@@ -360,7 +364,7 @@ export function PropertiesPanel({
         <div>
           <label className="block text-xs font-medium text-gray-700 mb-1">Type</label>
           <div className="flex gap-1">
-            {(["normal", "call"] as const).map((v) => (
+            {(["normal", "call", "event", "transaction"] as const).map((v) => (
               <button
                 key={v}
                 onClick={() => onUpdateProperties(element.id, { subprocessType: v })}
@@ -370,7 +374,7 @@ export function PropertiesPanel({
                     : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
                 }`}
               >
-                {v === "normal" ? "Normal" : "Call"}
+                {v === "normal" ? "Normal" : v === "call" ? "Call" : v === "event" ? "Event" : "Transaction"}
               </button>
             ))}
           </div>
@@ -445,7 +449,12 @@ export function PropertiesPanel({
           <label className="block text-xs font-medium text-gray-700 mb-1">Event Type</label>
           <div className="flex flex-col gap-1">
             {EVENT_TYPE_OPTIONS
-              .filter(o => !(element.type !== "end-event" && o.value === "terminate"))
+              .filter(o => {
+                if (element.type !== "end-event" && o.value === "terminate") return false;
+                if (element.type === "end-event" && (o.value === "timer" || o.value === "conditional")) return false;
+                if (element.type !== "intermediate-event" && o.value === "link") return false;
+                return true;
+              })
               .map(({ value, label }) => (
                 <button
                   key={value}
@@ -459,6 +468,27 @@ export function PropertiesPanel({
                   {label}
                 </button>
               ))}
+          </div>
+        </div>
+      )}
+
+      {(element.type === "start-event" || element.type === "intermediate-event") && (
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1">Interruption</label>
+          <div className="flex gap-1">
+            {(["interrupting", "non-interrupting"] as const).map((v) => (
+              <button
+                key={v}
+                onClick={() => onUpdateProperties(element.id, { interruptionType: v })}
+                className={`px-2 py-1 text-xs rounded border ${
+                  ((element.properties.interruptionType as string | undefined) ?? "interrupting") === v
+                    ? "bg-blue-600 text-white border-blue-600"
+                    : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                }`}
+              >
+                {v === "interrupting" ? "Interrupting" : "Non-Interrupting"}
+              </button>
+            ))}
           </div>
         </div>
       )}
