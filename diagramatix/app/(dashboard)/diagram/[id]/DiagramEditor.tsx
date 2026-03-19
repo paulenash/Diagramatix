@@ -1013,6 +1013,8 @@ export function DiagramEditor({
           poolHasContent={poolHasContent}
           laneHasContent={laneHasContent}
           hasMessageBpmnConnection={hasMessageBpmnConnection}
+          allConnectors={data.connectors}
+          allElements={data.elements}
         />
       </div>
 

@@ -522,10 +522,11 @@ export function Canvas({
           let connRouting: RoutingType;
           let connDirection: DirectionType;
 
-          // Child element ↔ boundary event on same expanded subprocess → always associationBPMN
+          // Child event ↔ boundary event on same expanded subprocess → always associationBPMN
+          const EVENT_TYPES = new Set(["start-event", "intermediate-event", "end-event"]);
           const isChildToBoundary =
-            (sourceEl?.parentId && targetEl.boundaryHostId === sourceEl.parentId) ||
-            (targetEl.parentId && sourceEl?.boundaryHostId === targetEl.parentId);
+            (sourceEl && EVENT_TYPES.has(sourceEl.type) && sourceEl.parentId && targetEl.boundaryHostId === sourceEl.parentId) ||
+            (EVENT_TYPES.has(targetEl.type) && targetEl.parentId && sourceEl?.boundaryHostId === targetEl.parentId);
 
           if (isChildToBoundary) {
             connType = "associationBPMN"; connRouting = "direct"; connDirection = "open-directed";
@@ -916,14 +917,14 @@ export function Canvas({
   function handleWheel(e: React.WheelEvent) {
     e.preventDefault();
     const rect = svgRef.current!.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
+    const cx = rect.width / 2;
+    const cy = rect.height / 2;
     const delta = e.deltaY > 0 ? 0.9 : 1.1;
     const newZoom = Math.min(4, Math.max(0.2, zoom * delta));
 
     setPan((prev) => ({
-      x: mouseX - (mouseX - prev.x) * (newZoom / zoom),
-      y: mouseY - (mouseY - prev.y) * (newZoom / zoom),
+      x: cx - (cx - prev.x) * (newZoom / zoom),
+      y: cy - (cy - prev.y) * (newZoom / zoom),
     }));
     setZoom(newZoom);
   }

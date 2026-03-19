@@ -29,6 +29,8 @@ interface Props {
   laneHasContent?: boolean;
   hasMessageBpmnConnection?: boolean;
   multiSelectionCount?: number;
+  allConnectors?: Connector[];
+  allElements?: DiagramElement[];
 }
 
 const TASK_TYPE_OPTIONS: { value: BpmnTaskType; label: string }[] = [
@@ -87,6 +89,8 @@ export function PropertiesPanel({
   laneHasContent,
   hasMessageBpmnConnection,
   multiSelectionCount,
+  allConnectors,
+  allElements,
 }: Props) {
   const [labelDraft, setLabelDraft] = useState("");
 
@@ -531,6 +535,54 @@ export function PropertiesPanel({
         </div>
       )}
 
+
+      {/* Outgoing connectors list */}
+      {allConnectors && allElements && (() => {
+        const outgoing = allConnectors.filter(c => c.sourceId === element.id);
+        return (
+          <div>
+            <p className="text-xs font-medium text-gray-500 mb-1">Outgoing Connectors</p>
+            {outgoing.length === 0 ? (
+              <p className="text-xs text-gray-400">None</p>
+            ) : (
+              <ul className="text-xs text-gray-600 space-y-0.5">
+                {outgoing.map(c => {
+                  const target = allElements.find(e => e.id === c.targetId);
+                  return (
+                    <li key={c.id}>
+                      <span className="text-gray-500">{c.type}</span> → {target?.label || "?"}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        );
+      })()}
+
+      {/* Incoming connectors list */}
+      {allConnectors && allElements && (() => {
+        const incoming = allConnectors.filter(c => c.targetId === element.id);
+        return (
+          <div>
+            <p className="text-xs font-medium text-gray-500 mb-1">Incoming Connectors</p>
+            {incoming.length === 0 ? (
+              <p className="text-xs text-gray-400">None</p>
+            ) : (
+              <ul className="text-xs text-gray-600 space-y-0.5">
+                {incoming.map(c => {
+                  const source = allElements.find(e => e.id === c.sourceId);
+                  return (
+                    <li key={c.id}>
+                      {source?.label || "?"} → <span className="text-gray-500">{c.type}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        );
+      })()}
 
       {element.type === "pool" ? (
         poolHasContent ? (
