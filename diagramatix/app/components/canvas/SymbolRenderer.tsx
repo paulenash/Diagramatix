@@ -171,14 +171,35 @@ function EventMarker({ type, cx, cy, r, filled }: {
             fill="none" stroke={filled ? "white" : "#374151"} strokeWidth={1.2} />
         </g>
       );
-    case "timer":
+    case "timer": {
+      const tr = s * 1.1;
+      // Hour tick marks — 12 small lines around inside of clock face
+      const ticks = Array.from({ length: 12 }, (_, i) => {
+        const angle = (i * 30 - 90) * Math.PI / 180;
+        const outerR = tr * 0.88;
+        const innerR = tr * 0.72;
+        return (
+          <line key={i}
+            x1={cx + Math.cos(angle) * innerR} y1={cy + Math.sin(angle) * innerR}
+            x2={cx + Math.cos(angle) * outerR} y2={cy + Math.sin(angle) * outerR}
+            stroke="#374151" strokeWidth={0.8} />
+        );
+      });
+      // Minute hand pointing to ~3 minutes past — 18° from 12
+      const minAngle = (18 - 90) * Math.PI / 180;
+      // Hour hand pointing to 3 — 90° from 12
+      const hrAngle = (90 - 90) * Math.PI / 180;
       return (
         <g>
-          <circle cx={cx} cy={cy} r={s} fill="white" stroke="#374151" strokeWidth={1.2} />
-          <line x1={cx} y1={cy - s * 0.7} x2={cx} y2={cy} stroke="#374151" strokeWidth={1.2} strokeLinecap="round" />
-          <line x1={cx} y1={cy} x2={cx + s * 0.5} y2={cy + s * 0.4} stroke="#374151" strokeWidth={1.2} strokeLinecap="round" />
+          <circle cx={cx} cy={cy} r={tr} fill="white" stroke="#374151" strokeWidth={1.2} />
+          {ticks}
+          <line x1={cx} y1={cy} x2={cx + Math.cos(minAngle) * tr * 0.6} y2={cy + Math.sin(minAngle) * tr * 0.6}
+            stroke="#374151" strokeWidth={1.2} strokeLinecap="round" />
+          <line x1={cx} y1={cy} x2={cx + Math.cos(hrAngle) * tr * 0.45} y2={cy + Math.sin(hrAngle) * tr * 0.45}
+            stroke="#374151" strokeWidth={1.5} strokeLinecap="round" />
         </g>
       );
+    }
     case "error": {
       // Asymmetric diagonal lightning bolt per bpmn-js EVENT_ERROR path proportions
       const pts = [
