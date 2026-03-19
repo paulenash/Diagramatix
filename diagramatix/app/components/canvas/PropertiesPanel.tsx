@@ -356,6 +356,27 @@ export function PropertiesPanel({
         </div>
       )}
 
+      {(element.type === "subprocess" || element.type === "subprocess-expanded") && (
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1">Type</label>
+          <div className="flex gap-1">
+            {(["normal", "call"] as const).map((v) => (
+              <button
+                key={v}
+                onClick={() => onUpdateProperties(element.id, { subprocessType: v })}
+                className={`px-2 py-1 text-xs rounded border ${
+                  ((element.properties.subprocessType as string | undefined) ?? "normal") === v
+                    ? "bg-blue-600 text-white border-blue-600"
+                    : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                }`}
+              >
+                {v === "normal" ? "Normal" : "Call"}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {(element.type === "task" || element.type === "subprocess" || element.type === "subprocess-expanded") && (
         <div>
           <p className="text-xs font-medium text-gray-500 mb-1">Repeat</p>

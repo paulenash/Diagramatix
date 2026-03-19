@@ -576,10 +576,12 @@ function SubprocessShape({ el }: { el: DiagramElement }) {
   const loopCX = plusCX - markerW / 2 - 4 - 5; // left edge of "+" - 4px gap - arc radius
   const mx = plusCX - markerW / 2;
   const my = el.y + el.height - markerH - 3;
+  const isCall = el.properties.subprocessType === "call";
+  const fill = resolveColor("subprocess", colors);
   return (
     <g>
       <rect x={el.x} y={el.y} width={el.width} height={el.height}
-        rx={4} ry={4} fill={resolveColor("subprocess", colors)} stroke="#374151" strokeWidth={1.5} />
+        rx={4} ry={4} fill={fill} stroke="#374151" strokeWidth={isCall ? 4 : 1.5} />
       <rect x={mx} y={my} width={markerW} height={markerH}
         rx={2} fill="white" stroke="#374151" strokeWidth={1} />
       <line x1={mx + markerW / 2} y1={my + 3} x2={mx + markerW / 2} y2={my + markerH - 3}
@@ -594,10 +596,12 @@ function SubprocessShape({ el }: { el: DiagramElement }) {
 function ExpandedSubprocessShape({ el }: { el: DiagramElement }) {
   const colors = useContext(SymbolColorCtx);
   const hasLoop = el.repeatType === "loop";
+  const isCall = el.properties.subprocessType === "call";
+  const fill = resolveColor("subprocess-expanded", colors);
   return (
     <g>
       <rect x={el.x} y={el.y} width={el.width} height={el.height}
-        rx={4} ry={4} fill={resolveColor("subprocess-expanded", colors)} stroke="#374151" strokeWidth={1.5} />
+        rx={4} ry={4} fill={fill} stroke="#374151" strokeWidth={isCall ? 4 : 1.5} />
       {hasLoop && <LoopMarker cx={el.x + el.width / 2} cy={el.y + el.height - 10} />}
     </g>
   );
