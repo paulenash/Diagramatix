@@ -33,6 +33,9 @@ export const DEFAULT_SYMBOL_COLORS: Record<SymbolType, string> = {
   "final-state":         "#374151",   // inner disc colour
   "composite-state":     "#ede9fe",   // header colour
   "composite-state-body": "#ede9fe",  // body fill colour (rendered with opacity)
+  // Context Diagram
+  "external-entity":     "#bfdbfe",   // light blue
+  "process-system":      "#e9d5ff",   // light purple
 };
 
 /** Black & white colour scheme: fills → white, lines/strokes → black. */
@@ -65,6 +68,9 @@ export const BW_SYMBOL_COLORS: Record<SymbolType, string> = {
   "final-state":         "#000000",
   "composite-state":     "#ffffff",
   "composite-state-body": "#ffffff",
+  // Context Diagram
+  "external-entity":     "#ffffff",
+  "process-system":      "#ffffff",
 };
 
 /** Return the effective colour for a symbol type, preferring the project config over defaults. */

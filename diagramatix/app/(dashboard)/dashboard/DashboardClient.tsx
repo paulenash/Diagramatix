@@ -28,14 +28,14 @@ interface Props {
 }
 
 const DIAGRAM_TYPE_LABELS: Record<string, string> = {
-  basic: "Basic",
+  basic: "Context Diagram",
   "process-context": "Process Context",
   "state-machine": "State Machine",
   bpmn: "BPMN",
 };
 
 const DIAGRAM_TYPES: { value: DiagramType; label: string; description: string }[] = [
-  { value: "basic", label: "Basic Diagram", description: "Simple boxes and arrows — the best starting point" },
+  { value: "basic", label: "Context Diagram", description: "External entities, processes, and data flows" },
   { value: "process-context", label: "Process Context", description: "Use cases with actors showing process participants" },
   { value: "state-machine", label: "State Machine", description: "States and transitions for entity lifecycle" },
   { value: "bpmn", label: "BPMN", description: "Full Business Process Model and Notation" },

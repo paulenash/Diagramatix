@@ -235,8 +235,13 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
   const offsetY = connector.labelOffsetY ?? -30;
   const lWidth  = connector.labelWidth ?? 80;
   const label   = connector.label ?? "";
-  const effectiveLWidth = lWidth;
-  const lines   = wrapText(label || " ", effectiveLWidth);
+  // Auto-size: measure text width from actual content
+  const fontSize = 10;
+  const avgCharWidth = fontSize * 0.6;
+  const rawLines = (label || " ").split('\n');
+  const measuredWidth = Math.max(30, ...rawLines.map(l => l.length * avgCharWidth + 12));
+  const effectiveLWidth = measuredWidth;
+  const lines   = rawLines;
   const lineH   = 14;
   const lHeight = Math.max(lineH, lines.length * lineH);
   const lCx     = anchor.x + offsetX;
@@ -325,8 +330,8 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
 
   return (
     <g>
-      {/* Dotted tether: only visible when connector is selected or label is being moved */}
-      {(selected || isLabelFocused) && (
+      {/* Dotted tether: always visible except when editing */}
+      {!isEditing && (
         <line
           x1={tetherPoint.x} y1={tetherPoint.y} x2={lCx} y2={lMidY}
           stroke="#6b7280" strokeWidth={1} strokeDasharray="4 3"
@@ -335,8 +340,8 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
       )}
       {/* Hit area + dashed blue highlight when active — transparent fill keeps it clickable */}
       <rect
-        x={lCx - effectiveLWidth / 2 - 5} y={lTy - 2}
-        width={effectiveLWidth + 25} height={lHeight + 4}
+        x={lCx - effectiveLWidth / 2 - 3} y={lTy - 2}
+        width={effectiveLWidth + 6} height={lHeight + 4}
         fill="transparent"
         stroke={(selected || isLabelFocused) ? "#2563eb" : "none"}
         strokeWidth={1} strokeDasharray={(selected || isLabelFocused) ? "4 3" : undefined}
@@ -354,8 +359,12 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
         </text>
       )}
       {/* Inline textarea — positioned exactly over the label area */}
-      {isEditing && (
-        <foreignObject x={lCx - effectiveLWidth / 2 - 5} y={lTy} width={effectiveLWidth + 25} height={Math.max(lHeight, 28)}>
+      {isEditing && (() => {
+        const editLines = editValue.split('\n');
+        const editMeasured = Math.max(80, ...editLines.map(l => l.length * avgCharWidth + 20));
+        const editH = Math.max(28, editLines.length * lineH + 8);
+        return (
+        <foreignObject x={lCx - editMeasured / 2 - 3} y={lTy} width={editMeasured + 6} height={editH}>
           <textarea
             autoFocus
             value={editValue}
@@ -376,11 +385,12 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
             }}
           />
         </foreignObject>
-      )}
+        );
+      })()}
       {/* Width resize handle */}
-      {(selected || isLabelFocused) && onUpdateLabel && (
+      {(selected || isLabelFocused) && onUpdateLabel && !isEditing && (
         <rect data-interactive
-          x={lCx + effectiveLWidth / 2 - 3} y={lMidY - 5} width={6} height={10}
+          x={lCx + effectiveLWidth / 2} y={lMidY - 5} width={6} height={10}
           fill="#2563eb" stroke="white" strokeWidth={1} rx={1}
           style={{ cursor: "ew-resize" }}
           onMouseDown={handleResizeMouseDown}
@@ -416,7 +426,7 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
   const visibleWaypoints = waypoints.slice(visStart, visEnd + 1);
 
   const visibleD = (() => {
-    if (connector.type === "transition" && connector.routingType === "curvilinear"
+    if ((connector.type === "transition" || connector.type === "flow") && connector.routingType === "curvilinear"
         && visibleWaypoints.length === 4) {
       const [P0, P1, P2, P3] = visibleWaypoints;
       const STUB = 4;
@@ -573,7 +583,7 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
       />
 
       {/* Floating connector label */}
-      {(connector.type === "transition" || connector.type === "messageBPMN"
+      {(connector.type === "transition" || connector.type === "flow" || connector.type === "messageBPMN"
         || (connector.type === "sequence" && connector.label !== undefined)) && (
         <InteractionLabel
           connector={connector}
@@ -585,7 +595,7 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
       )}
 
       {/* Curvature handles for selected transition connectors (state machine) */}
-      {selected && connector.type === "transition" && connector.routingType === "curvilinear"
+      {selected && (connector.type === "transition" || connector.type === "flow") && connector.routingType === "curvilinear"
        && visibleWaypoints.length === 4 && onUpdateCurveHandles && svgToWorld && (() => {
         const [P0, P1, P2, P3] = visibleWaypoints;
         const srcEdge = waypoints[1];

@@ -388,11 +388,13 @@ export function DiagramEditor({
   const selectedConnector = data.connectors.find((c) => c.id === selectedConnectorId) ?? null;
 
   const defaultDirectionType: DirectionType =
+    diagramType === "basic"           ? "open-directed" :
     diagramType === "process-context" ? "non-directed" :
     diagramType === "state-machine"   ? "open-directed" :
     "directed";
 
   const defaultRoutingType: RoutingType =
+    diagramType === "basic"           ? "curvilinear" :
     diagramType === "process-context" ? "direct" :
     diagramType === "state-machine"   ? "curvilinear" :
     "rectilinear";

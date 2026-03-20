@@ -305,6 +305,12 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       } else if (action.payload.symbolType === "lane") {
         const count = state.elements.filter((e) => e.type === "lane").length;
         label = `Lane ${count + 1}`;
+      } else if (action.payload.symbolType === "external-entity") {
+        const count = state.elements.filter((e) => e.type === "external-entity").length;
+        label = `Entity ${count + 1}`;
+      } else if (action.payload.symbolType === "process-system") {
+        const count = state.elements.filter((e) => e.type === "process-system").length;
+        label = `Process ${count + 1}`;
       }
       let newEl: DiagramElement = {
         id: nanoid(),
@@ -676,6 +682,10 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       const transitionCount = isTransition
         ? state.connectors.filter((c) => c.type === "transition").length
         : 0;
+      const isFlow = connectorType === "flow";
+      const flowCount = isFlow
+        ? state.connectors.filter((c) => c.type === "flow").length
+        : 0;
 
       // Decision gateway outgoing sequence connectors get a source-anchored label
       const isDecisionGatewayOutgoing = connectorType === "sequence"
@@ -696,13 +706,14 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         sourceInvisibleLeader,
         targetInvisibleLeader,
         waypoints,
-        label:        isTransition ? `transition ${transitionCount + 1}`
+        label:        isFlow       ? `flow ${flowCount + 1}`
+                    : isTransition ? `transition ${transitionCount + 1}`
                     : isMsgBpmn   ? `message ${msgBpmnCount + 1}`
                     : isDecisionGatewayOutgoing ? ""
                     : undefined,
-        labelOffsetX: isTransition ? 0   : isMsgBpmn ? 20  : isDecisionGatewayOutgoing ? 5  : undefined,
-        labelOffsetY: isTransition ? -30 : isMsgBpmn ? 0   : isDecisionGatewayOutgoing ? -20 : undefined,
-        labelWidth:   isTransition ? 80  : isMsgBpmn ? 80  : isDecisionGatewayOutgoing ? 60  : undefined,
+        labelOffsetX: isFlow ? 0   : isTransition ? 0   : isMsgBpmn ? 20  : isDecisionGatewayOutgoing ? 5  : undefined,
+        labelOffsetY: isFlow ? -30 : isTransition ? -30 : isMsgBpmn ? 0   : isDecisionGatewayOutgoing ? -20 : undefined,
+        labelWidth:   isFlow ? 80  : isTransition ? 80  : isMsgBpmn ? 80  : isDecisionGatewayOutgoing ? 60  : undefined,
         labelAnchor:  isDecisionGatewayOutgoing ? "source" : undefined,
       };
 

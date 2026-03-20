@@ -184,10 +184,24 @@ export const ALL_SYMBOLS: SymbolDefinition[] = [
     defaultHeight: 60,
     description: "A text annotation comment",
   },
+  {
+    type: "external-entity",
+    label: "External Entity",
+    defaultWidth: 80,
+    defaultHeight: 80,
+    description: "An external entity in a context diagram",
+  },
+  {
+    type: "process-system",
+    label: "Process",
+    defaultWidth: 160,
+    defaultHeight: 160,
+    description: "A process, system, or organisation in a context diagram",
+  },
 ];
 
 export const PALETTE_BY_DIAGRAM_TYPE: Record<DiagramType, SymbolType[]> = {
-  basic: ["task"],
+  basic: ["external-entity", "process-system"],
   "process-context": ["use-case", "actor", "team", "system", "hourglass", "system-boundary"],
   "state-machine": ["state", "initial-state", "final-state", "composite-state"],
   bpmn: [
@@ -208,7 +222,7 @@ export const PALETTE_BY_DIAGRAM_TYPE: Record<DiagramType, SymbolType[]> = {
 
 /** Colour-picker palette — includes body colour entries and lane that aren't in the drag palette. */
 export const COLOR_PALETTE_BY_DIAGRAM_TYPE: Record<DiagramType, SymbolType[]> = {
-  basic: ["task"],
+  basic: ["external-entity", "process-system"],
   "process-context": ["use-case", "actor", "team", "system", "hourglass", "system-boundary", "system-boundary-body"],
   "state-machine": ["state", "initial-state", "final-state", "composite-state", "composite-state-body"],
   bpmn: [

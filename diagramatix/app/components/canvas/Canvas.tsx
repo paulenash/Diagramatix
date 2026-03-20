@@ -571,6 +571,17 @@ export function Canvas({
               sourceEl?.type === "text-annotation" || targetEl.type === "text-annotation";
             connType = "associationBPMN"; connRouting = "direct";
             connDirection = isAnnotationConn ? "non-directed" : "open-directed";
+          } else if (diagramType === "basic" && defaultRoutingType === "curvilinear") {
+            connType = "flow"; connRouting = defaultRoutingType; connDirection = defaultDirectionType;
+            // Precise boundary attachment for flow connectors
+            if (sourceEl) {
+              const srcBound = pointToBoundaryOffset(effectiveWorldPos, sourceEl);
+              seqSourceSide = srcBound.side;
+              seqSourceOffsetAlong = srcBound.offsetAlong;
+            }
+            const tgtBound = pointToBoundaryOffset(pos, targetEl);
+            seqTargetSide = tgtBound.side;
+            seqTargetOffsetAlong = tgtBound.offsetAlong;
           } else if (defaultRoutingType === "curvilinear") {
             connType = "transition"; connRouting = defaultRoutingType; connDirection = defaultDirectionType;
           } else if ((sourceEl && actorLike.includes(sourceEl.type)) || actorLike.includes(targetEl.type)) {
@@ -644,8 +655,13 @@ export function Canvas({
       } else if (!isMsgBPMN && innerTarget) {
         // Dropped on a child or boundary event inside an expanded subprocess
         const targetOuterSide = getBoundaryEventOuterSide(innerTarget, data.elements);
-        const newSide = targetOuterSide ?? getClosestSide(pos, innerTarget);
-        onUpdateConnectorEndpoint(connectorId, endpoint, innerTarget.id, newSide, 0.5);
+        if (!targetOuterSide && (conn?.type === "flow" || conn?.type === "transition")) {
+          const bound = pointToBoundaryOffset(pos, innerTarget);
+          onUpdateConnectorEndpoint(connectorId, endpoint, innerTarget.id, bound.side, bound.offsetAlong);
+        } else {
+          const newSide = targetOuterSide ?? getClosestSide(pos, innerTarget);
+          onUpdateConnectorEndpoint(connectorId, endpoint, innerTarget.id, newSide, 0.5);
+        }
         onSelectConnector(null);
       } else if (isMsgBPMN) {
         // messageBPMN endpoint reconnection — must remain cross-pool
@@ -694,15 +710,25 @@ export function Canvas({
               // silently abort — data-to-data not allowed
             } else {
               const targetOuterSide = getBoundaryEventOuterSide(targetEl, data.elements);
-              const newSide = targetOuterSide ?? getClosestSide(pos, targetEl);
-              onUpdateConnectorEndpoint(connectorId, endpoint, targetEl.id, newSide, 0.5);
+              if (!targetOuterSide && (conn?.type === "flow" || conn?.type === "transition")) {
+                const bound = pointToBoundaryOffset(pos, targetEl);
+                onUpdateConnectorEndpoint(connectorId, endpoint, targetEl.id, bound.side, bound.offsetAlong);
+              } else {
+                const newSide = targetOuterSide ?? getClosestSide(pos, targetEl);
+                onUpdateConnectorEndpoint(connectorId, endpoint, targetEl.id, newSide, 0.5);
+              }
             }
           } else if (targetEl.type === "pool") {
             // silently abort — only messageBPMN connectors may attach to a pool
           } else {
             const targetOuterSide = getBoundaryEventOuterSide(targetEl, data.elements);
-            const newSide = targetOuterSide ?? getClosestSide(pos, targetEl);
-            onUpdateConnectorEndpoint(connectorId, endpoint, targetEl.id, newSide, 0.5);
+            if (!targetOuterSide && (conn?.type === "flow" || conn?.type === "transition")) {
+              const bound = pointToBoundaryOffset(pos, targetEl);
+              onUpdateConnectorEndpoint(connectorId, endpoint, targetEl.id, bound.side, bound.offsetAlong);
+            } else {
+              const newSide = targetOuterSide ?? getClosestSide(pos, targetEl);
+              onUpdateConnectorEndpoint(connectorId, endpoint, targetEl.id, newSide, 0.5);
+            }
           }
         }
         onSelectConnector(null);

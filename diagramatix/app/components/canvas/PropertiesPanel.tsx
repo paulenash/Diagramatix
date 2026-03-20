@@ -126,7 +126,7 @@ export function PropertiesPanel({
         </div>
 {connector.type !== "messageBPMN" &&
           (connector.type === "associationBPMN" ||
-          (connector.type !== "sequence" && connector.type !== "transition") ||
+          (connector.type !== "sequence" && connector.type !== "transition" && connector.type !== "flow") ||
           connector.routingType === "direct") && (
           <div>
             <p className="text-xs font-medium text-gray-700 mb-1">Direction</p>
@@ -164,7 +164,7 @@ export function PropertiesPanel({
             </div>
           </div>
         )}
-        {(connector.type === "transition" || connector.type === "messageBPMN"
+        {(connector.type === "transition" || connector.type === "flow" || connector.type === "messageBPMN"
           || (connector.type === "sequence" && connector.label !== undefined)) && onUpdateConnectorLabel && (
           <div>
             <p className="text-xs font-medium text-gray-700 mb-1">Label</p>

@@ -839,6 +839,29 @@ function BpmnTaskShape({ el }: { el: DiagramElement }) {
   );
 }
 
+function ExternalEntityShape({ el }: { el: DiagramElement }) {
+  const colors = useContext(SymbolColorCtx);
+  return (
+    <g>
+      <rect x={el.x} y={el.y} width={el.width} height={el.height}
+        fill={resolveColor("external-entity", colors)} stroke="#374151" strokeWidth={1.5} />
+    </g>
+  );
+}
+
+function ProcessSystemShape({ el }: { el: DiagramElement }) {
+  const colors = useContext(SymbolColorCtx);
+  const cx = el.x + el.width / 2;
+  const cy = el.y + el.height / 2;
+  const r = Math.min(el.width, el.height) / 2;
+  return (
+    <g>
+      <circle cx={cx} cy={cy} r={r}
+        fill={resolveColor("process-system", colors)} stroke="#374151" strokeWidth={1.5} />
+    </g>
+  );
+}
+
 function PoolShape({ el }: { el: DiagramElement }) {
   const colors = useContext(SymbolColorCtx);
   const { x, y, width: w, height: h } = el;
@@ -928,6 +951,8 @@ function SymbolShape({ el }: { el: DiagramElement }) {
         return el.taskType !== undefined ? <BpmnTaskShape el={el} /> : <TaskShape el={el} />;
       case "subprocess":          return <SubprocessShape el={el} />;
       case "subprocess-expanded": return <ExpandedSubprocessShape el={el} />;
+      case "external-entity":     return <ExternalEntityShape el={el} />;
+      case "process-system":      return <ProcessSystemShape el={el} />;
       default:                  return <TaskShape el={el} />;
     }
   })();

@@ -25,7 +25,9 @@ export type SymbolType =
   | "data-object"
   | "data-store"
   | "group"
-  | "text-annotation";
+  | "text-annotation"
+  | "external-entity"
+  | "process-system";
 
 export type BpmnTaskType =
   | "none"
@@ -49,7 +51,7 @@ export type RepeatType = "none" | "loop";
 
 export type FlowType = "none" | "catching" | "throwing";
 
-export type ConnectorType = "sequence" | "message" | "association" | "transition" | "associationBPMN" | "messageBPMN";
+export type ConnectorType = "sequence" | "message" | "association" | "transition" | "associationBPMN" | "messageBPMN" | "flow";
 
 export type Side = "top" | "right" | "bottom" | "left";
 
