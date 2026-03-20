@@ -658,7 +658,10 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       // Data elements may only use associationBPMN connectors
       const isDataConn = DATA_ELEMENT_TYPES.has(source.type) || DATA_ELEMENT_TYPES.has(target.type);
       if (isDataConn && connectorType !== "associationBPMN") return state;
-      if (!isDataConn && connectorType === "associationBPMN") return state;
+      // Allow associationBPMN between event elements (child/boundary event connections)
+      const EVENT_CONN_TYPES = new Set<SymbolType>(["start-event", "intermediate-event", "end-event"]);
+      const isEventToEvent = EVENT_CONN_TYPES.has(source.type) && EVENT_CONN_TYPES.has(target.type);
+      if (!isDataConn && !isEventToEvent && connectorType === "associationBPMN") return state;
 
       const { waypoints, sourceInvisibleLeader, targetInvisibleLeader } =
         connectorType === "messageBPMN"

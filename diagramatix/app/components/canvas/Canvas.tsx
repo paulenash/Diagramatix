@@ -309,11 +309,25 @@ export function Canvas({
   const [draggingConnector, setDraggingConnector] = useState<DraggingConnector | null>(null);
   const [draggingEndpoint, setDraggingEndpoint] = useState<DraggingEndpoint | null>(null);
   const [pendingDrop, setPendingDrop] = useState<PendingDrop | null>(null);
+  const [connectorChoice, setConnectorChoice] = useState<{
+    sourceId: string; targetId: string;
+    sourceSide: Side; targetSide: Side;
+    sourceOffset?: number; targetOffset?: number;
+    pos: Point;
+  } | null>(null);
   const [pickerOffset, setPickerOffset] = useState<Point>({ x: 0, y: 0 });
   const pickerDragRef = useRef<{ startX: number; startY: number; origOffX: number; origOffY: number } | null>(null);
 
   // Reset picker offset when a new pending drop appears
   useEffect(() => { setPickerOffset({ x: 0, y: 0 }); }, [pendingDrop]);
+
+  // Dismiss connector choice popup on click outside
+  useEffect(() => {
+    if (!connectorChoice) return;
+    function handleClick() { setConnectorChoice(null); }
+    window.addEventListener("mousedown", handleClick);
+    return () => window.removeEventListener("mousedown", handleClick);
+  }, [connectorChoice]);
 
   // Picker drag: attach window listeners while dragging
   useEffect(() => {
@@ -440,33 +454,58 @@ export function Canvas({
           sourcePoolId !== null && targetPoolId !== null && sourcePoolId !== targetPoolId;
         const involvesPool = sourceEl?.type === "pool" || targetEl.type === "pool";
 
-        // End-event source restrictions
-        if (sourceEl?.type === "end-event") {
-          if (!sourceEl.boundaryHostId && !isCrossPool && !involvesPool) return; // free-standing: messageBPMN only
-          if (sourceEl.boundaryHostId) {
-            if (targetEl.parentId === sourceEl.boundaryHostId) return; // no connection to children of parent subprocess
-            if (isCrossPool || involvesPool) return; // sequence only — no cross-pool messageBPMN
+        // Resolve ancestor chain (treating boundaryHostId as parent)
+        const CHILD_EVENT_TYPES = new Set(["start-event", "intermediate-event", "end-event"]);
+        function getAncestorIds(el: DiagramElement): Set<string> {
+          const ids = new Set<string>();
+          let cur: DiagramElement | undefined = el;
+          const visited = new Set<string>();
+          while (cur && !visited.has(cur.id)) {
+            visited.add(cur.id);
+            const nextId: string | undefined = cur.boundaryHostId ?? cur.parentId;
+            if (nextId) { ids.add(nextId); cur = data.elements.find(e => e.id === nextId); }
+            else break;
           }
+          return ids;
         }
+        // Child/boundary event ↔ boundary event on an ancestor — bypass validation rules
+        const sourceAncestors = sourceEl ? getAncestorIds(sourceEl) : new Set<string>();
+        const targetAncestors = getAncestorIds(targetEl);
+        // True when source and target share an ancestor chain (one is nested inside the other's host hierarchy)
+        const isChildEventToBoundary =
+          (sourceEl && CHILD_EVENT_TYPES.has(sourceEl.type) && targetEl.boundaryHostId && sourceAncestors.has(targetEl.boundaryHostId)) ||
+          (CHILD_EVENT_TYPES.has(targetEl.type) && sourceEl?.boundaryHostId && targetAncestors.has(sourceEl.boundaryHostId)) ||
+          // Also: both are boundary events and one's host is an ancestor of the other
+          (sourceEl && CHILD_EVENT_TYPES.has(sourceEl.type) && sourceEl.boundaryHostId &&
+           CHILD_EVENT_TYPES.has(targetEl.type) && targetEl.boundaryHostId &&
+           (sourceAncestors.has(targetEl.boundaryHostId) || targetAncestors.has(sourceEl.boundaryHostId)));
 
-        // Rule 2: Edge-mounted start event — can only connect to children of its parent subprocess
-        if (sourceEl?.type === "start-event" && sourceEl.boundaryHostId) {
-          if (targetEl.parentId !== sourceEl.boundaryHostId) return;
-        }
+        if (!isChildEventToBoundary) {
+          // End-event source restrictions
+          if (sourceEl?.type === "end-event") {
+            if (!sourceEl.boundaryHostId && !isCrossPool && !involvesPool) return;
+            if (sourceEl.boundaryHostId) {
+              if (targetEl.parentId === sourceEl.boundaryHostId) return;
+              if (isCrossPool || involvesPool) return;
+            }
+          }
 
-        // Rules 3 & 5: Edge-mounted intermediate event
-        if (sourceEl?.type === "intermediate-event" && sourceEl.boundaryHostId) {
-          // Rule 5: cannot connect to boundary events of the same parent subprocess
-          if (targetEl.boundaryHostId === sourceEl.boundaryHostId) return;
-
-          if (sourceEl.taskType === "send" || sourceEl.flowType === "throwing") {
-            // Rule 3 (send): cannot connect to children of parent subprocess
-            if (targetEl.parentId === sourceEl.boundaryHostId) return;
-          } else if (sourceEl.taskType === "receive" || sourceEl.flowType === "catching") {
-            // Rule 3 (receive): can ONLY connect to children of parent subprocess
+          // Rule 2: Edge-mounted start event — can only connect to children of its parent subprocess
+          if (sourceEl?.type === "start-event" && sourceEl.boundaryHostId) {
             if (targetEl.parentId !== sourceEl.boundaryHostId) return;
           }
-          // Generic intermediate boundary event: only Rule 5 above applies
+
+          // Rules 3 & 5: Edge-mounted intermediate event
+          if (sourceEl?.type === "intermediate-event" && sourceEl.boundaryHostId) {
+            // Rule 5: cannot connect to boundary events of the same parent subprocess
+            if (targetEl.boundaryHostId === sourceEl.boundaryHostId) return;
+
+            if (sourceEl.taskType === "send" || sourceEl.flowType === "throwing") {
+              if (targetEl.parentId === sourceEl.boundaryHostId) return;
+            } else if (sourceEl.taskType === "receive" || sourceEl.flowType === "catching") {
+              if (targetEl.parentId !== sourceEl.boundaryHostId) return;
+            }
+          }
         }
 
         // Rule 4: Child of subprocess cannot connect to its own parent subprocess
@@ -522,11 +561,8 @@ export function Canvas({
           let connRouting: RoutingType;
           let connDirection: DirectionType;
 
-          // Child event ↔ boundary event on same expanded subprocess → always associationBPMN
-          const EVENT_TYPES = new Set(["start-event", "intermediate-event", "end-event"]);
-          const isChildToBoundary =
-            (sourceEl && EVENT_TYPES.has(sourceEl.type) && sourceEl.parentId && targetEl.boundaryHostId === sourceEl.parentId) ||
-            (EVENT_TYPES.has(targetEl.type) && targetEl.parentId && sourceEl?.boundaryHostId === targetEl.parentId);
+          // Child/boundary event ↔ boundary event on ancestor → always associationBPMN
+          const isChildToBoundary = isChildEventToBoundary;
 
           if (isChildToBoundary) {
             connType = "associationBPMN"; connRouting = "direct"; connDirection = "open-directed";
@@ -1132,6 +1168,36 @@ export function Canvas({
   const draggingFromEdgeMountedIntermediateEvent =
     draggingFromEdgeMountedIntermediateSendEvent || draggingFromEdgeMountedIntermediateReceiveEvent;
   const draggingSourceBoundaryHostId = draggingSourceEl?.boundaryHostId ?? null;
+  const CHILD_EVENT_TYPES_HIGHLIGHT = new Set(["start-event", "intermediate-event", "end-event"]);
+  // Compute ancestor IDs for dragging source (treating boundaryHostId as parent)
+  const draggingSourceAncestorIds = (() => {
+    if (!draggingSourceEl) return new Set<string>();
+    const ids = new Set<string>();
+    let cur: DiagramElement | undefined = draggingSourceEl;
+    const visited = new Set<string>();
+    while (cur && !visited.has(cur.id)) {
+      visited.add(cur.id);
+      const nextId: string | undefined = cur.boundaryHostId ?? cur.parentId;
+      if (nextId) { ids.add(nextId); cur = data.elements.find(e => e.id === nextId); }
+      else break;
+    }
+    return ids;
+  })();
+  const draggingFromChildEvent =
+    draggingSourceEl != null &&
+    CHILD_EVENT_TYPES_HIGHLIGHT.has(draggingSourceEl.type) &&
+    !draggingSourceEl.boundaryHostId &&
+    !!draggingSourceEl.parentId;
+  const draggingSourceParentId = draggingSourceEl?.parentId ?? null;
+  // Edge-mounted event on a child element inside an expanded subprocess
+  const draggingFromBoundaryOnChild =
+    draggingSourceEl != null &&
+    CHILD_EVENT_TYPES_HIGHLIGHT.has(draggingSourceEl.type) &&
+    !!draggingSourceEl.boundaryHostId &&
+    data.elements.some(e => e.id === draggingSourceEl.boundaryHostId && !!e.parentId);
+  const draggingSourceHostParentId = draggingFromBoundaryOnChild
+    ? data.elements.find(e => e.id === draggingSourceEl!.boundaryHostId)?.parentId ?? null
+    : null;
 
   // Compute misaligned messageBPMN connectors (no x-overlap between source and target)
   const misalignedConnectorIds = new Set<string>();
@@ -1403,6 +1469,19 @@ export function Canvas({
                 elIsAssocTarget = true;
               } else if (!draggingSourceIsData && elIsData) {
                 elIsAssocTarget = true;
+              } else if (draggingFromBoundaryOnChild) {
+                // Edge-mounted event on a child element inside expanded subprocess
+                // Child events in same subprocess → dual highlight (sequence + association)
+                // Other valid targets → sequence only
+                if (CHILD_EVENT_TYPES_HIGHLIGHT.has(el.type) && !el.boundaryHostId && el.parentId === draggingSourceHostParentId) {
+                  elIsDropTarget = true;
+                  elIsAssocTarget = true;
+                } else {
+                  const elPoolId = getElementPoolId(el, data.elements);
+                  if (elPoolId === draggingSourcePoolId || !elPoolId) {
+                    elIsDropTarget = true;
+                  }
+                }
               } else if (draggingFromFreeEndEvent) {
                 // Free-standing end-event: messageBPMN targets only in white-box pools
                 const elPoolId = getElementPoolId(el, data.elements);
@@ -1536,7 +1615,10 @@ export function Canvas({
             let elIsMsgTarget = false;
             let elIsAssocTarget = false;
             if (isDraggingConnector && el.id !== draggingConnector!.fromId) {
-              if (draggingSourceIsData) {
+              if ((draggingFromChildEvent || draggingFromBoundaryOnChild) &&
+                  el.boundaryHostId && draggingSourceAncestorIds.has(el.boundaryHostId)) {
+                elIsAssocTarget = true; // purple — associationBPMN to boundary event on ancestor
+              } else if (draggingSourceIsData) {
                 elIsAssocTarget = true;
               } else if (draggingFromFreeEndEvent) {
                 // Free-standing end-event: boundary intermediate-events in other white-box pools are messageBPMN targets
@@ -1992,6 +2074,40 @@ export function Canvas({
         {" · "}
         {Math.round(zoom * 100)}%
       </div>
+
+      {/* Connector type choice popup — shown when both sequence and association are valid */}
+      {connectorChoice && (
+        <div
+          style={{ position: "absolute", left: connectorChoice.pos.x, top: connectorChoice.pos.y, zIndex: 50 }}
+          className="bg-white border border-gray-300 rounded shadow-lg p-1"
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <button
+            onClick={() => {
+              onAddConnector(connectorChoice.sourceId, connectorChoice.targetId,
+                "sequence", defaultDirectionType, defaultRoutingType,
+                connectorChoice.sourceSide, connectorChoice.targetSide,
+                connectorChoice.sourceOffset, connectorChoice.targetOffset);
+              setConnectorChoice(null);
+            }}
+            className="block px-3 py-1.5 text-xs hover:bg-gray-100 w-full text-left rounded"
+          >
+            Sequence
+          </button>
+          <button
+            onClick={() => {
+              onAddConnector(connectorChoice.sourceId, connectorChoice.targetId,
+                "associationBPMN", "open-directed", "direct",
+                connectorChoice.sourceSide, connectorChoice.targetSide,
+                connectorChoice.sourceOffset, connectorChoice.targetOffset);
+              setConnectorChoice(null);
+            }}
+            className="block px-3 py-1.5 text-xs hover:bg-gray-100 w-full text-left rounded"
+          >
+            Association
+          </button>
+        </div>
+      )}
     </div>
   );
 }

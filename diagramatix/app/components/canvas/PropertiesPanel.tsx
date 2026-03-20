@@ -209,10 +209,24 @@ export function PropertiesPanel({
           Properties
         </p>
         <p className="text-xs text-gray-400 mb-1">Type: {element.type}</p>
-        {parentName && (
-          <p className="text-xs text-gray-400 mb-3">Parent: {parentName}</p>
-        )}
-        {!parentName && <div className="mb-2" />}
+        {(() => {
+          if (!allElements) return parentName ? <p className="text-xs text-gray-400 mb-3">Parent: {parentName}</p> : <div className="mb-2" />;
+          // Resolve ancestor chain treating boundaryHostId as parent
+          const effectiveParentId = element.boundaryHostId ?? element.parentId;
+          const parent = effectiveParentId ? allElements.find(e => e.id === effectiveParentId) : undefined;
+          const gpId = parent ? (parent.boundaryHostId ?? parent.parentId) : undefined;
+          const grandparent = gpId ? allElements.find(e => e.id === gpId) : undefined;
+          const ggpId = grandparent ? (grandparent.boundaryHostId ?? grandparent.parentId) : undefined;
+          const greatGrandparent = ggpId ? allElements.find(e => e.id === ggpId) : undefined;
+          if (!parent) return <div className="mb-2" />;
+          return (
+            <div className="mb-3">
+              <p className="text-xs text-gray-400">Parent: {parent.label || parent.type}</p>
+              {grandparent && <p className="text-xs text-gray-400">Grandparent: {grandparent.label || grandparent.type}</p>}
+              {greatGrandparent && <p className="text-xs text-gray-400">Great Grandparent: {greatGrandparent.label || greatGrandparent.type}</p>}
+            </div>
+          );
+        })()}
       </div>
 
       <div>
