@@ -205,10 +205,11 @@ export function computeWaypoints(
     // Use closest boundary point on each element, along the line between their centres.
     // Use-case elements use the exact ellipse boundary; all others use the bounding rectangle.
     // The invisible leaders hide center→edge; the visible segment is edge→edge.
-    const srcEdge = source.type === "use-case"
+    const CIRCULAR_TYPES = new Set(["use-case", "process-system"]);
+    const srcEdge = CIRCULAR_TYPES.has(source.type)
       ? ellipseEdgePoint(endPt, source)
       : closestEdgePoint(endPt, getBounds(source));
-    const tgtEdge = target.type === "use-case"
+    const tgtEdge = CIRCULAR_TYPES.has(target.type)
       ? ellipseEdgePoint(startPt, target)
       : closestEdgePoint(startPt, getBounds(target));
     return {
@@ -220,8 +221,12 @@ export function computeWaypoints(
 
   if (routingType === "curvilinear") {
     // [sourceCenter, srcEdge, cp1, cp2, tgtEdge, targetCenter]
-    const srcEdge = sidePoint(source, sourceSide, sourceOffsetAlong);
-    const tgtEdge = sidePoint(target, targetSide, targetOffsetAlong);
+    const CIRC_TYPES = new Set(["use-case", "process-system"]);
+    const srcEdgeRaw = sidePoint(source, sourceSide, sourceOffsetAlong);
+    const tgtEdgeRaw = sidePoint(target, targetSide, targetOffsetAlong);
+    // Project onto circle boundary for circular elements
+    const srcEdge = CIRC_TYPES.has(source.type) ? ellipseEdgePoint(srcEdgeRaw, source) : srcEdgeRaw;
+    const tgtEdge = CIRC_TYPES.has(target.type) ? ellipseEdgePoint(tgtEdgeRaw, target) : tgtEdgeRaw;
     const dist   = euclideanDist(srcEdge, tgtEdge);
     const curveOffset = Math.max(60, dist / 3);
     const cp1 = perpendicularExitScaled(srcEdge, sourceSide, curveOffset);

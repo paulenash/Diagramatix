@@ -177,6 +177,7 @@ interface Props {
   onResizeElementEnd?: (id: string) => void;
   onLaneBoundaryMoveEnd?: () => void;
   onConnectorWaypointDragEnd?: (id: string) => void;
+  onNudgeConnector?: (connectorId: string, dx: number, dy: number) => void;
   onUpdateCurveHandles?: (id: string, waypoints: Point[], cp1Rel: Point, cp2Rel: Point) => void;
   colorConfig?: import("@/app/lib/diagram/colors").SymbolColorConfig;
   displayMode?: import("@/app/lib/diagram/displayMode").DisplayMode;
@@ -295,6 +296,7 @@ export function Canvas({
   onResizeElementEnd,
   onLaneBoundaryMoveEnd,
   onConnectorWaypointDragEnd,
+  onNudgeConnector,
   onUpdateCurveHandles,
   colorConfig,
   displayMode: displayModeProp,
@@ -1088,6 +1090,14 @@ export function Canvas({
       if (e.key === "ArrowRight") { e.preventDefault(); onMoveElements(ids, NUDGE, 0); return; }
       if (e.key === "ArrowUp")    { e.preventDefault(); onMoveElements(ids, 0, -NUDGE); return; }
       if (e.key === "ArrowDown")  { e.preventDefault(); onMoveElements(ids, 0, NUDGE); return; }
+    }
+    // Nudge selected connector with arrow keys
+    if (selectedConnectorId && selectedElementIds.size === 0 && !editingLabel && onNudgeConnector) {
+      const NUDGE = e.shiftKey ? 1 : 5;
+      if (e.key === "ArrowLeft")  { e.preventDefault(); onNudgeConnector(selectedConnectorId, -NUDGE, 0); return; }
+      if (e.key === "ArrowRight") { e.preventDefault(); onNudgeConnector(selectedConnectorId, NUDGE, 0); return; }
+      if (e.key === "ArrowUp")    { e.preventDefault(); onNudgeConnector(selectedConnectorId, 0, -NUDGE); return; }
+      if (e.key === "ArrowDown")  { e.preventDefault(); onNudgeConnector(selectedConnectorId, 0, NUDGE); return; }
     }
     if (e.key === "Escape") {
       setDraggingConnector(null);
