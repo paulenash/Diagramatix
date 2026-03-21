@@ -64,33 +64,34 @@ function pathWithHumps(rawWaypoints: Point[], otherWaypoints: Point[][], humpRad
 
   const d: string[] = [`M ${waypoints[0].x} ${waypoints[0].y}`];
 
+  // Precompute corner rounding for each interior waypoint
+  const cornerArcs = new Map<number, { ax: number; ay: number; bx: number; by: number }>();
+  for (let i = 1; i < waypoints.length - 1; i++) {
+    const prev = waypoints[i - 1], curr = waypoints[i], next = waypoints[i + 1];
+    const d1x = curr.x - prev.x, d1y = curr.y - prev.y;
+    const d2x = next.x - curr.x, d2y = next.y - curr.y;
+    const len1 = Math.hypot(d1x, d1y), len2 = Math.hypot(d2x, d2y);
+    if (len1 >= 1 && len2 >= 1) {
+      const cr = Math.min(cornerRadius, len1 * 0.45, len2 * 0.45);
+      if (cr >= 1) {
+        cornerArcs.set(i, {
+          ax: curr.x - (d1x / len1) * cr, ay: curr.y - (d1y / len1) * cr,
+          bx: curr.x + (d2x / len2) * cr, by: curr.y + (d2y / len2) * cr,
+        });
+      }
+    }
+  }
+
   for (let i = 0; i < waypoints.length - 1; i++) {
     const curr = waypoints[i];
     const next = waypoints[i + 1];
 
-    // Corner rounding at curr (skip first and last waypoints)
-    if (i > 0) {
-      const prev = waypoints[i - 1];
-      const d1x = curr.x - prev.x, d1y = curr.y - prev.y;
-      const d2x = next.x - curr.x, d2y = next.y - curr.y;
-      const len1 = Math.hypot(d1x, d1y);
-      const len2 = Math.hypot(d2x, d2y);
-      if (len1 >= 1 && len2 >= 1) {
-        const cr = Math.min(cornerRadius, len1 * 0.45, len2 * 0.45);
-        if (cr >= 1) {
-          const ax = curr.x - (d1x / len1) * cr;
-          const ay = curr.y - (d1y / len1) * cr;
-          const bx = curr.x + (d2x / len2) * cr;
-          const by = curr.y + (d2y / len2) * cr;
-          d.push(`L ${ax} ${ay}`);
-          d.push(`Q ${curr.x} ${curr.y} ${bx} ${by}`);
-          // Continue segment from departure point, not from curr
-          // Fall through to handle crossings on this segment
-        }
-      }
-    }
+    // Approach point for corner at end of this segment (if any)
+    const endCorner = cornerArcs.get(i + 1);
+    // The effective end of this segment is the approach point of the next corner, or next waypoint
+    const segEnd = endCorner ? { x: endCorner.ax, y: endCorner.ay } : next;
 
-    // Crossing humps on this segment
+    // Crossing humps on this segment (use original curr→next for t-value calculation)
     const crossings = segCrossings.filter((c) => c.segIdx === i);
     if (crossings.length > 0) {
       const segDx = next.x - curr.x, segDy = next.y - curr.y;
@@ -102,15 +103,19 @@ function pathWithHumps(rawWaypoints: Point[], otherWaypoints: Point[][], humpRad
           const cy = curr.y + segDy * cross.t;
           const r = Math.min(humpRadius, segLen * cross.t * 0.4, segLen * (1 - cross.t) * 0.4);
           if (r < 1) continue;
-          const ax = cx - ux * r, ay = cy - uy * r;
-          const bx = cx + ux * r, by = cy + uy * r;
-          d.push(`L ${ax} ${ay}`);
-          d.push(`A ${r} ${r} 0 0 1 ${bx} ${by}`);
+          d.push(`L ${cx - ux * r} ${cy - uy * r}`);
+          d.push(`A ${r} ${r} 0 0 1 ${cx + ux * r} ${cy + uy * r}`);
         }
       }
     }
 
-    d.push(`L ${next.x} ${next.y}`);
+    // Draw to effective end of segment
+    d.push(`L ${segEnd.x} ${segEnd.y}`);
+
+    // Corner arc at the end of this segment
+    if (endCorner) {
+      d.push(`Q ${next.x} ${next.y} ${endCorner.bx} ${endCorner.by}`);
+    }
   }
 
   return d.join(" ");
