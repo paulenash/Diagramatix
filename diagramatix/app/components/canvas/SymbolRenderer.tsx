@@ -1314,6 +1314,8 @@ export function SymbolRenderer({
         element.type === 'subprocess' ||
         element.type === 'subprocess-expanded' ||
         element.type === 'use-case' ||
+        element.type === 'external-entity' ||
+        element.type === 'process-system' ||
         element.type === 'pool' ||
         element.type === 'lane'
       ) && (
@@ -1509,7 +1511,9 @@ export function SymbolRenderer({
         element.type === 'task' ||
         element.type === 'subprocess' ||
         element.type === 'subprocess-expanded' ||
-        element.type === 'use-case'
+        element.type === 'use-case' ||
+        element.type === 'external-entity' ||
+        element.type === 'process-system'
       ) && (() => {
         const PAD = 4;
         const el = element;

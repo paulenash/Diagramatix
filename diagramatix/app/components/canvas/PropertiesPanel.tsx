@@ -236,7 +236,8 @@ export function PropertiesPanel({
         {(element.type === "gateway" || isEventElement ||
           element.type === "data-object" || element.type === "data-store" ||
           element.type === "task" || element.type === "subprocess" ||
-          element.type === "subprocess-expanded" || element.type === "use-case") ? (
+          element.type === "subprocess-expanded" || element.type === "use-case" ||
+          element.type === "external-entity" || element.type === "process-system") ? (
           <>
             <textarea
               key={element.id}
