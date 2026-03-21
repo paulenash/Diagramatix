@@ -209,6 +209,18 @@ function PaletteSymbolPreview({ type, colorConfig }: { type: SymbolType; colorCo
         </svg>
       );
     }
+    case "external-entity":
+      return (
+        <svg width={28} height={28} viewBox="0 0 36 36">
+          <rect x={2} y={2} width={32} height={32} fill={resolveColor("external-entity", colorConfig)} stroke="#374151" strokeWidth={1.5} />
+        </svg>
+      );
+    case "process-system":
+      return (
+        <svg width={28} height={28} viewBox="0 0 36 36">
+          <circle cx={18} cy={18} r={16} fill={resolveColor("process-system", colorConfig)} stroke="#374151" strokeWidth={1.5} />
+        </svg>
+      );
     default:
       return (
         <svg width={36} height={21} viewBox="0 0 48 28">

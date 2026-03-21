@@ -1122,9 +1122,7 @@ export function SymbolRenderer({
   const isWhiteBoxPool = element.type === "pool" &&
     ((element.properties.poolType as string | undefined) ?? "black-box") === "white-box";
   const isContainer = isBoundary || element.type === "composite-state" || isPoolLane; // gets resize handles
-  const canResize = isContainer || element.type === "task" || element.type === "subprocess" ||
-    element.type === "subprocess-expanded" || element.type === "use-case" || element.type === "group" ||
-    element.type === "text-annotation";
+  const canResize = element.type !== "lane"; // all types except lane can be resized
   const isBoundaryStartOrEnd = !!element.boundaryHostId &&
     (element.type === "start-event" || element.type === "end-event");
   const showLabel = element.type !== "initial-state" && element.type !== "final-state" && !isBoundaryStartOrEnd;

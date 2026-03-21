@@ -1,4 +1,4 @@
-export type DiagramType = "basic" | "process-context" | "state-machine" | "bpmn";
+export type DiagramType = "context" | "basic" | "process-context" | "state-machine" | "bpmn";
 
 export type SymbolType =
   | "task"

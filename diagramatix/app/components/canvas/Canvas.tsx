@@ -573,7 +573,7 @@ export function Canvas({
               sourceEl?.type === "text-annotation" || targetEl.type === "text-annotation";
             connType = "associationBPMN"; connRouting = "direct";
             connDirection = isAnnotationConn ? "non-directed" : "open-directed";
-          } else if (diagramType === "basic" && defaultRoutingType === "curvilinear") {
+          } else if ((diagramType === "context" || diagramType === "basic") && defaultRoutingType === "curvilinear") {
             connType = "flow"; connRouting = defaultRoutingType; connDirection = defaultDirectionType;
             // Precise boundary attachment for flow connectors
             if (sourceEl) {
@@ -815,11 +815,11 @@ export function Canvas({
     const el = data.elements.find((el) => el.id === elementId);
     if (!el) return;
 
-    const isTaskLike = el.type === "task" || el.type === "subprocess" || el.type === "subprocess-expanded";
-    const isUseCase = el.type === "use-case";
-    const ar = isUseCase ? el.width / el.height : 0;
-    const minW = isUseCase ? 60 : (isTaskLike ? 60 : MIN_BOUNDARY_W);
-    const minH = isUseCase ? 30 : (isTaskLike ? 36 : MIN_BOUNDARY_H);
+    const isContainer = el.type === "system-boundary" || el.type === "composite-state"
+      || el.type === "pool" || el.type === "subprocess-expanded" || el.type === "group";
+    const ar = el.width / el.height;
+    const minW = isContainer ? MIN_BOUNDARY_W : 20;
+    const minH = isContainer ? MIN_BOUNDARY_H : 20;
 
     const startMouse = { x: e.clientX, y: e.clientY };
     const startBounds = { x: el.x, y: el.y, width: el.width, height: el.height };
@@ -842,7 +842,7 @@ export function Canvas({
         height = newH;
       }
 
-      if (isUseCase && ar > 0) {
+      if (!isContainer && ar > 0) {
         if (handle.includes("e") || handle.includes("w")) {
           // Width is primary — derive height to preserve aspect ratio
           height = width / ar;
@@ -1603,11 +1603,7 @@ export function Canvas({
                 handleConnectionPointDragStart(el.id, side, worldPos)
               }
               showConnectionPoints={selectedElementIds.size <= 1 && (selectedElementIds.has(el.id) || isDraggingConnector || isDraggingEndpoint)}
-              onResizeDragStart={
-                (el.type === "task" || el.type === "subprocess" || el.type === "subprocess-expanded")
-                  ? (handle, e) => handleResizeDragStart(el.id, handle, e)
-                  : undefined
-              }
+              onResizeDragStart={(handle, e) => handleResizeDragStart(el.id, handle, e)}
               svgToWorld={clientToWorld}
               onUpdateProperties={onUpdateProperties}
               onUpdateLabel={onUpdateLabel}

@@ -201,7 +201,8 @@ export const ALL_SYMBOLS: SymbolDefinition[] = [
 ];
 
 export const PALETTE_BY_DIAGRAM_TYPE: Record<DiagramType, SymbolType[]> = {
-  basic: ["external-entity", "process-system"],
+  context: ["external-entity", "process-system"],
+  basic: ["external-entity", "process-system"],  // legacy alias
   "process-context": ["use-case", "actor", "team", "system", "hourglass", "system-boundary"],
   "state-machine": ["state", "initial-state", "final-state", "composite-state"],
   bpmn: [
@@ -222,7 +223,8 @@ export const PALETTE_BY_DIAGRAM_TYPE: Record<DiagramType, SymbolType[]> = {
 
 /** Colour-picker palette — includes body colour entries and lane that aren't in the drag palette. */
 export const COLOR_PALETTE_BY_DIAGRAM_TYPE: Record<DiagramType, SymbolType[]> = {
-  basic: ["external-entity", "process-system"],
+  context: ["external-entity", "process-system"],
+  basic: ["external-entity", "process-system"],  // legacy alias
   "process-context": ["use-case", "actor", "team", "system", "hourglass", "system-boundary", "system-boundary-body"],
   "state-machine": ["state", "initial-state", "final-state", "composite-state", "composite-state-body"],
   bpmn: [
