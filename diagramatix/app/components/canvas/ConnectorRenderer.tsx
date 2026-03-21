@@ -30,8 +30,20 @@ function segmentIntersection(a1: Point, a2: Point, b1: Point, b2: Point): number
 }
 
 // Build SVG path with small semicircular humps at crossing points
-function pathWithHumps(waypoints: Point[], otherWaypoints: Point[][], radius = 6): string {
-  if (waypoints.length < 2) return "";
+function pathWithHumps(rawWaypoints: Point[], otherWaypoints: Point[][], humpRadius = 6, cornerRadius = 8): string {
+  if (rawWaypoints.length < 2) return "";
+
+  // Remove collinear intermediate points
+  const waypoints = [rawWaypoints[0]];
+  for (let i = 1; i < rawWaypoints.length - 1; i++) {
+    const prev = waypoints[waypoints.length - 1];
+    const curr = rawWaypoints[i];
+    const next = rawWaypoints[i + 1];
+    if (Math.abs((curr.x - prev.x) * (next.y - curr.y) - (curr.y - prev.y) * (next.x - curr.x)) > 0.5) {
+      waypoints.push(curr);
+    }
+  }
+  waypoints.push(rawWaypoints[rawWaypoints.length - 1]);
 
   // Collect all crossing t-values per segment
   const segCrossings: { segIdx: number; t: number }[] = [];
@@ -53,33 +65,52 @@ function pathWithHumps(waypoints: Point[], otherWaypoints: Point[][], radius = 6
   const d: string[] = [`M ${waypoints[0].x} ${waypoints[0].y}`];
 
   for (let i = 0; i < waypoints.length - 1; i++) {
-    const a1 = waypoints[i], a2 = waypoints[i + 1];
+    const curr = waypoints[i];
+    const next = waypoints[i + 1];
+
+    // Corner rounding at curr (skip first and last waypoints)
+    if (i > 0) {
+      const prev = waypoints[i - 1];
+      const d1x = curr.x - prev.x, d1y = curr.y - prev.y;
+      const d2x = next.x - curr.x, d2y = next.y - curr.y;
+      const len1 = Math.hypot(d1x, d1y);
+      const len2 = Math.hypot(d2x, d2y);
+      if (len1 >= 1 && len2 >= 1) {
+        const cr = Math.min(cornerRadius, len1 * 0.45, len2 * 0.45);
+        if (cr >= 1) {
+          const ax = curr.x - (d1x / len1) * cr;
+          const ay = curr.y - (d1y / len1) * cr;
+          const bx = curr.x + (d2x / len2) * cr;
+          const by = curr.y + (d2y / len2) * cr;
+          d.push(`L ${ax} ${ay}`);
+          d.push(`Q ${curr.x} ${curr.y} ${bx} ${by}`);
+          // Continue segment from departure point, not from curr
+          // Fall through to handle crossings on this segment
+        }
+      }
+    }
+
+    // Crossing humps on this segment
     const crossings = segCrossings.filter((c) => c.segIdx === i);
-
-    if (crossings.length === 0) {
-      d.push(`L ${a2.x} ${a2.y}`);
-      continue;
+    if (crossings.length > 0) {
+      const segDx = next.x - curr.x, segDy = next.y - curr.y;
+      const segLen = Math.hypot(segDx, segDy);
+      if (segLen >= 1) {
+        const ux = segDx / segLen, uy = segDy / segLen;
+        for (const cross of crossings) {
+          const cx = curr.x + segDx * cross.t;
+          const cy = curr.y + segDy * cross.t;
+          const r = Math.min(humpRadius, segLen * cross.t * 0.4, segLen * (1 - cross.t) * 0.4);
+          if (r < 1) continue;
+          const ax = cx - ux * r, ay = cy - uy * r;
+          const bx = cx + ux * r, by = cy + uy * r;
+          d.push(`L ${ax} ${ay}`);
+          d.push(`A ${r} ${r} 0 0 1 ${bx} ${by}`);
+        }
+      }
     }
 
-    const segDx = a2.x - a1.x, segDy = a2.y - a1.y;
-    const segLen = Math.hypot(segDx, segDy);
-    if (segLen < 1) { d.push(`L ${a2.x} ${a2.y}`); continue; }
-    const ux = segDx / segLen, uy = segDy / segLen; // unit vector along segment
-
-    for (const cross of crossings) {
-      const cx = a1.x + segDx * cross.t;
-      const cy = a1.y + segDy * cross.t;
-      const r = Math.min(radius, segLen * cross.t * 0.4, segLen * (1 - cross.t) * 0.4);
-      if (r < 1) continue;
-      // Approach point: r before crossing
-      const ax = cx - ux * r, ay = cy - uy * r;
-      // Departure point: r after crossing
-      const bx = cx + ux * r, by = cy + uy * r;
-      d.push(`L ${ax} ${ay}`);
-      // Semicircular arc: sweep direction based on perpendicular direction
-      d.push(`A ${r} ${r} 0 0 1 ${bx} ${by}`);
-    }
-    d.push(`L ${a2.x} ${a2.y}`);
+    d.push(`L ${next.x} ${next.y}`);
   }
 
   return d.join(" ");

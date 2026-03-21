@@ -31,6 +31,7 @@ interface Props {
   multiSelectionCount?: number;
   allConnectors?: Connector[];
   allElements?: DiagramElement[];
+  debugMode?: boolean;
 }
 
 const TASK_TYPE_OPTIONS: { value: BpmnTaskType; label: string }[] = [
@@ -91,6 +92,7 @@ export function PropertiesPanel({
   multiSelectionCount,
   allConnectors,
   allElements,
+  debugMode,
 }: Props) {
   const [labelDraft, setLabelDraft] = useState("");
 
@@ -123,6 +125,18 @@ export function PropertiesPanel({
             Connector
           </p>
           <p className="text-xs text-gray-600">Type: {connector.type}</p>
+          {debugMode && (
+            <div className="mt-1 space-y-0.5 select-text">
+              <input readOnly className="text-xs text-gray-400 font-mono bg-transparent border-none outline-none w-full p-0" value={`ID: ${connector.id}`} />
+              <input readOnly className="text-xs text-gray-400 font-mono bg-transparent border-none outline-none w-full p-0" value={`Src: ${connector.sourceId} [${connector.sourceSide}:${(connector.sourceOffsetAlong ?? 0.5).toFixed(2)}]`} />
+              <input readOnly className="text-xs text-gray-400 font-mono bg-transparent border-none outline-none w-full p-0" value={`Tgt: ${connector.targetId} [${connector.targetSide}:${(connector.targetOffsetAlong ?? 0.5).toFixed(2)}]`} />
+              <input readOnly className="text-xs text-gray-400 font-mono bg-transparent border-none outline-none w-full p-0" value={`Routing: ${connector.routingType} | Segs: ${connector.waypoints.length - 1}`} />
+              {connector.waypoints.map((wp, i) => (
+                <input key={i} readOnly className="text-xs text-gray-400 font-mono bg-transparent border-none outline-none w-full p-0 pl-2"
+                  value={`WP${i}: (${Math.round(wp.x)},${Math.round(wp.y)})${i < connector.waypoints.length - 1 ? ` → WP${i+1}` : ""}`} />
+              ))}
+            </div>
+          )}
         </div>
 {connector.type !== "messageBPMN" &&
           (connector.type === "associationBPMN" ||
@@ -209,6 +223,9 @@ export function PropertiesPanel({
           Properties
         </p>
         <p className="text-xs text-gray-400 mb-1">Type: {element.type}</p>
+        {debugMode && (
+          <p className="text-xs text-gray-300 mb-1 font-mono">ID: {element.id}</p>
+        )}
         {(() => {
           if (!allElements) return parentName ? <p className="text-xs text-gray-400 mb-3">Parent: {parentName}</p> : <div className="mb-2" />;
           // Resolve ancestor chain treating boundaryHostId as parent
@@ -566,6 +583,7 @@ export function PropertiesPanel({
                   return (
                     <li key={c.id}>
                       <span className="text-gray-500">{c.type}</span> → {target?.label || "?"}
+                      {debugMode && <span className="text-gray-300 font-mono text-[9px]"> [{c.id}]</span>}
                     </li>
                   );
                 })}
@@ -590,6 +608,7 @@ export function PropertiesPanel({
                   return (
                     <li key={c.id}>
                       {source?.label || "?"} → <span className="text-gray-500">{c.type}</span>
+                      {debugMode && <span className="text-gray-300 font-mono text-[9px]"> [{c.id}]</span>}
                     </li>
                   );
                 })}

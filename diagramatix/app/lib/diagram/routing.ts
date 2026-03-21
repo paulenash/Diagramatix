@@ -265,8 +265,11 @@ export function computeWaypoints(
     .map(getBounds);
 
   const perpOff    = adaptedPerpOffset(srcEdge, sourceSide, tgtEdge, targetSide);
-  const exitPt     = perpendicularExitScaled(srcEdge, sourceSide, perpOff);
-  const approachPt = perpendicularExitScaled(tgtEdge, targetSide, perpOff);
+  // Scale perpendicular offset for small elements (events, etc.)
+  const srcPerpOff = Math.min(perpOff, Math.min(source.width, source.height) * 0.5);
+  const tgtPerpOff = Math.min(perpOff, Math.min(target.width, target.height) * 0.5);
+  const exitPt     = perpendicularExitScaled(srcEdge, sourceSide, srcPerpOff);
+  const approachPt = perpendicularExitScaled(tgtEdge, targetSide, tgtPerpOff);
 
   let midPath: Point[];
   if (
@@ -308,8 +311,26 @@ export function waypointsToSvgPath(waypoints: Point[]): string {
   return d.join(" ");
 }
 
-export function waypointsToRoundedPath(waypoints: Point[], r = 8): string {
-  if (waypoints.length < 2) return "";
+export function waypointsToRoundedPath(rawWaypoints: Point[], r = 8): string {
+  if (rawWaypoints.length < 2) return "";
+  if (rawWaypoints.length === 2)
+    return `M ${rawWaypoints[0].x} ${rawWaypoints[0].y} L ${rawWaypoints[1].x} ${rawWaypoints[1].y}`;
+
+  // Remove collinear intermediate points (same direction consecutive segments)
+  const waypoints = [rawWaypoints[0]];
+  for (let i = 1; i < rawWaypoints.length - 1; i++) {
+    const prev = waypoints[waypoints.length - 1];
+    const curr = rawWaypoints[i];
+    const next = rawWaypoints[i + 1];
+    const d1x = curr.x - prev.x, d1y = curr.y - prev.y;
+    const d2x = next.x - curr.x, d2y = next.y - curr.y;
+    // Cross product ~ 0 means collinear
+    if (Math.abs(d1x * d2y - d1y * d2x) > 0.5) {
+      waypoints.push(curr);
+    }
+  }
+  waypoints.push(rawWaypoints[rawWaypoints.length - 1]);
+
   if (waypoints.length === 2)
     return `M ${waypoints[0].x} ${waypoints[0].y} L ${waypoints[1].x} ${waypoints[1].y}`;
 
@@ -333,8 +354,8 @@ export function waypointsToRoundedPath(waypoints: Point[], r = 8): string {
       continue;
     }
 
-    // Clamp radius to half the shorter neighbouring segment
-    const ar = Math.min(r, len1 / 2, len2 / 2);
+    // Clamp to 45% of each neighbouring segment so adjacent corners don't overlap
+    const ar = Math.min(r, len1 * 0.45, len2 * 0.45);
 
     // Approach point (on incoming segment, r before corner)
     const ax = curr.x - (d1x / len1) * ar;

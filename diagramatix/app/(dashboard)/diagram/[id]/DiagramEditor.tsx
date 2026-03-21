@@ -265,6 +265,9 @@ export function DiagramEditor({
   const [diagramColorConfig, setDiagramColorConfig] = useState<SymbolColorConfig>(initialDiagramColorConfig ?? {});
   const [displayMode, setDisplayMode] = useState<DisplayMode>(initialDisplayMode ?? "normal");
   const [showDiagramMaintenance, setShowDiagramMaintenance] = useState(false);
+  const [debugMode, setDebugMode] = useState(() =>
+    typeof window !== "undefined" && localStorage.getItem(`debug-${projectId}`) === "true"
+  );
 
   // Template state (BPMN only)
   const isAdmin = userEmail === "paul@nashcc.com.au";
@@ -994,6 +997,7 @@ export function DiagramEditor({
           onUpdateCurveHandles={updateCurveHandles}
           colorConfig={effectiveColorConfig}
           displayMode={displayMode}
+          debugMode={debugMode}
           getViewportCenterRef={getViewportCenterRef}
         />
 
@@ -1022,6 +1026,7 @@ export function DiagramEditor({
           hasMessageBpmnConnection={hasMessageBpmnConnection}
           allConnectors={data.connectors}
           allElements={data.elements}
+          debugMode={debugMode}
         />
       </div>
 

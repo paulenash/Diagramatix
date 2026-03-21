@@ -182,6 +182,7 @@ interface Props {
   onUpdateCurveHandles?: (id: string, waypoints: Point[], cp1Rel: Point, cp2Rel: Point) => void;
   colorConfig?: import("@/app/lib/diagram/colors").SymbolColorConfig;
   displayMode?: import("@/app/lib/diagram/displayMode").DisplayMode;
+  debugMode?: boolean;
   getViewportCenterRef?: React.MutableRefObject<(() => Point) | null>;
 }
 
@@ -268,6 +269,52 @@ function sideMidpoint(el: DiagramElement, side: Side): Point {
   }
 }
 
+interface DebugItem {
+  id: string; label: string;
+  anchorX: number; anchorY: number;
+  color: string; defaultOX: number; defaultOY: number;
+}
+
+function DebugLabel({ item, svgToWorld, offsets, setOffset }: {
+  item: DebugItem;
+  svgToWorld: (cx: number, cy: number) => Point;
+  offsets: Map<string, Point>;
+  setOffset: (id: string, offset: Point) => void;
+}) {
+  const offset = offsets.get(item.id) ?? { x: item.defaultOX, y: item.defaultOY };
+  const lx = item.anchorX + offset.x;
+  const ly = item.anchorY + offset.y;
+
+  function handleMouseDown(e: React.MouseEvent) {
+    e.stopPropagation();
+    const startWorld = svgToWorld(e.clientX, e.clientY);
+    const startOff = { ...offset };
+    function onMove(ev: MouseEvent) {
+      const cur = svgToWorld(ev.clientX, ev.clientY);
+      setOffset(item.id, { x: startOff.x + cur.x - startWorld.x, y: startOff.y + cur.y - startWorld.y });
+    }
+    function onUp() {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    }
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  }
+
+  return (
+    <g>
+      <line x1={item.anchorX} y1={item.anchorY} x2={lx} y2={ly}
+        stroke={item.color} strokeWidth={0.5} strokeDasharray="2 2"
+        style={{ pointerEvents: "none" }} />
+      <text x={lx} y={ly} fontSize={7} fill={item.color} textAnchor="middle"
+        fontFamily="monospace" style={{ cursor: "grab", userSelect: "none" }}
+        onMouseDown={handleMouseDown}>
+        {item.label}
+      </text>
+    </g>
+  );
+}
+
 export function Canvas({
   data,
   diagramType,
@@ -302,6 +349,7 @@ export function Canvas({
   onUpdateCurveHandles,
   colorConfig,
   displayMode: displayModeProp,
+  debugMode,
   getViewportCenterRef,
 }: Props) {
   const displayMode = displayModeProp ?? "normal";
@@ -320,6 +368,10 @@ export function Canvas({
     pos: Point;
   } | null>(null);
   const [focusedEndpoint, setFocusedEndpoint] = useState<"source" | "target" | null>(null);
+  const [debugLabelOffsets, setDebugLabelOffsets] = useState<Map<string, Point>>(new Map());
+  const setDebugLabelOffset = useCallback((id: string, offset: Point) => {
+    setDebugLabelOffsets(prev => { const next = new Map(prev); next.set(id, offset); return next; });
+  }, []);
   const [pickerOffset, setPickerOffset] = useState<Point>({ x: 0, y: 0 });
   const pickerDragRef = useRef<{ startX: number; startY: number; origOffX: number; origOffY: number } | null>(null);
 
@@ -534,8 +586,14 @@ export function Canvas({
         } else {
           if (targetEl.type === "lane") return;  // pool already handled above
           const targetOuterSide = getBoundaryEventOuterSide(targetEl, data.elements);
-          // Sequence connectors connect to the INNER (subprocess-facing) side of boundary events
-          let seqSourceSide = outerSide ? oppositeSide(outerSide) : effectiveSide;
+          // For edge-mounted events: use inner side if target is inside the host, outer side if outside
+          let seqSourceSide: Side;
+          if (outerSide && sourceEl?.boundaryHostId) {
+            const targetIsInsideHost = targetEl.parentId === sourceEl.boundaryHostId;
+            seqSourceSide = targetIsInsideHost ? oppositeSide(outerSide) : outerSide;
+          } else {
+            seqSourceSide = outerSide ? oppositeSide(outerSide) : effectiveSide;
+          }
           let seqTargetSide: Side = targetOuterSide ? oppositeSide(targetOuterSide) : getClosestSide(pos, targetEl);
 
           // For expanded subprocess targets from external elements:
@@ -1498,10 +1556,107 @@ export function Canvas({
                 onUpdateCurveHandles={onUpdateCurveHandles}
                 otherConnectorWaypoints={
                   conn.type === "sequence"
-                    ? seqConns.slice(0, seqConns.indexOf(conn)).map(c => c.waypoints)
+                    ? seqConns.slice(0, seqConns.indexOf(conn)).map(c => {
+                        const vs = c.sourceInvisibleLeader ? 1 : 0;
+                        const ve = c.targetInvisibleLeader ? c.waypoints.length - 2 : c.waypoints.length - 1;
+                        return c.waypoints.slice(vs, ve + 1);
+                      })
                     : undefined
                 }
               />
+            ));
+          })()}
+
+          {/* Debug: labels for selected elements and their connectors */}
+          {debugMode && (() => {
+            const debugItems: { id: string; label: string; anchorX: number; anchorY: number; color: string; defaultOX: number; defaultOY: number }[] = [];
+
+            // Selected element debug labels
+            for (const selId of selectedElementIds) {
+              const el = data.elements.find(e => e.id === selId);
+              if (!el) continue;
+              debugItems.push({
+                id: `dbg-el-${el.id}`,
+                label: `[${el.id.slice(-6)}] ${el.type}`,
+                anchorX: el.x + el.width / 2, anchorY: el.y,
+                color: "#059669", defaultOX: 0, defaultOY: -18,
+              });
+              // Show connected connectors for this element
+              for (const conn of data.connectors) {
+                if (conn.sourceId !== el.id && conn.targetId !== el.id) continue;
+                const wps = conn.waypoints;
+                if (wps.length < 2) continue;
+                const vs = conn.sourceInvisibleLeader ? 1 : 0;
+                const ve = conn.targetInvisibleLeader ? wps.length - 2 : wps.length - 1;
+                // Source endpoint
+                debugItems.push({
+                  id: `dbg-cs-${conn.id}`,
+                  label: `S:${conn.id.slice(-4)} [${conn.sourceSide}]`,
+                  anchorX: wps[vs].x, anchorY: wps[vs].y,
+                  color: "#dc2626", defaultOX: -20, defaultOY: -14,
+                });
+                // Target endpoint
+                debugItems.push({
+                  id: `dbg-ct-${conn.id}`,
+                  label: `T:${conn.id.slice(-4)} [${conn.targetSide}]`,
+                  anchorX: wps[ve].x, anchorY: wps[ve].y,
+                  color: "#dc2626", defaultOX: 20, defaultOY: -14,
+                });
+                // Segment labels
+                for (let i = 0; i < ve - vs; i++) {
+                  const a = wps[vs + i], b = wps[vs + i + 1];
+                  debugItems.push({
+                    id: `dbg-seg-${conn.id}-${i}`,
+                    label: `${conn.id.slice(-4)}.s${i}`,
+                    anchorX: (a.x + b.x) / 2, anchorY: (a.y + b.y) / 2,
+                    color: "#9333ea", defaultOX: 0, defaultOY: -10,
+                  });
+                }
+              }
+            }
+
+            // Selected connector debug labels
+            if (selectedConnectorId && selectedElementIds.size === 0) {
+              const conn = data.connectors.find(c => c.id === selectedConnectorId);
+              if (conn && conn.waypoints.length >= 2) {
+                const wps = conn.waypoints;
+                const vs = conn.sourceInvisibleLeader ? 1 : 0;
+                const ve = conn.targetInvisibleLeader ? wps.length - 2 : wps.length - 1;
+                const srcEl = data.elements.find(e => e.id === conn.sourceId);
+                const tgtEl = data.elements.find(e => e.id === conn.targetId);
+                debugItems.push({
+                  id: `dbg-conn-${conn.id}`,
+                  label: `[${conn.id.slice(-6)}] ${conn.type} ${conn.routingType}`,
+                  anchorX: (wps[vs].x + wps[ve].x) / 2, anchorY: (wps[vs].y + wps[ve].y) / 2,
+                  color: "#2563eb", defaultOX: 0, defaultOY: -22,
+                });
+                debugItems.push({
+                  id: `dbg-cs2-${conn.id}`,
+                  label: `S:${srcEl?.label || conn.sourceId.slice(-4)} [${conn.sourceSide}:${(conn.sourceOffsetAlong ?? 0.5).toFixed(2)}]`,
+                  anchorX: wps[vs].x, anchorY: wps[vs].y,
+                  color: "#dc2626", defaultOX: -30, defaultOY: -14,
+                });
+                debugItems.push({
+                  id: `dbg-ct2-${conn.id}`,
+                  label: `T:${tgtEl?.label || conn.targetId.slice(-4)} [${conn.targetSide}:${(conn.targetOffsetAlong ?? 0.5).toFixed(2)}]`,
+                  anchorX: wps[ve].x, anchorY: wps[ve].y,
+                  color: "#dc2626", defaultOX: 30, defaultOY: -14,
+                });
+                for (let i = 0; i < ve - vs; i++) {
+                  const a = wps[vs + i], b = wps[vs + i + 1];
+                  debugItems.push({
+                    id: `dbg-seg2-${conn.id}-${i}`,
+                    label: `s${i} (${Math.round(a.x)},${Math.round(a.y)})→(${Math.round(b.x)},${Math.round(b.y)})`,
+                    anchorX: (a.x + b.x) / 2, anchorY: (a.y + b.y) / 2,
+                    color: "#9333ea", defaultOX: 0, defaultOY: -10,
+                  });
+                }
+              }
+            }
+
+            return debugItems.map(item => (
+              <DebugLabel key={item.id} item={item} svgToWorld={clientToWorld}
+                offsets={debugLabelOffsets} setOffset={setDebugLabelOffset} />
             ));
           })()}
 
@@ -1829,7 +1984,11 @@ export function Canvas({
                 onUpdateCurveHandles={onUpdateCurveHandles}
                 otherConnectorWaypoints={
                   conn.type === "sequence" && priorSeqConns.length > 0
-                    ? priorSeqConns.map(c => c.waypoints)
+                    ? priorSeqConns.map(c => {
+                        const vs = c.sourceInvisibleLeader ? 1 : 0;
+                        const ve = c.targetInvisibleLeader ? c.waypoints.length - 2 : c.waypoints.length - 1;
+                        return c.waypoints.slice(vs, ve + 1);
+                      })
                     : undefined
                 }
               />
@@ -1977,8 +2136,7 @@ export function Canvas({
               onChange={commonChange as React.ChangeEventHandler<HTMLTextAreaElement>}
               onBlur={commitLabel}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  if (e.ctrlKey) return;
+                if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
                   commitLabel();
                 }
@@ -2035,30 +2193,31 @@ export function Canvas({
           );
         }
         return (
-          <input
+          <textarea
             autoFocus
-            type="text"
             value={editingLabel.value}
             onFocus={(e) => { const t = e.target; setTimeout(() => { t.setSelectionRange(t.value.length, t.value.length); }, 0); }}
-            onChange={commonChange as React.ChangeEventHandler<HTMLInputElement>}
+            onChange={commonChange as React.ChangeEventHandler<HTMLTextAreaElement>}
             onBlur={commitLabel}
             onKeyDown={(e) => {
-              if (e.key === "Enter") commitLabel();
+              if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); commitLabel(); }
               if (e.key === "Escape") setEditingLabel(null);
             }}
             style={{
               position: "absolute",
               left: editingLabel.x,
-              top: editingLabel.y + (hasTaskMarker ? 20 * zoom : editingLabel.height / 2 - 12),
+              top: editingLabel.y + (hasTaskMarker ? 20 * zoom : 0),
               width: editingLabel.width,
-              height: 24,
+              height: editingLabel.height,
               fontSize: 12 * zoom,
               textAlign: "center",
               background: "white",
               border: "2px solid #2563eb",
               borderRadius: 4,
               outline: "none",
-              padding: "0 4px",
+              padding: "4px",
+              resize: "none",
+              overflow: "hidden",
             }}
           />
         );

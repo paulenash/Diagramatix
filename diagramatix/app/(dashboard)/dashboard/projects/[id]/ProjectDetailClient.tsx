@@ -161,8 +161,15 @@ export function ProjectDetailClient({ project, otherProjects }: Props) {
         <DiagramMaintenanceModal
           projectId={project.id}
           initialColorConfig={projectColorConfig}
+          debugMode={typeof window !== "undefined" && localStorage.getItem(`debug-${project.id}`) === "true"}
           onClose={() => setShowMaintenance(false)}
-          onSaved={(config) => { setProjectColorConfig(config); router.refresh(); }}
+          onSaved={(config, debugMode) => {
+            setProjectColorConfig(config);
+            if (typeof window !== "undefined") {
+              localStorage.setItem(`debug-${project.id}`, debugMode ? "true" : "false");
+            }
+            router.refresh();
+          }}
         />
       )}
 
