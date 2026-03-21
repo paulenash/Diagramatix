@@ -330,14 +330,35 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
 
   return (
     <g>
-      {/* Dotted tether: always visible except when editing */}
-      {!isEditing && (
-        <line
-          x1={tetherPoint.x} y1={tetherPoint.y} x2={lCx} y2={lMidY}
-          stroke="#6b7280" strokeWidth={1} strokeDasharray="4 3"
-          style={{ pointerEvents: "none" }}
-        />
-      )}
+      {/* Dotted tether: always visible except when editing — ends at label box boundary */}
+      {!isEditing && (() => {
+        // Compute intersection of tether line with label box boundary
+        const boxL = lCx - effectiveLWidth / 2 - 3;
+        const boxR = lCx + effectiveLWidth / 2 + 3;
+        const boxT = lTy - 2;
+        const boxB = lTy + lHeight + 2;
+        const boxCx = (boxL + boxR) / 2;
+        const boxCy = (boxT + boxB) / 2;
+        const dx = tetherPoint.x - boxCx;
+        const dy = tetherPoint.y - boxCy;
+        let tx = lCx, ty = lMidY;
+        if (Math.abs(dx) > 0.01 || Math.abs(dy) > 0.01) {
+          const halfW = (boxR - boxL) / 2;
+          const halfH = (boxB - boxT) / 2;
+          const scaleX = Math.abs(dx) > 0 ? halfW / Math.abs(dx) : Infinity;
+          const scaleY = Math.abs(dy) > 0 ? halfH / Math.abs(dy) : Infinity;
+          const s = Math.min(scaleX, scaleY);
+          tx = boxCx + dx * s;
+          ty = boxCy + dy * s;
+        }
+        return (
+          <line
+            x1={tetherPoint.x} y1={tetherPoint.y} x2={tx} y2={ty}
+            stroke="#6b7280" strokeWidth={1} strokeDasharray="4 3"
+            style={{ pointerEvents: "none" }}
+          />
+        );
+      })()}
       {/* Hit area + dashed blue highlight when active — transparent fill keeps it clickable */}
       <rect
         x={lCx - effectiveLWidth / 2 - 3} y={lTy - 2}
