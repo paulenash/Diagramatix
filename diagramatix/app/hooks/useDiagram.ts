@@ -122,6 +122,7 @@ type Action =
       newOffsetAlong?: number;
     }}
   | { type: "NUDGE_CONNECTOR"; payload: { connectorId: string; dx: number; dy: number } }
+  | { type: "NUDGE_CONNECTOR_ENDPOINT"; payload: { connectorId: string; endpoint: "source" | "target"; dx: number; dy: number } }
   | { type: "UPDATE_CONNECTOR"; payload: { id: string; directionType: DirectionType } }
   | { type: "UPDATE_CONNECTOR_WAYPOINTS"; payload: { id: string; waypoints: Point[] } }
   | { type: "UPDATE_CURVE_HANDLES"; payload: {
@@ -835,6 +836,33 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       return { ...state, connectors };
     }
 
+    case "NUDGE_CONNECTOR_ENDPOINT": {
+      const { connectorId, endpoint, dx, dy } = action.payload;
+      const connectors = state.connectors.map((conn) => {
+        if (conn.id !== connectorId) return conn;
+        function nudgeOffset(side: Side, offset: number): number {
+          const clamp = (v: number) => Math.max(0.02, Math.min(0.98, v));
+          if (side === "top" || side === "bottom") return clamp(offset + dx * 0.02);
+          return clamp(offset + dy * 0.02);
+        }
+        const updated = endpoint === "source"
+          ? { ...conn, sourceOffsetAlong: nudgeOffset(conn.sourceSide, conn.sourceOffsetAlong ?? 0.5) }
+          : { ...conn, targetOffsetAlong: nudgeOffset(conn.targetSide, conn.targetOffsetAlong ?? 0.5) };
+        const source = state.elements.find((el) => el.id === updated.sourceId);
+        const target = state.elements.find((el) => el.id === updated.targetId);
+        if (!source || !target) return conn;
+        const { waypoints, sourceInvisibleLeader, targetInvisibleLeader } =
+          updated.type === "messageBPMN"
+            ? messageBpmnWaypoints(source, target, updated.sourceSide, updated.targetSide,
+                updated.sourceOffsetAlong ?? 0.5)
+            : computeWaypoints(source, target, state.elements,
+                updated.sourceSide, updated.targetSide, updated.routingType,
+                updated.sourceOffsetAlong ?? 0.5, updated.targetOffsetAlong ?? 0.5);
+        return { ...updated, waypoints, sourceInvisibleLeader, targetInvisibleLeader };
+      });
+      return { ...state, connectors };
+    }
+
     case "UPDATE_CONNECTOR_WAYPOINTS":
       return {
         ...state,
@@ -1479,6 +1507,11 @@ export function useDiagram(initialData: DiagramData) {
     dispatch({ type: "NUDGE_CONNECTOR", payload: { connectorId, dx, dy } });
   }, []);
 
+  const nudgeConnectorEndpoint = useCallback((connectorId: string, endpoint: "source" | "target", dx: number, dy: number) => {
+    pushHistory(snapshotData());
+    dispatch({ type: "NUDGE_CONNECTOR_ENDPOINT", payload: { connectorId, endpoint, dx, dy } });
+  }, []);
+
   const connectorWaypointDragEnd = useCallback((id: string) => {
     if (waypointConnIdRef.current === id && preWaypointRef.current) {
       pushHistory(preWaypointRef.current);
@@ -1603,6 +1636,7 @@ export function useDiagram(initialData: DiagramData) {
     updateCurveHandles,
     connectorWaypointDragEnd,
     nudgeConnector,
+    nudgeConnectorEndpoint,
     updateConnectorLabel,
     elementMoveEnd,
     splitConnector,

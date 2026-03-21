@@ -147,6 +147,17 @@ function perpendicularApproach(pt: Point, side: Side): Point {
   }
 }
 
+// Control point along the radial outward direction from element centre through the edge point
+function radialControlPoint(edgePt: Point, el: DiagramElement, offset: number): Point {
+  const cx = el.x + el.width / 2;
+  const cy = el.y + el.height / 2;
+  const dx = edgePt.x - cx;
+  const dy = edgePt.y - cy;
+  const len = Math.sqrt(dx * dx + dy * dy);
+  if (len === 0) return { x: edgePt.x, y: edgePt.y - offset };
+  return { x: edgePt.x + (dx / len) * offset, y: edgePt.y + (dy / len) * offset };
+}
+
 function perpendicularExitScaled(pt: Point, side: Side, offset: number): Point {
   switch (side) {
     case "right":  return { x: pt.x + offset, y: pt.y };
@@ -225,12 +236,15 @@ export function computeWaypoints(
     const srcEdgeRaw = sidePoint(source, sourceSide, sourceOffsetAlong);
     const tgtEdgeRaw = sidePoint(target, targetSide, targetOffsetAlong);
     // Project onto circle boundary for circular elements
-    const srcEdge = CIRC_TYPES.has(source.type) ? ellipseEdgePoint(srcEdgeRaw, source) : srcEdgeRaw;
-    const tgtEdge = CIRC_TYPES.has(target.type) ? ellipseEdgePoint(tgtEdgeRaw, target) : tgtEdgeRaw;
+    const srcIsCirc = CIRC_TYPES.has(source.type);
+    const tgtIsCirc = CIRC_TYPES.has(target.type);
+    const srcEdge = srcIsCirc ? ellipseEdgePoint(srcEdgeRaw, source) : srcEdgeRaw;
+    const tgtEdge = tgtIsCirc ? ellipseEdgePoint(tgtEdgeRaw, target) : tgtEdgeRaw;
     const dist   = euclideanDist(srcEdge, tgtEdge);
     const curveOffset = Math.max(60, dist / 3);
-    const cp1 = perpendicularExitScaled(srcEdge, sourceSide, curveOffset);
-    const cp2 = perpendicularExitScaled(tgtEdge, targetSide, curveOffset);
+    // For circular elements, control point extends along the radial normal (outward from centre)
+    const cp1 = srcIsCirc ? radialControlPoint(srcEdge, source, curveOffset) : perpendicularExitScaled(srcEdge, sourceSide, curveOffset);
+    const cp2 = tgtIsCirc ? radialControlPoint(tgtEdge, target, curveOffset) : perpendicularExitScaled(tgtEdge, targetSide, curveOffset);
     return {
       waypoints: [startPt, srcEdge, cp1, cp2, tgtEdge, endPt],
       sourceInvisibleLeader: true,

@@ -430,10 +430,16 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
         && visibleWaypoints.length === 4) {
       const [P0, P1, P2, P3] = visibleWaypoints;
       const STUB = 4;
-      const u1 = sideNormal(connector.sourceSide);
-      const s1 = { x: P0.x + STUB * u1.x, y: P0.y + STUB * u1.y };
-      // End path at P3 (target edge) — the arrowhead aligns to the Bezier tangent (P2→P3 direction)
-      return `M ${P0.x} ${P0.y} L ${s1.x} ${s1.y} C ${P1.x} ${P1.y}, ${P2.x} ${P2.y}, ${P3.x} ${P3.y}`;
+      // Stub directions derived from control points (perpendicular for rects, radial for circles)
+      const srcDir = { x: P1.x - P0.x, y: P1.y - P0.y };
+      const srcLen = Math.sqrt(srcDir.x ** 2 + srcDir.y ** 2) || 1;
+      const s1 = { x: P0.x + (srcDir.x / srcLen) * STUB, y: P0.y + (srcDir.y / srcLen) * STUB };
+      const tgtDir = { x: P2.x - P3.x, y: P2.y - P3.y };
+      const tgtLen = Math.sqrt(tgtDir.x ** 2 + tgtDir.y ** 2) || 1;
+      const s2 = { x: P3.x + (tgtDir.x / tgtLen) * STUB, y: P3.y + (tgtDir.y / tgtLen) * STUB };
+      // Path: source edge → stub → curve → stub → target edge
+      // Arrowhead on last segment (s2→P3) aligns perpendicular to element edge
+      return `M ${P0.x} ${P0.y} L ${s1.x} ${s1.y} C ${P1.x} ${P1.y}, ${P2.x} ${P2.y}, ${s2.x} ${s2.y} L ${P3.x} ${P3.y}`;
     }
     // Crossing humps for the last sequence connector
     if (otherConnectorWaypoints && otherConnectorWaypoints.length > 0

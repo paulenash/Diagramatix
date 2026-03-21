@@ -211,6 +211,7 @@ export function DiagramEditor({
     updateCurveHandles,
     connectorWaypointDragEnd,
     nudgeConnector,
+    nudgeConnectorEndpoint,
     updateConnectorLabel,
     elementMoveEnd,
     splitConnector,
@@ -989,6 +990,7 @@ export function DiagramEditor({
           onLaneBoundaryMoveEnd={laneBoundaryMoveEnd}
           onConnectorWaypointDragEnd={connectorWaypointDragEnd}
           onNudgeConnector={nudgeConnector}
+          onNudgeConnectorEndpoint={nudgeConnectorEndpoint}
           onUpdateCurveHandles={updateCurveHandles}
           colorConfig={effectiveColorConfig}
           displayMode={displayMode}

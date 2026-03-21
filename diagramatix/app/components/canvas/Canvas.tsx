@@ -178,6 +178,7 @@ interface Props {
   onLaneBoundaryMoveEnd?: () => void;
   onConnectorWaypointDragEnd?: (id: string) => void;
   onNudgeConnector?: (connectorId: string, dx: number, dy: number) => void;
+  onNudgeConnectorEndpoint?: (connectorId: string, endpoint: "source" | "target", dx: number, dy: number) => void;
   onUpdateCurveHandles?: (id: string, waypoints: Point[], cp1Rel: Point, cp2Rel: Point) => void;
   colorConfig?: import("@/app/lib/diagram/colors").SymbolColorConfig;
   displayMode?: import("@/app/lib/diagram/displayMode").DisplayMode;
@@ -297,6 +298,7 @@ export function Canvas({
   onLaneBoundaryMoveEnd,
   onConnectorWaypointDragEnd,
   onNudgeConnector,
+  onNudgeConnectorEndpoint,
   onUpdateCurveHandles,
   colorConfig,
   displayMode: displayModeProp,
@@ -317,11 +319,13 @@ export function Canvas({
     sourceOffset?: number; targetOffset?: number;
     pos: Point;
   } | null>(null);
+  const [focusedEndpoint, setFocusedEndpoint] = useState<"source" | "target" | null>(null);
   const [pickerOffset, setPickerOffset] = useState<Point>({ x: 0, y: 0 });
   const pickerDragRef = useRef<{ startX: number; startY: number; origOffX: number; origOffY: number } | null>(null);
 
   // Reset picker offset when a new pending drop appears
   useEffect(() => { setPickerOffset({ x: 0, y: 0 }); }, [pendingDrop]);
+  useEffect(() => { setFocusedEndpoint(null); }, [selectedConnectorId]);
 
   // Dismiss connector choice popup on click outside
   useEffect(() => {
@@ -1091,13 +1095,20 @@ export function Canvas({
       if (e.key === "ArrowUp")    { e.preventDefault(); onMoveElements(ids, 0, -NUDGE); return; }
       if (e.key === "ArrowDown")  { e.preventDefault(); onMoveElements(ids, 0, NUDGE); return; }
     }
-    // Nudge selected connector with arrow keys
-    if (selectedConnectorId && selectedElementIds.size === 0 && !editingLabel && onNudgeConnector) {
+    // Nudge selected connector or focused endpoint with arrow keys
+    if (selectedConnectorId && selectedElementIds.size === 0 && !editingLabel) {
       const NUDGE = e.shiftKey ? 1 : 5;
-      if (e.key === "ArrowLeft")  { e.preventDefault(); onNudgeConnector(selectedConnectorId, -NUDGE, 0); return; }
-      if (e.key === "ArrowRight") { e.preventDefault(); onNudgeConnector(selectedConnectorId, NUDGE, 0); return; }
-      if (e.key === "ArrowUp")    { e.preventDefault(); onNudgeConnector(selectedConnectorId, 0, -NUDGE); return; }
-      if (e.key === "ArrowDown")  { e.preventDefault(); onNudgeConnector(selectedConnectorId, 0, NUDGE); return; }
+      if (focusedEndpoint && onNudgeConnectorEndpoint) {
+        if (e.key === "ArrowLeft")  { e.preventDefault(); onNudgeConnectorEndpoint(selectedConnectorId, focusedEndpoint, -NUDGE, 0); return; }
+        if (e.key === "ArrowRight") { e.preventDefault(); onNudgeConnectorEndpoint(selectedConnectorId, focusedEndpoint, NUDGE, 0); return; }
+        if (e.key === "ArrowUp")    { e.preventDefault(); onNudgeConnectorEndpoint(selectedConnectorId, focusedEndpoint, 0, -NUDGE); return; }
+        if (e.key === "ArrowDown")  { e.preventDefault(); onNudgeConnectorEndpoint(selectedConnectorId, focusedEndpoint, 0, NUDGE); return; }
+      } else if (onNudgeConnector) {
+        if (e.key === "ArrowLeft")  { e.preventDefault(); onNudgeConnector(selectedConnectorId, -NUDGE, 0); return; }
+        if (e.key === "ArrowRight") { e.preventDefault(); onNudgeConnector(selectedConnectorId, NUDGE, 0); return; }
+        if (e.key === "ArrowUp")    { e.preventDefault(); onNudgeConnector(selectedConnectorId, 0, -NUDGE); return; }
+        if (e.key === "ArrowDown")  { e.preventDefault(); onNudgeConnector(selectedConnectorId, 0, NUDGE); return; }
+      }
     }
     if (e.key === "Escape") {
       setDraggingConnector(null);
@@ -1851,28 +1862,54 @@ export function Canvas({
           })()}
 
           {/* Connector endpoint handles when a non-messageBPMN connector is selected */}
-          {endpointHandles && (
-            <g data-interactive>
-              <rect
-                x={endpointHandles.source.x - 5} y={endpointHandles.source.y - 5}
-                width={10} height={10}
-                fill="#2563eb" stroke="white" strokeWidth={1.5}
-                style={{ cursor: "crosshair" }}
-                onMouseDown={(e) =>
-                  handleEndpointDragStart(selectedConnectorId!, "source", endpointHandles.source, e)
+          {endpointHandles && (() => {
+            function makeEndpointHandler(endpoint: "source" | "target", pos: Point) {
+              return (e: React.MouseEvent) => {
+                e.stopPropagation();
+                e.preventDefault();
+                const startX = e.clientX, startY = e.clientY;
+                let dragged = false;
+                function onMove(ev: MouseEvent) {
+                  if (!dragged && (Math.abs(ev.clientX - startX) > 3 || Math.abs(ev.clientY - startY) > 3)) {
+                    dragged = true;
+                    window.removeEventListener("mousemove", onMove);
+                    window.removeEventListener("mouseup", onUp);
+                    handleEndpointDragStart(selectedConnectorId!, endpoint, pos, e);
+                  }
                 }
-              />
-              <rect
-                x={endpointHandles.target.x - 5} y={endpointHandles.target.y - 5}
-                width={10} height={10}
-                fill="#2563eb" stroke="white" strokeWidth={1.5}
-                style={{ cursor: "crosshair" }}
-                onMouseDown={(e) =>
-                  handleEndpointDragStart(selectedConnectorId!, "target", endpointHandles.target, e)
+                function onUp() {
+                  window.removeEventListener("mousemove", onMove);
+                  window.removeEventListener("mouseup", onUp);
+                  if (!dragged) {
+                    // Click without drag — toggle focus
+                    setFocusedEndpoint(prev => prev === endpoint ? null : endpoint);
+                  }
                 }
-              />
-            </g>
-          )}
+                window.addEventListener("mousemove", onMove);
+                window.addEventListener("mouseup", onUp);
+              };
+            }
+            return (
+              <g data-interactive>
+                <rect
+                  x={endpointHandles.source.x - 5} y={endpointHandles.source.y - 5}
+                  width={10} height={10}
+                  fill={focusedEndpoint === "source" ? "#f59e0b" : "#2563eb"}
+                  stroke="white" strokeWidth={1.5}
+                  style={{ cursor: "pointer" }}
+                  onMouseDown={makeEndpointHandler("source", endpointHandles.source)}
+                />
+                <rect
+                  x={endpointHandles.target.x - 5} y={endpointHandles.target.y - 5}
+                  width={10} height={10}
+                  fill={focusedEndpoint === "target" ? "#f59e0b" : "#2563eb"}
+                  stroke="white" strokeWidth={1.5}
+                  style={{ cursor: "pointer" }}
+                  onMouseDown={makeEndpointHandler("target", endpointHandles.target)}
+                />
+              </g>
+            );
+          })()}
 
           {/* Rubber-band line during connector drag */}
           {draggingConnector && (
