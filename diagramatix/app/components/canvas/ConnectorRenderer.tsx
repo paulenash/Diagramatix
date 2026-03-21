@@ -431,10 +431,9 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
       const [P0, P1, P2, P3] = visibleWaypoints;
       const STUB = 4;
       const u1 = sideNormal(connector.sourceSide);
-      const u2 = sideNormal(connector.targetSide);
       const s1 = { x: P0.x + STUB * u1.x, y: P0.y + STUB * u1.y };
-      const s2 = { x: P3.x + STUB * u2.x, y: P3.y + STUB * u2.y };
-      return `M ${P0.x} ${P0.y} L ${s1.x} ${s1.y} C ${P1.x} ${P1.y}, ${P2.x} ${P2.y}, ${s2.x} ${s2.y} L ${P3.x} ${P3.y}`;
+      // End path at P3 (target edge) — the arrowhead aligns to the Bezier tangent (P2→P3 direction)
+      return `M ${P0.x} ${P0.y} L ${s1.x} ${s1.y} C ${P1.x} ${P1.y}, ${P2.x} ${P2.y}, ${P3.x} ${P3.y}`;
     }
     // Crossing humps for the last sequence connector
     if (otherConnectorWaypoints && otherConnectorWaypoints.length > 0

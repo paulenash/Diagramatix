@@ -1429,14 +1429,13 @@ export function SymbolRenderer({
       }
 
       {/* Full-body connection overlay for all non-boundary elements */}
-      {showConnectionPoints && !isBoundary && element.type !== "lane" && element.type === "use-case" && (() => {
+      {showConnectionPoints && !isBoundary && element.type !== "lane" && (element.type === "use-case" || element.type === "process-system") && (() => {
         const cx = element.x + element.width / 2;
         const cy = element.y + element.height / 2;
         const handler = (e: React.MouseEvent) => {
           e.stopPropagation();
           const worldPt = svgToWorld ? svgToWorld(e.clientX, e.clientY) : { x: cx, y: cy };
           const side = getClosestSideFromPoint(worldPt, element);
-          const centerPos = { x: cx, y: cy };
 
           let fired = false;
           function activate() {
@@ -1445,7 +1444,7 @@ export function SymbolRenderer({
             clearTimeout(holdTimer);
             window.removeEventListener("mouseup", onUp);
             window.removeEventListener("mousemove", onMove);
-            onConnectionPointDragStart(side, centerPos);
+            onConnectionPointDragStart(side, worldPt);
           }
           const holdTimer = setTimeout(activate, 300);
           function onMove(ev: MouseEvent) {
@@ -1468,7 +1467,7 @@ export function SymbolRenderer({
           />
         );
       })()}
-      {showConnectionPoints && !isBoundary && element.type !== "lane" && element.type !== "use-case" && (
+      {showConnectionPoints && !isBoundary && element.type !== "lane" && element.type !== "use-case" && element.type !== "process-system" && (
         <rect data-interactive
           x={element.x} y={element.y}
           width={element.width} height={element.height}
@@ -1480,7 +1479,6 @@ export function SymbolRenderer({
               ? svgToWorld(e.clientX, e.clientY)
               : { x: element.x + element.width / 2, y: element.y + element.height / 2 };
             const side = getClosestSideFromPoint(worldPt, element);
-            const centerPos = { x: element.x + element.width / 2, y: element.y + element.height / 2 };
 
             let fired = false;
             function activate() {
@@ -1489,7 +1487,7 @@ export function SymbolRenderer({
               clearTimeout(holdTimer);
               window.removeEventListener("mouseup", onUp);
               window.removeEventListener("mousemove", onMove);
-              onConnectionPointDragStart(side, centerPos);
+              onConnectionPointDragStart(side, worldPt);
             }
             const holdTimer = setTimeout(activate, 300);
             function onMove(ev: MouseEvent) {
