@@ -10,6 +10,7 @@ import type {
   DiagramElement,
   DiagramType,
   DirectionType,
+  ConnectorType,
 } from "@/app/lib/diagram/types";
 
 interface Props {
@@ -21,6 +22,7 @@ interface Props {
   onDeleteElement: (id: string) => void;
   onDeleteConnector: (id: string) => void;
   onUpdateConnectorDirection: (id: string, directionType: DirectionType) => void;
+  onUpdateConnectorType?: (id: string, connectorType: ConnectorType) => void;
   onUpdateConnectorLabel?: (id: string, label: string) => void;
   onAddLane?: (poolId: string) => void;
   onAddSublane?: (laneId: string) => void;
@@ -82,6 +84,7 @@ export function PropertiesPanel({
   onDeleteElement,
   onDeleteConnector,
   onUpdateConnectorDirection,
+  onUpdateConnectorType,
   onUpdateConnectorLabel,
   onAddLane,
   onAddSublane,
@@ -138,6 +141,32 @@ export function PropertiesPanel({
             </div>
           )}
         </div>
+        {(connector.type === "uml-association" || connector.type === "uml-aggregation" ||
+          connector.type === "uml-composition" || connector.type === "uml-generalisation") && onUpdateConnectorType && (
+          <div>
+            <p className="text-xs font-medium text-gray-700 mb-1">Relationship</p>
+            <div className="flex flex-col gap-1">
+              {([
+                { value: "uml-association" as ConnectorType, label: "Association" },
+                { value: "uml-aggregation" as ConnectorType, label: "Aggregation" },
+                { value: "uml-composition" as ConnectorType, label: "Composition" },
+                { value: "uml-generalisation" as ConnectorType, label: "Generalisation" },
+              ]).map(({ value, label }) => (
+                <button
+                  key={value}
+                  onClick={() => onUpdateConnectorType(connector.id, value)}
+                  className={`px-2 py-1 text-xs rounded border text-left ${
+                    connector.type === value
+                      ? "bg-blue-600 text-white border-blue-600"
+                      : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 {connector.type !== "messageBPMN" &&
           (connector.type === "associationBPMN" ||
           (connector.type !== "sequence" && connector.type !== "transition" && connector.type !== "flow") ||

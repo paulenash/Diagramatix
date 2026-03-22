@@ -36,6 +36,9 @@ export const DEFAULT_SYMBOL_COLORS: Record<SymbolType, string> = {
   // Context Diagram
   "external-entity":     "#bfdbfe",   // light blue
   "process-system":      "#e9d5ff",   // light purple
+  // Domain Diagram
+  "uml-class":           "#fed7aa",   // light orange
+  "uml-enumeration":     "#bbf7d0",   // light green
 };
 
 /** Black & white colour scheme: fills → white, lines/strokes → black. */
@@ -71,6 +74,9 @@ export const BW_SYMBOL_COLORS: Record<SymbolType, string> = {
   // Context Diagram
   "external-entity":     "#ffffff",
   "process-system":      "#ffffff",
+  // Domain Diagram
+  "uml-class":           "#ffffff",
+  "uml-enumeration":     "#ffffff",
 };
 
 /** Return the effective colour for a symbol type, preferring the project config over defaults. */

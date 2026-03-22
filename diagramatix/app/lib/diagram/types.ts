@@ -1,4 +1,4 @@
-export type DiagramType = "context" | "basic" | "process-context" | "state-machine" | "bpmn";
+export type DiagramType = "context" | "basic" | "process-context" | "state-machine" | "bpmn" | "domain";
 
 export type SymbolType =
   | "task"
@@ -27,7 +27,9 @@ export type SymbolType =
   | "group"
   | "text-annotation"
   | "external-entity"
-  | "process-system";
+  | "process-system"
+  | "uml-class"
+  | "uml-enumeration";
 
 export type BpmnTaskType =
   | "none"
@@ -51,7 +53,7 @@ export type RepeatType = "none" | "loop";
 
 export type FlowType = "none" | "catching" | "throwing";
 
-export type ConnectorType = "sequence" | "message" | "association" | "transition" | "associationBPMN" | "messageBPMN" | "flow";
+export type ConnectorType = "sequence" | "message" | "association" | "transition" | "associationBPMN" | "messageBPMN" | "flow" | "uml-association" | "uml-aggregation" | "uml-composition" | "uml-generalisation";
 
 export type Side = "top" | "right" | "bottom" | "left";
 

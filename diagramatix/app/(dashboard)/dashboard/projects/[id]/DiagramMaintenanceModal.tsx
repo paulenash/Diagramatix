@@ -18,6 +18,7 @@ const TABS: { type: DiagramType; label: string }[] = [
   { type: "process-context", label: "Process Context" },
   { type: "state-machine",   label: "State Machine" },
   { type: "context",           label: "Context Diagram" },
+  { type: "domain",            label: "Domain Diagram" },
 ];
 
 export function DiagramMaintenanceModal({ projectId, initialColorConfig, debugMode: initialDebugMode, onClose, onSaved }: Props) {

@@ -38,6 +38,7 @@ const DIAGRAM_TYPE_LABELS: Record<string, string> = {
   "process-context": "Process Context",
   "state-machine": "State Machine",
   bpmn: "BPMN",
+  domain: "Domain Diagram",
 };
 
 const DIAGRAM_TYPES: { value: DiagramType; label: string; description: string }[] = [
@@ -45,6 +46,7 @@ const DIAGRAM_TYPES: { value: DiagramType; label: string; description: string }[
   { value: "process-context", label: "Process Context", description: "Use cases with actors showing process participants" },
   { value: "state-machine", label: "State Machine", description: "States and transitions for entity lifecycle" },
   { value: "bpmn", label: "BPMN", description: "Full Business Process Model and Notation" },
+  { value: "domain", label: "Domain Diagram", description: "UML class diagrams with classes, enumerations, and relationships" },
 ];
 
 export function ProjectDetailClient({ project, otherProjects }: Props) {

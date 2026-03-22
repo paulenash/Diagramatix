@@ -839,6 +839,36 @@ function BpmnTaskShape({ el }: { el: DiagramElement }) {
   );
 }
 
+function UmlClassShape({ el }: { el: DiagramElement }) {
+  const colors = useContext(SymbolColorCtx);
+  const fill = resolveColor("uml-class", colors);
+  return (
+    <g>
+      <rect x={el.x} y={el.y} width={el.width} height={el.height}
+        fill={fill} stroke="#374151" strokeWidth={1.5} />
+      <line x1={el.x} y1={el.y + HEADER_H} x2={el.x + el.width} y2={el.y + HEADER_H}
+        stroke="#374151" strokeWidth={1} />
+    </g>
+  );
+}
+
+function UmlEnumerationShape({ el }: { el: DiagramElement }) {
+  const colors = useContext(SymbolColorCtx);
+  const fill = resolveColor("uml-enumeration", colors);
+  return (
+    <g>
+      <rect x={el.x} y={el.y} width={el.width} height={el.height}
+        fill={fill} stroke="#374151" strokeWidth={1.5} />
+      <line x1={el.x} y1={el.y + HEADER_H} x2={el.x + el.width} y2={el.y + HEADER_H}
+        stroke="#374151" strokeWidth={1} />
+      <text x={el.x + el.width / 2} y={el.y + 10} textAnchor="middle" fontSize={9}
+        fill="#6b7280" fontStyle="italic" style={{ pointerEvents: "none", userSelect: "none" }}>
+        {"\u00ABenumeration\u00BB"}
+      </text>
+    </g>
+  );
+}
+
 function ExternalEntityShape({ el }: { el: DiagramElement }) {
   const colors = useContext(SymbolColorCtx);
   return (
@@ -951,6 +981,8 @@ function SymbolShape({ el }: { el: DiagramElement }) {
         return el.taskType !== undefined ? <BpmnTaskShape el={el} /> : <TaskShape el={el} />;
       case "subprocess":          return <SubprocessShape el={el} />;
       case "subprocess-expanded": return <ExpandedSubprocessShape el={el} />;
+      case "uml-class":             return <UmlClassShape el={el} />;
+      case "uml-enumeration":       return <UmlEnumerationShape el={el} />;
       case "external-entity":     return <ExternalEntityShape el={el} />;
       case "process-system":      return <ProcessSystemShape el={el} />;
       default:                  return <TaskShape el={el} />;
@@ -965,6 +997,12 @@ function getLabelPos(el: DiagramElement): { x: number; y: number; baseline: "han
   }
   if (el.type === "system-boundary" || el.type === "composite-state" || el.type === "group") {
     return { x: el.x + el.width / 2, y: el.y + HEADER_H / 2, baseline: "middle" };
+  }
+  if (el.type === "uml-class") {
+    return { x: el.x + el.width / 2, y: el.y + HEADER_H / 2, baseline: "middle" };
+  }
+  if (el.type === "uml-enumeration") {
+    return { x: el.x + el.width / 2, y: el.y + HEADER_H / 2 + 6, baseline: "middle" };
   }
   return { x: el.x + el.width / 2, y: el.y + el.height / 2, baseline: "middle" };
 }

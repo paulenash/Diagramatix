@@ -198,6 +198,20 @@ export const ALL_SYMBOLS: SymbolDefinition[] = [
     defaultHeight: 160,
     description: "A process, system, or organisation in a context diagram",
   },
+  {
+    type: "uml-class",
+    label: "Class",
+    defaultWidth: 160,
+    defaultHeight: 120,
+    description: "A UML class in a domain diagram",
+  },
+  {
+    type: "uml-enumeration",
+    label: "Enumeration",
+    defaultWidth: 160,
+    defaultHeight: 120,
+    description: "A UML enumeration in a domain diagram",
+  },
 ];
 
 export const PALETTE_BY_DIAGRAM_TYPE: Record<DiagramType, SymbolType[]> = {
@@ -219,6 +233,7 @@ export const PALETTE_BY_DIAGRAM_TYPE: Record<DiagramType, SymbolType[]> = {
     "group",
     "text-annotation",
   ],
+  domain: ["uml-class", "uml-enumeration"],
 };
 
 /** Colour-picker palette — includes body colour entries and lane that aren't in the drag palette. */
@@ -242,6 +257,7 @@ export const COLOR_PALETTE_BY_DIAGRAM_TYPE: Record<DiagramType, SymbolType[]> = 
     "group",
     "text-annotation",
   ],
+  domain: ["uml-class", "uml-enumeration"],
 };
 
 export function getSymbolDefinition(type: SymbolType): SymbolDefinition {

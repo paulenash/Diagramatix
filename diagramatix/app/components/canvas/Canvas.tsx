@@ -635,6 +635,8 @@ export function Canvas({
               sourceEl?.type === "text-annotation" || targetEl.type === "text-annotation";
             connType = "associationBPMN"; connRouting = "direct";
             connDirection = isAnnotationConn ? "non-directed" : "open-directed";
+          } else if (diagramType === "domain") {
+            connType = "uml-association"; connRouting = defaultRoutingType; connDirection = defaultDirectionType;
           } else if ((diagramType === "context" || diagramType === "basic") && defaultRoutingType === "curvilinear") {
             connType = "flow"; connRouting = defaultRoutingType; connDirection = defaultDirectionType;
             // Precise boundary attachment for flow connectors
@@ -878,7 +880,8 @@ export function Canvas({
     if (!el) return;
 
     const isContainer = el.type === "system-boundary" || el.type === "composite-state"
-      || el.type === "pool" || el.type === "subprocess-expanded" || el.type === "group";
+      || el.type === "pool" || el.type === "subprocess-expanded" || el.type === "group"
+      || el.type === "uml-class" || el.type === "uml-enumeration";
     const ar = el.width / el.height;
     const minW = isContainer ? MIN_BOUNDARY_W : 20;
     const minH = isContainer ? MIN_BOUNDARY_H : 20;

@@ -220,6 +220,33 @@ function OpenArrowMarkerStartThin({ id, color }: { id: string; color: string }) 
   );
 }
 
+// UML diamond marker (open) — aggregation source end
+function UmlDiamondOpen({ id, color }: { id: string; color: string }) {
+  return (
+    <marker id={id} markerWidth={14} markerHeight={10} refX={13} refY={5} orient="auto">
+      <polygon points="0,5 7,0 14,5 7,10" fill="white" stroke={color} strokeWidth={1.5} />
+    </marker>
+  );
+}
+
+// UML diamond marker (filled) — composition source end
+function UmlDiamondFilled({ id, color }: { id: string; color: string }) {
+  return (
+    <marker id={id} markerWidth={14} markerHeight={10} refX={13} refY={5} orient="auto">
+      <polygon points="0,5 7,0 14,5 7,10" fill={color} stroke={color} strokeWidth={1.5} />
+    </marker>
+  );
+}
+
+// UML open triangle — generalisation target end
+function UmlTriangleOpen({ id, color }: { id: string; color: string }) {
+  return (
+    <marker id={id} markerWidth={12} markerHeight={10} refX={11} refY={5} orient="auto">
+      <polygon points="0,0 12,5 0,10" fill="white" stroke={color} strokeWidth={1.5} />
+    </marker>
+  );
+}
+
 /** Unfilled equilateral triangle (messageBPMN target end) */
 function UnfilledTriangleMarker({ id, color }: { id: string; color: string }) {
   return (
@@ -468,9 +495,13 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
     : (isMessageBPMN && misaligned) ? "#dc2626"
     : isMessageBPMN ? "#b0b7c3"
     : "#6b7280";
+  const isUmlConn = connector.type === "uml-association" || connector.type === "uml-aggregation"
+    || connector.type === "uml-composition" || connector.type === "uml-generalisation";
   const markerId = `arrow-${connector.id}`;
   const openMarkerId = `arrow-open-${connector.id}`;
   const openStartMarkerId = `arrow-open-start-${connector.id}`;
+  const umlDiamondId = `uml-diamond-${connector.id}`;
+  const umlTriangleId = `uml-triangle-${connector.id}`;
   const showArrow = connector.directionType !== "non-directed";
   const isBothArrow = connector.directionType === "both";
   // associationBPMN always uses open arrowheads (never filled)
@@ -609,6 +640,13 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
           <UnfilledTriangleMarker id={`msg-end-${connector.id}`}   color={strokeColor} />
           <CircleMarker           id={`msg-start-${connector.id}`} color={strokeColor} />
         </defs>
+      ) : isUmlConn ? (
+        <defs>
+          {connector.type === "uml-association" && <ArrowMarker id={markerId} color={strokeColor} />}
+          {connector.type === "uml-aggregation" && <UmlDiamondOpen id={umlDiamondId} color={strokeColor} />}
+          {connector.type === "uml-composition" && <UmlDiamondFilled id={umlDiamondId} color={strokeColor} />}
+          {connector.type === "uml-generalisation" && <UmlTriangleOpen id={umlTriangleId} color={strokeColor} />}
+        </defs>
       ) : showArrow && (
         <defs>
           {isAssocBPMN
@@ -639,8 +677,19 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
         strokeWidth={isAssocBPMN ? (selected ? 2.5 : 2) : (selected ? 2 : 1.5)}
         strokeDasharray={isMessageBPMN ? "10 5" : isAssocBPMN ? "1 7" : (isMessage ? "6 3" : undefined)}
         strokeLinecap={isAssocBPMN ? "round" : undefined}
-        markerStart={isMessageBPMN ? `url(#msg-start-${connector.id})` : isBothArrow ? `url(#${openStartMarkerId})` : undefined}
-        markerEnd={isMessageBPMN ? `url(#msg-end-${connector.id})` : showArrow ? `url(#${isOpenArrow ? openMarkerId : markerId})` : undefined}
+        markerStart={
+          isMessageBPMN ? `url(#msg-start-${connector.id})`
+          : (connector.type === "uml-aggregation" || connector.type === "uml-composition") ? `url(#${umlDiamondId})`
+          : isBothArrow ? `url(#${openStartMarkerId})`
+          : undefined
+        }
+        markerEnd={
+          isMessageBPMN ? `url(#msg-end-${connector.id})`
+          : connector.type === "uml-association" ? `url(#${markerId})`
+          : connector.type === "uml-generalisation" ? `url(#${umlTriangleId})`
+          : showArrow ? `url(#${isOpenArrow ? openMarkerId : markerId})`
+          : undefined
+        }
         style={{ pointerEvents: "none" }}
       />
 

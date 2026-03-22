@@ -124,6 +124,7 @@ type Action =
   | { type: "NUDGE_CONNECTOR"; payload: { connectorId: string; dx: number; dy: number } }
   | { type: "NUDGE_CONNECTOR_ENDPOINT"; payload: { connectorId: string; endpoint: "source" | "target"; dx: number; dy: number } }
   | { type: "UPDATE_CONNECTOR"; payload: { id: string; directionType: DirectionType } }
+  | { type: "UPDATE_CONNECTOR_TYPE"; payload: { id: string; connectorType: ConnectorType } }
   | { type: "UPDATE_CONNECTOR_WAYPOINTS"; payload: { id: string; waypoints: Point[] } }
   | { type: "UPDATE_CURVE_HANDLES"; payload: {
       id: string;
@@ -307,6 +308,12 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       } else if (action.payload.symbolType === "lane") {
         const count = state.elements.filter((e) => e.type === "lane").length;
         label = `Lane ${count + 1}`;
+      } else if (action.payload.symbolType === "uml-class") {
+        const count = state.elements.filter((e) => e.type === "uml-class").length;
+        label = `Class ${count + 1}`;
+      } else if (action.payload.symbolType === "uml-enumeration") {
+        const count = state.elements.filter((e) => e.type === "uml-enumeration").length;
+        label = `Enumeration ${count + 1}`;
       } else if (action.payload.symbolType === "external-entity") {
         const count = state.elements.filter((e) => e.type === "external-entity").length;
         label = `Entity ${count + 1}`;
@@ -780,6 +787,16 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         connectors: state.connectors.map((c) =>
           c.id === action.payload.id
             ? { ...c, directionType: action.payload.directionType }
+            : c
+        ),
+      };
+
+    case "UPDATE_CONNECTOR_TYPE":
+      return {
+        ...state,
+        connectors: state.connectors.map((c) =>
+          c.id === action.payload.id
+            ? { ...c, type: action.payload.connectorType }
             : c
         ),
       };
@@ -1472,6 +1489,14 @@ export function useDiagram(initialData: DiagramData) {
     []
   );
 
+  const updateConnectorType = useCallback(
+    (id: string, connectorType: ConnectorType) => {
+      pushHistory(snapshotData());
+      dispatch({ type: "UPDATE_CONNECTOR_TYPE", payload: { id, connectorType } });
+    },
+    []
+  );
+
   const updateConnectorEndpoint = useCallback(
     (connectorId: string, endpoint: "source" | "target", newElementId: string, newSide: Side, newOffsetAlong?: number) => {
       // Clear any pending waypoint snapshot (messageBPMN drag commits via endpoint, not waypointDragEnd)
@@ -1631,6 +1656,7 @@ export function useDiagram(initialData: DiagramData) {
     addConnector,
     deleteConnector,
     updateConnectorDirection,
+    updateConnectorType,
     updateConnectorEndpoint,
     updateConnectorWaypoints,
     updateCurveHandles,

@@ -206,6 +206,7 @@ export function DiagramEditor({
     addConnector,
     deleteConnector,
     updateConnectorDirection,
+    updateConnectorType,
     updateConnectorEndpoint,
     updateConnectorWaypoints,
     updateCurveHandles,
@@ -1009,6 +1010,7 @@ export function DiagramEditor({
           onUpdateLabel={updateLabel}
           onUpdateProperties={updateProperties}
           onUpdateConnectorDirection={updateConnectorDirection}
+          onUpdateConnectorType={updateConnectorType}
           onUpdateConnectorLabel={(id, label) => updateConnectorLabel(id, label)}
           onDeleteElement={(id) => {
             deleteElement(id);
