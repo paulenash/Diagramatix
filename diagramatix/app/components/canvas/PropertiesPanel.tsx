@@ -23,6 +23,7 @@ interface Props {
   onDeleteConnector: (id: string) => void;
   onUpdateConnectorDirection: (id: string, directionType: DirectionType) => void;
   onUpdateConnectorType?: (id: string, connectorType: ConnectorType) => void;
+  onReverseConnector?: (id: string) => void;
   onUpdateConnectorLabel?: (id: string, label: string) => void;
   onAddLane?: (poolId: string) => void;
   onAddSublane?: (laneId: string) => void;
@@ -85,6 +86,7 @@ export function PropertiesPanel({
   onDeleteConnector,
   onUpdateConnectorDirection,
   onUpdateConnectorType,
+  onReverseConnector,
   onUpdateConnectorLabel,
   onAddLane,
   onAddSublane,
@@ -167,7 +169,44 @@ export function PropertiesPanel({
             </div>
           </div>
         )}
+        {/* UML association: None / Open direction + conditional Reverse */}
+        {connector.type === "uml-association" && (
+          <div>
+            <p className="text-xs font-medium text-gray-700 mb-1">Direction</p>
+            <div className="flex gap-1">
+              {([
+                { value: "non-directed" as DirectionType, label: "None" },
+                { value: "open-directed" as DirectionType, label: "Open" },
+              ]).map(({ value, label }) => (
+                <button
+                  key={value}
+                  onClick={() => onUpdateConnectorDirection(connector.id, value)}
+                  className={`px-2 py-1 text-xs rounded border ${
+                    connector.directionType === value
+                      ? "bg-blue-600 text-white border-blue-600"
+                      : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        {/* Reverse button for aggregation/composition/generalisation, and association when directed */}
+        {((connector.type === "uml-aggregation" || connector.type === "uml-composition" ||
+          connector.type === "uml-generalisation") ||
+          (connector.type === "uml-association" && connector.directionType !== "non-directed")) && onReverseConnector && (
+          <button
+            onClick={() => onReverseConnector(connector.id)}
+            className="w-full px-3 py-1.5 text-xs bg-gray-50 text-gray-700 border border-gray-300 rounded hover:bg-gray-100"
+          >
+            Reverse Direction
+          </button>
+        )}
 {connector.type !== "messageBPMN" &&
+          connector.type !== "uml-association" && connector.type !== "uml-aggregation" &&
+          connector.type !== "uml-composition" && connector.type !== "uml-generalisation" &&
           (connector.type === "associationBPMN" ||
           (connector.type !== "sequence" && connector.type !== "transition" && connector.type !== "flow") ||
           connector.routingType === "direct") && (

@@ -125,6 +125,7 @@ type Action =
   | { type: "NUDGE_CONNECTOR_ENDPOINT"; payload: { connectorId: string; endpoint: "source" | "target"; dx: number; dy: number } }
   | { type: "UPDATE_CONNECTOR"; payload: { id: string; directionType: DirectionType } }
   | { type: "UPDATE_CONNECTOR_TYPE"; payload: { id: string; connectorType: ConnectorType } }
+  | { type: "REVERSE_CONNECTOR"; payload: { id: string } }
   | { type: "UPDATE_CONNECTOR_WAYPOINTS"; payload: { id: string; waypoints: Point[] } }
   | { type: "UPDATE_CURVE_HANDLES"; payload: {
       id: string;
@@ -800,6 +801,27 @@ function reducer(state: DiagramData, action: Action): DiagramData {
             : c
         ),
       };
+
+    case "REVERSE_CONNECTOR": {
+      const connectors = state.connectors.map((c) => {
+        if (c.id !== action.payload.id) return c;
+        const source = state.elements.find((el) => el.id === c.targetId);
+        const target = state.elements.find((el) => el.id === c.sourceId);
+        if (!source || !target) return c;
+        const reversed = {
+          ...c,
+          sourceId: c.targetId, targetId: c.sourceId,
+          sourceSide: c.targetSide, targetSide: c.sourceSide,
+          sourceOffsetAlong: c.targetOffsetAlong, targetOffsetAlong: c.sourceOffsetAlong,
+        };
+        const { waypoints, sourceInvisibleLeader, targetInvisibleLeader } =
+          computeWaypoints(source, target, state.elements,
+            reversed.sourceSide, reversed.targetSide, reversed.routingType,
+            reversed.sourceOffsetAlong ?? 0.5, reversed.targetOffsetAlong ?? 0.5);
+        return { ...reversed, waypoints, sourceInvisibleLeader, targetInvisibleLeader };
+      });
+      return { ...state, connectors };
+    }
 
     case "UPDATE_CONNECTOR_ENDPOINT": {
       const { connectorId, endpoint, newElementId, newSide, newOffsetAlong } = action.payload;
@@ -1497,6 +1519,14 @@ export function useDiagram(initialData: DiagramData) {
     []
   );
 
+  const reverseConnector = useCallback(
+    (id: string) => {
+      pushHistory(snapshotData());
+      dispatch({ type: "REVERSE_CONNECTOR", payload: { id } });
+    },
+    []
+  );
+
   const updateConnectorEndpoint = useCallback(
     (connectorId: string, endpoint: "source" | "target", newElementId: string, newSide: Side, newOffsetAlong?: number) => {
       // Clear any pending waypoint snapshot (messageBPMN drag commits via endpoint, not waypointDragEnd)
@@ -1657,6 +1687,7 @@ export function useDiagram(initialData: DiagramData) {
     deleteConnector,
     updateConnectorDirection,
     updateConnectorType,
+    reverseConnector,
     updateConnectorEndpoint,
     updateConnectorWaypoints,
     updateCurveHandles,

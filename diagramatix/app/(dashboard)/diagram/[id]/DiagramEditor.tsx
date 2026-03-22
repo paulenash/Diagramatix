@@ -207,6 +207,7 @@ export function DiagramEditor({
     deleteConnector,
     updateConnectorDirection,
     updateConnectorType,
+    reverseConnector,
     updateConnectorEndpoint,
     updateConnectorWaypoints,
     updateCurveHandles,
@@ -1011,6 +1012,7 @@ export function DiagramEditor({
           onUpdateProperties={updateProperties}
           onUpdateConnectorDirection={updateConnectorDirection}
           onUpdateConnectorType={updateConnectorType}
+          onReverseConnector={reverseConnector}
           onUpdateConnectorLabel={(id, label) => updateConnectorLabel(id, label)}
           onDeleteElement={(id) => {
             deleteElement(id);
@@ -1112,6 +1114,13 @@ export function DiagramEditor({
           initialColorConfig={diagramColorConfig}
           displayMode={displayMode}
           onDisplayModeChange={handleToggleDisplayMode}
+          debugMode={debugMode}
+          onDebugModeChange={(on) => {
+            setDebugMode(on);
+            if (typeof window !== "undefined") {
+              localStorage.setItem(`debug-${projectId}`, on ? "true" : "false");
+            }
+          }}
           onClose={() => setShowDiagramMaintenance(false)}
           onSaved={(config) => {
             setDiagramColorConfig(config);

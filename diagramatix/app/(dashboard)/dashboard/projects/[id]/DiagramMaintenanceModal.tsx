@@ -8,9 +8,8 @@ import { COLOR_PALETTE_BY_DIAGRAM_TYPE, getSymbolDefinition } from "@/app/lib/di
 interface Props {
   projectId: string;
   initialColorConfig: SymbolColorConfig;
-  debugMode?: boolean;
   onClose: () => void;
-  onSaved: (config: SymbolColorConfig, debugMode?: boolean) => void;
+  onSaved: (config: SymbolColorConfig) => void;
 }
 
 const TABS: { type: DiagramType; label: string }[] = [
@@ -21,13 +20,12 @@ const TABS: { type: DiagramType; label: string }[] = [
   { type: "domain",            label: "Domain Diagram" },
 ];
 
-export function DiagramMaintenanceModal({ projectId, initialColorConfig, debugMode: initialDebugMode, onClose, onSaved }: Props) {
+export function DiagramMaintenanceModal({ projectId, initialColorConfig, onClose, onSaved }: Props) {
   const [activeTab, setActiveTab] = useState<DiagramType>("bpmn");
   const [workingColors, setWorkingColors] = useState<SymbolColorConfig>({
     ...DEFAULT_SYMBOL_COLORS,
     ...initialColorConfig,
   });
-  const [debugOn, setDebugOn] = useState(initialDebugMode ?? false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
 
@@ -59,7 +57,7 @@ export function DiagramMaintenanceModal({ projectId, initialColorConfig, debugMo
         setSaveError(`Save failed (${res.status})${body?.error ? ": " + body.error : ""}`);
         return;
       }
-      onSaved(workingColors, debugOn);
+      onSaved(workingColors);
       onClose();
     } catch {
       setSaveError("Network error — please try again.");
@@ -149,20 +147,6 @@ export function DiagramMaintenanceModal({ projectId, initialColorConfig, debugMo
               </div>
             );
           })}
-        </div>
-
-        {/* Debug Mode Toggle */}
-        <div className="flex items-center gap-3 px-6 py-3 border-t border-gray-200 flex-shrink-0">
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={debugOn}
-              onChange={(e) => setDebugOn(e.target.checked)}
-              className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-            />
-            <span className="text-sm text-gray-700">Debug Mode</span>
-          </label>
-          <span className="text-xs text-gray-400">Show element and connector IDs</span>
         </div>
 
         {/* Footer */}

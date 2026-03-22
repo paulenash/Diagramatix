@@ -13,6 +13,8 @@ interface Props {
   initialColorConfig: SymbolColorConfig;
   displayMode: DisplayMode;
   onDisplayModeChange: (mode: DisplayMode) => void;
+  debugMode?: boolean;
+  onDebugModeChange?: (on: boolean) => void;
   onClose: () => void;
   onSaved: (config: SymbolColorConfig) => void;
 }
@@ -24,6 +26,8 @@ export function DiagramColorModal({
   initialColorConfig,
   displayMode,
   onDisplayModeChange,
+  debugMode,
+  onDebugModeChange,
   onClose,
   onSaved,
 }: Props) {
@@ -105,6 +109,24 @@ export function DiagramColorModal({
             {displayMode === "hand-drawn" ? "Hand Drawn" : "Normal"}
           </button>
         </div>
+
+        {/* Debug Mode */}
+        {onDebugModeChange && (
+          <div className="flex items-center justify-between px-6 py-3 border-b border-gray-200 flex-shrink-0">
+            <div>
+              <span className="text-sm font-medium text-gray-700">Debug Mode</span>
+              <p className="text-xs text-gray-400">Show element and connector IDs</p>
+            </div>
+            <label className="flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={debugMode ?? false}
+                onChange={(e) => onDebugModeChange(e.target.checked)}
+                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+            </label>
+          </div>
+        )}
 
         {/* Colour actions */}
         <div className="flex items-center gap-3 px-6 py-3 border-b border-gray-200 flex-shrink-0">

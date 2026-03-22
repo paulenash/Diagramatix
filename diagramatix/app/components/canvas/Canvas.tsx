@@ -636,7 +636,7 @@ export function Canvas({
             connType = "associationBPMN"; connRouting = "direct";
             connDirection = isAnnotationConn ? "non-directed" : "open-directed";
           } else if (diagramType === "domain") {
-            connType = "uml-association"; connRouting = defaultRoutingType; connDirection = defaultDirectionType;
+            connType = "uml-association"; connRouting = defaultRoutingType; connDirection = "non-directed";
           } else if ((diagramType === "context" || diagramType === "basic") && defaultRoutingType === "curvilinear") {
             connType = "flow"; connRouting = defaultRoutingType; connDirection = defaultDirectionType;
             // Precise boundary attachment for flow connectors
