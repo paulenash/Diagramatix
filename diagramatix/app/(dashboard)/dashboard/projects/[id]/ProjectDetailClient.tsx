@@ -194,31 +194,27 @@ export function ProjectDetailClient({ project, otherProjects }: Props) {
               />
             </div>
 
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Type</label>
-              <div className="space-y-2">
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Type</label>
+              <div className="grid grid-cols-2 gap-1.5">
                 {DIAGRAM_TYPES.map((dt) => (
-                  <label
+                  <button
                     key={dt.value}
-                    className={`flex items-start gap-3 p-3 border rounded-lg cursor-pointer ${
-                      newType === dt.value ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-gray-300"
+                    type="button"
+                    onClick={() => setNewType(dt.value)}
+                    className={`px-3 py-1.5 text-sm rounded-md border text-left ${
+                      newType === dt.value
+                        ? "border-blue-500 bg-blue-50 text-blue-700 font-medium"
+                        : "border-gray-200 text-gray-700 hover:border-gray-300 hover:bg-gray-50"
                     }`}
                   >
-                    <input
-                      type="radio"
-                      name="type"
-                      value={dt.value}
-                      checked={newType === dt.value}
-                      onChange={() => setNewType(dt.value)}
-                      className="mt-0.5"
-                    />
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">{dt.label}</p>
-                      <p className="text-xs text-gray-500">{dt.description}</p>
-                    </div>
-                  </label>
+                    {dt.label}
+                  </button>
                 ))}
               </div>
+              <p className="mt-1.5 text-xs text-gray-500">
+                {DIAGRAM_TYPES.find((dt) => dt.value === newType)?.description}
+              </p>
             </div>
 
             <div className="flex gap-3 justify-end">

@@ -531,7 +531,7 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
     }
     // Crossing humps for the last sequence connector
     if (otherConnectorWaypoints && otherConnectorWaypoints.length > 0
-        && connector.type === "sequence" && connector.routingType === "rectilinear") {
+        && (connector.type === "sequence" || connector.type === "association") && (connector.routingType === "rectilinear" || connector.routingType === "direct")) {
       const humpPath = pathWithHumps(visibleWaypoints, otherConnectorWaypoints);
       if (humpPath) return humpPath;
     }

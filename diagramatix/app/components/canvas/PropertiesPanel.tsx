@@ -204,47 +204,77 @@ export function PropertiesPanel({
             Reverse Direction
           </button>
         )}
-{connector.type !== "messageBPMN" &&
-          connector.type !== "uml-association" && connector.type !== "uml-aggregation" &&
-          connector.type !== "uml-composition" && connector.type !== "uml-generalisation" &&
-          (connector.type === "associationBPMN" ||
-          (connector.type !== "sequence" && connector.type !== "transition" && connector.type !== "flow") ||
-          connector.routingType === "direct") && (
-          <div>
-            <p className="text-xs font-medium text-gray-700 mb-1">Direction</p>
-            <div className="flex flex-wrap gap-1">
-              {(connector.type === "associationBPMN"
+{(() => {
+          const isAssocPC = connector.type === "association" && diagramType === "process-context";
+          const showDirection = connector.type !== "messageBPMN" &&
+            connector.type !== "uml-association" && connector.type !== "uml-aggregation" &&
+            connector.type !== "uml-composition" && connector.type !== "uml-generalisation" &&
+            (connector.type === "associationBPMN" || isAssocPC ||
+            (connector.type !== "sequence" && connector.type !== "transition" && connector.type !== "flow") ||
+            connector.routingType === "direct");
+          if (!showDirection) return null;
+          // Check if either end is a "system" element
+          const hasSystem = isAssocPC && allElements && (
+            allElements.find(e => e.id === connector.sourceId)?.type === "system" ||
+            allElements.find(e => e.id === connector.targetId)?.type === "system"
+          );
+          const options = isAssocPC
+            ? [
+                { value: "non-directed"  as DirectionType, label: "None" },
+                { value: "open-directed" as DirectionType, label: "Directed" },
+                ...(hasSystem ? [{ value: "both" as DirectionType, label: "Both" }] : []),
+              ]
+            : connector.type === "associationBPMN"
+              ? [
+                  { value: "non-directed"  as DirectionType, label: "None"     },
+                  { value: "open-directed" as DirectionType, label: "Directed" },
+                  { value: "both"          as DirectionType, label: "Both"     },
+                ]
+              : connector.routingType === "direct"
                 ? [
-                    { value: "non-directed"  as DirectionType, label: "None"     },
                     { value: "open-directed" as DirectionType, label: "Directed" },
-                    { value: "both"          as DirectionType, label: "Both"     },
+                    { value: "both"          as DirectionType, label: "Both" },
                   ]
-                : connector.routingType === "direct"
-                  ? [
-                      { value: "open-directed" as DirectionType, label: "Directed" },
-                      { value: "both"          as DirectionType, label: "Both" },
-                    ]
-                  : [
-                      { value: "directed"      as DirectionType, label: "Filled" },
-                      { value: "open-directed" as DirectionType, label: "Open" },
-                      { value: "both"          as DirectionType, label: "Both" },
-                      { value: "non-directed"  as DirectionType, label: "None" },
-                    ].filter(o => !(diagramType === "process-context" && o.value === "directed"))
-              ).map(({ value, label }) => (
-                <button
-                  key={value}
-                  onClick={() => onUpdateConnectorDirection(connector.id, value)}
-                  className={`px-2 py-1 text-xs rounded border ${
-                    connector.directionType === value
-                      ? "bg-blue-600 text-white border-blue-600"
-                      : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
+                : [
+                    { value: "directed"      as DirectionType, label: "Filled" },
+                    { value: "open-directed" as DirectionType, label: "Open" },
+                    { value: "both"          as DirectionType, label: "Both" },
+                    { value: "non-directed"  as DirectionType, label: "None" },
+                  ].filter(o => !(diagramType === "process-context" && o.value === "directed"));
+          return (
+            <div>
+              <p className="text-xs font-medium text-gray-700 mb-1">Direction</p>
+              <div className="flex flex-wrap gap-1">
+                {options.map(({ value, label }) => (
+                  <button
+                    key={value}
+                    onClick={() => onUpdateConnectorDirection(connector.id, value)}
+                    className={`px-2 py-1 text-xs rounded border ${
+                      connector.directionType === value
+                        ? "bg-blue-600 text-white border-blue-600"
+                        : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          );
+        })()}
+        {/* Reverse for process-context association when Directed + System actor */}
+        {connector.type === "association" && diagramType === "process-context" &&
+          connector.directionType === "open-directed" &&
+          allElements && (
+            allElements.find(e => e.id === connector.sourceId)?.type === "system" ||
+            allElements.find(e => e.id === connector.targetId)?.type === "system"
+          ) && onReverseConnector && (
+          <button
+            onClick={() => onReverseConnector(connector.id)}
+            className="w-full px-3 py-1.5 text-xs bg-gray-50 text-gray-700 border border-gray-300 rounded hover:bg-gray-100"
+          >
+            Reverse Direction
+          </button>
         )}
         {(connector.type === "transition" || connector.type === "flow" || connector.type === "messageBPMN"
           || (connector.type === "sequence" && connector.label !== undefined)) && onUpdateConnectorLabel && (
@@ -637,7 +667,7 @@ export function PropertiesPanel({
 
 
       {/* Outgoing connectors list */}
-      {allConnectors && allElements && (() => {
+      {diagramType !== "process-context" && allConnectors && allElements && (() => {
         const outgoing = allConnectors.filter(c => c.sourceId === element.id);
         return (
           <div>
@@ -662,7 +692,7 @@ export function PropertiesPanel({
       })()}
 
       {/* Incoming connectors list */}
-      {allConnectors && allElements && (() => {
+      {diagramType !== "process-context" && allConnectors && allElements && (() => {
         const incoming = allConnectors.filter(c => c.targetId === element.id);
         return (
           <div>

@@ -287,7 +287,7 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         label = `System ${count + 1}`;
       } else if (action.payload.symbolType === "hourglass") {
         const count = state.elements.filter((e) => e.type === "hourglass").length;
-        label = `AutoTimer ${count + 1}`;
+        label = `Auto Scheduler ${count + 1}`;
       } else if (action.payload.symbolType === "subprocess") {
         const count = state.elements.filter((e) => e.type === "subprocess").length;
         label = `Subprocess ${count + 1}`;

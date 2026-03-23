@@ -501,7 +501,7 @@ export function Canvas({
       const targetEl = findDropTarget(pos, elementId);
       if (targetEl) {
         const sourceEl = data.elements.find((e) => e.id === elementId);
-        const actorLike = ["actor", "team"];
+        const actorLike = ["actor", "team", "system", "hourglass"];
         const isDataConn =
           (sourceEl && DATA_ELEMENT_TYPES.has(sourceEl.type)) ||
           DATA_ELEMENT_TYPES.has(targetEl.type);
@@ -652,6 +652,23 @@ export function Canvas({
             connType = "transition"; connRouting = defaultRoutingType; connDirection = defaultDirectionType;
           } else if ((sourceEl && actorLike.includes(sourceEl.type)) || actorLike.includes(targetEl.type)) {
             connType = "association"; connRouting = defaultRoutingType; connDirection = defaultDirectionType;
+            // Auto Scheduler (hourglass) ↔ Process: hourglass is always source, direction is Directed (toward Process)
+            const hourglassInvolved = (sourceEl?.type === "hourglass" && targetEl.type !== "hourglass") ||
+              (targetEl.type === "hourglass" && sourceEl && sourceEl.type !== "hourglass");
+            if (hourglassInvolved) {
+              connDirection = "open-directed";
+              if (targetEl.type === "hourglass") {
+                // Swap source and target so hourglass is source
+                const tmpSide = seqSourceSide; const tmpOff = seqSourceOffsetAlong;
+                seqSourceSide = seqTargetSide; seqSourceOffsetAlong = seqTargetOffsetAlong;
+                seqTargetSide = tmpSide; seqTargetOffsetAlong = tmpOff;
+                onAddConnector(targetEl.id, elementId, connType, connDirection, connRouting, seqSourceSide, seqTargetSide, seqSourceOffsetAlong, seqTargetOffsetAlong);
+                setDraggingConnector(null);
+                window.removeEventListener("mousemove", onMouseMove);
+                window.removeEventListener("mouseup", onMouseUp);
+                return;
+              }
+            }
           } else {
             connType = "sequence"; connRouting = defaultRoutingType; connDirection = defaultDirectionType;
           }
@@ -1540,7 +1557,7 @@ export function Canvas({
           {/* Regular connectors — rendered behind elements (skip selected, rendered on top later) */}
           {(() => {
             const regularConns = data.connectors.filter(c => c.type !== "associationBPMN" && c.type !== "messageBPMN");
-            const seqConns = regularConns.filter(c => c.type === "sequence");
+            const humpEligible = regularConns.filter(c => c.type === "sequence" || c.type === "association");
             return regularConns.filter(c => c.id !== selectedConnectorId).map((conn) => (
               <ConnectorRenderer
                 key={conn.id}
@@ -1558,8 +1575,8 @@ export function Canvas({
                   : undefined}
                 onUpdateCurveHandles={onUpdateCurveHandles}
                 otherConnectorWaypoints={
-                  conn.type === "sequence"
-                    ? seqConns.slice(0, seqConns.indexOf(conn)).map(c => {
+                  (conn.type === "sequence" || conn.type === "association")
+                    ? humpEligible.slice(0, humpEligible.indexOf(conn)).map(c => {
                         const vs = c.sourceInvisibleLeader ? 1 : 0;
                         const ve = c.targetInvisibleLeader ? c.waypoints.length - 2 : c.waypoints.length - 1;
                         return c.waypoints.slice(vs, ve + 1);
@@ -1965,10 +1982,10 @@ export function Canvas({
           {selectedConnectorId && (() => {
             const conn = data.connectors.find(c => c.id === selectedConnectorId && c.type !== "associationBPMN" && c.type !== "messageBPMN");
             if (!conn) return null;
-            const allSeqConns = data.connectors.filter(c => c.type === "sequence");
-            const connIdx = allSeqConns.findIndex(c => c.id === conn.id);
+            const allHumpConns = data.connectors.filter(c => c.type === "sequence" || c.type === "association");
+            const connIdx = allHumpConns.findIndex(c => c.id === conn.id);
             // Only hump over connectors added before this one
-            const priorSeqConns = allSeqConns.slice(0, connIdx);
+            const priorHumpConns = allHumpConns.slice(0, connIdx);
             return (
               <ConnectorRenderer
                 key={`sel-${conn.id}`}
@@ -1986,8 +2003,8 @@ export function Canvas({
                   : undefined}
                 onUpdateCurveHandles={onUpdateCurveHandles}
                 otherConnectorWaypoints={
-                  conn.type === "sequence" && priorSeqConns.length > 0
-                    ? priorSeqConns.map(c => {
+                  (conn.type === "sequence" || conn.type === "association") && priorHumpConns.length > 0
+                    ? priorHumpConns.map(c => {
                         const vs = c.sourceInvisibleLeader ? 1 : 0;
                         const ve = c.targetInvisibleLeader ? c.waypoints.length - 2 : c.waypoints.length - 1;
                         return c.waypoints.slice(vs, ve + 1);
