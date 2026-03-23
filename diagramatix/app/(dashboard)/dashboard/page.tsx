@@ -30,7 +30,8 @@ export default async function DashboardPage() {
     <DashboardClient
       projects={projects}
       unorganized={unorganized}
-      userName={session.user.name ?? session.user.email ?? "User"}
+      userName={session.user.name ?? "User"}
+      userEmail={session.user.email ?? ""}
       version={commitCount}
     />
   );
