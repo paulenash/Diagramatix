@@ -1222,9 +1222,25 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       const above = state.elements.find((e) => e.id === aboveLaneId);
       const below = state.elements.find((e) => e.id === belowLaneId);
       if (!above || !below) return state;
-      const newAboveH = Math.max(MIN_H, above.height + dy);
-      const actualDy = newAboveH - above.height;
-      const newBelowH = Math.max(MIN_H, below.height - actualDy);
+
+      // Clamp so neither lane goes below MIN_H
+      const maxGrow = below.height - MIN_H;   // above can grow at most this much
+      const maxShrink = above.height - MIN_H;  // above can shrink at most this much
+      const clampedDy = Math.max(-maxShrink, Math.min(maxGrow, dy));
+      if (clampedDy === 0) return state;
+
+      const newAboveH = above.height + clampedDy;
+      const newBelowH = below.height - clampedDy;
+      const newBelowY = below.y + clampedDy;
+
+      // Ensure lanes stay within parent bounds
+      const parent = above.parentId ? state.elements.find(e => e.id === above.parentId) : undefined;
+      if (parent) {
+        const parentBottom = parent.y + parent.height;
+        if (newBelowY + newBelowH > parentBottom + 1) return state;
+        if (above.y < parent.y - 1) return state;
+      }
+
       // Proportionally resize sub-lanes within the resized lanes
       const LANE_LW = 24;
       function resizeSublanes(elements: DiagramElement[], laneId: string, newLaneY: number, newLaneH: number, newLaneX: number, newLaneW: number): DiagramElement[] {
@@ -1233,7 +1249,7 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         const totalSubH = subs.reduce((s, l) => s + l.height, 0) || 1;
         let stackY = newLaneY;
         for (const sub of subs) {
-          const newSubH = Math.max(40, Math.round(newLaneH * (sub.height / totalSubH)));
+          const newSubH = Math.max(28, Math.round(newLaneH * (sub.height / totalSubH)));
           const updatedSub = { ...sub, x: newLaneX + LANE_LW, y: stackY, width: newLaneW - LANE_LW, height: newSubH };
           elements = elements.map((e) => e.id === sub.id ? updatedSub : e);
           stackY += newSubH;
@@ -1242,11 +1258,11 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       }
       let elements = state.elements.map((e) => {
         if (e.id === aboveLaneId) return { ...e, height: newAboveH };
-        if (e.id === belowLaneId) return { ...e, y: e.y + actualDy, height: newBelowH };
+        if (e.id === belowLaneId) return { ...e, y: newBelowY, height: newBelowH };
         return e;
       });
       elements = resizeSublanes(elements, aboveLaneId, above.y, newAboveH, above.x, above.width);
-      elements = resizeSublanes(elements, belowLaneId, below.y + actualDy, newBelowH, below.x, below.width);
+      elements = resizeSublanes(elements, belowLaneId, newBelowY, newBelowH, below.x, below.width);
       return { ...state, elements };
     }
 
