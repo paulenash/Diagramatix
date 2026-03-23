@@ -1426,7 +1426,7 @@ export function Canvas({
         style={{ cursor: isDraggingConnector || isDraggingEndpoint ? "crosshair" : "default" }}
       >
         <SketchyFilter />
-        <g transform={transform}>
+        <g transform={transform} style={displayMode === "hand-drawn" ? { fontStyle: "italic" } : undefined}>
           {/* Diagram Title Block */}
           {data.title?.showTitle && (() => {
             const els = data.elements;
@@ -1472,7 +1472,7 @@ export function Canvas({
             const titleH = (1 + subLines.length) * lineH + 8;
             const topY = minY - titleH - 20;
             return (
-              <g style={{ pointerEvents: "none" }}>
+              <g style={{ pointerEvents: "none", fontStyle: "normal" }}>
                 <text textAnchor="middle" x={cx} y={topY + lineH * 0.85}
                   fontSize={14} fill="#1f2937" fontWeight="bold" style={{ userSelect: "none" }}>
                   {diagramName ?? "Untitled"}
