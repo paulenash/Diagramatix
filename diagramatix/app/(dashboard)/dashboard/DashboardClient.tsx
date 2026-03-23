@@ -219,6 +219,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
           </div>
           <span className="font-semibold text-gray-900">Diagramatix</span>
           {version ? <span className="text-xs text-gray-400 ml-1">v1.0.{version}</span> : null}
+          <span className="text-xs text-gray-400 ml-3">brought to you by: <strong className="text-gray-600">Nash AI</strong></span>
         </div>
         <div className="flex items-center gap-4">
           <div className="text-right">

@@ -953,7 +953,11 @@ export function Canvas({
         height = newH;
       }
 
-      if (!isContainer && ar > 0) {
+      // Types that allow independent width/height resizing
+      const freeResize = el.type === "task" || el.type === "subprocess"
+        || el.type === "subprocess-expanded" || el.type === "state"
+        || el.type === "composite-state";
+      if (!isContainer && !freeResize && ar > 0) {
         if (handle.includes("e") || handle.includes("w")) {
           // Width is primary — derive height to preserve aspect ratio
           height = width / ar;
@@ -963,6 +967,13 @@ export function Canvas({
           width = height * ar;
           x = startBounds.x + (startBounds.width - width) / 2;
         }
+      }
+      if (freeResize) {
+        // Side handles: width only; top/bottom: height only; corners: both
+        const isHoriz = handle === "e" || handle === "w";
+        const isVert = handle === "n" || handle === "s";
+        if (isHoriz) { y = startBounds.y; height = startBounds.height; }
+        if (isVert) { x = startBounds.x; width = startBounds.width; }
       }
 
       onResizeElement(elementId, x, y, width, height);
