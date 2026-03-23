@@ -44,6 +44,7 @@ function useAutoSave(
 ) {
   const saveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "unsaved">("saved");
+  const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
   const lastSaved = useRef<string>(JSON.stringify(data));
 
   useEffect(() => {
@@ -65,6 +66,7 @@ function useAutoSave(
           body: JSON.stringify({ data }),
         });
         lastSaved.current = current;
+        setLastSavedAt(new Date().toISOString());
         setSaveStatus("saved");
       } catch {
         setSaveStatus("unsaved");
@@ -76,7 +78,7 @@ function useAutoSave(
     };
   }, [data, diagramId, delay, disabled]);
 
-  return saveStatus;
+  return { saveStatus, lastSavedAt };
 }
 
 function exportSvg(svgEl: SVGSVGElement, name: string) {
@@ -246,7 +248,8 @@ export function DiagramEditor({
     originalData: DiagramData;
   } | null>(null);
 
-  const saveStatus = useAutoSave(diagramId, data, 1500, templateEditState !== null);
+  const { saveStatus, lastSavedAt } = useAutoSave(diagramId, data, 1500, templateEditState !== null);
+  const effectiveUpdatedAt = lastSavedAt ?? updatedAt;
 
   useEffect(() => {
     function handleKeyDown(e: globalThis.KeyboardEvent) {
@@ -1009,7 +1012,7 @@ export function DiagramEditor({
           getViewportCenterRef={getViewportCenterRef}
           diagramName={diagramName}
           createdAt={createdAt}
-          updatedAt={updatedAt}
+          updatedAt={effectiveUpdatedAt}
         />
 
         <PropertiesPanel
@@ -1045,7 +1048,7 @@ export function DiagramEditor({
           diagramTitle={data.title}
           onUpdateDiagramTitle={updateDiagramTitle}
           createdAt={createdAt}
-          updatedAt={updatedAt}
+          updatedAt={effectiveUpdatedAt}
         />
       </div>
 

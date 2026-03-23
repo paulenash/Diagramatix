@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useCallback, useEffect } from "react";
+import React, { useRef, useState, useCallback, useEffect } from "react";
 import type {
   BpmnTaskType,
   Connector,
@@ -1418,25 +1418,52 @@ export function Canvas({
             const cx = (minX + maxX) / 2;
             const title = data.title;
             const statusLabel = (title.status ?? "draft").charAt(0).toUpperCase() + (title.status ?? "draft").slice(1);
-            const lines: string[] = [];
-            lines.push(diagramName ?? "Untitled");
-            if (title.version) lines.push(`Version ${title.version}`);
-            if (title.authors) lines.push(title.authors);
-            lines.push(`Status: ${statusLabel}`);
-            if (createdAt) lines.push(`Created: ${new Date(createdAt).toLocaleDateString()}`);
-            if (updatedAt) lines.push(`Modified: ${new Date(updatedAt).toLocaleString()}`);
+            // Format datetime in AEST/AEDT
+            function formatAustralianTime(iso: string): string {
+              const d = new Date(iso);
+              try {
+                return d.toLocaleString("en-AU", { timeZone: "Australia/Sydney", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: true, timeZoneName: "short" });
+              } catch { return d.toLocaleString(); }
+            }
+            function formatAustralianDate(iso: string): string {
+              const d = new Date(iso);
+              try {
+                return d.toLocaleDateString("en-AU", { timeZone: "Australia/Sydney", year: "numeric", month: "2-digit", day: "2-digit" });
+              } catch { return d.toLocaleDateString(); }
+            }
+            // Line 1: Diagram Name (bold, larger)
+            // Line 2: Version + Author/s
+            // Line 3: Status + Created
+            // Line 4: Modified
+            // Each sub-line is an array of { label, value } segments
+            type Seg = { label: string; value: string };
+            const line2Segs: Seg[] = [];
+            if (title.version) line2Segs.push({ label: "Version ", value: title.version });
+            if (title.authors) line2Segs.push({ label: "Author/s: ", value: title.authors });
+            const line3Segs: Seg[] = [];
+            line3Segs.push({ label: "Status: ", value: statusLabel });
+            if (createdAt) line3Segs.push({ label: "Created: ", value: formatAustralianDate(createdAt) });
+            const line4Segs: Seg[] = updatedAt ? [{ label: "Modified: ", value: formatAustralianTime(updatedAt) }] : [];
+            const subLines: Seg[][] = [line2Segs, line3Segs, line4Segs].filter(l => l.length > 0);
             const lineH = 16;
-            const titleH = lines.length * lineH + 8;
+            const titleH = (1 + subLines.length) * lineH + 8;
             const topY = minY - titleH - 20;
             return (
               <g style={{ pointerEvents: "none" }}>
-                <text textAnchor="middle" fontSize={12} fill="#1f2937" fontWeight="bold" style={{ userSelect: "none" }}>
-                  <tspan x={cx} y={topY + lineH * 0.85} fontSize={14}>{lines[0]}</tspan>
+                <text textAnchor="middle" x={cx} y={topY + lineH * 0.85}
+                  fontSize={14} fill="#1f2937" fontWeight="bold" style={{ userSelect: "none" }}>
+                  {diagramName ?? "Untitled"}
                 </text>
-                {lines.slice(1).map((ln, i) => (
+                {subLines.map((segs, i) => (
                   <text key={i} textAnchor="middle" x={cx} y={topY + (i + 1) * lineH + lineH * 0.85}
                     fontSize={11} fill="#6b7280" style={{ userSelect: "none" }}>
-                    {ln}
+                    {segs.map((seg, j) => (
+                      <React.Fragment key={j}>
+                        {j > 0 && <tspan>,  </tspan>}
+                        <tspan>{seg.label}</tspan>
+                        <tspan fontWeight="bold" fill="#1f2937">{seg.value}</tspan>
+                      </React.Fragment>
+                    ))}
                   </text>
                 ))}
               </g>
