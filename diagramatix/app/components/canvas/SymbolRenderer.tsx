@@ -1522,6 +1522,7 @@ export function SymbolRenderer({
           width={element.width} height={element.height}
           fill="transparent" stroke="none"
           style={{ cursor: "crosshair" }}
+          onDoubleClick={(e) => { e.stopPropagation(); onDoubleClick(); }}
           onMouseDown={(e) => {
             e.stopPropagation();
             const worldPt = svgToWorld
@@ -1589,7 +1590,8 @@ export function SymbolRenderer({
         function clamp(v: number, lo: number, hi: number) { return Math.max(lo, Math.min(hi, v)); }
         function handleInteriorLabelMouseDown(ev: React.MouseEvent) {
           ev.stopPropagation();
-          setLabelHighlighted(true);
+          // Single click on name area selects the element but does NOT highlight the name.
+          // User must double-click the name to select it for editing.
           onSelect();
           if (!svgToWorld) return;
           const startWorld = svgToWorld(ev.clientX, ev.clientY);
@@ -1640,7 +1642,10 @@ export function SymbolRenderer({
               stroke={labelHighlighted && selected && !multiSelected ? "#2563eb" : "none"}
               strokeWidth={1}
               strokeDasharray={labelHighlighted && selected && !multiSelected ? "3 2" : undefined}
-              style={{ cursor: onUpdateProperties ? "move" : "default" }}
+              style={{
+                cursor: labelHighlighted ? "move" : "crosshair",
+                pointerEvents: labelHighlighted ? "auto" : "none",
+              }}
               onMouseDown={handleInteriorLabelMouseDown}
               onDoubleClick={(e) => { e.stopPropagation(); onDoubleClick(); }}
             />

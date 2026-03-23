@@ -48,8 +48,18 @@ function boundsOverlapWithMargin(b: Bounds, margin: number): (p: Point) => boole
     p.y < b.y + b.height + margin;
 }
 
+// Direction vector for a side's outward normal
+function sideNormalDir(side: Side): { dx: number; dy: number } {
+  switch (side) {
+    case "right":  return { dx: 1, dy: 0 };
+    case "left":   return { dx: -1, dy: 0 };
+    case "bottom": return { dx: 0, dy: 1 };
+    case "top":    return { dx: 0, dy: -1 };
+  }
+}
+
 // Check if an axis-aligned segment (horizontal or vertical) intersects an obstacle bounds
-function segmentHitsObstacle(p1: Point, p2: Point, obs: Bounds, margin = 8): boolean {
+function segmentHitsObstacle(p1: Point, p2: Point, obs: Bounds, margin = 4): boolean {
   const left = obs.x - margin, right = obs.x + obs.width + margin;
   const top = obs.y - margin, bottom = obs.y + obs.height + margin;
   // Horizontal segment
@@ -91,11 +101,10 @@ function buildOrthogonalPath(
   if (!pathHitsObstacles(pathA, obstacles)) return pathA;
   if (!pathHitsObstacles(pathB, obstacles)) return pathB;
 
-  // Both L-shaped paths blocked — try routing around obstacles
+  // Both L-shaped paths blocked — try routing around nearby obstacles only
   const MARGIN = 20;
-  // Collect all obstacle edges we might bypass around
+  // Only consider obstacles in the bounding region between start and end
   const allObs = obstacles.filter(obs => {
-    // Only consider obstacles between start and end
     const minX = Math.min(start.x, end.x) - MARGIN;
     const maxX = Math.max(start.x, end.x) + MARGIN;
     const minY = Math.min(start.y, end.y) - MARGIN;
@@ -103,28 +112,35 @@ function buildOrthogonalPath(
     return obs.x + obs.width > minX && obs.x < maxX && obs.y + obs.height > minY && obs.y < maxY;
   });
 
-  // Try routing above all obstacles
-  const topY = Math.min(start.y, end.y, ...allObs.map(o => o.y)) - MARGIN;
-  const pathTop = [start, { x: start.x, y: topY }, { x: end.x, y: topY }, end];
-  if (!pathHitsObstacles(pathTop, obstacles)) return pathTop;
-
-  // Try routing below all obstacles
+  // Generate candidate routes sorted by total path length (prefer shorter)
   const bottomY = Math.max(start.y, end.y, ...allObs.map(o => o.y + o.height)) + MARGIN;
-  const pathBottom = [start, { x: start.x, y: bottomY }, { x: end.x, y: bottomY }, end];
-  if (!pathHitsObstacles(pathBottom, obstacles)) return pathBottom;
-
-  // Try routing left of all obstacles
-  const leftX = Math.min(start.x, end.x, ...allObs.map(o => o.x)) - MARGIN;
-  const pathLeft = [start, { x: leftX, y: start.y }, { x: leftX, y: end.y }, end];
-  if (!pathHitsObstacles(pathLeft, obstacles)) return pathLeft;
-
-  // Try routing right of all obstacles
+  const topY = Math.min(start.y, end.y, ...allObs.map(o => o.y)) - MARGIN;
   const rightX = Math.max(start.x, end.x, ...allObs.map(o => o.x + o.width)) + MARGIN;
-  const pathRight = [start, { x: rightX, y: start.y }, { x: rightX, y: end.y }, end];
-  if (!pathHitsObstacles(pathRight, obstacles)) return pathRight;
+  const leftX = Math.min(start.x, end.x, ...allObs.map(o => o.x)) - MARGIN;
 
-  // Fallback: route above with larger margin
-  return [start, { x: start.x, y: topY - MARGIN }, { x: end.x, y: topY - MARGIN }, end];
+  const candidates: { path: Point[]; len: number }[] = [
+    { path: [start, { x: start.x, y: bottomY }, { x: end.x, y: bottomY }, end], len: 0 },
+    { path: [start, { x: start.x, y: topY }, { x: end.x, y: topY }, end], len: 0 },
+    { path: [start, { x: rightX, y: start.y }, { x: rightX, y: end.y }, end], len: 0 },
+    { path: [start, { x: leftX, y: start.y }, { x: leftX, y: end.y }, end], len: 0 },
+  ];
+  // Compute total segment length for each candidate
+  for (const c of candidates) {
+    let len = 0;
+    for (let i = 0; i < c.path.length - 1; i++) {
+      len += Math.abs(c.path[i + 1].x - c.path[i].x) + Math.abs(c.path[i + 1].y - c.path[i].y);
+    }
+    c.len = len;
+  }
+  // Sort by length — prefer shortest path
+  candidates.sort((a, b) => a.len - b.len);
+
+  for (const c of candidates) {
+    if (!pathHitsObstacles(c.path, obstacles)) return c.path;
+  }
+
+  // Fallback: use the shortest candidate even if it hits obstacles
+  return candidates[0].path;
 }
 
 const PERP_OFFSET = 24;
@@ -258,8 +274,14 @@ export function computeWaypoints(
   const obstacles = allElements
     .filter((el) => {
       if (el.id === source.id || el.id === target.id) return false;
+      // Don't treat boundary events on source or target as obstacles
+      if (el.boundaryHostId === source.id || el.boundaryHostId === target.id) return false;
       // Don't treat the target's parent subprocess-expanded as an obstacle
       if (target.parentId && el.id === target.parentId && el.type === "subprocess-expanded") return false;
+      // Don't treat the source's parent subprocess-expanded as an obstacle
+      if (source.parentId && el.id === source.parentId && el.type === "subprocess-expanded") return false;
+      // Don't treat pools or lanes as obstacles (connectors route within them)
+      if (el.type === "pool" || el.type === "lane") return false;
       return true;
     })
     .map(getBounds);
@@ -291,7 +313,26 @@ export function computeWaypoints(
       ? [exitPt, approachPt]
       : [exitPt, { x: exitPt.x, y: midY }, { x: approachPt.x, y: midY }, approachPt];
   } else {
-    midPath = buildOrthogonalPath(exitPt, approachPt, obstacles);
+    // Perpendicular sides (e.g., right→top, bottom→left, etc.)
+    // Try a direct L-shape from srcEdge to tgtEdge first (just 1 corner, no stubs)
+    const lCorner1: Point = { x: tgtEdge.x, y: srcEdge.y };
+    const lCorner2: Point = { x: srcEdge.x, y: tgtEdge.y };
+    // Check which L-path is valid (doesn't go backwards from the exit/approach directions)
+    const srcDir = sideNormalDir(sourceSide);
+    const tgtDir = sideNormalDir(targetSide);
+    const aValid = (lCorner1.x - srcEdge.x) * srcDir.dx >= 0 && (lCorner1.y - srcEdge.y) * srcDir.dy >= 0
+                && (lCorner1.x - tgtEdge.x) * tgtDir.dx >= 0 && (lCorner1.y - tgtEdge.y) * tgtDir.dy >= 0;
+    const bValid = (lCorner2.x - srcEdge.x) * srcDir.dx >= 0 && (lCorner2.y - srcEdge.y) * srcDir.dy >= 0
+                && (lCorner2.x - tgtEdge.x) * tgtDir.dx >= 0 && (lCorner2.y - tgtEdge.y) * tgtDir.dy >= 0;
+    // midPath sits between srcEdge and tgtEdge in the final waypoints, so only include the corner point
+    if (aValid && !pathHitsObstacles([srcEdge, lCorner1, tgtEdge], obstacles)) {
+      midPath = [lCorner1];
+    } else if (bValid && !pathHitsObstacles([srcEdge, lCorner2, tgtEdge], obstacles)) {
+      midPath = [lCorner2];
+    } else {
+      // Fall back to stub-based routing with obstacle avoidance
+      midPath = buildOrthogonalPath(exitPt, approachPt, obstacles);
+    }
   }
 
   return {

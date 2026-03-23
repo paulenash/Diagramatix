@@ -625,31 +625,18 @@ export function Canvas({
           }
           let seqTargetSide: Side = targetOuterSide ? oppositeSide(targetOuterSide) : getClosestSide(pos, targetEl);
 
-          // For expanded subprocess targets from external elements:
-          // Source connects from the midpoint of its closest edge;
-          // Target connects at the nearest perpendicular point on its boundary.
+          // Source: nearest boundary point to initial click; Target: nearest to release point
           let seqSourceOffsetAlong: number | undefined;
           let seqTargetOffsetAlong: number | undefined;
-          if (!targetOuterSide && targetEl.type === "subprocess-expanded" && sourceEl && sourceEl.parentId !== targetEl.id) {
-            const srcCenter = { x: sourceEl.x + sourceEl.width / 2, y: sourceEl.y + sourceEl.height / 2 };
-            const tgtCenter = { x: targetEl.x + targetEl.width / 2, y: targetEl.y + targetEl.height / 2 };
-            seqTargetSide = getClosestSide(srcCenter, targetEl);
-            if (!outerSide) seqSourceSide = getClosestSide(tgtCenter, sourceEl);
-
-            // Source always connects from midpoint (0.5) — no custom offset needed
-            // Target: project source edge midpoint onto the target side
-            const clamp01 = (v: number) => Math.max(0.05, Math.min(0.95, v));
-            // The source edge midpoint is at the midpoint of seqSourceSide
-            const srcMid = seqSourceSide === "right"  ? { x: sourceEl.x + sourceEl.width, y: srcCenter.y }
-                         : seqSourceSide === "left"   ? { x: sourceEl.x, y: srcCenter.y }
-                         : seqSourceSide === "bottom" ? { x: srcCenter.x, y: sourceEl.y + sourceEl.height }
-                         :                              { x: srcCenter.x, y: sourceEl.y };
-            if (seqTargetSide === "left" || seqTargetSide === "right") {
-              seqTargetOffsetAlong = clamp01((srcMid.y - targetEl.y) / targetEl.height);
-            } else {
-              seqTargetOffsetAlong = clamp01((srcMid.x - targetEl.x) / targetEl.width);
-            }
+          if (sourceEl && !outerSide && !targetOuterSide) {
+            const srcBound = pointToBoundaryOffset(effectiveWorldPos, sourceEl);
+            seqSourceSide = srcBound.side;
+            seqSourceOffsetAlong = srcBound.offsetAlong;
+            const tgtBound = pointToBoundaryOffset(pos, targetEl);
+            seqTargetSide = tgtBound.side;
+            seqTargetOffsetAlong = tgtBound.offsetAlong;
           }
+          // (expanded subprocess attachment is handled by the click-based logic above)
           let connType: ConnectorType;
           let connRouting: RoutingType;
           let connDirection: DirectionType;
@@ -954,9 +941,10 @@ export function Canvas({
       }
 
       // Types that allow independent width/height resizing
-      const freeResize = el.type === "task" || el.type === "subprocess"
-        || el.type === "subprocess-expanded" || el.type === "state"
-        || el.type === "composite-state";
+      const elType = el!.type;
+      const freeResize = elType === "task" || elType === "subprocess"
+        || elType === "subprocess-expanded" || elType === "state"
+        || elType === "composite-state";
       if (!isContainer && !freeResize && ar > 0) {
         if (handle.includes("e") || handle.includes("w")) {
           // Width is primary — derive height to preserve aspect ratio
@@ -1713,6 +1701,7 @@ export function Canvas({
           {/* Debug: labels for selected elements and their connectors */}
           {debugMode && (() => {
             const debugItems: { id: string; label: string; anchorX: number; anchorY: number; color: string; defaultOX: number; defaultOY: number }[] = [];
+            const addedConnIds = new Set<string>();
 
             // Selected element debug labels
             for (const selId of selectedElementIds) {
@@ -1724,9 +1713,11 @@ export function Canvas({
                 anchorX: el.x + el.width / 2, anchorY: el.y,
                 color: "#059669", defaultOX: 0, defaultOY: -18,
               });
-              // Show connected connectors for this element
+              // Show connected connectors for this element (skip if already added)
               for (const conn of data.connectors) {
                 if (conn.sourceId !== el.id && conn.targetId !== el.id) continue;
+                if (addedConnIds.has(conn.id)) continue;
+                addedConnIds.add(conn.id);
                 const wps = conn.waypoints;
                 if (wps.length < 2) continue;
                 const vs = conn.sourceInvisibleLeader ? 1 : 0;
