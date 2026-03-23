@@ -529,9 +529,10 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
       // Arrowhead on last segment (s2→P3) aligns perpendicular to element edge
       return `M ${P0.x} ${P0.y} L ${s1.x} ${s1.y} C ${P1.x} ${P1.y}, ${P2.x} ${P2.y}, ${s2.x} ${s2.y} L ${P3.x} ${P3.y}`;
     }
-    // Crossing humps for the last sequence connector
+    // Crossing humps for sequence and association connectors
     if (otherConnectorWaypoints && otherConnectorWaypoints.length > 0
-        && (connector.type === "sequence" || connector.type === "association") && (connector.routingType === "rectilinear" || connector.routingType === "direct")) {
+        && (connector.type === "sequence" || connector.type === "association")
+        && (connector.routingType === "rectilinear" || connector.routingType === "direct")) {
       const humpPath = pathWithHumps(visibleWaypoints, otherConnectorWaypoints);
       if (humpPath) return humpPath;
     }
