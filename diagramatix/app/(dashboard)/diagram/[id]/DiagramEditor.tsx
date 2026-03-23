@@ -215,6 +215,7 @@ export function DiagramEditor({
     nudgeConnector,
     nudgeConnectorEndpoint,
     updateConnectorLabel,
+    updateConnectorFields,
     elementMoveEnd,
     splitConnector,
     applyTemplate,
@@ -1014,6 +1015,7 @@ export function DiagramEditor({
           onUpdateConnectorType={updateConnectorType}
           onReverseConnector={reverseConnector}
           onUpdateConnectorLabel={(id, label) => updateConnectorLabel(id, label)}
+          onUpdateConnectorFields={updateConnectorFields}
           onDeleteElement={(id) => {
             deleteElement(id);
             setSelectedElementIds((prev) => { const next = new Set(prev); next.delete(id); return next; });

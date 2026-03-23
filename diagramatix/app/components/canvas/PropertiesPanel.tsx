@@ -27,6 +27,7 @@ interface Props {
   onUpdateConnectorLabel?: (id: string, label: string) => void;
   onAddLane?: (poolId: string) => void;
   onAddSublane?: (laneId: string) => void;
+  onUpdateConnectorFields?: (id: string, fields: Partial<Connector>) => void;
   parentName?: string;
   poolHasContent?: boolean;
   laneHasContent?: boolean;
@@ -90,6 +91,7 @@ export function PropertiesPanel({
   onUpdateConnectorLabel,
   onAddLane,
   onAddSublane,
+  onUpdateConnectorFields,
   parentName,
   poolHasContent,
   laneHasContent,
@@ -276,7 +278,138 @@ export function PropertiesPanel({
             Reverse Direction
           </button>
         )}
-        {(connector.type === "transition" || connector.type === "flow" || connector.type === "messageBPMN"
+        {/* Transition formal/informal label */}
+        {connector.type === "transition" && onUpdateConnectorLabel && onUpdateConnectorFields && (() => {
+          const mode = connector.labelMode ?? "informal";
+          function composeFormalLabel(event: string, guard: string, actions: string): string {
+            const parts: string[] = [];
+            if (event.trim()) parts.push(event.trim());
+            if (guard.trim()) parts.push(`[${guard.trim()}]`);
+            if (actions.trim()) {
+              parts.push("/ " + actions.trim());
+            }
+            return parts.join("\n");
+          }
+          return (
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-xs font-medium text-gray-700">Label</p>
+                <div className="flex gap-1">
+                  {(["informal", "formal"] as const).map(m => (
+                    <button key={m}
+                      onClick={() => {
+                        if (m === "formal" && mode !== "formal") {
+                          // Switching to formal: compose from current parts (or empty)
+                          const ev = connector.transitionEvent ?? "";
+                          const gd = connector.transitionGuard ?? "";
+                          const ac = connector.transitionActions ?? "";
+                          onUpdateConnectorFields(connector.id, {
+                            labelMode: "formal",
+                            transitionEvent: ev, transitionGuard: gd, transitionActions: ac,
+                            label: composeFormalLabel(ev, gd, ac),
+                          });
+                        } else if (m === "informal") {
+                          onUpdateConnectorFields(connector.id, { labelMode: "informal" });
+                        }
+                      }}
+                      className={`px-1.5 py-0.5 text-[10px] rounded border ${
+                        mode === m ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-500 border-gray-300"
+                      }`}
+                    >{m === "informal" ? "Text" : "Formal"}</button>
+                  ))}
+                </div>
+              </div>
+              {mode === "informal" ? (
+                <>
+                  <textarea
+                    key={`inf-${connector.id}`}
+                    className="w-full text-xs border border-gray-300 rounded px-2 py-1 resize-y"
+                    rows={2}
+                    defaultValue={connector.label ?? ""}
+                    onFocus={(e) => { const l = e.target.value.length; e.target.setSelectionRange(l, l); }}
+                    onBlur={(e) => onUpdateConnectorLabel(connector.id, e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); (e.target as HTMLTextAreaElement).blur(); }
+                    }}
+                  />
+                  <p className="text-xs text-gray-400 mt-0.5">Shift+Enter for new line</p>
+                </>
+              ) : (
+                <div className="space-y-1.5">
+                  <div>
+                    <label className="text-[10px] text-gray-500">Event</label>
+                    <input
+                      key={`ev-${connector.id}`}
+                      type="text"
+                      className="w-full text-xs border border-gray-300 rounded px-2 py-0.5"
+                      defaultValue={connector.transitionEvent ?? ""}
+                      onBlur={(e) => {
+                        const ev = e.target.value;
+                        const gd = connector.transitionGuard ?? "";
+                        const ac = connector.transitionActions ?? "";
+                        onUpdateConnectorFields(connector.id, {
+                          transitionEvent: ev,
+                          label: composeFormalLabel(ev, gd, ac),
+                        });
+                      }}
+                      onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-gray-500">Guard</label>
+                    <div className="flex items-center gap-0.5">
+                      <span className="text-xs text-gray-400">[</span>
+                      <input
+                        key={`gd-${connector.id}`}
+                        type="text"
+                        className="flex-1 text-xs border border-gray-300 rounded px-2 py-0.5"
+                        defaultValue={connector.transitionGuard ?? ""}
+                        onBlur={(e) => {
+                          const gd = e.target.value;
+                          const ev = connector.transitionEvent ?? "";
+                          const ac = connector.transitionActions ?? "";
+                          onUpdateConnectorFields(connector.id, {
+                            transitionGuard: gd,
+                            label: composeFormalLabel(ev, gd, ac),
+                          });
+                        }}
+                        onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                      />
+                      <span className="text-xs text-gray-400">]</span>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-gray-500">Actions</label>
+                    <input
+                      key={`ac-${connector.id}`}
+                      type="text"
+                      className="w-full text-xs border border-gray-300 rounded px-2 py-0.5"
+                      placeholder="action1, action2"
+                      defaultValue={connector.transitionActions ?? ""}
+                      onBlur={(e) => {
+                        const ac = e.target.value;
+                        const ev = connector.transitionEvent ?? "";
+                        const gd = connector.transitionGuard ?? "";
+                        onUpdateConnectorFields(connector.id, {
+                          transitionActions: ac,
+                          label: composeFormalLabel(ev, gd, ac),
+                        });
+                      }}
+                      onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                    />
+                    <p className="text-xs text-gray-400 mt-0.5">Comma-separated list</p>
+                  </div>
+                  {/* Preview */}
+                  <div className="bg-gray-50 rounded p-1.5 text-[10px] text-gray-600 font-mono whitespace-pre-wrap">
+                    {composeFormalLabel(connector.transitionEvent ?? "", connector.transitionGuard ?? "", connector.transitionActions ?? "") || "(empty)"}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+        {/* Label for non-transition connectors */}
+        {(connector.type === "flow" || connector.type === "messageBPMN"
           || (connector.type === "sequence" && connector.label !== undefined)) && onUpdateConnectorLabel && (
           <div>
             <p className="text-xs font-medium text-gray-700 mb-1">Label</p>

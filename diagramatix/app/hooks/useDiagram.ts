@@ -134,6 +134,7 @@ type Action =
       cp2RelOffset: Point;
     }}
   | { type: "UPDATE_CONNECTOR_LABEL"; payload: { id: string; label?: string; labelOffsetX?: number; labelOffsetY?: number; labelWidth?: number } }
+  | { type: "UPDATE_CONNECTOR_FIELDS"; payload: { id: string; fields: Partial<Connector> } }
   | { type: "CORRECT_ALL_CONNECTORS" }
   | { type: "SET_VIEWPORT"; payload: { x: number; y: number; zoom: number } }
   | { type: "MOVE_END"; payload: { id: string } }
@@ -932,6 +933,14 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         ),
       };
 
+    case "UPDATE_CONNECTOR_FIELDS":
+      return {
+        ...state,
+        connectors: state.connectors.map((c) =>
+          c.id === action.payload.id ? { ...c, ...action.payload.fields } : c
+        ),
+      };
+
     case "CORRECT_ALL_CONNECTORS": {
       const connectors = state.connectors.map((conn) => {
         if (conn.routingType !== "rectilinear" || conn.waypoints.length < 7) return conn;
@@ -1695,6 +1704,12 @@ export function useDiagram(initialData: DiagramData) {
     nudgeConnector,
     nudgeConnectorEndpoint,
     updateConnectorLabel,
+    updateConnectorFields: useCallback(
+      (id: string, fields: Partial<Connector>) => {
+        pushHistory(snapshotData());
+        dispatch({ type: "UPDATE_CONNECTOR_FIELDS", payload: { id, fields } });
+      }, []
+    ),
     elementMoveEnd,
     splitConnector,
     applyTemplate,

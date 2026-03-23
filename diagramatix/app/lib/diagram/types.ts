@@ -112,6 +112,11 @@ export interface Connector {
   cp1RelOffset?: Point;   // cp1 offset from srcEdge — preserved across element moves
   cp2RelOffset?: Point;   // cp2 offset from tgtEdge — preserved across element moves
   labelAnchor?: "midpoint" | "source";  // where the label tethers to; default "midpoint"
+  // Formal transition label parts (state-machine only)
+  labelMode?: "informal" | "formal";
+  transitionEvent?: string;
+  transitionGuard?: string;
+  transitionActions?: string;
 }
 
 export interface Viewport {
