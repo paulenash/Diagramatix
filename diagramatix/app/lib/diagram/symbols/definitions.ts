@@ -67,14 +67,14 @@ export const ALL_SYMBOLS: SymbolDefinition[] = [
   },
   {
     type: "initial-state",
-    label: "Initial State",
+    label: "Initial",
     defaultWidth: 30,
     defaultHeight: 30,
     description: "Starting state",
   },
   {
     type: "final-state",
-    label: "Final State",
+    label: "Final",
     defaultWidth: 30,
     defaultHeight: 30,
     description: "Ending state",
@@ -102,7 +102,7 @@ export const ALL_SYMBOLS: SymbolDefinition[] = [
   },
   {
     type: "composite-state",
-    label: "Composite State Header",
+    label: "Composite",
     defaultWidth: 360,
     defaultHeight: 180,
     description: "A composite state containing sub-states",

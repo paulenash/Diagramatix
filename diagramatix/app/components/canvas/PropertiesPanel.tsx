@@ -131,7 +131,7 @@ export function PropertiesPanel({
         onClick={() => setPanelCollapsed(false)}
         title="Expand panel"
       >
-        <span className="text-gray-400 text-xs mt-2">◀</span>
+        <span className="text-gray-400 text-xs mt-2">{"\u25C0"}</span>
         <span className="text-[9px] text-gray-500 font-semibold uppercase tracking-widest mt-3"
           style={{ writingMode: "vertical-rl", textOrientation: "mixed" }}>
           {connector ? "Connector" : element ? "Properties" : "Title"}
@@ -144,8 +144,9 @@ export function PropertiesPanel({
   function CollapseButton() {
     return (
       <button onClick={() => setPanelCollapsed(true)} title="Collapse panel"
-        className="absolute top-1 right-1 w-5 h-5 flex items-center justify-center text-gray-400 hover:text-gray-600 text-xs rounded hover:bg-gray-100 z-10">
-        ▶
+        className="absolute right-1 w-5 h-5 flex items-center justify-center text-gray-400 hover:text-gray-600 text-xs rounded hover:bg-gray-100 z-10"
+        style={{ top: "1px" }}>
+        {"\u25B6"}
       </button>
     );
   }
@@ -156,7 +157,7 @@ export function PropertiesPanel({
       <button onClick={onToggle}
         className="w-full flex items-center justify-between py-0.5 border-b border-gray-200 mb-1">
         <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">{label}</span>
-        <span className="text-gray-400 text-[10px]">{open ? "▼" : "▶"}</span>
+        <span className="text-gray-400 text-[10px]">{open ? "\u25BC" : "\u25B6"}</span>
       </button>
     );
   }

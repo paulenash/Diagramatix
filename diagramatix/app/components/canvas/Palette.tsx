@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useMemo } from "react";
 import type { DiagramType, SymbolType } from "@/app/lib/diagram/types";
 import {
   ALL_SYMBOLS,
@@ -246,15 +247,62 @@ function PaletteSymbolPreview({ type, colorConfig }: { type: SymbolType; colorCo
 }
 
 export function Palette({ diagramType, onDragStart, disabledSymbols = [], colorConfig }: Props) {
+  const [collapsed, setCollapsed] = useState(false);
   const paletteTypes = PALETTE_BY_DIAGRAM_TYPE[diagramType] ?? ["task"];
   const symbols = ALL_SYMBOLS.filter((s) => paletteTypes.includes(s.type));
 
+  // Compute expanded width based on longest label
+  const expandedWidth = useMemo(() => {
+    const avgCharWidth = 6.5; // approx px per char at text-xs
+    const iconW = 36 + 8; // icon width + gap
+    const pad = 16 + 5; // px padding + 5px margin
+    const longest = Math.max(...symbols.map(s => s.label.length));
+    return Math.max(100, iconW + longest * avgCharWidth + pad);
+  }, [symbols]);
+
+  if (collapsed) {
+    return (
+      <div className="border-r border-gray-200 bg-white flex flex-col shrink-0" style={{ width: 52 }}>
+        <div className="px-1 py-1 border-b border-gray-200 flex items-center justify-center">
+          <button onClick={() => setCollapsed(false)} title="Expand symbols"
+            className="text-gray-400 hover:text-gray-600 text-xs">
+            {"\u25B6"}
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-0.5 space-y-0.5">
+          {symbols.map((sym) => {
+            const disabled = disabledSymbols.includes(sym.type);
+            return (
+              <div
+                key={sym.type}
+                draggable={!disabled}
+                onDragStart={disabled ? undefined : () => onDragStart(sym.type)}
+                title={sym.label}
+                className={`flex items-center justify-center px-1 py-1 rounded select-none ${
+                  disabled
+                    ? "opacity-40 cursor-not-allowed"
+                    : "hover:bg-gray-50 cursor-grab active:cursor-grabbing"
+                }`}
+              >
+                <PaletteSymbolPreview type={sym.type} colorConfig={colorConfig} />
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="w-48 border-r border-gray-200 bg-white flex flex-col">
-      <div className="px-2 py-1.5 border-b border-gray-200">
+    <div className="border-r border-gray-200 bg-white flex flex-col shrink-0" style={{ width: expandedWidth }}>
+      <div className="px-2 py-1.5 border-b border-gray-200 flex items-center justify-between">
         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
           Symbols
         </p>
+        <button onClick={() => setCollapsed(true)} title="Collapse symbols"
+          className="text-gray-400 hover:text-gray-600 text-xs">
+          {"\u25C0"}
+        </button>
       </div>
       <div className="flex-1 overflow-y-auto p-1 space-y-0.5">
         {symbols.map((sym) => {
