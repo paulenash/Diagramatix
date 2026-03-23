@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useState, useCallback, useEffect } from "react";
+import React, { useRef, useState, useCallback, useEffect, useMemo } from "react";
 import type {
   BpmnTaskType,
   Connector,
@@ -15,7 +15,7 @@ import type {
   Side,
   SymbolType,
 } from "@/app/lib/diagram/types";
-import { SymbolRenderer, type ResizeHandle } from "./SymbolRenderer";
+import { SymbolRenderer, SublaneIdsCtx, type ResizeHandle } from "./SymbolRenderer";
 import { DisplayModeCtx, FontScaleCtx, ConnectorFontScaleCtx, TitleFontSizeCtx, SketchyFilter } from "@/app/lib/diagram/displayMode";
 import { ConnectorRenderer } from "./ConnectorRenderer";
 
@@ -1248,6 +1248,18 @@ export function Canvas({
       const depthB = b.parentId && data.elements.find(e => e.id === b.parentId)?.type === "lane" ? 1 : 0;
       return depthA - depthB;
     });
+  // Compute sublane IDs: lanes whose parent is also a lane
+  const sublaneIds = useMemo(() => {
+    const laneIds = new Set(data.elements.filter(e => e.type === "lane").map(e => e.id));
+    const result = new Set<string>();
+    for (const el of data.elements) {
+      if (el.type === "lane" && el.parentId && laneIds.has(el.parentId)) {
+        result.add(el.id);
+      }
+    }
+    return result;
+  }, [data.elements]);
+
   const otherContainersUnsorted = data.elements.filter(
     (el) => el.type === "system-boundary" || el.type === "composite-state"
          || el.type === "subprocess-expanded"
@@ -1416,6 +1428,7 @@ export function Canvas({
       <FontScaleCtx.Provider value={((data.fontSize ?? 12) / 12) * (displayMode === "hand-drawn" ? 1.3 : 1)}>
       <ConnectorFontScaleCtx.Provider value={((data.connectorFontSize ?? 10) / 10) * (displayMode === "hand-drawn" ? 1.3 : 1)}>
       <TitleFontSizeCtx.Provider value={data.titleFontSize ?? 14}>
+      <SublaneIdsCtx.Provider value={sublaneIds}>
       <svg
         ref={svgRef}
         data-canvas
@@ -2236,6 +2249,7 @@ export function Canvas({
 
         </g>
       </svg>
+      </SublaneIdsCtx.Provider>
       </TitleFontSizeCtx.Provider>
       </ConnectorFontScaleCtx.Provider>
       </FontScaleCtx.Provider>

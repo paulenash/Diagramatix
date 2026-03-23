@@ -22,7 +22,12 @@ interface Props {
   titleFontSize?: number;
   onTitleFontSizeChange?: (size: number) => void;
   onClose: () => void;
-  onSaved: (config: SymbolColorConfig) => void;
+  onSaved: (config: SymbolColorConfig, settings?: {
+    displayMode?: DisplayMode;
+    fontSize?: number;
+    connectorFontSize?: number;
+    titleFontSize?: number;
+  }) => void;
 }
 
 export function DiagramColorModal({
@@ -48,6 +53,10 @@ export function DiagramColorModal({
     ...projectColors,
     ...initialColorConfig,
   });
+  const [workingDisplayMode, setWorkingDisplayMode] = useState<DisplayMode>(displayMode);
+  const [workingFontSize, setWorkingFontSize] = useState(fontSize ?? 12);
+  const [workingConnectorFontSize, setWorkingConnectorFontSize] = useState(connectorFontSize ?? 10);
+  const [workingTitleFontSize, setWorkingTitleFontSize] = useState(titleFontSize ?? 14);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
 
@@ -79,6 +88,11 @@ export function DiagramColorModal({
         setSaveError(`Save failed (${res.status})${body?.error ? ": " + body.error : ""}`);
         return;
       }
+      // Apply all pending settings
+      onDisplayModeChange(workingDisplayMode);
+      if (onFontSizeChange) onFontSizeChange(workingFontSize);
+      if (onConnectorFontSizeChange) onConnectorFontSizeChange(workingConnectorFontSize);
+      if (onTitleFontSizeChange) onTitleFontSizeChange(workingTitleFontSize);
       onSaved(workingColors);
       onClose();
     } catch {
@@ -107,9 +121,9 @@ export function DiagramColorModal({
         <div className="flex items-center justify-between px-6 py-3 border-b border-gray-200 flex-shrink-0">
           <span className="text-sm font-medium text-gray-700">Display Mode</span>
           <button
-            onClick={() => onDisplayModeChange(displayMode === "hand-drawn" ? "normal" : "hand-drawn")}
+            onClick={() => setWorkingDisplayMode(workingDisplayMode === "hand-drawn" ? "normal" : "hand-drawn")}
             className={`px-3 py-1.5 text-sm border rounded flex items-center gap-1.5 ${
-              displayMode === "hand-drawn"
+              workingDisplayMode === "hand-drawn"
                 ? "bg-gray-800 text-white border-gray-800"
                 : "text-gray-700 border-gray-300 hover:bg-gray-50"
             }`}
@@ -118,7 +132,7 @@ export function DiagramColorModal({
               <path d="M2 14l3-1L13.5 4.5a1.4 1.4 0 0 0-2-2L3 11l-1 3z" />
               <path d="M11.5 2.5l2 2" />
             </svg>
-            {displayMode === "hand-drawn" ? "Hand Drawn" : "Normal"}
+            {workingDisplayMode === "hand-drawn" ? "Hand Drawn" : "Normal"}
           </button>
         </div>
 
@@ -148,12 +162,12 @@ export function DiagramColorModal({
               <div className="flex items-center justify-between">
                 <span className="text-xs text-gray-500">Element Names</span>
                 <div className="flex items-center gap-1.5">
-                  <button onClick={() => onFontSizeChange(12)} disabled={(fontSize ?? 12) === 12} title="Revert to default (12px)"
+                  <button onClick={() => setWorkingFontSize(12)} disabled={workingFontSize === 12} title="Revert to default (12px)"
                     className="text-xs text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-default">{"\u21BA"}</button>
-                  <button onClick={() => onFontSizeChange(Math.max(6, (fontSize ?? 12) - 1))}
+                  <button onClick={() => setWorkingFontSize(Math.max(6, workingFontSize - 1))}
                     className="w-6 h-6 flex items-center justify-center text-xs font-bold text-gray-700 border border-gray-400 rounded hover:bg-gray-100">-</button>
-                  <span className="text-sm font-mono font-semibold text-gray-800 w-7 text-center">{fontSize ?? 12}</span>
-                  <button onClick={() => onFontSizeChange(Math.min(24, (fontSize ?? 12) + 1))}
+                  <span className="text-sm font-mono font-semibold text-gray-800 w-7 text-center">{workingFontSize}</span>
+                  <button onClick={() => setWorkingFontSize(Math.min(24, workingFontSize + 1))}
                     className="w-6 h-6 flex items-center justify-center text-xs font-bold text-gray-700 border border-gray-400 rounded hover:bg-gray-100">+</button>
                   <span className="text-[10px] text-gray-400">px</span>
                 </div>
@@ -163,12 +177,12 @@ export function DiagramColorModal({
               <div className="flex items-center justify-between">
                 <span className="text-xs text-gray-500">Connector Labels</span>
                 <div className="flex items-center gap-1.5">
-                  <button onClick={() => onConnectorFontSizeChange(10)} disabled={(connectorFontSize ?? 10) === 10} title="Revert to default (10px)"
+                  <button onClick={() => setWorkingConnectorFontSize(10)} disabled={workingConnectorFontSize === 10} title="Revert to default (10px)"
                     className="text-xs text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-default">{"\u21BA"}</button>
-                  <button onClick={() => onConnectorFontSizeChange(Math.max(6, (connectorFontSize ?? 10) - 1))}
+                  <button onClick={() => setWorkingConnectorFontSize(Math.max(6, workingConnectorFontSize - 1))}
                     className="w-6 h-6 flex items-center justify-center text-xs font-bold text-gray-700 border border-gray-400 rounded hover:bg-gray-100">-</button>
-                  <span className="text-sm font-mono font-semibold text-gray-800 w-7 text-center">{connectorFontSize ?? 10}</span>
-                  <button onClick={() => onConnectorFontSizeChange(Math.min(24, (connectorFontSize ?? 10) + 1))}
+                  <span className="text-sm font-mono font-semibold text-gray-800 w-7 text-center">{workingConnectorFontSize}</span>
+                  <button onClick={() => setWorkingConnectorFontSize(Math.min(24, workingConnectorFontSize + 1))}
                     className="w-6 h-6 flex items-center justify-center text-xs font-bold text-gray-700 border border-gray-400 rounded hover:bg-gray-100">+</button>
                   <span className="text-[10px] text-gray-400">px</span>
                 </div>
@@ -178,12 +192,12 @@ export function DiagramColorModal({
               <div className="flex items-center justify-between">
                 <span className="text-xs text-gray-500">Diagram Title</span>
                 <div className="flex items-center gap-1.5">
-                  <button onClick={() => onTitleFontSizeChange(14)} disabled={(titleFontSize ?? 14) === 14} title="Revert to default (14px)"
+                  <button onClick={() => setWorkingTitleFontSize(14)} disabled={workingTitleFontSize === 14} title="Revert to default (14px)"
                     className="text-xs text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-default">{"\u21BA"}</button>
-                  <button onClick={() => onTitleFontSizeChange(Math.max(8, (titleFontSize ?? 14) - 1))}
+                  <button onClick={() => setWorkingTitleFontSize(Math.max(8, workingTitleFontSize - 1))}
                     className="w-6 h-6 flex items-center justify-center text-xs font-bold text-gray-700 border border-gray-400 rounded hover:bg-gray-100">-</button>
-                  <span className="text-sm font-mono font-semibold text-gray-800 w-7 text-center">{titleFontSize ?? 14}</span>
-                  <button onClick={() => onTitleFontSizeChange(Math.min(30, (titleFontSize ?? 14) + 1))}
+                  <span className="text-sm font-mono font-semibold text-gray-800 w-7 text-center">{workingTitleFontSize}</span>
+                  <button onClick={() => setWorkingTitleFontSize(Math.min(30, workingTitleFontSize + 1))}
                     className="w-6 h-6 flex items-center justify-center text-xs font-bold text-gray-700 border border-gray-400 rounded hover:bg-gray-100">+</button>
                   <span className="text-[10px] text-gray-400">px</span>
                 </div>

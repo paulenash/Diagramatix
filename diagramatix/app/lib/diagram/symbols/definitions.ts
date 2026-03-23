@@ -171,6 +171,13 @@ export const ALL_SYMBOLS: SymbolDefinition[] = [
     description: "A BPMN lane within a pool",
   },
   {
+    type: "sublane",
+    label: "Sublane",
+    defaultWidth: 600,
+    defaultHeight: 40,
+    description: "A sublane within a lane",
+  },
+  {
     type: "group",
     label: "Group",
     defaultWidth: 240,
@@ -245,6 +252,7 @@ export const COLOR_PALETTE_BY_DIAGRAM_TYPE: Record<DiagramType, SymbolType[]> = 
   bpmn: [
     "pool",
     "lane",
+    "sublane",
     "start-event",
     "task",
     "subprocess",

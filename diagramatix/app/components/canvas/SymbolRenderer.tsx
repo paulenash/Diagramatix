@@ -9,6 +9,9 @@ import { DisplayModeCtx, FontScaleCtx, sketchyFilter } from "@/app/lib/diagram/d
  *  read from it; when undefined, resolveColor falls back to defaults. */
 const SymbolColorCtx = createContext<SymbolColorConfig | undefined>(undefined);
 
+/** Set of lane IDs whose parent is also a lane (sublanes) */
+export const SublaneIdsCtx = createContext<Set<string>>(new Set());
+
 export type ResizeHandle = "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w";
 
 interface Props {
@@ -932,7 +935,7 @@ function PoolShape({ el }: { el: DiagramElement }) {
   );
 }
 
-function LaneShape({ el }: { el: DiagramElement }) {
+function LaneShape({ el, isSublane }: { el: DiagramElement; isSublane?: boolean }) {
   const colors = useContext(SymbolColorCtx);
   const fsc = useContext(FontScaleCtx);
   const { x, y, width: w, height: h } = el;
@@ -944,7 +947,7 @@ function LaneShape({ el }: { el: DiagramElement }) {
   return (
     <g>
       <rect x={x} y={y} width={w} height={h} fill="none" stroke="#374151" strokeWidth={1} />
-      <rect x={x} y={y} width={LW} height={h} fill={resolveColor("lane", colors)} stroke="#374151" strokeWidth={1} />
+      <rect x={x} y={y} width={LW} height={h} fill={resolveColor(isSublane ? "sublane" : "lane", colors)} stroke="#374151" strokeWidth={1} />
       <text textAnchor="middle" fontSize={Math.round(10 * fsc * 10) / 10} fill="#3b1a08" fontWeight="bold"
             transform={`rotate(-90,${cx},${cy})`}
             style={{ userSelect: "none", pointerEvents: "none" }}>
@@ -958,6 +961,7 @@ function LaneShape({ el }: { el: DiagramElement }) {
 
 function SymbolShape({ el }: { el: DiagramElement }) {
   const mode = useContext(DisplayModeCtx);
+  const sublaneIds = useContext(SublaneIdsCtx);
   const shape = (() => {
     switch (el.type) {
       case "gateway":              return <GatewayShape el={el} />;
@@ -979,7 +983,7 @@ function SymbolShape({ el }: { el: DiagramElement }) {
       case "text-annotation":   return <TextAnnotationShape el={el} />;
       case "system":            return <SystemShape el={el} />;
       case "pool":              return <PoolShape el={el} />;
-      case "lane":              return <LaneShape el={el} />;
+      case "lane":              return <LaneShape el={el} isSublane={sublaneIds.has(el.id)} />;
       case "task":
         return el.taskType !== undefined ? <BpmnTaskShape el={el} /> : <TaskShape el={el} />;
       case "subprocess":          return <SubprocessShape el={el} />;

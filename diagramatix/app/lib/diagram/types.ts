@@ -29,7 +29,8 @@ export type SymbolType =
   | "external-entity"
   | "process-system"
   | "uml-class"
-  | "uml-enumeration";
+  | "uml-enumeration"
+  | "sublane";
 
 export type BpmnTaskType =
   | "none"
