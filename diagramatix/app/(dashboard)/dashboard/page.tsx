@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { execSync } from "child_process";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { DashboardClient } from "./DashboardClient";
@@ -20,11 +21,17 @@ export default async function DashboardPage() {
     }),
   ]);
 
+  let commitCount = 0;
+  try {
+    commitCount = parseInt(execSync("git rev-list --count HEAD", { encoding: "utf8" }).trim(), 10) || 0;
+  } catch { /* fallback to 0 */ }
+
   return (
     <DashboardClient
       projects={projects}
       unorganized={unorganized}
       userName={session.user.name ?? session.user.email ?? "User"}
+      version={commitCount}
     />
   );
 }

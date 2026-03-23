@@ -25,6 +25,7 @@ interface Props {
   projects: ProjectSummary[];
   unorganized: DiagramSummary[];
   userName: string;
+  version?: number;
 }
 
 const DIAGRAM_TYPE_LABELS: Record<string, string> = {
@@ -115,7 +116,7 @@ function DiagramCard({
   );
 }
 
-export function DashboardClient({ projects: initialProjects, unorganized: initialUnorganized, userName }: Props) {
+export function DashboardClient({ projects: initialProjects, unorganized: initialUnorganized, userName, version }: Props) {
   const router = useRouter();
   const [projects, setProjects] = useState(initialProjects);
   const [unorganized, setUnorganized] = useState(initialUnorganized);
@@ -216,6 +217,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
             </svg>
           </div>
           <span className="font-semibold text-gray-900">Diagramatix</span>
+          {version ? <span className="text-xs text-gray-400 ml-1">v1.0.{version}</span> : null}
         </div>
         <div className="flex items-center gap-4">
           <span className="text-sm text-gray-600">{userName}</span>
