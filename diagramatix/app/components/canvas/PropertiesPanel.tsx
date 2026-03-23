@@ -114,105 +114,148 @@ export function PropertiesPanel({
   updatedAt,
 }: Props) {
   const [labelDraft, setLabelDraft] = useState("");
+  const [panelCollapsed, setPanelCollapsed] = useState(false);
+  const [titleOpen, setTitleOpen] = useState(true);
+  const [connectorOpen, setConnectorOpen] = useState(true);
+  const [propsOpen, setPropsOpen] = useState(true);
 
   useEffect(() => {
     if (element) setLabelDraft(element.label);
   }, [element]);
 
+  // Collapsed state: show a narrow vertical tab
+  if (panelCollapsed) {
+    return (
+      <div
+        className="w-6 border-l border-gray-200 bg-gray-50 flex flex-col items-center cursor-pointer hover:bg-gray-100 shrink-0"
+        onClick={() => setPanelCollapsed(false)}
+        title="Expand panel"
+      >
+        <span className="text-gray-400 text-xs mt-2">◀</span>
+        <span className="text-[9px] text-gray-500 font-semibold uppercase tracking-widest mt-3"
+          style={{ writingMode: "vertical-rl", textOrientation: "mixed" }}>
+          {connector ? "Connector" : element ? "Properties" : "Title"}
+        </span>
+      </div>
+    );
+  }
+
+  // Collapse button for entire panel
+  function CollapseButton() {
+    return (
+      <button onClick={() => setPanelCollapsed(true)} title="Collapse panel"
+        className="absolute top-1 right-1 w-5 h-5 flex items-center justify-center text-gray-400 hover:text-gray-600 text-xs rounded hover:bg-gray-100 z-10">
+        ▶
+      </button>
+    );
+  }
+
+  // Collapsible section header
+  function SectionHeader({ label, open, onToggle }: { label: string; open: boolean; onToggle: () => void }) {
+    return (
+      <button onClick={onToggle}
+        className="w-full flex items-center justify-between py-0.5 border-b border-gray-200 mb-1">
+        <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">{label}</span>
+        <span className="text-gray-400 text-[10px]">{open ? "▼" : "▶"}</span>
+      </button>
+    );
+  }
+
+  // Compact inline row: label + value on same line
+  function InlineField({ label, children }: { label: string; children: React.ReactNode }) {
+    return (
+      <div className="flex items-center gap-1.5 mb-0.5">
+        <label className="text-[10px] text-gray-500 whitespace-nowrap w-16 shrink-0">{label}</label>
+        <div className="flex-1 min-w-0">{children}</div>
+      </div>
+    );
+  }
+
+  // Diagram Title section content
+  function TitleSection() {
+    if (!onUpdateDiagramTitle) return null;
+    return (
+      <div className="space-y-0.5 pb-1">
+        <InlineField label="Show">
+          <button
+            onClick={() => onUpdateDiagramTitle({ ...diagramTitle, showTitle: !(diagramTitle?.showTitle ?? false) })}
+            className={`px-2 py-0 text-[10px] rounded border ${
+              diagramTitle?.showTitle ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-500 border-gray-300"
+            }`}
+          >{diagramTitle?.showTitle ? "On" : "Off"}</button>
+        </InlineField>
+        <InlineField label="Name">
+          <input readOnly className="w-full text-[10px] border border-gray-200 rounded px-1.5 py-0 bg-gray-50 text-gray-500" value={diagramName ?? ""} />
+        </InlineField>
+        <InlineField label="Version">
+          <input type="text" className="w-full text-[10px] border border-gray-300 rounded px-1.5 py-0"
+            defaultValue={diagramTitle?.version ?? ""} key={`ver-${diagramName}`}
+            onBlur={(e) => onUpdateDiagramTitle({ ...diagramTitle, version: e.target.value })}
+            onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+          />
+        </InlineField>
+        <InlineField label="Authors">
+          <textarea className="w-full text-[10px] border border-gray-300 rounded px-1.5 py-0 resize-y" rows={1}
+            defaultValue={diagramTitle?.authors ?? ""} key={`auth-${diagramName}`}
+            onBlur={(e) => onUpdateDiagramTitle({ ...diagramTitle, authors: e.target.value })}
+            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); (e.target as HTMLTextAreaElement).blur(); } }}
+          />
+        </InlineField>
+        <InlineField label="Status">
+          <div className="flex gap-0.5">
+            {(["draft", "final", "production"] as DiagramStatus[]).map(s => (
+              <button key={s}
+                onClick={() => onUpdateDiagramTitle({ ...diagramTitle, status: s })}
+                className={`px-1.5 py-0 text-[9px] rounded border capitalize ${
+                  (diagramTitle?.status ?? "draft") === s
+                    ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-500 border-gray-300"
+                }`}
+              >{s}</button>
+            ))}
+          </div>
+        </InlineField>
+        <InlineField label="Created">
+          <span className="text-[10px] text-gray-500">{createdAt ? new Date(createdAt).toLocaleDateString() : ""}</span>
+        </InlineField>
+        <InlineField label="Modified">
+          <span className="text-[10px] text-gray-500">{updatedAt ? new Date(updatedAt).toLocaleString() : ""}</span>
+        </InlineField>
+      </div>
+    );
+  }
+
   if (multiSelectionCount && multiSelectionCount > 1) {
     return (
-      <div className="w-56 border-l border-gray-200 bg-white p-4">
-        <p className="text-xs text-gray-500 font-medium">{multiSelectionCount} elements selected</p>
-        <p className="text-xs text-gray-400 mt-1">Drag any selected element to move the group</p>
+      <div className="w-56 border-l border-gray-200 bg-white p-3 overflow-y-auto relative">
+        <CollapseButton />
+        <SectionHeader label="Diagram Title" open={titleOpen} onToggle={() => setTitleOpen(!titleOpen)} />
+        {titleOpen && <TitleSection />}
+        <p className="text-xs text-gray-500 font-medium mt-2">{multiSelectionCount} elements selected</p>
+        <p className="text-[10px] text-gray-400 mt-0.5">Drag any selected element to move the group</p>
       </div>
     );
   }
 
   if (!element && !connector) {
     return (
-      <div className="w-56 border-l border-gray-200 bg-white p-4 space-y-3 overflow-y-auto">
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Diagram Title</p>
-        {onUpdateDiagramTitle && (
-          <>
-            <div className="flex items-center gap-2">
-              <label className="text-[10px] text-gray-500 whitespace-nowrap">Show</label>
-              <button
-                onClick={() => onUpdateDiagramTitle({ ...diagramTitle, showTitle: !(diagramTitle?.showTitle ?? false) })}
-                className={`px-2 py-0.5 text-[10px] rounded border ${
-                  diagramTitle?.showTitle ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-500 border-gray-300"
-                }`}
-              >{diagramTitle?.showTitle ? "On" : "Off"}</button>
-            </div>
-            <div>
-              <label className="text-[10px] text-gray-500">Name</label>
-              <input readOnly className="w-full text-xs border border-gray-200 rounded px-2 py-0.5 bg-gray-50 text-gray-500" value={diagramName ?? ""} />
-            </div>
-            <div>
-              <label className="text-[10px] text-gray-500">Version</label>
-              <input
-                type="text"
-                className="w-full text-xs border border-gray-300 rounded px-2 py-0.5"
-                defaultValue={diagramTitle?.version ?? ""}
-                key={`ver-${diagramName}`}
-                onBlur={(e) => onUpdateDiagramTitle({ ...diagramTitle, version: e.target.value })}
-                onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
-              />
-            </div>
-            <div>
-              <label className="text-[10px] text-gray-500">Authors</label>
-              <textarea
-                className="w-full text-xs border border-gray-300 rounded px-2 py-0.5 resize-y"
-                rows={2}
-                defaultValue={diagramTitle?.authors ?? ""}
-                key={`auth-${diagramName}`}
-                onBlur={(e) => onUpdateDiagramTitle({ ...diagramTitle, authors: e.target.value })}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); (e.target as HTMLTextAreaElement).blur(); }
-                }}
-              />
-              <p className="text-xs text-gray-400 mt-0.5">Shift+Enter for new line</p>
-            </div>
-            <div>
-              <label className="text-[10px] text-gray-500">Status</label>
-              <div className="flex gap-1 mt-0.5">
-                {(["draft", "final", "production"] as DiagramStatus[]).map(s => (
-                  <button key={s}
-                    onClick={() => onUpdateDiagramTitle({ ...diagramTitle, status: s })}
-                    className={`px-2 py-0.5 text-[10px] rounded border capitalize ${
-                      (diagramTitle?.status ?? "draft") === s
-                        ? "bg-blue-600 text-white border-blue-600"
-                        : "bg-white text-gray-500 border-gray-300"
-                    }`}
-                  >{s}</button>
-                ))}
-              </div>
-            </div>
-            <div>
-              <label className="text-[10px] text-gray-500">Created</label>
-              <input readOnly className="w-full text-xs border border-gray-200 rounded px-2 py-0.5 bg-gray-50 text-gray-500"
-                value={createdAt ? new Date(createdAt).toLocaleDateString() : ""} />
-            </div>
-            <div>
-              <label className="text-[10px] text-gray-500">Last Modified</label>
-              <input readOnly className="w-full text-xs border border-gray-200 rounded px-2 py-0.5 bg-gray-50 text-gray-500"
-                value={updatedAt ? new Date(updatedAt).toLocaleString() : ""} />
-            </div>
-          </>
-        )}
-        {!onUpdateDiagramTitle && (
-          <p className="text-xs text-gray-400">Select an element to see properties</p>
-        )}
+      <div className="w-56 border-l border-gray-200 bg-white p-3 overflow-y-auto relative">
+        <CollapseButton />
+        <SectionHeader label="Diagram Title" open={titleOpen} onToggle={() => setTitleOpen(!titleOpen)} />
+        {titleOpen && <TitleSection />}
+        <p className="text-[10px] text-gray-400 mt-2">Select an element to see properties</p>
       </div>
     );
   }
 
   if (connector) {
     return (
-      <div className="w-56 border-l border-gray-200 bg-white p-4 space-y-4">
+      <div className="w-56 border-l border-gray-200 bg-white p-3 overflow-y-auto relative">
+        <CollapseButton />
+        <SectionHeader label="Diagram Title" open={titleOpen} onToggle={() => setTitleOpen(!titleOpen)} />
+        {titleOpen && <TitleSection />}
+        <SectionHeader label="Connector" open={connectorOpen} onToggle={() => setConnectorOpen(!connectorOpen)} />
+        {connectorOpen && <div className="space-y-2">
         <div>
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-            Connector
-          </p>
           <p className="text-xs text-gray-600">Type: {connector.type}</p>
           {debugMode && (
             <div className="mt-1 space-y-0.5 select-text">
@@ -514,10 +557,11 @@ export function PropertiesPanel({
         )}
         <button
           onClick={() => onDeleteConnector(connector.id)}
-          className="w-full px-3 py-1.5 text-xs bg-red-50 text-red-600 border border-red-200 rounded hover:bg-red-100"
+          className="w-full px-3 py-1 text-[10px] bg-red-50 text-red-600 border border-red-200 rounded hover:bg-red-100"
         >
           Delete connector
         </button>
+      </div>}
       </div>
     );
   }
@@ -530,12 +574,14 @@ export function PropertiesPanel({
     element.type === "end-event";
 
   return (
-    <div className="w-56 border-l border-gray-200 bg-white p-4 space-y-4 overflow-y-auto">
+    <div className="w-56 border-l border-gray-200 bg-white p-3 overflow-y-auto relative">
+      <CollapseButton />
+      <SectionHeader label="Diagram Title" open={titleOpen} onToggle={() => setTitleOpen(!titleOpen)} />
+      {titleOpen && <TitleSection />}
+      <SectionHeader label="Properties" open={propsOpen} onToggle={() => setPropsOpen(!propsOpen)} />
+      {propsOpen && <div className="space-y-2">
       <div>
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-          Properties
-        </p>
-        <p className="text-xs text-gray-400 mb-1">Type: {element.type}</p>
+        <p className="text-[10px] text-gray-400 mb-0.5">Type: {element.type}</p>
         {debugMode && (
           <p className="text-xs text-gray-300 mb-1 font-mono">ID: {element.id}</p>
         )}
@@ -977,6 +1023,7 @@ export function PropertiesPanel({
           Delete element
         </button>
       )}
+    </div>}
     </div>
   );
 }

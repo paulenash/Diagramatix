@@ -442,16 +442,7 @@ export function Canvas({
 
   // Lasso selection state
   const [lassoRect, setLassoRect] = useState<{ startX: number; startY: number; endX: number; endY: number } | null>(null);
-  const spaceHeldRef = useRef(false);
-
-  // Track Space key for pan-while-lasso
-  useEffect(() => {
-    function onKeyDown(e: KeyboardEvent) { if (e.code === "Space" && !e.repeat) spaceHeldRef.current = true; }
-    function onKeyUp(e: KeyboardEvent) { if (e.code === "Space") spaceHeldRef.current = false; }
-    window.addEventListener("keydown", onKeyDown);
-    window.addEventListener("keyup", onKeyUp);
-    return () => { window.removeEventListener("keydown", onKeyDown); window.removeEventListener("keyup", onKeyUp); };
-  }, []);
+  // (Shift key is checked directly via event.shiftKey for lasso selection)
 
   // Expose viewport center to parent via ref
   if (getViewportCenterRef) {
@@ -996,8 +987,8 @@ export function Canvas({
       return;
     }
 
-    // Default drag → pan; hold Space → lasso
-    if (!spaceHeldRef.current) {
+    // Default drag → pan; hold Shift → lasso
+    if (!e.shiftKey) {
       // --- Pan mode ---
       const startCX = e.clientX;
       const startCY = e.clientY;
@@ -2421,7 +2412,7 @@ export function Canvas({
       <div className="absolute bottom-2 left-2 text-xs text-gray-400 bg-white/80 px-2 py-1 rounded">
         {isDraggingConnector || isDraggingEndpoint
           ? "Release over an element to connect · Esc to cancel"
-          : "Drag to pan · Scroll to zoom · Double-click label · Delete to remove · Drag element body to connect"}
+          : "Drag to pan · Shift+Drag to select · Scroll to zoom · Double-click label · Delete to remove"}
         {" · "}
         {Math.round(zoom * 100)}%
       </div>
