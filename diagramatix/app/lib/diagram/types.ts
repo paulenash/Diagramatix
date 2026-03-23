@@ -125,10 +125,20 @@ export interface Viewport {
   zoom: number;
 }
 
+export type DiagramStatus = "draft" | "final" | "production";
+
+export interface DiagramTitle {
+  version?: string;
+  authors?: string;
+  status?: DiagramStatus;
+  showTitle?: boolean;
+}
+
 export interface DiagramData {
   elements: DiagramElement[];
   connectors: Connector[];
   viewport: Viewport;
+  title?: DiagramTitle;
 }
 
 export const EMPTY_DIAGRAM: DiagramData = {

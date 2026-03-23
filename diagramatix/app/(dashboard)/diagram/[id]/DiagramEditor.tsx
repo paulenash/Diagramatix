@@ -32,6 +32,8 @@ interface Props {
   initialDiagramColorConfig?: SymbolColorConfig;
   initialDisplayMode?: DisplayMode;
   userEmail?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 function useAutoSave(
@@ -191,6 +193,8 @@ export function DiagramEditor({
   initialDiagramColorConfig,
   initialDisplayMode,
   userEmail,
+  createdAt,
+  updatedAt,
 }: Props) {
   const router = useRouter();
 
@@ -216,6 +220,7 @@ export function DiagramEditor({
     nudgeConnectorEndpoint,
     updateConnectorLabel,
     updateConnectorFields,
+    updateDiagramTitle,
     elementMoveEnd,
     splitConnector,
     applyTemplate,
@@ -1002,6 +1007,9 @@ export function DiagramEditor({
           displayMode={displayMode}
           debugMode={debugMode}
           getViewportCenterRef={getViewportCenterRef}
+          diagramName={diagramName}
+          createdAt={createdAt}
+          updatedAt={updatedAt}
         />
 
         <PropertiesPanel
@@ -1033,6 +1041,11 @@ export function DiagramEditor({
           allConnectors={data.connectors}
           allElements={data.elements}
           debugMode={debugMode}
+          diagramName={diagramName}
+          diagramTitle={data.title}
+          onUpdateDiagramTitle={updateDiagramTitle}
+          createdAt={createdAt}
+          updatedAt={updatedAt}
         />
       </div>
 

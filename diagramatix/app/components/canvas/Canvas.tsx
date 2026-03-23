@@ -184,6 +184,9 @@ interface Props {
   displayMode?: import("@/app/lib/diagram/displayMode").DisplayMode;
   debugMode?: boolean;
   getViewportCenterRef?: React.MutableRefObject<(() => Point) | null>;
+  diagramName?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 interface EditingLabel {
@@ -351,6 +354,9 @@ export function Canvas({
   displayMode: displayModeProp,
   debugMode,
   getViewportCenterRef,
+  diagramName,
+  createdAt,
+  updatedAt,
 }: Props) {
   const displayMode = displayModeProp ?? "normal";
   const svgRef = useRef<SVGSVGElement>(null);
@@ -1398,6 +1404,44 @@ export function Canvas({
       >
         <SketchyFilter />
         <g transform={transform}>
+          {/* Diagram Title Block */}
+          {data.title?.showTitle && (() => {
+            const els = data.elements;
+            if (els.length === 0) return null;
+            let minX = Infinity, maxX = -Infinity, minY = Infinity;
+            for (const el of els) {
+              const l = el.x, r = el.x + el.width, t = el.y;
+              if (l < minX) minX = l;
+              if (r > maxX) maxX = r;
+              if (t < minY) minY = t;
+            }
+            const cx = (minX + maxX) / 2;
+            const title = data.title;
+            const statusLabel = (title.status ?? "draft").charAt(0).toUpperCase() + (title.status ?? "draft").slice(1);
+            const lines: string[] = [];
+            lines.push(diagramName ?? "Untitled");
+            if (title.version) lines.push(`Version ${title.version}`);
+            if (title.authors) lines.push(title.authors);
+            lines.push(`Status: ${statusLabel}`);
+            if (createdAt) lines.push(`Created: ${new Date(createdAt).toLocaleDateString()}`);
+            if (updatedAt) lines.push(`Modified: ${new Date(updatedAt).toLocaleString()}`);
+            const lineH = 16;
+            const titleH = lines.length * lineH + 8;
+            const topY = minY - titleH - 20;
+            return (
+              <g style={{ pointerEvents: "none" }}>
+                <text textAnchor="middle" fontSize={12} fill="#1f2937" fontWeight="bold" style={{ userSelect: "none" }}>
+                  <tspan x={cx} y={topY + lineH * 0.85} fontSize={14}>{lines[0]}</tspan>
+                </text>
+                {lines.slice(1).map((ln, i) => (
+                  <text key={i} textAnchor="middle" x={cx} y={topY + (i + 1) * lineH + lineH * 0.85}
+                    fontSize={11} fill="#6b7280" style={{ userSelect: "none" }}>
+                    {ln}
+                  </text>
+                ))}
+              </g>
+            );
+          })()}
           {/* Pools render first (deepest layer) */}
           {[...pools, ...otherContainers].map((el) => {
             const isMsgTarget =

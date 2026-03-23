@@ -11,6 +11,7 @@ import type {
   ConnectorType,
   DiagramData,
   DiagramElement,
+  DiagramTitle,
   DirectionType,
   Point,
   RoutingType,
@@ -135,6 +136,7 @@ type Action =
     }}
   | { type: "UPDATE_CONNECTOR_LABEL"; payload: { id: string; label?: string; labelOffsetX?: number; labelOffsetY?: number; labelWidth?: number } }
   | { type: "UPDATE_CONNECTOR_FIELDS"; payload: { id: string; fields: Partial<Connector> } }
+  | { type: "UPDATE_DIAGRAM_TITLE"; payload: DiagramTitle }
   | { type: "CORRECT_ALL_CONNECTORS" }
   | { type: "SET_VIEWPORT"; payload: { x: number; y: number; zoom: number } }
   | { type: "MOVE_END"; payload: { id: string } }
@@ -941,6 +943,9 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         ),
       };
 
+    case "UPDATE_DIAGRAM_TITLE":
+      return { ...state, title: action.payload };
+
     case "CORRECT_ALL_CONNECTORS": {
       const connectors = state.connectors.map((conn) => {
         if (conn.routingType !== "rectilinear" || conn.waypoints.length < 7) return conn;
@@ -1708,6 +1713,11 @@ export function useDiagram(initialData: DiagramData) {
       (id: string, fields: Partial<Connector>) => {
         pushHistory(snapshotData());
         dispatch({ type: "UPDATE_CONNECTOR_FIELDS", payload: { id, fields } });
+      }, []
+    ),
+    updateDiagramTitle: useCallback(
+      (title: DiagramTitle) => {
+        dispatch({ type: "UPDATE_DIAGRAM_TITLE", payload: title });
       }, []
     ),
     elementMoveEnd,

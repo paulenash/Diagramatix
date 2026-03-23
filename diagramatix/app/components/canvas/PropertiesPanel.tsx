@@ -9,6 +9,8 @@ import type {
   Connector,
   DiagramElement,
   DiagramType,
+  DiagramTitle,
+  DiagramStatus,
   DirectionType,
   ConnectorType,
 } from "@/app/lib/diagram/types";
@@ -36,6 +38,11 @@ interface Props {
   allConnectors?: Connector[];
   allElements?: DiagramElement[];
   debugMode?: boolean;
+  diagramName?: string;
+  diagramTitle?: DiagramTitle;
+  onUpdateDiagramTitle?: (title: DiagramTitle) => void;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 const TASK_TYPE_OPTIONS: { value: BpmnTaskType; label: string }[] = [
@@ -100,6 +107,11 @@ export function PropertiesPanel({
   allConnectors,
   allElements,
   debugMode,
+  diagramName,
+  diagramTitle,
+  onUpdateDiagramTitle,
+  createdAt,
+  updatedAt,
 }: Props) {
   const [labelDraft, setLabelDraft] = useState("");
 
@@ -118,8 +130,78 @@ export function PropertiesPanel({
 
   if (!element && !connector) {
     return (
-      <div className="w-56 border-l border-gray-200 bg-white p-4">
-        <p className="text-xs text-gray-400">Select an element to see properties</p>
+      <div className="w-56 border-l border-gray-200 bg-white p-4 space-y-3 overflow-y-auto">
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Diagram Title</p>
+        {onUpdateDiagramTitle && (
+          <>
+            <div className="flex items-center gap-2">
+              <label className="text-[10px] text-gray-500 whitespace-nowrap">Show</label>
+              <button
+                onClick={() => onUpdateDiagramTitle({ ...diagramTitle, showTitle: !(diagramTitle?.showTitle ?? false) })}
+                className={`px-2 py-0.5 text-[10px] rounded border ${
+                  diagramTitle?.showTitle ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-500 border-gray-300"
+                }`}
+              >{diagramTitle?.showTitle ? "On" : "Off"}</button>
+            </div>
+            <div>
+              <label className="text-[10px] text-gray-500">Name</label>
+              <input readOnly className="w-full text-xs border border-gray-200 rounded px-2 py-0.5 bg-gray-50 text-gray-500" value={diagramName ?? ""} />
+            </div>
+            <div>
+              <label className="text-[10px] text-gray-500">Version</label>
+              <input
+                type="text"
+                className="w-full text-xs border border-gray-300 rounded px-2 py-0.5"
+                defaultValue={diagramTitle?.version ?? ""}
+                key={`ver-${diagramName}`}
+                onBlur={(e) => onUpdateDiagramTitle({ ...diagramTitle, version: e.target.value })}
+                onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+              />
+            </div>
+            <div>
+              <label className="text-[10px] text-gray-500">Authors</label>
+              <textarea
+                className="w-full text-xs border border-gray-300 rounded px-2 py-0.5 resize-y"
+                rows={2}
+                defaultValue={diagramTitle?.authors ?? ""}
+                key={`auth-${diagramName}`}
+                onBlur={(e) => onUpdateDiagramTitle({ ...diagramTitle, authors: e.target.value })}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); (e.target as HTMLTextAreaElement).blur(); }
+                }}
+              />
+              <p className="text-xs text-gray-400 mt-0.5">Shift+Enter for new line</p>
+            </div>
+            <div>
+              <label className="text-[10px] text-gray-500">Status</label>
+              <div className="flex gap-1 mt-0.5">
+                {(["draft", "final", "production"] as DiagramStatus[]).map(s => (
+                  <button key={s}
+                    onClick={() => onUpdateDiagramTitle({ ...diagramTitle, status: s })}
+                    className={`px-2 py-0.5 text-[10px] rounded border capitalize ${
+                      (diagramTitle?.status ?? "draft") === s
+                        ? "bg-blue-600 text-white border-blue-600"
+                        : "bg-white text-gray-500 border-gray-300"
+                    }`}
+                  >{s}</button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="text-[10px] text-gray-500">Created</label>
+              <input readOnly className="w-full text-xs border border-gray-200 rounded px-2 py-0.5 bg-gray-50 text-gray-500"
+                value={createdAt ? new Date(createdAt).toLocaleDateString() : ""} />
+            </div>
+            <div>
+              <label className="text-[10px] text-gray-500">Last Modified</label>
+              <input readOnly className="w-full text-xs border border-gray-200 rounded px-2 py-0.5 bg-gray-50 text-gray-500"
+                value={updatedAt ? new Date(updatedAt).toLocaleString() : ""} />
+            </div>
+          </>
+        )}
+        {!onUpdateDiagramTitle && (
+          <p className="text-xs text-gray-400">Select an element to see properties</p>
+        )}
       </div>
     );
   }

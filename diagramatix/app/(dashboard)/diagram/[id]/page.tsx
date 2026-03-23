@@ -41,6 +41,8 @@ export default async function DiagramPage({ params }: Props) {
       initialDiagramColorConfig={diagramColorConfig}
       initialDisplayMode={(diagram.displayMode as DisplayMode) ?? "normal"}
       userEmail={session.user.email ?? ""}
+      createdAt={diagram.createdAt.toISOString()}
+      updatedAt={diagram.updatedAt.toISOString()}
     />
   );
 }
