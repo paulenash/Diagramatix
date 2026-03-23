@@ -223,6 +223,9 @@ export function DiagramEditor({
     updateConnectorLabel,
     updateConnectorFields,
     updateDiagramTitle,
+    setFontSize,
+    setConnectorFontSize,
+    setTitleFontSize,
     elementMoveEnd,
     splitConnector,
     applyTemplate,
@@ -1139,6 +1142,12 @@ export function DiagramEditor({
               localStorage.setItem(`debug-${projectId}`, on ? "true" : "false");
             }
           }}
+          fontSize={data.fontSize}
+          onFontSizeChange={setFontSize}
+          connectorFontSize={data.connectorFontSize}
+          onConnectorFontSizeChange={setConnectorFontSize}
+          titleFontSize={data.titleFontSize}
+          onTitleFontSizeChange={setTitleFontSize}
           onClose={() => setShowDiagramMaintenance(false)}
           onSaved={(config) => {
             setDiagramColorConfig(config);

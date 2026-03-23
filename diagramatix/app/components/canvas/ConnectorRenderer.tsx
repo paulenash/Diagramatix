@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useContext } from "react";
 import type { Connector, Point } from "@/app/lib/diagram/types";
+import { ConnectorFontScaleCtx } from "@/app/lib/diagram/displayMode";
 import { waypointsToSvgPath, waypointsToCurvePath, waypointsToRoundedPath } from "@/app/lib/diagram/routing";
 
 interface Props {
@@ -277,6 +278,7 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState("");
   const [isLabelFocused, setIsLabelFocused] = useState(false);
+  const fontScale = useContext(ConnectorFontScaleCtx);
 
   if (visibleWaypoints.length < 2) return null;
 
@@ -299,7 +301,7 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
   const lWidth  = connector.labelWidth ?? 80;
   const label   = connector.label ?? "";
   // Auto-size: measure text width from actual content
-  const fontSize = 10;
+  const fontSize = Math.round(10 * fontScale * 10) / 10;
   const avgCharWidth = fontSize * 0.6;
   const rawLines = (label || " ").split('\n');
   const measuredWidth = Math.max(30, ...rawLines.map(l => l.length * avgCharWidth + 12));
@@ -436,7 +438,7 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
       />
       {/* Label text (hidden while editing) */}
       {!isEditing && (
-        <text textAnchor="middle" fontSize={10} fill="#374151" style={{ pointerEvents: "none", userSelect: "none" }}>
+        <text textAnchor="middle" fontSize={fontSize} fill="#374151" style={{ pointerEvents: "none", userSelect: "none" }}>
           {lines.map((ln, i) => (
             <tspan key={i} x={lCx} y={lTy + i * lineH + lineH * 0.85}>{ln}</tspan>
           ))}
@@ -461,7 +463,7 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
             }}
             style={{
               width: "100%", height: "100%",
-              fontSize: 10, fontFamily: "inherit",
+              fontSize, fontFamily: "inherit",
               resize: "none", border: "none", outline: "none",
               background: "white", padding: "1px 2px",
               textAlign: "center", lineHeight: "14px",

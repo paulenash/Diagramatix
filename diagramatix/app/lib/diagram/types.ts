@@ -139,6 +139,9 @@ export interface DiagramData {
   connectors: Connector[];
   viewport: Viewport;
   title?: DiagramTitle;
+  fontSize?: number; // element names/labels font size in px (default 12)
+  connectorFontSize?: number; // connector labels font size in px (default 10)
+  titleFontSize?: number; // diagram title font size in px (default 14)
 }
 
 export const EMPTY_DIAGRAM: DiagramData = {

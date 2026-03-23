@@ -3,7 +3,7 @@
 import { useState, createContext, useContext } from "react";
 import type { BpmnTaskType, GatewayType, EventType, DiagramElement, Point, Side, SymbolType } from "@/app/lib/diagram/types";
 import { type SymbolColorConfig, resolveColor } from "@/app/lib/diagram/colors";
-import { DisplayModeCtx, sketchyFilter } from "@/app/lib/diagram/displayMode";
+import { DisplayModeCtx, FontScaleCtx, sketchyFilter } from "@/app/lib/diagram/displayMode";
 
 /** React context carrying the active project colour config.  Shape components
  *  read from it; when undefined, resolveColor falls back to defaults. */
@@ -854,6 +854,7 @@ function UmlClassShape({ el }: { el: DiagramElement }) {
 
 function UmlEnumerationShape({ el }: { el: DiagramElement }) {
   const colors = useContext(SymbolColorCtx);
+  const fsc = useContext(FontScaleCtx);
   const fill = resolveColor("uml-enumeration", colors);
   return (
     <g>
@@ -861,7 +862,7 @@ function UmlEnumerationShape({ el }: { el: DiagramElement }) {
         fill={fill} stroke="#374151" strokeWidth={1.5} />
       <line x1={el.x} y1={el.y + HEADER_H} x2={el.x + el.width} y2={el.y + HEADER_H}
         stroke="#374151" strokeWidth={1} />
-      <text x={el.x + el.width / 2} y={el.y + 10} textAnchor="middle" fontSize={9}
+      <text x={el.x + el.width / 2} y={el.y + 10} textAnchor="middle" fontSize={Math.round(9 * fsc * 10) / 10}
         fill="#6b7280" fontStyle="italic" style={{ pointerEvents: "none", userSelect: "none" }}>
         {"\u00ABenumeration\u00BB"}
       </text>
@@ -894,6 +895,7 @@ function ProcessSystemShape({ el }: { el: DiagramElement }) {
 
 function PoolShape({ el }: { el: DiagramElement }) {
   const colors = useContext(SymbolColorCtx);
+  const fsc = useContext(FontScaleCtx);
   const { x, y, width: w, height: h } = el;
   const LW = 30;
   const cx = x + LW / 2 + 3;
@@ -912,7 +914,7 @@ function PoolShape({ el }: { el: DiagramElement }) {
       <rect x={x} y={y} width={w} height={h} fill="#f9fafb" stroke="#374151" strokeWidth={1.5} />
       <rect x={x} y={y} width={LW} height={h} fill={resolveColor("pool", colors)} stroke="#374151" strokeWidth={1.5}
         style={isWhiteBox ? { cursor: "pointer" } : undefined} />
-      <text textAnchor="middle" fontSize={11} fill="#3b1a08" fontWeight="bold"
+      <text textAnchor="middle" fontSize={Math.round(11 * fsc * 10) / 10} fill="#3b1a08" fontWeight="bold"
             transform={`rotate(-90,${cx},${cy})`}
             style={{ userSelect: "none", pointerEvents: "none" }}>
         {lines.map((line, i) => (
@@ -932,6 +934,7 @@ function PoolShape({ el }: { el: DiagramElement }) {
 
 function LaneShape({ el }: { el: DiagramElement }) {
   const colors = useContext(SymbolColorCtx);
+  const fsc = useContext(FontScaleCtx);
   const { x, y, width: w, height: h } = el;
   const LW = 24;
   const cx = x + LW / 2 + 3;
@@ -942,7 +945,7 @@ function LaneShape({ el }: { el: DiagramElement }) {
     <g>
       <rect x={x} y={y} width={w} height={h} fill="none" stroke="#374151" strokeWidth={1} />
       <rect x={x} y={y} width={LW} height={h} fill={resolveColor("lane", colors)} stroke="#374151" strokeWidth={1} />
-      <text textAnchor="middle" fontSize={10} fill="#3b1a08" fontWeight="bold"
+      <text textAnchor="middle" fontSize={Math.round(10 * fsc * 10) / 10} fill="#3b1a08" fontWeight="bold"
             transform={`rotate(-90,${cx},${cy})`}
             style={{ userSelect: "none", pointerEvents: "none" }}>
         {lines.map((line, i) => (
@@ -1058,6 +1061,8 @@ export function SymbolRenderer({
   onGroupMove,
   onGroupMoveEnd,
 }: Props) {
+  const fontScale = useContext(FontScaleCtx);
+  const fs = (base: number) => Math.round(base * fontScale * 10) / 10;
   const [isEditingGatewayLabel, setIsEditingGatewayLabel] = useState(false);
   const [editGatewayLabelValue, setEditGatewayLabelValue] = useState("");
   const [labelHighlighted, setLabelHighlighted] = useState(false);
@@ -1268,7 +1273,7 @@ export function SymbolRenderer({
             {!isEditingGatewayLabel && (
               <text
                 textAnchor="middle"
-                fontSize={11}
+                fontSize={fs(11)}
                 fill="#111827"
                 style={{ userSelect: "none", pointerEvents: "none" }}
               >
@@ -1286,7 +1291,7 @@ export function SymbolRenderer({
                 textAnchor="middle"
                 x={labelCenterX}
                 y={labelTopY + lines.length * lineH + lineH * 0.85}
-                fontSize={10}
+                fontSize={fs(10)}
                 fill="#374151"
                 style={{ userSelect: "none", pointerEvents: "none" }}
               >
@@ -1338,7 +1343,7 @@ export function SymbolRenderer({
         const totalH = lines.length * lineH;
         const topY = element.y + element.height / 2 - totalH / 2;
         return (
-          <text textAnchor="start" fontSize={12} fill="#111827"
+          <text textAnchor="start" fontSize={fs(12)} fill="#111827"
             style={{ userSelect: "none", pointerEvents: "none" }}>
             {lines.map((line, i) => (
               <tspan key={i} x={element.x + PAD} y={topY + i * lineH + lineH * 0.85}>
@@ -1362,7 +1367,7 @@ export function SymbolRenderer({
           y={labelInfo.y}
           textAnchor="middle"
           dominantBaseline={labelInfo.baseline}
-          fontSize={isActorOrTeam ? 11 : 12}
+          fontSize={fs(isActorOrTeam ? 11 : 12)}
           fill="#111827"
           style={{ userSelect: "none", pointerEvents: "none" }}
         >
@@ -1637,7 +1642,7 @@ export function SymbolRenderer({
             />
             <text
               textAnchor="middle"
-              fontSize={12}
+              fontSize={fs(12)}
               fill="#111827"
               style={{ userSelect: "none", pointerEvents: "none" }}
             >

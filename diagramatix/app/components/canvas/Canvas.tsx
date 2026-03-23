@@ -16,7 +16,7 @@ import type {
   SymbolType,
 } from "@/app/lib/diagram/types";
 import { SymbolRenderer, type ResizeHandle } from "./SymbolRenderer";
-import { DisplayModeCtx, SketchyFilter } from "@/app/lib/diagram/displayMode";
+import { DisplayModeCtx, FontScaleCtx, ConnectorFontScaleCtx, TitleFontSizeCtx, SketchyFilter } from "@/app/lib/diagram/displayMode";
 import { ConnectorRenderer } from "./ConnectorRenderer";
 
 const HEADER_H = 28;
@@ -1413,6 +1413,9 @@ export function Canvas({
       }}
     >
       <DisplayModeCtx.Provider value={displayMode}>
+      <FontScaleCtx.Provider value={((data.fontSize ?? 12) / 12) * (displayMode === "hand-drawn" ? 1.3 : 1)}>
+      <ConnectorFontScaleCtx.Provider value={((data.connectorFontSize ?? 10) / 10) * (displayMode === "hand-drawn" ? 1.3 : 1)}>
+      <TitleFontSizeCtx.Provider value={data.titleFontSize ?? 14}>
       <svg
         ref={svgRef}
         data-canvas
@@ -1426,7 +1429,7 @@ export function Canvas({
         style={{ cursor: isDraggingConnector || isDraggingEndpoint ? "crosshair" : "default" }}
       >
         <SketchyFilter />
-        <g transform={transform} style={displayMode === "hand-drawn" ? { fontStyle: "italic" } : undefined}>
+        <g transform={transform} style={displayMode === "hand-drawn" ? { fontStyle: "italic", fontFamily: "var(--font-caveat), 'Segoe Print', 'Comic Sans MS', cursive" } : undefined}>
           {/* Diagram Title Block */}
           {data.title?.showTitle && (() => {
             const els = data.elements;
@@ -1468,18 +1471,20 @@ export function Canvas({
             if (createdAt) line3Segs.push({ label: "Created: ", value: formatAustralianDate(createdAt) });
             const line4Segs: Seg[] = updatedAt ? [{ label: "Modified: ", value: formatAustralianTime(updatedAt) }] : [];
             const subLines: Seg[][] = [line2Segs, line3Segs, line4Segs].filter(l => l.length > 0);
-            const lineH = 16;
+            const tfs = data.titleFontSize ?? 14;
+            const subFs = Math.round(tfs * 0.79);
+            const lineH = Math.round(tfs * 1.15);
             const titleH = (1 + subLines.length) * lineH + 8;
             const topY = minY - titleH - 20;
             return (
               <g style={{ pointerEvents: "none", fontStyle: "normal" }}>
                 <text textAnchor="middle" x={cx} y={topY + lineH * 0.85}
-                  fontSize={14} fill="#1f2937" fontWeight="bold" style={{ userSelect: "none" }}>
+                  fontSize={tfs} fill="#1f2937" fontWeight="bold" style={{ userSelect: "none" }}>
                   {diagramName ?? "Untitled"}
                 </text>
                 {subLines.map((segs, i) => (
                   <text key={i} textAnchor="middle" x={cx} y={topY + (i + 1) * lineH + lineH * 0.85}
-                    fontSize={11} fill="#6b7280" style={{ userSelect: "none" }}>
+                    fontSize={subFs} fill="#6b7280" style={{ userSelect: "none" }}>
                     {segs.map((seg, j) => (
                       <React.Fragment key={j}>
                         {j > 0 && <tspan>,  </tspan>}
@@ -2231,6 +2236,9 @@ export function Canvas({
 
         </g>
       </svg>
+      </TitleFontSizeCtx.Provider>
+      </ConnectorFontScaleCtx.Provider>
+      </FontScaleCtx.Provider>
       </DisplayModeCtx.Provider>
 
       {/* Inline label editor overlay */}
@@ -2262,7 +2270,7 @@ export function Canvas({
                 top: editingLabel.y,
                 width: editingLabel.width,
                 height: editingLabel.height,
-                fontSize: 12 * zoom,
+                fontSize: (data.fontSize ?? 12) * zoom,
                 textAlign: 'center',
                 background: 'white',
                 border: '2px solid #2563eb',
@@ -2293,7 +2301,7 @@ export function Canvas({
                 top: editingLabel.y,
                 width: editingLabel.width,
                 height: editingLabel.height,
-                fontSize: 11 * zoom,
+                fontSize: (data.fontSize ?? 12) * 11 / 12 * zoom,
                 textAlign: 'left',
                 background: 'white',
                 border: '2px solid #7c3a2a',
@@ -2323,7 +2331,7 @@ export function Canvas({
               top: editingLabel.y + (hasTaskMarker ? 20 * zoom : 0),
               width: editingLabel.width,
               height: editingLabel.height,
-              fontSize: 12 * zoom,
+              fontSize: (data.fontSize ?? 12) * zoom,
               textAlign: "center",
               background: "white",
               border: "2px solid #2563eb",

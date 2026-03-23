@@ -137,6 +137,9 @@ type Action =
   | { type: "UPDATE_CONNECTOR_LABEL"; payload: { id: string; label?: string; labelOffsetX?: number; labelOffsetY?: number; labelWidth?: number } }
   | { type: "UPDATE_CONNECTOR_FIELDS"; payload: { id: string; fields: Partial<Connector> } }
   | { type: "UPDATE_DIAGRAM_TITLE"; payload: DiagramTitle }
+  | { type: "SET_FONT_SIZE"; payload: number }
+  | { type: "SET_CONNECTOR_FONT_SIZE"; payload: number }
+  | { type: "SET_TITLE_FONT_SIZE"; payload: number }
   | { type: "CORRECT_ALL_CONNECTORS" }
   | { type: "SET_VIEWPORT"; payload: { x: number; y: number; zoom: number } }
   | { type: "MOVE_END"; payload: { id: string } }
@@ -946,6 +949,15 @@ function reducer(state: DiagramData, action: Action): DiagramData {
     case "UPDATE_DIAGRAM_TITLE":
       return { ...state, title: action.payload };
 
+    case "SET_FONT_SIZE":
+      return { ...state, fontSize: action.payload };
+
+    case "SET_CONNECTOR_FONT_SIZE":
+      return { ...state, connectorFontSize: action.payload };
+
+    case "SET_TITLE_FONT_SIZE":
+      return { ...state, titleFontSize: action.payload };
+
     case "CORRECT_ALL_CONNECTORS": {
       const connectors = state.connectors.map((conn) => {
         if (conn.routingType !== "rectilinear" || conn.waypoints.length < 7) return conn;
@@ -1718,6 +1730,21 @@ export function useDiagram(initialData: DiagramData) {
     updateDiagramTitle: useCallback(
       (title: DiagramTitle) => {
         dispatch({ type: "UPDATE_DIAGRAM_TITLE", payload: title });
+      }, []
+    ),
+    setFontSize: useCallback(
+      (size: number) => {
+        dispatch({ type: "SET_FONT_SIZE", payload: size });
+      }, []
+    ),
+    setConnectorFontSize: useCallback(
+      (size: number) => {
+        dispatch({ type: "SET_CONNECTOR_FONT_SIZE", payload: size });
+      }, []
+    ),
+    setTitleFontSize: useCallback(
+      (size: number) => {
+        dispatch({ type: "SET_TITLE_FONT_SIZE", payload: size });
       }, []
     ),
     elementMoveEnd,
