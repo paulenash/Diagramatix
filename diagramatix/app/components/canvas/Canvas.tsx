@@ -381,6 +381,38 @@ export function Canvas({
   const [pickerOffset, setPickerOffset] = useState<Point>({ x: 0, y: 0 });
   const pickerDragRef = useRef<{ startX: number; startY: number; origOffX: number; origOffY: number } | null>(null);
 
+  // Fit-to-content on initial mount
+  const hasFitted = useRef(false);
+  useEffect(() => {
+    if (hasFitted.current || !svgRef.current || data.elements.length === 0) return;
+    hasFitted.current = true;
+    const rect = svgRef.current.getBoundingClientRect();
+    if (rect.width < 10 || rect.height < 10) return;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const el of data.elements) {
+      if (el.x < minX) minX = el.x;
+      if (el.y < minY) minY = el.y;
+      if (el.x + el.width > maxX) maxX = el.x + el.width;
+      if (el.y + el.height > maxY) maxY = el.y + el.height;
+    }
+    // Include title block if shown
+    if (data.title?.showTitle) {
+      const titleLines = 4; // name + up to 3 sub-lines
+      const titleH = titleLines * 16 + 28;
+      minY -= titleH;
+    }
+    const pad = 40;
+    minX -= pad; minY -= pad; maxX += pad; maxY += pad;
+    const contentW = maxX - minX;
+    const contentH = maxY - minY;
+    if (contentW < 1 || contentH < 1) return;
+    const fitZoom = Math.min(rect.width / contentW, rect.height / contentH, 2);
+    const cx = (minX + maxX) / 2;
+    const cy = (minY + maxY) / 2;
+    setPan({ x: rect.width / 2 - cx * fitZoom, y: rect.height / 2 - cy * fitZoom });
+    setZoom(fitZoom);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Reset picker offset when a new pending drop appears
   useEffect(() => { setPickerOffset({ x: 0, y: 0 }); }, [pendingDrop]);
   useEffect(() => { setFocusedEndpoint(null); }, [selectedConnectorId]);
