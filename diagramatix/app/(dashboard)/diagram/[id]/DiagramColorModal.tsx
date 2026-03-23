@@ -264,9 +264,13 @@ export function DiagramColorModal({
             <button
               onClick={handleConfirm}
               disabled={saving}
-              className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+              className={`px-4 py-2 text-sm text-white rounded-md ${
+                saving
+                  ? "bg-green-600"
+                  : "bg-blue-600 hover:bg-blue-700"
+              } disabled:cursor-not-allowed`}
             >
-              {saving ? "Saving…" : "Confirm Changes"}
+              {saving ? "Saving\u2026" : "Confirm Changes"}
             </button>
           </div>
         </div>

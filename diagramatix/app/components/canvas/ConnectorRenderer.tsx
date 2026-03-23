@@ -2,7 +2,7 @@
 
 import { useState, useContext } from "react";
 import type { Connector, Point } from "@/app/lib/diagram/types";
-import { ConnectorFontScaleCtx } from "@/app/lib/diagram/displayMode";
+import { DisplayModeCtx, ConnectorFontScaleCtx, sketchyFilter } from "@/app/lib/diagram/displayMode";
 import { waypointsToSvgPath, waypointsToCurvePath, waypointsToRoundedPath } from "@/app/lib/diagram/routing";
 
 interface Props {
@@ -182,6 +182,7 @@ function ArrowMarker({ id, color }: { id: string; color: string }) {
       refX={9}
       refY={3.5}
       orient="auto"
+      overflow="visible"
     >
       <polygon points="0 0, 10 3.5, 0 7" fill={color} />
     </marker>
@@ -190,7 +191,7 @@ function ArrowMarker({ id, color }: { id: string; color: string }) {
 
 function OpenArrowMarker({ id, color }: { id: string; color: string }) {
   return (
-    <marker id={id} markerWidth={10} markerHeight={7} refX={9} refY={3.5} orient="auto">
+    <marker id={id} markerWidth={10} markerHeight={7} refX={9} refY={3.5} orient="auto" overflow="visible">
       <polyline points="0,0 10,3.5 0,7" fill="none" stroke={color} strokeWidth={1.5} />
     </marker>
   );
@@ -198,7 +199,7 @@ function OpenArrowMarker({ id, color }: { id: string; color: string }) {
 
 function OpenArrowMarkerStart({ id, color }: { id: string; color: string }) {
   return (
-    <marker id={id} markerWidth={10} markerHeight={7} refX={9} refY={3.5} orient="auto-start-reverse">
+    <marker id={id} markerWidth={10} markerHeight={7} refX={9} refY={3.5} orient="auto-start-reverse" overflow="visible">
       <polyline points="0,0 10,3.5 0,7" fill="none" stroke={color} strokeWidth={1.5} />
     </marker>
   );
@@ -207,7 +208,7 @@ function OpenArrowMarkerStart({ id, color }: { id: string; color: string }) {
 // Thinner, shorter open arrowhead for associationBPMN connectors
 function OpenArrowMarkerThin({ id, color }: { id: string; color: string }) {
   return (
-    <marker id={id} markerWidth={8} markerHeight={5} refX={7} refY={2.5} orient="auto">
+    <marker id={id} markerWidth={8} markerHeight={5} refX={7} refY={2.5} orient="auto" overflow="visible">
       <polyline points="0,0.5 7,2.5 0,4.5" fill="none" stroke={color} strokeWidth={1} />
     </marker>
   );
@@ -215,7 +216,7 @@ function OpenArrowMarkerThin({ id, color }: { id: string; color: string }) {
 
 function OpenArrowMarkerStartThin({ id, color }: { id: string; color: string }) {
   return (
-    <marker id={id} markerWidth={8} markerHeight={5} refX={7} refY={2.5} orient="auto-start-reverse">
+    <marker id={id} markerWidth={8} markerHeight={5} refX={7} refY={2.5} orient="auto-start-reverse" overflow="visible">
       <polyline points="0,0.5 7,2.5 0,4.5" fill="none" stroke={color} strokeWidth={1} />
     </marker>
   );
@@ -260,7 +261,7 @@ function UnfilledTriangleMarker({ id, color }: { id: string; color: string }) {
 /** Small filled circle (messageBPMN source end) */
 function CircleMarker({ id, color }: { id: string; color: string }) {
   return (
-    <marker id={id} markerWidth={8} markerHeight={8} refX={4} refY={4} orient="auto-start-reverse">
+    <marker id={id} markerWidth={8} markerHeight={8} refX={4} refY={4} orient="auto-start-reverse" overflow="visible">
       <circle cx={4} cy={4} r={3} fill="white" stroke={color} strokeWidth={1.5} />
     </marker>
   );
@@ -487,6 +488,7 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
 }
 
 export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, onUpdateWaypoints, onWaypointsDragEnd, onUpdateLabel, onUpdateCurveHandles, misaligned, otherConnectorWaypoints }: Props) {
+  const displayMode = useContext(DisplayModeCtx);
   const waypoints = connector.waypoints;
   if (waypoints.length === 0) return null;
 
@@ -673,6 +675,8 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
         onClick={(e) => { e.stopPropagation(); onSelect(); }}
       />
 
+      {/* Filtered connector line (hand-drawn wobble) — skip messageBPMN */}
+      <g filter={isMessageBPMN ? undefined : sketchyFilter(displayMode)}>
       <path
         d={visibleD}
         fill="none"
@@ -680,14 +684,14 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
         strokeWidth={isAssocBPMN ? (selected ? 2.5 : 2) : (selected ? 2 : 1.5)}
         strokeDasharray={isMessageBPMN ? "10 5" : isAssocBPMN ? "1 7" : (isMessage ? "6 3" : undefined)}
         strokeLinecap={isAssocBPMN ? "round" : undefined}
-        markerStart={
+        markerStart={(displayMode === "hand-drawn" && !isMessageBPMN) ? undefined :
           isMessageBPMN ? `url(#msg-start-${connector.id})`
           : (connector.type === "uml-aggregation" || connector.type === "uml-composition") ? `url(#${umlDiamondId})`
           : connector.type === "uml-generalisation" ? `url(#${umlTriangleId})`
           : isBothArrow ? `url(#${openStartMarkerId})`
           : undefined
         }
-        markerEnd={
+        markerEnd={(displayMode === "hand-drawn" && !isMessageBPMN) ? undefined :
           isMessageBPMN ? `url(#msg-end-${connector.id})`
           : connector.type === "uml-association" && showArrow ? `url(#${openMarkerId})`
           : showArrow && !isUmlConn ? `url(#${isOpenArrow ? openMarkerId : markerId})`
@@ -695,6 +699,30 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
         }
         style={{ pointerEvents: "none" }}
       />
+      </g>
+      {/* Unfiltered arrowheads (crisp in hand-drawn mode) — skip messageBPMN */}
+      {displayMode === "hand-drawn" && !isMessageBPMN && (
+        <path
+          d={visibleD}
+          fill="none"
+          stroke="transparent"
+          strokeWidth={isAssocBPMN ? (selected ? 2.5 : 2) : (selected ? 2 : 1.5)}
+          markerStart={
+            isMessageBPMN ? `url(#msg-start-${connector.id})`
+            : (connector.type === "uml-aggregation" || connector.type === "uml-composition") ? `url(#${umlDiamondId})`
+            : connector.type === "uml-generalisation" ? `url(#${umlTriangleId})`
+            : isBothArrow ? `url(#${openStartMarkerId})`
+            : undefined
+          }
+          markerEnd={
+            isMessageBPMN ? `url(#msg-end-${connector.id})`
+            : connector.type === "uml-association" && showArrow ? `url(#${openMarkerId})`
+            : showArrow && !isUmlConn ? `url(#${isOpenArrow ? openMarkerId : markerId})`
+            : undefined
+          }
+          style={{ pointerEvents: "none" }}
+        />
+      )}
 
       {/* Floating connector label */}
       {(connector.type === "transition" || connector.type === "flow" || connector.type === "messageBPMN"

@@ -356,9 +356,11 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
               <button
                 onClick={handleCreateProject}
                 disabled={creatingProject}
-                className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+                className={`px-4 py-2 text-sm text-white rounded-md ${
+                  creatingProject ? "bg-green-600" : "bg-blue-600 hover:bg-blue-700"
+                } disabled:cursor-not-allowed`}
               >
-                {creatingProject ? "Creating..." : "Create"}
+                {creatingProject ? "Creating\u2026" : "Create"}
               </button>
             </div>
           </div>
@@ -425,9 +427,11 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
               <button
                 onClick={handleCreateDiagram}
                 disabled={creating}
-                className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+                className={`px-4 py-2 text-sm text-white rounded-md ${
+                  creating ? "bg-green-600" : "bg-blue-600 hover:bg-blue-700"
+                } disabled:cursor-not-allowed`}
               >
-                {creating ? "Creating..." : "Create"}
+                {creating ? "Creating\u2026" : "Create"}
               </button>
             </div>
           </div>
