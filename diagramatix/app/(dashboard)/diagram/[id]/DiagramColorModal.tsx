@@ -141,11 +141,11 @@ export function DiagramColorModal({
           <span className="text-xs font-medium text-gray-700 flex-1">Colours</span>
           <button onClick={handleBlackAndWhite}
             className="text-[10px] text-gray-600 hover:text-gray-800 border border-gray-300 rounded px-2 py-0.5 hover:bg-gray-50">
-            B&amp;W
+            Black &amp; White
           </button>
           <button onClick={handleRevertToProject}
             className="text-[10px] text-gray-600 hover:text-gray-800 border border-gray-300 rounded px-2 py-0.5 hover:bg-gray-50">
-            Revert
+            Revert to Project Colours
           </button>
         </div>
 
