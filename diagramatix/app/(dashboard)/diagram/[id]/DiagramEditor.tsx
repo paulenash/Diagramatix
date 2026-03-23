@@ -78,7 +78,26 @@ function useAutoSave(
     };
   }, [data, diagramId, delay, disabled]);
 
-  return { saveStatus, lastSavedAt };
+  const saveNow = useCallback(async () => {
+    if (saveTimeout.current) clearTimeout(saveTimeout.current);
+    const current = JSON.stringify(data);
+    if (current === lastSaved.current) return;
+    setSaveStatus("saving");
+    try {
+      await fetch(`/api/diagrams/${diagramId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data }),
+      });
+      lastSaved.current = current;
+      setLastSavedAt(new Date().toISOString());
+      setSaveStatus("saved");
+    } catch {
+      setSaveStatus("unsaved");
+    }
+  }, [data, diagramId]);
+
+  return { saveStatus, lastSavedAt, saveNow };
 }
 
 function exportSvg(svgEl: SVGSVGElement, name: string) {
@@ -251,7 +270,7 @@ export function DiagramEditor({
     originalData: DiagramData;
   } | null>(null);
 
-  const { saveStatus, lastSavedAt } = useAutoSave(diagramId, data, 1500, templateEditState !== null);
+  const { saveStatus, lastSavedAt, saveNow } = useAutoSave(diagramId, data, 1500, templateEditState !== null);
   const effectiveUpdatedAt = lastSavedAt ?? updatedAt;
 
   useEffect(() => {
@@ -265,6 +284,10 @@ export function DiagramEditor({
       if ((e.ctrlKey || e.metaKey) && e.key === "y") {
         e.preventDefault();
         redo();
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+        e.preventDefault();
+        saveNow();
       }
     }
     window.addEventListener("keydown", handleKeyDown);
@@ -655,20 +678,29 @@ export function DiagramEditor({
 
         <div className="flex-1" />
 
-        <span className="text-xs text-gray-400">
-          {saveStatus === "saving" && "Saving…"}
-          {saveStatus === "saved" && "Saved"}
-          {saveStatus === "unsaved" && "Unsaved changes"}
-        </span>
+        <button
+          onClick={saveNow}
+          disabled={saveStatus !== "unsaved"}
+          title="Save now (Ctrl+S)"
+          className={`px-3 py-1.5 text-xs font-medium rounded border ${
+            saveStatus === "unsaved"
+              ? "bg-blue-600 text-white border-blue-600 hover:bg-blue-700"
+              : saveStatus === "saving"
+                ? "bg-yellow-50 text-yellow-700 border-yellow-300"
+                : "bg-green-50 text-green-600 border-green-200"
+          }`}
+        >
+          {saveStatus === "saving" ? "Saving\u2026" : saveStatus === "saved" ? "\u2713 Saved" : "Save"}
+        </button>
 
         <div className="flex items-center gap-1">
           <button
             onClick={undo}
             disabled={!canUndo}
             title="Undo (Ctrl+Z)"
-            className="p-1.5 rounded hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+            className="p-1.5 rounded text-gray-600 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
           >
-            <svg width={14} height={14} viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+            <svg width={14} height={14} viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
               <path d="M2 5h6a4 4 0 0 1 0 8H5" />
               <path d="M2 5L5 2M2 5l3 3" />
             </svg>
@@ -677,9 +709,9 @@ export function DiagramEditor({
             onClick={redo}
             disabled={!canRedo}
             title="Redo (Ctrl+Shift+Z)"
-            className="p-1.5 rounded hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+            className="p-1.5 rounded text-gray-600 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
           >
-            <svg width={14} height={14} viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+            <svg width={14} height={14} viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 5H6a4 4 0 0 0 0 8h3" />
               <path d="M12 5L9 2m3 3-3 3" />
             </svg>
