@@ -643,6 +643,21 @@ function reducer(state: DiagramData, action: Action): DiagramData {
             const newH = Math.max(40, Math.round(parent.height * (sib.height / totalSibH)));
             const updated = { ...sib, x: parent.x + headerW, y: stackY, width: parent.width - headerW, height: newH };
             elements = elements.map((e) => e.id === sib.id ? updated : e);
+            // Proportionally resize sub-lanes within this resized lane
+            const subLanes = elements
+              .filter((e) => e.type === "lane" && e.parentId === sib.id)
+              .sort((a, b) => a.y - b.y);
+            if (subLanes.length > 0) {
+              const SUBLANE_LW = 24;
+              const oldTotalSubH = subLanes.reduce((s, l) => s + l.height, 0) || 1;
+              let subStackY = updated.y;
+              for (const sub of subLanes) {
+                const subNewH = Math.max(28, Math.round(newH * (sub.height / oldTotalSubH)));
+                const updatedSub = { ...sub, x: updated.x + SUBLANE_LW, y: subStackY, width: updated.width - SUBLANE_LW, height: subNewH };
+                elements = elements.map((e) => e.id === sub.id ? updatedSub : e);
+                subStackY += subNewH;
+              }
+            }
             elements = clampChildrenToLane(elements, updated);
             stackY += newH;
           }
@@ -1087,23 +1102,47 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       const pool = state.elements.find((e) => e.id === poolId && e.type === "pool");
       if (!pool) return state;
       const POOL_LABEL_W = 30;
-      const DEFAULT_LANE_H = 150;
       const LANE_HEADER_H = 28;
-      const existingLanes = state.elements.filter((e) => e.type === "lane" && e.parentId === poolId);
-      const stackedH = existingLanes.reduce((s, l) => s + l.height, 0);
-      const laneY = pool.y + stackedH;
+      const MIN_LANE_H = 80;
+      const existingLanes = state.elements
+        .filter((e) => e.type === "lane" && e.parentId === poolId)
+        .sort((a, b) => a.y - b.y);
       const laneCount = state.elements.filter((e) => e.type === "lane").length;
-      const laneH = existingLanes.length === 0 ? pool.height : LANE_HEADER_H;
+
+      if (existingLanes.length === 0) {
+        // First lane: split pool into two lanes
+        const topH = Math.max(MIN_LANE_H, Math.floor(pool.height / 2));
+        const botH = Math.max(MIN_LANE_H, pool.height - topH);
+        const poolH = topH + botH;
+        const lane1: DiagramElement = {
+          id: nanoid(), type: "lane",
+          x: pool.x + POOL_LABEL_W, y: pool.y,
+          width: pool.width - POOL_LABEL_W, height: topH,
+          label: `Lane ${laneCount + 1}`, properties: {}, parentId: poolId,
+        };
+        const lane2: DiagramElement = {
+          id: nanoid(), type: "lane",
+          x: pool.x + POOL_LABEL_W, y: pool.y + topH,
+          width: pool.width - POOL_LABEL_W, height: botH,
+          label: `Lane ${laneCount + 2}`, properties: {}, parentId: poolId,
+        };
+        const elements = state.elements.map((e) =>
+          e.id === poolId ? { ...e, height: poolH } : e
+        );
+        return { ...state, elements: updatePoolTypes([...elements, lane1, lane2]) };
+      }
+
+      // Additional lane: add at bottom, grow pool
+      const lastLane = existingLanes[existingLanes.length - 1];
+      const laneY = lastLane.y + lastLane.height;
+      const newLaneH = Math.max(LANE_HEADER_H, MIN_LANE_H);
       const newLane: DiagramElement = {
         id: nanoid(), type: "lane",
-        x: pool.x + POOL_LABEL_W,
-        y: laneY,
-        width: pool.width - POOL_LABEL_W,
-        height: laneH,
-        label: `Lane ${laneCount + 1}`,
-        properties: {}, parentId: poolId,
+        x: pool.x + POOL_LABEL_W, y: laneY,
+        width: pool.width - POOL_LABEL_W, height: newLaneH,
+        label: `Lane ${laneCount + 1}`, properties: {}, parentId: poolId,
       };
-      const neededH = laneY + laneH - pool.y;
+      const neededH = (laneY + newLaneH) - pool.y;
       const elements = state.elements.map((e) =>
         e.id === poolId && neededH > e.height ? { ...e, height: neededH } : e
       );

@@ -311,6 +311,7 @@ export function DiagramEditor({
   const [userTemplates, setUserTemplates] = useState<{ id: string; name: string }[]>([]);
   const [builtInTemplates, setBuiltInTemplates] = useState<{ id: string; name: string }[]>([]);
   const [templateMode, setTemplateMode] = useState<"idle" | "capturing" | "capturing-builtin" | "editing">("idle");
+  const [deletingTemplateIds, setDeletingTemplateIds] = useState<Set<string>>(new Set());
   const [templateDropdownOpen, setTemplateDropdownOpen] = useState(false);
   const [builtInDropdownOpen, setBuiltInDropdownOpen] = useState(false);
   const [showTemplateNameModal, setShowTemplateNameModal] = useState(false);
@@ -564,6 +565,8 @@ export function DiagramEditor({
   }
 
   async function handleDeleteTemplate(templateId: string, isBuiltIn = false) {
+    // Immediately show as pending delete
+    setDeletingTemplateIds(prev => { const next = new Set(prev); next.add(templateId); return next; });
     try {
       const res = await fetch(`/api/templates/${templateId}`, { method: "DELETE" });
       if (res.ok) {
@@ -578,6 +581,7 @@ export function DiagramEditor({
     } catch (err) {
       console.error("Failed to delete template:", err);
     }
+    setDeletingTemplateIds(prev => { const next = new Set(prev); next.delete(templateId); return next; });
   }
 
   async function handleEditTemplate(templateId: string, templateName: string) {
@@ -809,15 +813,18 @@ export function DiagramEditor({
                   + Create Built-In Template
                 </button>
                 {builtInTemplates.length > 0 && <div className="border-t border-gray-100" />}
-                {builtInTemplates.map((t) => (
-                  <div key={t.id} className="flex items-center hover:bg-gray-50">
+                {builtInTemplates.map((t) => {
+                  const isDeleting = deletingTemplateIds.has(t.id);
+                  return (
+                  <div key={t.id} className={`flex items-center ${isDeleting ? "opacity-50" : "hover:bg-gray-50"}`}>
                     <button
-                      onClick={() => handleApplyTemplate(t.id)}
-                      className="flex-1 text-left px-3 py-2 text-xs text-gray-700"
+                      onClick={() => !isDeleting && handleApplyTemplate(t.id)}
+                      disabled={isDeleting}
+                      className={`flex-1 text-left px-3 py-2 text-xs text-gray-700 ${isDeleting ? "line-through text-gray-400" : ""}`}
                     >
-                      {t.name}
+                      {t.name}{isDeleting ? " (deleting\u2026)" : ""}
                     </button>
-                    {isAdmin && (
+                    {isAdmin && !isDeleting && (
                       <>
                         <button
                           onClick={(e) => { e.stopPropagation(); handleEditTemplate(t.id, t.name); }}
@@ -840,7 +847,8 @@ export function DiagramEditor({
                       </>
                     )}
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -862,14 +870,19 @@ export function DiagramEditor({
                   + Create User Template
                 </button>
                 {userTemplates.length > 0 && <div className="border-t border-gray-100" />}
-                {userTemplates.map((t) => (
-                  <div key={t.id} className="flex items-center hover:bg-gray-50">
+                {userTemplates.map((t) => {
+                  const isDeleting = deletingTemplateIds.has(t.id);
+                  return (
+                  <div key={t.id} className={`flex items-center ${isDeleting ? "opacity-50" : "hover:bg-gray-50"}`}>
                     <button
-                      onClick={() => handleApplyTemplate(t.id)}
-                      className="flex-1 text-left px-3 py-2 text-xs text-gray-700"
+                      onClick={() => !isDeleting && handleApplyTemplate(t.id)}
+                      disabled={isDeleting}
+                      className={`flex-1 text-left px-3 py-2 text-xs text-gray-700 ${isDeleting ? "line-through text-gray-400" : ""}`}
                     >
-                      {t.name}
+                      {t.name}{isDeleting ? " (deleting\u2026)" : ""}
                     </button>
+                    {!isDeleting && (
+                    <>
                     <button
                       onClick={(e) => { e.stopPropagation(); handleEditTemplate(t.id, t.name); }}
                       className="px-2 py-2 text-gray-400 hover:text-blue-500"
@@ -888,8 +901,11 @@ export function DiagramEditor({
                         <path d="M2 3h8M4.5 3V2h3v1M3 3v7a1 1 0 001 1h4a1 1 0 001-1V3" />
                       </svg>
                     </button>
+                    </>
+                    )}
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
