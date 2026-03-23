@@ -319,7 +319,7 @@ function StartEventShape({ el }: { el: DiagramElement }) {
   const nonInterrupting = el.properties.interruptionType === "non-interrupting";
   return (
     <g>
-      <circle cx={cx} cy={cy} r={r} fill={fill} stroke="#374151" strokeWidth={2}
+      <circle cx={cx} cy={cy} r={r} fill={fill} stroke="#374151" strokeWidth={1.2}
         strokeDasharray={nonInterrupting ? "4 3" : undefined} />
       {el.eventType && el.eventType !== "none" &&
         <EventMarker type={el.eventType} cx={cx} cy={cy} r={r} />}
@@ -335,7 +335,7 @@ function EndEventShape({ el }: { el: DiagramElement }) {
   const fill = resolveColor("end-event", colors);
   return (
     <g>
-      <circle cx={cx} cy={cy} r={r} fill={fill} stroke="#374151" strokeWidth={3} />
+      <circle cx={cx} cy={cy} r={r} fill={fill} stroke="#374151" strokeWidth={3.5} />
       {el.eventType && el.eventType !== "none" &&
         <EventMarker type={el.eventType} cx={cx} cy={cy} r={r} filled />}
     </g>

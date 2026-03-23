@@ -15,7 +15,7 @@ export const DEFAULT_SYMBOL_COLORS: Record<SymbolType, string> = {
   "subprocess-expanded": "#fef4a7",
   "pool":                "#c8956a",   // pool sidebar colour
   "lane":                "#e8c4a0",   // lane sidebar colour
-  "sublane":             "#f0d5b8",   // sublane sidebar colour (lighter than lane)
+  "sublane":             "#faf0e6",   // sublane sidebar colour (visibly lighter than lane #e8c4a0)
   "data-object":         "#bfdbfe",
   "data-store":          "#60a5fa",
   "group":               "#374151",   // boundary line colour

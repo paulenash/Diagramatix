@@ -107,8 +107,8 @@ export function DiagramColorModal({
       <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col">
 
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 flex-shrink-0">
-          <h2 className="text-lg font-semibold text-gray-900">Diagram Maintenance</h2>
+        <div className="flex items-center justify-between px-5 py-2.5 border-b border-gray-200 flex-shrink-0">
+          <h2 className="text-sm font-semibold text-gray-900">Diagram Maintenance</h2>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 text-lg leading-none"
@@ -117,18 +117,18 @@ export function DiagramColorModal({
           </button>
         </div>
 
-        {/* Display Mode */}
-        <div className="flex items-center justify-between px-6 py-3 border-b border-gray-200 flex-shrink-0">
-          <span className="text-sm font-medium text-gray-700">Display Mode</span>
+        {/* 1. Display Mode */}
+        <div className="flex items-center justify-between px-5 py-2 border-b border-gray-200 flex-shrink-0">
+          <span className="text-xs font-medium text-gray-700">Display Mode</span>
           <button
             onClick={() => setWorkingDisplayMode(workingDisplayMode === "hand-drawn" ? "normal" : "hand-drawn")}
-            className={`px-3 py-1.5 text-sm border rounded flex items-center gap-1.5 ${
+            className={`px-2.5 py-1 text-xs border rounded flex items-center gap-1.5 ${
               workingDisplayMode === "hand-drawn"
                 ? "bg-gray-800 text-white border-gray-800"
                 : "text-gray-700 border-gray-300 hover:bg-gray-50"
             }`}
           >
-            <svg width={12} height={12} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+            <svg width={10} height={10} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
               <path d="M2 14l3-1L13.5 4.5a1.4 1.4 0 0 0-2-2L3 11l-1 3z" />
               <path d="M11.5 2.5l2 2" />
             </svg>
@@ -136,133 +136,108 @@ export function DiagramColorModal({
           </button>
         </div>
 
-        {/* Debug Mode */}
-        {onDebugModeChange && (
-          <div className="flex items-center justify-between px-6 py-3 border-b border-gray-200 flex-shrink-0">
-            <div>
-              <span className="text-sm font-medium text-gray-700">Debug Mode</span>
-              <p className="text-xs text-gray-400">Show element and connector IDs</p>
-            </div>
-            <label className="flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                checked={debugMode ?? false}
-                onChange={(e) => onDebugModeChange(e.target.checked)}
-                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-              />
-            </label>
-          </div>
-        )}
-
-        {/* Font Sizes */}
-        {(onFontSizeChange || onConnectorFontSizeChange || onTitleFontSizeChange) && (
-          <div className="px-6 py-3 border-b border-gray-200 flex-shrink-0 space-y-2">
-            <span className="text-sm font-medium text-gray-700">Font Sizes</span>
-            {onFontSizeChange && (
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-500">Element Names</span>
-                <div className="flex items-center gap-1.5">
-                  <button onClick={() => setWorkingFontSize(12)} disabled={workingFontSize === 12} title="Revert to default (12px)"
-                    className="text-xs text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-default">{"\u21BA"}</button>
-                  <button onClick={() => setWorkingFontSize(Math.max(6, workingFontSize - 1))}
-                    className="w-6 h-6 flex items-center justify-center text-xs font-bold text-gray-700 border border-gray-400 rounded hover:bg-gray-100">-</button>
-                  <span className="text-sm font-mono font-semibold text-gray-800 w-7 text-center">{workingFontSize}</span>
-                  <button onClick={() => setWorkingFontSize(Math.min(24, workingFontSize + 1))}
-                    className="w-6 h-6 flex items-center justify-center text-xs font-bold text-gray-700 border border-gray-400 rounded hover:bg-gray-100">+</button>
-                  <span className="text-[10px] text-gray-400">px</span>
-                </div>
-              </div>
-            )}
-            {onConnectorFontSizeChange && (
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-500">Connector Labels</span>
-                <div className="flex items-center gap-1.5">
-                  <button onClick={() => setWorkingConnectorFontSize(10)} disabled={workingConnectorFontSize === 10} title="Revert to default (10px)"
-                    className="text-xs text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-default">{"\u21BA"}</button>
-                  <button onClick={() => setWorkingConnectorFontSize(Math.max(6, workingConnectorFontSize - 1))}
-                    className="w-6 h-6 flex items-center justify-center text-xs font-bold text-gray-700 border border-gray-400 rounded hover:bg-gray-100">-</button>
-                  <span className="text-sm font-mono font-semibold text-gray-800 w-7 text-center">{workingConnectorFontSize}</span>
-                  <button onClick={() => setWorkingConnectorFontSize(Math.min(24, workingConnectorFontSize + 1))}
-                    className="w-6 h-6 flex items-center justify-center text-xs font-bold text-gray-700 border border-gray-400 rounded hover:bg-gray-100">+</button>
-                  <span className="text-[10px] text-gray-400">px</span>
-                </div>
-              </div>
-            )}
-            {onTitleFontSizeChange && (
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-500">Diagram Title</span>
-                <div className="flex items-center gap-1.5">
-                  <button onClick={() => setWorkingTitleFontSize(14)} disabled={workingTitleFontSize === 14} title="Revert to default (14px)"
-                    className="text-xs text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-default">{"\u21BA"}</button>
-                  <button onClick={() => setWorkingTitleFontSize(Math.max(8, workingTitleFontSize - 1))}
-                    className="w-6 h-6 flex items-center justify-center text-xs font-bold text-gray-700 border border-gray-400 rounded hover:bg-gray-100">-</button>
-                  <span className="text-sm font-mono font-semibold text-gray-800 w-7 text-center">{workingTitleFontSize}</span>
-                  <button onClick={() => setWorkingTitleFontSize(Math.min(30, workingTitleFontSize + 1))}
-                    className="w-6 h-6 flex items-center justify-center text-xs font-bold text-gray-700 border border-gray-400 rounded hover:bg-gray-100">+</button>
-                  <span className="text-[10px] text-gray-400">px</span>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Colour actions */}
-        <div className="flex items-center gap-3 px-6 py-3 border-b border-gray-200 flex-shrink-0">
-          <span className="text-sm font-medium text-gray-700 flex-1">Colours</span>
-          <button
-            onClick={handleBlackAndWhite}
-            className="text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md px-3 py-1.5 hover:bg-gray-50"
-          >
-            Black &amp; White
+        {/* 2. Colours header + actions */}
+        <div className="flex items-center gap-2 px-5 py-1.5 border-b border-gray-200 flex-shrink-0">
+          <span className="text-xs font-medium text-gray-700 flex-1">Colours</span>
+          <button onClick={handleBlackAndWhite}
+            className="text-[10px] text-gray-600 hover:text-gray-800 border border-gray-300 rounded px-2 py-0.5 hover:bg-gray-50">
+            B&amp;W
           </button>
-          <button
-            onClick={handleRevertToProject}
-            className="text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md px-3 py-1.5 hover:bg-gray-50"
-          >
-            Revert to Project
+          <button onClick={handleRevertToProject}
+            className="text-[10px] text-gray-600 hover:text-gray-800 border border-gray-300 rounded px-2 py-0.5 hover:bg-gray-50">
+            Revert
           </button>
         </div>
 
-        {/* Symbol colour rows */}
-        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
+        {/* 2b. Symbol colour rows */}
+        <div className="flex-1 overflow-y-auto px-5 py-1.5 space-y-1">
           {symbols.map((symbolType) => {
             const def = getSymbolDefinition(symbolType);
             const currentColor = (workingColors[symbolType] ?? DEFAULT_SYMBOL_COLORS[symbolType]) as string;
             const projectColor = (projectColors[symbolType] ?? DEFAULT_SYMBOL_COLORS[symbolType]) as string;
             const isProjectColor = currentColor === projectColor;
             return (
-              <div key={symbolType} className="flex items-center gap-3">
-                {/* Colour swatch */}
-                <div
-                  className="w-6 h-6 rounded border border-gray-300 flex-shrink-0"
-                  style={{ backgroundColor: currentColor }}
-                />
-                {/* Symbol label */}
-                <span className="text-sm text-gray-700 flex-1">{def.label}</span>
-                {/* Per-symbol revert button */}
-                <button
-                  onClick={() => handleColorChange(symbolType, projectColor)}
+              <div key={symbolType} className="flex items-center gap-2">
+                <div className="w-5 h-5 rounded border border-gray-300 flex-shrink-0"
+                  style={{ backgroundColor: currentColor }} />
+                <span className="text-xs text-gray-700 flex-1">{def.label}</span>
+                <button onClick={() => handleColorChange(symbolType, projectColor)}
                   disabled={isProjectColor}
-                  className="text-xs text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-default px-1"
-                  title="Revert to project colour"
-                >
-                  ↺
-                </button>
-                {/* Colour picker */}
-                <input
-                  type="color"
+                  className="text-[10px] text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-default"
+                  title="Revert to project colour">{"\u21BA"}</button>
+                <input type="color"
                   value={currentColor.startsWith("#") ? currentColor : "#374151"}
                   onChange={(e) => handleColorChange(symbolType, e.target.value)}
-                  className="w-8 h-8 cursor-pointer rounded border border-gray-200 p-0.5"
-                  title={`Change colour for ${def.label}`}
-                />
+                  className="w-6 h-6 cursor-pointer rounded border border-gray-200 p-0"
+                  title={`Change colour for ${def.label}`} />
               </div>
             );
           })}
         </div>
 
+        {/* 3. Font Sizes */}
+        {(onFontSizeChange || onConnectorFontSizeChange || onTitleFontSizeChange) && (
+          <div className="px-5 py-1.5 border-t border-gray-200 flex-shrink-0 space-y-1">
+            <span className="text-xs font-medium text-gray-700">Font Sizes</span>
+            {onFontSizeChange && (
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] text-gray-500">Elements</span>
+                <div className="flex items-center gap-1">
+                  <button onClick={() => setWorkingFontSize(12)} disabled={workingFontSize === 12} title="Default (12px)"
+                    className="text-[10px] text-gray-400 hover:text-gray-600 disabled:opacity-30">{"\u21BA"}</button>
+                  <button onClick={() => setWorkingFontSize(Math.max(6, workingFontSize - 1))}
+                    className="w-5 h-5 flex items-center justify-center text-[10px] font-bold text-gray-700 border border-gray-400 rounded hover:bg-gray-100">-</button>
+                  <span className="text-xs font-mono font-semibold text-gray-800 w-6 text-center">{workingFontSize}</span>
+                  <button onClick={() => setWorkingFontSize(Math.min(24, workingFontSize + 1))}
+                    className="w-5 h-5 flex items-center justify-center text-[10px] font-bold text-gray-700 border border-gray-400 rounded hover:bg-gray-100">+</button>
+                </div>
+              </div>
+            )}
+            {onConnectorFontSizeChange && (
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] text-gray-500">Connectors</span>
+                <div className="flex items-center gap-1">
+                  <button onClick={() => setWorkingConnectorFontSize(10)} disabled={workingConnectorFontSize === 10} title="Default (10px)"
+                    className="text-[10px] text-gray-400 hover:text-gray-600 disabled:opacity-30">{"\u21BA"}</button>
+                  <button onClick={() => setWorkingConnectorFontSize(Math.max(6, workingConnectorFontSize - 1))}
+                    className="w-5 h-5 flex items-center justify-center text-[10px] font-bold text-gray-700 border border-gray-400 rounded hover:bg-gray-100">-</button>
+                  <span className="text-xs font-mono font-semibold text-gray-800 w-6 text-center">{workingConnectorFontSize}</span>
+                  <button onClick={() => setWorkingConnectorFontSize(Math.min(24, workingConnectorFontSize + 1))}
+                    className="w-5 h-5 flex items-center justify-center text-[10px] font-bold text-gray-700 border border-gray-400 rounded hover:bg-gray-100">+</button>
+                </div>
+              </div>
+            )}
+            {onTitleFontSizeChange && (
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] text-gray-500">Title</span>
+                <div className="flex items-center gap-1">
+                  <button onClick={() => setWorkingTitleFontSize(14)} disabled={workingTitleFontSize === 14} title="Default (14px)"
+                    className="text-[10px] text-gray-400 hover:text-gray-600 disabled:opacity-30">{"\u21BA"}</button>
+                  <button onClick={() => setWorkingTitleFontSize(Math.max(8, workingTitleFontSize - 1))}
+                    className="w-5 h-5 flex items-center justify-center text-[10px] font-bold text-gray-700 border border-gray-400 rounded hover:bg-gray-100">-</button>
+                  <span className="text-xs font-mono font-semibold text-gray-800 w-6 text-center">{workingTitleFontSize}</span>
+                  <button onClick={() => setWorkingTitleFontSize(Math.min(30, workingTitleFontSize + 1))}
+                    className="w-5 h-5 flex items-center justify-center text-[10px] font-bold text-gray-700 border border-gray-400 rounded hover:bg-gray-100">+</button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 4. Debug Mode */}
+        {onDebugModeChange && (
+          <div className="flex items-center justify-between px-5 py-1.5 border-t border-gray-200 flex-shrink-0">
+            <span className="text-xs font-medium text-gray-700">Debug Mode</span>
+            <label className="flex items-center cursor-pointer">
+              <input type="checkbox" checked={debugMode ?? false}
+                onChange={(e) => onDebugModeChange(e.target.checked)}
+                className="w-3.5 h-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+            </label>
+          </div>
+        )}
+
         {/* Footer */}
-        <div className="flex items-center justify-between gap-3 px-6 py-4 border-t border-gray-200 flex-shrink-0">
+        <div className="flex items-center justify-between gap-3 px-5 py-2.5 border-t border-gray-200 flex-shrink-0">
           {saveError ? (
             <p className="text-sm text-red-600">{saveError}</p>
           ) : (
