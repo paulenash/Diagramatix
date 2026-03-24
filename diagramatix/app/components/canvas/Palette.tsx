@@ -219,10 +219,10 @@ function PaletteSymbolPreview({ type, colorConfig }: { type: SymbolType; colorCo
       );
     case "uml-enumeration":
       return (
-        <svg width={36} height={28} viewBox="0 0 48 36">
-          <rect x={2} y={2} width={44} height={32} fill={resolveColor("uml-enumeration", colorConfig)} stroke="#374151" strokeWidth={1.5} />
-          <line x1={2} y1={12} x2={46} y2={12} stroke="#374151" strokeWidth={1} />
-          <text x={24} y={9} textAnchor="middle" fontSize={6} fill="#6b7280" fontStyle="italic">{"\u00ABE\u00BB"}</text>
+        <svg width={22} height={20} viewBox="0 0 30 26">
+          <rect x={2} y={2} width={26} height={22} fill={resolveColor("uml-enumeration", colorConfig)} stroke="#374151" strokeWidth={1.5} />
+          <line x1={2} y1={10} x2={28} y2={10} stroke="#374151" strokeWidth={1} />
+          <text x={15} y={8} textAnchor="middle" fontSize={5} fill="#6b7280" fontStyle="italic">{"\u00ABE\u00BB"}</text>
         </svg>
       );
     case "external-entity":
