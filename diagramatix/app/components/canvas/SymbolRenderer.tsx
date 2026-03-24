@@ -844,13 +844,25 @@ function BpmnTaskShape({ el }: { el: DiagramElement }) {
 
 function UmlClassShape({ el }: { el: DiagramElement }) {
   const colors = useContext(SymbolColorCtx);
+  const fsc = useContext(FontScaleCtx);
   const fill = resolveColor("uml-class", colors);
+  const labelLines = el.label.split("\n");
+  const lineH = Math.round(14 * fsc);
+  const labelFontSize = Math.round(12 * fsc * 10) / 10;
+  const labelStartY = el.y + HEADER_H / 2 - ((labelLines.length - 1) * lineH) / 2;
   return (
     <g>
       <rect x={el.x} y={el.y} width={el.width} height={el.height}
         fill={fill} stroke="#374151" strokeWidth={1.5} />
-      <line x1={el.x} y1={el.y + HEADER_H} x2={el.x + el.width} y2={el.y + HEADER_H}
+      <line x1={el.x} y1={el.y + HEADER_H + Math.max(0, labelLines.length - 1) * lineH}
+        x2={el.x + el.width} y2={el.y + HEADER_H + Math.max(0, labelLines.length - 1) * lineH}
         stroke="#374151" strokeWidth={1} />
+      <text textAnchor="middle" fontSize={labelFontSize} fill="#111827" fontWeight="bold"
+        style={{ userSelect: "none", pointerEvents: "none" }}>
+        {labelLines.map((line, i) => (
+          <tspan key={i} x={el.x + el.width / 2} y={labelStartY + i * lineH + lineH * 0.75}>{line}</tspan>
+        ))}
+      </text>
     </g>
   );
 }
@@ -861,21 +873,35 @@ function UmlEnumerationShape({ el }: { el: DiagramElement }) {
   const fill = resolveColor("uml-enumeration", colors);
   const values: string[] = (el.properties.values as string[] | undefined) ?? [];
   const valFontSize = Math.round(10 * fsc * 10) / 10;
+  const labelFontSize = Math.round(12 * fsc * 10) / 10;
   const lineH = Math.round(14 * fsc);
   const PAD = 4;
+  const labelLines = el.label.split("\n");
+  const extraLabelLines = Math.max(0, labelLines.length - 1);
+  const headerH = HEADER_H + extraLabelLines * lineH;
+  // Stereotype at top, then label lines centred in remaining header space
+  const stereotypeY = el.y + 10;
+  const labelStartY = el.y + 14 + lineH * 0.75;
   return (
     <g>
       <rect x={el.x} y={el.y} width={el.width} height={el.height}
         fill={fill} stroke="#374151" strokeWidth={1.5} />
-      <line x1={el.x} y1={el.y + HEADER_H} x2={el.x + el.width} y2={el.y + HEADER_H}
+      <line x1={el.x} y1={el.y + headerH} x2={el.x + el.width} y2={el.y + headerH}
         stroke="#374151" strokeWidth={1} />
-      <text x={el.x + el.width / 2} y={el.y + 10} textAnchor="middle" fontSize={Math.round(9 * fsc * 10) / 10}
+      <text x={el.x + el.width / 2} y={stereotypeY} textAnchor="middle" fontSize={Math.round(9 * fsc * 10) / 10}
         fill="#6b7280" fontStyle="italic" style={{ pointerEvents: "none", userSelect: "none" }}>
         {"\u00ABenumeration\u00BB"}
       </text>
+      {/* Multi-line label in header */}
+      <text textAnchor="middle" fontSize={labelFontSize} fill="#111827" fontWeight="bold"
+        style={{ userSelect: "none", pointerEvents: "none" }}>
+        {labelLines.map((line, i) => (
+          <tspan key={i} x={el.x + el.width / 2} y={labelStartY + i * lineH}>{line}</tspan>
+        ))}
+      </text>
       {/* Values list in second panel */}
       {values.map((v, i) => (
-        <text key={i} x={el.x + PAD} y={el.y + HEADER_H + 2 + (i + 1) * lineH - 2}
+        <text key={i} x={el.x + PAD} y={el.y + headerH + 2 + (i + 1) * lineH - 2}
           fontSize={valFontSize} fill="#374151"
           style={{ pointerEvents: "none", userSelect: "none" }}>
           {v}
@@ -1376,7 +1402,9 @@ export function SymbolRenderer({
         element.type === 'external-entity' ||
         element.type === 'process-system' ||
         element.type === 'pool' ||
-        element.type === 'lane'
+        element.type === 'lane' ||
+        element.type === 'uml-class' ||
+        element.type === 'uml-enumeration'
       ) && (
         <text
           x={labelInfo.x}

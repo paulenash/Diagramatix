@@ -701,7 +701,8 @@ export function PropertiesPanel({
           element.type === "data-object" || element.type === "data-store" ||
           element.type === "task" || element.type === "subprocess" ||
           element.type === "subprocess-expanded" || element.type === "use-case" ||
-          element.type === "external-entity" || element.type === "process-system") ? (
+          element.type === "external-entity" || element.type === "process-system" ||
+          element.type === "uml-class" || element.type === "uml-enumeration") ? (
           <>
             <textarea
               key={element.id}

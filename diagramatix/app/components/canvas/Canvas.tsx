@@ -1001,7 +1001,7 @@ export function Canvas({
         const HEADER_H = 28;
         const CHAR_W = 6.5;
         const LINE_H = 14;
-        const PAD = 8;
+        const PAD = 4;
         const labelLines = (el!.type === "uml-enumeration" || el!.type === "uml-class")
           ? (editingLabel?.elementId === el!.id ? editingLabel.value : el!.label).split("\n") : [el!.label];
         const extraLines = Math.max(0, labelLines.length - 1);

@@ -268,7 +268,7 @@ function clampChildrenToLane(elements: DiagramElement[], lane: DiagramElement): 
 /** Auto-resize a uml-enumeration or uml-class element to fit its label and content */
 function autoResizeUmlElement(el: DiagramElement): DiagramElement {
   const BASE_HEADER_H = 28;
-  const PAD = 8;
+  const PAD = 4;
   const CHAR_W = 6.5;
   const LINE_H = 14;
   const MIN_W = 80;
@@ -601,9 +601,11 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         return { ...state, elements, connectors };
       }
 
+      const movedIds = new Set<string>([id]);
       const elements = state.elements.map((el) => {
         if (el.id === id) return { ...el, x: newX, y: newY, width: newW, height: newH };
         if (el.boundaryHostId === id && target) {
+          movedIds.add(el.id);
           const evCx = el.x + el.width / 2;
           const evCy = el.y + el.height / 2;
           const { side, frac } = boundaryEdgeOf({ x: evCx, y: evCy }, target);
@@ -619,7 +621,11 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         }
         return el;
       });
-      const connectors = recomputeAllConnectors(state.connectors, elements);
+      // Only recompute connectors attached to the resized element or its boundary events
+      const connectors = state.connectors.map(conn => {
+        if (!movedIds.has(conn.sourceId) && !movedIds.has(conn.targetId)) return conn;
+        return recomputeAllConnectors([conn], elements)[0] ?? conn;
+      });
       return { ...state, elements, connectors };
     }
 
@@ -629,11 +635,19 @@ function reducer(state: DiagramData, action: Action): DiagramData {
           ? { ...el, label: action.payload.label }
           : el
       );
-      // Auto-resize UML elements
-      return { ...state, elements: elements.map(el =>
-        el.id === action.payload.id && (el.type === "uml-enumeration" || el.type === "uml-class")
-          ? autoResizeUmlElement(el) : el
-      )};
+      // Auto-resize UML elements and recompute attached connectors
+      const labelEl = elements.find(e => e.id === action.payload.id);
+      if (labelEl && (labelEl.type === "uml-enumeration" || labelEl.type === "uml-class")) {
+        const resizedElements = elements.map(e =>
+          e.id === action.payload.id ? autoResizeUmlElement(e) : e
+        );
+        const connectors = state.connectors.map(conn => {
+          if (conn.sourceId !== action.payload.id && conn.targetId !== action.payload.id) return conn;
+          return recomputeAllConnectors([conn], resizedElements)[0] ?? conn;
+        });
+        return { ...state, elements: resizedElements, connectors };
+      }
+      return { ...state, elements };
     }
 
     case "UPDATE_PROPERTIES": {
@@ -650,11 +664,19 @@ function reducer(state: DiagramData, action: Action): DiagramData {
           properties: { ...el.properties, ...rest },
         };
       });
-      // Auto-resize UML elements
-      return { ...state, elements: elements.map(el =>
-        el.id === action.payload.id && (el.type === "uml-enumeration" || el.type === "uml-class")
-          ? autoResizeUmlElement(el) : el
-      )};
+      // Auto-resize UML elements and recompute attached connectors
+      const el = elements.find(e => e.id === action.payload.id);
+      if (el && (el.type === "uml-enumeration" || el.type === "uml-class")) {
+        const resizedElements = elements.map(e =>
+          e.id === action.payload.id ? autoResizeUmlElement(e) : e
+        );
+        const connectors = state.connectors.map(conn => {
+          if (conn.sourceId !== action.payload.id && conn.targetId !== action.payload.id) return conn;
+          return recomputeAllConnectors([conn], resizedElements)[0] ?? conn;
+        });
+        return { ...state, elements: resizedElements, connectors };
+      }
+      return { ...state, elements };
     }
 
     case "DELETE_ELEMENT": {
