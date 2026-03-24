@@ -49,6 +49,8 @@ interface DiagramSummary {
 interface ProjectDetail {
   id: string;
   name: string;
+  description?: string;
+  ownerName?: string;
   colorConfig?: unknown;
   diagrams: DiagramSummary[];
 }
@@ -83,6 +85,10 @@ const DIAGRAM_TYPES: { value: DiagramType; label: string; description: string }[
 export function ProjectDetailClient({ project, otherProjects }: Props) {
   const router = useRouter();
   const [diagrams, setDiagrams] = useState(project.diagrams);
+  const [projectName, setProjectName] = useState(project.name);
+  const [projectDescription, setProjectDescription] = useState(project.description ?? "");
+  const [projectOwner, setProjectOwner] = useState(project.ownerName ?? "");
+  const [editingProjectName, setEditingProjectName] = useState(false);
 
   const [showNewDiagram, setShowNewDiagram] = useState(false);
   const [showMaintenance, setShowMaintenance] = useState(false);
@@ -232,6 +238,14 @@ export function ProjectDetailClient({ project, otherProjects }: Props) {
   const [newType, setNewType] = useState<DiagramType>("context");
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
+
+  function saveProjectField(fields: Record<string, string>) {
+    fetch(`/api/projects/${project.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(fields),
+    }).catch(() => {});
+  }
 
   async function handleCreateDiagram() {
     if (!newName.trim()) { setError("Please enter a name"); return; }
@@ -418,7 +432,7 @@ export function ProjectDetailClient({ project, otherProjects }: Props) {
   function renderFolder(folderId: string, depth: number): React.ReactNode {
     const isRoot = folderId === ROOT_ID;
     const folder = isRoot ? null : folderTree.folders.find(f => f.id === folderId);
-    const name = isRoot ? project.name : (folder?.name ?? "?");
+    const name = isRoot ? projectName : (folder?.name ?? "?");
     const isSelected = selectedFolderId === folderId;
     const isCollapsed = folder?.collapsed ?? false;
     const childFolders = getOrderedChildFolders(folderId);
@@ -557,29 +571,49 @@ export function ProjectDetailClient({ project, otherProjects }: Props) {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 px-6 py-3 flex items-center gap-4 flex-shrink-0">
-        <button
-          onClick={() => {
-            if (window.history.length > 1) router.back();
-            else router.push("/dashboard");
-          }}
-          className="text-gray-500 hover:text-gray-700 text-sm"
-        >
-          {"\u2190"} Dashboard
-        </button>
-        <h1 className="text-sm font-semibold text-gray-900 flex-1">{project.name}</h1>
-        <button
-          onClick={() => setShowMaintenance(true)}
-          className="px-3 py-1.5 text-xs font-medium text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50"
-        >
-          Project Maintenance
-        </button>
-        <button
-          onClick={() => setShowNewDiagram(true)}
-          className="px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-xs font-medium"
-        >
-          + New Diagram
-        </button>
+      <header className="bg-white border-b border-gray-200 px-4 py-2 flex-shrink-0">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => {
+              if (window.history.length > 1) router.back();
+              else router.push("/dashboard");
+            }}
+            className="text-gray-500 hover:text-gray-700 text-sm"
+          >
+            {"\u2190"} Dashboard
+          </button>
+          {/* Editable project name */}
+          {editingProjectName ? (
+            <input autoFocus type="text" value={projectName}
+              onChange={e => setProjectName(e.target.value)}
+              onBlur={() => { setEditingProjectName(false); saveProjectField({ name: projectName }); }}
+              onKeyDown={e => { if (e.key === "Enter") { setEditingProjectName(false); saveProjectField({ name: projectName }); } if (e.key === "Escape") { setProjectName(project.name); setEditingProjectName(false); } }}
+              className="text-sm font-semibold text-gray-900 border border-blue-400 rounded px-2 py-0.5 outline-none flex-1" />
+          ) : (
+            <h1 className="text-sm font-semibold text-gray-900 cursor-pointer hover:text-blue-600 flex-1"
+              onClick={() => setEditingProjectName(true)} title="Click to edit project name">
+              {projectName}
+            </h1>
+          )}
+          {projectOwner && (
+            <span className="text-[10px] text-gray-400">Owner: <strong className="text-gray-600">{projectOwner}</strong></span>
+          )}
+          <button
+            onClick={() => setShowMaintenance(true)}
+            className="px-3 py-1 text-xs font-medium text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50"
+          >
+            Project Maintenance
+          </button>
+          <button
+            onClick={() => setShowNewDiagram(true)}
+            className="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-xs font-medium"
+          >
+            + New Diagram
+          </button>
+        </div>
+        {projectDescription && (
+          <p className="text-[10px] text-gray-500 mt-1 ml-20 truncate" title={projectDescription}>{projectDescription}</p>
+        )}
       </header>
 
       <div className="flex flex-1 overflow-hidden">

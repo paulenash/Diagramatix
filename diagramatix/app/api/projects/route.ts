@@ -31,7 +31,11 @@ export async function POST(req: Request) {
   }
 
   const project = await prisma.project.create({
-    data: { name: name.trim(), userId: session.user.id },
+    data: {
+      name: name.trim(),
+      userId: session.user.id,
+      ownerName: session.user.name ?? session.user.email ?? "",
+    },
   });
 
   return NextResponse.json(project, { status: 201 });

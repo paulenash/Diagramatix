@@ -45,16 +45,20 @@ export async function PUT(req: Request, { params }: Params) {
   }
 
   const body = await req.json();
-  const { name, colorConfig } = body;
+  const { name, colorConfig, description, ownerName } = body;
 
   if (name !== undefined && !name?.trim()) {
     return NextResponse.json({ error: "Name is required" }, { status: 400 });
   }
 
   try {
-    // Update name via Prisma ORM if provided
-    if (name !== undefined) {
-      await prisma.project.update({ where: { id }, data: { name: name.trim() } });
+    // Update simple fields via Prisma ORM
+    const dataUpdate: Record<string, string> = {};
+    if (name !== undefined) dataUpdate.name = name.trim();
+    if (description !== undefined) dataUpdate.description = description;
+    if (ownerName !== undefined) dataUpdate.ownerName = ownerName;
+    if (Object.keys(dataUpdate).length > 0) {
+      await prisma.project.update({ where: { id }, data: dataUpdate });
     }
     // Update colorConfig via raw SQL — Prisma 7 parameterization schema
     // does not include JSON fields in the ProjectUpdateInput graph.

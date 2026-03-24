@@ -16,6 +16,8 @@ interface DiagramSummary {
 interface ProjectSummary {
   id: string;
   name: string;
+  description?: string;
+  ownerName?: string;
   createdAt: Date;
   updatedAt: Date;
   _count: { diagrams: number };
@@ -121,6 +123,21 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
   const router = useRouter();
   const [projects, setProjects] = useState(initialProjects);
   const [unorganized, setUnorganized] = useState(initialUnorganized);
+
+  // Selected project for properties panel
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [editDesc, setEditDesc] = useState("");
+  const [editOwner, setEditOwner] = useState("");
+
+  const selectedProject = selectedProjectId ? projects.find(p => p.id === selectedProjectId) : null;
+
+  function saveProjectProps(projectId: string, fields: Record<string, string>) {
+    fetch(`/api/projects/${projectId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(fields),
+    }).catch(() => {});
+  }
 
   // New project state
   const [showNewProject, setShowNewProject] = useState(false);
@@ -263,8 +280,15 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
               {projects.map((p) => (
                 <div
                   key={p.id}
-                  onClick={() => router.push(`/dashboard/projects/${p.id}`)}
-                  className="bg-white border border-gray-200 rounded-lg p-4 hover:border-blue-300 hover:shadow-sm cursor-pointer group transition-all"
+                  onClick={() => {
+                    setSelectedProjectId(p.id);
+                    setEditDesc(p.description ?? "");
+                    setEditOwner(p.ownerName ?? "");
+                  }}
+                  onDoubleClick={() => router.push(`/dashboard/projects/${p.id}`)}
+                  className={`bg-white border rounded-lg p-4 hover:shadow-sm cursor-pointer group transition-all ${
+                    selectedProjectId === p.id ? "border-blue-500 ring-1 ring-blue-300" : "border-gray-200 hover:border-blue-300"
+                  }`}
                 >
                   <div className="flex items-start justify-between mb-3">
                     <div className="w-8 h-8 bg-purple-50 rounded flex items-center justify-center">
@@ -335,6 +359,66 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
           </section>
         )}
       </main>
+
+      {/* Project Properties Panel */}
+      {selectedProject && (
+        <div className="fixed right-0 top-12 bottom-0 w-56 bg-white border-l border-gray-200 p-3 overflow-y-auto z-10 shadow-lg">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Project Properties</span>
+            <button onClick={() => setSelectedProjectId(null)}
+              className="text-gray-400 hover:text-gray-600 text-xs">{"\u2715"}</button>
+          </div>
+          <div className="space-y-2">
+            <div>
+              <label className="text-[10px] text-gray-500">Name</label>
+              <p className="text-xs font-medium text-gray-800">{selectedProject.name}</p>
+            </div>
+            <div>
+              <label className="text-[10px] text-gray-500">Description</label>
+              <textarea
+                className="w-full text-[10px] border border-gray-300 rounded px-1.5 py-0.5 resize-y"
+                rows={3}
+                value={editDesc}
+                onChange={e => setEditDesc(e.target.value)}
+                onBlur={() => {
+                  saveProjectProps(selectedProject.id, { description: editDesc });
+                  setProjects(prev => prev.map(p => p.id === selectedProject.id ? { ...p, description: editDesc } : p));
+                }}
+                onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); (e.target as HTMLTextAreaElement).blur(); } }}
+                placeholder="Project description..."
+              />
+              <p className="text-[9px] text-gray-400">Shift+Enter for new line</p>
+            </div>
+            <div>
+              <label className="text-[10px] text-gray-500">Owner</label>
+              <input type="text"
+                className="w-full text-[10px] border border-gray-300 rounded px-1.5 py-0.5"
+                value={editOwner}
+                onChange={e => setEditOwner(e.target.value)}
+                onBlur={() => {
+                  saveProjectProps(selectedProject.id, { ownerName: editOwner });
+                  setProjects(prev => prev.map(p => p.id === selectedProject.id ? { ...p, ownerName: editOwner } : p));
+                }}
+                onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+              />
+            </div>
+            <div>
+              <label className="text-[10px] text-gray-500">Diagrams</label>
+              <p className="text-xs text-gray-700">{selectedProject._count.diagrams}</p>
+            </div>
+            <div>
+              <label className="text-[10px] text-gray-500">Last Updated</label>
+              <p className="text-[10px] text-gray-500">{new Date(selectedProject.updatedAt).toLocaleString()}</p>
+            </div>
+            <button
+              onClick={() => router.push(`/dashboard/projects/${selectedProject.id}`)}
+              className="w-full px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
+            >
+              Open Project
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* New Project dialog */}
       {showNewProject && (

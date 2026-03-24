@@ -23,6 +23,8 @@ model User {
 model Project {
   id          String    @id @default(cuid())
   name        String
+  description String    @default("")
+  ownerName   String    @default("")
   colorConfig Json      @default("{}")
   userId      String
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
