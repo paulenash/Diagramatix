@@ -293,44 +293,78 @@ export function computeWaypoints(
   const exitPt     = perpendicularExitScaled(srcEdge, sourceSide, srcPerpOff);
   const approachPt = perpendicularExitScaled(tgtEdge, targetSide, tgtPerpOff);
 
+  const srcDir = sideNormalDir(sourceSide);
+  const tgtDir = sideNormalDir(targetSide);
+
+  // Verify exit/approach stubs go outward
+  const exitOutward = (exitPt.x - srcEdge.x) * srcDir.dx >= 0 && (exitPt.y - srcEdge.y) * srcDir.dy >= 0;
+  const approachOutward = (approachPt.x - tgtEdge.x) * tgtDir.dx >= 0 && (approachPt.y - tgtEdge.y) * tgtDir.dy >= 0;
+
   let midPath: Point[];
   if (
-    (sourceSide === "right" && targetSide === "left") ||
-    (sourceSide === "left"  && targetSide === "right")
+    exitOutward && approachOutward &&
+    ((sourceSide === "right" && targetSide === "left") ||
+    (sourceSide === "left"  && targetSide === "right"))
   ) {
-    // Center the vertical segment midway between the two facing horizontal edges
-    const midX = (exitPt.x + approachPt.x) / 2;
-    midPath = Math.abs(exitPt.y - approachPt.y) < 1
-      ? [exitPt, approachPt]
-      : [exitPt, { x: midX, y: exitPt.y }, { x: midX, y: approachPt.y }, approachPt];
+    // Facing horizontal sides — verify exit goes toward approach (outward direction)
+    const goesRight = sourceSide === "right";
+    const exitTowardApproach = goesRight ? exitPt.x <= approachPt.x : exitPt.x >= approachPt.x;
+    if (exitTowardApproach) {
+      const midX = (exitPt.x + approachPt.x) / 2;
+      midPath = Math.abs(exitPt.y - approachPt.y) < 1
+        ? [exitPt, approachPt]
+        : [exitPt, { x: midX, y: exitPt.y }, { x: midX, y: approachPt.y }, approachPt];
+    } else {
+      midPath = buildOrthogonalPath(exitPt, approachPt, obstacles);
+    }
   } else if (
-    (sourceSide === "bottom" && targetSide === "top") ||
-    (sourceSide === "top"    && targetSide === "bottom")
+    exitOutward && approachOutward &&
+    ((sourceSide === "bottom" && targetSide === "top") ||
+    (sourceSide === "top"    && targetSide === "bottom"))
   ) {
-    // Center the horizontal segment midway between the two facing vertical edges
-    const midY = (exitPt.y + approachPt.y) / 2;
-    midPath = Math.abs(exitPt.x - approachPt.x) < 1
-      ? [exitPt, approachPt]
-      : [exitPt, { x: exitPt.x, y: midY }, { x: approachPt.x, y: midY }, approachPt];
+    // Facing vertical sides — verify exit goes toward approach
+    const goesDown = sourceSide === "bottom";
+    const exitTowardApproach = goesDown ? exitPt.y <= approachPt.y : exitPt.y >= approachPt.y;
+    if (exitTowardApproach) {
+      const midY = (exitPt.y + approachPt.y) / 2;
+      midPath = Math.abs(exitPt.x - approachPt.x) < 1
+        ? [exitPt, approachPt]
+        : [exitPt, { x: exitPt.x, y: midY }, { x: approachPt.x, y: midY }, approachPt];
+    } else {
+      midPath = buildOrthogonalPath(exitPt, approachPt, obstacles);
+    }
   } else {
     // Perpendicular sides (e.g., right→top, bottom→left, etc.)
-    // Try a direct L-shape from srcEdge to tgtEdge first (just 1 corner, no stubs)
+    // Try L-shape paths that maintain perpendicularity at both ends
+
+    // L-shape corner options
     const lCorner1: Point = { x: tgtEdge.x, y: srcEdge.y };
     const lCorner2: Point = { x: srcEdge.x, y: tgtEdge.y };
-    // Check which L-path is valid (doesn't go backwards from the exit/approach directions)
-    const srcDir = sideNormalDir(sourceSide);
-    const tgtDir = sideNormalDir(targetSide);
-    const aValid = (lCorner1.x - srcEdge.x) * srcDir.dx >= 0 && (lCorner1.y - srcEdge.y) * srcDir.dy >= 0
-                && (lCorner1.x - tgtEdge.x) * tgtDir.dx >= 0 && (lCorner1.y - tgtEdge.y) * tgtDir.dy >= 0;
-    const bValid = (lCorner2.x - srcEdge.x) * srcDir.dx >= 0 && (lCorner2.y - srcEdge.y) * srcDir.dy >= 0
-                && (lCorner2.x - tgtEdge.x) * tgtDir.dx >= 0 && (lCorner2.y - tgtEdge.y) * tgtDir.dy >= 0;
-    // midPath sits between srcEdge and tgtEdge in the final waypoints, so only include the corner point
-    if (aValid && !pathHitsObstacles([srcEdge, lCorner1, tgtEdge], obstacles)) {
+
+    // Check perpendicularity: first segment must go in the source normal direction,
+    // second segment must arrive from the target normal direction
+    function isPerpendicular(corner: Point): boolean {
+      // srcEdge → corner must be along source normal axis
+      const dx1 = corner.x - srcEdge.x, dy1 = corner.y - srcEdge.y;
+      const srcOk = (srcDir.dx !== 0 && Math.abs(dy1) < 0.5) || (srcDir.dy !== 0 && Math.abs(dx1) < 0.5);
+      // Also must go outward (not back into element)
+      const srcOutward = dx1 * srcDir.dx >= 0 && dy1 * srcDir.dy >= 0;
+      // corner → tgtEdge must be along target normal axis
+      const dx2 = corner.x - tgtEdge.x, dy2 = corner.y - tgtEdge.y;
+      const tgtOk = (tgtDir.dx !== 0 && Math.abs(dy2) < 0.5) || (tgtDir.dy !== 0 && Math.abs(dx2) < 0.5);
+      const tgtOutward = dx2 * tgtDir.dx >= 0 && dy2 * tgtDir.dy >= 0;
+      return srcOk && srcOutward && tgtOk && tgtOutward;
+    }
+
+    const a1Perp = isPerpendicular(lCorner1);
+    const a2Perp = isPerpendicular(lCorner2);
+
+    if (a1Perp && !pathHitsObstacles([srcEdge, lCorner1, tgtEdge], obstacles)) {
       midPath = [lCorner1];
-    } else if (bValid && !pathHitsObstacles([srcEdge, lCorner2, tgtEdge], obstacles)) {
+    } else if (a2Perp && !pathHitsObstacles([srcEdge, lCorner2, tgtEdge], obstacles)) {
       midPath = [lCorner2];
     } else {
-      // Fall back to stub-based routing with obstacle avoidance
+      // Fall back to stub-based routing (guarantees perpendicularity, may have more corners)
       midPath = buildOrthogonalPath(exitPt, approachPt, obstacles);
     }
   }
@@ -528,9 +562,10 @@ export function recomputeAllConnectors(
       return { ...conn, waypoints: [startPt, srcEdge, cp1, cp2, tgtEdge, endPt] };
     }
 
-    // For rectilinear connectors with enough waypoints, preserve user's interior routing.
+    // For rectilinear connectors with enough waypoints, try to preserve user's interior routing.
     // Only the 6 boundary waypoints (srcCenter, srcEdge, exitPt, approachPt, tgtEdge, tgtCenter)
     // are updated; interior turns (indices 3..N-4) are kept as-is.
+    // But if the result hits obstacles, fall through to full recompute.
     if (conn.routingType === "rectilinear") {
       const wp = conn.waypoints;
       const N = wp.length;
@@ -549,16 +584,77 @@ export function recomputeAllConnectors(
           newApproachPt, newTgtEdge, newTgtCenter,
         ];
         const rectified = rectifyWaypoints(merged, conn.sourceSide);
-        return { ...conn, waypoints: consolidateWaypoints(rectified) };
+        const candidate = consolidateWaypoints(rectified);
+        // Validate outward perpendicularity: first visible segment must go outward from source,
+        // last visible segment must arrive from outward of target
+        const srcNorm = sideNormalDir(conn.sourceSide);
+        const tgtNorm = sideNormalDir(conn.targetSide);
+        const vs = 1; // after srcCenter (invisible leader)
+        const ve = candidate.length - 2; // before tgtCenter
+        let outwardOk = true;
+        if (candidate.length >= 4) {
+          // Check exit direction: srcEdge(vs) → next point(vs+1)
+          const exitDx = candidate[vs + 1].x - candidate[vs].x;
+          const exitDy = candidate[vs + 1].y - candidate[vs].y;
+          if (exitDx * srcNorm.dx < -0.5 || exitDy * srcNorm.dy < -0.5) outwardOk = false;
+          // Check approach direction: prev point(ve-1) → tgtEdge(ve)
+          const appDx = candidate[ve].x - candidate[ve - 1].x;
+          const appDy = candidate[ve].y - candidate[ve - 1].y;
+          if (appDx * (-tgtNorm.dx) < -0.5 || appDy * (-tgtNorm.dy) < -0.5) outwardOk = false;
+        }
+        // Check if preserved interior routing passes through any obstacle
+        const obstacles = elements
+          .filter(el => el.id !== source.id && el.id !== target.id
+            && el.type !== "pool" && el.type !== "lane"
+            && el.boundaryHostId !== source.id && el.boundaryHostId !== target.id)
+          .map(getBounds);
+        if (outwardOk && !pathHitsObstacles(candidate, obstacles)) {
+          return { ...conn, waypoints: candidate };
+        }
+        // Interior routing hits obstacle or goes inward — fall through to full recompute
       }
     }
 
-    // Full recompute for non-rectilinear or connectors with fewer than 7 waypoints
-    const { waypoints, sourceInvisibleLeader, targetInvisibleLeader } = computeWaypoints(
+    // Full recompute — first try with stored sides
+    const result1 = computeWaypoints(
       source, target, elements,
       conn.sourceSide, conn.targetSide, conn.routingType,
       conn.sourceOffsetAlong ?? 0.5, conn.targetOffsetAlong ?? 0.5,
     );
-    return { ...conn, waypoints, sourceInvisibleLeader, targetInvisibleLeader };
+
+    // Validate outward perpendicularity of the result
+    if (conn.routingType === "rectilinear" && result1.waypoints.length >= 4) {
+      const wp = result1.waypoints;
+      const srcN = sideNormalDir(conn.sourceSide);
+      const tgtN = sideNormalDir(conn.targetSide);
+      const exitDx = wp[2].x - wp[1].x, exitDy = wp[2].y - wp[1].y;
+      const exitOk = exitDx * srcN.dx >= -0.5 && exitDy * srcN.dy >= -0.5;
+      const ve = wp.length - 2;
+      const appDx = wp[ve].x - wp[ve - 1].x, appDy = wp[ve].y - wp[ve - 1].y;
+      const appOk = appDx * (-tgtN.dx) >= -0.5 && appDy * (-tgtN.dy) >= -0.5;
+
+      if (!exitOk || !appOk) {
+        // Recalculate optimal sides based on current element positions
+        const srcCx = source.x + source.width / 2, srcCy = source.y + source.height / 2;
+        const tgtCx = target.x + target.width / 2, tgtCy = target.y + target.height / 2;
+        const dx = tgtCx - srcCx, dy = tgtCy - srcCy;
+        const newSrcSide: Side = Math.abs(dx) >= Math.abs(dy) ? (dx > 0 ? "right" : "left") : (dy > 0 ? "bottom" : "top");
+        const newTgtSide: Side = Math.abs(dx) >= Math.abs(dy) ? (dx > 0 ? "left" : "right") : (dy > 0 ? "top" : "bottom");
+        const result2 = computeWaypoints(
+          source, target, elements,
+          newSrcSide, newTgtSide, conn.routingType, 0.5, 0.5,
+        );
+        return { ...conn, waypoints: result2.waypoints,
+          sourceInvisibleLeader: result2.sourceInvisibleLeader,
+          targetInvisibleLeader: result2.targetInvisibleLeader,
+          sourceSide: newSrcSide, targetSide: newTgtSide,
+          sourceOffsetAlong: 0.5, targetOffsetAlong: 0.5,
+        };
+      }
+    }
+
+    return { ...conn, waypoints: result1.waypoints,
+      sourceInvisibleLeader: result1.sourceInvisibleLeader,
+      targetInvisibleLeader: result1.targetInvisibleLeader };
   });
 }

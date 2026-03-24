@@ -7,6 +7,7 @@ import type {
   GatewayType,
   EventType,
   RepeatType,
+  Bounds,
   Connector,
   ConnectorType,
   DiagramData,
@@ -265,6 +266,27 @@ function clampChildrenToLane(elements: DiagramElement[], lane: DiagramElement): 
   });
 }
 
+function getBounds(el: DiagramElement): Bounds {
+  return { x: el.x, y: el.y, width: el.width, height: el.height };
+}
+
+/** Check if an axis-aligned segment intersects a rectangle (with margin) */
+function segmentHitsRect(p1: Point, p2: Point, rect: Bounds, margin = 4): boolean {
+  const left = rect.x - margin, right = rect.x + rect.width + margin;
+  const top = rect.y - margin, bottom = rect.y + rect.height + margin;
+  if (Math.abs(p1.y - p2.y) < 1) {
+    if (p1.y < top || p1.y > bottom) return false;
+    const minX = Math.min(p1.x, p2.x), maxX = Math.max(p1.x, p2.x);
+    return maxX > left && minX < right;
+  }
+  if (Math.abs(p1.x - p2.x) < 1) {
+    if (p1.x < left || p1.x > right) return false;
+    const minY = Math.min(p1.y, p2.y), maxY = Math.max(p1.y, p2.y);
+    return maxY > top && minY < bottom;
+  }
+  return false;
+}
+
 /** Auto-resize a uml-enumeration or uml-class element to fit its label and content */
 function autoResizeUmlElement(el: DiagramElement): DiagramElement {
   const BASE_HEADER_H = 28;
@@ -505,15 +527,39 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       });
 
       const affectedIds = new Set([id, ...descendantIds, ...attachedBoundaryIds]);
+      // Build obstacle bounds for the moved element's new position
+      const movedEl = elements.find(e => e.id === id);
+      const movedBounds: Bounds | null = movedEl ? getBounds(movedEl) : null;
       const connectors = state.connectors.map(conn => {
         const srcIn = affectedIds.has(conn.sourceId);
         const tgtIn = affectedIds.has(conn.targetId);
-        if (!srcIn && !tgtIn) return conn;
-        if (srcIn && tgtIn) return {
-          ...conn,
-          waypoints: conn.waypoints.map(pt => ({ x: pt.x + dx, y: pt.y + dy })),
-        };
-        return recomputeAllConnectors([conn], elements)[0] ?? conn;
+        if (srcIn && tgtIn) {
+          return {
+            ...conn,
+            waypoints: conn.waypoints.map(pt => ({ x: pt.x + dx, y: pt.y + dy })),
+          };
+        }
+        if (srcIn || tgtIn) {
+          // One end moved — full recompute with obstacle avoidance
+          return recomputeAllConnectors([conn], elements)[0] ?? conn;
+        }
+        // Neither end moved — check if the moved element now intersects this connector's path
+        if (movedBounds && conn.routingType === "rectilinear") {
+          const wp = conn.waypoints;
+          const vs = conn.sourceInvisibleLeader ? 1 : 0;
+          const ve = conn.targetInvisibleLeader ? wp.length - 2 : wp.length - 1;
+          const visible = wp.slice(vs, ve + 1);
+          let hits = false;
+          for (let i = 0; i < visible.length - 1; i++) {
+            if (segmentHitsRect(visible[i], visible[i + 1], movedBounds, 4)) {
+              hits = true; break;
+            }
+          }
+          if (hits) {
+            return recomputeAllConnectors([conn], elements)[0] ?? conn;
+          }
+        }
+        return conn;
       });
       return { ...state, elements: updatePoolTypes(elements), connectors };
     }
@@ -540,15 +586,43 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         return { ...e, x: e.x + dx, y: e.y + dy };
       });
 
+      // Build bounds for all moved elements
+      const movedBoundsList: Bounds[] = elements
+        .filter(e => expandedIds.has(e.id))
+        .map(getBounds);
+
       const connectors = state.connectors.map(conn => {
         const srcIn = expandedIds.has(conn.sourceId);
         const tgtIn = expandedIds.has(conn.targetId);
-        if (!srcIn && !tgtIn) return conn;
-        if (srcIn && tgtIn) return {
-          ...conn,
-          waypoints: conn.waypoints.map(pt => ({ x: pt.x + dx, y: pt.y + dy })),
-        };
-        return recomputeAllConnectors([conn], elements)[0] ?? conn;
+        if (srcIn && tgtIn) {
+          return {
+            ...conn,
+            waypoints: conn.waypoints.map(pt => ({ x: pt.x + dx, y: pt.y + dy })),
+          };
+        }
+        if (srcIn || tgtIn) {
+          return recomputeAllConnectors([conn], elements)[0] ?? conn;
+        }
+        // Check if any moved element now intersects this connector's path
+        if (conn.routingType === "rectilinear" && movedBoundsList.length > 0) {
+          const wp = conn.waypoints;
+          const vs = conn.sourceInvisibleLeader ? 1 : 0;
+          const ve = conn.targetInvisibleLeader ? wp.length - 2 : wp.length - 1;
+          const visible = wp.slice(vs, ve + 1);
+          let hits = false;
+          for (const mb of movedBoundsList) {
+            for (let i = 0; i < visible.length - 1; i++) {
+              if (segmentHitsRect(visible[i], visible[i + 1], mb, 4)) {
+                hits = true; break;
+              }
+            }
+            if (hits) break;
+          }
+          if (hits) {
+            return recomputeAllConnectors([conn], elements)[0] ?? conn;
+          }
+        }
+        return conn;
       });
 
       return { ...state, elements: updatePoolTypes(elements), connectors };
