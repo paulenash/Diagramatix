@@ -607,10 +607,42 @@ export function Canvas({
           const tgtCy = targetEl.y + targetEl.height / 2;
           const msgSrcSide: Side = srcCy <= tgtCy ? "bottom" : "top";
           const msgTgtSide: Side = srcCy <= tgtCy ? "top"    : "bottom";
+          // Determine x for perpendicular messageBPMN connector
+          const clamp01 = (v: number) => Math.max(0.05, Math.min(0.95, v));
+          const srcLeft = sourceEl ? sourceEl.x : 0;
+          const srcRight = sourceEl ? sourceEl.x + sourceEl.width : 0;
+          const tgtLeft = targetEl.x;
+          const tgtRight = targetEl.x + targetEl.width;
+          const overlapLeft = Math.max(srcLeft, tgtLeft);
+          const overlapRight = Math.min(srcRight, tgtRight);
+          const hasOverlap = overlapRight > overlapLeft;
+
+          let chosenX: number;
+          if (hasOverlap) {
+            // Always draw perpendicular: prefer click x, then release x, then overlap midpoint
+            const clickX = effectiveWorldPos.x;
+            if (clickX >= overlapLeft && clickX <= overlapRight) {
+              chosenX = clickX;
+            } else if (pos.x >= overlapLeft && pos.x <= overlapRight) {
+              chosenX = pos.x;
+            } else {
+              // Clamp click x into overlap range
+              chosenX = Math.max(overlapLeft, Math.min(overlapRight, clickX));
+            }
+          } else {
+            // No overlap — no perpendicular connector possible; use click x
+            chosenX = effectiveWorldPos.x;
+          }
+
+          // Store the source offset (unclamped so waypoints can reach edges)
+          const msgSrcOffset = sourceEl && sourceEl.width > 0
+            ? Math.max(0, Math.min(1, (chosenX - sourceEl.x) / sourceEl.width))
+            : 0.5;
           onAddConnector(
             elementId, targetEl.id,
             "messageBPMN", "directed", "direct",
-            msgSrcSide, msgTgtSide
+            msgSrcSide, msgTgtSide,
+            msgSrcOffset
           );
         } else {
           if (targetEl.type === "lane") return;  // pool already handled above

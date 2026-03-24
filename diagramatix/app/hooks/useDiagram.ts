@@ -67,19 +67,22 @@ function boundaryEdgeOf(
 
 function messageBpmnWaypoints(
   source: DiagramElement, target: DiagramElement,
-  sourceSide: Side, targetSide: Side, offsetAlong: number
+  sourceSide: Side, targetSide: Side, sourceOffset: number, _targetOffset?: number
 ): { waypoints: Point[]; sourceInvisibleLeader: true; targetInvisibleLeader: true } {
   const tgtIsEvent = target.type === "start-event" || target.type === "intermediate-event";
+  // Compute a single shared x for perpendicular connector
+  const effectiveSrcAlong = BPMN_EVENT_TYPES.has(source.type) ? 0.5 : sourceOffset;
+  const srcX = source.x + source.width * effectiveSrcAlong;
   let x: number;
   if (tgtIsEvent) {
     x = target.x + target.width / 2;
   } else {
-    const effectiveAlong = BPMN_EVENT_TYPES.has(source.type) ? 0.5 : offsetAlong;
-    const srcX = source.x + source.width * effectiveAlong;
+    // Clamp srcX into the x-overlap of source and target for perpendicular
     const minX = Math.max(source.x, target.x);
     const maxX = Math.min(source.x + source.width, target.x + target.width);
     x = maxX > minX ? Math.max(minX, Math.min(maxX, srcX)) : srcX;
   }
+  // Both source and target edge use the SAME x for perpendicularity
   const srcEdge: Point = sourceSide === "bottom"
     ? { x, y: source.y + source.height } : { x, y: source.y };
   const tgtEdge: Point = targetSide === "top"
@@ -702,7 +705,7 @@ function reducer(state: DiagramData, action: Action): DiagramData {
 
       const { waypoints, sourceInvisibleLeader, targetInvisibleLeader } =
         connectorType === "messageBPMN"
-          ? messageBpmnWaypoints(source, target, sourceSide, targetSide, 0.5)
+          ? messageBpmnWaypoints(source, target, sourceSide, targetSide, sourceOffsetAlong ?? 0.5, targetOffsetAlong)
           : computeWaypoints(source, target, state.elements, sourceSide, targetSide, routingType, sourceOffsetAlong, targetOffsetAlong);
 
       const isMsgBpmn = connectorType === "messageBPMN";
@@ -743,7 +746,43 @@ function reducer(state: DiagramData, action: Action): DiagramData {
                     : isDecisionGatewayOutgoing ? ""
                     : undefined,
         labelOffsetX: isFlow ? 0   : isTransition ? 0   : isMsgBpmn ? 20  : isDecisionGatewayOutgoing ? 5  : undefined,
-        labelOffsetY: isFlow ? -30 : isTransition ? -30 : isMsgBpmn ? 0   : isDecisionGatewayOutgoing ? -20 : undefined,
+        labelOffsetY: isFlow ? -30 : isTransition ? -30 : isMsgBpmn ? (() => {
+          // Find the pool containing each element
+          function findPool(el: DiagramElement): DiagramElement | undefined {
+            if (el.type === "pool") return el;
+            // Walk up parentId chain to find pool
+            let cur = el;
+            for (let i = 0; i < 10; i++) {
+              if (!cur.parentId) break;
+              const parent = state.elements.find(e => e.id === cur.parentId);
+              if (!parent) break;
+              if (parent.type === "pool") return parent;
+              cur = parent;
+            }
+            // Fallback: find pool by containment
+            return state.elements.find(e => e.type === "pool"
+              && el.x >= e.x && el.x + el.width <= e.x + e.width
+              && el.y >= e.y && el.y + el.height <= e.y + e.height);
+          }
+          const srcPool = findPool(source);
+          const tgtPool = findPool(target);
+          if (srcPool && tgtPool) {
+            const goingDown = sourceSide === "bottom";
+            const srcPoolEdgeY = goingDown ? srcPool.y + srcPool.height : srcPool.y;
+            const tgtPoolEdgeY = goingDown ? tgtPool.y : tgtPool.y + tgtPool.height;
+            const srcIsBlackBox = (srcPool.properties.poolType as string | undefined) !== "white-box";
+            const tgtIsBlackBox = (tgtPool.properties.poolType as string | undefined) !== "white-box";
+            let labelY: number;
+            if (srcIsBlackBox && tgtIsBlackBox) {
+              labelY = srcPoolEdgeY + (goingDown ? 15 : -15);
+            } else {
+              labelY = (srcPoolEdgeY + tgtPoolEdgeY) / 2;
+            }
+            const anchorY = (waypoints[1].y + waypoints[waypoints.length - 2].y) / 2;
+            return labelY - anchorY - 7;
+          }
+          return 0;
+        })() : isDecisionGatewayOutgoing ? -20 : undefined,
         labelWidth:   isFlow ? 80  : isTransition ? 80  : isMsgBpmn ? 80  : isDecisionGatewayOutgoing ? 60  : undefined,
         labelAnchor:  isDecisionGatewayOutgoing ? "source" : undefined,
       };
@@ -857,7 +896,7 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         const { waypoints, sourceInvisibleLeader, targetInvisibleLeader } =
           updated.type === "messageBPMN"
             ? messageBpmnWaypoints(source, target, updated.sourceSide, updated.targetSide,
-                updated.sourceOffsetAlong ?? 0.5)
+                updated.sourceOffsetAlong ?? 0.5, updated.targetOffsetAlong)
             : computeWaypoints(source, target, state.elements,
                 updated.sourceSide, updated.targetSide, updated.routingType,
                 updated.sourceOffsetAlong ?? 0.5, updated.targetOffsetAlong ?? 0.5);
@@ -887,7 +926,7 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         const { waypoints, sourceInvisibleLeader, targetInvisibleLeader } =
           updated.type === "messageBPMN"
             ? messageBpmnWaypoints(source, target, updated.sourceSide, updated.targetSide,
-                updated.sourceOffsetAlong ?? 0.5)
+                updated.sourceOffsetAlong ?? 0.5, updated.targetOffsetAlong)
             : computeWaypoints(source, target, state.elements,
                 updated.sourceSide, updated.targetSide, updated.routingType,
                 updated.sourceOffsetAlong ?? 0.5, updated.targetOffsetAlong ?? 0.5);
@@ -914,7 +953,7 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         const { waypoints, sourceInvisibleLeader, targetInvisibleLeader } =
           updated.type === "messageBPMN"
             ? messageBpmnWaypoints(source, target, updated.sourceSide, updated.targetSide,
-                updated.sourceOffsetAlong ?? 0.5)
+                updated.sourceOffsetAlong ?? 0.5, updated.targetOffsetAlong)
             : computeWaypoints(source, target, state.elements,
                 updated.sourceSide, updated.targetSide, updated.routingType,
                 updated.sourceOffsetAlong ?? 0.5, updated.targetOffsetAlong ?? 0.5);

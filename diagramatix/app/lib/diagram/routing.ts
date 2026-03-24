@@ -482,11 +482,12 @@ export function recomputeAllConnectors(
     const target = elementMap.get(conn.targetId);
     if (!source || !target) return conn;
 
-    // messageBPMN: always vertical, x derived from sourceOffsetAlong (fraction of source width)
+    // messageBPMN: always vertical when possible — single shared x for both edges
     if (conn.type === "messageBPMN") {
       const BPMN_EVENT_TYPES = new Set(["start-event", "intermediate-event", "end-event"]);
       const tgtIsEvent = target.type === "start-event" || target.type === "intermediate-event";
       let x: number;
+      let repairedSrcOffset = conn.sourceOffsetAlong;
       if (tgtIsEvent) {
         x = target.x + target.width / 2;
       } else {
@@ -495,8 +496,16 @@ export function recomputeAllConnectors(
         const srcX = source.x + source.width * offsetAlong;
         const minX = Math.max(source.x, target.x);
         const maxX = Math.min(source.x + source.width, target.x + target.width);
-        x = maxX > minX ? Math.max(minX, Math.min(maxX, srcX)) : srcX;
+        if (maxX > minX) {
+          // Overlap exists: clamp to make perpendicular and update offset
+          x = Math.max(minX, Math.min(maxX, srcX));
+          repairedSrcOffset = source.width > 0 ? (x - source.x) / source.width : 0.5;
+        } else {
+          // No overlap: diagonal (will show red)
+          x = srcX;
+        }
       }
+      // Both edges use the SAME x for perpendicularity
       const srcEdge: Point = conn.sourceSide === "bottom"
         ? { x, y: source.y + source.height } : { x, y: source.y };
       const tgtEdge: Point = conn.targetSide === "top"
@@ -504,7 +513,8 @@ export function recomputeAllConnectors(
       const startPt = { x: source.x + source.width / 2, y: source.y + source.height / 2 };
       const endPt   = { x: target.x + target.width / 2, y: target.y + target.height / 2 };
       return { ...conn, waypoints: [startPt, srcEdge, tgtEdge, endPt],
-        sourceInvisibleLeader: true, targetInvisibleLeader: true };
+        sourceInvisibleLeader: true, targetInvisibleLeader: true,
+        sourceOffsetAlong: repairedSrcOffset };
     }
 
     // Curvilinear: if the user has adjusted handles, preserve control points relative to edges
