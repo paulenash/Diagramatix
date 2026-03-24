@@ -1066,6 +1066,35 @@ export function PropertiesPanel({
         );
       })()}
 
+      {/* Stereotype for UML Class and Enumeration */}
+      {(element.type === "uml-class" || element.type === "uml-enumeration") && onUpdateProperties && (
+        <div className="space-y-1">
+          <div className="flex items-center gap-1.5">
+            <label className="text-[10px] text-gray-500 w-16 shrink-0">Stereotype</label>
+            <input type="text"
+              className="flex-1 text-[10px] border border-gray-300 rounded px-1 py-0 min-w-0"
+              defaultValue={(element.properties.stereotype as string | undefined) ?? (element.type === "uml-class" ? "class" : "enumeration")}
+              key={`stereo-${element.id}`}
+              onBlur={e => onUpdateProperties(element.id, { stereotype: e.target.value })}
+              onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+            />
+          </div>
+          {element.type === "uml-class" && (
+            <div className="flex items-center gap-1.5">
+              <label className="text-[10px] text-gray-500 w-16 shrink-0">Show</label>
+              <button
+                onClick={() => onUpdateProperties(element.id, { showStereotype: !((element.properties.showStereotype as boolean | undefined) ?? false) })}
+                className={`px-2 py-0 text-[10px] rounded border ${
+                  (element.properties.showStereotype as boolean | undefined) ?? false
+                    ? "bg-blue-600 text-white border-blue-600"
+                    : "bg-white text-gray-500 border-gray-300"
+                }`}
+              >{(element.properties.showStereotype as boolean | undefined) ?? false ? "On" : "Off"}</button>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Enumeration Values List */}
       {element.type === "uml-enumeration" && onUpdateProperties && (
         <EnumValuesList element={element} onUpdateProperties={onUpdateProperties} />

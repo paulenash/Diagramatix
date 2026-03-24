@@ -274,27 +274,32 @@ function autoResizeUmlElement(el: DiagramElement): DiagramElement {
   const MIN_W = 80;
   const MIN_H = 40;
 
+  const stereotype = (el.properties.stereotype as string | undefined)
+    ?? (el.type === "uml-class" ? "class" : "enumeration");
+  const showStereotype = el.type === "uml-enumeration"
+    || ((el.properties.showStereotype as boolean | undefined) ?? false);
+  const stereotypeW = showStereotype ? (`\u00AB${stereotype}\u00BB`.length * CHAR_W * 0.8) : 0;
+  const stereotypeH = showStereotype ? LINE_H : 0;
+
   const labelLines = el.label.split("\n");
   const labelMaxW = Math.max(...labelLines.map(l => l.length * CHAR_W));
-  // Header grows for multi-line labels (base 28 handles stereotype + 1 line)
   const extraLabelLines = Math.max(0, labelLines.length - 1);
-  const headerH = BASE_HEADER_H + extraLabelLines * LINE_H;
+  const headerH = BASE_HEADER_H + extraLabelLines * LINE_H + stereotypeH;
 
   if (el.type === "uml-enumeration") {
     const values: string[] = (el.properties.values as string[] | undefined) ?? [];
-    const stereotypeW = "\u00ABenumeration\u00BB".length * CHAR_W * 0.8;
     const valuesMaxW = values.length > 0 ? Math.max(...values.map(v => v.length * CHAR_W)) : 0;
     const contentW = Math.max(stereotypeW, labelMaxW, valuesMaxW) + PAD * 2;
     const newWidth = Math.max(MIN_W, contentW);
     const valuesH = values.length * LINE_H;
-    const bottomPad = values.length > 0 ? 4 : 0; // match top padding from divider to first value
+    const bottomPad = values.length > 0 ? 4 : 0;
     const newHeight = Math.max(MIN_H, headerH + valuesH + bottomPad);
     if (newWidth === el.width && newHeight === el.height) return el;
     return { ...el, width: newWidth, height: newHeight };
   }
 
   // uml-class
-  const contentW = labelMaxW + PAD * 2;
+  const contentW = Math.max(stereotypeW, labelMaxW) + PAD * 2;
   const newWidth = Math.max(MIN_W, contentW);
   const newHeight = Math.max(MIN_H, headerH + LINE_H);
   if (newWidth === el.width && newHeight === el.height) return el;

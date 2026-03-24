@@ -846,17 +846,31 @@ function UmlClassShape({ el }: { el: DiagramElement }) {
   const colors = useContext(SymbolColorCtx);
   const fsc = useContext(FontScaleCtx);
   const fill = resolveColor("uml-class", colors);
+  const showStereotype = (el.properties.showStereotype as boolean | undefined) ?? false;
+  const stereotype = (el.properties.stereotype as string | undefined) ?? "class";
   const labelLines = el.label.split("\n");
   const lineH = Math.round(14 * fsc);
   const labelFontSize = Math.round(12 * fsc * 10) / 10;
-  const labelStartY = el.y + HEADER_H / 2 - ((labelLines.length - 1) * lineH) / 2;
+  const stereotypeFontSize = Math.round(9 * fsc * 10) / 10;
+  const extraLabelLines = Math.max(0, labelLines.length - 1);
+  const stereotypeH = showStereotype ? lineH : 0;
+  const headerH = HEADER_H + extraLabelLines * lineH + stereotypeH;
+  const labelStartY = showStereotype
+    ? el.y + stereotypeH + HEADER_H / 2 - (extraLabelLines * lineH) / 2
+    : el.y + HEADER_H / 2 - (extraLabelLines * lineH) / 2;
   return (
     <g>
       <rect x={el.x} y={el.y} width={el.width} height={el.height}
         fill={fill} stroke="#374151" strokeWidth={1.5} />
-      <line x1={el.x} y1={el.y + HEADER_H + Math.max(0, labelLines.length - 1) * lineH}
-        x2={el.x + el.width} y2={el.y + HEADER_H + Math.max(0, labelLines.length - 1) * lineH}
+      <line x1={el.x} y1={el.y + headerH}
+        x2={el.x + el.width} y2={el.y + headerH}
         stroke="#374151" strokeWidth={1} />
+      {showStereotype && (
+        <text x={el.x + el.width / 2} y={el.y + 10} textAnchor="middle" fontSize={stereotypeFontSize}
+          fill="#6b7280" fontStyle="italic" style={{ pointerEvents: "none", userSelect: "none" }}>
+          {`\u00AB${stereotype}\u00BB`}
+        </text>
+      )}
       <text textAnchor="middle" fontSize={labelFontSize} fill="#111827" fontWeight="bold"
         style={{ userSelect: "none", pointerEvents: "none" }}>
         {labelLines.map((line, i) => (
@@ -871,6 +885,7 @@ function UmlEnumerationShape({ el }: { el: DiagramElement }) {
   const colors = useContext(SymbolColorCtx);
   const fsc = useContext(FontScaleCtx);
   const fill = resolveColor("uml-enumeration", colors);
+  const stereotype = (el.properties.stereotype as string | undefined) ?? "enumeration";
   const values: string[] = (el.properties.values as string[] | undefined) ?? [];
   const valFontSize = Math.round(10 * fsc * 10) / 10;
   const labelFontSize = Math.round(12 * fsc * 10) / 10;
@@ -890,7 +905,7 @@ function UmlEnumerationShape({ el }: { el: DiagramElement }) {
         stroke="#374151" strokeWidth={1} />
       <text x={el.x + el.width / 2} y={stereotypeY} textAnchor="middle" fontSize={Math.round(9 * fsc * 10) / 10}
         fill="#6b7280" fontStyle="italic" style={{ pointerEvents: "none", userSelect: "none" }}>
-        {"\u00ABenumeration\u00BB"}
+        {`\u00AB${stereotype}\u00BB`}
       </text>
       {/* Multi-line label in header */}
       <text textAnchor="middle" fontSize={labelFontSize} fill="#111827" fontWeight="bold"
