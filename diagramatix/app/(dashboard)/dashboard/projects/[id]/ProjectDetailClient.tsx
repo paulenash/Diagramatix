@@ -17,6 +17,8 @@ interface FolderNode {
 interface FolderTree {
   folders: FolderNode[];
   diagramFolderMap: Record<string, string>; // diagramId → folderId ("root" = project root)
+  diagramOrder?: Record<string, string[]>;  // folderId → ordered diagramId list
+  folderOrder?: Record<string, string[]>;   // parentFolderId → ordered child folderId list
 }
 
 const ROOT_ID = "root";
@@ -94,6 +96,7 @@ export function ProjectDetailClient({ project, otherProjects }: Props) {
   const [dragDiagramId, setDragDiagramId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
+  const [selectedTreeItem, setSelectedTreeItem] = useState<string | null>(null); // folder or diagram id
 
   // Resizable nav panel — initialize with default, load from localStorage in useEffect
   const [navWidth, setNavWidth] = useState(208);
@@ -105,6 +108,88 @@ export function ProjectDetailClient({ project, otherProjects }: Props) {
     const savedWidth = localStorage.getItem(`nav-width-${project.id}`);
     if (savedWidth) setNavWidth(parseInt(savedWidth, 10) || 208);
   }, [project.id]);
+
+  // Get ordered diagrams in a specific folder
+  function getOrderedDiagramsInFolder(folderId: string): DiagramSummary[] {
+    const direct = diagrams.filter(d => (folderTree.diagramFolderMap[d.id] ?? ROOT_ID) === folderId);
+    const order = folderTree.diagramOrder?.[folderId];
+    if (!order) return direct;
+    return direct.sort((a, b) => {
+      const ai = order.indexOf(a.id);
+      const bi = order.indexOf(b.id);
+      return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+    });
+  }
+
+  // Get ordered child folders
+  function getOrderedChildFolders(parentId: string): FolderNode[] {
+    const children = folderTree.folders.filter(f =>
+      (f.parentId === null && parentId === ROOT_ID) || f.parentId === parentId
+    );
+    const order = folderTree.folderOrder?.[parentId];
+    if (!order) return children;
+    return children.sort((a, b) => {
+      const ai = order.indexOf(a.id);
+      const bi = order.indexOf(b.id);
+      return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+    });
+  }
+
+  function moveItemInArray(arr: string[], id: string, direction: -1 | 1): string[] {
+    const idx = arr.indexOf(id);
+    if (idx === -1) return arr;
+    const newIdx = idx + direction;
+    if (newIdx < 0 || newIdx >= arr.length) return arr;
+    const next = [...arr];
+    [next[idx], next[newIdx]] = [next[newIdx], next[idx]];
+    return next;
+  }
+
+  function moveTreeItem(itemId: string, direction: -1 | 1) {
+    // Check if it's a diagram
+    const isDiagram = diagrams.some(d => d.id === itemId);
+    if (isDiagram) {
+      const folderId = folderTree.diagramFolderMap[itemId] ?? ROOT_ID;
+      const currentOrder = folderTree.diagramOrder?.[folderId]
+        ?? getOrderedDiagramsInFolder(folderId).map(d => d.id);
+      const newOrder = moveItemInArray(currentOrder, itemId, direction);
+      if (newOrder === currentOrder) return;
+      updateTree(t => ({
+        ...t,
+        diagramOrder: { ...t.diagramOrder, [folderId]: newOrder },
+      }));
+    } else {
+      // It's a folder
+      const folder = folderTree.folders.find(f => f.id === itemId);
+      if (!folder) return;
+      const parentId = folder.parentId === null ? ROOT_ID : folder.parentId;
+      const currentOrder = folderTree.folderOrder?.[parentId]
+        ?? getOrderedChildFolders(parentId).map(f => f.id);
+      const newOrder = moveItemInArray(currentOrder, itemId, direction);
+      if (newOrder === currentOrder) return;
+      updateTree(t => ({
+        ...t,
+        folderOrder: { ...t.folderOrder, [parentId]: newOrder },
+      }));
+    }
+  }
+
+  // Keyboard handler for Shift+Arrow reordering
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (!selectedTreeItem || editingId) return;
+      if (!e.shiftKey) return;
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        moveTreeItem(selectedTreeItem, -1);
+      } else if (e.key === "ArrowDown") {
+        e.preventDefault();
+        moveTreeItem(selectedTreeItem, 1);
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }); // intentionally no deps — uses latest state via closure
 
   const updateTree = useCallback((updater: (t: FolderTree) => FolderTree) => {
     setFolderTree(prev => {
@@ -297,18 +382,20 @@ export function ProjectDetailClient({ project, otherProjects }: Props) {
     const name = isRoot ? project.name : (folder?.name ?? "?");
     const isSelected = selectedFolderId === folderId;
     const isCollapsed = folder?.collapsed ?? false;
-    const childFolders = folderTree.folders.filter(f => (f.parentId === null && isRoot) || f.parentId === folderId);
-    const directDiagrams = diagrams.filter(d => (folderTree.diagramFolderMap[d.id] ?? ROOT_ID) === folderId);
+    const childFolders = getOrderedChildFolders(folderId);
+    const directDiagrams = getOrderedDiagramsInFolder(folderId);
     const hasChildren = childFolders.length > 0 || directDiagrams.length > 0;
 
     return (
       <div key={folderId}>
         <div
           className={`flex items-center gap-1 px-1 py-0.5 rounded cursor-pointer text-[11px] ${
-            isSelected ? "bg-blue-100 text-blue-800" : "text-gray-700 hover:bg-gray-100"
+            selectedTreeItem === folderId ? "bg-blue-200 text-blue-900 ring-1 ring-blue-400"
+            : isSelected ? "bg-blue-100 text-blue-800"
+            : "text-gray-700 hover:bg-gray-100"
           }`}
           style={{ paddingLeft: depth * 12 + 4 }}
-          onClick={() => setSelectedFolderId(folderId)}
+          onClick={() => { setSelectedFolderId(folderId); setSelectedTreeItem(isRoot ? null : folderId); }}
           onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add("bg-blue-50"); }}
           onDragLeave={(e) => { e.currentTarget.classList.remove("bg-blue-50"); }}
           onDrop={(e) => {
@@ -374,11 +461,12 @@ export function ProjectDetailClient({ project, otherProjects }: Props) {
                 draggable
                 onDragStart={() => setDragDiagramId(d.id)}
                 onDragEnd={() => setDragDiagramId(null)}
-                className={`flex items-center gap-1 px-1 py-0.5 rounded cursor-pointer text-[10px] text-gray-600 hover:bg-gray-50 ${
-                  dragDiagramId === d.id ? "opacity-40" : ""
-                }`}
+                className={`flex items-center gap-1 px-1 py-0.5 rounded cursor-pointer text-[10px] ${
+                  selectedTreeItem === d.id ? "bg-blue-100 text-blue-800" : "text-gray-600 hover:bg-gray-50"
+                } ${dragDiagramId === d.id ? "opacity-40" : ""}`}
                 style={{ paddingLeft: (depth + 1) * 12 + 4 }}
-                onClick={() => router.push(`/diagram/${d.id}`)}
+                onClick={(e) => { e.stopPropagation(); setSelectedTreeItem(d.id); }}
+                onDoubleClick={() => router.push(`/diagram/${d.id}`)}
               >
                 <span className="w-3" />
                 <svg width={14} height={14} viewBox="0 0 18 16" fill="none">
@@ -504,7 +592,7 @@ export function ProjectDetailClient({ project, otherProjects }: Props) {
           onClose={() => setShowMaintenance(false)}
           onSaved={(config) => {
             setProjectColorConfig(config);
-            router.refresh();
+            // No router.refresh() — React re-renders only affected diagram thumbnails
           }}
         />
       )}
@@ -658,7 +746,7 @@ function DiagramCard({
 
   return (
     <div
-      onClick={() => router.push(`/diagram/${diagram.id}`)}
+      onDoubleClick={() => router.push(`/diagram/${diagram.id}`)}
       className="bg-white border border-gray-200 rounded-md p-2.5 hover:border-blue-300 hover:shadow-sm cursor-pointer group transition-all relative"
     >
       <div className="flex items-center justify-between mb-1">
