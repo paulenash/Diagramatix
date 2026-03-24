@@ -1,10 +1,39 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import type { DiagramType, DiagramData } from "@/app/lib/diagram/types";
 import { resolveColor, DEFAULT_SYMBOL_COLORS, type SymbolColorConfig } from "@/app/lib/diagram/colors";
 import { DiagramMaintenanceModal } from "./DiagramMaintenanceModal";
+
+// --- Folder tree types ---
+interface FolderNode {
+  id: string;
+  name: string;
+  parentId: string | null; // null = root (project level)
+  collapsed?: boolean;
+}
+
+interface FolderTree {
+  folders: FolderNode[];
+  diagramFolderMap: Record<string, string>; // diagramId → folderId ("root" = project root)
+}
+
+const ROOT_ID = "root";
+
+function loadFolderTree(projectId: string): FolderTree {
+  if (typeof window === "undefined") return { folders: [], diagramFolderMap: {} };
+  try {
+    const raw = localStorage.getItem(`folder-tree-${projectId}`);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return { folders: [], diagramFolderMap: {} };
+}
+
+function saveFolderTree(projectId: string, tree: FolderTree) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(`folder-tree-${projectId}`, JSON.stringify(tree));
+}
 
 interface DiagramSummary {
   id: string;
@@ -57,8 +86,22 @@ export function ProjectDetailClient({ project, otherProjects }: Props) {
   const [showMaintenance, setShowMaintenance] = useState(false);
   const [projectColorConfig, setProjectColorConfig] = useState<SymbolColorConfig>((project.colorConfig as SymbolColorConfig | null) ?? {});
 
-  // Fetch fresh colorConfig from API on mount — bypasses Next.js Router Cache which may serve
-  // stale server props after navigating away and back.
+  // Folder tree state
+  const [folderTree, setFolderTree] = useState<FolderTree>(() => loadFolderTree(project.id));
+  const [selectedFolderId, setSelectedFolderId] = useState<string>(ROOT_ID);
+  const [newFolderParent, setNewFolderParent] = useState<string | null>(null);
+  const [newFolderName, setNewFolderName] = useState("");
+  const [dragDiagramId, setDragDiagramId] = useState<string | null>(null);
+
+  const updateTree = useCallback((updater: (t: FolderTree) => FolderTree) => {
+    setFolderTree(prev => {
+      const next = updater(prev);
+      saveFolderTree(project.id, next);
+      return next;
+    });
+  }, [project.id]);
+
+  // Fetch fresh colorConfig from API on mount
   useEffect(() => {
     fetch(`/api/projects/${project.id}`)
       .then((r) => r.json())
@@ -87,6 +130,10 @@ export function ProjectDetailClient({ project, otherProjects }: Props) {
     setCreating(false);
     if (!res.ok) { setError("Failed to create diagram"); return; }
     const diagram = await res.json();
+    // Place new diagram in selected folder
+    if (selectedFolderId !== ROOT_ID) {
+      updateTree(t => ({ ...t, diagramFolderMap: { ...t.diagramFolderMap, [diagram.id]: selectedFolderId } }));
+    }
     router.push(`/diagram/${diagram.id}`);
   }
 
@@ -94,6 +141,11 @@ export function ProjectDetailClient({ project, otherProjects }: Props) {
     if (!confirm("Delete this diagram?")) return;
     await fetch(`/api/diagrams/${id}`, { method: "DELETE" });
     setDiagrams((prev) => prev.filter((d) => d.id !== id));
+    updateTree(t => {
+      const map = { ...t.diagramFolderMap };
+      delete map[id];
+      return { ...t, diagramFolderMap: map };
+    });
   }
 
   async function handleMoveDiagram(diagramId: string, targetProjectId: string | null) {
@@ -106,57 +158,251 @@ export function ProjectDetailClient({ project, otherProjects }: Props) {
     setDiagrams((prev) => prev.filter((d) => d.id !== diagramId));
   }
 
+  function handleAddFolder(parentId: string) {
+    setNewFolderParent(parentId);
+    setNewFolderName("");
+  }
+
+  function confirmAddFolder() {
+    if (!newFolderName.trim() || newFolderParent === null) return;
+    const id = `f-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    updateTree(t => ({
+      ...t,
+      folders: [...t.folders, { id, name: newFolderName.trim(), parentId: newFolderParent === ROOT_ID ? null : newFolderParent }],
+    }));
+    setNewFolderParent(null);
+    setNewFolderName("");
+  }
+
+  function handleDeleteFolder(folderId: string) {
+    // Move diagrams in this folder (and descendants) to root
+    function getDescendantFolderIds(fid: string, folders: FolderNode[]): Set<string> {
+      const ids = new Set<string>([fid]);
+      for (const f of folders) {
+        if (f.parentId === fid || (f.parentId === null && fid === ROOT_ID)) {
+          if (!ids.has(f.id)) {
+            for (const did of getDescendantFolderIds(f.id, folders)) ids.add(did);
+          }
+        }
+      }
+      return ids;
+    }
+    const toRemove = getDescendantFolderIds(folderId, folderTree.folders);
+    updateTree(t => {
+      const map = { ...t.diagramFolderMap };
+      for (const [did, fid] of Object.entries(map)) {
+        if (toRemove.has(fid)) delete map[did];
+      }
+      return {
+        folders: t.folders.filter(f => !toRemove.has(f.id)),
+        diagramFolderMap: map,
+      };
+    });
+    if (toRemove.has(selectedFolderId)) setSelectedFolderId(ROOT_ID);
+  }
+
+  function toggleFolderCollapse(folderId: string) {
+    updateTree(t => ({
+      ...t,
+      folders: t.folders.map(f => f.id === folderId ? { ...f, collapsed: !f.collapsed } : f),
+    }));
+  }
+
+  function moveDiagramToFolder(diagramId: string, folderId: string) {
+    updateTree(t => {
+      const map = { ...t.diagramFolderMap };
+      if (folderId === ROOT_ID) delete map[diagramId];
+      else map[diagramId] = folderId;
+      return { ...t, diagramFolderMap: map };
+    });
+  }
+
+  // Get all diagram IDs visible under a folder (recursively)
+  function getDiagramsInFolder(folderId: string): DiagramSummary[] {
+    if (folderId === ROOT_ID) return diagrams; // project root shows ALL
+    const childFolderIds = new Set<string>([folderId]);
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const f of folderTree.folders) {
+        const pid = f.parentId === null ? ROOT_ID : f.parentId;
+        if (childFolderIds.has(pid) && !childFolderIds.has(f.id)) {
+          childFolderIds.add(f.id);
+          changed = true;
+        }
+      }
+    }
+    return diagrams.filter(d => {
+      const dFolder = folderTree.diagramFolderMap[d.id] ?? ROOT_ID;
+      return childFolderIds.has(dFolder);
+    });
+  }
+
+  // Diagram type icon markers
+  function DiagramTypeMarker({ type }: { type: string }) {
+    switch (type) {
+      case "bpmn": return <text x={9} y={11} fontSize={5} fill="#92400e" textAnchor="middle" fontWeight="bold">B</text>;
+      case "context": case "basic": return <text x={9} y={11} fontSize={5} fill="#92400e" textAnchor="middle" fontWeight="bold">C</text>;
+      case "process-context": return <text x={9} y={11} fontSize={5} fill="#92400e" textAnchor="middle" fontWeight="bold">PC</text>;
+      case "state-machine": return <text x={9} y={11} fontSize={5} fill="#92400e" textAnchor="middle" fontWeight="bold">SM</text>;
+      case "domain": return <text x={9} y={11} fontSize={5} fill="#92400e" textAnchor="middle" fontWeight="bold">D</text>;
+      default: return null;
+    }
+  }
+
+  // Render folder tree recursively
+  function renderFolder(folderId: string, depth: number): React.ReactNode {
+    const isRoot = folderId === ROOT_ID;
+    const folder = isRoot ? null : folderTree.folders.find(f => f.id === folderId);
+    const name = isRoot ? project.name : (folder?.name ?? "?");
+    const isSelected = selectedFolderId === folderId;
+    const isCollapsed = folder?.collapsed ?? false;
+    const childFolders = folderTree.folders.filter(f => (f.parentId === null && isRoot) || f.parentId === folderId);
+    const directDiagrams = diagrams.filter(d => (folderTree.diagramFolderMap[d.id] ?? ROOT_ID) === folderId);
+    const hasChildren = childFolders.length > 0 || directDiagrams.length > 0;
+
+    return (
+      <div key={folderId}>
+        <div
+          className={`flex items-center gap-1 px-1 py-0.5 rounded cursor-pointer text-[11px] ${
+            isSelected ? "bg-blue-100 text-blue-800" : "text-gray-700 hover:bg-gray-100"
+          }`}
+          style={{ paddingLeft: depth * 12 + 4 }}
+          onClick={() => setSelectedFolderId(folderId)}
+          onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add("bg-blue-50"); }}
+          onDragLeave={(e) => { e.currentTarget.classList.remove("bg-blue-50"); }}
+          onDrop={(e) => {
+            e.preventDefault();
+            e.currentTarget.classList.remove("bg-blue-50");
+            if (dragDiagramId) { moveDiagramToFolder(dragDiagramId, folderId); setDragDiagramId(null); }
+          }}
+        >
+          {hasChildren && !isRoot ? (
+            <span className="w-3 text-center text-gray-400 cursor-pointer text-[9px]"
+              onClick={(e) => { e.stopPropagation(); toggleFolderCollapse(folderId); }}>
+              {isCollapsed ? "\u25B6" : "\u25BC"}
+            </span>
+          ) : <span className="w-3" />}
+          {/* Folder icon */}
+          <svg width={14} height={12} viewBox="0 0 16 14" fill="none">
+            <path d="M1 3V12a1 1 0 001 1h12a1 1 0 001-1V5a1 1 0 00-1-1H8L6.5 2H2a1 1 0 00-1 1z"
+              fill={isRoot ? "#3b82f6" : "#fbbf24"} stroke="#78716c" strokeWidth={0.5} />
+          </svg>
+          <span className="truncate flex-1 font-medium">{name}</span>
+          {/* Add subfolder button */}
+          <button onClick={(e) => { e.stopPropagation(); handleAddFolder(folderId); }}
+            className="opacity-0 group-hover:opacity-100 hover:!opacity-100 text-gray-400 hover:text-blue-500 text-[10px] px-0.5"
+            title="Add subfolder"
+            style={{ opacity: isSelected ? 1 : undefined }}
+          >+</button>
+          {!isRoot && (
+            <button onClick={(e) => { e.stopPropagation(); handleDeleteFolder(folderId); }}
+              className="opacity-0 group-hover:opacity-100 hover:!opacity-100 text-gray-400 hover:text-red-500 text-[10px] px-0.5"
+              title="Delete folder"
+              style={{ opacity: isSelected ? 1 : undefined }}
+            >{"\u2715"}</button>
+          )}
+        </div>
+        {/* New folder input */}
+        {newFolderParent === folderId && (
+          <div className="flex items-center gap-1 py-0.5" style={{ paddingLeft: (depth + 1) * 12 + 18 }}>
+            <input autoFocus type="text" value={newFolderName} onChange={e => setNewFolderName(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter") confirmAddFolder(); if (e.key === "Escape") setNewFolderParent(null); }}
+              className="flex-1 text-[10px] border border-gray-300 rounded px-1 py-0.5" placeholder="Folder name" />
+            <button onClick={confirmAddFolder} className="text-[10px] text-blue-600">{"\u2713"}</button>
+            <button onClick={() => setNewFolderParent(null)} className="text-[10px] text-gray-400">{"\u2715"}</button>
+          </div>
+        )}
+        {/* Children (if not collapsed) */}
+        {!isCollapsed && (
+          <>
+            {childFolders.map(cf => renderFolder(cf.id, depth + 1))}
+            {directDiagrams.map(d => (
+              <div key={d.id}
+                draggable
+                onDragStart={() => setDragDiagramId(d.id)}
+                onDragEnd={() => setDragDiagramId(null)}
+                className={`flex items-center gap-1 px-1 py-0.5 rounded cursor-pointer text-[10px] text-gray-600 hover:bg-gray-50 ${
+                  dragDiagramId === d.id ? "opacity-40" : ""
+                }`}
+                style={{ paddingLeft: (depth + 1) * 12 + 4 }}
+                onClick={() => router.push(`/diagram/${d.id}`)}
+              >
+                <span className="w-3" />
+                <svg width={14} height={14} viewBox="0 0 18 16" fill="none">
+                  <rect x={1} y={1} width={16} height={14} rx={2} fill="#fef9c3" stroke="#d97706" strokeWidth={0.7} />
+                  <DiagramTypeMarker type={d.type} />
+                </svg>
+                <span className="truncate flex-1">{d.name}</span>
+              </div>
+            ))}
+          </>
+        )}
+      </div>
+    );
+  }
+
+  const visibleDiagrams = getDiagramsInFolder(selectedFolderId);
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center gap-4">
+      <header className="bg-white border-b border-gray-200 px-6 py-3 flex items-center gap-4 flex-shrink-0">
         <button
           onClick={() => router.push("/dashboard")}
           className="text-gray-500 hover:text-gray-700 text-sm"
         >
-          ← Dashboard
+          {"\u2190"} Dashboard
         </button>
-        <h1 className="text-lg font-semibold text-gray-900 flex-1">{project.name}</h1>
+        <h1 className="text-sm font-semibold text-gray-900 flex-1">{project.name}</h1>
         <button
           onClick={() => setShowMaintenance(true)}
-          className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50"
+          className="px-3 py-1.5 text-xs font-medium text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50"
         >
-          Project Diagram Maintenance
+          Project Maintenance
         </button>
         <button
           onClick={() => setShowNewDiagram(true)}
-          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm font-medium"
+          className="px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-xs font-medium"
         >
           + New Diagram
         </button>
       </header>
 
-      <main className="max-w-5xl mx-auto px-6 py-8">
-        {diagrams.length === 0 ? (
-          <div className="text-center py-16 bg-white rounded-lg border border-gray-200">
-            <p className="text-gray-500 mb-4">No diagrams yet</p>
-            <button
-              onClick={() => setShowNewDiagram(true)}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
-            >
-              Create your first diagram
-            </button>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {diagrams.map((d) => (
-              <DiagramCard
-                key={d.id}
-                diagram={d}
-                otherProjects={otherProjects}
-                onDelete={handleDeleteDiagram}
-                onMove={handleMoveDiagram}
-                colorConfig={projectColorConfig}
-              />
-            ))}
-          </div>
-        )}
-      </main>
+      <div className="flex flex-1 overflow-hidden">
+        {/* Left: Folder tree */}
+        <div className="w-52 border-r border-gray-200 bg-white overflow-y-auto p-2 flex-shrink-0 group">
+          {renderFolder(ROOT_ID, 0)}
+        </div>
+
+        {/* Right: Diagram tiles */}
+        <main className="flex-1 overflow-y-auto p-4">
+          {visibleDiagrams.length === 0 ? (
+            <div className="text-center py-12 bg-white rounded-lg border border-gray-200">
+              <p className="text-gray-500 text-sm mb-3">No diagrams in this folder</p>
+              <button
+                onClick={() => setShowNewDiagram(true)}
+                className="px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-xs"
+              >
+                Create a diagram
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+              {visibleDiagrams.map((d) => (
+                <DiagramCard
+                  key={d.id}
+                  diagram={d}
+                  otherProjects={otherProjects}
+                  onDelete={handleDeleteDiagram}
+                  onMove={handleMoveDiagram}
+                  colorConfig={projectColorConfig}
+                />
+              ))}
+            </div>
+          )}
+        </main>
+      </div>
 
       {/* Diagram Maintenance modal */}
       {showMaintenance && (
@@ -321,63 +567,46 @@ function DiagramCard({
   return (
     <div
       onClick={() => router.push(`/diagram/${diagram.id}`)}
-      className="bg-white border border-gray-200 rounded-lg p-4 hover:border-blue-300 hover:shadow-sm cursor-pointer group transition-all relative"
+      className="bg-white border border-gray-200 rounded-md p-2.5 hover:border-blue-300 hover:shadow-sm cursor-pointer group transition-all relative"
     >
-      <div className="flex items-start justify-between mb-2">
-        <div className="w-8 h-8 bg-blue-50 rounded flex items-center justify-center">
-          <svg width={16} height={16} viewBox="0 0 16 16" fill="none">
-            <rect x={1} y={4} width={6} height={4} rx={1} stroke="#2563eb" strokeWidth={1.2} />
-            <rect x={9} y={4} width={6} height={4} rx={1} stroke="#2563eb" strokeWidth={1.2} />
-            <line x1={7} y1={6} x2={9} y2={6} stroke="#2563eb" strokeWidth={1.2} />
-          </svg>
-        </div>
-        <div className="flex gap-1 opacity-0 group-hover:opacity-100">
+      <div className="flex items-center justify-between mb-1">
+        <h3 className="font-medium text-gray-900 text-xs truncate flex-1">{diagram.name}</h3>
+        <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 ml-1">
           <div className="relative">
             <button
               onClick={(e) => { e.stopPropagation(); setShowMove((v) => !v); }}
-              className="text-gray-400 hover:text-blue-500 text-xs px-1"
-              title="Move to..."
-            >
-              ↗
-            </button>
+              className="text-gray-400 hover:text-blue-500 text-[10px] px-0.5"
+              title="Move to project..."
+            >{"\u2197"}</button>
             {showMove && (
-              <div
-                onClick={(e) => e.stopPropagation()}
-                className="absolute right-0 top-5 z-20 bg-white border border-gray-200 rounded shadow-lg min-w-36 py-1"
-              >
-                <p className="px-3 py-1 text-xs text-gray-400 font-medium uppercase tracking-wide">Move to</p>
+              <div onClick={(e) => e.stopPropagation()}
+                className="absolute right-0 top-5 z-20 bg-white border border-gray-200 rounded shadow-lg min-w-36 py-1">
+                <p className="px-3 py-1 text-[10px] text-gray-400 font-medium uppercase tracking-wide">Move to project</p>
                 {otherProjects.map((p) => (
-                  <button
-                    key={p.id}
+                  <button key={p.id}
                     onClick={() => { onMove(diagram.id, p.id); setShowMove(false); }}
-                    className="block w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50"
-                  >
-                    {p.name}
-                  </button>
+                    className="block w-full text-left px-3 py-1 text-xs text-gray-700 hover:bg-gray-50">{p.name}</button>
                 ))}
                 <hr className="my-1 border-gray-100" />
                 <button
                   onClick={() => { onMove(diagram.id, null); setShowMove(false); }}
-                  className="block w-full text-left px-3 py-1.5 text-xs text-gray-500 hover:bg-gray-50 italic"
-                >
-                  Unorganized
-                </button>
+                  className="block w-full text-left px-3 py-1 text-xs text-gray-500 hover:bg-gray-50 italic">Unorganized</button>
               </div>
             )}
           </div>
           <button
             onClick={(e) => { e.stopPropagation(); onDelete(diagram.id); }}
-            className="text-gray-400 hover:text-red-500 text-xs px-1"
-          >
-            ✕
-          </button>
+            className="text-gray-400 hover:text-red-500 text-[10px] px-0.5"
+          >{"\u2715"}</button>
         </div>
       </div>
-      <h3 className="font-medium text-gray-900 text-sm mb-1">{diagram.name}</h3>
-      <p className="text-xs text-gray-500 mb-2">{DIAGRAM_TYPE_LABELS[diagram.type] ?? diagram.type}</p>
-      <p className="text-xs text-gray-400">{new Date(diagram.updatedAt).toLocaleDateString()}</p>
+      <div className="flex items-center gap-2 text-[10px] text-gray-400">
+        <span>{DIAGRAM_TYPE_LABELS[diagram.type] ?? diagram.type}</span>
+        <span>{"\u00B7"}</span>
+        <span>{new Date(diagram.updatedAt).toLocaleDateString()}</span>
+      </div>
       {diagram.data && (
-        <div className="absolute bottom-2 right-2 w-24 h-16 opacity-40 group-hover:opacity-70 transition-opacity pointer-events-none">
+        <div className="absolute bottom-1 right-1 w-16 h-10 opacity-30 group-hover:opacity-60 transition-opacity pointer-events-none">
           <DiagramThumbnail data={diagram.data} colorConfig={colorConfig} />
         </div>
       )}
