@@ -107,6 +107,11 @@ export function ProjectDetailClient({ project, otherProjects }: Props) {
     setFolderTree(loadFolderTree(project.id));
     const savedWidth = localStorage.getItem(`nav-width-${project.id}`);
     if (savedWidth) setNavWidth(parseInt(savedWidth, 10) || 208);
+    // Restore tree selection from last visit
+    const savedTreeItem = localStorage.getItem(`selected-tree-${project.id}`);
+    const savedFolder = localStorage.getItem(`selected-folder-${project.id}`);
+    if (savedTreeItem) setSelectedTreeItem(savedTreeItem);
+    if (savedFolder) setSelectedFolderId(savedFolder);
   }, [project.id]);
 
   // Get ordered diagrams in a specific folder
@@ -172,6 +177,18 @@ export function ProjectDetailClient({ project, otherProjects }: Props) {
         folderOrder: { ...t.folderOrder, [parentId]: newOrder },
       }));
     }
+  }
+
+  // Open a diagram: select it in tree, persist, navigate
+  function handleOpenDiagram(diagramId: string) {
+    setSelectedTreeItem(diagramId);
+    // Also select the folder containing this diagram
+    const folderId = folderTree.diagramFolderMap[diagramId] ?? ROOT_ID;
+    setSelectedFolderId(folderId);
+    // Persist selection so it's restored on return
+    localStorage.setItem(`selected-tree-${project.id}`, diagramId);
+    localStorage.setItem(`selected-folder-${project.id}`, folderId);
+    router.push(`/diagram/${diagramId}`);
   }
 
   // Keyboard handler for Shift+Arrow reordering
@@ -498,7 +515,7 @@ export function ProjectDetailClient({ project, otherProjects }: Props) {
                 } ${dragDiagramId === d.id ? "opacity-40" : ""}`}
                 style={{ paddingLeft: (depth + 1) * 12 + 4 }}
                 onClick={(e) => { e.stopPropagation(); setSelectedTreeItem(d.id); }}
-                onDoubleClick={() => router.push(`/diagram/${d.id}`)}
+                onDoubleClick={() => handleOpenDiagram(d.id)}
               >
                 <span className="w-3" />
                 <svg width={14} height={14} viewBox="0 0 18 16" fill="none">
@@ -617,6 +634,7 @@ export function ProjectDetailClient({ project, otherProjects }: Props) {
                   otherProjects={otherProjects}
                   onDelete={handleDeleteDiagram}
                   onMove={handleMoveDiagram}
+                  onOpen={handleOpenDiagram}
                   colorConfig={projectColorConfig}
                 />
               ))}
@@ -774,20 +792,21 @@ function DiagramCard({
   otherProjects,
   onDelete,
   onMove,
+  onOpen,
   colorConfig,
 }: {
   diagram: DiagramSummary;
   otherProjects: OtherProject[];
   onDelete: (id: string) => void;
   onMove: (diagramId: string, projectId: string | null) => void;
+  onOpen: (diagramId: string) => void;
   colorConfig?: SymbolColorConfig;
 }) {
-  const router = useRouter();
   const [showMove, setShowMove] = useState(false);
 
   return (
     <div
-      onDoubleClick={() => router.push(`/diagram/${diagram.id}`)}
+      onClick={() => onOpen(diagram.id)}
       className="bg-white border border-gray-200 rounded-md p-2.5 hover:border-blue-300 hover:shadow-sm cursor-pointer group transition-all relative"
     >
       <div className="flex items-center justify-between mb-1">
