@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import type { DiagramType, DiagramData } from "@/app/lib/diagram/types";
 import { resolveColor, DEFAULT_SYMBOL_COLORS, type SymbolColorConfig } from "@/app/lib/diagram/colors";
@@ -86,12 +86,25 @@ export function ProjectDetailClient({ project, otherProjects }: Props) {
   const [showMaintenance, setShowMaintenance] = useState(false);
   const [projectColorConfig, setProjectColorConfig] = useState<SymbolColorConfig>((project.colorConfig as SymbolColorConfig | null) ?? {});
 
-  // Folder tree state
-  const [folderTree, setFolderTree] = useState<FolderTree>(() => loadFolderTree(project.id));
+  // Folder tree state — initialize with defaults, load from localStorage in useEffect
+  const [folderTree, setFolderTree] = useState<FolderTree>({ folders: [], diagramFolderMap: {} });
   const [selectedFolderId, setSelectedFolderId] = useState<string>(ROOT_ID);
   const [newFolderParent, setNewFolderParent] = useState<string | null>(null);
   const [newFolderName, setNewFolderName] = useState("");
   const [dragDiagramId, setDragDiagramId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState("");
+
+  // Resizable nav panel — initialize with default, load from localStorage in useEffect
+  const [navWidth, setNavWidth] = useState(208);
+  const resizingRef = useRef(false);
+
+  // Hydration-safe: load persisted state after mount
+  useEffect(() => {
+    setFolderTree(loadFolderTree(project.id));
+    const savedWidth = localStorage.getItem(`nav-width-${project.id}`);
+    if (savedWidth) setNavWidth(parseInt(savedWidth, 10) || 208);
+  }, [project.id]);
 
   const updateTree = useCallback((updater: (t: FolderTree) => FolderTree) => {
     setFolderTree(prev => {
@@ -201,6 +214,33 @@ export function ProjectDetailClient({ project, otherProjects }: Props) {
     if (toRemove.has(selectedFolderId)) setSelectedFolderId(ROOT_ID);
   }
 
+  function startRename(id: string, currentName: string) {
+    setEditingId(id);
+    setEditingName(currentName);
+  }
+
+  function commitRename() {
+    if (!editingId || !editingName.trim()) { setEditingId(null); return; }
+    const trimmed = editingName.trim();
+    // Check if it's a folder
+    const isFolder = folderTree.folders.some(f => f.id === editingId);
+    if (isFolder) {
+      updateTree(t => ({
+        ...t,
+        folders: t.folders.map(f => f.id === editingId ? { ...f, name: trimmed } : f),
+      }));
+    } else {
+      // It's a diagram — update via API and local state
+      fetch(`/api/diagrams/${editingId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: trimmed }),
+      }).catch(() => {});
+      setDiagrams(prev => prev.map(d => d.id === editingId ? { ...d, name: trimmed } : d));
+    }
+    setEditingId(null);
+  }
+
   function toggleFolderCollapse(folderId: string) {
     updateTree(t => ({
       ...t,
@@ -288,7 +328,19 @@ export function ProjectDetailClient({ project, otherProjects }: Props) {
             <path d="M1 3V12a1 1 0 001 1h12a1 1 0 001-1V5a1 1 0 00-1-1H8L6.5 2H2a1 1 0 00-1 1z"
               fill={isRoot ? "#3b82f6" : "#fbbf24"} stroke="#78716c" strokeWidth={0.5} />
           </svg>
-          <span className="truncate flex-1 font-medium">{name}</span>
+          {editingId === folderId ? (
+            <input autoFocus type="text" value={editingName}
+              onChange={e => setEditingName(e.target.value)}
+              onBlur={commitRename}
+              onKeyDown={e => { if (e.key === "Enter") commitRename(); if (e.key === "Escape") setEditingId(null); }}
+              onClick={e => e.stopPropagation()}
+              className="flex-1 text-[11px] font-medium border border-blue-400 rounded px-1 py-0 outline-none min-w-0" />
+          ) : (
+            <span className="truncate flex-1 font-medium"
+              onDoubleClick={(e) => { if (!isRoot) { e.stopPropagation(); startRename(folderId, name); } }}>
+              {name}
+            </span>
+          )}
           {/* Add subfolder button */}
           <button onClick={(e) => { e.stopPropagation(); handleAddFolder(folderId); }}
             className="opacity-0 group-hover:opacity-100 hover:!opacity-100 text-gray-400 hover:text-blue-500 text-[10px] px-0.5"
@@ -333,7 +385,19 @@ export function ProjectDetailClient({ project, otherProjects }: Props) {
                   <rect x={1} y={1} width={16} height={14} rx={2} fill="#fef9c3" stroke="#d97706" strokeWidth={0.7} />
                   <DiagramTypeMarker type={d.type} />
                 </svg>
-                <span className="truncate flex-1">{d.name}</span>
+                {editingId === d.id ? (
+                  <input autoFocus type="text" value={editingName}
+                    onChange={e => setEditingName(e.target.value)}
+                    onBlur={commitRename}
+                    onKeyDown={e => { if (e.key === "Enter") commitRename(); if (e.key === "Escape") setEditingId(null); }}
+                    onClick={e => e.stopPropagation()}
+                    className="flex-1 text-[10px] border border-blue-400 rounded px-1 py-0 outline-none min-w-0" />
+                ) : (
+                  <span className="truncate flex-1"
+                    onDoubleClick={(e) => { e.stopPropagation(); startRename(d.id, d.name); }}>
+                    {d.name}
+                  </span>
+                )}
               </div>
             ))}
           </>
@@ -349,7 +413,10 @@ export function ProjectDetailClient({ project, otherProjects }: Props) {
       {/* Header */}
       <header className="bg-white border-b border-gray-200 px-6 py-3 flex items-center gap-4 flex-shrink-0">
         <button
-          onClick={() => router.push("/dashboard")}
+          onClick={() => {
+            if (window.history.length > 1) router.back();
+            else router.push("/dashboard");
+          }}
           className="text-gray-500 hover:text-gray-700 text-sm"
         >
           {"\u2190"} Dashboard
@@ -370,10 +437,35 @@ export function ProjectDetailClient({ project, otherProjects }: Props) {
       </header>
 
       <div className="flex flex-1 overflow-hidden">
-        {/* Left: Folder tree */}
-        <div className="w-52 border-r border-gray-200 bg-white overflow-y-auto p-2 flex-shrink-0 group">
+        {/* Left: Resizable folder tree */}
+        <div className="border-r border-gray-200 bg-white overflow-y-auto p-2 flex-shrink-0 group relative"
+          style={{ width: navWidth }}>
           {renderFolder(ROOT_ID, 0)}
         </div>
+        {/* Resize handle */}
+        <div
+          className="w-1 cursor-col-resize hover:bg-blue-300 active:bg-blue-400 flex-shrink-0"
+          onMouseDown={(e) => {
+            e.preventDefault();
+            resizingRef.current = true;
+            const startX = e.clientX;
+            const startW = navWidth;
+            let lastW = startW;
+            function onMove(ev: MouseEvent) {
+              if (!resizingRef.current) return;
+              lastW = Math.max(120, Math.min(500, startW + ev.clientX - startX));
+              setNavWidth(lastW);
+            }
+            function onUp() {
+              resizingRef.current = false;
+              window.removeEventListener("mousemove", onMove);
+              window.removeEventListener("mouseup", onUp);
+              localStorage.setItem(`nav-width-${project.id}`, String(lastW));
+            }
+            window.addEventListener("mousemove", onMove);
+            window.addEventListener("mouseup", onUp);
+          }}
+        />
 
         {/* Right: Diagram tiles */}
         <main className="flex-1 overflow-y-auto p-4">

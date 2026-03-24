@@ -657,9 +657,11 @@ export function DiagramEditor({
       {/* Top bar */}
       <header className="h-12 border-b border-gray-200 flex items-center px-4 gap-4 flex-shrink-0">
         <button
-          onClick={() =>
-            router.push(projectId ? `/dashboard/projects/${projectId}` : "/dashboard")
-          }
+          onClick={() => {
+            // Use back() for instant return to cached project screen
+            if (window.history.length > 1) router.back();
+            else router.push(projectId ? `/dashboard/projects/${projectId}` : "/dashboard");
+          }}
           className="text-gray-500 hover:text-gray-700 text-sm"
         >
           ← {projectId ? "Project" : "Dashboard"}
