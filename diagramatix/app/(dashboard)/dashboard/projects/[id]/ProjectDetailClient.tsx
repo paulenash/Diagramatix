@@ -376,6 +376,28 @@ export function ProjectDetailClient({ project, otherProjects }: Props) {
   }
 
   // Render folder tree recursively
+  // Check if a folder contains any diagrams or subfolders (recursively)
+  function folderHasContent(folderId: string): boolean {
+    const hasDiagrams = diagrams.some(d => (folderTree.diagramFolderMap[d.id] ?? ROOT_ID) === folderId);
+    if (hasDiagrams) return true;
+    const childFolders = folderTree.folders.filter(f =>
+      (f.parentId === null && folderId === ROOT_ID) || f.parentId === folderId
+    );
+    return childFolders.length > 0;
+  }
+
+  // SVG icons as inline components
+  const PencilIcon = (
+    <svg width={10} height={10} viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth={1.3} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M7 2l3 3-7 7H0V9z" />
+    </svg>
+  );
+  const TrashIcon = (
+    <svg width={10} height={10} viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth={1.3} strokeLinecap="round">
+      <path d="M2 3h8M4.5 3V2h3v1M3 3v7a1 1 0 001 1h4a1 1 0 001-1V3" />
+    </svg>
+  );
+
   function renderFolder(folderId: string, depth: number): React.ReactNode {
     const isRoot = folderId === ROOT_ID;
     const folder = isRoot ? null : folderTree.folders.find(f => f.id === folderId);
@@ -423,24 +445,34 @@ export function ProjectDetailClient({ project, otherProjects }: Props) {
               onClick={e => e.stopPropagation()}
               className="flex-1 text-[11px] font-medium border border-blue-400 rounded px-1 py-0 outline-none min-w-0" />
           ) : (
-            <span className="truncate flex-1 font-medium"
-              onDoubleClick={(e) => { if (!isRoot) { e.stopPropagation(); startRename(folderId, name); } }}>
-              {name}
-            </span>
+            <span className="truncate flex-1 font-medium">{name}</span>
           )}
-          {/* Add subfolder button */}
+          {/* Folder action buttons */}
+          {!isRoot && !editingId && (
+            <button onClick={(e) => { e.stopPropagation(); startRename(folderId, name); }}
+              className="opacity-0 group-hover:opacity-100 hover:!opacity-100 text-gray-400 hover:text-blue-500 px-0.5"
+              title="Rename folder"
+              style={{ opacity: selectedTreeItem === folderId ? 1 : undefined }}
+            >{PencilIcon}</button>
+          )}
           <button onClick={(e) => { e.stopPropagation(); handleAddFolder(folderId); }}
-            className="opacity-0 group-hover:opacity-100 hover:!opacity-100 text-gray-400 hover:text-blue-500 text-[10px] px-0.5"
+            className="opacity-0 group-hover:opacity-100 hover:!opacity-100 text-gray-400 hover:text-blue-500 text-[10px] px-0.5 font-bold"
             title="Add subfolder"
-            style={{ opacity: isSelected ? 1 : undefined }}
+            style={{ opacity: selectedTreeItem === folderId || isSelected ? 1 : undefined }}
           >+</button>
-          {!isRoot && (
-            <button onClick={(e) => { e.stopPropagation(); handleDeleteFolder(folderId); }}
-              className="opacity-0 group-hover:opacity-100 hover:!opacity-100 text-gray-400 hover:text-red-500 text-[10px] px-0.5"
-              title="Delete folder"
-              style={{ opacity: isSelected ? 1 : undefined }}
-            >{"\u2715"}</button>
-          )}
+          {!isRoot && (() => {
+            const hasContent = folderHasContent(folderId);
+            return (
+              <button onClick={(e) => { e.stopPropagation(); if (!hasContent) handleDeleteFolder(folderId); }}
+                disabled={hasContent}
+                className={`opacity-0 group-hover:opacity-100 hover:!opacity-100 px-0.5 ${
+                  hasContent ? "text-gray-300 cursor-not-allowed" : "text-gray-400 hover:text-red-500"
+                }`}
+                title={hasContent ? "Cannot delete: folder is not empty" : "Delete folder"}
+                style={{ opacity: selectedTreeItem === folderId ? 1 : undefined }}
+              >{TrashIcon}</button>
+            );
+          })()}
         </div>
         {/* New folder input */}
         {newFolderParent === folderId && (
@@ -481,10 +513,19 @@ export function ProjectDetailClient({ project, otherProjects }: Props) {
                     onClick={e => e.stopPropagation()}
                     className="flex-1 text-[10px] border border-blue-400 rounded px-1 py-0 outline-none min-w-0" />
                 ) : (
-                  <span className="truncate flex-1"
-                    onDoubleClick={(e) => { e.stopPropagation(); startRename(d.id, d.name); }}>
-                    {d.name}
-                  </span>
+                  <>
+                    <span className="truncate flex-1">{d.name}</span>
+                    <button onClick={(e) => { e.stopPropagation(); startRename(d.id, d.name); }}
+                      className="opacity-0 group-hover:opacity-100 hover:!opacity-100 text-gray-400 hover:text-blue-500 px-0.5"
+                      title="Rename diagram"
+                      style={{ opacity: selectedTreeItem === d.id ? 1 : undefined }}
+                    >{PencilIcon}</button>
+                    <button onClick={(e) => { e.stopPropagation(); handleDeleteDiagram(d.id); }}
+                      className="opacity-0 group-hover:opacity-100 hover:!opacity-100 text-gray-400 hover:text-red-500 px-0.5"
+                      title="Delete diagram"
+                      style={{ opacity: selectedTreeItem === d.id ? 1 : undefined }}
+                    >{TrashIcon}</button>
+                  </>
                 )}
               </div>
             ))}
