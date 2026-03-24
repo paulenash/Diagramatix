@@ -859,6 +859,10 @@ function UmlEnumerationShape({ el }: { el: DiagramElement }) {
   const colors = useContext(SymbolColorCtx);
   const fsc = useContext(FontScaleCtx);
   const fill = resolveColor("uml-enumeration", colors);
+  const values: string[] = (el.properties.values as string[] | undefined) ?? [];
+  const valFontSize = Math.round(10 * fsc * 10) / 10;
+  const lineH = Math.round(14 * fsc);
+  const PAD = 4;
   return (
     <g>
       <rect x={el.x} y={el.y} width={el.width} height={el.height}
@@ -869,6 +873,14 @@ function UmlEnumerationShape({ el }: { el: DiagramElement }) {
         fill="#6b7280" fontStyle="italic" style={{ pointerEvents: "none", userSelect: "none" }}>
         {"\u00ABenumeration\u00BB"}
       </text>
+      {/* Values list in second panel */}
+      {values.map((v, i) => (
+        <text key={i} x={el.x + PAD} y={el.y + HEADER_H + 2 + (i + 1) * lineH - 2}
+          fontSize={valFontSize} fill="#374151"
+          style={{ pointerEvents: "none", userSelect: "none" }}>
+          {v}
+        </text>
+      ))}
     </g>
   );
 }

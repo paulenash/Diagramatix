@@ -996,6 +996,32 @@ export function Canvas({
         if (isVert) { x = startBounds.x; width = startBounds.width; }
       }
 
+      // Enforce content-based minimums for UML elements
+      if (el!.type === "uml-enumeration" || el!.type === "uml-class") {
+        const HEADER_H = 28;
+        const CHAR_W = 6.5;
+        const LINE_H = 14;
+        const PAD = 8;
+        const labelLines = (el!.type === "uml-enumeration" || el!.type === "uml-class")
+          ? (editingLabel?.elementId === el!.id ? editingLabel.value : el!.label).split("\n") : [el!.label];
+        const extraLines = Math.max(0, labelLines.length - 1);
+        const headerH = HEADER_H + extraLines * LINE_H;
+        const labelMaxW = Math.max(...labelLines.map((l: string) => l.length * CHAR_W));
+        let contentMinW = labelMaxW + PAD * 2;
+        let contentMinH = headerH + LINE_H;
+        if (el!.type === "uml-enumeration") {
+          const values: string[] = (el!.properties.values as string[] | undefined) ?? [];
+          const stereotypeW = 15 * CHAR_W * 0.8;
+          const valuesMaxW = values.length > 0 ? Math.max(...values.map((v: string) => v.length * CHAR_W)) : 0;
+          contentMinW = Math.max(stereotypeW, labelMaxW, valuesMaxW) + PAD * 2;
+          contentMinH = headerH + values.length * LINE_H + (values.length > 0 ? 4 : 0);
+        }
+        width = Math.max(width, Math.max(80, contentMinW));
+        height = Math.max(height, Math.max(40, contentMinH));
+        if (handle.includes("w")) x = startBounds.x + startBounds.width - width;
+        if (handle.includes("n")) y = startBounds.y + startBounds.height - height;
+      }
+
       onResizeElement(elementId, x, y, width, height);
     }
 
@@ -1191,12 +1217,13 @@ export function Canvas({
         value: el.label,
       });
     } else {
+      const isUmlElement = el.type === "uml-class" || el.type === "uml-enumeration";
       setEditingLabel({
         elementId: el.id,
         x: el.x * zoom + pan.x,
         y: el.y * zoom + pan.y,
         width: el.width * zoom,
-        height: isOldContainer ? HEADER_H * zoom : el.height * zoom,
+        height: (isOldContainer || isUmlElement) ? HEADER_H * zoom : el.height * zoom,
         value: el.label,
       });
     }
@@ -1726,6 +1753,7 @@ export function Canvas({
                       })
                     : undefined
                 }
+                debugMode={debugMode}
               />
             ));
           })()}
@@ -2121,6 +2149,7 @@ export function Canvas({
                 ? (label, ox, oy, w) => onUpdateConnectorLabel(conn.id, label, ox, oy, w)
                 : undefined}
               onUpdateCurveHandles={onUpdateCurveHandles}
+              debugMode={debugMode}
             />
           ))}
 
@@ -2157,6 +2186,7 @@ export function Canvas({
                       })
                     : undefined
                 }
+                debugMode={debugMode}
               />
             );
           })()}
@@ -2362,6 +2392,9 @@ export function Canvas({
             />
           );
         }
+        const isUmlElement = editingEl?.type === "uml-class" || editingEl?.type === "uml-enumeration";
+        const editLines = editingLabel.value.split("\n").length;
+        const editH = isUmlElement ? Math.max(editingLabel.height, editLines * 16 * zoom + 8) : editingLabel.height;
         return (
           <textarea
             autoFocus
@@ -2378,7 +2411,7 @@ export function Canvas({
               left: editingLabel.x,
               top: editingLabel.y + (hasTaskMarker ? 20 * zoom : 0),
               width: editingLabel.width,
-              height: editingLabel.height,
+              height: editH,
               fontSize: (data.fontSize ?? 12) * zoom,
               textAlign: "center",
               background: "white",
@@ -2389,6 +2422,7 @@ export function Canvas({
               resize: "none",
               overflow: "hidden",
             }}
+            placeholder={isUmlElement ? "Name (Shift+Enter for new line)" : undefined}
           />
         );
       })()}

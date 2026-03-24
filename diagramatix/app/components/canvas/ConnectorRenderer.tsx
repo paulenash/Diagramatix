@@ -16,6 +16,7 @@ interface Props {
   onUpdateCurveHandles?: (id: string, waypoints: Point[], cp1Rel: Point, cp2Rel: Point) => void;
   misaligned?: boolean;
   otherConnectorWaypoints?: Point[][];
+  debugMode?: boolean;
 }
 
 // Line segment intersection: returns the parameter t along segment (a1→a2) where it crosses (b1→b2), or null
@@ -487,7 +488,7 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
   );
 }
 
-export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, onUpdateWaypoints, onWaypointsDragEnd, onUpdateLabel, onUpdateCurveHandles, misaligned, otherConnectorWaypoints }: Props) {
+export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, onUpdateWaypoints, onWaypointsDragEnd, onUpdateLabel, onUpdateCurveHandles, misaligned, otherConnectorWaypoints, debugMode }: Props) {
   const displayMode = useContext(DisplayModeCtx);
   const waypoints = connector.waypoints;
   if (waypoints.length === 0) return null;
@@ -822,8 +823,8 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
         );
       })}
 
-      {/* Waypoint vertex dots (selected connectors) */}
-      {selected && visibleWaypoints.map((pt, i) => (
+      {/* Waypoint vertex dots (debug mode only) */}
+      {selected && debugMode && visibleWaypoints.map((pt, i) => (
         <circle
           key={`wp-${i}`}
           cx={pt.x} cy={pt.y} r={3}

@@ -265,6 +265,42 @@ function clampChildrenToLane(elements: DiagramElement[], lane: DiagramElement): 
   });
 }
 
+/** Auto-resize a uml-enumeration or uml-class element to fit its label and content */
+function autoResizeUmlElement(el: DiagramElement): DiagramElement {
+  const BASE_HEADER_H = 28;
+  const PAD = 8;
+  const CHAR_W = 6.5;
+  const LINE_H = 14;
+  const MIN_W = 80;
+  const MIN_H = 40;
+
+  const labelLines = el.label.split("\n");
+  const labelMaxW = Math.max(...labelLines.map(l => l.length * CHAR_W));
+  // Header grows for multi-line labels (base 28 handles stereotype + 1 line)
+  const extraLabelLines = Math.max(0, labelLines.length - 1);
+  const headerH = BASE_HEADER_H + extraLabelLines * LINE_H;
+
+  if (el.type === "uml-enumeration") {
+    const values: string[] = (el.properties.values as string[] | undefined) ?? [];
+    const stereotypeW = "\u00ABenumeration\u00BB".length * CHAR_W * 0.8;
+    const valuesMaxW = values.length > 0 ? Math.max(...values.map(v => v.length * CHAR_W)) : 0;
+    const contentW = Math.max(stereotypeW, labelMaxW, valuesMaxW) + PAD * 2;
+    const newWidth = Math.max(MIN_W, contentW);
+    const valuesH = values.length * LINE_H;
+    const bottomPad = values.length > 0 ? 4 : 0; // match top padding from divider to first value
+    const newHeight = Math.max(MIN_H, headerH + valuesH + bottomPad);
+    if (newWidth === el.width && newHeight === el.height) return el;
+    return { ...el, width: newWidth, height: newHeight };
+  }
+
+  // uml-class
+  const contentW = labelMaxW + PAD * 2;
+  const newWidth = Math.max(MIN_W, contentW);
+  const newHeight = Math.max(MIN_H, headerH + LINE_H);
+  if (newWidth === el.width && newHeight === el.height) return el;
+  return { ...el, width: newWidth, height: newHeight };
+}
+
 function reducer(state: DiagramData, action: Action): DiagramData {
   switch (action.type) {
     case "SET_DATA":
@@ -587,33 +623,38 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       return { ...state, elements, connectors };
     }
 
-    case "UPDATE_LABEL":
-      return {
-        ...state,
-        elements: state.elements.map((el) =>
-          el.id === action.payload.id
-            ? { ...el, label: action.payload.label }
-            : el
-        ),
-      };
+    case "UPDATE_LABEL": {
+      const elements = state.elements.map((el) =>
+        el.id === action.payload.id
+          ? { ...el, label: action.payload.label }
+          : el
+      );
+      // Auto-resize UML elements
+      return { ...state, elements: elements.map(el =>
+        el.id === action.payload.id && (el.type === "uml-enumeration" || el.type === "uml-class")
+          ? autoResizeUmlElement(el) : el
+      )};
+    }
 
     case "UPDATE_PROPERTIES": {
-      return {
-        ...state,
-        elements: state.elements.map((el) => {
-          if (el.id !== action.payload.id) return el;
-          const { taskType, gatewayType, eventType, repeatType, flowType, ...rest } = action.payload.properties;
-          return {
-            ...el,
-            ...(taskType !== undefined ? { taskType: taskType as BpmnTaskType } : {}),
-            ...(gatewayType !== undefined ? { gatewayType: gatewayType as GatewayType } : {}),
-            ...(eventType !== undefined ? { eventType: eventType as EventType } : {}),
-            ...(repeatType !== undefined ? { repeatType: repeatType as RepeatType } : {}),
-            ...(flowType !== undefined ? { flowType: flowType as FlowType } : {}),
-            properties: { ...el.properties, ...rest },
-          };
-        }),
-      };
+      const elements = state.elements.map((el) => {
+        if (el.id !== action.payload.id) return el;
+        const { taskType, gatewayType, eventType, repeatType, flowType, ...rest } = action.payload.properties;
+        return {
+          ...el,
+          ...(taskType !== undefined ? { taskType: taskType as BpmnTaskType } : {}),
+          ...(gatewayType !== undefined ? { gatewayType: gatewayType as GatewayType } : {}),
+          ...(eventType !== undefined ? { eventType: eventType as EventType } : {}),
+          ...(repeatType !== undefined ? { repeatType: repeatType as RepeatType } : {}),
+          ...(flowType !== undefined ? { flowType: flowType as FlowType } : {}),
+          properties: { ...el.properties, ...rest },
+        };
+      });
+      // Auto-resize UML elements
+      return { ...state, elements: elements.map(el =>
+        el.id === action.payload.id && (el.type === "uml-enumeration" || el.type === "uml-class")
+          ? autoResizeUmlElement(el) : el
+      )};
     }
 
     case "DELETE_ELEMENT": {

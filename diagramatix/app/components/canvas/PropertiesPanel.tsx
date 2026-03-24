@@ -84,6 +84,75 @@ const EVENT_TYPE_OPTIONS: { value: EventType; label: string }[] = [
   { value: "link",         label: "Link" },
 ];
 
+function EnumValuesList({ element, onUpdateProperties }: {
+  element: DiagramElement;
+  onUpdateProperties: (id: string, props: Record<string, unknown>) => void;
+}) {
+  const [newVal, setNewVal] = useState("");
+  const values: string[] = (element.properties.values as string[] | undefined) ?? [];
+
+  function addValue() {
+    if (!newVal.trim()) return;
+    onUpdateProperties(element.id, { values: [...values, newVal.trim()] });
+    setNewVal("");
+  }
+  function removeValue(idx: number) {
+    onUpdateProperties(element.id, { values: values.filter((_, i) => i !== idx) });
+  }
+  function moveValue(idx: number, dir: -1 | 1) {
+    const newIdx = idx + dir;
+    if (newIdx < 0 || newIdx >= values.length) return;
+    const next = [...values];
+    [next[idx], next[newIdx]] = [next[newIdx], next[idx]];
+    onUpdateProperties(element.id, { values: next });
+  }
+  function updateValue(idx: number, val: string) {
+    const next = [...values];
+    next[idx] = val;
+    onUpdateProperties(element.id, { values: next });
+  }
+
+  return (
+    <div>
+      <p className="text-[10px] font-medium text-gray-700 mb-1">Values List</p>
+      {values.length === 0 && (
+        <p className="text-[10px] text-gray-400 mb-1 italic">No values defined</p>
+      )}
+      <div className="space-y-0.5 mb-1">
+        {values.map((v, i) => (
+          <div key={i} className="flex items-center gap-0.5">
+            <input type="text" value={v}
+              onChange={e => updateValue(i, e.target.value)}
+              className="flex-1 text-[10px] border border-gray-300 rounded px-1 py-0 min-w-0" />
+            <button onClick={() => moveValue(i, -1)} disabled={i === 0}
+              className="text-[9px] text-gray-400 hover:text-gray-600 disabled:opacity-30 px-0.5"
+              title="Move up">{"\u25B2"}</button>
+            <button onClick={() => moveValue(i, 1)} disabled={i === values.length - 1}
+              className="text-[9px] text-gray-400 hover:text-gray-600 disabled:opacity-30 px-0.5"
+              title="Move down">{"\u25BC"}</button>
+            <button onClick={() => removeValue(i)}
+              className="text-[9px] text-gray-400 hover:text-red-500 px-0.5"
+              title="Remove">
+              <svg width={8} height={8} viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round">
+                <path d="M2 3h8M4.5 3V2h3v1M3 3v7a1 1 0 001 1h4a1 1 0 001-1V3" />
+              </svg>
+            </button>
+          </div>
+        ))}
+      </div>
+      <div className="flex items-center gap-1">
+        <input type="text" value={newVal}
+          onChange={e => setNewVal(e.target.value)}
+          onKeyDown={e => { if (e.key === "Enter") addValue(); }}
+          placeholder="New value..."
+          className="flex-1 text-[10px] border border-gray-300 rounded px-1 py-0 min-w-0" />
+        <button onClick={addValue} disabled={!newVal.trim()}
+          className="text-[10px] text-blue-600 hover:text-blue-800 disabled:opacity-30 font-medium px-1">+</button>
+      </div>
+    </div>
+  );
+}
+
 export function PropertiesPanel({
   element,
   connector,
@@ -271,56 +340,74 @@ export function PropertiesPanel({
             </div>
           )}
         </div>
-        {(connector.type === "uml-association" || connector.type === "uml-aggregation" ||
-          connector.type === "uml-composition" || connector.type === "uml-generalisation") && onUpdateConnectorType && (
-          <div>
-            <p className="text-xs font-medium text-gray-700 mb-1">Relationship</p>
-            <div className="flex flex-col gap-1">
-              {([
-                { value: "uml-association" as ConnectorType, label: "Association" },
-                { value: "uml-aggregation" as ConnectorType, label: "Aggregation" },
-                { value: "uml-composition" as ConnectorType, label: "Composition" },
-                { value: "uml-generalisation" as ConnectorType, label: "Generalisation" },
-              ]).map(({ value, label }) => (
-                <button
-                  key={value}
-                  onClick={() => onUpdateConnectorType(connector.id, value)}
-                  className={`px-2 py-1 text-xs rounded border text-left ${
-                    connector.type === value
-                      ? "bg-blue-600 text-white border-blue-600"
-                      : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-        {/* UML association: None / Open direction + conditional Reverse */}
-        {connector.type === "uml-association" && (
-          <div>
-            <p className="text-xs font-medium text-gray-700 mb-1">Direction</p>
-            <div className="flex gap-1">
-              {([
-                { value: "non-directed" as DirectionType, label: "None" },
-                { value: "open-directed" as DirectionType, label: "Open" },
-              ]).map(({ value, label }) => (
-                <button
-                  key={value}
-                  onClick={() => onUpdateConnectorDirection(connector.id, value)}
-                  className={`px-2 py-1 text-xs rounded border ${
-                    connector.directionType === value
-                      ? "bg-blue-600 text-white border-blue-600"
-                      : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+        {(() => {
+          // Check if connector is between a Class and an Enumeration
+          const srcEl = allElements?.find(e => e.id === connector.sourceId);
+          const tgtEl = allElements?.find(e => e.id === connector.targetId);
+          const classEnumTypes = new Set(["uml-class", "uml-enumeration"]);
+          const isClassEnumConn = srcEl && tgtEl &&
+            (classEnumTypes.has(srcEl.type) && classEnumTypes.has(tgtEl.type)) &&
+            (srcEl.type !== tgtEl.type); // one is class, other is enumeration
+          const isUmlConn = connector.type === "uml-association" || connector.type === "uml-aggregation" ||
+            connector.type === "uml-composition" || connector.type === "uml-generalisation";
+          return (
+            <>
+              {/* Relationship type — hidden for Class↔Enumeration (always Association) */}
+              {isUmlConn && !isClassEnumConn && onUpdateConnectorType && (
+                <div>
+                  <p className="text-xs font-medium text-gray-700 mb-1">Relationship</p>
+                  <div className="flex flex-col gap-1">
+                    {([
+                      { value: "uml-association" as ConnectorType, label: "Association" },
+                      { value: "uml-aggregation" as ConnectorType, label: "Aggregation" },
+                      { value: "uml-composition" as ConnectorType, label: "Composition" },
+                      { value: "uml-generalisation" as ConnectorType, label: "Generalisation" },
+                    ]).map(({ value, label }) => (
+                      <button
+                        key={value}
+                        onClick={() => onUpdateConnectorType(connector.id, value)}
+                        className={`px-2 py-1 text-xs rounded border text-left ${
+                          connector.type === value
+                            ? "bg-blue-600 text-white border-blue-600"
+                            : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {isClassEnumConn && (
+                <p className="text-xs text-gray-700"><span className="font-medium">Relationship:</span> Association</p>
+              )}
+              {/* Direction — hidden for Class↔Enumeration */}
+              {connector.type === "uml-association" && !isClassEnumConn && (
+                <div>
+                  <p className="text-xs font-medium text-gray-700 mb-1">Direction</p>
+                  <div className="flex gap-1">
+                    {([
+                      { value: "non-directed" as DirectionType, label: "None" },
+                      { value: "open-directed" as DirectionType, label: "Open" },
+                    ]).map(({ value, label }) => (
+                      <button
+                        key={value}
+                        onClick={() => onUpdateConnectorDirection(connector.id, value)}
+                        className={`px-2 py-1 text-xs rounded border ${
+                          connector.directionType === value
+                            ? "bg-blue-600 text-white border-blue-600"
+                            : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          );
+        })()}
         {/* Reverse button for aggregation/composition/generalisation, and association when directed */}
         {((connector.type === "uml-aggregation" || connector.type === "uml-composition" ||
           connector.type === "uml-generalisation") ||
@@ -928,8 +1015,8 @@ export function PropertiesPanel({
       )}
 
 
-      {/* Outgoing connectors list */}
-      {diagramType !== "process-context" && allConnectors && allElements && (() => {
+      {/* Outgoing connectors list (debug mode only) */}
+      {debugMode && diagramType !== "process-context" && allConnectors && allElements && (() => {
         const outgoing = allConnectors.filter(c => c.sourceId === element.id);
         return (
           <div>
@@ -953,8 +1040,8 @@ export function PropertiesPanel({
         );
       })()}
 
-      {/* Incoming connectors list */}
-      {diagramType !== "process-context" && allConnectors && allElements && (() => {
+      {/* Incoming connectors list (debug mode only) */}
+      {debugMode && diagramType !== "process-context" && allConnectors && allElements && (() => {
         const incoming = allConnectors.filter(c => c.targetId === element.id);
         return (
           <div>
@@ -977,6 +1064,11 @@ export function PropertiesPanel({
           </div>
         );
       })()}
+
+      {/* Enumeration Values List */}
+      {element.type === "uml-enumeration" && onUpdateProperties && (
+        <EnumValuesList element={element} onUpdateProperties={onUpdateProperties} />
+      )}
 
       {element.type === "pool" ? (
         poolHasContent ? (
