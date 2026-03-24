@@ -20,7 +20,7 @@ function createPrismaClient() {
 export const prisma = globalForPrisma.prisma ?? createPrismaClient();
 
 export const pgPool = globalForPrisma.pgPool ?? new pg.Pool({
-  connectionString: process.env.DATABASE_URL!,
+  connectionString: process.env.DATABASE_URL!.split("?")[0] + "?sslmode=disable",
 });
 
 if (process.env.NODE_ENV !== "production") {

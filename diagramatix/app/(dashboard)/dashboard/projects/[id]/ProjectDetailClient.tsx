@@ -602,7 +602,7 @@ export function ProjectDetailClient({ project, otherProjects }: Props) {
             onClick={() => setShowMaintenance(true)}
             className="px-3 py-1 text-xs font-medium text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50"
           >
-            Project Maintenance
+            Project Settings
           </button>
           <button
             onClick={() => setShowNewDiagram(true)}
@@ -677,7 +677,7 @@ export function ProjectDetailClient({ project, otherProjects }: Props) {
         </main>
       </div>
 
-      {/* Diagram Maintenance modal */}
+      {/* Diagram Settings modal */}
       {showMaintenance && (
         <DiagramMaintenanceModal
           projectId={project.id}
