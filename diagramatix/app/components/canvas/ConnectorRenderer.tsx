@@ -497,7 +497,7 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
   const isAssocBPMN = connector.type === "associationBPMN";
   const isMessageBPMN = connector.type === "messageBPMN";
   const strokeColor = selected ? "#2563eb"
-    : (isMessageBPMN && misaligned) ? "#dc2626"
+    : misaligned ? "#dc2626"
     : isMessageBPMN ? "#b0b7c3"
     : "#6b7280";
   const isUmlConn = connector.type === "uml-association" || connector.type === "uml-aggregation"

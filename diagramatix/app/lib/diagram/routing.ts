@@ -101,22 +101,14 @@ function buildOrthogonalPath(
   if (!pathHitsObstacles(pathA, obstacles)) return pathA;
   if (!pathHitsObstacles(pathB, obstacles)) return pathB;
 
-  // Both L-shaped paths blocked — try routing around nearby obstacles only
+  // Both L-shaped paths blocked — route around ALL obstacles
   const MARGIN = 20;
-  // Only consider obstacles in the bounding region between start and end
-  const allObs = obstacles.filter(obs => {
-    const minX = Math.min(start.x, end.x) - MARGIN;
-    const maxX = Math.max(start.x, end.x) + MARGIN;
-    const minY = Math.min(start.y, end.y) - MARGIN;
-    const maxY = Math.max(start.y, end.y) + MARGIN;
-    return obs.x + obs.width > minX && obs.x < maxX && obs.y + obs.height > minY && obs.y < maxY;
-  });
 
-  // Generate candidate routes sorted by total path length (prefer shorter)
-  const bottomY = Math.max(start.y, end.y, ...allObs.map(o => o.y + o.height)) + MARGIN;
-  const topY = Math.min(start.y, end.y, ...allObs.map(o => o.y)) - MARGIN;
-  const rightX = Math.max(start.x, end.x, ...allObs.map(o => o.x + o.width)) + MARGIN;
-  const leftX = Math.min(start.x, end.x, ...allObs.map(o => o.x)) - MARGIN;
+  // Use ALL obstacles to compute safe routing bounds
+  const bottomY = Math.max(start.y, end.y, ...obstacles.map(o => o.y + o.height)) + MARGIN;
+  const topY = Math.min(start.y, end.y, ...obstacles.map(o => o.y)) - MARGIN;
+  const rightX = Math.max(start.x, end.x, ...obstacles.map(o => o.x + o.width)) + MARGIN;
+  const leftX = Math.min(start.x, end.x, ...obstacles.map(o => o.x)) - MARGIN;
 
   const candidates: { path: Point[]; len: number }[] = [
     { path: [start, { x: start.x, y: bottomY }, { x: end.x, y: bottomY }, end], len: 0 },
@@ -139,7 +131,11 @@ function buildOrthogonalPath(
     if (!pathHitsObstacles(c.path, obstacles)) return c.path;
   }
 
-  // Fallback: use the shortest candidate even if it hits obstacles
+  // Last resort: route far enough outside all obstacles
+  const farY = topY - MARGIN;
+  const farPath = [start, { x: start.x, y: farY }, { x: end.x, y: farY }, end];
+  if (!pathHitsObstacles(farPath, obstacles)) return farPath;
+
   return candidates[0].path;
 }
 
@@ -286,15 +282,56 @@ export function computeWaypoints(
     })
     .map(getBounds);
 
-  const perpOff    = adaptedPerpOffset(srcEdge, sourceSide, tgtEdge, targetSide);
-  // Scale perpendicular offset for small elements (events, etc.)
+  // Check if exit/approach stubs land inside an obstacle — if so, pick better sides
+  function pointInsideAnyObstacle(pt: Point, obs: Bounds[]): boolean {
+    return obs.some(o => pt.x > o.x && pt.x < o.x + o.width && pt.y > o.y && pt.y < o.y + o.height);
+  }
+
+  let effectiveSrcSide = sourceSide;
+  let effectiveTgtSide = targetSide;
+  let effectiveSrcEdge = srcEdge;
+  let effectiveTgtEdge = tgtEdge;
+
+  const testPerpOff = adaptedPerpOffset(srcEdge, sourceSide, tgtEdge, targetSide);
+  const testExitPt = perpendicularExitScaled(srcEdge, sourceSide, Math.min(testPerpOff, Math.min(source.width, source.height) * 0.5));
+  const testApproachPt = perpendicularExitScaled(tgtEdge, targetSide, Math.min(testPerpOff, Math.min(target.width, target.height) * 0.5));
+
+  if (pointInsideAnyObstacle(testExitPt, obstacles) || pointInsideAnyObstacle(testApproachPt, obstacles)) {
+    // Current sides cause exit/approach inside an obstacle — recalculate optimal facing sides
+    const srcCx = source.x + source.width / 2, srcCy = source.y + source.height / 2;
+    const tgtCx = target.x + target.width / 2, tgtCy = target.y + target.height / 2;
+    const ddx = tgtCx - srcCx, ddy = tgtCy - srcCy;
+    // Try all 4 side combinations and pick one where exit/approach don't hit obstacles
+    const sidePairs: [Side, Side][] = [
+      [ddx > 0 ? "right" : "left", ddx > 0 ? "left" : "right"],
+      [ddy > 0 ? "bottom" : "top", ddy > 0 ? "top" : "bottom"],
+      [ddx > 0 ? "left" : "right", ddx > 0 ? "right" : "left"],
+      [ddy > 0 ? "top" : "bottom", ddy > 0 ? "bottom" : "top"],
+    ];
+    for (const [ss, ts] of sidePairs) {
+      const se = sidePoint(source, ss, 0.5);
+      const te = sidePoint(target, ts, 0.5);
+      const po = adaptedPerpOffset(se, ss, te, ts);
+      const ep = perpendicularExitScaled(se, ss, Math.min(po, Math.min(source.width, source.height) * 0.5));
+      const ap = perpendicularExitScaled(te, ts, Math.min(po, Math.min(target.width, target.height) * 0.5));
+      if (!pointInsideAnyObstacle(ep, obstacles) && !pointInsideAnyObstacle(ap, obstacles)) {
+        effectiveSrcSide = ss;
+        effectiveTgtSide = ts;
+        effectiveSrcEdge = se;
+        effectiveTgtEdge = te;
+        break;
+      }
+    }
+  }
+
+  const perpOff    = adaptedPerpOffset(effectiveSrcEdge, effectiveSrcSide, effectiveTgtEdge, effectiveTgtSide);
   const srcPerpOff = Math.min(perpOff, Math.min(source.width, source.height) * 0.5);
   const tgtPerpOff = Math.min(perpOff, Math.min(target.width, target.height) * 0.5);
-  const exitPt     = perpendicularExitScaled(srcEdge, sourceSide, srcPerpOff);
-  const approachPt = perpendicularExitScaled(tgtEdge, targetSide, tgtPerpOff);
+  const exitPt     = perpendicularExitScaled(effectiveSrcEdge, effectiveSrcSide, srcPerpOff);
+  const approachPt = perpendicularExitScaled(effectiveTgtEdge, effectiveTgtSide, tgtPerpOff);
 
-  const srcDir = sideNormalDir(sourceSide);
-  const tgtDir = sideNormalDir(targetSide);
+  const srcDir = sideNormalDir(effectiveSrcSide);
+  const tgtDir = sideNormalDir(effectiveTgtSide);
 
   // Verify exit/approach stubs go outward
   const exitOutward = (exitPt.x - srcEdge.x) * srcDir.dx >= 0 && (exitPt.y - srcEdge.y) * srcDir.dy >= 0;
@@ -338,19 +375,16 @@ export function computeWaypoints(
     // Try L-shape paths that maintain perpendicularity at both ends
 
     // L-shape corner options
-    const lCorner1: Point = { x: tgtEdge.x, y: srcEdge.y };
-    const lCorner2: Point = { x: srcEdge.x, y: tgtEdge.y };
+    const lCorner1: Point = { x: effectiveTgtEdge.x, y: effectiveSrcEdge.y };
+    const lCorner2: Point = { x: effectiveSrcEdge.x, y: effectiveTgtEdge.y };
 
     // Check perpendicularity: first segment must go in the source normal direction,
     // second segment must arrive from the target normal direction
     function isPerpendicular(corner: Point): boolean {
-      // srcEdge → corner must be along source normal axis
-      const dx1 = corner.x - srcEdge.x, dy1 = corner.y - srcEdge.y;
+      const dx1 = corner.x - effectiveSrcEdge.x, dy1 = corner.y - effectiveSrcEdge.y;
       const srcOk = (srcDir.dx !== 0 && Math.abs(dy1) < 0.5) || (srcDir.dy !== 0 && Math.abs(dx1) < 0.5);
-      // Also must go outward (not back into element)
       const srcOutward = dx1 * srcDir.dx >= 0 && dy1 * srcDir.dy >= 0;
-      // corner → tgtEdge must be along target normal axis
-      const dx2 = corner.x - tgtEdge.x, dy2 = corner.y - tgtEdge.y;
+      const dx2 = corner.x - effectiveTgtEdge.x, dy2 = corner.y - effectiveTgtEdge.y;
       const tgtOk = (tgtDir.dx !== 0 && Math.abs(dy2) < 0.5) || (tgtDir.dy !== 0 && Math.abs(dx2) < 0.5);
       const tgtOutward = dx2 * tgtDir.dx >= 0 && dy2 * tgtDir.dy >= 0;
       return srcOk && srcOutward && tgtOk && tgtOutward;
@@ -359,9 +393,9 @@ export function computeWaypoints(
     const a1Perp = isPerpendicular(lCorner1);
     const a2Perp = isPerpendicular(lCorner2);
 
-    if (a1Perp && !pathHitsObstacles([srcEdge, lCorner1, tgtEdge], obstacles)) {
+    if (a1Perp && !pathHitsObstacles([effectiveSrcEdge, lCorner1, effectiveTgtEdge], obstacles)) {
       midPath = [lCorner1];
-    } else if (a2Perp && !pathHitsObstacles([srcEdge, lCorner2, tgtEdge], obstacles)) {
+    } else if (a2Perp && !pathHitsObstacles([effectiveSrcEdge, lCorner2, effectiveTgtEdge], obstacles)) {
       midPath = [lCorner2];
     } else {
       // Fall back to stub-based routing (guarantees perpendicularity, may have more corners)
@@ -370,7 +404,7 @@ export function computeWaypoints(
   }
 
   return {
-    waypoints: [startPt, srcEdge, ...midPath, tgtEdge, endPt],
+    waypoints: [startPt, effectiveSrcEdge, ...midPath, effectiveTgtEdge, endPt],
     sourceInvisibleLeader: true,
     targetInvisibleLeader: true,
   };
@@ -593,14 +627,14 @@ export function recomputeAllConnectors(
         const ve = candidate.length - 2; // before tgtCenter
         let outwardOk = true;
         if (candidate.length >= 4) {
-          // Check exit direction: srcEdge(vs) → next point(vs+1)
+          // Check exit direction: srcEdge(vs) → next point(vs+1) must go outward
           const exitDx = candidate[vs + 1].x - candidate[vs].x;
           const exitDy = candidate[vs + 1].y - candidate[vs].y;
-          if (exitDx * srcNorm.dx < -0.5 || exitDy * srcNorm.dy < -0.5) outwardOk = false;
-          // Check approach direction: prev point(ve-1) → tgtEdge(ve)
+          if ((srcNorm.dx !== 0 && exitDx * srcNorm.dx <= 0) || (srcNorm.dy !== 0 && exitDy * srcNorm.dy <= 0)) outwardOk = false;
+          // Check approach direction: prev point(ve-1) → tgtEdge(ve) must arrive inward
           const appDx = candidate[ve].x - candidate[ve - 1].x;
           const appDy = candidate[ve].y - candidate[ve - 1].y;
-          if (appDx * (-tgtNorm.dx) < -0.5 || appDy * (-tgtNorm.dy) < -0.5) outwardOk = false;
+          if ((tgtNorm.dx !== 0 && appDx * (-tgtNorm.dx) <= 0) || (tgtNorm.dy !== 0 && appDy * (-tgtNorm.dy) <= 0)) outwardOk = false;
         }
         // Check if preserved interior routing passes through any obstacle
         const obstacles = elements
@@ -628,10 +662,14 @@ export function recomputeAllConnectors(
       const srcN = sideNormalDir(conn.sourceSide);
       const tgtN = sideNormalDir(conn.targetSide);
       const exitDx = wp[2].x - wp[1].x, exitDy = wp[2].y - wp[1].y;
-      const exitOk = exitDx * srcN.dx >= -0.5 && exitDy * srcN.dy >= -0.5;
+      // Exit must go in the source normal direction (not backwards)
+      const exitOk = (srcN.dx !== 0 ? exitDx * srcN.dx > 0 : true)
+                  && (srcN.dy !== 0 ? exitDy * srcN.dy > 0 : true);
       const ve = wp.length - 2;
       const appDx = wp[ve].x - wp[ve - 1].x, appDy = wp[ve].y - wp[ve - 1].y;
-      const appOk = appDx * (-tgtN.dx) >= -0.5 && appDy * (-tgtN.dy) >= -0.5;
+      // Approach must come from the target normal direction (arriving inward)
+      const appOk = (tgtN.dx !== 0 ? appDx * (-tgtN.dx) > 0 : true)
+                 && (tgtN.dy !== 0 ? appDy * (-tgtN.dy) > 0 : true);
 
       if (!exitOk || !appOk) {
         // Recalculate optimal sides based on current element positions
@@ -651,6 +689,40 @@ export function recomputeAllConnectors(
           sourceOffsetAlong: 0.5, targetOffsetAlong: 0.5,
         };
       }
+    }
+
+    // Final validation: check no visible waypoint is inside an obstacle element
+    const finalWp = result1.waypoints;
+    const fvs = result1.sourceInvisibleLeader ? 1 : 0;
+    const fve = result1.targetInvisibleLeader ? finalWp.length - 2 : finalWp.length - 1;
+    const obsElements = elements.filter(el =>
+      el.id !== source.id && el.id !== target.id
+      && el.type !== "pool" && el.type !== "lane"
+      && el.boundaryHostId !== source.id && el.boundaryHostId !== target.id);
+    let waypointInsideObs = false;
+    for (let i = fvs; i <= fve; i++) {
+      const pt = finalWp[i];
+      for (const obs of obsElements) {
+        if (pt.x > obs.x && pt.x < obs.x + obs.width && pt.y > obs.y && pt.y < obs.y + obs.height) {
+          waypointInsideObs = true; break;
+        }
+      }
+      if (waypointInsideObs) break;
+    }
+    if (waypointInsideObs) {
+      // Recalculate with optimal facing sides
+      const srcCx = source.x + source.width / 2, srcCy = source.y + source.height / 2;
+      const tgtCx = target.x + target.width / 2, tgtCy = target.y + target.height / 2;
+      const ddx = tgtCx - srcCx, ddy = tgtCy - srcCy;
+      const reSrcSide: Side = Math.abs(ddx) >= Math.abs(ddy) ? (ddx > 0 ? "right" : "left") : (ddy > 0 ? "bottom" : "top");
+      const reTgtSide: Side = Math.abs(ddx) >= Math.abs(ddy) ? (ddx > 0 ? "left" : "right") : (ddy > 0 ? "top" : "bottom");
+      const result3 = computeWaypoints(source, target, elements, reSrcSide, reTgtSide, conn.routingType, 0.5, 0.5);
+      return { ...conn, waypoints: result3.waypoints,
+        sourceInvisibleLeader: result3.sourceInvisibleLeader,
+        targetInvisibleLeader: result3.targetInvisibleLeader,
+        sourceSide: reSrcSide, targetSide: reTgtSide,
+        sourceOffsetAlong: 0.5, targetOffsetAlong: 0.5,
+      };
     }
 
     return { ...conn, waypoints: result1.waypoints,

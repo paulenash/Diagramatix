@@ -270,21 +270,116 @@ function getBounds(el: DiagramElement): Bounds {
   return { x: el.x, y: el.y, width: el.width, height: el.height };
 }
 
-/** Check if an axis-aligned segment intersects a rectangle (with margin) */
+/** Check if a segment intersects a rectangle (with margin) */
 function segmentHitsRect(p1: Point, p2: Point, rect: Bounds, margin = 4): boolean {
   const left = rect.x - margin, right = rect.x + rect.width + margin;
   const top = rect.y - margin, bottom = rect.y + rect.height + margin;
+  // Horizontal segment
   if (Math.abs(p1.y - p2.y) < 1) {
     if (p1.y < top || p1.y > bottom) return false;
     const minX = Math.min(p1.x, p2.x), maxX = Math.max(p1.x, p2.x);
     return maxX > left && minX < right;
   }
+  // Vertical segment
   if (Math.abs(p1.x - p2.x) < 1) {
     if (p1.x < left || p1.x > right) return false;
     const minY = Math.min(p1.y, p2.y), maxY = Math.max(p1.y, p2.y);
     return maxY > top && minY < bottom;
   }
+  // Diagonal segment — check if the segment's bounding box overlaps the rect
+  const segMinX = Math.min(p1.x, p2.x), segMaxX = Math.max(p1.x, p2.x);
+  const segMinY = Math.min(p1.y, p2.y), segMaxY = Math.max(p1.y, p2.y);
+  if (segMaxX < left || segMinX > right || segMaxY < top || segMinY > bottom) return false;
+  // Check if line actually crosses the rectangle using line-rect intersection
+  const dx = p2.x - p1.x, dy = p2.y - p1.y;
+  // Check each edge of the rect for intersection with the segment
+  function lineIntersectsHEdge(ey: number, ex1: number, ex2: number): boolean {
+    if (Math.abs(dy) < 0.01) return false;
+    const t = (ey - p1.y) / dy;
+    if (t < 0 || t > 1) return false;
+    const ix = p1.x + dx * t;
+    return ix >= ex1 && ix <= ex2;
+  }
+  function lineIntersectsVEdge(ex: number, ey1: number, ey2: number): boolean {
+    if (Math.abs(dx) < 0.01) return false;
+    const t = (ex - p1.x) / dx;
+    if (t < 0 || t > 1) return false;
+    const iy = p1.y + dy * t;
+    return iy >= ey1 && iy <= ey2;
+  }
+  return lineIntersectsHEdge(top, left, right) || lineIntersectsHEdge(bottom, left, right)
+    || lineIntersectsVEdge(left, top, bottom) || lineIntersectsVEdge(right, top, bottom);
+}
+
+/** Check if a connector's visible path passes through any element (including its own source/target interior) */
+function connectorHitsAnyElement(conn: Connector, elements: DiagramElement[]): boolean {
+  const wp = conn.waypoints;
+  if (wp.length < 3) return false;
+  const vs = conn.sourceInvisibleLeader ? 1 : 0;
+  const ve = conn.targetInvisibleLeader ? wp.length - 2 : wp.length - 1;
+  // Check interior waypoints (skip srcEdge and tgtEdge — they're ON the boundary)
+  const interior = wp.slice(vs + 1, ve);
+
+  const obsEls = elements.filter(el =>
+    el.type !== "pool" && el.type !== "lane");
+
+  for (const obs of obsEls) {
+    const b = getBounds(obs);
+    const isSourceOrTarget = obs.id === conn.sourceId || obs.id === conn.targetId;
+    // For source/target: only check interior waypoints (not edge points)
+    // For other elements: check all visible waypoints and segments
+    if (isSourceOrTarget) {
+      // Check if any interior waypoint is inside the source/target element
+      for (const pt of interior) {
+        if (pt.x > b.x + 1 && pt.x < b.x + b.width - 1 && pt.y > b.y + 1 && pt.y < b.y + b.height - 1) {
+          return true;
+        }
+      }
+    } else {
+      // Exclude boundary events on source/target
+      if (obs.boundaryHostId === conn.sourceId || obs.boundaryHostId === conn.targetId) continue;
+      const visible = wp.slice(vs, ve + 1);
+      for (let i = 0; i < visible.length; i++) {
+        const pt = visible[i];
+        if (pt.x > b.x && pt.x < b.x + b.width && pt.y > b.y && pt.y < b.y + b.height) return true;
+      }
+      for (let i = 0; i < visible.length - 1; i++) {
+        if (segmentHitsRect(visible[i], visible[i + 1], b, 0)) return true;
+      }
+    }
+  }
   return false;
+}
+
+/** Validate all connectors: reroute any whose path violates obstacles. Runs multiple passes. */
+function validateConnectorsAgainstObstacles(connectors: Connector[], elements: DiagramElement[]): Connector[] {
+  let result = connectors;
+  // Run up to 3 passes to resolve cascading violations
+  for (let pass = 0; pass < 3; pass++) {
+    let anyChanged = false;
+    result = result.map(conn => {
+      if (!connectorHitsAnyElement(conn, elements)) return conn;
+      anyChanged = true;
+      const source = elements.find(e => e.id === conn.sourceId);
+      const target = elements.find(e => e.id === conn.targetId);
+      if (!source || !target) return conn;
+      // Try with stored sides first
+      const r1 = computeWaypoints(source, target, elements, conn.sourceSide, conn.targetSide, conn.routingType, conn.sourceOffsetAlong ?? 0.5, conn.targetOffsetAlong ?? 0.5);
+      const c1 = { ...conn, waypoints: r1.waypoints, sourceInvisibleLeader: r1.sourceInvisibleLeader, targetInvisibleLeader: r1.targetInvisibleLeader };
+      if (!connectorHitsAnyElement(c1, elements)) return c1;
+      // Try with recalculated optimal sides
+      const srcCx = source.x + source.width / 2, srcCy = source.y + source.height / 2;
+      const tgtCx = target.x + target.width / 2, tgtCy = target.y + target.height / 2;
+      const ddx = tgtCx - srcCx, ddy = tgtCy - srcCy;
+      const newSrcSide: Side = Math.abs(ddx) >= Math.abs(ddy) ? (ddx > 0 ? "right" : "left") : (ddy > 0 ? "bottom" : "top");
+      const newTgtSide: Side = Math.abs(ddx) >= Math.abs(ddy) ? (ddx > 0 ? "left" : "right") : (ddy > 0 ? "top" : "bottom");
+      const r2 = computeWaypoints(source, target, elements, newSrcSide, newTgtSide, conn.routingType, 0.5, 0.5);
+      return { ...conn, waypoints: r2.waypoints, sourceInvisibleLeader: r2.sourceInvisibleLeader, targetInvisibleLeader: r2.targetInvisibleLeader,
+        sourceSide: newSrcSide, targetSide: newTgtSide, sourceOffsetAlong: 0.5, targetOffsetAlong: 0.5 };
+    });
+    if (!anyChanged) break;
+  }
+  return result;
 }
 
 /** Auto-resize a uml-enumeration or uml-class element to fit its label and content */
@@ -527,40 +622,24 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       });
 
       const affectedIds = new Set([id, ...descendantIds, ...attachedBoundaryIds]);
-      // Build obstacle bounds for the moved element's new position
-      const movedEl = elements.find(e => e.id === id);
-      const movedBounds: Bounds | null = movedEl ? getBounds(movedEl) : null;
-      const connectors = state.connectors.map(conn => {
+
+      // Step 1: Initial connector update
+      let connectors = state.connectors.map(conn => {
         const srcIn = affectedIds.has(conn.sourceId);
         const tgtIn = affectedIds.has(conn.targetId);
         if (srcIn && tgtIn) {
-          return {
-            ...conn,
-            waypoints: conn.waypoints.map(pt => ({ x: pt.x + dx, y: pt.y + dy })),
-          };
+          return { ...conn, waypoints: conn.waypoints.map(pt => ({ x: pt.x + dx, y: pt.y + dy })) };
         }
         if (srcIn || tgtIn) {
-          // One end moved — full recompute with obstacle avoidance
+          // Use recomputeAllConnectors which validates perpendicularity and recalculates sides if needed
           return recomputeAllConnectors([conn], elements)[0] ?? conn;
-        }
-        // Neither end moved — check if the moved element now intersects this connector's path
-        if (movedBounds && conn.routingType === "rectilinear") {
-          const wp = conn.waypoints;
-          const vs = conn.sourceInvisibleLeader ? 1 : 0;
-          const ve = conn.targetInvisibleLeader ? wp.length - 2 : wp.length - 1;
-          const visible = wp.slice(vs, ve + 1);
-          let hits = false;
-          for (let i = 0; i < visible.length - 1; i++) {
-            if (segmentHitsRect(visible[i], visible[i + 1], movedBounds, 4)) {
-              hits = true; break;
-            }
-          }
-          if (hits) {
-            return recomputeAllConnectors([conn], elements)[0] ?? conn;
-          }
         }
         return conn;
       });
+
+      // Step 2: Validate ALL connectors against ALL elements
+      connectors = validateConnectorsAgainstObstacles(connectors, elements);
+
       return { ...state, elements: updatePoolTypes(elements), connectors };
     }
 
@@ -586,44 +665,21 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         return { ...e, x: e.x + dx, y: e.y + dy };
       });
 
-      // Build bounds for all moved elements
-      const movedBoundsList: Bounds[] = elements
-        .filter(e => expandedIds.has(e.id))
-        .map(getBounds);
-
-      const connectors = state.connectors.map(conn => {
+      // Step 1: Initial connector update
+      let connectors = state.connectors.map(conn => {
         const srcIn = expandedIds.has(conn.sourceId);
         const tgtIn = expandedIds.has(conn.targetId);
         if (srcIn && tgtIn) {
-          return {
-            ...conn,
-            waypoints: conn.waypoints.map(pt => ({ x: pt.x + dx, y: pt.y + dy })),
-          };
+          return { ...conn, waypoints: conn.waypoints.map(pt => ({ x: pt.x + dx, y: pt.y + dy })) };
         }
         if (srcIn || tgtIn) {
           return recomputeAllConnectors([conn], elements)[0] ?? conn;
         }
-        // Check if any moved element now intersects this connector's path
-        if (conn.routingType === "rectilinear" && movedBoundsList.length > 0) {
-          const wp = conn.waypoints;
-          const vs = conn.sourceInvisibleLeader ? 1 : 0;
-          const ve = conn.targetInvisibleLeader ? wp.length - 2 : wp.length - 1;
-          const visible = wp.slice(vs, ve + 1);
-          let hits = false;
-          for (const mb of movedBoundsList) {
-            for (let i = 0; i < visible.length - 1; i++) {
-              if (segmentHitsRect(visible[i], visible[i + 1], mb, 4)) {
-                hits = true; break;
-              }
-            }
-            if (hits) break;
-          }
-          if (hits) {
-            return recomputeAllConnectors([conn], elements)[0] ?? conn;
-          }
-        }
         return conn;
       });
+
+      // Step 2: Validate ALL connectors against ALL elements
+      connectors = validateConnectorsAgainstObstacles(connectors, elements);
 
       return { ...state, elements: updatePoolTypes(elements), connectors };
     }
@@ -701,10 +757,12 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         return el;
       });
       // Only recompute connectors attached to the resized element or its boundary events
-      const connectors = state.connectors.map(conn => {
+      let connectors = state.connectors.map(conn => {
         if (!movedIds.has(conn.sourceId) && !movedIds.has(conn.targetId)) return conn;
         return recomputeAllConnectors([conn], elements)[0] ?? conn;
       });
+      // Validate ALL connectors against ALL elements
+      connectors = validateConnectorsAgainstObstacles(connectors, elements);
       return { ...state, elements, connectors };
     }
 
@@ -1044,7 +1102,7 @@ function reducer(state: DiagramData, action: Action): DiagramData {
                 updated.sourceOffsetAlong ?? 0.5, updated.targetOffsetAlong ?? 0.5);
         return { ...updated, waypoints, sourceInvisibleLeader, targetInvisibleLeader };
       });
-      return { ...state, connectors };
+      return { ...state, connectors: validateConnectorsAgainstObstacles(connectors, state.elements) };
     }
 
     case "NUDGE_CONNECTOR": {
@@ -1074,7 +1132,7 @@ function reducer(state: DiagramData, action: Action): DiagramData {
                 updated.sourceOffsetAlong ?? 0.5, updated.targetOffsetAlong ?? 0.5);
         return { ...updated, waypoints, sourceInvisibleLeader, targetInvisibleLeader };
       });
-      return { ...state, connectors };
+      return { ...state, connectors: validateConnectorsAgainstObstacles(connectors, state.elements) };
     }
 
     case "NUDGE_CONNECTOR_ENDPOINT": {
@@ -1101,16 +1159,15 @@ function reducer(state: DiagramData, action: Action): DiagramData {
                 updated.sourceOffsetAlong ?? 0.5, updated.targetOffsetAlong ?? 0.5);
         return { ...updated, waypoints, sourceInvisibleLeader, targetInvisibleLeader };
       });
-      return { ...state, connectors };
+      return { ...state, connectors: validateConnectorsAgainstObstacles(connectors, state.elements) };
     }
 
-    case "UPDATE_CONNECTOR_WAYPOINTS":
-      return {
-        ...state,
-        connectors: state.connectors.map((c) =>
-          c.id === action.payload.id ? { ...c, waypoints: consolidateWaypoints(action.payload.waypoints) } : c
-        ),
-      };
+    case "UPDATE_CONNECTOR_WAYPOINTS": {
+      const updatedConns = state.connectors.map((c) =>
+        c.id === action.payload.id ? { ...c, waypoints: consolidateWaypoints(action.payload.waypoints) } : c
+      );
+      return { ...state, connectors: validateConnectorsAgainstObstacles(updatedConns, state.elements) };
+    }
 
     case "UPDATE_CURVE_HANDLES":
       return {

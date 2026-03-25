@@ -1441,6 +1441,70 @@ export function Canvas({
       }
     });
 
+  // Detect connectors whose path passes through elements (obstacle violations)
+  const obstacleViolationConnIds = new Set<string>();
+  const obstacleViolationElementIds = new Set<string>();
+  function segCrossesRect(p1: Point, p2: Point, r: { x: number; y: number; w: number; h: number }): boolean {
+    const left = r.x, right = r.x + r.w, top = r.y, bottom = r.y + r.h;
+    if (Math.abs(p1.y - p2.y) < 1) {
+      if (p1.y < top || p1.y > bottom) return false;
+      return Math.max(p1.x, p2.x) > left && Math.min(p1.x, p2.x) < right;
+    }
+    if (Math.abs(p1.x - p2.x) < 1) {
+      if (p1.x < left || p1.x > right) return false;
+      return Math.max(p1.y, p2.y) > top && Math.min(p1.y, p2.y) < bottom;
+    }
+    // Diagonal
+    const dx = p2.x - p1.x, dy = p2.y - p1.y;
+    for (const ey of [top, bottom]) {
+      if (Math.abs(dy) > 0.01) { const t = (ey - p1.y) / dy; if (t >= 0 && t <= 1) { const ix = p1.x + dx * t; if (ix >= left && ix <= right) return true; } }
+    }
+    for (const ex of [left, right]) {
+      if (Math.abs(dx) > 0.01) { const t = (ex - p1.x) / dx; if (t >= 0 && t <= 1) { const iy = p1.y + dy * t; if (iy >= top && iy <= bottom) return true; } }
+    }
+    return false;
+  }
+  for (const conn of data.connectors) {
+    const wp = conn.waypoints;
+    if (wp.length < 3) continue;
+    const vs = conn.sourceInvisibleLeader ? 1 : 0;
+    const ve = conn.targetInvisibleLeader ? wp.length - 2 : wp.length - 1;
+    const visible = wp.slice(vs, ve + 1);
+    const interior = wp.slice(vs + 1, ve);
+    for (const el of data.elements) {
+      if (el.type === "pool" || el.type === "lane") continue;
+      const b = { x: el.x, y: el.y, w: el.width, h: el.height };
+      const isOwn = el.id === conn.sourceId || el.id === conn.targetId;
+      let violation = false;
+      if (isOwn) {
+        // Check if interior waypoints or segments pass through own source/target
+        for (const pt of interior) {
+          if (pt.x > b.x + 1 && pt.x < b.x + b.w - 1 && pt.y > b.y + 1 && pt.y < b.y + b.h - 1) { violation = true; break; }
+        }
+        if (!violation) {
+          for (let i = 0; i < interior.length - 1; i++) {
+            if (segCrossesRect(interior[i], interior[i + 1], b)) { violation = true; break; }
+          }
+        }
+      } else {
+        if (el.boundaryHostId === conn.sourceId || el.boundaryHostId === conn.targetId) continue;
+        // Check waypoints inside OR segments crossing
+        for (const pt of visible) {
+          if (pt.x > b.x && pt.x < b.x + b.w && pt.y > b.y && pt.y < b.y + b.h) { violation = true; break; }
+        }
+        if (!violation) {
+          for (let i = 0; i < visible.length - 1; i++) {
+            if (segCrossesRect(visible[i], visible[i + 1], b)) { violation = true; break; }
+          }
+        }
+      }
+      if (violation) {
+        obstacleViolationConnIds.add(conn.id);
+        obstacleViolationElementIds.add(el.id);
+      }
+    }
+  }
+
   // Endpoint handle positions for selected connector
   const selectedConnector: Connector | null =
     selectedConnectorId
@@ -1754,105 +1818,12 @@ export function Canvas({
                     : undefined
                 }
                 debugMode={debugMode}
+                misaligned={obstacleViolationConnIds.has(conn.id)}
               />
             ));
           })()}
 
-          {/* Debug: labels for selected elements and their connectors */}
-          {debugMode && (() => {
-            const debugItems: { id: string; label: string; anchorX: number; anchorY: number; color: string; defaultOX: number; defaultOY: number }[] = [];
-            const addedConnIds = new Set<string>();
-
-            // Selected element debug labels
-            for (const selId of selectedElementIds) {
-              const el = data.elements.find(e => e.id === selId);
-              if (!el) continue;
-              debugItems.push({
-                id: `dbg-el-${el.id}`,
-                label: `[${el.id.slice(-6)}] ${el.type}`,
-                anchorX: el.x + el.width / 2, anchorY: el.y,
-                color: "#059669", defaultOX: 0, defaultOY: -18,
-              });
-              // Show connected connectors for this element (skip if already added)
-              for (const conn of data.connectors) {
-                if (conn.sourceId !== el.id && conn.targetId !== el.id) continue;
-                if (addedConnIds.has(conn.id)) continue;
-                addedConnIds.add(conn.id);
-                const wps = conn.waypoints;
-                if (wps.length < 2) continue;
-                const vs = conn.sourceInvisibleLeader ? 1 : 0;
-                const ve = conn.targetInvisibleLeader ? wps.length - 2 : wps.length - 1;
-                // Source endpoint
-                debugItems.push({
-                  id: `dbg-cs-${conn.id}`,
-                  label: `S:${conn.id.slice(-4)} [${conn.sourceSide}]`,
-                  anchorX: wps[vs].x, anchorY: wps[vs].y,
-                  color: "#dc2626", defaultOX: -20, defaultOY: -14,
-                });
-                // Target endpoint
-                debugItems.push({
-                  id: `dbg-ct-${conn.id}`,
-                  label: `T:${conn.id.slice(-4)} [${conn.targetSide}]`,
-                  anchorX: wps[ve].x, anchorY: wps[ve].y,
-                  color: "#dc2626", defaultOX: 20, defaultOY: -14,
-                });
-                // Segment labels
-                for (let i = 0; i < ve - vs; i++) {
-                  const a = wps[vs + i], b = wps[vs + i + 1];
-                  debugItems.push({
-                    id: `dbg-seg-${conn.id}-${i}`,
-                    label: `${conn.id.slice(-4)}.s${i}`,
-                    anchorX: (a.x + b.x) / 2, anchorY: (a.y + b.y) / 2,
-                    color: "#9333ea", defaultOX: 0, defaultOY: -10,
-                  });
-                }
-              }
-            }
-
-            // Selected connector debug labels
-            if (selectedConnectorId && selectedElementIds.size === 0) {
-              const conn = data.connectors.find(c => c.id === selectedConnectorId);
-              if (conn && conn.waypoints.length >= 2) {
-                const wps = conn.waypoints;
-                const vs = conn.sourceInvisibleLeader ? 1 : 0;
-                const ve = conn.targetInvisibleLeader ? wps.length - 2 : wps.length - 1;
-                const srcEl = data.elements.find(e => e.id === conn.sourceId);
-                const tgtEl = data.elements.find(e => e.id === conn.targetId);
-                debugItems.push({
-                  id: `dbg-conn-${conn.id}`,
-                  label: `[${conn.id.slice(-6)}] ${conn.type} ${conn.routingType}`,
-                  anchorX: (wps[vs].x + wps[ve].x) / 2, anchorY: (wps[vs].y + wps[ve].y) / 2,
-                  color: "#2563eb", defaultOX: 0, defaultOY: -22,
-                });
-                debugItems.push({
-                  id: `dbg-cs2-${conn.id}`,
-                  label: `S:${srcEl?.label || conn.sourceId.slice(-4)} [${conn.sourceSide}:${(conn.sourceOffsetAlong ?? 0.5).toFixed(2)}]`,
-                  anchorX: wps[vs].x, anchorY: wps[vs].y,
-                  color: "#dc2626", defaultOX: -30, defaultOY: -14,
-                });
-                debugItems.push({
-                  id: `dbg-ct2-${conn.id}`,
-                  label: `T:${tgtEl?.label || conn.targetId.slice(-4)} [${conn.targetSide}:${(conn.targetOffsetAlong ?? 0.5).toFixed(2)}]`,
-                  anchorX: wps[ve].x, anchorY: wps[ve].y,
-                  color: "#dc2626", defaultOX: 30, defaultOY: -14,
-                });
-                for (let i = 0; i < ve - vs; i++) {
-                  const a = wps[vs + i], b = wps[vs + i + 1];
-                  debugItems.push({
-                    id: `dbg-seg2-${conn.id}-${i}`,
-                    label: `s${i} (${Math.round(a.x)},${Math.round(a.y)})→(${Math.round(b.x)},${Math.round(b.y)})`,
-                    anchorX: (a.x + b.x) / 2, anchorY: (a.y + b.y) / 2,
-                    color: "#9333ea", defaultOX: 0, defaultOY: -10,
-                  });
-                }
-              }
-            }
-
-            return debugItems.map(item => (
-              <DebugLabel key={item.id} item={item} svgToWorld={clientToWorld}
-                offsets={debugLabelOffsets} setOffset={setDebugLabelOffset} />
-            ));
-          })()}
+          {/* Debug labels rendered at end of SVG for z-order */}
 
           {/* Non-container elements */}
           {nonContainers.map((el) => {
@@ -1948,7 +1919,7 @@ export function Canvas({
               isDropTarget={elIsDropTarget}
               isMessageBpmnTarget={elIsMsgTarget}
               isAssocBpmnTarget={elIsAssocTarget}
-              isErrorTarget={errorTargetIds.has(el.id)}
+              isErrorTarget={errorTargetIds.has(el.id) || obstacleViolationElementIds.has(el.id)}
               onSelect={(ev) => {
                 if (ev?.shiftKey) {
                   onSetSelectedElements((prev) => { const next = new Set(prev); if (next.has(el.id)) next.delete(el.id); else next.add(el.id); return next; });
@@ -2137,7 +2108,7 @@ export function Canvas({
               key={conn.id}
               connector={conn}
               selected={conn.id === selectedConnectorId}
-              misaligned={misalignedConnectorIds.has(conn.id)}
+              misaligned={misalignedConnectorIds.has(conn.id) || obstacleViolationConnIds.has(conn.id)}
               onSelect={() => {
                 onSelectConnector(conn.id);
                 onSetSelectedElements(new Set());
@@ -2187,6 +2158,7 @@ export function Canvas({
                     : undefined
                 }
                 debugMode={debugMode}
+                misaligned={obstacleViolationConnIds.has(conn.id)}
               />
             );
           })()}
@@ -2309,6 +2281,65 @@ export function Canvas({
                 style={{ pointerEvents: "none" }}
               />
             );
+          })()}
+
+          {/* Debug labels — rendered last so they appear on top of everything */}
+          {debugMode && (() => {
+            const debugItems: { id: string; label: string; anchorX: number; anchorY: number; color: string; defaultOX: number; defaultOY: number }[] = [];
+            const addedConnIds = new Set<string>();
+            for (const selId of selectedElementIds) {
+              const el = data.elements.find(e => e.id === selId);
+              if (!el) continue;
+              debugItems.push({
+                id: `dbg-el-${el.id}`,
+                label: `[${el.id.slice(-6)}] ${el.type}`,
+                anchorX: el.x + el.width / 2, anchorY: el.y,
+                color: "#059669", defaultOX: 0, defaultOY: -18,
+              });
+              for (const conn of data.connectors) {
+                if (conn.sourceId !== el.id && conn.targetId !== el.id) continue;
+                if (addedConnIds.has(conn.id)) continue;
+                addedConnIds.add(conn.id);
+                const wps = conn.waypoints;
+                if (wps.length < 2) continue;
+                const vs = conn.sourceInvisibleLeader ? 1 : 0;
+                const ve = conn.targetInvisibleLeader ? wps.length - 2 : wps.length - 1;
+                debugItems.push({ id: `dbg-cs-${conn.id}`, label: `S:${conn.id.slice(-4)} [${conn.sourceSide}]`,
+                  anchorX: wps[vs].x, anchorY: wps[vs].y, color: "#dc2626", defaultOX: -20, defaultOY: -14 });
+                debugItems.push({ id: `dbg-ct-${conn.id}`, label: `T:${conn.id.slice(-4)} [${conn.targetSide}]`,
+                  anchorX: wps[ve].x, anchorY: wps[ve].y, color: "#dc2626", defaultOX: 20, defaultOY: -14 });
+                for (let i = 0; i < ve - vs; i++) {
+                  const a = wps[vs + i], b = wps[vs + i + 1];
+                  debugItems.push({ id: `dbg-seg-${conn.id}-${i}`, label: `${conn.id.slice(-4)}.s${i}`,
+                    anchorX: (a.x + b.x) / 2, anchorY: (a.y + b.y) / 2, color: "#9333ea", defaultOX: 0, defaultOY: -10 });
+                }
+              }
+            }
+            if (selectedConnectorId && selectedElementIds.size === 0) {
+              const conn = data.connectors.find(c => c.id === selectedConnectorId);
+              if (conn && conn.waypoints.length >= 2) {
+                const wps = conn.waypoints;
+                const vs = conn.sourceInvisibleLeader ? 1 : 0;
+                const ve = conn.targetInvisibleLeader ? wps.length - 2 : wps.length - 1;
+                const srcEl = data.elements.find(e => e.id === conn.sourceId);
+                const tgtEl = data.elements.find(e => e.id === conn.targetId);
+                debugItems.push({ id: `dbg-conn-${conn.id}`, label: `[${conn.id.slice(-6)}] ${conn.type} ${conn.routingType}`,
+                  anchorX: (wps[vs].x + wps[ve].x) / 2, anchorY: (wps[vs].y + wps[ve].y) / 2, color: "#2563eb", defaultOX: 0, defaultOY: -22 });
+                debugItems.push({ id: `dbg-cs2-${conn.id}`, label: `S:${srcEl?.label || conn.sourceId.slice(-4)} [${conn.sourceSide}:${(conn.sourceOffsetAlong ?? 0.5).toFixed(2)}]`,
+                  anchorX: wps[vs].x, anchorY: wps[vs].y, color: "#dc2626", defaultOX: -30, defaultOY: -14 });
+                debugItems.push({ id: `dbg-ct2-${conn.id}`, label: `T:${tgtEl?.label || conn.targetId.slice(-4)} [${conn.targetSide}:${(conn.targetOffsetAlong ?? 0.5).toFixed(2)}]`,
+                  anchorX: wps[ve].x, anchorY: wps[ve].y, color: "#dc2626", defaultOX: 30, defaultOY: -14 });
+                for (let i = 0; i < ve - vs; i++) {
+                  const a = wps[vs + i], b = wps[vs + i + 1];
+                  debugItems.push({ id: `dbg-seg2-${conn.id}-${i}`, label: `s${i} (${Math.round(a.x)},${Math.round(a.y)})\u2192(${Math.round(b.x)},${Math.round(b.y)})`,
+                    anchorX: (a.x + b.x) / 2, anchorY: (a.y + b.y) / 2, color: "#9333ea", defaultOX: 0, defaultOY: -10 });
+                }
+              }
+            }
+            return debugItems.map(item => (
+              <DebugLabel key={item.id} item={item} svgToWorld={clientToWorld}
+                offsets={debugLabelOffsets} setOffset={setDebugLabelOffset} />
+            ));
           })()}
 
         </g>
