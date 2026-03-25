@@ -419,6 +419,114 @@ export function PropertiesPanel({
             Reverse Direction
           </button>
         )}
+        {/* UML association end properties */}
+        {(connector.type === "uml-association" || connector.type === "uml-aggregation" ||
+          connector.type === "uml-composition") && onUpdateConnectorFields && (() => {
+          const srcEl = allElements?.find(e => e.id === connector.sourceId);
+          const tgtEl = allElements?.find(e => e.id === connector.targetId);
+          return (
+            <div className="space-y-2">
+              {/* Source end */}
+              <div className="border-t border-gray-100 pt-1.5">
+                <p className="text-[10px] font-medium text-gray-500 mb-1">Source End ({srcEl?.label || "?"})</p>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-1">
+                    <label className="text-[9px] text-gray-400 w-12 shrink-0">Role</label>
+                    <input type="text" className="flex-1 text-[10px] border border-gray-300 rounded px-1 py-0 min-w-0"
+                      defaultValue={connector.sourceRole ?? ""} key={`sr-${connector.id}`}
+                      onBlur={e => onUpdateConnectorFields(connector.id, { sourceRole: e.target.value })}
+                      onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                      placeholder="role name" />
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <label className="text-[9px] text-gray-400 w-12 shrink-0">Multiplicity</label>
+                    <input type="text" className="flex-1 text-[10px] border border-gray-300 rounded px-1 py-0 min-w-0"
+                      defaultValue={connector.sourceMultiplicity ?? ""} key={`sm-${connector.id}`}
+                      onBlur={e => onUpdateConnectorFields(connector.id, { sourceMultiplicity: e.target.value })}
+                      onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                      placeholder="e.g. 1, 0..*, 1..*" />
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <label className="text-[9px] text-gray-400 w-12 shrink-0">Constraint</label>
+                    <input type="text" className="flex-1 text-[10px] border border-gray-300 rounded px-1 py-0 min-w-0"
+                      defaultValue={connector.sourcePropertyString ?? ""} key={`sp-${connector.id}`}
+                      onBlur={e => onUpdateConnectorFields(connector.id, { sourcePropertyString: e.target.value })}
+                      onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                      placeholder="{ordered}" />
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <label className="text-[9px] text-gray-400 w-12 shrink-0">Visibility</label>
+                    <div className="flex gap-0.5">
+                      {["", "+", "-", "#", "~"].map(v => (
+                        <button key={v || "none"} onClick={() => onUpdateConnectorFields(connector.id, { sourceVisibility: v })}
+                          className={`px-1 py-0 text-[9px] rounded border ${(connector.sourceVisibility ?? "") === v ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-500 border-gray-300"}`}>
+                          {v || "\u2205"}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <label className="text-[9px] text-gray-400 w-12 shrink-0">Qualifier</label>
+                    <input type="text" className="flex-1 text-[10px] border border-gray-300 rounded px-1 py-0 min-w-0"
+                      defaultValue={connector.sourceQualifier ?? ""} key={`sq-${connector.id}`}
+                      onBlur={e => onUpdateConnectorFields(connector.id, { sourceQualifier: e.target.value })}
+                      onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                      placeholder="accountNumber" />
+                  </div>
+                </div>
+              </div>
+              {/* Target end */}
+              <div className="border-t border-gray-100 pt-1.5">
+                <p className="text-[10px] font-medium text-gray-500 mb-1">Target End ({tgtEl?.label || "?"})</p>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-1">
+                    <label className="text-[9px] text-gray-400 w-12 shrink-0">Role</label>
+                    <input type="text" className="flex-1 text-[10px] border border-gray-300 rounded px-1 py-0 min-w-0"
+                      defaultValue={connector.targetRole ?? ""} key={`tr-${connector.id}`}
+                      onBlur={e => onUpdateConnectorFields(connector.id, { targetRole: e.target.value })}
+                      onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                      placeholder="role name" />
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <label className="text-[9px] text-gray-400 w-12 shrink-0">Multiplicity</label>
+                    <input type="text" className="flex-1 text-[10px] border border-gray-300 rounded px-1 py-0 min-w-0"
+                      defaultValue={connector.targetMultiplicity ?? ""} key={`tm-${connector.id}`}
+                      onBlur={e => onUpdateConnectorFields(connector.id, { targetMultiplicity: e.target.value })}
+                      onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                      placeholder="e.g. 1, 0..*, 1..*" />
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <label className="text-[9px] text-gray-400 w-12 shrink-0">Constraint</label>
+                    <input type="text" className="flex-1 text-[10px] border border-gray-300 rounded px-1 py-0 min-w-0"
+                      defaultValue={connector.targetPropertyString ?? ""} key={`tp-${connector.id}`}
+                      onBlur={e => onUpdateConnectorFields(connector.id, { targetPropertyString: e.target.value })}
+                      onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                      placeholder="{ordered}" />
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <label className="text-[9px] text-gray-400 w-12 shrink-0">Visibility</label>
+                    <div className="flex gap-0.5">
+                      {["", "+", "-", "#", "~"].map(v => (
+                        <button key={v || "none"} onClick={() => onUpdateConnectorFields(connector.id, { targetVisibility: v })}
+                          className={`px-1 py-0 text-[9px] rounded border ${(connector.targetVisibility ?? "") === v ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-500 border-gray-300"}`}>
+                          {v || "\u2205"}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <label className="text-[9px] text-gray-400 w-12 shrink-0">Qualifier</label>
+                    <input type="text" className="flex-1 text-[10px] border border-gray-300 rounded px-1 py-0 min-w-0"
+                      defaultValue={connector.targetQualifier ?? ""} key={`tq-${connector.id}`}
+                      onBlur={e => onUpdateConnectorFields(connector.id, { targetQualifier: e.target.value })}
+                      onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                      placeholder="accountNumber" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 {(() => {
           const isAssocPC = connector.type === "association" && diagramType === "process-context";
           const showDirection = connector.type !== "messageBPMN" &&

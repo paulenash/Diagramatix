@@ -118,6 +118,23 @@ export interface Connector {
   transitionEvent?: string;
   transitionGuard?: string;
   transitionActions?: string;
+  // UML association end properties
+  sourceRole?: string;
+  sourceMultiplicity?: string;
+  sourcePropertyString?: string;  // e.g. "{ordered}", "{unique}"
+  sourceVisibility?: string;      // +, -, #, ~
+  sourceQualifier?: string;       // e.g. "accountNumber"
+  sourceRoleOffset?: Point;       // offset for visibility+role composite label
+  sourceMultOffset?: Point;       // offset for multiplicity label
+  sourceConstraintOffset?: Point; // offset for constraint + qualifier
+  targetRole?: string;
+  targetMultiplicity?: string;
+  targetPropertyString?: string;
+  targetVisibility?: string;
+  targetQualifier?: string;
+  targetRoleOffset?: Point;
+  targetMultOffset?: Point;
+  targetConstraintOffset?: Point;
 }
 
 export interface Viewport {

@@ -1059,6 +1059,7 @@ export function DiagramEditor({
           onNudgeConnector={nudgeConnector}
           onNudgeConnectorEndpoint={nudgeConnectorEndpoint}
           onUpdateCurveHandles={updateCurveHandles}
+          onUpdateConnectorFields={updateConnectorFields}
           colorConfig={effectiveColorConfig}
           displayMode={displayMode}
           debugMode={debugMode}

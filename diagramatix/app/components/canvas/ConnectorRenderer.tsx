@@ -17,6 +17,7 @@ interface Props {
   misaligned?: boolean;
   otherConnectorWaypoints?: Point[][];
   debugMode?: boolean;
+  onUpdateEndOffset?: (connectorId: string, field: string, offset: Point) => void;
 }
 
 // Line segment intersection: returns the parameter t along segment (a1→a2) where it crosses (b1→b2), or null
@@ -488,8 +489,10 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
   );
 }
 
-export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, onUpdateWaypoints, onWaypointsDragEnd, onUpdateLabel, onUpdateCurveHandles, misaligned, otherConnectorWaypoints, debugMode }: Props) {
+export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, onUpdateWaypoints, onWaypointsDragEnd, onUpdateLabel, onUpdateCurveHandles, misaligned, otherConnectorWaypoints, debugMode, onUpdateEndOffset }: Props) {
   const displayMode = useContext(DisplayModeCtx);
+  const connFontScale = useContext(ConnectorFontScaleCtx);
+  const [draggingEndLabel, setDraggingEndLabel] = useState<string | null>(null);
   const waypoints = connector.waypoints;
   if (waypoints.length === 0) return null;
 
@@ -736,6 +739,126 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
           onUpdateLabel={onUpdateLabel}
         />
       )}
+
+      {/* UML association end annotations (movable) */}
+      {(connector.type === "uml-association" || connector.type === "uml-aggregation" ||
+        connector.type === "uml-composition") && visibleWaypoints.length >= 2 && (() => {
+        const fs = Math.round(10 * connFontScale * 10) / 10;
+        const lineH = fs * 1.3;
+        const srcPt = visibleWaypoints[0];
+        const tgtPt = visibleWaypoints[visibleWaypoints.length - 1];
+        const srcNext = visibleWaypoints[1];
+        const tgtPrev = visibleWaypoints[visibleWaypoints.length - 2];
+        const srcDx = srcNext.x - srcPt.x, srcDy = srcNext.y - srcPt.y;
+        const tgtDx = tgtPt.x - tgtPrev.x, tgtDy = tgtPt.y - tgtPrev.y;
+        // Default label anchor positions near the edge point
+        const defSrcX = srcPt.x + (srcDx !== 0 ? Math.sign(srcDx) * 8 : 0);
+        const defSrcY = srcPt.y + (srcDy !== 0 ? Math.sign(srcDy) * 8 : 0);
+        const defTgtX = tgtPt.x - (tgtDx !== 0 ? Math.sign(tgtDx) * 8 : 0);
+        const defTgtY = tgtPt.y - (tgtDy !== 0 ? Math.sign(tgtDy) * 8 : 0);
+        // Perpendicular offsets
+        const srcPerpX = Math.abs(srcDy) > Math.abs(srcDx) ? (srcDy > 0 ? -6 : 6) : 0;
+        const srcPerpY = Math.abs(srcDx) > Math.abs(srcDy) ? -6 : 0;
+        const tgtPerpX = Math.abs(tgtDy) > Math.abs(tgtDx) ? (tgtDy < 0 ? -6 : 6) : 0;
+        const tgtPerpY = Math.abs(tgtDx) > Math.abs(tgtDy) ? -6 : 0;
+
+        // Build label groups: role (with visibility), multiplicity, constraint+qualifier
+        function buildRole(role?: string, vis?: string): string | null {
+          if (role) return vis ? `${vis} ${role}` : role;
+          if (vis) return vis;
+          return null;
+        }
+        function buildConstraint(prop?: string, qual?: string): string | null {
+          const parts: string[] = [];
+          if (prop) parts.push(prop);
+          if (qual) parts.push(`[${qual}]`);
+          return parts.length > 0 ? parts.join(" ") : null;
+        }
+
+        const srcRole = buildRole(connector.sourceRole, connector.sourceVisibility);
+        const srcMult = connector.sourceMultiplicity || null;
+        const srcConst = buildConstraint(connector.sourcePropertyString, connector.sourceQualifier);
+        const tgtRole = buildRole(connector.targetRole, connector.targetVisibility);
+        const tgtMult = connector.targetMultiplicity || null;
+        const tgtConst = buildConstraint(connector.targetPropertyString, connector.targetQualifier);
+
+        if (!srcRole && !srcMult && !srcConst && !tgtRole && !tgtMult && !tgtConst) return null;
+
+        // Draggable label component
+        function EndLabel({ text, anchorX, anchorY, offsetField, offset, anchor }: {
+          text: string; anchorX: number; anchorY: number; offsetField: string; offset?: Point; anchor: "start" | "middle" | "end";
+        }) {
+          const ox = offset?.x ?? 0, oy = offset?.y ?? 0;
+          const x = anchorX + ox, y = anchorY + oy;
+          function handleMouseDown(e: React.MouseEvent) {
+            if (!svgToWorld || !onUpdateEndOffset) return;
+            e.stopPropagation();
+            const startWorld = svgToWorld(e.clientX, e.clientY);
+            const startOx = ox, startOy = oy;
+            document.body.style.cursor = "grabbing";
+            setDraggingEndLabel(offsetField);
+            function onMove(ev: MouseEvent) {
+              const cur = svgToWorld!(ev.clientX, ev.clientY);
+              onUpdateEndOffset!(connector.id, offsetField, {
+                x: startOx + cur.x - startWorld.x,
+                y: startOy + cur.y - startWorld.y,
+              });
+            }
+            function onUp() {
+              document.body.style.cursor = "";
+              setDraggingEndLabel(null);
+              window.removeEventListener("mousemove", onMove);
+              window.removeEventListener("mouseup", onUp);
+            }
+            window.addEventListener("mousemove", onMove);
+            window.addEventListener("mouseup", onUp);
+          }
+          const isDragging = draggingEndLabel === offsetField;
+          return (
+            <g>
+              {isDragging && (
+                <line x1={anchorX} y1={anchorY} x2={x} y2={y}
+                  stroke="#9ca3af" strokeWidth={0.7} strokeDasharray="3 2"
+                  style={{ pointerEvents: "none" }} />
+              )}
+              <text textAnchor={anchor} fontSize={fs} fill="#374151"
+                x={x} y={y}
+                style={{ cursor: onUpdateEndOffset ? "grab" : "default", userSelect: "none" }}
+                onMouseDown={handleMouseDown}>
+                {text}
+              </text>
+            </g>
+          );
+        }
+
+        const srcAnchor: "start" | "middle" | "end" = srcDx > 0 ? "start" : srcDx < 0 ? "end" : "middle";
+        const tgtAnchor: "start" | "middle" | "end" = tgtDx > 0 ? "end" : tgtDx < 0 ? "start" : "middle";
+
+        return (
+          <g>
+            {/* Source end labels */}
+            {srcRole && <EndLabel text={srcRole}
+              anchorX={defSrcX + srcPerpX} anchorY={defSrcY + srcPerpY}
+              offsetField="sourceRoleOffset" offset={connector.sourceRoleOffset} anchor={srcAnchor} />}
+            {srcMult && <EndLabel text={srcMult}
+              anchorX={defSrcX + srcPerpX} anchorY={defSrcY + srcPerpY + lineH}
+              offsetField="sourceMultOffset" offset={connector.sourceMultOffset} anchor={srcAnchor} />}
+            {srcConst && <EndLabel text={srcConst}
+              anchorX={defSrcX + srcPerpX} anchorY={defSrcY + srcPerpY + lineH * 2}
+              offsetField="sourceConstraintOffset" offset={connector.sourceConstraintOffset} anchor={srcAnchor} />}
+            {/* Target end labels */}
+            {tgtRole && <EndLabel text={tgtRole}
+              anchorX={defTgtX + tgtPerpX} anchorY={defTgtY + tgtPerpY}
+              offsetField="targetRoleOffset" offset={connector.targetRoleOffset} anchor={tgtAnchor} />}
+            {tgtMult && <EndLabel text={tgtMult}
+              anchorX={defTgtX + tgtPerpX} anchorY={defTgtY + tgtPerpY + lineH}
+              offsetField="targetMultOffset" offset={connector.targetMultOffset} anchor={tgtAnchor} />}
+            {tgtConst && <EndLabel text={tgtConst}
+              anchorX={defTgtX + tgtPerpX} anchorY={defTgtY + tgtPerpY + lineH * 2}
+              offsetField="targetConstraintOffset" offset={connector.targetConstraintOffset} anchor={tgtAnchor} />}
+          </g>
+        );
+      })()}
 
       {/* Curvature handles for selected transition connectors (state machine) */}
       {selected && (connector.type === "transition" || connector.type === "flow") && connector.routingType === "curvilinear"

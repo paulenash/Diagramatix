@@ -183,6 +183,7 @@ interface Props {
   colorConfig?: import("@/app/lib/diagram/colors").SymbolColorConfig;
   displayMode?: import("@/app/lib/diagram/displayMode").DisplayMode;
   debugMode?: boolean;
+  onUpdateConnectorFields?: (id: string, fields: Partial<import("@/app/lib/diagram/types").Connector>) => void;
   getViewportCenterRef?: React.MutableRefObject<(() => Point) | null>;
   diagramName?: string;
   createdAt?: string;
@@ -353,6 +354,7 @@ export function Canvas({
   colorConfig,
   displayMode: displayModeProp,
   debugMode,
+  onUpdateConnectorFields,
   getViewportCenterRef,
   diagramName,
   createdAt,
@@ -938,6 +940,10 @@ export function Canvas({
     window.addEventListener("mousemove", onMouseMove);
     window.addEventListener("mouseup", onMouseUp);
   }
+
+  const handleUpdateEndOffset = useCallback((connectorId: string, field: string, offset: Point) => {
+    onUpdateConnectorFields?.(connectorId, { [field]: offset } as Partial<import("@/app/lib/diagram/types").Connector>);
+  }, [onUpdateConnectorFields]);
 
   function handleResizeDragStart(elementId: string, handle: ResizeHandle, e: React.MouseEvent) {
     e.stopPropagation();
@@ -1819,6 +1825,7 @@ export function Canvas({
                 }
                 debugMode={debugMode}
                 misaligned={obstacleViolationConnIds.has(conn.id)}
+                onUpdateEndOffset={handleUpdateEndOffset}
               />
             ));
           })()}
@@ -2121,6 +2128,7 @@ export function Canvas({
                 : undefined}
               onUpdateCurveHandles={onUpdateCurveHandles}
               debugMode={debugMode}
+              onUpdateEndOffset={handleUpdateEndOffset}
             />
           ))}
 
@@ -2159,6 +2167,7 @@ export function Canvas({
                 }
                 debugMode={debugMode}
                 misaligned={obstacleViolationConnIds.has(conn.id)}
+                onUpdateEndOffset={handleUpdateEndOffset}
               />
             );
           })()}
