@@ -419,6 +419,38 @@ export function PropertiesPanel({
             Reverse Direction
           </button>
         )}
+        {/* UML association name */}
+        {(connector.type === "uml-association" || connector.type === "uml-aggregation" ||
+          connector.type === "uml-composition") && onUpdateConnectorFields && (
+          <div className="space-y-1 border-t border-gray-100 pt-1.5">
+            <div className="flex items-center gap-1">
+              <label className="text-[9px] text-gray-400 w-12 shrink-0">Name</label>
+              <input type="text" className="flex-1 text-[10px] border border-gray-300 rounded px-1 py-0 min-w-0"
+                defaultValue={connector.associationName ?? ""} key={`an-${connector.id}`}
+                onBlur={e => onUpdateConnectorFields(connector.id, { associationName: e.target.value })}
+                onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                placeholder="association name" />
+            </div>
+            <div className="flex items-center gap-1">
+              <label className="text-[9px] text-gray-400 w-12 shrink-0">Reading</label>
+              <div className="flex gap-0.5">
+                {([
+                  { value: "none" as const, label: "None" },
+                  { value: "to-source" as const, label: "\u25C0 Source" },
+                  { value: "to-target" as const, label: "Target \u25B6" },
+                ]).map(({ value, label }) => (
+                  <button key={value}
+                    onClick={() => onUpdateConnectorFields(connector.id, { readingDirection: value })}
+                    className={`px-1 py-0 text-[9px] rounded border ${
+                      (connector.readingDirection ?? "none") === value
+                        ? "bg-blue-600 text-white border-blue-600"
+                        : "bg-white text-gray-500 border-gray-300"
+                    }`}>{label}</button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
         {/* UML association end properties */}
         {(connector.type === "uml-association" || connector.type === "uml-aggregation" ||
           connector.type === "uml-composition") && onUpdateConnectorFields && (() => {

@@ -135,6 +135,10 @@ export interface Connector {
   targetRoleOffset?: Point;
   targetMultOffset?: Point;
   targetConstraintOffset?: Point;
+  // UML association name (shown near midpoint)
+  associationName?: string;
+  readingDirection?: "none" | "to-source" | "to-target";
+  associationNameOffset?: Point;
 }
 
 export interface Viewport {

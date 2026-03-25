@@ -785,8 +785,8 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
         if (!srcRole && !srcMult && !srcConst && !tgtRole && !tgtMult && !tgtConst) return null;
 
         // Draggable label component
-        function EndLabel({ text, anchorX, anchorY, offsetField, offset, anchor }: {
-          text: string; anchorX: number; anchorY: number; offsetField: string; offset?: Point; anchor: "start" | "middle" | "end";
+        function EndLabel({ text, anchorX, anchorY, offsetField, offset, anchor, bold }: {
+          text: string; anchorX: number; anchorY: number; offsetField: string; offset?: Point; anchor: "start" | "middle" | "end"; bold?: boolean;
         }) {
           const ox = offset?.x ?? 0, oy = offset?.y ?? 0;
           const x = anchorX + ox, y = anchorY + oy;
@@ -822,7 +822,7 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
                   style={{ pointerEvents: "none" }} />
               )}
               <text textAnchor={anchor} fontSize={fs} fill="#374151"
-                x={x} y={y}
+                x={x} y={y} fontWeight={bold ? "bold" : "normal"}
                 style={{ cursor: onUpdateEndOffset ? "grab" : "default", userSelect: "none" }}
                 onMouseDown={handleMouseDown}>
                 {text}
@@ -840,7 +840,7 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
             {srcRole && <EndLabel text={srcRole}
               anchorX={defSrcX + srcPerpX} anchorY={defSrcY + srcPerpY}
               offsetField="sourceRoleOffset" offset={connector.sourceRoleOffset} anchor={srcAnchor} />}
-            {srcMult && <EndLabel text={srcMult}
+            {srcMult && <EndLabel text={srcMult} bold
               anchorX={defSrcX + srcPerpX} anchorY={defSrcY + srcPerpY + lineH}
               offsetField="sourceMultOffset" offset={connector.sourceMultOffset} anchor={srcAnchor} />}
             {srcConst && <EndLabel text={srcConst}
@@ -850,12 +850,127 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
             {tgtRole && <EndLabel text={tgtRole}
               anchorX={defTgtX + tgtPerpX} anchorY={defTgtY + tgtPerpY}
               offsetField="targetRoleOffset" offset={connector.targetRoleOffset} anchor={tgtAnchor} />}
-            {tgtMult && <EndLabel text={tgtMult}
+            {tgtMult && <EndLabel text={tgtMult} bold
               anchorX={defTgtX + tgtPerpX} anchorY={defTgtY + tgtPerpY + lineH}
               offsetField="targetMultOffset" offset={connector.targetMultOffset} anchor={tgtAnchor} />}
             {tgtConst && <EndLabel text={tgtConst}
               anchorX={defTgtX + tgtPerpX} anchorY={defTgtY + tgtPerpY + lineH * 2}
               offsetField="targetConstraintOffset" offset={connector.targetConstraintOffset} anchor={tgtAnchor} />}
+          </g>
+        );
+      })()}
+
+      {/* UML association name with reading direction arrow */}
+      {(connector.type === "uml-association" || connector.type === "uml-aggregation" ||
+        connector.type === "uml-composition") && connector.associationName && visibleWaypoints.length >= 2 && (() => {
+        const fs = Math.round(10 * connFontScale * 10) / 10;
+        const nameOx = connector.associationNameOffset?.x ?? 0;
+        const nameOy = connector.associationNameOffset?.y ?? 0;
+
+        // Find the midpoint of the visible path
+        let totalLen = 0;
+        const segLens: number[] = [];
+        for (let i = 0; i < visibleWaypoints.length - 1; i++) {
+          const dx = visibleWaypoints[i + 1].x - visibleWaypoints[i].x;
+          const dy = visibleWaypoints[i + 1].y - visibleWaypoints[i].y;
+          const len = Math.hypot(dx, dy);
+          segLens.push(len);
+          totalLen += len;
+        }
+        let half = totalLen / 2;
+        let midX = visibleWaypoints[0].x, midY = visibleWaypoints[0].y;
+        let segDirX = 0, segDirY = 0;
+        for (let i = 0; i < segLens.length; i++) {
+          if (half <= segLens[i] || i === segLens.length - 1) {
+            const t = segLens[i] > 0 ? half / segLens[i] : 0;
+            midX = visibleWaypoints[i].x + t * (visibleWaypoints[i + 1].x - visibleWaypoints[i].x);
+            midY = visibleWaypoints[i].y + t * (visibleWaypoints[i + 1].y - visibleWaypoints[i].y);
+            segDirX = visibleWaypoints[i + 1].x - visibleWaypoints[i].x;
+            segDirY = visibleWaypoints[i + 1].y - visibleWaypoints[i].y;
+            break;
+          }
+          half -= segLens[i];
+        }
+
+        // Normalize segment direction
+        const segLen = Math.hypot(segDirX, segDirY);
+        const ux = segLen > 0 ? segDirX / segLen : 1;
+        const uy = segLen > 0 ? segDirY / segLen : 0;
+
+        const labelX = midX + nameOx;
+        const labelY = midY + nameOy - 6; // offset above the connector
+
+        const name = connector.associationName;
+        const charW = fs * 0.6;
+        const nameW = name.length * charW;
+        const readDir = connector.readingDirection ?? "none";
+
+        // Arrow positioning: height matches lowercase x-height, centred vertically with text
+        const xHeight = fs * 0.5; // approximate lowercase letter height
+        const arrowH = xHeight;   // arrow height = x-height
+        const arrowW = arrowH * 0.8; // arrow width proportional to height
+        const toTarget = readDir === "to-target";
+        const toSource = readDir === "to-source";
+        // Arrow placed just beyond the text, vertically centred with text middle
+        const arrowOff = nameW / 2 + arrowW + 3;
+        // Text baseline is at labelY; x-height region is labelY-xHeight to labelY
+        // Vertical centre of text = labelY - xHeight/2
+        const arrowMidY = labelY - xHeight / 2;
+
+        const isDragging = draggingEndLabel === "associationNameOffset";
+
+        function handleNameMouseDown(e: React.MouseEvent) {
+          if (!svgToWorld || !onUpdateEndOffset) return;
+          e.stopPropagation();
+          const startWorld = svgToWorld(e.clientX, e.clientY);
+          const startOx = nameOx, startOy = nameOy;
+          document.body.style.cursor = "grabbing";
+          setDraggingEndLabel("associationNameOffset");
+          function onMove(ev: MouseEvent) {
+            const cur = svgToWorld!(ev.clientX, ev.clientY);
+            onUpdateEndOffset!(connector.id, "associationNameOffset", {
+              x: startOx + cur.x - startWorld.x,
+              y: startOy + cur.y - startWorld.y,
+            });
+          }
+          function onUp() {
+            document.body.style.cursor = "";
+            setDraggingEndLabel(null);
+            window.removeEventListener("mousemove", onMove);
+            window.removeEventListener("mouseup", onUp);
+          }
+          window.addEventListener("mousemove", onMove);
+          window.addEventListener("mouseup", onUp);
+        }
+
+        return (
+          <g>
+            {/* Tether line while dragging */}
+            {isDragging && (
+              <line x1={midX} y1={midY} x2={labelX} y2={labelY}
+                stroke="#9ca3af" strokeWidth={0.7} strokeDasharray="3 2"
+                style={{ pointerEvents: "none" }} />
+            )}
+            {/* Name text */}
+            <text textAnchor="middle" fontSize={fs} fill="#374151" fontStyle="italic"
+              x={labelX} y={labelY}
+              style={{ cursor: onUpdateEndOffset ? "grab" : "default", userSelect: "none" }}
+              onMouseDown={handleNameMouseDown}>
+              {name}
+            </text>
+            {/* Reading direction arrow — height matches lowercase, centred with text */}
+            {toTarget && (
+              <polygon
+                points={`${labelX + arrowOff - arrowW},${arrowMidY - arrowH / 2} ${labelX + arrowOff},${arrowMidY} ${labelX + arrowOff - arrowW},${arrowMidY + arrowH / 2}`}
+                fill="#374151" style={{ pointerEvents: "none" }}
+              />
+            )}
+            {toSource && (
+              <polygon
+                points={`${labelX - arrowOff + arrowW},${arrowMidY - arrowH / 2} ${labelX - arrowOff},${arrowMidY} ${labelX - arrowOff + arrowW},${arrowMidY + arrowH / 2}`}
+                fill="#374151" style={{ pointerEvents: "none" }}
+              />
+            )}
           </g>
         );
       })()}
