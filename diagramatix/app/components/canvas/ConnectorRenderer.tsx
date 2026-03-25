@@ -536,7 +536,7 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
     }
     // Crossing humps for sequence and association connectors
     if (otherConnectorWaypoints && otherConnectorWaypoints.length > 0
-        && (connector.type === "sequence" || connector.type === "association")
+        && (connector.type === "sequence" || connector.type === "association" || connector.type === "uml-association")
         && (connector.routingType === "rectilinear" || connector.routingType === "direct")) {
       const humpPath = pathWithHumps(visibleWaypoints, otherConnectorWaypoints);
       if (humpPath) return humpPath;

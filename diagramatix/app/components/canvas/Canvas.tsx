@@ -1791,7 +1791,7 @@ export function Canvas({
           {/* Regular connectors — rendered behind elements (skip selected, rendered on top later) */}
           {(() => {
             const regularConns = data.connectors.filter(c => c.type !== "associationBPMN" && c.type !== "messageBPMN");
-            const humpEligible = regularConns.filter(c => c.type === "sequence" || c.type === "association");
+            const humpEligible = regularConns.filter(c => c.type === "sequence" || c.type === "association" || c.type === "uml-association");
             return regularConns.filter(c => c.id !== selectedConnectorId).map((conn) => (
               <ConnectorRenderer
                 key={conn.id}
@@ -1809,7 +1809,7 @@ export function Canvas({
                   : undefined}
                 onUpdateCurveHandles={onUpdateCurveHandles}
                 otherConnectorWaypoints={
-                  (conn.type === "sequence" || conn.type === "association")
+                  (conn.type === "sequence" || conn.type === "association" || conn.type === "uml-association")
                     ? humpEligible.slice(0, humpEligible.indexOf(conn)).map(c => {
                         const vs = c.sourceInvisibleLeader ? 1 : 0;
                         const ve = c.targetInvisibleLeader ? c.waypoints.length - 2 : c.waypoints.length - 1;
@@ -2128,7 +2128,7 @@ export function Canvas({
           {selectedConnectorId && (() => {
             const conn = data.connectors.find(c => c.id === selectedConnectorId && c.type !== "associationBPMN" && c.type !== "messageBPMN");
             if (!conn) return null;
-            const allHumpConns = data.connectors.filter(c => c.type === "sequence" || c.type === "association");
+            const allHumpConns = data.connectors.filter(c => c.type === "sequence" || c.type === "association" || c.type === "uml-association");
             const connIdx = allHumpConns.findIndex(c => c.id === conn.id);
             // Only hump over connectors added before this one
             const priorHumpConns = allHumpConns.slice(0, connIdx);
@@ -2149,7 +2149,7 @@ export function Canvas({
                   : undefined}
                 onUpdateCurveHandles={onUpdateCurveHandles}
                 otherConnectorWaypoints={
-                  (conn.type === "sequence" || conn.type === "association") && priorHumpConns.length > 0
+                  (conn.type === "sequence" || conn.type === "association" || conn.type === "uml-association") && priorHumpConns.length > 0
                     ? priorHumpConns.map(c => {
                         const vs = c.sourceInvisibleLeader ? 1 : 0;
                         const ve = c.targetInvisibleLeader ? c.waypoints.length - 2 : c.waypoints.length - 1;
