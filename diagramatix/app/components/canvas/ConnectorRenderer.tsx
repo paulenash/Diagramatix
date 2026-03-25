@@ -905,16 +905,15 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
         const nameW = name.length * charW;
         const readDir = connector.readingDirection ?? "none";
 
-        // Arrow positioning: height matches lowercase x-height, centred vertically with text
-        const xHeight = fs * 0.5; // approximate lowercase letter height
-        const arrowH = xHeight;   // arrow height = x-height
-        const arrowW = arrowH * 0.8; // arrow width proportional to height
+        // Arrow positioning: height matches lowercase x-height, 70% longer than default
+        const xHeight = fs * 0.5;
+        const arrowH = xHeight;
+        const arrowW = arrowH * 0.8 * 1.7; // 70% longer
         const toTarget = readDir === "to-target";
         const toSource = readDir === "to-source";
-        // Arrow placed just beyond the text, vertically centred with text middle
-        const arrowOff = nameW / 2 + arrowW + 3;
-        // Text baseline is at labelY; x-height region is labelY-xHeight to labelY
-        // Vertical centre of text = labelY - xHeight/2
+        // Determine if segment is vertical (arrow goes above/below) or horizontal (arrow goes left/right)
+        const isVerticalSeg = Math.abs(uy) > Math.abs(ux);
+        // Text baseline is at labelY; x-height centre = labelY - xHeight/2
         const arrowMidY = labelY - xHeight / 2;
 
         const isDragging = draggingEndLabel === "associationNameOffset";
@@ -958,19 +957,60 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
               onMouseDown={handleNameMouseDown}>
               {name}
             </text>
-            {/* Reading direction arrow — height matches lowercase, centred with text */}
-            {toTarget && (
-              <polygon
-                points={`${labelX + arrowOff - arrowW},${arrowMidY - arrowH / 2} ${labelX + arrowOff},${arrowMidY} ${labelX + arrowOff - arrowW},${arrowMidY + arrowH / 2}`}
-                fill="#374151" style={{ pointerEvents: "none" }}
-              />
-            )}
-            {toSource && (
-              <polygon
-                points={`${labelX - arrowOff + arrowW},${arrowMidY - arrowH / 2} ${labelX - arrowOff},${arrowMidY} ${labelX - arrowOff + arrowW},${arrowMidY + arrowH / 2}`}
-                fill="#374151" style={{ pointerEvents: "none" }}
-              />
-            )}
+            {/* Reading direction arrow */}
+            {(toTarget || toSource) && (() => {
+              // Find the nearest segment to the label's current position
+              let bestSegIdx = 0, bestDist = Infinity;
+              for (let i = 0; i < visibleWaypoints.length - 1; i++) {
+                const ax = visibleWaypoints[i].x, ay = visibleWaypoints[i].y;
+                const bx = visibleWaypoints[i + 1].x, by = visibleWaypoints[i + 1].y;
+                const mx = (ax + bx) / 2, my = (ay + by) / 2;
+                const d = Math.hypot(labelX - mx, labelY - my);
+                if (d < bestDist) { bestDist = d; bestSegIdx = i; }
+              }
+              const segA = visibleWaypoints[bestSegIdx];
+              const segB = visibleWaypoints[bestSegIdx + 1];
+              const sdx = segB.x - segA.x, sdy = segB.y - segA.y;
+              const isVert = Math.abs(sdy) > Math.abs(sdx);
+
+              if (isVert) {
+                // Vertical segment: arrow above or below name, centred horizontally
+                const pointsDown = (toTarget && sdy > 0) || (toSource && sdy < 0);
+                // Arrow base is a horizontal line, tip points up or down
+                const baseY = pointsDown ? labelY + 4 : labelY - xHeight - 4;
+                const tipY = pointsDown ? baseY + arrowW : baseY - arrowW;
+                return (
+                  <polygon
+                    points={`${labelX - arrowH / 2},${baseY} ${labelX + arrowH / 2},${baseY} ${labelX},${tipY}`}
+                    fill="#374151" style={{ pointerEvents: "none" }}
+                  />
+                );
+              } else {
+                // Horizontal segment: arrow left or right of name, centred vertically
+                const arrowOff = nameW / 2 + arrowW + 3;
+                if (toTarget) {
+                  const pointsRight = sdx > 0;
+                  const ax = pointsRight ? labelX + arrowOff - arrowW : labelX - arrowOff + arrowW;
+                  const tipX = pointsRight ? labelX + arrowOff : labelX - arrowOff;
+                  return (
+                    <polygon
+                      points={`${ax},${arrowMidY - arrowH / 2} ${tipX},${arrowMidY} ${ax},${arrowMidY + arrowH / 2}`}
+                      fill="#374151" style={{ pointerEvents: "none" }}
+                    />
+                  );
+                } else {
+                  const pointsLeft = sdx < 0;
+                  const ax = pointsLeft ? labelX - arrowOff + arrowW : labelX + arrowOff - arrowW;
+                  const tipX = pointsLeft ? labelX - arrowOff : labelX + arrowOff;
+                  return (
+                    <polygon
+                      points={`${ax},${arrowMidY - arrowH / 2} ${tipX},${arrowMidY} ${ax},${arrowMidY + arrowH / 2}`}
+                      fill="#374151" style={{ pointerEvents: "none" }}
+                    />
+                  );
+                }
+              }
+            })()}
           </g>
         );
       })()}
