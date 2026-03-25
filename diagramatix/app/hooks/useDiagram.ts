@@ -365,7 +365,15 @@ function validateConnectorsAgainstObstacles(connectors: Connector[], elements: D
       if (!source || !target) return conn;
       // Try with stored sides first
       const r1 = computeWaypoints(source, target, elements, conn.sourceSide, conn.targetSide, conn.routingType, conn.sourceOffsetAlong ?? 0.5, conn.targetOffsetAlong ?? 0.5);
-      const c1 = { ...conn, waypoints: r1.waypoints, sourceInvisibleLeader: r1.sourceInvisibleLeader, targetInvisibleLeader: r1.targetInvisibleLeader };
+      const endLabelResets = {
+        associationNameOffset: undefined,
+        sourceRoleOffset: undefined, sourceMultOffset: undefined,
+        sourceConstraintOffset: undefined, sourceUniqueOffset: undefined,
+        targetRoleOffset: undefined, targetMultOffset: undefined,
+        targetConstraintOffset: undefined, targetUniqueOffset: undefined,
+      };
+      const c1 = { ...conn, waypoints: r1.waypoints, sourceInvisibleLeader: r1.sourceInvisibleLeader, targetInvisibleLeader: r1.targetInvisibleLeader,
+        ...endLabelResets };
       if (!connectorHitsAnyElement(c1, elements)) return c1;
       // Try with recalculated optimal sides
       const srcCx = source.x + source.width / 2, srcCy = source.y + source.height / 2;
@@ -375,7 +383,8 @@ function validateConnectorsAgainstObstacles(connectors: Connector[], elements: D
       const newTgtSide: Side = Math.abs(ddx) >= Math.abs(ddy) ? (ddx > 0 ? "left" : "right") : (ddy > 0 ? "top" : "bottom");
       const r2 = computeWaypoints(source, target, elements, newSrcSide, newTgtSide, conn.routingType, 0.5, 0.5);
       return { ...conn, waypoints: r2.waypoints, sourceInvisibleLeader: r2.sourceInvisibleLeader, targetInvisibleLeader: r2.targetInvisibleLeader,
-        sourceSide: newSrcSide, targetSide: newTgtSide, sourceOffsetAlong: 0.5, targetOffsetAlong: 0.5 };
+        sourceSide: newSrcSide, targetSide: newTgtSide, sourceOffsetAlong: 0.5, targetOffsetAlong: 0.5,
+        ...endLabelResets };
     });
     if (!anyChanged) break;
   }
@@ -1087,8 +1096,14 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       const connectors = state.connectors.map((conn) => {
         if (conn.id !== connectorId) return conn;
         const updated = endpoint === "source"
-          ? { ...conn, sourceId: newElementId, sourceSide: newSide, sourceOffsetAlong: newOffsetAlong ?? 0.5 }
-          : { ...conn, targetId: newElementId, targetSide: newSide, targetOffsetAlong: newOffsetAlong ?? 0.5 };
+          ? { ...conn, sourceId: newElementId, sourceSide: newSide, sourceOffsetAlong: newOffsetAlong ?? 0.5,
+              sourceRoleOffset: undefined, sourceMultOffset: undefined,
+              sourceConstraintOffset: undefined, sourceUniqueOffset: undefined,
+              associationNameOffset: undefined }
+          : { ...conn, targetId: newElementId, targetSide: newSide, targetOffsetAlong: newOffsetAlong ?? 0.5,
+              targetRoleOffset: undefined, targetMultOffset: undefined,
+              targetConstraintOffset: undefined, targetUniqueOffset: undefined,
+              associationNameOffset: undefined };
         const source = state.elements.find((el) => el.id === updated.sourceId);
         const target = state.elements.find((el) => el.id === updated.targetId);
         if (!source || !target) return conn;
@@ -1118,7 +1133,12 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         }
         const newSrcOffset = nudgeOffset(conn.sourceSide, conn.sourceOffsetAlong ?? 0.5);
         const newTgtOffset = nudgeOffset(conn.targetSide, conn.targetOffsetAlong ?? 0.5);
-        const updated = { ...conn, sourceOffsetAlong: newSrcOffset, targetOffsetAlong: newTgtOffset };
+        const updated = { ...conn, sourceOffsetAlong: newSrcOffset, targetOffsetAlong: newTgtOffset,
+          sourceRoleOffset: undefined, sourceMultOffset: undefined,
+          sourceConstraintOffset: undefined, sourceUniqueOffset: undefined,
+          targetRoleOffset: undefined, targetMultOffset: undefined,
+          targetConstraintOffset: undefined, targetUniqueOffset: undefined,
+          associationNameOffset: undefined };
         const source = state.elements.find((el) => el.id === updated.sourceId);
         const target = state.elements.find((el) => el.id === updated.targetId);
         if (!source || !target) return conn;
@@ -1144,8 +1164,12 @@ function reducer(state: DiagramData, action: Action): DiagramData {
           return clamp(offset + dy * 0.02);
         }
         const updated = endpoint === "source"
-          ? { ...conn, sourceOffsetAlong: nudgeOffset(conn.sourceSide, conn.sourceOffsetAlong ?? 0.5) }
-          : { ...conn, targetOffsetAlong: nudgeOffset(conn.targetSide, conn.targetOffsetAlong ?? 0.5) };
+          ? { ...conn, sourceOffsetAlong: nudgeOffset(conn.sourceSide, conn.sourceOffsetAlong ?? 0.5),
+              sourceRoleOffset: undefined, sourceMultOffset: undefined,
+              sourceConstraintOffset: undefined, sourceUniqueOffset: undefined }
+          : { ...conn, targetOffsetAlong: nudgeOffset(conn.targetSide, conn.targetOffsetAlong ?? 0.5),
+              targetRoleOffset: undefined, targetMultOffset: undefined,
+              targetConstraintOffset: undefined, targetUniqueOffset: undefined };
         const source = state.elements.find((el) => el.id === updated.sourceId);
         const target = state.elements.find((el) => el.id === updated.targetId);
         if (!source || !target) return conn;

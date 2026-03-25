@@ -687,6 +687,11 @@ export function recomputeAllConnectors(
           targetInvisibleLeader: result2.targetInvisibleLeader,
           sourceSide: newSrcSide, targetSide: newTgtSide,
           sourceOffsetAlong: 0.5, targetOffsetAlong: 0.5,
+          associationNameOffset: undefined,
+          sourceRoleOffset: undefined, sourceMultOffset: undefined,
+          sourceConstraintOffset: undefined, sourceUniqueOffset: undefined,
+          targetRoleOffset: undefined, targetMultOffset: undefined,
+          targetConstraintOffset: undefined, targetUniqueOffset: undefined,
         };
       }
     }
@@ -722,6 +727,11 @@ export function recomputeAllConnectors(
         targetInvisibleLeader: result3.targetInvisibleLeader,
         sourceSide: reSrcSide, targetSide: reTgtSide,
         sourceOffsetAlong: 0.5, targetOffsetAlong: 0.5,
+        associationNameOffset: undefined,
+        sourceRoleOffset: undefined, sourceMultOffset: undefined,
+        sourceConstraintOffset: undefined, sourceUniqueOffset: undefined,
+        targetRoleOffset: undefined, targetMultOffset: undefined,
+        targetConstraintOffset: undefined, targetUniqueOffset: undefined,
       };
     }
 

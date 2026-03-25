@@ -145,6 +145,7 @@ export interface Connector {
   associationName?: string;
   readingDirection?: "none" | "to-source" | "to-target";
   associationNameOffset?: Point;
+  arrowAtSource?: boolean; // if true, open-directed arrow is shown at source end instead of target
 }
 
 export interface Viewport {

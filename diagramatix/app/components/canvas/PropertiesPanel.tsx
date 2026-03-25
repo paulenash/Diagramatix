@@ -413,86 +413,101 @@ export function PropertiesPanel({
             connector.type === "uml-composition" || connector.type === "uml-generalisation";
           return (
             <>
-              {/* Relationship type */}
+              {/* Relationship, Name, Reading Direction, Navigability — compact group */}
               {isUmlConn && (() => {
-                const opts = [
+                const relOpts = [
                   { value: "uml-association" as ConnectorType, label: "Association" },
                   { value: "uml-aggregation" as ConnectorType, label: "Aggregation" },
                   { value: "uml-composition" as ConnectorType, label: "Composition" },
                   { value: "uml-generalisation" as ConnectorType, label: "Generalisation" },
                 ];
-                const currentLabel = opts.find(o => o.value === connector.type)?.label ?? connector.type;
-                if (isClassEnumConn) {
-                  return <p className="text-xs text-gray-700"><span className="font-medium">Relationship:</span> Association</p>;
-                }
+                const labelCls = "text-[10px] font-medium text-gray-500 w-20 shrink-0";
+                const selectCls = "text-[10px] border border-gray-300 rounded px-1 py-0 bg-white text-gray-700 cursor-pointer font-medium flex-1 min-w-0";
                 return (
-                  <div className="flex items-center gap-1">
-                    <span className="text-[10px] font-medium text-gray-500 shrink-0">Relationship:</span>
-                    <select
-                      value={connector.type}
-                      onChange={e => onUpdateConnectorType?.(connector.id, e.target.value as ConnectorType)}
-                      className="text-[10px] border border-gray-300 rounded px-1 py-0 bg-white text-gray-700 cursor-pointer font-medium"
-                    >
-                      {opts.map(o => (
-                        <option key={o.value} value={o.value}>{o.label}</option>
-                      ))}
-                    </select>
+                  <div className="space-y-0.5">
+                    {/* Relationship */}
+                    {isClassEnumConn ? (
+                      <div className="flex items-center gap-1">
+                        <span className={labelCls}>Relationship:</span>
+                        <span className="text-[10px] font-medium text-gray-700">Association</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1">
+                        <span className={labelCls}>Relationship:</span>
+                        <select value={connector.type}
+                          onChange={e => onUpdateConnectorType?.(connector.id, e.target.value as ConnectorType)}
+                          className={selectCls}>
+                          {relOpts.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                        </select>
+                      </div>
+                    )}
+                    {/* Name */}
+                    {(connector.type === "uml-association" || connector.type === "uml-aggregation" ||
+                      connector.type === "uml-composition") && onUpdateConnectorFields && (
+                      <div className="flex items-center gap-1">
+                        <span className={labelCls}>Name:</span>
+                        <input type="text" className={"flex-1 text-[10px] border border-gray-300 rounded px-1 py-0 min-w-0"}
+                          defaultValue={connector.associationName ?? ""} key={`an-${connector.id}`}
+                          onBlur={e => onUpdateConnectorFields(connector.id, { associationName: e.target.value })}
+                          onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                          placeholder="association name" />
+                      </div>
+                    )}
+                    {/* Reading Direction */}
+                    {(connector.type === "uml-association" || connector.type === "uml-aggregation" ||
+                      connector.type === "uml-composition") && onUpdateConnectorFields && (
+                      <div className="flex items-center gap-1">
+                        <span className={labelCls}>Reading Dir:</span>
+                        <select value={connector.readingDirection ?? "none"}
+                          onChange={e => onUpdateConnectorFields(connector.id, { readingDirection: e.target.value as "none" | "to-source" | "to-target" })}
+                          className={selectCls}>
+                          <option value="none">None</option>
+                          <option value="to-source">{"\u25C0"} To Source</option>
+                          <option value="to-target">To Target {"\u25B6"}</option>
+                        </select>
+                      </div>
+                    )}
+                    {/* Navigability */}
+                    {connector.type === "uml-association" && !isClassEnumConn && onUpdateConnectorDirection && onUpdateConnectorFields && (
+                      <div className="flex items-center gap-1">
+                        <span className={labelCls}>Navigability:</span>
+                        <select
+                          value={connector.directionType === "non-directed" ? "none" : connector.arrowAtSource ? "to-source" : "to-target"}
+                          onChange={e => {
+                            const v = e.target.value;
+                            if (v === "none") {
+                              onUpdateConnectorDirection(connector.id, "non-directed");
+                              onUpdateConnectorFields(connector.id, { arrowAtSource: false });
+                            } else if (v === "to-target") {
+                              onUpdateConnectorDirection(connector.id, "open-directed");
+                              onUpdateConnectorFields(connector.id, { arrowAtSource: false });
+                            } else if (v === "to-source") {
+                              onUpdateConnectorDirection(connector.id, "open-directed");
+                              onUpdateConnectorFields(connector.id, { arrowAtSource: true });
+                            }
+                          }}
+                          className={selectCls}>
+                          <option value="none">None</option>
+                          <option value="to-source">{"\u25C0"} To Source</option>
+                          <option value="to-target">To Target {"\u25B6"}</option>
+                        </select>
+                      </div>
+                    )}
                   </div>
                 );
               })()}
-              {/* Direction — hidden for Class↔Enumeration */}
-              {connector.type === "uml-association" && !isClassEnumConn && (
-                <div className="flex items-center gap-1">
-                  <span className="text-[10px] font-medium text-gray-500 shrink-0">Direction:</span>
-                  <select
-                    value={connector.directionType}
-                    onChange={e => onUpdateConnectorDirection(connector.id, e.target.value as DirectionType)}
-                    className="text-[10px] border border-gray-300 rounded px-1 py-0 bg-white text-gray-700 cursor-pointer font-medium"
-                  >
-                    <option value="non-directed">None</option>
-                    <option value="open-directed">Open</option>
-                  </select>
-                </div>
-              )}
             </>
           );
         })()}
-        {/* Reverse button for aggregation/composition/generalisation, and association when directed */}
-        {((connector.type === "uml-aggregation" || connector.type === "uml-composition" ||
-          connector.type === "uml-generalisation") ||
-          (connector.type === "uml-association" && connector.directionType !== "non-directed")) && onReverseConnector && (
+        {/* Reverse button for aggregation/composition/generalisation only */}
+        {(connector.type === "uml-aggregation" || connector.type === "uml-composition" ||
+          connector.type === "uml-generalisation") && onReverseConnector && (
           <button
             onClick={() => onReverseConnector(connector.id)}
-            className="w-full px-3 py-1.5 text-xs bg-gray-50 text-gray-700 border border-gray-300 rounded hover:bg-gray-100"
+            className="w-full px-3 py-1 text-[10px] bg-gray-50 text-gray-700 border border-gray-300 rounded hover:bg-gray-100"
           >
             Reverse Direction
           </button>
-        )}
-        {/* UML association name */}
-        {(connector.type === "uml-association" || connector.type === "uml-aggregation" ||
-          connector.type === "uml-composition") && onUpdateConnectorFields && (
-          <div className="space-y-1 border-t border-gray-100 pt-1.5">
-            <div className="flex items-center gap-1">
-              <label className="text-[9px] text-gray-400 w-12 shrink-0">Name</label>
-              <input type="text" className="flex-1 text-[10px] border border-gray-300 rounded px-1 py-0 min-w-0"
-                defaultValue={connector.associationName ?? ""} key={`an-${connector.id}`}
-                onBlur={e => onUpdateConnectorFields(connector.id, { associationName: e.target.value })}
-                onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
-                placeholder="association name" />
-            </div>
-            <div className="flex items-center gap-1">
-              <label className="text-[9px] text-gray-400 w-12 shrink-0">Reading Direction</label>
-              <select
-                value={connector.readingDirection ?? "none"}
-                onChange={e => onUpdateConnectorFields(connector.id, { readingDirection: e.target.value as "none" | "to-source" | "to-target" })}
-                className="text-[10px] border border-gray-300 rounded px-1 py-0 bg-white text-gray-700 cursor-pointer font-medium"
-              >
-                <option value="none">None</option>
-                <option value="to-source">{"\u25C0"} Source</option>
-                <option value="to-target">Target {"\u25B6"}</option>
-              </select>
-            </div>
-          </div>
         )}
         {/* UML association end properties */}
         {(connector.type === "uml-association" || connector.type === "uml-aggregation" ||
@@ -541,9 +556,9 @@ export function PropertiesPanel({
                       className="text-[10px] border border-gray-300 rounded px-1 py-0 bg-white text-gray-700 cursor-pointer font-medium"
                     >
                       <option value="">None</option>
-                      <option value="+">+</option>
-                      <option value="-">-</option>
-                      <option value="#">#</option>
+                      <option value="+">+ Public</option>
+                      <option value="-">- Private</option>
+                      <option value="#"># Protected</option>
                     </select>
                   </div>
                   <div className="flex items-center gap-1">
@@ -596,9 +611,9 @@ export function PropertiesPanel({
                       className="text-[10px] border border-gray-300 rounded px-1 py-0 bg-white text-gray-700 cursor-pointer font-medium"
                     >
                       <option value="">None</option>
-                      <option value="+">+</option>
-                      <option value="-">-</option>
-                      <option value="#">#</option>
+                      <option value="+">+ Public</option>
+                      <option value="-">- Private</option>
+                      <option value="#"># Protected</option>
                     </select>
                   </div>
                   <div className="flex items-center gap-1">

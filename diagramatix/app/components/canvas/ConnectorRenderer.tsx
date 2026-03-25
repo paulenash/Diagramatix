@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useContext } from "react";
-import type { Connector, Point } from "@/app/lib/diagram/types";
+import type { Connector, Point, Side } from "@/app/lib/diagram/types";
 import { DisplayModeCtx, ConnectorFontScaleCtx, sketchyFilter } from "@/app/lib/diagram/displayMode";
 import { waypointsToSvgPath, waypointsToCurvePath, waypointsToRoundedPath } from "@/app/lib/diagram/routing";
 
@@ -651,7 +651,8 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
         </defs>
       ) : isUmlConn ? (
         <defs>
-          {connector.type === "uml-association" && showArrow && <OpenArrowMarker id={openMarkerId} color={strokeColor} />}
+          {connector.type === "uml-association" && showArrow && !connector.arrowAtSource && <OpenArrowMarker id={openMarkerId} color={strokeColor} />}
+          {connector.type === "uml-association" && showArrow && connector.arrowAtSource && <OpenArrowMarkerStart id={`${openMarkerId}-src`} color={strokeColor} />}
           {connector.type === "uml-aggregation" && <UmlDiamondOpen id={umlDiamondId} color={strokeColor} />}
           {connector.type === "uml-composition" && <UmlDiamondFilled id={umlDiamondId} color={strokeColor} />}
           {connector.type === "uml-generalisation" && <UmlTriangleOpen id={umlTriangleId} color={strokeColor} />}
@@ -692,12 +693,13 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
           isMessageBPMN ? `url(#msg-start-${connector.id})`
           : (connector.type === "uml-aggregation" || connector.type === "uml-composition") ? `url(#${umlDiamondId})`
           : connector.type === "uml-generalisation" ? `url(#${umlTriangleId})`
+          : connector.type === "uml-association" && showArrow && connector.arrowAtSource ? `url(#${openMarkerId}-src)`
           : isBothArrow ? `url(#${openStartMarkerId})`
           : undefined
         }
         markerEnd={(displayMode === "hand-drawn" && !isMessageBPMN) ? undefined :
           isMessageBPMN ? `url(#msg-end-${connector.id})`
-          : connector.type === "uml-association" && showArrow ? `url(#${openMarkerId})`
+          : connector.type === "uml-association" && showArrow && !connector.arrowAtSource ? `url(#${openMarkerId})`
           : showArrow && !isUmlConn ? `url(#${isOpenArrow ? openMarkerId : markerId})`
           : undefined
         }
@@ -715,12 +717,13 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
             isMessageBPMN ? `url(#msg-start-${connector.id})`
             : (connector.type === "uml-aggregation" || connector.type === "uml-composition") ? `url(#${umlDiamondId})`
             : connector.type === "uml-generalisation" ? `url(#${umlTriangleId})`
+            : connector.type === "uml-association" && showArrow && connector.arrowAtSource ? `url(#${openMarkerId}-src)`
             : isBothArrow ? `url(#${openStartMarkerId})`
             : undefined
           }
           markerEnd={
             isMessageBPMN ? `url(#msg-end-${connector.id})`
-            : connector.type === "uml-association" && showArrow ? `url(#${openMarkerId})`
+            : connector.type === "uml-association" && showArrow && !connector.arrowAtSource ? `url(#${openMarkerId})`
             : showArrow && !isUmlConn ? `url(#${isOpenArrow ? openMarkerId : markerId})`
             : undefined
           }
@@ -751,40 +754,93 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
         const tgtPrev = visibleWaypoints[visibleWaypoints.length - 2];
         const srcDx = srcNext.x - srcPt.x, srcDy = srcNext.y - srcPt.y;
         const tgtDx = tgtPt.x - tgtPrev.x, tgtDy = tgtPt.y - tgtPrev.y;
-        // Default label anchor positions near the edge point
-        const defSrcX = srcPt.x + (srcDx !== 0 ? Math.sign(srcDx) * 8 : 0);
-        const defSrcY = srcPt.y + (srcDy !== 0 ? Math.sign(srcDy) * 8 : 0);
-        const defTgtX = tgtPt.x - (tgtDx !== 0 ? Math.sign(tgtDx) * 8 : 0);
-        const defTgtY = tgtPt.y - (tgtDy !== 0 ? Math.sign(tgtDy) * 8 : 0);
-        // Perpendicular offsets
-        const srcPerpX = Math.abs(srcDy) > Math.abs(srcDx) ? (srcDy > 0 ? -6 : 6) : 0;
-        const srcPerpY = Math.abs(srcDx) > Math.abs(srcDy) ? -6 : 0;
-        const tgtPerpX = Math.abs(tgtDy) > Math.abs(tgtDx) ? (tgtDy < 0 ? -6 : 6) : 0;
-        const tgtPerpY = Math.abs(tgtDx) > Math.abs(tgtDy) ? -6 : 0;
-
-        // Build label groups: role (with visibility), multiplicity, constraint+qualifier
-        function buildRole(role?: string, vis?: string): string | null {
-          if (role) return vis ? `${vis} ${role}` : role;
-          if (vis) return vis;
-          return null;
-        }
-        const srcRole = buildRole(connector.sourceRole, connector.sourceVisibility);
+        // Build label groups first (needed to determine placement)
+        const srcRole = connector.sourceRole || null;
+        const srcVis = connector.sourceVisibility || null;
         const srcMult = connector.sourceMultiplicity || null;
         const srcOrdered = connector.sourceOrdered ? "{ordered}" : null;
         const srcUnique = connector.sourceUnique ? "{unique}" : null;
         const srcQual = connector.sourceQualifier ? `[${connector.sourceQualifier}]` : null;
-        const tgtRole = buildRole(connector.targetRole, connector.targetVisibility);
+        const tgtRole = connector.targetRole || null;
+
+        // Multiplicity offset based on which element edge the connector attaches to:
+        // bottom: (-5, +5), left: (+5, -5), top: (-5, -5), right: (+5, -5)
+        function multOffset(side: Side): { mx: number; my: number } {
+          switch (side) {
+            case "bottom": return { mx: -15, my: 15 };
+            case "left":   return { mx: -15, my: -15 };
+            case "top":    return { mx: -15, my: -15 };
+            case "right":  return { mx: 15, my: -15 };
+          }
+        }
+        function roleOffset(side: Side): { rx: number; ry: number } {
+          switch (side) {
+            case "bottom": return { rx: 15, ry: 15 };
+            case "left":   return { rx: -15, ry: 15 };
+            case "top":    return { rx: 15, ry: -15 };
+            case "right":  return { rx: 15, ry: 15 };
+          }
+        }
+
+        // Constraint offset: same side as multiplicity, pushed further away from element
+        // For bottom/top edges: constraints stack vertically below/above multiplicity
+        // For left/right edges: constraints stack vertically below/above multiplicity
+        function constraintOffset(side: Side, index: number): { cx: number; cy: number } {
+          const m = multOffset(side);
+          const spacing = lineH; // distance between stacked constraints
+          switch (side) {
+            case "bottom": return { cx: m.mx, cy: m.my + spacing * (index + 1) };
+            case "top":    return { cx: m.mx, cy: m.my - spacing * (index + 1) };
+            case "left":   return { cx: m.mx - spacing * (index + 1), cy: m.my };
+            case "right":  return { cx: m.mx + spacing * (index + 1), cy: m.my };
+          }
+        }
+
+        // Source: unit vectors (still needed for other calculations)
+        const srcLen = Math.hypot(srcDx, srcDy) || 1;
+        const srcUx = srcDx / srcLen, srcUy = srcDy / srcLen;
+        const srcPerpUx = -srcUy, srcPerpUy = srcUx;
+
+        // Source multiplicity base: edge point + side-based offset
+        const srcM = multOffset(connector.sourceSide);
+        const srcMultBaseX = srcPt.x + srcM.mx;
+        const srcMultBaseY = srcPt.y + srcM.my;
+        // Source role base: opposite side from multiplicity
+        const srcR = roleOffset(connector.sourceSide);
+        const srcRoleBaseX = srcPt.x + srcR.rx;
+        const srcRoleBaseY = srcPt.y + srcR.ry;
+        // Source constraints: same side as multiplicity, further out (stacked)
+        const srcC0 = constraintOffset(connector.sourceSide, 0);
+        const srcC1 = constraintOffset(connector.sourceSide, 1);
+
+        // Target: unit vectors (reversed to point away from target)
+        const tgtLen = Math.hypot(tgtDx, tgtDy) || 1;
+        const tgtUx = -tgtDx / tgtLen, tgtUy = -tgtDy / tgtLen;
+        const tgtPerpUx = -tgtUy, tgtPerpUy = tgtUx;
+        const tgtVis = connector.targetVisibility || null;
         const tgtMult = connector.targetMultiplicity || null;
         const tgtOrdered = connector.targetOrdered ? "{ordered}" : null;
         const tgtUnique = connector.targetUnique ? "{unique}" : null;
         const tgtQual = connector.targetQualifier ? `[${connector.targetQualifier}]` : null;
 
-        if (!srcRole && !srcMult && !srcOrdered && !srcUnique && !srcQual
-          && !tgtRole && !tgtMult && !tgtOrdered && !tgtUnique && !tgtQual) return null;
+        // Target multiplicity base: edge point + side-based offset
+        const tgtM = multOffset(connector.targetSide);
+        const tgtMultBaseX = tgtPt.x + tgtM.mx;
+        const tgtMultBaseY = tgtPt.y + tgtM.my;
+        // Target role base: opposite side
+        const tgtR = roleOffset(connector.targetSide);
+        const tgtRoleBaseX = tgtPt.x + tgtR.rx;
+        const tgtRoleBaseY = tgtPt.y + tgtR.ry;
+        // Target constraints: same side as multiplicity, further out (stacked)
+        const tgtC0 = constraintOffset(connector.targetSide, 0);
+        const tgtC1 = constraintOffset(connector.targetSide, 1);
+
+        if (!srcRole && !srcVis && !srcMult && !srcOrdered && !srcUnique && !srcQual
+          && !tgtRole && !tgtVis && !tgtMult && !tgtOrdered && !tgtUnique && !tgtQual) return null;
 
         // Draggable label component
-        function EndLabel({ text, anchorX, anchorY, offsetField, offset, anchor, bold }: {
-          text: string; anchorX: number; anchorY: number; offsetField: string; offset?: Point; anchor: "start" | "middle" | "end"; bold?: boolean;
+        function EndLabel({ text, anchorX, anchorY, offsetField, offset, anchor, bold, prefix, prefixLarger }: {
+          text: string; anchorX: number; anchorY: number; offsetField: string; offset?: Point; anchor: "start" | "middle" | "end"; bold?: boolean; prefix?: string; prefixLarger?: boolean;
         }) {
           const ox = offset?.x ?? 0, oy = offset?.y ?? 0;
           const x = anchorX + ox, y = anchorY + oy;
@@ -823,6 +879,7 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
                 x={x} y={y} fontWeight={bold ? "bold" : "normal"}
                 style={{ cursor: onUpdateEndOffset ? "grab" : "default", userSelect: "none" }}
                 onMouseDown={handleMouseDown}>
+                {prefix && <tspan fontSize={prefixLarger ? fs * 1.4 : fs} fontWeight="bold" dy={prefixLarger ? 2 : 0}>{prefix}</tspan>}{prefix && <tspan dy={prefixLarger ? -2 : 0}> </tspan>}
                 {text}
               </text>
             </g>
@@ -831,40 +888,47 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
 
         const srcAnchor: "start" | "middle" | "end" = srcDx > 0 ? "start" : srcDx < 0 ? "end" : "middle";
         const tgtAnchor: "start" | "middle" | "end" = tgtDx > 0 ? "end" : tgtDx < 0 ? "start" : "middle";
+        // Role anchor: based on role offset direction — "start" when placed right, "end" when placed left
+        const srcRoleAnchor: "start" | "middle" | "end" = srcR.rx > 0 ? "start" : srcR.rx < 0 ? "end" : srcAnchor;
+        const tgtRoleAnchor: "start" | "middle" | "end" = tgtR.rx > 0 ? "start" : tgtR.rx < 0 ? "end" : tgtAnchor;
 
         return (
           <g>
-            {/* Source end labels */}
-            {srcRole && <EndLabel text={srcRole}
-              anchorX={defSrcX + srcPerpX} anchorY={defSrcY + srcPerpY}
-              offsetField="sourceRoleOffset" offset={connector.sourceRoleOffset} anchor={srcAnchor} />}
+            {/* Source end: Role+Vis on one side, Mult on other, Constraints same side as Mult */}
+            {(srcRole || srcVis) && <EndLabel text={srcRole ?? ""}
+              prefix={srcVis ?? undefined} prefixLarger
+              anchorX={srcRoleBaseX} anchorY={srcRoleBaseY}
+              offsetField="sourceRoleOffset" offset={connector.sourceRoleOffset} anchor={srcRoleAnchor} />}
             {srcMult && <EndLabel text={srcMult} bold
-              anchorX={defSrcX + srcPerpX} anchorY={defSrcY + srcPerpY + lineH}
+              anchorX={srcMultBaseX} anchorY={srcMultBaseY}
               offsetField="sourceMultOffset" offset={connector.sourceMultOffset} anchor={srcAnchor} />}
             {srcOrdered && <EndLabel text={srcOrdered}
-              anchorX={defSrcX + srcPerpX} anchorY={defSrcY + srcPerpY + lineH * 2}
+              anchorX={srcPt.x + srcC0.cx} anchorY={srcPt.y + srcC0.cy}
               offsetField="sourceConstraintOffset" offset={connector.sourceConstraintOffset} anchor={srcAnchor} />}
             {srcUnique && <EndLabel text={srcUnique}
-              anchorX={defSrcX + srcPerpX + (srcOrdered ? fs * 5 : 0)} anchorY={defSrcY + srcPerpY + lineH * 2}
+              anchorX={srcPt.x + (srcOrdered ? srcC1.cx : srcC0.cx)} anchorY={srcPt.y + (srcOrdered ? srcC1.cy : srcC0.cy)}
               offsetField="sourceUniqueOffset" offset={connector.sourceUniqueOffset} anchor={srcAnchor} />}
             {srcQual && <EndLabel text={srcQual}
-              anchorX={defSrcX + srcPerpX} anchorY={defSrcY + srcPerpY + lineH * 3}
+              anchorX={srcPt.x + constraintOffset(connector.sourceSide, (srcOrdered ? 1 : 0) + (srcUnique ? 1 : 0)).cx}
+              anchorY={srcPt.y + constraintOffset(connector.sourceSide, (srcOrdered ? 1 : 0) + (srcUnique ? 1 : 0)).cy}
               offsetField="sourceConstraintOffset" offset={connector.sourceConstraintOffset} anchor={srcAnchor} />}
-            {/* Target end labels */}
-            {tgtRole && <EndLabel text={tgtRole}
-              anchorX={defTgtX + tgtPerpX} anchorY={defTgtY + tgtPerpY}
-              offsetField="targetRoleOffset" offset={connector.targetRoleOffset} anchor={tgtAnchor} />}
+            {/* Target end: same layout */}
+            {(tgtRole || tgtVis) && <EndLabel text={tgtRole ?? ""}
+              prefix={tgtVis ?? undefined} prefixLarger
+              anchorX={tgtRoleBaseX} anchorY={tgtRoleBaseY}
+              offsetField="targetRoleOffset" offset={connector.targetRoleOffset} anchor={tgtRoleAnchor} />}
             {tgtMult && <EndLabel text={tgtMult} bold
-              anchorX={defTgtX + tgtPerpX} anchorY={defTgtY + tgtPerpY + lineH}
+              anchorX={tgtMultBaseX} anchorY={tgtMultBaseY}
               offsetField="targetMultOffset" offset={connector.targetMultOffset} anchor={tgtAnchor} />}
             {tgtOrdered && <EndLabel text={tgtOrdered}
-              anchorX={defTgtX + tgtPerpX} anchorY={defTgtY + tgtPerpY + lineH * 2}
+              anchorX={tgtPt.x + tgtC0.cx} anchorY={tgtPt.y + tgtC0.cy}
               offsetField="targetConstraintOffset" offset={connector.targetConstraintOffset} anchor={tgtAnchor} />}
             {tgtUnique && <EndLabel text={tgtUnique}
-              anchorX={defTgtX + tgtPerpX + (tgtOrdered ? fs * 5 : 0)} anchorY={defTgtY + tgtPerpY + lineH * 2}
+              anchorX={tgtPt.x + (tgtOrdered ? tgtC1.cx : tgtC0.cx)} anchorY={tgtPt.y + (tgtOrdered ? tgtC1.cy : tgtC0.cy)}
               offsetField="targetUniqueOffset" offset={connector.targetUniqueOffset} anchor={tgtAnchor} />}
             {tgtQual && <EndLabel text={tgtQual}
-              anchorX={defTgtX + tgtPerpX} anchorY={defTgtY + tgtPerpY + lineH * 3}
+              anchorX={tgtPt.x + constraintOffset(connector.targetSide, (tgtOrdered ? 1 : 0) + (tgtUnique ? 1 : 0)).cx}
+              anchorY={tgtPt.y + constraintOffset(connector.targetSide, (tgtOrdered ? 1 : 0) + (tgtUnique ? 1 : 0)).cy}
               offsetField="targetConstraintOffset" offset={connector.targetConstraintOffset} anchor={tgtAnchor} />}
           </g>
         );
@@ -908,7 +972,7 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
         const uy = segLen > 0 ? segDirY / segLen : 0;
 
         const labelX = midX + nameOx;
-        const labelY = midY + nameOy - 6; // offset above the connector
+        const labelY = midY + nameOy - 3; // very near the middle, slightly above
 
         const name = connector.associationName;
         const charW = fs * 0.6;
