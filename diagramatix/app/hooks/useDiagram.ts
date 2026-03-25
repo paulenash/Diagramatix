@@ -409,8 +409,7 @@ function autoResizeUmlElement(el: DiagramElement): DiagramElement {
     const contentW = Math.max(stereotypeW, labelMaxW, valuesMaxW) + PAD * 2;
     const newWidth = Math.max(MIN_W, contentW);
     const valuesH = values.length * LINE_H;
-    const bottomPad = values.length > 0 ? 4 : 0;
-    const newHeight = Math.max(MIN_H, headerH + valuesH + bottomPad);
+    const newHeight = Math.max(MIN_H, headerH + valuesH);
     if (newWidth === el.width && newHeight === el.height) return el;
     return { ...el, width: newWidth, height: newHeight };
   }

@@ -768,21 +768,19 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
           if (vis) return vis;
           return null;
         }
-        function buildConstraint(prop?: string, qual?: string): string | null {
-          const parts: string[] = [];
-          if (prop) parts.push(prop);
-          if (qual) parts.push(`[${qual}]`);
-          return parts.length > 0 ? parts.join(" ") : null;
-        }
-
         const srcRole = buildRole(connector.sourceRole, connector.sourceVisibility);
         const srcMult = connector.sourceMultiplicity || null;
-        const srcConst = buildConstraint(connector.sourcePropertyString, connector.sourceQualifier);
+        const srcOrdered = connector.sourceOrdered ? "{ordered}" : null;
+        const srcUnique = connector.sourceUnique ? "{unique}" : null;
+        const srcQual = connector.sourceQualifier ? `[${connector.sourceQualifier}]` : null;
         const tgtRole = buildRole(connector.targetRole, connector.targetVisibility);
         const tgtMult = connector.targetMultiplicity || null;
-        const tgtConst = buildConstraint(connector.targetPropertyString, connector.targetQualifier);
+        const tgtOrdered = connector.targetOrdered ? "{ordered}" : null;
+        const tgtUnique = connector.targetUnique ? "{unique}" : null;
+        const tgtQual = connector.targetQualifier ? `[${connector.targetQualifier}]` : null;
 
-        if (!srcRole && !srcMult && !srcConst && !tgtRole && !tgtMult && !tgtConst) return null;
+        if (!srcRole && !srcMult && !srcOrdered && !srcUnique && !srcQual
+          && !tgtRole && !tgtMult && !tgtOrdered && !tgtUnique && !tgtQual) return null;
 
         // Draggable label component
         function EndLabel({ text, anchorX, anchorY, offsetField, offset, anchor, bold }: {
@@ -843,8 +841,14 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
             {srcMult && <EndLabel text={srcMult} bold
               anchorX={defSrcX + srcPerpX} anchorY={defSrcY + srcPerpY + lineH}
               offsetField="sourceMultOffset" offset={connector.sourceMultOffset} anchor={srcAnchor} />}
-            {srcConst && <EndLabel text={srcConst}
+            {srcOrdered && <EndLabel text={srcOrdered}
               anchorX={defSrcX + srcPerpX} anchorY={defSrcY + srcPerpY + lineH * 2}
+              offsetField="sourceConstraintOffset" offset={connector.sourceConstraintOffset} anchor={srcAnchor} />}
+            {srcUnique && <EndLabel text={srcUnique}
+              anchorX={defSrcX + srcPerpX + (srcOrdered ? fs * 5 : 0)} anchorY={defSrcY + srcPerpY + lineH * 2}
+              offsetField="sourceUniqueOffset" offset={connector.sourceUniqueOffset} anchor={srcAnchor} />}
+            {srcQual && <EndLabel text={srcQual}
+              anchorX={defSrcX + srcPerpX} anchorY={defSrcY + srcPerpY + lineH * 3}
               offsetField="sourceConstraintOffset" offset={connector.sourceConstraintOffset} anchor={srcAnchor} />}
             {/* Target end labels */}
             {tgtRole && <EndLabel text={tgtRole}
@@ -853,8 +857,14 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
             {tgtMult && <EndLabel text={tgtMult} bold
               anchorX={defTgtX + tgtPerpX} anchorY={defTgtY + tgtPerpY + lineH}
               offsetField="targetMultOffset" offset={connector.targetMultOffset} anchor={tgtAnchor} />}
-            {tgtConst && <EndLabel text={tgtConst}
+            {tgtOrdered && <EndLabel text={tgtOrdered}
               anchorX={defTgtX + tgtPerpX} anchorY={defTgtY + tgtPerpY + lineH * 2}
+              offsetField="targetConstraintOffset" offset={connector.targetConstraintOffset} anchor={tgtAnchor} />}
+            {tgtUnique && <EndLabel text={tgtUnique}
+              anchorX={defTgtX + tgtPerpX + (tgtOrdered ? fs * 5 : 0)} anchorY={defTgtY + tgtPerpY + lineH * 2}
+              offsetField="targetUniqueOffset" offset={connector.targetUniqueOffset} anchor={tgtAnchor} />}
+            {tgtQual && <EndLabel text={tgtQual}
+              anchorX={defTgtX + tgtPerpX} anchorY={defTgtY + tgtPerpY + lineH * 3}
               offsetField="targetConstraintOffset" offset={connector.targetConstraintOffset} anchor={tgtAnchor} />}
           </g>
         );
@@ -987,28 +997,17 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
                 );
               } else {
                 // Horizontal segment: arrow left or right of name, centred vertically
+                // to-target: arrow points in segment direction; to-source: opposite
+                const pointsRight = toTarget ? sdx > 0 : sdx < 0;
                 const arrowOff = nameW / 2 + arrowW + 3;
-                if (toTarget) {
-                  const pointsRight = sdx > 0;
-                  const ax = pointsRight ? labelX + arrowOff - arrowW : labelX - arrowOff + arrowW;
-                  const tipX = pointsRight ? labelX + arrowOff : labelX - arrowOff;
-                  return (
-                    <polygon
-                      points={`${ax},${arrowMidY - arrowH / 2} ${tipX},${arrowMidY} ${ax},${arrowMidY + arrowH / 2}`}
-                      fill="#374151" style={{ pointerEvents: "none" }}
-                    />
-                  );
-                } else {
-                  const pointsLeft = sdx < 0;
-                  const ax = pointsLeft ? labelX - arrowOff + arrowW : labelX + arrowOff - arrowW;
-                  const tipX = pointsLeft ? labelX - arrowOff : labelX + arrowOff;
-                  return (
-                    <polygon
-                      points={`${ax},${arrowMidY - arrowH / 2} ${tipX},${arrowMidY} ${ax},${arrowMidY + arrowH / 2}`}
-                      fill="#374151" style={{ pointerEvents: "none" }}
-                    />
-                  );
-                }
+                const baseX = pointsRight ? labelX + arrowOff - arrowW : labelX - arrowOff + arrowW;
+                const tipX = pointsRight ? labelX + arrowOff : labelX - arrowOff;
+                return (
+                  <polygon
+                    points={`${baseX},${arrowMidY - arrowH / 2} ${tipX},${arrowMidY} ${baseX},${arrowMidY + arrowH / 2}`}
+                    fill="#374151" style={{ pointerEvents: "none" }}
+                  />
+                );
               }
             })()}
           </g>

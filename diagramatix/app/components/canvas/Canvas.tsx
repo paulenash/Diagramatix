@@ -1020,7 +1020,7 @@ export function Canvas({
           const stereotypeW = 15 * CHAR_W * 0.8;
           const valuesMaxW = values.length > 0 ? Math.max(...values.map((v: string) => v.length * CHAR_W)) : 0;
           contentMinW = Math.max(stereotypeW, labelMaxW, valuesMaxW) + PAD * 2;
-          contentMinH = headerH + values.length * LINE_H + (values.length > 0 ? 4 : 0);
+          contentMinH = headerH + values.length * LINE_H;
         }
         width = Math.max(width, Math.max(80, contentMinW));
         height = Math.max(height, Math.max(40, contentMinH));

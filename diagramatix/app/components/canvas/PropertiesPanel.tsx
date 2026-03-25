@@ -84,6 +84,69 @@ const EVENT_TYPE_OPTIONS: { value: EventType; label: string }[] = [
   { value: "link",         label: "Link" },
 ];
 
+/** Multiplicity selector: preset values + custom n..m */
+function MultSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const presets = ["", "1", "0..1", "0..*", "1..*"];
+  const isPreset = presets.includes(value);
+  const [customMode, setCustomMode] = useState(!isPreset && value !== "");
+  const [nVal, setNVal] = useState(() => {
+    if (!isPreset && value.includes("..")) return value.split("..")[0];
+    return "";
+  });
+  const [mVal, setMVal] = useState(() => {
+    if (!isPreset && value.includes("..")) return value.split("..")[1];
+    return "";
+  });
+
+  function commitCustom() {
+    const n = nVal.trim(), m = mVal.trim();
+    if (n && m) {
+      onChange(`${n}..${m}`);
+    }
+  }
+
+  if (customMode) {
+    return (
+      <div className="flex items-center gap-0.5 flex-1 min-w-0">
+        <input type="text" value={nVal} onChange={e => setNVal(e.target.value)}
+          onBlur={commitCustom}
+          onKeyDown={e => { if (e.key === "Enter") commitCustom(); }}
+          className="w-6 text-[10px] border border-gray-300 rounded px-0.5 py-0 text-center" placeholder="n" />
+        <span className="text-[10px] text-gray-400">..</span>
+        <input type="text" value={mVal} onChange={e => setMVal(e.target.value)}
+          onBlur={commitCustom}
+          onKeyDown={e => { if (e.key === "Enter") commitCustom(); }}
+          className="w-6 text-[10px] border border-gray-300 rounded px-0.5 py-0 text-center" placeholder="m" />
+        <button onClick={() => { setCustomMode(false); onChange(""); }}
+          className="text-[9px] text-gray-400 hover:text-gray-600 px-0.5" title="Back to presets">{"\u2715"}</button>
+      </div>
+    );
+  }
+
+  return (
+    <select
+      value={isPreset ? value : "__custom__"}
+      onChange={e => {
+        const v = e.target.value;
+        if (v === "__custom__") {
+          setCustomMode(true);
+          setNVal(""); setMVal("");
+        } else {
+          onChange(v);
+        }
+      }}
+      className="text-[10px] border border-gray-300 rounded px-1 py-0 bg-white text-gray-700 cursor-pointer font-medium flex-1 min-w-0"
+    >
+      <option value="">None</option>
+      <option value="1">1</option>
+      <option value="0..1">0..1</option>
+      <option value="0..*">0..*</option>
+      <option value="1..*">1..*</option>
+      <option value="__custom__">Custom (n..m)</option>
+    </select>
+  );
+}
+
 function EnumValuesList({ element, onUpdateProperties }: {
   element: DiagramElement;
   onUpdateProperties: (id: string, props: Record<string, unknown>) => void;
@@ -272,17 +335,15 @@ export function PropertiesPanel({
           />
         </InlineField>
         <InlineField label="Status">
-          <div className="flex gap-0.5">
+          <select
+            value={diagramTitle?.status ?? "draft"}
+            onChange={e => onUpdateDiagramTitle({ ...diagramTitle, status: e.target.value as DiagramStatus })}
+            className="text-[10px] border border-gray-300 rounded px-1 py-0 bg-white text-gray-700 cursor-pointer font-medium"
+          >
             {(["draft", "final", "production"] as DiagramStatus[]).map(s => (
-              <button key={s}
-                onClick={() => onUpdateDiagramTitle({ ...diagramTitle, status: s })}
-                className={`px-1.5 py-0 text-[9px] rounded border capitalize ${
-                  (diagramTitle?.status ?? "draft") === s
-                    ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-500 border-gray-300"
-                }`}
-              >{s}</button>
+              <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
             ))}
-          </div>
+          </select>
         </InlineField>
         <InlineField label="Created">
           <span className="text-[10px] text-gray-500">{createdAt ? new Date(createdAt).toLocaleDateString() : ""}</span>
@@ -352,57 +413,45 @@ export function PropertiesPanel({
             connector.type === "uml-composition" || connector.type === "uml-generalisation";
           return (
             <>
-              {/* Relationship type — hidden for Class↔Enumeration (always Association) */}
-              {isUmlConn && !isClassEnumConn && onUpdateConnectorType && (
-                <div>
-                  <p className="text-xs font-medium text-gray-700 mb-1">Relationship</p>
-                  <div className="flex flex-col gap-1">
-                    {([
-                      { value: "uml-association" as ConnectorType, label: "Association" },
-                      { value: "uml-aggregation" as ConnectorType, label: "Aggregation" },
-                      { value: "uml-composition" as ConnectorType, label: "Composition" },
-                      { value: "uml-generalisation" as ConnectorType, label: "Generalisation" },
-                    ]).map(({ value, label }) => (
-                      <button
-                        key={value}
-                        onClick={() => onUpdateConnectorType(connector.id, value)}
-                        className={`px-2 py-1 text-xs rounded border text-left ${
-                          connector.type === value
-                            ? "bg-blue-600 text-white border-blue-600"
-                            : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                        }`}
-                      >
-                        {label}
-                      </button>
-                    ))}
+              {/* Relationship type */}
+              {isUmlConn && (() => {
+                const opts = [
+                  { value: "uml-association" as ConnectorType, label: "Association" },
+                  { value: "uml-aggregation" as ConnectorType, label: "Aggregation" },
+                  { value: "uml-composition" as ConnectorType, label: "Composition" },
+                  { value: "uml-generalisation" as ConnectorType, label: "Generalisation" },
+                ];
+                const currentLabel = opts.find(o => o.value === connector.type)?.label ?? connector.type;
+                if (isClassEnumConn) {
+                  return <p className="text-xs text-gray-700"><span className="font-medium">Relationship:</span> Association</p>;
+                }
+                return (
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] font-medium text-gray-500 shrink-0">Relationship:</span>
+                    <select
+                      value={connector.type}
+                      onChange={e => onUpdateConnectorType?.(connector.id, e.target.value as ConnectorType)}
+                      className="text-[10px] border border-gray-300 rounded px-1 py-0 bg-white text-gray-700 cursor-pointer font-medium"
+                    >
+                      {opts.map(o => (
+                        <option key={o.value} value={o.value}>{o.label}</option>
+                      ))}
+                    </select>
                   </div>
-                </div>
-              )}
-              {isClassEnumConn && (
-                <p className="text-xs text-gray-700"><span className="font-medium">Relationship:</span> Association</p>
-              )}
+                );
+              })()}
               {/* Direction — hidden for Class↔Enumeration */}
               {connector.type === "uml-association" && !isClassEnumConn && (
-                <div>
-                  <p className="text-xs font-medium text-gray-700 mb-1">Direction</p>
-                  <div className="flex gap-1">
-                    {([
-                      { value: "non-directed" as DirectionType, label: "None" },
-                      { value: "open-directed" as DirectionType, label: "Open" },
-                    ]).map(({ value, label }) => (
-                      <button
-                        key={value}
-                        onClick={() => onUpdateConnectorDirection(connector.id, value)}
-                        className={`px-2 py-1 text-xs rounded border ${
-                          connector.directionType === value
-                            ? "bg-blue-600 text-white border-blue-600"
-                            : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                        }`}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
+                <div className="flex items-center gap-1">
+                  <span className="text-[10px] font-medium text-gray-500 shrink-0">Direction:</span>
+                  <select
+                    value={connector.directionType}
+                    onChange={e => onUpdateConnectorDirection(connector.id, e.target.value as DirectionType)}
+                    className="text-[10px] border border-gray-300 rounded px-1 py-0 bg-white text-gray-700 cursor-pointer font-medium"
+                  >
+                    <option value="non-directed">None</option>
+                    <option value="open-directed">Open</option>
+                  </select>
                 </div>
               )}
             </>
@@ -432,22 +481,16 @@ export function PropertiesPanel({
                 placeholder="association name" />
             </div>
             <div className="flex items-center gap-1">
-              <label className="text-[9px] text-gray-400 w-12 shrink-0">Reading</label>
-              <div className="flex gap-0.5">
-                {([
-                  { value: "none" as const, label: "None" },
-                  { value: "to-source" as const, label: "\u25C0 Source" },
-                  { value: "to-target" as const, label: "Target \u25B6" },
-                ]).map(({ value, label }) => (
-                  <button key={value}
-                    onClick={() => onUpdateConnectorFields(connector.id, { readingDirection: value })}
-                    className={`px-1 py-0 text-[9px] rounded border ${
-                      (connector.readingDirection ?? "none") === value
-                        ? "bg-blue-600 text-white border-blue-600"
-                        : "bg-white text-gray-500 border-gray-300"
-                    }`}>{label}</button>
-                ))}
-              </div>
+              <label className="text-[9px] text-gray-400 w-12 shrink-0">Reading Direction</label>
+              <select
+                value={connector.readingDirection ?? "none"}
+                onChange={e => onUpdateConnectorFields(connector.id, { readingDirection: e.target.value as "none" | "to-source" | "to-target" })}
+                className="text-[10px] border border-gray-300 rounded px-1 py-0 bg-white text-gray-700 cursor-pointer font-medium"
+              >
+                <option value="none">None</option>
+                <option value="to-source">{"\u25C0"} Source</option>
+                <option value="to-target">Target {"\u25B6"}</option>
+              </select>
             </div>
           </div>
         )}
@@ -472,30 +515,36 @@ export function PropertiesPanel({
                   </div>
                   <div className="flex items-center gap-1">
                     <label className="text-[9px] text-gray-400 w-12 shrink-0">Multiplicity</label>
-                    <input type="text" className="flex-1 text-[10px] border border-gray-300 rounded px-1 py-0 min-w-0"
-                      defaultValue={connector.sourceMultiplicity ?? ""} key={`sm-${connector.id}`}
-                      onBlur={e => onUpdateConnectorFields(connector.id, { sourceMultiplicity: e.target.value })}
-                      onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
-                      placeholder="e.g. 1, 0..*, 1..*" />
+                    <MultSelect value={connector.sourceMultiplicity ?? ""}
+                      onChange={v => onUpdateConnectorFields(connector.id, { sourceMultiplicity: v })} />
                   </div>
                   <div className="flex items-center gap-1">
-                    <label className="text-[9px] text-gray-400 w-12 shrink-0">Constraint</label>
-                    <input type="text" className="flex-1 text-[10px] border border-gray-300 rounded px-1 py-0 min-w-0"
-                      defaultValue={connector.sourcePropertyString ?? ""} key={`sp-${connector.id}`}
-                      onBlur={e => onUpdateConnectorFields(connector.id, { sourcePropertyString: e.target.value })}
-                      onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
-                      placeholder="{ordered}" />
+                    <label className="text-[9px] text-gray-400 w-12 shrink-0">Constraints</label>
+                    <label className="flex items-center gap-0.5 text-[10px] text-gray-600 cursor-pointer">
+                      <input type="checkbox" checked={connector.sourceOrdered ?? false}
+                        onChange={e => onUpdateConnectorFields(connector.id, { sourceOrdered: e.target.checked })}
+                        className="w-3 h-3 rounded border-gray-300" />
+                      ordered
+                    </label>
+                    <label className="flex items-center gap-0.5 text-[10px] text-gray-600 cursor-pointer">
+                      <input type="checkbox" checked={connector.sourceUnique ?? false}
+                        onChange={e => onUpdateConnectorFields(connector.id, { sourceUnique: e.target.checked })}
+                        className="w-3 h-3 rounded border-gray-300" />
+                      unique
+                    </label>
                   </div>
                   <div className="flex items-center gap-1">
                     <label className="text-[9px] text-gray-400 w-12 shrink-0">Visibility</label>
-                    <div className="flex gap-0.5">
-                      {["", "+", "-", "#", "~"].map(v => (
-                        <button key={v || "none"} onClick={() => onUpdateConnectorFields(connector.id, { sourceVisibility: v })}
-                          className={`px-1 py-0 text-[9px] rounded border ${(connector.sourceVisibility ?? "") === v ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-500 border-gray-300"}`}>
-                          {v || "\u2205"}
-                        </button>
-                      ))}
-                    </div>
+                    <select
+                      value={connector.sourceVisibility ?? ""}
+                      onChange={e => onUpdateConnectorFields(connector.id, { sourceVisibility: e.target.value })}
+                      className="text-[10px] border border-gray-300 rounded px-1 py-0 bg-white text-gray-700 cursor-pointer font-medium"
+                    >
+                      <option value="">None</option>
+                      <option value="+">+</option>
+                      <option value="-">-</option>
+                      <option value="#">#</option>
+                    </select>
                   </div>
                   <div className="flex items-center gap-1">
                     <label className="text-[9px] text-gray-400 w-12 shrink-0">Qualifier</label>
@@ -521,30 +570,36 @@ export function PropertiesPanel({
                   </div>
                   <div className="flex items-center gap-1">
                     <label className="text-[9px] text-gray-400 w-12 shrink-0">Multiplicity</label>
-                    <input type="text" className="flex-1 text-[10px] border border-gray-300 rounded px-1 py-0 min-w-0"
-                      defaultValue={connector.targetMultiplicity ?? ""} key={`tm-${connector.id}`}
-                      onBlur={e => onUpdateConnectorFields(connector.id, { targetMultiplicity: e.target.value })}
-                      onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
-                      placeholder="e.g. 1, 0..*, 1..*" />
+                    <MultSelect value={connector.targetMultiplicity ?? ""}
+                      onChange={v => onUpdateConnectorFields(connector.id, { targetMultiplicity: v })} />
                   </div>
                   <div className="flex items-center gap-1">
-                    <label className="text-[9px] text-gray-400 w-12 shrink-0">Constraint</label>
-                    <input type="text" className="flex-1 text-[10px] border border-gray-300 rounded px-1 py-0 min-w-0"
-                      defaultValue={connector.targetPropertyString ?? ""} key={`tp-${connector.id}`}
-                      onBlur={e => onUpdateConnectorFields(connector.id, { targetPropertyString: e.target.value })}
-                      onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
-                      placeholder="{ordered}" />
+                    <label className="text-[9px] text-gray-400 w-12 shrink-0">Constraints</label>
+                    <label className="flex items-center gap-0.5 text-[10px] text-gray-600 cursor-pointer">
+                      <input type="checkbox" checked={connector.targetOrdered ?? false}
+                        onChange={e => onUpdateConnectorFields(connector.id, { targetOrdered: e.target.checked })}
+                        className="w-3 h-3 rounded border-gray-300" />
+                      ordered
+                    </label>
+                    <label className="flex items-center gap-0.5 text-[10px] text-gray-600 cursor-pointer">
+                      <input type="checkbox" checked={connector.targetUnique ?? false}
+                        onChange={e => onUpdateConnectorFields(connector.id, { targetUnique: e.target.checked })}
+                        className="w-3 h-3 rounded border-gray-300" />
+                      unique
+                    </label>
                   </div>
                   <div className="flex items-center gap-1">
                     <label className="text-[9px] text-gray-400 w-12 shrink-0">Visibility</label>
-                    <div className="flex gap-0.5">
-                      {["", "+", "-", "#", "~"].map(v => (
-                        <button key={v || "none"} onClick={() => onUpdateConnectorFields(connector.id, { targetVisibility: v })}
-                          className={`px-1 py-0 text-[9px] rounded border ${(connector.targetVisibility ?? "") === v ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-500 border-gray-300"}`}>
-                          {v || "\u2205"}
-                        </button>
-                      ))}
-                    </div>
+                    <select
+                      value={connector.targetVisibility ?? ""}
+                      onChange={e => onUpdateConnectorFields(connector.id, { targetVisibility: e.target.value })}
+                      className="text-[10px] border border-gray-300 rounded px-1 py-0 bg-white text-gray-700 cursor-pointer font-medium"
+                    >
+                      <option value="">None</option>
+                      <option value="+">+</option>
+                      <option value="-">-</option>
+                      <option value="#">#</option>
+                    </select>
                   </div>
                   <div className="flex items-center gap-1">
                     <label className="text-[9px] text-gray-400 w-12 shrink-0">Qualifier</label>
@@ -597,23 +652,17 @@ export function PropertiesPanel({
                     { value: "non-directed"  as DirectionType, label: "None" },
                   ].filter(o => !(diagramType === "process-context" && o.value === "directed"));
           return (
-            <div>
-              <p className="text-xs font-medium text-gray-700 mb-1">Direction</p>
-              <div className="flex flex-wrap gap-1">
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] font-medium text-gray-500 shrink-0">Direction:</span>
+              <select
+                value={connector.directionType}
+                onChange={e => onUpdateConnectorDirection(connector.id, e.target.value as DirectionType)}
+                className="text-[10px] border border-gray-300 rounded px-1 py-0 bg-white text-gray-700 cursor-pointer font-medium"
+              >
                 {options.map(({ value, label }) => (
-                  <button
-                    key={value}
-                    onClick={() => onUpdateConnectorDirection(connector.id, value)}
-                    className={`px-2 py-1 text-xs rounded border ${
-                      connector.directionType === value
-                        ? "bg-blue-600 text-white border-blue-600"
-                        : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                    }`}
-                  >
-                    {label}
-                  </button>
+                  <option key={value} value={value}>{label}</option>
                 ))}
-              </div>
+              </select>
             </div>
           );
         })()}

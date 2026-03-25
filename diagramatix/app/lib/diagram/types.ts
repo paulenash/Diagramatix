@@ -122,19 +122,25 @@ export interface Connector {
   sourceRole?: string;
   sourceMultiplicity?: string;
   sourcePropertyString?: string;  // e.g. "{ordered}", "{unique}"
-  sourceVisibility?: string;      // +, -, #, ~
+  sourceOrdered?: boolean;
+  sourceUnique?: boolean;
+  sourceVisibility?: string;      // +, -, #
   sourceQualifier?: string;       // e.g. "accountNumber"
   sourceRoleOffset?: Point;       // offset for visibility+role composite label
   sourceMultOffset?: Point;       // offset for multiplicity label
-  sourceConstraintOffset?: Point; // offset for constraint + qualifier
+  sourceConstraintOffset?: Point; // offset for {ordered}
+  sourceUniqueOffset?: Point;     // offset for {unique}
   targetRole?: string;
   targetMultiplicity?: string;
   targetPropertyString?: string;
+  targetOrdered?: boolean;
+  targetUnique?: boolean;
   targetVisibility?: string;
   targetQualifier?: string;
   targetRoleOffset?: Point;
   targetMultOffset?: Point;
-  targetConstraintOffset?: Point;
+  targetConstraintOffset?: Point; // offset for {ordered}
+  targetUniqueOffset?: Point;     // offset for {unique}
   // UML association name (shown near midpoint)
   associationName?: string;
   readingDirection?: "none" | "to-source" | "to-target";
