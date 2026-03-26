@@ -2373,8 +2373,16 @@ export function Canvas({
         const isUseCase = editingEl?.type === 'use-case';
         const isPoolLane = editingEl?.type === 'pool' || editingEl?.type === 'lane';
         const hasTaskMarker = editingEl?.type === 'task' && !!editingEl?.taskType && editingEl?.taskType !== 'none';
-        const commonChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
-          setEditingLabel(prev => prev ? { ...prev, value: e.target.value } : null);
+        const isUmlElement = editingEl?.type === 'uml-class' || editingEl?.type === 'uml-enumeration';
+        const commonChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+          let val = e.target.value;
+          // UML class/enumeration: limit to 2 lines
+          if (isUmlElement) {
+            const lines = val.split('\n');
+            if (lines.length > 2) val = lines.slice(0, 2).join('\n');
+          }
+          setEditingLabel(prev => prev ? { ...prev, value: val } : null);
+        };
         if (isUseCase) {
           return (
             <textarea
@@ -2440,9 +2448,9 @@ export function Canvas({
             />
           );
         }
-        const isUmlElement = editingEl?.type === "uml-class" || editingEl?.type === "uml-enumeration";
+        const isUmlEl = editingEl?.type === "uml-class" || editingEl?.type === "uml-enumeration";
         const editLines = editingLabel.value.split("\n").length;
-        const editH = isUmlElement ? Math.max(editingLabel.height, editLines * 16 * zoom + 8) : editingLabel.height;
+        const editH = isUmlEl ? Math.max(editingLabel.height, editLines * 16 * zoom + 8) : editingLabel.height;
         return (
           <textarea
             autoFocus
@@ -2470,7 +2478,7 @@ export function Canvas({
               resize: "none",
               overflow: "hidden",
             }}
-            placeholder={isUmlElement ? "Name (Shift+Enter for new line)" : undefined}
+            placeholder={isUmlEl ? "Name (Shift+Enter for new line)" : undefined}
           />
         );
       })()}

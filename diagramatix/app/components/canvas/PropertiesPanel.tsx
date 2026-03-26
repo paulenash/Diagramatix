@@ -151,72 +151,136 @@ function MultSelect({ value, onChange }: { value: string; onChange: (v: string) 
 
 const UML_TYPES = ["String", "Number", "Integer", "Date", "DateTime", "Duration", "Money", "Decimal", "Boolean"];
 
+function formatAttrDisplay(attr: UmlAttribute): string {
+  let s = "";
+  if (attr.visibility) s += attr.visibility + " ";
+  if (attr.isDerived) s += "/";
+  s += attr.name;
+  if (attr.type) s += " : " + attr.type;
+  if (attr.multiplicity) s += " [" + attr.multiplicity + "]";
+  if (attr.defaultValue) s += " = " + attr.defaultValue;
+  if (attr.propertyString) s += " " + attr.propertyString;
+  return s;
+}
+
 function ClassAttributesList({ element, onUpdateProperties }: {
   element: DiagramElement;
   onUpdateProperties: (id: string, props: Record<string, unknown>) => void;
 }) {
   const attrs: UmlAttribute[] = (element.properties.attributes as UmlAttribute[] | undefined) ?? [];
+  const [editingIdx, setEditingIdx] = useState<number | null>(null);
+  const [draft, setDraft] = useState<UmlAttribute | null>(null);
 
   function update(newAttrs: UmlAttribute[]) {
     onUpdateProperties(element.id, { attributes: newAttrs });
   }
   function addAttr() {
-    update([...attrs, { name: `attr${attrs.length + 1}` }]);
+    const newAttrs = [...attrs, { name: `attr${attrs.length + 1}` }];
+    update(newAttrs);
+    setEditingIdx(newAttrs.length - 1);
+    setDraft(newAttrs[newAttrs.length - 1]);
   }
-  function removeAttr(idx: number) { update(attrs.filter((_, i) => i !== idx)); }
+  function removeAttr(idx: number) {
+    update(attrs.filter((_, i) => i !== idx));
+    if (editingIdx === idx) { setEditingIdx(null); setDraft(null); }
+    else if (editingIdx !== null && editingIdx > idx) setEditingIdx(editingIdx - 1);
+  }
   function moveAttr(idx: number, dir: -1 | 1) {
     const ni = idx + dir;
     if (ni < 0 || ni >= attrs.length) return;
     const next = [...attrs]; [next[idx], next[ni]] = [next[ni], next[idx]]; update(next);
+    if (editingIdx === idx) setEditingIdx(ni);
+    else if (editingIdx === ni) setEditingIdx(idx);
   }
-  function setField(idx: number, field: keyof UmlAttribute, val: unknown) {
-    const next = [...attrs]; next[idx] = { ...next[idx], [field]: val }; update(next);
+  function startEdit(idx: number) {
+    setEditingIdx(idx);
+    setDraft({ ...attrs[idx] });
+  }
+  function confirmEdit() {
+    if (editingIdx === null || !draft) return;
+    const next = [...attrs]; next[editingIdx] = draft; update(next);
+    setEditingIdx(null); setDraft(null);
+  }
+  function cancelEdit() {
+    setEditingIdx(null); setDraft(null);
   }
 
   return (
     <div>
       <p className="text-[10px] font-medium text-gray-700 mb-1">Attributes</p>
       {attrs.length === 0 && <p className="text-[10px] text-gray-400 mb-1 italic">No attributes</p>}
-      <div className="space-y-1 mb-1">
+      <div className="space-y-0.5 mb-1">
         {attrs.map((attr, i) => (
-          <div key={i} className="border border-gray-200 rounded p-1 space-y-0.5">
-            <div className="flex items-center gap-0.5">
-              <select value={attr.visibility ?? ""} onChange={e => setField(i, "visibility", e.target.value || undefined)}
-                className="text-[9px] border border-gray-300 rounded px-0.5 py-0 w-12">
-                <option value="">None</option>
-                <option value="+">+ Public</option>
-                <option value="-">- Private</option>
-                <option value="#"># Protected</option>
-              </select>
-              <input type="text" value={attr.name} onChange={e => setField(i, "name", e.target.value)}
-                className="flex-1 text-[10px] border border-gray-300 rounded px-1 py-0 min-w-0" placeholder="name" />
-              <label className="flex items-center gap-0.5 text-[9px] text-gray-500">
-                <input type="checkbox" checked={attr.isDerived ?? false}
-                  onChange={e => setField(i, "isDerived", e.target.checked)}
-                  className="w-2.5 h-2.5" /> /
-              </label>
+          editingIdx === i && draft ? (
+            /* Expanded edit mode */
+            <div key={i} className="border border-blue-300 rounded p-1.5 bg-blue-50 space-y-1">
+              <div className="flex items-center gap-1">
+                <label className="text-[9px] text-gray-500 w-10 shrink-0">Visibility</label>
+                <select value={draft.visibility ?? ""} onChange={e => setDraft({ ...draft, visibility: (e.target.value || undefined) as UmlAttribute["visibility"] })}
+                  className="text-[9px] border border-gray-300 rounded px-0.5 py-0 flex-1">
+                  <option value="">None</option>
+                  <option value="+">+ Public</option>
+                  <option value="-">- Private</option>
+                  <option value="#"># Protected</option>
+                </select>
+              </div>
+              <div className="flex items-center gap-1">
+                <label className="text-[9px] text-gray-500 w-10 shrink-0">Name</label>
+                <input type="text" value={draft.name} onChange={e => setDraft({ ...draft, name: e.target.value })}
+                  className="flex-1 text-[10px] border border-gray-300 rounded px-1 py-0 min-w-0" />
+              </div>
+              <div className="flex items-center gap-1">
+                <label className="text-[9px] text-gray-500 w-10 shrink-0">Type</label>
+                <select value={draft.type ?? ""} onChange={e => setDraft({ ...draft, type: e.target.value || undefined })}
+                  className="text-[9px] border border-gray-300 rounded px-0.5 py-0 flex-1">
+                  <option value="">None</option>
+                  {UML_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+              <div className="flex items-center gap-1">
+                <label className="text-[9px] text-gray-500 w-10 shrink-0">Mult.</label>
+                <MultSelect value={draft.multiplicity ?? ""} onChange={v => setDraft({ ...draft, multiplicity: v || undefined })} />
+              </div>
+              <div className="flex items-center gap-1">
+                <label className="text-[9px] text-gray-500 w-10 shrink-0">Default</label>
+                <input type="text" value={draft.defaultValue ?? ""} onChange={e => setDraft({ ...draft, defaultValue: e.target.value || undefined })}
+                  className="flex-1 text-[9px] border border-gray-300 rounded px-1 py-0 min-w-0" placeholder="value" />
+              </div>
+              <div className="flex items-center gap-1">
+                <label className="text-[9px] text-gray-500 w-10 shrink-0">Derived</label>
+                <input type="checkbox" checked={draft.isDerived ?? false}
+                  onChange={e => setDraft({ ...draft, isDerived: e.target.checked })}
+                  className="w-3 h-3" />
+              </div>
+              <div className="flex justify-end gap-1 pt-0.5">
+                <button onClick={cancelEdit}
+                  className="px-2 py-0.5 text-[9px] text-gray-600 border border-gray-300 rounded hover:bg-gray-100">Cancel</button>
+                <button onClick={confirmEdit}
+                  className="px-2 py-0.5 text-[9px] text-white bg-blue-600 rounded hover:bg-blue-700">Confirm</button>
+              </div>
+            </div>
+          ) : (
+            /* Compact list view */
+            <div key={i} className="flex items-center gap-0.5 group">
+              <span className="flex-1 text-[10px] text-gray-700 truncate font-mono">{formatAttrDisplay(attr)}</span>
+              <button onClick={() => startEdit(i)}
+                className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-blue-500 px-0.5" title="Edit">
+                <svg width={9} height={9} viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth={1.3} strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M7 2l3 3-7 7H0V9z" />
+                </svg>
+              </button>
               <button onClick={() => moveAttr(i, -1)} disabled={i === 0}
-                className="text-[9px] text-gray-400 hover:text-gray-600 disabled:opacity-30">{"\u25B2"}</button>
+                className="opacity-0 group-hover:opacity-100 text-[9px] text-gray-400 hover:text-gray-600 disabled:opacity-30 px-0.5">{"\u25B2"}</button>
               <button onClick={() => moveAttr(i, 1)} disabled={i === attrs.length - 1}
-                className="text-[9px] text-gray-400 hover:text-gray-600 disabled:opacity-30">{"\u25BC"}</button>
+                className="opacity-0 group-hover:opacity-100 text-[9px] text-gray-400 hover:text-gray-600 disabled:opacity-30 px-0.5">{"\u25BC"}</button>
               <button onClick={() => removeAttr(i)}
-                className="text-[9px] text-gray-400 hover:text-red-500">
+                className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 px-0.5" title="Delete">
                 <svg width={8} height={8} viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round">
                   <path d="M2 3h8M4.5 3V2h3v1M3 3v7a1 1 0 001 1h4a1 1 0 001-1V3" />
                 </svg>
               </button>
             </div>
-            <div className="flex items-center gap-0.5">
-              <select value={attr.type ?? ""} onChange={e => setField(i, "type", e.target.value || undefined)}
-                className="text-[9px] border border-gray-300 rounded px-0.5 py-0 flex-1">
-                <option value="">Type</option>
-                {UML_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-              </select>
-              <MultSelect value={attr.multiplicity ?? ""} onChange={v => setField(i, "multiplicity", v || undefined)} />
-              <input type="text" value={attr.defaultValue ?? ""} onChange={e => setField(i, "defaultValue", e.target.value || undefined)}
-                className="w-12 text-[9px] border border-gray-300 rounded px-0.5 py-0" placeholder="default" />
-            </div>
-          </div>
+          )
         ))}
       </div>
       <button onClick={addAttr}
@@ -225,23 +289,53 @@ function ClassAttributesList({ element, onUpdateProperties }: {
   );
 }
 
+function formatOpDisplay(op: UmlOperation): string {
+  let s = "";
+  if (op.visibility) s += op.visibility + " ";
+  s += op.name + "()";
+  return s;
+}
+
 function ClassOperationsList({ element, onUpdateProperties }: {
   element: DiagramElement;
   onUpdateProperties: (id: string, props: Record<string, unknown>) => void;
 }) {
   const ops: UmlOperation[] = (element.properties.operations as UmlOperation[] | undefined) ?? [];
+  const [editingIdx, setEditingIdx] = useState<number | null>(null);
+  const [draft, setDraft] = useState<UmlOperation | null>(null);
 
   function update(newOps: UmlOperation[]) {
     onUpdateProperties(element.id, { operations: newOps });
   }
   function addOp() {
-    update([...ops, { name: `operation${ops.length + 1}` }]);
+    const newOps = [...ops, { name: `operation${ops.length + 1}` }];
+    update(newOps);
+    setEditingIdx(newOps.length - 1);
+    setDraft(newOps[newOps.length - 1]);
   }
-  function removeOp(idx: number) { update(ops.filter((_, i) => i !== idx)); }
+  function removeOp(idx: number) {
+    update(ops.filter((_, i) => i !== idx));
+    if (editingIdx === idx) { setEditingIdx(null); setDraft(null); }
+    else if (editingIdx !== null && editingIdx > idx) setEditingIdx(editingIdx - 1);
+  }
   function moveOp(idx: number, dir: -1 | 1) {
     const ni = idx + dir;
     if (ni < 0 || ni >= ops.length) return;
     const next = [...ops]; [next[idx], next[ni]] = [next[ni], next[idx]]; update(next);
+    if (editingIdx === idx) setEditingIdx(ni);
+    else if (editingIdx === ni) setEditingIdx(idx);
+  }
+  function startEdit(idx: number) {
+    setEditingIdx(idx);
+    setDraft({ ...ops[idx] });
+  }
+  function confirmEdit() {
+    if (editingIdx === null || !draft) return;
+    const next = [...ops]; next[editingIdx] = draft; update(next);
+    setEditingIdx(null); setDraft(null);
+  }
+  function cancelEdit() {
+    setEditingIdx(null); setDraft(null);
   }
 
   return (
@@ -250,32 +344,54 @@ function ClassOperationsList({ element, onUpdateProperties }: {
       {ops.length === 0 && <p className="text-[10px] text-gray-400 mb-1 italic">No operations</p>}
       <div className="space-y-0.5 mb-1">
         {ops.map((op, i) => (
-          <div key={i} className="flex items-center gap-0.5">
-            <select value={op.visibility ?? ""} onChange={e => {
-              const next = [...ops]; next[i] = { ...next[i], visibility: (e.target.value || undefined) as UmlOperation["visibility"] }; update(next);
-            }}
-              className="text-[9px] border border-gray-300 rounded px-0.5 py-0 w-12">
-              <option value="">None</option>
-              <option value="+">+ Public</option>
-              <option value="-">- Private</option>
-              <option value="#"># Protected</option>
-            </select>
-            <input type="text" value={op.name} onChange={e => {
-              const next = [...ops]; next[i] = { ...next[i], name: e.target.value }; update(next);
-            }}
-              className="flex-1 text-[10px] border border-gray-300 rounded px-1 py-0 min-w-0" placeholder="name" />
-            <span className="text-[10px] text-gray-400">()</span>
-            <button onClick={() => moveOp(i, -1)} disabled={i === 0}
-              className="text-[9px] text-gray-400 hover:text-gray-600 disabled:opacity-30">{"\u25B2"}</button>
-            <button onClick={() => moveOp(i, 1)} disabled={i === ops.length - 1}
-              className="text-[9px] text-gray-400 hover:text-gray-600 disabled:opacity-30">{"\u25BC"}</button>
-            <button onClick={() => removeOp(i)}
-              className="text-[9px] text-gray-400 hover:text-red-500">
-              <svg width={8} height={8} viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round">
-                <path d="M2 3h8M4.5 3V2h3v1M3 3v7a1 1 0 001 1h4a1 1 0 001-1V3" />
-              </svg>
-            </button>
-          </div>
+          editingIdx === i && draft ? (
+            /* Expanded edit mode */
+            <div key={i} className="border border-blue-300 rounded p-1.5 bg-blue-50 space-y-1">
+              <div className="flex items-center gap-1">
+                <label className="text-[9px] text-gray-500 w-10 shrink-0">Visibility</label>
+                <select value={draft.visibility ?? ""} onChange={e => setDraft({ ...draft, visibility: (e.target.value || undefined) as UmlOperation["visibility"] })}
+                  className="text-[9px] border border-gray-300 rounded px-0.5 py-0 flex-1">
+                  <option value="">None</option>
+                  <option value="+">+ Public</option>
+                  <option value="-">- Private</option>
+                  <option value="#"># Protected</option>
+                </select>
+              </div>
+              <div className="flex items-center gap-1">
+                <label className="text-[9px] text-gray-500 w-10 shrink-0">Name</label>
+                <input type="text" value={draft.name} onChange={e => setDraft({ ...draft, name: e.target.value })}
+                  className="flex-1 text-[10px] border border-gray-300 rounded px-1 py-0 min-w-0" />
+                <span className="text-[10px] text-gray-400">()</span>
+              </div>
+              <div className="flex justify-end gap-1 pt-0.5">
+                <button onClick={cancelEdit}
+                  className="px-2 py-0.5 text-[9px] text-gray-600 border border-gray-300 rounded hover:bg-gray-100">Cancel</button>
+                <button onClick={confirmEdit}
+                  className="px-2 py-0.5 text-[9px] text-white bg-blue-600 rounded hover:bg-blue-700">Confirm</button>
+              </div>
+            </div>
+          ) : (
+            /* Compact list view */
+            <div key={i} className="flex items-center gap-0.5 group">
+              <span className="flex-1 text-[10px] text-gray-700 truncate font-mono">{formatOpDisplay(op)}</span>
+              <button onClick={() => startEdit(i)}
+                className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-blue-500 px-0.5" title="Edit">
+                <svg width={9} height={9} viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth={1.3} strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M7 2l3 3-7 7H0V9z" />
+                </svg>
+              </button>
+              <button onClick={() => moveOp(i, -1)} disabled={i === 0}
+                className="opacity-0 group-hover:opacity-100 text-[9px] text-gray-400 hover:text-gray-600 disabled:opacity-30 px-0.5">{"\u25B2"}</button>
+              <button onClick={() => moveOp(i, 1)} disabled={i === ops.length - 1}
+                className="opacity-0 group-hover:opacity-100 text-[9px] text-gray-400 hover:text-gray-600 disabled:opacity-30 px-0.5">{"\u25BC"}</button>
+              <button onClick={() => removeOp(i)}
+                className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 px-0.5" title="Delete">
+                <svg width={8} height={8} viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round">
+                  <path d="M2 3h8M4.5 3V2h3v1M3 3v7a1 1 0 001 1h4a1 1 0 001-1V3" />
+                </svg>
+              </button>
+            </div>
+          )
         ))}
       </div>
       <button onClick={addOp}
@@ -1036,7 +1152,7 @@ export function PropertiesPanel({
 
       <div>
         <label className="block text-xs font-medium text-gray-700 mb-1">
-          Label
+          {element.type === "uml-class" || element.type === "uml-enumeration" ? "Name" : "Label"}
         </label>
         {(element.type === "gateway" || isEventElement ||
           element.type === "data-object" || element.type === "data-store" ||
@@ -1048,10 +1164,17 @@ export function PropertiesPanel({
             <textarea
               key={element.id}
               className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 resize-y"
-              rows={3}
+              rows={(element.type === "uml-class" || element.type === "uml-enumeration") ? 2 : 3}
               value={labelDraft}
               onFocus={(e) => { const l = e.target.value.length; e.target.setSelectionRange(l, l); }}
-              onChange={(e) => setLabelDraft(e.target.value)}
+              onChange={(e) => {
+                let val = e.target.value;
+                if (element.type === "uml-class" || element.type === "uml-enumeration") {
+                  const lines = val.split("\n");
+                  if (lines.length > 2) val = lines.slice(0, 2).join("\n");
+                }
+                setLabelDraft(val);
+              }}
               onBlur={() => onUpdateLabel(element.id, labelDraft)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
