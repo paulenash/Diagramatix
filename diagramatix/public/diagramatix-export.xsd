@@ -1,0 +1,522 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           xmlns:dgx="http://diagramatix.com/export/1.0"
+           targetNamespace="http://diagramatix.com/export/1.0"
+           elementFormDefault="qualified">
+
+  <!-- ============================================================ -->
+  <!-- Root element                                                  -->
+  <!-- ============================================================ -->
+  <xs:element name="diagramatix-export" type="dgx:ExportType"/>
+
+  <xs:complexType name="ExportType">
+    <xs:sequence>
+      <xs:element name="project"    type="dgx:ProjectType"/>
+      <xs:element name="diagrams"   type="dgx:DiagramListType"/>
+      <xs:element name="folderTree" type="dgx:FolderTreeType" minOccurs="0"/>
+    </xs:sequence>
+    <xs:attribute name="version"    type="xs:string"   use="required"/>
+    <xs:attribute name="exportedAt" type="xs:dateTime" use="required"/>
+  </xs:complexType>
+
+  <!-- ============================================================ -->
+  <!-- Project metadata                                              -->
+  <!-- ============================================================ -->
+  <xs:complexType name="ProjectType">
+    <xs:sequence>
+      <xs:element name="name"        type="xs:string"/>
+      <xs:element name="description" type="xs:string"  minOccurs="0"/>
+      <xs:element name="ownerName"   type="xs:string"  minOccurs="0"/>
+      <xs:element name="colorConfig" type="dgx:ColorConfigType" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="ColorConfigType">
+    <xs:sequence>
+      <xs:any processContents="lax" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+    <xs:anyAttribute processContents="lax"/>
+  </xs:complexType>
+
+  <!-- ============================================================ -->
+  <!-- Diagram list                                                  -->
+  <!-- ============================================================ -->
+  <xs:complexType name="DiagramListType">
+    <xs:sequence>
+      <xs:element name="diagram" type="dgx:DiagramType" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="DiagramType">
+    <xs:sequence>
+      <xs:element name="name"        type="xs:string"/>
+      <xs:element name="data"        type="dgx:DiagramDataType"/>
+      <xs:element name="colorConfig" type="dgx:ColorConfigType" minOccurs="0"/>
+    </xs:sequence>
+    <xs:attribute name="originalId"  type="xs:string" use="required"/>
+    <xs:attribute name="type"        type="dgx:DiagramTypeEnum" use="required"/>
+    <xs:attribute name="displayMode" type="xs:string" use="optional"/>
+  </xs:complexType>
+
+  <!-- ============================================================ -->
+  <!-- Diagram type enum                                             -->
+  <!-- ============================================================ -->
+  <xs:simpleType name="DiagramTypeEnum">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="context"/>
+      <xs:enumeration value="basic"/>
+      <xs:enumeration value="process-context"/>
+      <xs:enumeration value="state-machine"/>
+      <xs:enumeration value="bpmn"/>
+      <xs:enumeration value="domain"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- ============================================================ -->
+  <!-- DiagramData (elements + connectors + viewport + title)        -->
+  <!-- ============================================================ -->
+  <xs:complexType name="DiagramDataType">
+    <xs:sequence>
+      <xs:element name="elements"   type="dgx:ElementListType"/>
+      <xs:element name="connectors" type="dgx:ConnectorListType"/>
+      <xs:element name="viewport"   type="dgx:ViewportType"/>
+      <xs:element name="title"      type="dgx:DiagramTitleType" minOccurs="0"/>
+    </xs:sequence>
+    <xs:attribute name="fontSize"          type="xs:decimal" use="optional"/>
+    <xs:attribute name="connectorFontSize" type="xs:decimal" use="optional"/>
+    <xs:attribute name="titleFontSize"     type="xs:decimal" use="optional"/>
+  </xs:complexType>
+
+  <!-- ============================================================ -->
+  <!-- DiagramTitle                                                  -->
+  <!-- ============================================================ -->
+  <xs:complexType name="DiagramTitleType">
+    <xs:attribute name="version"   type="xs:string"          use="optional"/>
+    <xs:attribute name="authors"   type="xs:string"          use="optional"/>
+    <xs:attribute name="status"    type="dgx:DiagramStatusEnum" use="optional"/>
+    <xs:attribute name="showTitle" type="xs:boolean"         use="optional"/>
+  </xs:complexType>
+
+  <xs:simpleType name="DiagramStatusEnum">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="draft"/>
+      <xs:enumeration value="final"/>
+      <xs:enumeration value="production"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- ============================================================ -->
+  <!-- Viewport                                                      -->
+  <!-- ============================================================ -->
+  <xs:complexType name="ViewportType">
+    <xs:attribute name="x"    type="xs:decimal" use="required"/>
+    <xs:attribute name="y"    type="xs:decimal" use="required"/>
+    <xs:attribute name="zoom" type="xs:decimal" use="required"/>
+  </xs:complexType>
+
+  <!-- ============================================================ -->
+  <!-- Point                                                         -->
+  <!-- ============================================================ -->
+  <xs:complexType name="PointType">
+    <xs:attribute name="x" type="xs:decimal" use="required"/>
+    <xs:attribute name="y" type="xs:decimal" use="required"/>
+  </xs:complexType>
+
+  <!-- ============================================================ -->
+  <!-- Elements                                                      -->
+  <!-- ============================================================ -->
+  <xs:complexType name="ElementListType">
+    <xs:sequence>
+      <xs:element name="element" type="dgx:ElementType" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="ElementType">
+    <xs:sequence>
+      <xs:element name="label"      type="xs:string"/>
+      <xs:element name="properties" type="dgx:PropertiesType" minOccurs="0"/>
+    </xs:sequence>
+    <xs:attribute name="id"     type="xs:string"          use="required"/>
+    <xs:attribute name="type"   type="dgx:SymbolTypeEnum" use="required"/>
+    <xs:attribute name="x"      type="xs:decimal"         use="required"/>
+    <xs:attribute name="y"      type="xs:decimal"         use="required"/>
+    <xs:attribute name="width"  type="xs:decimal"         use="required"/>
+    <xs:attribute name="height" type="xs:decimal"         use="required"/>
+    <!-- Optional type-specific attributes -->
+    <xs:attribute name="parentId"       type="xs:string"              use="optional"/>
+    <xs:attribute name="boundaryHostId" type="xs:string"              use="optional"/>
+    <xs:attribute name="taskType"       type="dgx:BpmnTaskTypeEnum"   use="optional"/>
+    <xs:attribute name="gatewayType"    type="dgx:GatewayTypeEnum"    use="optional"/>
+    <xs:attribute name="eventType"      type="dgx:EventTypeEnum"      use="optional"/>
+    <xs:attribute name="repeatType"     type="dgx:RepeatTypeEnum"     use="optional"/>
+    <xs:attribute name="flowType"       type="dgx:FlowTypeEnum"       use="optional"/>
+  </xs:complexType>
+
+  <!-- Element properties (flexible key-value) -->
+  <xs:complexType name="PropertiesType">
+    <xs:sequence>
+      <xs:element name="property" minOccurs="0" maxOccurs="unbounded">
+        <xs:complexType mixed="true">
+          <xs:sequence>
+            <!-- For structured property values (e.g. UML attributes/operations) -->
+            <xs:element name="item" type="dgx:PropertyItemType" minOccurs="0" maxOccurs="unbounded"/>
+          </xs:sequence>
+          <xs:attribute name="name"  type="xs:string" use="required"/>
+          <xs:attribute name="type"  type="xs:string" use="optional"/>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- Property item (for list values like UML attributes/operations/enum values) -->
+  <xs:complexType name="PropertyItemType">
+    <xs:sequence>
+      <xs:element name="field" minOccurs="0" maxOccurs="unbounded">
+        <xs:complexType>
+          <xs:simpleContent>
+            <xs:extension base="xs:string">
+              <xs:attribute name="name" type="xs:string" use="required"/>
+            </xs:extension>
+          </xs:simpleContent>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- ============================================================ -->
+  <!-- Symbol type enum                                              -->
+  <!-- ============================================================ -->
+  <xs:simpleType name="SymbolTypeEnum">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="task"/>
+      <xs:enumeration value="gateway"/>
+      <xs:enumeration value="start-event"/>
+      <xs:enumeration value="intermediate-event"/>
+      <xs:enumeration value="end-event"/>
+      <xs:enumeration value="use-case"/>
+      <xs:enumeration value="actor"/>
+      <xs:enumeration value="team"/>
+      <xs:enumeration value="state"/>
+      <xs:enumeration value="initial-state"/>
+      <xs:enumeration value="final-state"/>
+      <xs:enumeration value="pool"/>
+      <xs:enumeration value="lane"/>
+      <xs:enumeration value="subprocess"/>
+      <xs:enumeration value="subprocess-expanded"/>
+      <xs:enumeration value="system-boundary"/>
+      <xs:enumeration value="system-boundary-body"/>
+      <xs:enumeration value="hourglass"/>
+      <xs:enumeration value="composite-state"/>
+      <xs:enumeration value="composite-state-body"/>
+      <xs:enumeration value="system"/>
+      <xs:enumeration value="data-object"/>
+      <xs:enumeration value="data-store"/>
+      <xs:enumeration value="group"/>
+      <xs:enumeration value="text-annotation"/>
+      <xs:enumeration value="external-entity"/>
+      <xs:enumeration value="process-system"/>
+      <xs:enumeration value="uml-class"/>
+      <xs:enumeration value="uml-enumeration"/>
+      <xs:enumeration value="sublane"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- ============================================================ -->
+  <!-- BPMN task type enum                                           -->
+  <!-- ============================================================ -->
+  <xs:simpleType name="BpmnTaskTypeEnum">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="none"/>
+      <xs:enumeration value="user"/>
+      <xs:enumeration value="service"/>
+      <xs:enumeration value="script"/>
+      <xs:enumeration value="send"/>
+      <xs:enumeration value="receive"/>
+      <xs:enumeration value="manual"/>
+      <xs:enumeration value="business-rule"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- ============================================================ -->
+  <!-- Gateway type enum                                             -->
+  <!-- ============================================================ -->
+  <xs:simpleType name="GatewayTypeEnum">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="none"/>
+      <xs:enumeration value="exclusive"/>
+      <xs:enumeration value="inclusive"/>
+      <xs:enumeration value="parallel"/>
+      <xs:enumeration value="event-based"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- ============================================================ -->
+  <!-- Event type enum                                               -->
+  <!-- ============================================================ -->
+  <xs:simpleType name="EventTypeEnum">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="none"/>
+      <xs:enumeration value="message"/>
+      <xs:enumeration value="timer"/>
+      <xs:enumeration value="error"/>
+      <xs:enumeration value="signal"/>
+      <xs:enumeration value="terminate"/>
+      <xs:enumeration value="conditional"/>
+      <xs:enumeration value="escalation"/>
+      <xs:enumeration value="cancel"/>
+      <xs:enumeration value="compensation"/>
+      <xs:enumeration value="link"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- ============================================================ -->
+  <!-- Repeat type enum                                              -->
+  <!-- ============================================================ -->
+  <xs:simpleType name="RepeatTypeEnum">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="none"/>
+      <xs:enumeration value="loop"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- ============================================================ -->
+  <!-- Flow type enum                                                -->
+  <!-- ============================================================ -->
+  <xs:simpleType name="FlowTypeEnum">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="none"/>
+      <xs:enumeration value="catching"/>
+      <xs:enumeration value="throwing"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- ============================================================ -->
+  <!-- Connectors                                                    -->
+  <!-- ============================================================ -->
+  <xs:complexType name="ConnectorListType">
+    <xs:sequence>
+      <xs:element name="connector" type="dgx:ConnectorType" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="ConnectorType">
+    <xs:sequence>
+      <xs:element name="waypoints" type="dgx:WaypointListType" minOccurs="0"/>
+      <!-- Optional label -->
+      <xs:element name="label"     type="xs:string" minOccurs="0"/>
+      <!-- Curvilinear control point offsets -->
+      <xs:element name="cp1RelOffset" type="dgx:PointType" minOccurs="0"/>
+      <xs:element name="cp2RelOffset" type="dgx:PointType" minOccurs="0"/>
+      <!-- Formal transition label parts (state-machine) -->
+      <xs:element name="transition" type="dgx:TransitionType" minOccurs="0"/>
+      <!-- UML association source end -->
+      <xs:element name="sourceEnd" type="dgx:AssociationEndType" minOccurs="0"/>
+      <!-- UML association target end -->
+      <xs:element name="targetEnd" type="dgx:AssociationEndType" minOccurs="0"/>
+      <!-- UML association name -->
+      <xs:element name="associationName" type="dgx:AssociationNameType" minOccurs="0"/>
+    </xs:sequence>
+    <!-- Required attributes -->
+    <xs:attribute name="id"            type="xs:string"                use="required"/>
+    <xs:attribute name="sourceId"      type="xs:string"                use="required"/>
+    <xs:attribute name="targetId"      type="xs:string"                use="required"/>
+    <xs:attribute name="type"          type="dgx:ConnectorTypeEnum"    use="required"/>
+    <xs:attribute name="sourceSide"    type="dgx:SideEnum"             use="required"/>
+    <xs:attribute name="targetSide"    type="dgx:SideEnum"             use="required"/>
+    <xs:attribute name="directionType" type="dgx:DirectionTypeEnum"    use="required"/>
+    <xs:attribute name="routingType"   type="dgx:RoutingTypeEnum"      use="required"/>
+    <!-- Optional attributes -->
+    <xs:attribute name="sourceInvisibleLeader" type="xs:boolean" use="optional"/>
+    <xs:attribute name="targetInvisibleLeader" type="xs:boolean" use="optional"/>
+    <xs:attribute name="labelOffsetX"   type="xs:decimal" use="optional"/>
+    <xs:attribute name="labelOffsetY"   type="xs:decimal" use="optional"/>
+    <xs:attribute name="labelWidth"     type="xs:decimal" use="optional"/>
+    <xs:attribute name="sourceOffsetAlong" type="xs:decimal" use="optional"/>
+    <xs:attribute name="targetOffsetAlong" type="xs:decimal" use="optional"/>
+    <xs:attribute name="labelAnchor"    type="dgx:LabelAnchorEnum" use="optional"/>
+    <xs:attribute name="arrowAtSource"  type="xs:boolean" use="optional"/>
+  </xs:complexType>
+
+  <!-- Waypoints -->
+  <xs:complexType name="WaypointListType">
+    <xs:sequence>
+      <xs:element name="point" type="dgx:PointType" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- Formal transition labels -->
+  <xs:complexType name="TransitionType">
+    <xs:attribute name="labelMode" type="dgx:LabelModeEnum" use="optional"/>
+    <xs:attribute name="event"     type="xs:string" use="optional"/>
+    <xs:attribute name="guard"     type="xs:string" use="optional"/>
+    <xs:attribute name="actions"   type="xs:string" use="optional"/>
+  </xs:complexType>
+
+  <xs:simpleType name="LabelModeEnum">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="informal"/>
+      <xs:enumeration value="formal"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- UML association end properties -->
+  <xs:complexType name="AssociationEndType">
+    <xs:sequence>
+      <xs:element name="roleOffset"       type="dgx:PointType" minOccurs="0"/>
+      <xs:element name="multOffset"       type="dgx:PointType" minOccurs="0"/>
+      <xs:element name="constraintOffset" type="dgx:PointType" minOccurs="0"/>
+      <xs:element name="uniqueOffset"     type="dgx:PointType" minOccurs="0"/>
+    </xs:sequence>
+    <xs:attribute name="role"           type="xs:string"             use="optional"/>
+    <xs:attribute name="multiplicity"   type="xs:string"             use="optional"/>
+    <xs:attribute name="visibility"     type="dgx:UmlVisibilityEnum" use="optional"/>
+    <xs:attribute name="ordered"        type="xs:boolean"            use="optional"/>
+    <xs:attribute name="unique"         type="xs:boolean"            use="optional"/>
+    <xs:attribute name="qualifier"      type="xs:string"             use="optional"/>
+    <xs:attribute name="propertyString" type="xs:string"             use="optional"/>
+  </xs:complexType>
+
+  <xs:simpleType name="UmlVisibilityEnum">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="+"/>
+      <xs:enumeration value="-"/>
+      <xs:enumeration value="#"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- UML association name -->
+  <xs:complexType name="AssociationNameType">
+    <xs:sequence>
+      <xs:element name="offset" type="dgx:PointType" minOccurs="0"/>
+    </xs:sequence>
+    <xs:attribute name="name"             type="xs:string" use="required"/>
+    <xs:attribute name="readingDirection" type="dgx:ReadingDirectionEnum" use="optional"/>
+  </xs:complexType>
+
+  <xs:simpleType name="ReadingDirectionEnum">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="none"/>
+      <xs:enumeration value="to-source"/>
+      <xs:enumeration value="to-target"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- ============================================================ -->
+  <!-- Connector type enum                                           -->
+  <!-- ============================================================ -->
+  <xs:simpleType name="ConnectorTypeEnum">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="sequence"/>
+      <xs:enumeration value="message"/>
+      <xs:enumeration value="association"/>
+      <xs:enumeration value="transition"/>
+      <xs:enumeration value="associationBPMN"/>
+      <xs:enumeration value="messageBPMN"/>
+      <xs:enumeration value="flow"/>
+      <xs:enumeration value="uml-association"/>
+      <xs:enumeration value="uml-aggregation"/>
+      <xs:enumeration value="uml-composition"/>
+      <xs:enumeration value="uml-generalisation"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- ============================================================ -->
+  <!-- Side enum                                                     -->
+  <!-- ============================================================ -->
+  <xs:simpleType name="SideEnum">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="top"/>
+      <xs:enumeration value="right"/>
+      <xs:enumeration value="bottom"/>
+      <xs:enumeration value="left"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- ============================================================ -->
+  <!-- Direction type enum                                           -->
+  <!-- ============================================================ -->
+  <xs:simpleType name="DirectionTypeEnum">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="directed"/>
+      <xs:enumeration value="non-directed"/>
+      <xs:enumeration value="open-directed"/>
+      <xs:enumeration value="both"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- ============================================================ -->
+  <!-- Routing type enum                                             -->
+  <!-- ============================================================ -->
+  <xs:simpleType name="RoutingTypeEnum">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="direct"/>
+      <xs:enumeration value="rectilinear"/>
+      <xs:enumeration value="curvilinear"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- ============================================================ -->
+  <!-- Label anchor enum                                             -->
+  <!-- ============================================================ -->
+  <xs:simpleType name="LabelAnchorEnum">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="midpoint"/>
+      <xs:enumeration value="source"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- ============================================================ -->
+  <!-- Folder tree (preserves project organisation)                  -->
+  <!-- ============================================================ -->
+  <xs:complexType name="FolderTreeType">
+    <xs:sequence>
+      <xs:element name="folders" type="dgx:FolderListType" minOccurs="0"/>
+      <xs:element name="diagramFolderMap" type="dgx:MappingListType" minOccurs="0"/>
+      <xs:element name="diagramOrder"     type="dgx:OrderListType"   minOccurs="0"/>
+      <xs:element name="folderOrder"      type="dgx:OrderListType"   minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="FolderListType">
+    <xs:sequence>
+      <xs:element name="folder" minOccurs="0" maxOccurs="unbounded">
+        <xs:complexType>
+          <xs:attribute name="id"       type="xs:string"  use="required"/>
+          <xs:attribute name="name"     type="xs:string"  use="required"/>
+          <xs:attribute name="parentId" type="xs:string"  use="optional"/>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- Generic key → value mapping (diagramId → folderId) -->
+  <xs:complexType name="MappingListType">
+    <xs:sequence>
+      <xs:element name="entry" minOccurs="0" maxOccurs="unbounded">
+        <xs:complexType>
+          <xs:attribute name="key"   type="xs:string" use="required"/>
+          <xs:attribute name="value" type="xs:string" use="required"/>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- Generic key → ordered list mapping (folderId → [id1, id2, ...]) -->
+  <xs:complexType name="OrderListType">
+    <xs:sequence>
+      <xs:element name="group" minOccurs="0" maxOccurs="unbounded">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="ref" minOccurs="0" maxOccurs="unbounded">
+              <xs:complexType>
+                <xs:attribute name="id" type="xs:string" use="required"/>
+              </xs:complexType>
+            </xs:element>
+          </xs:sequence>
+          <xs:attribute name="key" type="xs:string" use="required"/>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+</xs:schema>

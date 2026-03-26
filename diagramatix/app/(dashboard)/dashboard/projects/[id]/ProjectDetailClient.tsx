@@ -23,6 +23,229 @@ interface FolderTree {
 
 const ROOT_ID = "root";
 
+type ExportFormat = "json" | "xml";
+
+// --- XML export helpers ---
+const NS = "http://diagramatix.com/export/1.0";
+function esc(s: string): string { return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+function attr(name: string, val: string | number | boolean | undefined | null): string {
+  if (val === undefined || val === null) return "";
+  return ` ${name}="${esc(String(val))}"`;
+}
+function pointXml(tag: string, p: { x: number; y: number } | undefined | null, indent: string): string {
+  if (!p) return "";
+  return `${indent}<${tag}${attr("x",p.x)}${attr("y",p.y)}/>\n`;
+}
+
+interface ExportDiagramRecord { originalId: string; name: string; type: string; data: DiagramData; colorConfig?: unknown; displayMode?: string }
+interface ExportPayload { version: string; exportedAt: string; project: { name: string; description: string; ownerName: string; colorConfig: unknown }; diagrams: ExportDiagramRecord[]; folderTree: FolderTree }
+
+function convertExportToXml(exp: ExportPayload): string {
+  let x = `<?xml version="1.0" encoding="UTF-8"?>\n`;
+  x += `<dgx:diagramatix-export xmlns:dgx="${NS}"${attr("version",exp.version)}${attr("exportedAt",exp.exportedAt)}>\n`;
+
+  // Project
+  x += `  <dgx:project>\n`;
+  x += `    <dgx:name>${esc(exp.project.name)}</dgx:name>\n`;
+  if (exp.project.description) x += `    <dgx:description>${esc(exp.project.description)}</dgx:description>\n`;
+  if (exp.project.ownerName) x += `    <dgx:ownerName>${esc(exp.project.ownerName)}</dgx:ownerName>\n`;
+  if (exp.project.colorConfig && Object.keys(exp.project.colorConfig as Record<string,unknown>).length > 0) {
+    x += `    <dgx:colorConfig>${esc(JSON.stringify(exp.project.colorConfig))}</dgx:colorConfig>\n`;
+  }
+  x += `  </dgx:project>\n`;
+
+  // Diagrams
+  x += `  <dgx:diagrams>\n`;
+  for (const d of exp.diagrams) {
+    x += `    <dgx:diagram${attr("originalId",d.originalId)}${attr("type",d.type)}${attr("displayMode",d.displayMode)}>\n`;
+    x += `      <dgx:name>${esc(d.name)}</dgx:name>\n`;
+    x += diagramDataXml(d.data as DiagramData, "      ");
+    if (d.colorConfig && Object.keys(d.colorConfig as Record<string,unknown>).length > 0) {
+      x += `      <dgx:colorConfig>${esc(JSON.stringify(d.colorConfig))}</dgx:colorConfig>\n`;
+    }
+    x += `    </dgx:diagram>\n`;
+  }
+  x += `  </dgx:diagrams>\n`;
+
+  // Folder tree
+  x += folderTreeXml(exp.folderTree, "  ");
+
+  x += `</dgx:diagramatix-export>\n`;
+  return x;
+}
+
+function diagramDataXml(dd: DiagramData, ind: string): string {
+  let x = `${ind}<dgx:data${attr("fontSize",dd.fontSize)}${attr("connectorFontSize",dd.connectorFontSize)}${attr("titleFontSize",dd.titleFontSize)}>\n`;
+
+  // Elements
+  x += `${ind}  <dgx:elements>\n`;
+  for (const el of dd.elements) {
+    x += `${ind}    <dgx:element${attr("id",el.id)}${attr("type",el.type)}${attr("x",el.x)}${attr("y",el.y)}${attr("width",el.width)}${attr("height",el.height)}`;
+    x += `${attr("parentId",el.parentId)}${attr("boundaryHostId",el.boundaryHostId)}${attr("taskType",el.taskType)}${attr("gatewayType",el.gatewayType)}`;
+    x += `${attr("eventType",el.eventType)}${attr("repeatType",el.repeatType)}${attr("flowType",el.flowType)}>\n`;
+    x += `${ind}      <dgx:label>${esc(el.label)}</dgx:label>\n`;
+    if (el.properties && Object.keys(el.properties).length > 0) {
+      x += propertiesXml(el.properties, `${ind}      `);
+    }
+    x += `${ind}    </dgx:element>\n`;
+  }
+  x += `${ind}  </dgx:elements>\n`;
+
+  // Connectors
+  x += `${ind}  <dgx:connectors>\n`;
+  for (const c of dd.connectors) {
+    x += connectorXml(c, `${ind}    `);
+  }
+  x += `${ind}  </dgx:connectors>\n`;
+
+  // Viewport
+  x += `${ind}  <dgx:viewport${attr("x",dd.viewport.x)}${attr("y",dd.viewport.y)}${attr("zoom",dd.viewport.zoom)}/>\n`;
+
+  // Title
+  if (dd.title) {
+    x += `${ind}  <dgx:title${attr("version",dd.title.version)}${attr("authors",dd.title.authors)}${attr("status",dd.title.status)}${attr("showTitle",dd.title.showTitle)}/>\n`;
+  }
+
+  x += `${ind}</dgx:data>\n`;
+  return x;
+}
+
+function propertiesXml(props: Record<string, unknown>, ind: string): string {
+  let x = `${ind}<dgx:properties>\n`;
+  for (const [key, val] of Object.entries(props)) {
+    if (val === undefined || val === null) continue;
+    if (Array.isArray(val)) {
+      x += `${ind}  <dgx:property${attr("name",key)}${attr("type","array")}>\n`;
+      for (const item of val) {
+        if (typeof item === "object" && item !== null) {
+          x += `${ind}    <dgx:item>\n`;
+          for (const [fk, fv] of Object.entries(item as Record<string,unknown>)) {
+            if (fv !== undefined && fv !== null) x += `${ind}      <dgx:field${attr("name",fk)}>${esc(String(fv))}</dgx:field>\n`;
+          }
+          x += `${ind}    </dgx:item>\n`;
+        } else {
+          x += `${ind}    <dgx:item><dgx:field${attr("name","value")}>${esc(String(item))}</dgx:field></dgx:item>\n`;
+        }
+      }
+      x += `${ind}  </dgx:property>\n`;
+    } else if (typeof val === "object") {
+      x += `${ind}  <dgx:property${attr("name",key)}>${esc(JSON.stringify(val))}</dgx:property>\n`;
+    } else {
+      x += `${ind}  <dgx:property${attr("name",key)}>${esc(String(val))}</dgx:property>\n`;
+    }
+  }
+  x += `${ind}</dgx:properties>\n`;
+  return x;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function connectorXml(c: any, ind: string): string {
+  let x = `${ind}<dgx:connector${attr("id",c.id)}${attr("sourceId",c.sourceId)}${attr("targetId",c.targetId)}`;
+  x += `${attr("type",c.type)}${attr("sourceSide",c.sourceSide)}${attr("targetSide",c.targetSide)}`;
+  x += `${attr("directionType",c.directionType)}${attr("routingType",c.routingType)}`;
+  x += `${attr("sourceInvisibleLeader",c.sourceInvisibleLeader||undefined)}${attr("targetInvisibleLeader",c.targetInvisibleLeader||undefined)}`;
+  x += `${attr("labelOffsetX",c.labelOffsetX)}${attr("labelOffsetY",c.labelOffsetY)}${attr("labelWidth",c.labelWidth)}`;
+  x += `${attr("sourceOffsetAlong",c.sourceOffsetAlong)}${attr("targetOffsetAlong",c.targetOffsetAlong)}`;
+  x += `${attr("labelAnchor",c.labelAnchor)}${attr("arrowAtSource",c.arrowAtSource||undefined)}>\n`;
+
+  // Waypoints
+  if (c.waypoints && c.waypoints.length > 0) {
+    x += `${ind}  <dgx:waypoints>\n`;
+    for (const wp of c.waypoints) x += `${ind}    <dgx:point${attr("x",wp.x)}${attr("y",wp.y)}/>\n`;
+    x += `${ind}  </dgx:waypoints>\n`;
+  }
+
+  // Label
+  if (c.label) x += `${ind}  <dgx:label>${esc(c.label)}</dgx:label>\n`;
+
+  // Curvilinear control points
+  x += pointXml("dgx:cp1RelOffset", c.cp1RelOffset as { x:number;y:number }|undefined, `${ind}  `);
+  x += pointXml("dgx:cp2RelOffset", c.cp2RelOffset as { x:number;y:number }|undefined, `${ind}  `);
+
+  // Transition (state-machine)
+  if (c.labelMode || c.transitionEvent || c.transitionGuard || c.transitionActions) {
+    x += `${ind}  <dgx:transition${attr("labelMode",c.labelMode as string)}${attr("event",c.transitionEvent as string)}${attr("guard",c.transitionGuard as string)}${attr("actions",c.transitionActions as string)}/>\n`;
+  }
+
+  // UML association ends
+  const ends = [["sourceEnd","source"],["targetEnd","target"]] as const;
+  for (const [tag, prefix] of ends) {
+    const role = c[`${prefix}Role`] as string|undefined;
+    const mult = c[`${prefix}Multiplicity`] as string|undefined;
+    const vis = c[`${prefix}Visibility`] as string|undefined;
+    const ordered = c[`${prefix}Ordered`] as boolean|undefined;
+    const unique = c[`${prefix}Unique`] as boolean|undefined;
+    const qualifier = c[`${prefix}Qualifier`] as string|undefined;
+    const propStr = c[`${prefix}PropertyString`] as string|undefined;
+    if (role || mult || vis || ordered || unique || qualifier || propStr) {
+      x += `${ind}  <dgx:${tag}${attr("role",role)}${attr("multiplicity",mult)}${attr("visibility",vis)}${attr("ordered",ordered)}${attr("unique",unique)}${attr("qualifier",qualifier)}${attr("propertyString",propStr)}>\n`;
+      x += pointXml(`dgx:roleOffset`, c[`${prefix}RoleOffset`] as { x:number;y:number }|undefined, `${ind}    `);
+      x += pointXml(`dgx:multOffset`, c[`${prefix}MultOffset`] as { x:number;y:number }|undefined, `${ind}    `);
+      x += pointXml(`dgx:constraintOffset`, c[`${prefix}ConstraintOffset`] as { x:number;y:number }|undefined, `${ind}    `);
+      x += pointXml(`dgx:uniqueOffset`, c[`${prefix}UniqueOffset`] as { x:number;y:number }|undefined, `${ind}    `);
+      x += `${ind}  </dgx:${tag}>\n`;
+    }
+  }
+
+  // Association name
+  if (c.associationName) {
+    x += `${ind}  <dgx:associationName${attr("name",c.associationName)}${attr("readingDirection",c.readingDirection as string)}>\n`;
+    x += pointXml("dgx:offset", c.associationNameOffset as { x:number;y:number }|undefined, `${ind}    `);
+    x += `${ind}  </dgx:associationName>\n`;
+  }
+
+  x += `${ind}</dgx:connector>\n`;
+  return x;
+}
+
+function folderTreeXml(ft: FolderTree, ind: string): string {
+  let x = `${ind}<dgx:folderTree>\n`;
+
+  // Folders
+  if (ft.folders && ft.folders.length > 0) {
+    x += `${ind}  <dgx:folders>\n`;
+    for (const f of ft.folders) {
+      x += `${ind}    <dgx:folder${attr("id",f.id)}${attr("name",f.name)}${attr("parentId",f.parentId)}/>\n`;
+    }
+    x += `${ind}  </dgx:folders>\n`;
+  }
+
+  // DiagramFolderMap
+  if (ft.diagramFolderMap && Object.keys(ft.diagramFolderMap).length > 0) {
+    x += `${ind}  <dgx:diagramFolderMap>\n`;
+    for (const [k, v] of Object.entries(ft.diagramFolderMap)) {
+      x += `${ind}    <dgx:entry${attr("key",k)}${attr("value",v)}/>\n`;
+    }
+    x += `${ind}  </dgx:diagramFolderMap>\n`;
+  }
+
+  // Diagram order
+  if (ft.diagramOrder && Object.keys(ft.diagramOrder).length > 0) {
+    x += `${ind}  <dgx:diagramOrder>\n`;
+    for (const [k, ids] of Object.entries(ft.diagramOrder)) {
+      x += `${ind}    <dgx:group${attr("key",k)}>\n`;
+      for (const id of ids) x += `${ind}      <dgx:ref${attr("id",id)}/>\n`;
+      x += `${ind}    </dgx:group>\n`;
+    }
+    x += `${ind}  </dgx:diagramOrder>\n`;
+  }
+
+  // Folder order
+  if (ft.folderOrder && Object.keys(ft.folderOrder).length > 0) {
+    x += `${ind}  <dgx:folderOrder>\n`;
+    for (const [k, ids] of Object.entries(ft.folderOrder)) {
+      x += `${ind}    <dgx:group${attr("key",k)}>\n`;
+      for (const id of ids) x += `${ind}      <dgx:ref${attr("id",id)}/>\n`;
+      x += `${ind}    </dgx:group>\n`;
+    }
+    x += `${ind}  </dgx:folderOrder>\n`;
+  }
+
+  x += `${ind}</dgx:folderTree>\n`;
+  return x;
+}
+
+
 function loadFolderTree(projectId: string): FolderTree {
   if (typeof window === "undefined") return { folders: [], diagramFolderMap: {} };
   try {
@@ -95,6 +318,8 @@ export function ProjectDetailClient({ project, otherProjects }: Props) {
   const [exporting, setExporting] = useState(false);
   const [exportLog, setExportLog] = useState<string[]>([]);
   const [exportResult, setExportResult] = useState<"success" | "failed" | null>(null);
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
   const [projectColorConfig, setProjectColorConfig] = useState<SymbolColorConfig>((project.colorConfig as SymbolColorConfig | null) ?? {});
 
   // Folder tree state — initialize with defaults, load from localStorage in useEffect
@@ -122,6 +347,15 @@ export function ProjectDetailClient({ project, otherProjects }: Props) {
     if (savedTreeItem) setSelectedTreeItem(savedTreeItem);
     if (savedFolder) setSelectedFolderId(savedFolder);
   }, [project.id]);
+
+  // Close export menu on click outside
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) setShowExportMenu(false);
+    }
+    if (showExportMenu) document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [showExportMenu]);
 
   // Get ordered diagrams in a specific folder
   function getOrderedDiagramsInFolder(folderId: string): DiagramSummary[] {
@@ -250,7 +484,7 @@ export function ProjectDetailClient({ project, otherProjects }: Props) {
     }).catch(() => {});
   }
 
-  async function handleExportProject() {
+  async function handleExportProject(format: ExportFormat = "json") {
     setExporting(true);
     setExportLog([]);
     setExportResult(null);
@@ -306,18 +540,25 @@ export function ProjectDetailClient({ project, otherProjects }: Props) {
         folderTree,
       };
 
-      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
+      const isXml = format === "xml";
+      const fileExt = isXml ? "xml" : "json";
+      const mimeType = isXml ? "application/xml" : "application/json";
+      const content = isXml
+        ? convertExportToXml(exportData as ExportPayload)
+        : JSON.stringify(exportData, null, 2);
+
+      const blob = new Blob([content], { type: mimeType });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `${projectName}.diagramatix.json`;
+      a.download = `${projectName}.diagramatix.${fileExt}`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       setTimeout(() => URL.revokeObjectURL(url), 1000);
 
       const sizeKb = Math.round(blob.size / 1024);
-      log(`\u2714 Export complete! File: ${projectName}.diagramatix.json (${sizeKb} KB)`);
+      log(`\u2714 Export complete! File: ${projectName}.diagramatix.${fileExt} (${sizeKb} KB)`);
       log(`   ${diagramsWithData.length} diagram(s), ${folderCount} folder(s)`);
       setExportResult("success");
     } catch (err) {
@@ -687,15 +928,33 @@ export function ProjectDetailClient({ project, otherProjects }: Props) {
           >
             Project Settings
           </button>
-          <button
-            onClick={handleExportProject}
-            disabled={exporting}
-            className={`px-3 py-1 text-xs font-medium rounded-md border ${
-              exporting ? "bg-green-600 text-white border-green-600 cursor-not-allowed" : "text-gray-700 border-gray-300 hover:bg-gray-50"
-            }`}
-          >
-            {exporting ? "Exporting\u2026" : "Export Project"}
-          </button>
+          <div className="relative" ref={exportMenuRef}>
+            <button
+              onClick={() => { if (!exporting) setShowExportMenu(v => !v); }}
+              disabled={exporting}
+              className={`px-3 py-1 text-xs font-medium rounded-md border ${
+                exporting ? "bg-green-600 text-white border-green-600 cursor-not-allowed" : "text-gray-700 border-gray-300 hover:bg-gray-50"
+              }`}
+            >
+              {exporting ? "Exporting\u2026" : "Export Project \u25BE"}
+            </button>
+            {showExportMenu && (
+              <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-50 min-w-[140px]">
+                <button
+                  className="block w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50"
+                  onClick={() => { setShowExportMenu(false); handleExportProject("json"); }}
+                >
+                  Export as JSON
+                </button>
+                <button
+                  className="block w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50"
+                  onClick={() => { setShowExportMenu(false); handleExportProject("xml"); }}
+                >
+                  Export as XML
+                </button>
+              </div>
+            )}
+          </div>
           <button
             onClick={() => setShowNewDiagram(true)}
             className="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-xs font-medium"
@@ -1008,11 +1267,11 @@ function DiagramCard({
         <span>{"\u00B7"}</span>
         <span>{new Date(diagram.updatedAt).toLocaleDateString()}</span>
       </div>
-      {diagram.data && (
+      {diagram.data ? (
         <div className="absolute bottom-1 right-1 w-16 h-10 opacity-30 group-hover:opacity-60 transition-opacity pointer-events-none">
-          <DiagramThumbnail data={diagram.data} colorConfig={colorConfig} />
+          <DiagramThumbnail data={diagram.data as DiagramData} colorConfig={colorConfig} />
         </div>
-      )}
+      ) : null}
     </div>
   );
 }
