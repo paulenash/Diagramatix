@@ -347,12 +347,15 @@ export function ProjectDetailClient({ project, otherProjects }: Props) {
       }));
     } else {
       // It's a diagram — update via API and local state
-      fetch(`/api/diagrams/${editingId}`, {
+      const diagId = editingId;
+      fetch(`/api/diagrams/${diagId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: trimmed }),
-      }).catch(() => {});
-      setDiagrams(prev => prev.map(d => d.id === editingId ? { ...d, name: trimmed } : d));
+      }).then(res => {
+        if (!res.ok) console.error("Failed to rename diagram:", res.status);
+      }).catch(err => console.error("Failed to rename diagram:", err));
+      setDiagrams(prev => prev.map(d => d.id === diagId ? { ...d, name: trimmed } : d));
     }
     setEditingId(null);
   }
