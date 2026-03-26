@@ -207,10 +207,10 @@ export const ALL_SYMBOLS: SymbolDefinition[] = [
   },
   {
     type: "uml-class",
-    label: "Class",
-    defaultWidth: 160,
-    defaultHeight: 120,
-    description: "A UML class in a domain diagram",
+    label: "Entity",
+    defaultWidth: 80,
+    defaultHeight: 60,
+    description: "A UML entity (class) in a domain diagram",
   },
   {
     type: "uml-enumeration",

@@ -866,7 +866,7 @@ function UmlClassShape({ el }: { el: DiagramElement }) {
   const fsc = useContext(FontScaleCtx);
   const fill = resolveColor("uml-class", colors);
   const showStereotype = (el.properties.showStereotype as boolean | undefined) ?? false;
-  const stereotype = (el.properties.stereotype as string | undefined) ?? "class";
+  const stereotype = (el.properties.stereotype as string | undefined) ?? "entity";
   const labelLines = el.label.split("\n");
   const lineH = Math.round(14 * fsc);
   const labelFontSize = Math.round(12 * fsc * 10) / 10;
@@ -884,8 +884,8 @@ function UmlClassShape({ el }: { el: DiagramElement }) {
     (el.properties.attributes as import("@/app/lib/diagram/types").UmlAttribute[] | undefined) ?? [];
   const operations: import("@/app/lib/diagram/types").UmlOperation[] =
     (el.properties.operations as import("@/app/lib/diagram/types").UmlOperation[] | undefined) ?? [];
-  const showAttrs = (el.properties.showAttributes as boolean | undefined) ?? true;
-  const showOps = (el.properties.showOperations as boolean | undefined) ?? true;
+  const showAttrs = (el.properties.showAttributes as boolean | undefined) ?? false;
+  const showOps = (el.properties.showOperations as boolean | undefined) ?? false;
 
   const PAD = 4;
   const SECTION_PAD = 5; // buffer between last attribute text and divider line

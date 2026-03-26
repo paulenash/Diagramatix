@@ -1024,8 +1024,8 @@ export function Canvas({
         } else if (el!.type === "uml-class") {
           const attrs = (el!.properties.attributes as { name: string }[] | undefined) ?? [];
           const ops = (el!.properties.operations as { name: string }[] | undefined) ?? [];
-          const showA = (el!.properties.showAttributes as boolean | undefined) ?? true;
-          const showO = (el!.properties.showOperations as boolean | undefined) ?? true;
+          const showA = (el!.properties.showAttributes as boolean | undefined) ?? false;
+          const showO = (el!.properties.showOperations as boolean | undefined) ?? false;
           const attrsH = showA ? attrs.length * LINE_H : 0;
           const opsH = showO ? ops.length * LINE_H : 0;
           contentMinH = headerH + Math.max(LINE_H, attrsH + opsH + 3);

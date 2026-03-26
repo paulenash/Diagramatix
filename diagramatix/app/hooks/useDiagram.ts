@@ -401,7 +401,7 @@ function autoResizeUmlElement(el: DiagramElement): DiagramElement {
   const MIN_H = 40;
 
   const stereotype = (el.properties.stereotype as string | undefined)
-    ?? (el.type === "uml-class" ? "class" : "enumeration");
+    ?? (el.type === "uml-class" ? "entity" : "enumeration");
   const showStereotype = el.type === "uml-enumeration"
     || ((el.properties.showStereotype as boolean | undefined) ?? false);
   const stereotypeW = showStereotype ? (`\u00AB${stereotype}\u00BB`.length * CHAR_W * 0.8) : 0;
@@ -426,8 +426,8 @@ function autoResizeUmlElement(el: DiagramElement): DiagramElement {
   // uml-class — with attributes and operations compartments
   const attributes = (el.properties.attributes as { name: string; visibility?: string; type?: string; multiplicity?: string; defaultValue?: string; propertyString?: string; isDerived?: boolean }[] | undefined) ?? [];
   const operations = (el.properties.operations as { name: string; visibility?: string }[] | undefined) ?? [];
-  const showAttrs = (el.properties.showAttributes as boolean | undefined) ?? true;
-  const showOps = (el.properties.showOperations as boolean | undefined) ?? true;
+  const showAttrs = (el.properties.showAttributes as boolean | undefined) ?? false;
+  const showOps = (el.properties.showOperations as boolean | undefined) ?? false;
 
   // Compute max width from all content
   let maxContentW = Math.max(stereotypeW, labelMaxW);
@@ -520,7 +520,7 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         label = `Lane ${count + 1}`;
       } else if (action.payload.symbolType === "uml-class") {
         const count = state.elements.filter((e) => e.type === "uml-class").length;
-        label = `Class ${count + 1}`;
+        label = `Entity ${count + 1}`;
       } else if (action.payload.symbolType === "uml-enumeration") {
         const count = state.elements.filter((e) => e.type === "uml-enumeration").length;
         label = `Enumeration ${count + 1}`;
@@ -539,7 +539,9 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         width: def.defaultWidth,
         height: def.defaultHeight,
         label,
-        properties: action.payload.symbolType === "pool" ? { poolType: "black-box" } : {},
+        properties: action.payload.symbolType === "pool" ? { poolType: "black-box" }
+          : action.payload.symbolType === "uml-class" ? { showAttributes: false, showOperations: false }
+          : {},
         taskType:  action.payload.taskType,
         eventType: action.payload.eventType,
       };

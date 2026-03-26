@@ -1414,7 +1414,7 @@ export function PropertiesPanel({
             <label className="text-[10px] text-gray-500 w-16 shrink-0">Stereotype</label>
             <input type="text"
               className="flex-1 text-[10px] border border-gray-300 rounded px-1 py-0 min-w-0"
-              defaultValue={(element.properties.stereotype as string | undefined) ?? (element.type === "uml-class" ? "class" : "enumeration")}
+              defaultValue={(element.properties.stereotype as string | undefined) ?? (element.type === "uml-class" ? "entity" : "enumeration")}
               key={`stereo-${element.id}`}
               onBlur={e => onUpdateProperties(element.id, { stereotype: e.target.value })}
               onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
@@ -1441,20 +1441,20 @@ export function PropertiesPanel({
         <>
           <div className="flex items-center gap-2 border-t border-gray-100 pt-1">
             <label className="flex items-center gap-1 text-[10px] text-gray-500 cursor-pointer">
-              <input type="checkbox" checked={(element.properties.showAttributes as boolean | undefined) ?? true}
+              <input type="checkbox" checked={(element.properties.showAttributes as boolean | undefined) ?? false}
                 onChange={e => onUpdateProperties(element.id, { showAttributes: e.target.checked })}
                 className="w-3 h-3" /> Attributes
             </label>
             <label className="flex items-center gap-1 text-[10px] text-gray-500 cursor-pointer">
-              <input type="checkbox" checked={(element.properties.showOperations as boolean | undefined) ?? true}
+              <input type="checkbox" checked={(element.properties.showOperations as boolean | undefined) ?? false}
                 onChange={e => onUpdateProperties(element.id, { showOperations: e.target.checked })}
                 className="w-3 h-3" /> Operations
             </label>
           </div>
-          {((element.properties.showAttributes as boolean | undefined) ?? true) && (
+          {((element.properties.showAttributes as boolean | undefined) ?? false) && (
             <ClassAttributesList element={element} onUpdateProperties={onUpdateProperties} />
           )}
-          {((element.properties.showOperations as boolean | undefined) ?? true) && (
+          {((element.properties.showOperations as boolean | undefined) ?? false) && (
             <ClassOperationsList element={element} onUpdateProperties={onUpdateProperties} />
           )}
         </>
