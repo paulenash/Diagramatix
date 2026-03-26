@@ -152,20 +152,34 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
   const [error, setError] = useState("");
 
   const [importing, setImporting] = useState(false);
+  const [importLog, setImportLog] = useState<string[]>([]);
+  const [importResult, setImportResult] = useState<"success" | "failed" | null>(null);
+  const [importedProjectId, setImportedProjectId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function handleImportProject(file: File) {
     setImporting(true);
+    setImportLog([]);
+    setImportResult(null);
+    setImportedProjectId(null);
+    const log = (msg: string) => setImportLog(prev => [...prev, msg]);
+
     try {
+      log(`Reading file: ${file.name} (${Math.round(file.size / 1024)} KB)`);
       const text = await file.text();
       const exportData = JSON.parse(text);
       if (!exportData.version || !exportData.project || !exportData.diagrams) {
-        alert("Invalid export file format"); setImporting(false); return;
+        log("\u2718 Invalid export file format — missing required fields");
+        setImportResult("failed"); return;
       }
+      log(`\u2714 Valid export file (version ${exportData.version})`);
+      log(`   Project: "${exportData.project.name}"`);
+      log(`   Diagrams: ${exportData.diagrams.length}`);
+      log(`   Exported: ${new Date(exportData.exportedAt).toLocaleString()}`);
 
       const importName = (exportData.project.name ?? "Imported") + " (imported)";
 
-      // Create project
+      log("Creating project...");
       const projRes = await fetch("/api/projects", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -175,21 +189,29 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
           ownerName: exportData.project.ownerName ?? "",
         }),
       });
-      if (!projRes.ok) { alert("Failed to create project"); setImporting(false); return; }
+      if (!projRes.ok) {
+        log("\u2718 Failed to create project");
+        setImportResult("failed"); return;
+      }
       const newProject = await projRes.json();
+      log(`\u2714 Project "${importName}" created`);
 
-      // Save project colorConfig if present
       if (exportData.project.colorConfig && Object.keys(exportData.project.colorConfig).length > 0) {
+        log("Importing project colour settings...");
         await fetch(`/api/projects/${newProject.id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ colorConfig: exportData.project.colorConfig }),
         });
+        log("\u2714 Colour settings imported");
       }
 
-      // Create diagrams and build ID remap
+      log(`Importing ${exportData.diagrams.length} diagram(s)...`);
       const idMap = new Map<string, string>();
-      for (const diag of exportData.diagrams) {
+      let successCount = 0;
+      for (let i = 0; i < exportData.diagrams.length; i++) {
+        const diag = exportData.diagrams[i];
+        log(`  Importing diagram ${i + 1}/${exportData.diagrams.length}: "${diag.name}" (${diag.type ?? "context"})`);
         const dRes = await fetch("/api/diagrams", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -205,11 +227,15 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
         if (dRes.ok) {
           const newDiag = await dRes.json();
           idMap.set(diag.originalId, newDiag.id);
+          successCount++;
+          log(`  \u2714 Diagram "${diag.name}" imported`);
+        } else {
+          log(`  \u2718 Failed to import diagram "${diag.name}"`);
         }
       }
 
-      // Remap folder tree IDs and save to localStorage
       if (exportData.folderTree) {
+        log("Importing folder structure...");
         const ft = exportData.folderTree;
         const remappedMap: Record<string, string> = {};
         for (const [oldId, folderId] of Object.entries(ft.diagramFolderMap ?? {})) {
@@ -227,14 +253,18 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
           folderOrder: ft.folderOrder ?? {},
         };
         localStorage.setItem(`folder-tree-${newProject.id}`, JSON.stringify(remappedTree));
+        const folderCount = (ft.folders ?? []).length;
+        log(`\u2714 ${folderCount} folder(s) imported`);
       }
 
-      router.push(`/dashboard/projects/${newProject.id}`);
+      log("");
+      log(`\u2714 Import complete! ${successCount}/${exportData.diagrams.length} diagram(s) imported successfully.`);
+      setImportResult("success");
+      setImportedProjectId(newProject.id);
     } catch (err) {
       console.error("Import failed:", err);
-      alert("Import failed: invalid file");
-    } finally {
-      setImporting(false);
+      log(`\u2718 Import failed: ${err instanceof Error ? err.message : String(err)}`);
+      setImportResult("failed");
     }
   }
 
@@ -514,6 +544,61 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
             >
               Open Project
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Import progress modal */}
+      {importing && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md flex flex-col max-h-[70vh]">
+            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200">
+              <h2 className="text-sm font-semibold text-gray-900">
+                {importResult === "success" ? "\u2714 Import Complete" : importResult === "failed" ? "\u2718 Import Failed" : "Importing Project\u2026"}
+              </h2>
+              {importResult && (
+                <button onClick={() => {
+                  if (importResult === "success" && importedProjectId) {
+                    router.push(`/dashboard/projects/${importedProjectId}`);
+                  }
+                  setImporting(false); setImportLog([]); setImportResult(null); setImportedProjectId(null);
+                }}
+                  className="text-gray-400 hover:text-gray-600 text-lg leading-none">&times;</button>
+              )}
+            </div>
+            <div className="flex-1 overflow-y-auto px-5 py-3 font-mono text-[10px] text-gray-600 space-y-0.5">
+              {importLog.map((line, i) => (
+                <p key={i} className={
+                  line.startsWith("\u2714") ? "text-green-600" :
+                  line.startsWith("\u2718") ? "text-red-600" :
+                  line.startsWith("  ") ? "text-gray-500 pl-2" :
+                  line.startsWith("   ") ? "text-gray-400 pl-4" : "text-gray-700"
+                }>{line}</p>
+              ))}
+              {!importResult && (
+                <p className="text-blue-500 animate-pulse">{"\u25CF"} Working...</p>
+              )}
+            </div>
+            {importResult && (
+              <div className="px-5 py-3 border-t border-gray-200 flex justify-end gap-2">
+                {importResult === "success" && importedProjectId && (
+                  <button onClick={() => {
+                    setImporting(false); setImportLog([]); setImportResult(null);
+                    router.push(`/dashboard/projects/${importedProjectId}`);
+                  }}
+                    className="px-4 py-1.5 text-xs rounded-md text-white bg-blue-600 hover:bg-blue-700">
+                    Open Project
+                  </button>
+                )}
+                <button onClick={() => {
+                  setImporting(false); setImportLog([]); setImportResult(null); setImportedProjectId(null);
+                  if (importResult === "success") router.refresh();
+                }}
+                  className={`px-4 py-1.5 text-xs rounded-md text-white ${importResult === "success" ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700"}`}>
+                  Close
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
