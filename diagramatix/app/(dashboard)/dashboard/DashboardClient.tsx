@@ -155,38 +155,54 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
   const [importLog, setImportLog] = useState<string[]>([]);
   const [importResult, setImportResult] = useState<"success" | "failed" | null>(null);
   const [importedProjectId, setImportedProjectId] = useState<string | null>(null);
+  const [pendingImportData, setPendingImportData] = useState<Record<string, unknown> | null>(null);
+  const [importProjectName, setImportProjectName] = useState("");
+  const [showImportNameDialog, setShowImportNameDialog] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  async function handleImportProject(file: File) {
+  function handleFileSelected(file: File) {
+    file.text().then(text => {
+      try {
+        const data = JSON.parse(text);
+        if (!data.version || !data.project || !data.diagrams) {
+          alert("Invalid export file — missing required fields"); return;
+        }
+        setPendingImportData(data);
+        setImportProjectName((data.project.name ?? "Imported") + " (imported)");
+        setShowImportNameDialog(true);
+      } catch {
+        alert("Invalid JSON file");
+      }
+    });
+  }
+
+  async function handleImportProject() {
+    if (!pendingImportData || !importProjectName.trim()) return;
+    setShowImportNameDialog(false);
     setImporting(true);
     setImportLog([]);
     setImportResult(null);
     setImportedProjectId(null);
+    const exportData = pendingImportData as Record<string, unknown>;
+    const importName = importProjectName.trim();
     const log = (msg: string) => setImportLog(prev => [...prev, msg]);
 
     try {
-      log(`Reading file: ${file.name} (${Math.round(file.size / 1024)} KB)`);
-      const text = await file.text();
-      const exportData = JSON.parse(text);
-      if (!exportData.version || !exportData.project || !exportData.diagrams) {
-        log("\u2718 Invalid export file format — missing required fields");
-        setImportResult("failed"); return;
-      }
-      log(`\u2714 Valid export file (version ${exportData.version})`);
-      log(`   Project: "${exportData.project.name}"`);
-      log(`   Diagrams: ${exportData.diagrams.length}`);
-      log(`   Exported: ${new Date(exportData.exportedAt).toLocaleString()}`);
+      const proj = exportData.project as Record<string, unknown>;
+      const diags = exportData.diagrams as Record<string, unknown>[];
+      log(`\u2714 Valid export file (version ${exportData.version as string})`);
+      log(`   Original project: "${proj.name as string}"`);
+      log(`   Diagrams: ${diags.length}`);
+      if (exportData.exportedAt) log(`   Exported: ${new Date(exportData.exportedAt as string).toLocaleString()}`);
 
-      const importName = (exportData.project.name ?? "Imported") + " (imported)";
-
-      log("Creating project...");
+      log(`Creating project "${importName}"...`);
       const projRes = await fetch("/api/projects", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: importName,
-          description: exportData.project.description ?? "",
-          ownerName: exportData.project.ownerName ?? "",
+          description: (proj.description as string) ?? "",
+          ownerName: (proj.ownerName as string) ?? "",
         }),
       });
       if (!projRes.ok) {
@@ -196,22 +212,23 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
       const newProject = await projRes.json();
       log(`\u2714 Project "${importName}" created`);
 
-      if (exportData.project.colorConfig && Object.keys(exportData.project.colorConfig).length > 0) {
+      const projColorConfig = proj.colorConfig as Record<string, unknown> | undefined;
+      if (projColorConfig && Object.keys(projColorConfig).length > 0) {
         log("Importing project colour settings...");
         await fetch(`/api/projects/${newProject.id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ colorConfig: exportData.project.colorConfig }),
+          body: JSON.stringify({ colorConfig: projColorConfig }),
         });
         log("\u2714 Colour settings imported");
       }
 
-      log(`Importing ${exportData.diagrams.length} diagram(s)...`);
+      log(`Importing ${diags.length} diagram(s)...`);
       const idMap = new Map<string, string>();
       let successCount = 0;
-      for (let i = 0; i < exportData.diagrams.length; i++) {
-        const diag = exportData.diagrams[i];
-        log(`  Importing diagram ${i + 1}/${exportData.diagrams.length}: "${diag.name}" (${diag.type ?? "context"})`);
+      for (let i = 0; i < diags.length; i++) {
+        const diag = diags[i] as Record<string, unknown>;
+        log(`  Importing diagram ${i + 1}/${diags.length}: "${diag.name as string}" (${(diag.type as string) ?? "context"})`);
         const dRes = await fetch("/api/diagrams", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -226,45 +243,52 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
         });
         if (dRes.ok) {
           const newDiag = await dRes.json();
-          idMap.set(diag.originalId, newDiag.id);
+          idMap.set(diag.originalId as string, newDiag.id);
           successCount++;
-          log(`  \u2714 Diagram "${diag.name}" imported`);
+          log(`  \u2714 Diagram "${diag.name as string}" imported`);
         } else {
-          log(`  \u2718 Failed to import diagram "${diag.name}"`);
+          log(`  \u2718 Failed to import diagram "${diag.name as string}"`);
         }
       }
 
       if (exportData.folderTree) {
         log("Importing folder structure...");
-        const ft = exportData.folderTree;
+        const ft = exportData.folderTree as Record<string, unknown>;
         const remappedMap: Record<string, string> = {};
-        for (const [oldId, folderId] of Object.entries(ft.diagramFolderMap ?? {})) {
+        for (const [oldId, folderId] of Object.entries((ft.diagramFolderMap as Record<string,string>) ?? {})) {
           const newId = idMap.get(oldId);
           if (newId) remappedMap[newId] = folderId as string;
         }
         const remappedOrder: Record<string, string[]> = {};
-        for (const [folderId, ids] of Object.entries(ft.diagramOrder ?? {})) {
+        for (const [folderId, ids] of Object.entries((ft.diagramOrder as Record<string,string[]>) ?? {})) {
           remappedOrder[folderId] = (ids as string[]).map(id => idMap.get(id) ?? id);
         }
         const remappedTree = {
-          folders: ft.folders ?? [],
+          folders: (ft.folders as unknown[]) ?? [],
           diagramFolderMap: remappedMap,
           diagramOrder: remappedOrder,
-          folderOrder: ft.folderOrder ?? {},
+          folderOrder: (ft.folderOrder as Record<string,string[]>) ?? {},
         };
         localStorage.setItem(`folder-tree-${newProject.id}`, JSON.stringify(remappedTree));
-        const folderCount = (ft.folders ?? []).length;
+        const folderCount = ((ft.folders as unknown[]) ?? []).length;
         log(`\u2714 ${folderCount} folder(s) imported`);
       }
 
       log("");
-      log(`\u2714 Import complete! ${successCount}/${exportData.diagrams.length} diagram(s) imported successfully.`);
+      log(`\u2714 Import complete! ${successCount}/${diags.length} diagram(s) imported successfully.`);
       setImportResult("success");
       setImportedProjectId(newProject.id);
+      // Add imported project to dashboard list
+      setProjects(prev => [{
+        ...newProject,
+        _count: { diagrams: successCount },
+      }, ...prev]);
+      setPendingImportData(null);
     } catch (err) {
       console.error("Import failed:", err);
       log(`\u2718 Import failed: ${err instanceof Error ? err.message : String(err)}`);
       setImportResult("failed");
+      setPendingImportData(null);
     }
   }
 
@@ -375,7 +399,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-xl font-semibold text-gray-900">Projects</h1>
             <input ref={fileInputRef} type="file" accept=".json" className="hidden"
-              onChange={e => { const f = e.target.files?.[0]; if (f) handleImportProject(f); e.target.value = ""; }} />
+              onChange={e => { const f = e.target.files?.[0]; if (f) handleFileSelected(f); e.target.value = ""; }} />
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={importing}
@@ -544,6 +568,30 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
             >
               Open Project
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Import name dialog */}
+      {showImportNameDialog && pendingImportData && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-sm p-5">
+            <h2 className="text-sm font-semibold text-gray-900 mb-3">Import Project</h2>
+            <p className="text-[10px] text-gray-500 mb-1">
+              Original: &quot;{(pendingImportData.project as Record<string,unknown>)?.name as string}&quot;
+              {"\u00B7"} {((pendingImportData.diagrams as unknown[]) ?? []).length} diagram(s)
+            </p>
+            <label className="block text-xs text-gray-600 mb-1 mt-3">Project Name</label>
+            <input autoFocus type="text" value={importProjectName}
+              onChange={e => setImportProjectName(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter" && importProjectName.trim()) handleImportProject(); }}
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            <div className="flex justify-end gap-2 mt-4">
+              <button onClick={() => { setShowImportNameDialog(false); setPendingImportData(null); }}
+                className="px-3 py-1.5 text-xs text-gray-700 border border-gray-300 rounded hover:bg-gray-50">Cancel</button>
+              <button onClick={handleImportProject} disabled={!importProjectName.trim()}
+                className="px-3 py-1.5 text-xs text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50">Import</button>
+            </div>
           </div>
         </div>
       )}
