@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import type { DiagramType, DiagramData } from "@/app/lib/diagram/types";
+import { EXPORT_VERSION } from "@/app/lib/diagram/types";
 import { resolveColor, DEFAULT_SYMBOL_COLORS, type SymbolColorConfig } from "@/app/lib/diagram/colors";
 import { DiagramMaintenanceModal } from "./DiagramMaintenanceModal";
 
@@ -42,7 +43,7 @@ interface ExportPayload { version: string; exportedAt: string; project: { name: 
 
 function convertExportToXml(exp: ExportPayload): string {
   let x = `<?xml version="1.0" encoding="UTF-8"?>\n`;
-  x += `<dgx:diagramatix-export xmlns:dgx="${NS}"${attr("version",exp.version)}${attr("exportedAt",exp.exportedAt)}>\n`;
+  x += `<dgx:diagramatix-export xmlns:dgx="${NS}" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="${NS} /api/schema"${attr("version",exp.version)}${attr("exportedAt",exp.exportedAt)}>\n`;
 
   // Project
   x += `  <dgx:project>\n`;
@@ -286,6 +287,7 @@ interface OtherProject {
 interface Props {
   project: ProjectDetail;
   otherProjects: OtherProject[];
+  version?: number;
 }
 
 const DIAGRAM_TYPE_LABELS: Record<string, string> = {
@@ -305,7 +307,7 @@ const DIAGRAM_TYPES: { value: DiagramType; label: string; description: string }[
   { value: "domain", label: "Domain", description: "UML class diagrams with classes, enumerations, and relationships" },
 ];
 
-export function ProjectDetailClient({ project, otherProjects }: Props) {
+export function ProjectDetailClient({ project, otherProjects, version }: Props) {
   const router = useRouter();
   const [diagrams, setDiagrams] = useState(project.diagrams);
   const [projectName, setProjectName] = useState(project.name);
@@ -521,7 +523,7 @@ export function ProjectDetailClient({ project, otherProjects }: Props) {
 
       log("Assembling export file...");
       const exportData = {
-        version: "1.0",
+        version: `${EXPORT_VERSION}.${version ?? 0}`,
         exportedAt: new Date().toISOString(),
         project: {
           name: projectName,

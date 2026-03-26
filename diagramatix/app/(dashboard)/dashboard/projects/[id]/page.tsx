@@ -1,4 +1,5 @@
 import { notFound, redirect } from "next/navigation";
+import { execSync } from "child_process";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { ProjectDetailClient } from "./ProjectDetailClient";
@@ -10,6 +11,11 @@ export default async function ProjectPage({ params }: Props) {
   if (!session?.user?.id) redirect("/login");
 
   const { id } = await params;
+
+  let commitCount = 0;
+  try {
+    commitCount = parseInt(execSync("git rev-list --count HEAD", { encoding: "utf8" }).trim(), 10) || 0;
+  } catch {}
 
   const [project, otherProjects] = await Promise.all([
     prisma.project.findFirst({
@@ -29,5 +35,5 @@ export default async function ProjectPage({ params }: Props) {
 
   if (!project) notFound();
 
-  return <ProjectDetailClient project={project} otherProjects={otherProjects} />;
+  return <ProjectDetailClient project={project} otherProjects={otherProjects} version={commitCount} />;
 }

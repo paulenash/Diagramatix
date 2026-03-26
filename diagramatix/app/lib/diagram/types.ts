@@ -212,3 +212,6 @@ export interface TemplateData {
   elements: DiagramElement[];
   connectors: Connector[];
 }
+
+/** Export format version — bump when schema changes */
+export const EXPORT_VERSION = "1.0";

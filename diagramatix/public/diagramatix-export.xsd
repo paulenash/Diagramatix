@@ -1,8 +1,24 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Diagramatix Export Schema
+  Namespace: http://diagramatix.com/export/1.0
+  Schema version matches the Diagramatix app version: major.minor.build
+  Version is injected at runtime via /api/schema endpoint
+-->
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
            xmlns:dgx="http://diagramatix.com/export/1.0"
            targetNamespace="http://diagramatix.com/export/1.0"
-           elementFormDefault="qualified">
+           elementFormDefault="qualified"
+           version="{{DIAGRAMATIX_VERSION}}">
+
+  <!-- ============================================================ -->
+  <!-- Version pattern: major.minor.build  e.g. "1.0.147"           -->
+  <!-- ============================================================ -->
+  <xs:simpleType name="VersionString">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="\d+\.\d+\.\d+"/>
+    </xs:restriction>
+  </xs:simpleType>
 
   <!-- ============================================================ -->
   <!-- Root element                                                  -->
@@ -15,8 +31,8 @@
       <xs:element name="diagrams"   type="dgx:DiagramListType"/>
       <xs:element name="folderTree" type="dgx:FolderTreeType" minOccurs="0"/>
     </xs:sequence>
-    <xs:attribute name="version"    type="xs:string"   use="required"/>
-    <xs:attribute name="exportedAt" type="xs:dateTime" use="required"/>
+    <xs:attribute name="version"    type="dgx:VersionString" use="required"/>
+    <xs:attribute name="exportedAt" type="xs:dateTime"       use="required"/>
   </xs:complexType>
 
   <!-- ============================================================ -->
