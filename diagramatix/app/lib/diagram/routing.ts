@@ -58,6 +58,23 @@ function sideNormalDir(side: Side): { dx: number; dy: number } {
   }
 }
 
+// Determine which side of an element is closest to a given point
+function getClosestSideOfElement(px: number, py: number, el: DiagramElement): Side {
+  const cx = el.x + el.width / 2, cy = el.y + el.height / 2;
+  const dx = px - cx, dy = py - cy;
+  const normX = Math.abs(dx) / (el.width / 2 || 1);
+  const normY = Math.abs(dy) / (el.height / 2 || 1);
+  if (normX > normY) return dx > 0 ? "right" : "left";
+  return dy > 0 ? "bottom" : "top";
+}
+
+// Project a point onto an element's side to get the fractional offset along that side
+function getOffsetAlong(el: DiagramElement, side: Side, pt: Point): number {
+  const clamp = (v: number) => Math.max(0.1, Math.min(0.9, v));
+  if (side === "top" || side === "bottom") return clamp((pt.x - el.x) / el.width);
+  return clamp((pt.y - el.y) / el.height);
+}
+
 // Check if an axis-aligned segment (horizontal or vertical) intersects an obstacle bounds
 function segmentHitsObstacle(p1: Point, p2: Point, obs: Bounds, margin = 4): boolean {
   const left = obs.x - margin, right = obs.x + obs.width + margin;
@@ -594,6 +611,31 @@ export function recomputeAllConnectors(
       const cp1 = { x: srcEdge.x + conn.cp1RelOffset.x, y: srcEdge.y + conn.cp1RelOffset.y };
       const cp2 = { x: tgtEdge.x + conn.cp2RelOffset.x, y: tgtEdge.y + conn.cp2RelOffset.y };
       return { ...conn, waypoints: [startPt, srcEdge, cp1, cp2, tgtEdge, endPt] };
+    }
+
+    // UML connectors: always optimize attachment points to closest positions
+    const isUmlConn = conn.type === "uml-association" || conn.type === "uml-aggregation"
+      || conn.type === "uml-composition" || conn.type === "uml-generalisation";
+    if (isUmlConn) {
+      const srcCx = source.x + source.width / 2, srcCy = source.y + source.height / 2;
+      const tgtCx = target.x + target.width / 2, tgtCy = target.y + target.height / 2;
+      const optSrcSide = getClosestSideOfElement(tgtCx, tgtCy, source);
+      const optTgtSide = getClosestSideOfElement(srcCx, srcCy, target);
+      const optSrcOffset = getOffsetAlong(source, optSrcSide, { x: tgtCx, y: tgtCy });
+      const optTgtOffset = getOffsetAlong(target, optTgtSide, { x: srcCx, y: srcCy });
+      const umlResult = computeWaypoints(source, target, elements,
+        optSrcSide, optTgtSide, conn.routingType, optSrcOffset, optTgtOffset);
+      return { ...conn, waypoints: umlResult.waypoints,
+        sourceInvisibleLeader: umlResult.sourceInvisibleLeader,
+        targetInvisibleLeader: umlResult.targetInvisibleLeader,
+        sourceSide: optSrcSide, targetSide: optTgtSide,
+        sourceOffsetAlong: optSrcOffset, targetOffsetAlong: optTgtOffset,
+        associationNameOffset: undefined,
+        sourceRoleOffset: undefined, sourceMultOffset: undefined,
+        sourceConstraintOffset: undefined, sourceUniqueOffset: undefined,
+        targetRoleOffset: undefined, targetMultOffset: undefined,
+        targetConstraintOffset: undefined, targetUniqueOffset: undefined,
+      };
     }
 
     // For rectilinear connectors with enough waypoints, try to preserve user's interior routing.
