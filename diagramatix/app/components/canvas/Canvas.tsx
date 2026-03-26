@@ -1455,7 +1455,7 @@ export function Canvas({
       }
     });
 
-  // Detect connectors whose path passes through elements (obstacle violations)
+  // Detect connectors whose path passes through elements (obstacle violations) — domain diagrams only
   const obstacleViolationConnIds = new Set<string>();
   const obstacleViolationElementIds = new Set<string>();
   function segCrossesRect(p1: Point, p2: Point, r: { x: number; y: number; w: number; h: number }): boolean {
@@ -1478,7 +1478,7 @@ export function Canvas({
     }
     return false;
   }
-  for (const conn of data.connectors) {
+  if (diagramType === "domain") for (const conn of data.connectors) {
     const wp = conn.waypoints;
     if (wp.length < 3) continue;
     const vs = conn.sourceInvisibleLeader ? 1 : 0;
