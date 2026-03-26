@@ -92,6 +92,9 @@ export function ProjectDetailClient({ project, otherProjects }: Props) {
 
   const [showNewDiagram, setShowNewDiagram] = useState(false);
   const [showMaintenance, setShowMaintenance] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [exportLog, setExportLog] = useState<string[]>([]);
+  const [exportResult, setExportResult] = useState<"success" | "failed" | null>(null);
   const [projectColorConfig, setProjectColorConfig] = useState<SymbolColorConfig>((project.colorConfig as SymbolColorConfig | null) ?? {});
 
   // Folder tree state — initialize with defaults, load from localStorage in useEffect
@@ -245,6 +248,83 @@ export function ProjectDetailClient({ project, otherProjects }: Props) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(fields),
     }).catch(() => {});
+  }
+
+  async function handleExportProject() {
+    setExporting(true);
+    setExportLog([]);
+    setExportResult(null);
+    const log = (msg: string) => setExportLog(prev => [...prev, msg]);
+
+    try {
+      log("Exporting project metadata...");
+      const res = await fetch(`/api/projects/${project.id}`);
+      if (!res.ok) { log("\u2718 Failed to fetch project data"); setExportResult("failed"); return; }
+      const projectData = await res.json();
+      log(`\u2714 Project "${projectName}" loaded`);
+
+      const diagramList = projectData.diagrams ?? [];
+      log(`Exporting ${diagramList.length} diagram(s)...`);
+
+      const diagramsWithData: Record<string, unknown>[] = [];
+      for (let i = 0; i < diagramList.length; i++) {
+        const d = diagramList[i] as { id: string; name: string; type: string };
+        log(`  Exporting diagram ${i + 1}/${diagramList.length}: "${d.name}" (${d.type})`);
+        const dRes = await fetch(`/api/diagrams/${d.id}`);
+        if (!dRes.ok) {
+          log(`  \u2718 Failed to fetch diagram "${d.name}"`);
+          continue;
+        }
+        diagramsWithData.push(await dRes.json());
+        log(`  \u2714 Diagram "${d.name}" exported`);
+      }
+
+      log("Exporting folder structure...");
+      const folderTreeRaw = localStorage.getItem(`folder-tree-${project.id}`);
+      const folderTree = folderTreeRaw ? JSON.parse(folderTreeRaw) : { folders: [], diagramFolderMap: {} };
+      const folderCount = (folderTree.folders ?? []).length;
+      log(`\u2714 ${folderCount} folder(s) exported`);
+
+      log("Assembling export file...");
+      const exportData = {
+        version: "1.0",
+        exportedAt: new Date().toISOString(),
+        project: {
+          name: projectName,
+          description: projectDescription,
+          ownerName: projectOwner,
+          colorConfig: projectColorConfig,
+        },
+        diagrams: diagramsWithData.map((d) => ({
+          originalId: d.id,
+          name: d.name,
+          type: d.type,
+          data: d.data,
+          colorConfig: d.colorConfig,
+          displayMode: d.displayMode,
+        })),
+        folderTree,
+      };
+
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${projectName}.diagramatix.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+      const sizeKb = Math.round(blob.size / 1024);
+      log(`\u2714 Export complete! File: ${projectName}.diagramatix.json (${sizeKb} KB)`);
+      log(`   ${diagramsWithData.length} diagram(s), ${folderCount} folder(s)`);
+      setExportResult("success");
+    } catch (err) {
+      console.error("Export failed:", err);
+      log(`\u2718 Export failed: ${err instanceof Error ? err.message : String(err)}`);
+      setExportResult("failed");
+    }
   }
 
   async function handleCreateDiagram() {
@@ -608,6 +688,15 @@ export function ProjectDetailClient({ project, otherProjects }: Props) {
             Project Settings
           </button>
           <button
+            onClick={handleExportProject}
+            disabled={exporting}
+            className={`px-3 py-1 text-xs font-medium rounded-md border ${
+              exporting ? "bg-green-600 text-white border-green-600 cursor-not-allowed" : "text-gray-700 border-gray-300 hover:bg-gray-50"
+            }`}
+          >
+            {exporting ? "Exporting\u2026" : "Export Project"}
+          </button>
+          <button
             onClick={() => setShowNewDiagram(true)}
             className="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-xs font-medium"
           >
@@ -679,6 +768,43 @@ export function ProjectDetailClient({ project, otherProjects }: Props) {
           )}
         </main>
       </div>
+
+      {/* Export progress modal */}
+      {exporting && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md flex flex-col max-h-[70vh]">
+            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200">
+              <h2 className="text-sm font-semibold text-gray-900">
+                {exportResult === "success" ? "\u2714 Export Complete" : exportResult === "failed" ? "\u2718 Export Failed" : "Exporting Project\u2026"}
+              </h2>
+              {exportResult && (
+                <button onClick={() => { setExporting(false); setExportLog([]); setExportResult(null); }}
+                  className="text-gray-400 hover:text-gray-600 text-lg leading-none">&times;</button>
+              )}
+            </div>
+            <div className="flex-1 overflow-y-auto px-5 py-3 font-mono text-[10px] text-gray-600 space-y-0.5">
+              {exportLog.map((line, i) => (
+                <p key={i} className={
+                  line.startsWith("\u2714") ? "text-green-600" :
+                  line.startsWith("\u2718") ? "text-red-600" :
+                  line.startsWith("  ") ? "text-gray-500 pl-2" : "text-gray-700"
+                }>{line}</p>
+              ))}
+              {!exportResult && (
+                <p className="text-blue-500 animate-pulse">{"\u25CF"} Working...</p>
+              )}
+            </div>
+            {exportResult && (
+              <div className="px-5 py-3 border-t border-gray-200 flex justify-end">
+                <button onClick={() => { setExporting(false); setExportLog([]); setExportResult(null); }}
+                  className={`px-4 py-1.5 text-xs rounded-md text-white ${exportResult === "success" ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700"}`}>
+                  Close
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Diagram Settings modal */}
       {showMaintenance && (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import type { DiagramType } from "@/app/lib/diagram/types";
@@ -151,6 +151,93 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
 
+  const [importing, setImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  async function handleImportProject(file: File) {
+    setImporting(true);
+    try {
+      const text = await file.text();
+      const exportData = JSON.parse(text);
+      if (!exportData.version || !exportData.project || !exportData.diagrams) {
+        alert("Invalid export file format"); setImporting(false); return;
+      }
+
+      const importName = (exportData.project.name ?? "Imported") + " (imported)";
+
+      // Create project
+      const projRes = await fetch("/api/projects", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: importName,
+          description: exportData.project.description ?? "",
+          ownerName: exportData.project.ownerName ?? "",
+        }),
+      });
+      if (!projRes.ok) { alert("Failed to create project"); setImporting(false); return; }
+      const newProject = await projRes.json();
+
+      // Save project colorConfig if present
+      if (exportData.project.colorConfig && Object.keys(exportData.project.colorConfig).length > 0) {
+        await fetch(`/api/projects/${newProject.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ colorConfig: exportData.project.colorConfig }),
+        });
+      }
+
+      // Create diagrams and build ID remap
+      const idMap = new Map<string, string>();
+      for (const diag of exportData.diagrams) {
+        const dRes = await fetch("/api/diagrams", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: diag.name,
+            type: diag.type ?? "context",
+            projectId: newProject.id,
+            data: diag.data,
+            colorConfig: diag.colorConfig,
+            displayMode: diag.displayMode,
+          }),
+        });
+        if (dRes.ok) {
+          const newDiag = await dRes.json();
+          idMap.set(diag.originalId, newDiag.id);
+        }
+      }
+
+      // Remap folder tree IDs and save to localStorage
+      if (exportData.folderTree) {
+        const ft = exportData.folderTree;
+        const remappedMap: Record<string, string> = {};
+        for (const [oldId, folderId] of Object.entries(ft.diagramFolderMap ?? {})) {
+          const newId = idMap.get(oldId);
+          if (newId) remappedMap[newId] = folderId as string;
+        }
+        const remappedOrder: Record<string, string[]> = {};
+        for (const [folderId, ids] of Object.entries(ft.diagramOrder ?? {})) {
+          remappedOrder[folderId] = (ids as string[]).map(id => idMap.get(id) ?? id);
+        }
+        const remappedTree = {
+          folders: ft.folders ?? [],
+          diagramFolderMap: remappedMap,
+          diagramOrder: remappedOrder,
+          folderOrder: ft.folderOrder ?? {},
+        };
+        localStorage.setItem(`folder-tree-${newProject.id}`, JSON.stringify(remappedTree));
+      }
+
+      router.push(`/dashboard/projects/${newProject.id}`);
+    } catch (err) {
+      console.error("Import failed:", err);
+      alert("Import failed: invalid file");
+    } finally {
+      setImporting(false);
+    }
+  }
+
   async function handleCreateProject() {
     if (!newProjectName.trim()) return;
     setCreatingProject(true);
@@ -257,6 +344,17 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
         <section>
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-xl font-semibold text-gray-900">Projects</h1>
+            <input ref={fileInputRef} type="file" accept=".json" className="hidden"
+              onChange={e => { const f = e.target.files?.[0]; if (f) handleImportProject(f); e.target.value = ""; }} />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={importing}
+              className={`px-4 py-2 text-sm font-medium rounded-md border ${
+                importing ? "bg-green-600 text-white" : "text-gray-700 border-gray-300 hover:bg-gray-50"
+              }`}
+            >
+              {importing ? "Importing\u2026" : "Import Project"}
+            </button>
             <button
               onClick={() => setShowNewProject(true)}
               className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm font-medium"

@@ -31,7 +31,7 @@ export async function POST(req: Request) {
   }
 
   const body = await req.json();
-  const { name, type = "context", projectId } = body;
+  const { name, type = "context", projectId, data, colorConfig, displayMode } = body;
 
   if (!name?.trim()) {
     return NextResponse.json({ error: "Name is required" }, { status: 400 });
@@ -50,7 +50,10 @@ export async function POST(req: Request) {
       name: name.trim(),
       type,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      data: EMPTY_DIAGRAM as any,
+      data: (data ?? EMPTY_DIAGRAM) as any,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ...(colorConfig ? { colorConfig: colorConfig as any } : {}),
+      ...(displayMode ? { displayMode } : {}),
       userId: session.user.id,
       ...(projectId ? { projectId } : {}),
     },
