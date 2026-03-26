@@ -405,7 +405,7 @@ function autoResizeUmlElement(el: DiagramElement): DiagramElement {
   const showStereotype = el.type === "uml-enumeration"
     || ((el.properties.showStereotype as boolean | undefined) ?? false);
   const stereotypeW = showStereotype ? (`\u00AB${stereotype}\u00BB`.length * CHAR_W * 0.8) : 0;
-  const stereotypeH = showStereotype ? LINE_H : 0;
+  const stereotypeH = showStereotype ? Math.round(9 + 2) : 0; // tight: stereotype font size (~9) + 2px gap
 
   const labelLines = el.label.split("\n");
   const labelMaxW = Math.max(...labelLines.map(l => l.length * CHAR_W));
@@ -423,10 +423,44 @@ function autoResizeUmlElement(el: DiagramElement): DiagramElement {
     return { ...el, width: newWidth, height: newHeight };
   }
 
-  // uml-class
-  const contentW = Math.max(stereotypeW, labelMaxW) + PAD * 2;
+  // uml-class — with attributes and operations compartments
+  const attributes = (el.properties.attributes as { name: string; visibility?: string; type?: string; multiplicity?: string; defaultValue?: string; propertyString?: string; isDerived?: boolean }[] | undefined) ?? [];
+  const operations = (el.properties.operations as { name: string; visibility?: string }[] | undefined) ?? [];
+  const showAttrs = (el.properties.showAttributes as boolean | undefined) ?? true;
+  const showOps = (el.properties.showOperations as boolean | undefined) ?? true;
+
+  // Compute max width from all content
+  let maxContentW = Math.max(stereotypeW, labelMaxW);
+  if (showAttrs) {
+    for (const attr of attributes) {
+      let s = "";
+      if (attr.visibility) s += attr.visibility + " ";
+      if (attr.isDerived) s += "/";
+      s += attr.name;
+      if (attr.type) s += " : " + attr.type;
+      if (attr.multiplicity) s += " [" + attr.multiplicity + "]";
+      if (attr.defaultValue) s += " = " + attr.defaultValue;
+      if (attr.propertyString) s += " " + attr.propertyString;
+      maxContentW = Math.max(maxContentW, s.length * CHAR_W);
+    }
+  }
+  if (showOps) {
+    for (const op of operations) {
+      let s = "";
+      if (op.visibility) s += op.visibility + " ";
+      s += op.name + "()";
+      maxContentW = Math.max(maxContentW, s.length * CHAR_W);
+    }
+  }
+
+  const contentW = maxContentW + PAD * 2;
   const newWidth = Math.max(MIN_W, contentW);
-  const newHeight = Math.max(MIN_H, headerH + LINE_H);
+  const BOTTOM_PAD = 3;
+  const SECTION_PAD = 5;
+  const attrsH = showAttrs ? attributes.length * LINE_H + (attributes.length > 0 && showOps ? SECTION_PAD : 0) : 0;
+  const opsH = showOps ? operations.length * LINE_H : 0;
+  const bodyH = Math.max(LINE_H, attrsH + opsH + BOTTOM_PAD);
+  const newHeight = Math.max(MIN_H, headerH + bodyH);
   if (newWidth === el.width && newHeight === el.height) return el;
   return { ...el, width: newWidth, height: newHeight };
 }

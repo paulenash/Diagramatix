@@ -67,6 +67,21 @@ export interface Point {
   y: number;
 }
 
+export interface UmlAttribute {
+  visibility?: "+" | "-" | "#";
+  name: string;
+  type?: string;
+  multiplicity?: string;
+  defaultValue?: string;
+  propertyString?: string;
+  isDerived?: boolean;
+}
+
+export interface UmlOperation {
+  visibility?: "+" | "-" | "#";
+  name: string;
+}
+
 export interface Bounds {
   x: number;
   y: number;

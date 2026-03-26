@@ -842,6 +842,25 @@ function BpmnTaskShape({ el }: { el: DiagramElement }) {
   );
 }
 
+function formatUmlAttribute(attr: import("@/app/lib/diagram/types").UmlAttribute): string {
+  let s = "";
+  if (attr.visibility) s += attr.visibility + " ";
+  if (attr.isDerived) s += "/";
+  s += attr.name;
+  if (attr.type) s += " : " + attr.type;
+  if (attr.multiplicity) s += " [" + attr.multiplicity + "]";
+  if (attr.defaultValue) s += " = " + attr.defaultValue;
+  if (attr.propertyString) s += " " + attr.propertyString;
+  return s;
+}
+
+function formatUmlOperation(op: import("@/app/lib/diagram/types").UmlOperation): string {
+  let s = "";
+  if (op.visibility) s += op.visibility + " ";
+  s += op.name + "()";
+  return s;
+}
+
 function UmlClassShape({ el }: { el: DiagramElement }) {
   const colors = useContext(SymbolColorCtx);
   const fsc = useContext(FontScaleCtx);
@@ -851,32 +870,76 @@ function UmlClassShape({ el }: { el: DiagramElement }) {
   const labelLines = el.label.split("\n");
   const lineH = Math.round(14 * fsc);
   const labelFontSize = Math.round(12 * fsc * 10) / 10;
+  const attrFontSize = Math.round(10 * fsc * 10) / 10;
   const stereotypeFontSize = Math.round(9 * fsc * 10) / 10;
   const extraLabelLines = Math.max(0, labelLines.length - 1);
-  const stereotypeH = showStereotype ? lineH : 0;
+  const stereotypeH = showStereotype ? stereotypeFontSize + 2 : 0; // tight: just text height + 2px
   const headerH = HEADER_H + extraLabelLines * lineH + stereotypeH;
-  const labelStartY = showStereotype
-    ? el.y + stereotypeH + HEADER_H / 2 - (extraLabelLines * lineH) / 2
-    : el.y + HEADER_H / 2 - (extraLabelLines * lineH) / 2;
+  // Stereotype + class name block centred vertically in header with tight spacing
+  const blockH = stereotypeH + labelLines.length * lineH;
+  const blockTopY = el.y + (headerH - blockH) / 2;
+  const labelStartY = blockTopY + stereotypeH;
+
+  const attributes: import("@/app/lib/diagram/types").UmlAttribute[] =
+    (el.properties.attributes as import("@/app/lib/diagram/types").UmlAttribute[] | undefined) ?? [];
+  const operations: import("@/app/lib/diagram/types").UmlOperation[] =
+    (el.properties.operations as import("@/app/lib/diagram/types").UmlOperation[] | undefined) ?? [];
+  const showAttrs = (el.properties.showAttributes as boolean | undefined) ?? true;
+  const showOps = (el.properties.showOperations as boolean | undefined) ?? true;
+
+  const PAD = 4;
+  const SECTION_PAD = 5; // buffer between last attribute text and divider line
+  const attrsY = el.y + headerH;
+  const attrsH = showAttrs ? attributes.length * lineH + (attributes.length > 0 ? SECTION_PAD : 0) : 0;
+  const opsY = attrsY + attrsH;
+  const opsH = showOps ? operations.length * lineH : 0;
+
   return (
     <g>
       <rect x={el.x} y={el.y} width={el.width} height={el.height}
         fill={fill} stroke="#374151" strokeWidth={1.5} />
-      <line x1={el.x} y1={el.y + headerH}
-        x2={el.x + el.width} y2={el.y + headerH}
-        stroke="#374151" strokeWidth={1} />
+      {/* Header divider — only shown when attributes or operations compartment is visible */}
+      {(showAttrs || showOps) && (
+        <line x1={el.x} y1={el.y + headerH}
+          x2={el.x + el.width} y2={el.y + headerH}
+          stroke="#374151" strokeWidth={1} />
+      )}
+      {/* Stereotype — tight above class name */}
       {showStereotype && (
-        <text x={el.x + el.width / 2} y={el.y + 10} textAnchor="middle" fontSize={stereotypeFontSize}
+        <text x={el.x + el.width / 2} y={blockTopY + stereotypeFontSize} textAnchor="middle" fontSize={stereotypeFontSize}
           fill="#6b7280" fontStyle="italic" style={{ pointerEvents: "none", userSelect: "none" }}>
           {`\u00AB${stereotype}\u00BB`}
         </text>
       )}
+      {/* Class name */}
       <text textAnchor="middle" fontSize={labelFontSize} fill="#111827" fontWeight="bold"
         style={{ userSelect: "none", pointerEvents: "none" }}>
         {labelLines.map((line, i) => (
           <tspan key={i} x={el.x + el.width / 2} y={labelStartY + i * lineH + lineH * 0.75}>{line}</tspan>
         ))}
       </text>
+      {/* Attributes compartment */}
+      {showAttrs && attributes.map((attr, i) => (
+        <text key={`a${i}`} x={el.x + PAD} y={attrsY + 2 + (i + 1) * lineH - 2}
+          fontSize={attrFontSize} fill="#374151"
+          style={{ pointerEvents: "none", userSelect: "none" }}>
+          {formatUmlAttribute(attr)}
+        </text>
+      ))}
+      {/* Divider between attributes and operations */}
+      {showOps && operations.length > 0 && (
+        <line x1={el.x} y1={opsY}
+          x2={el.x + el.width} y2={opsY}
+          stroke="#374151" strokeWidth={1} />
+      )}
+      {/* Operations compartment */}
+      {showOps && operations.map((op, i) => (
+        <text key={`o${i}`} x={el.x + PAD} y={opsY + 2 + (i + 1) * lineH - 2}
+          fontSize={attrFontSize} fill="#374151"
+          style={{ pointerEvents: "none", userSelect: "none" }}>
+          {formatUmlOperation(op)}
+        </text>
+      ))}
     </g>
   );
 }

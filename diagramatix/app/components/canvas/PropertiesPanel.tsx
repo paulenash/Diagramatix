@@ -13,6 +13,8 @@ import type {
   DiagramStatus,
   DirectionType,
   ConnectorType,
+  UmlAttribute,
+  UmlOperation,
 } from "@/app/lib/diagram/types";
 
 interface Props {
@@ -144,6 +146,141 @@ function MultSelect({ value, onChange }: { value: string; onChange: (v: string) 
       <option value="1..*">1..*</option>
       <option value="__custom__">Custom (n..m)</option>
     </select>
+  );
+}
+
+const UML_TYPES = ["String", "Number", "Integer", "Date", "DateTime", "Duration", "Money", "Decimal", "Boolean"];
+
+function ClassAttributesList({ element, onUpdateProperties }: {
+  element: DiagramElement;
+  onUpdateProperties: (id: string, props: Record<string, unknown>) => void;
+}) {
+  const attrs: UmlAttribute[] = (element.properties.attributes as UmlAttribute[] | undefined) ?? [];
+
+  function update(newAttrs: UmlAttribute[]) {
+    onUpdateProperties(element.id, { attributes: newAttrs });
+  }
+  function addAttr() {
+    update([...attrs, { name: `attr${attrs.length + 1}` }]);
+  }
+  function removeAttr(idx: number) { update(attrs.filter((_, i) => i !== idx)); }
+  function moveAttr(idx: number, dir: -1 | 1) {
+    const ni = idx + dir;
+    if (ni < 0 || ni >= attrs.length) return;
+    const next = [...attrs]; [next[idx], next[ni]] = [next[ni], next[idx]]; update(next);
+  }
+  function setField(idx: number, field: keyof UmlAttribute, val: unknown) {
+    const next = [...attrs]; next[idx] = { ...next[idx], [field]: val }; update(next);
+  }
+
+  return (
+    <div>
+      <p className="text-[10px] font-medium text-gray-700 mb-1">Attributes</p>
+      {attrs.length === 0 && <p className="text-[10px] text-gray-400 mb-1 italic">No attributes</p>}
+      <div className="space-y-1 mb-1">
+        {attrs.map((attr, i) => (
+          <div key={i} className="border border-gray-200 rounded p-1 space-y-0.5">
+            <div className="flex items-center gap-0.5">
+              <select value={attr.visibility ?? ""} onChange={e => setField(i, "visibility", e.target.value || undefined)}
+                className="text-[9px] border border-gray-300 rounded px-0.5 py-0 w-12">
+                <option value="">None</option>
+                <option value="+">+ Public</option>
+                <option value="-">- Private</option>
+                <option value="#"># Protected</option>
+              </select>
+              <input type="text" value={attr.name} onChange={e => setField(i, "name", e.target.value)}
+                className="flex-1 text-[10px] border border-gray-300 rounded px-1 py-0 min-w-0" placeholder="name" />
+              <label className="flex items-center gap-0.5 text-[9px] text-gray-500">
+                <input type="checkbox" checked={attr.isDerived ?? false}
+                  onChange={e => setField(i, "isDerived", e.target.checked)}
+                  className="w-2.5 h-2.5" /> /
+              </label>
+              <button onClick={() => moveAttr(i, -1)} disabled={i === 0}
+                className="text-[9px] text-gray-400 hover:text-gray-600 disabled:opacity-30">{"\u25B2"}</button>
+              <button onClick={() => moveAttr(i, 1)} disabled={i === attrs.length - 1}
+                className="text-[9px] text-gray-400 hover:text-gray-600 disabled:opacity-30">{"\u25BC"}</button>
+              <button onClick={() => removeAttr(i)}
+                className="text-[9px] text-gray-400 hover:text-red-500">
+                <svg width={8} height={8} viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round">
+                  <path d="M2 3h8M4.5 3V2h3v1M3 3v7a1 1 0 001 1h4a1 1 0 001-1V3" />
+                </svg>
+              </button>
+            </div>
+            <div className="flex items-center gap-0.5">
+              <select value={attr.type ?? ""} onChange={e => setField(i, "type", e.target.value || undefined)}
+                className="text-[9px] border border-gray-300 rounded px-0.5 py-0 flex-1">
+                <option value="">Type</option>
+                {UML_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+              <MultSelect value={attr.multiplicity ?? ""} onChange={v => setField(i, "multiplicity", v || undefined)} />
+              <input type="text" value={attr.defaultValue ?? ""} onChange={e => setField(i, "defaultValue", e.target.value || undefined)}
+                className="w-12 text-[9px] border border-gray-300 rounded px-0.5 py-0" placeholder="default" />
+            </div>
+          </div>
+        ))}
+      </div>
+      <button onClick={addAttr}
+        className="text-[10px] text-blue-600 hover:text-blue-800 font-medium">+ Add Attribute</button>
+    </div>
+  );
+}
+
+function ClassOperationsList({ element, onUpdateProperties }: {
+  element: DiagramElement;
+  onUpdateProperties: (id: string, props: Record<string, unknown>) => void;
+}) {
+  const ops: UmlOperation[] = (element.properties.operations as UmlOperation[] | undefined) ?? [];
+
+  function update(newOps: UmlOperation[]) {
+    onUpdateProperties(element.id, { operations: newOps });
+  }
+  function addOp() {
+    update([...ops, { name: `operation${ops.length + 1}` }]);
+  }
+  function removeOp(idx: number) { update(ops.filter((_, i) => i !== idx)); }
+  function moveOp(idx: number, dir: -1 | 1) {
+    const ni = idx + dir;
+    if (ni < 0 || ni >= ops.length) return;
+    const next = [...ops]; [next[idx], next[ni]] = [next[ni], next[idx]]; update(next);
+  }
+
+  return (
+    <div>
+      <p className="text-[10px] font-medium text-gray-700 mb-1">Operations</p>
+      {ops.length === 0 && <p className="text-[10px] text-gray-400 mb-1 italic">No operations</p>}
+      <div className="space-y-0.5 mb-1">
+        {ops.map((op, i) => (
+          <div key={i} className="flex items-center gap-0.5">
+            <select value={op.visibility ?? ""} onChange={e => {
+              const next = [...ops]; next[i] = { ...next[i], visibility: (e.target.value || undefined) as UmlOperation["visibility"] }; update(next);
+            }}
+              className="text-[9px] border border-gray-300 rounded px-0.5 py-0 w-12">
+              <option value="">None</option>
+              <option value="+">+ Public</option>
+              <option value="-">- Private</option>
+              <option value="#"># Protected</option>
+            </select>
+            <input type="text" value={op.name} onChange={e => {
+              const next = [...ops]; next[i] = { ...next[i], name: e.target.value }; update(next);
+            }}
+              className="flex-1 text-[10px] border border-gray-300 rounded px-1 py-0 min-w-0" placeholder="name" />
+            <span className="text-[10px] text-gray-400">()</span>
+            <button onClick={() => moveOp(i, -1)} disabled={i === 0}
+              className="text-[9px] text-gray-400 hover:text-gray-600 disabled:opacity-30">{"\u25B2"}</button>
+            <button onClick={() => moveOp(i, 1)} disabled={i === ops.length - 1}
+              className="text-[9px] text-gray-400 hover:text-gray-600 disabled:opacity-30">{"\u25BC"}</button>
+            <button onClick={() => removeOp(i)}
+              className="text-[9px] text-gray-400 hover:text-red-500">
+              <svg width={8} height={8} viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round">
+                <path d="M2 3h8M4.5 3V2h3v1M3 3v7a1 1 0 001 1h4a1 1 0 001-1V3" />
+              </svg>
+            </button>
+          </div>
+        ))}
+      </div>
+      <button onClick={addOp}
+        className="text-[10px] text-blue-600 hover:text-blue-800 font-medium">+ Add Operation</button>
+    </div>
   );
 }
 
@@ -1297,6 +1434,30 @@ export function PropertiesPanel({
             </div>
           )}
         </div>
+      )}
+
+      {/* UML Class: Attributes and Operations compartments */}
+      {element.type === "uml-class" && onUpdateProperties && (
+        <>
+          <div className="flex items-center gap-2 border-t border-gray-100 pt-1">
+            <label className="flex items-center gap-1 text-[10px] text-gray-500 cursor-pointer">
+              <input type="checkbox" checked={(element.properties.showAttributes as boolean | undefined) ?? true}
+                onChange={e => onUpdateProperties(element.id, { showAttributes: e.target.checked })}
+                className="w-3 h-3" /> Attributes
+            </label>
+            <label className="flex items-center gap-1 text-[10px] text-gray-500 cursor-pointer">
+              <input type="checkbox" checked={(element.properties.showOperations as boolean | undefined) ?? true}
+                onChange={e => onUpdateProperties(element.id, { showOperations: e.target.checked })}
+                className="w-3 h-3" /> Operations
+            </label>
+          </div>
+          {((element.properties.showAttributes as boolean | undefined) ?? true) && (
+            <ClassAttributesList element={element} onUpdateProperties={onUpdateProperties} />
+          )}
+          {((element.properties.showOperations as boolean | undefined) ?? true) && (
+            <ClassOperationsList element={element} onUpdateProperties={onUpdateProperties} />
+          )}
+        </>
       )}
 
       {/* Enumeration Values List */}

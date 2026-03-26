@@ -1021,6 +1021,14 @@ export function Canvas({
           const valuesMaxW = values.length > 0 ? Math.max(...values.map((v: string) => v.length * CHAR_W)) : 0;
           contentMinW = Math.max(stereotypeW, labelMaxW, valuesMaxW) + PAD * 2;
           contentMinH = headerH + values.length * LINE_H;
+        } else if (el!.type === "uml-class") {
+          const attrs = (el!.properties.attributes as { name: string }[] | undefined) ?? [];
+          const ops = (el!.properties.operations as { name: string }[] | undefined) ?? [];
+          const showA = (el!.properties.showAttributes as boolean | undefined) ?? true;
+          const showO = (el!.properties.showOperations as boolean | undefined) ?? true;
+          const attrsH = showA ? attrs.length * LINE_H : 0;
+          const opsH = showO ? ops.length * LINE_H : 0;
+          contentMinH = headerH + Math.max(LINE_H, attrsH + opsH + 3);
         }
         width = Math.max(width, Math.max(80, contentMinW));
         height = Math.max(height, Math.max(40, contentMinH));
