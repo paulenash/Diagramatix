@@ -417,8 +417,9 @@ function autoResizeUmlElement(el: DiagramElement): DiagramElement {
     const valuesMaxW = values.length > 0 ? Math.max(...values.map(v => v.length * CHAR_W)) : 0;
     const contentW = Math.max(stereotypeW, labelMaxW, valuesMaxW) + PAD * 2;
     const newWidth = Math.max(MIN_W, contentW);
+    const ENUM_BOTTOM_PAD = -2; // tighter bottom on enumeration values
     const valuesH = values.length * LINE_H;
-    const newHeight = Math.max(MIN_H, headerH + valuesH);
+    const newHeight = Math.max(MIN_H, headerH + valuesH + (values.length > 0 ? ENUM_BOTTOM_PAD : 0));
     if (newWidth === el.width && newHeight === el.height) return el;
     return { ...el, width: newWidth, height: newHeight };
   }
@@ -455,11 +456,11 @@ function autoResizeUmlElement(el: DiagramElement): DiagramElement {
 
   const contentW = maxContentW + PAD * 2;
   const newWidth = Math.max(MIN_W, contentW);
-  const BOTTOM_PAD = 3;
+  const OPS_BOTTOM_PAD = 6;
   const SECTION_PAD = 5;
   const attrsH = showAttrs ? attributes.length * LINE_H + (attributes.length > 0 && showOps ? SECTION_PAD : 0) : 0;
-  const opsH = showOps ? operations.length * LINE_H : 0;
-  const bodyH = Math.max(LINE_H, attrsH + opsH + BOTTOM_PAD);
+  const opsH = showOps ? operations.length * LINE_H + (operations.length > 0 ? OPS_BOTTOM_PAD : 0) : 0;
+  const bodyH = Math.max(LINE_H, attrsH + opsH);
   const newHeight = Math.max(MIN_H, headerH + bodyH);
   if (newWidth === el.width && newHeight === el.height) return el;
   return { ...el, width: newWidth, height: newHeight };

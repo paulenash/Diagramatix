@@ -550,8 +550,8 @@ export function PropertiesPanel({
   // Compact inline row: label + value on same line
   function InlineField({ label, children }: { label: string; children: React.ReactNode }) {
     return (
-      <div className="flex items-center gap-1.5 mb-0.5">
-        <label className="text-[10px] text-gray-500 whitespace-nowrap w-16 shrink-0">{label}</label>
+      <div className="flex items-center gap-1">
+        <label className="text-[9px] text-gray-500 whitespace-nowrap w-12 shrink-0">{label}</label>
         <div className="flex-1 min-w-0">{children}</div>
       </div>
     );
@@ -561,49 +561,41 @@ export function PropertiesPanel({
   function TitleSection() {
     if (!onUpdateDiagramTitle) return null;
     return (
-      <div className="space-y-0.5 pb-1">
-        <InlineField label="Show">
-          <button
-            onClick={() => onUpdateDiagramTitle({ ...diagramTitle, showTitle: !(diagramTitle?.showTitle ?? false) })}
-            className={`px-2 py-0 text-[10px] rounded border ${
-              diagramTitle?.showTitle ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-500 border-gray-300"
-            }`}
+      <div className="pb-0.5">
+        <div className="flex items-center gap-1 mb-0.5">
+          <span className="text-[9px] text-gray-500 w-12 shrink-0">Show</span>
+          <button onClick={() => onUpdateDiagramTitle({ ...diagramTitle, showTitle: !(diagramTitle?.showTitle ?? false) })}
+            className={`px-1.5 py-0 text-[9px] rounded border ${diagramTitle?.showTitle ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-500 border-gray-300"}`}
           >{diagramTitle?.showTitle ? "On" : "Off"}</button>
-        </InlineField>
-        <InlineField label="Name">
-          <input readOnly className="w-full text-[10px] border border-gray-200 rounded px-1.5 py-0 bg-gray-50 text-gray-500" value={diagramName ?? ""} />
-        </InlineField>
-        <InlineField label="Version">
-          <input type="text" className="w-full text-[10px] border border-gray-300 rounded px-1.5 py-0"
-            defaultValue={diagramTitle?.version ?? ""} key={`ver-${diagramName}`}
-            onBlur={(e) => onUpdateDiagramTitle({ ...diagramTitle, version: e.target.value })}
-            onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
-          />
-        </InlineField>
-        <InlineField label="Authors">
-          <textarea className="w-full text-[10px] border border-gray-300 rounded px-1.5 py-0 resize-y" rows={1}
-            defaultValue={diagramTitle?.authors ?? ""} key={`auth-${diagramName}`}
-            onBlur={(e) => onUpdateDiagramTitle({ ...diagramTitle, authors: e.target.value })}
-            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); (e.target as HTMLTextAreaElement).blur(); } }}
-          />
-        </InlineField>
-        <InlineField label="Status">
-          <select
-            value={diagramTitle?.status ?? "draft"}
+          <span className="text-[9px] text-gray-500 ml-1">Status</span>
+          <select value={diagramTitle?.status ?? "draft"}
             onChange={e => onUpdateDiagramTitle({ ...diagramTitle, status: e.target.value as DiagramStatus })}
-            className="text-[10px] border border-gray-300 rounded px-1 py-0 bg-white text-gray-700 cursor-pointer font-medium"
-          >
+            className="text-[9px] border border-gray-300 rounded px-0.5 py-0 bg-white text-gray-700 cursor-pointer">
             {(["draft", "final", "production"] as DiagramStatus[]).map(s => (
               <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
             ))}
           </select>
+        </div>
+        <InlineField label="Name">
+          <span className="text-[9px] text-gray-600 truncate">{diagramName ?? ""}</span>
         </InlineField>
-        <InlineField label="Created">
-          <span className="text-[10px] text-gray-500">{createdAt ? new Date(createdAt).toLocaleDateString() : ""}</span>
+        <InlineField label="Version">
+          <input type="text" className="w-full text-[9px] border border-gray-300 rounded px-1 py-0"
+            defaultValue={diagramTitle?.version ?? ""} key={`ver-${diagramName}`}
+            onBlur={(e) => onUpdateDiagramTitle({ ...diagramTitle, version: e.target.value })}
+            onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }} />
         </InlineField>
-        <InlineField label="Modified">
-          <span className="text-[10px] text-gray-500">{updatedAt ? new Date(updatedAt).toLocaleString() : ""}</span>
+        <InlineField label="Authors">
+          <input type="text" className="w-full text-[9px] border border-gray-300 rounded px-1 py-0"
+            defaultValue={diagramTitle?.authors ?? ""} key={`auth-${diagramName}`}
+            onBlur={(e) => onUpdateDiagramTitle({ ...diagramTitle, authors: e.target.value })}
+            onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }} />
         </InlineField>
+        <div className="flex items-center gap-1 text-[8px] text-gray-400 mt-0.5">
+          <span>Created: {createdAt ? new Date(createdAt).toLocaleDateString() : ""}</span>
+          <span>{"\u00B7"}</span>
+          <span>Modified: {updatedAt ? new Date(updatedAt).toLocaleString() : ""}</span>
+        </div>
       </div>
     );
   }
