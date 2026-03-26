@@ -939,15 +939,27 @@ export function ProjectDetailClient({ project, otherProjects }: Props) {
               {exporting ? "Exporting\u2026" : "Export Project \u25BE"}
             </button>
             {showExportMenu && (
-              <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-50 min-w-[140px]">
+              <div
+                className="fixed bg-white border border-gray-200 rounded-md shadow-lg py-1"
+                style={{
+                  zIndex: 9999,
+                  top: exportMenuRef.current
+                    ? exportMenuRef.current.getBoundingClientRect().bottom + 4
+                    : 0,
+                  left: exportMenuRef.current
+                    ? exportMenuRef.current.getBoundingClientRect().left
+                    : 0,
+                  minWidth: 140,
+                }}
+              >
                 <button
-                  className="block w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50"
+                  className="block w-full text-left px-3 py-1.5 text-xs text-gray-700 font-medium hover:bg-gray-100"
                   onClick={() => { setShowExportMenu(false); handleExportProject("json"); }}
                 >
                   Export as JSON
                 </button>
                 <button
-                  className="block w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50"
+                  className="block w-full text-left px-3 py-1.5 text-xs text-gray-700 font-medium hover:bg-gray-100"
                   onClick={() => { setShowExportMenu(false); handleExportProject("xml"); }}
                 >
                   Export as XML
