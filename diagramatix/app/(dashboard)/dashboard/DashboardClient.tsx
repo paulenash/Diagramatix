@@ -4,6 +4,7 @@ import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import type { DiagramType } from "@/app/lib/diagram/types";
+import { SCHEMA_VERSION } from "@/app/lib/diagram/types";
 
 interface DiagramSummary {
   id: string;
@@ -160,12 +161,40 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
   const [showImportNameDialog, setShowImportNameDialog] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  function checkSchemaCompatibility(fileSchema: string): { ok: boolean; message?: string } {
+    const [appMajor, appMinor] = SCHEMA_VERSION.split(".").map(Number);
+    const [fileMajor, fileMinor] = fileSchema.split(".").map(Number);
+    if (fileMajor > appMajor) {
+      return { ok: false, message: `This file uses schema version ${fileSchema} which is incompatible with this version of Diagramatix (schema ${SCHEMA_VERSION}). Please upgrade Diagramatix to import this file.` };
+    }
+    if (fileMajor === appMajor && fileMinor > appMinor) {
+      return { ok: false, message: `This file uses schema version ${fileSchema} which is newer than this version of Diagramatix supports (schema ${SCHEMA_VERSION}). Please upgrade Diagramatix to import this file.` };
+    }
+    if (fileMajor < appMajor) {
+      return { ok: true, message: `This file uses an older schema version (${fileSchema}). It will be upgraded to the current format (${SCHEMA_VERSION}).` };
+    }
+    return { ok: true };
+  }
+
   function handleFileSelected(file: File) {
     file.text().then(text => {
       try {
         const data = JSON.parse(text);
-        if (!data.version || !data.project || !data.diagrams) {
+        // Support both old "version" field and new "schemaVersion" field
+        const schemaVer: string = data.schemaVersion ?? data.version ?? "";
+        if (!schemaVer || !data.project || !data.diagrams) {
           alert("Invalid export file — missing required fields"); return;
+        }
+        // Parse schema version (strip build number if present in legacy "version" field, e.g. "1.0.147" → "1.0")
+        const parts = schemaVer.split(".");
+        const normalised = parts.length >= 2 ? `${parts[0]}.${parts[1]}` : schemaVer;
+        const compat = checkSchemaCompatibility(normalised);
+        if (!compat.ok) {
+          alert(compat.message); return;
+        }
+        if (compat.message) {
+          // Non-blocking warning for older schemas
+          alert(compat.message);
         }
         setPendingImportData(data);
         setImportProjectName((data.project.name ?? "Imported") + " (imported)");
@@ -190,7 +219,9 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
     try {
       const proj = exportData.project as Record<string, unknown>;
       const diags = exportData.diagrams as Record<string, unknown>[];
-      log(`\u2714 Valid export file (version ${exportData.version as string})`);
+      const fileSchemaVer = (exportData.schemaVersion ?? exportData.version ?? "?") as string;
+      const fileAppVer = (exportData.appVersion ?? "") as string;
+      log(`\u2714 Valid export file (schema ${fileSchemaVer}${fileAppVer ? `, app ${fileAppVer}` : ""})`);
       log(`   Original project: "${proj.name as string}"`);
       log(`   Diagrams: ${diags.length}`);
       if (exportData.exportedAt) log(`   Exported: ${new Date(exportData.exportedAt as string).toLocaleString()}`);

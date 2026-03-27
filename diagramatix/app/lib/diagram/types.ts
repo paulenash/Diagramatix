@@ -213,5 +213,6 @@ export interface TemplateData {
   connectors: Connector[];
 }
 
-/** Export format version — bump when schema changes */
-export const EXPORT_VERSION = "1.0";
+/** Export schema version — bump when the export data structure changes.
+ *  Major bump = breaking (fields removed/renamed). Minor bump = additive (new optional fields). */
+export const SCHEMA_VERSION = "1.0";

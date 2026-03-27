@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import type { DiagramType, DiagramData } from "@/app/lib/diagram/types";
-import { EXPORT_VERSION } from "@/app/lib/diagram/types";
+import { SCHEMA_VERSION } from "@/app/lib/diagram/types";
 import { resolveColor, DEFAULT_SYMBOL_COLORS, type SymbolColorConfig } from "@/app/lib/diagram/colors";
 import { DiagramMaintenanceModal } from "./DiagramMaintenanceModal";
 
@@ -39,11 +39,11 @@ function pointXml(tag: string, p: { x: number; y: number } | undefined | null, i
 }
 
 interface ExportDiagramRecord { originalId: string; name: string; type: string; data: DiagramData; colorConfig?: unknown; displayMode?: string }
-interface ExportPayload { version: string; exportedAt: string; project: { name: string; description: string; ownerName: string; colorConfig: unknown }; diagrams: ExportDiagramRecord[]; folderTree: FolderTree }
+interface ExportPayload { schemaVersion: string; appVersion: string; exportedAt: string; project: { name: string; description: string; ownerName: string; colorConfig: unknown }; diagrams: ExportDiagramRecord[]; folderTree: FolderTree }
 
 function convertExportToXml(exp: ExportPayload): string {
   let x = `<?xml version="1.0" encoding="UTF-8"?>\n`;
-  x += `<dgx:diagramatix-export xmlns:dgx="${NS}" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="${NS} /api/schema"${attr("version",exp.version)}${attr("exportedAt",exp.exportedAt)}>\n`;
+  x += `<dgx:diagramatix-export xmlns:dgx="${NS}" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="${NS} /api/schema"${attr("schemaVersion",exp.schemaVersion)}${attr("appVersion",exp.appVersion)}${attr("exportedAt",exp.exportedAt)}>\n`;
 
   // Project
   x += `  <dgx:project>\n`;
@@ -523,7 +523,8 @@ export function ProjectDetailClient({ project, otherProjects, version }: Props) 
 
       log("Assembling export file...");
       const exportData = {
-        version: `${EXPORT_VERSION}.${version ?? 0}`,
+        schemaVersion: SCHEMA_VERSION,
+        appVersion: `${SCHEMA_VERSION}.${version ?? 0}`,
         exportedAt: new Date().toISOString(),
         project: {
           name: projectName,
