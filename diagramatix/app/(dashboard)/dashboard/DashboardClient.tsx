@@ -60,17 +60,24 @@ function DiagramCard({
   projects,
   onDelete,
   onMove,
+  onDragStart,
+  onDragEnd,
 }: {
   diagram: DiagramSummary;
   projects: ProjectSummary[];
   onDelete: (id: string) => void;
   onMove: (diagramId: string, projectId: string | null) => void;
+  onDragStart?: () => void;
+  onDragEnd?: () => void;
 }) {
   const router = useRouter();
   const [showMove, setShowMove] = useState(false);
 
   return (
     <div
+      draggable
+      onDragStart={(e) => { e.dataTransfer.setData("text/plain", diagram.id); onDragStart?.(); }}
+      onDragEnd={() => onDragEnd?.()}
       onClick={() => router.push(`/diagram/${diagram.id}`)}
       className="bg-white border border-gray-200 rounded px-3 py-2 hover:border-blue-300 hover:shadow-sm cursor-pointer group transition-all relative"
     >
@@ -159,6 +166,10 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
   const [showNewProject, setShowNewProject] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
   const [creatingProject, setCreatingProject] = useState(false);
+
+  // Drag-drop state for moving unorganised diagrams to projects
+  const [dragDiagramId, setDragDiagramId] = useState<string | null>(null);
+  const [dropTargetProjectId, setDropTargetProjectId] = useState<string | null>(null);
 
   // New diagram (unorganized) state
   const [showNewDiagram, setShowNewDiagram] = useState(false);
@@ -419,19 +430,41 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
     });
   }
 
-  async function handleMoveDiagram(diagramId: string, projectId: string | null) {
+  async function handleMoveDiagram(diagramId: string, targetProjectId: string | null) {
+    if (targetProjectId === null) return;
+
+    // Check for name clash — fetch existing diagram names in target project
+    const diagram = unorganized.find(d => d.id === diagramId);
+    if (!diagram) return;
+    let newName = diagram.name;
+    try {
+      const projRes = await fetch(`/api/projects/${targetProjectId}`);
+      if (projRes.ok) {
+        const projData = await projRes.json();
+        const existingNames = new Set(
+          ((projData.diagrams ?? []) as { name: string }[]).map(d => d.name)
+        );
+        if (existingNames.has(newName)) {
+          let suffix = 2;
+          while (existingNames.has(`${diagram.name} (${suffix})`)) suffix++;
+          newName = `${diagram.name} (${suffix})`;
+        }
+      }
+    } catch {}
+
+    const updates: Record<string, unknown> = { projectId: targetProjectId };
+    if (newName !== diagram.name) updates.name = newName;
+
     const res = await fetch(`/api/diagrams/${diagramId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ projectId }),
+      body: JSON.stringify(updates),
     });
     if (!res.ok) return;
-    if (projectId !== null) {
-      // Moved to a project — remove from unorganized
-      setUnorganized((prev) => prev.filter((d) => d.id !== diagramId));
-      // Update project count
-      setProjects((prev) => prev.map((p) => p.id === projectId ? { ...p, _count: { diagrams: p._count.diagrams + 1 } } : p));
-    }
+    // Remove from unorganised
+    setUnorganized((prev) => prev.filter((d) => d.id !== diagramId));
+    // Update project count
+    setProjects((prev) => prev.map((p) => p.id === targetProjectId ? { ...p, _count: { diagrams: p._count.diagrams + 1 } } : p));
   }
 
   return (
@@ -536,7 +569,18 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                     setEditOwner(p.ownerName ?? "");
                   }}
                   onDoubleClick={() => router.push(`/dashboard/projects/${p.id}`)}
+                  onDragOver={(e) => { if (dragDiagramId) { e.preventDefault(); setDropTargetProjectId(p.id); } }}
+                  onDragLeave={() => { if (dropTargetProjectId === p.id) setDropTargetProjectId(null); }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    if (dragDiagramId) {
+                      handleMoveDiagram(dragDiagramId, p.id);
+                      setDragDiagramId(null);
+                      setDropTargetProjectId(null);
+                    }
+                  }}
                   className={`bg-white border rounded px-3 py-2 hover:shadow-sm cursor-pointer group transition-all ${
+                    dropTargetProjectId === p.id ? "border-blue-500 ring-2 ring-blue-300 bg-blue-50" :
                     selectedProjectId === p.id ? "border-blue-500 ring-1 ring-blue-300" : "border-gray-200 hover:border-blue-300"
                   }`}
                 >
@@ -599,6 +643,8 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                     projects={projects}
                     onDelete={handleDeleteDiagram}
                     onMove={handleMoveDiagram}
+                    onDragStart={() => setDragDiagramId(d.id)}
+                    onDragEnd={() => { setDragDiagramId(null); setDropTargetProjectId(null); }}
                   />
                 ))}
               </div>
