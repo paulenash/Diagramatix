@@ -7,6 +7,7 @@ import { SCHEMA_VERSION } from "@/app/lib/diagram/types";
 import { resolveColor, DEFAULT_SYMBOL_COLORS, type SymbolColorConfig } from "@/app/lib/diagram/colors";
 import { DiagramMaintenanceModal } from "./DiagramMaintenanceModal";
 import { ImpersonationBanner } from "@/app/components/ImpersonationBanner";
+import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 
 // --- Folder tree types ---
 interface FolderNode {
@@ -334,6 +335,9 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
   const [editingProjectName, setEditingProjectName] = useState(false);
 
   const [showNewDiagram, setShowNewDiagram] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    title: string; message: string; onConfirm: () => void;
+  } | null>(null);
   const [showMaintenance, setShowMaintenance] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [exportLog, setExportLog] = useState<string[]>([]);
@@ -626,14 +630,21 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
     router.push(`/diagram/${diagram.id}`);
   }
 
-  async function handleDeleteDiagram(id: string) {
-    if (!confirm("Delete this diagram?")) return;
-    await fetch(`/api/diagrams/${id}`, { method: "DELETE" });
-    setDiagrams((prev) => prev.filter((d) => d.id !== id));
-    updateTree(t => {
-      const map = { ...t.diagramFolderMap };
-      delete map[id];
-      return { ...t, diagramFolderMap: map };
+  function handleDeleteDiagram(id: string) {
+    const diag = diagrams.find(d => d.id === id);
+    setConfirmDialog({
+      title: "Delete Diagram",
+      message: `Are you sure you want to delete "${diag?.name ?? "this diagram"}"? This cannot be undone.`,
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        await fetch(`/api/diagrams/${id}`, { method: "DELETE" });
+        setDiagrams((prev) => prev.filter((d) => d.id !== id));
+        updateTree(t => {
+          const map = { ...t.diagramFolderMap };
+          delete map[id];
+          return { ...t, diagramFolderMap: map };
+        });
+      },
     });
   }
 
@@ -1206,6 +1217,15 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
             </div>
           </div>
         </div>
+      )}
+
+      {confirmDialog && (
+        <ConfirmDialog
+          title={confirmDialog.title}
+          message={confirmDialog.message}
+          onConfirm={confirmDialog.onConfirm}
+          onCancel={() => setConfirmDialog(null)}
+        />
       )}
     </div>
   );

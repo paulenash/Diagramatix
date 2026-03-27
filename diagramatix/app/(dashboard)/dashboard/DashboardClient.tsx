@@ -6,6 +6,7 @@ import { signOut } from "next-auth/react";
 import type { DiagramType } from "@/app/lib/diagram/types";
 import { SCHEMA_VERSION } from "@/app/lib/diagram/types";
 import { ImpersonationBanner } from "@/app/components/ImpersonationBanner";
+import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 
 interface DiagramSummary {
   id: string;
@@ -148,6 +149,11 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
       body: JSON.stringify(fields),
     }).catch(() => {});
   }
+
+  // Confirm dialog state
+  const [confirmDialog, setConfirmDialog] = useState<{
+    title: string; message: string; onConfirm: () => void;
+  } | null>(null);
 
   // New project state
   const [showNewProject, setShowNewProject] = useState(false);
@@ -360,14 +366,21 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
     setProjects((prev) => [{ ...project, _count: { diagrams: prev.find((p) => p.id === id)?._count.diagrams ?? 0 } }, ...prev]);
   }
 
-  async function handleDeleteProject(id: string, e: React.MouseEvent) {
+  function handleDeleteProject(id: string, e: React.MouseEvent) {
     e.stopPropagation();
-    if (!confirm("Delete this project? Its diagrams will be moved to Unorganised.")) return;
-    const res = await fetch(`/api/projects/${id}`, { method: "DELETE" });
-    if (!res.ok) return;
-    setProjects((prev) => prev.filter((p) => p.id !== id));
-    // Refresh the page so server re-fetches unorganized diagrams (SetNull moved them)
-    router.refresh();
+    const proj = projects.find(p => p.id === id);
+    setConfirmDialog({
+      title: "Delete Project",
+      message: `Are you sure you want to delete "${proj?.name ?? "this project"}"? Its diagrams will be moved to Unorganised.`,
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        const res = await fetch(`/api/projects/${id}`, { method: "DELETE" });
+        if (!res.ok) return;
+        setProjects((prev) => prev.filter((p) => p.id !== id));
+        if (selectedProjectId === id) setSelectedProjectId(null);
+        router.refresh();
+      },
+    });
   }
 
   async function handleCreateDiagram() {
@@ -385,10 +398,17 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
     router.push(`/diagram/${diagram.id}`);
   }
 
-  async function handleDeleteDiagram(id: string) {
-    if (!confirm("Delete this diagram?")) return;
-    await fetch(`/api/diagrams/${id}`, { method: "DELETE" });
-    setUnorganized((prev) => prev.filter((d) => d.id !== id));
+  function handleDeleteDiagram(id: string) {
+    const diag = unorganized.find(d => d.id === id);
+    setConfirmDialog({
+      title: "Delete Diagram",
+      message: `Are you sure you want to delete "${diag?.name ?? "this diagram"}"? This cannot be undone.`,
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        await fetch(`/api/diagrams/${id}`, { method: "DELETE" });
+        setUnorganized((prev) => prev.filter((d) => d.id !== id));
+      },
+    });
   }
 
   async function handleMoveDiagram(diagramId: string, projectId: string | null) {
@@ -818,6 +838,15 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
             </div>
           </div>
         </div>
+      )}
+
+      {confirmDialog && (
+        <ConfirmDialog
+          title={confirmDialog.title}
+          message={confirmDialog.message}
+          onConfirm={confirmDialog.onConfirm}
+          onCancel={() => setConfirmDialog(null)}
+        />
       )}
     </div>
   );

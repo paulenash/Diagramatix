@@ -425,27 +425,25 @@ export function DiagramEditor({
       .catch(() => {/* keep initial value */});
   }, [diagramId]);
 
-  // Fetch templates on mount (BPMN only)
+  // Fetch templates on mount (BPMN only) — sequential to avoid overwhelming PGlite
   useEffect(() => {
     if (diagramType !== "bpmn") return;
-    fetch("/api/templates?type=user")
-      .then((r) => {
-        if (!r.ok) throw new Error(`GET /api/templates?type=user failed: ${r.status}`);
-        return r.json();
-      })
-      .then((list: { id: string; name: string; diagramType: string }[]) =>
-        setUserTemplates(list.filter((t) => t.diagramType === "bpmn"))
-      )
-      .catch((err) => console.error("Failed to fetch user templates:", err));
-    fetch("/api/templates?type=builtin")
-      .then((r) => {
-        if (!r.ok) throw new Error(`GET /api/templates?type=builtin failed: ${r.status}`);
-        return r.json();
-      })
-      .then((list: { id: string; name: string; diagramType: string }[]) =>
-        setBuiltInTemplates(list.filter((t) => t.diagramType === "bpmn"))
-      )
-      .catch((err) => console.error("Failed to fetch built-in templates:", err));
+    (async () => {
+      try {
+        const r1 = await fetch("/api/templates?type=user");
+        if (r1.ok) {
+          const list = await r1.json() as { id: string; name: string; diagramType: string }[];
+          setUserTemplates(list.filter((t) => t.diagramType === "bpmn"));
+        }
+      } catch {}
+      try {
+        const r2 = await fetch("/api/templates?type=builtin");
+        if (r2.ok) {
+          const list = await r2.json() as { id: string; name: string; diagramType: string }[];
+          setBuiltInTemplates(list.filter((t) => t.diagramType === "bpmn"));
+        }
+      } catch {}
+    })();
   }, [diagramType]);
 
   // Close template dropdowns on outside click
