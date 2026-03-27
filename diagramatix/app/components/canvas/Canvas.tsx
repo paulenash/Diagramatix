@@ -412,7 +412,7 @@ export function Canvas({
     const contentW = maxX - minX;
     const contentH = maxY - minY;
     if (contentW < 1 || contentH < 1) return;
-    const fitZoom = Math.min(rect.width / contentW, rect.height / contentH, 2);
+    const fitZoom = Math.min(rect.width / contentW, rect.height / contentH, 1);
     const cx = (minX + maxX) / 2;
     const cy = (minY + maxY) / 2;
     setPan({ x: rect.width / 2 - cx * fitZoom, y: rect.height / 2 - cy * fitZoom });
