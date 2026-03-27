@@ -32,7 +32,8 @@ export async function GET(req: Request) {
          ORDER BY "updatedAt" DESC`
       );
     } else {
-      const userId = getEffectiveUserId(session, await cookies());
+      let userId = session.user.id;
+      try { userId = getEffectiveUserId(session, await cookies()); } catch { /* fallback to session user */ }
       result = await pgPool.query(
         `SELECT id, name, "diagramType", "createdAt"
          FROM "DiagramTemplate"

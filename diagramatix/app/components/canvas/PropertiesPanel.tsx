@@ -1171,7 +1171,7 @@ export function PropertiesPanel({
                 }
                 setLabelDraft(val);
               }}
-              onBlur={() => onUpdateLabel(element.id, labelDraft)}
+              onBlur={() => { if (labelDraft !== element.label) onUpdateLabel(element.id, labelDraft); }}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
@@ -1187,7 +1187,7 @@ export function PropertiesPanel({
             value={labelDraft}
             onFocus={(e) => { const l = e.target.value.length; e.target.setSelectionRange(l, l); }}
             onChange={(e) => setLabelDraft(e.target.value)}
-            onBlur={() => onUpdateLabel(element.id, labelDraft)}
+            onBlur={() => { if (labelDraft !== element.label) onUpdateLabel(element.id, labelDraft); }}
             onKeyDown={(e) => {
               if (e.key === "Enter") onUpdateLabel(element.id, labelDraft);
             }}
@@ -1336,25 +1336,30 @@ export function PropertiesPanel({
         </div>
       )}
 
-      {element.type === "subprocess" && siblingDiagrams && siblingDiagrams.length > 0 && (
+      {element.type === "subprocess" && siblingDiagrams && (() => {
+        const bpmnSiblings = siblingDiagrams.filter(d => d.type === "bpmn");
+        if (bpmnSiblings.length === 0) return null;
+        return (
         <div>
           <label className="block text-xs font-medium text-gray-700 mb-1">Linked Diagram</label>
           {(() => {
             const linkedId = element.properties.linkedDiagramId as string | undefined;
-            const linkedExists = linkedId ? siblingDiagrams.some(d => d.id === linkedId) : true;
+            const linkedExists = linkedId ? bpmnSiblings.some(d => d.id === linkedId) : true;
             return (
               <>
                 <select
                   value={linkedId ?? ""}
                   onChange={(e) => onUpdateProperties(element.id, {
-                    linkedDiagramId: e.target.value || undefined,
+                    linkedDiagramId: e.target.value || null,
                   })}
-                  className="w-full text-xs border border-gray-300 rounded px-2 py-1.5 bg-white text-gray-700"
+                  className="w-full text-xs border border-gray-300 rounded px-2 py-1.5 bg-white text-gray-700 cursor-pointer"
+                  onMouseDown={(e) => { e.stopPropagation(); }}
+                  onClick={(e) => { e.stopPropagation(); (e.target as HTMLSelectElement).focus(); }}
                 >
                   <option value="">None</option>
-                  {siblingDiagrams.map((d) => (
+                  {bpmnSiblings.map((d) => (
                     <option key={d.id} value={d.id}>
-                      {d.name} ({d.type})
+                      {d.name}
                     </option>
                   ))}
                 </select>
@@ -1368,7 +1373,8 @@ export function PropertiesPanel({
             );
           })()}
         </div>
-      )}
+        );
+      })()}
 
       {(element.type === "task" || element.type === "subprocess" || element.type === "subprocess-expanded") && (
         <div>

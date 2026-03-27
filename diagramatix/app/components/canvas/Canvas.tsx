@@ -1957,7 +1957,14 @@ export function Canvas({
                 onSelectConnector(null);
               }}
               onMove={(x, y) => { setDraggingElementId(el.id); onMoveElement(el.id, x, y); }}
-              onDoubleClick={() => startEditingLabel(el)}
+              onDoubleClick={() => {
+                const linkedId = el.type === "subprocess" ? el.properties.linkedDiagramId as string | undefined : undefined;
+                if (linkedId && onDrillIntoSubprocess) {
+                  onDrillIntoSubprocess(linkedId);
+                } else {
+                  startEditingLabel(el);
+                }
+              }}
               onConnectionPointDragStart={(side, worldPos) =>
                 handleConnectionPointDragStart(el.id, side, worldPos)
               }

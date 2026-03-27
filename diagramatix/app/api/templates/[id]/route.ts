@@ -20,7 +20,8 @@ export async function GET(_req: Request, { params }: Params) {
   }
 
   try {
-    const userId = getEffectiveUserId(session, await cookies());
+    let userId = session.user.id;
+    try { userId = getEffectiveUserId(session, await cookies()); } catch { /* fallback */ }
     const { id } = await params;
     const result = await pgPool.query(
       `SELECT id, name, "diagramType", "templateType", data, "createdAt"

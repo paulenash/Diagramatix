@@ -11,8 +11,8 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const cookieStore = await cookies();
-  const userId = getEffectiveUserId(session, cookieStore);
+  let userId = session.user.id;
+  try { userId = getEffectiveUserId(session, await cookies()); } catch { /* fallback */ }
   const diagrams = await prisma.diagram.findMany({
     where: { userId },
     orderBy: { updatedAt: "desc" },

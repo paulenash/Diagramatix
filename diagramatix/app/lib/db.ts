@@ -21,6 +21,9 @@ export const prisma = globalForPrisma.prisma ?? createPrismaClient();
 
 export const pgPool = globalForPrisma.pgPool ?? new pg.Pool({
   connectionString: process.env.DATABASE_URL!.split("?")[0] + "?sslmode=disable",
+  connectionTimeoutMillis: 120_000,  // PGlite can be slow on cold start
+  idleTimeoutMillis: 30_000,
+  max: 5,
 });
 
 if (process.env.NODE_ENV !== "production") {

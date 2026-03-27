@@ -24,8 +24,8 @@ export async function GET(_req: Request, { params }: Params) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const cookieStore = await cookies();
-  const userId = getEffectiveUserId(session, cookieStore);
+  let userId = session.user.id;
+  try { userId = getEffectiveUserId(session, await cookies()); } catch { /* fallback */ }
   const { id } = await params;
   const diagram = await getAuthorizedDiagram(id, userId);
   if (!diagram) {
