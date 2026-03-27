@@ -1,4 +1,3 @@
-import { Suspense } from "react";
 import { redirect, notFound } from "next/navigation";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
@@ -51,8 +50,7 @@ export default async function DiagramPage({ params }: Props) {
   }
 
   return (
-    <Suspense fallback={null}>
-      <DiagramEditor
+    <DiagramEditor
         diagramId={diagram.id}
         diagramName={diagram.name}
         diagramType={diagram.type as DiagramType}
@@ -67,6 +65,5 @@ export default async function DiagramPage({ params }: Props) {
         viewingAsName={viewingAsName}
         viewingAsEmail={viewingAsEmail}
       />
-    </Suspense>
   );
 }

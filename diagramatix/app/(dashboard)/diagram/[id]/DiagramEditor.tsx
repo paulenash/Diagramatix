@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import type {
   ConnectorType,
   DiagramData,
@@ -225,8 +225,24 @@ export function DiagramEditor({
   viewingAsEmail,
 }: Props) {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const fromDiagramId = searchParams.get("from");
+
+  // --- Subprocess drill-down navigation stack (sessionStorage) ---
+  const STACK_KEY = "dgx_drill_stack";
+
+  function getDrillStack(): { id: string; name: string }[] {
+    try {
+      const raw = sessionStorage.getItem(STACK_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch { return []; }
+  }
+
+  // The parent diagram (top of stack) — if we got here via drill-down
+  const [parentDiagram, setParentDiagram] = useState<{ id: string; name: string } | null>(null);
+  useEffect(() => {
+    const stack = getDrillStack();
+    const top = stack.length > 0 ? stack[stack.length - 1] : null;
+    setParentDiagram(top);
+  }, []);
 
   // Sibling diagrams in the same project (for subprocess linking)
   const [siblingDiagrams, setSiblingDiagrams] = useState<{ id: string; name: string; type: string }[]>([]);
@@ -245,13 +261,31 @@ export function DiagramEditor({
       .catch(() => {});
   }, [projectId, diagramId]);
 
-  const fromDiagramName = fromDiagramId
-    ? siblingDiagrams.find(d => d.id === fromDiagramId)?.name ?? null
-    : null;
-
   const handleDrillIntoSubprocess = useCallback((linkedDiagramId: string) => {
-    router.push(`/diagram/${linkedDiagramId}?from=${diagramId}`);
-  }, [router, diagramId]);
+    // Push current diagram onto stack before navigating
+    const stack = getDrillStack();
+    stack.push({ id: diagramId, name: diagramName });
+    sessionStorage.setItem(STACK_KEY, JSON.stringify(stack));
+    router.push(`/diagram/${linkedDiagramId}`);
+  }, [router, diagramId, diagramName]);
+
+  const handleDrillBack = useCallback(() => {
+    // Pop the stack and navigate to the parent diagram
+    const stack = getDrillStack();
+    const parent = stack.pop();
+    sessionStorage.setItem(STACK_KEY, JSON.stringify(stack));
+    if (parent) {
+      router.push(`/diagram/${parent.id}`);
+    } else {
+      router.push(projectId ? `/dashboard/projects/${projectId}` : "/dashboard");
+    }
+  }, [router, projectId]);
+
+  const handleBackToProject = useCallback(() => {
+    // Clear the entire stack and go to the project
+    sessionStorage.removeItem(STACK_KEY);
+    router.push(projectId ? `/dashboard/projects/${projectId}` : "/dashboard");
+  }, [router, projectId]);
 
   const {
     data,
@@ -694,19 +728,11 @@ export function DiagramEditor({
       {/* Top bar */}
       <header className={`h-12 border-b border-gray-200 flex items-center px-4 gap-4 flex-shrink-0 ${readOnly ? "bg-orange-50" : ""}`}>
         <button
-          onClick={() => {
-            if (fromDiagramId) {
-              router.push(`/diagram/${fromDiagramId}`);
-            } else if (window.history.length > 1) {
-              router.back();
-            } else {
-              router.push(projectId ? `/dashboard/projects/${projectId}` : "/dashboard");
-            }
-          }}
+          onClick={parentDiagram ? handleDrillBack : handleBackToProject}
           className="text-gray-500 hover:text-gray-700 text-sm"
         >
-          {fromDiagramId
-            ? `\u2190 ${fromDiagramName ?? "Parent Diagram"}`
+          {parentDiagram
+            ? `\u2190 ${parentDiagram.name}`
             : `\u2190 ${projectId ? "Project" : "Dashboard"}`}
         </button>
 
