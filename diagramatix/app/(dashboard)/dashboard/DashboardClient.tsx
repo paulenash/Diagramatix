@@ -71,10 +71,10 @@ function DiagramCard({
   return (
     <div
       onClick={() => router.push(`/diagram/${diagram.id}`)}
-      className="bg-white border border-gray-200 rounded-lg p-4 hover:border-blue-300 hover:shadow-sm cursor-pointer group transition-all relative"
+      className="bg-white border border-gray-200 rounded px-3 py-2 hover:border-blue-300 hover:shadow-sm cursor-pointer group transition-all relative"
     >
-      <div className="flex items-start justify-between mb-2">
-        <div className="w-8 h-8 bg-blue-50 rounded flex items-center justify-center">
+      <div className="flex items-center justify-between">
+        <div className="w-8 h-8 bg-blue-50 rounded flex items-center justify-center shrink-0">
           <svg width={16} height={16} viewBox="0 0 16 16" fill="none">
             <rect x={1} y={4} width={6} height={4} rx={1} stroke="#2563eb" strokeWidth={1.2} />
             <rect x={9} y={4} width={6} height={4} rx={1} stroke="#2563eb" strokeWidth={1.2} />
@@ -118,9 +118,13 @@ function DiagramCard({
           </button>
         </div>
       </div>
-      <h3 className="font-medium text-gray-900 text-sm mb-1">{diagram.name}</h3>
-      <p className="text-xs text-gray-500 mb-2">{DIAGRAM_TYPE_LABELS[diagram.type] ?? diagram.type}</p>
-      <p className="text-xs text-gray-400">{new Date(diagram.updatedAt).toLocaleDateString()}</p>
+      <div className="mt-1">
+        <h3 className="font-medium text-gray-900 text-xs truncate">{diagram.name}</h3>
+        <div className="flex items-center gap-2 mt-0.5">
+          <span className="text-[10px] text-gray-500">{DIAGRAM_TYPE_LABELS[diagram.type] ?? diagram.type}</span>
+          <span className="text-[10px] text-gray-400">{new Date(diagram.updatedAt).toLocaleDateString()}</span>
+        </div>
+      </div>
     </div>
   );
 }
@@ -418,7 +422,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
           {version ? <span className="text-xs text-gray-400 ml-1">v1.0.{version}</span> : null}
           <span className="text-xs text-gray-400 ml-3">brought to you by: <strong className="text-gray-600">Nash AI</strong></span>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           {isSu && !readOnly && (
             <a
               href="/dashboard/admin"
@@ -426,6 +430,21 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
             >
               Admin
             </a>
+          )}
+          {!readOnly && (
+            <>
+              <input ref={fileInputRef} type="file" accept=".json" className="hidden"
+                onChange={e => { const f = e.target.files?.[0]; if (f) handleFileSelected(f); e.target.value = ""; }} />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={importing}
+                className={`text-xs font-medium rounded px-2 py-1 border ${
+                  importing ? "bg-green-600 text-white border-green-600" : "text-gray-600 border-gray-300 hover:bg-gray-50"
+                }`}
+              >
+                {importing ? "Importing\u2026" : "Import"}
+              </button>
+            </>
           )}
           <div className="text-right">
             <span className="text-sm text-gray-700 font-medium">{userName}</span>
@@ -440,31 +459,18 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-6 py-8 space-y-10">
+      <main className="max-w-5xl mx-auto px-6 py-6 space-y-6">
         {/* Projects section */}
         <section>
-          <div className="flex items-center justify-between mb-4">
-            <h1 className="text-xl font-semibold text-gray-900">Projects</h1>
-            <input ref={fileInputRef} type="file" accept=".json" className="hidden"
-              onChange={e => { const f = e.target.files?.[0]; if (f) handleFileSelected(f); e.target.value = ""; }} />
+          <div className="flex items-center justify-between mb-3">
+            <h1 className="text-lg font-semibold text-gray-900">Projects</h1>
             {!readOnly && (
-              <>
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={importing}
-                  className={`px-4 py-2 text-sm font-medium rounded-md border ${
-                    importing ? "bg-green-600 text-white" : "text-gray-700 border-gray-300 hover:bg-gray-50"
-                  }`}
-                >
-                  {importing ? "Importing\u2026" : "Import Project"}
-                </button>
-                <button
-                  onClick={() => setShowNewProject(true)}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm font-medium"
-                >
-                  + New Project
-                </button>
-              </>
+              <button
+                onClick={() => setShowNewProject(true)}
+                className="px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-xs font-medium"
+              >
+                + New Project
+              </button>
             )}
           </div>
 
@@ -481,7 +487,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
               )}
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
               {projects.map((p) => (
                 <div
                   key={p.id}
@@ -491,42 +497,37 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                     setEditOwner(p.ownerName ?? "");
                   }}
                   onDoubleClick={() => router.push(`/dashboard/projects/${p.id}`)}
-                  className={`bg-white border rounded-lg p-4 hover:shadow-sm cursor-pointer group transition-all ${
+                  className={`bg-white border rounded px-3 py-2 hover:shadow-sm cursor-pointer group transition-all ${
                     selectedProjectId === p.id ? "border-blue-500 ring-1 ring-blue-300" : "border-gray-200 hover:border-blue-300"
                   }`}
                 >
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="w-8 h-8 bg-purple-50 rounded flex items-center justify-center">
-                      <svg width={16} height={16} viewBox="0 0 16 16" fill="none">
-                        <rect x={1} y={4} width={14} height={11} rx={1.5} stroke="#7c3aed" strokeWidth={1.2} />
-                        <path d="M1 7h14" stroke="#7c3aed" strokeWidth={1.2} />
-                        <path d="M4 4V2.5A1.5 1.5 0 015.5 1h5A1.5 1.5 0 0112 2.5V4" stroke="#7c3aed" strokeWidth={1.2} />
-                      </svg>
-                    </div>
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-medium text-gray-900 text-xs truncate">{p.name}</h3>
                     {!readOnly && (
-                      <div className="flex gap-1 opacity-0 group-hover:opacity-100">
+                      <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 shrink-0 ml-1">
                         <button
                           onClick={(e) => handleCloneProject(p.id, e)}
-                          className="text-gray-400 hover:text-blue-500 text-xs px-1"
+                          className="text-gray-400 hover:text-blue-500 text-[10px] px-0.5"
                           title="Clone project"
                         >
-                          ⧉
+                          {"\u29C9"}
                         </button>
                         <button
                           onClick={(e) => handleDeleteProject(p.id, e)}
-                          className="text-gray-400 hover:text-red-500 text-xs px-1"
+                          className="text-gray-400 hover:text-red-500 text-[10px] px-0.5"
                           title="Delete project"
                         >
-                          ✕
+                          {"\u2715"}
                         </button>
                       </div>
                     )}
                   </div>
-                  <h3 className="font-medium text-gray-900 text-sm mb-1">{p.name}</h3>
-                  <p className="text-xs text-gray-500 mb-1">
-                    {p._count.diagrams} {p._count.diagrams === 1 ? "diagram" : "diagrams"}
-                  </p>
-                  <p className="text-xs text-gray-400">{new Date(p.updatedAt).toLocaleDateString()}</p>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="text-[10px] text-gray-500">
+                      {p._count.diagrams} {p._count.diagrams === 1 ? "diagram" : "diagrams"}
+                    </span>
+                    <span className="text-[10px] text-gray-400">{new Date(p.updatedAt).toLocaleDateString()}</span>
+                  </div>
                 </div>
               ))}
             </div>
@@ -536,11 +537,11 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
         {/* Unorganized diagrams section */}
         {(unorganized.length > 0 || true) && (
           <section>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-gray-900">Unorganized Diagrams</h2>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-semibold text-gray-900">Unorganized Diagrams</h2>
               <button
                 onClick={() => setShowNewDiagram(true)}
-                className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 text-sm font-medium"
+                className="px-3 py-1.5 bg-white border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 text-xs font-medium"
               >
                 + New Diagram
               </button>
@@ -551,7 +552,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                 <p className="text-gray-400 text-sm">No unorganized diagrams</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
                 {unorganized.map((d) => (
                   <DiagramCard
                     key={d.id}
@@ -569,7 +570,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
 
       {/* Project Properties Panel */}
       {selectedProject && (
-        <div className="fixed right-0 top-12 bottom-0 w-56 bg-white border-l border-gray-200 p-3 overflow-y-auto z-10 shadow-lg">
+        <div className="fixed right-0 top-[65px] bottom-0 w-56 bg-white border-l border-gray-200 p-3 overflow-y-auto z-10 shadow-lg">
           <div className="flex items-center justify-between mb-2">
             <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Project Properties</span>
             <button onClick={() => setSelectedProjectId(null)}

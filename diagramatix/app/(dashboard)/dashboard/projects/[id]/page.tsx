@@ -13,8 +13,14 @@ export default async function ProjectPage({ params }: Props) {
   if (!session?.user?.id) redirect("/login");
 
   const cookieStore = await cookies();
-  const effectiveUserId = getEffectiveUserId(session, cookieStore);
-  const viewing = isImpersonating(session, cookieStore);
+  let effectiveUserId = getEffectiveUserId(session, cookieStore);
+  let viewing = isImpersonating(session, cookieStore);
+
+  // Validate impersonation target exists
+  if (viewing) {
+    const target = await prisma.user.findUnique({ where: { id: effectiveUserId }, select: { id: true } });
+    if (!target) { cookieStore.delete("dgx_view_as"); effectiveUserId = session.user.id; viewing = false; }
+  }
 
   const { id } = await params;
 
