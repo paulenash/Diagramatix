@@ -24,8 +24,8 @@ export function AdminClient({ users, currentUserId }: Props) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ userId }),
     });
-    router.push("/dashboard");
-    router.refresh();
+    // Hard navigation so server sees the new impersonation cookie
+    window.location.href = "/dashboard";
   }
 
   return (

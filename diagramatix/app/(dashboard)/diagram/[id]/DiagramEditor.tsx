@@ -272,10 +272,11 @@ export function DiagramEditor({
   const handleDrillBack = useCallback(() => {
     // Pop the stack and navigate to the parent diagram
     const stack = getDrillStack();
-    const parent = stack.pop();
+    stack.pop();
     sessionStorage.setItem(STACK_KEY, JSON.stringify(stack));
-    if (parent) {
-      router.push(`/diagram/${parent.id}`);
+    // Use back() to return to the cached parent page
+    if (window.history.length > 1) {
+      router.back();
     } else {
       router.push(projectId ? `/dashboard/projects/${projectId}` : "/dashboard");
     }
@@ -284,7 +285,12 @@ export function DiagramEditor({
   const handleBackToProject = useCallback(() => {
     // Clear the entire stack and go to the project
     sessionStorage.removeItem(STACK_KEY);
-    router.push(projectId ? `/dashboard/projects/${projectId}` : "/dashboard");
+    // Use back() for instant return to cached project/dashboard screen
+    if (window.history.length > 1) {
+      router.back();
+    } else {
+      router.push(projectId ? `/dashboard/projects/${projectId}` : "/dashboard");
+    }
   }, [router, projectId]);
 
   const {
