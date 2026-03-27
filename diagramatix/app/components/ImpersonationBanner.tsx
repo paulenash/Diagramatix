@@ -12,8 +12,8 @@ export function ImpersonationBanner({ viewingAsName, viewingAsEmail }: Props) {
 
   async function handleReturn() {
     await fetch("/api/admin/impersonate", { method: "DELETE" });
-    router.push("/dashboard");
-    router.refresh();
+    // Hard navigation ensures the server sees the cleared cookie
+    window.location.href = "/dashboard";
   }
 
   const displayName = viewingAsName || viewingAsEmail || "another user";

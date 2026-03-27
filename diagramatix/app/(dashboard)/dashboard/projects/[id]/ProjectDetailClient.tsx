@@ -248,18 +248,31 @@ function folderTreeXml(ft: FolderTree, ind: string): string {
 }
 
 
-function loadFolderTree(projectId: string): FolderTree {
-  if (typeof window === "undefined") return { folders: [], diagramFolderMap: {} };
-  try {
-    const raw = localStorage.getItem(`folder-tree-${projectId}`);
-    if (raw) return JSON.parse(raw);
-  } catch {}
-  return { folders: [], diagramFolderMap: {} };
+const EMPTY_FOLDER_TREE: FolderTree = { folders: [], diagramFolderMap: {} };
+
+function parseFolderTree(raw: unknown): FolderTree {
+  if (!raw || typeof raw !== "object") return EMPTY_FOLDER_TREE;
+  const obj = raw as Record<string, unknown>;
+  if (!Array.isArray(obj.folders)) return EMPTY_FOLDER_TREE;
+  return raw as FolderTree;
 }
 
-function saveFolderTree(projectId: string, tree: FolderTree) {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(`folder-tree-${projectId}`, JSON.stringify(tree));
+// Debounced save — ensures rapid changes don't flood the API
+let _folderTreeSaveTimer: ReturnType<typeof setTimeout> | null = null;
+function saveFolderTreeToDb(projectId: string, tree: FolderTree) {
+  if (_folderTreeSaveTimer) clearTimeout(_folderTreeSaveTimer);
+  _folderTreeSaveTimer = setTimeout(() => {
+    _folderTreeSaveTimer = null;
+    fetch(`/api/projects/${projectId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ folderTree: tree }),
+    }).then(r => {
+      if (!r.ok) console.error("[saveFolderTree] failed:", r.status);
+    }).catch(err => {
+      console.error("[saveFolderTree] error:", err);
+    });
+  }, 500);
 }
 
 interface DiagramSummary {
@@ -277,6 +290,7 @@ interface ProjectDetail {
   description?: string;
   ownerName?: string;
   colorConfig?: unknown;
+  folderTree?: unknown;
   diagrams: DiagramSummary[];
 }
 
@@ -342,17 +356,33 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
   const [navWidth, setNavWidth] = useState(208);
   const resizingRef = useRef(false);
 
-  // Hydration-safe: load persisted state after mount
+  // Initialize folder tree from DB prop, with one-time migration from localStorage
   useEffect(() => {
-    setFolderTree(loadFolderTree(project.id));
+    const dbTree = parseFolderTree(project.folderTree);
+    if (dbTree.folders.length > 0 || Object.keys(dbTree.diagramFolderMap).length > 0) {
+      // DB has folder tree data — use it
+      setFolderTree(dbTree);
+    } else {
+      // DB is empty — check localStorage for legacy data and migrate
+      try {
+        const raw = localStorage.getItem(`folder-tree-${project.id}`);
+        if (raw) {
+          const legacy = JSON.parse(raw) as FolderTree;
+          if (legacy.folders?.length > 0 || Object.keys(legacy.diagramFolderMap ?? {}).length > 0) {
+            setFolderTree(legacy);
+            saveFolderTreeToDb(project.id, legacy); // migrate to DB
+            localStorage.removeItem(`folder-tree-${project.id}`); // clean up
+          }
+        }
+      } catch {}
+    }
     const savedWidth = localStorage.getItem(`nav-width-${project.id}`);
     if (savedWidth) setNavWidth(parseInt(savedWidth, 10) || 208);
-    // Restore tree selection from last visit
     const savedTreeItem = localStorage.getItem(`selected-tree-${project.id}`);
     const savedFolder = localStorage.getItem(`selected-folder-${project.id}`);
     if (savedTreeItem) setSelectedTreeItem(savedTreeItem);
     if (savedFolder) setSelectedFolderId(savedFolder);
-  }, [project.id]);
+  }, [project.id, project.folderTree]);
 
   // Close export menu on click outside
   useEffect(() => {
@@ -460,7 +490,7 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
   const updateTree = useCallback((updater: (t: FolderTree) => FolderTree) => {
     setFolderTree(prev => {
       const next = updater(prev);
-      saveFolderTree(project.id, next);
+      saveFolderTreeToDb(project.id, next);
       return next;
     });
   }, [project.id]);
@@ -520,8 +550,10 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
       }
 
       log("Exporting folder structure...");
-      const folderTreeRaw = localStorage.getItem(`folder-tree-${project.id}`);
-      const folderTree = folderTreeRaw ? JSON.parse(folderTreeRaw) : { folders: [], diagramFolderMap: {} };
+      // Fetch folder tree from the project API (persisted in DB)
+      const ftRes = await fetch(`/api/projects/${project.id}`);
+      const ftData = ftRes.ok ? await ftRes.json() : null;
+      const folderTree = parseFolderTree(ftData?.folderTree);
       const folderCount = (folderTree.folders ?? []).length;
       log(`\u2714 ${folderCount} folder(s) exported`);
 
@@ -897,7 +929,10 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
     );
   }
 
-  const visibleDiagrams = getDiagramsInFolder(selectedFolderId);
+  // If a specific diagram is selected in the tree, show only that diagram;
+  // otherwise show all diagrams in the selected folder
+  const selectedDiagram = selectedTreeItem ? diagrams.find(d => d.id === selectedTreeItem) : null;
+  const visibleDiagrams = selectedDiagram ? [selectedDiagram] : getDiagramsInFolder(selectedFolderId);
 
   return (
     <div className={`min-h-screen ${readOnly ? "bg-orange-50" : "bg-gray-50"} flex flex-col`}>
@@ -1280,7 +1315,7 @@ function DiagramCard({
                 <hr className="my-1 border-gray-100" />
                 <button
                   onClick={() => { onMove(diagram.id, null); setShowMove(false); }}
-                  className="block w-full text-left px-3 py-1 text-xs text-gray-500 hover:bg-gray-50 italic">Unorganized</button>
+                  className="block w-full text-left px-3 py-1 text-xs text-gray-500 hover:bg-gray-50 italic">Unorganised</button>
               </div>
             )}
           </div>

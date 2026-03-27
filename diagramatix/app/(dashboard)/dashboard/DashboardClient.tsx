@@ -309,7 +309,11 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
           diagramOrder: remappedOrder,
           folderOrder: (ft.folderOrder as Record<string,string[]>) ?? {},
         };
-        localStorage.setItem(`folder-tree-${newProject.id}`, JSON.stringify(remappedTree));
+        await fetch(`/api/projects/${newProject.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ folderTree: remappedTree }),
+        });
         const folderCount = ((ft.folders as unknown[]) ?? []).length;
         log(`\u2714 ${folderCount} folder(s) imported`);
       }
@@ -358,7 +362,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
 
   async function handleDeleteProject(id: string, e: React.MouseEvent) {
     e.stopPropagation();
-    if (!confirm("Delete this project? Its diagrams will be moved to Unorganized.")) return;
+    if (!confirm("Delete this project? Its diagrams will be moved to Unorganised.")) return;
     const res = await fetch(`/api/projects/${id}`, { method: "DELETE" });
     if (!res.ok) return;
     setProjects((prev) => prev.filter((p) => p.id !== id));
@@ -538,7 +542,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
         {(unorganized.length > 0 || true) && (
           <section>
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-semibold text-gray-900">Unorganized Diagrams</h2>
+              <h2 className="text-sm font-semibold text-gray-900">Unorganised Diagrams</h2>
               <button
                 onClick={() => setShowNewDiagram(true)}
                 className="px-3 py-1.5 bg-white border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 text-xs font-medium"
@@ -549,7 +553,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
 
             {unorganized.length === 0 ? (
               <div className="text-center py-8 bg-white rounded-lg border border-gray-200 border-dashed">
-                <p className="text-gray-400 text-sm">No unorganized diagrams</p>
+                <p className="text-gray-400 text-sm">No unorganised diagrams</p>
               </div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">

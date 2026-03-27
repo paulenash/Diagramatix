@@ -26,6 +26,7 @@ model Project {
   description String    @default("")
   ownerName   String    @default("")
   colorConfig Json      @default("{}")
+  folderTree  Json      @default("{}")
   userId      String
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   diagrams    Diagram[]
