@@ -1,10 +1,13 @@
-import type { ReadonlyRequestCookies } from "next/dist/server/web/spec-extension/adapters/request-cookies";
-
 /** The only email permitted to impersonate other users */
 export const SUPERUSER_EMAIL = "paul@nashcc.com.au";
 
 /** Cookie name used to store the impersonation target userId */
 export const IMPERSONATE_COOKIE = "dgx_view_as";
+
+/** Minimal cookie store interface — compatible with whatever cookies() returns */
+interface CookieStore {
+  get(name: string): { value: string } | undefined;
+}
 
 /** Check whether the authenticated session belongs to the superuser */
 export function isSuperuser(session: { user?: { email?: string | null } } | null): boolean {
@@ -14,7 +17,7 @@ export function isSuperuser(session: { user?: { email?: string | null } } | null
 /** If the superuser is impersonating another user, return that user's ID; otherwise null */
 export function getViewAsUserId(
   session: { user?: { id?: string; email?: string | null } } | null,
-  cookieStore: ReadonlyRequestCookies,
+  cookieStore: CookieStore,
 ): string | null {
   if (!isSuperuser(session)) return null;
   const val = cookieStore.get(IMPERSONATE_COOKIE)?.value;
@@ -27,7 +30,7 @@ export function getViewAsUserId(
 /** Return the effective userId for data queries — impersonation target or own id */
 export function getEffectiveUserId(
   session: { user?: { id?: string; email?: string | null } } | null,
-  cookieStore: ReadonlyRequestCookies,
+  cookieStore: CookieStore,
 ): string {
   return getViewAsUserId(session, cookieStore) ?? session?.user?.id ?? "";
 }
@@ -35,7 +38,7 @@ export function getEffectiveUserId(
 /** Whether the current request is in impersonation mode */
 export function isImpersonating(
   session: { user?: { id?: string; email?: string | null } } | null,
-  cookieStore: ReadonlyRequestCookies,
+  cookieStore: CookieStore,
 ): boolean {
   return getViewAsUserId(session, cookieStore) !== null;
 }

@@ -45,9 +45,12 @@ export async function PUT(req: Request, { params }: Params) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  if (isImpersonating(session, await cookies())) {
-    return NextResponse.json({ error: "Read-only: viewing another user" }, { status: 403 });
-  }
+  try {
+    const ck = await cookies();
+    if (isImpersonating(session, ck)) {
+      return NextResponse.json({ error: "Read-only: viewing another user" }, { status: 403 });
+    }
+  } catch { /* proceed normally */ }
 
   try {
     const { id } = await params;
@@ -117,9 +120,12 @@ export async function DELETE(req: Request, { params }: Params) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  if (isImpersonating(session, await cookies())) {
-    return NextResponse.json({ error: "Read-only: viewing another user" }, { status: 403 });
-  }
+  try {
+    const ck = await cookies();
+    if (isImpersonating(session, ck)) {
+      return NextResponse.json({ error: "Read-only: viewing another user" }, { status: 403 });
+    }
+  } catch { /* proceed normally */ }
 
   try {
     const { id } = await params;

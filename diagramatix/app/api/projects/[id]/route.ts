@@ -10,13 +10,23 @@ async function getAuthorizedProject(id: string, userId: string) {
   return prisma.project.findFirst({ where: { id, userId } });
 }
 
+/** Safely check if impersonating — returns false if cookies() fails */
+async function checkImpersonating(session: Parameters<typeof isImpersonating>[0]) {
+  try {
+    return isImpersonating(session, await cookies());
+  } catch {
+    return false;
+  }
+}
+
 export async function GET(_req: Request, { params }: Params) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const userId = getEffectiveUserId(session, await cookies());
+  const cookieStore = await cookies();
+  const userId = getEffectiveUserId(session, cookieStore);
   const { id } = await params;
   const project = await prisma.project.findFirst({
     where: { id, userId },
@@ -41,7 +51,7 @@ export async function PUT(req: Request, { params }: Params) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  if (isImpersonating(session, await cookies())) {
+  if (await checkImpersonating(session)) {
     return NextResponse.json({ error: "Read-only: viewing another user" }, { status: 403 });
   }
 
@@ -59,7 +69,6 @@ export async function PUT(req: Request, { params }: Params) {
   }
 
   try {
-    // Update simple fields via Prisma ORM
     const dataUpdate: Record<string, string> = {};
     if (name !== undefined) dataUpdate.name = name.trim();
     if (description !== undefined) dataUpdate.description = description;
@@ -67,8 +76,6 @@ export async function PUT(req: Request, { params }: Params) {
     if (Object.keys(dataUpdate).length > 0) {
       await prisma.project.update({ where: { id }, data: dataUpdate });
     }
-    // Update colorConfig via raw SQL — Prisma 7 parameterization schema
-    // does not include JSON fields in the ProjectUpdateInput graph.
     if (colorConfig !== undefined) {
       await prisma.$executeRawUnsafe(
         'UPDATE "Project" SET "colorConfig" = $1::jsonb, "updatedAt" = NOW() WHERE id = $2',
@@ -91,7 +98,7 @@ export async function DELETE(_req: Request, { params }: Params) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  if (isImpersonating(session, await cookies())) {
+  if (await checkImpersonating(session)) {
     return NextResponse.json({ error: "Read-only: viewing another user" }, { status: 403 });
   }
 
@@ -101,7 +108,6 @@ export async function DELETE(_req: Request, { params }: Params) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  // SetNull cascade handles moving diagrams to Unorganized
   await prisma.project.delete({ where: { id } });
   return NextResponse.json({ success: true });
 }

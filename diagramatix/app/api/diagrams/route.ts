@@ -11,7 +11,8 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const userId = getEffectiveUserId(session, await cookies());
+  const cookieStore = await cookies();
+  const userId = getEffectiveUserId(session, cookieStore);
   const diagrams = await prisma.diagram.findMany({
     where: { userId },
     orderBy: { updatedAt: "desc" },
@@ -33,8 +34,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  if (isImpersonating(session, await cookies())) {
-    return NextResponse.json({ error: "Read-only: viewing another user" }, { status: 403 });
+  try {
+    const cookieStore = await cookies();
+    if (isImpersonating(session, cookieStore)) {
+      return NextResponse.json({ error: "Read-only: viewing another user" }, { status: 403 });
+    }
+  } catch {
+    // cookies() may fail in some contexts — if so, proceed normally
   }
 
   const body = await req.json();

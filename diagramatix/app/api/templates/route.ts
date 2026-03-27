@@ -55,9 +55,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  if (isImpersonating(session, await cookies())) {
-    return NextResponse.json({ error: "Read-only: viewing another user" }, { status: 403 });
-  }
+  try {
+    const cookieStore = await cookies();
+    if (isImpersonating(session, cookieStore)) {
+      return NextResponse.json({ error: "Read-only: viewing another user" }, { status: 403 });
+    }
+  } catch { /* proceed normally */ }
 
   const body = await req.json();
   const { name, diagramType = "bpmn", data, templateType = "user", adminPassword } = body;
