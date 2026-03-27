@@ -189,6 +189,7 @@ interface Props {
   createdAt?: string;
   updatedAt?: string;
   readOnly?: boolean;
+  onDrillIntoSubprocess?: (diagramId: string) => void;
 }
 
 interface EditingLabel {
@@ -361,6 +362,7 @@ export function Canvas({
   createdAt,
   updatedAt,
   readOnly,
+  onDrillIntoSubprocess,
 }: Props) {
   const displayMode = displayModeProp ?? "normal";
   const svgRef = useRef<SVGSVGElement>(null);
@@ -1711,7 +1713,14 @@ export function Canvas({
                   onSelectConnector(null);
                 }}
                 onMove={(x, y) => onMoveElement(el.id, x, y)}
-                onDoubleClick={() => startEditingLabel(el)}
+                onDoubleClick={() => {
+                  const linkedId = el.type === "subprocess" ? el.properties.linkedDiagramId as string | undefined : undefined;
+                  if (linkedId && onDrillIntoSubprocess) {
+                    onDrillIntoSubprocess(linkedId);
+                  } else {
+                    startEditingLabel(el);
+                  }
+                }}
                 onConnectionPointDragStart={(side, worldPos) => {
                   if (isWhiteBoxPool) return; // no connectors from white-box pools
                   handleConnectionPointDragStart(el.id, side, worldPos);

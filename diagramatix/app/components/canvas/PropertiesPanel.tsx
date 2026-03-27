@@ -45,6 +45,8 @@ interface Props {
   onUpdateDiagramTitle?: (title: DiagramTitle) => void;
   createdAt?: string;
   updatedAt?: string;
+  siblingDiagrams?: { id: string; name: string; type: string }[];
+  currentDiagramId?: string;
 }
 
 const TASK_TYPE_OPTIONS: { value: BpmnTaskType; label: string }[] = [
@@ -497,6 +499,8 @@ export function PropertiesPanel({
   onUpdateDiagramTitle,
   createdAt,
   updatedAt,
+  siblingDiagrams,
+  currentDiagramId,
 }: Props) {
   const [labelDraft, setLabelDraft] = useState("");
   const [panelCollapsed, setPanelCollapsed] = useState(false);
@@ -1329,6 +1333,40 @@ export function PropertiesPanel({
               </button>
             ))}
           </div>
+        </div>
+      )}
+
+      {element.type === "subprocess" && siblingDiagrams && siblingDiagrams.length > 0 && (
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1">Linked Diagram</label>
+          {(() => {
+            const linkedId = element.properties.linkedDiagramId as string | undefined;
+            const linkedExists = linkedId ? siblingDiagrams.some(d => d.id === linkedId) : true;
+            return (
+              <>
+                <select
+                  value={linkedId ?? ""}
+                  onChange={(e) => onUpdateProperties(element.id, {
+                    linkedDiagramId: e.target.value || undefined,
+                  })}
+                  className="w-full text-xs border border-gray-300 rounded px-2 py-1.5 bg-white text-gray-700"
+                >
+                  <option value="">None</option>
+                  {siblingDiagrams.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name} ({d.type})
+                    </option>
+                  ))}
+                </select>
+                {linkedId && !linkedExists && (
+                  <p className="text-[10px] text-red-500 mt-1">Linked diagram not found — it may have been deleted</p>
+                )}
+                {linkedId && linkedExists && (
+                  <p className="text-[10px] text-gray-400 mt-1">Double-click to drill into linked diagram</p>
+                )}
+              </>
+            );
+          })()}
         </div>
       )}
 

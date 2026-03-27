@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { redirect, notFound } from "next/navigation";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
@@ -50,20 +51,22 @@ export default async function DiagramPage({ params }: Props) {
   }
 
   return (
-    <DiagramEditor
-      diagramId={diagram.id}
-      diagramName={diagram.name}
-      diagramType={diagram.type as DiagramType}
-      initialData={data}
-      projectId={diagram.projectId ?? null}
-      initialDiagramColorConfig={diagramColorConfig}
-      initialDisplayMode={(diagram.displayMode as DisplayMode) ?? "normal"}
-      userEmail={session.user.email ?? ""}
-      createdAt={diagram.createdAt.toISOString()}
-      updatedAt={diagram.updatedAt.toISOString()}
-      readOnly={viewing}
-      viewingAsName={viewingAsName}
-      viewingAsEmail={viewingAsEmail}
-    />
+    <Suspense fallback={null}>
+      <DiagramEditor
+        diagramId={diagram.id}
+        diagramName={diagram.name}
+        diagramType={diagram.type as DiagramType}
+        initialData={data}
+        projectId={diagram.projectId ?? null}
+        initialDiagramColorConfig={diagramColorConfig}
+        initialDisplayMode={(diagram.displayMode as DisplayMode) ?? "normal"}
+        userEmail={session.user.email ?? ""}
+        createdAt={diagram.createdAt.toISOString()}
+        updatedAt={diagram.updatedAt.toISOString()}
+        readOnly={viewing}
+        viewingAsName={viewingAsName}
+        viewingAsEmail={viewingAsEmail}
+      />
+    </Suspense>
   );
 }

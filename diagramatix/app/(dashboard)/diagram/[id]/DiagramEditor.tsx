@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import type {
   ConnectorType,
   DiagramData,
@@ -225,6 +225,33 @@ export function DiagramEditor({
   viewingAsEmail,
 }: Props) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const fromDiagramId = searchParams.get("from");
+
+  // Sibling diagrams in the same project (for subprocess linking)
+  const [siblingDiagrams, setSiblingDiagrams] = useState<{ id: string; name: string; type: string }[]>([]);
+  useEffect(() => {
+    if (!projectId) return;
+    fetch(`/api/projects/${projectId}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data?.diagrams) {
+          setSiblingDiagrams(
+            (data.diagrams as { id: string; name: string; type: string }[])
+              .filter(d => d.id !== diagramId)
+          );
+        }
+      })
+      .catch(() => {});
+  }, [projectId, diagramId]);
+
+  const fromDiagramName = fromDiagramId
+    ? siblingDiagrams.find(d => d.id === fromDiagramId)?.name ?? null
+    : null;
+
+  const handleDrillIntoSubprocess = useCallback((linkedDiagramId: string) => {
+    router.push(`/diagram/${linkedDiagramId}?from=${diagramId}`);
+  }, [router, diagramId]);
 
   const {
     data,
@@ -668,13 +695,19 @@ export function DiagramEditor({
       <header className={`h-12 border-b border-gray-200 flex items-center px-4 gap-4 flex-shrink-0 ${readOnly ? "bg-orange-50" : ""}`}>
         <button
           onClick={() => {
-            // Use back() for instant return to cached project screen
-            if (window.history.length > 1) router.back();
-            else router.push(projectId ? `/dashboard/projects/${projectId}` : "/dashboard");
+            if (fromDiagramId) {
+              router.push(`/diagram/${fromDiagramId}`);
+            } else if (window.history.length > 1) {
+              router.back();
+            } else {
+              router.push(projectId ? `/dashboard/projects/${projectId}` : "/dashboard");
+            }
           }}
           className="text-gray-500 hover:text-gray-700 text-sm"
         >
-          ← {projectId ? "Project" : "Dashboard"}
+          {fromDiagramId
+            ? `\u2190 ${fromDiagramName ?? "Parent Diagram"}`
+            : `\u2190 ${projectId ? "Project" : "Dashboard"}`}
         </button>
 
         <div className="flex items-center gap-2">
@@ -1086,6 +1119,7 @@ export function DiagramEditor({
           createdAt={createdAt}
           updatedAt={effectiveUpdatedAt}
           readOnly={readOnly}
+          onDrillIntoSubprocess={handleDrillIntoSubprocess}
         />
 
         {!readOnly && (
@@ -1123,6 +1157,8 @@ export function DiagramEditor({
             onUpdateDiagramTitle={updateDiagramTitle}
             createdAt={createdAt}
             updatedAt={effectiveUpdatedAt}
+            siblingDiagrams={siblingDiagrams}
+            currentDiagramId={diagramId}
           />
         )}
       </div>

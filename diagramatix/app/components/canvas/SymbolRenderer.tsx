@@ -692,6 +692,12 @@ function SubprocessShape({ el }: { el: DiagramElement }) {
       <line x1={mx + 3} y1={my + markerH / 2} x2={mx + markerW - 3} y2={my + markerH / 2}
         stroke="#374151" strokeWidth={1} />
       {hasLoop && <LoopMarker cx={loopCX} cy={my + markerH * 0.55} />}
+      {(el.properties.linkedDiagramId as string | undefined) && (
+        <g transform={`translate(${el.x + el.width - 14},${el.y + 3})`}>
+          <path d="M2 9L6 5L2 1" fill="none" stroke="#2563eb" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M6 9L10 5L6 1" fill="none" stroke="#2563eb" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+        </g>
+      )}
     </g>
   );
 }
