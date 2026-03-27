@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { pgPool } from "@/app/lib/db";
 import { prisma } from "@/app/lib/db";
+import { getEffectiveUserId, isImpersonating, SUPERUSER_EMAIL } from "@/app/lib/superuser";
 
-const ADMIN_EMAIL = "paul@nashcc.com.au";
 const ADMIN_PASSWORD = "!Aardwolf2026";
 
 function cuid() {
@@ -31,12 +32,13 @@ export async function GET(req: Request) {
          ORDER BY "updatedAt" DESC`
       );
     } else {
+      const userId = getEffectiveUserId(session, await cookies());
       result = await pgPool.query(
         `SELECT id, name, "diagramType", "createdAt"
          FROM "DiagramTemplate"
          WHERE "templateType" = 'user' AND "userId" = $1
          ORDER BY "updatedAt" DESC`,
-        [session.user.id]
+        [userId]
       );
     }
     return NextResponse.json(result.rows);
@@ -53,6 +55,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  if (isImpersonating(session, await cookies())) {
+    return NextResponse.json({ error: "Read-only: viewing another user" }, { status: 403 });
+  }
+
   const body = await req.json();
   const { name, diagramType = "bpmn", data, templateType = "user", adminPassword } = body;
 
@@ -63,7 +69,7 @@ export async function POST(req: Request) {
   // Admin authorization for built-in templates
   if (templateType === "builtin") {
     const userEmail = await getUserEmail(session.user.id);
-    if (userEmail !== ADMIN_EMAIL && adminPassword !== ADMIN_PASSWORD) {
+    if (userEmail !== SUPERUSER_EMAIL && adminPassword !== ADMIN_PASSWORD) {
       return NextResponse.json({ error: "Invalid admin password" }, { status: 403 });
     }
   }

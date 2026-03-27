@@ -188,6 +188,7 @@ interface Props {
   diagramName?: string;
   createdAt?: string;
   updatedAt?: string;
+  readOnly?: boolean;
 }
 
 interface EditingLabel {
@@ -359,6 +360,7 @@ export function Canvas({
   diagramName,
   createdAt,
   updatedAt,
+  readOnly,
 }: Props) {
   const displayMode = displayModeProp ?? "normal";
   const svgRef = useRef<SVGSVGElement>(null);
@@ -1177,6 +1179,7 @@ export function Canvas({
 
   function handleDrop(e: React.DragEvent) {
     e.preventDefault();
+    if (readOnly) return;
     if (!pendingDragSymbol) return;
     const rect = svgRef.current!.getBoundingClientRect();
     const worldPos = svgToWorld(e.clientX - rect.left, e.clientY - rect.top);
@@ -1257,6 +1260,7 @@ export function Canvas({
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
+    if (readOnly) return;
     const NUDGE = e.shiftKey ? 1 : 5;
     if (selectedElementIds.size === 1 && !editingLabel) {
       const selId = [...selectedElementIds][0];
@@ -1578,7 +1582,7 @@ export function Canvas({
         style={{ cursor: isDraggingConnector || isDraggingEndpoint ? "crosshair" : "default" }}
       >
         <SketchyFilter />
-        <g transform={transform} style={displayMode === "hand-drawn" ? { fontStyle: "italic", fontFamily: "var(--font-caveat), 'Segoe Print', 'Comic Sans MS', cursive" } : undefined}>
+        <g transform={transform} style={{ ...(displayMode === "hand-drawn" ? { fontStyle: "italic", fontFamily: "var(--font-caveat), 'Segoe Print', 'Comic Sans MS', cursive" } : undefined), ...(readOnly ? { pointerEvents: "none" } : undefined) }}>
           {/* Diagram Title Block */}
           {data.title?.showTitle && (() => {
             const els = data.elements;

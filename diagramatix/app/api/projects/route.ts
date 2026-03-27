@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
+import { getEffectiveUserId, isImpersonating } from "@/app/lib/superuser";
 
 export async function GET() {
   const session = await auth();
@@ -8,8 +10,9 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const userId = getEffectiveUserId(session, await cookies());
   const projects = await prisma.project.findMany({
-    where: { userId: session.user.id },
+    where: { userId },
     orderBy: { updatedAt: "desc" },
     include: { _count: { select: { diagrams: true } } },
   });
@@ -21,6 +24,10 @@ export async function POST(req: Request) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (isImpersonating(session, await cookies())) {
+    return NextResponse.json({ error: "Read-only: viewing another user" }, { status: 403 });
   }
 
   const body = await req.json();

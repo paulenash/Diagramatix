@@ -1,4 +1,5 @@
 import { redirect, notFound } from "next/navigation";
+import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { DiagramEditor } from "./DiagramEditor";
@@ -6,6 +7,7 @@ import type { DiagramData, DiagramType } from "@/app/lib/diagram/types";
 import { EMPTY_DIAGRAM } from "@/app/lib/diagram/types";
 import type { SymbolColorConfig } from "@/app/lib/diagram/colors";
 import type { DisplayMode } from "@/app/lib/diagram/displayMode";
+import { getEffectiveUserId, isImpersonating } from "@/app/lib/superuser";
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -13,10 +15,14 @@ export default async function DiagramPage({ params }: Props) {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
+  const cookieStore = await cookies();
+  const effectiveUserId = getEffectiveUserId(session, cookieStore);
+  const viewing = isImpersonating(session, cookieStore);
+
   const { id } = await params;
 
   const diagram = await prisma.diagram.findFirst({
-    where: { id, userId: session.user.id },
+    where: { id, userId: effectiveUserId },
   });
 
   if (!diagram) notFound();
@@ -31,6 +37,18 @@ export default async function DiagramPage({ params }: Props) {
       ? (diagram.colorConfig as unknown as SymbolColorConfig)
       : {};
 
+  // If impersonating, fetch the target user's info for the banner
+  let viewingAsName = "";
+  let viewingAsEmail = "";
+  if (viewing) {
+    const target = await prisma.user.findUnique({
+      where: { id: effectiveUserId },
+      select: { name: true, email: true },
+    });
+    viewingAsName = target?.name ?? "";
+    viewingAsEmail = target?.email ?? "";
+  }
+
   return (
     <DiagramEditor
       diagramId={diagram.id}
@@ -43,6 +61,9 @@ export default async function DiagramPage({ params }: Props) {
       userEmail={session.user.email ?? ""}
       createdAt={diagram.createdAt.toISOString()}
       updatedAt={diagram.updatedAt.toISOString()}
+      readOnly={viewing}
+      viewingAsName={viewingAsName}
+      viewingAsEmail={viewingAsEmail}
     />
   );
 }

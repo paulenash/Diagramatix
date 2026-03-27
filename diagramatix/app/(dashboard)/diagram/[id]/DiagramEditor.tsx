@@ -22,6 +22,7 @@ import { Canvas } from "@/app/components/canvas/Canvas";
 import { Palette } from "@/app/components/canvas/Palette";
 import { PropertiesPanel } from "@/app/components/canvas/PropertiesPanel";
 import { captureTemplate, instantiateTemplate } from "@/app/lib/diagram/templates";
+import { ImpersonationBanner } from "@/app/components/ImpersonationBanner";
 
 interface Props {
   diagramId: string;
@@ -34,6 +35,9 @@ interface Props {
   userEmail?: string;
   createdAt?: string;
   updatedAt?: string;
+  readOnly?: boolean;
+  viewingAsName?: string;
+  viewingAsEmail?: string;
 }
 
 function useAutoSave(
@@ -216,6 +220,9 @@ export function DiagramEditor({
   userEmail,
   createdAt,
   updatedAt,
+  readOnly,
+  viewingAsName,
+  viewingAsEmail,
 }: Props) {
   const router = useRouter();
 
@@ -270,7 +277,7 @@ export function DiagramEditor({
     originalData: DiagramData;
   } | null>(null);
 
-  const { saveStatus, lastSavedAt, saveNow } = useAutoSave(diagramId, data, 1500, templateEditState !== null);
+  const { saveStatus, lastSavedAt, saveNow } = useAutoSave(diagramId, data, 1500, templateEditState !== null || !!readOnly);
   const effectiveUpdatedAt = lastSavedAt ?? updatedAt;
 
   useEffect(() => {
@@ -653,9 +660,12 @@ export function DiagramEditor({
   }
 
   return (
-    <div className="flex flex-col h-screen bg-white">
+    <div className={`flex flex-col h-screen ${readOnly ? "bg-orange-50" : "bg-white"}`}>
+      {readOnly && viewingAsName !== undefined && viewingAsEmail !== undefined && (
+        <ImpersonationBanner viewingAsName={viewingAsName ?? ""} viewingAsEmail={viewingAsEmail ?? ""} />
+      )}
       {/* Top bar */}
-      <header className="h-12 border-b border-gray-200 flex items-center px-4 gap-4 flex-shrink-0">
+      <header className={`h-12 border-b border-gray-200 flex items-center px-4 gap-4 flex-shrink-0 ${readOnly ? "bg-orange-50" : ""}`}>
         <button
           onClick={() => {
             // Use back() for instant return to cached project screen
@@ -684,45 +694,49 @@ export function DiagramEditor({
 
         <div className="flex-1" />
 
-        <button
-          onClick={saveNow}
-          disabled={saveStatus !== "unsaved"}
-          title="Save now (Ctrl+S)"
-          className={`px-3 py-1.5 text-xs font-medium rounded border ${
-            saveStatus === "unsaved"
-              ? "bg-blue-600 text-white border-blue-600 hover:bg-blue-700"
-              : saveStatus === "saving"
-                ? "bg-yellow-50 text-yellow-700 border-yellow-300"
-                : "bg-green-50 text-green-600 border-green-200"
-          }`}
-        >
-          {saveStatus === "saving" ? "Saving\u2026" : saveStatus === "saved" ? "\u2713 Saved" : "Save"}
-        </button>
+        {!readOnly && (
+          <>
+            <button
+              onClick={saveNow}
+              disabled={saveStatus !== "unsaved"}
+              title="Save now (Ctrl+S)"
+              className={`px-3 py-1.5 text-xs font-medium rounded border ${
+                saveStatus === "unsaved"
+                  ? "bg-blue-600 text-white border-blue-600 hover:bg-blue-700"
+                  : saveStatus === "saving"
+                    ? "bg-yellow-50 text-yellow-700 border-yellow-300"
+                    : "bg-green-50 text-green-600 border-green-200"
+              }`}
+            >
+              {saveStatus === "saving" ? "Saving\u2026" : saveStatus === "saved" ? "\u2713 Saved" : "Save"}
+            </button>
 
-        <div className="flex items-center gap-1">
-          <button
-            onClick={undo}
-            disabled={!canUndo}
-            title="Undo (Ctrl+Z)"
-            className="p-1.5 rounded text-gray-600 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
-          >
-            <svg width={14} height={14} viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-              <path d="M2 5h6a4 4 0 0 1 0 8H5" />
-              <path d="M2 5L5 2M2 5l3 3" />
-            </svg>
-          </button>
-          <button
-            onClick={redo}
-            disabled={!canRedo}
-            title="Redo (Ctrl+Shift+Z)"
-            className="p-1.5 rounded text-gray-600 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
-          >
-            <svg width={14} height={14} viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 5H6a4 4 0 0 0 0 8h3" />
-              <path d="M12 5L9 2m3 3-3 3" />
-            </svg>
-          </button>
-        </div>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={undo}
+                disabled={!canUndo}
+                title="Undo (Ctrl+Z)"
+                className="p-1.5 rounded text-gray-600 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                <svg width={14} height={14} viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M2 5h6a4 4 0 0 1 0 8H5" />
+                  <path d="M2 5L5 2M2 5l3 3" />
+                </svg>
+              </button>
+              <button
+                onClick={redo}
+                disabled={!canRedo}
+                title="Redo (Ctrl+Shift+Z)"
+                className="p-1.5 rounded text-gray-600 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                <svg width={14} height={14} viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 5H6a4 4 0 0 0 0 8h3" />
+                  <path d="M12 5L9 2m3 3-3 3" />
+                </svg>
+              </button>
+            </div>
+          </>
+        )}
 
         {selectedElementIds.size > 1 && templateMode !== "editing" && (
           <div className="relative" ref={alignDropdownRef}>
@@ -961,12 +975,14 @@ export function DiagramEditor({
 
         {templateMode !== "editing" && (
           <>
-        <button
-          onClick={() => setShowDiagramMaintenance(true)}
-          className="px-3 py-1.5 text-xs text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
-        >
-          Diagram Settings
-        </button>
+        {!readOnly && (
+          <button
+            onClick={() => setShowDiagramMaintenance(true)}
+            className="px-3 py-1.5 text-xs text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
+          >
+            Diagram Settings
+          </button>
+        )}
 
         <div className="relative" ref={exportDropdownRef}>
           <button
@@ -1014,12 +1030,14 @@ export function DiagramEditor({
 
       {/* Main editor area */}
       <div className="flex flex-1 overflow-hidden">
-        <Palette
-          diagramType={diagramType}
-          onDragStart={(type) => setPendingDragSymbol(type)}
-          disabledSymbols={disabledSymbols}
-          colorConfig={effectiveColorConfig}
-        />
+        {!readOnly && (
+          <Palette
+            diagramType={diagramType}
+            onDragStart={(type) => setPendingDragSymbol(type)}
+            disabledSymbols={disabledSymbols}
+            colorConfig={effectiveColorConfig}
+          />
+        )}
 
         <Canvas
           data={data}
@@ -1067,43 +1085,46 @@ export function DiagramEditor({
           diagramName={diagramName}
           createdAt={createdAt}
           updatedAt={effectiveUpdatedAt}
+          readOnly={readOnly}
         />
 
-        <PropertiesPanel
-          element={selectedElement}
-          connector={selectedConnector}
-          diagramType={diagramType}
-          multiSelectionCount={selectedElementIds.size}
-          onUpdateLabel={updateLabel}
-          onUpdateProperties={updateProperties}
-          onUpdateConnectorDirection={updateConnectorDirection}
-          onUpdateConnectorType={updateConnectorType}
-          onReverseConnector={reverseConnector}
-          onUpdateConnectorLabel={(id, label) => updateConnectorLabel(id, label)}
-          onUpdateConnectorFields={updateConnectorFields}
-          onDeleteElement={(id) => {
-            deleteElement(id);
-            setSelectedElementIds((prev) => { const next = new Set(prev); next.delete(id); return next; });
-          }}
-          onDeleteConnector={(id) => {
-            deleteConnector(id);
-            setSelectedConnectorId(null);
-          }}
-          onAddLane={addLane}
-          onAddSublane={addSublane}
-          parentName={parentName}
-          poolHasContent={poolHasContent}
-          laneHasContent={laneHasContent}
-          hasMessageBpmnConnection={hasMessageBpmnConnection}
-          allConnectors={data.connectors}
-          allElements={data.elements}
-          debugMode={debugMode}
-          diagramName={diagramName}
-          diagramTitle={data.title}
-          onUpdateDiagramTitle={updateDiagramTitle}
-          createdAt={createdAt}
-          updatedAt={effectiveUpdatedAt}
-        />
+        {!readOnly && (
+          <PropertiesPanel
+            element={selectedElement}
+            connector={selectedConnector}
+            diagramType={diagramType}
+            multiSelectionCount={selectedElementIds.size}
+            onUpdateLabel={updateLabel}
+            onUpdateProperties={updateProperties}
+            onUpdateConnectorDirection={updateConnectorDirection}
+            onUpdateConnectorType={updateConnectorType}
+            onReverseConnector={reverseConnector}
+            onUpdateConnectorLabel={(id, label) => updateConnectorLabel(id, label)}
+            onUpdateConnectorFields={updateConnectorFields}
+            onDeleteElement={(id) => {
+              deleteElement(id);
+              setSelectedElementIds((prev) => { const next = new Set(prev); next.delete(id); return next; });
+            }}
+            onDeleteConnector={(id) => {
+              deleteConnector(id);
+              setSelectedConnectorId(null);
+            }}
+            onAddLane={addLane}
+            onAddSublane={addSublane}
+            parentName={parentName}
+            poolHasContent={poolHasContent}
+            laneHasContent={laneHasContent}
+            hasMessageBpmnConnection={hasMessageBpmnConnection}
+            allConnectors={data.connectors}
+            allElements={data.elements}
+            debugMode={debugMode}
+            diagramName={diagramName}
+            diagramTitle={data.title}
+            onUpdateDiagramTitle={updateDiagramTitle}
+            createdAt={createdAt}
+            updatedAt={effectiveUpdatedAt}
+          />
+        )}
       </div>
 
       {showTemplateNameModal && (

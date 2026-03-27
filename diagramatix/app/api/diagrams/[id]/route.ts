@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
+import { getEffectiveUserId, isImpersonating } from "@/app/lib/superuser";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -14,8 +16,9 @@ export async function GET(_req: Request, { params }: Params) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const userId = getEffectiveUserId(session, await cookies());
   const { id } = await params;
-  const diagram = await getAuthorizedDiagram(id, session.user.id);
+  const diagram = await getAuthorizedDiagram(id, userId);
   if (!diagram) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
@@ -27,6 +30,10 @@ export async function PUT(req: Request, { params }: Params) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (isImpersonating(session, await cookies())) {
+    return NextResponse.json({ error: "Read-only: viewing another user" }, { status: 403 });
   }
 
   const { id } = await params;
@@ -75,6 +82,10 @@ export async function DELETE(_req: Request, { params }: Params) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (isImpersonating(session, await cookies())) {
+    return NextResponse.json({ error: "Read-only: viewing another user" }, { status: 403 });
   }
 
   const { id } = await params;

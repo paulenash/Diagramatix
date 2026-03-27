@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import type { DiagramType } from "@/app/lib/diagram/types";
 import { SCHEMA_VERSION } from "@/app/lib/diagram/types";
+import { ImpersonationBanner } from "@/app/components/ImpersonationBanner";
 
 interface DiagramSummary {
   id: string;
@@ -30,6 +31,10 @@ interface Props {
   userName: string;
   userEmail?: string;
   version?: number;
+  readOnly?: boolean;
+  viewingAsName?: string;
+  viewingAsEmail?: string;
+  isSuperuser?: boolean;
 }
 
 const DIAGRAM_TYPE_LABELS: Record<string, string> = {
@@ -120,7 +125,7 @@ function DiagramCard({
   );
 }
 
-export function DashboardClient({ projects: initialProjects, unorganized: initialUnorganized, userName, userEmail, version }: Props) {
+export function DashboardClient({ projects: initialProjects, unorganized: initialUnorganized, userName, userEmail, version, readOnly, viewingAsName, viewingAsEmail, isSuperuser: isSu }: Props) {
   const router = useRouter();
   const [projects, setProjects] = useState(initialProjects);
   const [unorganized, setUnorganized] = useState(initialUnorganized);
@@ -394,9 +399,12 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className={`min-h-screen ${readOnly ? "bg-orange-50" : "bg-gray-50"}`}>
+      {readOnly && viewingAsName !== undefined && viewingAsEmail !== undefined && (
+        <ImpersonationBanner viewingAsName={viewingAsName ?? ""} viewingAsEmail={viewingAsEmail ?? ""} />
+      )}
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+      <header className={`${readOnly ? "bg-orange-50" : "bg-white"} border-b border-gray-200 px-6 py-4 flex items-center justify-between`}>
         <div className="flex items-center gap-3">
           <div className="w-7 h-7 bg-blue-600 rounded flex items-center justify-center">
             <svg width={14} height={14} viewBox="0 0 14 14" fill="none">
@@ -411,6 +419,14 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
           <span className="text-xs text-gray-400 ml-3">brought to you by: <strong className="text-gray-600">Nash AI</strong></span>
         </div>
         <div className="flex items-center gap-4">
+          {isSu && !readOnly && (
+            <a
+              href="/dashboard/admin"
+              className="text-xs text-orange-600 hover:text-orange-800 font-medium border border-orange-300 rounded px-2 py-1"
+            >
+              Admin
+            </a>
+          )}
           <div className="text-right">
             <span className="text-sm text-gray-700 font-medium">{userName}</span>
             {userEmail && <p className="text-[10px] text-gray-400 leading-tight">{userEmail}</p>}
@@ -431,32 +447,38 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
             <h1 className="text-xl font-semibold text-gray-900">Projects</h1>
             <input ref={fileInputRef} type="file" accept=".json" className="hidden"
               onChange={e => { const f = e.target.files?.[0]; if (f) handleFileSelected(f); e.target.value = ""; }} />
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={importing}
-              className={`px-4 py-2 text-sm font-medium rounded-md border ${
-                importing ? "bg-green-600 text-white" : "text-gray-700 border-gray-300 hover:bg-gray-50"
-              }`}
-            >
-              {importing ? "Importing\u2026" : "Import Project"}
-            </button>
-            <button
-              onClick={() => setShowNewProject(true)}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm font-medium"
-            >
-              + New Project
-            </button>
+            {!readOnly && (
+              <>
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={importing}
+                  className={`px-4 py-2 text-sm font-medium rounded-md border ${
+                    importing ? "bg-green-600 text-white" : "text-gray-700 border-gray-300 hover:bg-gray-50"
+                  }`}
+                >
+                  {importing ? "Importing\u2026" : "Import Project"}
+                </button>
+                <button
+                  onClick={() => setShowNewProject(true)}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm font-medium"
+                >
+                  + New Project
+                </button>
+              </>
+            )}
           </div>
 
           {projects.length === 0 ? (
             <div className="text-center py-12 bg-white rounded-lg border border-gray-200">
-              <p className="text-gray-500 mb-4">No projects yet</p>
-              <button
-                onClick={() => setShowNewProject(true)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
-              >
-                Create your first project
-              </button>
+              <p className="text-gray-500 mb-4">{readOnly ? "No projects" : "No projects yet"}</p>
+              {!readOnly && (
+                <button
+                  onClick={() => setShowNewProject(true)}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
+                >
+                  Create your first project
+                </button>
+              )}
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -481,22 +503,24 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                         <path d="M4 4V2.5A1.5 1.5 0 015.5 1h5A1.5 1.5 0 0112 2.5V4" stroke="#7c3aed" strokeWidth={1.2} />
                       </svg>
                     </div>
-                    <div className="flex gap-1 opacity-0 group-hover:opacity-100">
-                      <button
-                        onClick={(e) => handleCloneProject(p.id, e)}
-                        className="text-gray-400 hover:text-blue-500 text-xs px-1"
-                        title="Clone project"
-                      >
-                        ⧉
-                      </button>
-                      <button
-                        onClick={(e) => handleDeleteProject(p.id, e)}
-                        className="text-gray-400 hover:text-red-500 text-xs px-1"
-                        title="Delete project"
-                      >
-                        ✕
-                      </button>
-                    </div>
+                    {!readOnly && (
+                      <div className="flex gap-1 opacity-0 group-hover:opacity-100">
+                        <button
+                          onClick={(e) => handleCloneProject(p.id, e)}
+                          className="text-gray-400 hover:text-blue-500 text-xs px-1"
+                          title="Clone project"
+                        >
+                          ⧉
+                        </button>
+                        <button
+                          onClick={(e) => handleDeleteProject(p.id, e)}
+                          className="text-gray-400 hover:text-red-500 text-xs px-1"
+                          title="Delete project"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    )}
                   </div>
                   <h3 className="font-medium text-gray-900 text-sm mb-1">{p.name}</h3>
                   <p className="text-xs text-gray-500 mb-1">

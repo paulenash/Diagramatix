@@ -6,6 +6,7 @@ import type { DiagramType, DiagramData } from "@/app/lib/diagram/types";
 import { SCHEMA_VERSION } from "@/app/lib/diagram/types";
 import { resolveColor, DEFAULT_SYMBOL_COLORS, type SymbolColorConfig } from "@/app/lib/diagram/colors";
 import { DiagramMaintenanceModal } from "./DiagramMaintenanceModal";
+import { ImpersonationBanner } from "@/app/components/ImpersonationBanner";
 
 // --- Folder tree types ---
 interface FolderNode {
@@ -288,6 +289,9 @@ interface Props {
   project: ProjectDetail;
   otherProjects: OtherProject[];
   version?: number;
+  readOnly?: boolean;
+  viewingAsName?: string;
+  viewingAsEmail?: string;
 }
 
 const DIAGRAM_TYPE_LABELS: Record<string, string> = {
@@ -307,7 +311,7 @@ const DIAGRAM_TYPES: { value: DiagramType; label: string; description: string }[
   { value: "domain", label: "Domain", description: "UML class diagrams with classes, enumerations, and relationships" },
 ];
 
-export function ProjectDetailClient({ project, otherProjects, version }: Props) {
+export function ProjectDetailClient({ project, otherProjects, version, readOnly, viewingAsName, viewingAsEmail }: Props) {
   const router = useRouter();
   const [diagrams, setDiagrams] = useState(project.diagrams);
   const [projectName, setProjectName] = useState(project.name);
@@ -896,9 +900,12 @@ export function ProjectDetailClient({ project, otherProjects, version }: Props) 
   const visibleDiagrams = getDiagramsInFolder(selectedFolderId);
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className={`min-h-screen ${readOnly ? "bg-orange-50" : "bg-gray-50"} flex flex-col`}>
+      {readOnly && viewingAsName !== undefined && viewingAsEmail !== undefined && (
+        <ImpersonationBanner viewingAsName={viewingAsName ?? ""} viewingAsEmail={viewingAsEmail ?? ""} />
+      )}
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 px-4 py-2 flex-shrink-0">
+      <header className={`${readOnly ? "bg-orange-50" : "bg-white"} border-b border-gray-200 px-4 py-2 flex-shrink-0`}>
         <div className="flex items-center gap-3">
           <button
             onClick={() => {
@@ -909,73 +916,79 @@ export function ProjectDetailClient({ project, otherProjects, version }: Props) 
           >
             {"\u2190"} Dashboard
           </button>
-          {/* Editable project name */}
-          {editingProjectName ? (
+          {/* Project name — editable only when not readOnly */}
+          {!readOnly && editingProjectName ? (
             <input autoFocus type="text" value={projectName}
               onChange={e => setProjectName(e.target.value)}
               onBlur={() => { setEditingProjectName(false); saveProjectField({ name: projectName }); }}
               onKeyDown={e => { if (e.key === "Enter") { setEditingProjectName(false); saveProjectField({ name: projectName }); } if (e.key === "Escape") { setProjectName(project.name); setEditingProjectName(false); } }}
               className="text-sm font-semibold text-gray-900 border border-blue-400 rounded px-2 py-0.5 outline-none flex-1" />
           ) : (
-            <h1 className="text-sm font-semibold text-gray-900 cursor-pointer hover:text-blue-600 flex-1"
-              onClick={() => setEditingProjectName(true)} title="Click to edit project name">
+            <h1 className={`text-sm font-semibold text-gray-900 flex-1 ${readOnly ? "" : "cursor-pointer hover:text-blue-600"}`}
+              onClick={() => { if (!readOnly) setEditingProjectName(true); }} title={readOnly ? undefined : "Click to edit project name"}>
               {projectName}
             </h1>
           )}
           {projectOwner && (
             <span className="text-[10px] text-gray-400">Owner: <strong className="text-gray-600">{projectOwner}</strong></span>
           )}
-          <button
-            onClick={() => setShowMaintenance(true)}
-            className="px-3 py-1 text-xs font-medium text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50"
-          >
-            Project Settings
-          </button>
-          <div className="relative" ref={exportMenuRef}>
+          {!readOnly && (
             <button
-              onClick={() => { if (!exporting) setShowExportMenu(v => !v); }}
-              disabled={exporting}
-              className={`px-3 py-1 text-xs font-medium rounded-md border ${
-                exporting ? "bg-green-600 text-white border-green-600 cursor-not-allowed" : "text-gray-700 border-gray-300 hover:bg-gray-50"
-              }`}
+              onClick={() => setShowMaintenance(true)}
+              className="px-3 py-1 text-xs font-medium text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50"
             >
-              {exporting ? "Exporting\u2026" : "Export Project \u25BE"}
+              Project Settings
             </button>
-            {showExportMenu && (
-              <div
-                className="fixed bg-white border border-gray-200 rounded-md shadow-lg py-1"
-                style={{
-                  zIndex: 9999,
-                  top: exportMenuRef.current
-                    ? exportMenuRef.current.getBoundingClientRect().bottom + 4
-                    : 0,
-                  left: exportMenuRef.current
-                    ? exportMenuRef.current.getBoundingClientRect().left
-                    : 0,
-                  minWidth: 140,
-                }}
-              >
+          )}
+          {!readOnly && (
+            <>
+              <div className="relative" ref={exportMenuRef}>
                 <button
-                  className="block w-full text-left px-3 py-1.5 text-xs text-gray-700 font-medium hover:bg-gray-100"
-                  onClick={() => { setShowExportMenu(false); handleExportProject("json"); }}
+                  onClick={() => { if (!exporting) setShowExportMenu(v => !v); }}
+                  disabled={exporting}
+                  className={`px-3 py-1 text-xs font-medium rounded-md border ${
+                    exporting ? "bg-green-600 text-white border-green-600 cursor-not-allowed" : "text-gray-700 border-gray-300 hover:bg-gray-50"
+                  }`}
                 >
-                  Export as JSON
+                  {exporting ? "Exporting\u2026" : "Export Project \u25BE"}
                 </button>
-                <button
-                  className="block w-full text-left px-3 py-1.5 text-xs text-gray-700 font-medium hover:bg-gray-100"
-                  onClick={() => { setShowExportMenu(false); handleExportProject("xml"); }}
-                >
-                  Export as XML
-                </button>
+                {showExportMenu && (
+                  <div
+                    className="fixed bg-white border border-gray-200 rounded-md shadow-lg py-1"
+                    style={{
+                      zIndex: 9999,
+                      top: exportMenuRef.current
+                        ? exportMenuRef.current.getBoundingClientRect().bottom + 4
+                        : 0,
+                      left: exportMenuRef.current
+                        ? exportMenuRef.current.getBoundingClientRect().left
+                        : 0,
+                      minWidth: 140,
+                    }}
+                  >
+                    <button
+                      className="block w-full text-left px-3 py-1.5 text-xs text-gray-700 font-medium hover:bg-gray-100"
+                      onClick={() => { setShowExportMenu(false); handleExportProject("json"); }}
+                    >
+                      Export as JSON
+                    </button>
+                    <button
+                      className="block w-full text-left px-3 py-1.5 text-xs text-gray-700 font-medium hover:bg-gray-100"
+                      onClick={() => { setShowExportMenu(false); handleExportProject("xml"); }}
+                    >
+                      Export as XML
+                    </button>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-          <button
-            onClick={() => setShowNewDiagram(true)}
-            className="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-xs font-medium"
-          >
-            + New Diagram
-          </button>
+              <button
+                onClick={() => setShowNewDiagram(true)}
+                className="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-xs font-medium"
+              >
+                + New Diagram
+              </button>
+            </>
+          )}
         </div>
         {projectDescription && (
           <p className="text-[10px] text-gray-500 mt-1 ml-20 truncate" title={projectDescription}>{projectDescription}</p>

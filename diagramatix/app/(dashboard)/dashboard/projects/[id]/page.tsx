@@ -1,14 +1,20 @@
 import { notFound, redirect } from "next/navigation";
 import { execSync } from "child_process";
+import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { ProjectDetailClient } from "./ProjectDetailClient";
+import { getEffectiveUserId, isImpersonating } from "@/app/lib/superuser";
 
 type Props = { params: Promise<{ id: string }> };
 
 export default async function ProjectPage({ params }: Props) {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
+
+  const cookieStore = await cookies();
+  const effectiveUserId = getEffectiveUserId(session, cookieStore);
+  const viewing = isImpersonating(session, cookieStore);
 
   const { id } = await params;
 
@@ -19,7 +25,7 @@ export default async function ProjectPage({ params }: Props) {
 
   const [project, otherProjects] = await Promise.all([
     prisma.project.findFirst({
-      where: { id, userId: session.user.id },
+      where: { id, userId: effectiveUserId },
       include: {
         diagrams: {
           orderBy: { updatedAt: "desc" },
@@ -28,12 +34,33 @@ export default async function ProjectPage({ params }: Props) {
       },
     }),
     prisma.project.findMany({
-      where: { userId: session.user.id, id: { not: id } },
+      where: { userId: effectiveUserId, id: { not: id } },
       select: { id: true, name: true },
     }),
   ]);
 
   if (!project) notFound();
 
-  return <ProjectDetailClient project={project} otherProjects={otherProjects} version={commitCount} />;
+  // If impersonating, fetch the target user's info for the banner
+  let viewingAsName = "";
+  let viewingAsEmail = "";
+  if (viewing) {
+    const target = await prisma.user.findUnique({
+      where: { id: effectiveUserId },
+      select: { name: true, email: true },
+    });
+    viewingAsName = target?.name ?? "";
+    viewingAsEmail = target?.email ?? "";
+  }
+
+  return (
+    <ProjectDetailClient
+      project={project}
+      otherProjects={otherProjects}
+      version={commitCount}
+      readOnly={viewing}
+      viewingAsName={viewingAsName}
+      viewingAsEmail={viewingAsEmail}
+    />
+  );
 }
