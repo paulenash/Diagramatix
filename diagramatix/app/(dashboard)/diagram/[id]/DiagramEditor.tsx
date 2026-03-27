@@ -376,9 +376,10 @@ export function DiagramEditor({
   const [diagramColorConfig, setDiagramColorConfig] = useState<SymbolColorConfig>(initialDiagramColorConfig ?? {});
   const [displayMode, setDisplayMode] = useState<DisplayMode>(initialDisplayMode ?? "normal");
   const [showDiagramMaintenance, setShowDiagramMaintenance] = useState(false);
-  const [debugMode, setDebugMode] = useState(() =>
-    typeof window !== "undefined" && localStorage.getItem(`debug-${projectId}`) === "true"
-  );
+  const [debugMode, setDebugMode] = useState(false);
+  useEffect(() => {
+    if (localStorage.getItem(`debug-${projectId}`) === "true") setDebugMode(true);
+  }, [projectId]);
 
   // Template state (BPMN only)
   const isAdmin = userEmail === "paul@nashcc.com.au";

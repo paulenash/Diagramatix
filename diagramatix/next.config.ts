@@ -5,8 +5,8 @@ const nextConfig: NextConfig = {
     // Extend client-side Router Cache lifetime to avoid re-fetching
     // recently visited pages (Dashboard, Project screens)
     staleTimes: {
-      dynamic: 300, // cache dynamic pages for 5 minutes
-      static: 600,  // cache static pages for 10 minutes
+      dynamic: 30,  // cache dynamic pages for 30 seconds
+      static: 300,  // cache static pages for 5 minutes
     },
   },
 };

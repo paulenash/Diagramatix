@@ -374,11 +374,19 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
       message: `Are you sure you want to delete "${proj?.name ?? "this project"}"? Its diagrams will be moved to Unorganised.`,
       onConfirm: async () => {
         setConfirmDialog(null);
+        // Fetch the project's diagrams before deleting so we can add them to unorganised
+        const projRes = await fetch(`/api/projects/${id}`);
+        const projData = projRes.ok ? await projRes.json() : null;
+        const orphanedDiagrams = (projData?.diagrams ?? []) as DiagramSummary[];
+
         const res = await fetch(`/api/projects/${id}`, { method: "DELETE" });
         if (!res.ok) return;
         setProjects((prev) => prev.filter((p) => p.id !== id));
         if (selectedProjectId === id) setSelectedProjectId(null);
-        router.refresh();
+        // Add orphaned diagrams to unorganised list
+        if (orphanedDiagrams.length > 0) {
+          setUnorganized((prev) => [...orphanedDiagrams, ...prev]);
+        }
       },
     });
   }
@@ -470,6 +478,13 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
               </button>
             </>
           )}
+          <button
+            onClick={() => window.location.reload()}
+            className="text-xs text-gray-500 hover:text-gray-700 border border-gray-300 rounded px-2 py-1 hover:bg-gray-50"
+            title="Refresh from database"
+          >
+            {"\u21BB"}
+          </button>
           <div className="text-right">
             <span className="text-sm text-gray-700 font-medium">{userName}</span>
             {userEmail && <p className="text-[10px] text-gray-400 leading-tight">{userEmail}</p>}
