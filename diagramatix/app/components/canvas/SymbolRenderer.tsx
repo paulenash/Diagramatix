@@ -736,12 +736,20 @@ function SubprocessShape({ el }: { el: DiagramElement }) {
         <rect x={el.x + 4} y={el.y + 4} width={el.width - 8} height={el.height - 8}
           rx={3} ry={3} fill="none" stroke="#374151" strokeWidth={1.5} />
       )}
-      <rect x={mx} y={my} width={markerW} height={markerH}
-        rx={2} fill="white" stroke="#374151" strokeWidth={1} />
-      <line x1={mx + markerW / 2} y1={my + 3} x2={mx + markerW / 2} y2={my + markerH - 3}
-        stroke="#374151" strokeWidth={1} />
-      <line x1={mx + 3} y1={my + markerH / 2} x2={mx + markerW - 3} y2={my + markerH / 2}
-        stroke="#374151" strokeWidth={1} />
+      {(() => {
+        const hasLink = !!(el.properties.linkedDiagramId as string | undefined);
+        const markerStroke = hasLink ? "#16a34a" : "#c0c0c0";
+        return (
+          <>
+            <rect x={mx} y={my} width={markerW} height={markerH}
+              rx={2} fill="white" stroke={markerStroke} strokeWidth={1} />
+            <line x1={mx + markerW / 2} y1={my + 3} x2={mx + markerW / 2} y2={my + markerH - 3}
+              stroke={markerStroke} strokeWidth={1} />
+            <line x1={mx + 3} y1={my + markerH / 2} x2={mx + markerW - 3} y2={my + markerH / 2}
+              stroke={markerStroke} strokeWidth={1} />
+          </>
+        );
+      })()}
       {hasLoop && <LoopMarker cx={loopCX} cy={my + markerH * 0.55} />}
       {/* Link icon and ValueBadge rendered in main SymbolRenderer */}
     </g>
@@ -1406,19 +1414,21 @@ export function SymbolRenderer({
         <ValueBadge el={element} show={true} />
       )}
 
-      {/* Subprocess drill-through link icon (outside element, own event handling) */}
-      {element.type === "subprocess" && (element.properties.linkedDiagramId as string | undefined) && (
-        <g
-          transform={`translate(${element.x + element.width + 3},${element.y + 1})`}
-          style={{ cursor: "pointer", pointerEvents: "all" }}
-          onMouseDown={(e) => e.stopPropagation()}
-          onDoubleClick={(e) => { e.stopPropagation(); onDoubleClick(); }}
-        >
-          <rect x={-2} y={-2} width={16} height={14} fill="transparent" />
-          <path d="M2 9L6 5L2 1" fill="none" stroke="#2563eb" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
-          <path d="M6 9L10 5L6 1" fill="none" stroke="#2563eb" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
-        </g>
-      )}
+      {/* Subprocess drill-through — hit area on the + marker (only when linked) */}
+      {element.type === "subprocess" && (element.properties.linkedDiagramId as string | undefined) && (() => {
+        const mw = 14, mh = 14;
+        const pmx = element.x + element.width / 2 - mw / 2;
+        const pmy = element.y + element.height - mh - 3;
+        return (
+          <rect
+            x={pmx - 2} y={pmy - 2} width={mw + 4} height={mh + 4}
+            fill="transparent" stroke="none"
+            style={{ cursor: "pointer", pointerEvents: "all" }}
+            onMouseDown={(e) => e.stopPropagation()}
+            onDoubleClick={(e) => { e.stopPropagation(); onDoubleClick(); }}
+          />
+        );
+      })()}
 
       {/* Drill-back icon on start events when this diagram was navigated to from a subprocess */}
       {element.type === "start-event" && onDrillBack && !element.boundaryHostId && (

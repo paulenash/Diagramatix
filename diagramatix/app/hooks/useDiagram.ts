@@ -1392,9 +1392,10 @@ function reducer(state: DiagramData, action: Action): DiagramData {
             sourceOffsetAlong: 0.5, targetOffsetAlong: orig.targetOffsetAlong,
             waypoints: wB, sourceInvisibleLeader: sIB, targetInvisibleLeader: tIB,
             label: orig.type === "sequence" ? "" : undefined,
-            labelOffsetX: orig.type === "sequence" ? 0 : undefined,
+            labelOffsetX: orig.type === "sequence" ? (el.type === "gateway" ? 5 : 0) : undefined,
             labelOffsetY: orig.type === "sequence" ? -20 : undefined,
-            labelWidth: orig.type === "sequence" ? 80 : undefined },
+            labelWidth: orig.type === "sequence" ? (el.type === "gateway" ? 60 : 80) : undefined,
+            labelAnchor: el.type === "gateway" ? "source" : undefined },
         ],
       };
     }
@@ -1470,9 +1471,10 @@ function reducer(state: DiagramData, action: Action): DiagramData {
             sourceOffsetAlong: 0.5, targetOffsetAlong: orig.targetOffsetAlong,
             waypoints: wB, sourceInvisibleLeader: sIB, targetInvisibleLeader: tIB,
             label: orig.type === "sequence" ? "" : undefined,
-            labelOffsetX: orig.type === "sequence" ? 0 : undefined,
+            labelOffsetX: orig.type === "sequence" ? (symbolType === "gateway" ? 5 : 0) : undefined,
             labelOffsetY: orig.type === "sequence" ? -20 : undefined,
-            labelWidth: orig.type === "sequence" ? 80 : undefined },
+            labelWidth: orig.type === "sequence" ? (symbolType === "gateway" ? 60 : 80) : undefined,
+            labelAnchor: symbolType === "gateway" ? "source" : undefined },
         ],
       };
     }
