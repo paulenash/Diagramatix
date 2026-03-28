@@ -24,6 +24,24 @@ interface QueryResult {
   error?: string;
 }
 
+interface JsonEditorState {
+  value: string;           // pretty-printed JSON text
+  rowIndex: number;        // which result row
+  fieldName: string;       // which column
+  tableName: string | null; // for UPDATE (extracted from last query)
+  rowId: string | null;    // id column value for UPDATE
+  readOnly: boolean;       // true if we can't determine table/id for saving
+}
+
+function isJsonValue(val: unknown): boolean {
+  return val !== null && typeof val === "object";
+}
+
+function extractTableFromSql(sql: string): string | null {
+  const m = sql.match(/FROM\s+"?([A-Za-z_]\w*)"?/i);
+  return m ? m[1] : null;
+}
+
 export function DatabaseClient() {
   const router = useRouter();
   const [schemaData, setSchemaData] = useState<SchemaData | null>(null);
@@ -36,6 +54,9 @@ export function DatabaseClient() {
   const [history, setHistory] = useState<string[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [jsonEditor, setJsonEditor] = useState<JsonEditorState | null>(null);
+  const [jsonSaving, setJsonSaving] = useState(false);
+  const [jsonError, setJsonError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/admin/database")
@@ -106,6 +127,66 @@ export function DatabaseClient() {
   function handleTableClick(table: string) {
     setSelectedTable(table === selectedTable ? null : table);
     setSql(`SELECT * FROM "${table}" LIMIT 50`);
+  }
+
+  function openJsonEditor(rowIndex: number, fieldName: string, val: unknown) {
+    const tableName = extractTableFromSql(sql);
+    const row = queryResult?.rows[rowIndex];
+    const rowId = row?.id ? String(row.id) : null;
+    const canEdit = !!tableName && !!rowId;
+    setJsonError(null);
+    setJsonEditor({
+      value: JSON.stringify(val, null, 2),
+      rowIndex,
+      fieldName,
+      tableName,
+      rowId,
+      readOnly: !canEdit,
+    });
+  }
+
+  async function saveJsonEdit() {
+    if (!jsonEditor || jsonEditor.readOnly || !jsonEditor.tableName || !jsonEditor.rowId) return;
+    setJsonSaving(true);
+    setJsonError(null);
+
+    // Validate JSON
+    try {
+      JSON.parse(jsonEditor.value);
+    } catch {
+      setJsonError("Invalid JSON syntax");
+      setJsonSaving(false);
+      return;
+    }
+
+    try {
+      const updateSql = `UPDATE "${jsonEditor.tableName}" SET "${jsonEditor.fieldName}" = $1::jsonb, "updatedAt" = NOW() WHERE id = $2`;
+      const res = await fetch("/api/admin/database", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sql: updateSql, params: [jsonEditor.value, jsonEditor.rowId] }),
+      });
+      const data = await res.json();
+      if (data.error) {
+        setJsonError(data.error);
+      } else {
+        // Update the local result row
+        if (queryResult) {
+          const updated = { ...queryResult };
+          updated.rows = [...updated.rows];
+          updated.rows[jsonEditor.rowIndex] = {
+            ...updated.rows[jsonEditor.rowIndex],
+            [jsonEditor.fieldName]: JSON.parse(jsonEditor.value),
+          };
+          setQueryResult(updated);
+        }
+        setJsonEditor(null);
+      }
+    } catch (err) {
+      setJsonError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setJsonSaving(false);
+    }
   }
 
   function formatValue(val: unknown): string {
@@ -266,17 +347,24 @@ export function DatabaseClient() {
                       {queryResult.rows.map((row, i) => (
                         <tr key={i} className="hover:bg-blue-50">
                           <td className="px-2 py-1 text-gray-400 font-mono">{i + 1}</td>
-                          {queryResult.fields.map((f) => (
-                            <td
-                              key={f.name}
-                              className={`px-2 py-1 font-mono max-w-xs truncate ${
-                                row[f.name] === null ? "text-gray-300 italic" : "text-gray-800"
-                              }`}
-                              title={String(row[f.name] ?? "")}
-                            >
-                              {formatValue(row[f.name])}
-                            </td>
-                          ))}
+                          {queryResult.fields.map((f) => {
+                            const val = row[f.name];
+                            const isJson = isJsonValue(val);
+                            return (
+                              <td
+                                key={f.name}
+                                className={`px-2 py-1 font-mono max-w-xs truncate ${
+                                  val === null ? "text-gray-300 italic" :
+                                  isJson ? "text-purple-700 cursor-pointer hover:bg-purple-50" : "text-gray-800"
+                                }`}
+                                title={isJson ? "Click to view/edit JSON" : String(val ?? "")}
+                                onClick={isJson ? (e) => { e.stopPropagation(); openJsonEditor(i, f.name, val); } : undefined}
+                              >
+                                {isJson && <span className="text-purple-400 mr-1">{"{}"}</span>}
+                                {formatValue(val)}
+                              </td>
+                            );
+                          })}
                         </tr>
                       ))}
                     </tbody>
@@ -292,6 +380,102 @@ export function DatabaseClient() {
           </div>
         </main>
       </div>
+
+      {/* JSON Viewer/Editor Modal */}
+      {jsonEditor && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 flex flex-col max-h-[80vh]">
+            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200">
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900">
+                  {jsonEditor.readOnly ? "JSON Viewer" : "JSON Editor"}
+                </h3>
+                <p className="text-[10px] text-gray-400 mt-0.5">
+                  {jsonEditor.tableName ? `${jsonEditor.tableName}.${jsonEditor.fieldName}` : jsonEditor.fieldName}
+                  {jsonEditor.rowId ? ` (id: ${jsonEditor.rowId})` : ""}
+                  {jsonEditor.readOnly && <span className="text-orange-500 ml-2">Read-only (no id column found)</span>}
+                </p>
+              </div>
+              <button
+                onClick={() => setJsonEditor(null)}
+                className="text-gray-400 hover:text-gray-600 text-lg leading-none"
+              >
+                &times;
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-hidden p-4">
+              <textarea
+                value={jsonEditor.value}
+                onChange={jsonEditor.readOnly ? undefined : (e) => setJsonEditor({ ...jsonEditor, value: e.target.value })}
+                readOnly={jsonEditor.readOnly}
+                className={`w-full h-full min-h-[300px] font-mono text-xs border rounded px-3 py-2 resize-none outline-none ${
+                  jsonEditor.readOnly
+                    ? "bg-gray-50 border-gray-200 text-gray-700"
+                    : "border-gray-300 focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
+                }`}
+                spellCheck={false}
+              />
+            </div>
+
+            {jsonError && (
+              <div className="px-5 pb-2">
+                <p className="text-xs text-red-600 font-mono">{jsonError}</p>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100">
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    try {
+                      const formatted = JSON.stringify(JSON.parse(jsonEditor.value), null, 2);
+                      setJsonEditor({ ...jsonEditor, value: formatted });
+                      setJsonError(null);
+                    } catch {
+                      setJsonError("Invalid JSON — cannot format");
+                    }
+                  }}
+                  className="text-xs text-gray-600 border border-gray-300 rounded px-2 py-1 hover:bg-gray-50"
+                >
+                  Format
+                </button>
+                <button
+                  onClick={() => {
+                    try {
+                      const compact = JSON.stringify(JSON.parse(jsonEditor.value));
+                      setJsonEditor({ ...jsonEditor, value: compact });
+                      setJsonError(null);
+                    } catch {
+                      setJsonError("Invalid JSON — cannot compact");
+                    }
+                  }}
+                  className="text-xs text-gray-600 border border-gray-300 rounded px-2 py-1 hover:bg-gray-50"
+                >
+                  Compact
+                </button>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setJsonEditor(null)}
+                  className="px-3 py-1.5 text-xs font-medium text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
+                >
+                  {jsonEditor.readOnly ? "Close" : "Cancel"}
+                </button>
+                {!jsonEditor.readOnly && (
+                  <button
+                    onClick={saveJsonEdit}
+                    disabled={jsonSaving}
+                    className="px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {jsonSaving ? "Saving..." : "Save to Database"}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

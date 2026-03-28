@@ -52,14 +52,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const { sql } = (await req.json()) as { sql?: string };
+  const { sql, params } = (await req.json()) as { sql?: string; params?: unknown[] };
   if (!sql?.trim()) {
     return NextResponse.json({ error: "SQL query required" }, { status: 400 });
   }
 
   try {
     const start = Date.now();
-    const result = await pgPool.query(sql);
+    const result = params?.length ? await pgPool.query(sql, params) : await pgPool.query(sql);
     const duration = Date.now() - start;
 
     return NextResponse.json({
