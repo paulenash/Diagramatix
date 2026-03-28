@@ -5,6 +5,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { DashboardClient } from "./DashboardClient";
 import { getEffectiveUserId, isImpersonating, isSuperuser } from "@/app/lib/superuser";
+import { ARCHIVE_PROJECT_NAME } from "@/app/lib/archive";
 
 export default async function DashboardPage() {
   const session = await auth();
@@ -26,7 +27,7 @@ export default async function DashboardPage() {
 
   const [projects, unorganized] = await Promise.all([
     prisma.project.findMany({
-      where: { userId: effectiveUserId },
+      where: { userId: effectiveUserId, name: { not: ARCHIVE_PROJECT_NAME } },
       orderBy: { updatedAt: "desc" },
       include: { _count: { select: { diagrams: true } } },
     }),

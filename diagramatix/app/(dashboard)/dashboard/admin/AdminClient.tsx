@@ -40,6 +40,12 @@ export function AdminClient({ users, currentUserId }: Props) {
           </button>
           <h1 className="font-semibold text-gray-900">Admin — Registered Users</h1>
         </div>
+        <a
+          href="/dashboard/admin/archive"
+          className="text-xs text-orange-600 hover:text-orange-800 font-medium border border-orange-300 rounded px-2 py-1"
+        >
+          System Archive
+        </a>
       </header>
 
       <div className="max-w-4xl mx-auto px-6 py-8">

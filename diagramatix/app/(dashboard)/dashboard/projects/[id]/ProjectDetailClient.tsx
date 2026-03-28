@@ -634,10 +634,10 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
     const diag = diagrams.find(d => d.id === id);
     setConfirmDialog({
       title: "Delete Diagram",
-      message: `Are you sure you want to delete "${diag?.name ?? "this diagram"}"? This cannot be undone.`,
+      message: `Are you sure you want to delete "${diag?.name ?? "this diagram"}"? It will be moved to the system archive.`,
       onConfirm: async () => {
         setConfirmDialog(null);
-        await fetch(`/api/diagrams/${id}`, { method: "DELETE" });
+        await fetch(`/api/diagrams/${id}/archive`, { method: "POST" });
         setDiagrams((prev) => prev.filter((d) => d.id !== id));
         updateTree(t => {
           const map = { ...t.diagramFolderMap };

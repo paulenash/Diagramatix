@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { getEffectiveUserId, isImpersonating } from "@/app/lib/superuser";
+import { ARCHIVE_PROJECT_NAME } from "@/app/lib/archive";
 
 export async function GET() {
   const session = await auth();
@@ -13,7 +14,7 @@ export async function GET() {
   let userId = session.user.id;
   try { userId = getEffectiveUserId(session, await cookies()); } catch { /* fallback */ }
   const projects = await prisma.project.findMany({
-    where: { userId },
+    where: { userId, name: { not: ARCHIVE_PROJECT_NAME } },
     orderBy: { updatedAt: "desc" },
     include: { _count: { select: { diagrams: true } } },
   });
