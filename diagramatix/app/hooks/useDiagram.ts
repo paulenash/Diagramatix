@@ -938,9 +938,51 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         }
       }
 
-      const connectors = state.connectors.filter(
+      // BPMN connector bridging: if exactly 1 incoming and 1 outgoing sequence connector,
+      // create a new connector from the source of the incoming to the target of the outgoing
+      const BRIDGE_TYPES = new Set(["task", "subprocess", "subprocess-expanded", "gateway", "intermediate-event"]);
+      let bridgeConnector: Connector | null = null;
+      if (el && BRIDGE_TYPES.has(el.type)) {
+        const incoming = state.connectors.filter(c => c.targetId === id && c.type === "sequence");
+        const outgoing = state.connectors.filter(c => c.sourceId === id && c.type === "sequence");
+        if (incoming.length === 1 && outgoing.length === 1) {
+          const cX = incoming[0];
+          const cY = outgoing[0];
+          const sourceEl = elements.find(e => e.id === cX.sourceId);
+          const targetEl = elements.find(e => e.id === cY.targetId);
+          if (sourceEl && targetEl) {
+            const { waypoints, sourceInvisibleLeader, targetInvisibleLeader } =
+              computeWaypoints(sourceEl, targetEl, elements,
+                cX.sourceSide, cY.targetSide, cX.routingType,
+                cX.sourceOffsetAlong ?? 0.5, cY.targetOffsetAlong ?? 0.5);
+            bridgeConnector = {
+              id: nanoid(),
+              sourceId: cX.sourceId,
+              targetId: cY.targetId,
+              sourceSide: cX.sourceSide,
+              targetSide: cY.targetSide,
+              type: "sequence",
+              directionType: cX.directionType,
+              routingType: cX.routingType,
+              sourceInvisibleLeader,
+              targetInvisibleLeader,
+              waypoints,
+              sourceOffsetAlong: cX.sourceOffsetAlong,
+              targetOffsetAlong: cY.targetOffsetAlong,
+              label: cX.label,
+              labelOffsetX: cX.labelOffsetX,
+              labelOffsetY: cX.labelOffsetY,
+              labelWidth: cX.labelWidth,
+              labelAnchor: cX.labelAnchor,
+            };
+          }
+        }
+      }
+
+      let connectors = state.connectors.filter(
         (c) => c.sourceId !== id && c.targetId !== id
       );
+      if (bridgeConnector) connectors = [...connectors, bridgeConnector];
       return { ...state, elements: updatePoolTypes(elements), connectors };
     }
 
