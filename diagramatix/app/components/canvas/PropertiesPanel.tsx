@@ -1096,6 +1096,17 @@ export function PropertiesPanel({
             <p className="text-xs text-gray-400 mt-0.5">Shift+Enter for new line</p>
           </div>
         )}
+        {connector.type === "sequence" && onUpdateConnectorFields && (
+          <label className="flex items-center gap-2 text-xs text-gray-700 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={!!connector.bottleneck}
+              onChange={(e) => onUpdateConnectorFields(connector.id, { bottleneck: e.target.checked || undefined } as Partial<Connector>)}
+              className="accent-purple-600"
+            />
+            Bottleneck
+          </label>
+        )}
         <button
           onClick={() => onDeleteConnector(connector.id)}
           className="w-full px-3 py-1 text-[10px] bg-red-50 text-red-600 border border-red-200 rounded hover:bg-red-100"

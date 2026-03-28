@@ -107,20 +107,39 @@ const VALUE_COLORS: Record<string, string> = {
 
 function ValueBadge({ el }: { el: DiagramElement }) {
   const va = (el.properties.valueAnalysis as string | undefined) ?? "none";
-  if (va === "none") return null;
-  const color = VALUE_COLORS[va] ?? "#374151";
+  const ct = el.properties.cycleTime as number | undefined;
+  const wt = el.properties.waitTime as number | undefined;
+  const tu = (el.properties.timeUnit as string | undefined) ?? "none";
+  const tuCustom = (el.properties.timeUnitCustom as string | undefined) ?? "";
+  const unitLabel = tu === "other" ? tuCustom : tu === "none" ? "" : tu;
+  const hasValue = va !== "none";
+  const hasTimes = (ct !== undefined && ct !== 0) || (wt !== undefined && wt !== 0);
+  if (!hasValue && !hasTimes) return null;
+  const color = hasValue ? (VALUE_COLORS[va] ?? "#374151") : "#6b7280";
+  const x = el.x + el.width + 3;
+  const baseY = el.y + el.height;
+  let timesText = "";
+  if (hasTimes) {
+    const parts: string[] = [];
+    if (ct !== undefined && ct !== 0) parts.push(`CT=${ct}`);
+    if (wt !== undefined && wt !== 0) parts.push(`WT=${wt}`);
+    timesText = `(${parts.join(", ")}${unitLabel ? ":" + unitLabel : ""})`;
+  }
   return (
-    <text
-      x={el.x + el.width + 3}
-      y={el.y + el.height}
-      fontSize={9}
-      fontWeight="bold"
-      fill={color}
-      textAnchor="start"
-      dominantBaseline="auto"
-    >
-      {va}
-    </text>
+    <g>
+      {hasValue && (
+        <text x={x} y={baseY} fontSize={9} fontWeight="bold" fill={color}
+          textAnchor="start" dominantBaseline="auto">
+          {va}
+        </text>
+      )}
+      {hasTimes && (
+        <text x={x} y={baseY + (hasValue ? 10 : 0)} fontSize={8} fontWeight="bold" fill={color}
+          textAnchor="start" dominantBaseline="auto">
+          {timesText}
+        </text>
+      )}
+    </g>
   );
 }
 

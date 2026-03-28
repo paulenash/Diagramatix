@@ -499,8 +499,10 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
   const isMessage = connector.type === "message";
   const isAssocBPMN = connector.type === "associationBPMN";
   const isMessageBPMN = connector.type === "messageBPMN";
+  const isBottleneck = connector.type === "sequence" && !!connector.bottleneck;
   const strokeColor = selected ? "#2563eb"
     : misaligned ? "#dc2626"
+    : isBottleneck ? "#9333ea"
     : isMessageBPMN ? "#b0b7c3"
     : "#6b7280";
   const isUmlConn = connector.type === "uml-association" || connector.type === "uml-aggregation"
@@ -730,6 +732,42 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
           style={{ pointerEvents: "none" }}
         />
       )}
+
+      {/* Bottleneck indicator — coke bottle shape at midpoint */}
+      {isBottleneck && visibleWaypoints.length >= 2 && (() => {
+        // Find midpoint along the visible path
+        const segments: { len: number; x1: number; y1: number; x2: number; y2: number }[] = [];
+        let totalLen = 0;
+        for (let i = 0; i < visibleWaypoints.length - 1; i++) {
+          const x1 = visibleWaypoints[i].x, y1 = visibleWaypoints[i].y;
+          const x2 = visibleWaypoints[i + 1].x, y2 = visibleWaypoints[i + 1].y;
+          const len = Math.hypot(x2 - x1, y2 - y1);
+          segments.push({ len, x1, y1, x2, y2 });
+          totalLen += len;
+        }
+        let half = totalLen / 2;
+        let mx = visibleWaypoints[0].x, my = visibleWaypoints[0].y, angle = 0;
+        for (const seg of segments) {
+          if (half <= seg.len) {
+            const t = seg.len > 0 ? half / seg.len : 0;
+            mx = seg.x1 + (seg.x2 - seg.x1) * t;
+            my = seg.y1 + (seg.y2 - seg.y1) * t;
+            angle = Math.atan2(seg.y2 - seg.y1, seg.x2 - seg.x1) * 180 / Math.PI;
+            break;
+          }
+          half -= seg.len;
+        }
+        // Coke bottle: vertical hourglass shape (narrow waist, wider top/bottom)
+        const h = 16, w = 8;
+        return (
+          <g transform={`translate(${mx},${my}) rotate(${angle})`}>
+            <path
+              d={`M${-w/2},${-h/2} C${-w/2},${-h/6} ${-w/4},${-1} 0,0 C${w/4},1 ${w/2},${h/6} ${w/2},${h/2} L${-w/2},${h/2} C${-w/2},${h/6} ${-w/4},1 0,0 C${w/4},${-1} ${w/2},${-h/6} ${w/2},${-h/2} Z`}
+              fill="white" stroke="#9333ea" strokeWidth={1.5}
+            />
+          </g>
+        );
+      })()}
 
       {/* Floating connector label */}
       {(connector.type === "transition" || connector.type === "flow" || connector.type === "messageBPMN"
