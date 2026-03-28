@@ -325,6 +325,7 @@ export function DiagramEditor({
     alignElements,
     setData,
     correctAllConnectors,
+    insertSpace,
     addLane,
     addSublane,
     moveLaneBoundary,
@@ -1123,6 +1124,7 @@ export function DiagramEditor({
           parentDiagramName={parentDiagram?.name}
           showValueDisplay={showValueDisplay}
           showBottleneck={showBottleneck}
+          onInsertSpace={diagramType === "bpmn" ? insertSpace : undefined}
         />
 
         {!readOnly && (

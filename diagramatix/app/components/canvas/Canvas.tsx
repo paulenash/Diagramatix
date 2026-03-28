@@ -194,6 +194,7 @@ interface Props {
   parentDiagramName?: string;
   showValueDisplay?: boolean;
   showBottleneck?: boolean;
+  onInsertSpace?: (markerX: number, markerY: number, dx: number, dy: number) => void;
 }
 
 interface EditingLabel {
@@ -371,6 +372,7 @@ export function Canvas({
   parentDiagramName,
   showValueDisplay,
   showBottleneck,
+  onInsertSpace,
 }: Props) {
   const displayMode = displayModeProp ?? "normal";
   const svgRef = useRef<SVGSVGElement>(null);
@@ -456,6 +458,10 @@ export function Canvas({
 
   // Lasso selection state
   const [lassoRect, setLassoRect] = useState<{ startX: number; startY: number; endX: number; endY: number } | null>(null);
+
+  // Space insertion marker state (BPMN only)
+  const [spaceMarker, setSpaceMarker] = useState<Point | null>(null);
+  const [spaceMarkerPlacing, setSpaceMarkerPlacing] = useState(false);
   // (Shift key is checked directly via event.shiftKey for lasso selection)
 
   // Expose viewport center to parent via ref
@@ -1070,6 +1076,28 @@ export function Canvas({
       return;
     }
 
+    // Ctrl+click on background: place/move space insertion marker (BPMN only)
+    if (e.ctrlKey && onInsertSpace) {
+      const worldPt = clientToWorld(e.clientX, e.clientY);
+      setSpaceMarker(worldPt);
+      setSpaceMarkerPlacing(true);
+      // Allow immediate drag to reposition
+      const startCX = e.clientX;
+      const startCY = e.clientY;
+      function onMove(ev: MouseEvent) {
+        const wp = clientToWorld(ev.clientX, ev.clientY);
+        setSpaceMarker(wp);
+      }
+      function onUp() {
+        window.removeEventListener("mousemove", onMove);
+        window.removeEventListener("mouseup", onUp);
+        setSpaceMarkerPlacing(false);
+      }
+      window.addEventListener("mousemove", onMove);
+      window.addEventListener("mouseup", onUp);
+      return;
+    }
+
     // Default drag → pan; hold Shift → lasso
     if (!e.shiftKey) {
       // --- Pan mode ---
@@ -1318,6 +1346,11 @@ export function Canvas({
         onSetSelectedElements(new Set());
       }
       if (selectedConnectorId) onDeleteConnector(selectedConnectorId);
+    }
+    // Escape cancels space marker
+    if (e.key === "Escape" && spaceMarker) {
+      setSpaceMarker(null);
+      setSpaceMarkerPlacing(false);
     }
   }
 
@@ -2331,6 +2364,75 @@ export function Canvas({
                 strokeDasharray={`${4 / zoom} ${4 / zoom}`}
                 style={{ pointerEvents: "none" }}
               />
+            );
+          })()}
+
+          {/* Space insertion marker */}
+          {spaceMarker && (() => {
+            const mx = spaceMarker.x;
+            const my = spaceMarker.y;
+            const extent = 100000;
+            const hitSize = 20 / zoom; // generous hit area in screen pixels
+
+            function handleMarkerMouseDown(e: React.MouseEvent) {
+              e.stopPropagation();
+              e.preventDefault();
+              if (e.shiftKey && onInsertSpace) {
+                // Shift+drag: insert space
+                let lastWorld = clientToWorld(e.clientX, e.clientY);
+                function onMove(ev: MouseEvent) {
+                  const curWorld = clientToWorld(ev.clientX, ev.clientY);
+                  const ddx = curWorld.x - lastWorld.x;
+                  const ddy = curWorld.y - lastWorld.y;
+                  if (Math.abs(ddx) > Math.abs(ddy)) {
+                    if (ddx > 0) onInsertSpace!(mx, my, ddx, 0);
+                  } else {
+                    if (ddy > 0) onInsertSpace!(mx, my, 0, ddy);
+                  }
+                  lastWorld = curWorld;
+                }
+                function onUp() {
+                  window.removeEventListener("mousemove", onMove);
+                  window.removeEventListener("mouseup", onUp);
+                }
+                window.addEventListener("mousemove", onMove);
+                window.addEventListener("mouseup", onUp);
+              } else {
+                // Normal drag: reposition marker
+                function onMove(ev: MouseEvent) {
+                  setSpaceMarker(clientToWorld(ev.clientX, ev.clientY));
+                }
+                function onUp() {
+                  window.removeEventListener("mousemove", onMove);
+                  window.removeEventListener("mouseup", onUp);
+                }
+                window.addEventListener("mousemove", onMove);
+                window.addEventListener("mouseup", onUp);
+              }
+            }
+
+            return (
+              <g>
+                {/* Crosshair lines — non-interactive */}
+                <line x1={mx} y1={my - extent} x2={mx} y2={my + extent}
+                  stroke="rgba(34,197,94,0.25)" strokeWidth={2 / zoom}
+                  style={{ pointerEvents: "none" }} />
+                <line x1={mx - extent} y1={my} x2={mx + extent} y2={my}
+                  stroke="rgba(34,197,94,0.25)" strokeWidth={2 / zoom}
+                  style={{ pointerEvents: "none" }} />
+                {/* Large invisible hit area */}
+                <rect
+                  x={mx - hitSize / 2} y={my - hitSize / 2}
+                  width={hitSize} height={hitSize}
+                  fill="transparent" stroke="none"
+                  style={{ cursor: "move", pointerEvents: "all" }}
+                  onMouseDown={handleMarkerMouseDown}
+                />
+                {/* Visible green circle */}
+                <circle cx={mx} cy={my} r={6 / zoom}
+                  fill="#22c55e" stroke="#16a34a" strokeWidth={2 / zoom}
+                  style={{ pointerEvents: "none" }} />
+              </g>
             );
           })()}
 

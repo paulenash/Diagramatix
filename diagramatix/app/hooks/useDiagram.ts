@@ -145,6 +145,7 @@ type Action =
   | { type: "SET_CONNECTOR_FONT_SIZE"; payload: number }
   | { type: "SET_TITLE_FONT_SIZE"; payload: number }
   | { type: "CORRECT_ALL_CONNECTORS" }
+  | { type: "INSERT_SPACE"; payload: { markerX: number; markerY: number; dx: number; dy: number } }
   | { type: "SET_VIEWPORT"; payload: { x: number; y: number; zoom: number } }
   | { type: "MOVE_END"; payload: { id: string } }
   | { type: "SPLIT_CONNECTOR"; payload: {
@@ -1331,6 +1332,78 @@ function reducer(state: DiagramData, action: Action): DiagramData {
     case "SET_TITLE_FONT_SIZE":
       return { ...state, titleFontSize: action.payload };
 
+    case "INSERT_SPACE": {
+      const { markerX, markerY, dx, dy } = action.payload;
+
+      // Classify each element relative to the marker
+      const elements = state.elements.map(el => {
+        const cx = el.x + el.width / 2;
+        const cy = el.y + el.height / 2;
+        const isPool = el.type === "pool";
+        const isLane = el.type === "lane";
+        const isSublane = isLane && !!el.parentId &&
+          state.elements.some(p => p.id === el.parentId && p.type === "lane");
+
+        // Horizontal shift (dx > 0: push elements to the right of marker)
+        if (dx !== 0) {
+          if (isPool || isLane || isSublane) {
+            // Extend pool/lane/sublane right boundary if the marker vertical line intersects it
+            if (markerX > el.x && markerX < el.x + el.width) {
+              return { ...el, width: el.width + dx };
+            }
+            // If the entire pool/lane is to the right, shift it
+            if (el.x >= markerX) {
+              return { ...el, x: el.x + dx };
+            }
+            return el;
+          }
+          // Normal element: shift if centre is to the right of marker
+          if (cx > markerX) {
+            return { ...el, x: el.x + dx };
+          }
+          return el;
+        }
+
+        // Vertical shift (dy > 0: push elements below marker down)
+        if (dy !== 0) {
+          if (isPool) {
+            // If marker horizontal line intersects this pool, extend its bottom
+            if (markerY > el.y && markerY < el.y + el.height) {
+              return { ...el, height: el.height + dy };
+            }
+            // If pool is entirely below marker, shift it down
+            if (el.y >= markerY) {
+              return { ...el, y: el.y + dy };
+            }
+            return el;
+          }
+          if (isLane || isSublane) {
+            // If marker intersects this lane, extend its bottom
+            if (markerY > el.y && markerY < el.y + el.height) {
+              return { ...el, height: el.height + dy };
+            }
+            // If lane is below marker, shift it down
+            if (el.y >= markerY) {
+              return { ...el, y: el.y + dy };
+            }
+            return el;
+          }
+          // Normal element: shift if centre is below marker
+          if (cy > markerY) {
+            return { ...el, y: el.y + dy };
+          }
+          return el;
+        }
+
+        return el;
+      });
+
+      // Recompute all connectors after space insertion
+      const connectors = recomputeAllConnectors(state.connectors, elements);
+
+      return { ...state, elements: updatePoolTypes(elements), connectors: validateConnectorsAgainstObstacles(connectors, elements) };
+    }
+
     case "CORRECT_ALL_CONNECTORS": {
       const connectors = state.connectors.map((conn) => {
         if (conn.routingType !== "rectilinear" || conn.waypoints.length < 7) return conn;
@@ -2094,6 +2167,11 @@ export function useDiagram(initialData: DiagramData) {
     dispatch({ type: "CORRECT_ALL_CONNECTORS" });
   }, []);
 
+  const insertSpace = useCallback((markerX: number, markerY: number, dx: number, dy: number) => {
+    pushHistory(snapshotData());
+    dispatch({ type: "INSERT_SPACE", payload: { markerX, markerY, dx, dy } });
+  }, []);
+
   const addLane = useCallback((poolId: string) => {
     pushHistory(snapshotData());
     dispatch({ type: "ADD_LANE", payload: { poolId } });
@@ -2193,6 +2271,7 @@ export function useDiagram(initialData: DiagramData) {
     setData,
     setViewport,
     correctAllConnectors,
+    insertSpace,
     addLane,
     addSublane,
     moveLaneBoundary,
