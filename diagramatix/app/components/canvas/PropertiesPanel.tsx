@@ -1528,7 +1528,11 @@ export function PropertiesPanel({
       {isEventElement && (
         <div>
           <label className="block text-xs font-medium text-gray-700 mb-1">Event Type</label>
-          <div className="flex flex-col gap-1">
+          <select
+            value={element.eventType ?? "none"}
+            onChange={(e) => onUpdateProperties(element.id, { eventType: e.target.value })}
+            className="w-full text-xs border border-gray-300 rounded px-2 py-1 outline-none focus:border-blue-400"
+          >
             {EVENT_TYPE_OPTIONS
               .filter(o => {
                 if (element.type !== "end-event" && o.value === "terminate") return false;
@@ -1537,40 +1541,23 @@ export function PropertiesPanel({
                 return true;
               })
               .map(({ value, label }) => (
-                <button
-                  key={value}
-                  onClick={() => onUpdateProperties(element.id, { eventType: value })}
-                  className={`px-2 py-1 text-xs rounded border text-left ${
-                    (element.eventType ?? "none") === value
-                      ? "bg-blue-600 text-white border-blue-600"
-                      : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                  }`}
-                >
-                  {label}
-                </button>
+                <option key={value} value={value}>{label}</option>
               ))}
-          </div>
+          </select>
         </div>
       )}
 
       {(element.type === "start-event" || element.type === "intermediate-event") && (
         <div>
           <label className="block text-xs font-medium text-gray-700 mb-1">Interruption</label>
-          <div className="flex gap-1">
-            {(["interrupting", "non-interrupting"] as const).map((v) => (
-              <button
-                key={v}
-                onClick={() => onUpdateProperties(element.id, { interruptionType: v })}
-                className={`px-2 py-1 text-xs rounded border ${
-                  ((element.properties.interruptionType as string | undefined) ?? "interrupting") === v
-                    ? "bg-blue-600 text-white border-blue-600"
-                    : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                }`}
-              >
-                {v === "interrupting" ? "Interrupting" : "Non-Interrupting"}
-              </button>
-            ))}
-          </div>
+          <select
+            value={(element.properties.interruptionType as string | undefined) ?? "interrupting"}
+            onChange={(e) => onUpdateProperties(element.id, { interruptionType: e.target.value })}
+            className="w-full text-xs border border-gray-300 rounded px-2 py-1 outline-none focus:border-blue-400"
+          >
+            <option value="interrupting">Interrupting</option>
+            <option value="non-interrupting">Non-Interrupting</option>
+          </select>
         </div>
       )}
 
@@ -1580,24 +1567,20 @@ export function PropertiesPanel({
           {hasMessageBpmnConnection && (
             <p className="text-xs text-gray-400 mb-1">Cannot change while messageBPMN connections exist</p>
           )}
-          <div className="flex flex-col gap-1">
+          <select
+            value={element.flowType ?? "none"}
+            disabled={hasMessageBpmnConnection}
+            onChange={(e) => { if (!hasMessageBpmnConnection) onUpdateProperties(element.id, { flowType: e.target.value }); }}
+            className={`w-full text-xs border rounded px-2 py-1 outline-none ${
+              hasMessageBpmnConnection
+                ? "border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed"
+                : "border-gray-300 focus:border-blue-400"
+            }`}
+          >
             {FLOW_TYPE_OPTIONS.map(({ value, label }) => (
-              <button
-                key={value}
-                disabled={hasMessageBpmnConnection}
-                onClick={() => { if (!hasMessageBpmnConnection) onUpdateProperties(element.id, { flowType: value }); }}
-                className={`px-2 py-1 text-xs rounded border text-left ${
-                  (element.flowType ?? "none") === value
-                    ? "bg-blue-600 text-white border-blue-600"
-                    : hasMessageBpmnConnection
-                    ? "bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed"
-                    : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                }`}
-              >
-                {label}
-              </button>
+              <option key={value} value={value}>{label}</option>
             ))}
-          </div>
+          </select>
         </div>
       )}
 
