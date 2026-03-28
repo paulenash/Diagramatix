@@ -924,16 +924,31 @@ export function Canvas({
     if (!sourceEl || !targetEl) return;
 
     const startClientX = e.clientX;
-    const minX = Math.max(sourceEl.x, targetEl.x);
-    const maxX = Math.min(sourceEl.x + sourceEl.width, targetEl.x + targetEl.width);
+
+    // For black-box pool to black-box pool: allow free x movement along each pool's full width
+    const srcIsBlackBoxPool = sourceEl.type === "pool" && ((sourceEl.properties.poolType as string | undefined) ?? "black-box") !== "white-box";
+    const tgtIsBlackBoxPool = targetEl.type === "pool" && ((targetEl.properties.poolType as string | undefined) ?? "black-box") !== "white-box";
+
+    let minX: number, maxX: number;
+    if (srcIsBlackBoxPool && tgtIsBlackBoxPool) {
+      // Free movement across the full union of both pool widths
+      minX = Math.min(sourceEl.x, targetEl.x);
+      maxX = Math.max(sourceEl.x + sourceEl.width, targetEl.x + targetEl.width);
+    } else {
+      minX = Math.max(sourceEl.x, targetEl.x);
+      maxX = Math.min(sourceEl.x + sourceEl.width, targetEl.x + targetEl.width);
+    }
 
     function clampX(raw: number) { return maxX > minX ? Math.max(minX, Math.min(maxX, raw)) : raw; }
 
     function buildWaypoints(x: number): Point[] {
+      // For black-box pools, clamp each endpoint to its own pool width
+      const srcX = srcIsBlackBoxPool ? Math.max(sourceEl!.x, Math.min(sourceEl!.x + sourceEl!.width, x)) : x;
+      const tgtX = tgtIsBlackBoxPool ? Math.max(targetEl!.x, Math.min(targetEl!.x + targetEl!.width, x)) : x;
       const srcEdge: Point = conn!.sourceSide === "bottom"
-        ? { x, y: sourceEl!.y + sourceEl!.height } : { x, y: sourceEl!.y };
+        ? { x: srcX, y: sourceEl!.y + sourceEl!.height } : { x: srcX, y: sourceEl!.y };
       const tgtEdge: Point = conn!.targetSide === "top"
-        ? { x, y: targetEl!.y } : { x, y: targetEl!.y + targetEl!.height };
+        ? { x: tgtX, y: targetEl!.y } : { x: tgtX, y: targetEl!.y + targetEl!.height };
       return [
         { x: sourceEl!.x + sourceEl!.width / 2, y: sourceEl!.y + sourceEl!.height / 2 },
         srcEdge, tgtEdge,
@@ -949,7 +964,8 @@ export function Canvas({
     function onMouseUp(ev: MouseEvent) {
       const dx = (ev.clientX - startClientX) / zoom;
       const newX = clampX(startX + dx);
-      const newOffsetAlong = sourceEl!.width > 0 ? (newX - sourceEl!.x) / sourceEl!.width : 0.5;
+      const srcClampedX = srcIsBlackBoxPool ? Math.max(sourceEl!.x, Math.min(sourceEl!.x + sourceEl!.width, newX)) : newX;
+      const newOffsetAlong = sourceEl!.width > 0 ? (srcClampedX - sourceEl!.x) / sourceEl!.width : 0.5;
       onUpdateConnectorEndpoint(connectorId, "source", conn!.sourceId, conn!.sourceSide, newOffsetAlong);
       window.removeEventListener("mousemove", onMouseMove);
       window.removeEventListener("mouseup", onMouseUp);

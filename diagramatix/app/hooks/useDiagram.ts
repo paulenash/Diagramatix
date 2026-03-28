@@ -1020,9 +1020,11 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         : 0;
 
       // Decision gateway outgoing sequence connectors get a source-anchored label
-      const isDecisionGatewayOutgoing = connectorType === "sequence"
-        && source.type === "gateway"
-        && ((source.properties.gatewayRole as string | undefined) ?? "decision") === "decision";
+      const gwType = source.gatewayType ?? "exclusive";
+      const isDecisionGateway = source.type === "gateway"
+        && (gwType === "none" || gwType === "exclusive" || gwType === "inclusive");
+      const isDecisionGatewayOutgoing = connectorType === "sequence" && isDecisionGateway;
+      const isDecisionGatewayBottom = isDecisionGatewayOutgoing && sourceSide === "bottom";
 
       const newConnector: Connector = {
         id: nanoid(),
@@ -1044,7 +1046,7 @@ function reducer(state: DiagramData, action: Action): DiagramData {
                     : isDecisionGatewayOutgoing ? ""
                     : connectorType === "sequence" ? ""
                     : undefined,
-        labelOffsetX: isFlow ? 0   : isTransition ? 0   : isMsgBpmn ? 20  : isDecisionGatewayOutgoing ? 5  : connectorType === "sequence" ? 0 : undefined,
+        labelOffsetX: isFlow ? 0   : isTransition ? 0   : isMsgBpmn ? 20  : isDecisionGatewayBottom ? 10 : isDecisionGatewayOutgoing ? 5  : connectorType === "sequence" ? 0 : undefined,
         labelOffsetY: isFlow ? -30 : isTransition ? -30 : isMsgBpmn ? (() => {
           // Find the pool containing each element
           function findPool(el: DiagramElement): DiagramElement | undefined {
@@ -1081,7 +1083,7 @@ function reducer(state: DiagramData, action: Action): DiagramData {
             return labelY - anchorY - 7;
           }
           return 0;
-        })() : isDecisionGatewayOutgoing ? -20 : connectorType === "sequence" ? -20 : undefined,
+        })() : isDecisionGatewayBottom ? 10 : isDecisionGatewayOutgoing ? -20 : connectorType === "sequence" ? -20 : undefined,
         labelWidth:   isFlow ? 80  : isTransition ? 80  : isMsgBpmn ? 80  : isDecisionGatewayOutgoing ? 60  : connectorType === "sequence" ? 80 : undefined,
         labelAnchor:  isDecisionGatewayOutgoing ? "source" : undefined,
       };
