@@ -99,6 +99,31 @@ function getClosestSideFromPoint(pt: Point, el: DiagramElement): Side {
   return dy > 0 ? "bottom" : "top";
 }
 
+const VALUE_COLORS: Record<string, string> = {
+  VA: "#16a34a",    // vivid green
+  NNVA: "#ea580c",  // vivid orange
+  NVA: "#dc2626",   // vivid red
+};
+
+function ValueBadge({ el }: { el: DiagramElement }) {
+  const va = (el.properties.valueAnalysis as string | undefined) ?? "none";
+  if (va === "none") return null;
+  const color = VALUE_COLORS[va] ?? "#374151";
+  return (
+    <text
+      x={el.x + el.width + 3}
+      y={el.y + el.height}
+      fontSize={9}
+      fontWeight="bold"
+      fill={color}
+      textAnchor="start"
+      dominantBaseline="auto"
+    >
+      {va}
+    </text>
+  );
+}
+
 function TaskShape({ el }: { el: DiagramElement }) {
   const colors = useContext(SymbolColorCtx);
   const hasLoop = el.repeatType === "loop";
@@ -107,6 +132,7 @@ function TaskShape({ el }: { el: DiagramElement }) {
       <rect x={el.x} y={el.y} width={el.width} height={el.height}
         rx={4} ry={4} fill={resolveColor("task", colors)} stroke="#374151" strokeWidth={1.5} />
       {hasLoop && <LoopMarker cx={el.x + el.width / 2} cy={el.y + el.height - 10} />}
+      <ValueBadge el={el} />
     </g>
   );
 }
@@ -694,11 +720,12 @@ function SubprocessShape({ el }: { el: DiagramElement }) {
         stroke="#374151" strokeWidth={1} />
       {hasLoop && <LoopMarker cx={loopCX} cy={my + markerH * 0.55} />}
       {(el.properties.linkedDiagramId as string | undefined) && (
-        <g transform={`translate(${el.x + el.width - 14},${el.y + 3})`}>
+        <g transform={`translate(${el.x + el.width + 3},${el.y + 1})`}>
           <path d="M2 9L6 5L2 1" fill="none" stroke="#2563eb" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
           <path d="M6 9L10 5L6 1" fill="none" stroke="#2563eb" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
         </g>
       )}
+      <ValueBadge el={el} />
     </g>
   );
 }
@@ -719,6 +746,7 @@ function ExpandedSubprocessShape({ el }: { el: DiagramElement }) {
           rx={3} ry={3} fill="none" stroke="#374151" strokeWidth={1.5} />
       )}
       {hasLoop && <LoopMarker cx={el.x + el.width / 2} cy={el.y + el.height - 10} />}
+      <ValueBadge el={el} />
     </g>
   );
 }
@@ -845,6 +873,7 @@ function BpmnTaskShape({ el }: { el: DiagramElement }) {
         <BpmnTaskMarker taskType={el.taskType} x={el.x + 4} y={el.y + 4} />
       )}
       {hasLoop && <LoopMarker cx={el.x + el.width / 2} cy={el.y + el.height - 10} />}
+      <ValueBadge el={el} />
     </g>
   );
 }
@@ -1312,7 +1341,7 @@ export function SymbolRenderer({
         <g
           transform={`translate(${element.x - 2},${element.y - 2})`}
           style={{ cursor: "pointer", pointerEvents: "all" }}
-          onClick={(e) => { e.stopPropagation(); onDrillBack(); }}
+          onDoubleClick={(e) => { e.stopPropagation(); onDrillBack(); }}
         >
           <rect x={-12} y={-4} width={14} height={12} rx={2} fill="white" fillOpacity={0.8} />
           <path d="M0 4L-4 0L0 -4" fill="none" stroke="#2563eb" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />

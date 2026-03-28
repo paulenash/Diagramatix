@@ -1377,6 +1377,7 @@ export function PropertiesPanel({
       })()}
 
       {(element.type === "task" || element.type === "subprocess" || element.type === "subprocess-expanded") && (
+        <>
         <div>
           <p className="text-xs font-medium text-gray-500 mb-1">Repeat</p>
           <div className="flex gap-1">
@@ -1395,6 +1396,30 @@ export function PropertiesPanel({
             ))}
           </div>
         </div>
+        <div>
+          <p className="text-xs font-medium text-gray-500 mb-1">Value</p>
+          <div className="flex gap-1">
+            {([
+              { value: "none", label: "None", color: "" },
+              { value: "VA", label: "VA", color: "bg-green-500 text-white border-green-500" },
+              { value: "NNVA", label: "NNVA", color: "bg-orange-500 text-white border-orange-500" },
+              { value: "NVA", label: "NVA", color: "bg-red-500 text-white border-red-500" },
+            ] as const).map(({ value, label, color }) => (
+              <button
+                key={value}
+                onClick={() => onUpdateProperties(element.id, { valueAnalysis: value })}
+                className={`px-2 py-1 text-xs rounded border ${
+                  ((element.properties.valueAnalysis as string | undefined) ?? "none") === value
+                    ? (color || "bg-blue-600 text-white border-blue-600")
+                    : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+        </>
       )}
 
       {element.type === "gateway" && (
