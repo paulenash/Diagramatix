@@ -1041,8 +1041,9 @@ function reducer(state: DiagramData, action: Action): DiagramData {
                     : isTransition ? `transition ${transitionCount + 1}`
                     : isMsgBpmn   ? `message ${msgBpmnCount + 1}`
                     : isDecisionGatewayOutgoing ? ""
+                    : connectorType === "sequence" ? ""
                     : undefined,
-        labelOffsetX: isFlow ? 0   : isTransition ? 0   : isMsgBpmn ? 20  : isDecisionGatewayOutgoing ? 5  : undefined,
+        labelOffsetX: isFlow ? 0   : isTransition ? 0   : isMsgBpmn ? 20  : isDecisionGatewayOutgoing ? 5  : connectorType === "sequence" ? 0 : undefined,
         labelOffsetY: isFlow ? -30 : isTransition ? -30 : isMsgBpmn ? (() => {
           // Find the pool containing each element
           function findPool(el: DiagramElement): DiagramElement | undefined {
@@ -1079,8 +1080,8 @@ function reducer(state: DiagramData, action: Action): DiagramData {
             return labelY - anchorY - 7;
           }
           return 0;
-        })() : isDecisionGatewayOutgoing ? -20 : undefined,
-        labelWidth:   isFlow ? 80  : isTransition ? 80  : isMsgBpmn ? 80  : isDecisionGatewayOutgoing ? 60  : undefined,
+        })() : isDecisionGatewayOutgoing ? -20 : connectorType === "sequence" ? -20 : undefined,
+        labelWidth:   isFlow ? 80  : isTransition ? 80  : isMsgBpmn ? 80  : isDecisionGatewayOutgoing ? 60  : connectorType === "sequence" ? 80 : undefined,
         labelAnchor:  isDecisionGatewayOutgoing ? "source" : undefined,
       };
 
@@ -1349,7 +1350,8 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       const { id } = action.payload;
       const el = state.elements.find(e => e.id === id);
       if (!el) return state;
-      if (el.type !== "gateway" && el.type !== "intermediate-event") return state;
+      const SPLITTABLE_TYPES = new Set(["gateway", "intermediate-event", "task", "subprocess"]);
+      if (!SPLITTABLE_TYPES.has(el.type)) return state;
 
       const orig = findConnectorOverlappingElement(state.connectors, el);
       if (!orig) return state;
@@ -1381,12 +1383,18 @@ function reducer(state: DiagramData, action: Action): DiagramData {
             sourceSide: orig.sourceSide, targetSide: cASide,
             directionType: orig.directionType, routingType: orig.routingType,
             sourceOffsetAlong: orig.sourceOffsetAlong, targetOffsetAlong: 0.5,
-            waypoints: wA, sourceInvisibleLeader: sIA, targetInvisibleLeader: tIA },
+            waypoints: wA, sourceInvisibleLeader: sIA, targetInvisibleLeader: tIA,
+            label: orig.label, labelOffsetX: orig.labelOffsetX, labelOffsetY: orig.labelOffsetY,
+            labelWidth: orig.labelWidth, labelAnchor: orig.labelAnchor },
           { id: nanoid(), type: orig.type, sourceId: el.id, targetId: orig.targetId,
             sourceSide: cBSide, targetSide: orig.targetSide,
             directionType: orig.directionType, routingType: orig.routingType,
             sourceOffsetAlong: 0.5, targetOffsetAlong: orig.targetOffsetAlong,
-            waypoints: wB, sourceInvisibleLeader: sIB, targetInvisibleLeader: tIB },
+            waypoints: wB, sourceInvisibleLeader: sIB, targetInvisibleLeader: tIB,
+            label: orig.type === "sequence" ? "" : undefined,
+            labelOffsetX: orig.type === "sequence" ? 0 : undefined,
+            labelOffsetY: orig.type === "sequence" ? -20 : undefined,
+            labelWidth: orig.type === "sequence" ? 80 : undefined },
         ],
       };
     }
@@ -1399,9 +1407,17 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       // Build new element (same labelling logic as ADD_ELEMENT)
       const def = getSymbolDefinition(symbolType);
       let label = def.label;
-      if (symbolType === "intermediate-event") {
+      if (symbolType === "gateway") {
+        label = "Test?";
+      } else if (symbolType === "intermediate-event") {
         const count = state.elements.filter(e => e.type === "intermediate-event").length;
         label = `Event ${count + 1}`;
+      } else if (symbolType === "task") {
+        const count = state.elements.filter(e => e.type === "task").length;
+        label = `Task ${count + 1}`;
+      } else if (symbolType === "subprocess") {
+        const count = state.elements.filter(e => e.type === "subprocess").length;
+        label = `Subprocess ${count + 1}`;
       }
       const newEl: DiagramElement = {
         id: nanoid(),
@@ -1411,9 +1427,10 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         width: def.defaultWidth,
         height: def.defaultHeight,
         label,
-        properties: {},
+        properties: symbolType === "gateway" ? { labelOffsetX: -30, labelOffsetY: -54 } : {},
         ...(taskType  !== undefined ? { taskType  } : {}),
         ...(eventType !== undefined ? { eventType } : {}),
+        ...(symbolType === "gateway" ? { gatewayType: "none" as GatewayType } : {}),
       };
 
       const elementsWithNew = [...state.elements, newEl];
@@ -1444,12 +1461,18 @@ function reducer(state: DiagramData, action: Action): DiagramData {
             sourceSide: orig.sourceSide, targetSide: cASide,
             directionType: orig.directionType, routingType: orig.routingType,
             sourceOffsetAlong: orig.sourceOffsetAlong, targetOffsetAlong: 0.5,
-            waypoints: wA, sourceInvisibleLeader: sIA, targetInvisibleLeader: tIA },
+            waypoints: wA, sourceInvisibleLeader: sIA, targetInvisibleLeader: tIA,
+            label: orig.label, labelOffsetX: orig.labelOffsetX, labelOffsetY: orig.labelOffsetY,
+            labelWidth: orig.labelWidth, labelAnchor: orig.labelAnchor },
           { id: nanoid(), type: orig.type, sourceId: newEl.id, targetId: orig.targetId,
             sourceSide: cBSide, targetSide: orig.targetSide,
             directionType: orig.directionType, routingType: orig.routingType,
             sourceOffsetAlong: 0.5, targetOffsetAlong: orig.targetOffsetAlong,
-            waypoints: wB, sourceInvisibleLeader: sIB, targetInvisibleLeader: tIB },
+            waypoints: wB, sourceInvisibleLeader: sIB, targetInvisibleLeader: tIB,
+            label: orig.type === "sequence" ? "" : undefined,
+            labelOffsetX: orig.type === "sequence" ? 0 : undefined,
+            labelOffsetY: orig.type === "sequence" ? -20 : undefined,
+            labelWidth: orig.type === "sequence" ? 80 : undefined },
         ],
       };
     }

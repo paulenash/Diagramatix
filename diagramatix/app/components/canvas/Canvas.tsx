@@ -1195,13 +1195,13 @@ export function Canvas({
     const worldPos = svgToWorld(e.clientX - rect.left, e.clientY - rect.top);
 
     // Check if dropped on a sequence connector (split connector feature)
-    if (diagramType === "bpmn" && onSplitConnector &&
-        (pendingDragSymbol === "gateway" || pendingDragSymbol === "intermediate-event")) {
+    const SPLITTABLE_DROPS = new Set(["gateway", "intermediate-event", "task", "subprocess"]);
+    if (diagramType === "bpmn" && onSplitConnector && SPLITTABLE_DROPS.has(pendingDragSymbol)) {
       const hit = findConnectorNearPoint(data.connectors, worldPos);
       if (hit) {
-        if (pendingDragSymbol === "gateway") {
-          // Gateways have no type picker — split immediately with default type
-          onSplitConnector("gateway", worldPos, hit.id);
+        if (pendingDragSymbol === "gateway" || pendingDragSymbol === "task" || pendingDragSymbol === "subprocess") {
+          // These have no type picker — split immediately
+          onSplitConnector(pendingDragSymbol, worldPos, hit.id);
           return;
         } else {
           // Intermediate event: show type picker, then split
@@ -1739,7 +1739,7 @@ export function Canvas({
                 onUpdateProperties={onUpdateProperties}
                 onUpdateLabel={onUpdateLabel}
                 onMoveEnd={
-                  (el.type === "gateway" || el.type === "intermediate-event")
+                  (el.type === "gateway" || el.type === "intermediate-event" || el.type === "task" || el.type === "subprocess")
                     ? () => onElementMoveEnd?.(el.id)
                     : undefined
                 }
