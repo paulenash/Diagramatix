@@ -190,6 +190,8 @@ interface Props {
   updatedAt?: string;
   readOnly?: boolean;
   onDrillIntoSubprocess?: (diagramId: string) => void;
+  onDrillBack?: () => void;
+  parentDiagramName?: string;
 }
 
 interface EditingLabel {
@@ -363,6 +365,8 @@ export function Canvas({
   updatedAt,
   readOnly,
   onDrillIntoSubprocess,
+  onDrillBack,
+  parentDiagramName,
 }: Props) {
   const displayMode = displayModeProp ?? "normal";
   const svgRef = useRef<SVGSVGElement>(null);
@@ -1739,6 +1743,7 @@ export function Canvas({
                 onGroupMove={onMoveElements ? (dx, dy) => onMoveElements([...selectedElementIds], dx / zoom, dy / zoom) : undefined}
                 onGroupMoveEnd={onElementsMoveEnd}
                 colorConfig={colorConfig}
+                onDrillBack={el.type === "start-event" ? onDrillBack : undefined}
               />
             );
           })}
@@ -2003,6 +2008,7 @@ export function Canvas({
                 }
                 return false;
               }}
+              onDrillBack={el.type === "start-event" ? onDrillBack : undefined}
             />
             );
           })}

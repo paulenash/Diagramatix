@@ -1151,6 +1151,8 @@ export function DiagramEditor({
           updatedAt={effectiveUpdatedAt}
           readOnly={readOnly}
           onDrillIntoSubprocess={handleDrillIntoSubprocess}
+          onDrillBack={parentDiagram ? handleDrillBack : undefined}
+          parentDiagramName={parentDiagram?.name}
         />
 
         {!readOnly && (

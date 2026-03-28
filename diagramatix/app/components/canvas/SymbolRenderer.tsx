@@ -38,6 +38,7 @@ interface Props {
   multiSelected?: boolean;
   onGroupMove?: (dx: number, dy: number) => void;
   onGroupMoveEnd?: () => void;
+  onDrillBack?: () => void;
 }
 
 function ellipseOctagonPoints(cx: number, cy: number, rx: number, ry: number): string {
@@ -1186,6 +1187,7 @@ export function SymbolRenderer({
   multiSelected,
   onGroupMove,
   onGroupMoveEnd,
+  onDrillBack,
 }: Props) {
   const fontScale = useContext(FontScaleCtx);
   const fs = (base: number) => Math.round(base * fontScale * 10) / 10;
@@ -1304,6 +1306,19 @@ export function SymbolRenderer({
       style={{ cursor: (isBoundary || isWhiteBoxPool) ? "default" : multiSelected ? "grab" : "move" }}
     >
       <SymbolShape el={element} />
+
+      {/* Drill-back icon on start events when this diagram was navigated to from a subprocess */}
+      {element.type === "start-event" && onDrillBack && !element.boundaryHostId && (
+        <g
+          transform={`translate(${element.x - 2},${element.y - 2})`}
+          style={{ cursor: "pointer", pointerEvents: "all" }}
+          onClick={(e) => { e.stopPropagation(); onDrillBack(); }}
+        >
+          <rect x={-12} y={-4} width={14} height={12} rx={2} fill="white" fillOpacity={0.8} />
+          <path d="M0 4L-4 0L0 -4" fill="none" stroke="#2563eb" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M-4 4L-8 0L-4 -4" fill="none" stroke="#2563eb" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+        </g>
+      )}
 
       {showLabel && (
         element.type === 'start-event'        ||
