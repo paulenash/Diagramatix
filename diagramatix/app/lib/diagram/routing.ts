@@ -219,7 +219,36 @@ export function getConnectionPointBySide(el: DiagramElement, _side: Side): Point
 }
 
 // Returns a point along the specified side at a fractional offset (0=start, 0.5=midpoint, 1=end)
+// For gateways, the point moves along the diamond edge for that side.
+// Each side spans two diamond edges meeting at the vertex:
+//   top:    left-vertex → top-vertex → right-vertex  (offset 0→0.5→1)
+//   right:  top-vertex → right-vertex → bottom-vertex
+//   bottom: right-vertex → bottom-vertex → left-vertex
+//   left:   bottom-vertex → left-vertex → top-vertex
 export function sidePoint(el: DiagramElement, side: Side, offset = 0.5): Point {
+  if (el.type === "gateway") {
+    const cx = el.x + el.width / 2;
+    const cy = el.y + el.height / 2;
+    const top: Point    = { x: cx, y: el.y };
+    const right: Point  = { x: el.x + el.width, y: cy };
+    const bottom: Point = { x: cx, y: el.y + el.height };
+    const left: Point   = { x: el.x, y: cy };
+    // Each side has a start vertex, the main vertex at 0.5, and an end vertex
+    let v0: Point, v1: Point, v2: Point;
+    switch (side) {
+      case "top":    v0 = left;   v1 = top;    v2 = right;  break;
+      case "right":  v0 = top;    v1 = right;  v2 = bottom; break;
+      case "bottom": v0 = right;  v1 = bottom; v2 = left;   break;
+      case "left":   v0 = bottom; v1 = left;   v2 = top;    break;
+    }
+    if (offset <= 0.5) {
+      const t = offset * 2; // 0→1 over first half
+      return { x: v0.x + (v1.x - v0.x) * t, y: v0.y + (v1.y - v0.y) * t };
+    } else {
+      const t = (offset - 0.5) * 2; // 0→1 over second half
+      return { x: v1.x + (v2.x - v1.x) * t, y: v1.y + (v2.y - v1.y) * t };
+    }
+  }
   switch (side) {
     case "right":  return { x: el.x + el.width,         y: el.y + el.height * offset };
     case "left":   return { x: el.x,                    y: el.y + el.height * offset };

@@ -1267,16 +1267,53 @@ export function SymbolRenderer({
     if (multiSelected && onGroupMove) {
       let lastClientX = e.clientX;
       let lastClientY = e.clientY;
+      let autoScrollTimer: ReturnType<typeof setInterval> | null = null;
+      let lastEv: MouseEvent | null = null;
+
+      const EDGE = 40; // px from edge to trigger auto-scroll
+      const SCROLL_SPEED = 8; // px per tick
+
+      function startAutoScroll() {
+        if (autoScrollTimer) return;
+        autoScrollTimer = setInterval(() => {
+          if (!lastEv) return;
+          const svg = document.querySelector("[data-canvas]") as SVGSVGElement | null;
+          if (!svg) return;
+          const rect = svg.getBoundingClientRect();
+          let sdx = 0, sdy = 0;
+          if (lastEv.clientX < rect.left + EDGE) sdx = SCROLL_SPEED;
+          else if (lastEv.clientX > rect.right - EDGE) sdx = -SCROLL_SPEED;
+          if (lastEv.clientY < rect.top + EDGE) sdy = SCROLL_SPEED;
+          else if (lastEv.clientY > rect.bottom - EDGE) sdy = -SCROLL_SPEED;
+          if (sdx !== 0 || sdy !== 0) onGroupMove!(sdx, sdy);
+        }, 30);
+      }
+
+      function stopAutoScroll() {
+        if (autoScrollTimer) { clearInterval(autoScrollTimer); autoScrollTimer = null; }
+      }
 
       function onMouseMove(ev: MouseEvent) {
         const dx = ev.clientX - lastClientX;
         const dy = ev.clientY - lastClientY;
         lastClientX = ev.clientX;
         lastClientY = ev.clientY;
+        lastEv = ev;
         onGroupMove!(dx, dy);
+
+        // Check if near canvas edge
+        const svg = document.querySelector("[data-canvas]") as SVGSVGElement | null;
+        if (svg) {
+          const rect = svg.getBoundingClientRect();
+          const nearEdge = ev.clientX < rect.left + EDGE || ev.clientX > rect.right - EDGE ||
+                           ev.clientY < rect.top + EDGE || ev.clientY > rect.bottom - EDGE;
+          if (nearEdge) startAutoScroll();
+          else stopAutoScroll();
+        }
       }
 
       function onMouseUp() {
+        stopAutoScroll();
         window.removeEventListener("mousemove", onMouseMove);
         window.removeEventListener("mouseup", onMouseUp);
         onGroupMoveEnd?.();
@@ -1732,7 +1769,45 @@ export function SymbolRenderer({
           />
         );
       })()}
-      {showConnectionPoints && !isBoundary && element.type !== "lane" && element.type !== "use-case" && element.type !== "process-system" && (
+      {/* Diamond connection overlay for gateways */}
+      {showConnectionPoints && element.type === "gateway" && (() => {
+        const cx = element.x + element.width / 2;
+        const cy = element.y + element.height / 2;
+        const pts = `${cx},${element.y} ${element.x + element.width},${cy} ${cx},${element.y + element.height} ${element.x},${cy}`;
+        const handler = (e: React.MouseEvent) => {
+          e.stopPropagation();
+          const worldPt = svgToWorld ? svgToWorld(e.clientX, e.clientY) : { x: cx, y: cy };
+          const side = getClosestSideFromPoint(worldPt, element);
+          let fired = false;
+          function activate() {
+            if (fired) return;
+            fired = true;
+            clearTimeout(holdTimer);
+            window.removeEventListener("mouseup", onUp);
+            window.removeEventListener("mousemove", onMove);
+            onConnectionPointDragStart(side, worldPt);
+          }
+          const holdTimer = setTimeout(activate, 300);
+          function onMove(ev: MouseEvent) {
+            if (Math.abs(ev.clientX - e.clientX) > 5 || Math.abs(ev.clientY - e.clientY) > 5) activate();
+          }
+          function onUp() {
+            clearTimeout(holdTimer);
+            window.removeEventListener("mouseup", onUp);
+            window.removeEventListener("mousemove", onMove);
+          }
+          window.addEventListener("mouseup", onUp);
+          window.addEventListener("mousemove", onMove);
+        };
+        return (
+          <polygon points={pts} fill="transparent" stroke="none"
+            style={{ cursor: "crosshair" }}
+            onDoubleClick={(e) => { e.stopPropagation(); onDoubleClick(); }}
+            onMouseDown={handler}
+          />
+        );
+      })()}
+      {showConnectionPoints && !isBoundary && element.type !== "lane" && element.type !== "use-case" && element.type !== "process-system" && element.type !== "gateway" && (
         <rect data-interactive
           x={element.x} y={element.y}
           width={element.width} height={element.height}

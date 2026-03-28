@@ -680,7 +680,6 @@ function reducer(state: DiagramData, action: Action): DiagramData {
           return { ...conn, waypoints: conn.waypoints.map(pt => ({ x: pt.x + dx, y: pt.y + dy })) };
         }
         if (srcIn || tgtIn) {
-          // Use recomputeAllConnectors which validates perpendicularity and recalculates sides if needed
           return recomputeAllConnectors([conn], elements)[0] ?? conn;
         }
         return conn;
@@ -714,21 +713,17 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         return { ...e, x: e.x + dx, y: e.y + dy };
       });
 
-      // Step 1: Initial connector update
-      let connectors = state.connectors.map(conn => {
+      // Only update connectors that are fully within the moved group (translate waypoints)
+      // Skip recomputing partial connectors and obstacle validation during drag
+      // — full recomputation runs on ELEMENTS_MOVE_END
+      const connectors = state.connectors.map(conn => {
         const srcIn = expandedIds.has(conn.sourceId);
         const tgtIn = expandedIds.has(conn.targetId);
         if (srcIn && tgtIn) {
           return { ...conn, waypoints: conn.waypoints.map(pt => ({ x: pt.x + dx, y: pt.y + dy })) };
         }
-        if (srcIn || tgtIn) {
-          return recomputeAllConnectors([conn], elements)[0] ?? conn;
-        }
         return conn;
       });
-
-      // Step 2: Validate ALL connectors against ALL elements
-      connectors = validateConnectorsAgainstObstacles(connectors, elements);
 
       return { ...state, elements: updatePoolTypes(elements), connectors };
     }
@@ -1210,16 +1205,23 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       const { connectorId, endpoint, dx, dy } = action.payload;
       const connectors = state.connectors.map((conn) => {
         if (conn.id !== connectorId) return conn;
-        function nudgeOffset(side: Side, offset: number): number {
+        function nudgeOffset(side: Side, offset: number, elId: string): number {
           const clamp = (v: number) => Math.max(0.02, Math.min(0.98, v));
+          const el = state.elements.find(e => e.id === elId);
+          if (el?.type === "gateway") {
+            // For diamond edges, both dx and dy contribute to movement along the diagonal
+            // Use the dominant axis for the nudge direction
+            const delta = (Math.abs(dx) > Math.abs(dy) ? dx : dy) * 0.02;
+            return clamp(offset + delta);
+          }
           if (side === "top" || side === "bottom") return clamp(offset + dx * 0.02);
           return clamp(offset + dy * 0.02);
         }
         const updated = endpoint === "source"
-          ? { ...conn, sourceOffsetAlong: nudgeOffset(conn.sourceSide, conn.sourceOffsetAlong ?? 0.5),
+          ? { ...conn, sourceOffsetAlong: nudgeOffset(conn.sourceSide, conn.sourceOffsetAlong ?? 0.5, conn.sourceId),
               sourceRoleOffset: undefined, sourceMultOffset: undefined,
               sourceConstraintOffset: undefined, sourceUniqueOffset: undefined }
-          : { ...conn, targetOffsetAlong: nudgeOffset(conn.targetSide, conn.targetOffsetAlong ?? 0.5),
+          : { ...conn, targetOffsetAlong: nudgeOffset(conn.targetSide, conn.targetOffsetAlong ?? 0.5, conn.targetId),
               targetRoleOffset: undefined, targetMultOffset: undefined,
               targetConstraintOffset: undefined, targetUniqueOffset: undefined };
         const source = state.elements.find((el) => el.id === updated.sourceId);
@@ -1835,6 +1837,8 @@ export function useDiagram(initialData: DiagramData) {
       preGroupMoveRef.current = null;
       groupDraggingRef.current = false;
     }
+    // Recompute partial connectors and validate obstacles after group drag ends
+    dispatch({ type: "CORRECT_ALL_CONNECTORS" });
   }, []);
 
   const resizeElement = useCallback((id: string, x: number, y: number, width: number, height: number) => {

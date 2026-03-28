@@ -609,6 +609,8 @@ export function DiagramEditor({
     setShowTemplateNameModal(false);
     setShowAdminPasswordModal(false);
     setTemplateMode("idle");
+    setSelectedElementIds(new Set());
+    setSelectedConnectorId(null);
   }
 
   async function handleApplyTemplate(templateId: string) {
