@@ -390,6 +390,7 @@ export function Canvas({
     pos: Point;
   } | null>(null);
   const [focusedEndpoint, setFocusedEndpoint] = useState<"source" | "target" | null>(null);
+  const [msgMarkerFocused, setMsgMarkerFocused] = useState(false);
   const [debugLabelOffsets, setDebugLabelOffsets] = useState<Map<string, Point>>(new Map());
   const setDebugLabelOffset = useCallback((id: string, offset: Point) => {
     setDebugLabelOffsets(prev => { const next = new Map(prev); next.set(id, offset); return next; });
@@ -431,7 +432,7 @@ export function Canvas({
 
   // Reset picker offset when a new pending drop appears
   useEffect(() => { setPickerOffset({ x: 0, y: 0 }); }, [pendingDrop]);
-  useEffect(() => { setFocusedEndpoint(null); }, [selectedConnectorId]);
+  useEffect(() => { setFocusedEndpoint(null); setMsgMarkerFocused(false); }, [selectedConnectorId]);
 
   // Dismiss connector choice popup on click outside
   useEffect(() => {
@@ -925,26 +926,10 @@ export function Canvas({
 
     const startClientX = e.clientX;
 
-    // For black-box pool to black-box pool: allow free x movement along each pool's full width
-    const srcIsBlackBoxPool = sourceEl.type === "pool" && ((sourceEl.properties.poolType as string | undefined) ?? "black-box") !== "white-box";
-    const tgtIsBlackBoxPool = targetEl.type === "pool" && ((targetEl.properties.poolType as string | undefined) ?? "black-box") !== "white-box";
-
-    let minX: number, maxX: number;
-    if (srcIsBlackBoxPool && tgtIsBlackBoxPool) {
-      // Free movement across the full union of both pool widths
-      minX = Math.min(sourceEl.x, targetEl.x);
-      maxX = Math.max(sourceEl.x + sourceEl.width, targetEl.x + targetEl.width);
-    } else {
-      minX = Math.max(sourceEl.x, targetEl.x);
-      maxX = Math.min(sourceEl.x + sourceEl.width, targetEl.x + targetEl.width);
-    }
-
-    function clampX(raw: number) { return maxX > minX ? Math.max(minX, Math.min(maxX, raw)) : raw; }
-
     function buildWaypoints(x: number): Point[] {
-      // For black-box pools, clamp each endpoint to its own pool width
-      const srcX = srcIsBlackBoxPool ? Math.max(sourceEl!.x, Math.min(sourceEl!.x + sourceEl!.width, x)) : x;
-      const tgtX = tgtIsBlackBoxPool ? Math.max(targetEl!.x, Math.min(targetEl!.x + targetEl!.width, x)) : x;
+      // Each endpoint independently clamped to its own element's width
+      const srcX = Math.max(sourceEl!.x, Math.min(sourceEl!.x + sourceEl!.width, x));
+      const tgtX = Math.max(targetEl!.x, Math.min(targetEl!.x + targetEl!.width, x));
       const srcEdge: Point = conn!.sourceSide === "bottom"
         ? { x: srcX, y: sourceEl!.y + sourceEl!.height } : { x: srcX, y: sourceEl!.y };
       const tgtEdge: Point = conn!.targetSide === "top"
@@ -958,15 +943,18 @@ export function Canvas({
 
     function onMouseMove(ev: MouseEvent) {
       const dx = (ev.clientX - startClientX) / zoom;
-      onUpdateConnectorWaypoints?.(connectorId, buildWaypoints(clampX(startX + dx)));
+      onUpdateConnectorWaypoints?.(connectorId, buildWaypoints(startX + dx));
     }
 
     function onMouseUp(ev: MouseEvent) {
       const dx = (ev.clientX - startClientX) / zoom;
-      const newX = clampX(startX + dx);
-      const srcClampedX = srcIsBlackBoxPool ? Math.max(sourceEl!.x, Math.min(sourceEl!.x + sourceEl!.width, newX)) : newX;
-      const newOffsetAlong = sourceEl!.width > 0 ? (srcClampedX - sourceEl!.x) / sourceEl!.width : 0.5;
-      onUpdateConnectorEndpoint(connectorId, "source", conn!.sourceId, conn!.sourceSide, newOffsetAlong);
+      const newX = startX + dx;
+      const srcClampedX = Math.max(sourceEl!.x, Math.min(sourceEl!.x + sourceEl!.width, newX));
+      const tgtClampedX = Math.max(targetEl!.x, Math.min(targetEl!.x + targetEl!.width, newX));
+      const srcOffset = sourceEl!.width > 0 ? (srcClampedX - sourceEl!.x) / sourceEl!.width : 0.5;
+      const tgtOffset = targetEl!.width > 0 ? (tgtClampedX - targetEl!.x) / targetEl!.width : 0.5;
+      onUpdateConnectorEndpoint(connectorId, "source", conn!.sourceId, conn!.sourceSide, srcOffset);
+      onUpdateConnectorEndpoint(connectorId, "target", conn!.targetId, conn!.targetSide, tgtOffset);
       window.removeEventListener("mousemove", onMouseMove);
       window.removeEventListener("mouseup", onMouseUp);
     }
@@ -2280,9 +2268,32 @@ export function Canvas({
                   onMouseDown={(e) => handleMessageBpmnDrag(selectedConnectorId!, x, e)}
                 />
                 <circle cx={x} cy={midY} r={7}
-                  fill="#2563eb" fillOpacity={0.25} stroke="#2563eb" strokeWidth={1.5}
+                  fill={msgMarkerFocused ? "#f59e0b" : "#2563eb"} fillOpacity={msgMarkerFocused ? 0.5 : 0.25}
+                  stroke={msgMarkerFocused ? "#d97706" : "#2563eb"} strokeWidth={1.5}
                   style={{ cursor: "ew-resize" }}
-                  onMouseDown={(e) => handleMessageBpmnDrag(selectedConnectorId!, x, e)}
+                  onMouseDown={(e) => {
+                    e.stopPropagation();
+                    const startCX = e.clientX;
+                    let dragged = false;
+                    function onMove(ev: MouseEvent) {
+                      if (Math.abs(ev.clientX - startCX) > 3) {
+                        dragged = true;
+                        window.removeEventListener("mousemove", onMove);
+                        window.removeEventListener("mouseup", onUp);
+                        handleMessageBpmnDrag(selectedConnectorId!, x, e);
+                      }
+                    }
+                    function onUp() {
+                      window.removeEventListener("mousemove", onMove);
+                      window.removeEventListener("mouseup", onUp);
+                      if (!dragged) {
+                        // Click without drag: toggle orange focused state for arrow key nudging
+                        setMsgMarkerFocused(prev => !prev);
+                      }
+                    }
+                    window.addEventListener("mousemove", onMove);
+                    window.addEventListener("mouseup", onUp);
+                  }}
                 />
               </g>
             );

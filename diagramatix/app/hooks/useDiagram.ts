@@ -68,26 +68,21 @@ function boundaryEdgeOf(
 
 function messageBpmnWaypoints(
   source: DiagramElement, target: DiagramElement,
-  sourceSide: Side, targetSide: Side, sourceOffset: number, _targetOffset?: number
+  sourceSide: Side, targetSide: Side, sourceOffset: number, targetOffset?: number
 ): { waypoints: Point[]; sourceInvisibleLeader: true; targetInvisibleLeader: true } {
-  const tgtIsEvent = target.type === "start-event" || target.type === "intermediate-event";
-  // Compute a single shared x for perpendicular connector
-  const effectiveSrcAlong = BPMN_EVENT_TYPES.has(source.type) ? 0.5 : sourceOffset;
-  const srcX = source.x + source.width * effectiveSrcAlong;
-  let x: number;
-  if (tgtIsEvent) {
-    x = target.x + target.width / 2;
-  } else {
-    // Clamp srcX into the x-overlap of source and target for perpendicular
-    const minX = Math.max(source.x, target.x);
-    const maxX = Math.min(source.x + source.width, target.x + target.width);
-    x = maxX > minX ? Math.max(minX, Math.min(maxX, srcX)) : srcX;
-  }
-  // Both source and target edge use the SAME x for perpendicularity
+  const srcIsEvent = BPMN_EVENT_TYPES.has(source.type);
+  const tgtIsEvent = BPMN_EVENT_TYPES.has(target.type);
+  // Compute source edge x — clamped to source element boundary
+  const effectiveSrcAlong = srcIsEvent ? 0.5 : sourceOffset;
+  const srcX = Math.max(source.x, Math.min(source.x + source.width, source.x + source.width * effectiveSrcAlong));
+  // Compute target edge x — clamped to target element boundary
+  const effectiveTgtAlong = tgtIsEvent ? 0.5 : (targetOffset ?? effectiveSrcAlong);
+  const tgtX = Math.max(target.x, Math.min(target.x + target.width, target.x + target.width * effectiveTgtAlong));
+  // Source and target edge points (each independently positioned)
   const srcEdge: Point = sourceSide === "bottom"
-    ? { x, y: source.y + source.height } : { x, y: source.y };
+    ? { x: srcX, y: source.y + source.height } : { x: srcX, y: source.y };
   const tgtEdge: Point = targetSide === "top"
-    ? { x, y: target.y } : { x, y: target.y + target.height };
+    ? { x: tgtX, y: target.y } : { x: tgtX, y: target.y + target.height };
   return {
     waypoints: [
       { x: source.x + source.width / 2, y: source.y + source.height / 2 },
@@ -1251,25 +1246,36 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       const { connectorId, dx, dy } = action.payload;
       const connectors = state.connectors.map((conn) => {
         if (conn.id !== connectorId) return conn;
-        // Compute offset delta per side: how much to shift offsetAlong
-        function nudgeOffset(side: Side, offset: number): number {
+        const source = state.elements.find((el) => el.id === conn.sourceId);
+        const target = state.elements.find((el) => el.id === conn.targetId);
+        if (!source || !target) return conn;
+
+        let newSrcOffset: number, newTgtOffset: number;
+
+        if (conn.type === "messageBPMN") {
+          // For message connectors, nudge by pixels (convert dx to offset fraction per element width)
           const clamp = (v: number) => Math.max(0.02, Math.min(0.98, v));
-          // For top/bottom sides, horizontal nudge changes offset; vertical changes side
-          // For left/right sides, vertical nudge changes offset; horizontal changes side
-          if (side === "top" || side === "bottom") return clamp(offset + dx * 0.02);
-          return clamp(offset + dy * 0.02);
+          const srcStep = source.width > 0 ? dx / source.width : 0;
+          const tgtStep = target.width > 0 ? dx / target.width : 0;
+          newSrcOffset = clamp((conn.sourceOffsetAlong ?? 0.5) + srcStep);
+          newTgtOffset = clamp((conn.targetOffsetAlong ?? 0.5) + tgtStep);
+        } else {
+          // For other connectors, use fractional offset
+          function nudgeOffset(side: Side, offset: number): number {
+            const clamp = (v: number) => Math.max(0.02, Math.min(0.98, v));
+            if (side === "top" || side === "bottom") return clamp(offset + dx * 0.02);
+            return clamp(offset + dy * 0.02);
+          }
+          newSrcOffset = nudgeOffset(conn.sourceSide, conn.sourceOffsetAlong ?? 0.5);
+          newTgtOffset = nudgeOffset(conn.targetSide, conn.targetOffsetAlong ?? 0.5);
         }
-        const newSrcOffset = nudgeOffset(conn.sourceSide, conn.sourceOffsetAlong ?? 0.5);
-        const newTgtOffset = nudgeOffset(conn.targetSide, conn.targetOffsetAlong ?? 0.5);
+
         const updated = { ...conn, sourceOffsetAlong: newSrcOffset, targetOffsetAlong: newTgtOffset,
           sourceRoleOffset: undefined, sourceMultOffset: undefined,
           sourceConstraintOffset: undefined, sourceUniqueOffset: undefined,
           targetRoleOffset: undefined, targetMultOffset: undefined,
           targetConstraintOffset: undefined, targetUniqueOffset: undefined,
           associationNameOffset: undefined };
-        const source = state.elements.find((el) => el.id === updated.sourceId);
-        const target = state.elements.find((el) => el.id === updated.targetId);
-        if (!source || !target) return conn;
         const { waypoints, sourceInvisibleLeader, targetInvisibleLeader } =
           updated.type === "messageBPMN"
             ? messageBpmnWaypoints(source, target, updated.sourceSide, updated.targetSide,
@@ -1279,6 +1285,11 @@ function reducer(state: DiagramData, action: Action): DiagramData {
                 updated.sourceOffsetAlong ?? 0.5, updated.targetOffsetAlong ?? 0.5);
         return { ...updated, waypoints, sourceInvisibleLeader, targetInvisibleLeader };
       });
+      // Skip obstacle validation for messageBPMN nudges — they don't interact with obstacles
+      const nudgedConn = connectors.find(c => c.id === connectorId);
+      if (nudgedConn?.type === "messageBPMN") {
+        return { ...state, connectors };
+      }
       return { ...state, connectors: validateConnectorsAgainstObstacles(connectors, state.elements) };
     }
 
