@@ -392,13 +392,12 @@ export function DiagramEditor({
   const [templateMode, setTemplateMode] = useState<"idle" | "capturing" | "capturing-builtin" | "editing">("idle");
   const [deletingTemplateIds, setDeletingTemplateIds] = useState<Set<string>>(new Set());
   const [templateDropdownOpen, setTemplateDropdownOpen] = useState(false);
-  const [builtInDropdownOpen, setBuiltInDropdownOpen] = useState(false);
+  // builtInDropdownOpen removed — merged into single Templates dropdown
   const [showTemplateNameModal, setShowTemplateNameModal] = useState(false);
   const [showAdminPasswordModal, setShowAdminPasswordModal] = useState(false);
   const [pendingTemplateData, setPendingTemplateData] = useState<TemplateData | null>(null);
   const getViewportCenterRef = useRef<(() => Point) | null>(null);
   const templateDropdownRef = useRef<HTMLDivElement>(null);
-  const builtInDropdownRef = useRef<HTMLDivElement>(null);
 
   // Alignment dropdown state
   const [alignDropdownOpen, setAlignDropdownOpen] = useState(false);
@@ -462,17 +461,6 @@ export function DiagramEditor({
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, [templateDropdownOpen]);
-
-  useEffect(() => {
-    if (!builtInDropdownOpen) return;
-    function handleClick(e: MouseEvent) {
-      if (builtInDropdownRef.current && !builtInDropdownRef.current.contains(e.target as Node)) {
-        setBuiltInDropdownOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [builtInDropdownOpen]);
 
   // Close alignment dropdown on outside click
   useEffect(() => {
@@ -625,7 +613,6 @@ export function DiagramEditor({
 
   async function handleApplyTemplate(templateId: string) {
     setTemplateDropdownOpen(false);
-    setBuiltInDropdownOpen(false);
     try {
       const res = await fetch(`/api/templates/${templateId}`);
       if (!res.ok) { console.error("Failed to fetch template:", res.status); return; }
@@ -663,7 +650,6 @@ export function DiagramEditor({
 
   async function handleEditTemplate(templateId: string, templateName: string) {
     setTemplateDropdownOpen(false);
-    setBuiltInDropdownOpen(false);
     try {
       const res = await fetch(`/api/templates/${templateId}`);
       if (!res.ok) { console.error("Failed to fetch template:", res.status); return; }
@@ -872,128 +858,104 @@ export function DiagramEditor({
         )}
 
         {diagramType === "bpmn" && templateMode === "idle" && (
-          <>
-          {/* Built-In Templates dropdown */}
-          <div className="relative" ref={builtInDropdownRef}>
-            <button
-              onClick={() => setBuiltInDropdownOpen((prev) => !prev)}
-              className="px-3 py-1.5 text-xs text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
-            >
-              Built-In Templates ▾
-            </button>
-            {builtInDropdownOpen && (
-              <div className="absolute right-0 top-full mt-1 w-52 bg-white border border-gray-200 rounded shadow-lg z-50">
-                <button
-                  onClick={() => {
-                    setBuiltInDropdownOpen(false);
-                    if (isAdmin) {
-                      setTemplateMode("capturing-builtin");
-                    } else {
-                      setShowAdminPasswordModal(true);
-                    }
-                  }}
-                  className="w-full text-left px-3 py-2 text-xs text-blue-600 hover:bg-blue-50 font-medium"
-                >
-                  + Create Built-In Template
-                </button>
-                {builtInTemplates.length > 0 && <div className="border-t border-gray-100" />}
-                {builtInTemplates.map((t) => {
-                  const isDeleting = deletingTemplateIds.has(t.id);
-                  return (
-                  <div key={t.id} className={`flex items-center ${isDeleting ? "opacity-50" : "hover:bg-gray-50"}`}>
-                    <button
-                      onClick={() => !isDeleting && handleApplyTemplate(t.id)}
-                      disabled={isDeleting}
-                      className={`flex-1 text-left px-3 py-2 text-xs text-gray-700 ${isDeleting ? "line-through text-gray-400" : ""}`}
-                    >
-                      {t.name}{isDeleting ? " (deleting\u2026)" : ""}
-                    </button>
-                    {isAdmin && !isDeleting && (
-                      <>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleEditTemplate(t.id, t.name); }}
-                          className="px-2 py-2 text-gray-400 hover:text-blue-500"
-                          title="Edit template"
-                        >
-                          <svg width={12} height={12} viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M7 2l3 3-7 7H0V9z" />
-                          </svg>
-                        </button>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleDeleteTemplate(t.id, true); }}
-                          className="px-2 py-2 text-gray-400 hover:text-red-500"
-                          title="Delete template"
-                        >
-                          <svg width={12} height={12} viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round">
-                            <path d="M2 3h8M4.5 3V2h3v1M3 3v7a1 1 0 001 1h4a1 1 0 001-1V3" />
-                          </svg>
-                        </button>
-                      </>
-                    )}
-                  </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* User Templates dropdown */}
           <div className="relative" ref={templateDropdownRef}>
             <button
               onClick={() => setTemplateDropdownOpen((prev) => !prev)}
               className="px-3 py-1.5 text-xs text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
             >
-              User Templates ▾
+              Templates {"\u25BE"}
             </button>
             {templateDropdownOpen && (
-              <div className="absolute right-0 top-full mt-1 w-52 bg-white border border-gray-200 rounded shadow-lg z-50">
+              <div className="absolute right-0 top-full mt-1 w-56 bg-white border border-gray-200 rounded shadow-lg z-50 max-h-80 overflow-y-auto">
+                {/* Create actions */}
                 <button
                   onClick={() => { setTemplateMode("capturing"); setTemplateDropdownOpen(false); }}
                   className="w-full text-left px-3 py-2 text-xs text-blue-600 hover:bg-blue-50 font-medium"
                 >
                   + Create User Template
                 </button>
-                {userTemplates.length > 0 && <div className="border-t border-gray-100" />}
-                {userTemplates.map((t) => {
-                  const isDeleting = deletingTemplateIds.has(t.id);
-                  return (
-                  <div key={t.id} className={`flex items-center ${isDeleting ? "opacity-50" : "hover:bg-gray-50"}`}>
-                    <button
-                      onClick={() => !isDeleting && handleApplyTemplate(t.id)}
-                      disabled={isDeleting}
-                      className={`flex-1 text-left px-3 py-2 text-xs text-gray-700 ${isDeleting ? "line-through text-gray-400" : ""}`}
-                    >
-                      {t.name}{isDeleting ? " (deleting\u2026)" : ""}
-                    </button>
-                    {!isDeleting && (
-                    <>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleEditTemplate(t.id, t.name); }}
-                      className="px-2 py-2 text-gray-400 hover:text-blue-500"
-                      title="Edit template"
-                    >
-                      <svg width={12} height={12} viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M7 2l3 3-7 7H0V9z" />
-                      </svg>
-                    </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleDeleteTemplate(t.id); }}
-                      className="px-2 py-2 text-gray-400 hover:text-red-500"
-                      title="Delete template"
-                    >
-                      <svg width={12} height={12} viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round">
-                        <path d="M2 3h8M4.5 3V2h3v1M3 3v7a1 1 0 001 1h4a1 1 0 001-1V3" />
-                      </svg>
-                    </button>
-                    </>
-                    )}
-                  </div>
-                  );
-                })}
+                {isAdmin && (
+                  <button
+                    onClick={() => {
+                      setTemplateDropdownOpen(false);
+                      setTemplateMode("capturing-builtin");
+                    }}
+                    className="w-full text-left px-3 py-2 text-xs text-orange-600 hover:bg-orange-50 font-medium"
+                  >
+                    + Create Built-In Template
+                  </button>
+                )}
+
+                {/* Built-In Templates */}
+                {builtInTemplates.length > 0 && (
+                  <>
+                    <div className="border-t border-gray-100" />
+                    <p className="px-3 py-1.5 text-[10px] text-gray-400 font-semibold uppercase tracking-wide">Built-In</p>
+                    {builtInTemplates.map((t) => {
+                      const isDeleting = deletingTemplateIds.has(t.id);
+                      return (
+                        <div key={t.id} className={`flex items-center ${isDeleting ? "opacity-50" : "hover:bg-gray-50"}`}>
+                          <button
+                            onClick={() => !isDeleting && handleApplyTemplate(t.id)}
+                            disabled={isDeleting}
+                            className={`flex-1 text-left px-3 py-1.5 text-xs text-gray-700 ${isDeleting ? "line-through text-gray-400" : ""}`}
+                          >
+                            {t.name}{isDeleting ? " (deleting\u2026)" : ""}
+                          </button>
+                          {isAdmin && !isDeleting && (
+                            <>
+                              <button onClick={(e) => { e.stopPropagation(); handleEditTemplate(t.id, t.name); }}
+                                className="px-1.5 py-1.5 text-gray-400 hover:text-blue-500" title="Edit">
+                                <svg width={11} height={11} viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"><path d="M7 2l3 3-7 7H0V9z" /></svg>
+                              </button>
+                              <button onClick={(e) => { e.stopPropagation(); handleDeleteTemplate(t.id, true); }}
+                                className="px-1.5 py-1.5 text-gray-400 hover:text-red-500" title="Delete">
+                                <svg width={11} height={11} viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round"><path d="M2 3h8M4.5 3V2h3v1M3 3v7a1 1 0 001 1h4a1 1 0 001-1V3" /></svg>
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </>
+                )}
+
+                {/* User Templates */}
+                {userTemplates.length > 0 && (
+                  <>
+                    <div className="border-t border-gray-100" />
+                    <p className="px-3 py-1.5 text-[10px] text-gray-400 font-semibold uppercase tracking-wide">User</p>
+                    {userTemplates.map((t) => {
+                      const isDeleting = deletingTemplateIds.has(t.id);
+                      return (
+                        <div key={t.id} className={`flex items-center ${isDeleting ? "opacity-50" : "hover:bg-gray-50"}`}>
+                          <button
+                            onClick={() => !isDeleting && handleApplyTemplate(t.id)}
+                            disabled={isDeleting}
+                            className={`flex-1 text-left px-3 py-1.5 text-xs text-gray-700 ${isDeleting ? "line-through text-gray-400" : ""}`}
+                          >
+                            {t.name}{isDeleting ? " (deleting\u2026)" : ""}
+                          </button>
+                          {!isDeleting && (
+                            <>
+                              <button onClick={(e) => { e.stopPropagation(); handleEditTemplate(t.id, t.name); }}
+                                className="px-1.5 py-1.5 text-gray-400 hover:text-blue-500" title="Edit">
+                                <svg width={11} height={11} viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"><path d="M7 2l3 3-7 7H0V9z" /></svg>
+                              </button>
+                              <button onClick={(e) => { e.stopPropagation(); handleDeleteTemplate(t.id); }}
+                                className="px-1.5 py-1.5 text-gray-400 hover:text-red-500" title="Delete">
+                                <svg width={11} height={11} viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round"><path d="M2 3h8M4.5 3V2h3v1M3 3v7a1 1 0 001 1h4a1 1 0 001-1V3" /></svg>
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </>
+                )}
               </div>
             )}
           </div>
-          </>
         )}
         {diagramType === "bpmn" && (templateMode === "capturing" || templateMode === "capturing-builtin") && (
           <div className="flex items-center gap-2">

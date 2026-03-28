@@ -512,6 +512,11 @@ export function PropertiesPanel({
     if (element) setLabelDraft(element.label);
   }, [element]);
 
+  // Auto-collapse title when element/connector selected, auto-open when deselected
+  useEffect(() => {
+    setTitleOpen(!element && !connector);
+  }, [element, connector]);
+
   // Collapsed state: show a narrow vertical tab
   if (panelCollapsed) {
     return (
