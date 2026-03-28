@@ -926,14 +926,14 @@ export function Canvas({
 
     const startClientX = e.clientX;
 
-    function buildWaypoints(x: number): Point[] {
-      // Each endpoint independently clamped to its own element's width
-      const srcX = Math.max(sourceEl!.x, Math.min(sourceEl!.x + sourceEl!.width, x));
-      const tgtX = Math.max(targetEl!.x, Math.min(targetEl!.x + targetEl!.width, x));
+    function buildWaypoints(rawX: number): Point[] {
+      // Clamp to both element boundaries — connector must remain vertical (single shared x)
+      let x = Math.max(sourceEl!.x, Math.min(sourceEl!.x + sourceEl!.width, rawX));
+      x = Math.max(targetEl!.x, Math.min(targetEl!.x + targetEl!.width, x));
       const srcEdge: Point = conn!.sourceSide === "bottom"
-        ? { x: srcX, y: sourceEl!.y + sourceEl!.height } : { x: srcX, y: sourceEl!.y };
+        ? { x, y: sourceEl!.y + sourceEl!.height } : { x, y: sourceEl!.y };
       const tgtEdge: Point = conn!.targetSide === "top"
-        ? { x: tgtX, y: targetEl!.y } : { x: tgtX, y: targetEl!.y + targetEl!.height };
+        ? { x, y: targetEl!.y } : { x, y: targetEl!.y + targetEl!.height };
       return [
         { x: sourceEl!.x + sourceEl!.width / 2, y: sourceEl!.y + sourceEl!.height / 2 },
         srcEdge, tgtEdge,
@@ -948,13 +948,12 @@ export function Canvas({
 
     function onMouseUp(ev: MouseEvent) {
       const dx = (ev.clientX - startClientX) / zoom;
-      const newX = startX + dx;
-      const srcClampedX = Math.max(sourceEl!.x, Math.min(sourceEl!.x + sourceEl!.width, newX));
-      const tgtClampedX = Math.max(targetEl!.x, Math.min(targetEl!.x + targetEl!.width, newX));
-      const srcOffset = sourceEl!.width > 0 ? (srcClampedX - sourceEl!.x) / sourceEl!.width : 0.5;
-      const tgtOffset = targetEl!.width > 0 ? (tgtClampedX - targetEl!.x) / targetEl!.width : 0.5;
+      const rawX = startX + dx;
+      // Clamp to overlap of both elements to keep vertical
+      let x = Math.max(sourceEl!.x, Math.min(sourceEl!.x + sourceEl!.width, rawX));
+      x = Math.max(targetEl!.x, Math.min(targetEl!.x + targetEl!.width, x));
+      const srcOffset = sourceEl!.width > 0 ? (x - sourceEl!.x) / sourceEl!.width : 0.5;
       onUpdateConnectorEndpoint(connectorId, "source", conn!.sourceId, conn!.sourceSide, srcOffset);
-      onUpdateConnectorEndpoint(connectorId, "target", conn!.targetId, conn!.targetSide, tgtOffset);
       window.removeEventListener("mousemove", onMouseMove);
       window.removeEventListener("mouseup", onMouseUp);
     }

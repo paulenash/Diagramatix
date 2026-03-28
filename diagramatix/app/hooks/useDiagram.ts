@@ -68,21 +68,29 @@ function boundaryEdgeOf(
 
 function messageBpmnWaypoints(
   source: DiagramElement, target: DiagramElement,
-  sourceSide: Side, targetSide: Side, sourceOffset: number, targetOffset?: number
+  sourceSide: Side, targetSide: Side, sourceOffset: number, _targetOffset?: number
 ): { waypoints: Point[]; sourceInvisibleLeader: true; targetInvisibleLeader: true } {
   const srcIsEvent = BPMN_EVENT_TYPES.has(source.type);
   const tgtIsEvent = BPMN_EVENT_TYPES.has(target.type);
-  // Compute source edge x — clamped to source element boundary
+  // Compute a single shared x — message connectors must always be vertical
   const effectiveSrcAlong = srcIsEvent ? 0.5 : sourceOffset;
-  const srcX = Math.max(source.x, Math.min(source.x + source.width, source.x + source.width * effectiveSrcAlong));
-  // Compute target edge x — clamped to target element boundary
-  const effectiveTgtAlong = tgtIsEvent ? 0.5 : (targetOffset ?? effectiveSrcAlong);
-  const tgtX = Math.max(target.x, Math.min(target.x + target.width, target.x + target.width * effectiveTgtAlong));
-  // Source and target edge points (each independently positioned)
+  let x: number;
+  if (tgtIsEvent) {
+    x = target.x + target.width / 2;
+  } else if (srcIsEvent) {
+    x = source.x + source.width / 2;
+  } else {
+    // Use the source offset to position, clamped to both element boundaries
+    const rawX = source.x + source.width * effectiveSrcAlong;
+    // Clamp to source boundary
+    x = Math.max(source.x, Math.min(source.x + source.width, rawX));
+    // Also clamp to target boundary so the connector stays on both elements
+    x = Math.max(target.x, Math.min(target.x + target.width, x));
+  }
   const srcEdge: Point = sourceSide === "bottom"
-    ? { x: srcX, y: source.y + source.height } : { x: srcX, y: source.y };
+    ? { x, y: source.y + source.height } : { x, y: source.y };
   const tgtEdge: Point = targetSide === "top"
-    ? { x: tgtX, y: target.y } : { x: tgtX, y: target.y + target.height };
+    ? { x, y: target.y } : { x, y: target.y + target.height };
   return {
     waypoints: [
       { x: source.x + source.width / 2, y: source.y + source.height / 2 },
@@ -1253,12 +1261,15 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         let newSrcOffset: number, newTgtOffset: number;
 
         if (conn.type === "messageBPMN") {
-          // For message connectors, nudge by pixels (convert dx to offset fraction per element width)
+          // For message connectors, nudge by pixels using a single shared x to stay vertical
           const clamp = (v: number) => Math.max(0.02, Math.min(0.98, v));
-          const srcStep = source.width > 0 ? dx / source.width : 0;
-          const tgtStep = target.width > 0 ? dx / target.width : 0;
-          newSrcOffset = clamp((conn.sourceOffsetAlong ?? 0.5) + srcStep);
-          newTgtOffset = clamp((conn.targetOffsetAlong ?? 0.5) + tgtStep);
+          const curX = source.x + source.width * (conn.sourceOffsetAlong ?? 0.5);
+          let newX = curX + dx;
+          // Clamp to both element boundaries
+          newX = Math.max(source.x, Math.min(source.x + source.width, newX));
+          newX = Math.max(target.x, Math.min(target.x + target.width, newX));
+          newSrcOffset = clamp(source.width > 0 ? (newX - source.x) / source.width : 0.5);
+          newTgtOffset = newSrcOffset; // not used — messageBpmnWaypoints uses sourceOffset only
         } else {
           // For other connectors, use fractional offset
           function nudgeOffset(side: Side, offset: number): number {

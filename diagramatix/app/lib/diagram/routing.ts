@@ -599,25 +599,21 @@ export function recomputeAllConnectors(
     // messageBPMN: always vertical when possible — single shared x for both edges
     if (conn.type === "messageBPMN") {
       const BPMN_EVENT_TYPES = new Set(["start-event", "intermediate-event", "end-event"]);
+      const srcIsEvent = BPMN_EVENT_TYPES.has(source.type);
       const tgtIsEvent = target.type === "start-event" || target.type === "intermediate-event";
       let x: number;
       let repairedSrcOffset = conn.sourceOffsetAlong;
       if (tgtIsEvent) {
         x = target.x + target.width / 2;
+      } else if (srcIsEvent) {
+        x = source.x + source.width / 2;
       } else {
+        // Use source offset, clamped to both element boundaries to stay vertical
         const rawOffset = conn.sourceOffsetAlong ?? 0.5;
-        const offsetAlong = BPMN_EVENT_TYPES.has(source.type) ? 0.5 : rawOffset;
-        const srcX = source.x + source.width * offsetAlong;
-        const minX = Math.max(source.x, target.x);
-        const maxX = Math.min(source.x + source.width, target.x + target.width);
-        if (maxX > minX) {
-          // Overlap exists: clamp to make perpendicular and update offset
-          x = Math.max(minX, Math.min(maxX, srcX));
-          repairedSrcOffset = source.width > 0 ? (x - source.x) / source.width : 0.5;
-        } else {
-          // No overlap: diagonal (will show red)
-          x = srcX;
-        }
+        const rawX = source.x + source.width * rawOffset;
+        x = Math.max(source.x, Math.min(source.x + source.width, rawX));
+        x = Math.max(target.x, Math.min(target.x + target.width, x));
+        repairedSrcOffset = source.width > 0 ? (x - source.x) / source.width : 0.5;
       }
       // Both edges use the SAME x for perpendicularity
       const srcEdge: Point = conn.sourceSide === "bottom"
