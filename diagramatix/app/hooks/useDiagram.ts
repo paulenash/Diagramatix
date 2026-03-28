@@ -531,6 +531,9 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       } else if (action.payload.symbolType === "process-system") {
         const count = state.elements.filter((e) => e.type === "process-system").length;
         label = `Process ${count + 1}`;
+      } else if (action.payload.symbolType === "gateway") {
+        // Exclusive/Inclusive get "Test?", Parallel/Event-based get no label
+        label = "Test?";
       }
       let newEl: DiagramElement = {
         id: nanoid(),
@@ -542,6 +545,7 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         label,
         properties: action.payload.symbolType === "pool" ? { poolType: "black-box" }
           : action.payload.symbolType === "uml-class" ? { showAttributes: false, showOperations: false }
+          : action.payload.symbolType === "gateway" ? { labelOffsetX: -30, labelOffsetY: -54 }
           : {},
         taskType:  action.payload.taskType,
         eventType: action.payload.eventType,
@@ -836,8 +840,19 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       const elements = state.elements.map((el) => {
         if (el.id !== action.payload.id) return el;
         const { taskType, gatewayType, eventType, repeatType, flowType, ...rest } = action.payload.properties;
+        let updatedLabel = el.label;
+        // When gateway type changes, update label accordingly
+        if (gatewayType !== undefined && el.type === "gateway") {
+          const gt = gatewayType as GatewayType;
+          if (gt === "parallel" || gt === "event-based") {
+            updatedLabel = "";
+          } else if ((gt === "exclusive" || gt === "inclusive" || gt === "none") && !el.label) {
+            updatedLabel = "Test?";
+          }
+        }
         return {
           ...el,
+          label: updatedLabel,
           ...(taskType !== undefined ? { taskType: taskType as BpmnTaskType } : {}),
           ...(gatewayType !== undefined ? { gatewayType: gatewayType as GatewayType } : {}),
           ...(eventType !== undefined ? { eventType: eventType as EventType } : {}),
