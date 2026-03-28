@@ -398,8 +398,8 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
 
   return (
     <g>
-      {/* Dotted tether: always visible except when editing — ends at label box boundary */}
-      {!isEditing && (() => {
+      {/* Dotted tether: for sequence connectors, only show when label is focused/editing; others always show */}
+      {!isEditing && (connector.type !== "sequence" || isLabelFocused || selected) && (() => {
         // Compute intersection of tether line with label box boundary
         const boxL = lCx - effectiveLWidth / 2 - 3;
         const boxR = lCx + effectiveLWidth / 2 + 3;
