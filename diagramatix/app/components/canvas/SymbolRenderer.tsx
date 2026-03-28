@@ -743,13 +743,7 @@ function SubprocessShape({ el }: { el: DiagramElement }) {
       <line x1={mx + 3} y1={my + markerH / 2} x2={mx + markerW - 3} y2={my + markerH / 2}
         stroke="#374151" strokeWidth={1} />
       {hasLoop && <LoopMarker cx={loopCX} cy={my + markerH * 0.55} />}
-      {(el.properties.linkedDiagramId as string | undefined) && (
-        <g transform={`translate(${el.x + el.width + 3},${el.y + 1})`}>
-          <path d="M2 9L6 5L2 1" fill="none" stroke="#2563eb" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
-          <path d="M6 9L10 5L6 1" fill="none" stroke="#2563eb" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
-        </g>
-      )}
-      {/* ValueBadge rendered in main SymbolRenderer */}
+      {/* Link icon and ValueBadge rendered in main SymbolRenderer */}
     </g>
   );
 }
@@ -1357,7 +1351,15 @@ export function SymbolRenderer({
     <ShowValueDisplayCtx.Provider value={!!showValueDisplay}>
     <g
       onMouseDown={handleMouseDown}
-      onDoubleClick={(e) => { e.stopPropagation(); onDoubleClick(); }}
+      onDoubleClick={(e) => {
+        e.stopPropagation();
+        // For pools, only trigger label edit when double-clicking the header strip (left 30px)
+        if (element.type === "pool" && svgToWorld) {
+          const world = svgToWorld(e.clientX, e.clientY);
+          if (world.x > element.x + 30) return;
+        }
+        onDoubleClick();
+      }}
       style={{ cursor: (isBoundary || isWhiteBoxPool) ? "default" : multiSelected ? "grab" : "move" }}
     >
       <SymbolShape el={element} />
@@ -1367,14 +1369,29 @@ export function SymbolRenderer({
         <ValueBadge el={element} show={true} />
       )}
 
+      {/* Subprocess drill-through link icon (outside element, own event handling) */}
+      {element.type === "subprocess" && (element.properties.linkedDiagramId as string | undefined) && (
+        <g
+          transform={`translate(${element.x + element.width + 3},${element.y + 1})`}
+          style={{ cursor: "pointer", pointerEvents: "all" }}
+          onMouseDown={(e) => e.stopPropagation()}
+          onDoubleClick={(e) => { e.stopPropagation(); onDoubleClick(); }}
+        >
+          <rect x={-2} y={-2} width={16} height={14} fill="transparent" />
+          <path d="M2 9L6 5L2 1" fill="none" stroke="#2563eb" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M6 9L10 5L6 1" fill="none" stroke="#2563eb" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+        </g>
+      )}
+
       {/* Drill-back icon on start events when this diagram was navigated to from a subprocess */}
       {element.type === "start-event" && onDrillBack && !element.boundaryHostId && (
         <g
           transform={`translate(${element.x - 2},${element.y - 2})`}
           style={{ cursor: "pointer", pointerEvents: "all" }}
+          onMouseDown={(e) => e.stopPropagation()}
           onDoubleClick={(e) => { e.stopPropagation(); onDrillBack(); }}
         >
-          <rect x={-12} y={-4} width={14} height={12} rx={2} fill="white" fillOpacity={0.8} />
+          <rect x={-12} y={-4} width={16} height={14} fill="transparent" />
           <path d="M0 4L-4 0L0 -4" fill="none" stroke="#2563eb" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
           <path d="M-4 4L-8 0L-4 -4" fill="none" stroke="#2563eb" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
         </g>
