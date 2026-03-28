@@ -1110,7 +1110,25 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         return el;
       });
 
-      return { ...state, elements: updatedElements, connectors: [...state.connectors, newConnector] };
+      // Auto-set data-object role based on associationBPMN connector directions
+      const allConnectors = [...state.connectors, newConnector];
+      const finalElements = (connectorType === "associationBPMN")
+        ? updatedElements.map(el => {
+            if (el.type !== "data-object") return el;
+            // Only update if this data object is involved in the new connector
+            if (el.id !== sourceId && el.id !== targetId) return el;
+            const inbound = allConnectors.filter(c => c.type === "associationBPMN" && c.targetId === el.id);
+            const outbound = allConnectors.filter(c => c.type === "associationBPMN" && c.sourceId === el.id);
+            let role: string;
+            if (inbound.length > 0 && outbound.length > 0) role = "none";
+            else if (inbound.length > 0) role = "output";
+            else if (outbound.length > 0) role = "input";
+            else role = "none";
+            return { ...el, properties: { ...el.properties, role } };
+          })
+        : updatedElements;
+
+      return { ...state, elements: finalElements, connectors: allConnectors };
     }
 
     case "DELETE_CONNECTOR": {
@@ -1137,6 +1155,23 @@ function reducer(state: DiagramData, action: Action): DiagramData {
           return el;
         });
 
+        return { ...state, elements: updatedElements, connectors: updatedConnectors };
+      }
+
+      // Recalculate data-object role when associationBPMN connector is deleted
+      if (conn?.type === "associationBPMN") {
+        const updatedElements = state.elements.map(el => {
+          if (el.type !== "data-object") return el;
+          if (el.id !== conn.sourceId && el.id !== conn.targetId) return el;
+          const inbound = updatedConnectors.filter(c => c.type === "associationBPMN" && c.targetId === el.id);
+          const outbound = updatedConnectors.filter(c => c.type === "associationBPMN" && c.sourceId === el.id);
+          let role: string;
+          if (inbound.length > 0 && outbound.length > 0) role = "none";
+          else if (inbound.length > 0) role = "output";
+          else if (outbound.length > 0) role = "input";
+          else role = "none";
+          return { ...el, properties: { ...el.properties, role } };
+        });
         return { ...state, elements: updatedElements, connectors: updatedConnectors };
       }
 
