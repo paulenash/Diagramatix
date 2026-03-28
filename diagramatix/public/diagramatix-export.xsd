@@ -328,6 +328,32 @@
   </xs:simpleType>
 
   <!-- ============================================================ -->
+  <!-- Value analysis enum (BPMN task/subprocess)                    -->
+  <!-- ============================================================ -->
+  <xs:simpleType name="ValueAnalysisEnum">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="none"/>
+      <xs:enumeration value="VA"/>
+      <xs:enumeration value="NNVA"/>
+      <xs:enumeration value="NVA"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- ============================================================ -->
+  <!-- Time unit enum (BPMN task/subprocess cycle/wait times)        -->
+  <!-- ============================================================ -->
+  <xs:simpleType name="TimeUnitEnum">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="none"/>
+      <xs:enumeration value="sec"/>
+      <xs:enumeration value="min"/>
+      <xs:enumeration value="hrs"/>
+      <xs:enumeration value="days"/>
+      <xs:enumeration value="other"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- ============================================================ -->
   <!-- Connectors                                                    -->
   <!-- ============================================================ -->
   <xs:complexType name="ConnectorListType">

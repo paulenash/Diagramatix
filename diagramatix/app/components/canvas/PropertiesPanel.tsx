@@ -1419,6 +1419,67 @@ export function PropertiesPanel({
             ))}
           </div>
         </div>
+        <div className="flex gap-2">
+          <div className="flex-1">
+            <p className="text-xs font-medium text-gray-500 mb-1">Cycle Time</p>
+            <input
+              type="number"
+              min={0}
+              step="any"
+              value={(element.properties.cycleTime as number | undefined) ?? ""}
+              onChange={(e) => onUpdateProperties(element.id, { cycleTime: e.target.value ? Number(e.target.value) : undefined })}
+              placeholder="0"
+              className="w-full text-xs border border-gray-300 rounded px-2 py-1 outline-none focus:border-blue-400"
+            />
+          </div>
+          <div className="flex-1">
+            <p className="text-xs font-medium text-gray-500 mb-1">Wait Time</p>
+            <input
+              type="number"
+              min={0}
+              step="any"
+              value={(element.properties.waitTime as number | undefined) ?? ""}
+              onChange={(e) => onUpdateProperties(element.id, { waitTime: e.target.value ? Number(e.target.value) : undefined })}
+              placeholder="0"
+              className="w-full text-xs border border-gray-300 rounded px-2 py-1 outline-none focus:border-blue-400"
+            />
+          </div>
+        </div>
+        <div>
+          <p className="text-xs font-medium text-gray-500 mb-1">Time Units</p>
+          <div className="flex gap-1 items-center">
+            <select
+              value={
+                (element.properties.timeUnit as string | undefined) ?? "none"
+              }
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v === "other") {
+                  onUpdateProperties(element.id, { timeUnit: "other", timeUnitCustom: element.properties.timeUnitCustom ?? "" });
+                } else {
+                  onUpdateProperties(element.id, { timeUnit: v, timeUnitCustom: undefined });
+                }
+              }}
+              className="text-xs border border-gray-300 rounded px-2 py-1 outline-none focus:border-blue-400"
+            >
+              <option value="none">None</option>
+              <option value="sec">sec</option>
+              <option value="min">min</option>
+              <option value="hrs">hrs</option>
+              <option value="days">days</option>
+              <option value="other">other</option>
+            </select>
+            {(element.properties.timeUnit as string) === "other" && (
+              <input
+                type="text"
+                value={(element.properties.timeUnitCustom as string | undefined) ?? ""}
+                onChange={(e) => onUpdateProperties(element.id, { timeUnitCustom: e.target.value })}
+                placeholder="unit"
+                className="flex-1 text-xs border border-gray-300 rounded px-2 py-1 outline-none focus:border-blue-400"
+              />
+            )}
+          </div>
+        </div>
         </>
       )}
 
