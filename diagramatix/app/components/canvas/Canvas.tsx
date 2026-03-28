@@ -192,6 +192,8 @@ interface Props {
   onDrillIntoSubprocess?: (diagramId: string) => void;
   onDrillBack?: () => void;
   parentDiagramName?: string;
+  showValueDisplay?: boolean;
+  showBottleneck?: boolean;
 }
 
 interface EditingLabel {
@@ -367,6 +369,8 @@ export function Canvas({
   onDrillIntoSubprocess,
   onDrillBack,
   parentDiagramName,
+  showValueDisplay,
+  showBottleneck,
 }: Props) {
   const displayMode = displayModeProp ?? "normal";
   const svgRef = useRef<SVGSVGElement>(null);
@@ -1744,6 +1748,7 @@ export function Canvas({
                 onGroupMoveEnd={onElementsMoveEnd}
                 colorConfig={colorConfig}
                 onDrillBack={el.type === "start-event" ? onDrillBack : undefined}
+                showValueDisplay={showValueDisplay}
               />
             );
           })}
@@ -1852,6 +1857,7 @@ export function Canvas({
                 debugMode={debugMode}
                 misaligned={obstacleViolationConnIds.has(conn.id)}
                 onUpdateEndOffset={handleUpdateEndOffset}
+                showBottleneck={showBottleneck}
               />
             ));
           })()}
@@ -2009,6 +2015,7 @@ export function Canvas({
                 return false;
               }}
               onDrillBack={el.type === "start-event" ? onDrillBack : undefined}
+              showValueDisplay={showValueDisplay}
             />
             );
           })}
@@ -2202,6 +2209,7 @@ export function Canvas({
                 debugMode={debugMode}
                 misaligned={obstacleViolationConnIds.has(conn.id)}
                 onUpdateEndOffset={handleUpdateEndOffset}
+                showBottleneck={showBottleneck}
               />
             );
           })()}

@@ -18,6 +18,7 @@ interface Props {
   otherConnectorWaypoints?: Point[][];
   debugMode?: boolean;
   onUpdateEndOffset?: (connectorId: string, field: string, offset: Point) => void;
+  showBottleneck?: boolean;
 }
 
 // Line segment intersection: returns the parameter t along segment (a1→a2) where it crosses (b1→b2), or null
@@ -489,7 +490,7 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
   );
 }
 
-export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, onUpdateWaypoints, onWaypointsDragEnd, onUpdateLabel, onUpdateCurveHandles, misaligned, otherConnectorWaypoints, debugMode, onUpdateEndOffset }: Props) {
+export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, onUpdateWaypoints, onWaypointsDragEnd, onUpdateLabel, onUpdateCurveHandles, misaligned, otherConnectorWaypoints, debugMode, onUpdateEndOffset, showBottleneck }: Props) {
   const displayMode = useContext(DisplayModeCtx);
   const connFontScale = useContext(ConnectorFontScaleCtx);
   const [draggingEndLabel, setDraggingEndLabel] = useState<string | null>(null);
@@ -499,7 +500,7 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
   const isMessage = connector.type === "message";
   const isAssocBPMN = connector.type === "associationBPMN";
   const isMessageBPMN = connector.type === "messageBPMN";
-  const isBottleneck = connector.type === "sequence" && !!connector.bottleneck;
+  const isBottleneck = connector.type === "sequence" && !!connector.bottleneck && !!showBottleneck;
   const strokeColor = selected ? "#2563eb"
     : misaligned ? "#dc2626"
     : isBottleneck ? "#9333ea"

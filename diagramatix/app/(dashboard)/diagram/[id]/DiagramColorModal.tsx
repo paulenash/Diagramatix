@@ -15,6 +15,10 @@ interface Props {
   onDisplayModeChange: (mode: DisplayMode) => void;
   debugMode?: boolean;
   onDebugModeChange?: (on: boolean) => void;
+  showValueDisplay?: boolean;
+  onShowValueDisplayChange?: (on: boolean) => void;
+  showBottleneck?: boolean;
+  onShowBottleneckChange?: (on: boolean) => void;
   fontSize?: number;
   onFontSizeChange?: (size: number) => void;
   connectorFontSize?: number;
@@ -39,6 +43,10 @@ export function DiagramColorModal({
   onDisplayModeChange,
   debugMode,
   onDebugModeChange,
+  showValueDisplay,
+  onShowValueDisplayChange,
+  showBottleneck,
+  onShowBottleneckChange,
   fontSize,
   onFontSizeChange,
   connectorFontSize,
@@ -57,8 +65,7 @@ export function DiagramColorModal({
   const [workingFontSize, setWorkingFontSize] = useState(fontSize ?? 12);
   const [workingConnectorFontSize, setWorkingConnectorFontSize] = useState(connectorFontSize ?? 10);
   const [workingTitleFontSize, setWorkingTitleFontSize] = useState(titleFontSize ?? 14);
-  const [saving, setSaving] = useState(false);
-  const [saveError, setSaveError] = useState("");
+  // saving/saveError no longer needed — save happens in background after modal closes
 
   const symbols: SymbolType[] = COLOR_PALETTE_BY_DIAGRAM_TYPE[diagramType];
 
@@ -74,32 +81,23 @@ export function DiagramColorModal({
     setWorkingColors({ ...BW_SYMBOL_COLORS });
   }
 
-  async function handleConfirm() {
-    setSaving(true);
-    setSaveError("");
-    try {
-      const res = await fetch(`/api/diagrams/${diagramId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ colorConfig: workingColors }),
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        setSaveError(`Save failed (${res.status})${body?.error ? ": " + body.error : ""}`);
-        return;
-      }
-      // Apply all pending settings
-      onDisplayModeChange(workingDisplayMode);
-      if (onFontSizeChange) onFontSizeChange(workingFontSize);
-      if (onConnectorFontSizeChange) onConnectorFontSizeChange(workingConnectorFontSize);
-      if (onTitleFontSizeChange) onTitleFontSizeChange(workingTitleFontSize);
-      onSaved(workingColors);
-      onClose();
-    } catch {
-      setSaveError("Network error — please try again.");
-    } finally {
-      setSaving(false);
-    }
+  function handleConfirm() {
+    // Apply all pending settings immediately
+    onDisplayModeChange(workingDisplayMode);
+    if (onFontSizeChange) onFontSizeChange(workingFontSize);
+    if (onConnectorFontSizeChange) onConnectorFontSizeChange(workingConnectorFontSize);
+    if (onTitleFontSizeChange) onTitleFontSizeChange(workingTitleFontSize);
+    onSaved(workingColors);
+    onClose();
+
+    // Save colour config to database in the background
+    fetch(`/api/diagrams/${diagramId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ colorConfig: workingColors }),
+    }).catch(() => {
+      // Background save failed — colours still applied locally, will persist on next diagram save
+    });
   }
 
   return (
@@ -236,32 +234,44 @@ export function DiagramColorModal({
           </div>
         )}
 
-        {/* Footer */}
-        <div className="flex items-center justify-between gap-3 px-5 py-2.5 border-t border-gray-200 flex-shrink-0">
-          {saveError ? (
-            <p className="text-sm text-red-600">{saveError}</p>
-          ) : (
-            <span />
-          )}
-          <div className="flex gap-3">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleConfirm}
-              disabled={saving}
-              className={`px-4 py-2 text-sm text-white rounded-md ${
-                saving
-                  ? "bg-green-600"
-                  : "bg-blue-600 hover:bg-blue-700"
-              } disabled:cursor-not-allowed`}
-            >
-              {saving ? "Saving\u2026" : "Confirm Changes"}
-            </button>
+        {/* 5. Value Display */}
+        {onShowValueDisplayChange && (
+          <div className="flex items-center justify-between px-5 py-1.5 border-t border-gray-200 flex-shrink-0">
+            <span className="text-xs font-medium text-gray-700">Value Display</span>
+            <label className="flex items-center cursor-pointer">
+              <input type="checkbox" checked={showValueDisplay ?? false}
+                onChange={(e) => onShowValueDisplayChange(e.target.checked)}
+                className="w-3.5 h-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+            </label>
           </div>
+        )}
+
+        {/* 6. Bottleneck Display */}
+        {onShowBottleneckChange && (
+          <div className="flex items-center justify-between px-5 py-1.5 border-t border-gray-200 flex-shrink-0">
+            <span className="text-xs font-medium text-gray-700">Bottleneck Display</span>
+            <label className="flex items-center cursor-pointer">
+              <input type="checkbox" checked={showBottleneck ?? false}
+                onChange={(e) => onShowBottleneckChange(e.target.checked)}
+                className="w-3.5 h-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+            </label>
+          </div>
+        )}
+
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-3 px-5 py-2.5 border-t border-gray-200 flex-shrink-0">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleConfirm}
+            className="px-4 py-2 text-sm text-white rounded-md bg-blue-600 hover:bg-blue-700"
+          >
+            Confirm Changes
+          </button>
         </div>
       </div>
     </div>

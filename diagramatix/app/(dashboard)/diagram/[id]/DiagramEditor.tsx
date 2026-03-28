@@ -377,9 +377,13 @@ export function DiagramEditor({
   const [displayMode, setDisplayMode] = useState<DisplayMode>(initialDisplayMode ?? "normal");
   const [showDiagramMaintenance, setShowDiagramMaintenance] = useState(false);
   const [debugMode, setDebugMode] = useState(false);
+  const [showValueDisplay, setShowValueDisplay] = useState(false);
+  const [showBottleneck, setShowBottleneck] = useState(false);
   useEffect(() => {
     if (localStorage.getItem(`debug-${projectId}`) === "true") setDebugMode(true);
-  }, [projectId]);
+    if (localStorage.getItem(`valueDisplay-${diagramId}`) === "true") setShowValueDisplay(true);
+    if (localStorage.getItem(`bottleneck-${diagramId}`) === "true") setShowBottleneck(true);
+  }, [projectId, diagramId]);
 
   // Template state (BPMN only)
   const isAdmin = userEmail === "paul@nashcc.com.au";
@@ -1153,6 +1157,8 @@ export function DiagramEditor({
           onDrillIntoSubprocess={handleDrillIntoSubprocess}
           onDrillBack={parentDiagram ? handleDrillBack : undefined}
           parentDiagramName={parentDiagram?.name}
+          showValueDisplay={showValueDisplay}
+          showBottleneck={showBottleneck}
         />
 
         {!readOnly && (
@@ -1282,6 +1288,16 @@ export function DiagramEditor({
             if (typeof window !== "undefined") {
               localStorage.setItem(`debug-${projectId}`, on ? "true" : "false");
             }
+          }}
+          showValueDisplay={showValueDisplay}
+          onShowValueDisplayChange={(on) => {
+            setShowValueDisplay(on);
+            localStorage.setItem(`valueDisplay-${diagramId}`, on ? "true" : "false");
+          }}
+          showBottleneck={showBottleneck}
+          onShowBottleneckChange={(on) => {
+            setShowBottleneck(on);
+            localStorage.setItem(`bottleneck-${diagramId}`, on ? "true" : "false");
           }}
           fontSize={data.fontSize}
           onFontSizeChange={setFontSize}

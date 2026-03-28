@@ -398,6 +398,7 @@
     <xs:attribute name="targetOffsetAlong" type="xs:decimal" use="optional"/>
     <xs:attribute name="labelAnchor"    type="dgx:LabelAnchorEnum" use="optional"/>
     <xs:attribute name="arrowAtSource"  type="xs:boolean" use="optional"/>
+    <xs:attribute name="bottleneck"    type="xs:boolean" use="optional"/>
   </xs:complexType>
 
   <!-- Waypoints -->

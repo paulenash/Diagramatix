@@ -39,6 +39,7 @@ interface Props {
   onGroupMove?: (dx: number, dy: number) => void;
   onGroupMoveEnd?: () => void;
   onDrillBack?: () => void;
+  showValueDisplay?: boolean;
 }
 
 function ellipseOctagonPoints(cx: number, cy: number, rx: number, ry: number): string {
@@ -105,7 +106,11 @@ const VALUE_COLORS: Record<string, string> = {
   NVA: "#dc2626",   // vivid red
 };
 
-function ValueBadge({ el }: { el: DiagramElement }) {
+const ShowValueDisplayCtx = createContext(false);
+
+function ValueBadge({ el, show: showProp }: { el: DiagramElement; show?: boolean }) {
+  const showCtx = useContext(ShowValueDisplayCtx);
+  if (!(showProp ?? showCtx)) return null;
   const va = (el.properties.valueAnalysis as string | undefined) ?? "none";
   const ct = el.properties.cycleTime as number | undefined;
   const wt = el.properties.waitTime as number | undefined;
@@ -151,7 +156,7 @@ function TaskShape({ el }: { el: DiagramElement }) {
       <rect x={el.x} y={el.y} width={el.width} height={el.height}
         rx={4} ry={4} fill={resolveColor("task", colors)} stroke="#374151" strokeWidth={1.5} />
       {hasLoop && <LoopMarker cx={el.x + el.width / 2} cy={el.y + el.height - 10} />}
-      <ValueBadge el={el} />
+      {/* ValueBadge rendered in main SymbolRenderer */}
     </g>
   );
 }
@@ -744,7 +749,7 @@ function SubprocessShape({ el }: { el: DiagramElement }) {
           <path d="M6 9L10 5L6 1" fill="none" stroke="#2563eb" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
         </g>
       )}
-      <ValueBadge el={el} />
+      {/* ValueBadge rendered in main SymbolRenderer */}
     </g>
   );
 }
@@ -765,7 +770,7 @@ function ExpandedSubprocessShape({ el }: { el: DiagramElement }) {
           rx={3} ry={3} fill="none" stroke="#374151" strokeWidth={1.5} />
       )}
       {hasLoop && <LoopMarker cx={el.x + el.width / 2} cy={el.y + el.height - 10} />}
-      <ValueBadge el={el} />
+      {/* ValueBadge rendered in main SymbolRenderer */}
     </g>
   );
 }
@@ -892,7 +897,7 @@ function BpmnTaskShape({ el }: { el: DiagramElement }) {
         <BpmnTaskMarker taskType={el.taskType} x={el.x + 4} y={el.y + 4} />
       )}
       {hasLoop && <LoopMarker cx={el.x + el.width / 2} cy={el.y + el.height - 10} />}
-      <ValueBadge el={el} />
+      {/* ValueBadge rendered in main SymbolRenderer */}
     </g>
   );
 }
@@ -1236,6 +1241,7 @@ export function SymbolRenderer({
   onGroupMove,
   onGroupMoveEnd,
   onDrillBack,
+  showValueDisplay,
 }: Props) {
   const fontScale = useContext(FontScaleCtx);
   const fs = (base: number) => Math.round(base * fontScale * 10) / 10;
@@ -1348,12 +1354,18 @@ export function SymbolRenderer({
 
   return (
     <SymbolColorCtx.Provider value={colorConfig}>
+    <ShowValueDisplayCtx.Provider value={!!showValueDisplay}>
     <g
       onMouseDown={handleMouseDown}
       onDoubleClick={(e) => { e.stopPropagation(); onDoubleClick(); }}
       style={{ cursor: (isBoundary || isWhiteBoxPool) ? "default" : multiSelected ? "grab" : "move" }}
     >
       <SymbolShape el={element} />
+
+      {/* Value analysis badge (task/subprocess only, when Value Display is on) */}
+      {showValueDisplay && (element.type === "task" || element.type === "subprocess" || element.type === "subprocess-expanded") && (
+        <ValueBadge el={element} show={true} />
+      )}
 
       {/* Drill-back icon on start events when this diagram was navigated to from a subprocess */}
       {element.type === "start-event" && onDrillBack && !element.boundaryHostId && (
@@ -1861,6 +1873,7 @@ export function SymbolRenderer({
         );
       })()}
     </g>
+    </ShowValueDisplayCtx.Provider>
     </SymbolColorCtx.Provider>
   );
 }
