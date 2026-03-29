@@ -885,13 +885,118 @@ export function PropertiesPanel({
         })()}
 {(() => {
           const isAssocPC = connector.type === "association" && diagramType === "process-context";
+          const isAssocBPMN = connector.type === "associationBPMN";
           const showDirection = connector.type !== "messageBPMN" &&
             connector.type !== "uml-association" && connector.type !== "uml-aggregation" &&
             connector.type !== "uml-composition" && connector.type !== "uml-generalisation" &&
-            (connector.type === "associationBPMN" || isAssocPC ||
+            (isAssocBPMN || isAssocPC ||
             (connector.type !== "sequence" && connector.type !== "transition" && connector.type !== "flow") ||
             connector.routingType === "direct");
           if (!showDirection) return null;
+
+          // --- associationBPMN: "To Data Object" / "From Data Object" buttons ---
+          if (isAssocBPMN && allElements && allConnectors && onReverseConnector) {
+            const srcEl = allElements.find(e => e.id === connector.sourceId);
+            const tgtEl = allElements.find(e => e.id === connector.targetId);
+            const DATA_TYPES = new Set(["data-object", "data-store", "text-annotation"]);
+            const dataEl = tgtEl && DATA_TYPES.has(tgtEl.type) ? tgtEl
+                         : srcEl && DATA_TYPES.has(srcEl.type) ? srcEl : null;
+            // Arrow currently points toward target (open-directed) or is non-directed
+            const arrowToTarget = connector.directionType === "open-directed";
+            const dataIsTarget = dataEl?.id === connector.targetId;
+            // Current effective direction relative to the data object
+            const isToData = arrowToTarget ? dataIsTarget : !dataIsTarget;
+            // Treat non-directed as neither selected
+            const isNonDirected = connector.directionType === "non-directed" || connector.directionType === "both";
+
+            function setAssocDirection(toData: boolean) {
+              if (!dataEl || !connector || !allConnectors || !onReverseConnector) return;
+              const dataIsTarget = dataEl.id === connector.targetId;
+              // "To Data Object" means arrow points toward data element
+              // "From Data Object" means arrow points away from data element
+              const needArrowToTarget = toData ? dataIsTarget : !dataIsTarget;
+
+              // Ensure direction is open-directed (if currently non-directed or both)
+              if (connector.directionType !== "open-directed") {
+                onUpdateConnectorDirection(connector.id, "open-directed");
+              }
+              // If current arrow direction is wrong, reverse
+              const currentArrowToTarget = connector.directionType === "open-directed";
+              if (currentArrowToTarget !== needArrowToTarget) {
+                onReverseConnector(connector.id);
+              }
+
+              // Auto-set data object role based on all associations after this change
+              if (dataEl.type !== "data-object") return;
+              const otherConns = allConnectors.filter(
+                c => c.id !== connector.id && c.type === "associationBPMN"
+                  && (c.sourceId === dataEl.id || c.targetId === dataEl.id)
+              );
+              if (toData) {
+                // "To Data Object" chosen → this is an incoming association to the data object
+                if (otherConns.length === 0) {
+                  // No other connectors → Output
+                  onUpdateProperties(dataEl.id, { role: "output" });
+                } else {
+                  const allIncoming = otherConns.every(c => {
+                    // Is this other connector also incoming to the data object?
+                    const cDataIsTarget = c.targetId === dataEl.id;
+                    const cArrowToTarget = c.directionType === "open-directed";
+                    return cArrowToTarget ? cDataIsTarget : !cDataIsTarget;
+                  });
+                  if (allIncoming) {
+                    onUpdateProperties(dataEl.id, { role: "output" });
+                  } else {
+                    // Has outgoing connectors → None
+                    onUpdateProperties(dataEl.id, { role: "none" });
+                  }
+                }
+              } else {
+                // "From Data Object" chosen → this is an outgoing association from the data object
+                if (otherConns.length === 0) {
+                  // No other connectors → Input
+                  onUpdateProperties(dataEl.id, { role: "input" });
+                } else {
+                  const hasIncoming = otherConns.some(c => {
+                    const cDataIsTarget = c.targetId === dataEl.id;
+                    const cArrowToTarget = c.directionType === "open-directed";
+                    return cArrowToTarget ? cDataIsTarget : !cDataIsTarget;
+                  });
+                  if (hasIncoming) {
+                    // Has incoming connectors → None
+                    onUpdateProperties(dataEl.id, { role: "none" });
+                  } else {
+                    // Only outgoing → Input
+                    onUpdateProperties(dataEl.id, { role: "input" });
+                  }
+                }
+              }
+            }
+
+            return (
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] font-medium text-gray-500 shrink-0">Direction:</span>
+                <button
+                  onClick={() => setAssocDirection(true)}
+                  className={`px-2 py-0.5 text-[10px] rounded border font-medium ${
+                    !isNonDirected && isToData
+                      ? "bg-blue-600 text-white border-blue-600"
+                      : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                  }`}
+                >To Data Object</button>
+                <button
+                  onClick={() => setAssocDirection(false)}
+                  className={`px-2 py-0.5 text-[10px] rounded border font-medium ${
+                    !isNonDirected && !isToData
+                      ? "bg-blue-600 text-white border-blue-600"
+                      : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                  }`}
+                >From Data Object</button>
+              </div>
+            );
+          }
+
+          // --- Other connector types: dropdown ---
           // Check if either end is a "system" element
           const hasSystem = isAssocPC && allElements && (
             allElements.find(e => e.id === connector.sourceId)?.type === "system" ||
@@ -903,23 +1008,17 @@ export function PropertiesPanel({
                 { value: "open-directed" as DirectionType, label: "Directed" },
                 ...(hasSystem ? [{ value: "both" as DirectionType, label: "Both" }] : []),
               ]
-            : connector.type === "associationBPMN"
+            : connector.routingType === "direct"
               ? [
-                  { value: "non-directed"  as DirectionType, label: "None"     },
                   { value: "open-directed" as DirectionType, label: "Directed" },
-                  { value: "both"          as DirectionType, label: "Both"     },
+                  { value: "both"          as DirectionType, label: "Both" },
                 ]
-              : connector.routingType === "direct"
-                ? [
-                    { value: "open-directed" as DirectionType, label: "Directed" },
-                    { value: "both"          as DirectionType, label: "Both" },
-                  ]
-                : [
-                    { value: "directed"      as DirectionType, label: "Filled" },
-                    { value: "open-directed" as DirectionType, label: "Open" },
-                    { value: "both"          as DirectionType, label: "Both" },
-                    { value: "non-directed"  as DirectionType, label: "None" },
-                  ].filter(o => !(diagramType === "process-context" && o.value === "directed"));
+              : [
+                  { value: "directed"      as DirectionType, label: "Filled" },
+                  { value: "open-directed" as DirectionType, label: "Open" },
+                  { value: "both"          as DirectionType, label: "Both" },
+                  { value: "non-directed"  as DirectionType, label: "None" },
+                ].filter(o => !(diagramType === "process-context" && o.value === "directed"));
           return (
             <div className="flex items-center gap-1">
               <span className="text-[10px] font-medium text-gray-500 shrink-0">Direction:</span>
