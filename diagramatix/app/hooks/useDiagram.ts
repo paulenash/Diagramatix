@@ -102,6 +102,39 @@ function messageBpmnWaypoints(
   };
 }
 
+/**
+ * When messageBPMN waypoints change (endpoint move, space insertion, etc.),
+ * adjust labelOffsetY so the label stays at the same absolute Y relative to
+ * its nearest original endpoint rather than drifting with the midpoint.
+ */
+function adjustMsgLabelOffset(
+  conn: Connector,
+  oldWaypoints: Point[],
+  newWaypoints: Point[]
+): { labelOffsetY?: number } {
+  if (conn.type !== "messageBPMN") return {};
+  if (oldWaypoints.length < 3 || newWaypoints.length < 3) return {};
+  const oldSrcY = oldWaypoints[1].y;  // source edge
+  const oldTgtY = oldWaypoints[oldWaypoints.length - 2].y;  // target edge
+  const newSrcY = newWaypoints[1].y;
+  const newTgtY = newWaypoints[newWaypoints.length - 2].y;
+  const oldMidY = (oldSrcY + oldTgtY) / 2;
+  const newMidY = (newSrcY + newTgtY) / 2;
+  if (oldMidY === newMidY) return {};
+  const labelOY = conn.labelOffsetY ?? 0;
+  // Absolute Y of label = oldMidY + labelOY
+  const labelAbsY = oldMidY + labelOY;
+  // Which endpoint was the label closer to?
+  const distToSrc = Math.abs(labelAbsY - oldSrcY);
+  const distToTgt = Math.abs(labelAbsY - oldTgtY);
+  // Keep label at the same offset from that nearest endpoint
+  const nearestOldY = distToSrc <= distToTgt ? oldSrcY : oldTgtY;
+  const nearestNewY = distToSrc <= distToTgt ? newSrcY : newTgtY;
+  const relativeOffset = labelAbsY - nearestOldY;
+  const newAbsY = nearestNewY + relativeOffset;
+  return { labelOffsetY: newAbsY - newMidY };
+}
+
 type Action =
   | { type: "SET_DATA"; payload: DiagramData }
   | { type: "ADD_ELEMENT"; payload: { symbolType: SymbolType; position: Point; taskType?: BpmnTaskType; eventType?: EventType } }
@@ -663,9 +696,10 @@ function reducer(state: DiagramData, action: Action): DiagramData {
           const updated = { ...conn, sourceOffsetAlong: newSrcOffset };
           const wp = messageBpmnWaypoints(source, target,
             updated.sourceSide, updated.targetSide, newSrcOffset);
+          const labelAdj = adjustMsgLabelOffset(conn, conn.waypoints, wp.waypoints);
           return { ...updated, waypoints: wp.waypoints,
             sourceInvisibleLeader: wp.sourceInvisibleLeader,
-            targetInvisibleLeader: wp.targetInvisibleLeader };
+            targetInvisibleLeader: wp.targetInvisibleLeader, ...labelAdj };
         });
         return { ...state, elements: updatePoolTypes(elements), connectors };
       }
@@ -743,7 +777,9 @@ function reducer(state: DiagramData, action: Action): DiagramData {
           return { ...conn, waypoints: conn.waypoints.map(pt => ({ x: pt.x + dx, y: pt.y + dy })) };
         }
         if (srcIn || tgtIn) {
-          return recomputeAllConnectors([conn], elements)[0] ?? conn;
+          const recomputed = recomputeAllConnectors([conn], elements)[0] ?? conn;
+          const labelAdj = adjustMsgLabelOffset(conn, conn.waypoints, recomputed.waypoints);
+          return Object.keys(labelAdj).length > 0 ? { ...recomputed, ...labelAdj } : recomputed;
         }
         return conn;
       });
@@ -1304,7 +1340,8 @@ function reducer(state: DiagramData, action: Action): DiagramData {
             : computeWaypoints(source, target, state.elements,
                 updated.sourceSide, updated.targetSide, updated.routingType,
                 updated.sourceOffsetAlong ?? 0.5, updated.targetOffsetAlong ?? 0.5);
-        return { ...updated, waypoints, sourceInvisibleLeader, targetInvisibleLeader };
+        const labelAdj = adjustMsgLabelOffset(conn, conn.waypoints, waypoints);
+        return { ...updated, waypoints, sourceInvisibleLeader, targetInvisibleLeader, ...labelAdj };
       });
       // Skip obstacle validation for messageBPMN — they cross pools and don't interact with obstacles
       const updatedConn = connectors.find(c => c.id === connectorId);
@@ -1526,8 +1563,14 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         return el;
       });
 
-      // Recompute all connectors after space insertion
-      const connectors = recomputeAllConnectors(state.connectors, elements);
+      // Recompute all connectors after space insertion, adjusting messageBPMN labels
+      const recomputed = recomputeAllConnectors(state.connectors, elements);
+      const connectors = recomputed.map((conn, i) => {
+        const old = state.connectors[i];
+        if (!old || old.id !== conn.id) return conn;
+        const labelAdj = adjustMsgLabelOffset(old, old.waypoints, conn.waypoints);
+        return Object.keys(labelAdj).length > 0 ? { ...conn, ...labelAdj } : conn;
+      });
 
       return { ...state, elements: updatePoolTypes(elements), connectors: validateConnectorsAgainstObstacles(connectors, elements) };
     }
