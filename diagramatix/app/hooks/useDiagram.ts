@@ -611,6 +611,65 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         }
       }
 
+      // CASE A2: Moving a black-box pool — connector attachment points stay fixed in world space.
+      // The pool is clamped so no messageBPMN attachment point falls outside its boundary.
+      const isBlackBoxPool = el.type === "pool" &&
+        ((el.properties.poolType as string | undefined) ?? "black-box") === "black-box";
+      if (isBlackBoxPool) {
+        let rawDx = x - el.x;
+        const rawDy = y - el.y;
+        // Find all messageBPMN connectors attached to this pool and their world-x attachment points.
+        // waypoints[1] and [2] share the same x for vertical messageBPMN connectors.
+        const msgConns = state.connectors.filter(
+          c => c.type === "messageBPMN" && (c.sourceId === id || c.targetId === id)
+        );
+        const attachXs: number[] = [];
+        for (const c of msgConns) {
+          // The shared vertical x is at waypoints[1] (source edge) or waypoints[2] (target edge)
+          const edgeX = c.waypoints[1]?.x;
+          if (edgeX != null) attachXs.push(edgeX);
+        }
+        // Clamp dx so no attachment point falls outside the new pool boundary
+        if (attachXs.length > 0) {
+          const minAttachX = Math.min(...attachXs);
+          const maxAttachX = Math.max(...attachXs);
+          // After move: pool spans [el.x + rawDx, el.x + rawDx + el.width]
+          // Need: minAttachX >= el.x + rawDx  →  rawDx <= minAttachX - el.x
+          // Need: maxAttachX <= el.x + rawDx + el.width  →  rawDx >= maxAttachX - el.x - el.width
+          const maxDx = minAttachX - el.x;
+          const minDx = maxAttachX - el.x - el.width;
+          rawDx = Math.max(minDx, Math.min(maxDx, rawDx));
+        }
+        const clampedX = el.x + rawDx;
+        const clampedY = el.y + rawDy;
+        // Move the pool
+        const elements = state.elements.map(e =>
+          e.id === id ? { ...e, x: clampedX, y: clampedY } : e
+        );
+        // Update messageBPMN connectors: keep attachment world-x fixed, adjust offsets
+        const connectors = state.connectors.map(conn => {
+          if (conn.type !== "messageBPMN") return conn;
+          const isSrc = conn.sourceId === id;
+          const isTgt = conn.targetId === id;
+          if (!isSrc && !isTgt) return conn;
+          const source = elements.find(e => e.id === conn.sourceId)!;
+          const target = elements.find(e => e.id === conn.targetId)!;
+          // The current world-x of the vertical connector (from existing waypoints)
+          const worldX = conn.waypoints[1]?.x ?? (el.x + el.width * (conn.sourceOffsetAlong ?? 0.5));
+          // Recompute source offset so the world-x stays fixed relative to the
+          // (possibly moved) source element
+          const newSrcOffset = source.width > 0
+            ? (worldX - source.x) / source.width : 0.5;
+          const updated = { ...conn, sourceOffsetAlong: newSrcOffset };
+          const wp = messageBpmnWaypoints(source, target,
+            updated.sourceSide, updated.targetSide, newSrcOffset);
+          return { ...updated, waypoints: wp.waypoints,
+            sourceInvisibleLeader: wp.sourceInvisibleLeader,
+            targetInvisibleLeader: wp.targetInvisibleLeader };
+        });
+        return { ...state, elements: updatePoolTypes(elements), connectors };
+      }
+
       // CASE B + C: Normal move (host elements also carry their boundary events)
       const dx = x - el.x, dy = y - el.y;
       const movingIsContainer = isContainerType(el.type);
