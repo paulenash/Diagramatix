@@ -1430,7 +1430,7 @@ export function Canvas({
   const boundaryEvents = data.elements.filter((el) => !!el.boundaryHostId);
 
   // Precompute messageBPMN highlight context
-  const BPMN_TRIGGER_TYPES = new Set<string>(["task", "subprocess", "subprocess-expanded", "intermediate-event", "end-event"]);
+  const BPMN_TRIGGER_TYPES = new Set<string>(["task", "subprocess", "subprocess-expanded", "intermediate-event", "end-event", "pool"]);
   const draggingSourceEl = draggingConnector
     ? (data.elements.find((e) => e.id === draggingConnector.fromId) ?? null)
     : null;
@@ -1439,6 +1439,7 @@ export function Canvas({
     ? getElementPoolId(draggingSourceEl, data.elements)
     : null;
   const draggingSourceIsData = draggingSourceEl ? DATA_ELEMENT_TYPES.has(draggingSourceEl.type) : false;
+  const draggingFromPool = draggingSourceEl?.type === "pool";
   const draggingFromFreeEndEvent =
     draggingSourceEl?.type === "end-event" && !draggingSourceEl.boundaryHostId;
   const draggingFromEdgeMountedEndEvent =
@@ -1907,7 +1908,25 @@ export function Canvas({
             let elIsAssocTarget = false;
             if (isDraggingConnector && el.id !== draggingConnector!.fromId) {
               const elIsData = DATA_ELEMENT_TYPES.has(el.type);
-              if (draggingSourceIsData && !elIsData) {
+              // End events are always senders — never valid messageBPMN targets.
+              // Send tasks / throwing events are excluded only if they already have an
+              // outgoing messageBPMN connector; otherwise they can be targets (auto-flipped
+              // to receive/catching on connection).
+              const elIsSendLocked = el.type === "end-event"
+                || ((el.taskType === "send" || el.flowType === "throwing")
+                    && data.connectors.some(c => c.type === "messageBPMN" && c.sourceId === el.id));
+              if (draggingFromPool) {
+                // Pools can only create messageBPMN — target elements in other white-box pools
+                if (!elIsData && !elIsSendLocked) {
+                  const elPoolId = getElementPoolId(el, data.elements);
+                  if (elPoolId && elPoolId !== draggingSourcePoolId) {
+                    const elPool = data.elements.find((p) => p.id === elPoolId);
+                    if (((elPool?.properties.poolType as string | undefined) ?? "black-box") === "white-box") {
+                      elIsMsgTarget = true;
+                    }
+                  }
+                }
+              } else if (draggingSourceIsData && !elIsData) {
                 elIsAssocTarget = true;
               } else if (!draggingSourceIsData && elIsData) {
                 elIsAssocTarget = true;
@@ -1926,11 +1945,13 @@ export function Canvas({
                 }
               } else if (draggingFromFreeEndEvent) {
                 // Free-standing end-event: messageBPMN targets only in white-box pools
-                const elPoolId = getElementPoolId(el, data.elements);
-                if (elPoolId) {
-                  const elPool = data.elements.find((p) => p.id === elPoolId);
-                  if (((elPool?.properties.poolType as string | undefined) ?? "black-box") === "white-box") {
-                    elIsMsgTarget = true;
+                if (!elIsData && !elIsSendLocked) {
+                  const elPoolId = getElementPoolId(el, data.elements);
+                  if (elPoolId) {
+                    const elPool = data.elements.find((p) => p.id === elPoolId);
+                    if (((elPool?.properties.poolType as string | undefined) ?? "black-box") === "white-box") {
+                      elIsMsgTarget = true;
+                    }
                   }
                 }
               } else if (draggingFromEdgeMountedEndEvent) {
@@ -1948,7 +1969,7 @@ export function Canvas({
                   const elPoolId = getElementPoolId(el, data.elements);
                   if (elPoolId === draggingSourcePoolId) {
                     elIsDropTarget = true;
-                  } else if (elPoolId && elPoolId !== draggingSourcePoolId) {
+                  } else if (elPoolId && elPoolId !== draggingSourcePoolId && !elIsData && !elIsSendLocked) {
                     const elPool = data.elements.find((p) => p.id === elPoolId);
                     if (((elPool?.properties.poolType as string | undefined) ?? "black-box") === "white-box") elIsMsgTarget = true;
                   } else if (!elPoolId) {
@@ -1964,7 +1985,7 @@ export function Canvas({
                 const elPoolId = getElementPoolId(el, data.elements);
                 if (elPoolId === draggingSourcePoolId) {
                   elIsDropTarget = true;
-                } else if (elPoolId && elPoolId !== draggingSourcePoolId) {
+                } else if (elPoolId && elPoolId !== draggingSourcePoolId && !elIsData && !elIsSendLocked) {
                   const elPool = data.elements.find((p) => p.id === elPoolId);
                   const elPoolIsWhiteBox =
                     ((elPool?.properties.poolType as string | undefined) ?? "black-box") === "white-box";
@@ -1973,11 +1994,17 @@ export function Canvas({
               }
             } else if (isMessageBpmnEndpointDrag) {
               // Highlight elements in white-box pools that differ from the fixed end's pool
-              const elPoolId = getElementPoolId(el, data.elements);
-              if (elPoolId && elPoolId !== epDragFixedPoolId) {
-                const elPool = data.elements.find(p => p.id === elPoolId);
-                if (((elPool?.properties.poolType as string | undefined) ?? "black-box") === "white-box") {
-                  elIsMsgTarget = true;
+              // Exclude data elements and send elements (send tasks, throwing events, end events)
+              const epElIsSendLocked = el.type === "end-event"
+                || ((el.taskType === "send" || el.flowType === "throwing")
+                    && data.connectors.some(c => c.type === "messageBPMN" && c.sourceId === el.id));
+              if (!DATA_ELEMENT_TYPES.has(el.type) && !epElIsSendLocked) {
+                const elPoolId = getElementPoolId(el, data.elements);
+                if (elPoolId && elPoolId !== epDragFixedPoolId) {
+                  const elPool = data.elements.find(p => p.id === elPoolId);
+                  if (((elPool?.properties.poolType as string | undefined) ?? "black-box") === "white-box") {
+                    elIsMsgTarget = true;
+                  }
                 }
               }
             } else if (isAssocBpmnEndpointDrag && el.id !== epDragMovingId) {
@@ -2062,15 +2089,27 @@ export function Canvas({
             let elIsMsgTarget = false;
             let elIsAssocTarget = false;
             if (isDraggingConnector && el.id !== draggingConnector!.fromId) {
-              if ((draggingFromChildEvent || draggingFromBoundaryOnChild) &&
+              // Throwing/send boundary events excluded only if they already have an outgoing messageBPMN
+              const bEvtIsSendLocked = (el.flowType === "throwing" || el.taskType === "send")
+                && data.connectors.some(c => c.type === "messageBPMN" && c.sourceId === el.id);
+              if (draggingFromPool) {
+                // Pools can only create messageBPMN — boundary catching intermediate-events in other white-box pools
+                const elPoolId = getElementPoolId(el, data.elements);
+                if (elPoolId && elPoolId !== draggingSourcePoolId && el.type === "intermediate-event" && !bEvtIsSendLocked) {
+                  const elPool = data.elements.find((p) => p.id === elPoolId);
+                  if (((elPool?.properties.poolType as string | undefined) ?? "black-box") === "white-box") {
+                    elIsMsgTarget = true;
+                  }
+                }
+              } else if ((draggingFromChildEvent || draggingFromBoundaryOnChild) &&
                   el.boundaryHostId && draggingSourceAncestorIds.has(el.boundaryHostId)) {
                 elIsAssocTarget = true; // purple — associationBPMN to boundary event on ancestor
               } else if (draggingSourceIsData) {
                 elIsAssocTarget = true;
               } else if (draggingFromFreeEndEvent) {
-                // Free-standing end-event: boundary intermediate-events in other white-box pools are messageBPMN targets
+                // Free-standing end-event: boundary catching intermediate-events in other white-box pools are messageBPMN targets
                 const elPoolId = getElementPoolId(el, data.elements);
-                if (elPoolId && el.type === "intermediate-event") {
+                if (elPoolId && el.type === "intermediate-event" && !bEvtIsSendLocked) {
                   const elPool = data.elements.find((p) => p.id === elPoolId);
                   if (((elPool?.properties.poolType as string | undefined) ?? "black-box") === "white-box") {
                     elIsMsgTarget = true;
@@ -2094,7 +2133,7 @@ export function Canvas({
                   if (!hostEl || hostEl.parentId !== draggingSourceBoundaryHostId) {
                     const elPoolId = getElementPoolId(el, data.elements);
                     if (elPoolId === draggingSourcePoolId) elIsDropTarget = true;
-                    else if (elPoolId && elPoolId !== draggingSourcePoolId && el.type === "intermediate-event") {
+                    else if (elPoolId && elPoolId !== draggingSourcePoolId && el.type === "intermediate-event" && !bEvtIsSendLocked) {
                       const elPool = data.elements.find((p) => p.id === elPoolId);
                       if (((elPool?.properties.poolType as string | undefined) ?? "black-box") === "white-box") elIsMsgTarget = true;
                     }
@@ -2110,7 +2149,7 @@ export function Canvas({
                 const elPoolId = getElementPoolId(el, data.elements);
                 if (elPoolId === draggingSourcePoolId) {
                   elIsDropTarget = true;
-                } else if (elPoolId && elPoolId !== draggingSourcePoolId && el.type === "intermediate-event") {
+                } else if (elPoolId && elPoolId !== draggingSourcePoolId && el.type === "intermediate-event" && !bEvtIsSendLocked) {
                   const elPool = data.elements.find((p) => p.id === elPoolId);
                   const elPoolIsWhiteBox =
                     ((elPool?.properties.poolType as string | undefined) ?? "black-box") === "white-box";

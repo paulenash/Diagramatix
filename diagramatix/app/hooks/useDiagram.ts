@@ -1247,6 +1247,11 @@ function reducer(state: DiagramData, action: Action): DiagramData {
                 updated.sourceOffsetAlong ?? 0.5, updated.targetOffsetAlong ?? 0.5);
         return { ...updated, waypoints, sourceInvisibleLeader, targetInvisibleLeader };
       });
+      // Skip obstacle validation for messageBPMN — they cross pools and don't interact with obstacles
+      const updatedConn = connectors.find(c => c.id === connectorId);
+      if (updatedConn?.type === "messageBPMN") {
+        return { ...state, connectors };
+      }
       return { ...state, connectors: validateConnectorsAgainstObstacles(connectors, state.elements) };
     }
 
@@ -1346,6 +1351,11 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       const updatedConns = state.connectors.map((c) =>
         c.id === action.payload.id ? { ...c, waypoints: consolidateWaypoints(action.payload.waypoints) } : c
       );
+      // Skip obstacle validation for messageBPMN — they cross pools and don't interact with obstacles
+      const waypointConn = updatedConns.find(c => c.id === action.payload.id);
+      if (waypointConn?.type === "messageBPMN") {
+        return { ...state, connectors: updatedConns };
+      }
       return { ...state, connectors: validateConnectorsAgainstObstacles(updatedConns, state.elements) };
     }
 

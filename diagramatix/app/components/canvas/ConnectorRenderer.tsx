@@ -553,8 +553,10 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
   })();
 
   const fullD = waypointsToSvgPath(waypoints);
-  // For curvilinear, use the actual curve for the hit area so clicks near the arc are detected
-  const hitD = connector.routingType === "curvilinear" ? visibleD : fullD;
+  // For curvilinear, use the actual curve for the hit area so clicks near the arc are detected.
+  // For messageBPMN, use visible path only — invisible leaders extend into pool bodies and
+  // would make clicks inside the pool incorrectly select the connector.
+  const hitD = (connector.routingType === "curvilinear" || isMessageBPMN) ? visibleD : fullD;
 
   if (!visibleD) return null;
 
