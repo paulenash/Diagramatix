@@ -622,6 +622,9 @@ export function Canvas({
         if (sourceEl?.parentId && targetEl.id === sourceEl.parentId && targetEl.type === "composite-state") return;
 
         if (isCrossPool || involvesPool) {
+          // Never create messageBPMN between an element and its own containing pool
+          if (targetEl.type === "pool" && targetPoolId === sourcePoolId) return;
+          if (sourceEl?.type === "pool" && sourcePoolId === targetPoolId) return;
           // Start events cannot send messageBPMN
           if (sourceEl?.type === "start-event") return;
           const srcCy = sourceEl ? sourceEl.y + sourceEl.height / 2 : 0;
