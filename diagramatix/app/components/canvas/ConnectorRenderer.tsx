@@ -282,6 +282,7 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState("");
   const [isLabelFocused, setIsLabelFocused] = useState(false);
+  const [isDraggingLabel, setIsDraggingLabel] = useState(false);
   const fontScale = useContext(ConnectorFontScaleCtx);
 
   if (visibleWaypoints.length < 2) return null;
@@ -342,6 +343,7 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
     if (!svgToWorld || !onUpdateLabel) return;
     e.stopPropagation();
     setIsLabelFocused(true);
+    setIsDraggingLabel(true);
     // Clear focus when user clicks elsewhere
     function onWindowMouseDown() {
       setIsLabelFocused(false);
@@ -360,25 +362,7 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
     }
     function onUp() {
       document.body.style.cursor = "";
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", onUp);
-    }
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
-  }
-
-  function handleResizeMouseDown(e: React.MouseEvent) {
-    if (!svgToWorld || !onUpdateLabel) return;
-    e.stopPropagation();
-    const startWorld = svgToWorld(e.clientX, e.clientY);
-    const startW = lWidth;
-    document.body.style.cursor = "ew-resize";
-    function onMove(ev: MouseEvent) {
-      const cur = svgToWorld!(ev.clientX, ev.clientY);
-      onUpdateLabel!(label, offsetX, offsetY, Math.max(40, startW + (cur.x - startWorld.x) * 2));
-    }
-    function onUp() {
-      document.body.style.cursor = "";
+      setIsDraggingLabel(false);
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
     }
@@ -399,8 +383,8 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
 
   return (
     <g>
-      {/* Dotted tether: for sequence connectors, only show when label is focused/editing; others always show */}
-      {!isEditing && (connector.type !== "sequence" || isLabelFocused || selected) && (() => {
+      {/* Dotted tether: only show while dragging the label */}
+      {!isEditing && isDraggingLabel && (() => {
         // Compute intersection of tether line with label box boundary
         const boxL = lCx - effectiveLWidth / 2 - 3;
         const boxR = lCx + effectiveLWidth / 2 + 3;
@@ -477,15 +461,6 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
         </foreignObject>
         );
       })()}
-      {/* Width resize handle */}
-      {(selected || isLabelFocused) && onUpdateLabel && !isEditing && (
-        <rect data-interactive
-          x={lCx + effectiveLWidth / 2} y={lMidY - 5} width={6} height={10}
-          fill="#2563eb" stroke="white" strokeWidth={1} rx={1}
-          style={{ cursor: "ew-resize" }}
-          onMouseDown={handleResizeMouseDown}
-        />
-      )}
     </g>
   );
 }
