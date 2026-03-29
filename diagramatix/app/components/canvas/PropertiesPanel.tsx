@@ -1270,7 +1270,8 @@ export function PropertiesPanel({
           element.type === "task" || element.type === "subprocess" ||
           element.type === "subprocess-expanded" || element.type === "use-case" ||
           element.type === "external-entity" || element.type === "process-system" ||
-          element.type === "uml-class" || element.type === "uml-enumeration") ? (
+          element.type === "uml-class" || element.type === "uml-enumeration" ||
+          element.type === "text-annotation") ? (
           <>
             <textarea
               key={element.id}
@@ -1310,6 +1311,57 @@ export function PropertiesPanel({
           />
         )}
       </div>
+
+      {element.type === "text-annotation" && (
+        <>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Colour</label>
+            <div className="flex flex-wrap gap-1">
+              {([
+                { value: "black",  label: "Black",  bg: "#000000" },
+                { value: "green",  label: "Green",  bg: "#16a34a" },
+                { value: "orange", label: "Orange", bg: "#ea580c" },
+                { value: "red",    label: "Red",    bg: "#dc2626" },
+                { value: "purple", label: "Purple", bg: "#9333ea" },
+              ] as const).map(({ value, label, bg }) => (
+                <button
+                  key={value}
+                  onClick={() => onUpdateProperties(element.id, { annotationColor: value })}
+                  className={`px-2 py-1 text-xs rounded border font-medium ${
+                    ((element.properties.annotationColor as string | undefined) ?? "black") === value
+                      ? "text-white border-transparent"
+                      : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                  }`}
+                  style={((element.properties.annotationColor as string | undefined) ?? "black") === value
+                    ? { backgroundColor: bg }
+                    : undefined}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Font Style</label>
+            <div className="flex flex-wrap gap-1">
+              {(["normal", "italic"] as const).map((v) => (
+                <button
+                  key={v}
+                  onClick={() => onUpdateProperties(element.id, { annotationFontStyle: v })}
+                  className={`px-2 py-1 text-xs rounded border ${
+                    ((element.properties.annotationFontStyle as string | undefined) ?? "normal") === v
+                      ? "bg-blue-600 text-white border-blue-600"
+                      : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                  }`}
+                  style={v === "italic" ? { fontStyle: "italic" } : undefined}
+                >
+                  {v === "normal" ? "Normal" : "Italic"}
+                </button>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
 
       {element.type === "pool" && (
         <>

@@ -592,23 +592,34 @@ function GroupShape({ el }: { el: DiagramElement }) {
   );
 }
 
+const ANNOTATION_COLORS: Record<string, string> = {
+  black: "#000000", green: "#16a34a", orange: "#ea580c", red: "#dc2626", purple: "#9333ea",
+};
+
 function TextAnnotationShape({ el }: { el: DiagramElement }) {
-  const colors = useContext(SymbolColorCtx);
-  const lineColor = resolveColor("text-annotation", colors);
+  const annotationColor = (el.properties.annotationColor as string | undefined) ?? "black";
+  const bracketColor = ANNOTATION_COLORS[annotationColor] ?? "#000000";
   const capLen = 12;
+  // Compute visible text height so bracket matches the rendered text
+  const PAD = 10;
+  const lineH = 14;
+  const lines = wrapText(el.label, el.width - PAD - 4);
+  const totalH = lines.length * lineH;
+  const topY = el.y + el.height / 2 - totalH / 2 - 3;
+  const botY = el.y + el.height / 2 + totalH / 2 + 3;
   return (
     <g>
       {/* Invisible hit target for the entire bounding box */}
       <rect x={el.x} y={el.y} width={el.width} height={el.height}
         fill="rgba(0,0,0,0)" stroke="none"
         style={{ pointerEvents: "fill" }} />
-      {/* Left bracket: top cap, vertical line, bottom cap */}
-      <line x1={el.x + capLen} y1={el.y} x2={el.x} y2={el.y}
-        stroke={lineColor} strokeWidth={1.5} />
-      <line x1={el.x} y1={el.y} x2={el.x} y2={el.y + el.height}
-        stroke={lineColor} strokeWidth={1.5} />
-      <line x1={el.x} y1={el.y + el.height} x2={el.x + capLen} y2={el.y + el.height}
-        stroke={lineColor} strokeWidth={1.5} />
+      {/* Left bracket: sized to visible text height + 3px padding top & bottom */}
+      <line x1={el.x + capLen} y1={topY} x2={el.x} y2={topY}
+        stroke={bracketColor} strokeWidth={1.5} />
+      <line x1={el.x} y1={topY} x2={el.x} y2={botY}
+        stroke={bracketColor} strokeWidth={1.5} />
+      <line x1={el.x} y1={botY} x2={el.x + capLen} y2={botY}
+        stroke={bracketColor} strokeWidth={1.5} />
     </g>
   );
 }
@@ -1602,14 +1613,17 @@ export function SymbolRenderer({
           </g>
         );
       })() : showLabel && element.type === 'text-annotation' ? (() => {
-        const PAD = 16;
+        const PAD = 10;
         const lines = wrapText(element.label, element.width - PAD - 4);
         const lineH = 14;
         const totalH = lines.length * lineH;
         const topY = element.y + element.height / 2 - totalH / 2;
+        const aColor = (element.properties.annotationColor as string | undefined) ?? "black";
+        const textColor = ANNOTATION_COLORS[aColor] ?? "#000000";
+        const fontStyle = (element.properties.annotationFontStyle as string | undefined) ?? "normal";
         return (
-          <text textAnchor="start" fontSize={fs(12)} fill="#111827"
-            style={{ userSelect: "none", pointerEvents: "none" }}>
+          <text textAnchor="start" fontSize={fs(12)} fill={textColor}
+            style={{ userSelect: "none", pointerEvents: "none", fontStyle }}>
             {lines.map((line, i) => (
               <tspan key={i} x={element.x + PAD} y={topY + i * lineH + lineH * 0.85}>
                 {line}

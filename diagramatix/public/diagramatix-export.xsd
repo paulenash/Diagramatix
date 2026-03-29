@@ -354,6 +354,92 @@
   </xs:simpleType>
 
   <!-- ============================================================ -->
+  <!-- Pool type enum                                                -->
+  <!-- ============================================================ -->
+  <xs:simpleType name="PoolTypeEnum">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="black-box"/>
+      <xs:enumeration value="white-box"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- ============================================================ -->
+  <!-- Data object role enum                                         -->
+  <!-- ============================================================ -->
+  <xs:simpleType name="DataObjectRoleEnum">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="none"/>
+      <xs:enumeration value="input"/>
+      <xs:enumeration value="output"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- ============================================================ -->
+  <!-- Data object/store multiplicity enum                           -->
+  <!-- ============================================================ -->
+  <xs:simpleType name="DataMultiplicityEnum">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="single"/>
+      <xs:enumeration value="collection"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- ============================================================ -->
+  <!-- Subprocess type enum                                          -->
+  <!-- ============================================================ -->
+  <xs:simpleType name="SubprocessTypeEnum">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="normal"/>
+      <xs:enumeration value="call"/>
+      <xs:enumeration value="event"/>
+      <xs:enumeration value="transaction"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- ============================================================ -->
+  <!-- Gateway role enum                                             -->
+  <!-- ============================================================ -->
+  <xs:simpleType name="GatewayRoleEnum">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="decision"/>
+      <xs:enumeration value="merge"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- ============================================================ -->
+  <!-- Interruption type enum (boundary events)                      -->
+  <!-- ============================================================ -->
+  <xs:simpleType name="InterruptionTypeEnum">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="interrupting"/>
+      <xs:enumeration value="non-interrupting"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- ============================================================ -->
+  <!-- Annotation colour enum                                        -->
+  <!-- ============================================================ -->
+  <xs:simpleType name="AnnotationColorEnum">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="black"/>
+      <xs:enumeration value="green"/>
+      <xs:enumeration value="orange"/>
+      <xs:enumeration value="red"/>
+      <xs:enumeration value="purple"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- ============================================================ -->
+  <!-- Annotation font style enum                                    -->
+  <!-- ============================================================ -->
+  <xs:simpleType name="AnnotationFontStyleEnum">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="normal"/>
+      <xs:enumeration value="italic"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- ============================================================ -->
   <!-- Connectors                                                    -->
   <!-- ============================================================ -->
   <xs:complexType name="ConnectorListType">

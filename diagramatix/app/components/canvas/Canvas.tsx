@@ -1277,6 +1277,33 @@ export function Canvas({
         height: Math.min(80, el.height * zoom),
         value: el.label,
       });
+    } else if (el.type === 'text-annotation') {
+      // Size edit box to match visible text area
+      const PAD = 10;
+      const lineH = 14;
+      const avgCharWidth = 12 * 0.55;
+      const charsPerLine = Math.max(1, Math.floor((el.width - PAD - 4) / avgCharWidth));
+      let lineCount = 0;
+      for (const segment of (el.label || ' ').split('\n')) {
+        const words = segment.split(' ');
+        let current = '';
+        for (const word of words) {
+          if (!current) { current = word; }
+          else if (current.length + 1 + word.length <= charsPerLine) { current += ' ' + word; }
+          else { lineCount++; current = word; }
+        }
+        lineCount++;
+      }
+      const textH = Math.max(lineH, lineCount * lineH);
+      const textTopY = el.y + el.height / 2 - textH / 2;
+      setEditingLabel({
+        elementId: el.id,
+        x: (el.x + PAD) * zoom + pan.x,
+        y: textTopY * zoom + pan.y,
+        width: (el.width - PAD - 4) * zoom,
+        height: (textH + 4) * zoom,
+        value: el.label,
+      });
     } else {
       const isUmlElement = el.type === "uml-class" || el.type === "uml-enumeration";
       setEditingLabel({
@@ -1297,6 +1324,28 @@ export function Canvas({
       const { w, h } = computeUseCaseSize(editingLabel.value, el.width);
       if (w !== el.width || h !== el.height) {
         onResizeElement(el.id, el.x, el.y, w, h);
+      }
+    }
+    // Auto-resize text-annotation height to fit wrapped text
+    if (el && el.type === 'text-annotation') {
+      const PAD = 10;
+      const lineH = 14;
+      const avgCharWidth = 12 * 0.55;
+      const charsPerLine = Math.max(1, Math.floor((el.width - PAD - 4) / avgCharWidth));
+      let lineCount = 0;
+      for (const segment of (editingLabel.value || ' ').split('\n')) {
+        const words = segment.split(' ');
+        let current = '';
+        for (const word of words) {
+          if (!current) { current = word; }
+          else if (current.length + 1 + word.length <= charsPerLine) { current += ' ' + word; }
+          else { lineCount++; current = word; }
+        }
+        lineCount++;
+      }
+      const newH = Math.max(30, lineCount * lineH + 8);
+      if (newH !== el.height) {
+        onResizeElement(el.id, el.x, el.y, el.width, newH);
       }
     }
     onUpdateLabel(editingLabel.elementId, editingLabel.value);

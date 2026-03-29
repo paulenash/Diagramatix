@@ -217,4 +217,4 @@ export interface TemplateData {
 
 /** Export schema version — bump when the export data structure changes.
  *  Major bump = breaking (fields removed/renamed). Minor bump = additive (new optional fields). */
-export const SCHEMA_VERSION = "1.1";
+export const SCHEMA_VERSION = "1.2";
