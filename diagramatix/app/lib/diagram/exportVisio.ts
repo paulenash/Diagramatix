@@ -6,7 +6,7 @@
  * the masters actually used by the diagram are included in the output.
  */
 import JSZip from "jszip";
-import type { DiagramData, DiagramElement, Connector, Point } from "./types";
+import type { DiagramData } from "./types";
 import { getElementMasterId, getConnectorMasterId } from "./visioMasterMap";
 
 const VISIO_NS = "http://schemas.microsoft.com/office/visio/2012/main";
@@ -239,6 +239,8 @@ function contentTypesXml(masterFiles: string[]): string {
     masterOverrides +
     `<Override PartName="/visio/pages/pages.xml" ContentType="application/vnd.ms-visio.pages+xml"/>` +
     `<Override PartName="/visio/pages/page1.xml" ContentType="application/vnd.ms-visio.page+xml"/>` +
+    `<Override PartName="/visio/windows.xml" ContentType="application/vnd.ms-visio.windows+xml"/>` +
+    `<Override PartName="/visio/theme/theme1.xml" ContentType="application/vnd.openxmlformats-officedocument.theme+xml"/>` +
     `<Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>` +
     `<Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>` +
     `</Types>`;
@@ -257,6 +259,8 @@ const DOC_RELS =
   `<Relationships xmlns="${REL_NS}">` +
   `<Relationship Id="rId1" Type="http://schemas.microsoft.com/visio/2010/relationships/masters" Target="masters/masters.xml"/>` +
   `<Relationship Id="rId2" Type="http://schemas.microsoft.com/visio/2010/relationships/pages" Target="pages/pages.xml"/>` +
+  `<Relationship Id="rId3" Type="http://schemas.microsoft.com/visio/2010/relationships/windows" Target="windows.xml"/>` +
+  `<Relationship Id="rId4" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme" Target="theme/theme1.xml"/>` +
   `</Relationships>`;
 
 function mastersIndexXml(masters: MasterInfo[]): string {
@@ -283,17 +287,25 @@ function mastersRelsXml(masters: MasterInfo[]): string {
 function pagesXml(pageW: number, pageH: number): string {
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
     `<Pages xmlns='${VISIO_NS}' xmlns:r='${REL_NS}' xml:space='preserve'>` +
-    `<Page ID='0' NameU='Page-1' Name='Page-1'>` +
-    `<PageSheet>` +
+    `<Page ID='0' NameU='Page-1' Name='Page-1' ViewScale='-1' ViewCenterX='${pageW / 2}' ViewCenterY='${pageH / 2}'>` +
+    `<PageSheet LineStyle='0' FillStyle='0' TextStyle='0'>` +
     `<Cell N='PageWidth' V='${pageW}'/>` +
     `<Cell N='PageHeight' V='${pageH}'/>` +
-    `<Cell N='ShdwOffsetX' V='0.118'/>` +
-    `<Cell N='ShdwOffsetY' V='-0.118'/>` +
-    `<Cell N='PageScale' V='1'/>` +
-    `<Cell N='DrawingScale' V='1'/>` +
-    `<Cell N='DrawingSizeType' V='1'/>` +
+    `<Cell N='ShdwOffsetX' V='0.1181102362204724'/>` +
+    `<Cell N='ShdwOffsetY' V='-0.1181102362204724'/>` +
+    `<Cell N='PageScale' V='1' U='IN_F'/>` +
+    `<Cell N='DrawingScale' V='1' U='IN_F'/>` +
+    `<Cell N='DrawingSizeType' V='0'/>` +
     `<Cell N='DrawingScaleType' V='0'/>` +
     `<Cell N='InhibitSnap' V='0'/>` +
+    `<Cell N='PageLockReplace' V='0' U='BOOL'/>` +
+    `<Cell N='PageLockDuplicate' V='0' U='BOOL'/>` +
+    `<Cell N='UIVisibility' V='0'/>` +
+    `<Cell N='ShdwType' V='0'/>` +
+    `<Cell N='ShdwObliqueAngle' V='0'/>` +
+    `<Cell N='ShdwScaleFactor' V='1'/>` +
+    `<Cell N='DrawingResizeType' V='1'/>` +
+    `<Cell N='PageShapeSplit' V='1'/>` +
     `</PageSheet>` +
     `<Rel r:id='rId1'/>` +
     `</Page></Pages>`;
@@ -332,31 +344,14 @@ const APP_PROPS_XML =
   `<Application>Diagramatix</Application>` +
   `</Properties>`;
 
-// ── Minimal document.xml ─────────────────────────────────────────────
-
-function documentXml(): string {
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
-    `<VisioDocument xmlns='${VISIO_NS}' xmlns:r='${REL_NS}' xml:space='preserve'>` +
-    `<DocumentSettings TopPage='0' DefaultTextStyle='0' DefaultLineStyle='0' DefaultFillStyle='0'>` +
-    `<Cell N='GlueSettings' V='57'/>` +
-    `<Cell N='SnapSettings' V='65847'/>` +
-    `<Cell N='SnapExtensions' V='34'/>` +
-    `<Cell N='DynamicGridEnabled' V='1'/>` +
-    `</DocumentSettings>` +
-    `<StyleSheets>` +
-    `<StyleSheet ID='0' NameU='No Style' Name='No Style'>` +
-    `<Cell N='LineWeight' V='0.01041666666666667'/>` +
-    `<Cell N='LineColor' V='0'/>` +
-    `<Cell N='LinePattern' V='1'/>` +
-    `<Cell N='FillForegnd' V='1'/>` +
-    `<Cell N='FillPattern' V='1'/>` +
-    `<Cell N='VerticalAlign' V='1'/>` +
-    `<Section N='Character'><Row IX='0'>` +
-    `<Cell N='Font' V='Calibri'/><Cell N='Size' V='0.1111111111111111'/>` +
-    `<Cell N='Color' V='0'/></Row></Section>` +
-    `</StyleSheet>` +
-    `</StyleSheets>` +
-    `</VisioDocument>`;
+/**
+ * Copy document.xml from the stencil, changing the content type marker
+ * from stencil to drawing. The stencil's document.xml contains all the
+ * style sheets, colour tables, and face names that master shapes reference.
+ */
+async function getDocumentXml(stencil: JSZip): Promise<string> {
+  const raw = await stencil.file("visio/document.xml")!.async("string");
+  return raw;
 }
 
 // ── Main export function ─────────────────────────────────────────────
@@ -394,9 +389,15 @@ export async function exportVisio(
   // Root relationships
   zip.file("_rels/.rels", ROOT_RELS);
 
-  // Document
-  zip.file("visio/document.xml", documentXml());
+  // Document — copy from stencil (contains style sheets, colours, face names)
+  zip.file("visio/document.xml", await getDocumentXml(stencil));
   zip.file("visio/_rels/document.xml.rels", DOC_RELS);
+
+  // Theme and windows — copy from stencil (master shapes use THEMEVAL() functions)
+  const themeXml = await stencil.file("visio/theme/theme1.xml")?.async("string");
+  if (themeXml) zip.file("visio/theme/theme1.xml", themeXml);
+  const windowsXml = await stencil.file("visio/windows.xml")?.async("string");
+  if (windowsXml) zip.file("visio/windows.xml", windowsXml);
 
   // Masters
   zip.file("visio/masters/masters.xml", mastersIndexXml(neededMasters));
