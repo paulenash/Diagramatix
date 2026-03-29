@@ -1038,6 +1038,18 @@ export function DiagramEditor({
               >
                 Export PDF
               </button>
+              {diagramType === "bpmn" && (
+                <button
+                  onClick={async () => {
+                    const { exportVisio } = await import("@/app/lib/diagram/exportVisio");
+                    await exportVisio(data, diagramName);
+                    setExportDropdownOpen(false);
+                  }}
+                  className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                >
+                  Export Visio
+                </button>
+              )}
               <div className="border-t border-gray-100" />
               <div className="px-3 py-2">
                 <div className="text-xs text-gray-500 mb-1.5">PDF Scale</div>
