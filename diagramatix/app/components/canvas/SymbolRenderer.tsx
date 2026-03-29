@@ -1343,7 +1343,8 @@ export function SymbolRenderer({
       return;
     }
 
-    // Single element drag
+    // Single element drag — use svgToWorld to convert client→world so zoom is respected
+    const startWorld = svgToWorld ? svgToWorld(e.clientX, e.clientY) : { x: e.clientX, y: e.clientY };
     dragStart = {
       mouseX: e.clientX,
       mouseY: e.clientY,
@@ -1355,8 +1356,9 @@ export function SymbolRenderer({
 
     function onMouseMove(ev: MouseEvent) {
       if (!dragStart) return;
-      lastX = dragStart.elX + (ev.clientX - dragStart.mouseX);
-      lastY = dragStart.elY + (ev.clientY - dragStart.mouseY);
+      const curWorld = svgToWorld ? svgToWorld(ev.clientX, ev.clientY) : { x: ev.clientX, y: ev.clientY };
+      lastX = dragStart.elX + (curWorld.x - startWorld.x);
+      lastY = dragStart.elY + (curWorld.y - startWorld.y);
       onMove(lastX, lastY);
     }
 
