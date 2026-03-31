@@ -39,13 +39,11 @@ export async function GET(request: Request) {
   }
   if (!isFinite(minX)) { minX = 0; minY = 0; maxX = 800; maxY = 600; }
   // All Visio Cell values (without U= attribute) are in inches internally.
-  // Use a standard page size and center the diagram on it.
+  // A4 landscape page, diagram centered
   const diagramW = (maxX - minX) / 96;
   const diagramH = (maxY - minY) / 96;
-  // Use A3 landscape or fit to diagram with margins, whichever is larger
-  const pageW = Math.max(16.54, diagramW + 2); // A3 landscape = 16.54 x 11.69
-  const pageH = Math.max(11.69, diagramH + 2);
-  // Offset to center diagram on page
+  const pageW = 11.69; // A4 landscape
+  const pageH = 8.27;
   const offsetX = (pageW - diagramW) / 2;
   const offsetY = (pageH - diagramH) / 2;
 
@@ -94,13 +92,21 @@ export async function GET(request: Request) {
 
     const isEvent = el.type === "start-event" || el.type === "end-event" || el.type === "intermediate-event";
     const isGateway = el.type === "gateway";
+    const isPool = el.type === "pool";
+    const isDataObject = el.type === "data-object";
     const gatewayRole = (el.properties as any)?.gatewayRole;
 
-    // Use Visio master dimensions — ensures selection rectangle matches visual shape
     const visioDefault = VISIO_SIZES[el.type];
     const isSubprocess = el.type === "subprocess" || el.type === "subprocess-expanded";
-    const vw = visioDefault ? visioDefault.w : dgxW;
-    const vh = visioDefault ? visioDefault.h : dgxH;
+    let vw: number, vh: number;
+    if (isPool || isSubprocess) {
+      // Pools and subprocesses use Diagramatix dimensions
+      vw = dgxW;
+      vh = dgxH;
+    } else {
+      vw = visioDefault ? visioDefault.w : dgxW;
+      vh = visioDefault ? visioDefault.h : dgxH;
+    }
 
     // Store actual Visio dimensions for connector calculation
     elVisioInfo.set(el.id, { cx, cy, w: vw, h: vh });
@@ -108,8 +114,94 @@ export async function GET(request: Request) {
     let textEl = "";
     let propSection = "";
     let extraCells = "";
+    let sizeCells = "";
 
-    if (isGateway) {
+    // Subprocesses: draw without master to control marker size
+    if (isSubprocess) {
+      const markerSize = 0.12; // small + marker
+      const markerX = vw / 2;
+      const markerBottom = 0.06;
+      shapes.push(
+        `<Shape ID='${shapeId}' NameU='${esc(el.label || "Subprocess")}' Type='Shape'>` +
+        `<Cell N='PinX' V='${cx}'/>` +
+        `<Cell N='PinY' V='${cy}'/>` +
+        `<Cell N='Width' V='${vw}'/>` +
+        `<Cell N='Height' V='${vh}'/>` +
+        `<Cell N='LocPinX' V='${vw / 2}' F='Width*0.5'/>` +
+        `<Cell N='LocPinY' V='${vh / 2}' F='Height*0.5'/>` +
+        `<Cell N='LineWeight' V='0.01388888888888889'/>` +
+        `<Cell N='LineColor' V='0'/>` +
+        `<Cell N='FillForegnd' V='#FFFFFF'/>` +
+        `<Cell N='FillPattern' V='1'/>` +
+        `<Cell N='Rounding' V='0.06'/>` +
+        `<Cell N='VerticalAlign' V='1'/>` +
+        `<Section N='Character'><Row IX='0'><Cell N='Size' V='0.1111111111111111'/></Row></Section>` +
+        `<Section N='Paragraph'><Row IX='0'><Cell N='HorzAlign' V='1'/></Row></Section>` +
+        // Main rectangle
+        `<Section N='Geometry' IX='0'>` +
+        `<Cell N='NoFill' V='0'/><Cell N='NoLine' V='0'/><Cell N='NoShow' V='0'/><Cell N='NoSnap' V='0'/>` +
+        `<Row T='MoveTo' IX='1'><Cell N='X' V='0' F='Width*0'/><Cell N='Y' V='0' F='Height*0'/></Row>` +
+        `<Row T='LineTo' IX='2'><Cell N='X' V='${vw}' F='Width*1'/><Cell N='Y' V='0' F='Height*0'/></Row>` +
+        `<Row T='LineTo' IX='3'><Cell N='X' V='${vw}' F='Width*1'/><Cell N='Y' V='${vh}' F='Height*1'/></Row>` +
+        `<Row T='LineTo' IX='4'><Cell N='X' V='0' F='Width*0'/><Cell N='Y' V='${vh}' F='Height*1'/></Row>` +
+        `<Row T='LineTo' IX='5'><Cell N='X' V='0' F='Width*0'/><Cell N='Y' V='0' F='Height*0'/></Row>` +
+        `</Section>` +
+        // + marker box at bottom center
+        `<Section N='Geometry' IX='1'>` +
+        `<Cell N='NoFill' V='1'/><Cell N='NoLine' V='0'/><Cell N='NoShow' V='0'/><Cell N='NoSnap' V='0'/>` +
+        `<Row T='MoveTo' IX='1'><Cell N='X' V='${markerX - markerSize / 2}'/><Cell N='Y' V='${markerBottom}'/></Row>` +
+        `<Row T='LineTo' IX='2'><Cell N='X' V='${markerX + markerSize / 2}'/><Cell N='Y' V='${markerBottom}'/></Row>` +
+        `<Row T='LineTo' IX='3'><Cell N='X' V='${markerX + markerSize / 2}'/><Cell N='Y' V='${markerBottom + markerSize}'/></Row>` +
+        `<Row T='LineTo' IX='4'><Cell N='X' V='${markerX - markerSize / 2}'/><Cell N='Y' V='${markerBottom + markerSize}'/></Row>` +
+        `<Row T='LineTo' IX='5'><Cell N='X' V='${markerX - markerSize / 2}'/><Cell N='Y' V='${markerBottom}'/></Row>` +
+        `</Section>` +
+        // + cross inside the marker box
+        `<Section N='Geometry' IX='2'>` +
+        `<Cell N='NoFill' V='1'/><Cell N='NoLine' V='0'/><Cell N='NoShow' V='0'/><Cell N='NoSnap' V='0'/>` +
+        `<Row T='MoveTo' IX='1'><Cell N='X' V='${markerX}'/><Cell N='Y' V='${markerBottom + 0.02}'/></Row>` +
+        `<Row T='LineTo' IX='2'><Cell N='X' V='${markerX}'/><Cell N='Y' V='${markerBottom + markerSize - 0.02}'/></Row>` +
+        `</Section>` +
+        `<Section N='Geometry' IX='3'>` +
+        `<Cell N='NoFill' V='1'/><Cell N='NoLine' V='0'/><Cell N='NoShow' V='0'/><Cell N='NoSnap' V='0'/>` +
+        `<Row T='MoveTo' IX='1'><Cell N='X' V='${markerX - markerSize / 2 + 0.02}'/><Cell N='Y' V='${markerBottom + markerSize / 2}'/></Row>` +
+        `<Row T='LineTo' IX='2'><Cell N='X' V='${markerX + markerSize / 2 - 0.02}'/><Cell N='Y' V='${markerBottom + markerSize / 2}'/></Row>` +
+        `</Section>` +
+        (el.label ? `<Text>${esc(el.label)}</Text>` : "") +
+        `</Shape>`
+      );
+      continue;
+    }
+
+    if (isPool) {
+      // Draw pools as simple rectangles — the master's sub-shape formulas don't
+      // recalculate properly with custom Width/Height.
+      // We'll create the pool shape without a Master reference.
+      shapes.push(
+        `<Shape ID='${shapeId}' NameU='${esc(el.label || "Pool")}' Type='Shape'>` +
+        `<Cell N='PinX' V='${cx}'/>` +
+        `<Cell N='PinY' V='${cy}'/>` +
+        `<Cell N='Width' V='${vw}'/>` +
+        `<Cell N='Height' V='${vh}'/>` +
+        `<Cell N='LocPinX' V='${vw / 2}' F='Width*0.5'/>` +
+        `<Cell N='LocPinY' V='${vh / 2}' F='Height*0.5'/>` +
+        `<Cell N='LineWeight' V='0.02083333333333333'/>` +
+        `<Cell N='LineColor' V='0'/>` +
+        `<Cell N='FillForegnd' V='#FFFFFF'/>` +
+        `<Cell N='FillPattern' V='1'/>` +
+        `<Cell N='Rounding' V='0.04'/>` +
+        `<Section N='Geometry' IX='0'>` +
+        `<Cell N='NoFill' V='0'/><Cell N='NoLine' V='0'/><Cell N='NoShow' V='0'/><Cell N='NoSnap' V='0'/>` +
+        `<Row T='MoveTo' IX='1'><Cell N='X' V='0' F='Width*0'/><Cell N='Y' V='0' F='Height*0'/></Row>` +
+        `<Row T='LineTo' IX='2'><Cell N='X' V='${vw}' F='Width*1'/><Cell N='Y' V='0' F='Height*0'/></Row>` +
+        `<Row T='LineTo' IX='3'><Cell N='X' V='${vw}' F='Width*1'/><Cell N='Y' V='${vh}' F='Height*1'/></Row>` +
+        `<Row T='LineTo' IX='4'><Cell N='X' V='0' F='Width*0'/><Cell N='Y' V='${vh}' F='Height*1'/></Row>` +
+        `<Row T='LineTo' IX='5'><Cell N='X' V='0' F='Width*0'/><Cell N='Y' V='0' F='Height*0'/></Row>` +
+        `</Section>` +
+        `</Shape>`
+      );
+      // Skip the normal shape.push below
+      continue;
+    } else if (isGateway) {
       const skipLabel = gatewayRole === "merge" || !el.label || el.label === "Decision?";
       if (skipLabel) {
         propSection = `<Section N='Property'><Row N='BpmnName'><Cell N='Value' V='' U='STR'/></Row></Section>`;
@@ -120,18 +212,17 @@ export async function GET(request: Request) {
       }
     } else if (isEvent && el.label) {
       // Events: don't set Text on the group (causes vertical text).
-      // We'll create a separate label shape below.
+      // Separate label shape created below.
       propSection = `<Section N='Property'><Row N='BpmnName'><Cell N='Value' V='${esc(el.label)}' U='STR'/></Row></Section>`;
+    } else if (isDataObject) {
+      // Data objects: don't set Text on group — separate label + state shapes below
+      if (el.label) {
+        propSection = `<Section N='Property'><Row N='BpmnName'><Cell N='Value' V='${esc(el.label)}' U='STR'/></Row></Section>`;
+      }
     } else if (el.label) {
-      // Other shapes: set BpmnName + Text
       propSection = `<Section N='Property'><Row N='BpmnName'><Cell N='Value' V='${esc(el.label)}' U='STR'/></Row></Section>`;
       textEl = `<Text>${esc(el.label)}</Text>`;
     }
-
-    // No Width/Height override — all shapes use master defaults.
-    const sizeCells = ``;
-    // TODO: fix subprocess marker size (DropOnPageScale issue)
-    const dropOnPageScale = "";
 
     shapes.push(
       `<Shape ID='${shapeId}' NameU='${esc(el.label || el.type)}' Type='Group' Master='${masterId}'>` +
@@ -140,58 +231,131 @@ export async function GET(request: Request) {
       sizeCells +
       extraCells +
       propSection +
-      dropOnPageScale +
       textEl +
       `</Shape>`
     );
   }
 
-  // Create separate label shapes for events (below the circle)
-  for (const el of elements) {
-    const isEvent = el.type === "start-event" || el.type === "end-event" || el.type === "intermediate-event";
-    if (!isEvent || !el.label) continue;
-
-    const labelId = nextId;
+  // Helper: create a moveable text label shape
+  function makeTextLabel(text: string, x: number, y: number, fontSize?: string): string {
+    const id = nextId;
     nextId += 100;
-    const info = elVisioInfo.get(el.id);
-    if (!info) continue;
-    const labelX = info.cx;
-    const labelY = info.cy - info.h / 2 - 0.15; // below the circle in Visio (Y increases upward)
-    const charW = 0.07; // approximate character width at 8pt
-    const labelW = Math.max(0.5, el.label.length * charW + 0.1);
-
-    shapes.push(
-      `<Shape ID='${labelId}' NameU='${esc(el.label)} label' Type='Shape'>` +
-      `<Cell N='PinX' V='${labelX}'/>` +
-      `<Cell N='PinY' V='${labelY}'/>` +
-      `<Cell N='Width' V='${labelW}'/>` +
-      `<Cell N='Height' V='0.2'/>` +
-      `<Cell N='LocPinX' V='${labelW / 2}' F='Width*0.5'/>` +
-      `<Cell N='LocPinY' V='0.1' F='Height*0.5'/>` +
+    const charW = 0.07;
+    const w = Math.max(0.4, text.length * charW + 0.1);
+    const h = 0.2;
+    const fs = fontSize ?? '0.1111111111111111';
+    return (
+      `<Shape ID='${id}' NameU='${esc(text)}' Type='Shape'>` +
+      `<Cell N='PinX' V='${x}'/>` +
+      `<Cell N='PinY' V='${y}'/>` +
+      `<Cell N='Width' V='${w}'/>` +
+      `<Cell N='Height' V='${h}'/>` +
+      `<Cell N='LocPinX' V='${w / 2}' F='Width*0.5'/>` +
+      `<Cell N='LocPinY' V='${h / 2}' F='Height*0.5'/>` +
       `<Cell N='Angle' V='0'/>` +
       `<Cell N='LinePattern' V='0'/>` +
       `<Cell N='FillPattern' V='0'/>` +
       `<Cell N='ShdwPattern' V='0'/>` +
-      `<Cell N='TxtPinX' V='${labelW / 2}' F='Width*0.5'/>` +
-      `<Cell N='TxtPinY' V='0.1' F='Height*0.5'/>` +
-      `<Cell N='TxtWidth' V='${labelW}' F='Width'/>` +
-      `<Cell N='TxtHeight' V='0.2' F='Height'/>` +
-      `<Cell N='TxtLocPinX' V='${labelW / 2}' F='TxtWidth*0.5'/>` +
-      `<Cell N='TxtLocPinY' V='0.1' F='TxtHeight*0.5'/>` +
+      `<Cell N='TxtPinX' V='${w / 2}' F='Width*0.5'/>` +
+      `<Cell N='TxtPinY' V='${h / 2}' F='Height*0.5'/>` +
+      `<Cell N='TxtWidth' V='${w}' F='Width'/>` +
+      `<Cell N='TxtHeight' V='${h}' F='Height'/>` +
+      `<Cell N='TxtLocPinX' V='${w / 2}' F='TxtWidth*0.5'/>` +
+      `<Cell N='TxtLocPinY' V='${h / 2}' F='TxtHeight*0.5'/>` +
       `<Cell N='TxtAngle' V='0'/>` +
-      `<Section N='Character'><Row IX='0'><Cell N='Size' V='0.1111111111111111'/></Row></Section>` +
+      `<Section N='Character'><Row IX='0'><Cell N='Size' V='${fs}'/></Row></Section>` +
       `<Section N='Paragraph'><Row IX='0'><Cell N='HorzAlign' V='1'/></Row></Section>` +
       `<Section N='Geometry' IX='0'>` +
       `<Cell N='NoFill' V='1'/><Cell N='NoLine' V='1'/><Cell N='NoShow' V='0'/><Cell N='NoSnap' V='0'/>` +
       `<Row T='MoveTo' IX='1'><Cell N='X' V='0' F='Width*0'/><Cell N='Y' V='0' F='Height*0'/></Row>` +
-      `<Row T='LineTo' IX='2'><Cell N='X' V='${labelW}' F='Width*1'/><Cell N='Y' V='0' F='Height*0'/></Row>` +
-      `<Row T='LineTo' IX='3'><Cell N='X' V='${labelW}' F='Width*1'/><Cell N='Y' V='0.2' F='Height*1'/></Row>` +
-      `<Row T='LineTo' IX='4'><Cell N='X' V='0' F='Width*0'/><Cell N='Y' V='0.2' F='Height*1'/></Row>` +
+      `<Row T='LineTo' IX='2'><Cell N='X' V='${w}' F='Width*1'/><Cell N='Y' V='0' F='Height*0'/></Row>` +
+      `<Row T='LineTo' IX='3'><Cell N='X' V='${w}' F='Width*1'/><Cell N='Y' V='${h}' F='Height*1'/></Row>` +
+      `<Row T='LineTo' IX='4'><Cell N='X' V='0' F='Width*0'/><Cell N='Y' V='${h}' F='Height*1'/></Row>` +
       `<Row T='LineTo' IX='5'><Cell N='X' V='0' F='Width*0'/><Cell N='Y' V='0' F='Height*0'/></Row>` +
       `</Section>` +
-      `<Text>${esc(el.label)}</Text>` +
+      `<Text>${esc(text)}</Text>` +
       `</Shape>`
     );
+  }
+
+  // Create separate labels for events, pools, and data objects
+  for (const el of elements) {
+    const info = elVisioInfo.get(el.id);
+    if (!info) continue;
+
+    const isEvent = el.type === "start-event" || el.type === "end-event" || el.type === "intermediate-event";
+    const isPool = el.type === "pool";
+    const isDataObject = el.type === "data-object";
+
+    // Event labels — below the circle
+    if (isEvent && el.label) {
+      const labelY = info.cy - info.h / 2 - 0.15;
+      shapes.push(makeTextLabel(el.label, info.cx, labelY));
+    }
+
+    // Pool sidebar — brown header with vertical text (rotated -90°, reading bottom-to-top)
+    if (isPool && el.label) {
+      const labelId = nextId;
+      nextId += 100;
+      const sidebarW = 0.32; // ~30px at 96dpi
+      const labelX = info.cx - info.w / 2 + sidebarW / 2;
+      const labelY = info.cy;
+      // Rotate the entire shape -90° (270° = 4.712 radians) to get bottom-to-top text
+      // but keep the shape itself as a tall narrow rectangle
+      shapes.push(
+        `<Shape ID='${labelId}' NameU='${esc(el.label)} label' Type='Shape'>` +
+        `<Cell N='PinX' V='${labelX}'/>` +
+        `<Cell N='PinY' V='${labelY}'/>` +
+        `<Cell N='Width' V='${sidebarW}'/>` +
+        `<Cell N='Height' V='${info.h}'/>` +
+        `<Cell N='LocPinX' V='${sidebarW / 2}' F='Width*0.5'/>` +
+        `<Cell N='LocPinY' V='${info.h / 2}' F='Height*0.5'/>` +
+        `<Cell N='Angle' V='0'/>` +
+        `<Cell N='LineWeight' V='0.02083333333333333'/>` +
+        `<Cell N='LineColor' V='0'/>` +
+        `<Cell N='FillForegnd' V='#c8956a'/>` +
+        `<Cell N='FillPattern' V='1'/>` +
+        `<Cell N='TxtPinX' V='${sidebarW / 2}' F='Width*0.5'/>` +
+        `<Cell N='TxtPinY' V='${info.h / 2}' F='Height*0.5'/>` +
+        `<Cell N='TxtWidth' V='${info.h}'/>` +
+        `<Cell N='TxtHeight' V='${sidebarW}'/>` +
+        `<Cell N='TxtLocPinX' V='${info.h / 2}' F='TxtWidth*0.5'/>` +
+        `<Cell N='TxtLocPinY' V='${sidebarW / 2}' F='TxtHeight*0.5'/>` +
+        `<Cell N='TxtAngle' V='1.5707963267948966'/>` +
+        `<Cell N='VerticalAlign' V='1'/>` +
+        `<Section N='Character'><Row IX='0'>` +
+        `<Cell N='Size' V='0.1111111111111111'/>` +
+        `<Cell N='Style' V='17'/>` +
+        `<Cell N='Color' V='#3b1a08'/>` +
+        `</Row></Section>` +
+        `<Section N='Paragraph'><Row IX='0'><Cell N='HorzAlign' V='1'/></Row></Section>` +
+        `<Section N='Geometry' IX='0'>` +
+        `<Cell N='NoFill' V='0'/><Cell N='NoLine' V='0'/><Cell N='NoShow' V='0'/><Cell N='NoSnap' V='0'/>` +
+        `<Row T='MoveTo' IX='1'><Cell N='X' V='0' F='Width*0'/><Cell N='Y' V='0' F='Height*0'/></Row>` +
+        `<Row T='LineTo' IX='2'><Cell N='X' V='${sidebarW}' F='Width*1'/><Cell N='Y' V='0' F='Height*0'/></Row>` +
+        `<Row T='LineTo' IX='3'><Cell N='X' V='${sidebarW}' F='Width*1'/><Cell N='Y' V='${info.h}' F='Height*1'/></Row>` +
+        `<Row T='LineTo' IX='4'><Cell N='X' V='0' F='Width*0'/><Cell N='Y' V='${info.h}' F='Height*1'/></Row>` +
+        `<Row T='LineTo' IX='5'><Cell N='X' V='0' F='Width*0'/><Cell N='Y' V='0' F='Height*0'/></Row>` +
+        `</Section>` +
+        `<Text>${esc(el.label)}</Text>` +
+        `</Shape>`
+      );
+    }
+
+    // Data object label — below the shape
+    if (isDataObject && el.label) {
+      const labelY = info.cy - info.h / 2 - 0.15;
+      shapes.push(makeTextLabel(el.label, info.cx, labelY));
+    }
+
+    // Data object state — below the label in [brackets]
+    if (isDataObject) {
+      const state = (el.properties as any)?.state;
+      if (state) {
+        const labelY = info.cy - info.h / 2 - 0.35;
+        shapes.push(makeTextLabel(`[${state}]`, info.cx, labelY));
+      }
+    }
   }
 
   // Build connectors — use source/target element centers for Begin/End coordinates.
@@ -210,19 +374,28 @@ export async function GET(request: Request) {
     if (!srcInfo || !tgtInfo) continue;
 
     // Calculate connector attachment points on the Visio shape edges.
-    // Use the connector's sourceSide/targetSide to determine which edge.
-    function edgePoint(info: { cx: number; cy: number; w: number; h: number }, side: string) {
+    function edgePoint(
+      info: { cx: number; cy: number; w: number; h: number },
+      side: string,
+      offsetAlong?: number
+    ) {
+      const oa = offsetAlong ?? 0.5;
       switch (side) {
-        case "right":  return { x: info.cx + info.w / 2, y: info.cy };
-        case "left":   return { x: info.cx - info.w / 2, y: info.cy };
-        case "top":    return { x: info.cx, y: info.cy + info.h / 2 }; // Visio Y increases upward
-        case "bottom": return { x: info.cx, y: info.cy - info.h / 2 };
-        default:       return { x: info.cx + info.w / 2, y: info.cy }; // default right
+        case "right":  return { x: info.cx + info.w / 2, y: info.cy + info.h * (0.5 - oa) };
+        case "left":   return { x: info.cx - info.w / 2, y: info.cy + info.h * (0.5 - oa) };
+        case "top":    return { x: info.cx + info.w * (oa - 0.5), y: info.cy + info.h / 2 };
+        case "bottom": return { x: info.cx + info.w * (oa - 0.5), y: info.cy - info.h / 2 };
+        default:       return { x: info.cx + info.w / 2, y: info.cy };
       }
     }
 
-    const srcPt = edgePoint(srcInfo, conn.sourceSide);
-    const tgtPt = edgePoint(tgtInfo, conn.targetSide);
+    const srcPt = edgePoint(srcInfo, conn.sourceSide, conn.sourceOffsetAlong);
+    const tgtPt = edgePoint(tgtInfo, conn.targetSide, conn.targetOffsetAlong);
+
+    // messageBPMN connectors must be vertical — use the source x for both endpoints
+    if (conn.type === "messageBPMN") {
+      tgtPt.x = srcPt.x;
+    }
     const bx = srcPt.x;
     const by = srcPt.y;
     const ex = tgtPt.x;
