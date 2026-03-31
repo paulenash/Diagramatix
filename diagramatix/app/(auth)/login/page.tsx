@@ -109,6 +109,26 @@ export default function LoginPage() {
           </button>
         </form>
 
+        <div className="mt-4 flex items-center gap-3">
+          <div className="flex-1 h-px bg-gray-200" />
+          <span className="text-xs text-gray-400">or</span>
+          <div className="flex-1 h-px bg-gray-200" />
+        </div>
+
+        <button
+          type="button"
+          onClick={() => signIn("microsoft-entra-id", { callbackUrl: "/dashboard" })}
+          className="mt-4 w-full py-2 px-4 bg-white text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 font-medium text-sm flex items-center justify-center gap-2"
+        >
+          <svg width={16} height={16} viewBox="0 0 21 21">
+            <rect x={1} y={1} width={9} height={9} fill="#f25022"/>
+            <rect x={11} y={1} width={9} height={9} fill="#7fba00"/>
+            <rect x={1} y={11} width={9} height={9} fill="#00a4ef"/>
+            <rect x={11} y={11} width={9} height={9} fill="#ffb900"/>
+          </svg>
+          Sign in with Microsoft
+        </button>
+
         <p className="mt-4 text-center text-sm text-gray-600">
           Don&apos;t have an account?{" "}
           <Link href="/register" className="text-blue-600 hover:underline">

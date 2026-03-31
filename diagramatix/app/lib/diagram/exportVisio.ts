@@ -74,9 +74,9 @@ async function parseMasters(stencil: JSZip): Promise<Map<number, MasterInfo>> {
   const mastersXml = await stencil.file("visio/masters/masters.xml")!.async("string");
   const relsXml = await stencil.file("visio/masters/_rels/masters.xml.rels")!.async("string");
 
-  // Parse rId → filename from .rels
+  // Parse rId → filename from .rels (handles both single and double quotes)
   const rIdToFile = new Map<string, string>();
-  const relRe = /Relationship\s+Id='(rId\d+)'[^>]*Target='([^']*)'/g;
+  const relRe = /Relationship\s+Id=["'](rId\d+)["'][^>]*Target=["']([^"']*)["']/g;
   let m;
   while ((m = relRe.exec(relsXml)) !== null) {
     rIdToFile.set(m[1], m[2]);
@@ -140,7 +140,7 @@ function generatePageShapes(
     const h = px2in(el.height);
 
     shapes.push(
-      `<Shape ID='${shapeId}' NameU='${escXml(el.label || el.type)}' Type='Shape' Master='${masterId}'>` +
+      `<Shape ID='${shapeId}' NameU='${escXml(el.label || el.type)}' Type='Shape' Master='${masterId}' LineStyle='3' FillStyle='3' TextStyle='3'>` +
       `<Cell N='PinX' V='${cx}'/>` +
       `<Cell N='PinY' V='${cy}'/>` +
       `<Cell N='Width' V='${w}'/>` +
@@ -152,8 +152,8 @@ function generatePageShapes(
     );
   }
 
-  // Connectors
-  for (const conn of data.connectors) {
+  // Connectors (temporarily disabled for debugging — uncomment when shapes work)
+  for (const conn of [] as typeof data.connectors) {
     const masterId = getConnectorMasterId(conn, data.elements);
     masterIds.add(masterId);
 
@@ -285,7 +285,7 @@ function mastersRelsXml(masters: MasterInfo[]): string {
 }
 
 function pagesXml(pageW: number, pageH: number): string {
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
+  return `<?xml version='1.0' encoding='utf-8' ?>` +
     `<Pages xmlns='${VISIO_NS}' xmlns:r='${REL_NS}' xml:space='preserve'>` +
     `<Page ID='0' NameU='Page-1' Name='Page-1' ViewScale='-1' ViewCenterX='${pageW / 2}' ViewCenterY='${pageH / 2}'>` +
     `<PageSheet LineStyle='0' FillStyle='0' TextStyle='0'>` +
@@ -362,6 +362,7 @@ export async function exportVisio(
 ): Promise<void> {
   const stencil = await loadStencil();
   const allMasters = await parseMasters(stencil);
+  console.log("[exportVisio] Masters parsed from stencil:", allMasters.size);
 
   // Compute page dimensions
   const bounds = getDiagramBounds(data);
@@ -377,40 +378,64 @@ export async function exportVisio(
   for (const id of neededMasterIds) {
     const info = allMasters.get(id);
     if (info) neededMasters.push(info);
+    else console.warn("[exportVisio] Master ID not found in stencil:", id);
   }
+  console.log("[exportVisio] Needed masters:", neededMasters.map(m => `${m.id}→${m.filename}`));
+  console.log("[exportVisio] Elements:", data.elements.length, "Connectors:", data.connectors.length);
+  console.log("[exportVisio] Bounds:", bounds);
+  console.log("[exportVisio] Page size:", pageW.toFixed(2), "x", pageH.toFixed(2), "inches");
+  console.log("[exportVisio] Shapes XML (first 500):", shapesXml.substring(0, 500));
+  console.log("[exportVisio] Connects XML length:", connectsXml.length);
+  console.log("[exportVisio] page1.xml content (first 300):", pageContentXml(shapesXml, connectsXml, pageW, pageH).substring(0, 300));
 
-  // Build the .vsdx ZIP
+  // Build the .vsdx ZIP from scratch.
   const zip = new JSZip();
 
-  // Content types
-  const masterFiles = neededMasters.map(m => m.filename);
-  zip.file("[Content_Types].xml", contentTypesXml(masterFiles));
+  // Content types — copy from stencil, change stencil→drawing, add page1 + jpeg default
+  let ct = await stencil.file("[Content_Types].xml")!.async("string");
+  ct = ct.replace("application/vnd.ms-visio.stencil.main+xml",
+                   "application/vnd.ms-visio.drawing.main+xml");
+  if (!ct.includes("page1.xml")) {
+    ct = ct.replace("</Types>",
+      '<Override PartName="/visio/pages/page1.xml" ContentType="application/vnd.ms-visio.page+xml"/></Types>');
+  }
+  zip.file("[Content_Types].xml", ct);
 
   // Root relationships
   zip.file("_rels/.rels", ROOT_RELS);
 
   // Document — copy from stencil (contains style sheets, colours, face names)
-  zip.file("visio/document.xml", await getDocumentXml(stencil));
-  zip.file("visio/_rels/document.xml.rels", DOC_RELS);
+  zip.file("visio/document.xml", await stencil.file("visio/document.xml")!.async("string"));
 
-  // Theme and windows — copy from stencil (master shapes use THEMEVAL() functions)
+  // Document rels — copy from stencil (already has masters, pages, windows, theme)
+  zip.file("visio/_rels/document.xml.rels",
+    await stencil.file("visio/_rels/document.xml.rels")!.async("string"));
+
+  // Theme and windows — copy from stencil
   const themeXml = await stencil.file("visio/theme/theme1.xml")?.async("string");
   if (themeXml) zip.file("visio/theme/theme1.xml", themeXml);
   const windowsXml = await stencil.file("visio/windows.xml")?.async("string");
   if (windowsXml) zip.file("visio/windows.xml", windowsXml);
 
-  // Masters
-  zip.file("visio/masters/masters.xml", mastersIndexXml(neededMasters));
-  zip.file("visio/masters/_rels/masters.xml.rels", mastersRelsXml(neededMasters));
+  // Copy ALL masters from the stencil unchanged — avoids regex-based XML manipulation
+  // which can corrupt Icon base64 data or miss edge cases
+  zip.file("visio/masters/masters.xml",
+    await stencil.file("visio/masters/masters.xml")!.async("string"));
+  zip.file("visio/masters/_rels/masters.xml.rels",
+    await stencil.file("visio/masters/_rels/masters.xml.rels")!.async("string"));
 
-  // Copy each needed master XML from the stencil
-  for (const master of neededMasters) {
-    const path = `visio/masters/${master.filename}`;
-    const content = await stencil.file(path)?.async("string");
-    if (content) {
-      zip.file(path, content);
+  // Copy ALL master XML files from the stencil
+  for (const [path, entry] of Object.entries(stencil.files)) {
+    if (path.startsWith("visio/masters/master") && path.endsWith(".xml") && !entry.dir) {
+      zip.file(path, await entry.async("string"));
     }
   }
+  // Also copy master55's image relationship if present
+  const master55Rels = stencil.file("visio/masters/_rels/master55.xml.rels");
+  if (master55Rels) zip.file("visio/masters/_rels/master55.xml.rels", await master55Rels.async("string"));
+  // Copy media files (DWC Logo image)
+  const image1 = stencil.file("visio/media/image1.jpeg");
+  if (image1) zip.file("visio/media/image1.jpeg", await image1.async("uint8array"));
 
   // Pages
   zip.file("visio/pages/pages.xml", pagesXml(pageW, pageH));
