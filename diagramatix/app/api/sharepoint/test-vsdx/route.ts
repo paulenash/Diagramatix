@@ -50,30 +50,13 @@ export async function GET(request: Request) {
   // Helper
   const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/'/g, "&apos;").replace(/"/g, "&quot;");
 
-  // Visio master default dimensions in inches (from stencil master XML values).
-  // Master Width V='0.984' U='MM' = 0.984mm ≈ 0.0387 inches.
-  // BUT: these values are interpreted as inches on our inch-based page, so
-  // the visual size is the raw value in inches (0.984 inches ≈ 25mm).
-  const VISIO_SIZES: Record<string, { w: number; h: number }> = {
-    "start-event":        { w: 0.394, h: 0.394 },
-    "end-event":          { w: 0.394, h: 0.394 },
-    "intermediate-event": { w: 0.394, h: 0.394 },
-    "gateway":            { w: 0.591, h: 0.472 },
-    "task":               { w: 0.984, h: 0.787 },
-    "subprocess":         { w: 0.984, h: 0.787 },
-    "subprocess-expanded":{ w: 0.984, h: 0.787 },
-    "data-object":        { w: 0.394, h: 0.472 },
-    "data-store":         { w: 0.591, h: 0.394 },
-    "group":              { w: 2.953, h: 1.969 },
-    "text-annotation":    { w: 0.984, h: 0.394 },
-  };
+  // All shapes use Diagramatix dimensions — no Visio master size map needed
+  // since we draw most shapes as custom shapes or wrap masters in Groups.
 
   // Build shapes
   const shapes: string[] = [];
   const connects: string[] = [];
   const elIdToShapeId = new Map<string, number>();
-  // Track the actual Visio dimensions for each element (for connector endpoint calculation)
-  const elVisioInfo = new Map<string, { cx: number; cy: number; w: number; h: number }>();
   let nextId = 100;
   const connectors = data.connectors ?? [];
 
@@ -96,31 +79,333 @@ export async function GET(request: Request) {
     const isDataObject = el.type === "data-object";
     const gatewayRole = (el.properties as any)?.gatewayRole;
 
-    const visioDefault = VISIO_SIZES[el.type];
     const isSubprocess = el.type === "subprocess" || el.type === "subprocess-expanded";
-    let vw: number, vh: number;
-    if (isPool || isSubprocess) {
-      // Pools and subprocesses use Diagramatix dimensions
-      vw = dgxW;
-      vh = dgxH;
-    } else {
-      vw = visioDefault ? visioDefault.w : dgxW;
-      vh = visioDefault ? visioDefault.h : dgxH;
-    }
+    const isTask = el.type === "task";
+    // All shapes use Diagramatix dimensions
+    const vw = dgxW;
+    const vh = dgxH;
 
     // Store actual Visio dimensions for connector calculation
-    elVisioInfo.set(el.id, { cx, cy, w: vw, h: vh });
-
     let textEl = "";
     let propSection = "";
     let extraCells = "";
     let sizeCells = "";
 
+    // Tasks: draw as custom rounded rectangles with task type marker
+    if (isTask) {
+      const taskType = (el.taskType as string) ?? "none";
+      // Task type marker geometry — small icon at top-left of task
+      let taskMarker = "";
+      const mx = 0.04; // marker x offset from left
+      const my = vh - 0.04; // marker y offset from top (Visio Y up, so top = vh)
+      const ms = 0.14; // marker size
+      if (taskType === "user") {
+        // Person silhouette: circle head + body arc
+        taskMarker =
+          `<Section N='Geometry' IX='1'><Cell N='NoFill' V='1'/><Cell N='NoLine' V='0'/><Cell N='NoShow' V='0'/><Cell N='NoSnap' V='0'/>` +
+          `<Row T='MoveTo' IX='1'><Cell N='X' V='${mx + ms / 2 + ms * 0.2}'/><Cell N='Y' V='${my - ms * 0.25}'/></Row>` +
+          `<Row T='EllipticalArcTo' IX='2'><Cell N='X' V='${mx + ms / 2 - ms * 0.2}'/><Cell N='Y' V='${my - ms * 0.25}'/><Cell N='A' V='${mx + ms / 2}'/><Cell N='B' V='${my - ms * 0.05}'/><Cell N='C' V='0'/><Cell N='D' V='1'/></Row>` +
+          `<Row T='EllipticalArcTo' IX='3'><Cell N='X' V='${mx + ms / 2 + ms * 0.2}'/><Cell N='Y' V='${my - ms * 0.25}'/><Cell N='A' V='${mx + ms / 2}'/><Cell N='B' V='${my - ms * 0.45}'/><Cell N='C' V='0'/><Cell N='D' V='1'/></Row>` +
+          `</Section>` +
+          `<Section N='Geometry' IX='2'><Cell N='NoFill' V='1'/><Cell N='NoLine' V='0'/><Cell N='NoShow' V='0'/><Cell N='NoSnap' V='0'/>` +
+          `<Row T='MoveTo' IX='1'><Cell N='X' V='${mx + ms * 0.15}'/><Cell N='Y' V='${my - ms * 0.5}'/></Row>` +
+          `<Row T='LineTo' IX='2'><Cell N='X' V='${mx + ms * 0.15}'/><Cell N='Y' V='${my - ms}'/></Row>` +
+          `<Row T='LineTo' IX='3'><Cell N='X' V='${mx + ms * 0.85}'/><Cell N='Y' V='${my - ms}'/></Row>` +
+          `<Row T='LineTo' IX='4'><Cell N='X' V='${mx + ms * 0.85}'/><Cell N='Y' V='${my - ms * 0.5}'/></Row>` +
+          `</Section>`;
+      } else if (taskType === "send") {
+        // Filled envelope
+        taskMarker =
+          `<Section N='Geometry' IX='1'><Cell N='NoFill' V='0'/><Cell N='NoLine' V='0'/><Cell N='NoShow' V='0'/><Cell N='NoSnap' V='0'/>` +
+          `<Cell N='FillForegnd' V='#374151'/>` +
+          `<Row T='MoveTo' IX='1'><Cell N='X' V='${mx}'/><Cell N='Y' V='${my - ms * 0.3}'/></Row>` +
+          `<Row T='LineTo' IX='2'><Cell N='X' V='${mx + ms}'/><Cell N='Y' V='${my - ms * 0.3}'/></Row>` +
+          `<Row T='LineTo' IX='3'><Cell N='X' V='${mx + ms}'/><Cell N='Y' V='${my - ms}'/></Row>` +
+          `<Row T='LineTo' IX='4'><Cell N='X' V='${mx}'/><Cell N='Y' V='${my - ms}'/></Row>` +
+          `<Row T='LineTo' IX='5'><Cell N='X' V='${mx}'/><Cell N='Y' V='${my - ms * 0.3}'/></Row>` +
+          `</Section>` +
+          `<Section N='Geometry' IX='2'><Cell N='NoFill' V='1'/><Cell N='NoLine' V='0'/><Cell N='NoShow' V='0'/><Cell N='NoSnap' V='0'/>` +
+          `<Cell N='LineColor' V='#FFFFFF'/>` +
+          `<Row T='MoveTo' IX='1'><Cell N='X' V='${mx}'/><Cell N='Y' V='${my - ms * 0.3}'/></Row>` +
+          `<Row T='LineTo' IX='2'><Cell N='X' V='${mx + ms / 2}'/><Cell N='Y' V='${my - ms * 0.65}'/></Row>` +
+          `<Row T='LineTo' IX='3'><Cell N='X' V='${mx + ms}'/><Cell N='Y' V='${my - ms * 0.3}'/></Row>` +
+          `</Section>`;
+      } else if (taskType === "receive") {
+        // Outline envelope
+        taskMarker =
+          `<Section N='Geometry' IX='1'><Cell N='NoFill' V='1'/><Cell N='NoLine' V='0'/><Cell N='NoShow' V='0'/><Cell N='NoSnap' V='0'/>` +
+          `<Row T='MoveTo' IX='1'><Cell N='X' V='${mx}'/><Cell N='Y' V='${my - ms * 0.3}'/></Row>` +
+          `<Row T='LineTo' IX='2'><Cell N='X' V='${mx + ms}'/><Cell N='Y' V='${my - ms * 0.3}'/></Row>` +
+          `<Row T='LineTo' IX='3'><Cell N='X' V='${mx + ms}'/><Cell N='Y' V='${my - ms}'/></Row>` +
+          `<Row T='LineTo' IX='4'><Cell N='X' V='${mx}'/><Cell N='Y' V='${my - ms}'/></Row>` +
+          `<Row T='LineTo' IX='5'><Cell N='X' V='${mx}'/><Cell N='Y' V='${my - ms * 0.3}'/></Row>` +
+          `</Section>` +
+          `<Section N='Geometry' IX='2'><Cell N='NoFill' V='1'/><Cell N='NoLine' V='0'/><Cell N='NoShow' V='0'/><Cell N='NoSnap' V='0'/>` +
+          `<Row T='MoveTo' IX='1'><Cell N='X' V='${mx}'/><Cell N='Y' V='${my - ms * 0.3}'/></Row>` +
+          `<Row T='LineTo' IX='2'><Cell N='X' V='${mx + ms / 2}'/><Cell N='Y' V='${my - ms * 0.65}'/></Row>` +
+          `<Row T='LineTo' IX='3'><Cell N='X' V='${mx + ms}'/><Cell N='Y' V='${my - ms * 0.3}'/></Row>` +
+          `</Section>`;
+      } else if (taskType === "service") {
+        // Simple gear: circle with radiating lines
+        const gr = ms * 0.35;
+        const gcx = mx + ms / 2, gcy = my - ms * 0.65;
+        taskMarker =
+          `<Section N='Geometry' IX='1'><Cell N='NoFill' V='1'/><Cell N='NoLine' V='0'/><Cell N='NoShow' V='0'/><Cell N='NoSnap' V='0'/>` +
+          `<Row T='MoveTo' IX='1'><Cell N='X' V='${gcx + gr}'/><Cell N='Y' V='${gcy}'/></Row>` +
+          `<Row T='EllipticalArcTo' IX='2'><Cell N='X' V='${gcx - gr}'/><Cell N='Y' V='${gcy}'/><Cell N='A' V='${gcx}'/><Cell N='B' V='${gcy + gr}'/><Cell N='C' V='0'/><Cell N='D' V='1'/></Row>` +
+          `<Row T='EllipticalArcTo' IX='3'><Cell N='X' V='${gcx + gr}'/><Cell N='Y' V='${gcy}'/><Cell N='A' V='${gcx}'/><Cell N='B' V='${gcy - gr}'/><Cell N='C' V='0'/><Cell N='D' V='1'/></Row>` +
+          `</Section>`;
+      } else if (taskType === "script") {
+        // Wavy page
+        taskMarker =
+          `<Section N='Geometry' IX='1'><Cell N='NoFill' V='1'/><Cell N='NoLine' V='0'/><Cell N='NoShow' V='0'/><Cell N='NoSnap' V='0'/>` +
+          `<Row T='MoveTo' IX='1'><Cell N='X' V='${mx + ms * 0.2}'/><Cell N='Y' V='${my - ms * 0.15}'/></Row>` +
+          `<Row T='LineTo' IX='2'><Cell N='X' V='${mx + ms * 0.8}'/><Cell N='Y' V='${my - ms * 0.15}'/></Row>` +
+          `<Row T='LineTo' IX='3'><Cell N='X' V='${mx + ms * 0.8}'/><Cell N='Y' V='${my - ms}'/></Row>` +
+          `<Row T='LineTo' IX='4'><Cell N='X' V='${mx + ms * 0.2}'/><Cell N='Y' V='${my - ms}'/></Row>` +
+          `<Row T='LineTo' IX='5'><Cell N='X' V='${mx + ms * 0.2}'/><Cell N='Y' V='${my - ms * 0.15}'/></Row>` +
+          `</Section>` +
+          // Horizontal lines
+          `<Section N='Geometry' IX='2'><Cell N='NoFill' V='1'/><Cell N='NoLine' V='0'/><Cell N='NoShow' V='0'/><Cell N='NoSnap' V='0'/>` +
+          `<Cell N='LineWeight' V='0.005'/>` +
+          `<Row T='MoveTo' IX='1'><Cell N='X' V='${mx + ms * 0.3}'/><Cell N='Y' V='${my - ms * 0.38}'/></Row>` +
+          `<Row T='LineTo' IX='2'><Cell N='X' V='${mx + ms * 0.7}'/><Cell N='Y' V='${my - ms * 0.38}'/></Row>` +
+          `</Section>` +
+          `<Section N='Geometry' IX='3'><Cell N='NoFill' V='1'/><Cell N='NoLine' V='0'/><Cell N='NoShow' V='0'/><Cell N='NoSnap' V='0'/>` +
+          `<Cell N='LineWeight' V='0.005'/>` +
+          `<Row T='MoveTo' IX='1'><Cell N='X' V='${mx + ms * 0.3}'/><Cell N='Y' V='${my - ms * 0.58}'/></Row>` +
+          `<Row T='LineTo' IX='2'><Cell N='X' V='${mx + ms * 0.7}'/><Cell N='Y' V='${my - ms * 0.58}'/></Row>` +
+          `</Section>` +
+          `<Section N='Geometry' IX='4'><Cell N='NoFill' V='1'/><Cell N='NoLine' V='0'/><Cell N='NoShow' V='0'/><Cell N='NoSnap' V='0'/>` +
+          `<Cell N='LineWeight' V='0.005'/>` +
+          `<Row T='MoveTo' IX='1'><Cell N='X' V='${mx + ms * 0.3}'/><Cell N='Y' V='${my - ms * 0.78}'/></Row>` +
+          `<Row T='LineTo' IX='2'><Cell N='X' V='${mx + ms * 0.7}'/><Cell N='Y' V='${my - ms * 0.78}'/></Row>` +
+          `</Section>`;
+      } else if (taskType === "manual") {
+        // Hand shape (simplified as rectangle with fingers)
+        taskMarker =
+          `<Section N='Geometry' IX='1'><Cell N='NoFill' V='1'/><Cell N='NoLine' V='0'/><Cell N='NoShow' V='0'/><Cell N='NoSnap' V='0'/>` +
+          `<Row T='MoveTo' IX='1'><Cell N='X' V='${mx}'/><Cell N='Y' V='${my - ms * 0.4}'/></Row>` +
+          `<Row T='LineTo' IX='2'><Cell N='X' V='${mx + ms * 0.7}'/><Cell N='Y' V='${my - ms * 0.4}'/></Row>` +
+          `<Row T='LineTo' IX='3'><Cell N='X' V='${mx + ms * 0.7}'/><Cell N='Y' V='${my - ms}'/></Row>` +
+          `<Row T='LineTo' IX='4'><Cell N='X' V='${mx}'/><Cell N='Y' V='${my - ms}'/></Row>` +
+          `<Row T='LineTo' IX='5'><Cell N='X' V='${mx}'/><Cell N='Y' V='${my - ms * 0.4}'/></Row>` +
+          `</Section>`;
+      } else if (taskType === "business-rule") {
+        // Table/grid
+        taskMarker =
+          `<Section N='Geometry' IX='1'><Cell N='NoFill' V='1'/><Cell N='NoLine' V='0'/><Cell N='NoShow' V='0'/><Cell N='NoSnap' V='0'/>` +
+          `<Row T='MoveTo' IX='1'><Cell N='X' V='${mx}'/><Cell N='Y' V='${my - ms * 0.2}'/></Row>` +
+          `<Row T='LineTo' IX='2'><Cell N='X' V='${mx + ms}'/><Cell N='Y' V='${my - ms * 0.2}'/></Row>` +
+          `<Row T='LineTo' IX='3'><Cell N='X' V='${mx + ms}'/><Cell N='Y' V='${my - ms}'/></Row>` +
+          `<Row T='LineTo' IX='4'><Cell N='X' V='${mx}'/><Cell N='Y' V='${my - ms}'/></Row>` +
+          `<Row T='LineTo' IX='5'><Cell N='X' V='${mx}'/><Cell N='Y' V='${my - ms * 0.2}'/></Row>` +
+          `</Section>` +
+          `<Section N='Geometry' IX='2'><Cell N='NoFill' V='1'/><Cell N='NoLine' V='0'/><Cell N='NoShow' V='0'/><Cell N='NoSnap' V='0'/>` +
+          `<Cell N='LineWeight' V='0.005'/>` +
+          `<Row T='MoveTo' IX='1'><Cell N='X' V='${mx}'/><Cell N='Y' V='${my - ms * 0.55}'/></Row>` +
+          `<Row T='LineTo' IX='2'><Cell N='X' V='${mx + ms}'/><Cell N='Y' V='${my - ms * 0.55}'/></Row>` +
+          `</Section>` +
+          `<Section N='Geometry' IX='3'><Cell N='NoFill' V='1'/><Cell N='NoLine' V='0'/><Cell N='NoShow' V='0'/><Cell N='NoSnap' V='0'/>` +
+          `<Cell N='LineWeight' V='0.005'/>` +
+          `<Row T='MoveTo' IX='1'><Cell N='X' V='${mx + ms * 0.4}'/><Cell N='Y' V='${my - ms * 0.2}'/></Row>` +
+          `<Row T='LineTo' IX='2'><Cell N='X' V='${mx + ms * 0.4}'/><Cell N='Y' V='${my - ms}'/></Row>` +
+          `</Section>`;
+      }
+      // taskType "none" → no marker
+
+      shapes.push(
+        `<Shape ID='${shapeId}' NameU='${esc(el.label || "Task")}' Type='Shape'>` +
+        `<Cell N='PinX' V='${cx}'/>` +
+        `<Cell N='PinY' V='${cy}'/>` +
+        `<Cell N='Width' V='${vw}'/>` +
+        `<Cell N='Height' V='${vh}'/>` +
+        `<Cell N='LocPinX' V='${vw / 2}' F='Width*0.5'/>` +
+        `<Cell N='LocPinY' V='${vh / 2}' F='Height*0.5'/>` +
+        `<Cell N='LineWeight' V='0.01388888888888889'/>` +
+        `<Cell N='LineColor' V='0'/>` +
+        `<Cell N='FillForegnd' V='#fef9c3'/>` +
+        `<Cell N='FillPattern' V='1'/>` +
+        `<Cell N='Rounding' V='0.06'/>` +
+        `<Cell N='VerticalAlign' V='1'/>` +
+        `<Section N='Character'><Row IX='0'><Cell N='Size' V='0.1111111111111111'/></Row></Section>` +
+        `<Section N='Paragraph'><Row IX='0'><Cell N='HorzAlign' V='1'/></Row></Section>` +
+        `<Section N='Geometry' IX='0'>` +
+        `<Cell N='NoFill' V='0'/><Cell N='NoLine' V='0'/><Cell N='NoShow' V='0'/><Cell N='NoSnap' V='0'/>` +
+        `<Row T='MoveTo' IX='1'><Cell N='X' V='0' F='Width*0'/><Cell N='Y' V='0' F='Height*0'/></Row>` +
+        `<Row T='LineTo' IX='2'><Cell N='X' V='${vw}' F='Width*1'/><Cell N='Y' V='0' F='Height*0'/></Row>` +
+        `<Row T='LineTo' IX='3'><Cell N='X' V='${vw}' F='Width*1'/><Cell N='Y' V='${vh}' F='Height*1'/></Row>` +
+        `<Row T='LineTo' IX='4'><Cell N='X' V='0' F='Width*0'/><Cell N='Y' V='${vh}' F='Height*1'/></Row>` +
+        `<Row T='LineTo' IX='5'><Cell N='X' V='0' F='Width*0'/><Cell N='Y' V='0' F='Height*0'/></Row>` +
+        `</Section>` +
+        taskMarker +
+        (el.label ? `<Text>${esc(el.label)}</Text>` : "") +
+        `</Shape>`
+      );
+      continue;
+    }
+
+    // Gateways: custom diamond shape matching Diagramatix dimensions and markers
+    if (isGateway) {
+      const gwType = (el.gatewayType as string) ?? "none";
+      const hw = vw / 2;
+      const hh = vh / 2;
+      // Marker geometry matching Diagramatix GatewayMarker
+      let markerGeom = "";
+      const s = Math.min(hw, hh) * 0.58; // ~11.7/20 ratio from Diagramatix
+      const lw = "0.05"; // thick marker lines (~5px at 96dpi scaled)
+      if (gwType === "exclusive") {
+        // X marker with thick lines at 70° angle
+        const dx = s * 0.7 * Math.sin(35 * Math.PI / 180);
+        const dy = s * 0.7 * Math.cos(35 * Math.PI / 180);
+        markerGeom =
+          `<Section N='Geometry' IX='1'>` +
+          `<Cell N='NoFill' V='1'/><Cell N='NoLine' V='0'/><Cell N='NoShow' V='0'/><Cell N='NoSnap' V='0'/>` +
+          `<Cell N='LineWeight' V='${lw}'/>` +
+          `<Row T='MoveTo' IX='1'><Cell N='X' V='${hw - dx}'/><Cell N='Y' V='${hh + dy}'/></Row>` +
+          `<Row T='LineTo' IX='2'><Cell N='X' V='${hw + dx}'/><Cell N='Y' V='${hh - dy}'/></Row>` +
+          `</Section>` +
+          `<Section N='Geometry' IX='2'>` +
+          `<Cell N='NoFill' V='1'/><Cell N='NoLine' V='0'/><Cell N='NoShow' V='0'/><Cell N='NoSnap' V='0'/>` +
+          `<Cell N='LineWeight' V='${lw}'/>` +
+          `<Row T='MoveTo' IX='1'><Cell N='X' V='${hw + dx}'/><Cell N='Y' V='${hh + dy}'/></Row>` +
+          `<Row T='LineTo' IX='2'><Cell N='X' V='${hw - dx}'/><Cell N='Y' V='${hh - dy}'/></Row>` +
+          `</Section>`;
+      } else if (gwType === "parallel") {
+        // + marker with thick lines
+        const ms = s * 0.7;
+        markerGeom =
+          `<Section N='Geometry' IX='1'>` +
+          `<Cell N='NoFill' V='1'/><Cell N='NoLine' V='0'/><Cell N='NoShow' V='0'/><Cell N='NoSnap' V='0'/>` +
+          `<Cell N='LineWeight' V='${lw}'/>` +
+          `<Row T='MoveTo' IX='1'><Cell N='X' V='${hw - ms}'/><Cell N='Y' V='${hh}'/></Row>` +
+          `<Row T='LineTo' IX='2'><Cell N='X' V='${hw + ms}'/><Cell N='Y' V='${hh}'/></Row>` +
+          `</Section>` +
+          `<Section N='Geometry' IX='2'>` +
+          `<Cell N='NoFill' V='1'/><Cell N='NoLine' V='0'/><Cell N='NoShow' V='0'/><Cell N='NoSnap' V='0'/>` +
+          `<Cell N='LineWeight' V='${lw}'/>` +
+          `<Row T='MoveTo' IX='1'><Cell N='X' V='${hw}'/><Cell N='Y' V='${hh - ms}'/></Row>` +
+          `<Row T='LineTo' IX='2'><Cell N='X' V='${hw}'/><Cell N='Y' V='${hh + ms}'/></Row>` +
+          `</Section>`;
+      } else if (gwType === "inclusive") {
+        // Thick circle
+        const cr = s * 0.7;
+        markerGeom =
+          `<Section N='Geometry' IX='1'>` +
+          `<Cell N='NoFill' V='1'/><Cell N='NoLine' V='0'/><Cell N='NoShow' V='0'/><Cell N='NoSnap' V='0'/>` +
+          `<Cell N='LineWeight' V='0.04'/>` +
+          `<Row T='MoveTo' IX='1'><Cell N='X' V='${hw + cr}'/><Cell N='Y' V='${hh}'/></Row>` +
+          `<Row T='EllipticalArcTo' IX='2'>` +
+          `<Cell N='X' V='${hw - cr}'/><Cell N='Y' V='${hh}'/><Cell N='A' V='${hw}'/><Cell N='B' V='${hh + cr}'/><Cell N='C' V='0'/><Cell N='D' V='1'/></Row>` +
+          `<Row T='EllipticalArcTo' IX='3'>` +
+          `<Cell N='X' V='${hw + cr}'/><Cell N='Y' V='${hh}'/><Cell N='A' V='${hw}'/><Cell N='B' V='${hh - cr}'/><Cell N='C' V='0'/><Cell N='D' V='1'/></Row>` +
+          `</Section>`;
+      } else if (gwType === "event-based") {
+        // Double circle + pentagon
+        const or = s * 0.95;
+        const ir = s * 0.75;
+        const pr = s * 0.5;
+        // Outer circle
+        markerGeom =
+          `<Section N='Geometry' IX='1'>` +
+          `<Cell N='NoFill' V='1'/><Cell N='NoLine' V='0'/><Cell N='NoShow' V='0'/><Cell N='NoSnap' V='0'/>` +
+          `<Row T='MoveTo' IX='1'><Cell N='X' V='${hw + or}'/><Cell N='Y' V='${hh}'/></Row>` +
+          `<Row T='EllipticalArcTo' IX='2'><Cell N='X' V='${hw - or}'/><Cell N='Y' V='${hh}'/><Cell N='A' V='${hw}'/><Cell N='B' V='${hh + or}'/><Cell N='C' V='0'/><Cell N='D' V='1'/></Row>` +
+          `<Row T='EllipticalArcTo' IX='3'><Cell N='X' V='${hw + or}'/><Cell N='Y' V='${hh}'/><Cell N='A' V='${hw}'/><Cell N='B' V='${hh - or}'/><Cell N='C' V='0'/><Cell N='D' V='1'/></Row>` +
+          `</Section>` +
+          // Inner circle
+          `<Section N='Geometry' IX='2'>` +
+          `<Cell N='NoFill' V='1'/><Cell N='NoLine' V='0'/><Cell N='NoShow' V='0'/><Cell N='NoSnap' V='0'/>` +
+          `<Row T='MoveTo' IX='1'><Cell N='X' V='${hw + ir}'/><Cell N='Y' V='${hh}'/></Row>` +
+          `<Row T='EllipticalArcTo' IX='2'><Cell N='X' V='${hw - ir}'/><Cell N='Y' V='${hh}'/><Cell N='A' V='${hw}'/><Cell N='B' V='${hh + ir}'/><Cell N='C' V='0'/><Cell N='D' V='1'/></Row>` +
+          `<Row T='EllipticalArcTo' IX='3'><Cell N='X' V='${hw + ir}'/><Cell N='Y' V='${hh}'/><Cell N='A' V='${hw}'/><Cell N='B' V='${hh - ir}'/><Cell N='C' V='0'/><Cell N='D' V='1'/></Row>` +
+          `</Section>` +
+          // Pentagon
+          `<Section N='Geometry' IX='3'>` +
+          `<Cell N='NoFill' V='1'/><Cell N='NoLine' V='0'/><Cell N='NoShow' V='0'/><Cell N='NoSnap' V='0'/>`;
+        let pentRows = "";
+        for (let i = 0; i <= 5; i++) {
+          const a = ((i % 5) * 2 * Math.PI / 5) - Math.PI / 2;
+          const px = hw + pr * Math.cos(a);
+          const py = hh + pr * Math.sin(a);
+          pentRows += i === 0
+            ? `<Row T='MoveTo' IX='1'><Cell N='X' V='${px}'/><Cell N='Y' V='${py}'/></Row>`
+            : `<Row T='LineTo' IX='${i + 1}'><Cell N='X' V='${px}'/><Cell N='Y' V='${py}'/></Row>`;
+        }
+        markerGeom += pentRows + `</Section>`;
+      }
+      // gwType "none" → no marker (empty markerGeom)
+
+      // Gateway with external text block via TxtPin
+      const skipLabel = gatewayRole === "merge" || !el.label || el.label === "Decision?";
+
+      let gwTxtCells = "";
+      let gwTextEl = "";
+      if (skipLabel) {
+        gwTxtCells = `<Cell N='HideText' V='1'/>`;
+        gwTextEl = `<Text></Text>`;
+      } else if (el.label) {
+        const lox = ((el.properties as any)?.labelOffsetX ?? -30);
+        const loy = ((el.properties as any)?.labelOffsetY ?? -54);
+        const labelH = 0.18;
+        const charW = 0.07;
+        const labelW = Math.max(0.5, el.label.length * charW + 0.15);
+        const txtPinX = lox / 96;
+        const txtPinY = -(el.height / 2 + loy) / 96 - labelH / 2;
+        gwTxtCells =
+          `<Cell N='TxtPinX' V='${hw + txtPinX}'/>` +
+          `<Cell N='TxtPinY' V='${hh + txtPinY}'/>` +
+          `<Cell N='TxtWidth' V='${labelW}'/>` +
+          `<Cell N='TxtHeight' V='${labelH}'/>` +
+          `<Cell N='TxtLocPinX' V='${labelW / 2}' F='TxtWidth*0.5'/>` +
+          `<Cell N='TxtLocPinY' V='${labelH / 2}' F='TxtHeight*0.5'/>` +
+          `<Cell N='TxtAngle' V='0'/>`;
+        gwTextEl = `<Text>${esc(el.label)}</Text>`;
+      }
+
+      shapes.push(
+        `<Shape ID='${shapeId}' NameU='${esc(el.label || "Gateway")}' Type='Shape'>` +
+        `<Cell N='PinX' V='${cx}'/>` +
+        `<Cell N='PinY' V='${cy}'/>` +
+        `<Cell N='Width' V='${vw}'/>` +
+        `<Cell N='Height' V='${vh}'/>` +
+        `<Cell N='LocPinX' V='${hw}' F='Width*0.5'/>` +
+        `<Cell N='LocPinY' V='${hh}' F='Height*0.5'/>` +
+        `<Cell N='LineWeight' V='0.01388888888888889'/>` +
+        `<Cell N='LineColor' V='#374151'/>` +
+        `<Cell N='FillForegnd' V='#f3e8ff'/>` +
+        `<Cell N='FillPattern' V='1'/>` +
+        gwTxtCells +
+        `<Section N='Character'><Row IX='0'><Cell N='Size' V='0.1111111111111111'/></Row></Section>` +
+        `<Section N='Paragraph'><Row IX='0'><Cell N='HorzAlign' V='1'/></Row></Section>` +
+        // Diamond geometry
+        `<Section N='Geometry' IX='0'>` +
+        `<Cell N='NoFill' V='0'/><Cell N='NoLine' V='0'/><Cell N='NoShow' V='0'/><Cell N='NoSnap' V='0'/>` +
+        `<Row T='MoveTo' IX='1'><Cell N='X' V='${hw}'/><Cell N='Y' V='0'/></Row>` +
+        `<Row T='LineTo' IX='2'><Cell N='X' V='${vw}'/><Cell N='Y' V='${hh}'/></Row>` +
+        `<Row T='LineTo' IX='3'><Cell N='X' V='${hw}'/><Cell N='Y' V='${vh}'/></Row>` +
+        `<Row T='LineTo' IX='4'><Cell N='X' V='0'/><Cell N='Y' V='${hh}'/></Row>` +
+        `<Row T='LineTo' IX='5'><Cell N='X' V='${hw}'/><Cell N='Y' V='0'/></Row>` +
+        `</Section>` +
+        markerGeom +
+        // Connection points at diamond tips
+        `<Section N='Connection'>` +
+        `<Row T='Connection' IX='0'><Cell N='X' V='${hw}' F='Width*0.5'/><Cell N='Y' V='${vh}' F='Height*1'/><Cell N='DirX' V='0'/><Cell N='DirY' V='0'/><Cell N='Type' V='0'/><Cell N='AutoGen' V='0'/></Row>` +
+        `<Row T='Connection' IX='1'><Cell N='X' V='${vw}' F='Width*1'/><Cell N='Y' V='${hh}' F='Height*0.5'/><Cell N='DirX' V='0'/><Cell N='DirY' V='0'/><Cell N='Type' V='0'/><Cell N='AutoGen' V='0'/></Row>` +
+        `<Row T='Connection' IX='2'><Cell N='X' V='${hw}' F='Width*0.5'/><Cell N='Y' V='0'/><Cell N='DirX' V='0'/><Cell N='DirY' V='0'/><Cell N='Type' V='0'/><Cell N='AutoGen' V='0'/></Row>` +
+        `<Row T='Connection' IX='3'><Cell N='X' V='0'/><Cell N='Y' V='${hh}' F='Height*0.5'/><Cell N='DirX' V='0'/><Cell N='DirY' V='0'/><Cell N='Type' V='0'/><Cell N='AutoGen' V='0'/></Row>` +
+        `</Section>` +
+        gwTextEl +
+        `</Shape>`
+      );
+      continue;
+    }
+
     // Subprocesses: draw without master to control marker size
     if (isSubprocess) {
-      const markerSize = 0.12; // small + marker
+      const markerSize = 0.18; // 50% larger marker
       const markerX = vw / 2;
-      const markerBottom = 0.06;
+      const markerBottom = 0.04;
       shapes.push(
         `<Shape ID='${shapeId}' NameU='${esc(el.label || "Subprocess")}' Type='Shape'>` +
         `<Cell N='PinX' V='${cx}'/>` +
@@ -131,7 +416,7 @@ export async function GET(request: Request) {
         `<Cell N='LocPinY' V='${vh / 2}' F='Height*0.5'/>` +
         `<Cell N='LineWeight' V='0.01388888888888889'/>` +
         `<Cell N='LineColor' V='0'/>` +
-        `<Cell N='FillForegnd' V='#FFFFFF'/>` +
+        `<Cell N='FillForegnd' V='#fef08a'/>` +
         `<Cell N='FillPattern' V='1'/>` +
         `<Cell N='Rounding' V='0.06'/>` +
         `<Cell N='VerticalAlign' V='1'/>` +
@@ -173,22 +458,34 @@ export async function GET(request: Request) {
     }
 
     if (isPool) {
-      // Draw pools as simple rectangles — the master's sub-shape formulas don't
-      // recalculate properly with custom Width/Height.
-      // We'll create the pool shape without a Master reference.
+      // Pool as a Group shape containing body rectangle + header sidebar.
+      // Connectors attach to the group boundary.
+      const sidebarW = 0.32;
+      const bodyId = shapeId + 1;
+      const headerId = shapeId + 2;
       shapes.push(
-        `<Shape ID='${shapeId}' NameU='${esc(el.label || "Pool")}' Type='Shape'>` +
+        `<Shape ID='${shapeId}' NameU='${esc(el.label || "Pool")}' Type='Group'>` +
         `<Cell N='PinX' V='${cx}'/>` +
         `<Cell N='PinY' V='${cy}'/>` +
         `<Cell N='Width' V='${vw}'/>` +
         `<Cell N='Height' V='${vh}'/>` +
         `<Cell N='LocPinX' V='${vw / 2}' F='Width*0.5'/>` +
         `<Cell N='LocPinY' V='${vh / 2}' F='Height*0.5'/>` +
+        `<Cell N='IsTextEditTarget' V='0'/>` +
+        `<Cell N='SelectMode' V='1'/>` +
+        `<Shapes>` +
+        // Body rectangle (child shape)
+        `<Shape ID='${bodyId}' NameU='Pool Body' Type='Shape'>` +
+        `<Cell N='PinX' V='${vw / 2}' F='Sheet.${shapeId}!Width*0.5'/>` +
+        `<Cell N='PinY' V='${vh / 2}' F='Sheet.${shapeId}!Height*0.5'/>` +
+        `<Cell N='Width' V='${vw}' F='Sheet.${shapeId}!Width'/>` +
+        `<Cell N='Height' V='${vh}' F='Sheet.${shapeId}!Height'/>` +
+        `<Cell N='LocPinX' V='${vw / 2}' F='Width*0.5'/>` +
+        `<Cell N='LocPinY' V='${vh / 2}' F='Height*0.5'/>` +
         `<Cell N='LineWeight' V='0.02083333333333333'/>` +
         `<Cell N='LineColor' V='0'/>` +
-        `<Cell N='FillForegnd' V='#FFFFFF'/>` +
+        `<Cell N='FillForegnd' V='#f9fafb'/>` +
         `<Cell N='FillPattern' V='1'/>` +
-        `<Cell N='Rounding' V='0.04'/>` +
         `<Section N='Geometry' IX='0'>` +
         `<Cell N='NoFill' V='0'/><Cell N='NoLine' V='0'/><Cell N='NoShow' V='0'/><Cell N='NoSnap' V='0'/>` +
         `<Row T='MoveTo' IX='1'><Cell N='X' V='0' F='Width*0'/><Cell N='Y' V='0' F='Height*0'/></Row>` +
@@ -197,6 +494,45 @@ export async function GET(request: Request) {
         `<Row T='LineTo' IX='4'><Cell N='X' V='0' F='Width*0'/><Cell N='Y' V='${vh}' F='Height*1'/></Row>` +
         `<Row T='LineTo' IX='5'><Cell N='X' V='0' F='Width*0'/><Cell N='Y' V='0' F='Height*0'/></Row>` +
         `</Section>` +
+        `</Shape>` +
+        // Header sidebar (child shape)
+        `<Shape ID='${headerId}' NameU='${esc(el.label || "Pool")} Header' Type='Shape'>` +
+        `<Cell N='IsTextEditTarget' V='1'/>` +
+        `<Cell N='PinX' V='${sidebarW / 2}'/>` +
+        `<Cell N='PinY' V='${vh / 2}' F='Sheet.${shapeId}!Height*0.5'/>` +
+        `<Cell N='Width' V='${sidebarW}'/>` +
+        `<Cell N='Height' V='${vh}' F='Sheet.${shapeId}!Height'/>` +
+        `<Cell N='LocPinX' V='${sidebarW / 2}' F='Width*0.5'/>` +
+        `<Cell N='LocPinY' V='${vh / 2}' F='Height*0.5'/>` +
+        `<Cell N='LineWeight' V='0.02083333333333333'/>` +
+        `<Cell N='LineColor' V='0'/>` +
+        `<Cell N='FillForegnd' V='#c8956a'/>` +
+        `<Cell N='FillPattern' V='1'/>` +
+        `<Cell N='TxtPinX' V='${sidebarW / 2}' F='Width*0.5'/>` +
+        `<Cell N='TxtPinY' V='${vh / 2}' F='Height*0.5'/>` +
+        `<Cell N='TxtWidth' V='${vh}'/>` +
+        `<Cell N='TxtHeight' V='${sidebarW}'/>` +
+        `<Cell N='TxtLocPinX' V='${vh / 2}' F='TxtWidth*0.5'/>` +
+        `<Cell N='TxtLocPinY' V='${sidebarW / 2}' F='TxtHeight*0.5'/>` +
+        `<Cell N='TxtAngle' V='1.5707963267948966'/>` +
+        `<Cell N='VerticalAlign' V='1'/>` +
+        `<Section N='Character'><Row IX='0'>` +
+        `<Cell N='Size' V='0.1111111111111111'/>` +
+        `<Cell N='Style' V='17'/>` +
+        `<Cell N='Color' V='#3b1a08'/>` +
+        `</Row></Section>` +
+        `<Section N='Paragraph'><Row IX='0'><Cell N='HorzAlign' V='1'/></Row></Section>` +
+        `<Section N='Geometry' IX='0'>` +
+        `<Cell N='NoFill' V='0'/><Cell N='NoLine' V='0'/><Cell N='NoShow' V='0'/><Cell N='NoSnap' V='0'/>` +
+        `<Row T='MoveTo' IX='1'><Cell N='X' V='0' F='Width*0'/><Cell N='Y' V='0' F='Height*0'/></Row>` +
+        `<Row T='LineTo' IX='2'><Cell N='X' V='${sidebarW}' F='Width*1'/><Cell N='Y' V='0' F='Height*0'/></Row>` +
+        `<Row T='LineTo' IX='3'><Cell N='X' V='${sidebarW}' F='Width*1'/><Cell N='Y' V='${vh}' F='Height*1'/></Row>` +
+        `<Row T='LineTo' IX='4'><Cell N='X' V='0' F='Width*0'/><Cell N='Y' V='${vh}' F='Height*1'/></Row>` +
+        `<Row T='LineTo' IX='5'><Cell N='X' V='0' F='Width*0'/><Cell N='Y' V='0' F='Height*0'/></Row>` +
+        `</Section>` +
+        (el.label ? `<Text>${esc(el.label)}</Text>` : "") +
+        `</Shape>` +
+        `</Shapes>` +
         `</Shape>`
       );
       // Skip the normal shape.push below
@@ -210,20 +546,59 @@ export async function GET(request: Request) {
       } else {
         textEl = `<Text>${esc(el.label)}</Text>`;
       }
-    } else if (isEvent && el.label) {
-      // Events: don't set Text on the group (causes vertical text).
-      // Separate label shape created below.
-      propSection = `<Section N='Property'><Row N='BpmnName'><Cell N='Value' V='${esc(el.label)}' U='STR'/></Row></Section>`;
-    } else if (isDataObject) {
-      // Data objects: don't set Text on group — separate label + state shapes below
-      if (el.label) {
-        propSection = `<Section N='Property'><Row N='BpmnName'><Cell N='Value' V='${esc(el.label)}' U='STR'/></Row></Section>`;
+    } else if ((isEvent || isDataObject) && el.label) {
+      // Events & data objects: use master shape with external text block (TxtPin)
+      // This gives the yellow handle in Visio for repositioning the label
+      const lox = ((el.properties as any)?.labelOffsetX ?? 0);
+      const loy = ((el.properties as any)?.labelOffsetY ?? 7);
+      const lineH = 0.18;
+      const charW = 0.07;
+
+      // Build label text (wrap for data objects, append state)
+      let labelText = el.label;
+      if (isDataObject) {
+        const maxChars = 12;
+        const words = el.label.split(' ');
+        const wrapped: string[] = [];
+        let cur = '';
+        for (const w of words) {
+          if (cur && (cur.length + 1 + w.length) > maxChars) { wrapped.push(cur); cur = w; }
+          else { cur = cur ? cur + ' ' + w : w; }
+        }
+        if (cur) wrapped.push(cur);
+        // Append state on a new line
+        const state = (el.properties as any)?.state;
+        if (state) wrapped.push(`[${state}]`);
+        labelText = wrapped.join('\n');
       }
+      const labelLines = labelText.split('\n').length;
+      const labelH = labelLines * lineH;
+      const maxLineLen = Math.max(...labelText.split('\n').map((l: string) => l.length));
+      const labelW = Math.max(0.5, maxLineLen * charW + 0.15);
+
+      // TxtPin position relative to shape center (in inches)
+      // In Diagramatix: labelTopY = el.y + el.height + loy
+      // Relative to el center: offset = el.height/2 + loy (downward in Diagramatix)
+      // In Visio (Y up): TxtPinY = -(el.height/2 + loy)/96 - labelH/2
+      const txtPinX = lox / 96;
+      const txtPinY = -(el.height / 2 + loy) / 96 - labelH / 2;
+
+      propSection = `<Section N='Property'><Row N='BpmnName'><Cell N='Value' V='${esc(el.label)}' U='STR'/></Row></Section>`;
+      extraCells =
+        `<Cell N='TxtPinX' V='${vw / 2 + txtPinX}'/>` +
+        `<Cell N='TxtPinY' V='${vh / 2 + txtPinY}'/>` +
+        `<Cell N='TxtWidth' V='${labelW}'/>` +
+        `<Cell N='TxtHeight' V='${labelH}'/>` +
+        `<Cell N='TxtLocPinX' V='${labelW / 2}' F='TxtWidth*0.5'/>` +
+        `<Cell N='TxtLocPinY' V='${labelH / 2}' F='TxtHeight*0.5'/>` +
+        `<Cell N='TxtAngle' V='0'/>`;
+      textEl = `<Text>${esc(labelText).replace(/\n/g, '&#xA;')}</Text>`;
     } else if (el.label) {
       propSection = `<Section N='Property'><Row N='BpmnName'><Cell N='Value' V='${esc(el.label)}' U='STR'/></Row></Section>`;
       textEl = `<Text>${esc(el.label)}</Text>`;
     }
 
+    // Simple master-based shape for remaining elements (data-store without label, etc.)
     shapes.push(
       `<Shape ID='${shapeId}' NameU='${esc(el.label || el.type)}' Type='Group' Master='${masterId}'>` +
       `<Cell N='PinX' V='${cx}'/>` +
@@ -241,8 +616,11 @@ export async function GET(request: Request) {
     const id = nextId;
     nextId += 100;
     const charW = 0.07;
-    const w = Math.max(0.4, text.length * charW + 0.1);
-    const h = 0.2;
+    const lines = text.split('\n');
+    const maxLineLen = Math.max(...lines.map(l => l.length));
+    const w = Math.max(0.4, maxLineLen * charW + 0.1);
+    const lineH = 0.18;
+    const h = lines.length * lineH;
     const fs = fontSize ?? '0.1111111111111111';
     return (
       `<Shape ID='${id}' NameU='${esc(text)}' Type='Shape'>` +
@@ -273,90 +651,12 @@ export async function GET(request: Request) {
       `<Row T='LineTo' IX='4'><Cell N='X' V='0' F='Width*0'/><Cell N='Y' V='${h}' F='Height*1'/></Row>` +
       `<Row T='LineTo' IX='5'><Cell N='X' V='0' F='Width*0'/><Cell N='Y' V='0' F='Height*0'/></Row>` +
       `</Section>` +
-      `<Text>${esc(text)}</Text>` +
+      `<Text>${esc(text).replace(/\n/g, '&#xA;')}</Text>` +
       `</Shape>`
     );
   }
 
-  // Create separate labels for events, pools, and data objects
-  for (const el of elements) {
-    const info = elVisioInfo.get(el.id);
-    if (!info) continue;
-
-    const isEvent = el.type === "start-event" || el.type === "end-event" || el.type === "intermediate-event";
-    const isPool = el.type === "pool";
-    const isDataObject = el.type === "data-object";
-
-    // Event labels — below the circle
-    if (isEvent && el.label) {
-      const labelY = info.cy - info.h / 2 - 0.15;
-      shapes.push(makeTextLabel(el.label, info.cx, labelY));
-    }
-
-    // Pool sidebar — brown header with vertical text (rotated -90°, reading bottom-to-top)
-    if (isPool && el.label) {
-      const labelId = nextId;
-      nextId += 100;
-      const sidebarW = 0.32; // ~30px at 96dpi
-      const labelX = info.cx - info.w / 2 + sidebarW / 2;
-      const labelY = info.cy;
-      // Rotate the entire shape -90° (270° = 4.712 radians) to get bottom-to-top text
-      // but keep the shape itself as a tall narrow rectangle
-      shapes.push(
-        `<Shape ID='${labelId}' NameU='${esc(el.label)} label' Type='Shape'>` +
-        `<Cell N='PinX' V='${labelX}'/>` +
-        `<Cell N='PinY' V='${labelY}'/>` +
-        `<Cell N='Width' V='${sidebarW}'/>` +
-        `<Cell N='Height' V='${info.h}'/>` +
-        `<Cell N='LocPinX' V='${sidebarW / 2}' F='Width*0.5'/>` +
-        `<Cell N='LocPinY' V='${info.h / 2}' F='Height*0.5'/>` +
-        `<Cell N='Angle' V='0'/>` +
-        `<Cell N='LineWeight' V='0.02083333333333333'/>` +
-        `<Cell N='LineColor' V='0'/>` +
-        `<Cell N='FillForegnd' V='#c8956a'/>` +
-        `<Cell N='FillPattern' V='1'/>` +
-        `<Cell N='TxtPinX' V='${sidebarW / 2}' F='Width*0.5'/>` +
-        `<Cell N='TxtPinY' V='${info.h / 2}' F='Height*0.5'/>` +
-        `<Cell N='TxtWidth' V='${info.h}'/>` +
-        `<Cell N='TxtHeight' V='${sidebarW}'/>` +
-        `<Cell N='TxtLocPinX' V='${info.h / 2}' F='TxtWidth*0.5'/>` +
-        `<Cell N='TxtLocPinY' V='${sidebarW / 2}' F='TxtHeight*0.5'/>` +
-        `<Cell N='TxtAngle' V='1.5707963267948966'/>` +
-        `<Cell N='VerticalAlign' V='1'/>` +
-        `<Section N='Character'><Row IX='0'>` +
-        `<Cell N='Size' V='0.1111111111111111'/>` +
-        `<Cell N='Style' V='17'/>` +
-        `<Cell N='Color' V='#3b1a08'/>` +
-        `</Row></Section>` +
-        `<Section N='Paragraph'><Row IX='0'><Cell N='HorzAlign' V='1'/></Row></Section>` +
-        `<Section N='Geometry' IX='0'>` +
-        `<Cell N='NoFill' V='0'/><Cell N='NoLine' V='0'/><Cell N='NoShow' V='0'/><Cell N='NoSnap' V='0'/>` +
-        `<Row T='MoveTo' IX='1'><Cell N='X' V='0' F='Width*0'/><Cell N='Y' V='0' F='Height*0'/></Row>` +
-        `<Row T='LineTo' IX='2'><Cell N='X' V='${sidebarW}' F='Width*1'/><Cell N='Y' V='0' F='Height*0'/></Row>` +
-        `<Row T='LineTo' IX='3'><Cell N='X' V='${sidebarW}' F='Width*1'/><Cell N='Y' V='${info.h}' F='Height*1'/></Row>` +
-        `<Row T='LineTo' IX='4'><Cell N='X' V='0' F='Width*0'/><Cell N='Y' V='${info.h}' F='Height*1'/></Row>` +
-        `<Row T='LineTo' IX='5'><Cell N='X' V='0' F='Width*0'/><Cell N='Y' V='0' F='Height*0'/></Row>` +
-        `</Section>` +
-        `<Text>${esc(el.label)}</Text>` +
-        `</Shape>`
-      );
-    }
-
-    // Data object label — below the shape
-    if (isDataObject && el.label) {
-      const labelY = info.cy - info.h / 2 - 0.15;
-      shapes.push(makeTextLabel(el.label, info.cx, labelY));
-    }
-
-    // Data object state — below the label in [brackets]
-    if (isDataObject) {
-      const state = (el.properties as any)?.state;
-      if (state) {
-        const labelY = info.cy - info.h / 2 - 0.35;
-        shapes.push(makeTextLabel(`[${state}]`, info.cx, labelY));
-      }
-    }
-  }
+  // All labels are now inside Group shapes — no separate label loop needed.
 
   // Build connectors — use source/target element centers for Begin/End coordinates.
   // Visio will route the connector and snap to the nearest connection point on each shape.
@@ -367,39 +667,25 @@ export async function GET(request: Request) {
 
     const srcShapeId = elIdToShapeId.get(conn.sourceId);
     const tgtShapeId = elIdToShapeId.get(conn.targetId);
-    if (srcShapeId == null || tgtShapeId == null) continue;
-
-    const srcInfo = elVisioInfo.get(conn.sourceId);
-    const tgtInfo = elVisioInfo.get(conn.targetId);
-    if (!srcInfo || !tgtInfo) continue;
-
-    // Calculate connector attachment points on the Visio shape edges.
-    function edgePoint(
-      info: { cx: number; cy: number; w: number; h: number },
-      side: string,
-      offsetAlong?: number
-    ) {
-      const oa = offsetAlong ?? 0.5;
-      switch (side) {
-        case "right":  return { x: info.cx + info.w / 2, y: info.cy + info.h * (0.5 - oa) };
-        case "left":   return { x: info.cx - info.w / 2, y: info.cy + info.h * (0.5 - oa) };
-        case "top":    return { x: info.cx + info.w * (oa - 0.5), y: info.cy + info.h / 2 };
-        case "bottom": return { x: info.cx + info.w * (oa - 0.5), y: info.cy - info.h / 2 };
-        default:       return { x: info.cx + info.w / 2, y: info.cy };
-      }
+    if (srcShapeId == null || tgtShapeId == null) {
+      console.log(`[visio] Skipping connector "${conn.label || conn.type}" — missing shape: src=${srcShapeId} tgt=${tgtShapeId} srcId=${conn.sourceId} tgtId=${conn.targetId}`);
+      continue;
     }
 
-    const srcPt = edgePoint(srcInfo, conn.sourceSide, conn.sourceOffsetAlong);
-    const tgtPt = edgePoint(tgtInfo, conn.targetSide, conn.targetOffsetAlong);
+    // Use Diagramatix waypoints directly for connector endpoints.
+    // This ensures connectors match the original diagram exactly.
+    const wp = conn.waypoints ?? [];
+    const visStart = conn.sourceInvisibleLeader ? 1 : 0;
+    const visEnd = conn.targetInvisibleLeader ? wp.length - 2 : wp.length - 1;
+    const visPts = wp.slice(visStart, visEnd + 1);
+    if (visPts.length < 2) continue;
 
-    // messageBPMN connectors must be vertical — use the source x for both endpoints
-    if (conn.type === "messageBPMN") {
-      tgtPt.x = srcPt.x;
-    }
-    const bx = srcPt.x;
-    const by = srcPt.y;
-    const ex = tgtPt.x;
-    const ey = tgtPt.y;
+    const p0 = visPts[0];
+    const pN = visPts[visPts.length - 1];
+    const bx = (p0.x - minX) / 96 + offsetX;
+    const by = pageH - (p0.y - minY) / 96 - offsetY;
+    const ex = (pN.x - minX) / 96 + offsetX;
+    const ey = pageH - (pN.y - minY) / 96 - offsetY;
 
     // Connector style
     let linePattern = "1"; // solid
@@ -411,6 +697,7 @@ export async function GET(request: Request) {
       lineWeight = "0.01388888888888889";
     } else if (conn.type === "associationBPMN") {
       linePattern = "3";
+      lineWeight = "0.01736111111111111"; // ~1.25pt — slightly thicker for association
       endArrow = conn.directionType === "open-directed" ? "1" : "0";
       beginArrow = conn.directionType === "both" ? "1" : "0";
     }
@@ -418,28 +705,16 @@ export async function GET(request: Request) {
     const dx = ex - bx;
     const dy = ey - by;
 
-    // Geometry with Diagramatix waypoints, scaled to fit between Begin and End points.
-    // Association connectors use direct (straight) lines — no intermediate waypoints.
+    // Geometry from Diagramatix waypoints
     const isAssoc = conn.type === "associationBPMN";
-    const wp = conn.waypoints ?? [];
-    const visStart = conn.sourceInvisibleLeader ? 1 : 0;
-    const visEnd = conn.targetInvisibleLeader ? wp.length - 2 : wp.length - 1;
-    const visPts = wp.slice(visStart, visEnd + 1);
+    const isMsg = conn.type === "messageBPMN";
 
     let geomRows = `<Row T='MoveTo' IX='1'><Cell N='X' V='0'/><Cell N='Y' V='0'/></Row>`;
     if (!isAssoc && visPts.length > 2) {
-      // Raw span from first to last waypoint (in inches)
-      const rawDx = (visPts[visPts.length - 1].x - visPts[0].x) / 96;
-      const rawDy = -(visPts[visPts.length - 1].y - visPts[0].y) / 96;
-      // Scale factors to map raw waypoint span to actual Begin→End span
-      const sx = Math.abs(rawDx) > 0.001 ? dx / rawDx : 1;
-      const sy = Math.abs(rawDy) > 0.001 ? dy / rawDy : 1;
-
+      // Rectilinear waypoints from Diagramatix
       for (let i = 1; i < visPts.length; i++) {
-        const rawX = (visPts[i].x - visPts[0].x) / 96;
-        const rawY = -(visPts[i].y - visPts[0].y) / 96;
-        const rx = rawX * sx;
-        const ry = rawY * sy;
+        const rx = (visPts[i].x - visPts[0].x) / 96;
+        const ry = -(visPts[i].y - visPts[0].y) / 96;
         geomRows += `<Row T='LineTo' IX='${i + 1}'><Cell N='X' V='${rx}'/><Cell N='Y' V='${ry}'/></Row>`;
       }
     } else {
@@ -479,60 +754,36 @@ export async function GET(request: Request) {
       `<Cell N='BegTrigger' V='2' F='_XFTRIGGER(Sheet.${srcShapeId}!EventXFMod)'/>` +
       `<Cell N='EndTrigger' V='2' F='_XFTRIGGER(Sheet.${tgtShapeId}!EventXFMod)'/>` +
       `<Cell N='ConFixedCode' V='6'/>` +
+      (isAssoc ? `<Cell N='ShapeRouteStyle' V='1'/>` : "") +
       `<Cell N='LayerMember' V='0'/>` +
+      // Connector label via TxtPin — attached with yellow handle in Visio
+      (() => {
+        if (!conn.label) return "";
+        const labelOX = (conn.labelOffsetX ?? 0) / 96;
+        const labelOY = (conn.labelOffsetY ?? -0.2 * 96) / 96;
+        // TxtPin is relative to shape's local coordinate system
+        // For connectors: local origin is at BeginX,BeginY; Width = EndX-BeginX
+        const anchorLocalX = conn.labelAnchor === "source" ? 0 : dx / 2;
+        const anchorLocalY = conn.labelAnchor === "source" ? 0 : dy / 2;
+        const charW = 0.07;
+        const labelW = Math.max(0.3, conn.label.length * charW + 0.1);
+        const labelH = 0.18;
+        return (
+          `<Cell N='TxtPinX' V='${anchorLocalX + labelOX}'/>` +
+          `<Cell N='TxtPinY' V='${anchorLocalY + labelOY}'/>` +
+          `<Cell N='TxtWidth' V='${labelW}'/>` +
+          `<Cell N='TxtHeight' V='${labelH}'/>` +
+          `<Cell N='TxtLocPinX' V='${labelW / 2}' F='TxtWidth*0.5'/>` +
+          `<Cell N='TxtLocPinY' V='${labelH / 2}' F='TxtHeight*0.5'/>` +
+          `<Cell N='TxtAngle' V='0'/>`
+        );
+      })() +
+      `<Section N='Character'><Row IX='0'><Cell N='Size' V='0.1111111111111111'/></Row></Section>` +
+      `<Section N='Paragraph'><Row IX='0'><Cell N='HorzAlign' V='1'/></Row></Section>` +
       geom +
+      (conn.label ? `<Text>${esc(conn.label)}</Text>` : "") +
       `</Shape>`
     );
-
-    // Create separate text shape for connector label — selectable and moveable
-    if (conn.label) {
-      const labelId = nextId;
-      nextId += 100;
-      // Position label near the source end of the connector (matching Diagramatix placement)
-      // Use labelAnchor and offsets if available, otherwise near source
-      const labelOX = (conn.labelOffsetX ?? 0) / 96;
-      const labelOY = (conn.labelOffsetY ?? -0.2 * 96) / 96;
-      const anchorX = (bx + ex) / 2;
-      const anchorY = (by + ey) / 2;
-      const labelX = conn.labelAnchor === "source" ? bx + labelOX : anchorX + labelOX;
-      const labelY = conn.labelAnchor === "source" ? by - labelOY : anchorY - labelOY; // flip Y offset
-      const charW = 0.07;
-      const labelW = Math.max(0.3, conn.label.length * charW + 0.1);
-      const labelH = 0.18;
-
-      shapes.push(
-        `<Shape ID='${labelId}' NameU='${esc(conn.label)}' Type='Shape'>` +
-        `<Cell N='PinX' V='${labelX}'/>` +
-        `<Cell N='PinY' V='${labelY}'/>` +
-        `<Cell N='Width' V='${labelW}'/>` +
-        `<Cell N='Height' V='${labelH}'/>` +
-        `<Cell N='LocPinX' V='${labelW / 2}' F='Width*0.5'/>` +
-        `<Cell N='LocPinY' V='${labelH / 2}' F='Height*0.5'/>` +
-        `<Cell N='Angle' V='0'/>` +
-        `<Cell N='LinePattern' V='0'/>` +
-        `<Cell N='FillPattern' V='0'/>` +
-        `<Cell N='ShdwPattern' V='0'/>` +
-        `<Cell N='TxtPinX' V='${labelW / 2}' F='Width*0.5'/>` +
-        `<Cell N='TxtPinY' V='${labelH / 2}' F='Height*0.5'/>` +
-        `<Cell N='TxtWidth' V='${labelW}' F='Width'/>` +
-        `<Cell N='TxtHeight' V='${labelH}' F='Height'/>` +
-        `<Cell N='TxtLocPinX' V='${labelW / 2}' F='TxtWidth*0.5'/>` +
-        `<Cell N='TxtLocPinY' V='${labelH / 2}' F='TxtHeight*0.5'/>` +
-        `<Cell N='TxtAngle' V='0'/>` +
-        `<Section N='Character'><Row IX='0'><Cell N='Size' V='0.1111111111111111'/></Row></Section>` +
-        `<Section N='Paragraph'><Row IX='0'><Cell N='HorzAlign' V='1'/></Row></Section>` +
-        `<Section N='Geometry' IX='0'>` +
-        `<Cell N='NoFill' V='1'/><Cell N='NoLine' V='1'/><Cell N='NoShow' V='0'/><Cell N='NoSnap' V='0'/>` +
-        `<Row T='MoveTo' IX='1'><Cell N='X' V='0' F='Width*0'/><Cell N='Y' V='0' F='Height*0'/></Row>` +
-        `<Row T='LineTo' IX='2'><Cell N='X' V='${labelW}' F='Width*1'/><Cell N='Y' V='0' F='Height*0'/></Row>` +
-        `<Row T='LineTo' IX='3'><Cell N='X' V='${labelW}' F='Width*1'/><Cell N='Y' V='${labelH}' F='Height*1'/></Row>` +
-        `<Row T='LineTo' IX='4'><Cell N='X' V='0' F='Width*0'/><Cell N='Y' V='${labelH}' F='Height*1'/></Row>` +
-        `<Row T='LineTo' IX='5'><Cell N='X' V='0' F='Width*0'/><Cell N='Y' V='0' F='Height*0'/></Row>` +
-        `</Section>` +
-        `<Text>${esc(conn.label)}</Text>` +
-        `</Shape>`
-      );
-    }
 
     connects.push(
       `<Connect FromSheet='${shapeId}' FromCell='BeginX' FromPart='9' ToSheet='${srcShapeId}' ToCell='PinX' ToPart='3'/>` +
