@@ -258,10 +258,15 @@ export async function exportVisioV2(
         // Gateway (BPMN_M master): F='Inh' sub-shapes don't work — skip for now
         subShapes = "";
       } else if (isPool) {
-        // Pool: only override Shape 6 (body rect). Don't touch Shape 8 (header) —
-        // it breaks the pool when included as a sub-shape override.
-        // The header will show "Function" at default size. User can rename in Visio.
+        // Pool: Shape 6 = body rect, Shape 8 = header sidebar (rotated 90°)
+        // Shape 8's Width = pool Height (because it's rotated), Height = 0.3937 (fixed bar thickness)
+        const poolLabel = el.label ?? "Pool";
+        userSection = `<Section N='User'>` +
+          `<Row N='IsInstance'><Cell N='Value' V='1' U='BOOL' F='Inh'/></Row>` +
+          `<Row N='visHeadingText'><Cell N='Value' V='${esc(poolLabel)}' U='STR' F='Inh'/></Row>` +
+          `</Section>`;
         subShapes = `<Shapes>` +
+          // Shape 6: body rect — full pool dimensions
           `<Shape ID='${shapeId + 1}' Type='Shape' MasterShape='6'>` +
           `<Cell N='PinX' V='${hw}' F='Inh'/><Cell N='PinY' V='${hh}' F='Inh'/>` +
           `<Cell N='Width' V='${w}' F='Inh'/><Cell N='Height' V='${h}' F='Inh'/>` +
@@ -272,6 +277,12 @@ export async function exportVisioV2(
           `<Row T='LineTo' IX='3'><Cell N='X' V='${w}' F='Inh'/><Cell N='Y' V='${h}' F='Inh'/></Row>` +
           `<Row T='LineTo' IX='4'><Cell N='Y' V='${h}' F='Inh'/></Row>` +
           `</Section></Shape>` +
+          // Shape 8: header sidebar — Width = pool Height (rotated), fixed Height
+          `<Shape ID='${shapeId + 2}' Type='Shape' MasterShape='8'>` +
+          `<Cell N='Width' V='${h}' F='Inh'/>` +
+          `<Cell N='LocPinX' V='${h / 2}' F='Inh'/>` +
+          `<Text><cp IX='0'/>${esc(poolLabel)}</Text>` +
+          `</Shape>` +
           `</Shapes>`;
       } else {
         // Task, Subprocess: rectangular sub-shapes
