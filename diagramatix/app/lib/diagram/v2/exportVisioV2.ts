@@ -258,11 +258,10 @@ export async function exportVisioV2(
         // Gateway (BPMN_M master): F='Inh' sub-shapes don't work — skip for now
         subShapes = "";
       } else if (isPool) {
-        // Pool: Shape 6 = body, Shape 8 = header sidebar
-        const poolLabel = el.label ?? "Pool";
-        // Shape 6: resized body + Shape 8: header with correct text and Width=pool Height
+        // Pool: only override Shape 6 (body rect). Don't touch Shape 8 (header) —
+        // it breaks the pool when included as a sub-shape override.
+        // The header will show "Function" at default size. User can rename in Visio.
         subShapes = `<Shapes>` +
-          // Shape 6: body rect resized
           `<Shape ID='${shapeId + 1}' Type='Shape' MasterShape='6'>` +
           `<Cell N='PinX' V='${hw}' F='Inh'/><Cell N='PinY' V='${hh}' F='Inh'/>` +
           `<Cell N='Width' V='${w}' F='Inh'/><Cell N='Height' V='${h}' F='Inh'/>` +
@@ -273,11 +272,6 @@ export async function exportVisioV2(
           `<Row T='LineTo' IX='3'><Cell N='X' V='${w}' F='Inh'/><Cell N='Y' V='${h}' F='Inh'/></Row>` +
           `<Row T='LineTo' IX='4'><Cell N='Y' V='${h}' F='Inh'/></Row>` +
           `</Section></Shape>` +
-          // Shape 8: header sidebar — just override text
-          `<Shape ID='${shapeId + 2}' Type='Shape' MasterShape='8'>` +
-          `<Cell N='LayerMember' V='0'/>` +
-          `<Text>${esc(poolLabel)}</Text>` +
-          `</Shape>` +
           `</Shapes>`;
       } else {
         // Task, Subprocess: rectangular sub-shapes
