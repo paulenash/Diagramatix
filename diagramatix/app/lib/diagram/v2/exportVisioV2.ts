@@ -230,7 +230,9 @@ export async function exportVisioV2(
         `</Section>`;
     }
 
-    const textEl = el.label ? `<Text>${esc(el.label)}</Text>` : "";
+    // Pool text goes on Shape 8 (header), not the parent
+    const isPool = mapping.masterId === 19;
+    const textEl = (!isPool && el.label) ? `<Text>${esc(el.label)}</Text>` : "";
 
     // For Tasks, Subprocesses, Pools, Gateways: set Width/Height + sub-shapes with F='Inh'
     // so the visual matches the Diagramatix dimensions
@@ -257,9 +259,11 @@ export async function exportVisioV2(
         // Gateway (BPMN_M master): F='Inh' sub-shapes don't work — skip for now
         subShapes = "";
       } else if (mapping.masterId === 19) {
-        // Pool (template master): Shape 6 = body rect, Shape 8 = header sidebar
-        // Only override Shape 6 with pool dimensions. Don't touch Shape 7/8/9.
+        // Pool (template master): Shape 6 = body rect, Shape 8 = header sidebar with text
+        // Override Shape 6 with pool dimensions, Shape 8 with pool name
+        const poolLabel = el.label ?? "Pool";
         subShapes = `<Shapes>` +
+          // Shape 6: body rect — resized to match pool dimensions
           `<Shape ID='${shapeId + 1}' Type='Shape' MasterShape='6'>` +
           `<Cell N='PinX' V='${hw}' F='Inh'/><Cell N='PinY' V='${hh}' F='Inh'/>` +
           `<Cell N='Width' V='${w}' F='Inh'/><Cell N='Height' V='${h}' F='Inh'/>` +
@@ -270,6 +274,14 @@ export async function exportVisioV2(
           `<Row T='LineTo' IX='3'><Cell N='X' V='${w}' F='Inh'/><Cell N='Y' V='${h}' F='Inh'/></Row>` +
           `<Row T='LineTo' IX='4'><Cell N='Y' V='${h}' F='Inh'/></Row>` +
           `</Section></Shape>` +
+          // Shape 8: header sidebar — set Width (= pool height) and text
+          `<Shape ID='${shapeId + 2}' Type='Shape' MasterShape='8'>` +
+          `<Cell N='Width' V='${h}' F='Inh'/>` +
+          `<Cell N='LocPinX' V='${h / 2}' F='Inh'/>` +
+          `<Cell N='PinY' V='${hh}' F='Inh'/>` +
+          `<Cell N='LayerMember' V='0'/>` +
+          `<Text>${esc(poolLabel)}</Text>` +
+          `</Shape>` +
           `</Shapes>`;
       } else {
         // Task, Subprocess: rectangular sub-shapes
