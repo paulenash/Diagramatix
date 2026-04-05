@@ -254,36 +254,12 @@ export async function exportVisioV2(
       userSection = `<Section N='User'><Row N='IsInstance'><Cell N='Value' V='1' U='BOOL' F='Inh'/></Row></Section>`;
 
       if (mapping.masterId === 104) {
-        // Gateway: Shape 6 is the diamond — geometry uses Width/Height formulas so auto-scales
-        subShapes = `<Shapes>` +
-          `<Shape ID='${shapeId + 1}' Type='Shape' MasterShape='6'>` +
-          `<Cell N='PinX' V='${hw}' F='Inh'/><Cell N='PinY' V='${hh}' F='Inh'/>` +
-          `<Cell N='Width' V='${w}' F='Inh'/><Cell N='Height' V='${h}' F='Inh'/>` +
-          `<Cell N='LocPinX' V='${hw}' F='Inh'/><Cell N='LocPinY' V='${hh}' F='Inh'/>` +
-          `<Cell N='LayerMember' V='0'/>` +
-          `</Shape>` +
-          `</Shapes>`;
+        // Gateway (BPMN_M master): F='Inh' sub-shapes don't work — skip for now
+        subShapes = "";
       } else if (mapping.masterId === 19) {
-        // Pool: Shape 6 = body rect, Shape 8 = header sidebar
-        subShapes = `<Shapes>` +
-          // Shape 6: pool body — width and height match pool dimensions
-          `<Shape ID='${shapeId + 1}' Type='Shape' MasterShape='6'>` +
-          `<Cell N='PinX' V='${hw}' F='Inh'/><Cell N='PinY' V='${hh}' F='Inh'/>` +
-          `<Cell N='Width' V='${w}' F='Inh'/><Cell N='Height' V='${h}' F='Inh'/>` +
-          `<Cell N='LocPinX' V='${hw}' F='Inh'/><Cell N='LocPinY' V='${hh}' F='Inh'/>` +
-          `<Cell N='LayerMember' V='0'/>` +
-          `<Section N='Geometry' IX='0'>` +
-          `<Row T='LineTo' IX='2'><Cell N='X' V='${w}' F='Inh'/></Row>` +
-          `<Row T='LineTo' IX='3'><Cell N='X' V='${w}' F='Inh'/><Cell N='Y' V='${h}' F='Inh'/></Row>` +
-          `<Row T='LineTo' IX='4'><Cell N='Y' V='${h}' F='Inh'/></Row>` +
-          `</Section></Shape>` +
-          // Shape 8: header sidebar — its Width = pool Height (rotated)
-          `<Shape ID='${shapeId + 2}' Type='Shape' MasterShape='8'>` +
-          `<Cell N='Width' V='${h}' F='Inh'/>` +
-          `<Cell N='PinY' V='${hh}' F='Inh'/>` +
-          `<Cell N='LayerMember' V='0'/>` +
-          `</Shape>` +
-          `</Shapes>`;
+        // Pool (template master): use same F='Inh' approach as Tasks
+        // Pool master has same MasterShape structure (6=body, 7=group, 8=inner, 9=border)
+        subShapes = makeRectSubShapes(shapeId + 1, w, h);
       } else {
         // Task, Subprocess: rectangular sub-shapes
         subShapes = makeRectSubShapes(shapeId + 1, w, h);
