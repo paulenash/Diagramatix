@@ -230,8 +230,9 @@ export async function exportVisioV2(
         `</Section>`;
     }
 
-    // All shapes get text on the parent — for Pools this feeds the header via visHeadingText
-    const textEl = el.label ? `<Text>${esc(el.label)}</Text>` : "";
+    const isPool = mapping.masterId === 19;
+    // Pool: no text on parent body — name goes via visHeadingText to the header
+    const textEl = (isPool ? "" : (el.label ? `<Text>${esc(el.label)}</Text>` : ""));
 
     // For Tasks, Subprocesses, Pools, Gateways: set Width/Height + sub-shapes with F='Inh'
     // so the visual matches the Diagramatix dimensions
@@ -257,9 +258,14 @@ export async function exportVisioV2(
       if (mapping.masterId === 104) {
         // Gateway (BPMN_M master): F='Inh' sub-shapes don't work — skip for now
         subShapes = "";
-      } else if (mapping.masterId === 19) {
-        // Pool (template master): Shape 6 = body rect only
-        // Shape 8 (header) will use master defaults — its formulas reference Sheet.5!Height
+      } else if (isPool) {
+        // Pool: override visHeadingText with pool name, hide body text
+        const poolLabel = el.label ?? "Pool";
+        userSection = `<Section N='User'>` +
+          `<Row N='IsInstance'><Cell N='Value' V='1' U='BOOL' F='Inh'/></Row>` +
+          `<Row N='visHeadingText'><Cell N='Value' V='${esc(poolLabel)}' U='STR'/></Row>` +
+          `</Section>`;
+        // Shape 6: body rect resized
         subShapes = `<Shapes>` +
           `<Shape ID='${shapeId + 1}' Type='Shape' MasterShape='6'>` +
           `<Cell N='PinX' V='${hw}' F='Inh'/><Cell N='PinY' V='${hh}' F='Inh'/>` +
