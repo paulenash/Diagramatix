@@ -258,27 +258,89 @@ export async function exportVisioV2(
         // Gateway (BPMN_M master): F='Inh' sub-shapes don't work — skip for now
         subShapes = "";
       } else if (isPool) {
-        // Pool: Shape 6 = body rect, Shape 8 = header sidebar (rotated 90°)
-        // Shape 8's Width = pool Height (because it's rotated), Height = 0.3937 (fixed bar thickness)
+        // Pool: create a per-instance master with modified Width/Height formulas
+        // This is what Visio does — it changes the formula from 'User.DefaultWidth' to '{value}*25.4MM'
         const poolLabel = el.label ?? "Pool";
-        userSection = `<Section N='User'>` +
-          `<Row N='IsInstance'><Cell N='Value' V='1' U='BOOL' F='Inh'/></Row>` +
-          `<Row N='visHeadingText'><Cell N='Value' V='${esc(poolLabel)}' U='STR' F='Inh'/></Row>` +
-          `</Section>`;
-        subShapes = `<Shapes>` +
-          // Shape 6: body rect — full pool dimensions
-          `<Shape ID='${shapeId + 1}' Type='Shape' MasterShape='6'>` +
-          `<Cell N='PinX' V='${hw}' F='Inh'/><Cell N='PinY' V='${hh}' F='Inh'/>` +
-          `<Cell N='Width' V='${w}' F='Inh'/><Cell N='Height' V='${h}' F='Inh'/>` +
-          `<Cell N='LocPinX' V='${hw}' F='Inh'/><Cell N='LocPinY' V='${hh}' F='Inh'/>` +
-          `<Cell N='LayerMember' V='0'/>` +
-          `<Section N='Geometry' IX='0'>` +
-          `<Row T='LineTo' IX='2'><Cell N='X' V='${w}' F='Inh'/></Row>` +
-          `<Row T='LineTo' IX='3'><Cell N='X' V='${w}' F='Inh'/><Cell N='Y' V='${h}' F='Inh'/></Row>` +
-          `<Row T='LineTo' IX='4'><Cell N='Y' V='${h}' F='Inh'/></Row>` +
-          `</Section></Shape>` +
-          // Shape 8 NOT included — breaks pool when overridden
-          `</Shapes>`;
+
+        // Find the Pool master file from the template
+        const tRelsXml = await base.file("visio/masters/_rels/masters.xml.rels")!.async("string");
+        const tMastersXml2 = await base.file("visio/masters/masters.xml")!.async("string");
+        const poolMasterBlock = tMastersXml2.match(/<Master\s+ID='19'[\s\S]*?<\/Master>/);
+        const poolRelMatch = poolMasterBlock?.[0].match(/<Rel\s+r:id='(rId\d+)'/);
+        const poolFileMatch = poolRelMatch ? tRelsXml.match(new RegExp(`Id=["']${poolRelMatch[1]}["'][^>]*Target=["']([^"']*)["']`)) : null;
+
+        if (poolFileMatch) {
+          let poolMasterXml = await base.file("visio/masters/" + poolFileMatch[1])!.async("string");
+
+          // Replace Width formula: from F='...' to F='{w}*25.4MM'
+          poolMasterXml = poolMasterXml.replace(
+            new RegExp("(<Cell N='Width' V=')[^']*(' U='MM' F=')[^']*(')", ""),
+            `$1${w}$2${w}*25.4MM$3`
+          );
+          // Replace Height formula
+          poolMasterXml = poolMasterXml.replace(
+            new RegExp("(<Cell N='Height' V=')[^']*(' U='MM' F=')[^']*(')", ""),
+            `$1${h}$2${h}*25.4MM$3`
+          );
+          // Update LocPinX/Y values
+          poolMasterXml = poolMasterXml.replace(
+            new RegExp("(<Cell N='LocPinX' V=')[^']*(')", ""),
+            `$1${hw}$2`
+          );
+          poolMasterXml = poolMasterXml.replace(
+            new RegExp("(<Cell N='LocPinY' V=')[^']*(')", ""),
+            `$1${hh}$2`
+          );
+          // Update PinX/PinY (center of master page)
+          poolMasterXml = poolMasterXml.replace(
+            new RegExp("(<Cell N='PinX' V=')[^']*(')", ""),
+            `$1${hw + 1}$2`
+          );
+          poolMasterXml = poolMasterXml.replace(
+            new RegExp("(<Cell N='PinY' V=')[^']*(')", ""),
+            `$1${hh + 1}$2`
+          );
+
+          // Write as new master file
+          const poolInstanceId = 200 + shapeId;
+          const poolFileName = `master${200 + shapeId}.xml`;
+          const poolRId = `rId${200 + shapeId}`;
+          zip.file("visio/masters/" + poolFileName, poolMasterXml);
+
+          // Add master entry
+          let newPoolBlock = poolMasterBlock![0]
+            .replace(/ID='19'/, `ID='${poolInstanceId}'`)
+            .replace(/<Rel\s+r:id='rId\d+'/, `<Rel r:id='${poolRId}'`);
+          mastersXml = mastersXml.replace("</Masters>", newPoolBlock + "</Masters>");
+          mastersRels = mastersRels.replace("</Relationships>",
+            `<Relationship Id="${poolRId}" Type="http://schemas.microsoft.com/visio/2010/relationships/master" Target="${poolFileName}"/></Relationships>`);
+          contentTypes = contentTypes.replace("</Types>",
+            `<Override PartName="/visio/masters/${poolFileName}" ContentType="application/vnd.ms-visio.master+xml"/></Types>`);
+
+          // Update the zip files
+          zip.file("visio/masters/masters.xml", mastersXml);
+          zip.file("visio/masters/_rels/masters.xml.rels", mastersRels);
+          zip.file("[Content_Types].xml", contentTypes);
+
+          // Use the per-instance master ID for this shape
+          userSection = `<Section N='User'>` +
+            `<Row N='IsInstance'><Cell N='Value' V='1' U='BOOL' F='Inh'/></Row>` +
+            `<Row N='visHeadingText'><Cell N='Value' V='${esc(poolLabel)}' U='STR' F='Inh'/></Row>` +
+            `</Section>`;
+
+          // Override masterId for this shape
+          shapes.push(
+            `<Shape ID='${shapeId}' NameU='${esc(poolLabel)}' Type='Group' Master='${poolInstanceId}'>` +
+            `<Cell N='PinX' V='${cx}'/>` +
+            `<Cell N='PinY' V='${cy}'/>` +
+            userSection +
+            propSection +
+            `</Shape>`
+          );
+          continue; // skip the normal shape.push below
+        }
+        // Fallback: no sub-shapes, just position
+        subShapes = "";
       } else {
         // Task, Subprocess: rectangular sub-shapes
         subShapes = makeRectSubShapes(shapeId + 1, w, h);
