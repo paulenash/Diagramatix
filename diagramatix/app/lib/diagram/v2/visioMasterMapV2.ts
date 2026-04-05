@@ -71,7 +71,7 @@ export function getElementMappingV2(el: DiagramElement): MasterMapping | null {
         BpmnGatewayType: gwInfo.type,
       };
       if (gwInfo.exclusive) gwProps.BpmnExclusiveType = gwInfo.exclusive;
-      if (gwInfo.marker) gwProps.BpmnMarkerVisible = "TRUE";
+      if (gwInfo.marker) gwProps.BpmnMarkerVisible = "1";  // BOOL: 1=true
       return { masterId: MASTER.GATEWAY, properties: gwProps };
     }
 
