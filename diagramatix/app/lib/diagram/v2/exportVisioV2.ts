@@ -272,33 +272,34 @@ export async function exportVisioV2(
         if (poolFileMatch) {
           let poolMasterXml = await base.file("visio/masters/" + poolFileMatch[1])!.async("string");
 
-          // Replace Width formula: from F='...' to F='{w}*25.4MM'
+          // Replace root Shape 5's Width/Height — the original has NO formula,
+          // but Visio adds one as '{value}*25.4MM' when creating per-instance masters.
+          // Match: <Cell N='Width' V='...' U='MM'/> (no F= attribute)
           poolMasterXml = poolMasterXml.replace(
-            new RegExp("(<Cell N='Width' V=')[^']*(' U='MM' F=')[^']*(')", ""),
-            `$1${w}$2${w}*25.4MM$3`
-          );
-          // Replace Height formula
-          poolMasterXml = poolMasterXml.replace(
-            new RegExp("(<Cell N='Height' V=')[^']*(' U='MM' F=')[^']*(')", ""),
-            `$1${h}$2${h}*25.4MM$3`
-          );
-          // Update LocPinX/Y values
-          poolMasterXml = poolMasterXml.replace(
-            new RegExp("(<Cell N='LocPinX' V=')[^']*(')", ""),
-            `$1${hw}$2`
+            "<Cell N='Width' V='4.921259842519685' U='MM'/>",
+            `<Cell N='Width' V='${w}' U='MM' F='${w}*25.4MM'/>`
           );
           poolMasterXml = poolMasterXml.replace(
-            new RegExp("(<Cell N='LocPinY' V=')[^']*(')", ""),
-            `$1${hh}$2`
+            "<Cell N='Height' V='1.181102362204724' U='MM'/>",
+            `<Cell N='Height' V='${h}' U='MM' F='${h}*25.4MM'/>`
           );
-          // Update PinX/PinY (center of master page)
+          // Update LocPinX/Y values (they have F='Width*0.5')
           poolMasterXml = poolMasterXml.replace(
-            new RegExp("(<Cell N='PinX' V=')[^']*(')", ""),
-            `$1${hw + 1}$2`
+            "N='LocPinX' V='2.460629921259843'",
+            `N='LocPinX' V='${hw}'`
           );
           poolMasterXml = poolMasterXml.replace(
-            new RegExp("(<Cell N='PinY' V=')[^']*(')", ""),
-            `$1${hh + 1}$2`
+            "N='LocPinY' V='0.5905511811023622'",
+            `N='LocPinY' V='${hh}'`
+          );
+          // Update PinX/PinY
+          poolMasterXml = poolMasterXml.replace(
+            "N='PinX' V='1.968503924805349'",
+            `N='PinX' V='${hw + 1}'`
+          );
+          poolMasterXml = poolMasterXml.replace(
+            "N='PinY' V='1.968503920581397'",
+            `N='PinY' V='${hh + 1}'`
           );
 
           // Write as new master file
