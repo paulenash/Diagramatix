@@ -154,6 +154,58 @@ export async function exportVisioV2(
   const elIdToShapeId = new Map<string, number>();
   let nextId = 100;
 
+  // Helper: generate sub-shapes with F='Inh' for BOTH width AND height scaling
+  // MasterShapes 6 (outer rect), 7 (border group containing 8,9)
+  function makeRectSubShapes(baseId: number, w: number, h: number): string {
+    const hw = w / 2;
+    const hh = h / 2;
+    const wi = w - 0.05; // inner border slightly smaller
+    const hi = h - 0.05;
+    return `<Shapes>` +
+      // MasterShape 6: outer rect
+      `<Shape ID='${baseId}' Type='Shape' MasterShape='6'>` +
+      `<Cell N='PinX' V='${hw}' F='Inh'/><Cell N='PinY' V='${hh}' F='Inh'/>` +
+      `<Cell N='Width' V='${w}' F='Inh'/><Cell N='Height' V='${h}' F='Inh'/>` +
+      `<Cell N='LocPinX' V='${hw}' F='Inh'/><Cell N='LocPinY' V='${hh}' F='Inh'/>` +
+      `<Cell N='LayerMember' V='0'/>` +
+      `<Section N='Geometry' IX='0'>` +
+      `<Row T='LineTo' IX='2'><Cell N='X' V='${w}' F='Inh'/></Row>` +
+      `<Row T='LineTo' IX='3'><Cell N='X' V='${w}' F='Inh'/><Cell N='Y' V='${h}' F='Inh'/></Row>` +
+      `<Row T='LineTo' IX='4'><Cell N='Y' V='${h}' F='Inh'/></Row>` +
+      `</Section></Shape>` +
+      // MasterShape 7: inner border group
+      `<Shape ID='${baseId + 1}' Type='Group' MasterShape='7'>` +
+      `<Cell N='PinX' V='${hw}' F='Inh'/><Cell N='PinY' V='${hh}' F='Inh'/>` +
+      `<Cell N='Width' V='${w}' F='Inh'/><Cell N='Height' V='${h}' F='Inh'/>` +
+      `<Cell N='LocPinX' V='${hw}' F='Inh'/><Cell N='LocPinY' V='${hh}' F='Inh'/>` +
+      `<Cell N='LayerMember' V='0'/>` +
+      `<Shapes>` +
+      // MasterShape 8: border rect
+      `<Shape ID='${baseId + 2}' Type='Shape' MasterShape='8'>` +
+      `<Cell N='PinX' V='${hw}' F='Inh'/><Cell N='PinY' V='${hh}' F='Inh'/>` +
+      `<Cell N='Width' V='${w}' F='Inh'/><Cell N='Height' V='${h}' F='Inh'/>` +
+      `<Cell N='LocPinX' V='${hw}' F='Inh'/><Cell N='LocPinY' V='${hh}' F='Inh'/>` +
+      `<Cell N='LayerMember' V='0'/>` +
+      `<Section N='Geometry' IX='0'>` +
+      `<Row T='LineTo' IX='2'><Cell N='X' V='${w}' F='Inh'/></Row>` +
+      `<Row T='LineTo' IX='3'><Cell N='X' V='${w}' F='Inh'/><Cell N='Y' V='${h}' F='Inh'/></Row>` +
+      `<Row T='LineTo' IX='4'><Cell N='Y' V='${h}' F='Inh'/></Row>` +
+      `</Section></Shape>` +
+      // MasterShape 9: inner border (slightly smaller)
+      `<Shape ID='${baseId + 3}' Type='Shape' MasterShape='9'>` +
+      `<Cell N='PinX' V='${hw}' F='Inh'/><Cell N='PinY' V='${hh}' F='Inh'/>` +
+      `<Cell N='Width' V='${wi}' F='Inh'/><Cell N='Height' V='${hi}' F='Inh'/>` +
+      `<Cell N='LocPinX' V='${wi / 2}' F='Inh'/><Cell N='LocPinY' V='${hi / 2}' F='Inh'/>` +
+      `<Cell N='LayerMember' V='0'/>` +
+      `<Section N='Geometry' IX='0'>` +
+      `<Row T='LineTo' IX='2'><Cell N='X' V='${wi}' F='Inh'/></Row>` +
+      `<Row T='LineTo' IX='3'><Cell N='X' V='${wi}' F='Inh'/><Cell N='Y' V='${hi}' F='Inh'/></Row>` +
+      `<Row T='LineTo' IX='4'><Cell N='Y' V='${hi}' F='Inh'/></Row>` +
+      `</Section></Shape>` +
+      `</Shapes></Shape>` +
+      `</Shapes>`;
+  }
+
   for (const el of data.elements) {
     const mapping = getElementMappingV2(el);
     if (!mapping) continue;
@@ -164,6 +216,8 @@ export async function exportVisioV2(
 
     const cx = (el.x + el.width / 2 - bounds.minX) / 96 + offsetX;
     const cy = pageH - (el.y + el.height / 2 - bounds.minY) / 96 - offsetY;
+    const w = el.width / 96;
+    const h = el.height / 96;
 
     // Property overrides
     let propSection = "";
@@ -178,12 +232,38 @@ export async function exportVisioV2(
 
     const textEl = el.label ? `<Text>${esc(el.label)}</Text>` : "";
 
+    // For Tasks, Subprocesses, Pools: set Width/Height + sub-shapes with F='Inh'
+    // so the visual matches the Diagramatix dimensions
+    const isResizable = [9, 33, 19].includes(mapping.masterId); // Task, Subprocess, Pool
+    const hw = w / 2;
+    const hh = h / 2;
+
+    let sizeCells = "";
+    let subShapes = "";
+    let userSection = "";
+
+    if (isResizable) {
+      sizeCells =
+        `<Cell N='Width' V='${w}'/>` +
+        `<Cell N='Height' V='${h}'/>` +
+        `<Cell N='LocPinX' V='${hw}' F='Inh'/>` +
+        `<Cell N='LocPinY' V='${hh}' F='Inh'/>` +
+        `<Cell N='TxtPinX' V='${hw}' F='Inh'/>` +
+        `<Cell N='TxtWidth' V='${w}' F='Inh'/>` +
+        `<Cell N='TxtLocPinX' V='${hw}' F='Inh'/>`;
+      userSection = `<Section N='User'><Row N='IsInstance'><Cell N='Value' V='1' U='BOOL' F='Inh'/></Row></Section>`;
+      subShapes = makeRectSubShapes(shapeId + 1, w, h);
+    }
+
     shapes.push(
       `<Shape ID='${shapeId}' NameU='${esc(el.label || el.type)}' Type='Group' Master='${mapping.masterId}'>` +
       `<Cell N='PinX' V='${cx}'/>` +
       `<Cell N='PinY' V='${cy}'/>` +
+      sizeCells +
+      userSection +
       propSection +
       textEl +
+      subShapes +
       `</Shape>`
     );
   }
