@@ -257,9 +257,20 @@ export async function exportVisioV2(
         // Gateway (BPMN_M master): F='Inh' sub-shapes don't work — skip for now
         subShapes = "";
       } else if (mapping.masterId === 19) {
-        // Pool (template master): use same F='Inh' approach as Tasks
-        // Pool master has same MasterShape structure (6=body, 7=group, 8=inner, 9=border)
-        subShapes = makeRectSubShapes(shapeId + 1, w, h);
+        // Pool (template master): Shape 6 = body rect, Shape 8 = header sidebar
+        // Only override Shape 6 with pool dimensions. Don't touch Shape 7/8/9.
+        subShapes = `<Shapes>` +
+          `<Shape ID='${shapeId + 1}' Type='Shape' MasterShape='6'>` +
+          `<Cell N='PinX' V='${hw}' F='Inh'/><Cell N='PinY' V='${hh}' F='Inh'/>` +
+          `<Cell N='Width' V='${w}' F='Inh'/><Cell N='Height' V='${h}' F='Inh'/>` +
+          `<Cell N='LocPinX' V='${hw}' F='Inh'/><Cell N='LocPinY' V='${hh}' F='Inh'/>` +
+          `<Cell N='LayerMember' V='0'/>` +
+          `<Section N='Geometry' IX='0'>` +
+          `<Row T='LineTo' IX='2'><Cell N='X' V='${w}' F='Inh'/></Row>` +
+          `<Row T='LineTo' IX='3'><Cell N='X' V='${w}' F='Inh'/><Cell N='Y' V='${h}' F='Inh'/></Row>` +
+          `<Row T='LineTo' IX='4'><Cell N='Y' V='${h}' F='Inh'/></Row>` +
+          `</Section></Shape>` +
+          `</Shapes>`;
       } else {
         // Task, Subprocess: rectangular sub-shapes
         subShapes = makeRectSubShapes(shapeId + 1, w, h);
