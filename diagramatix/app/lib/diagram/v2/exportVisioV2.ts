@@ -230,9 +230,8 @@ export async function exportVisioV2(
         `</Section>`;
     }
 
-    // Pool text goes on Shape 8 (header), not the parent
-    const isPool = mapping.masterId === 19;
-    const textEl = (!isPool && el.label) ? `<Text>${esc(el.label)}</Text>` : "";
+    // All shapes get text on the parent — for Pools this feeds the header via visHeadingText
+    const textEl = el.label ? `<Text>${esc(el.label)}</Text>` : "";
 
     // For Tasks, Subprocesses, Pools, Gateways: set Width/Height + sub-shapes with F='Inh'
     // so the visual matches the Diagramatix dimensions
