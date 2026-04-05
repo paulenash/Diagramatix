@@ -232,9 +232,9 @@ export async function exportVisioV2(
 
     const textEl = el.label ? `<Text>${esc(el.label)}</Text>` : "";
 
-    // For Tasks, Subprocesses, Pools: set Width/Height + sub-shapes with F='Inh'
+    // For Tasks, Subprocesses, Pools, Gateways: set Width/Height + sub-shapes with F='Inh'
     // so the visual matches the Diagramatix dimensions
-    const isResizable = [9, 33, 19].includes(mapping.masterId); // Task, Subprocess, Pool
+    const isResizable = [9, 33, 19, 104].includes(mapping.masterId); // Task, Subprocess, Pool, Gateway
     const hw = w / 2;
     const hh = h / 2;
 
@@ -252,7 +252,22 @@ export async function exportVisioV2(
         `<Cell N='TxtWidth' V='${w}' F='Inh'/>` +
         `<Cell N='TxtLocPinX' V='${hw}' F='Inh'/>`;
       userSection = `<Section N='User'><Row N='IsInstance'><Cell N='Value' V='1' U='BOOL' F='Inh'/></Row></Section>`;
-      subShapes = makeRectSubShapes(shapeId + 1, w, h);
+
+      if (mapping.masterId === 104) {
+        // Gateway: Shape 6 is the diamond — geometry uses Width/Height formulas
+        // so just override Width/Height/Pin on Shape 6, geometry auto-scales
+        subShapes = `<Shapes>` +
+          `<Shape ID='${shapeId + 1}' Type='Shape' MasterShape='6'>` +
+          `<Cell N='PinX' V='${hw}' F='Inh'/><Cell N='PinY' V='${hh}' F='Inh'/>` +
+          `<Cell N='Width' V='${w}' F='Inh'/><Cell N='Height' V='${h}' F='Inh'/>` +
+          `<Cell N='LocPinX' V='${hw}' F='Inh'/><Cell N='LocPinY' V='${hh}' F='Inh'/>` +
+          `<Cell N='LayerMember' V='0'/>` +
+          `</Shape>` +
+          `</Shapes>`;
+      } else {
+        // Task, Subprocess, Pool: rectangular sub-shapes
+        subShapes = makeRectSubShapes(shapeId + 1, w, h);
+      }
     }
 
     shapes.push(
