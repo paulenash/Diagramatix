@@ -277,12 +277,7 @@ export async function exportVisioV2(
           `<Row T='LineTo' IX='3'><Cell N='X' V='${w}' F='Inh'/><Cell N='Y' V='${h}' F='Inh'/></Row>` +
           `<Row T='LineTo' IX='4'><Cell N='Y' V='${h}' F='Inh'/></Row>` +
           `</Section></Shape>` +
-          // Shape 8: header sidebar — Width = pool Height (rotated), fixed Height
-          `<Shape ID='${shapeId + 2}' Type='Shape' MasterShape='8'>` +
-          `<Cell N='Width' V='${h}' F='Inh'/>` +
-          `<Cell N='LocPinX' V='${h / 2}' F='Inh'/>` +
-          `<Text><cp IX='0'/>${esc(poolLabel)}</Text>` +
-          `</Shape>` +
+          // Shape 8 NOT included — breaks pool when overridden
           `</Shapes>`;
       } else {
         // Task, Subprocess: rectangular sub-shapes
