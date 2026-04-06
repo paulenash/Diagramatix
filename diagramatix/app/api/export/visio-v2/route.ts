@@ -4,6 +4,8 @@ import { prisma } from "@/app/lib/db";
 import * as fs from "fs";
 import * as path from "path";
 import { exportVisioV2 } from "@/app/lib/diagram/v2/exportVisioV2";
+import { DEFAULT_SYMBOL_COLORS, BW_SYMBOL_COLORS } from "@/app/lib/diagram/colors";
+import type { SymbolColorConfig } from "@/app/lib/diagram/colors";
 
 /**
  * GET /api/export/visio-v2?diagramId=<id>
@@ -17,7 +19,7 @@ export async function GET(request: Request) {
   const diagramId = searchParams.get("diagramId");
   if (!diagramId) return NextResponse.json({ error: "diagramId required" }, { status: 400 });
 
-  const diagram = await prisma.diagram.findUnique({ where: { id: diagramId } });
+  const diagram = await prisma.diagram.findUnique({ where: { id: diagramId }, include: { project: true } });
   if (!diagram) return NextResponse.json({ error: "Diagram not found" }, { status: 404 });
 
   try {
@@ -29,8 +31,16 @@ export async function GET(request: Request) {
 
     const data = diagram.data as any;
     const displayMode = (diagram as any).displayMode ?? "normal";
+
+    // Build effective colour config: defaults ← project overrides ← diagram overrides
+    const projectColors = ((diagram as any).project?.colorConfig as SymbolColorConfig) ?? {};
+    const diagramColors = (data.colorConfig as SymbolColorConfig) ?? {};
+    const effectiveColors: SymbolColorConfig = displayMode === "hand-drawn"
+      ? BW_SYMBOL_COLORS
+      : { ...DEFAULT_SYMBOL_COLORS, ...projectColors, ...diagramColors };
+
     console.log("[visio-v2] Elements:", data.elements?.length, "Connectors:", data.connectors?.length, "Mode:", displayMode);
-    const result = await exportVisioV2(data, diagram.name, stencilBuf.buffer, templateBuf.buffer, displayMode);
+    const result = await exportVisioV2(data, diagram.name, stencilBuf.buffer, templateBuf.buffer, displayMode, effectiveColors);
     console.log("[visio-v2] Output size:", result.length, "bytes");
 
     return new NextResponse(result as any, {

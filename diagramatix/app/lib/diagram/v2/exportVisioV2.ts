@@ -7,8 +7,8 @@
 import JSZip from "jszip";
 import type { DiagramData } from "../types";
 import { getElementMappingV2, getConnectorMappingV2 } from "./visioMasterMapV2";
-import { DEFAULT_SYMBOL_COLORS, BW_SYMBOL_COLORS } from "../colors";
-import type { SymbolType } from "../types";
+import { DEFAULT_SYMBOL_COLORS } from "../colors";
+import type { SymbolColorConfig } from "../colors";
 
 const VISIO_NS = "http://schemas.microsoft.com/office/visio/2012/main";
 const REL_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
@@ -49,7 +49,8 @@ export async function exportVisioV2(
   diagramName: string,
   stencilBuffer: ArrayBuffer,
   templateBuffer: ArrayBuffer,
-  displayMode: string = "normal"
+  displayMode: string = "normal",
+  colorConfig?: SymbolColorConfig
 ): Promise<Uint8Array> {
   const base = await JSZip.loadAsync(templateBuffer);
   const bpmnM = await JSZip.loadAsync(stencilBuffer);
@@ -123,14 +124,37 @@ export async function exportVisioV2(
   let nextRId = 50;
   let nextFileNum = 50;
 
+  // Map BPMN_M master newIds to element types for colour injection
+  const masterColorMap: Record<number, string> = {
+    104: "gateway", 105: "intermediate-event", 106: "end-event", 107: "start-event",
+    110: "text-annotation", 111: "", 112: "", // connectors: no fill
+    115: "data-object", 116: "data-store", 117: "group",
+  };
+
   for (const entry of mastersToAdd) {
     const info = bpmnMasterBlocks[entry.origId];
     if (!info) { console.log(`[v2] BPMN_M master ${entry.origId} not found`); continue; }
 
     // Copy master content file with a new filename
     const newFileName = `master${nextFileNum++}.xml`;
-    const masterContent = await bpmnM.file("visio/masters/" + info.file)?.async("string");
+    let masterContent = await bpmnM.file("visio/masters/" + info.file)?.async("string");
     if (!masterContent) { console.log(`[v2] Master file ${info.file} not found`); continue; }
+
+    // Inject fill colour into the root shape's FillForegnd.
+    // BPMN_M masters use GUARD() which prevents page-level overrides,
+    // so we must modify the master XML itself.
+    const elType = masterColorMap[entry.newId];
+    if (isColor && elType) {
+      const hex = colorMap[elType];
+      if (hex) {
+        // Replace the FIRST FillForegnd (root shape's) with our colour
+        masterContent = masterContent.replace(
+          /N='FillForegnd' V='[^']*' F='[^']*'/,
+          `N='FillForegnd' V='${hex}' F='${hexToVisioRgb(hex)}'`
+        );
+      }
+    }
+
     zip.file("visio/masters/" + newFileName, masterContent);
 
     // Create new <Master> entry with new ID and rId
@@ -162,6 +186,40 @@ export async function exportVisioV2(
   // not our added BPMN_M masters. Visio will use masters.xml instead.
   zip.remove("visio/pages/_rels/page1.xml.rels");
 
+  // Inject fill colours into template masters (Task, Subprocess).
+  // These use THEMEVAL which CAN be overridden, but for consistency
+  // we modify the master XML to use GUARD(RGB()) like BPMN_M masters.
+  if (isColor) {
+    const templateColorMap: Record<string, string> = {
+      "master9.xml": colorMap["task"] ?? "",       // Task
+      "master12.xml": colorMap["subprocess"] ?? "", // Collapsed Sub-Process (master ID 33)
+    };
+
+    // Find which file corresponds to master 33 (Collapsed Sub-Process)
+    const tRels = await base.file("visio/masters/_rels/masters.xml.rels")!.async("string");
+    const tMasters = await base.file("visio/masters/masters.xml")!.async("string");
+    const m33 = tMasters.match(/<Master\s+ID='33'[\s\S]*?<\/Master>/);
+    if (m33) {
+      const m33Rel = m33[0].match(/<Rel\s+r:id='(rId\d+)'/);
+      if (m33Rel) {
+        const m33File = tRels.match(new RegExp(`Id=["']${m33Rel[1]}["'][^>]*Target=["']([^"']*)["']`));
+        if (m33File) templateColorMap[m33File[1]] = colorMap["subprocess"] ?? "";
+      }
+    }
+
+    for (const [file, hex] of Object.entries(templateColorMap)) {
+      if (!hex) continue;
+      const existing = await zip.file("visio/masters/" + file)?.async("string");
+      if (!existing) continue;
+      // Replace FIRST FillForegnd with our colour
+      const modified = existing.replace(
+        /N='FillForegnd' V='[^']*' F='[^']*'/,
+        `N='FillForegnd' V='${hex}' F='${hexToVisioRgb(hex)}'`
+      );
+      zip.file("visio/masters/" + file, modified);
+    }
+  }
+
   // ── Step 3: Build shapes ──
   // Font sizes from diagram settings (px → Visio inches: px / 96 * 72 / 72 = px / 96)
   // Visio Character.Size is in inches (e.g. 0.125 = 9pt)
@@ -172,13 +230,15 @@ export async function exportVisioV2(
   const elCharSection = `<Section N='Character' IX='0'><Row IX='0'><Cell N='Size' V='${elFontIn}'/></Row></Section>`;
   const connCharSection = `<Section N='Character' IX='0'><Row IX='0'><Cell N='Size' V='${connFontIn}'/></Row></Section>`;
 
-  // Color mode: "hand-drawn" = B&W, otherwise use Diagramatix default colours.
-  // GUARD(RGB()) prevents Visio theme from overriding our fill colours.
+  // Color mode: "hand-drawn" = B&W (no colour overrides), otherwise use passed-in colours.
+  // colorConfig is the effective merged config: defaults ← project ← diagram overrides.
   const isColor = displayMode !== "hand-drawn";
-  const colorMap = isColor ? DEFAULT_SYMBOL_COLORS : BW_SYMBOL_COLORS;
+  const colorMap: Record<string, string> = isColor
+    ? (colorConfig as Record<string, string>) ?? DEFAULT_SYMBOL_COLORS
+    : {};
   function fillCells(elType: string): string {
-    const hex = (colorMap as Record<string, string>)[elType];
-    if (!hex || !isColor) return ""; // B&W: no fill override, use master default (white/themed)
+    const hex = colorMap[elType];
+    if (!hex || !isColor) return "";
     return `<Cell N='FillForegnd' V='${hex}' F='${hexToVisioRgb(hex)}'/>` +
       `<Cell N='FillPattern' V='1' F='GUARD(1)'/>`;
   }
@@ -369,7 +429,7 @@ export async function exportVisioV2(
           // Shape 8's FillForegnd is immediately after ResizeMode in that sub-shape.
           // Replace from the last occurrence (Shape 8 is the last sub-shape).
           if (isColor) {
-            const poolColor = (colorMap as Record<string, string>)[el.type] ?? "#e5e7eb";
+            const poolColor = colorMap[el.type] ?? "#e5e7eb";
             // Find the last FillForegnd with THEMEVAL("FillColor") — that's Shape 8's
             const lastFillIdx = poolMasterXml.lastIndexOf("N='FillForegnd' V='1' F='THEMEVAL(\"FillColor\",1)'");
             if (lastFillIdx >= 0) {
@@ -380,14 +440,30 @@ export async function exportVisioV2(
           }
 
           // Fix pool/lane header text fitting.
-          // Shape 8's text runs along TxtWidth = pool Height (rotated sidebar).
-          // Calculate the max font size that fits the label without wrapping.
-          // TxtWidth (text run length) = pool height in inches = h.
-          // Average char width ≈ fontSize * 0.55 (proportional font).
-          // Need: labelLen * fontSize * 0.55 <= h, so fontSize <= h / (labelLen * 0.55).
-          // Cap at the diagram's element font size so it never gets larger than intended.
-          const maxFitFontIn = poolLabel.length > 0 ? h / (poolLabel.length * 0.6) : elFontIn;
-          const headerFontIn = Math.min(elFontIn, maxFitFontIn);
+          // Shape 8 is the rotated sidebar. Its Height = sidebar visual width (default 12mm).
+          // TxtWidth = pool height (text runs vertically along the pool).
+          // Use the diagram font size. If text doesn't fit single-line, widen the header.
+          const headerFontIn = elFontIn;
+          const textRunIn = h; // pool height = available text width
+          const textNeededIn = poolLabel.length * headerFontIn * 0.6; // approx text width
+          let headerMm = 12; // default 12mm for single-line text
+          if (textNeededIn > textRunIn) {
+            // Text wraps — calculate lines needed and widen header
+            const lines = Math.ceil(textNeededIn / textRunIn);
+            headerMm = 12 * lines;
+          }
+          // Apply header width if different from default
+          if (headerMm > 12) {
+            poolMasterXml = poolMasterXml.split("F='12MM*DropOnPageScale'").join(
+              `F='${headerMm}MM*DropOnPageScale'`
+            );
+            const headerCachedV = headerMm * 0.03937007874;
+            poolMasterXml = poolMasterXml.split(
+              "N='Height' V='0.4724409448818898' U='MM'"
+            ).join(
+              `N='Height' V='${headerCachedV}' U='MM'`
+            );
+          }
           const charSectionForHeader = `<Section N='Character' IX='0'><Row IX='0'>` +
             `<Cell N='Size' V='${headerFontIn}'/>` +
             `</Row></Section>`;
