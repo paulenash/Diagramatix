@@ -288,7 +288,10 @@ export async function exportVisioV2(
           poolMasterXml = poolMasterXml.split('1.968503924805349').join(String(hw + 1));
           poolMasterXml = poolMasterXml.split('1.968503920581397').join(String(hh + 1));
 
-          console.log(`[v2] Pool master: global replace w=${w}, h=${h}`);
+          // Replace "Function" text with the actual pool/lane name
+          poolMasterXml = poolMasterXml.split('Function').join(esc(poolLabel));
+
+          console.log(`[v2] Pool master: global replace w=${w}, h=${h}, name=${poolLabel}`);
 
           // Write as new master file
           const poolInstanceId = 200 + shapeId;
