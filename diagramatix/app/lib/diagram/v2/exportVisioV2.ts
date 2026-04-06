@@ -258,8 +258,10 @@ export async function exportVisioV2(
         // Gateway (BPMN_M master): F='Inh' sub-shapes don't work — skip for now
         subShapes = "";
       } else if (isPool) {
-        // Pool: create a per-instance master with modified Width/Height formulas
-        // This is what Visio does — it changes the formula from 'User.DefaultWidth' to '{value}*25.4MM'
+        // Pool/Lane: create a per-instance master with updated cached dimension values.
+        // Sub-shapes have formulas (Sheet.5!Width*1, etc.) but Visio uses cached V= values
+        // on file open, so ALL cached values must be updated.
+        // Key: root Width/Height must be plain values (NO F= formula) for user resizability.
         const poolLabel = el.label ?? "Pool";
 
         // Find the Pool master file from the template
@@ -272,35 +274,45 @@ export async function exportVisioV2(
         if (poolFileMatch) {
           let poolMasterXml = await base.file("visio/masters/" + poolFileMatch[1])!.async("string");
 
-          // Global replace of stored values AND add formulas like Visio does
-          const oldW = '4.921259842519685';
-          const oldH = '1.181102362204724';
-          const oldHW = '2.460629921259843';
-          const oldHH = '0.5905511811023622';
+          // Update all cached V= values for Width, Height, and their halves.
+          // These appear on the root shape AND sub-shapes as cached formula results.
+          // Formulas use symbolic refs (Sheet.5!Width*1) not literals, so this is safe.
+          // Original cached values:
+          //   Width       = 4.921259842519685
+          //   Height      = 1.181102362204724
+          //   Width*0.5   = 2.460629921259843
+          //   Height*0.5  = 0.5905511811023622
+          //   PinX (root) = 1.968503924805349  (master page center)
+          //   PinY (root) = 1.968503920581397  (master page center)
+          // Note: DropOnPageScale-dependent values (0.4724, 0.2362, 0.1181, 0.0590)
+          //       must NOT be changed — they depend on scale ratio, not shape dimensions.
+          poolMasterXml = poolMasterXml.split('4.921259842519685').join(String(w));
+          poolMasterXml = poolMasterXml.split('1.181102362204724').join(String(h));
+          poolMasterXml = poolMasterXml.split('2.460629921259843').join(String(hw));
+          poolMasterXml = poolMasterXml.split('0.5905511811023622').join(String(hh));
+          // Root PinX/PinY: position on master page (for icon preview only, not page rendering)
+          poolMasterXml = poolMasterXml.split('1.968503924805349').join(String(hw));
+          poolMasterXml = poolMasterXml.split('1.968503920581397').join(String(hh));
 
-          // Replace all occurrences of old values with new ones
-          poolMasterXml = poolMasterXml.split(oldW).join(String(w));
-          poolMasterXml = poolMasterXml.split(oldH).join(String(h));
-          poolMasterXml = poolMasterXml.split(oldHW).join(String(hw));
-          poolMasterXml = poolMasterXml.split(oldHH).join(String(hh));
-          poolMasterXml = poolMasterXml.split('1.968503924805349').join(String(hw + 1));
-          poolMasterXml = poolMasterXml.split('1.968503920581397').join(String(hh + 1));
-
-          // Add Width/Height formulas on root shape like Visio does for resizable instances
-          // Change: V='w' U='MM'/> to V='w' U='MM' F='w*25.4MM'/>
+          // Replace "Function" text in <Text> elements and property values only
           poolMasterXml = poolMasterXml.replace(
-            `N='Width' V='${w}' U='MM'/>`,
-            `N='Width' V='${w}' U='MM' F='${w}*25.4MM'/>`
+            /<Text>Function\s*<\/Text>/g,
+            `<Text>${esc(poolLabel)}\n</Text>`
           );
           poolMasterXml = poolMasterXml.replace(
-            `N='Height' V='${h}' U='MM'/>`,
-            `N='Height' V='${h}' U='MM' F='${h}*25.4MM'/>`
+            "V='Function' U='STR' F='SHAPETEXT(Sheet.8!TheText)'",
+            `V='${esc(poolLabel)}' U='STR' F='SHAPETEXT(Sheet.8!TheText)'`
+          );
+          poolMasterXml = poolMasterXml.replace(
+            "N='BpmnName'><Cell N='Value' V='Function'",
+            `N='BpmnName'><Cell N='Value' V='${esc(poolLabel)}'`
+          );
+          poolMasterXml = poolMasterXml.replace(
+            "N='BpmnPoolName'><Cell N='Value' V='Function'",
+            `N='BpmnPoolName'><Cell N='Value' V='${esc(poolLabel)}'`
           );
 
-          // Replace "Function" text with the actual pool/lane name
-          poolMasterXml = poolMasterXml.split('Function').join(esc(poolLabel));
-
-          console.log(`[v2] Pool master: global replace w=${w}, h=${h}, name=${poolLabel}`);
+          console.log(`[v2] Pool per-instance master: w=${w}, h=${h}, name=${poolLabel}`);
 
           // Write as new master file
           const poolInstanceId = 200 + shapeId;
@@ -308,9 +320,11 @@ export async function exportVisioV2(
           const poolRId = `rId${200 + shapeId}`;
           zip.file("visio/masters/" + poolFileName, poolMasterXml);
 
-          // Add master entry
+          // Add master entry with Visio naming convention
           let newPoolBlock = poolMasterBlock![0]
             .replace(/ID='19'/, `ID='${poolInstanceId}'`)
+            .replace(/NameU='Pool \/ Lane'/, `NameU='Pool / Lane.${poolInstanceId}'`)
+            .replace(/Name='Pool \/ Lane'/, `Name='Pool / Lane.${poolInstanceId}'`)
             .replace(/<Rel\s+r:id='rId\d+'/, `<Rel r:id='${poolRId}'`);
           mastersXml = mastersXml.replace("</Masters>", newPoolBlock + "</Masters>");
           mastersRels = mastersRels.replace("</Relationships>",
@@ -323,18 +337,12 @@ export async function exportVisioV2(
           zip.file("visio/masters/_rels/masters.xml.rels", mastersRels);
           zip.file("[Content_Types].xml", contentTypes);
 
-          // Use the per-instance master ID for this shape
-          userSection = `<Section N='User'>` +
-            `<Row N='IsInstance'><Cell N='Value' V='1' U='BOOL' F='Inh'/></Row>` +
-            `<Row N='visHeadingText'><Cell N='Value' V='${esc(poolLabel)}' U='STR' F='Inh'/></Row>` +
-            `</Section>`;
-
-          // Override masterId for this shape
+          // Override masterId for this shape — no additional overrides needed,
+          // the per-instance master has the correct dimensions
           shapes.push(
             `<Shape ID='${shapeId}' NameU='${esc(poolLabel)}' Type='Group' Master='${poolInstanceId}'>` +
             `<Cell N='PinX' V='${cx}'/>` +
             `<Cell N='PinY' V='${cy}'/>` +
-            userSection +
             propSection +
             `</Shape>`
           );
