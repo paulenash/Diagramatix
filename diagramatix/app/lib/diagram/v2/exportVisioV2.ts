@@ -222,13 +222,14 @@ export async function exportVisioV2(
     const w = el.width / 96;
     const h = el.height / 96;
 
-    // Property overrides
+    // Property overrides — use F='No Formula' to prevent master's INDEX() formula
+    // from overriding the value we set here.
     let propSection = "";
     const propEntries = Object.entries(mapping.properties);
     if (propEntries.length > 0) {
       propSection = `<Section N='Property'>` +
         propEntries.map(([name, value]) =>
-          `<Row N='${name}'><Cell N='Value' V='${esc(value)}' U='STR'/></Row>`
+          `<Row N='${name}'><Cell N='Value' V='${esc(value)}' U='STR' F='No Formula'/></Row>`
         ).join("") +
         `</Section>`;
     }
@@ -335,17 +336,17 @@ export async function exportVisioV2(
 
           // Widen header sidebar to fit pool/lane name text.
           // Shape 8's Height = header width (rotated 90°). Default: 12MM*DropOnPageScale.
-          // Estimate needed width: ~2.5mm per character + 4mm padding, minimum 12mm.
-          const headerMm = Math.max(12, poolLabel.length * 2.5 + 4);
-          poolMasterXml = poolMasterXml.replace(
-            "F='12MM*DropOnPageScale'",
+          // The text runs vertically in the sidebar. Estimate ~3mm per character + 6mm padding.
+          const headerMm = Math.max(12, poolLabel.length * 3 + 6);
+          // Replace ALL occurrences of the formula (appears once) and cached value
+          poolMasterXml = poolMasterXml.split("F='12MM*DropOnPageScale'").join(
             `F='${headerMm}MM*DropOnPageScale'`
           );
-          // Also update the cached V= value for the header Height
-          const headerCachedV = headerMm * 0.03937007874;  // mm to inches (master units)
-          poolMasterXml = poolMasterXml.replace(
-            "N='Height' V='0.4724409448818898' U='MM' F=",
-            `N='Height' V='${headerCachedV}' U='MM' F=`
+          const headerCachedV = headerMm * 0.03937007874;
+          poolMasterXml = poolMasterXml.split(
+            "N='Height' V='0.4724409448818898' U='MM'"
+          ).join(
+            `N='Height' V='${headerCachedV}' U='MM'`
           );
 
           console.log(`[v2] Pool per-instance master: w=${w}, h=${h}, header=${headerMm}mm, name=${poolLabel}`);
@@ -452,23 +453,22 @@ export async function exportVisioV2(
 
     const textEl = conn.label ? `<Text>${esc(conn.label)}</Text>` : "";
 
-    // Label positioning: labelOffsetX/Y are pixel offsets from connector midpoint.
-    // Convert to Visio TxtPinX/TxtPinY (relative to shape's local coordinate system).
-    // The shape's origin is at BeginX,BeginY; LocPinX/Y is the midpoint offset.
+    // Label positioning: use Visio's text block transform with GUARD formulas
+    // so the label stays attached to the connector when it moves.
+    // labelOffsetX/Y are pixel offsets from connector midpoint.
     let txtCells = "";
     if (conn.label) {
       const labelW = (conn.labelWidth ?? 80) / 96;
-      const labelH = 0.2; // approximate single-line height in inches
-      // labelOffset is from connector midpoint in pixels; convert to inches from shape origin
-      const txtX = dx / 2 + (conn.labelOffsetX ?? 0) / 96;
-      const txtY = dy / 2 - (conn.labelOffsetY ?? 0) / 96; // Y inverted
+      const labelH = 0.2;
+      const offX = (conn.labelOffsetX ?? 0) / 96;
+      const offY = -(conn.labelOffsetY ?? 0) / 96; // Y inverted
       txtCells =
-        `<Cell N='TxtPinX' V='${txtX}'/>` +
-        `<Cell N='TxtPinY' V='${txtY}'/>` +
+        `<Cell N='TxtPinX' V='${dx / 2 + offX}' F='GUARD(Width*0.5+${offX})'/>` +
+        `<Cell N='TxtPinY' V='${dy / 2 + offY}' F='GUARD(Height*0.5+${offY})'/>` +
         `<Cell N='TxtWidth' V='${labelW}'/>` +
-        `<Cell N='TxtHeight' V='${labelH}'/>` +
-        `<Cell N='TxtLocPinX' V='${labelW / 2}'/>` +
-        `<Cell N='TxtLocPinY' V='${labelH / 2}'/>`;
+        `<Cell N='TxtHeight' V='${labelH}' F='TEXTHEIGHT(TheText,TxtWidth)'/>` +
+        `<Cell N='TxtLocPinX' V='${labelW / 2}' F='TxtWidth*0.5'/>` +
+        `<Cell N='TxtLocPinY' V='${labelH / 2}' F='TxtHeight*0.5'/>`;
     }
 
     shapes.push(
