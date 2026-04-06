@@ -466,20 +466,42 @@ export async function exportVisioV2(
 
     const textEl = conn.label ? `<Text>${esc(conn.label)}</Text>` : "";
 
-    // Connector label: use Controls.TextPosition (yellow diamond handle) so text
-    // stays attached to a draggable pin. TxtPinX/Y use SETATREF to track it.
-    // labelOffsetX/Y are pixel offsets from connector midpoint in Diagramatix.
+    // Connector label: measure offset from label centre to closest endpoint,
+    // then place pin+text at that offset from the corresponding Visio endpoint.
+    // Controls.TextPosition creates a draggable yellow pin handle.
     let txtCells = "";
     if (conn.label) {
-      const offX = (conn.labelOffsetX ?? 0) / 96;
-      const offY = -(conn.labelOffsetY ?? 0) / 96; // Y inverted
-      const ctrlX = dx / 2 + offX;  // local coords: midpoint + offset
-      const ctrlY = dy / 2 + offY;
+      const wp = conn.waypoints ?? [];
+      const visStart = conn.sourceInvisibleLeader ? 1 : 0;
+      const visEnd = conn.targetInvisibleLeader ? wp.length - 2 : wp.length - 1;
+      const visPtsL = wp.slice(visStart, visEnd + 1);
+      const lp0 = visPtsL[0], lpN = visPtsL[visPtsL.length - 1];
+      const midPxX = (lp0.x + lpN.x) / 2, midPxY = (lp0.y + lpN.y) / 2;
+      const labelCX = midPxX + (conn.labelOffsetX ?? 0);
+      const labelCY = midPxY + (conn.labelOffsetY ?? 0);
+
+      // Find closest endpoint
+      const distToStart = Math.hypot(labelCX - lp0.x, labelCY - lp0.y);
+      const distToEnd = Math.hypot(labelCX - lpN.x, labelCY - lpN.y);
+      const closestIsStart = distToStart < distToEnd;
+      const closestPx = closestIsStart ? lp0 : lpN;
+
+      // Offset from closest endpoint in pixels, then convert to inches
+      const labelOffInX = (labelCX - closestPx.x) / 96;
+      const labelOffInY = -(labelCY - closestPx.y) / 96; // Y inverted
+
+      // Closest endpoint in Visio local coords (shape origin = BeginX,BeginY)
+      // Begin = (0,0), End = (dx,dy)
+      const anchorX = closestIsStart ? 0 : dx;
+      const anchorY = closestIsStart ? 0 : dy;
+
+      const ctrlX = anchorX + labelOffInX;
+      const ctrlY = anchorY + labelOffInY;
       const labelW = (conn.labelWidth ?? 80) / 96;
       txtCells =
         `<Section N='Controls'><Row N='TextPosition'>` +
-        `<Cell N='X' V='${ctrlX}'/>` +
-        `<Cell N='Y' V='${ctrlY}'/>` +
+        `<Cell N='X' V='${ctrlX}' F='Controls.TextPosition.XDyn'/>` +
+        `<Cell N='Y' V='${ctrlY}' F='Controls.TextPosition.YDyn'/>` +
         `<Cell N='XDyn' V='${ctrlX}'/>` +
         `<Cell N='YDyn' V='${ctrlY}'/>` +
         `<Cell N='XCon' V='0'/>` +
