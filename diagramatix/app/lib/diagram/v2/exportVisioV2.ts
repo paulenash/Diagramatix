@@ -146,16 +146,16 @@ export async function exportVisioV2(
     let masterContent = await bpmnM.file("visio/masters/" + info.file)?.async("string");
     if (!masterContent) { console.log(`[v2] Master file ${info.file} not found`); continue; }
 
-    // Inject fill colour into ALL white-fill FillForegnd cells.
+    // Inject fill colour into the root shape's FillForegnd (first occurrence).
+    // Sub-shapes that reference Sheet.5!FillForegnd will inherit the new colour.
     // BPMN_M masters use GUARD() which prevents page-level overrides,
-    // so we modify the master XML. Replace V='1' (white) fills with our colour.
-    // V='0' (black/line colour) fills are left unchanged.
+    // so we must modify the master XML itself.
     const elType = masterColorMap[entry.newId];
     if (isColor && elType) {
       const hex = colorMap[elType];
       if (hex) {
         masterContent = masterContent.replace(
-          /N='FillForegnd' V='1' F='[^']*'/g,
+          /N='FillForegnd' V='[^']*' F='[^']*'/,
           `N='FillForegnd' V='${hex}' F='${hexToVisioRgb(hex)}'`
         );
       }
@@ -212,8 +212,9 @@ export async function exportVisioV2(
       if (!mFile) continue;
       const existing = await zip.file("visio/masters/" + mFile[1])?.async("string");
       if (!existing) continue;
+      // Replace root shape's FillForegnd (first occurrence only)
       const modified = existing.replace(
-        /N='FillForegnd' V='1' F='[^']*'/g,
+        /N='FillForegnd' V='[^']*' F='[^']*'/,
         `N='FillForegnd' V='${hex}' F='${hexToVisioRgb(hex)}'`
       );
       zip.file("visio/masters/" + mFile[1], modified);
