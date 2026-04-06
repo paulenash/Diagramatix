@@ -272,32 +272,35 @@ export async function exportVisioV2(
         if (poolFileMatch) {
           let poolMasterXml = await base.file("visio/masters/" + poolFileMatch[1])!.async("string");
 
-          // Replace dimension values in V= attributes only (not in formulas)
-          // This preserves formula relationships for resizability
+          // Global replace of stored values AND add formulas like Visio does
           const oldW = '4.921259842519685';
           const oldH = '1.181102362204724';
           const oldHW = '2.460629921259843';
           const oldHH = '0.5905511811023622';
 
-          // Helper: replace V='oldVal' with V='newVal' globally (only in V= attribute context)
-          function replaceVal(xml: string, oldVal: string, newVal: string): string {
-            return xml.split(`V='${oldVal}'`).join(`V='${newVal}'`);
-          }
+          // Replace all occurrences of old values with new ones
+          poolMasterXml = poolMasterXml.split(oldW).join(String(w));
+          poolMasterXml = poolMasterXml.split(oldH).join(String(h));
+          poolMasterXml = poolMasterXml.split(oldHW).join(String(hw));
+          poolMasterXml = poolMasterXml.split(oldHH).join(String(hh));
+          poolMasterXml = poolMasterXml.split('1.968503924805349').join(String(hw + 1));
+          poolMasterXml = poolMasterXml.split('1.968503920581397').join(String(hh + 1));
 
-          poolMasterXml = replaceVal(poolMasterXml, oldW, String(w));
-          poolMasterXml = replaceVal(poolMasterXml, oldH, String(h));
-          poolMasterXml = replaceVal(poolMasterXml, oldHW, String(hw));
-          poolMasterXml = replaceVal(poolMasterXml, oldHH, String(hh));
-          poolMasterXml = replaceVal(poolMasterXml, '1.968503924805349', String(hw + 1));
-          poolMasterXml = replaceVal(poolMasterXml, '1.968503920581397', String(hh + 1));
-
-          // Also update PageWidth/PageHeight in the master's PageSheet
-          poolMasterXml = replaceVal(poolMasterXml, '6', String(w + 2));
+          // Add Width/Height formulas on root shape like Visio does for resizable instances
+          // Change: V='w' U='MM'/> to V='w' U='MM' F='w*25.4MM'/>
+          poolMasterXml = poolMasterXml.replace(
+            `N='Width' V='${w}' U='MM'/>`,
+            `N='Width' V='${w}' U='MM' F='${w}*25.4MM'/>`
+          );
+          poolMasterXml = poolMasterXml.replace(
+            `N='Height' V='${h}' U='MM'/>`,
+            `N='Height' V='${h}' U='MM' F='${h}*25.4MM'/>`
+          );
 
           // Replace "Function" text with the actual pool/lane name
           poolMasterXml = poolMasterXml.split('Function').join(esc(poolLabel));
 
-          console.log(`[v2] Pool master: val replace w=${w}, h=${h}, name=${poolLabel}`);
+          console.log(`[v2] Pool master: global replace w=${w}, h=${h}, name=${poolLabel}`);
 
           // Write as new master file
           const poolInstanceId = 200 + shapeId;
