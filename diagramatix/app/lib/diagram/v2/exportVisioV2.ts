@@ -152,6 +152,15 @@ export async function exportVisioV2(
   zip.remove("visio/pages/_rels/page1.xml.rels");
 
   // ── Step 3: Build shapes ──
+  // Font sizes from diagram settings (px → Visio inches: px / 96 * 72 / 72 = px / 96)
+  // Visio Character.Size is in inches (e.g. 0.125 = 9pt)
+  const elFontPx = data.fontSize ?? 12;
+  const connFontPx = data.connectorFontSize ?? 10;
+  const elFontIn = elFontPx / 96;        // px to inches
+  const connFontIn = connFontPx / 96;
+  const elCharSection = `<Section N='Character' IX='0'><Row IX='0'><Cell N='Size' V='${elFontIn}'/></Row></Section>`;
+  const connCharSection = `<Section N='Character' IX='0'><Row IX='0'><Cell N='Size' V='${connFontIn}'/></Row></Section>`;
+
   const shapes: string[] = [];
   const connects: string[] = [];
   const elIdToShapeId = new Map<string, number>();
@@ -336,8 +345,11 @@ export async function exportVisioV2(
 
           // Widen header sidebar to fit pool/lane name text.
           // Shape 8's Height = header width (rotated 90°). Default: 12MM*DropOnPageScale.
-          // The text runs vertically in the sidebar. Estimate ~3mm per character + 6mm padding.
-          const headerMm = Math.max(12, poolLabel.length * 3 + 6);
+          // Scale header width based on diagram font size (default 12px = 9pt).
+          // At 9pt, ~2.5mm per char. Scale proportionally for other sizes.
+          const fontScale = elFontPx / 12;
+          const mmPerChar = 2.5 * fontScale;
+          const headerMm = Math.max(12, poolLabel.length * mmPerChar + 6 * fontScale);
           // Replace ALL occurrences of the formula (appears once) and cached value
           poolMasterXml = poolMasterXml.split("F='12MM*DropOnPageScale'").join(
             `F='${headerMm}MM*DropOnPageScale'`
@@ -390,6 +402,7 @@ export async function exportVisioV2(
             `<Cell N='LocPinY' V='${hh}' F='Inh'/>` +
             poolUserSection +
             propSection +
+            elCharSection +
             `</Shape>`
           );
           continue; // skip the normal shape.push below
@@ -409,6 +422,7 @@ export async function exportVisioV2(
       sizeCells +
       userSection +
       propSection +
+      elCharSection +
       textEl +
       subShapes +
       `</Shape>`
@@ -498,6 +512,7 @@ export async function exportVisioV2(
       `<Cell N='NoFill' V='1'/><Cell N='NoLine' V='0'/><Cell N='NoShow' V='0'/><Cell N='NoSnap' V='0'/>` +
       geomRows +
       `</Section>` +
+      connCharSection +
       textEl +
       `</Shape>`
     );
