@@ -294,6 +294,16 @@ export async function exportVisioV2(
           poolMasterXml = poolMasterXml.split('1.968503924805349').join(String(hw));
           poolMasterXml = poolMasterXml.split('1.968503920581397').join(String(hh));
 
+          // Add F='w*25.4MM' formula on root Width/Height (matches Visio's per-instance format)
+          poolMasterXml = poolMasterXml.replace(
+            `N='Width' V='${w}' U='MM'/>`,
+            `N='Width' V='${w}' U='MM' F='${w}*25.4MM'/>`
+          );
+          poolMasterXml = poolMasterXml.replace(
+            `N='Height' V='${h}' U='MM'/>`,
+            `N='Height' V='${h}' U='MM' F='${h}*25.4MM'/>`
+          );
+
           // Replace "Function" text in <Text> elements and property values only
           poolMasterXml = poolMasterXml.replace(
             /<Text>Function\s*<\/Text>/g,
@@ -337,12 +347,21 @@ export async function exportVisioV2(
           zip.file("visio/masters/_rels/masters.xml.rels", mastersRels);
           zip.file("[Content_Types].xml", contentTypes);
 
-          // Override masterId for this shape — no additional overrides needed,
-          // the per-instance master has the correct dimensions
+          // Page instance must have explicit Width/Height for Visio to allow resizing.
+          // LocPinX/LocPinY use F='Inh' to calculate from local Width/Height.
+          // visHeadingText overrides the master's default label.
+          const poolUserSection = `<Section N='User'>` +
+            `<Row N='visHeadingText'><Cell N='Value' V='${esc(poolLabel)}' U='STR' F='Inh'/></Row>` +
+            `</Section>`;
           shapes.push(
             `<Shape ID='${shapeId}' NameU='${esc(poolLabel)}' Type='Group' Master='${poolInstanceId}'>` +
             `<Cell N='PinX' V='${cx}'/>` +
             `<Cell N='PinY' V='${cy}'/>` +
+            `<Cell N='Width' V='${w}'/>` +
+            `<Cell N='Height' V='${h}'/>` +
+            `<Cell N='LocPinX' V='${hw}' F='Inh'/>` +
+            `<Cell N='LocPinY' V='${hh}' F='Inh'/>` +
+            poolUserSection +
             propSection +
             `</Shape>`
           );
