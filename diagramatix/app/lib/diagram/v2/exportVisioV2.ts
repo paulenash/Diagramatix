@@ -63,6 +63,12 @@ export async function exportVisioV2(
   const offsetX = (pageW - diagramW) / 2;
   const offsetY = (pageH - diagramH) / 2;
 
+  // Colour setup — needed before master processing
+  const isColor = displayMode !== "hand-drawn";
+  const colorMap: Record<string, string> = isColor
+    ? (colorConfig as Record<string, string>) ?? DEFAULT_SYMBOL_COLORS
+    : {};
+
   // ── Step 1: Copy ALL template files ──
   const zip = new JSZip();
   for (const [fpath, entry] of Object.entries(base.files)) {
@@ -230,12 +236,6 @@ export async function exportVisioV2(
   const elCharSection = `<Section N='Character' IX='0'><Row IX='0'><Cell N='Size' V='${elFontIn}'/></Row></Section>`;
   const connCharSection = `<Section N='Character' IX='0'><Row IX='0'><Cell N='Size' V='${connFontIn}'/></Row></Section>`;
 
-  // Color mode: "hand-drawn" = B&W (no colour overrides), otherwise use passed-in colours.
-  // colorConfig is the effective merged config: defaults ← project ← diagram overrides.
-  const isColor = displayMode !== "hand-drawn";
-  const colorMap: Record<string, string> = isColor
-    ? (colorConfig as Record<string, string>) ?? DEFAULT_SYMBOL_COLORS
-    : {};
   function fillCells(elType: string): string {
     const hex = colorMap[elType];
     if (!hex || !isColor) return "";
@@ -439,31 +439,11 @@ export async function exportVisioV2(
             }
           }
 
-          // Fix pool/lane header text fitting.
-          // Shape 8 is the rotated sidebar. Its Height = sidebar visual width (default 12mm).
-          // TxtWidth = pool height (text runs vertically along the pool).
-          // Use the diagram font size. If text doesn't fit single-line, widen the header.
-          const headerFontIn = elFontIn;
-          const textRunIn = h; // pool height = available text width
-          const textNeededIn = poolLabel.length * headerFontIn * 0.6; // approx text width
-          let headerMm = 12; // default 12mm for single-line text
-          if (textNeededIn > textRunIn) {
-            // Text wraps — calculate lines needed and widen header
-            const lines = Math.ceil(textNeededIn / textRunIn);
-            headerMm = 12 * lines;
-          }
-          // Apply header width if different from default
-          if (headerMm > 12) {
-            poolMasterXml = poolMasterXml.split("F='12MM*DropOnPageScale'").join(
-              `F='${headerMm}MM*DropOnPageScale'`
-            );
-            const headerCachedV = headerMm * 0.03937007874;
-            poolMasterXml = poolMasterXml.split(
-              "N='Height' V='0.4724409448818898' U='MM'"
-            ).join(
-              `N='Height' V='${headerCachedV}' U='MM'`
-            );
-          }
+          // Inject font size into Shape 8 header so text fits.
+          // Calculate font that fits label single-line within pool height.
+          // If it can't fit, just use the diagram font and let Visio wrap.
+          const maxFitFontIn = poolLabel.length > 0 ? h / (poolLabel.length * 0.6) : elFontIn;
+          const headerFontIn = Math.min(elFontIn, maxFitFontIn);
           const charSectionForHeader = `<Section N='Character' IX='0'><Row IX='0'>` +
             `<Cell N='Size' V='${headerFontIn}'/>` +
             `</Row></Section>`;
