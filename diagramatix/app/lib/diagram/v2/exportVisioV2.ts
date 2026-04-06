@@ -343,22 +343,18 @@ export async function exportVisioV2(
             `N='BpmnPoolName'><Cell N='Value' V='${esc(poolLabel)}'`
           );
 
-          // Widen header sidebar to fit pool/lane name text.
-          // Shape 8's Height = header width (rotated 90°). Default: 12MM*DropOnPageScale.
-          // Scale header width based on diagram font size (default 12px = 9pt).
-          // At 9pt, ~2.5mm per char. Scale proportionally for other sizes.
-          const fontScale = elFontPx / 12;
-          const mmPerChar = 2.5 * fontScale;
-          const headerMm = Math.max(12, poolLabel.length * mmPerChar + 6 * fontScale);
-          // Replace ALL occurrences of the formula (appears once) and cached value
-          poolMasterXml = poolMasterXml.split("F='12MM*DropOnPageScale'").join(
-            `F='${headerMm}MM*DropOnPageScale'`
-          );
-          const headerCachedV = headerMm * 0.03937007874;
-          poolMasterXml = poolMasterXml.split(
-            "N='Height' V='0.4724409448818898' U='MM'"
-          ).join(
-            `N='Height' V='${headerCachedV}' U='MM'`
+          // Fix pool/lane header text fitting.
+          // Shape 8's text runs along TxtWidth = pool Height (rotated sidebar).
+          // The style default is 12pt font, but Diagramatix uses smaller fonts.
+          // Inject a Character section into Shape 8 to set the correct font size.
+          // Shape 8 ends with: </Section><Text>...\n</Text></Shape>
+          // Insert Character section before <Text>
+          const charSectionForHeader = `<Section N='Character' IX='0'><Row IX='0'>` +
+            `<Cell N='Size' V='${elFontIn}'/>` +
+            `</Row></Section>`;
+          poolMasterXml = poolMasterXml.replace(
+            /<Text>([^<]*)<\/Text><\/Shape><\/Shapes><\/Shape>/,
+            `${charSectionForHeader}<Text>$1</Text></Shape></Shapes></Shape>`
           );
 
           console.log(`[v2] Pool per-instance master: w=${w}, h=${h}, header=${headerMm}mm, name=${poolLabel}`);
@@ -467,9 +463,9 @@ export async function exportVisioV2(
 
     const textEl = conn.label ? `<Text>${esc(conn.label)}</Text>` : "";
 
-    // Label positioning: use Visio's text block transform with GUARD formulas
-    // so the label stays attached to the connector when it moves.
-    // labelOffsetX/Y are pixel offsets from connector midpoint.
+    // Label positioning: TxtPinX/Y position the text block relative to the shape's
+    // local coordinates. Use Width*0.5/Height*0.5 + offset formulas so text moves
+    // with the connector but can also be dragged by the user.
     let txtCells = "";
     if (conn.label) {
       const labelW = (conn.labelWidth ?? 80) / 96;
@@ -477,8 +473,8 @@ export async function exportVisioV2(
       const offX = (conn.labelOffsetX ?? 0) / 96;
       const offY = -(conn.labelOffsetY ?? 0) / 96; // Y inverted
       txtCells =
-        `<Cell N='TxtPinX' V='${dx / 2 + offX}' F='GUARD(Width*0.5+${offX})'/>` +
-        `<Cell N='TxtPinY' V='${dy / 2 + offY}' F='GUARD(Height*0.5+${offY})'/>` +
+        `<Cell N='TxtPinX' V='${dx / 2 + offX}' F='Width*0.5+${offX}'/>` +
+        `<Cell N='TxtPinY' V='${dy / 2 + offY}' F='Height*0.5+${offY}'/>` +
         `<Cell N='TxtWidth' V='${labelW}'/>` +
         `<Cell N='TxtHeight' V='${labelH}' F='TEXTHEIGHT(TheText,TxtWidth)'/>` +
         `<Cell N='TxtLocPinX' V='${labelW / 2}' F='TxtWidth*0.5'/>` +
