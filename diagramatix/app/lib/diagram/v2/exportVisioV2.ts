@@ -146,18 +146,20 @@ export async function exportVisioV2(
     let masterContent = await bpmnM.file("visio/masters/" + info.file)?.async("string");
     if (!masterContent) { console.log(`[v2] Master file ${info.file} not found`); continue; }
 
-    // Inject fill colour into the root shape's FillForegnd (first occurrence).
-    // Sub-shapes that reference Sheet.5!FillForegnd will inherit the new colour.
-    // BPMN_M masters use GUARD() which prevents page-level overrides,
-    // so we must modify the master XML itself.
+    // Inject fill colour into root shape (ID='5').
+    // If root already has FillForegnd, replace it. Otherwise inject one.
+    // Sub-shapes referencing Sheet.5!FillForegnd will inherit the colour.
     const elType = masterColorMap[entry.newId];
     if (isColor && elType) {
       const hex = colorMap[elType];
       if (hex) {
-        masterContent = masterContent.replace(
-          /N='FillForegnd' V='[^']*' F='[^']*'/,
-          `N='FillForegnd' V='${hex}' F='${hexToVisioRgb(hex)}'`
-        );
+        const fillCell = `<Cell N='FillForegnd' V='${hex}' F='${hexToVisioRgb(hex)}'/>`;
+        // Find root shape's first cell area (after <Shape ID='5'...>)
+        const rootShapeMatch = masterContent.match(/<Shape ID='5'[^>]*>/);
+        if (rootShapeMatch) {
+          const insertPos = rootShapeMatch.index! + rootShapeMatch[0].length;
+          masterContent = masterContent.substring(0, insertPos) + fillCell + masterContent.substring(insertPos);
+        }
       }
     }
 
@@ -212,12 +214,14 @@ export async function exportVisioV2(
       if (!mFile) continue;
       const existing = await zip.file("visio/masters/" + mFile[1])?.async("string");
       if (!existing) continue;
-      // Replace root shape's FillForegnd (first occurrence only)
-      const modified = existing.replace(
-        /N='FillForegnd' V='[^']*' F='[^']*'/,
-        `N='FillForegnd' V='${hex}' F='${hexToVisioRgb(hex)}'`
-      );
-      zip.file("visio/masters/" + mFile[1], modified);
+      // Inject FillForegnd into root shape (ID='5')
+      const fillCell = `<Cell N='FillForegnd' V='${hex}' F='${hexToVisioRgb(hex)}'/>`;
+      const rootMatch = existing.match(/<Shape ID='5'[^>]*>/);
+      if (rootMatch) {
+        const pos = rootMatch.index! + rootMatch[0].length;
+        const modified = existing.substring(0, pos) + fillCell + existing.substring(pos);
+        zip.file("visio/masters/" + mFile[1], modified);
+      }
     }
   }
 
