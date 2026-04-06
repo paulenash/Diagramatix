@@ -466,9 +466,34 @@ export async function exportVisioV2(
 
     const textEl = conn.label ? `<Text>${esc(conn.label)}</Text>` : "";
 
-    // Connector label: no TxtPin overrides — let the master's default text block
-    // handle positioning (text at midpoint, attached to label pin, user-draggable).
+    // Connector label: use Controls.TextPosition (yellow diamond handle) so text
+    // stays attached to a draggable pin. TxtPinX/Y use SETATREF to track it.
+    // labelOffsetX/Y are pixel offsets from connector midpoint in Diagramatix.
     let txtCells = "";
+    if (conn.label) {
+      const offX = (conn.labelOffsetX ?? 0) / 96;
+      const offY = -(conn.labelOffsetY ?? 0) / 96; // Y inverted
+      const ctrlX = dx / 2 + offX;  // local coords: midpoint + offset
+      const ctrlY = dy / 2 + offY;
+      const labelW = (conn.labelWidth ?? 80) / 96;
+      txtCells =
+        `<Section N='Controls'><Row N='TextPosition'>` +
+        `<Cell N='X' V='${ctrlX}'/>` +
+        `<Cell N='Y' V='${ctrlY}'/>` +
+        `<Cell N='XDyn' V='${ctrlX}'/>` +
+        `<Cell N='YDyn' V='${ctrlY}'/>` +
+        `<Cell N='XCon' V='0'/>` +
+        `<Cell N='YCon' V='0'/>` +
+        `<Cell N='CanGlue' V='0'/>` +
+        `</Row></Section>` +
+        `<Cell N='TxtPinX' V='${ctrlX}' F='SETATREF(Controls.TextPosition)'/>` +
+        `<Cell N='TxtPinY' V='${ctrlY}' F='SETATREF(Controls.TextPosition.Y)'/>` +
+        `<Cell N='TxtWidth' V='${labelW}' F='MAX(TEXTWIDTH(TheText),5*Char.Size)'/>` +
+        `<Cell N='TxtHeight' V='0.2' F='TEXTHEIGHT(TheText,TxtWidth)'/>` +
+        `<Cell N='TxtLocPinX' V='${labelW / 2}' F='TxtWidth*0.5'/>` +
+        `<Cell N='TxtLocPinY' V='0.1' F='TxtHeight*0.5'/>` +
+        `<Cell N='TxtAngle' V='0'/>`;
+    }
 
     shapes.push(
       `<Shape ID='${shapeId}' NameU='${esc(conn.label || conn.type)}' Type='Shape' Master='${mapping.masterId}'>` +
