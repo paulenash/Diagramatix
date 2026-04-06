@@ -7,6 +7,8 @@
 import JSZip from "jszip";
 import type { DiagramData } from "../types";
 import { getElementMappingV2, getConnectorMappingV2 } from "./visioMasterMapV2";
+import { DEFAULT_SYMBOL_COLORS, BW_SYMBOL_COLORS } from "../colors";
+import type { SymbolType } from "../types";
 
 const VISIO_NS = "http://schemas.microsoft.com/office/visio/2012/main";
 const REL_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
@@ -14,6 +16,14 @@ const REL_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationsh
 function esc(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;").replace(/'/g, "&apos;");
+}
+
+/** Convert hex color like "#fef9c3" to Visio GUARD(RGB(r,g,b)) cell value */
+function hexToVisioRgb(hex: string): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `GUARD(RGB(${r},${g},${b}))`;
 }
 
 interface Bounds { minX: number; minY: number; maxX: number; maxY: number }
@@ -38,7 +48,8 @@ export async function exportVisioV2(
   data: DiagramData,
   diagramName: string,
   stencilBuffer: ArrayBuffer,
-  templateBuffer: ArrayBuffer
+  templateBuffer: ArrayBuffer,
+  displayMode: string = "normal"
 ): Promise<Uint8Array> {
   const base = await JSZip.loadAsync(templateBuffer);
   const bpmnM = await JSZip.loadAsync(stencilBuffer);
@@ -160,6 +171,17 @@ export async function exportVisioV2(
   const connFontIn = connFontPx / 96;
   const elCharSection = `<Section N='Character' IX='0'><Row IX='0'><Cell N='Size' V='${elFontIn}'/></Row></Section>`;
   const connCharSection = `<Section N='Character' IX='0'><Row IX='0'><Cell N='Size' V='${connFontIn}'/></Row></Section>`;
+
+  // Color mode: "hand-drawn" = B&W, otherwise use Diagramatix default colours.
+  // GUARD(RGB()) prevents Visio theme from overriding our fill colours.
+  const isColor = displayMode !== "hand-drawn";
+  const colorMap = isColor ? DEFAULT_SYMBOL_COLORS : BW_SYMBOL_COLORS;
+  function fillCells(elType: string): string {
+    const hex = (colorMap as Record<string, string>)[elType];
+    if (!hex || !isColor) return ""; // B&W: no fill override, use master default (white/themed)
+    return `<Cell N='FillForegnd' V='${hex}' F='${hexToVisioRgb(hex)}'/>` +
+      `<Cell N='FillPattern' V='1' F='GUARD(1)'/>`;
+  }
 
   const shapes: string[] = [];
   const connects: string[] = [];
@@ -343,6 +365,20 @@ export async function exportVisioV2(
             `N='BpmnPoolName'><Cell N='Value' V='${esc(poolLabel)}'`
           );
 
+          // Apply colour to the header sidebar (Shape 8).
+          // Shape 8's FillForegnd is immediately after ResizeMode in that sub-shape.
+          // Replace from the last occurrence (Shape 8 is the last sub-shape).
+          if (isColor) {
+            const poolColor = (colorMap as Record<string, string>)[el.type] ?? "#e5e7eb";
+            // Find the last FillForegnd with THEMEVAL("FillColor") — that's Shape 8's
+            const lastFillIdx = poolMasterXml.lastIndexOf("N='FillForegnd' V='1' F='THEMEVAL(\"FillColor\",1)'");
+            if (lastFillIdx >= 0) {
+              const before = poolMasterXml.substring(0, lastFillIdx);
+              const after = poolMasterXml.substring(lastFillIdx + "N='FillForegnd' V='1' F='THEMEVAL(\"FillColor\",1)'".length);
+              poolMasterXml = before + `N='FillForegnd' V='${poolColor}' F='${hexToVisioRgb(poolColor)}'` + after;
+            }
+          }
+
           // Fix pool/lane header text fitting.
           // Shape 8's text runs along TxtWidth = pool Height (rotated sidebar).
           // Calculate the max font size that fits the label without wrapping.
@@ -418,6 +454,7 @@ export async function exportVisioV2(
       `<Shape ID='${shapeId}' NameU='${esc(el.label || el.type)}' Type='Group' Master='${mapping.masterId}'>` +
       `<Cell N='PinX' V='${cx}'/>` +
       `<Cell N='PinY' V='${cy}'/>` +
+      fillCells(el.type) +
       sizeCells +
       userSection +
       propSection +

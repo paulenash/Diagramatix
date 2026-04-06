@@ -28,8 +28,9 @@ export async function GET(request: Request) {
     const templateBuf = fs.readFileSync(templatePath);
 
     const data = diagram.data as any;
-    console.log("[visio-v2] Elements:", data.elements?.length, "Connectors:", data.connectors?.length);
-    const result = await exportVisioV2(data, diagram.name, stencilBuf.buffer, templateBuf.buffer);
+    const displayMode = (diagram as any).displayMode ?? "normal";
+    console.log("[visio-v2] Elements:", data.elements?.length, "Connectors:", data.connectors?.length, "Mode:", displayMode);
+    const result = await exportVisioV2(data, diagram.name, stencilBuf.buffer, templateBuf.buffer, displayMode);
     console.log("[visio-v2] Output size:", result.length, "bytes");
 
     return new NextResponse(result as any, {
