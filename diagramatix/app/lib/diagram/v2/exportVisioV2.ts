@@ -345,19 +345,22 @@ export async function exportVisioV2(
 
           // Fix pool/lane header text fitting.
           // Shape 8's text runs along TxtWidth = pool Height (rotated sidebar).
-          // The style default is 12pt font, but Diagramatix uses smaller fonts.
-          // Inject a Character section into Shape 8 to set the correct font size.
-          // Shape 8 ends with: </Section><Text>...\n</Text></Shape>
-          // Insert Character section before <Text>
+          // Calculate the max font size that fits the label without wrapping.
+          // TxtWidth (text run length) = pool height in inches = h.
+          // Average char width ≈ fontSize * 0.55 (proportional font).
+          // Need: labelLen * fontSize * 0.55 <= h, so fontSize <= h / (labelLen * 0.55).
+          // Cap at the diagram's element font size so it never gets larger than intended.
+          const maxFitFontIn = poolLabel.length > 0 ? h / (poolLabel.length * 0.6) : elFontIn;
+          const headerFontIn = Math.min(elFontIn, maxFitFontIn);
           const charSectionForHeader = `<Section N='Character' IX='0'><Row IX='0'>` +
-            `<Cell N='Size' V='${elFontIn}'/>` +
+            `<Cell N='Size' V='${headerFontIn}'/>` +
             `</Row></Section>`;
           poolMasterXml = poolMasterXml.replace(
             /<Text>([^<]*)<\/Text><\/Shape><\/Shapes><\/Shape>/,
             `${charSectionForHeader}<Text>$1</Text></Shape></Shapes></Shape>`
           );
 
-          console.log(`[v2] Pool per-instance master: w=${w}, h=${h}, header=${headerMm}mm, name=${poolLabel}`);
+          console.log(`[v2] Pool per-instance master: w=${w}, h=${h}, name=${poolLabel}`);
 
           // Write as new master file
           const poolInstanceId = 200 + shapeId;
@@ -463,23 +466,9 @@ export async function exportVisioV2(
 
     const textEl = conn.label ? `<Text>${esc(conn.label)}</Text>` : "";
 
-    // Label positioning: TxtPinX/Y position the text block relative to the shape's
-    // local coordinates. Use Width*0.5/Height*0.5 + offset formulas so text moves
-    // with the connector but can also be dragged by the user.
+    // Connector label: no TxtPin overrides — let the master's default text block
+    // handle positioning (text at midpoint, attached to label pin, user-draggable).
     let txtCells = "";
-    if (conn.label) {
-      const labelW = (conn.labelWidth ?? 80) / 96;
-      const labelH = 0.2;
-      const offX = (conn.labelOffsetX ?? 0) / 96;
-      const offY = -(conn.labelOffsetY ?? 0) / 96; // Y inverted
-      txtCells =
-        `<Cell N='TxtPinX' V='${dx / 2 + offX}' F='Width*0.5+${offX}'/>` +
-        `<Cell N='TxtPinY' V='${dy / 2 + offY}' F='Height*0.5+${offY}'/>` +
-        `<Cell N='TxtWidth' V='${labelW}'/>` +
-        `<Cell N='TxtHeight' V='${labelH}' F='TEXTHEIGHT(TheText,TxtWidth)'/>` +
-        `<Cell N='TxtLocPinX' V='${labelW / 2}' F='TxtWidth*0.5'/>` +
-        `<Cell N='TxtLocPinY' V='${labelH / 2}' F='TxtHeight*0.5'/>`;
-    }
 
     shapes.push(
       `<Shape ID='${shapeId}' NameU='${esc(conn.label || conn.type)}' Type='Shape' Master='${mapping.masterId}'>` +
