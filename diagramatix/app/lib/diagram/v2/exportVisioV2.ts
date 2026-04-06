@@ -294,6 +294,14 @@ export async function exportVisioV2(
           poolMasterXml = poolMasterXml.split('1.968503924805349').join(String(hw));
           poolMasterXml = poolMasterXml.split('1.968503920581397').join(String(hh));
 
+          // Enable resize handles — the master has NoObjHandles='1' which hides them.
+          // Visio's CFF container addon normally manages resizing, but our export
+          // doesn't trigger it, so we enable standard handles instead.
+          poolMasterXml = poolMasterXml.replace(
+            "N='NoObjHandles' V='1'",
+            "N='NoObjHandles' V='0'"
+          );
+
           // Add F='w*25.4MM' formula on root Width/Height (matches Visio's per-instance format)
           poolMasterXml = poolMasterXml.replace(
             `N='Width' V='${w}' U='MM'/>`,
