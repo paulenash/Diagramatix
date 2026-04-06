@@ -146,16 +146,16 @@ export async function exportVisioV2(
     let masterContent = await bpmnM.file("visio/masters/" + info.file)?.async("string");
     if (!masterContent) { console.log(`[v2] Master file ${info.file} not found`); continue; }
 
-    // Inject fill colour into the root shape's FillForegnd.
+    // Inject fill colour into ALL white-fill FillForegnd cells.
     // BPMN_M masters use GUARD() which prevents page-level overrides,
-    // so we must modify the master XML itself.
+    // so we modify the master XML. Replace V='1' (white) fills with our colour.
+    // V='0' (black/line colour) fills are left unchanged.
     const elType = masterColorMap[entry.newId];
     if (isColor && elType) {
       const hex = colorMap[elType];
       if (hex) {
-        // Replace the FIRST FillForegnd (root shape's) with our colour
         masterContent = masterContent.replace(
-          /N='FillForegnd' V='[^']*' F='[^']*'/,
+          /N='FillForegnd' V='1' F='[^']*'/g,
           `N='FillForegnd' V='${hex}' F='${hexToVisioRgb(hex)}'`
         );
       }
@@ -192,37 +192,31 @@ export async function exportVisioV2(
   // not our added BPMN_M masters. Visio will use masters.xml instead.
   zip.remove("visio/pages/_rels/page1.xml.rels");
 
-  // Inject fill colours into template masters (Task, Subprocess).
-  // These use THEMEVAL which CAN be overridden, but for consistency
-  // we modify the master XML to use GUARD(RGB()) like BPMN_M masters.
+  // Inject fill colours into template masters (Task=9, Subprocess=33).
+  // Dynamically find master files via rels, then replace white fills.
   if (isColor) {
-    const templateColorMap: Record<string, string> = {
-      "master9.xml": colorMap["task"] ?? "",       // Task
-      "master12.xml": colorMap["subprocess"] ?? "", // Collapsed Sub-Process (master ID 33)
-    };
-
-    // Find which file corresponds to master 33 (Collapsed Sub-Process)
     const tRels = await base.file("visio/masters/_rels/masters.xml.rels")!.async("string");
     const tMasters = await base.file("visio/masters/masters.xml")!.async("string");
-    const m33 = tMasters.match(/<Master\s+ID='33'[\s\S]*?<\/Master>/);
-    if (m33) {
-      const m33Rel = m33[0].match(/<Rel\s+r:id='(rId\d+)'/);
-      if (m33Rel) {
-        const m33File = tRels.match(new RegExp(`Id=["']${m33Rel[1]}["'][^>]*Target=["']([^"']*)["']`));
-        if (m33File) templateColorMap[m33File[1]] = colorMap["subprocess"] ?? "";
-      }
-    }
-
-    for (const [file, hex] of Object.entries(templateColorMap)) {
+    const templateMasterColors: Array<{ id: number; elType: string }> = [
+      { id: 9, elType: "task" },
+      { id: 33, elType: "subprocess" },
+    ];
+    for (const { id, elType } of templateMasterColors) {
+      const hex = colorMap[elType];
       if (!hex) continue;
-      const existing = await zip.file("visio/masters/" + file)?.async("string");
+      const mBlock = tMasters.match(new RegExp(`<Master\\s+ID='${id}'[\\s\\S]*?</Master>`));
+      if (!mBlock) continue;
+      const mRel = mBlock[0].match(/<Rel\s+r:id='(rId\d+)'/);
+      if (!mRel) continue;
+      const mFile = tRels.match(new RegExp(`Id=["']${mRel[1]}["'][^>]*Target=["']([^"']*)["']`));
+      if (!mFile) continue;
+      const existing = await zip.file("visio/masters/" + mFile[1])?.async("string");
       if (!existing) continue;
-      // Replace FIRST FillForegnd with our colour
       const modified = existing.replace(
-        /N='FillForegnd' V='[^']*' F='[^']*'/,
+        /N='FillForegnd' V='1' F='[^']*'/g,
         `N='FillForegnd' V='${hex}' F='${hexToVisioRgb(hex)}'`
       );
-      zip.file("visio/masters/" + file, modified);
+      zip.file("visio/masters/" + mFile[1], modified);
     }
   }
 
