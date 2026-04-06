@@ -272,35 +272,23 @@ export async function exportVisioV2(
         if (poolFileMatch) {
           let poolMasterXml = await base.file("visio/masters/" + poolFileMatch[1])!.async("string");
 
-          // Replace root Shape 5's Width/Height — the original has NO formula,
-          // but Visio adds one as '{value}*25.4MM' when creating per-instance masters.
-          // Match: <Cell N='Width' V='...' U='MM'/> (no F= attribute)
-          poolMasterXml = poolMasterXml.replace(
-            "<Cell N='Width' V='4.921259842519685' U='MM'/>",
-            `<Cell N='Width' V='${w}' U='MM' F='${w}*25.4MM'/>`
-          );
-          poolMasterXml = poolMasterXml.replace(
-            "<Cell N='Height' V='1.181102362204724' U='MM'/>",
-            `<Cell N='Height' V='${h}' U='MM' F='${h}*25.4MM'/>`
-          );
-          // Update LocPinX/Y values (they have F='Width*0.5')
-          poolMasterXml = poolMasterXml.replace(
-            "N='LocPinX' V='2.460629921259843'",
-            `N='LocPinX' V='${hw}'`
-          );
-          poolMasterXml = poolMasterXml.replace(
-            "N='LocPinY' V='0.5905511811023622'",
-            `N='LocPinY' V='${hh}'`
-          );
-          // Update PinX/PinY
-          poolMasterXml = poolMasterXml.replace(
-            "N='PinX' V='1.968503924805349'",
-            `N='PinX' V='${hw + 1}'`
-          );
-          poolMasterXml = poolMasterXml.replace(
-            "N='PinY' V='1.968503920581397'",
-            `N='PinY' V='${hh + 1}'`
-          );
+          // Global replace ALL occurrences of old dimension values with new ones.
+          // This updates every stored value in root shape AND all sub-shapes.
+          // The formulas stay intact — only the cached V= values change.
+          const oldW = '4.921259842519685';
+          const oldH = '1.181102362204724';
+          const oldHW = '2.460629921259843'; // old Width/2
+          const oldHH = '0.5905511811023622'; // old Height/2
+
+          poolMasterXml = poolMasterXml.split(oldW).join(String(w));
+          poolMasterXml = poolMasterXml.split(oldH).join(String(h));
+          poolMasterXml = poolMasterXml.split(oldHW).join(String(hw));
+          poolMasterXml = poolMasterXml.split(oldHH).join(String(hh));
+          // Update PinX/PinY (center of master page)
+          poolMasterXml = poolMasterXml.split('1.968503924805349').join(String(hw + 1));
+          poolMasterXml = poolMasterXml.split('1.968503920581397').join(String(hh + 1));
+
+          console.log(`[v2] Pool master: global replace w=${w}, h=${h}`);
 
           // Write as new master file
           const poolInstanceId = 200 + shapeId;
