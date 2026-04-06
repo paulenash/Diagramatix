@@ -94,10 +94,13 @@ export async function exportVisioV2(
   let contentTypes = await base.file("[Content_Types].xml")!.async("string");
 
   // Masters to add from BPMN_M (original ID → new ID in our file)
+  // Note: Template "Start Event" (8) and "End Event" (15) are Phase markers,
+  // not BPMN events. We import the real BPMN events from BPMN_M.
   const mastersToAdd: Array<{ origId: number; newId: number; name: string }> = [
     { origId: 4,  newId: 104, name: "Gateway" },
     { origId: 5,  newId: 105, name: "Intermediate Event" },
-    { origId: 6,  newId: 106, name: "End Event BPMN" },
+    { origId: 6,  newId: 106, name: "End Event" },
+    { origId: 7,  newId: 107, name: "Start Event" },
     { origId: 10, newId: 110, name: "Text Annotation" },
     { origId: 11, newId: 111, name: "Sequence Flow" },
     { origId: 12, newId: 112, name: "Association" },
@@ -330,7 +333,22 @@ export async function exportVisioV2(
             `N='BpmnPoolName'><Cell N='Value' V='${esc(poolLabel)}'`
           );
 
-          console.log(`[v2] Pool per-instance master: w=${w}, h=${h}, name=${poolLabel}`);
+          // Widen header sidebar to fit pool/lane name text.
+          // Shape 8's Height = header width (rotated 90°). Default: 12MM*DropOnPageScale.
+          // Estimate needed width: ~2.5mm per character + 4mm padding, minimum 12mm.
+          const headerMm = Math.max(12, poolLabel.length * 2.5 + 4);
+          poolMasterXml = poolMasterXml.replace(
+            "F='12MM*DropOnPageScale'",
+            `F='${headerMm}MM*DropOnPageScale'`
+          );
+          // Also update the cached V= value for the header Height
+          const headerCachedV = headerMm * 0.03937007874;  // mm to inches (master units)
+          poolMasterXml = poolMasterXml.replace(
+            "N='Height' V='0.4724409448818898' U='MM' F=",
+            `N='Height' V='${headerCachedV}' U='MM' F=`
+          );
+
+          console.log(`[v2] Pool per-instance master: w=${w}, h=${h}, header=${headerMm}mm, name=${poolLabel}`);
 
           // Write as new master file
           const poolInstanceId = 200 + shapeId;
@@ -434,6 +452,25 @@ export async function exportVisioV2(
 
     const textEl = conn.label ? `<Text>${esc(conn.label)}</Text>` : "";
 
+    // Label positioning: labelOffsetX/Y are pixel offsets from connector midpoint.
+    // Convert to Visio TxtPinX/TxtPinY (relative to shape's local coordinate system).
+    // The shape's origin is at BeginX,BeginY; LocPinX/Y is the midpoint offset.
+    let txtCells = "";
+    if (conn.label) {
+      const labelW = (conn.labelWidth ?? 80) / 96;
+      const labelH = 0.2; // approximate single-line height in inches
+      // labelOffset is from connector midpoint in pixels; convert to inches from shape origin
+      const txtX = dx / 2 + (conn.labelOffsetX ?? 0) / 96;
+      const txtY = dy / 2 - (conn.labelOffsetY ?? 0) / 96; // Y inverted
+      txtCells =
+        `<Cell N='TxtPinX' V='${txtX}'/>` +
+        `<Cell N='TxtPinY' V='${txtY}'/>` +
+        `<Cell N='TxtWidth' V='${labelW}'/>` +
+        `<Cell N='TxtHeight' V='${labelH}'/>` +
+        `<Cell N='TxtLocPinX' V='${labelW / 2}'/>` +
+        `<Cell N='TxtLocPinY' V='${labelH / 2}'/>`;
+    }
+
     shapes.push(
       `<Shape ID='${shapeId}' NameU='${esc(conn.label || conn.type)}' Type='Shape' Master='${mapping.masterId}'>` +
       `<Cell N='PinX' V='${(bx + ex) / 2}' F='GUARD((BeginX+EndX)/2)'/>` +
@@ -456,6 +493,7 @@ export async function exportVisioV2(
       `<Cell N='BegTrigger' V='2' F='_XFTRIGGER(Sheet.${srcShapeId}!EventXFMod)'/>` +
       `<Cell N='EndTrigger' V='2' F='_XFTRIGGER(Sheet.${tgtShapeId}!EventXFMod)'/>` +
       `<Cell N='ConFixedCode' V='6'/>` +
+      txtCells +
       `<Section N='Geometry' IX='0'>` +
       `<Cell N='NoFill' V='1'/><Cell N='NoLine' V='0'/><Cell N='NoShow' V='0'/><Cell N='NoSnap' V='0'/>` +
       geomRows +

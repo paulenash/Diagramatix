@@ -10,15 +10,17 @@ interface MasterMapping {
 }
 
 // Template masters (original) + BPMN_M masters (added with IDs 100+)
+// Note: Template "Start Event" (8) and "End Event" (15) are Phase markers,
+// NOT BPMN events. Use BPMN_M Start Event (7→107) and End Event (6→106) instead.
 const MASTER = {
   // From template
   TASK: 9,
-  START_EVENT: 8,
-  END_EVENT: 15,
   COLLAPSED_SUBPROCESS: 33,
   POOL_LANE: 19,
   MESSAGE_FLOW: 24,
   // From BPMN_M (added to template with new IDs)
+  START_EVENT: 107,
+  END_EVENT: 106,
   GATEWAY: 104,
   INTERMEDIATE_EVENT: 105,
   SEQUENCE_FLOW: 111,
