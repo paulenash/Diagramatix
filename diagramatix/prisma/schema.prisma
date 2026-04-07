@@ -86,11 +86,9 @@ model Project {
   folderTree  Json      @default("{}")
   userId      String
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  // Org scoping — nullable during Phase 0 backfill, tightened to NOT NULL
-  // in a follow-up schema diff once scripts/backfill-orgs.ts has been run
-  // and verified.
-  orgId       String?
-  org         Org?      @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  // Org scoping — required after Phase 0 backfill (scripts/backfill-orgs.ts).
+  orgId       String
+  org         Org       @relation(fields: [orgId], references: [id], onDelete: Restrict)
   diagrams    Diagram[]
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -110,9 +108,9 @@ model Diagram {
   projectId   String?
   project     Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
   // Denormalised from Project for query performance — kept in sync by the
-  // application layer. Nullable during Phase 0 backfill.
-  orgId       String?
-  org         Org?     @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  // application layer. Required after Phase 0 backfill.
+  orgId       String
+  org         Org      @relation(fields: [orgId], references: [id], onDelete: Restrict)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
