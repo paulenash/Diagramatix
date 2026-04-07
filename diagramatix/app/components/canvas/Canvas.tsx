@@ -1306,16 +1306,27 @@ export function Canvas({
         .map(el => ({ el, dist: proposedLength(el) }))
         .sort((a, b) => a.dist - b.dist);
 
-      // Pre-pass 1: proximity override
-      if (leftCandidates.length >= 2) {
-        const [first, second] = leftCandidates;
-        if (first.dist < second.dist / 4) {
+      // Pre-pass 1: proximity override.
+      // "Very near" means the proposed connector is short relative to the
+      // new element's size. If the nearest left candidate's connector is
+      // shorter than the smaller of the new element's dimensions, use it
+      // directly. This guarantees that placing an element right next to an
+      // existing one always wires straight to it, regardless of any decision
+      // gateway preference.
+      // Additionally, when there are multiple candidates, the nearest also
+      // wins if it is < 1/4 the length of the second-nearest.
+      if (leftCandidates.length >= 1) {
+        const first = leftCandidates[0];
+        const proximityThreshold = Math.min(newW, newH);
+        if (first.dist < proximityThreshold) {
           return buildResult(first.el);
         }
-      } else if (leftCandidates.length === 1) {
-        // Only one candidate — proximity override trivially applies if there's
-        // nothing else to compete; let the normal cases handle this so we don't
-        // pre-empt other rules.
+        if (leftCandidates.length >= 2) {
+          const second = leftCandidates[1];
+          if (first.dist < second.dist / 4) {
+            return buildResult(first.el);
+          }
+        }
       }
 
       // Pre-pass 2: decision-gateway precedence
