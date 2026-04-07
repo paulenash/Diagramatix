@@ -1268,6 +1268,48 @@ export function Canvas({
     const candidates = data.elements.filter(e => AUTO_CONNECT_TYPES.has(e.type));
     const newRight = newX + newW;
     const newBottom = newY + newH;
+    const newCx = newX + newW / 2;
+    const newCy = newY + newH / 2;
+
+    // Pre-pass: if a DECISION gateway is to the left of the new element AND
+    // is the 1st or 2nd closest (centre-to-centre) of all left candidates,
+    // it always takes precedence.
+    {
+      const leftCandidates = candidates
+        .filter(el => el.x + el.width <= newX)
+        .map(el => ({
+          el,
+          dist: Math.hypot(
+            (el.x + el.width / 2) - newCx,
+            (el.y + el.height / 2) - newCy
+          ),
+        }))
+        .sort((a, b) => a.dist - b.dist);
+      const top2 = leftCandidates.slice(0, 2);
+      const decisionGw = top2.find(c =>
+        c.el.type === "gateway" &&
+        ((c.el.properties?.gatewayRole as string | undefined) ?? "decision") === "decision"
+      );
+      if (decisionGw) {
+        const src = decisionGw.el;
+        const srcCy = src.y + src.height / 2;
+        const srcRight = src.x + src.width;
+        const vOverlap = Math.min(src.y + src.height, newBottom) - Math.max(src.y, newY);
+        // Choose appropriate sides:
+        //   - vertical overlap → right→left
+        //   - new above/below diagonally → top/bottom→left
+        let srcSide: Side; let tgtSide: Side;
+        if (vOverlap > 0) {
+          srcSide = "right"; tgtSide = "left";
+        } else {
+          srcSide = newCy < srcCy ? "top" : "bottom";
+          tgtSide = "left";
+        }
+        // Suppress unused-variable warning for srcRight
+        void srcRight;
+        return { source: src, srcSide, tgtSide };
+      }
+    }
 
     // Case A: nearest LEFT element where new is diagonally above/below
     // (no horizontal overlap AND no vertical overlap with the source).
