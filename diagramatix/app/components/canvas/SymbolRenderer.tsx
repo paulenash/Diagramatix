@@ -1644,7 +1644,7 @@ export function SymbolRenderer({
         element.type === 'lane' ||
         element.type === 'uml-class' ||
         element.type === 'uml-enumeration'
-      ) && (
+      ) && !(element.type === 'gateway' && (element.properties.gatewayRole as string | undefined) === 'merge') && (
         <text
           x={labelInfo.x}
           y={labelInfo.y}
