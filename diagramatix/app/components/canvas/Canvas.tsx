@@ -1254,10 +1254,10 @@ export function Canvas({
 
   // BPMN auto-connect: find the best existing element to connect to a newly placed
   // element, plus which sides to use. Returns null if no suitable source found.
-  // Priority order:
-  //   A) Nearest element strictly to the LEFT with vertical overlap → right→left
+  // Priority order (checked A → B → C):
+  //   A) Nearest element strictly to the LEFT (no vertical overlap, diagonal) → top/bottom→left
   //   B) Nearest element strictly ABOVE/BELOW with horizontal overlap → bottom→top or top→bottom
-  //   C) Nearest element strictly to the LEFT (no vertical overlap) → top/bottom→left
+  //   C) Nearest element strictly to the LEFT with vertical overlap → right→left
   function findAutoConnectSource(
     newX: number, newY: number, newW: number, newH: number
   ): { source: DiagramElement; srcSide: Side; tgtSide: Side } | null {
@@ -1269,55 +1269,7 @@ export function Canvas({
     const newRight = newX + newW;
     const newBottom = newY + newH;
 
-    // Case A: nearest LEFT with vertical (y) overlap.
-    // If the 2nd-nearest is a gateway, prefer it over the 1st-nearest.
-    {
-      const matches: Array<{ el: DiagramElement; right: number }> = [];
-      for (const el of candidates) {
-        const elRight = el.x + el.width;
-        if (elRight > newX) continue;
-        const overlapTop = Math.max(el.y, newY);
-        const overlapBottom = Math.min(el.y + el.height, newBottom);
-        if (overlapBottom <= overlapTop) continue;
-        matches.push({ el, right: elRight });
-      }
-      if (matches.length > 0) {
-        matches.sort((a, b) => b.right - a.right); // nearest (largest right) first
-        let chosen = matches[0].el;
-        if (matches.length >= 2 && matches[1].el.type === "gateway") chosen = matches[1].el;
-        return { source: chosen, srcSide: "right", tgtSide: "left" };
-      }
-    }
-
-    // Case B: nearest ABOVE/BELOW with horizontal (x) overlap
-    {
-      let best: DiagramElement | null = null;
-      let bestGap = Infinity;
-      let bestSrcSide: Side = "bottom";
-      let bestTgtSide: Side = "top";
-      for (const el of candidates) {
-        const elBottom = el.y + el.height;
-        const overlapLeft = Math.max(el.x, newX);
-        const overlapRight = Math.min(el.x + el.width, newRight);
-        if (overlapRight <= overlapLeft) continue;
-        let gap: number; let srcSide: Side; let tgtSide: Side;
-        if (elBottom <= newY) {
-          // existing is above new
-          gap = newY - elBottom;
-          srcSide = "bottom"; tgtSide = "top";
-        } else if (newBottom <= el.y) {
-          // existing is below new
-          gap = el.y - newBottom;
-          srcSide = "top"; tgtSide = "bottom";
-        } else {
-          continue; // overlapping vertically — handled by Case A
-        }
-        if (gap < bestGap) { bestGap = gap; best = el; bestSrcSide = srcSide; bestTgtSide = tgtSide; }
-      }
-      if (best) return { source: best, srcSide: bestSrcSide, tgtSide: bestTgtSide };
-    }
-
-    // Case C: nearest LEFT element where new is diagonally above/below
+    // Case A: nearest LEFT element where new is diagonally above/below
     // (no horizontal overlap AND no vertical overlap with the source).
     // If the 2nd-nearest is a gateway, prefer it.
     {
@@ -1340,6 +1292,52 @@ export function Canvas({
         const newCy = newY + newH / 2;
         const srcSide: Side = newCy < srcCy ? "top" : "bottom";
         return { source: chosen, srcSide, tgtSide: "left" };
+      }
+    }
+
+    // Case B: nearest ABOVE/BELOW with horizontal (x) overlap
+    {
+      let best: DiagramElement | null = null;
+      let bestGap = Infinity;
+      let bestSrcSide: Side = "bottom";
+      let bestTgtSide: Side = "top";
+      for (const el of candidates) {
+        const elBottom = el.y + el.height;
+        const overlapLeft = Math.max(el.x, newX);
+        const overlapRight = Math.min(el.x + el.width, newRight);
+        if (overlapRight <= overlapLeft) continue;
+        let gap: number; let srcSide: Side; let tgtSide: Side;
+        if (elBottom <= newY) {
+          gap = newY - elBottom;
+          srcSide = "bottom"; tgtSide = "top";
+        } else if (newBottom <= el.y) {
+          gap = el.y - newBottom;
+          srcSide = "top"; tgtSide = "bottom";
+        } else {
+          continue; // vertically overlapping — handled by Case C
+        }
+        if (gap < bestGap) { bestGap = gap; best = el; bestSrcSide = srcSide; bestTgtSide = tgtSide; }
+      }
+      if (best) return { source: best, srcSide: bestSrcSide, tgtSide: bestTgtSide };
+    }
+
+    // Case C: nearest LEFT with vertical (y) overlap.
+    // If the 2nd-nearest is a gateway, prefer it.
+    {
+      const matches: Array<{ el: DiagramElement; right: number }> = [];
+      for (const el of candidates) {
+        const elRight = el.x + el.width;
+        if (elRight > newX) continue;
+        const overlapTop = Math.max(el.y, newY);
+        const overlapBottom = Math.min(el.y + el.height, newBottom);
+        if (overlapBottom <= overlapTop) continue;
+        matches.push({ el, right: elRight });
+      }
+      if (matches.length > 0) {
+        matches.sort((a, b) => b.right - a.right);
+        let chosen = matches[0].el;
+        if (matches.length >= 2 && matches[1].el.type === "gateway") chosen = matches[1].el;
+        return { source: chosen, srcSide: "right", tgtSide: "left" };
       }
     }
 
