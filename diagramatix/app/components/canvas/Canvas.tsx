@@ -1252,34 +1252,112 @@ export function Canvas({
     setZoom(newZoom);
   }
 
-  // BPMN auto-connect: find the nearest element to the LEFT of (newX, newY, newW, newH)
-  // that vertically overlaps the new element. Returns the source element id or null.
+  // BPMN auto-connect: find the best existing element to connect to a newly placed
+  // element, plus which sides to use. Returns null if no suitable source found.
+  // Priority order:
+  //   A) Nearest element strictly to the LEFT with vertical overlap → right→left
+  //   B) Nearest element strictly ABOVE/BELOW with horizontal overlap → bottom→top or top→bottom
+  //   C) Nearest element strictly to the LEFT (no vertical overlap) → top/bottom→left
   function findAutoConnectSource(
     newX: number, newY: number, newW: number, newH: number
-  ): DiagramElement | null {
+  ): { source: DiagramElement; srcSide: Side; tgtSide: Side } | null {
     const AUTO_CONNECT_TYPES = new Set<SymbolType>([
       "task", "subprocess", "subprocess-expanded", "gateway",
       "start-event", "intermediate-event", "end-event",
     ]);
-    let best: DiagramElement | null = null;
-    let bestRight = -Infinity;
-    for (const el of data.elements) {
-      if (!AUTO_CONNECT_TYPES.has(el.type)) continue;
-      const elRight = el.x + el.width;
-      if (elRight > newX) continue; // not strictly to the left
-      // Vertical overlap check
-      const overlapTop = Math.max(el.y, newY);
-      const overlapBottom = Math.min(el.y + el.height, newY + newH);
-      if (overlapBottom <= overlapTop) continue;
-      if (elRight > bestRight) { bestRight = elRight; best = el; }
+    const candidates = data.elements.filter(e => AUTO_CONNECT_TYPES.has(e.type));
+    const newRight = newX + newW;
+    const newBottom = newY + newH;
+
+    // Case A: nearest LEFT with vertical (y) overlap
+    {
+      let best: DiagramElement | null = null;
+      let bestRight = -Infinity;
+      for (const el of candidates) {
+        const elRight = el.x + el.width;
+        if (elRight > newX) continue;
+        const overlapTop = Math.max(el.y, newY);
+        const overlapBottom = Math.min(el.y + el.height, newBottom);
+        if (overlapBottom <= overlapTop) continue;
+        if (elRight > bestRight) { bestRight = elRight; best = el; }
+      }
+      if (best) return { source: best, srcSide: "right", tgtSide: "left" };
     }
-    return best;
+
+    // Case B: nearest ABOVE/BELOW with horizontal (x) overlap
+    {
+      let best: DiagramElement | null = null;
+      let bestGap = Infinity;
+      let bestSrcSide: Side = "bottom";
+      let bestTgtSide: Side = "top";
+      for (const el of candidates) {
+        const elBottom = el.y + el.height;
+        const overlapLeft = Math.max(el.x, newX);
+        const overlapRight = Math.min(el.x + el.width, newRight);
+        if (overlapRight <= overlapLeft) continue;
+        let gap: number; let srcSide: Side; let tgtSide: Side;
+        if (elBottom <= newY) {
+          // existing is above new
+          gap = newY - elBottom;
+          srcSide = "bottom"; tgtSide = "top";
+        } else if (newBottom <= el.y) {
+          // existing is below new
+          gap = el.y - newBottom;
+          srcSide = "top"; tgtSide = "bottom";
+        } else {
+          continue; // overlapping vertically — handled by Case A
+        }
+        if (gap < bestGap) { bestGap = gap; best = el; bestSrcSide = srcSide; bestTgtSide = tgtSide; }
+      }
+      if (best) return { source: best, srcSide: bestSrcSide, tgtSide: bestTgtSide };
+    }
+
+    // Case C: nearest LEFT regardless of vertical overlap (diagonal placement)
+    {
+      let best: DiagramElement | null = null;
+      let bestRight = -Infinity;
+      for (const el of candidates) {
+        const elRight = el.x + el.width;
+        if (elRight > newX) continue;
+        if (elRight > bestRight) { bestRight = elRight; best = el; }
+      }
+      if (best) {
+        // New is above or below the source — choose top or bottom of source
+        const srcCy = best.y + best.height / 2;
+        const newCy = newY + newH / 2;
+        const srcSide: Side = newCy < srcCy ? "top" : "bottom";
+        return { source: best, srcSide, tgtSide: "left" };
+      }
+    }
+
+    return null;
   }
 
-  function startAutoConnect(sourceEl: DiagramElement, targetId: string, targetX: number, targetY: number, targetH: number) {
+  // Compute the (x,y) point on an element's side at offset 0.5 (middle).
+  function sideMidpoint(el: DiagramElement, side: Side): Point {
+    const cx = el.x + el.width / 2;
+    const cy = el.y + el.height / 2;
+    switch (side) {
+      case "left":   return { x: el.x,              y: cy };
+      case "right":  return { x: el.x + el.width,   y: cy };
+      case "top":    return { x: cx,                y: el.y };
+      case "bottom": return { x: cx,                y: el.y + el.height };
+    }
+  }
+
+  function startAutoConnect(
+    sourceEl: DiagramElement, targetId: string,
+    targetX: number, targetY: number, targetW: number, targetH: number,
+    srcSide: Side, tgtSide: Side
+  ) {
     autoConnectAbortRef.current = false;
-    const from = { x: sourceEl.x + sourceEl.width, y: sourceEl.y + sourceEl.height / 2 };
-    const to = { x: targetX, y: targetY + targetH / 2 };
+    const from = sideMidpoint(sourceEl, srcSide);
+    // Synthesize a target rect for midpoint calculation
+    const targetRect: DiagramElement = {
+      ...sourceEl, // structural fields don't matter for sideMidpoint
+      x: targetX, y: targetY, width: targetW, height: targetH,
+    } as DiagramElement;
+    const to = sideMidpoint(targetRect, tgtSide);
     let cycle = 0;
     const TOTAL_CYCLES = 6; // 3 flashes = 3 on + 3 off
     setAutoConnectFlash({ sourceId: sourceEl.id, targetId, from, to, visible: true });
@@ -1287,13 +1365,12 @@ export function Canvas({
       if (autoConnectAbortRef.current) { setAutoConnectFlash(null); return; }
       cycle++;
       if (cycle >= TOTAL_CYCLES) {
-        // Commit the connector
         setAutoConnectFlash(null);
         if (!autoConnectAbortRef.current) {
           onAddConnector(
             sourceEl.id, targetId,
             "sequence", defaultDirectionType, defaultRoutingType,
-            "right", "left", 0.5, 0.5
+            srcSide, tgtSide, 0.5, 0.5
           );
         }
         return;
@@ -1362,11 +1439,11 @@ export function Canvas({
       const def = getSymbolDefinition(symbolType);
       const newX = worldPos.x - def.defaultWidth / 2;
       const newY = worldPos.y - def.defaultHeight / 2;
-      const source = findAutoConnectSource(newX, newY, def.defaultWidth, def.defaultHeight);
-      if (source) {
+      const found = findAutoConnectSource(newX, newY, def.defaultWidth, def.defaultHeight);
+      if (found) {
         const newId = nanoid();
         onAddElement(symbolType, worldPos, taskType, eventType, newId);
-        startAutoConnect(source, newId, newX, newY, def.defaultHeight);
+        startAutoConnect(found.source, newId, newX, newY, def.defaultWidth, def.defaultHeight, found.srcSide, found.tgtSide);
         return;
       }
     }
