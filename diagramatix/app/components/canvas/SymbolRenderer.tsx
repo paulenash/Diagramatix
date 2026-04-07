@@ -1464,7 +1464,7 @@ export function SymbolRenderer({
         element.type === 'gateway'            ||
         element.type === 'data-object'        ||
         element.type === 'data-store'
-      ) ? (() => {
+      ) && !(element.type === 'gateway' && (element.properties.gatewayRole as string | undefined) === 'merge') ? (() => {
         const labelOffsetX = (element.properties.labelOffsetX as number) ?? 0;
         const labelOffsetY = (element.properties.labelOffsetY as number) ?? 7;
         const labelWidth   = (element.properties.labelWidth   as number) ?? 80;
