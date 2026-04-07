@@ -13,7 +13,7 @@ export const ALL_SYMBOLS: SymbolDefinition[] = [
     type: "task",
     label: "Task",
     defaultWidth: 102,
-    defaultHeight: 60,
+    defaultHeight: 65,
     description: "A work item or activity",
   },
   {

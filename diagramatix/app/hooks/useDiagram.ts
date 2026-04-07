@@ -2029,29 +2029,13 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       const elMap = new Map<string, DiagramElement>();
       for (const el of newElements) elMap.set(el.id, el);
 
-      // Helper: find the nearest pair of sides between two elements
-      function nearestSides(src: DiagramElement, tgt: DiagramElement): { sourceSide: Side; targetSide: Side } {
-        const sides: Side[] = ["top", "right", "bottom", "left"];
-        function midpoint(el: DiagramElement, side: Side): Point {
-          const cx = el.x + el.width / 2, cy = el.y + el.height / 2;
-          if (side === "top") return { x: cx, y: el.y };
-          if (side === "bottom") return { x: cx, y: el.y + el.height };
-          if (side === "left") return { x: el.x, y: cy };
-          return { x: el.x + el.width, y: cy };
-        }
-        let bestDist = Infinity, bestSrc: Side = "right", bestTgt: Side = "left";
-        for (const ss of sides) {
-          const sp = midpoint(src, ss);
-          for (const ts of sides) {
-            const tp = midpoint(tgt, ts);
-            const d = Math.hypot(sp.x - tp.x, sp.y - tp.y);
-            if (d < bestDist) { bestDist = d; bestSrc = ss; bestTgt = ts; }
-          }
-        }
-        return { sourceSide: bestSrc, targetSide: bestTgt };
-      }
-
-      // Re-route connectors between aligned elements with nearest connection points
+      // Re-route connectors between aligned elements.
+      //
+      // Sequence connectors (and any connector with existing waypoints) get a
+      // pure interpolated translation — never a recompute — so existing
+      // orthogonal segments stay orthogonal. Recomputing via computeWaypoints
+      // here can introduce diagonal segments after Align Centres Vertically /
+      // Horizontally, which the user does not want.
       const newConnectors = state.connectors.map((c) => {
         const srcInSet = idSet.has(c.sourceId);
         const tgtInSet = idSet.has(c.targetId);
@@ -2061,11 +2045,24 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         const tgtEl = elMap.get(c.targetId);
         if (!srcEl || !tgtEl) return c;
 
+        const dSrc = dxyMap.get(c.sourceId) ?? { dx: 0, dy: 0 };
+        const dTgt = dxyMap.get(c.targetId) ?? { dx: 0, dy: 0 };
+
         if (srcInSet && tgtInSet) {
-          // Both in selection — find nearest sides and recompute waypoints
-          const { sourceSide, targetSide } = nearestSides(srcEl, tgtEl);
-          const result = computeWaypoints(srcEl, tgtEl, newElements, sourceSide, targetSide, c.routingType);
-          return { ...c, sourceSide, targetSide, waypoints: result.waypoints };
+          // Both endpoints moved — translate each waypoint by linearly
+          // interpolating between dSrc (at index 0) and dTgt (at index n-1).
+          // This preserves the existing zig-zag/orthogonal pattern.
+          if (!c.waypoints || c.waypoints.length === 0) return c;
+          const n = c.waypoints.length;
+          return {
+            ...c,
+            waypoints: c.waypoints.map((wp, i) => {
+              const t = n > 1 ? i / (n - 1) : 0;
+              const dx = dSrc.dx * (1 - t) + dTgt.dx * t;
+              const dy = dSrc.dy * (1 - t) + dTgt.dy * t;
+              return { x: wp.x + dx, y: wp.y + dy };
+            }),
+          };
         }
 
         // Only one endpoint in selection — interpolate waypoint shift

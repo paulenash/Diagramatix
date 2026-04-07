@@ -18,9 +18,10 @@ interface Props {
 function PaletteSymbolPreview({ type, colorConfig }: { type: SymbolType; colorConfig?: SymbolColorConfig }) {
   switch (type) {
     case "task":
+      // Aspect ratio matches the default Task element: 102 × 65
       return (
-        <svg width={36} height={21} viewBox="0 0 48 28">
-          <rect x={2} y={2} width={44} height={24} rx={3} fill={resolveColor("task", colorConfig)} stroke="#374151" strokeWidth={1.5} />
+        <svg width={36} height={23} viewBox="0 0 48 31">
+          <rect x={2} y={2} width={44} height={27} rx={3} fill={resolveColor("task", colorConfig)} stroke="#374151" strokeWidth={1.5} />
         </svg>
       );
     case "subprocess":
