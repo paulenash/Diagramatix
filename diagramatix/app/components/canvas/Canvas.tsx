@@ -1278,17 +1278,7 @@ export function Canvas({
     // Pre-pass 2: DECISION-GATEWAY PRECEDENCE — if a decision gateway is
     // 1st or 2nd closest of all left candidates, it always takes precedence.
     {
-      const leftCandidates = candidates
-        .filter(el => el.x + el.width <= newX)
-        .map(el => ({
-          el,
-          dist: Math.hypot(
-            (el.x + el.width / 2) - newCx,
-            (el.y + el.height / 2) - newCy
-          ),
-        }))
-        .sort((a, b) => a.dist - b.dist);
-
+      // Compute proposed connector endpoints + length for each left candidate.
       const buildResult = (src: DiagramElement) => {
         const srcCy = src.y + src.height / 2;
         const vOverlap = Math.min(src.y + src.height, newBottom) - Math.max(src.y, newY);
@@ -1301,6 +1291,20 @@ export function Canvas({
         }
         return { source: src, srcSide, tgtSide };
       };
+
+      const proposedLength = (el: DiagramElement) => {
+        const r = buildResult(el);
+        const from = sideMidpoint(r.source, r.srcSide);
+        // Synthetic target rect for the new element
+        const targetRect = { ...el, x: newX, y: newY, width: newW, height: newH } as DiagramElement;
+        const to = sideMidpoint(targetRect, r.tgtSide);
+        return Math.hypot(to.x - from.x, to.y - from.y);
+      };
+
+      const leftCandidates = candidates
+        .filter(el => el.x + el.width <= newX)
+        .map(el => ({ el, dist: proposedLength(el) }))
+        .sort((a, b) => a.dist - b.dist);
 
       // Pre-pass 1: proximity override
       if (leftCandidates.length >= 2) {
