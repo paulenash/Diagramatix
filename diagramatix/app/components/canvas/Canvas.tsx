@@ -2733,17 +2733,17 @@ export function Canvas({
             }
             return (
               <g data-interactive>
-                <rect
-                  x={endpointHandles.source.x - 5} y={endpointHandles.source.y - 5}
-                  width={10} height={10}
+                <circle
+                  cx={endpointHandles.source.x} cy={endpointHandles.source.y}
+                  r={5.5}
                   fill={focusedEndpoint === "source" ? "#f59e0b" : "#2563eb"}
                   stroke="white" strokeWidth={1.5}
                   style={{ cursor: "pointer" }}
                   onMouseDown={makeEndpointHandler("source", endpointHandles.source)}
                 />
-                <rect
-                  x={endpointHandles.target.x - 5} y={endpointHandles.target.y - 5}
-                  width={10} height={10}
+                <circle
+                  cx={endpointHandles.target.x} cy={endpointHandles.target.y}
+                  r={5.5}
                   fill={focusedEndpoint === "target" ? "#f59e0b" : "#2563eb"}
                   stroke="white" strokeWidth={1.5}
                   style={{ cursor: "pointer" }}

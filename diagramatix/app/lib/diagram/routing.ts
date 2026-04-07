@@ -313,17 +313,30 @@ export function computeWaypoints(
   // Rectilinear: use offset-aware side points for perpendicular exit/entry
   const srcEdge = sidePoint(source, sourceSide, sourceOffsetAlong);
   const tgtEdge = sidePoint(target, targetSide, targetOffsetAlong);
+  // Sequence-flow obstacle set: only BPMN flow-node-like shapes act as
+  // obstacles. Edge-mounted (boundary) events are intentionally NOT obstacles
+  // so connectors can still attach to them.
+  const SEQ_OBSTACLE_TYPES = new Set<string>([
+    "task", "subprocess", "subprocess-expanded",
+    "start-event", "intermediate-event", "end-event",
+    "data-object", "data-store",
+  ]);
   const obstacles = allElements
     .filter((el) => {
       if (el.id === source.id || el.id === target.id) return false;
       // Don't treat boundary events on source or target as obstacles
       if (el.boundaryHostId === source.id || el.boundaryHostId === target.id) return false;
+      // Edge-mounted (boundary) events on ANY host are excluded so connectors
+      // can route to them without their host shape blocking the path.
+      if (el.boundaryHostId) return false;
       // Don't treat the target's parent subprocess-expanded as an obstacle
       if (target.parentId && el.id === target.parentId && el.type === "subprocess-expanded") return false;
       // Don't treat the source's parent subprocess-expanded as an obstacle
       if (source.parentId && el.id === source.parentId && el.type === "subprocess-expanded") return false;
       // Don't treat pools or lanes as obstacles (connectors route within them)
       if (el.type === "pool" || el.type === "lane") return false;
+      // Only the BPMN flow-node types listed above are obstacles for sequence flow.
+      if (!SEQ_OBSTACLE_TYPES.has(el.type)) return false;
       return true;
     })
     .map(getBounds);
@@ -703,11 +716,19 @@ export function recomputeAllConnectors(
           const appDy = candidate[ve].y - candidate[ve - 1].y;
           if ((tgtNorm.dx !== 0 && appDx * (-tgtNorm.dx) <= 0) || (tgtNorm.dy !== 0 && appDy * (-tgtNorm.dy) <= 0)) outwardOk = false;
         }
-        // Check if preserved interior routing passes through any obstacle
+        // Check if preserved interior routing passes through any obstacle.
+        // Same set as the main routing pass: only BPMN flow-node types are
+        // obstacles for sequence flow, and edge-mounted events are excluded.
+        const SEQ_OBS = new Set<string>([
+          "task", "subprocess", "subprocess-expanded",
+          "start-event", "intermediate-event", "end-event",
+          "data-object", "data-store",
+        ]);
         const obstacles = elements
           .filter(el => el.id !== source.id && el.id !== target.id
             && el.type !== "pool" && el.type !== "lane"
-            && el.boundaryHostId !== source.id && el.boundaryHostId !== target.id)
+            && !el.boundaryHostId
+            && SEQ_OBS.has(el.type))
           .map(getBounds);
         if (outwardOk && !pathHitsObstacles(candidate, obstacles)) {
           return { ...conn, waypoints: candidate };
