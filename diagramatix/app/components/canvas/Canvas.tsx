@@ -1291,13 +1291,18 @@ export function Canvas({
         ((c.el.properties?.gatewayRole as string | undefined) ?? "decision") === "decision"
       );
       if (decisionGw) {
-        const src = decisionGw.el;
+        // Proximity override: if the NEAREST candidate is not the decision gateway
+        // and its connector would be shorter than 1/3 of the decision gateway's
+        // connector, use the nearest instead (it's close enough to absolutely win).
+        const nearest = leftCandidates[0];
+        let src: DiagramElement;
+        if (nearest.el !== decisionGw.el && nearest.dist < decisionGw.dist / 3) {
+          src = nearest.el;
+        } else {
+          src = decisionGw.el;
+        }
         const srcCy = src.y + src.height / 2;
-        const srcRight = src.x + src.width;
         const vOverlap = Math.min(src.y + src.height, newBottom) - Math.max(src.y, newY);
-        // Choose appropriate sides:
-        //   - vertical overlap → right→left
-        //   - new above/below diagonally → top/bottom→left
         let srcSide: Side; let tgtSide: Side;
         if (vOverlap > 0) {
           srcSide = "right"; tgtSide = "left";
@@ -1305,8 +1310,6 @@ export function Canvas({
           srcSide = newCy < srcCy ? "top" : "bottom";
           tgtSide = "left";
         }
-        // Suppress unused-variable warning for srcRight
-        void srcRight;
         return { source: src, srcSide, tgtSide };
       }
     }
