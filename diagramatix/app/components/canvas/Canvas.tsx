@@ -1269,19 +1269,24 @@ export function Canvas({
     const newRight = newX + newW;
     const newBottom = newY + newH;
 
-    // Case A: nearest LEFT with vertical (y) overlap
+    // Case A: nearest LEFT with vertical (y) overlap.
+    // If the 2nd-nearest is a gateway, prefer it over the 1st-nearest.
     {
-      let best: DiagramElement | null = null;
-      let bestRight = -Infinity;
+      const matches: Array<{ el: DiagramElement; right: number }> = [];
       for (const el of candidates) {
         const elRight = el.x + el.width;
         if (elRight > newX) continue;
         const overlapTop = Math.max(el.y, newY);
         const overlapBottom = Math.min(el.y + el.height, newBottom);
         if (overlapBottom <= overlapTop) continue;
-        if (elRight > bestRight) { bestRight = elRight; best = el; }
+        matches.push({ el, right: elRight });
       }
-      if (best) return { source: best, srcSide: "right", tgtSide: "left" };
+      if (matches.length > 0) {
+        matches.sort((a, b) => b.right - a.right); // nearest (largest right) first
+        let chosen = matches[0].el;
+        if (matches.length >= 2 && matches[1].el.type === "gateway") chosen = matches[1].el;
+        return { source: chosen, srcSide: "right", tgtSide: "left" };
+      }
     }
 
     // Case B: nearest ABOVE/BELOW with horizontal (x) overlap
@@ -1314,28 +1319,27 @@ export function Canvas({
 
     // Case C: nearest LEFT element where new is diagonally above/below
     // (no horizontal overlap AND no vertical overlap with the source).
+    // If the 2nd-nearest is a gateway, prefer it.
     {
-      let best: DiagramElement | null = null;
-      let bestDist = Infinity;
+      const matches: Array<{ el: DiagramElement; dist: number }> = [];
       for (const el of candidates) {
         const elRight = el.x + el.width;
         const elBottom = el.y + el.height;
-        // Must be strictly to the left (no horizontal overlap)
         if (elRight > newX) continue;
-        // Must be strictly above or below (no vertical overlap)
         const vOverlap = Math.min(elBottom, newBottom) - Math.max(el.y, newY);
         if (vOverlap > 0) continue;
-        // Pick the closest element by Euclidean distance between nearest corners
         const dx = newX - elRight;
         const dy = newY < el.y ? el.y - newBottom : newY - elBottom;
-        const dist = Math.hypot(dx, dy);
-        if (dist < bestDist) { bestDist = dist; best = el; }
+        matches.push({ el, dist: Math.hypot(dx, dy) });
       }
-      if (best) {
-        const srcCy = best.y + best.height / 2;
+      if (matches.length > 0) {
+        matches.sort((a, b) => a.dist - b.dist);
+        let chosen = matches[0].el;
+        if (matches.length >= 2 && matches[1].el.type === "gateway") chosen = matches[1].el;
+        const srcCy = chosen.y + chosen.height / 2;
         const newCy = newY + newH / 2;
         const srcSide: Side = newCy < srcCy ? "top" : "bottom";
-        return { source: best, srcSide, tgtSide: "left" };
+        return { source: chosen, srcSide, tgtSide: "left" };
       }
     }
 
