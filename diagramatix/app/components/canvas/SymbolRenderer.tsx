@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, createContext, useContext } from "react";
+import { useState, useRef, createContext, useContext } from "react";
 import type { BpmnTaskType, GatewayType, EventType, DiagramElement, Point, Side, SymbolType } from "@/app/lib/diagram/types";
 import { type SymbolColorConfig, resolveColor } from "@/app/lib/diagram/colors";
 import { DisplayModeCtx, FontScaleCtx, sketchyFilter } from "@/app/lib/diagram/displayMode";
@@ -1286,6 +1286,9 @@ export function SymbolRenderer({
   // Clear label highlight when element is deselected
   if (!selected && labelHighlighted) setLabelHighlighted(false);
   let dragStart: { mouseX: number; mouseY: number; elX: number; elY: number } | null = null;
+  // Suppresses the next double-click event (used after a label-move drag so
+  // the OS double-click doesn't open the label editor).
+  const suppressNextDblClickRef = useRef(false);
 
   function handleMouseDown(e: React.MouseEvent) {
     // White-box pool: only the 30px header sidebar accepts interaction
@@ -1306,63 +1309,64 @@ export function SymbolRenderer({
     onSelect(e);
 
     // Task/Subprocess click model:
-    //   1. Click (not selected) → select only
-    //   2. Click again on already-selected → enter connection-creation mode
-    //   3. Click and hold (>= HOLD_MS) → cancel any pending connection mode,
-    //      enter label-move (element-drag) mode with grabbing cursor
-    //   4. Quick mouse-move during click → normal element drag
+    //   1. Click on element body (not selected) → select only
+    //   2. Click on element body (already selected) → enter connection-creation mode
+    //   3. Click on the LABEL TEXT itself → enter label-move mode (drag to reposition)
+    //   4. Drag → move element
     //   5. Double-click → edit label
     const isTaskLike =
       element.type === "task" ||
       element.type === "subprocess" ||
       element.type === "subprocess-expanded";
     if (isTaskLike && !multiSelected && onEnterConnectionMode) {
-      const HOLD_MS = 200;
+      // Hit-test: did the click land on the label text?
+      // The label is centred on getLabelPos(element). Estimate text bounds
+      // from labelWidth (default = element width) and a single line height.
+      const labelPos = getLabelPos(element);
+      const labelW = (element.properties?.labelWidth as number) ?? element.width;
+      const lines = wrapText(element.label, labelW);
+      const lineH = 14;
+      const textH = lines.length * lineH;
+      // Approximate text width (the longer of any wrapped line)
+      const longestChars = lines.reduce((m, l) => Math.max(m, l.length), 0);
+      const textW = Math.min(labelW, Math.max(40, longestChars * 12 * 0.55));
+      const HIT_PAD = 4;
+      const worldPt = svgToWorld ? svgToWorld(e.clientX, e.clientY) : null;
+      const hitLabel = !!worldPt &&
+        Math.abs(worldPt.x - labelPos.x) <= textW / 2 + HIT_PAD &&
+        Math.abs(worldPt.y - labelPos.y) <= textH / 2 + HIT_PAD;
+
+      if (hitLabel) {
+        // Click on label → label-move mode (also cancels connection-creation if active)
+        if (onCancelConnectionMode) onCancelConnectionMode();
+        document.body.style.cursor = "grabbing";
+        // Suppress the OS double-click that would otherwise open the label editor
+        suppressNextDblClickRef.current = true;
+        beginLabelMoveDrag(e);
+        return;
+      }
+      // Click on body — track movement; if no drag, treat as click and (if
+      // element was already selected) enter connection-creation mode.
       const MOVE_THRESHOLD = 4;
       const startClientX = e.clientX;
       const startClientY = e.clientY;
       let dragStartedFlag = false;
-      let cancelled = false;
 
-      const startMoveDrag = (holdTriggered: boolean) => {
-        if (dragStartedFlag || cancelled) return;
-        dragStartedFlag = true;
-        clearTimeout(holdTimer);
-        window.removeEventListener("mousemove", onPreMove);
-        window.removeEventListener("mouseup", onPreUp);
-        if (holdTriggered) {
-          // Hold-triggered: cancel any pending connection-creation mode and
-          // start a LABEL-move drag (the label moves within the element).
-          if (onCancelConnectionMode) onCancelConnectionMode();
-          document.body.style.cursor = "grabbing";
-          beginLabelMoveDrag(e);
-        } else {
-          // Quick movement: normal element drag
+      const onPreMove = (ev: MouseEvent) => {
+        if (dragStartedFlag) return;
+        if (Math.hypot(ev.clientX - startClientX, ev.clientY - startClientY) > MOVE_THRESHOLD) {
+          dragStartedFlag = true;
+          window.removeEventListener("mousemove", onPreMove);
+          window.removeEventListener("mouseup", onPreUp);
           beginElementDrag(e);
         }
       };
-
-      const onPreMove = (ev: MouseEvent) => {
-        if (Math.hypot(ev.clientX - startClientX, ev.clientY - startClientY) > MOVE_THRESHOLD) {
-          // Quick movement → normal element drag
-          startMoveDrag(false);
-        }
-      };
-
       const onPreUp = () => {
         if (dragStartedFlag) return;
-        cancelled = true;
-        clearTimeout(holdTimer);
         window.removeEventListener("mousemove", onPreMove);
         window.removeEventListener("mouseup", onPreUp);
-        // No movement, no hold — treat as a click. If element was already
-        // selected, enter connection creation mode.
         if (wasSelected && onEnterConnectionMode) onEnterConnectionMode();
       };
-
-      // After HOLD_MS the user is holding, not clicking — start label-move mode
-      // and cancel any pending connection-creation mode.
-      const holdTimer = setTimeout(() => { startMoveDrag(true); }, HOLD_MS);
       window.addEventListener("mousemove", onPreMove);
       window.addEventListener("mouseup", onPreUp);
       return;
@@ -1545,6 +1549,11 @@ export function SymbolRenderer({
       onMouseDown={handleMouseDown}
       onDoubleClick={(e) => {
         e.stopPropagation();
+        // Suppress double-click immediately after a label-move drag
+        if (suppressNextDblClickRef.current) {
+          suppressNextDblClickRef.current = false;
+          return;
+        }
         // For pools, only trigger label edit when double-clicking the header strip (left 30px)
         if (element.type === "pool" && svgToWorld) {
           const world = svgToWorld(e.clientX, e.clientY);
