@@ -1271,9 +1271,12 @@ export function Canvas({
     const newCx = newX + newW / 2;
     const newCy = newY + newH / 2;
 
-    // Pre-pass: if a DECISION gateway is to the left of the new element AND
-    // is the 1st or 2nd closest (centre-to-centre) of all left candidates,
-    // it always takes precedence.
+    // Pre-pass 1: PROXIMITY OVERRIDE — if the nearest left candidate is
+    // closer than 1/4 of the second-nearest, it wins absolutely (regardless
+    // of any gateway preference).
+    //
+    // Pre-pass 2: DECISION-GATEWAY PRECEDENCE — if a decision gateway is
+    // 1st or 2nd closest of all left candidates, it always takes precedence.
     {
       const leftCandidates = candidates
         .filter(el => el.x + el.width <= newX)
@@ -1285,22 +1288,8 @@ export function Canvas({
           ),
         }))
         .sort((a, b) => a.dist - b.dist);
-      const top2 = leftCandidates.slice(0, 2);
-      const decisionGw = top2.find(c =>
-        c.el.type === "gateway" &&
-        ((c.el.properties?.gatewayRole as string | undefined) ?? "decision") === "decision"
-      );
-      if (decisionGw) {
-        // Proximity override: if the NEAREST candidate is not the decision gateway
-        // and its connector would be shorter than 1/3 of the decision gateway's
-        // connector, use the nearest instead (it's close enough to absolutely win).
-        const nearest = leftCandidates[0];
-        let src: DiagramElement;
-        if (nearest.el !== decisionGw.el && nearest.dist < decisionGw.dist / 3) {
-          src = nearest.el;
-        } else {
-          src = decisionGw.el;
-        }
+
+      const buildResult = (src: DiagramElement) => {
         const srcCy = src.y + src.height / 2;
         const vOverlap = Math.min(src.y + src.height, newBottom) - Math.max(src.y, newY);
         let srcSide: Side; let tgtSide: Side;
@@ -1311,6 +1300,28 @@ export function Canvas({
           tgtSide = "left";
         }
         return { source: src, srcSide, tgtSide };
+      };
+
+      // Pre-pass 1: proximity override
+      if (leftCandidates.length >= 2) {
+        const [first, second] = leftCandidates;
+        if (first.dist < second.dist / 4) {
+          return buildResult(first.el);
+        }
+      } else if (leftCandidates.length === 1) {
+        // Only one candidate — proximity override trivially applies if there's
+        // nothing else to compete; let the normal cases handle this so we don't
+        // pre-empt other rules.
+      }
+
+      // Pre-pass 2: decision-gateway precedence
+      const top2 = leftCandidates.slice(0, 2);
+      const decisionGw = top2.find(c =>
+        c.el.type === "gateway" &&
+        ((c.el.properties?.gatewayRole as string | undefined) ?? "decision") === "decision"
+      );
+      if (decisionGw) {
+        return buildResult(decisionGw.el);
       }
     }
 
