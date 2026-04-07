@@ -2146,6 +2146,7 @@ export function Canvas({
                 onGroupMoveEnd={onElementsMoveEnd}
                 colorConfig={colorConfig}
                 onEnterConnectionMode={() => setPendingConnSourceId(el.id)}
+                onCancelConnectionMode={() => setPendingConnSourceId(null)}
                 inConnectionMode={pendingConnSourceId === el.id}
                 onDrillBack={el.type === "start-event" ? onDrillBack : undefined}
                 showValueDisplay={showValueDisplay}
@@ -2563,6 +2564,7 @@ export function Canvas({
                 onGroupMoveEnd={onElementsMoveEnd}
                 colorConfig={colorConfig}
                 onEnterConnectionMode={() => setPendingConnSourceId(el.id)}
+                onCancelConnectionMode={() => setPendingConnSourceId(null)}
                 inConnectionMode={pendingConnSourceId === el.id}
               />
             );

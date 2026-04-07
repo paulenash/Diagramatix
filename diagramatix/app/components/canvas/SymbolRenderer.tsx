@@ -43,6 +43,9 @@ interface Props {
   /** Called when a click on an already-selected task/subprocess should enter
    *  connection-creation mode (without dragging or editing the label). */
   onEnterConnectionMode?: () => void;
+  /** Cancel any in-progress connection-creation mode (e.g. when the user
+   *  starts holding to drag instead). */
+  onCancelConnectionMode?: () => void;
   /** True if this element is the source for an in-progress connection-creation
    *  mode (set by Canvas after onEnterConnectionMode fires). */
   inConnectionMode?: boolean;
@@ -1206,6 +1209,16 @@ function getLabelPos(el: DiagramElement): { x: number; y: number; baseline: "han
   if (el.type === "uml-enumeration") {
     return { x: el.x + el.width / 2, y: el.y + HEADER_H / 2 + 6, baseline: "middle" };
   }
+  // Tasks and subprocesses honour an internal label offset (clamped at draw time)
+  if (el.type === "task" || el.type === "subprocess" || el.type === "subprocess-expanded") {
+    const offX = (el.properties?.labelOffsetX as number) ?? 0;
+    const offY = (el.properties?.labelOffsetY as number) ?? 0;
+    return {
+      x: el.x + el.width / 2 + offX,
+      y: el.y + el.height / 2 + offY,
+      baseline: "middle",
+    };
+  }
   return { x: el.x + el.width / 2, y: el.y + el.height / 2, baseline: "middle" };
 }
 
@@ -1262,6 +1275,7 @@ export function SymbolRenderer({
   onDrillBack,
   showValueDisplay,
   onEnterConnectionMode,
+  onCancelConnectionMode,
   inConnectionMode,
 }: Props) {
   const fontScale = useContext(FontScaleCtx);
@@ -1293,9 +1307,11 @@ export function SymbolRenderer({
 
     // Task/Subprocess click model:
     //   1. Click (not selected) → select only
-    //   2. Click again on already-selected → enter connection creation mode
-    //   3. Click and hold (or drag) → move element
-    //   4. Double-click → edit label (handled separately)
+    //   2. Click again on already-selected → enter connection-creation mode
+    //   3. Click and hold (>= HOLD_MS) → cancel any pending connection mode,
+    //      enter label-move (element-drag) mode with grabbing cursor
+    //   4. Quick mouse-move during click → normal element drag
+    //   5. Double-click → edit label
     const isTaskLike =
       element.type === "task" ||
       element.type === "subprocess" ||
@@ -1308,18 +1324,28 @@ export function SymbolRenderer({
       let dragStartedFlag = false;
       let cancelled = false;
 
-      const startActualDrag = () => {
+      const startMoveDrag = (holdTriggered: boolean) => {
         if (dragStartedFlag || cancelled) return;
         dragStartedFlag = true;
         clearTimeout(holdTimer);
         window.removeEventListener("mousemove", onPreMove);
         window.removeEventListener("mouseup", onPreUp);
-        beginElementDrag(e);
+        if (holdTriggered) {
+          // Hold-triggered: cancel any pending connection-creation mode and
+          // start a LABEL-move drag (the label moves within the element).
+          if (onCancelConnectionMode) onCancelConnectionMode();
+          document.body.style.cursor = "grabbing";
+          beginLabelMoveDrag(e);
+        } else {
+          // Quick movement: normal element drag
+          beginElementDrag(e);
+        }
       };
 
       const onPreMove = (ev: MouseEvent) => {
         if (Math.hypot(ev.clientX - startClientX, ev.clientY - startClientY) > MOVE_THRESHOLD) {
-          startActualDrag();
+          // Quick movement → normal element drag
+          startMoveDrag(false);
         }
       };
 
@@ -1334,13 +1360,56 @@ export function SymbolRenderer({
         if (wasSelected && onEnterConnectionMode) onEnterConnectionMode();
       };
 
-      const holdTimer = setTimeout(() => { startActualDrag(); }, HOLD_MS);
+      // After HOLD_MS the user is holding, not clicking — start label-move mode
+      // and cancel any pending connection-creation mode.
+      const holdTimer = setTimeout(() => { startMoveDrag(true); }, HOLD_MS);
       window.addEventListener("mousemove", onPreMove);
       window.addEventListener("mouseup", onPreUp);
       return;
     }
 
     beginElementDrag(e);
+  }
+
+  // Drag the label inside a task/subprocess element. Adjusts
+  // properties.labelOffsetX/Y, clamped to keep the label within the element.
+  function beginLabelMoveDrag(e: React.MouseEvent) {
+    if (!svgToWorld || !onUpdateProperties) {
+      // Fall back to element drag if we can't reach the API
+      beginElementDrag(e);
+      return;
+    }
+    const startWorld = svgToWorld(e.clientX, e.clientY);
+    const startOffX = (element.properties?.labelOffsetX as number) ?? 0;
+    const startOffY = (element.properties?.labelOffsetY as number) ?? 0;
+    const halfW = element.width / 2;
+    const halfH = element.height / 2;
+    const PAD = 4;
+    const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+
+    function onMouseMove(ev: MouseEvent) {
+      const cur = svgToWorld!(ev.clientX, ev.clientY);
+      const dx = cur.x - startWorld.x;
+      const dy = cur.y - startWorld.y;
+      const newOffX = clamp(startOffX + dx, -halfW + PAD, halfW - PAD);
+      const newOffY = clamp(startOffY + dy, -halfH + PAD, halfH - PAD);
+      onUpdateProperties!(element.id, { labelOffsetX: newOffX, labelOffsetY: newOffY });
+    }
+    function onMouseUp() {
+      document.body.style.cursor = "";
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+      window.removeEventListener("keydown", onKeyDown);
+    }
+    function onKeyDown(ev: KeyboardEvent) {
+      if (ev.key !== "Escape") return;
+      // Revert to original offsets
+      onUpdateProperties!(element.id, { labelOffsetX: startOffX, labelOffsetY: startOffY });
+      onMouseUp();
+    }
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+    window.addEventListener("keydown", onKeyDown);
   }
 
   function beginElementDrag(e: React.MouseEvent) {
@@ -1429,6 +1498,7 @@ export function SymbolRenderer({
       const origX = dragStart!.elX;
       const origY = dragStart!.elY;
       dragStart = null;
+      document.body.style.cursor = "";
       window.removeEventListener("mousemove", onMouseMove);
       window.removeEventListener("mouseup", onMouseUp);
       window.removeEventListener("keydown", onKeyDown);
@@ -1443,6 +1513,7 @@ export function SymbolRenderer({
       if (ev.key !== "Escape" || !dragStart) return;
       const { elX, elY } = dragStart;
       dragStart = null;
+      document.body.style.cursor = "";
       window.removeEventListener("mousemove", onMouseMove);
       window.removeEventListener("mouseup", onMouseUp);
       window.removeEventListener("keydown", onKeyDown);
