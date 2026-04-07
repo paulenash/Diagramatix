@@ -7,17 +7,74 @@ datasource db {
   provider = "postgresql"
 }
 
+// ────────────────────────────────────────────────────────────────────────────
+// CPS 230 Phase 0 — Multi-tenancy foundation
+//
+// Org is the regulated-entity boundary. Every Project and Diagram belongs to
+// exactly one Org (initially nullable for backfill, will be tightened to
+// NOT NULL after the data migration runs successfully).
+// ────────────────────────────────────────────────────────────────────────────
+
+enum OrgEntityType {
+  ADI
+  Insurer
+  LifeInsurer
+  HealthInsurer
+  RSE
+  Other
+}
+
+enum OrgRole {
+  Owner          // full control of the org, including billing and deletion
+  Admin          // manage members and settings, no destructive ops
+  RiskOwner      // create/edit Risks, Controls, link to processes
+  ProcessOwner   // create/edit critical operations + BPMN process content
+  ControlOwner   // edit Controls and test outcomes
+  InternalAudit  // read-only across the whole org, can export
+  BoardObserver  // read-only access to BCPs, registers and dashboards
+  Viewer         // read-only access to diagrams and registers
+}
+
+model Org {
+  id         String        @id @default(cuid())
+  name       String
+  entityType OrgEntityType @default(Other)
+  createdAt  DateTime      @default(now())
+
+  members  OrgMember[]
+  projects Project[]
+  diagrams Diagram[]
+}
+
+model OrgMember {
+  id        String   @id @default(cuid())
+  orgId     String
+  org       Org      @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      OrgRole
+  createdAt DateTime @default(now())
+
+  @@unique([orgId, userId])
+  @@index([userId])
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Existing models — Org back-relations and orgId added
+// ────────────────────────────────────────────────────────────────────────────
+
 model User {
-  id        String    @id @default(cuid())
-  email     String    @unique
-  name      String?
+  id               String    @id @default(cuid())
+  email            String    @unique
+  name             String?
   password         String    @default("")
   resetToken       String?   @unique
   resetTokenExpiry DateTime?
-  diagrams  Diagram[]
-  projects  Project[]
-  templates DiagramTemplate[]
-  createdAt DateTime  @default(now())
+  diagrams         Diagram[]
+  projects         Project[]
+  templates        DiagramTemplate[]
+  orgMembers       OrgMember[]
+  createdAt        DateTime  @default(now())
 }
 
 model Project {
@@ -29,34 +86,47 @@ model Project {
   folderTree  Json      @default("{}")
   userId      String
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Org scoping — nullable during Phase 0 backfill, tightened to NOT NULL
+  // in a follow-up schema diff once scripts/backfill-orgs.ts has been run
+  // and verified.
+  orgId       String?
+  org         Org?      @relation(fields: [orgId], references: [id], onDelete: Restrict)
   diagrams    Diagram[]
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+
+  @@index([orgId])
 }
 
 model Diagram {
-  id        String   @id @default(cuid())
-  name      String
-  type      String   @default("basic")
+  id          String   @id @default(cuid())
+  name        String
+  type        String   @default("basic")
   data        Json     @default("{}")
   colorConfig Json     @default("{}")
   displayMode String   @default("normal")
   userId      String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  projectId String?
-  project   Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectId   String?
+  project     Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  // Denormalised from Project for query performance — kept in sync by the
+  // application layer. Nullable during Phase 0 backfill.
+  orgId       String?
+  org         Org?     @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([orgId])
 }
 
 model DiagramTemplate {
-  id          String   @id @default(cuid())
-  name        String
+  id           String   @id @default(cuid())
+  name         String
   diagramType  String   @default("bpmn")
   templateType String   @default("user")
   data         Json     @default("{}")
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }
