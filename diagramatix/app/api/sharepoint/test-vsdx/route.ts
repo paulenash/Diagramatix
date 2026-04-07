@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import JSZip from "jszip";
 import * as fs from "fs";
 import * as path from "path";
 import { getElementMasterId, getConnectorMasterId } from "@/app/lib/diagram/visioMasterMap";
+import { getCurrentOrgId, OrgContextError } from "@/app/lib/auth/orgContext";
 
 /**
  * GET /api/sharepoint/test-vsdx?diagramId=<id>
@@ -18,7 +20,17 @@ export async function GET(request: Request) {
   const diagramId = searchParams.get("diagramId");
   if (!diagramId) return NextResponse.json({ error: "diagramId required" }, { status: 400 });
 
-  const diagram = await prisma.diagram.findUnique({ where: { id: diagramId } });
+  let orgId: string;
+  try {
+    orgId = await getCurrentOrgId(session, await cookies());
+  } catch (err) {
+    if (err instanceof OrgContextError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+    throw err;
+  }
+
+  const diagram = await prisma.diagram.findFirst({ where: { id: diagramId, orgId } });
   if (!diagram) return NextResponse.json({ error: "Diagram not found" }, { status: 404 });
 
   const data = diagram.data as any;

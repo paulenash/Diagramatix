@@ -5,6 +5,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { ProjectDetailClient } from "./ProjectDetailClient";
 import { getEffectiveUserId, isImpersonating } from "@/app/lib/superuser";
+import { tryGetCurrentOrgId } from "@/app/lib/auth/orgContext";
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -24,6 +25,9 @@ export default async function ProjectPage({ params }: Props) {
 
   const { id } = await params;
 
+  const orgId = await tryGetCurrentOrgId(session, cookieStore);
+  if (!orgId) notFound();
+
   let commitCount = 0;
   try {
     commitCount = parseInt(execSync("git rev-list --count HEAD", { encoding: "utf8" }).trim(), 10) || 0;
@@ -31,7 +35,7 @@ export default async function ProjectPage({ params }: Props) {
 
   const [project, otherProjects] = await Promise.all([
     prisma.project.findFirst({
-      where: { id, userId: effectiveUserId },
+      where: { id, userId: effectiveUserId, orgId },
       include: {
         diagrams: {
           orderBy: { updatedAt: "desc" },
@@ -40,7 +44,7 @@ export default async function ProjectPage({ params }: Props) {
       },
     }),
     prisma.project.findMany({
-      where: { userId: effectiveUserId, id: { not: id } },
+      where: { userId: effectiveUserId, orgId, id: { not: id } },
       select: { id: true, name: true },
     }),
   ]);

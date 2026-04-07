@@ -8,6 +8,7 @@ import { EMPTY_DIAGRAM } from "@/app/lib/diagram/types";
 import type { SymbolColorConfig } from "@/app/lib/diagram/colors";
 import type { DisplayMode } from "@/app/lib/diagram/displayMode";
 import { getEffectiveUserId, isImpersonating } from "@/app/lib/superuser";
+import { tryGetCurrentOrgId } from "@/app/lib/auth/orgContext";
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -27,8 +28,11 @@ export default async function DiagramPage({ params }: Props) {
 
   const { id } = await params;
 
+  const orgId = await tryGetCurrentOrgId(session, cookieStore);
+  if (!orgId) notFound();
+
   const diagram = await prisma.diagram.findFirst({
-    where: { id, userId: effectiveUserId },
+    where: { id, userId: effectiveUserId, orgId },
   });
 
   if (!diagram) notFound();

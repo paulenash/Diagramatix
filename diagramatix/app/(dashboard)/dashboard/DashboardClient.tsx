@@ -31,6 +31,7 @@ interface Props {
   unorganized: DiagramSummary[];
   userName: string;
   userEmail?: string;
+  orgName?: string;
   version?: number;
   readOnly?: boolean;
   viewingAsName?: string;
@@ -137,7 +138,7 @@ function DiagramCard({
   );
 }
 
-export function DashboardClient({ projects: initialProjects, unorganized: initialUnorganized, userName, userEmail, version, readOnly, viewingAsName, viewingAsEmail, isSuperuser: isSu }: Props) {
+export function DashboardClient({ projects: initialProjects, unorganized: initialUnorganized, userName, userEmail, orgName, version, readOnly, viewingAsName, viewingAsEmail, isSuperuser: isSu }: Props) {
   const router = useRouter();
   const [projects, setProjects] = useState(initialProjects);
   const [unorganized, setUnorganized] = useState(initialUnorganized);
@@ -518,6 +519,14 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
           >
             {"\u21BB"}
           </button>
+          {orgName && (
+            <div
+              className="text-xs text-gray-600 border border-gray-200 rounded px-2 py-1 bg-gray-50"
+              title="Active organisation"
+            >
+              {orgName}
+            </div>
+          )}
           <div className="text-right">
             <span className="text-sm text-gray-700 font-medium">{userName}</span>
             {userEmail && <p className="text-[10px] text-gray-400 leading-tight">{userEmail}</p>}

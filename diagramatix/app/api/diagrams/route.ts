@@ -4,6 +4,12 @@ import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { EMPTY_DIAGRAM } from "@/app/lib/diagram/types";
 import { getEffectiveUserId, isImpersonating } from "@/app/lib/superuser";
+import {
+  getCurrentOrgId,
+  requireRole,
+  WRITE_ROLES,
+  OrgContextError,
+} from "@/app/lib/auth/orgContext";
 
 export async function GET() {
   const session = await auth();
@@ -13,8 +19,19 @@ export async function GET() {
 
   let userId = session.user.id;
   try { userId = getEffectiveUserId(session, await cookies()); } catch { /* fallback */ }
+
+  let orgId: string;
+  try {
+    orgId = await getCurrentOrgId(session, await cookies());
+  } catch (err) {
+    if (err instanceof OrgContextError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+    throw err;
+  }
+
   const diagrams = await prisma.diagram.findMany({
-    where: { userId },
+    where: { userId, orgId },
     orderBy: { updatedAt: "desc" },
     select: {
       id: true,
@@ -43,6 +60,16 @@ export async function POST(req: Request) {
     // cookies() may fail in some contexts — if so, proceed normally
   }
 
+  let orgId: string;
+  try {
+    ({ orgId } = await requireRole(session, await cookies(), WRITE_ROLES));
+  } catch (err) {
+    if (err instanceof OrgContextError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+    throw err;
+  }
+
   const body = await req.json();
   const { name, type = "context", projectId, data, colorConfig, displayMode } = body;
 
@@ -50,9 +77,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Name is required" }, { status: 400 });
   }
 
-  // Validate project ownership if supplied
+  // Validate project ownership AND org match if supplied
   if (projectId) {
-    const project = await prisma.project.findFirst({ where: { id: projectId, userId: session.user.id } });
+    const project = await prisma.project.findFirst({
+      where: { id: projectId, userId: session.user.id, orgId },
+    });
     if (!project) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
@@ -68,6 +97,7 @@ export async function POST(req: Request) {
       ...(colorConfig ? { colorConfig: colorConfig as any } : {}),
       ...(displayMode ? { displayMode } : {}),
       userId: session.user.id,
+      orgId,
       ...(projectId ? { projectId } : {}),
     },
   });

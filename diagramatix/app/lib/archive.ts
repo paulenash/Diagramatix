@@ -18,11 +18,23 @@ export async function getArchiveProject(): Promise<{ id: string; adminId: string
   });
   if (existing) return { id: existing.id, adminId: admin.id };
 
+  // Archive project lives in the superuser's first org. The Phase 0 backfill
+  // guarantees the superuser has an OrgMember row.
+  const adminOrg = await prisma.orgMember.findFirst({
+    where: { userId: admin.id },
+    orderBy: { createdAt: "asc" },
+    select: { orgId: true },
+  });
+  if (!adminOrg) {
+    throw new Error("Superuser has no org membership — run scripts/backfill-orgs.ts");
+  }
+
   const created = await prisma.project.create({
     data: {
       name: ARCHIVE_PROJECT_NAME,
       description: "System archive for deleted diagrams",
       userId: admin.id,
+      orgId: adminOrg.orgId,
     },
   });
   return { id: created.id, adminId: admin.id };

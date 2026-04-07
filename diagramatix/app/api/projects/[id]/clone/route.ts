@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { isImpersonating } from "@/app/lib/superuser";
+import { requireRole, WRITE_ROLES, OrgContextError } from "@/app/lib/auth/orgContext";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -21,9 +22,19 @@ export async function POST(_req: Request, { params }: Params) {
     // proceed normally
   }
 
+  let orgId: string;
+  try {
+    ({ orgId } = await requireRole(session, await cookies(), WRITE_ROLES));
+  } catch (err) {
+    if (err instanceof OrgContextError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+    throw err;
+  }
+
   const { id } = await params;
   const source = await prisma.project.findFirst({
-    where: { id, userId: session.user.id },
+    where: { id, userId: session.user.id, orgId },
     include: { diagrams: true },
   });
 
@@ -37,6 +48,7 @@ export async function POST(_req: Request, { params }: Params) {
       description: source.description,
       ownerName: source.ownerName,
       userId: session.user.id,
+      orgId,
     },
   });
 
@@ -53,6 +65,7 @@ export async function POST(_req: Request, { params }: Params) {
         colorConfig: diagram.colorConfig as any,
         displayMode: diagram.displayMode,
         userId: session.user.id,
+        orgId,
         projectId: newProject.id,
       },
     });

@@ -1,3 +1,5 @@
+// @ts-nocheck — references the pre-tightening schema (orgId nullable) for
+// post-backfill verification. Kept for traceability; not part of runtime.
 /**
  * CPS 230 Phase 0 — verify backfill results.
  *

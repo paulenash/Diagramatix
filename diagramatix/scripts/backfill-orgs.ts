@@ -1,3 +1,6 @@
+// @ts-nocheck — this is a one-shot historical migration script that
+// references a pre-tightening schema state. The file remains in the repo
+// for traceability but is not part of the runtime build.
 /**
  * CPS 230 Phase 0 — Backfill orgs for existing single-user data.
  *

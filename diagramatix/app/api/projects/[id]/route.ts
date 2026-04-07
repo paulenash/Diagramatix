@@ -3,11 +3,17 @@ import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { getEffectiveUserId, isImpersonating } from "@/app/lib/superuser";
+import {
+  getCurrentOrgId,
+  requireRole,
+  WRITE_ROLES,
+  OrgContextError,
+} from "@/app/lib/auth/orgContext";
 
 type Params = { params: Promise<{ id: string }> };
 
-async function getAuthorizedProject(id: string, userId: string) {
-  return prisma.project.findFirst({ where: { id, userId } });
+async function getAuthorizedProject(id: string, userId: string, orgId: string) {
+  return prisma.project.findFirst({ where: { id, userId, orgId } });
 }
 
 /** Safely check if impersonating — returns false if cookies() fails */
@@ -27,9 +33,20 @@ export async function GET(_req: Request, { params }: Params) {
 
   let userId = session.user.id;
   try { userId = getEffectiveUserId(session, await cookies()); } catch { /* fallback */ }
+
+  let orgId: string;
+  try {
+    orgId = await getCurrentOrgId(session, await cookies());
+  } catch (err) {
+    if (err instanceof OrgContextError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+    throw err;
+  }
+
   const { id } = await params;
   const project = await prisma.project.findFirst({
-    where: { id, userId },
+    where: { id, userId, orgId },
     include: {
       diagrams: {
         orderBy: { updatedAt: "desc" },
@@ -55,8 +72,18 @@ export async function PUT(req: Request, { params }: Params) {
     return NextResponse.json({ error: "Read-only: viewing another user" }, { status: 403 });
   }
 
+  let orgId: string;
+  try {
+    ({ orgId } = await requireRole(session, await cookies(), WRITE_ROLES));
+  } catch (err) {
+    if (err instanceof OrgContextError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+    throw err;
+  }
+
   const { id } = await params;
-  const existing = await getAuthorizedProject(id, session.user.id);
+  const existing = await getAuthorizedProject(id, session.user.id, orgId);
   if (!existing) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
@@ -109,8 +136,18 @@ export async function DELETE(_req: Request, { params }: Params) {
     return NextResponse.json({ error: "Read-only: viewing another user" }, { status: 403 });
   }
 
+  let orgId: string;
+  try {
+    ({ orgId } = await requireRole(session, await cookies(), WRITE_ROLES));
+  } catch (err) {
+    if (err instanceof OrgContextError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+    throw err;
+  }
+
   const { id } = await params;
-  const existing = await getAuthorizedProject(id, session.user.id);
+  const existing = await getAuthorizedProject(id, session.user.id, orgId);
   if (!existing) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }

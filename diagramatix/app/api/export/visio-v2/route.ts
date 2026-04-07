@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import * as fs from "fs";
@@ -6,6 +7,7 @@ import * as path from "path";
 import { exportVisioV2 } from "@/app/lib/diagram/v2/exportVisioV2";
 import { DEFAULT_SYMBOL_COLORS, BW_SYMBOL_COLORS } from "@/app/lib/diagram/colors";
 import type { SymbolColorConfig } from "@/app/lib/diagram/colors";
+import { getCurrentOrgId, OrgContextError } from "@/app/lib/auth/orgContext";
 
 /**
  * GET /api/export/visio-v2?diagramId=<id>
@@ -19,7 +21,20 @@ export async function GET(request: Request) {
   const diagramId = searchParams.get("diagramId");
   if (!diagramId) return NextResponse.json({ error: "diagramId required" }, { status: 400 });
 
-  const diagram = await prisma.diagram.findUnique({ where: { id: diagramId }, include: { project: true } });
+  let orgId: string;
+  try {
+    orgId = await getCurrentOrgId(session, await cookies());
+  } catch (err) {
+    if (err instanceof OrgContextError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+    throw err;
+  }
+
+  const diagram = await prisma.diagram.findFirst({
+    where: { id: diagramId, orgId },
+    include: { project: true },
+  });
   if (!diagram) return NextResponse.json({ error: "Diagram not found" }, { status: 404 });
 
   try {

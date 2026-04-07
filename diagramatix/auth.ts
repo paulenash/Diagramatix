@@ -5,6 +5,28 @@ import { authConfig } from "./auth.config";
 import { prisma } from "@/app/lib/db";
 import bcrypt from "bcryptjs";
 
+/**
+ * Idempotent: ensures the user has at least one OrgMember row. If none, creates
+ * a default Org named "${displayName}'s Org" (entityType=Other) and an Owner
+ * membership. Called from the signIn callback so SSO users get an org without
+ * a separate registration step.
+ */
+async function ensureDefaultOrgForUser(userId: string, displayName: string) {
+  const existing = await prisma.orgMember.findFirst({
+    where: { userId },
+    select: { id: true },
+  });
+  if (existing) return;
+  await prisma.$transaction(async (tx) => {
+    const org = await tx.org.create({
+      data: { name: `${displayName}'s Org`, entityType: "Other" },
+    });
+    await tx.orgMember.create({
+      data: { orgId: org.id, userId, role: "Owner" },
+    });
+  });
+}
+
 export const { handlers, signIn, signOut, auth } = NextAuth({
   ...authConfig,
   providers: [
@@ -71,8 +93,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
               },
             });
             user.id = created.id;
+            // CPS 230: every new user gets a default Org with Owner role
+            await ensureDefaultOrgForUser(created.id, created.name ?? user.email);
           } else {
             user.id = existing.id;
+            // Idempotent — only creates an org if the user doesn't already have one
+            await ensureDefaultOrgForUser(existing.id, existing.name ?? existing.email);
           }
         } catch (err) {
           console.error("[auth] signIn callback error:", err);

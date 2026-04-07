@@ -3,11 +3,17 @@ import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { getEffectiveUserId, isImpersonating } from "@/app/lib/superuser";
+import {
+  getCurrentOrgId,
+  requireRole,
+  WRITE_ROLES,
+  OrgContextError,
+} from "@/app/lib/auth/orgContext";
 
 type Params = { params: Promise<{ id: string }> };
 
-async function getAuthorizedDiagram(id: string, userId: string) {
-  return prisma.diagram.findFirst({ where: { id, userId } });
+async function getAuthorizedDiagram(id: string, userId: string, orgId: string) {
+  return prisma.diagram.findFirst({ where: { id, userId, orgId } });
 }
 
 async function checkImpersonating(session: Parameters<typeof isImpersonating>[0]) {
@@ -26,8 +32,19 @@ export async function GET(_req: Request, { params }: Params) {
 
   let userId = session.user.id;
   try { userId = getEffectiveUserId(session, await cookies()); } catch { /* fallback */ }
+
+  let orgId: string;
+  try {
+    orgId = await getCurrentOrgId(session, await cookies());
+  } catch (err) {
+    if (err instanceof OrgContextError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+    throw err;
+  }
+
   const { id } = await params;
-  const diagram = await getAuthorizedDiagram(id, userId);
+  const diagram = await getAuthorizedDiagram(id, userId, orgId);
   if (!diagram) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
@@ -45,8 +62,18 @@ export async function PUT(req: Request, { params }: Params) {
     return NextResponse.json({ error: "Read-only: viewing another user" }, { status: 403 });
   }
 
+  let orgId: string;
+  try {
+    ({ orgId } = await requireRole(session, await cookies(), WRITE_ROLES));
+  } catch (err) {
+    if (err instanceof OrgContextError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+    throw err;
+  }
+
   const { id } = await params;
-  const existing = await getAuthorizedDiagram(id, session.user.id);
+  const existing = await getAuthorizedDiagram(id, session.user.id, orgId);
   if (!existing) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
@@ -54,9 +81,11 @@ export async function PUT(req: Request, { params }: Params) {
   const body = await req.json();
   const { name, data, projectId, colorConfig, displayMode } = body;
 
-  // Validate project ownership if non-null projectId supplied
+  // Validate project ownership AND org match if non-null projectId supplied
   if (projectId !== undefined && projectId !== null) {
-    const project = await prisma.project.findFirst({ where: { id: projectId, userId: session.user.id } });
+    const project = await prisma.project.findFirst({
+      where: { id: projectId, userId: session.user.id, orgId },
+    });
     if (!project) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
@@ -97,8 +126,18 @@ export async function DELETE(_req: Request, { params }: Params) {
     return NextResponse.json({ error: "Read-only: viewing another user" }, { status: 403 });
   }
 
+  let orgId: string;
+  try {
+    ({ orgId } = await requireRole(session, await cookies(), WRITE_ROLES));
+  } catch (err) {
+    if (err instanceof OrgContextError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+    throw err;
+  }
+
   const { id } = await params;
-  const existing = await getAuthorizedDiagram(id, session.user.id);
+  const existing = await getAuthorizedDiagram(id, session.user.id, orgId);
   if (!existing) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
