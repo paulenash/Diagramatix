@@ -429,6 +429,12 @@ export function Canvas({
   } | null>(null);
   const autoConnectAbortRef = useRef(false);
 
+  // Connection-creation mode: when set, the next click on a different element
+  // creates a sequence connector from this source. Triggered by clicking an
+  // already-selected task/subprocess. Cleared by Esc, background click, or
+  // successful connector creation.
+  const [pendingConnSourceId, setPendingConnSourceId] = useState<string | null>(null);
+
   // Fit-to-content on initial mount
   const hasFitted = useRef(false);
   useEffect(() => {
@@ -1166,6 +1172,7 @@ export function Canvas({
         if (!didPanDrag) {
           onSetSelectedElements(new Set());
           onSelectConnector(null);
+          if (pendingConnSourceId) setPendingConnSourceId(null);
         }
       }
 
@@ -1683,6 +1690,8 @@ export function Canvas({
         autoConnectAbortRef.current = true;
         setAutoConnectFlash(null);
       }
+      // Cancel connection-creation mode
+      if (pendingConnSourceId) setPendingConnSourceId(null);
     }
     if (e.key === "Delete") {
       if (editingLabel) return;
@@ -2090,6 +2099,16 @@ export function Canvas({
                 isAssocBpmnTarget={isSubExpAssocTarget}
                 isElementDragTarget={isElementDragTarget}
                 onSelect={(e) => {
+                  // Connection-creation mode: clicking a different element commits the connector
+                  if (pendingConnSourceId && pendingConnSourceId !== el.id) {
+                    onAddConnector(
+                      pendingConnSourceId, el.id,
+                      "sequence", defaultDirectionType, defaultRoutingType,
+                      "right", "left", 0.5, 0.5
+                    );
+                    setPendingConnSourceId(null);
+                    return;
+                  }
                   if (isWhiteBoxPool && selectedElementIds.has(el.id) && selectedElementIds.size === 1) {
                     onSetSelectedElements(new Set()); // toggle deselect for white-box pools
                   } else if (e?.shiftKey) {
@@ -2126,6 +2145,8 @@ export function Canvas({
                 onGroupMove={onMoveElements ? (dx, dy) => onMoveElements([...selectedElementIds], dx / zoom, dy / zoom) : undefined}
                 onGroupMoveEnd={onElementsMoveEnd}
                 colorConfig={colorConfig}
+                onEnterConnectionMode={() => setPendingConnSourceId(el.id)}
+                inConnectionMode={pendingConnSourceId === el.id}
                 onDrillBack={el.type === "start-event" ? onDrillBack : undefined}
                 showValueDisplay={showValueDisplay}
               />
@@ -2513,6 +2534,15 @@ export function Canvas({
                 isMessageBpmnTarget={elIsMsgTarget}
                 isAssocBpmnTarget={elIsAssocTarget}
                 onSelect={(ev) => {
+                  if (pendingConnSourceId && pendingConnSourceId !== el.id) {
+                    onAddConnector(
+                      pendingConnSourceId, el.id,
+                      "sequence", defaultDirectionType, defaultRoutingType,
+                      "right", "left", 0.5, 0.5
+                    );
+                    setPendingConnSourceId(null);
+                    return;
+                  }
                   if (ev?.shiftKey) {
                     onSetSelectedElements((prev) => { const next = new Set(prev); if (next.has(el.id)) next.delete(el.id); else next.add(el.id); return next; });
                   } else if (!selectedElementIds.has(el.id)) {
@@ -2532,6 +2562,8 @@ export function Canvas({
                 onGroupMove={onMoveElements ? (dx, dy) => onMoveElements([...selectedElementIds], dx / zoom, dy / zoom) : undefined}
                 onGroupMoveEnd={onElementsMoveEnd}
                 colorConfig={colorConfig}
+                onEnterConnectionMode={() => setPendingConnSourceId(el.id)}
+                inConnectionMode={pendingConnSourceId === el.id}
               />
             );
           })}

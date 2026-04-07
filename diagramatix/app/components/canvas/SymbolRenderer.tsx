@@ -40,6 +40,12 @@ interface Props {
   onGroupMoveEnd?: () => void;
   onDrillBack?: () => void;
   showValueDisplay?: boolean;
+  /** Called when a click on an already-selected task/subprocess should enter
+   *  connection-creation mode (without dragging or editing the label). */
+  onEnterConnectionMode?: () => void;
+  /** True if this element is the source for an in-progress connection-creation
+   *  mode (set by Canvas after onEnterConnectionMode fires). */
+  inConnectionMode?: boolean;
 }
 
 function ellipseOctagonPoints(cx: number, cy: number, rx: number, ry: number): string {
@@ -1255,6 +1261,8 @@ export function SymbolRenderer({
   onGroupMoveEnd,
   onDrillBack,
   showValueDisplay,
+  onEnterConnectionMode,
+  inConnectionMode,
 }: Props) {
   const fontScale = useContext(FontScaleCtx);
   const fs = (base: number) => Math.round(base * fontScale * 10) / 10;
@@ -1280,7 +1288,62 @@ export function SymbolRenderer({
     }
 
     setLabelHighlighted(false);
+    const wasSelected = selected;
     onSelect(e);
+
+    // Task/Subprocess click model:
+    //   1. Click (not selected) → select only
+    //   2. Click again on already-selected → enter connection creation mode
+    //   3. Click and hold (or drag) → move element
+    //   4. Double-click → edit label (handled separately)
+    const isTaskLike =
+      element.type === "task" ||
+      element.type === "subprocess" ||
+      element.type === "subprocess-expanded";
+    if (isTaskLike && !multiSelected && onEnterConnectionMode) {
+      const HOLD_MS = 200;
+      const MOVE_THRESHOLD = 4;
+      const startClientX = e.clientX;
+      const startClientY = e.clientY;
+      let dragStartedFlag = false;
+      let cancelled = false;
+
+      const startActualDrag = () => {
+        if (dragStartedFlag || cancelled) return;
+        dragStartedFlag = true;
+        clearTimeout(holdTimer);
+        window.removeEventListener("mousemove", onPreMove);
+        window.removeEventListener("mouseup", onPreUp);
+        beginElementDrag(e);
+      };
+
+      const onPreMove = (ev: MouseEvent) => {
+        if (Math.hypot(ev.clientX - startClientX, ev.clientY - startClientY) > MOVE_THRESHOLD) {
+          startActualDrag();
+        }
+      };
+
+      const onPreUp = () => {
+        if (dragStartedFlag) return;
+        cancelled = true;
+        clearTimeout(holdTimer);
+        window.removeEventListener("mousemove", onPreMove);
+        window.removeEventListener("mouseup", onPreUp);
+        // No movement, no hold — treat as a click. If element was already
+        // selected, enter connection creation mode.
+        if (wasSelected && onEnterConnectionMode) onEnterConnectionMode();
+      };
+
+      const holdTimer = setTimeout(() => { startActualDrag(); }, HOLD_MS);
+      window.addEventListener("mousemove", onPreMove);
+      window.addEventListener("mouseup", onPreUp);
+      return;
+    }
+
+    beginElementDrag(e);
+  }
+
+  function beginElementDrag(e: React.MouseEvent) {
 
     // Group drag mode: when multi-selected and clicking a selected element
     if (multiSelected && onGroupMove) {
@@ -1685,6 +1748,17 @@ export function SymbolRenderer({
           x={element.x - 4} y={element.y - 4}
           width={element.width + 8} height={element.height + 8}
           fill="none" stroke="#4ade80" strokeWidth={2} rx={6}
+          style={{ pointerEvents: "none" }}
+        />
+      )}
+
+      {/* Connection-creation-mode source highlight (orange ring) */}
+      {inConnectionMode && (
+        <rect data-interactive
+          x={element.x - 5} y={element.y - 5}
+          width={element.width + 10} height={element.height + 10}
+          fill="none" stroke="#f97316" strokeWidth={2.5}
+          strokeDasharray="5 3" rx={6}
           style={{ pointerEvents: "none" }}
         />
       )}
