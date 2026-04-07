@@ -1657,18 +1657,8 @@ export function Canvas({
     if (selectedConnectorId && selectedElementIds.size === 0 && !editingLabel) {
       const NUDGE = e.shiftKey ? 1 : 5;
       if (focusedEndpoint && onNudgeConnectorEndpoint) {
-        // If the focused endpoint is on a gateway, swap left/right arrows
-        // (gateway boundary moves around the diamond perimeter; left/right
-        // physical arrows feel reversed because the diamond vertex sweeps
-        // the opposite way along the side).
-        const conn = data.connectors.find(c => c.id === selectedConnectorId);
-        const endpointId = focusedEndpoint === "source" ? conn?.sourceId : conn?.targetId;
-        const endpointEl = endpointId ? data.elements.find(e => e.id === endpointId) : null;
-        const swapLR = endpointEl?.type === "gateway";
-        const leftDx = swapLR ? NUDGE : -NUDGE;
-        const rightDx = swapLR ? -NUDGE : NUDGE;
-        if (e.key === "ArrowLeft")  { e.preventDefault(); onNudgeConnectorEndpoint(selectedConnectorId, focusedEndpoint, leftDx, 0); return; }
-        if (e.key === "ArrowRight") { e.preventDefault(); onNudgeConnectorEndpoint(selectedConnectorId, focusedEndpoint, rightDx, 0); return; }
+        if (e.key === "ArrowLeft")  { e.preventDefault(); onNudgeConnectorEndpoint(selectedConnectorId, focusedEndpoint, -NUDGE, 0); return; }
+        if (e.key === "ArrowRight") { e.preventDefault(); onNudgeConnectorEndpoint(selectedConnectorId, focusedEndpoint, NUDGE, 0); return; }
         if (e.key === "ArrowUp")    { e.preventDefault(); onNudgeConnectorEndpoint(selectedConnectorId, focusedEndpoint, 0, -NUDGE); return; }
         if (e.key === "ArrowDown")  { e.preventDefault(); onNudgeConnectorEndpoint(selectedConnectorId, focusedEndpoint, 0, NUDGE); return; }
       } else if (onNudgeConnector) {

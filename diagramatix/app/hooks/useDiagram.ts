@@ -1413,10 +1413,21 @@ function reducer(state: DiagramData, action: Action): DiagramData {
           const clamp = (v: number) => Math.max(0.02, Math.min(0.98, v));
           const el = state.elements.find(e => e.id === elId);
           if (el?.type === "gateway") {
-            // For diamond edges, both dx and dy contribute to movement along the diagonal
-            // Use the dominant axis for the nudge direction
-            const delta = (Math.abs(dx) > Math.abs(dy) ? dx : dy) * 0.02;
-            return clamp(offset + delta);
+            // Map (dx, dy) → offset delta so the visible endpoint moves
+            // in the same direction as the arrow key. Per side, increasing
+            // offset (0→1) traverses the two diamond edges:
+            //   top:    left vertex → top → right vertex (offset rises with +dx)
+            //   right:  top vertex → right → bottom vertex (offset rises with +dy)
+            //   bottom: right vertex → bottom → left vertex (offset rises with -dx)
+            //   left:   bottom vertex → left → top vertex (offset rises with -dy)
+            let delta = 0;
+            switch (side) {
+              case "top":    delta = dx; break;
+              case "right":  delta = dy; break;
+              case "bottom": delta = -dx; break;
+              case "left":   delta = -dy; break;
+            }
+            return clamp(offset + delta * 0.02);
           }
           if (side === "top" || side === "bottom") return clamp(offset + dx * 0.02);
           return clamp(offset + dy * 0.02);

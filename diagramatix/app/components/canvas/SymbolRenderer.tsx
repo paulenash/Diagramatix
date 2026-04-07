@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, createContext, useContext } from "react";
+import { useState, createContext, useContext } from "react";
 import type { BpmnTaskType, GatewayType, EventType, DiagramElement, Point, Side, SymbolType } from "@/app/lib/diagram/types";
 import { type SymbolColorConfig, resolveColor } from "@/app/lib/diagram/colors";
 import { DisplayModeCtx, FontScaleCtx, sketchyFilter } from "@/app/lib/diagram/displayMode";
@@ -1209,16 +1209,6 @@ function getLabelPos(el: DiagramElement): { x: number; y: number; baseline: "han
   if (el.type === "uml-enumeration") {
     return { x: el.x + el.width / 2, y: el.y + HEADER_H / 2 + 6, baseline: "middle" };
   }
-  // Tasks and subprocesses honour an internal label offset (clamped at draw time)
-  if (el.type === "task" || el.type === "subprocess" || el.type === "subprocess-expanded") {
-    const offX = (el.properties?.labelOffsetX as number) ?? 0;
-    const offY = (el.properties?.labelOffsetY as number) ?? 0;
-    return {
-      x: el.x + el.width / 2 + offX,
-      y: el.y + el.height / 2 + offY,
-      baseline: "middle",
-    };
-  }
   return { x: el.x + el.width / 2, y: el.y + el.height / 2, baseline: "middle" };
 }
 
@@ -1286,9 +1276,6 @@ export function SymbolRenderer({
   // Clear label highlight when element is deselected
   if (!selected && labelHighlighted) setLabelHighlighted(false);
   let dragStart: { mouseX: number; mouseY: number; elX: number; elY: number } | null = null;
-  // Suppresses the next double-click event (used after a label-move drag so
-  // the OS double-click doesn't open the label editor).
-  const suppressNextDblClickRef = useRef(false);
 
   function handleMouseDown(e: React.MouseEvent) {
     // White-box pool: only the 30px header sidebar accepts interaction
@@ -1309,44 +1296,15 @@ export function SymbolRenderer({
     onSelect(e);
 
     // Task/Subprocess click model:
-    //   1. Click on element body (not selected) → select only
-    //   2. Click on element body (already selected) → enter connection-creation mode
-    //   3. Click on the LABEL TEXT itself → enter label-move mode (drag to reposition)
-    //   4. Drag → move element
-    //   5. Double-click → edit label
+    //   1. Click (not selected) → select
+    //   2. Click again on already-selected → enter connection-creation mode
+    //   3. Drag → move element
+    //   4. Double-click → edit label
     const isTaskLike =
       element.type === "task" ||
       element.type === "subprocess" ||
       element.type === "subprocess-expanded";
     if (isTaskLike && !multiSelected && onEnterConnectionMode) {
-      // Hit-test: did the click land on the label text?
-      // The label is centred on getLabelPos(element). Estimate text bounds
-      // from labelWidth (default = element width) and a single line height.
-      const labelPos = getLabelPos(element);
-      const labelW = (element.properties?.labelWidth as number) ?? element.width;
-      const lines = wrapText(element.label, labelW);
-      const lineH = 14;
-      const textH = lines.length * lineH;
-      // Approximate text width (the longer of any wrapped line)
-      const longestChars = lines.reduce((m, l) => Math.max(m, l.length), 0);
-      const textW = Math.min(labelW, Math.max(40, longestChars * 12 * 0.55));
-      const HIT_PAD = 4;
-      const worldPt = svgToWorld ? svgToWorld(e.clientX, e.clientY) : null;
-      const hitLabel = !!worldPt &&
-        Math.abs(worldPt.x - labelPos.x) <= textW / 2 + HIT_PAD &&
-        Math.abs(worldPt.y - labelPos.y) <= textH / 2 + HIT_PAD;
-
-      if (hitLabel) {
-        // Click on label → label-move mode (also cancels connection-creation if active)
-        if (onCancelConnectionMode) onCancelConnectionMode();
-        document.body.style.cursor = "grabbing";
-        // Suppress the OS double-click that would otherwise open the label editor
-        suppressNextDblClickRef.current = true;
-        beginLabelMoveDrag(e);
-        return;
-      }
-      // Click on body — track movement; if no drag, treat as click and (if
-      // element was already selected) enter connection-creation mode.
       const MOVE_THRESHOLD = 4;
       const startClientX = e.clientX;
       const startClientY = e.clientY;
@@ -1373,47 +1331,6 @@ export function SymbolRenderer({
     }
 
     beginElementDrag(e);
-  }
-
-  // Drag the label inside a task/subprocess element. Adjusts
-  // properties.labelOffsetX/Y, clamped to keep the label within the element.
-  function beginLabelMoveDrag(e: React.MouseEvent) {
-    if (!svgToWorld || !onUpdateProperties) {
-      // Fall back to element drag if we can't reach the API
-      beginElementDrag(e);
-      return;
-    }
-    const startWorld = svgToWorld(e.clientX, e.clientY);
-    const startOffX = (element.properties?.labelOffsetX as number) ?? 0;
-    const startOffY = (element.properties?.labelOffsetY as number) ?? 0;
-    const halfW = element.width / 2;
-    const halfH = element.height / 2;
-    const PAD = 4;
-    const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
-
-    function onMouseMove(ev: MouseEvent) {
-      const cur = svgToWorld!(ev.clientX, ev.clientY);
-      const dx = cur.x - startWorld.x;
-      const dy = cur.y - startWorld.y;
-      const newOffX = clamp(startOffX + dx, -halfW + PAD, halfW - PAD);
-      const newOffY = clamp(startOffY + dy, -halfH + PAD, halfH - PAD);
-      onUpdateProperties!(element.id, { labelOffsetX: newOffX, labelOffsetY: newOffY });
-    }
-    function onMouseUp() {
-      document.body.style.cursor = "";
-      window.removeEventListener("mousemove", onMouseMove);
-      window.removeEventListener("mouseup", onMouseUp);
-      window.removeEventListener("keydown", onKeyDown);
-    }
-    function onKeyDown(ev: KeyboardEvent) {
-      if (ev.key !== "Escape") return;
-      // Revert to original offsets
-      onUpdateProperties!(element.id, { labelOffsetX: startOffX, labelOffsetY: startOffY });
-      onMouseUp();
-    }
-    window.addEventListener("mousemove", onMouseMove);
-    window.addEventListener("mouseup", onMouseUp);
-    window.addEventListener("keydown", onKeyDown);
   }
 
   function beginElementDrag(e: React.MouseEvent) {
@@ -1549,11 +1466,6 @@ export function SymbolRenderer({
       onMouseDown={handleMouseDown}
       onDoubleClick={(e) => {
         e.stopPropagation();
-        // Suppress double-click immediately after a label-move drag
-        if (suppressNextDblClickRef.current) {
-          suppressNextDblClickRef.current = false;
-          return;
-        }
         // For pools, only trigger label edit when double-clicking the header strip (left 30px)
         if (element.type === "pool" && svgToWorld) {
           const world = svgToWorld(e.clientX, e.clientY);
