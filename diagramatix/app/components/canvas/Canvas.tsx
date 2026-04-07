@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useRef, useState, useCallback, useEffect, useMemo } from "react";
+import { nanoid } from "nanoid";
 import type {
   BpmnTaskType,
   Connector,
@@ -16,6 +17,7 @@ import type {
   SymbolType,
 } from "@/app/lib/diagram/types";
 import { SymbolRenderer, SublaneIdsCtx, type ResizeHandle } from "./SymbolRenderer";
+import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
 import { DisplayModeCtx, FontScaleCtx, ConnectorFontScaleCtx, TitleFontSizeCtx, SketchyFilter } from "@/app/lib/diagram/displayMode";
 import { ConnectorRenderer } from "./ConnectorRenderer";
 
@@ -135,7 +137,7 @@ function findConnectorNearPoint(connectors: Connector[], pos: Point, margin = 15
 interface Props {
   data: DiagramData;
   diagramType: DiagramType;
-  onAddElement: (type: SymbolType, position: Point, taskType?: BpmnTaskType, eventType?: EventType) => void;
+  onAddElement: (type: SymbolType, position: Point, taskType?: BpmnTaskType, eventType?: EventType, id?: string) => void;
   onMoveElement: (id: string, x: number, y: number) => void;
   onResizeElement: (id: string, x: number, y: number, width: number, height: number) => void;
   onUpdateLabel: (id: string, label: string) => void;
@@ -233,6 +235,24 @@ function getClosestSide(pos: Point, el: DiagramElement): Side {
 
 function pointToBoundaryOffset(p: Point, el: DiagramElement): { side: Side; offsetAlong: number } {
   const clamp = (v: number) => Math.max(0, Math.min(1, v));
+  // Gateways: snap to nearest diamond vertex if within 3px.
+  // Each vertex is at offset 0.5 of its corresponding side.
+  if (el.type === "gateway") {
+    const cx = el.x + el.width / 2;
+    const cy = el.y + el.height / 2;
+    const verts: Array<{ side: Side; x: number; y: number }> = [
+      { side: "top",    x: cx,                y: el.y },
+      { side: "right",  x: el.x + el.width,   y: cy },
+      { side: "bottom", x: cx,                y: el.y + el.height },
+      { side: "left",   x: el.x,              y: cy },
+    ];
+    let best = verts[0]; let bestDist = Infinity;
+    for (const v of verts) {
+      const d = Math.hypot(p.x - v.x, p.y - v.y);
+      if (d < bestDist) { bestDist = d; best = v; }
+    }
+    if (bestDist <= 3) return { side: best.side, offsetAlong: 0.5 };
+  }
   const distTop    = Math.abs(p.y - el.y);
   const distBottom = Math.abs(p.y - (el.y + el.height));
   const distLeft   = Math.abs(p.x - el.x);
@@ -397,6 +417,17 @@ export function Canvas({
   }, []);
   const [pickerOffset, setPickerOffset] = useState<Point>({ x: 0, y: 0 });
   const pickerDragRef = useRef<{ startX: number; startY: number; origOffX: number; origOffY: number } | null>(null);
+
+  // Auto-connect after BPMN element drop: flashes a sequence connector preview
+  // that the user can abort by pressing Esc.
+  const [autoConnectFlash, setAutoConnectFlash] = useState<{
+    sourceId: string;
+    targetId: string;
+    from: Point;
+    to: Point;
+    visible: boolean;
+  } | null>(null);
+  const autoConnectAbortRef = useRef(false);
 
   // Fit-to-content on initial mount
   const hasFitted = useRef(false);
@@ -1221,6 +1252,58 @@ export function Canvas({
     setZoom(newZoom);
   }
 
+  // BPMN auto-connect: find the nearest element to the LEFT of (newX, newY, newW, newH)
+  // that vertically overlaps the new element. Returns the source element id or null.
+  function findAutoConnectSource(
+    newX: number, newY: number, newW: number, newH: number
+  ): DiagramElement | null {
+    const AUTO_CONNECT_TYPES = new Set<SymbolType>([
+      "task", "subprocess", "subprocess-expanded", "gateway",
+      "start-event", "intermediate-event", "end-event",
+    ]);
+    let best: DiagramElement | null = null;
+    let bestRight = -Infinity;
+    for (const el of data.elements) {
+      if (!AUTO_CONNECT_TYPES.has(el.type)) continue;
+      const elRight = el.x + el.width;
+      if (elRight > newX) continue; // not strictly to the left
+      // Vertical overlap check
+      const overlapTop = Math.max(el.y, newY);
+      const overlapBottom = Math.min(el.y + el.height, newY + newH);
+      if (overlapBottom <= overlapTop) continue;
+      if (elRight > bestRight) { bestRight = elRight; best = el; }
+    }
+    return best;
+  }
+
+  function startAutoConnect(sourceEl: DiagramElement, targetId: string, targetX: number, targetY: number, targetH: number) {
+    autoConnectAbortRef.current = false;
+    const from = { x: sourceEl.x + sourceEl.width, y: sourceEl.y + sourceEl.height / 2 };
+    const to = { x: targetX, y: targetY + targetH / 2 };
+    let cycle = 0;
+    const TOTAL_CYCLES = 6; // 3 flashes = 3 on + 3 off
+    setAutoConnectFlash({ sourceId: sourceEl.id, targetId, from, to, visible: true });
+    const tick = () => {
+      if (autoConnectAbortRef.current) { setAutoConnectFlash(null); return; }
+      cycle++;
+      if (cycle >= TOTAL_CYCLES) {
+        // Commit the connector
+        setAutoConnectFlash(null);
+        if (!autoConnectAbortRef.current) {
+          onAddConnector(
+            sourceEl.id, targetId,
+            "sequence", defaultDirectionType, defaultRoutingType,
+            "right", "left", 0.5, 0.5
+          );
+        }
+        return;
+      }
+      setAutoConnectFlash(prev => prev ? { ...prev, visible: !prev.visible } : null);
+      setTimeout(tick, 150);
+    };
+    setTimeout(tick, 150);
+  }
+
   function handleDrop(e: React.DragEvent) {
     e.preventDefault();
     if (readOnly) return;
@@ -1261,8 +1344,33 @@ export function Canvas({
         symbolType: pendingDragSymbol,
       });
     } else {
-      onAddElement(pendingDragSymbol, worldPos);
+      addElementWithAutoConnect(pendingDragSymbol, worldPos);
     }
+  }
+
+  // Wraps onAddElement, adding BPMN auto-connect logic for elements placed
+  // to the right of an existing element with vertical overlap.
+  function addElementWithAutoConnect(
+    symbolType: SymbolType, worldPos: Point,
+    taskType?: BpmnTaskType, eventType?: EventType
+  ) {
+    const AUTO_CONNECT_TYPES = new Set<SymbolType>([
+      "task", "subprocess", "subprocess-expanded", "gateway",
+      "start-event", "intermediate-event", "end-event",
+    ]);
+    if (diagramType === "bpmn" && AUTO_CONNECT_TYPES.has(symbolType)) {
+      const def = getSymbolDefinition(symbolType);
+      const newX = worldPos.x - def.defaultWidth / 2;
+      const newY = worldPos.y - def.defaultHeight / 2;
+      const source = findAutoConnectSource(newX, newY, def.defaultWidth, def.defaultHeight);
+      if (source) {
+        const newId = nanoid();
+        onAddElement(symbolType, worldPos, taskType, eventType, newId);
+        startAutoConnect(source, newId, newX, newY, def.defaultHeight);
+        return;
+      }
+    }
+    onAddElement(symbolType, worldPos, taskType, eventType);
   }
 
   function startEditingLabel(el: DiagramElement) {
@@ -1393,6 +1501,11 @@ export function Canvas({
       setPendingDrop(null);
       onSetSelectedElements(new Set());
       onSelectConnector(null);
+      // Abort any in-progress auto-connect
+      if (autoConnectFlash) {
+        autoConnectAbortRef.current = true;
+        setAutoConnectFlash(null);
+      }
     }
     if (e.key === "Delete") {
       if (editingLabel) return;
@@ -2453,6 +2566,38 @@ export function Canvas({
             />
           )}
 
+          {/* Auto-connect flashing preview — user can press Esc to abort */}
+          {autoConnectFlash && autoConnectFlash.visible && (() => {
+            const dx = autoConnectFlash.to.x - autoConnectFlash.from.x;
+            const dy = autoConnectFlash.to.y - autoConnectFlash.from.y;
+            const len = Math.hypot(dx, dy) || 1;
+            const ux = dx / len, uy = dy / len;
+            // Arrowhead at target end
+            const aSize = 8;
+            const aBaseX = autoConnectFlash.to.x - ux * aSize;
+            const aBaseY = autoConnectFlash.to.y - uy * aSize;
+            const aLeftX = aBaseX - uy * (aSize * 0.5);
+            const aLeftY = aBaseY + ux * (aSize * 0.5);
+            const aRightX = aBaseX + uy * (aSize * 0.5);
+            const aRightY = aBaseY - ux * (aSize * 0.5);
+            return (
+              <g style={{ pointerEvents: "none" }}>
+                <line
+                  x1={autoConnectFlash.from.x}
+                  y1={autoConnectFlash.from.y}
+                  x2={autoConnectFlash.to.x}
+                  y2={autoConnectFlash.to.y}
+                  stroke="#10b981"
+                  strokeWidth={2}
+                />
+                <polygon
+                  points={`${autoConnectFlash.to.x},${autoConnectFlash.to.y} ${aLeftX},${aLeftY} ${aRightX},${aRightY}`}
+                  fill="#10b981"
+                />
+              </g>
+            );
+          })()}
+
           {/* Rubber-band line during endpoint drag */}
           {draggingEndpoint && (
             <line data-interactive
@@ -2759,7 +2904,7 @@ export function Canvas({
                 className="text-left px-3 py-0.5 text-sm text-gray-700 hover:bg-gray-50"
                 onMouseDown={(e) => {
                   e.preventDefault();
-                  onAddElement("task", pendingDrop.worldPos, opt.value);
+                  addElementWithAutoConnect("task", pendingDrop.worldPos, opt.value);
                   setPendingDrop(null);
                 }}
               >
@@ -2795,7 +2940,7 @@ export function Canvas({
                   if (pendingDrop.splitConnectorId && onSplitConnector) {
                     onSplitConnector("intermediate-event", pendingDrop.worldPos, pendingDrop.splitConnectorId, undefined, opt.value);
                   } else {
-                    onAddElement("intermediate-event", pendingDrop.worldPos, undefined, opt.value);
+                    addElementWithAutoConnect("intermediate-event", pendingDrop.worldPos, undefined, opt.value);
                   }
                   setPendingDrop(null);
                 }}

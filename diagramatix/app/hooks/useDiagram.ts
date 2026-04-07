@@ -137,7 +137,7 @@ function adjustMsgLabelOffset(
 
 type Action =
   | { type: "SET_DATA"; payload: DiagramData }
-  | { type: "ADD_ELEMENT"; payload: { symbolType: SymbolType; position: Point; taskType?: BpmnTaskType; eventType?: EventType } }
+  | { type: "ADD_ELEMENT"; payload: { symbolType: SymbolType; position: Point; taskType?: BpmnTaskType; eventType?: EventType; id?: string } }
   | { type: "MOVE_ELEMENT"; payload: { id: string; x: number; y: number } }
   | { type: "RESIZE_ELEMENT"; payload: { id: string; x: number; y: number; width: number; height: number } }
   | { type: "UPDATE_LABEL"; payload: { id: string; label: string } }
@@ -573,7 +573,7 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         label = "Test?";
       }
       let newEl: DiagramElement = {
-        id: nanoid(),
+        id: action.payload.id ?? nanoid(),
         type: action.payload.symbolType,
         x: action.payload.position.x - def.defaultWidth / 2,
         y: action.payload.position.y - def.defaultHeight / 2,
@@ -2119,9 +2119,9 @@ export function useDiagram(initialData: DiagramData) {
   // ────────────────────────────────────────────────────────────────────────────
 
   const addElement = useCallback(
-    (symbolType: SymbolType, position: Point, taskType?: BpmnTaskType, eventType?: EventType) => {
+    (symbolType: SymbolType, position: Point, taskType?: BpmnTaskType, eventType?: EventType, id?: string) => {
       pushHistory(snapshotData());
-      dispatch({ type: "ADD_ELEMENT", payload: { symbolType, position, taskType, eventType } });
+      dispatch({ type: "ADD_ELEMENT", payload: { symbolType, position, taskType, eventType, id } });
     },
     []
   );
