@@ -1450,12 +1450,20 @@ export function Canvas({
     ]);
     if (diagramType === "bpmn" && AUTO_CONNECT_TYPES.has(symbolType)) {
       const def = getSymbolDefinition(symbolType);
-      const newX = worldPos.x - def.defaultWidth / 2;
-      const newY = worldPos.y - def.defaultHeight / 2;
+      let newX = worldPos.x - def.defaultWidth / 2;
+      let newY = worldPos.y - def.defaultHeight / 2;
       const found = findAutoConnectSource(newX, newY, def.defaultWidth, def.defaultHeight);
       if (found) {
+        // Case A (right + vertical overlap): auto-align horizontally so the
+        // new element's centre y matches the source's centre y.
+        let alignedPos = worldPos;
+        if (found.srcSide === "right" && found.tgtSide === "left") {
+          const srcCy = found.source.y + found.source.height / 2;
+          newY = srcCy - def.defaultHeight / 2;
+          alignedPos = { x: worldPos.x, y: srcCy };
+        }
         const newId = nanoid();
-        onAddElement(symbolType, worldPos, taskType, eventType, newId);
+        onAddElement(symbolType, alignedPos, taskType, eventType, newId);
         startAutoConnect(found.source, newId, newX, newY, def.defaultWidth, def.defaultHeight, found.srcSide, found.tgtSide);
         return;
       }
