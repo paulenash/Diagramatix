@@ -1312,17 +1312,26 @@ export function Canvas({
       if (best) return { source: best, srcSide: bestSrcSide, tgtSide: bestTgtSide };
     }
 
-    // Case C: nearest LEFT regardless of vertical overlap (diagonal placement)
+    // Case C: nearest LEFT element where new is diagonally above/below
+    // (no horizontal overlap AND no vertical overlap with the source).
     {
       let best: DiagramElement | null = null;
-      let bestRight = -Infinity;
+      let bestDist = Infinity;
       for (const el of candidates) {
         const elRight = el.x + el.width;
+        const elBottom = el.y + el.height;
+        // Must be strictly to the left (no horizontal overlap)
         if (elRight > newX) continue;
-        if (elRight > bestRight) { bestRight = elRight; best = el; }
+        // Must be strictly above or below (no vertical overlap)
+        const vOverlap = Math.min(elBottom, newBottom) - Math.max(el.y, newY);
+        if (vOverlap > 0) continue;
+        // Pick the closest element by Euclidean distance between nearest corners
+        const dx = newX - elRight;
+        const dy = newY < el.y ? el.y - newBottom : newY - elBottom;
+        const dist = Math.hypot(dx, dy);
+        if (dist < bestDist) { bestDist = dist; best = el; }
       }
       if (best) {
-        // New is above or below the source — choose top or bottom of source
         const srcCy = best.y + best.height / 2;
         const newCy = newY + newH / 2;
         const srcSide: Side = newCy < srcCy ? "top" : "bottom";
