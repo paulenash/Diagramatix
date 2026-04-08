@@ -1272,7 +1272,10 @@ export function Canvas({
       "task", "subprocess", "subprocess-expanded", "gateway",
       "start-event", "intermediate-event", "end-event",
     ]);
-    const candidates = data.elements.filter(e => AUTO_CONNECT_TYPES.has(e.type));
+    // Never auto-connect to/from edge-mounted (boundary) events.
+    const candidates = data.elements.filter(
+      (e) => AUTO_CONNECT_TYPES.has(e.type) && !e.boundaryHostId
+    );
     const newRight = newX + newW;
     const newBottom = newY + newH;
     const newCx = newX + newW / 2;
@@ -1524,7 +1527,42 @@ export function Canvas({
       "task", "subprocess", "subprocess-expanded", "gateway",
       "start-event", "intermediate-event", "end-event",
     ]);
-    if (diagramType === "bpmn" && AUTO_CONNECT_TYPES.has(symbolType)) {
+    // Mirror useDiagram's boundary-snap thresholds so we can predict if the
+    // new element will become an edge-mounted (boundary) event in the reducer.
+    const BOUNDARY_EVENT_TYPES_LOCAL = new Set<SymbolType>([
+      "start-event", "intermediate-event", "end-event",
+    ]);
+    const BOUNDARY_HOST_TYPES_LOCAL = new Set<SymbolType>([
+      "task", "subprocess", "subprocess-expanded",
+    ]);
+    const BOUNDARY_SNAP_THRESHOLD_LOCAL = 25;
+    function willBeBoundaryEvent(): boolean {
+      if (!BOUNDARY_EVENT_TYPES_LOCAL.has(symbolType)) return false;
+      const centre = worldPos;
+      for (const host of data.elements) {
+        if (!BOUNDARY_HOST_TYPES_LOCAL.has(host.type)) continue;
+        // Closest point on host's rectangle boundary to centre
+        const cx = Math.max(host.x, Math.min(host.x + host.width, centre.x));
+        const cy = Math.max(host.y, Math.min(host.y + host.height, centre.y));
+        const onLeft   = Math.abs(centre.x - host.x);
+        const onRight  = Math.abs(centre.x - (host.x + host.width));
+        const onTop    = Math.abs(centre.y - host.y);
+        const onBottom = Math.abs(centre.y - (host.y + host.height));
+        const inside =
+          centre.x > host.x && centre.x < host.x + host.width &&
+          centre.y > host.y && centre.y < host.y + host.height;
+        let dist: number;
+        if (inside) {
+          dist = Math.min(onLeft, onRight, onTop, onBottom);
+        } else {
+          dist = Math.hypot(centre.x - cx, centre.y - cy);
+        }
+        if (dist < BOUNDARY_SNAP_THRESHOLD_LOCAL) return true;
+      }
+      return false;
+    }
+
+    if (diagramType === "bpmn" && AUTO_CONNECT_TYPES.has(symbolType) && !willBeBoundaryEvent()) {
       const def = getSymbolDefinition(symbolType);
       let newX = worldPos.x - def.defaultWidth / 2;
       let newY = worldPos.y - def.defaultHeight / 2;
