@@ -1008,16 +1008,35 @@ export function DiagramEditor({
                 Export PDF
               </button>
               {diagramType === "bpmn" && (
-                <button
-                  onClick={async () => {
-                    const { exportVisio } = await import("@/app/lib/diagram/exportVisio");
-                    await exportVisio(data, diagramName);
-                    setExportDropdownOpen(false);
-                  }}
-                  className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
-                >
-                  Export Visio
-                </button>
+                <>
+                  <button
+                    onClick={() => {
+                      setExportDropdownOpen(false);
+                      // V3 server-side export — independent fork of V2,
+                      // free to evolve without affecting V2.
+                      const a = document.createElement("a");
+                      a.href = `/api/export/visio-v3?diagramId=${diagramId}`;
+                      a.rel = "noopener";
+                      a.click();
+                    }}
+                    className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                  >
+                    Export Visio (V3)
+                  </button>
+                  <button
+                    onClick={() => {
+                      setExportDropdownOpen(false);
+                      // V2 server-side export (frozen baseline).
+                      const a = document.createElement("a");
+                      a.href = `/api/export/visio-v2?diagramId=${diagramId}`;
+                      a.rel = "noopener";
+                      a.click();
+                    }}
+                    className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                  >
+                    Export Visio (V2)
+                  </button>
+                </>
               )}
               <div className="border-t border-gray-100" />
               <div className="px-3 py-2">
