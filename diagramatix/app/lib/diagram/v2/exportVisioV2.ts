@@ -327,9 +327,14 @@ export async function exportVisioV2(
     const isPool = mapping.masterId === 19;
     const textEl = el.label ? `<Text>${esc(el.label)}</Text>` : "";
 
-    // For Tasks, Subprocesses, Pools, Gateways: set Width/Height + sub-shapes with F='Inh'
-    // so the visual matches the Diagramatix dimensions
-    const isResizable = [9, 33, 19, 104].includes(mapping.masterId); // Task, Subprocess, Pool, Gateway
+    // For Tasks, Subprocesses, Pools: set Width/Height + sub-shapes with F='Inh'
+    // so the visual matches the Diagramatix dimensions.
+    //
+    // Gateways are intentionally EXCLUDED from this list so the page instance
+    // inherits the BPMN_M master's natural Width/Height. That keeps the
+    // visible diamond and the selection boundary as the same shape (the
+    // standard Visio gateway), and connectors attach to the master's sides.
+    const isResizable = [9, 33, 19].includes(mapping.masterId); // Task, Subprocess, Pool
     const hw = w / 2;
     const hh = h / 2;
 
@@ -348,10 +353,7 @@ export async function exportVisioV2(
         `<Cell N='TxtLocPinX' V='${hw}' F='Inh'/>`;
       userSection = `<Section N='User'><Row N='IsInstance'><Cell N='Value' V='1' U='BOOL' F='Inh'/></Row></Section>`;
 
-      if (mapping.masterId === 104) {
-        // Gateway (BPMN_M master): F='Inh' sub-shapes don't work — skip for now
-        subShapes = "";
-      } else if (isPool) {
+      if (isPool) {
         // Pool/Lane: create a per-instance master with updated cached dimension values.
         // Sub-shapes have formulas (Sheet.5!Width*1, etc.) but Visio uses cached V= values
         // on file open, so ALL cached values must be updated.

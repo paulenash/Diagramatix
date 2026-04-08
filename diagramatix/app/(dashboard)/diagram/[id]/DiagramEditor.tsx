@@ -1009,24 +1009,26 @@ export function DiagramEditor({
               </button>
               {diagramType === "bpmn" && (
                 <>
+                  {isAdmin && (
+                    <button
+                      onClick={() => {
+                        setExportDropdownOpen(false);
+                        // V3 server-side export — admin-only experimental fork of V2,
+                        // free to evolve without affecting V2.
+                        const a = document.createElement("a");
+                        a.href = `/api/export/visio-v3?diagramId=${diagramId}`;
+                        a.rel = "noopener";
+                        a.click();
+                      }}
+                      className="w-full text-left px-3 py-2 text-xs text-orange-600 hover:bg-orange-50"
+                    >
+                      Export Visio (V3) — admin
+                    </button>
+                  )}
                   <button
                     onClick={() => {
                       setExportDropdownOpen(false);
-                      // V3 server-side export — independent fork of V2,
-                      // free to evolve without affecting V2.
-                      const a = document.createElement("a");
-                      a.href = `/api/export/visio-v3?diagramId=${diagramId}`;
-                      a.rel = "noopener";
-                      a.click();
-                    }}
-                    className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
-                  >
-                    Export Visio (V3)
-                  </button>
-                  <button
-                    onClick={() => {
-                      setExportDropdownOpen(false);
-                      // V2 server-side export (frozen baseline).
+                      // V2 server-side export (stable baseline).
                       const a = document.createElement("a");
                       a.href = `/api/export/visio-v2?diagramId=${diagramId}`;
                       a.rel = "noopener";
@@ -1034,7 +1036,7 @@ export function DiagramEditor({
                     }}
                     className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
                   >
-                    Export Visio (V2)
+                    Export Visio
                   </button>
                 </>
               )}
