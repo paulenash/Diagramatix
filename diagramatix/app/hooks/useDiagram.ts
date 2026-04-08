@@ -1920,60 +1920,105 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       const dxyMap = new Map<string, { dx: number; dy: number }>();
 
       if (mode === "smart") {
-        // Smart: per-element decision based on proximity to group average
-        // Exclude boundary intermediate events — they stay with their host
-        // Boundary start/end events ARE movable (they align with the group)
+        // Smart align: detect ROWS (elements whose Y-ranges overlap, plus
+        // a small tolerance) and COLUMNS (whose X-ranges overlap), using
+        // union-find so membership is transitive. Each row of size >= 2
+        // snaps to its median Y; each column of size >= 2 snaps to its
+        // median X. An element in both a row and a column gets snapped on
+        // both axes — a 3x3 grid resolves to a clean grid in one click.
+        //
+        // Boundary intermediate events stay with their host. Boundary
+        // start/end events are movable.
         const movable = selected.filter((el) =>
           !el.boundaryHostId || el.type === "start-event" || el.type === "end-event"
         );
         if (movable.length < 2) return state;
 
-        const avgCX = movable.reduce((s, el) => s + el.x + el.width / 2, 0) / movable.length;
-        const avgCY = movable.reduce((s, el) => s + el.y + el.height / 2, 0) / movable.length;
+        // Tolerance pad on each side of the bounding box, so elements that
+        // are close but not quite overlapping still cluster together.
+        const PAD = 12;
 
-        // Classify each element as horizontal or vertical sub-group
-        const hGroup: DiagramElement[] = [];
-        const vGroup: DiagramElement[] = [];
+        // Union-find
+        function makeUF(n: number) {
+          const parent = Array.from({ length: n }, (_, i) => i);
+          function find(i: number): number {
+            while (parent[i] !== i) {
+              parent[i] = parent[parent[i]];
+              i = parent[i];
+            }
+            return i;
+          }
+          function union(a: number, b: number) {
+            const ra = find(a), rb = find(b);
+            if (ra !== rb) parent[ra] = rb;
+          }
+          return { find, union };
+        }
+
+        // Cluster movable elements by axis overlap. For rows we test
+        // Y-range overlap; for columns we test X-range overlap.
+        function clusterByOverlap(axis: "x" | "y") {
+          const uf = makeUF(movable.length);
+          for (let i = 0; i < movable.length; i++) {
+            for (let j = i + 1; j < movable.length; j++) {
+              const a = movable[i];
+              const b = movable[j];
+              const aLo = (axis === "y" ? a.y : a.x) - PAD;
+              const aHi = (axis === "y" ? a.y + a.height : a.x + a.width) + PAD;
+              const bLo = (axis === "y" ? b.y : b.x);
+              const bHi = (axis === "y" ? b.y + b.height : b.x + b.width);
+              if (aLo < bHi && bLo < aHi) uf.union(i, j);
+            }
+          }
+          const groups = new Map<number, DiagramElement[]>();
+          for (let i = 0; i < movable.length; i++) {
+            const r = uf.find(i);
+            if (!groups.has(r)) groups.set(r, []);
+            groups.get(r)!.push(movable[i]);
+          }
+          return [...groups.values()];
+        }
+
+        const rows = clusterByOverlap("y");   // Y-range overlap → rows
+        const cols = clusterByOverlap("x");   // X-range overlap → columns
+
+        // Per-element accumulated dx/dy
+        const dx = new Map<string, number>();
+        const dy = new Map<string, number>();
+        for (const el of movable) { dx.set(el.id, 0); dy.set(el.id, 0); }
+
+        // Snap each row of >= 2 to its median centre Y
+        for (const row of rows) {
+          if (row.length < 2) continue;
+          const sorted = row.map((el) => el.y + el.height / 2).sort((a, b) => a - b);
+          const medianY = sorted[Math.floor(sorted.length / 2)];
+          for (const el of row) {
+            dy.set(el.id, medianY - (el.y + el.height / 2));
+          }
+        }
+
+        // Snap each column of >= 2 to its median centre X
+        for (const col of cols) {
+          if (col.length < 2) continue;
+          const sorted = col.map((el) => el.x + el.width / 2).sort((a, b) => a - b);
+          const medianX = sorted[Math.floor(sorted.length / 2)];
+          for (const el of col) {
+            dx.set(el.id, medianX - (el.x + el.width / 2));
+          }
+        }
+
         for (const el of movable) {
-          const cx = el.x + el.width / 2;
-          const cy = el.y + el.height / 2;
-          const diffX = Math.abs(cx - avgCX);
-          const diffY = Math.abs(cy - avgCY);
-          if (diffY <= diffX) {
-            hGroup.push(el);
-          } else {
-            vGroup.push(el);
-          }
+          dxyMap.set(el.id, { dx: dx.get(el.id) ?? 0, dy: dy.get(el.id) ?? 0 });
         }
 
-        // Horizontal sub-group: align Y centres to median Y (minimises movement)
-        if (hGroup.length > 0) {
-          const yCentres = hGroup.map((el) => el.y + el.height / 2).sort((a, b) => a - b);
-          const medianY = yCentres[Math.floor(yCentres.length / 2)];
-          for (const el of hGroup) {
-            dxyMap.set(el.id, { dx: 0, dy: medianY - (el.y + el.height / 2) });
-          }
-        }
-
-        // Vertical sub-group: align X centres to median X (minimises movement)
-        if (vGroup.length > 0) {
-          const xCentres = vGroup.map((el) => el.x + el.width / 2).sort((a, b) => a - b);
-          const medianX = xCentres[Math.floor(xCentres.length / 2)];
-          for (const el of vGroup) {
-            dxyMap.set(el.id, { dx: medianX - (el.x + el.width / 2), dy: 0 });
-          }
-        }
-
-        // Boundary intermediate events: follow their host's movement (if host is in selection)
-        // Otherwise stay put — never move independently
-        // (Boundary start/end events are already in the movable set and aligned normally)
+        // Boundary intermediate events: follow their host's movement
         for (const el of selected) {
           if (el.boundaryHostId && el.type === "intermediate-event") {
             const hostDelta = dxyMap.get(el.boundaryHostId);
             dxyMap.set(el.id, hostDelta ? { ...hostDelta } : { dx: 0, dy: 0 });
           }
         }
-        // Also move boundary events NOT in selection but whose host IS moving
+        // Boundary events NOT in selection but whose host IS moving
         for (const el of state.elements) {
           if (el.boundaryHostId && !idSet.has(el.id)) {
             const hostDelta = dxyMap.get(el.boundaryHostId);
@@ -2029,58 +2074,42 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       const elMap = new Map<string, DiagramElement>();
       for (const el of newElements) elMap.set(el.id, el);
 
-      // Helper: find the nearest pair of sides between two elements
-      function nearestSides(src: DiagramElement, tgt: DiagramElement): { sourceSide: Side; targetSide: Side } {
-        const sides: Side[] = ["top", "right", "bottom", "left"];
-        function midpoint(el: DiagramElement, side: Side): Point {
-          const cx = el.x + el.width / 2, cy = el.y + el.height / 2;
-          if (side === "top") return { x: cx, y: el.y };
-          if (side === "bottom") return { x: cx, y: el.y + el.height };
-          if (side === "left") return { x: el.x, y: cy };
-          return { x: el.x + el.width, y: cy };
-        }
-        let bestDist = Infinity, bestSrc: Side = "right", bestTgt: Side = "left";
-        for (const ss of sides) {
-          const sp = midpoint(src, ss);
-          for (const ts of sides) {
-            const tp = midpoint(tgt, ts);
-            const d = Math.hypot(sp.x - tp.x, sp.y - tp.y);
-            if (d < bestDist) { bestDist = d; bestSrc = ss; bestTgt = ts; }
-          }
-        }
-        return { sourceSide: bestSrc, targetSide: bestTgt };
-      }
-
-      // Re-route connectors between aligned elements with nearest connection points
+      // Re-route connectors that touch aligned elements.
+      //
+      // Use the same code path as a normal element move (recomputeAllConnectors)
+      // so the result preserves sourceInvisibleLeader / targetInvisibleLeader
+      // flags and the connector's first/last waypoints land exactly on the
+      // element's boundary. The previous bespoke recompute here updated only
+      // sourceSide/targetSide/waypoints and left the leader flags stale,
+      // which made connectors appear visually disconnected from elements.
+      //
+      // Optimisation: connectors where BOTH endpoints move by the SAME delta
+      // (uniform translation, e.g. all members of the same group nudged) can
+      // be translated directly without rerouting.
       const newConnectors = state.connectors.map((c) => {
         const srcInSet = idSet.has(c.sourceId);
         const tgtInSet = idSet.has(c.targetId);
         if (!srcInSet && !tgtInSet) return c;
 
-        const srcEl = elMap.get(c.sourceId);
-        const tgtEl = elMap.get(c.targetId);
-        if (!srcEl || !tgtEl) return c;
+        const dSrc = dxyMap.get(c.sourceId) ?? { dx: 0, dy: 0 };
+        const dTgt = dxyMap.get(c.targetId) ?? { dx: 0, dy: 0 };
 
-        if (srcInSet && tgtInSet) {
-          // Both in selection — find nearest sides and recompute waypoints
-          const { sourceSide, targetSide } = nearestSides(srcEl, tgtEl);
-          const result = computeWaypoints(srcEl, tgtEl, newElements, sourceSide, targetSide, c.routingType);
-          return { ...c, sourceSide, targetSide, waypoints: result.waypoints };
+        // Both endpoints moved by the same delta → simple translation preserves
+        // the existing geometry (no diagonal segments introduced).
+        if (
+          srcInSet && tgtInSet &&
+          dSrc.dx === dTgt.dx && dSrc.dy === dTgt.dy &&
+          c.waypoints && c.waypoints.length > 0
+        ) {
+          return {
+            ...c,
+            waypoints: c.waypoints.map((wp) => ({ x: wp.x + dSrc.dx, y: wp.y + dSrc.dy })),
+          };
         }
 
-        // Only one endpoint in selection — interpolate waypoint shift
-        const d = dxyMap.get(srcInSet ? c.sourceId : c.targetId);
-        if (!d || (d.dx === 0 && d.dy === 0) || !c.waypoints || c.waypoints.length === 0) return c;
-        const n = c.waypoints.length;
-        return {
-          ...c,
-          waypoints: c.waypoints.map((wp, i) => {
-            const t = srcInSet
-              ? (n > 1 ? 1 - i / (n - 1) : 1)
-              : (n > 1 ? i / (n - 1) : 1);
-            return { x: wp.x + d.dx * t, y: wp.y + d.dy * t };
-          }),
-        };
+        // Otherwise: full recompute via the same helper used for normal moves.
+        // This sets sourceInvisibleLeader/targetInvisibleLeader correctly.
+        return recomputeAllConnectors([c], newElements)[0] ?? c;
       });
 
       return { ...state, elements: newElements, connectors: newConnectors };
