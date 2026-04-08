@@ -676,14 +676,16 @@ export function recomputeAllConnectors(
       };
     }
 
-    // For rectilinear connectors with enough waypoints, try to preserve user's interior routing.
-    // Only the 6 boundary waypoints (srcCenter, srcEdge, exitPt, approachPt, tgtEdge, tgtCenter)
-    // are updated; interior turns (indices 3..N-4) are kept as-is.
-    // But if the result hits obstacles, fall through to full recompute.
+    // For rectilinear connectors with USER-CUSTOMISED interior routing,
+    // try to preserve their waypoints. Auto-generated routes (single L-shape
+    // = 7 waypoints, single vertical jog = 8 waypoints) are NOT preserved —
+    // they should always recompute from scratch so jogs stay centred between
+    // the two elements as they move. Only when N >= 9 do we have evidence of
+    // user customisation worth preserving.
     if (conn.routingType === "rectilinear") {
       const wp = conn.waypoints;
       const N = wp.length;
-      if (N >= 7) {
+      if (N >= 9) {
         const newSrcCenter  = getConnectionPointBySide(source, conn.sourceSide);
         const newTgtCenter  = getConnectionPointBySide(target, conn.targetSide);
         const newSrcEdge    = sidePoint(source, conn.sourceSide, conn.sourceOffsetAlong ?? 0.5);
@@ -730,10 +732,20 @@ export function recomputeAllConnectors(
             && !el.boundaryHostId
             && SEQ_OBS.has(el.type))
           .map(getBounds);
-        if (outwardOk && !pathHitsObstacles(candidate, obstacles)) {
+        // Validate every segment is strictly axis-aligned. If the rectify pass
+        // failed to make the result orthogonal (e.g. because the user-customised
+        // interior is no longer compatible with the new exit/approach), fall
+        // through to a full recompute.
+        let allOrthogonal = true;
+        for (let i = 1; i < candidate.length; i++) {
+          const dx = Math.abs(candidate[i].x - candidate[i - 1].x);
+          const dy = Math.abs(candidate[i].y - candidate[i - 1].y);
+          if (dx > 0.5 && dy > 0.5) { allOrthogonal = false; break; }
+        }
+        if (allOrthogonal && outwardOk && !pathHitsObstacles(candidate, obstacles)) {
           return { ...conn, waypoints: candidate };
         }
-        // Interior routing hits obstacle or goes inward — fall through to full recompute
+        // Interior routing hits obstacle, goes inward, or is non-orthogonal — fall through
       }
     }
 
