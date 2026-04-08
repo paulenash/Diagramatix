@@ -782,11 +782,20 @@ function ExpandedSubprocessShape({ el }: { el: DiagramElement }) {
   const colors = useContext(SymbolColorCtx);
   const spType = (el.properties.subprocessType as string | undefined) ?? "normal";
   const fill = resolveColor("subprocess-expanded", colors);
-  // Position markers along the bottom edge: repeat marker centred,
-  // ad-hoc marker just to its right.
-  const repeatCX = el.x + el.width / 2;
-  const repeatCY = el.y + el.height - 10;
-  const adHocCX = repeatCX + 14; // 14px to the right of the loop/MI marker
+  // Centre one or two bottom markers (Repeat and/or Ad-hoc) about the
+  // shape's horizontal centre. With two markers, they sit symmetrically
+  // 7px either side of centre; with one, it sits exactly on centre.
+  const cx = el.x + el.width / 2;
+  const cy = el.y + el.height - 10;
+  const hasRepeat = el.repeatType && el.repeatType !== "none";
+  const hasAdHoc = !!el.properties.adHoc;
+  const offset = 7;
+  let repeatCX = cx;
+  let adHocCX = cx;
+  if (hasRepeat && hasAdHoc) {
+    repeatCX = cx - offset;
+    adHocCX = cx + offset;
+  }
   return (
     <g>
       <rect x={el.x} y={el.y} width={el.width} height={el.height}
@@ -797,8 +806,8 @@ function ExpandedSubprocessShape({ el }: { el: DiagramElement }) {
         <rect x={el.x + 4} y={el.y + 4} width={el.width - 8} height={el.height - 8}
           rx={3} ry={3} fill="none" stroke="#374151" strokeWidth={1.5} />
       )}
-      <RepeatMarker el={el} cx={repeatCX} cy={repeatCY} />
-      {!!el.properties.adHoc && <AdHocMarker cx={adHocCX} cy={repeatCY} />}
+      {hasRepeat && <RepeatMarker el={el} cx={repeatCX} cy={cy} />}
+      {hasAdHoc && <AdHocMarker cx={adHocCX} cy={cy} />}
       {/* ValueBadge rendered in main SymbolRenderer */}
     </g>
   );
