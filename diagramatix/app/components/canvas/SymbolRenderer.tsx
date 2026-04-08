@@ -770,6 +770,9 @@ function SubprocessShape({ el }: { el: DiagramElement }) {
         );
       })()}
       {hasRepeat && <RepeatMarker el={el} cx={repeatCX} cy={my + markerH * 0.55} />}
+      {!!el.properties.adHoc && (
+        <AdHocMarker cx={plusCX + markerW / 2 + 4 + 5} cy={my + markerH * 0.55} />
+      )}
       {/* Link icon and ValueBadge rendered in main SymbolRenderer */}
     </g>
   );
@@ -779,6 +782,11 @@ function ExpandedSubprocessShape({ el }: { el: DiagramElement }) {
   const colors = useContext(SymbolColorCtx);
   const spType = (el.properties.subprocessType as string | undefined) ?? "normal";
   const fill = resolveColor("subprocess-expanded", colors);
+  // Position markers along the bottom edge: repeat marker centred,
+  // ad-hoc marker just to its right.
+  const repeatCX = el.x + el.width / 2;
+  const repeatCY = el.y + el.height - 10;
+  const adHocCX = repeatCX + 14; // 14px to the right of the loop/MI marker
   return (
     <g>
       <rect x={el.x} y={el.y} width={el.width} height={el.height}
@@ -789,7 +797,8 @@ function ExpandedSubprocessShape({ el }: { el: DiagramElement }) {
         <rect x={el.x + 4} y={el.y + 4} width={el.width - 8} height={el.height - 8}
           rx={3} ry={3} fill="none" stroke="#374151" strokeWidth={1.5} />
       )}
-      <RepeatMarker el={el} cx={el.x + el.width / 2} cy={el.y + el.height - 10} />
+      <RepeatMarker el={el} cx={repeatCX} cy={repeatCY} />
+      {!!el.properties.adHoc && <AdHocMarker cx={adHocCX} cy={repeatCY} />}
       {/* ValueBadge rendered in main SymbolRenderer */}
     </g>
   );
@@ -903,6 +912,23 @@ function LoopMarker({ cx, cy }: { cx: number; cy: number }) {
         fill="#374151"
       />
     </g>
+  );
+}
+
+/** Ad-hoc marker — bold tilde, drawn as an SVG path so it scales cleanly
+ *  and matches the visual weight of the loop and multi-instance markers. */
+function AdHocMarker({ cx, cy }: { cx: number; cy: number }) {
+  // Tilde drawn as two cubic-bezier humps, total width ~12px, height ~6px
+  const w = 6;   // half-width
+  const h = 3;   // peak height
+  return (
+    <path
+      d={`M ${cx - w} ${cy} C ${cx - w / 2} ${cy - h}, ${cx - w / 4} ${cy - h}, ${cx} ${cy} S ${cx + w / 2} ${cy + h}, ${cx + w} ${cy}`}
+      fill="none"
+      stroke="#374151"
+      strokeWidth={2}
+      strokeLinecap="round"
+    />
   );
 }
 

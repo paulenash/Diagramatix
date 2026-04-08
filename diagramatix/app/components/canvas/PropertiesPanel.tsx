@@ -1275,8 +1275,8 @@ export function PropertiesPanel({
           <>
             <textarea
               key={element.id}
-              className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 resize-y"
-              rows={(element.type === "uml-class" || element.type === "uml-enumeration") ? 2 : 3}
+              className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 resize-y overflow-y-auto"
+              rows={2}
               value={labelDraft}
               onFocus={(e) => { const l = e.target.value.length; e.target.setSelectionRange(l, l); }}
               onChange={(e) => {
@@ -1483,24 +1483,39 @@ export function PropertiesPanel({
       )}
 
       {(element.type === "subprocess" || element.type === "subprocess-expanded") && (
-        <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">Type</label>
-          <div className="flex gap-1">
-            {(["normal", "call", "event", "transaction"] as const).map((v) => (
-              <button
-                key={v}
-                onClick={() => onUpdateProperties(element.id, { subprocessType: v })}
-                className={`px-2 py-1 text-xs rounded border ${
-                  ((element.properties.subprocessType as string | undefined) ?? "normal") === v
-                    ? "bg-blue-600 text-white border-blue-600"
-                    : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                }`}
-              >
-                {v === "normal" ? "Normal" : v === "call" ? "Call" : v === "event" ? "Event" : "Transaction"}
-              </button>
-            ))}
+        <>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Type</label>
+            <div className="flex gap-1">
+              {(["normal", "call", "event", "transaction"] as const).map((v) => (
+                <button
+                  key={v}
+                  onClick={() => onUpdateProperties(element.id, { subprocessType: v })}
+                  className={`px-2 py-1 text-xs rounded border ${
+                    ((element.properties.subprocessType as string | undefined) ?? "normal") === v
+                      ? "bg-blue-600 text-white border-blue-600"
+                      : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                  }`}
+                >
+                  {v === "normal" ? "Normal" : v === "call" ? "Call" : v === "event" ? "Event" : "Transaction"}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+          <div>
+            <label className="flex items-center gap-2 text-xs font-medium text-gray-700">
+              <input
+                type="checkbox"
+                checked={!!element.properties.adHoc}
+                onChange={(e) =>
+                  onUpdateProperties(element.id, { adHoc: e.target.checked })
+                }
+                className="cursor-pointer"
+              />
+              Ad-hoc
+            </label>
+          </div>
+        </>
       )}
 
       {element.type === "subprocess" && siblingDiagrams && (() => {
