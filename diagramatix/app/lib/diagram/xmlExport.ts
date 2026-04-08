@@ -150,6 +150,353 @@ export function connectorXml(c: any, ind: string): string {
 }
 
 /**
+ * Parse a Diagramatix XML export back into the JSON shape that the importer
+ * already understands. Throws on malformed input.
+ *
+ * The result mirrors what `JSON.parse(<exported .json>)` would yield, so it
+ * can be fed directly into the existing import flow:
+ *   {
+ *     schemaVersion, appVersion, exportedAt,
+ *     project:    { name, description?, ownerName?, colorConfig? },
+ *     diagrams:   [{ originalId, name, type, data, colorConfig?, displayMode? }],
+ *     folderTree?: { folders, diagramFolderMap, diagramOrder, folderOrder }
+ *   }
+ *
+ * No XSD validation is performed — the importer trusts the file. Bad input
+ * raises an Error.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function parseDiagramatixXml(xmlText: string): any {
+  if (typeof DOMParser === "undefined") {
+    throw new Error("XML import requires a browser environment (DOMParser)");
+  }
+  const doc = new DOMParser().parseFromString(xmlText, "application/xml");
+  const parserError = doc.querySelector("parsererror");
+  if (parserError) {
+    throw new Error("Invalid XML: " + (parserError.textContent ?? "parse error"));
+  }
+  const root = doc.documentElement;
+  if (!root || root.localName !== "diagramatix-export") {
+    throw new Error("Not a Diagramatix XML export (root element is not <diagramatix-export>)");
+  }
+
+  const getChild = (parent: Element, name: string): Element | null => {
+    for (const c of Array.from(parent.children)) {
+      if (c.localName === name) return c;
+    }
+    return null;
+  };
+  const getChildren = (parent: Element, name: string): Element[] => {
+    const out: Element[] = [];
+    for (const c of Array.from(parent.children)) {
+      if (c.localName === name) out.push(c);
+    }
+    return out;
+  };
+  const txt = (parent: Element | null, name: string): string | undefined => {
+    if (!parent) return undefined;
+    const el = getChild(parent, name);
+    return el?.textContent ?? undefined;
+  };
+  const num = (s: string | null): number | undefined => {
+    if (s == null || s === "") return undefined;
+    const n = Number(s);
+    return Number.isFinite(n) ? n : undefined;
+  };
+  const bool = (s: string | null): boolean | undefined => {
+    if (s == null || s === "") return undefined;
+    return s === "true" || s === "1";
+  };
+  const json = (s: string | undefined): unknown => {
+    if (!s) return undefined;
+    try { return JSON.parse(s); } catch { return undefined; }
+  };
+
+  // ---- Envelope attributes ----
+  const schemaVersion = root.getAttribute("schemaVersion") ?? "";
+  const appVersion = root.getAttribute("appVersion") ?? "";
+  const exportedAt = root.getAttribute("exportedAt") ?? "";
+
+  // ---- Project ----
+  const projectEl = getChild(root, "project");
+  const project = {
+    name: txt(projectEl, "name") ?? "",
+    description: txt(projectEl, "description") ?? "",
+    ownerName: txt(projectEl, "ownerName") ?? "",
+    colorConfig: json(txt(projectEl, "colorConfig")) ?? {},
+  };
+
+  // ---- Diagrams ----
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const diagrams: any[] = [];
+  const diagramsEl = getChild(root, "diagrams");
+  if (diagramsEl) {
+    for (const dEl of getChildren(diagramsEl, "diagram")) {
+      const originalId = dEl.getAttribute("originalId") ?? "";
+      const type = dEl.getAttribute("type") ?? "context";
+      const displayMode = dEl.getAttribute("displayMode") ?? undefined;
+      const name = txt(dEl, "name") ?? "(unnamed)";
+      const dataEl = getChild(dEl, "data");
+      const data = dataEl ? parseDiagramData(dataEl) : { elements: [], connectors: [], viewport: { x: 0, y: 0, zoom: 1 } };
+      const colorConfig = json(txt(dEl, "colorConfig"));
+      diagrams.push({ originalId, name, type, data, colorConfig, displayMode });
+    }
+  }
+
+  // ---- Folder tree ----
+  let folderTree: unknown = undefined;
+  const ftEl = getChild(root, "folderTree");
+  if (ftEl) {
+    const folders: Array<{ id: string; name: string; parentId: string | null; collapsed?: boolean }> = [];
+    const foldersEl = getChild(ftEl, "folders");
+    if (foldersEl) {
+      for (const f of getChildren(foldersEl, "folder")) {
+        folders.push({
+          id: f.getAttribute("id") ?? "",
+          name: f.getAttribute("name") ?? "",
+          parentId: f.getAttribute("parentId") || null,
+          collapsed: bool(f.getAttribute("collapsed")),
+        });
+      }
+    }
+    const diagramFolderMap: Record<string, string> = {};
+    const dfmEl = getChild(ftEl, "diagramFolderMap");
+    if (dfmEl) {
+      for (const e of getChildren(dfmEl, "entry")) {
+        const k = e.getAttribute("key");
+        const v = e.getAttribute("value");
+        if (k && v) diagramFolderMap[k] = v;
+      }
+    }
+    const parseGroup = (containerName: string): Record<string, string[]> => {
+      const out: Record<string, string[]> = {};
+      const containerEl = getChild(ftEl, containerName);
+      if (!containerEl) return out;
+      for (const g of getChildren(containerEl, "group")) {
+        const k = g.getAttribute("key");
+        if (!k) continue;
+        out[k] = getChildren(g, "ref")
+          .map(r => r.getAttribute("id") ?? "")
+          .filter(Boolean);
+      }
+      return out;
+    };
+    folderTree = {
+      folders,
+      diagramFolderMap,
+      diagramOrder: parseGroup("diagramOrder"),
+      folderOrder: parseGroup("folderOrder"),
+    };
+  }
+
+  return {
+    schemaVersion,
+    appVersion,
+    exportedAt,
+    project,
+    diagrams,
+    ...(folderTree ? { folderTree } : {}),
+  };
+
+  // ---- Helpers ----
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function parseDiagramData(dataEl: Element): any {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const data: any = {
+      elements: [],
+      connectors: [],
+      viewport: { x: 0, y: 0, zoom: 1 },
+    };
+    const fontSize = num(dataEl.getAttribute("fontSize"));
+    const connectorFontSize = num(dataEl.getAttribute("connectorFontSize"));
+    const titleFontSize = num(dataEl.getAttribute("titleFontSize"));
+    if (fontSize !== undefined) data.fontSize = fontSize;
+    if (connectorFontSize !== undefined) data.connectorFontSize = connectorFontSize;
+    if (titleFontSize !== undefined) data.titleFontSize = titleFontSize;
+
+    // Elements
+    const elementsEl = getChild(dataEl, "elements");
+    if (elementsEl) {
+      for (const eEl of getChildren(elementsEl, "element")) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const el: any = {
+          id: eEl.getAttribute("id") ?? "",
+          type: eEl.getAttribute("type") ?? "",
+          x: num(eEl.getAttribute("x")) ?? 0,
+          y: num(eEl.getAttribute("y")) ?? 0,
+          width: num(eEl.getAttribute("width")) ?? 0,
+          height: num(eEl.getAttribute("height")) ?? 0,
+          label: txt(eEl, "label") ?? "",
+          properties: {},
+        };
+        const optionalAttrs = ["parentId", "boundaryHostId", "taskType", "gatewayType", "eventType", "repeatType", "flowType"];
+        for (const a of optionalAttrs) {
+          const v = eEl.getAttribute(a);
+          if (v != null && v !== "") el[a] = v;
+        }
+        const propsEl = getChild(eEl, "properties");
+        if (propsEl) el.properties = parseProperties(propsEl);
+        data.elements.push(el);
+      }
+    }
+
+    // Connectors
+    const connectorsEl = getChild(dataEl, "connectors");
+    if (connectorsEl) {
+      for (const cEl of getChildren(connectorsEl, "connector")) {
+        data.connectors.push(parseConnector(cEl));
+      }
+    }
+
+    // Viewport
+    const vpEl = getChild(dataEl, "viewport");
+    if (vpEl) {
+      data.viewport = {
+        x: num(vpEl.getAttribute("x")) ?? 0,
+        y: num(vpEl.getAttribute("y")) ?? 0,
+        zoom: num(vpEl.getAttribute("zoom")) ?? 1,
+      };
+    }
+
+    // Title
+    const titleEl = getChild(dataEl, "title");
+    if (titleEl) {
+      data.title = {
+        version: titleEl.getAttribute("version") ?? "",
+        authors: titleEl.getAttribute("authors") ?? "",
+        status: titleEl.getAttribute("status") ?? "",
+        showTitle: bool(titleEl.getAttribute("showTitle")) ?? false,
+      };
+    }
+
+    return data;
+  }
+
+  function parseProperties(propsEl: Element): Record<string, unknown> {
+    const out: Record<string, unknown> = {};
+    for (const p of getChildren(propsEl, "property")) {
+      const name = p.getAttribute("name");
+      if (!name) continue;
+      const type = p.getAttribute("type");
+      if (type === "array") {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const arr: any[] = [];
+        for (const item of getChildren(p, "item")) {
+          // Plain value-only items
+          const fields = getChildren(item, "field");
+          if (fields.length === 1 && fields[0].getAttribute("name") === "value") {
+            arr.push(fields[0].textContent ?? "");
+          } else {
+            const obj: Record<string, unknown> = {};
+            for (const f of fields) {
+              const fname = f.getAttribute("name");
+              if (fname) obj[fname] = f.textContent ?? "";
+            }
+            arr.push(obj);
+          }
+        }
+        out[name] = arr;
+      } else {
+        // Try to parse as JSON object first (mixed content), else string
+        const text = p.textContent ?? "";
+        if (text.startsWith("{") || text.startsWith("[")) {
+          try { out[name] = JSON.parse(text); continue; } catch { /* fallthrough */ }
+        }
+        // Coerce booleans/numbers when obvious
+        if (text === "true") out[name] = true;
+        else if (text === "false") out[name] = false;
+        else if (/^-?\d+(?:\.\d+)?$/.test(text)) out[name] = Number(text);
+        else out[name] = text;
+      }
+    }
+    return out;
+  }
+
+  function parseConnector(cEl: Element): Record<string, unknown> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c: any = {
+      id: cEl.getAttribute("id") ?? "",
+      sourceId: cEl.getAttribute("sourceId") ?? "",
+      targetId: cEl.getAttribute("targetId") ?? "",
+      type: cEl.getAttribute("type") ?? "sequence",
+      sourceSide: cEl.getAttribute("sourceSide") ?? undefined,
+      targetSide: cEl.getAttribute("targetSide") ?? undefined,
+      directionType: cEl.getAttribute("directionType") ?? undefined,
+      routingType: cEl.getAttribute("routingType") ?? undefined,
+      waypoints: [],
+    };
+    const numAttrs = ["labelOffsetX", "labelOffsetY", "labelWidth", "sourceOffsetAlong", "targetOffsetAlong"];
+    for (const a of numAttrs) {
+      const v = num(cEl.getAttribute(a));
+      if (v !== undefined) c[a] = v;
+    }
+    const boolAttrs = ["sourceInvisibleLeader", "targetInvisibleLeader", "arrowAtSource"];
+    for (const a of boolAttrs) {
+      const v = bool(cEl.getAttribute(a));
+      if (v !== undefined) c[a] = v;
+    }
+    const strAttrs = ["labelAnchor"];
+    for (const a of strAttrs) {
+      const v = cEl.getAttribute(a);
+      if (v != null && v !== "") c[a] = v;
+    }
+
+    // Waypoints
+    const wpsEl = getChild(cEl, "waypoints");
+    if (wpsEl) {
+      for (const p of getChildren(wpsEl, "point")) {
+        c.waypoints.push({
+          x: num(p.getAttribute("x")) ?? 0,
+          y: num(p.getAttribute("y")) ?? 0,
+        });
+      }
+    }
+    // Label
+    const labelEl = getChild(cEl, "label");
+    if (labelEl) c.label = labelEl.textContent ?? "";
+    // Curve control points
+    for (const tag of ["cp1RelOffset", "cp2RelOffset"]) {
+      const e = getChild(cEl, tag);
+      if (e) c[tag] = { x: num(e.getAttribute("x")) ?? 0, y: num(e.getAttribute("y")) ?? 0 };
+    }
+    // Transition
+    const tEl = getChild(cEl, "transition");
+    if (tEl) {
+      const lm = tEl.getAttribute("labelMode"); if (lm) c.labelMode = lm;
+      const ev = tEl.getAttribute("event"); if (ev) c.transitionEvent = ev;
+      const gd = tEl.getAttribute("guard"); if (gd) c.transitionGuard = gd;
+      const ac = tEl.getAttribute("actions"); if (ac) c.transitionActions = ac;
+    }
+    // UML association ends
+    for (const [tag, prefix] of [["sourceEnd", "source"], ["targetEnd", "target"]] as const) {
+      const e = getChild(cEl, tag);
+      if (!e) continue;
+      const role = e.getAttribute("role"); if (role) c[`${prefix}Role`] = role;
+      const mult = e.getAttribute("multiplicity"); if (mult) c[`${prefix}Multiplicity`] = mult;
+      const vis = e.getAttribute("visibility"); if (vis) c[`${prefix}Visibility`] = vis;
+      const ord = bool(e.getAttribute("ordered")); if (ord !== undefined) c[`${prefix}Ordered`] = ord;
+      const uniq = bool(e.getAttribute("unique")); if (uniq !== undefined) c[`${prefix}Unique`] = uniq;
+      const qual = e.getAttribute("qualifier"); if (qual) c[`${prefix}Qualifier`] = qual;
+      const propStr = e.getAttribute("propertyString"); if (propStr) c[`${prefix}PropertyString`] = propStr;
+      for (const off of ["roleOffset", "multOffset", "constraintOffset", "uniqueOffset"]) {
+        const ofEl = getChild(e, off);
+        if (ofEl) c[`${prefix}${off[0].toUpperCase()}${off.slice(1)}`] = { x: num(ofEl.getAttribute("x")) ?? 0, y: num(ofEl.getAttribute("y")) ?? 0 };
+      }
+    }
+    // Association name
+    const anEl = getChild(cEl, "associationName");
+    if (anEl) {
+      const nm = anEl.getAttribute("name"); if (nm) c.associationName = nm;
+      const rd = anEl.getAttribute("readingDirection"); if (rd) c.readingDirection = rd;
+      const ofEl = getChild(anEl, "offset");
+      if (ofEl) c.associationNameOffset = { x: num(ofEl.getAttribute("x")) ?? 0, y: num(ofEl.getAttribute("y")) ?? 0 };
+    }
+
+    return c;
+  }
+}
+
+/**
  * Build a single-diagram XML export wrapped in the same diagramatix-export
  * envelope used for project exports. The `diagrams` block contains exactly
  * one entry; project metadata is set to a minimal placeholder; folderTree

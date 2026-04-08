@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import type { DiagramType } from "@/app/lib/diagram/types";
@@ -187,6 +187,21 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
   const [importProjectName, setImportProjectName] = useState("");
   const [showImportNameDialog, setShowImportNameDialog] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [importDropdownOpen, setImportDropdownOpen] = useState(false);
+  const [importFormat, setImportFormat] = useState<"json" | "xml">("json");
+  const importDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close import dropdown on outside click
+  useEffect(() => {
+    if (!importDropdownOpen) return;
+    function handleClick(e: MouseEvent) {
+      if (importDropdownRef.current && !importDropdownRef.current.contains(e.target as Node)) {
+        setImportDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [importDropdownOpen]);
 
   function checkSchemaCompatibility(fileSchema: string): { ok: boolean; message?: string } {
     const [appMajor, appMinor] = SCHEMA_VERSION.split(".").map(Number);
@@ -203,33 +218,53 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
     return { ok: true };
   }
 
-  function handleFileSelected(file: File) {
-    file.text().then(text => {
+  async function handleFileSelected(file: File) {
+    const text = await file.text();
+    let data: Record<string, unknown> | null = null;
+
+    // Decide format by file extension first, then fall back to content sniff
+    const lowerName = file.name.toLowerCase();
+    const looksXml = lowerName.endsWith(".xml") || /^\s*<\?xml/.test(text);
+
+    if (looksXml) {
       try {
-        const data = JSON.parse(text);
-        // Support both old "version" field and new "schemaVersion" field
-        const schemaVer: string = data.schemaVersion ?? data.version ?? "";
-        if (!schemaVer || !data.project || !data.diagrams) {
-          alert("Invalid export file — missing required fields"); return;
-        }
-        // Parse schema version (strip build number if present in legacy "version" field, e.g. "1.0.147" → "1.0")
-        const parts = schemaVer.split(".");
-        const normalised = parts.length >= 2 ? `${parts[0]}.${parts[1]}` : schemaVer;
-        const compat = checkSchemaCompatibility(normalised);
-        if (!compat.ok) {
-          alert(compat.message); return;
-        }
-        if (compat.message) {
-          // Non-blocking warning for older schemas
-          alert(compat.message);
-        }
-        setPendingImportData(data);
-        setImportProjectName((data.project.name ?? "Imported") + " (imported)");
-        setShowImportNameDialog(true);
+        const { parseDiagramatixXml } = await import("@/app/lib/diagram/xmlExport");
+        data = parseDiagramatixXml(text);
+      } catch (err) {
+        alert(`Invalid Diagramatix XML file: ${err instanceof Error ? err.message : String(err)}`);
+        return;
+      }
+    } else {
+      try {
+        data = JSON.parse(text);
       } catch {
         alert("Invalid JSON file");
+        return;
       }
-    });
+    }
+
+    if (!data) return;
+    // Support both old "version" field and new "schemaVersion" field
+    const schemaVer: string = (data.schemaVersion as string) ?? (data.version as string) ?? "";
+    if (!schemaVer || !data.project || !data.diagrams) {
+      alert("Invalid export file — missing required fields");
+      return;
+    }
+    // Parse schema version (strip build number if present in legacy "version" field, e.g. "1.0.147" → "1.0")
+    const parts = schemaVer.split(".");
+    const normalised = parts.length >= 2 ? `${parts[0]}.${parts[1]}` : schemaVer;
+    const compat = checkSchemaCompatibility(normalised);
+    if (!compat.ok) {
+      alert(compat.message);
+      return;
+    }
+    if (compat.message) {
+      // Non-blocking warning for older schemas
+      alert(compat.message);
+    }
+    setPendingImportData(data);
+    setImportProjectName(((data.project as Record<string, unknown>).name as string ?? "Imported") + " (imported)");
+    setShowImportNameDialog(true);
   }
 
   async function handleImportProject() {
@@ -499,17 +534,55 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
           )}
           {!readOnly && (
             <>
-              <input ref={fileInputRef} type="file" accept=".json" className="hidden"
-                onChange={e => { const f = e.target.files?.[0]; if (f) handleFileSelected(f); e.target.value = ""; }} />
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={importing}
-                className={`text-xs font-medium rounded px-2 py-1 border ${
-                  importing ? "bg-green-600 text-white border-green-600" : "text-gray-600 border-gray-300 hover:bg-gray-50"
-                }`}
-              >
-                {importing ? "Importing\u2026" : "Import"}
-              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept={importFormat === "xml" ? ".xml" : ".json"}
+                className="hidden"
+                onChange={e => { const f = e.target.files?.[0]; if (f) handleFileSelected(f); e.target.value = ""; }}
+              />
+              <div className="relative" ref={importDropdownRef}>
+                <button
+                  onClick={() => setImportDropdownOpen(prev => !prev)}
+                  disabled={importing}
+                  className={`text-xs font-medium rounded px-2 py-1 border ${
+                    importing ? "bg-green-600 text-white border-green-600" : "text-gray-600 border-gray-300 hover:bg-gray-50"
+                  }`}
+                >
+                  {importing ? "Importing\u2026" : "Import \u25BE"}
+                </button>
+                {importDropdownOpen && !importing && (
+                  <div className="absolute right-0 top-full mt-1 w-40 bg-white border border-gray-200 rounded shadow-lg z-50">
+                    <button
+                      onClick={() => {
+                        setImportDropdownOpen(false);
+                        setImportFormat("json");
+                        // Update accept attribute then open file picker
+                        if (fileInputRef.current) {
+                          fileInputRef.current.accept = ".json";
+                          fileInputRef.current.click();
+                        }
+                      }}
+                      className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                    >
+                      Import JSON
+                    </button>
+                    <button
+                      onClick={() => {
+                        setImportDropdownOpen(false);
+                        setImportFormat("xml");
+                        if (fileInputRef.current) {
+                          fileInputRef.current.accept = ".xml";
+                          fileInputRef.current.click();
+                        }
+                      }}
+                      className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                    >
+                      Import XML
+                    </button>
+                  </div>
+                )}
+              </div>
             </>
           )}
           <button
