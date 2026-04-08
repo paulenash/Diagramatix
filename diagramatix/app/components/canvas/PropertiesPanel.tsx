@@ -1547,18 +1547,23 @@ export function PropertiesPanel({
         <>
         <div>
           <p className="text-xs font-medium text-gray-500 mb-1">Repeat</p>
-          <div className="flex gap-1">
-            {(["none", "loop"] as const).map((v) => (
+          <div className="flex flex-wrap gap-1">
+            {([
+              { value: "none",          label: "None" },
+              { value: "loop",          label: "Loop" },
+              { value: "mi-sequential", label: "MI Sequential" },
+              { value: "mi-parallel",   label: "MI Parallel" },
+            ] as const).map(({ value, label }) => (
               <button
-                key={v}
-                onClick={() => onUpdateProperties(element.id, { repeatType: v })}
+                key={value}
+                onClick={() => onUpdateProperties(element.id, { repeatType: value })}
                 className={`px-2 py-1 text-xs rounded border ${
-                  (element.repeatType ?? "none") === v
+                  (element.repeatType ?? "none") === value
                     ? "bg-blue-600 text-white border-blue-600"
                     : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
                 }`}
               >
-                {v === "none" ? "None" : "Loop"}
+                {label}
               </button>
             ))}
           </div>

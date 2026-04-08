@@ -159,12 +159,11 @@ function ValueBadge({ el, show: showProp }: { el: DiagramElement; show?: boolean
 
 function TaskShape({ el }: { el: DiagramElement }) {
   const colors = useContext(SymbolColorCtx);
-  const hasLoop = el.repeatType === "loop";
   return (
     <g>
       <rect x={el.x} y={el.y} width={el.width} height={el.height}
         rx={4} ry={4} fill={resolveColor("task", colors)} stroke="#374151" strokeWidth={1.5} />
-      {hasLoop && <LoopMarker cx={el.x + el.width / 2} cy={el.y + el.height - 10} />}
+      <RepeatMarker el={el} cx={el.x + el.width / 2} cy={el.y + el.height - 10} />
       {/* ValueBadge rendered in main SymbolRenderer */}
     </g>
   );
@@ -737,11 +736,11 @@ function FinalStateShape({ el }: { el: DiagramElement }) {
 
 function SubprocessShape({ el }: { el: DiagramElement }) {
   const colors = useContext(SymbolColorCtx);
-  const hasLoop = el.repeatType === "loop";
+  const hasRepeat = el.repeatType && el.repeatType !== "none";
   const markerW = 14, markerH = 14;
-  // "+" always stays centred; loop marker sits to the left with 4px gap
+  // "+" always stays centred; repeat marker sits to the left with 4px gap
   const plusCX = el.x + el.width / 2;
-  const loopCX = plusCX - markerW / 2 - 4 - 5; // left edge of "+" - 4px gap - arc radius
+  const repeatCX = plusCX - markerW / 2 - 4 - 5; // left edge of "+" - 4px gap - marker radius
   const mx = plusCX - markerW / 2;
   const my = el.y + el.height - markerH - 3;
   const spType = (el.properties.subprocessType as string | undefined) ?? "normal";
@@ -770,7 +769,7 @@ function SubprocessShape({ el }: { el: DiagramElement }) {
           </>
         );
       })()}
-      {hasLoop && <LoopMarker cx={loopCX} cy={my + markerH * 0.55} />}
+      {hasRepeat && <RepeatMarker el={el} cx={repeatCX} cy={my + markerH * 0.55} />}
       {/* Link icon and ValueBadge rendered in main SymbolRenderer */}
     </g>
   );
@@ -778,7 +777,6 @@ function SubprocessShape({ el }: { el: DiagramElement }) {
 
 function ExpandedSubprocessShape({ el }: { el: DiagramElement }) {
   const colors = useContext(SymbolColorCtx);
-  const hasLoop = el.repeatType === "loop";
   const spType = (el.properties.subprocessType as string | undefined) ?? "normal";
   const fill = resolveColor("subprocess-expanded", colors);
   return (
@@ -791,7 +789,7 @@ function ExpandedSubprocessShape({ el }: { el: DiagramElement }) {
         <rect x={el.x + 4} y={el.y + 4} width={el.width - 8} height={el.height - 8}
           rx={3} ry={3} fill="none" stroke="#374151" strokeWidth={1.5} />
       )}
-      {hasLoop && <LoopMarker cx={el.x + el.width / 2} cy={el.y + el.height - 10} />}
+      <RepeatMarker el={el} cx={el.x + el.width / 2} cy={el.y + el.height - 10} />
       {/* ValueBadge rendered in main SymbolRenderer */}
     </g>
   );
@@ -908,9 +906,45 @@ function LoopMarker({ cx, cy }: { cx: number; cy: number }) {
   );
 }
 
+/** Picks the appropriate marker for an element's repeatType. Renders nothing
+ *  for repeatType "none" / undefined. */
+function RepeatMarker({ el, cx, cy }: { el: DiagramElement; cx: number; cy: number }) {
+  if (el.repeatType === "loop") return <LoopMarker cx={cx} cy={cy} />;
+  if (el.repeatType === "mi-parallel") return <MultiInstanceMarker cx={cx} cy={cy} orientation="parallel" />;
+  if (el.repeatType === "mi-sequential") return <MultiInstanceMarker cx={cx} cy={cy} orientation="sequential" />;
+  return null;
+}
+
+/** Multi-Instance marker — three short lines, vertical for parallel, horizontal for sequential.
+ *  Matches the visual style of the data-object multiplicity collection marker. */
+function MultiInstanceMarker({
+  cx, cy, orientation,
+}: { cx: number; cy: number; orientation: "parallel" | "sequential" }) {
+  const lineLen = 9;
+  const lineGap = 3;
+  const half = lineLen / 2;
+  if (orientation === "parallel") {
+    // Three vertical lines
+    return (
+      <g stroke="#374151" strokeWidth={1.5} strokeLinecap="round">
+        <line x1={cx - lineGap} y1={cy - half} x2={cx - lineGap} y2={cy + half} />
+        <line x1={cx}           y1={cy - half} x2={cx}           y2={cy + half} />
+        <line x1={cx + lineGap} y1={cy - half} x2={cx + lineGap} y2={cy + half} />
+      </g>
+    );
+  }
+  // Three horizontal lines (sequential)
+  return (
+    <g stroke="#374151" strokeWidth={1.5} strokeLinecap="round">
+      <line x1={cx - half} y1={cy - lineGap} x2={cx + half} y2={cy - lineGap} />
+      <line x1={cx - half} y1={cy}           x2={cx + half} y2={cy} />
+      <line x1={cx - half} y1={cy + lineGap} x2={cx + half} y2={cy + lineGap} />
+    </g>
+  );
+}
+
 function BpmnTaskShape({ el }: { el: DiagramElement }) {
   const colors = useContext(SymbolColorCtx);
-  const hasLoop = el.repeatType === "loop";
   return (
     <g>
       <rect x={el.x} y={el.y} width={el.width} height={el.height}
@@ -918,7 +952,7 @@ function BpmnTaskShape({ el }: { el: DiagramElement }) {
       {el.taskType && el.taskType !== "none" && (
         <BpmnTaskMarker taskType={el.taskType} x={el.x + 4} y={el.y + 4} />
       )}
-      {hasLoop && <LoopMarker cx={el.x + el.width / 2} cy={el.y + el.height - 10} />}
+      <RepeatMarker el={el} cx={el.x + el.width / 2} cy={el.y + el.height - 10} />
       {/* ValueBadge rendered in main SymbolRenderer */}
     </g>
   );
@@ -1967,7 +2001,8 @@ export function SymbolRenderer({
             : labelCenterY - totalLabelH / 2;
         const labelLeftX = labelCenterX - labelWidth / 2;
         const iconReserveTop = hasTaskMarker ? 20 : 0;
-        const iconReserveBot = (el.type === 'subprocess' || el.repeatType === 'loop') ? 20 : 0;
+        const hasRepeatMarker = el.repeatType && el.repeatType !== 'none';
+        const iconReserveBot = (el.type === 'subprocess' || hasRepeatMarker) ? 20 : 0;
         const minY    = hasTaskMarker ? el.y + 20 : el.y + PAD + iconReserveTop;
         const maxBotY = el.y + el.height - PAD - iconReserveBot;
         function clamp(v: number, lo: number, hi: number) { return Math.max(lo, Math.min(hi, v)); }

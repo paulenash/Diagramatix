@@ -50,7 +50,7 @@ export type EventType =
   | "none" | "message" | "timer" | "error" | "signal" | "terminate" | "conditional"
   | "escalation" | "cancel" | "compensation" | "link";
 
-export type RepeatType = "none" | "loop";
+export type RepeatType = "none" | "loop" | "mi-sequential" | "mi-parallel";
 
 export type FlowType = "none" | "catching" | "throwing";
 
