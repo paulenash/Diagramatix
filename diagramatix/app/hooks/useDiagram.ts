@@ -607,6 +607,33 @@ function reducer(state: DiagramData, action: Action): DiagramData {
           };
         }
       }
+      // If a Task / Subprocess / Expanded Subprocess is dropped inside an
+      // existing Expanded Subprocess, shrink it to 75% of its default size so
+      // it fits naturally within the container. The drop centre stays under
+      // the cursor.
+      const SHRINK_TYPES = new Set<SymbolType>(["task", "subprocess", "subprocess-expanded"]);
+      if (!newEl.boundaryHostId && SHRINK_TYPES.has(newEl.type)) {
+        const dropCx = action.payload.position.x;
+        const dropCy = action.payload.position.y;
+        const insideExpanded = state.elements.find(
+          (b) =>
+            b.type === "subprocess-expanded" &&
+            dropCx >= b.x && dropCx <= b.x + b.width &&
+            dropCy >= b.y && dropCy <= b.y + b.height
+        );
+        if (insideExpanded) {
+          const newW = Math.round(newEl.width * 0.75);
+          const newH = Math.round(newEl.height * 0.75);
+          newEl = {
+            ...newEl,
+            x: dropCx - newW / 2,
+            y: dropCy - newH / 2,
+            width: newW,
+            height: newH,
+          };
+        }
+      }
+
       // Check if newly dropped element is fully inside a subprocess-expanded
       if (!newEl.boundaryHostId) {
         const container = state.elements.find(
