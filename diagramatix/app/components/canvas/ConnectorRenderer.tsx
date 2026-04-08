@@ -19,6 +19,11 @@ interface Props {
   debugMode?: boolean;
   onUpdateEndOffset?: (connectorId: string, field: string, offset: Point) => void;
   showBottleneck?: boolean;
+  /** Source/target element bounds — used to mask out the click hit area for
+   *  associationBPMN connectors so a click inside an endpoint element selects
+   *  the element rather than the connector. */
+  sourceBounds?: { x: number; y: number; width: number; height: number };
+  targetBounds?: { x: number; y: number; width: number; height: number };
 }
 
 // Line segment intersection: returns the parameter t along segment (a1→a2) where it crosses (b1→b2), or null
@@ -466,7 +471,7 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
   );
 }
 
-export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, onUpdateWaypoints, onWaypointsDragEnd, onUpdateLabel, onUpdateCurveHandles, misaligned, otherConnectorWaypoints, debugMode, onUpdateEndOffset, showBottleneck }: Props) {
+export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, onUpdateWaypoints, onWaypointsDragEnd, onUpdateLabel, onUpdateCurveHandles, misaligned, otherConnectorWaypoints, debugMode, onUpdateEndOffset, showBottleneck, sourceBounds, targetBounds }: Props) {
   const displayMode = useContext(DisplayModeCtx);
   const connFontScale = useContext(ConnectorFontScaleCtx);
   const [draggingEndLabel, setDraggingEndLabel] = useState<string | null>(null);
@@ -481,6 +486,7 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
     : misaligned ? "#dc2626"
     : isBottleneck ? "#9333ea"
     : isMessageBPMN ? "#b0b7c3"
+    : isAssocBPMN ? "#9ca3af"
     : "#6b7280";
   const isUmlConn = connector.type === "uml-association" || connector.type === "uml-aggregation"
     || connector.type === "uml-composition" || connector.type === "uml-generalisation";
@@ -651,6 +657,37 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
         </defs>
       )}
 
+      {/* For associationBPMN: mask out the source/target element rectangles
+          so the connector hit area never covers them — clicks inside fall
+          through to the element underneath. */}
+      {isAssocBPMN && (sourceBounds || targetBounds) && (() => {
+        const maskId = `assoc-hit-mask-${connector.id}`;
+        // The mask must cover the entire SVG viewport. We use a far-out
+        // rectangle since masks on transformed groups follow the local
+        // coordinate space.
+        return (
+          <defs>
+            <mask id={maskId} maskUnits="userSpaceOnUse">
+              <rect x={-100000} y={-100000} width={200000} height={200000} fill="white" />
+              {sourceBounds && (
+                <rect
+                  x={sourceBounds.x} y={sourceBounds.y}
+                  width={sourceBounds.width} height={sourceBounds.height}
+                  fill="black"
+                />
+              )}
+              {targetBounds && (
+                <rect
+                  x={targetBounds.x} y={targetBounds.y}
+                  width={targetBounds.width} height={targetBounds.height}
+                  fill="black"
+                />
+              )}
+            </mask>
+          </defs>
+        );
+      })()}
+
       {/* Invisible wider hit area — follows curve for curvilinear */}
       <path
         d={hitD}
@@ -658,6 +695,7 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
         stroke="transparent"
         strokeWidth={12}
         style={{ cursor: "pointer" }}
+        mask={isAssocBPMN && (sourceBounds || targetBounds) ? `url(#assoc-hit-mask-${connector.id})` : undefined}
         onClick={(e) => { e.stopPropagation(); onSelect(); }}
       />
 

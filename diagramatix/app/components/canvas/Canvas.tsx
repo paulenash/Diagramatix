@@ -612,15 +612,22 @@ export function Canvas({
 
     function onMouseUp(ev: MouseEvent) {
       const pos = clientToWorld(ev.clientX, ev.clientY);
-      const targetEl = findDropTarget(pos, elementId);
-      // Abort if released on the source element itself — the user clearly
-      // didn't intend to create a self-loop here.
-      if (targetEl && targetEl.id === elementId) {
+      // Abort if released over the source element's bounding box. We check
+      // the release position directly because findDropTarget intentionally
+      // skips the source element and would otherwise return a neighbour
+      // within its 30px proximity margin.
+      const srcEl = data.elements.find((e) => e.id === elementId);
+      if (
+        srcEl &&
+        pos.x >= srcEl.x && pos.x <= srcEl.x + srcEl.width &&
+        pos.y >= srcEl.y && pos.y <= srcEl.y + srcEl.height
+      ) {
         setDraggingConnector(null);
         window.removeEventListener("mousemove", onMouseMove);
         window.removeEventListener("mouseup", onMouseUp);
         return;
       }
+      const targetEl = findDropTarget(pos, elementId);
       if (targetEl) {
         const sourceEl = data.elements.find((e) => e.id === elementId);
         const actorLike = ["actor", "team", "system", "hourglass"];
@@ -2906,27 +2913,35 @@ export function Canvas({
           ))}
 
           {/* Association connectors — rendered above all elements */}
-          {data.connectors.filter(c => c.type === "associationBPMN" || c.type === "messageBPMN").map((conn) => (
-            <ConnectorRenderer
-              key={conn.id}
-              connector={conn}
-              selected={conn.id === selectedConnectorId}
-              misaligned={misalignedConnectorIds.has(conn.id) || obstacleViolationConnIds.has(conn.id)}
-              onSelect={() => {
-                onSelectConnector(conn.id);
-                onSetSelectedElements(new Set());
-              }}
-              svgToWorld={clientToWorld}
-              onUpdateWaypoints={onUpdateConnectorWaypoints}
-              onWaypointsDragEnd={onConnectorWaypointDragEnd ? () => onConnectorWaypointDragEnd(conn.id) : undefined}
-              onUpdateLabel={onUpdateConnectorLabel
-                ? (label, ox, oy, w) => onUpdateConnectorLabel(conn.id, label, ox, oy, w)
-                : undefined}
-              onUpdateCurveHandles={onUpdateCurveHandles}
-              debugMode={debugMode}
-              onUpdateEndOffset={handleUpdateEndOffset}
-            />
-          ))}
+          {data.connectors.filter(c => c.type === "associationBPMN" || c.type === "messageBPMN").map((conn) => {
+            const srcEl = data.elements.find(e => e.id === conn.sourceId);
+            const tgtEl = data.elements.find(e => e.id === conn.targetId);
+            const srcBounds = srcEl ? { x: srcEl.x, y: srcEl.y, width: srcEl.width, height: srcEl.height } : undefined;
+            const tgtBounds = tgtEl ? { x: tgtEl.x, y: tgtEl.y, width: tgtEl.width, height: tgtEl.height } : undefined;
+            return (
+              <ConnectorRenderer
+                key={conn.id}
+                connector={conn}
+                selected={conn.id === selectedConnectorId}
+                misaligned={misalignedConnectorIds.has(conn.id) || obstacleViolationConnIds.has(conn.id)}
+                onSelect={() => {
+                  onSelectConnector(conn.id);
+                  onSetSelectedElements(new Set());
+                }}
+                svgToWorld={clientToWorld}
+                onUpdateWaypoints={onUpdateConnectorWaypoints}
+                onWaypointsDragEnd={onConnectorWaypointDragEnd ? () => onConnectorWaypointDragEnd(conn.id) : undefined}
+                onUpdateLabel={onUpdateConnectorLabel
+                  ? (label, ox, oy, w) => onUpdateConnectorLabel(conn.id, label, ox, oy, w)
+                  : undefined}
+                onUpdateCurveHandles={onUpdateCurveHandles}
+                debugMode={debugMode}
+                onUpdateEndOffset={handleUpdateEndOffset}
+                sourceBounds={srcBounds}
+                targetBounds={tgtBounds}
+              />
+            );
+          })}
 
           {/* Selected regular connector — rendered on top of all elements */}
           {selectedConnectorId && (() => {
