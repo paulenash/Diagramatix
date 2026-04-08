@@ -724,27 +724,27 @@ export function DiagramEditor({
         <ImpersonationBanner viewingAsName={viewingAsName ?? ""} viewingAsEmail={viewingAsEmail ?? ""} />
       )}
       {/* Top bar */}
-      <header className={`h-12 border-b border-gray-200 flex items-center px-4 gap-4 flex-shrink-0 ${readOnly ? "bg-orange-50" : ""}`}>
+      <header className={`h-9 border-b border-gray-200 flex items-center px-2 gap-2 flex-shrink-0 ${readOnly ? "bg-orange-50" : ""}`}>
         <button
           onClick={parentDiagram ? handleDrillBack : handleBackToProject}
-          className="text-gray-500 hover:text-gray-700 text-sm"
+          className="text-gray-500 hover:text-gray-700 text-xs"
         >
           {parentDiagram
             ? `\u2190 ${parentDiagram.name}`
             : `\u2190 ${projectId ? "Project" : "Dashboard"}`}
         </button>
 
-        <div className="flex items-center gap-2">
-          <div className="w-5 h-5 bg-blue-600 rounded flex items-center justify-center">
-            <svg width={10} height={10} viewBox="0 0 10 10" fill="none">
+        <div className="flex items-center gap-1.5">
+          <div className="w-4 h-4 bg-blue-600 rounded flex items-center justify-center">
+            <svg width={8} height={8} viewBox="0 0 10 10" fill="none">
               <rect x={0.5} y={0.5} width={3.5} height={3.5} rx={0.5} fill="white" />
               <rect x={6} y={0.5} width={3.5} height={3.5} rx={0.5} fill="white" />
               <rect x={0.5} y={6} width={3.5} height={3.5} rx={0.5} fill="white" />
               <rect x={6} y={6} width={3.5} height={3.5} rx={0.5} fill="white" />
             </svg>
           </div>
-          <span className="font-semibold text-gray-900 text-sm">{diagramName}</span>
-          <span className="text-xs text-gray-400 px-1.5 py-0.5 bg-gray-100 rounded">
+          <span className="font-semibold text-gray-900 text-xs">{diagramName}</span>
+          <span className="text-[10px] text-gray-400 px-1 py-0 bg-gray-100 rounded">
             {diagramType}
           </span>
         </div>
@@ -757,7 +757,7 @@ export function DiagramEditor({
               onClick={saveNow}
               disabled={saveStatus !== "unsaved"}
               title="Save now (Ctrl+S)"
-              className={`px-3 py-1.5 text-xs font-medium rounded border ${
+              className={`px-2 py-0.5 text-[11px] font-medium rounded border ${
                 saveStatus === "unsaved"
                   ? "bg-blue-600 text-white border-blue-600 hover:bg-blue-700"
                   : saveStatus === "saving"
@@ -768,14 +768,14 @@ export function DiagramEditor({
               {saveStatus === "saving" ? "Saving\u2026" : saveStatus === "saved" ? "\u2713 Saved" : "Save"}
             </button>
 
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-0.5">
               <button
                 onClick={undo}
                 disabled={!canUndo}
                 title="Undo (Ctrl+Z)"
-                className="p-1.5 rounded text-gray-600 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+                className="p-1 rounded text-gray-600 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
               >
-                <svg width={14} height={14} viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                <svg width={12} height={12} viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
                   <path d="M2 5h6a4 4 0 0 1 0 8H5" />
                   <path d="M2 5L5 2M2 5l3 3" />
                 </svg>
@@ -784,9 +784,9 @@ export function DiagramEditor({
                 onClick={redo}
                 disabled={!canRedo}
                 title="Redo (Ctrl+Shift+Z)"
-                className="p-1.5 rounded text-gray-600 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+                className="p-1 rounded text-gray-600 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
               >
-                <svg width={14} height={14} viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                <svg width={12} height={12} viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
                   <path d="M12 5H6a4 4 0 0 0 0 8h3" />
                   <path d="M12 5L9 2m3 3-3 3" />
                 </svg>
@@ -799,7 +799,7 @@ export function DiagramEditor({
           <div className="relative" ref={alignDropdownRef}>
             <button
               onClick={() => setAlignDropdownOpen((prev) => !prev)}
-              className="px-3 py-1.5 text-xs text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
+              className="px-2 py-0.5 text-[11px] text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
             >
               Alignment ▾
             </button>
@@ -833,7 +833,7 @@ export function DiagramEditor({
           <div className="relative" ref={templateDropdownRef}>
             <button
               onClick={() => setTemplateDropdownOpen((prev) => !prev)}
-              className="px-3 py-1.5 text-xs text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
+              className="px-2 py-0.5 text-[11px] text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
             >
               Templates {"\u25BE"}
             </button>
@@ -930,20 +930,20 @@ export function DiagramEditor({
           </div>
         )}
         {diagramType === "bpmn" && (templateMode === "capturing" || templateMode === "capturing-builtin") && (
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-blue-600">
+          <div className="flex items-center gap-1.5">
+            <span className="text-[11px] text-blue-600">
               Select elements for {templateMode === "capturing-builtin" ? "built-in" : "user"} template
             </span>
             <button
               onClick={handleSaveAsTemplate}
               disabled={selectedElementIds.size === 0}
-              className="px-3 py-1.5 text-xs text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-2 py-0.5 text-[11px] text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Save as Template
             </button>
             <button
               onClick={() => setTemplateMode("idle")}
-              className="px-3 py-1.5 text-xs text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
+              className="px-2 py-0.5 text-[11px] text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
             >
               Cancel
             </button>
@@ -962,13 +962,13 @@ export function DiagramEditor({
                 setShowTemplateNameModal(true);
               }}
               disabled={selectedElementIds.size === 0}
-              className="px-3 py-1.5 text-xs text-white bg-amber-600 rounded hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-2 py-0.5 text-[11px] text-white bg-amber-600 rounded hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Update Template
             </button>
             <button
               onClick={handleCancelTemplateEdit}
-              className="px-3 py-1.5 text-xs text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
+              className="px-2 py-0.5 text-[11px] text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
             >
               Cancel
             </button>
@@ -980,7 +980,7 @@ export function DiagramEditor({
         {!readOnly && (
           <button
             onClick={() => setShowDiagramMaintenance(true)}
-            className="px-3 py-1.5 text-xs text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
+            className="px-2 py-0.5 text-[11px] text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
           >
             Diagram Settings
           </button>
@@ -989,7 +989,7 @@ export function DiagramEditor({
         <div className="relative" ref={exportDropdownRef}>
           <button
             onClick={() => setExportDropdownOpen((prev) => !prev)}
-            className="px-3 py-1.5 text-xs text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
+            className="px-2 py-0.5 text-[11px] text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
           >
             Export ▾
           </button>
@@ -1197,7 +1197,7 @@ export function DiagramEditor({
               <button
                 type="button"
                 onClick={() => setShowAdminPasswordModal(false)}
-                className="px-3 py-1.5 text-xs text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
+                className="px-2 py-0.5 text-[11px] text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
               >
                 Cancel
               </button>
