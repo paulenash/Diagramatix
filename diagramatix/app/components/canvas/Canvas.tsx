@@ -1585,6 +1585,40 @@ export function Canvas({
     onAddElement(symbolType, worldPos, taskType, eventType);
   }
 
+  // Group-connect feature: when there's a multi-selection and the user
+  // double-clicks a gateway that sits to the right of every selected element,
+  // create a sequence connector from each selected element to the gateway and
+  // mark the gateway as a Merge gateway.
+  // Returns true if the group-connect was performed (so the caller skips its
+  // default double-click behaviour like opening the label editor).
+  function tryGroupConnectToGateway(targetEl: DiagramElement): boolean {
+    if (diagramType !== "bpmn") return false;
+    if (targetEl.type !== "gateway") return false;
+    if (selectedElementIds.size < 2) return false;
+    if (selectedElementIds.has(targetEl.id)) return false;
+
+    const sources = data.elements.filter((e) => selectedElementIds.has(e.id));
+    if (sources.length < 2) return false;
+
+    // Gateway must be strictly to the right of every selected element
+    const gwLeft = targetEl.x;
+    const allLeft = sources.every((s) => s.x + s.width <= gwLeft);
+    if (!allLeft) return false;
+
+    // Create a sequence connector from each source to the gateway.
+    // All target the gateway's left vertex (left side at offset 0.5).
+    for (const src of sources) {
+      onAddConnector(
+        src.id, targetEl.id,
+        "sequence", defaultDirectionType, defaultRoutingType,
+        "right", "left", 0.5, 0.5,
+      );
+    }
+    // Mark the gateway as a Merge
+    onUpdateProperties?.(targetEl.id, { gatewayRole: "merge" });
+    return true;
+  }
+
   function startEditingLabel(el: DiagramElement) {
     const isOldContainer = el.type === "system-boundary" || el.type === "composite-state" || el.type === "subprocess-expanded" || el.type === "group";
     if (el.type === "pool" || el.type === "lane") {
@@ -2148,6 +2182,7 @@ export function Canvas({
                 }}
                 onMove={(x, y) => onMoveElement(el.id, x, y)}
                 onDoubleClick={() => {
+                  if (tryGroupConnectToGateway(el)) return;
                   const linkedId = el.type === "subprocess" ? el.properties.linkedDiagramId as string | undefined : undefined;
                   if (linkedId && onDrillIntoSubprocess) {
                     onDrillIntoSubprocess(linkedId);
@@ -2424,6 +2459,7 @@ export function Canvas({
               }}
               onMove={(x, y) => { setDraggingElementId(el.id); onMoveElement(el.id, x, y); }}
               onDoubleClick={() => {
+                if (tryGroupConnectToGateway(el)) return;
                 const linkedId = el.type === "subprocess" ? el.properties.linkedDiagramId as string | undefined : undefined;
                 if (linkedId && onDrillIntoSubprocess) {
                   onDrillIntoSubprocess(linkedId);
