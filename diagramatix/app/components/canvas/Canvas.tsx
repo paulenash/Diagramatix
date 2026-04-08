@@ -435,6 +435,23 @@ export function Canvas({
   // successful connector creation.
   const [pendingConnSourceId, setPendingConnSourceId] = useState<string | null>(null);
 
+  // Group-Connect-to-Gateway support: a click on a gateway clears any
+  // pre-existing multi-selection before the double-click event fires. We
+  // capture the pre-click selection here so the double-click handler can
+  // still see the original group. Cleared after a short window so it can't
+  // affect unrelated future events.
+  const groupConnectPrevSelectionRef = useRef<{ ids: Set<string>; expiresAt: number } | null>(null);
+  const GROUP_CONNECT_CAPTURE_MS = 600;
+
+  // Group-Connect flash overlay: shows red lines for connectors about to be
+  // deleted and green lines for the new ones, both flashing 3 times before
+  // committing. Multiple connectors at once.
+  const [groupFlash, setGroupFlash] = useState<{
+    deleted: Array<{ from: Point; to: Point }>;
+    created: Array<{ from: Point; to: Point }>;
+    visible: boolean;
+  } | null>(null);
+
   // Fit-to-content on initial mount
   const hasFitted = useRef(false);
   useEffect(() => {
@@ -1571,14 +1588,35 @@ export function Canvas({
         // Case A (right + vertical overlap): auto-align horizontally so the
         // new element's centre y matches the source's centre y.
         let alignedPos = worldPos;
-        if (found.srcSide === "right" && found.tgtSide === "left") {
+        let srcSide = found.srcSide;
+        let tgtSide = found.tgtSide;
+        if (srcSide === "right" && tgtSide === "left") {
           const srcCy = found.source.y + found.source.height / 2;
           newY = srcCy - def.defaultHeight / 2;
           alignedPos = { x: worldPos.x, y: srcCy };
         }
+        // Override target side when the new element is a gateway: pick the
+        // diamond vertex that matches the source's vertical position.
+        //   source clearly above gateway → top vertex
+        //   source vertically overlaps    → left vertex
+        //   source clearly below gateway  → bottom vertex
+        if (symbolType === "gateway") {
+          const src = found.source;
+          const srcTop = src.y;
+          const srcBottom = src.y + src.height;
+          const gwTop = newY;
+          const gwBottom = newY + def.defaultHeight;
+          if (srcBottom <= gwTop) {
+            srcSide = "bottom"; tgtSide = "top";
+          } else if (srcTop >= gwBottom) {
+            srcSide = "top"; tgtSide = "bottom";
+          } else {
+            srcSide = "right"; tgtSide = "left";
+          }
+        }
         const newId = nanoid();
         onAddElement(symbolType, alignedPos, taskType, eventType, newId);
-        startAutoConnect(found.source, newId, newX, newY, def.defaultWidth, def.defaultHeight, found.srcSide, found.tgtSide);
+        startAutoConnect(found.source, newId, newX, newY, def.defaultWidth, def.defaultHeight, srcSide, tgtSide);
         return;
       }
     }
@@ -1589,15 +1627,36 @@ export function Canvas({
   // double-clicks a gateway that sits to the right of every selected element,
   // create a sequence connector from each selected element to the gateway and
   // mark the gateway as a Merge gateway.
+  //
+  // The first click of the double-click typically replaces the selection with
+  // just the gateway, so we also consult `groupConnectPrevSelectionRef` which
+  // captures the pre-click selection at element-mousedown time.
+  //
   // Returns true if the group-connect was performed (so the caller skips its
-  // default double-click behaviour like opening the label editor).
+  // default double-click behaviour).
   function tryGroupConnectToGateway(targetEl: DiagramElement): boolean {
     if (diagramType !== "bpmn") return false;
     if (targetEl.type !== "gateway") return false;
-    if (selectedElementIds.size < 2) return false;
-    if (selectedElementIds.has(targetEl.id)) return false;
 
-    const sources = data.elements.filter((e) => selectedElementIds.has(e.id));
+    // Resolve the effective selection: prefer the captured pre-click set if
+    // it's still fresh, otherwise fall back to the current selection.
+    let effectiveSelection: Set<string> = selectedElementIds;
+    const captured = groupConnectPrevSelectionRef.current;
+    if (
+      captured &&
+      Date.now() < captured.expiresAt &&
+      captured.ids.size >= 2 &&
+      !captured.ids.has(targetEl.id)
+    ) {
+      effectiveSelection = captured.ids;
+    }
+    // Consume the capture so it can't bleed into a later double-click
+    groupConnectPrevSelectionRef.current = null;
+
+    if (effectiveSelection.size < 2) return false;
+    if (effectiveSelection.has(targetEl.id)) return false;
+
+    const sources = data.elements.filter((e) => effectiveSelection.has(e.id));
     if (sources.length < 2) return false;
 
     // Gateway must be strictly to the right of every selected element
@@ -1605,17 +1664,71 @@ export function Canvas({
     const allLeft = sources.every((s) => s.x + s.width <= gwLeft);
     if (!allLeft) return false;
 
-    // Create a sequence connector from each source to the gateway.
-    // All target the gateway's left vertex (left side at offset 0.5).
-    for (const src of sources) {
-      onAddConnector(
-        src.id, targetEl.id,
-        "sequence", defaultDirectionType, defaultRoutingType,
-        "right", "left", 0.5, 0.5,
-      );
-    }
-    // Mark the gateway as a Merge
-    onUpdateProperties?.(targetEl.id, { gatewayRole: "merge" });
+    // ALWAYS connect FROM the source's right edge.
+    // Pick the gateway's diamond vertex based on source vertical position:
+    //   source clearly above → top vertex
+    //   source vertically overlaps → left vertex
+    //   source clearly below → bottom vertex
+    const gwTop = targetEl.y;
+    const gwBottom = targetEl.y + targetEl.height;
+    const sourceIds = new Set(sources.map((s) => s.id));
+
+    // Find any existing connectors from a source in the group to this gateway
+    // — they'll be deleted before the new connectors are committed.
+    const existingToDelete = data.connectors.filter(
+      (c) => sourceIds.has(c.sourceId) && c.targetId === targetEl.id,
+    );
+
+    // Prepare per-source connection plans (for both flash + commit)
+    const plans: Array<{ src: DiagramElement; tgtSide: Side }> = sources.map((src) => {
+      const srcBottom = src.y + src.height;
+      const srcTop = src.y;
+      let tgtSide: Side;
+      if (srcBottom <= gwTop) tgtSide = "top";
+      else if (srcTop >= gwBottom) tgtSide = "bottom";
+      else tgtSide = "left";
+      return { src, tgtSide };
+    });
+
+    // Build flash overlay endpoints (in world coords)
+    const deletedFlash = existingToDelete.map((c) => {
+      const wp = c.waypoints;
+      // Use the first and last waypoints — they're the actual visible endpoints
+      const from = wp[0] ?? { x: 0, y: 0 };
+      const to = wp[wp.length - 1] ?? { x: 0, y: 0 };
+      return { from, to };
+    });
+    const createdFlash = plans.map(({ src, tgtSide }) => ({
+      from: sideMidpoint(src, "right"),
+      to: sideMidpoint(targetEl, tgtSide),
+    }));
+
+    // Run a 3-flash animation, then commit the deletes + adds + role change
+    setGroupFlash({ deleted: deletedFlash, created: createdFlash, visible: true });
+    let cycle = 0;
+    const TOTAL_CYCLES = 6; // 3 on + 3 off
+    const tick = () => {
+      cycle++;
+      if (cycle >= TOTAL_CYCLES) {
+        setGroupFlash(null);
+        // Delete existing connectors
+        for (const c of existingToDelete) onDeleteConnector(c.id);
+        // Create new connectors (always source.right → gateway.{top|left|bottom})
+        for (const { src, tgtSide } of plans) {
+          onAddConnector(
+            src.id, targetEl.id,
+            "sequence", defaultDirectionType, defaultRoutingType,
+            "right", tgtSide, 0.5, 0.5,
+          );
+        }
+        // Mark the gateway as a Merge
+        onUpdateProperties?.(targetEl.id, { gatewayRole: "merge" });
+        return;
+      }
+      setGroupFlash((prev) => (prev ? { ...prev, visible: !prev.visible } : null));
+      setTimeout(tick, 150);
+    };
+    setTimeout(tick, 150);
     return true;
   }
 
@@ -2171,6 +2284,19 @@ export function Canvas({
                     setPendingConnSourceId(null);
                     return;
                   }
+                  // Group-Connect-to-Gateway: capture the pre-click multi-selection
+                  // before it gets cleared, so the upcoming double-click can use it.
+                  if (
+                    el.type === "gateway" &&
+                    selectedElementIds.size >= 2 &&
+                    !selectedElementIds.has(el.id) &&
+                    !e?.shiftKey
+                  ) {
+                    groupConnectPrevSelectionRef.current = {
+                      ids: new Set(selectedElementIds),
+                      expiresAt: Date.now() + GROUP_CONNECT_CAPTURE_MS,
+                    };
+                  }
                   if (isWhiteBoxPool && selectedElementIds.has(el.id) && selectedElementIds.size === 1) {
                     onSetSelectedElements(new Set()); // toggle deselect for white-box pools
                   } else if (e?.shiftKey) {
@@ -2183,6 +2309,9 @@ export function Canvas({
                 onMove={(x, y) => onMoveElement(el.id, x, y)}
                 onDoubleClick={() => {
                   if (tryGroupConnectToGateway(el)) return;
+                  // Gateway shape double-click never opens the label editor —
+                  // the label rect has its own dblclick handler for that.
+                  if (el.type === "gateway") return;
                   const linkedId = el.type === "subprocess" ? el.properties.linkedDiagramId as string | undefined : undefined;
                   if (linkedId && onDrillIntoSubprocess) {
                     onDrillIntoSubprocess(linkedId);
@@ -2450,6 +2579,18 @@ export function Canvas({
               isAssocBpmnTarget={elIsAssocTarget}
               isErrorTarget={errorTargetIds.has(el.id) || obstacleViolationElementIds.has(el.id)}
               onSelect={(ev) => {
+                // Group-Connect-to-Gateway: capture pre-click multi-selection
+                if (
+                  el.type === "gateway" &&
+                  selectedElementIds.size >= 2 &&
+                  !selectedElementIds.has(el.id) &&
+                  !ev?.shiftKey
+                ) {
+                  groupConnectPrevSelectionRef.current = {
+                    ids: new Set(selectedElementIds),
+                    expiresAt: Date.now() + GROUP_CONNECT_CAPTURE_MS,
+                  };
+                }
                 if (ev?.shiftKey) {
                   onSetSelectedElements((prev) => { const next = new Set(prev); if (next.has(el.id)) next.delete(el.id); else next.add(el.id); return next; });
                 } else if (!selectedElementIds.has(el.id)) {
@@ -2460,6 +2601,9 @@ export function Canvas({
               onMove={(x, y) => { setDraggingElementId(el.id); onMoveElement(el.id, x, y); }}
               onDoubleClick={() => {
                 if (tryGroupConnectToGateway(el)) return;
+                // Gateway shape double-click never opens the label editor —
+                // the label rect has its own dblclick handler for that.
+                if (el.type === "gateway") return;
                 const linkedId = el.type === "subprocess" ? el.properties.linkedDiagramId as string | undefined : undefined;
                 if (linkedId && onDrillIntoSubprocess) {
                   onDrillIntoSubprocess(linkedId);
@@ -2608,6 +2752,18 @@ export function Canvas({
                     setPendingConnSourceId(null);
                     return;
                   }
+                  // Group-Connect-to-Gateway: capture pre-click multi-selection
+                  if (
+                    el.type === "gateway" &&
+                    selectedElementIds.size >= 2 &&
+                    !selectedElementIds.has(el.id) &&
+                    !ev?.shiftKey
+                  ) {
+                    groupConnectPrevSelectionRef.current = {
+                      ids: new Set(selectedElementIds),
+                      expiresAt: Date.now() + GROUP_CONNECT_CAPTURE_MS,
+                    };
+                  }
                   if (ev?.shiftKey) {
                     onSetSelectedElements((prev) => { const next = new Set(prev); if (next.has(el.id)) next.delete(el.id); else next.add(el.id); return next; });
                   } else if (!selectedElementIds.has(el.id)) {
@@ -2616,7 +2772,7 @@ export function Canvas({
                   onSelectConnector(null);
                 }}
                 onMove={(x, y) => onMoveElement(el.id, x, y)}
-                onDoubleClick={() => {}}
+                onDoubleClick={() => { tryGroupConnectToGateway(el); }}
                 onConnectionPointDragStart={(side, worldPos) =>
                   handleConnectionPointDragStart(el.id, side, worldPos)}
                 showConnectionPoints={selectedElementIds.size <= 1 && (selectedElementIds.has(el.id) || isDraggingConnector || isDraggingEndpoint)}
@@ -2839,6 +2995,46 @@ export function Canvas({
               strokeDasharray="6 3"
               style={{ pointerEvents: "none" }}
             />
+          )}
+
+          {/* Group-connect flash: red for to-be-deleted, green for to-be-created */}
+          {groupFlash && groupFlash.visible && (
+            <g style={{ pointerEvents: "none" }}>
+              {groupFlash.deleted.map((seg, i) => (
+                <line
+                  key={`del-${i}`}
+                  x1={seg.from.x} y1={seg.from.y}
+                  x2={seg.to.x} y2={seg.to.y}
+                  stroke="#dc2626" strokeWidth={2.5} strokeDasharray="5 3"
+                />
+              ))}
+              {groupFlash.created.map((seg, i) => {
+                const dx = seg.to.x - seg.from.x;
+                const dy = seg.to.y - seg.from.y;
+                const len = Math.hypot(dx, dy) || 1;
+                const ux = dx / len, uy = dy / len;
+                const aSize = 8;
+                const aBaseX = seg.to.x - ux * aSize;
+                const aBaseY = seg.to.y - uy * aSize;
+                const aLeftX = aBaseX - uy * (aSize * 0.5);
+                const aLeftY = aBaseY + ux * (aSize * 0.5);
+                const aRightX = aBaseX + uy * (aSize * 0.5);
+                const aRightY = aBaseY - ux * (aSize * 0.5);
+                return (
+                  <g key={`new-${i}`}>
+                    <line
+                      x1={seg.from.x} y1={seg.from.y}
+                      x2={seg.to.x} y2={seg.to.y}
+                      stroke="#10b981" strokeWidth={2}
+                    />
+                    <polygon
+                      points={`${seg.to.x},${seg.to.y} ${aLeftX},${aLeftY} ${aRightX},${aRightY}`}
+                      fill="#10b981"
+                    />
+                  </g>
+                );
+              })}
+            </g>
           )}
 
           {/* Auto-connect flashing preview — user can press Esc to abort */}
