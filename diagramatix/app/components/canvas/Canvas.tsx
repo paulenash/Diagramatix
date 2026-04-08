@@ -613,6 +613,14 @@ export function Canvas({
     function onMouseUp(ev: MouseEvent) {
       const pos = clientToWorld(ev.clientX, ev.clientY);
       const targetEl = findDropTarget(pos, elementId);
+      // Abort if released on the source element itself — the user clearly
+      // didn't intend to create a self-loop here.
+      if (targetEl && targetEl.id === elementId) {
+        setDraggingConnector(null);
+        window.removeEventListener("mousemove", onMouseMove);
+        window.removeEventListener("mouseup", onMouseUp);
+        return;
+      }
       if (targetEl) {
         const sourceEl = data.elements.find((e) => e.id === elementId);
         const actorLike = ["actor", "team", "system", "hourglass"];
@@ -756,7 +764,14 @@ export function Canvas({
             seqTargetSide = tgtBound.side;
             seqTargetOffsetAlong = tgtBound.offsetAlong;
           }
-          // (expanded subprocess attachment is handled by the click-based logic above)
+          // Expanded subprocess targets always attach at the boundary point
+          // nearest to the release position — even when the conditional
+          // branch above didn't run (e.g. boundary-event source).
+          if (targetEl.type === "subprocess-expanded") {
+            const tgtBound = pointToBoundaryOffset(pos, targetEl);
+            seqTargetSide = tgtBound.side;
+            seqTargetOffsetAlong = tgtBound.offsetAlong;
+          }
           let connType: ConnectorType;
           let connRouting: RoutingType;
           let connDirection: DirectionType;
@@ -1423,79 +1438,56 @@ export function Canvas({
       }
     }
 
-    // Case A: nearest LEFT element where new is diagonally above/below
-    // (no horizontal overlap AND no vertical overlap with the source).
-    // If the 2nd-nearest is a gateway, prefer it.
+    // Main: pick the NEAREST eligible candidate across all positional
+    // categories (left+vertical-overlap, left+diagonal, above/below with
+    // horizontal overlap). For each candidate compute the proposed connector
+    // (using the side pair appropriate to its relative position) and rank by
+    // the resulting connector length. Return the shortest.
     {
-      const matches: Array<{ el: DiagramElement; dist: number }> = [];
+      type Match = { el: DiagramElement; srcSide: Side; tgtSide: Side; dist: number };
+      const matches: Match[] = [];
       for (const el of candidates) {
+        const elLeft = el.x;
         const elRight = el.x + el.width;
+        const elTop = el.y;
         const elBottom = el.y + el.height;
-        if (elRight > newX) continue;
-        const vOverlap = Math.min(elBottom, newBottom) - Math.max(el.y, newY);
-        if (vOverlap > 0) continue;
-        const dx = newX - elRight;
-        const dy = newY < el.y ? el.y - newBottom : newY - elBottom;
-        matches.push({ el, dist: Math.hypot(dx, dy) });
-      }
-      if (matches.length > 0) {
-        matches.sort((a, b) => a.dist - b.dist);
-        let chosen = matches[0].el;
-        if (matches.length >= 2 && matches[1].el.type === "gateway") chosen = matches[1].el;
-        const srcCy = chosen.y + chosen.height / 2;
-        const newCy = newY + newH / 2;
-        const srcSide: Side = newCy < srcCy ? "top" : "bottom";
-        return { source: chosen, srcSide, tgtSide: "left" };
-      }
-    }
+        const vOverlap = Math.min(elBottom, newBottom) - Math.max(elTop, newY);
+        const hOverlap = Math.min(elRight, newRight) - Math.max(elLeft, newX);
 
-    // Case B: nearest ABOVE/BELOW with horizontal (x) overlap
-    {
-      let best: DiagramElement | null = null;
-      let bestGap = Infinity;
-      let bestSrcSide: Side = "bottom";
-      let bestTgtSide: Side = "top";
-      for (const el of candidates) {
-        const elBottom = el.y + el.height;
-        const overlapLeft = Math.max(el.x, newX);
-        const overlapRight = Math.min(el.x + el.width, newRight);
-        if (overlapRight <= overlapLeft) continue;
-        let gap: number; let srcSide: Side; let tgtSide: Side;
-        if (elBottom <= newY) {
-          gap = newY - elBottom;
+        let srcSide: Side | null = null;
+        let tgtSide: Side | null = null;
+
+        if (elRight <= newX && vOverlap > 0) {
+          // Left + vertical overlap → right→left
+          srcSide = "right"; tgtSide = "left";
+        } else if (elRight <= newX) {
+          // Left + diagonal (no vertical overlap)
+          const elCy = elTop + el.height / 2;
+          const newCy = newY + newH / 2;
+          srcSide = newCy < elCy ? "top" : "bottom";
+          tgtSide = "left";
+        } else if (hOverlap > 0 && elBottom <= newY) {
+          // Above with horizontal overlap → bottom→top
           srcSide = "bottom"; tgtSide = "top";
-        } else if (newBottom <= el.y) {
-          gap = el.y - newBottom;
+        } else if (hOverlap > 0 && newBottom <= elTop) {
+          // Below with horizontal overlap → top→bottom
           srcSide = "top"; tgtSide = "bottom";
-        } else {
-          continue; // vertically overlapping — handled by Case C
         }
-        if (gap < bestGap) { bestGap = gap; best = el; bestSrcSide = srcSide; bestTgtSide = tgtSide; }
-      }
-      if (best) return { source: best, srcSide: bestSrcSide, tgtSide: bestTgtSide };
-    }
+        if (!srcSide || !tgtSide) continue;
 
-    // Case C: nearest LEFT with vertical (y) overlap.
-    // If the 2nd-nearest is a gateway, prefer it.
-    {
-      const matches: Array<{ el: DiagramElement; right: number }> = [];
-      for (const el of candidates) {
-        const elRight = el.x + el.width;
-        if (elRight > newX) continue;
-        const overlapTop = Math.max(el.y, newY);
-        const overlapBottom = Math.min(el.y + el.height, newBottom);
-        if (overlapBottom <= overlapTop) continue;
-        matches.push({ el, right: elRight });
+        // Distance metric: sideMidpoint (source) → sideMidpoint (synthetic
+        // target rect at the new element's position).
+        const from = sideMidpoint(el, srcSide);
+        const targetRect = { ...el, x: newX, y: newY, width: newW, height: newH } as DiagramElement;
+        const to = sideMidpoint(targetRect, tgtSide);
+        const dist = Math.hypot(to.x - from.x, to.y - from.y);
+        matches.push({ el, srcSide, tgtSide, dist });
       }
-      if (matches.length > 0) {
-        matches.sort((a, b) => b.right - a.right);
-        let chosen = matches[0].el;
-        if (matches.length >= 2 && matches[1].el.type === "gateway") chosen = matches[1].el;
-        return { source: chosen, srcSide: "right", tgtSide: "left" };
-      }
+      if (matches.length === 0) return null;
+      matches.sort((a, b) => a.dist - b.dist);
+      const winner = matches[0];
+      return { source: winner.el, srcSide: winner.srcSide, tgtSide: winner.tgtSide };
     }
-
-    return null;
   }
 
   // Compute the (x,y) point on an element's side at offset 0.5 (middle).
@@ -2532,7 +2524,15 @@ export function Canvas({
             let elIsDropTarget = false;
             let elIsMsgTarget = false;
             let elIsAssocTarget = false;
-            if (isDraggingConnector && el.id !== draggingConnector!.fromId) {
+            // When dragging from an expanded subprocess, never highlight its
+            // own children (parentId === source.id) or its boundary events
+            // (boundaryHostId === source.id) — connectors from the container
+            // to its own contents/boundary aren't valid.
+            const skipBecauseExpandedSelfContent =
+              draggingSourceEl?.type === "subprocess-expanded" &&
+              (el.parentId === draggingSourceEl.id ||
+               el.boundaryHostId === draggingSourceEl.id);
+            if (isDraggingConnector && el.id !== draggingConnector!.fromId && !skipBecauseExpandedSelfContent) {
               const elIsData = DATA_ELEMENT_TYPES.has(el.type);
               // End events are always senders — never valid messageBPMN targets.
               // Send tasks / throwing events are excluded only if they already have an
@@ -2642,6 +2642,9 @@ export function Canvas({
               if (epDragFixedIsData && !elIsData) elIsAssocTarget = true;
               else if (!epDragFixedIsData && elIsData) elIsAssocTarget = true;
             }
+            // Start events are never valid sequence-flow targets, but they
+            // can still be association or message-flow targets.
+            if (el.type === "start-event") elIsDropTarget = false;
             return (
             <SymbolRenderer
               key={el.id}
@@ -2733,7 +2736,12 @@ export function Canvas({
             let elIsDropTarget = false;
             let elIsMsgTarget = false;
             let elIsAssocTarget = false;
-            if (isDraggingConnector && el.id !== draggingConnector!.fromId) {
+            // When dragging from an expanded subprocess, never highlight a
+            // boundary event mounted on that same subprocess.
+            const skipBecauseOwnBoundary =
+              draggingSourceEl?.type === "subprocess-expanded" &&
+              el.boundaryHostId === draggingSourceEl.id;
+            if (isDraggingConnector && el.id !== draggingConnector!.fromId && !skipBecauseOwnBoundary) {
               // Throwing/send boundary events excluded only if they already have an outgoing messageBPMN
               const bEvtIsSendLocked = (el.flowType === "throwing" || el.taskType === "send")
                 && data.connectors.some(c => c.type === "messageBPMN" && c.sourceId === el.id);
@@ -2806,6 +2814,9 @@ export function Canvas({
               if (epDragFixedIsData && !elIsData) elIsAssocTarget = true;
               else if (!epDragFixedIsData && elIsData) elIsAssocTarget = true;
             }
+            // Start events are never valid sequence-flow targets, but they
+            // can still be association or message-flow targets.
+            if (el.type === "start-event") elIsDropTarget = false;
             return (
               <SymbolRenderer
                 key={el.id}

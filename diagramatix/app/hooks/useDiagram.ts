@@ -1511,23 +1511,32 @@ function reducer(state: DiagramData, action: Action): DiagramData {
     case "INSERT_SPACE": {
       const { markerX, markerY, dx, dy } = action.payload;
 
-      // Classify each element relative to the marker
+      // First pass: shift / grow non-boundary-event elements. Boundary events
+      // are handled in a second pass so they can be re-anchored to their
+      // host's NEW edges.
       const elements = state.elements.map(el => {
+        // Skip boundary events here — handled in second pass
+        if (el.boundaryHostId) return el;
+
         const cx = el.x + el.width / 2;
         const cy = el.y + el.height / 2;
         const isPool = el.type === "pool";
         const isLane = el.type === "lane";
         const isSublane = isLane && !!el.parentId &&
           state.elements.some(p => p.id === el.parentId && p.type === "lane");
+        // Expanded subprocesses behave like pools/lanes for space insertion:
+        // their boundary stretches when the marker line cuts through them so
+        // that children straddling the marker stay inside the container.
+        const isExpandedSp = el.type === "subprocess-expanded";
 
         // Horizontal shift (dx > 0: push elements to the right of marker)
         if (dx !== 0) {
-          if (isPool || isLane || isSublane) {
-            // Extend pool/lane/sublane right boundary if the marker vertical line intersects it
+          if (isPool || isLane || isSublane || isExpandedSp) {
+            // Extend right boundary if the marker vertical line intersects it
             if (markerX > el.x && markerX < el.x + el.width) {
               return { ...el, width: el.width + dx };
             }
-            // If the entire pool/lane is to the right, shift it
+            // If the entire container is to the right, shift it
             if (el.x >= markerX) {
               return { ...el, x: el.x + dx };
             }
@@ -1553,12 +1562,12 @@ function reducer(state: DiagramData, action: Action): DiagramData {
             }
             return el;
           }
-          if (isLane || isSublane) {
-            // If marker intersects this lane, extend its bottom
+          if (isLane || isSublane || isExpandedSp) {
+            // If marker intersects this lane / expanded subprocess, extend its bottom
             if (markerY > el.y && markerY < el.y + el.height) {
               return { ...el, height: el.height + dy };
             }
-            // If lane is below marker, shift it down
+            // If it is entirely below the marker, shift it down
             if (el.y >= markerY) {
               return { ...el, y: el.y + dy };
             }
@@ -1574,8 +1583,58 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         return el;
       });
 
+      // Second pass: re-anchor boundary events to their host's new edges.
+      // A boundary event only moves when the specific host edge it is mounted
+      // on actually moves:
+      //   • If the host shifts entirely → ALL boundary events shift with it
+      //   • If the host grows right (dx>0, marker line cuts host horizontally)
+      //     → only boundary events on the RIGHT edge shift right
+      //   • If the host grows down (dy>0, marker line cuts host vertically)
+      //     → only boundary events on the BOTTOM edge shift down
+      //   • Otherwise → the event stays where it is
+      const oldElementMap = new Map(state.elements.map(e => [e.id, e]));
+      const newElementMap = new Map(elements.map(e => [e.id, e]));
+      const finalElements = elements.map(el => {
+        if (!el.boundaryHostId) return el;
+        const oldHost = oldElementMap.get(el.boundaryHostId);
+        const newHost = newElementMap.get(el.boundaryHostId);
+        if (!oldHost || !newHost) return el;
+
+        // Identify which side of the OLD host the event is mounted on
+        const evCx = el.x + el.width / 2;
+        const evCy = el.y + el.height / 2;
+        const distTop    = Math.abs(evCy - oldHost.y);
+        const distBottom = Math.abs(evCy - (oldHost.y + oldHost.height));
+        const distLeft   = Math.abs(evCx - oldHost.x);
+        const distRight  = Math.abs(evCx - (oldHost.x + oldHost.width));
+        const minDist = Math.min(distTop, distBottom, distLeft, distRight);
+        const onTop    = minDist === distTop;
+        const onBottom = !onTop && minDist === distBottom;
+        const onLeft   = !onTop && !onBottom && minDist === distLeft;
+        const onRight  = !onTop && !onBottom && !onLeft;
+
+        const hostShifted = oldHost.x !== newHost.x || oldHost.y !== newHost.y;
+        const hostGrewRight = newHost.width !== oldHost.width;
+        const hostGrewDown  = newHost.height !== oldHost.height;
+
+        let evDx = 0;
+        let evDy = 0;
+        if (hostShifted) {
+          evDx += newHost.x - oldHost.x;
+          evDy += newHost.y - oldHost.y;
+        }
+        if (hostGrewRight && onRight) {
+          evDx += newHost.width - oldHost.width;
+        }
+        if (hostGrewDown && onBottom) {
+          evDy += newHost.height - oldHost.height;
+        }
+        if (evDx === 0 && evDy === 0) return el;
+        return { ...el, x: el.x + evDx, y: el.y + evDy };
+      });
+
       // Recompute all connectors after space insertion, adjusting messageBPMN labels
-      const recomputed = recomputeAllConnectors(state.connectors, elements);
+      const recomputed = recomputeAllConnectors(state.connectors, finalElements);
       const connectors = recomputed.map((conn, i) => {
         const old = state.connectors[i];
         if (!old || old.id !== conn.id) return conn;
@@ -1583,7 +1642,7 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         return Object.keys(labelAdj).length > 0 ? { ...conn, ...labelAdj } : conn;
       });
 
-      return { ...state, elements: updatePoolTypes(elements), connectors: validateConnectorsAgainstObstacles(connectors, elements) };
+      return { ...state, elements: updatePoolTypes(finalElements), connectors: validateConnectorsAgainstObstacles(connectors, finalElements) };
     }
 
     case "CORRECT_ALL_CONNECTORS": {

@@ -208,11 +208,12 @@ function OpenArrowMarkerStart({ id, color }: { id: string; color: string }) {
   );
 }
 
-// Thinner, shorter open arrowhead for associationBPMN connectors
+// Thinner, slightly shorter open arrowhead for associationBPMN connectors.
+// Legs are 85% of the original length, same opening angle as the original.
 function OpenArrowMarkerThin({ id, color }: { id: string; color: string }) {
   return (
     <marker id={id} markerWidth={8} markerHeight={5} refX={7} refY={2.5} orient="auto" overflow="visible">
-      <polyline points="0,0.5 7,2.5 0,4.5" fill="none" stroke={color} strokeWidth={1} />
+      <polyline points="1.05,0.8 7,2.5 1.05,4.2" fill="none" stroke={color} strokeWidth={1} strokeLinecap="round" strokeLinejoin="round" />
     </marker>
   );
 }
@@ -220,7 +221,7 @@ function OpenArrowMarkerThin({ id, color }: { id: string; color: string }) {
 function OpenArrowMarkerStartThin({ id, color }: { id: string; color: string }) {
   return (
     <marker id={id} markerWidth={8} markerHeight={5} refX={7} refY={2.5} orient="auto-start-reverse" overflow="visible">
-      <polyline points="0,0.5 7,2.5 0,4.5" fill="none" stroke={color} strokeWidth={1} />
+      <polyline points="1.05,0.8 7,2.5 1.05,4.2" fill="none" stroke={color} strokeWidth={1} strokeLinecap="round" strokeLinejoin="round" />
     </marker>
   );
 }
@@ -667,7 +668,7 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
         fill="none"
         stroke={strokeColor}
         strokeWidth={isAssocBPMN ? (selected ? 2.5 : 2) : (selected ? 2 : 1.5)}
-        strokeDasharray={isMessageBPMN ? "10 5" : isAssocBPMN ? "1 7" : (isMessage ? "6 3" : undefined)}
+        strokeDasharray={isMessageBPMN ? "10 5" : isAssocBPMN ? "0.5 3" : (isMessage ? "6 3" : undefined)}
         strokeLinecap={isAssocBPMN ? "round" : undefined}
         markerStart={(displayMode === "hand-drawn" && !isMessageBPMN) ? undefined :
           isMessageBPMN ? `url(#msg-start-${connector.id})`
