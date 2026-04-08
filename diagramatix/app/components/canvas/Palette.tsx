@@ -15,7 +15,7 @@ interface Props {
   colorConfig?: SymbolColorConfig;
 }
 
-function PaletteSymbolPreview({ type, colorConfig }: { type: SymbolType; colorConfig?: SymbolColorConfig }) {
+export function PaletteSymbolPreview({ type, colorConfig }: { type: SymbolType; colorConfig?: SymbolColorConfig }) {
   switch (type) {
     case "task":
       // Aspect ratio matches the default Task element: 102 × 65
@@ -34,9 +34,11 @@ function PaletteSymbolPreview({ type, colorConfig }: { type: SymbolType; colorCo
         </svg>
       );
     case "subprocess-expanded":
+      // 75% taller than the standard 36×21 task icon, so it's clearly
+      // distinguishable in the palette and quick-add popup.
       return (
-        <svg width={36} height={21} viewBox="0 0 48 28">
-          <rect x={2} y={2} width={44} height={24} rx={3} fill={resolveColor("subprocess-expanded", colorConfig)} stroke="#374151" strokeWidth={1.5} />
+        <svg width={36} height={37} viewBox="0 0 48 49">
+          <rect x={2} y={2} width={44} height={45} rx={3} fill={resolveColor("subprocess-expanded", colorConfig)} stroke="#374151" strokeWidth={1.5} />
         </svg>
       );
     case "gateway":

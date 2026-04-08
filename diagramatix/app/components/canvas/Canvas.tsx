@@ -18,6 +18,7 @@ import type {
 } from "@/app/lib/diagram/types";
 import { SymbolRenderer, SublaneIdsCtx, type ResizeHandle } from "./SymbolRenderer";
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
+import { PaletteSymbolPreview } from "./Palette";
 import { DisplayModeCtx, FontScaleCtx, ConnectorFontScaleCtx, TitleFontSizeCtx, SketchyFilter } from "@/app/lib/diagram/displayMode";
 import { ConnectorRenderer } from "./ConnectorRenderer";
 
@@ -450,6 +451,15 @@ export function Canvas({
     deleted: Array<{ from: Point; to: Point }>;
     created: Array<{ from: Point; to: Point }>;
     visible: boolean;
+  } | null>(null);
+
+  // Right-click quick-add popup: small palette of common BPMN shapes shown
+  // at the cursor position. Choosing one places that element at the original
+  // right-click world position and runs auto-connect.
+  const [quickAdd, setQuickAdd] = useState<{
+    worldPos: Point;
+    screenX: number;
+    screenY: number;
   } | null>(null);
 
   // Fit-to-content on initial mount
@@ -1135,6 +1145,10 @@ export function Canvas({
       setPendingDrop(null);
       return;
     }
+    if (quickAdd) {
+      setQuickAdd(null);
+      return;
+    }
 
     // Ctrl+click on background: place/move space insertion marker (BPMN only)
     if (e.ctrlKey && onInsertSpace) {
@@ -1289,10 +1303,52 @@ export function Canvas({
       "task", "subprocess", "subprocess-expanded", "gateway",
       "start-event", "intermediate-event", "end-event",
     ]);
-    // Never auto-connect to/from edge-mounted (boundary) events.
-    const candidates = data.elements.filter(
-      (e) => AUTO_CONNECT_TYPES.has(e.type) && !e.boundaryHostId
-    );
+
+    // Walk an element's parent chain and return the id of the nearest
+    // subprocess-expanded ANCESTOR (excluding the element itself) — or null
+    // if there isn't one. Used to confine auto-connect to elements that share
+    // the same expanded-subprocess scope. An expanded-subprocess element is
+    // therefore "outside its own scope", so it can be a valid target from
+    // siblings outside the subprocess.
+    function expandedParentOf(el: DiagramElement): string | null {
+      let cur: DiagramElement | undefined = el.parentId
+        ? data.elements.find((e) => e.id === el.parentId)
+        : undefined;
+      while (cur) {
+        if (cur.type === "subprocess-expanded") return cur.id;
+        if (!cur.parentId) return null;
+        cur = data.elements.find((e) => e.id === cur!.parentId);
+      }
+      return null;
+    }
+    // The new element doesn't have a parentId yet, so infer the expanded
+    // subprocess that would contain it based on spatial containment (matches
+    // the reducer's ADD_ELEMENT logic). If a candidate expanded-subprocess
+    // contains the new element's bbox, it becomes its expanded scope.
+    const newRight2 = newX + newW;
+    const newBottom2 = newY + newH;
+    let newExpandedScope: string | null = null;
+    for (const cand of data.elements) {
+      if (cand.type !== "subprocess-expanded") continue;
+      if (newX >= cand.x && newRight2 <= cand.x + cand.width &&
+          newY >= cand.y && newBottom2 <= cand.y + cand.height) {
+        newExpandedScope = cand.id;
+        break;
+      }
+    }
+
+    // Never auto-connect to/from edge-mounted (boundary) events, and never
+    // cross an expanded-subprocess boundary.
+    const candidates = data.elements.filter((e) => {
+      if (!AUTO_CONNECT_TYPES.has(e.type)) return false;
+      if (e.boundaryHostId) return false;
+      // Both must share the same expanded-subprocess scope (or both have none).
+      // Skip the new element's own expanded scope if the candidate IS that
+      // subprocess (you can't connect to your own container).
+      if (e.id === newExpandedScope) return false;
+      const candScope = expandedParentOf(e);
+      return candScope === newExpandedScope;
+    });
     const newRight = newX + newW;
     const newBottom = newY + newH;
     const newCx = newX + newW / 2;
@@ -1867,6 +1923,8 @@ export function Canvas({
       }
       // Cancel connection-creation mode
       if (pendingConnSourceId) setPendingConnSourceId(null);
+      // Dismiss right-click quick-add popup
+      if (quickAdd) setQuickAdd(null);
     }
     if (e.key === "Delete") {
       if (editingLabel) return;
@@ -2152,6 +2210,18 @@ export function Canvas({
         onDrop={handleDrop}
         onDragOver={(e) => e.preventDefault()}
         onKeyDown={handleKeyDown}
+        onContextMenu={(e) => {
+          if (readOnly || diagramType !== "bpmn") return;
+          e.preventDefault();
+          const rect = svgRef.current?.getBoundingClientRect();
+          if (!rect) return;
+          const worldPos = svgToWorld(e.clientX - rect.left, e.clientY - rect.top);
+          setQuickAdd({
+            worldPos,
+            screenX: e.clientX - rect.left,
+            screenY: e.clientY - rect.top,
+          });
+        }}
         style={{ cursor: isDraggingConnector || isDraggingEndpoint ? "crosshair" : "default" }}
       >
         <SketchyFilter />
@@ -2484,6 +2554,9 @@ export function Canvas({
                 }
               } else if (draggingSourceIsData && !elIsData) {
                 elIsAssocTarget = true;
+              } else if (draggingSourceIsData && elIsData) {
+                // Data → data is not a legal connector. Leave all flags false
+                // so the target receives no highlight at all.
               } else if (!draggingSourceIsData && elIsData) {
                 elIsAssocTarget = true;
               } else if (draggingFromBoundaryOnChild) {
@@ -3417,6 +3490,81 @@ export function Canvas({
                 }}
               >
                 {opt.label}
+              </button>
+            ))}
+          </div>
+        );
+      })()}
+
+      {/* Right-click quick-add popup: 4-column grid of common BPMN shapes */}
+      {quickAdd && (() => {
+        const QUICK_ADD_TYPES: SymbolType[] = [
+          "start-event",
+          "task",
+          "subprocess",
+          "subprocess-expanded",
+          "intermediate-event",
+          "end-event",
+          "data-object",
+          "data-store",
+          "text-annotation",
+          "group",
+        ];
+        const labels: Record<string, string> = {
+          "start-event": "Start",
+          "task": "Task",
+          "subprocess": "Sub-Process",
+          "subprocess-expanded": "Expanded",
+          "intermediate-event": "Intermediate",
+          "end-event": "End",
+          "data-object": "Data Object",
+          "data-store": "Data Store",
+          "text-annotation": "Annotation",
+          "group": "Group",
+        };
+        const COLS = 4;
+        const BUTTON = 40;       // w-10 / h-10
+        const GAP = 4;           // gap-1 in tailwind = 0.25rem ≈ 4px
+        const PAD = 4;           // p-1
+        const popupW = COLS * BUTTON + (COLS - 1) * GAP + 2 * PAD;
+        const rows = Math.ceil(QUICK_ADD_TYPES.length / COLS);
+        const popupH = rows * BUTTON + (rows - 1) * GAP + 2 * PAD;
+        // Clamp popup so it stays inside the canvas
+        const containerRect = svgRef.current?.parentElement?.getBoundingClientRect();
+        const containerW = containerRect?.width ?? window.innerWidth;
+        const containerH = containerRect?.height ?? window.innerHeight;
+        const left = Math.min(quickAdd.screenX, containerW - popupW - 4);
+        const top = Math.min(quickAdd.screenY, containerH - popupH - 4);
+        return (
+          <div
+            style={{
+              position: "absolute",
+              left,
+              top,
+              zIndex: 50,
+              width: popupW,
+              display: "grid",
+              gridTemplateColumns: `repeat(${COLS}, ${BUTTON}px)`,
+              gap: `${GAP}px`,
+              padding: `${PAD}px`,
+            }}
+            className="bg-white border border-gray-300 rounded shadow-lg"
+            onMouseDown={(e) => e.stopPropagation()}
+            onContextMenu={(e) => e.preventDefault()}
+          >
+            {QUICK_ADD_TYPES.map((sym) => (
+              <button
+                key={sym}
+                title={labels[sym]}
+                className="w-10 h-10 flex items-center justify-center rounded hover:bg-blue-50 border border-transparent hover:border-blue-200"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  addElementWithAutoConnect(sym, quickAdd.worldPos);
+                  setQuickAdd(null);
+                }}
+              >
+                <PaletteSymbolPreview type={sym} colorConfig={colorConfig} />
               </button>
             ))}
           </div>
