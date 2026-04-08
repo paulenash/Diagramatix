@@ -216,5 +216,12 @@ export interface TemplateData {
 }
 
 /** Export schema version — bump when the export data structure changes.
- *  Major bump = breaking (fields removed/renamed). Minor bump = additive (new optional fields). */
-export const SCHEMA_VERSION = "1.2";
+ *  Major bump = breaking (fields removed/renamed). Minor bump = additive (new optional fields).
+ *  History:
+ *    1.2 — initial XSD release
+ *    1.3 — added RepeatType values "mi-sequential" / "mi-parallel"; documented
+ *          GatewayRoleEnum, SubprocessTypeEnum, PoolTypeEnum and the
+ *          element.properties keys (adHoc, labelOffsetX/Y, labelWidth,
+ *          multiplicity, role, state, linkedDiagramId).
+ */
+export const SCHEMA_VERSION = "1.3";
