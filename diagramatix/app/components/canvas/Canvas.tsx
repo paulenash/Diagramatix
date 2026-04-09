@@ -1112,6 +1112,22 @@ export function Canvas({
         if (isVert) { x = startBounds.x; width = startBounds.width; }
       }
 
+      // Fork/Join: only resize along the long axis, keep the thin dimension fixed
+      if (elType === "fork-join") {
+        const isVertical = startBounds.height >= startBounds.width;
+        if (isVertical) {
+          // Long axis is vertical — only allow n/s resize
+          width = startBounds.width;
+          x = startBounds.x;
+          height = Math.max(20, height);
+        } else {
+          // Long axis is horizontal — only allow e/w resize
+          height = startBounds.height;
+          y = startBounds.y;
+          width = Math.max(20, width);
+        }
+      }
+
       // Enforce content-based minimums for UML elements
       if (el!.type === "uml-enumeration" || el!.type === "uml-class") {
         const HEADER_H = 28;
@@ -1366,15 +1382,17 @@ export function Canvas({
 
     // Never auto-connect to/from edge-mounted (boundary) events, and never
     // cross a container boundary (expanded-subprocess or composite-state).
-    // State-machine rules: never auto-connect TO an initial-state, and never
-    // connect initial-state → initial-state.
+    // State-machine rules: never auto-connect TO an initial-state, never
+    // connect initial → initial, never connect final → final.
     const isStateMachine = diagramType === "state-machine";
     const newIsInitial = newSymbolType === "initial-state";
+    const newIsFinal = newSymbolType === "final-state";
     const candidates = data.elements.filter((e) => {
       if (!AUTO_CONNECT_TYPES.has(e.type)) return false;
       if (e.boundaryHostId) return false;
-      // State-machine: never auto-connect initial → initial
+      // State-machine: never auto-connect initial → initial or final → final
       if (isStateMachine && newIsInitial && e.type === "initial-state") return false;
+      if (isStateMachine && newIsFinal && e.type === "final-state") return false;
       // Both must share the same container scope (or both have none).
       if (e.id === newExpandedScope) return false;
       const candScope = expandedParentOf(e);
@@ -1577,13 +1595,13 @@ export function Canvas({
 
     // Check if dropped on a connector (split connector feature)
     const BPMN_SPLITTABLE = new Set(["gateway", "intermediate-event", "task", "subprocess"]);
-    const SM_SPLITTABLE = new Set(["gateway", "state", "composite-state"]);
+    const SM_SPLITTABLE = new Set(["gateway", "state", "composite-state", "fork-join"]);
     const SPLITTABLE_DROPS = diagramType === "state-machine" ? SM_SPLITTABLE : BPMN_SPLITTABLE;
     if ((diagramType === "bpmn" || diagramType === "state-machine") && onSplitConnector && SPLITTABLE_DROPS.has(pendingDragSymbol)) {
       const hit = findConnectorNearPoint(data.connectors, worldPos);
       if (hit) {
         if (pendingDragSymbol === "gateway" || pendingDragSymbol === "task" || pendingDragSymbol === "subprocess"
-            || pendingDragSymbol === "state" || pendingDragSymbol === "composite-state") {
+            || pendingDragSymbol === "state" || pendingDragSymbol === "composite-state" || pendingDragSymbol === "fork-join") {
           // These have no type picker — split immediately
           onSplitConnector(pendingDragSymbol, worldPos, hit.id);
           return;
@@ -1626,7 +1644,7 @@ export function Canvas({
       "start-event", "intermediate-event", "end-event",
     ]);
     const SM_AUTO_CONNECT_TYPES = new Set<SymbolType>([
-      "state", "initial-state", "final-state", "composite-state", "gateway",
+      "state", "initial-state", "final-state", "composite-state", "gateway", "fork-join",
     ]);
     const AUTO_CONNECT_TYPES = diagramType === "state-machine" ? SM_AUTO_CONNECT_TYPES : BPMN_AUTO_CONNECT_TYPES;
 
@@ -1666,8 +1684,8 @@ export function Canvas({
     }
 
     const supportsAutoConnect = diagramType === "bpmn" || diagramType === "state-machine";
-    // State-machine rule: never auto-connect TO an initial-state
-    const skipAutoConnect = diagramType === "state-machine" && symbolType === "initial-state";
+    // State-machine rules: never auto-connect TO an initial-state or final-state
+    const skipAutoConnect = diagramType === "state-machine" && (symbolType === "initial-state" || symbolType === "final-state");
     if (supportsAutoConnect && AUTO_CONNECT_TYPES.has(symbolType) && !willBeBoundaryEvent() && !skipAutoConnect) {
       const def = getSymbolDefinition(symbolType);
       let newX = worldPos.x - def.defaultWidth / 2;
@@ -3565,7 +3583,7 @@ export function Canvas({
           "text-annotation", "group",
         ];
         const SM_QUICK_ADD: SymbolType[] = [
-          "state", "initial-state", "final-state", "composite-state", "gateway",
+          "state", "initial-state", "final-state", "composite-state", "gateway", "fork-join",
         ];
         const QUICK_ADD_TYPES = diagramType === "state-machine" ? SM_QUICK_ADD : BPMN_QUICK_ADD;
         const labels: Record<string, string> = {
@@ -3584,6 +3602,7 @@ export function Canvas({
           "final-state": "Final",
           "composite-state": "Composite",
           "gateway": "Gateway",
+          "fork-join": "Fork/Join",
         };
         const COLS = 4;
         const BUTTON = 40;       // w-10 / h-10

@@ -30,7 +30,8 @@ export type SymbolType =
   | "process-system"
   | "uml-class"
   | "uml-enumeration"
-  | "sublane";
+  | "sublane"
+  | "fork-join";
 
 export type BpmnTaskType =
   | "none"

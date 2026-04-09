@@ -166,6 +166,7 @@ type Action =
   | { type: "NUDGE_CONNECTOR_ENDPOINT"; payload: { connectorId: string; endpoint: "source" | "target"; dx: number; dy: number } }
   | { type: "UPDATE_CONNECTOR"; payload: { id: string; directionType: DirectionType } }
   | { type: "UPDATE_CONNECTOR_TYPE"; payload: { id: string; connectorType: ConnectorType } }
+  | { type: "FLIP_FORK_JOIN"; payload: { id: string } }
   | { type: "REVERSE_CONNECTOR"; payload: { id: string } }
   | { type: "UPDATE_CONNECTOR_WAYPOINTS"; payload: { id: string; waypoints: Point[] } }
   | { type: "UPDATE_CURVE_HANDLES"; payload: {
@@ -869,6 +870,48 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       return { ...state, elements: updatePoolTypes(elements), connectors };
     }
 
+    case "FLIP_FORK_JOIN": {
+      const { id } = action.payload;
+      const el = state.elements.find(e => e.id === id);
+      if (!el || el.type !== "fork-join") return state;
+
+      // Swap width ↔ height, keeping the centre fixed
+      const cx = el.x + el.width / 2;
+      const cy = el.y + el.height / 2;
+      const newW = el.height;
+      const newH = el.width;
+      const newX = cx - newW / 2;
+      const newY = cy - newH / 2;
+      const elements = state.elements.map(e =>
+        e.id === id ? { ...e, x: newX, y: newY, width: newW, height: newH } : e
+      );
+
+      // Map connector sides: when flipping, left↔top and right↔bottom
+      const flipSide = (s: Side): Side =>
+        ({ top: "left", right: "bottom", bottom: "right", left: "top" } as const)[s];
+
+      const connectors = state.connectors.map(conn => {
+        const srcFlip = conn.sourceId === id;
+        const tgtFlip = conn.targetId === id;
+        if (!srcFlip && !tgtFlip) return conn;
+        const updated = {
+          ...conn,
+          ...(srcFlip ? { sourceSide: flipSide(conn.sourceSide) } : {}),
+          ...(tgtFlip ? { targetSide: flipSide(conn.targetSide) } : {}),
+        };
+        const source = elements.find(e => e.id === updated.sourceId);
+        const target = elements.find(e => e.id === updated.targetId);
+        if (!source || !target) return conn;
+        const { waypoints, sourceInvisibleLeader, targetInvisibleLeader } =
+          computeWaypoints(source, target, elements,
+            updated.sourceSide, updated.targetSide, updated.routingType,
+            updated.sourceOffsetAlong ?? 0.5, updated.targetOffsetAlong ?? 0.5);
+        return { ...updated, waypoints, sourceInvisibleLeader, targetInvisibleLeader };
+      });
+
+      return { ...state, elements, connectors };
+    }
+
     case "RESIZE_ELEMENT": {
       const { id, x: newX, y: newY, width: newW, height: newH } = action.payload;
       const target = state.elements.find((e) => e.id === id);
@@ -1082,7 +1125,7 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       // Connector bridging: if exactly 1 incoming and 1 outgoing sequence/transition connector,
       // create a new connector from the source of the incoming to the target of the outgoing
       const BRIDGE_TYPES = new Set(["task", "subprocess", "subprocess-expanded", "gateway", "intermediate-event",
-        "state", "initial-state", "final-state", "composite-state"]);
+        "state", "initial-state", "final-state", "composite-state", "fork-join"]);
       const BRIDGE_CONN_TYPES = new Set(["sequence", "transition"]);
       let bridgeConnector: Connector | null = null;
       if (el && BRIDGE_TYPES.has(el.type)) {
@@ -2586,6 +2629,10 @@ export function useDiagram(initialData: DiagramData) {
         dispatch({ type: "SET_TITLE_FONT_SIZE", payload: size });
       }, []
     ),
+    flipForkJoin: useCallback((id: string) => {
+      pushHistory(snapshotData());
+      dispatch({ type: "FLIP_FORK_JOIN", payload: { id } });
+    }, []),
     elementMoveEnd,
     splitConnector,
     applyTemplate,

@@ -320,6 +320,7 @@ export function DiagramEditor({
     setConnectorFontSize,
     setTitleFontSize,
     elementMoveEnd,
+    flipForkJoin,
     splitConnector,
     applyTemplate,
     alignElements,
@@ -1416,6 +1417,7 @@ export function DiagramEditor({
             updatedAt={effectiveUpdatedAt}
             siblingDiagrams={siblingDiagrams}
             currentDiagramId={diagramId}
+            onFlipForkJoin={flipForkJoin}
           />
         )}
       </div>

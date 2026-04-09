@@ -734,6 +734,13 @@ function FinalStateShape({ el }: { el: DiagramElement }) {
   );
 }
 
+function ForkJoinShape({ el }: { el: DiagramElement }) {
+  return (
+    <rect x={el.x} y={el.y} width={el.width} height={el.height}
+      fill="#1f2937" rx={2} ry={2} />
+  );
+}
+
 function SubprocessShape({ el }: { el: DiagramElement }) {
   const colors = useContext(SymbolColorCtx);
   const hasRepeat = el.repeatType && el.repeatType !== "none";
@@ -1244,6 +1251,7 @@ function SymbolShape({ el }: { el: DiagramElement }) {
       case "state":         return <StateShape el={el} />;
       case "initial-state": return <InitialStateShape el={el} />;
       case "final-state":   return <FinalStateShape el={el} />;
+      case "fork-join":     return <ForkJoinShape el={el} />;
       case "system-boundary":   return <SystemBoundaryShape el={el} />;
       case "composite-state":   return <CompositeStateShape el={el} />;
       case "group":             return <GroupShape el={el} />;
@@ -1526,7 +1534,7 @@ export function SymbolRenderer({
   const canResize = element.type !== "lane"; // all types except lane can be resized
   const isBoundaryStartOrEnd = !!element.boundaryHostId &&
     (element.type === "start-event" || element.type === "end-event");
-  const showLabel = element.type !== "initial-state" && element.type !== "final-state" && !isBoundaryStartOrEnd;
+  const showLabel = element.type !== "initial-state" && element.type !== "final-state" && element.type !== "fork-join" && !isBoundaryStartOrEnd;
 
   return (
     <SymbolColorCtx.Provider value={colorConfig}>
@@ -1876,7 +1884,14 @@ export function SymbolRenderer({
 
       {/* Resize handles (containers + task/subprocess) */}
       {selected && !multiSelected && canResize && onResizeDragStart &&
-        RESIZE_HANDLES.map(({ handle, cursor }) => {
+        RESIZE_HANDLES
+        .filter(({ handle }) => {
+          // Fork-join: only show handles on the long axis ends
+          if (element.type !== "fork-join") return true;
+          const isVertical = element.height >= element.width;
+          return isVertical ? (handle === "n" || handle === "s") : (handle === "e" || handle === "w");
+        })
+        .map(({ handle, cursor }) => {
           const { hx, hy } = getHandlePos(handle, element);
           return (
             <rect data-interactive

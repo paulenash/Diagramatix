@@ -47,6 +47,7 @@ interface Props {
   updatedAt?: string;
   siblingDiagrams?: { id: string; name: string; type: string }[];
   currentDiagramId?: string;
+  onFlipForkJoin?: (id: string) => void;
 }
 
 const TASK_TYPE_OPTIONS: { value: BpmnTaskType; label: string }[] = [
@@ -501,6 +502,7 @@ export function PropertiesPanel({
   updatedAt,
   siblingDiagrams,
   currentDiagramId,
+  onFlipForkJoin,
 }: Props) {
   const [labelDraft, setLabelDraft] = useState("");
   const [panelCollapsed, setPanelCollapsed] = useState(false);
@@ -1670,7 +1672,7 @@ export function PropertiesPanel({
         </>
       )}
 
-      {element.type === "gateway" && (
+      {element.type === "gateway" && diagramType !== "state-machine" && (
         <div>
           <label className="block text-xs font-medium text-gray-700 mb-1">Type</label>
           <div className="flex flex-col gap-1">
@@ -1709,6 +1711,18 @@ export function PropertiesPanel({
               </button>
             ))}
           </div>
+        </div>
+      )}
+
+      {element.type === "fork-join" && onFlipForkJoin && (
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1">Orientation</label>
+          <button
+            onClick={() => onFlipForkJoin(element.id)}
+            className="px-2 py-1 text-xs rounded border bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+          >
+            {element.height >= element.width ? "Flip to Horizontal" : "Flip to Vertical"}
+          </button>
         </div>
       )}
 

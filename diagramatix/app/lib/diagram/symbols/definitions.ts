@@ -206,6 +206,13 @@ export const ALL_SYMBOLS: SymbolDefinition[] = [
     description: "A process, system, or organisation in a context diagram",
   },
   {
+    type: "fork-join",
+    label: "",
+    defaultWidth: 5,
+    defaultHeight: 100,
+    description: "A fork or join bar in a state machine diagram",
+  },
+  {
     type: "uml-class",
     label: "Entity",
     defaultWidth: 80,
@@ -225,7 +232,7 @@ export const PALETTE_BY_DIAGRAM_TYPE: Record<DiagramType, SymbolType[]> = {
   context: ["external-entity", "process-system"],
   basic: ["external-entity", "process-system"],  // legacy alias
   "process-context": ["use-case", "actor", "team", "system", "hourglass", "system-boundary"],
-  "state-machine": ["state", "initial-state", "final-state", "composite-state", "gateway"],
+  "state-machine": ["state", "initial-state", "final-state", "composite-state", "gateway", "fork-join"],
   bpmn: [
     "pool",
     "start-event",
@@ -248,7 +255,7 @@ export const COLOR_PALETTE_BY_DIAGRAM_TYPE: Record<DiagramType, SymbolType[]> = 
   context: ["external-entity", "process-system"],
   basic: ["external-entity", "process-system"],  // legacy alias
   "process-context": ["use-case", "actor", "team", "system", "hourglass", "system-boundary", "system-boundary-body"],
-  "state-machine": ["state", "initial-state", "final-state", "composite-state", "composite-state-body", "gateway"],
+  "state-machine": ["state", "initial-state", "final-state", "composite-state", "composite-state-body", "gateway", "fork-join"],
   bpmn: [
     "pool",
     "lane",
