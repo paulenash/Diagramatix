@@ -143,6 +143,30 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
   const [projects, setProjects] = useState(initialProjects);
   const [unorganized, setUnorganized] = useState(initialUnorganized);
 
+  // Re-fetch projects + unorganised diagrams from the API and update local
+  // state. Used after operations that mutate the user's content from outside
+  // the normal optimistic update path (e.g. backup restore, project import).
+  // Both endpoints are already org-scoped server-side.
+  async function reloadDashboardContent() {
+    try {
+      const [projResp, diagResp] = await Promise.all([
+        fetch("/api/projects"),
+        fetch("/api/diagrams"),
+      ]);
+      if (projResp.ok) {
+        const projList = await projResp.json();
+        setProjects(projList);
+      }
+      if (diagResp.ok) {
+        const diagList = (await diagResp.json()) as Array<{ id: string; projectId?: string | null }>;
+        // The dashboard's "unorganized" list is diagrams without a project
+        setUnorganized(diagList.filter(d => !d.projectId) as typeof initialUnorganized);
+      }
+    } catch {
+      // best-effort — fall back to a hard reload if needed
+    }
+  }
+
   // Selected project for properties panel
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [editDesc, setEditDesc] = useState("");
@@ -265,6 +289,8 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
       log(`\u2714 ${json.result.unfiledDiagramsRestored} unfiled diagram(s)`);
       log(`\u2714 ${json.result.templatesRestored} user template(s)`);
       setRestoreResult("success");
+      // Refresh local state so the restored projects/diagrams appear immediately
+      await reloadDashboardContent();
     } catch (err) {
       log(`\u2718 Restore failed: ${err instanceof Error ? err.message : String(err)}`);
       setRestoreResult("failed");

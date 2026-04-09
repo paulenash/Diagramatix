@@ -37,6 +37,7 @@ export async function GET() {
       id: true,
       name: true,
       type: true,
+      projectId: true,
       createdAt: true,
       updatedAt: true,
     },
