@@ -354,6 +354,29 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
   const [importedProjectId, setImportedProjectId] = useState<string | null>(null);
   const [projectColorConfig, setProjectColorConfig] = useState<SymbolColorConfig>((project.colorConfig as SymbolColorConfig | null) ?? {});
 
+  // Re-fetch project data (diagrams + folderTree) from the API
+  const refreshProjectData = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/projects/${project.id}`);
+      if (!res.ok) return;
+      const fresh = await res.json();
+      if (fresh.diagrams) {
+        setDiagrams(fresh.diagrams);
+      }
+      const freshTree = parseFolderTree(fresh.folderTree);
+      if (freshTree.folders.length > 0 || Object.keys(freshTree.diagramFolderMap).length > 0) {
+        setFolderTree(freshTree);
+      }
+    } catch { /* best-effort */ }
+  }, [project.id]);
+
+  // Refresh project data when window regains focus (e.g. returning from diagram editor)
+  useEffect(() => {
+    function handleFocus() { refreshProjectData(); }
+    window.addEventListener("focus", handleFocus);
+    return () => window.removeEventListener("focus", handleFocus);
+  }, [refreshProjectData]);
+
   // Folder tree state — initialize with defaults, load from localStorage in useEffect
   const [folderTree, setFolderTree] = useState<FolderTree>({ folders: [], diagramFolderMap: {} });
   const [selectedFolderId, setSelectedFolderId] = useState<string>(ROOT_ID);
@@ -819,6 +842,43 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
     });
   }
 
+  async function handleCloneDiagram(diagramId: string) {
+    try {
+      // Fetch full diagram data
+      const srcRes = await fetch(`/api/diagrams/${diagramId}`);
+      if (!srcRes.ok) return;
+      const src = await srcRes.json();
+
+      // Create a copy in the same project
+      const res = await fetch("/api/diagrams", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: `${src.name} (copy)`,
+          type: src.type,
+          projectId: project.id,
+          data: src.data,
+          colorConfig: src.colorConfig ?? undefined,
+          displayMode: src.displayMode ?? undefined,
+        }),
+      });
+      if (!res.ok) return;
+      const created = await res.json();
+
+      // Add the clone to the diagram list in the same folder as the original
+      setDiagrams(prev => [{ id: created.id, name: created.name, type: created.type, createdAt: created.createdAt, updatedAt: created.updatedAt }, ...prev]);
+      const srcFolder = folderTree.diagramFolderMap[diagramId];
+      if (srcFolder) {
+        updateTree(t => ({
+          ...t,
+          diagramFolderMap: { ...t.diagramFolderMap, [created.id]: srcFolder },
+        }));
+      }
+    } catch (err) {
+      console.error("Failed to clone diagram:", err);
+    }
+  }
+
   async function handleMoveDiagram(diagramId: string, targetProjectId: string | null) {
     const res = await fetch(`/api/diagrams/${diagramId}`, {
       method: "PUT",
@@ -1022,6 +1082,19 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
               className="flex-1 text-[11px] font-medium border border-blue-400 rounded px-1 py-0 outline-none min-w-0" />
           ) : (
             <span className="truncate flex-1 font-medium">{name}</span>
+          )}
+          {/* Refresh icon on root folder */}
+          {isRoot && (
+            <button onClick={(e) => { e.stopPropagation(); refreshProjectData(); }}
+              className="opacity-0 group-hover:opacity-100 hover:!opacity-100 text-gray-400 hover:text-blue-500 px-0.5"
+              title="Refresh project tree"
+              style={{ opacity: isSelected ? 1 : undefined }}
+            >
+              <svg width={11} height={11} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+                <path d="M1 2v5h5" /><path d="M15 14v-5h-5" />
+                <path d="M2.5 10.5A6 6 0 0113.3 4.3L15 6M13.5 5.5A6 6 0 012.7 11.7L1 10" />
+              </svg>
+            </button>
           )}
           {/* Folder action buttons */}
           {!isRoot && !editingId && (
@@ -1305,6 +1378,7 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
                   diagram={d}
                   otherProjects={otherProjects}
                   onDelete={handleDeleteDiagram}
+                  onClone={handleCloneDiagram}
                   onMove={handleMoveDiagram}
                   onOpen={handleOpenDiagram}
                   colorConfig={projectColorConfig}
@@ -1584,6 +1658,7 @@ function DiagramCard({
   diagram,
   otherProjects,
   onDelete,
+  onClone,
   onMove,
   onOpen,
   colorConfig,
@@ -1591,6 +1666,7 @@ function DiagramCard({
   diagram: DiagramSummary;
   otherProjects: OtherProject[];
   onDelete: (id: string) => void;
+  onClone: (id: string) => void;
   onMove: (diagramId: string, projectId: string | null) => void;
   onOpen: (diagramId: string) => void;
   colorConfig?: SymbolColorConfig;
@@ -1605,6 +1681,16 @@ function DiagramCard({
       <div className="flex items-center justify-between mb-1">
         <h3 className="font-medium text-gray-900 text-xs truncate flex-1">{diagram.name}</h3>
         <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 ml-1">
+          <button
+            onClick={(e) => { e.stopPropagation(); onClone(diagram.id); }}
+            className="text-gray-400 hover:text-blue-500 px-0.5"
+            title="Clone diagram"
+          >
+            <svg width={11} height={11} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+              <rect x={5} y={5} width={10} height={10} rx={1.5} />
+              <path d="M11 5V2.5A1.5 1.5 0 009.5 1H2.5A1.5 1.5 0 001 2.5v7A1.5 1.5 0 002.5 11H5" />
+            </svg>
+          </button>
           <div className="relative">
             <button
               onClick={(e) => { e.stopPropagation(); setShowMove((v) => !v); }}
