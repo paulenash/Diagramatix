@@ -1376,7 +1376,7 @@ export function DiagramEditor({
           parentDiagramName={parentDiagram?.name}
           showValueDisplay={showValueDisplay}
           showBottleneck={showBottleneck}
-          onInsertSpace={diagramType === "bpmn" ? insertSpace : undefined}
+          onInsertSpace={(diagramType === "bpmn" || diagramType === "state-machine") ? insertSpace : undefined}
         />
 
         {!readOnly && (

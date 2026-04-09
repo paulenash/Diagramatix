@@ -126,7 +126,7 @@ function distToSegment(p: Point, a: Point, b: Point): number {
 
 function findConnectorNearPoint(connectors: Connector[], pos: Point, margin = 15): Connector | null {
   for (const c of connectors) {
-    if (c.type !== "sequence") continue;
+    if (c.type !== "sequence" && c.type !== "transition") continue;
     const pts = c.waypoints;
     for (let i = 0; i < pts.length - 1; i++) {
       if (distToSegment(pos, pts[i], pts[i + 1]) <= margin) return c;
@@ -1321,10 +1321,14 @@ export function Canvas({
   function findAutoConnectSource(
     newX: number, newY: number, newW: number, newH: number
   ): { source: DiagramElement; srcSide: Side; tgtSide: Side } | null {
-    const AUTO_CONNECT_TYPES = new Set<SymbolType>([
+    const BPMN_AUTO_CONNECT = new Set<SymbolType>([
       "task", "subprocess", "subprocess-expanded", "gateway",
       "start-event", "intermediate-event", "end-event",
     ]);
+    const SM_AUTO_CONNECT = new Set<SymbolType>([
+      "state", "initial-state", "final-state", "composite-state", "gateway",
+    ]);
+    const AUTO_CONNECT_TYPES = diagramType === "state-machine" ? SM_AUTO_CONNECT : BPMN_AUTO_CONNECT;
 
     // Walk an element's parent chain and return the id of the nearest
     // subprocess-expanded ANCESTOR (excluding the element itself) — or null
@@ -1531,9 +1535,10 @@ export function Canvas({
       if (cycle >= TOTAL_CYCLES) {
         setAutoConnectFlash(null);
         if (!autoConnectAbortRef.current) {
+          const autoConnType: ConnectorType = diagramType === "state-machine" ? "transition" : "sequence";
           onAddConnector(
             sourceEl.id, targetId,
-            "sequence", defaultDirectionType, defaultRoutingType,
+            autoConnType, defaultDirectionType, defaultRoutingType,
             srcSide, tgtSide, 0.5, 0.5
           );
         }
@@ -1552,12 +1557,15 @@ export function Canvas({
     const rect = svgRef.current!.getBoundingClientRect();
     const worldPos = svgToWorld(e.clientX - rect.left, e.clientY - rect.top);
 
-    // Check if dropped on a sequence connector (split connector feature)
-    const SPLITTABLE_DROPS = new Set(["gateway", "intermediate-event", "task", "subprocess"]);
-    if (diagramType === "bpmn" && onSplitConnector && SPLITTABLE_DROPS.has(pendingDragSymbol)) {
+    // Check if dropped on a connector (split connector feature)
+    const BPMN_SPLITTABLE = new Set(["gateway", "intermediate-event", "task", "subprocess"]);
+    const SM_SPLITTABLE = new Set(["gateway", "state", "composite-state"]);
+    const SPLITTABLE_DROPS = diagramType === "state-machine" ? SM_SPLITTABLE : BPMN_SPLITTABLE;
+    if ((diagramType === "bpmn" || diagramType === "state-machine") && onSplitConnector && SPLITTABLE_DROPS.has(pendingDragSymbol)) {
       const hit = findConnectorNearPoint(data.connectors, worldPos);
       if (hit) {
-        if (pendingDragSymbol === "gateway" || pendingDragSymbol === "task" || pendingDragSymbol === "subprocess") {
+        if (pendingDragSymbol === "gateway" || pendingDragSymbol === "task" || pendingDragSymbol === "subprocess"
+            || pendingDragSymbol === "state" || pendingDragSymbol === "composite-state") {
           // These have no type picker — split immediately
           onSplitConnector(pendingDragSymbol, worldPos, hit.id);
           return;
@@ -1595,10 +1603,15 @@ export function Canvas({
     symbolType: SymbolType, worldPos: Point,
     taskType?: BpmnTaskType, eventType?: EventType
   ) {
-    const AUTO_CONNECT_TYPES = new Set<SymbolType>([
+    const BPMN_AUTO_CONNECT_TYPES = new Set<SymbolType>([
       "task", "subprocess", "subprocess-expanded", "gateway",
       "start-event", "intermediate-event", "end-event",
     ]);
+    const SM_AUTO_CONNECT_TYPES = new Set<SymbolType>([
+      "state", "initial-state", "final-state", "composite-state", "gateway",
+    ]);
+    const AUTO_CONNECT_TYPES = diagramType === "state-machine" ? SM_AUTO_CONNECT_TYPES : BPMN_AUTO_CONNECT_TYPES;
+
     // Mirror useDiagram's boundary-snap thresholds so we can predict if the
     // new element will become an edge-mounted (boundary) event in the reducer.
     const BOUNDARY_EVENT_TYPES_LOCAL = new Set<SymbolType>([
@@ -1609,11 +1622,11 @@ export function Canvas({
     ]);
     const BOUNDARY_SNAP_THRESHOLD_LOCAL = 25;
     function willBeBoundaryEvent(): boolean {
+      if (diagramType !== "bpmn") return false; // no boundary events in state machine
       if (!BOUNDARY_EVENT_TYPES_LOCAL.has(symbolType)) return false;
       const centre = worldPos;
       for (const host of data.elements) {
         if (!BOUNDARY_HOST_TYPES_LOCAL.has(host.type)) continue;
-        // Closest point on host's rectangle boundary to centre
         const cx = Math.max(host.x, Math.min(host.x + host.width, centre.x));
         const cy = Math.max(host.y, Math.min(host.y + host.height, centre.y));
         const onLeft   = Math.abs(centre.x - host.x);
@@ -1634,7 +1647,8 @@ export function Canvas({
       return false;
     }
 
-    if (diagramType === "bpmn" && AUTO_CONNECT_TYPES.has(symbolType) && !willBeBoundaryEvent()) {
+    const supportsAutoConnect = diagramType === "bpmn" || diagramType === "state-machine";
+    if (supportsAutoConnect && AUTO_CONNECT_TYPES.has(symbolType) && !willBeBoundaryEvent()) {
       const def = getSymbolDefinition(symbolType);
       let newX = worldPos.x - def.defaultWidth / 2;
       let newY = worldPos.y - def.defaultHeight / 2;
@@ -2210,7 +2224,7 @@ export function Canvas({
         onDragOver={(e) => e.preventDefault()}
         onKeyDown={handleKeyDown}
         onContextMenu={(e) => {
-          if (readOnly || diagramType !== "bpmn") return;
+          if (readOnly || (diagramType !== "bpmn" && diagramType !== "state-machine")) return;
           e.preventDefault();
           const rect = svgRef.current?.getBoundingClientRect();
           if (!rect) return;
@@ -3522,20 +3536,17 @@ export function Canvas({
         );
       })()}
 
-      {/* Right-click quick-add popup: 4-column grid of common BPMN shapes */}
+      {/* Right-click quick-add popup */}
       {quickAdd && (() => {
-        const QUICK_ADD_TYPES: SymbolType[] = [
-          "start-event",
-          "task",
-          "subprocess",
-          "subprocess-expanded",
-          "intermediate-event",
-          "end-event",
-          "data-object",
-          "data-store",
-          "text-annotation",
-          "group",
+        const BPMN_QUICK_ADD: SymbolType[] = [
+          "start-event", "task", "subprocess", "subprocess-expanded",
+          "intermediate-event", "end-event", "data-object", "data-store",
+          "text-annotation", "group",
         ];
+        const SM_QUICK_ADD: SymbolType[] = [
+          "state", "initial-state", "final-state", "composite-state", "gateway",
+        ];
+        const QUICK_ADD_TYPES = diagramType === "state-machine" ? SM_QUICK_ADD : BPMN_QUICK_ADD;
         const labels: Record<string, string> = {
           "start-event": "Start",
           "task": "Task",
@@ -3547,6 +3558,11 @@ export function Canvas({
           "data-store": "Data Store",
           "text-annotation": "Annotation",
           "group": "Group",
+          "state": "State",
+          "initial-state": "Initial",
+          "final-state": "Final",
+          "composite-state": "Composite",
+          "gateway": "Gateway",
         };
         const COLS = 4;
         const BUTTON = 40;       // w-10 / h-10

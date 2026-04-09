@@ -1064,13 +1064,15 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         }
       }
 
-      // BPMN connector bridging: if exactly 1 incoming and 1 outgoing sequence connector,
+      // Connector bridging: if exactly 1 incoming and 1 outgoing sequence/transition connector,
       // create a new connector from the source of the incoming to the target of the outgoing
-      const BRIDGE_TYPES = new Set(["task", "subprocess", "subprocess-expanded", "gateway", "intermediate-event"]);
+      const BRIDGE_TYPES = new Set(["task", "subprocess", "subprocess-expanded", "gateway", "intermediate-event",
+        "state", "initial-state", "final-state", "composite-state"]);
+      const BRIDGE_CONN_TYPES = new Set(["sequence", "transition"]);
       let bridgeConnector: Connector | null = null;
       if (el && BRIDGE_TYPES.has(el.type)) {
-        const incoming = state.connectors.filter(c => c.targetId === id && c.type === "sequence");
-        const outgoing = state.connectors.filter(c => c.sourceId === id && c.type === "sequence");
+        const incoming = state.connectors.filter(c => c.targetId === id && BRIDGE_CONN_TYPES.has(c.type));
+        const outgoing = state.connectors.filter(c => c.sourceId === id && BRIDGE_CONN_TYPES.has(c.type));
         if (incoming.length === 1 && outgoing.length === 1) {
           const cX = incoming[0];
           const cY = outgoing[0];
@@ -1087,7 +1089,7 @@ function reducer(state: DiagramData, action: Action): DiagramData {
               targetId: cY.targetId,
               sourceSide: cX.sourceSide,
               targetSide: cY.targetSide,
-              type: "sequence",
+              type: cX.type,
               directionType: cX.directionType,
               routingType: cX.routingType,
               sourceInvisibleLeader,
@@ -1760,6 +1762,12 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       } else if (symbolType === "subprocess") {
         const count = state.elements.filter(e => e.type === "subprocess").length;
         label = `Subprocess ${count + 1}`;
+      } else if (symbolType === "state") {
+        const count = state.elements.filter(e => e.type === "state").length;
+        label = `State ${count + 1}`;
+      } else if (symbolType === "composite-state") {
+        const count = state.elements.filter(e => e.type === "composite-state").length;
+        label = `Composite ${count + 1}`;
       }
       const newEl: DiagramElement = {
         id: nanoid(),
@@ -1811,10 +1819,10 @@ function reducer(state: DiagramData, action: Action): DiagramData {
             directionType: orig.directionType, routingType: orig.routingType,
             sourceOffsetAlong: 0.5, targetOffsetAlong: orig.targetOffsetAlong,
             waypoints: wB, sourceInvisibleLeader: sIB, targetInvisibleLeader: tIB,
-            label: orig.type === "sequence" ? "" : undefined,
-            labelOffsetX: orig.type === "sequence" ? (symbolType === "gateway" ? 5 : 0) : undefined,
-            labelOffsetY: orig.type === "sequence" ? -20 : undefined,
-            labelWidth: orig.type === "sequence" ? (symbolType === "gateway" ? 60 : 80) : undefined,
+            label: (orig.type === "sequence" || orig.type === "transition") ? "" : undefined,
+            labelOffsetX: (orig.type === "sequence" || orig.type === "transition") ? (symbolType === "gateway" ? 5 : 0) : undefined,
+            labelOffsetY: (orig.type === "sequence" || orig.type === "transition") ? -20 : undefined,
+            labelWidth: (orig.type === "sequence" || orig.type === "transition") ? (symbolType === "gateway" ? 60 : 80) : undefined,
             labelAnchor: symbolType === "gateway" ? "source" : undefined },
         ],
       };

@@ -225,7 +225,7 @@ export const PALETTE_BY_DIAGRAM_TYPE: Record<DiagramType, SymbolType[]> = {
   context: ["external-entity", "process-system"],
   basic: ["external-entity", "process-system"],  // legacy alias
   "process-context": ["use-case", "actor", "team", "system", "hourglass", "system-boundary"],
-  "state-machine": ["state", "initial-state", "final-state", "composite-state"],
+  "state-machine": ["state", "initial-state", "final-state", "composite-state", "gateway"],
   bpmn: [
     "pool",
     "start-event",
@@ -248,7 +248,7 @@ export const COLOR_PALETTE_BY_DIAGRAM_TYPE: Record<DiagramType, SymbolType[]> = 
   context: ["external-entity", "process-system"],
   basic: ["external-entity", "process-system"],  // legacy alias
   "process-context": ["use-case", "actor", "team", "system", "hourglass", "system-boundary", "system-boundary-body"],
-  "state-machine": ["state", "initial-state", "final-state", "composite-state", "composite-state-body"],
+  "state-machine": ["state", "initial-state", "final-state", "composite-state", "composite-state-body", "gateway"],
   bpmn: [
     "pool",
     "lane",
