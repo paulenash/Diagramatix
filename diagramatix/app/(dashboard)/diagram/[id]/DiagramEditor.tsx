@@ -1301,6 +1301,16 @@ export function DiagramEditor({
         </div>
           </>
         )}
+
+        <a
+          href="/help"
+          target="_blank"
+          rel="noopener"
+          className="text-[11px] text-gray-400 hover:text-blue-600"
+          title="User Guide"
+        >
+          ?
+        </a>
       </header>
 
       {/* Main editor area */}

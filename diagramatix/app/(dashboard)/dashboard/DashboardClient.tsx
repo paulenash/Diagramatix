@@ -720,6 +720,13 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
               </div>
             </>
           )}
+          <a
+            href="/help"
+            className="text-xs text-gray-500 hover:text-blue-600"
+            title="User Guide"
+          >
+            Help
+          </a>
           {orgName && (
             <div
               className="text-xs text-gray-600 border border-gray-200 rounded px-2 py-1 bg-gray-50"
