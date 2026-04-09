@@ -1178,6 +1178,10 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       const target = state.elements.find((el) => el.id === targetId);
       if (!source || !target) return state;
 
+      // State-machine rules: never connect FROM a final-state or TO an initial-state
+      if (source.type === "final-state") return state;
+      if (target.type === "initial-state") return state;
+
       // Data elements may only use associationBPMN connectors
       const isDataConn = DATA_ELEMENT_TYPES.has(source.type) || DATA_ELEMENT_TYPES.has(target.type);
       if (isDataConn && connectorType !== "associationBPMN") return state;

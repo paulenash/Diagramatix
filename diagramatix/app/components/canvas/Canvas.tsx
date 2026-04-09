@@ -2092,6 +2092,8 @@ export function Canvas({
   const draggingFromEdgeMountedIntermediateEvent =
     draggingFromEdgeMountedIntermediateSendEvent || draggingFromEdgeMountedIntermediateReceiveEvent;
   const draggingSourceBoundaryHostId = draggingSourceEl?.boundaryHostId ?? null;
+  // State-machine: no connections FROM final-state or TO initial-state
+  const draggingFromFinalState = draggingSourceEl?.type === "final-state";
   const CHILD_EVENT_TYPES_HIGHLIGHT = new Set(["start-event", "intermediate-event", "end-event"]);
   // Compute ancestor IDs for dragging source (treating boundaryHostId as parent)
   const draggingSourceAncestorIds = (() => {
@@ -2397,11 +2399,15 @@ export function Canvas({
                 isElementDragTarget={isElementDragTarget}
                 onSelect={(e) => {
                   // Connection-creation mode: clicking a different element commits the connector
-                  if (pendingConnSourceId && pendingConnSourceId !== el.id) {
+                  if (pendingConnSourceId && el.type !== "initial-state"
+                      && (pendingConnSourceId !== el.id || el.type === "state")) {
                     onAddConnector(
                       pendingConnSourceId, el.id,
                       "sequence", defaultDirectionType, defaultRoutingType,
-                      "right", "left", 0.5, 0.5
+                      pendingConnSourceId === el.id ? "right" : "right",
+                      pendingConnSourceId === el.id ? "top" : "left",
+                      pendingConnSourceId === el.id ? 0.8 : 0.5,
+                      pendingConnSourceId === el.id ? 0.8 : 0.5
                     );
                     setPendingConnSourceId(null);
                     return;
@@ -2443,9 +2449,10 @@ export function Canvas({
                 }}
                 onConnectionPointDragStart={(side, worldPos) => {
                   if (isWhiteBoxPool) return; // no connectors from white-box pools
+                  if (el.type === "final-state") return; // no connectors FROM final-state
                   handleConnectionPointDragStart(el.id, side, worldPos);
                 }}
-                showConnectionPoints={selectedElementIds.size <= 1 && !isWhiteBoxPool && (selectedElementIds.has(el.id) || isDraggingConnector || isDraggingEndpoint)}
+                showConnectionPoints={selectedElementIds.size <= 1 && !isWhiteBoxPool && el.type !== "final-state" && (selectedElementIds.has(el.id) || isDraggingConnector || isDraggingEndpoint)}
                 onResizeDragStart={(handle, e) => handleResizeDragStart(el.id, handle, e)}
                 svgToWorld={clientToWorld}
                 onUpdateProperties={onUpdateProperties}
@@ -2459,7 +2466,7 @@ export function Canvas({
                 onGroupMove={onMoveElements ? (dx, dy) => onMoveElements([...selectedElementIds], dx / zoom, dy / zoom) : undefined}
                 onGroupMoveEnd={onElementsMoveEnd}
                 colorConfig={colorConfig}
-                onEnterConnectionMode={() => setPendingConnSourceId(el.id)}
+                onEnterConnectionMode={el.type !== "final-state" ? () => setPendingConnSourceId(el.id) : undefined}
                 onCancelConnectionMode={() => setPendingConnSourceId(null)}
                 inConnectionMode={pendingConnSourceId === el.id}
                 onDrillBack={el.type === "start-event" ? onDrillBack : undefined}
@@ -2592,7 +2599,8 @@ export function Canvas({
               draggingSourceEl?.type === "subprocess-expanded" &&
               (el.parentId === draggingSourceEl.id ||
                el.boundaryHostId === draggingSourceEl.id);
-            if (isDraggingConnector && el.id !== draggingConnector!.fromId && !skipBecauseExpandedSelfContent) {
+            if (isDraggingConnector && el.id !== draggingConnector!.fromId && !skipBecauseExpandedSelfContent
+                && !draggingFromFinalState && el.type !== "initial-state") {
               const elIsData = DATA_ELEMENT_TYPES.has(el.type);
               // End events are always senders — never valid messageBPMN targets.
               // Send tasks / throwing events are excluded only if they already have an
@@ -2747,10 +2755,11 @@ export function Canvas({
                   startEditingLabel(el);
                 }
               }}
-              onConnectionPointDragStart={(side, worldPos) =>
-                handleConnectionPointDragStart(el.id, side, worldPos)
-              }
-              showConnectionPoints={selectedElementIds.size <= 1 && (selectedElementIds.has(el.id) || isDraggingConnector || isDraggingEndpoint)}
+              onConnectionPointDragStart={(side, worldPos) => {
+                if (el.type === "final-state") return;
+                handleConnectionPointDragStart(el.id, side, worldPos);
+              }}
+              showConnectionPoints={selectedElementIds.size <= 1 && el.type !== "final-state" && (selectedElementIds.has(el.id) || isDraggingConnector || isDraggingEndpoint)}
               onResizeDragStart={(handle, e) => handleResizeDragStart(el.id, handle, e)}
               svgToWorld={clientToWorld}
               onUpdateProperties={onUpdateProperties}
@@ -2801,7 +2810,8 @@ export function Canvas({
             const skipBecauseOwnBoundary =
               draggingSourceEl?.type === "subprocess-expanded" &&
               el.boundaryHostId === draggingSourceEl.id;
-            if (isDraggingConnector && el.id !== draggingConnector!.fromId && !skipBecauseOwnBoundary) {
+            if (isDraggingConnector && el.id !== draggingConnector!.fromId && !skipBecauseOwnBoundary
+                && !draggingFromFinalState && el.type !== "initial-state") {
               // Throwing/send boundary events excluded only if they already have an outgoing messageBPMN
               const bEvtIsSendLocked = (el.flowType === "throwing" || el.taskType === "send")
                 && data.connectors.some(c => c.type === "messageBPMN" && c.sourceId === el.id);
@@ -2887,11 +2897,15 @@ export function Canvas({
                 isMessageBpmnTarget={elIsMsgTarget}
                 isAssocBpmnTarget={elIsAssocTarget}
                 onSelect={(ev) => {
-                  if (pendingConnSourceId && pendingConnSourceId !== el.id) {
+                  if (pendingConnSourceId && el.type !== "initial-state"
+                      && (pendingConnSourceId !== el.id || el.type === "state")) {
                     onAddConnector(
                       pendingConnSourceId, el.id,
                       "sequence", defaultDirectionType, defaultRoutingType,
-                      "right", "left", 0.5, 0.5
+                      pendingConnSourceId === el.id ? "right" : "right",
+                      pendingConnSourceId === el.id ? "top" : "left",
+                      pendingConnSourceId === el.id ? 0.8 : 0.5,
+                      pendingConnSourceId === el.id ? 0.8 : 0.5
                     );
                     setPendingConnSourceId(null);
                     return;
@@ -2917,9 +2931,11 @@ export function Canvas({
                 }}
                 onMove={(x, y) => onMoveElement(el.id, x, y)}
                 onDoubleClick={() => { tryGroupConnectToGateway(el); }}
-                onConnectionPointDragStart={(side, worldPos) =>
-                  handleConnectionPointDragStart(el.id, side, worldPos)}
-                showConnectionPoints={selectedElementIds.size <= 1 && (selectedElementIds.has(el.id) || isDraggingConnector || isDraggingEndpoint)}
+                onConnectionPointDragStart={(side, worldPos) => {
+                  if (el.type === "final-state") return;
+                  handleConnectionPointDragStart(el.id, side, worldPos);
+                }}
+                showConnectionPoints={selectedElementIds.size <= 1 && el.type !== "final-state" && (selectedElementIds.has(el.id) || isDraggingConnector || isDraggingEndpoint)}
                 svgToWorld={clientToWorld}
                 onUpdateProperties={onUpdateProperties}
                 onUpdateLabel={onUpdateLabel}
@@ -2927,7 +2943,7 @@ export function Canvas({
                 onGroupMove={onMoveElements ? (dx, dy) => onMoveElements([...selectedElementIds], dx / zoom, dy / zoom) : undefined}
                 onGroupMoveEnd={onElementsMoveEnd}
                 colorConfig={colorConfig}
-                onEnterConnectionMode={() => setPendingConnSourceId(el.id)}
+                onEnterConnectionMode={el.type !== "final-state" ? () => setPendingConnSourceId(el.id) : undefined}
                 onCancelConnectionMode={() => setPendingConnSourceId(null)}
                 inConnectionMode={pendingConnSourceId === el.id}
               />
