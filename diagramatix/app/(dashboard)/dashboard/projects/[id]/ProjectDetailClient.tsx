@@ -360,21 +360,25 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
       const res = await fetch(`/api/projects/${project.id}`);
       if (!res.ok) return;
       const fresh = await res.json();
-      if (fresh.diagrams) {
-        setDiagrams(fresh.diagrams);
-      }
-      const freshTree = parseFolderTree(fresh.folderTree);
-      if (freshTree.folders.length > 0 || Object.keys(freshTree.diagramFolderMap).length > 0) {
-        setFolderTree(freshTree);
-      }
+      if (fresh.diagrams) setDiagrams(fresh.diagrams);
+      if (fresh.folderTree) setFolderTree(parseFolderTree(fresh.folderTree));
     } catch { /* best-effort */ }
   }, [project.id]);
 
-  // Refresh project data when window regains focus (e.g. returning from diagram editor)
+  // Refresh project data on mount (catches same-tab navigation back from diagram editor)
+  // and when window/tab regains visibility
   useEffect(() => {
+    refreshProjectData();
+    function handleVisibility() {
+      if (document.visibilityState === "visible") refreshProjectData();
+    }
     function handleFocus() { refreshProjectData(); }
+    document.addEventListener("visibilitychange", handleVisibility);
     window.addEventListener("focus", handleFocus);
-    return () => window.removeEventListener("focus", handleFocus);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("focus", handleFocus);
+    };
   }, [refreshProjectData]);
 
   // Folder tree state — initialize with defaults, load from localStorage in useEffect
