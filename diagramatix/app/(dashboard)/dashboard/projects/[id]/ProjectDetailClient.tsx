@@ -611,6 +611,15 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
       const sizeKb = Math.round(blob.size / 1024);
       log(`\u2714 Export complete! File: ${projectName}.diagramatix.${fileExt} (${sizeKb} KB)`);
       log(`   ${diagramsWithData.length} diagram(s), ${folderCount} folder(s)`);
+
+      // For XML exports, also download the matching XSD schema so the .xml
+      // can be validated by external tools.
+      if (isXml) {
+        const { downloadMatchingXsd } = await import("@/app/lib/diagram/xmlExport");
+        const xsdAppVersion = await downloadMatchingXsd(SCHEMA_VERSION);
+        log(`\u2714 XSD schema downloaded (diagramatix-export-v${xsdAppVersion}.xsd)`);
+      }
+
       setExportResult("success");
     } catch (err) {
       console.error("Export failed:", err);
