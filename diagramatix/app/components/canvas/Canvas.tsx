@@ -1319,7 +1319,8 @@ export function Canvas({
   //   B) Nearest element strictly ABOVE/BELOW with horizontal overlap → bottom→top or top→bottom
   //   C) Nearest element strictly to the LEFT with vertical overlap → right→left
   function findAutoConnectSource(
-    newX: number, newY: number, newW: number, newH: number
+    newX: number, newY: number, newW: number, newH: number,
+    newSymbolType?: SymbolType
   ): { source: DiagramElement; srcSide: Side; tgtSide: Side } | null {
     const BPMN_AUTO_CONNECT = new Set<SymbolType>([
       "task", "subprocess", "subprocess-expanded", "gateway",
@@ -1341,21 +1342,21 @@ export function Canvas({
         ? data.elements.find((e) => e.id === el.parentId)
         : undefined;
       while (cur) {
-        if (cur.type === "subprocess-expanded") return cur.id;
+        if (cur.type === "subprocess-expanded" || cur.type === "composite-state") return cur.id;
         if (!cur.parentId) return null;
         cur = data.elements.find((e) => e.id === cur!.parentId);
       }
       return null;
     }
-    // The new element doesn't have a parentId yet, so infer the expanded
-    // subprocess that would contain it based on spatial containment (matches
-    // the reducer's ADD_ELEMENT logic). If a candidate expanded-subprocess
-    // contains the new element's bbox, it becomes its expanded scope.
+    // The new element doesn't have a parentId yet, so infer the container
+    // that would contain it based on spatial containment (matches the
+    // reducer's ADD_ELEMENT logic).
+    const CONTAINER_TYPES = new Set(["subprocess-expanded", "composite-state"]);
     const newRight2 = newX + newW;
     const newBottom2 = newY + newH;
     let newExpandedScope: string | null = null;
     for (const cand of data.elements) {
-      if (cand.type !== "subprocess-expanded") continue;
+      if (!CONTAINER_TYPES.has(cand.type)) continue;
       if (newX >= cand.x && newRight2 <= cand.x + cand.width &&
           newY >= cand.y && newBottom2 <= cand.y + cand.height) {
         newExpandedScope = cand.id;
@@ -1364,13 +1365,17 @@ export function Canvas({
     }
 
     // Never auto-connect to/from edge-mounted (boundary) events, and never
-    // cross an expanded-subprocess boundary.
+    // cross a container boundary (expanded-subprocess or composite-state).
+    // State-machine rules: never auto-connect TO an initial-state, and never
+    // connect initial-state → initial-state.
+    const isStateMachine = diagramType === "state-machine";
+    const newIsInitial = newSymbolType === "initial-state";
     const candidates = data.elements.filter((e) => {
       if (!AUTO_CONNECT_TYPES.has(e.type)) return false;
       if (e.boundaryHostId) return false;
-      // Both must share the same expanded-subprocess scope (or both have none).
-      // Skip the new element's own expanded scope if the candidate IS that
-      // subprocess (you can't connect to your own container).
+      // State-machine: never auto-connect initial → initial
+      if (isStateMachine && newIsInitial && e.type === "initial-state") return false;
+      // Both must share the same container scope (or both have none).
       if (e.id === newExpandedScope) return false;
       const candScope = expandedParentOf(e);
       return candScope === newExpandedScope;
@@ -1438,7 +1443,7 @@ export function Canvas({
         }
       }
 
-      // Pre-pass 2: decision-gateway precedence
+      // Pre-pass 2: decision-gateway precedence (BPMN + state-machine)
       const top2 = leftCandidates.slice(0, 2);
       const decisionGw = top2.find(c =>
         c.el.type === "gateway" &&
@@ -1446,6 +1451,19 @@ export function Canvas({
       );
       if (decisionGw) {
         return buildResult(decisionGw.el);
+      }
+
+      // Pre-pass 3 (state-machine only): initial-state precedence.
+      // If an initial-state with no outgoing connectors exists among all
+      // candidates (not just left), it always takes priority as the source.
+      if (isStateMachine && newSymbolType !== "initial-state") {
+        const unconnectedInitial = candidates.find(c =>
+          c.type === "initial-state" &&
+          !data.connectors.some(conn => conn.sourceId === c.id)
+        );
+        if (unconnectedInitial) {
+          return buildResult(unconnectedInitial);
+        }
       }
     }
 
@@ -1648,11 +1666,13 @@ export function Canvas({
     }
 
     const supportsAutoConnect = diagramType === "bpmn" || diagramType === "state-machine";
-    if (supportsAutoConnect && AUTO_CONNECT_TYPES.has(symbolType) && !willBeBoundaryEvent()) {
+    // State-machine rule: never auto-connect TO an initial-state
+    const skipAutoConnect = diagramType === "state-machine" && symbolType === "initial-state";
+    if (supportsAutoConnect && AUTO_CONNECT_TYPES.has(symbolType) && !willBeBoundaryEvent() && !skipAutoConnect) {
       const def = getSymbolDefinition(symbolType);
       let newX = worldPos.x - def.defaultWidth / 2;
       let newY = worldPos.y - def.defaultHeight / 2;
-      const found = findAutoConnectSource(newX, newY, def.defaultWidth, def.defaultHeight);
+      const found = findAutoConnectSource(newX, newY, def.defaultWidth, def.defaultHeight, symbolType);
       if (found) {
         // Case A (right + vertical overlap): auto-align horizontally so the
         // new element's centre y matches the source's centre y.
@@ -2218,6 +2238,7 @@ export function Canvas({
         data-canvas
         className="w-full h-full outline-none"
         tabIndex={0}
+        onMouseDownCapture={() => svgRef.current?.focus({ preventScroll: true })}
         onMouseDown={handleBackgroundMouseDown}
         onWheel={handleWheel}
         onDrop={handleDrop}

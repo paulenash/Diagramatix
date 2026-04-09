@@ -1138,6 +1138,7 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         ? state.connectors.filter((c) => c.type === "messageBPMN").length
         : 0;
       const isTransition = connectorType === "transition";
+      const isFromInitialState = isTransition && source.type === "initial-state";
       const transitionCount = isTransition
         ? state.connectors.filter((c) => c.type === "transition").length
         : 0;
@@ -1150,7 +1151,7 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       const gwType = source.gatewayType ?? "exclusive";
       const isDecisionGateway = source.type === "gateway"
         && (gwType === "none" || gwType === "exclusive" || gwType === "inclusive");
-      const isDecisionGatewayOutgoing = connectorType === "sequence" && isDecisionGateway;
+      const isDecisionGatewayOutgoing = (connectorType === "sequence" || connectorType === "transition") && isDecisionGateway;
       const isDecisionGatewayBottom = isDecisionGatewayOutgoing && sourceSide === "bottom";
 
       const newConnector: Connector = {
@@ -1168,6 +1169,7 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         targetInvisibleLeader,
         waypoints,
         label:        isFlow       ? `flow ${flowCount + 1}`
+                    : isFromInitialState ? ""
                     : isTransition ? `transition ${transitionCount + 1}`
                     : isMsgBpmn   ? `message ${msgBpmnCount + 1}`
                     : isDecisionGatewayOutgoing ? ""
