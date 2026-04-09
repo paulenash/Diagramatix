@@ -10,7 +10,7 @@ import type { HelpChapter } from "./HelpViewer";
 
    To add a screenshot:
    1. Save the PNG to  public/help/images/<name>.png
-   2. Set  image: "/help/images/<name>.svg"  on the section.
+   2. Set  image: "/help/images/<name>.png"  on the section.
    ================================================================ */
 
 export const CHAPTERS: HelpChapter[] = [
@@ -33,7 +33,7 @@ export const CHAPTERS: HelpChapter[] = [
             </p>
           </>
         ),
-        image: "/help/images/dashboard-overview.svg",
+        image: "/help/images/dashboard-overview.png",
         imageAlt: "Dashboard overview",
         imageCaption: "The Dashboard — your projects and diagrams at a glance.",
       },
@@ -102,7 +102,7 @@ export const CHAPTERS: HelpChapter[] = [
             </p>
           </>
         ),
-        image: "/help/images/project-folders.svg",
+        image: "/help/images/project-folders.png",
         imageAlt: "Project with folders",
         imageCaption: "Folders help you organise diagrams within a project.",
       },
@@ -154,7 +154,7 @@ export const CHAPTERS: HelpChapter[] = [
             </p>
           </>
         ),
-        image: "/help/images/bpmn-example.svg",
+        image: "/help/images/bpmn-example.png",
         imageAlt: "BPMN diagram",
         imageCaption: "A BPMN process diagram with tasks, gateways, and events.",
       },
@@ -250,9 +250,16 @@ export const CHAPTERS: HelpChapter[] = [
               border appears with resize handles.
             </p>
             <p className="mt-2">
+              <strong>Shift+click</strong> on additional elements to{" "}
+              <strong>add them to the selection</strong> without deselecting
+              what you already have.
+            </p>
+            <p className="mt-2">
               <strong>Click and drag</strong> on empty canvas to draw a{" "}
-              <strong>selection rectangle</strong> — all elements inside it
-              will be selected.
+              <strong>selection rectangle</strong> (lasso) — all elements
+              fully inside it will be selected. Hold <strong>Shift</strong>{" "}
+              while releasing to <strong>add</strong> the lassoed elements to
+              your existing selection instead of replacing it.
             </p>
             <p className="mt-2">
               Press <strong>Escape</strong> to deselect everything.
@@ -309,7 +316,7 @@ export const CHAPTERS: HelpChapter[] = [
             current diagram type.
           </p>
         ),
-        image: "/help/images/palette-bpmn.svg",
+        image: "/help/images/palette-bpmn.png",
         imageAlt: "BPMN Palette",
         imageCaption: "The Palette for a BPMN diagram.",
       },
@@ -355,7 +362,7 @@ export const CHAPTERS: HelpChapter[] = [
             </p>
           </>
         ),
-        image: "/help/images/quick-add.svg",
+        image: "/help/images/quick-add.png",
         imageAlt: "Quick-add popup",
         imageCaption: "Right-click quick-add popup for BPMN diagrams.",
       },
@@ -528,7 +535,7 @@ export const CHAPTERS: HelpChapter[] = [
             lets you configure all aspects of the selected item.
           </p>
         ),
-        image: "/help/images/properties-panel.svg",
+        image: "/help/images/properties-panel.png",
         imageAlt: "Properties Panel",
         imageCaption: "The Properties Panel showing element properties.",
       },
@@ -556,6 +563,47 @@ export const CHAPTERS: HelpChapter[] = [
             <li><strong>Connector type</strong> — depends on diagram type</li>
           </ul>
         ),
+      },
+      {
+        heading: "Diagram title block",
+        body: (
+          <>
+            <p>
+              When nothing is selected, the Properties Panel shows the{" "}
+              <strong>Diagram Title</strong> section. Here you can configure
+              a title block that appears centred above the diagram content:
+            </p>
+            <ul className="list-disc list-inside space-y-1 mt-2">
+              <li>
+                <strong>Show (On/Off)</strong> — toggle the title block
+                on the canvas. When Off, the title is hidden but the
+                metadata is still saved.
+              </li>
+              <li>
+                <strong>Status</strong> — Draft, Final, or Production.
+                Displayed in the title block.
+              </li>
+              <li>
+                <strong>Name</strong> — the diagram name (set when the
+                diagram was created; rename from the project page).
+              </li>
+              <li>
+                <strong>Version</strong> — free-text version string
+                (e.g. &ldquo;1.0&rdquo;, &ldquo;2.3-beta&rdquo;).
+              </li>
+              <li>
+                <strong>Authors</strong> — free-text author name(s).
+              </li>
+            </ul>
+            <p className="mt-2">
+              The title block also shows the <strong>Created</strong> date
+              and <strong>Modified</strong> date/time automatically.
+            </p>
+          </>
+        ),
+        image: "/help/images/title-block.png",
+        imageAlt: "Diagram title block",
+        imageCaption: "The title block shown above the diagram content.",
       },
       {
         heading: "Diagram settings",
@@ -671,7 +719,7 @@ export const CHAPTERS: HelpChapter[] = [
             </p>
           </>
         ),
-        image: "/help/images/smart-align.svg",
+        image: "/help/images/smart-align.png",
         imageAlt: "Smart alignment before and after",
         imageCaption: "Before and after Smart Align — messy layout to clean grid.",
       },
@@ -703,6 +751,10 @@ export const CHAPTERS: HelpChapter[] = [
                 <tr><td className="py-1.5 pr-4 font-mono text-xs">Enter</td><td>Commit label edit</td></tr>
                 <tr><td className="py-1.5 pr-4 font-mono text-xs">Shift+Enter</td><td>Line break in label</td></tr>
                 <tr><td className="py-1.5 pr-4 font-mono text-xs">Double-click</td><td>Edit element or connector label</td></tr>
+                <tr><td className="py-1.5 pr-4 font-mono text-xs">Shift+click</td><td>Add element to selection / toggle selection</td></tr>
+                <tr><td className="py-1.5 pr-4 font-mono text-xs">Shift+lasso</td><td>Add lassoed elements to existing selection</td></tr>
+                <tr><td className="py-1.5 pr-4 font-mono text-xs">Ctrl+click canvas</td><td>Place space-insertion marker (BPMN only)</td></tr>
+                <tr><td className="py-1.5 pr-4 font-mono text-xs">Shift+drag marker</td><td>Insert horizontal or vertical space</td></tr>
                 <tr><td className="py-1.5 pr-4 font-mono text-xs">Right-click</td><td>Quick-add popup (BPMN only)</td></tr>
                 <tr><td className="py-1.5 pr-4 font-mono text-xs">Mouse wheel</td><td>Zoom in / out</td></tr>
               </tbody>
@@ -888,6 +940,539 @@ export const CHAPTERS: HelpChapter[] = [
   },
 
   /* ──────────────────────────────────────────────── 14 ── */
+  {
+    slug: "templates",
+    title: "Templates (BPMN)",
+    sections: [
+      {
+        body: (
+          <p>
+            Templates let you save reusable groups of BPMN elements and
+            connectors and stamp them onto any BPMN diagram. They are
+            available only in BPMN diagrams.
+          </p>
+        ),
+      },
+      {
+        heading: "Applying a template",
+        body: (
+          <ol className="list-decimal list-inside space-y-2">
+            <li>
+              Click <strong>Templates ▾</strong> in the toolbar.
+            </li>
+            <li>
+              The dropdown lists <strong>Built-In</strong> templates
+              (shared across all users) and <strong>User</strong> templates
+              (yours only).
+            </li>
+            <li>
+              Click a template name to stamp it onto the canvas at the
+              current viewport centre. The new elements are automatically
+              selected so you can immediately drag them into position.
+            </li>
+          </ol>
+        ),
+        image: "/help/images/templates-dropdown.png",
+        imageAlt: "Templates dropdown",
+        imageCaption: "The Templates dropdown showing built-in and user templates.",
+      },
+      {
+        heading: "Creating a user template",
+        body: (
+          <ol className="list-decimal list-inside space-y-2">
+            <li>
+              Click <strong>Templates ▾ → + Create User Template</strong>.
+            </li>
+            <li>
+              The toolbar enters <strong>capture mode</strong> — a blue
+              prompt reads &ldquo;Select elements for user template&rdquo;.
+            </li>
+            <li>
+              Select the elements (and their connectors) you want to save.
+              Use click, Shift+click, or lasso selection.
+            </li>
+            <li>
+              Click <strong>Save as Template</strong>. Enter a name in the
+              modal and confirm.
+            </li>
+          </ol>
+        ),
+      },
+      {
+        heading: "Editing a template",
+        body: (
+          <>
+            <p>
+              In the Templates dropdown, click the <strong>pencil icon</strong>{" "}
+              next to a template. The current diagram is temporarily replaced
+              with the template&apos;s elements so you can modify them.
+            </p>
+            <p className="mt-2">
+              An amber banner shows <strong>&ldquo;Editing template:
+              &lt;name&gt;&rdquo;</strong>. Select the elements you want
+              to keep, then click <strong>Update Template</strong>. Your
+              original diagram is restored automatically when you finish
+              or cancel.
+            </p>
+          </>
+        ),
+      },
+      {
+        heading: "Deleting a template",
+        body: (
+          <p>
+            Click the <strong>trash icon</strong> next to a template in
+            the dropdown. The template is permanently removed.
+          </p>
+        ),
+      },
+      {
+        heading: "Built-in templates (admin only)",
+        body: (
+          <p>
+            Administrators can create <strong>built-in templates</strong>{" "}
+            that are shared with all users. Click{" "}
+            <strong>+ Create Built-In Template</strong> (visible only to
+            admins) and enter the admin password when prompted. Built-in
+            templates appear under the &ldquo;Built-In&rdquo; heading in
+            every user&apos;s Templates dropdown.
+          </p>
+        ),
+      },
+    ],
+  },
+
+  /* ──────────────────────────────────────────────── 15 ── */
+  {
+    slug: "inserting-space",
+    title: "Inserting Space",
+    sections: [
+      {
+        body: (
+          <p>
+            When a diagram gets crowded you can push elements apart by
+            inserting horizontal or vertical space. This is available in
+            <strong> BPMN diagrams</strong>.
+          </p>
+        ),
+      },
+      {
+        heading: "How to insert space",
+        body: (
+          <ol className="list-decimal list-inside space-y-2">
+            <li>
+              <strong>Ctrl+click</strong> on an empty area of the canvas.
+              A space-insertion marker (crosshair line) appears at that
+              position.
+            </li>
+            <li>
+              <strong>Shift+drag</strong> the marker <strong>horizontally</strong>{" "}
+              to push all elements to the right of the marker further
+              rightward, or <strong>vertically</strong> to push all elements
+              below the marker further downward.
+            </li>
+            <li>
+              Release the mouse button. The space is inserted and all
+              connectors re-route automatically.
+            </li>
+          </ol>
+        ),
+        image: "/help/images/insert-space.png",
+        imageAlt: "Inserting space",
+        imageCaption: "Ctrl+click to place the marker, then Shift+drag to insert space.",
+      },
+      {
+        heading: "What gets moved",
+        body: (
+          <ul className="list-disc list-inside space-y-1">
+            <li>
+              Normal elements whose centre is beyond the marker line are
+              shifted by the drag distance.
+            </li>
+            <li>
+              <strong>Pools, lanes, and expanded subprocesses</strong> that
+              the marker line cuts through are <em>stretched</em> rather
+              than shifted, so they grow to accommodate the new space.
+            </li>
+            <li>
+              Boundary events stay attached to their host element&apos;s edge
+              and are re-anchored automatically.
+            </li>
+          </ul>
+        ),
+      },
+      {
+        heading: "Tips",
+        body: (
+          <>
+            <p>
+              Drag the marker (without Shift) to reposition it before
+              inserting space. Press <strong>Escape</strong> to cancel the
+              marker entirely.
+            </p>
+          </>
+        ),
+      },
+    ],
+  },
+
+  /* ──────────────────────────────────────────────── 15 ── */
+  {
+    slug: "drop-on-connector",
+    title: "Drop onto Connector & Delete Healing",
+    sections: [
+      {
+        body: (
+          <p>
+            In BPMN diagrams you can insert a new element into the middle
+            of an existing flow by dropping it directly onto a sequence
+            connector. When you later delete that element, the flow heals
+            itself automatically.
+          </p>
+        ),
+      },
+      {
+        heading: "Inserting an element onto a connector",
+        body: (
+          <>
+            <ol className="list-decimal list-inside space-y-2">
+              <li>
+                Drag a <strong>Task</strong>, <strong>Gateway</strong>,{" "}
+                <strong>Subprocess</strong>, or{" "}
+                <strong>Intermediate Event</strong> from the palette.
+              </li>
+              <li>
+                Hover over a <strong>sequence connector</strong> — the
+                connector highlights to show it will accept the drop.
+              </li>
+              <li>
+                Release the mouse button. The original connector is replaced
+                by <strong>two new connectors</strong>: one from the original
+                source to the new element, and one from the new element to
+                the original target.
+              </li>
+            </ol>
+            <p className="mt-2">
+              Only sequence connectors can be split. Message flows and
+              associations are not affected.
+            </p>
+          </>
+        ),
+        image: "/help/images/drop-on-connector.png",
+        imageAlt: "Dropping element onto a connector",
+        imageCaption: "Drag a task onto a connector to insert it into the flow.",
+      },
+      {
+        heading: "Delete and heal",
+        body: (
+          <>
+            <p>
+              When you delete an element that has <strong>exactly one
+              incoming</strong> and <strong>one outgoing</strong> sequence
+              connector, the two connectors are automatically{" "}
+              <strong>bridged</strong> into a single connector from the
+              upstream element to the downstream element.
+            </p>
+            <p className="mt-2">
+              This makes it easy to remove a step from a process without
+              having to manually reconnect the flow.
+            </p>
+            <p className="mt-2 text-xs text-gray-500">
+              Applies to tasks, gateways, subprocesses, and intermediate
+              events. If the element has multiple incoming or outgoing
+              connectors, all connectors are simply deleted.
+            </p>
+          </>
+        ),
+      },
+    ],
+  },
+
+  /* ──────────────────────────────────────────────── 16 ── */
+  {
+    slug: "boundary-events",
+    title: "Edge-Mounted (Boundary) Events",
+    sections: [
+      {
+        body: (
+          <p>
+            In BPMN, events can be mounted on the <strong>boundary</strong>{" "}
+            (edge) of a task or subprocess to model interruptions, errors,
+            timers and other triggers that occur during the activity&apos;s
+            execution.
+          </p>
+        ),
+      },
+      {
+        heading: "Creating a boundary event",
+        body: (
+          <ol className="list-decimal list-inside space-y-2">
+            <li>
+              Drag a <strong>Start Event</strong>,{" "}
+              <strong>Intermediate Event</strong>, or{" "}
+              <strong>End Event</strong> from the palette.
+            </li>
+            <li>
+              Drop it <strong>precisely on the edge</strong> of a task,
+              subprocess, or expanded subprocess. If the drop point is
+              within 25 pixels of the host&apos;s boundary, the event
+              <strong> snaps</strong> to the edge and becomes a boundary
+              event.
+            </li>
+            <li>
+              The event is automatically resized to the standard boundary
+              event size and visually attached to the host.
+            </li>
+          </ol>
+        ),
+        image: "/help/images/boundary-event.png",
+        imageAlt: "Boundary event on a task",
+        imageCaption: "An intermediate timer event mounted on the boundary of a task.",
+      },
+      {
+        heading: "Behaviour",
+        body: (
+          <ul className="list-disc list-inside space-y-1">
+            <li>
+              Boundary events <strong>move with their host</strong> — when
+              you drag the task, the boundary event stays on the same edge.
+            </li>
+            <li>
+              When the host is <strong>resized</strong>, boundary events on
+              the growing/shrinking edge shift to stay attached.
+            </li>
+            <li>
+              <strong>Deleting</strong> the host also deletes all its
+              boundary events.
+            </li>
+          </ul>
+        ),
+      },
+      {
+        heading: "Connection rules",
+        body: (
+          <>
+            <p>Boundary events have special connection restrictions:</p>
+            <ul className="list-disc list-inside space-y-1 mt-2">
+              <li>
+                <strong>Catching intermediate events</strong> (e.g. timer,
+                message) — can connect to elements inside the parent
+                subprocess, modelling an interruption handler.
+              </li>
+              <li>
+                <strong>Throwing intermediate events</strong> — connect to
+                elements outside the parent subprocess.
+              </li>
+              <li>
+                <strong>Boundary start events</strong> — can only connect to
+                children of their parent subprocess.
+              </li>
+            </ul>
+          </>
+        ),
+      },
+      {
+        heading: "Common patterns",
+        body: (
+          <ul className="list-disc list-inside space-y-1">
+            <li>
+              <strong>Timer boundary event</strong> — models a timeout
+              (e.g. &ldquo;if not completed within 3 days, escalate&rdquo;).
+            </li>
+            <li>
+              <strong>Error boundary event</strong> — catches errors thrown
+              by the activity and routes to an error handling path.
+            </li>
+            <li>
+              <strong>Message boundary event</strong> — waits for an
+              external message while the activity is running.
+            </li>
+          </ul>
+        ),
+      },
+    ],
+  },
+
+  /* ──────────────────────────────────────────────── 17 ── */
+  {
+    slug: "value-analysis",
+    title: "Value Analysis",
+    sections: [
+      {
+        body: (
+          <p>
+            Value analysis lets you classify each task and subprocess in a
+            BPMN diagram as <strong>value-adding</strong>,{" "}
+            <strong>necessary but non-value-adding</strong>, or{" "}
+            <strong>non-value-adding</strong>. You can also record cycle
+            time and wait time for process performance analysis.
+          </p>
+        ),
+      },
+      {
+        heading: "Setting the value classification",
+        body: (
+          <>
+            <p>
+              Select a <strong>task</strong>, <strong>subprocess</strong>, or{" "}
+              <strong>expanded subprocess</strong>. In the Properties Panel
+              you will see a <strong>Value</strong> section with four buttons:
+            </p>
+            <ul className="list-disc list-inside space-y-1 mt-2">
+              <li>
+                <strong>None</strong> — no classification (default)
+              </li>
+              <li>
+                <strong className="text-green-600">VA</strong> — Value Adding
+                (shown in green)
+              </li>
+              <li>
+                <strong className="text-orange-500">NNVA</strong> — Necessary
+                Non-Value Adding (shown in orange)
+              </li>
+              <li>
+                <strong className="text-red-600">NVA</strong> — Non-Value
+                Adding (shown in red)
+              </li>
+            </ul>
+          </>
+        ),
+      },
+      {
+        heading: "Cycle time and wait time",
+        body: (
+          <>
+            <p>
+              Below the Value buttons you can enter:
+            </p>
+            <ul className="list-disc list-inside space-y-1 mt-2">
+              <li>
+                <strong>Cycle Time</strong> — how long the activity takes to
+                complete
+              </li>
+              <li>
+                <strong>Wait Time</strong> — how long work waits before this
+                activity begins
+              </li>
+              <li>
+                <strong>Time Units</strong> — sec, min, hrs, days, or a
+                custom unit
+              </li>
+            </ul>
+          </>
+        ),
+      },
+      {
+        heading: "Showing values on the canvas",
+        body: (
+          <>
+            <p>
+              To see value badges on the diagram:
+            </p>
+            <ol className="list-decimal list-inside space-y-1 mt-2">
+              <li>
+                Click <strong>Diagram Settings</strong> in the toolbar.
+              </li>
+              <li>
+                Check the <strong>Value Display</strong> checkbox.
+              </li>
+            </ol>
+            <p className="mt-2">
+              When enabled, a coloured badge appears at the bottom-right of
+              each classified element showing the classification code
+              (VA/NNVA/NVA) and any recorded times (e.g.{" "}
+              <code className="text-xs bg-gray-100 px-1 rounded">
+                CT=5, WT=2:min
+              </code>
+              ).
+            </p>
+          </>
+        ),
+        image: "/help/images/value-display.png",
+        imageAlt: "Value analysis badges on tasks",
+        imageCaption: "Tasks showing VA, NNVA, and NVA badges with cycle/wait times.",
+      },
+    ],
+  },
+
+  /* ──────────────────────────────────────────────── 18 ── */
+  {
+    slug: "bottleneck",
+    title: "Bottleneck Highlighting",
+    sections: [
+      {
+        body: (
+          <p>
+            Bottleneck highlighting lets you visually flag sequence
+            connectors that represent capacity constraints or resource
+            bottlenecks in a process.
+          </p>
+        ),
+      },
+      {
+        heading: "Marking a connector as a bottleneck",
+        body: (
+          <ol className="list-decimal list-inside space-y-2">
+            <li>
+              Select a <strong>sequence connector</strong> in a BPMN diagram.
+            </li>
+            <li>
+              In the Properties Panel, check the{" "}
+              <strong>Bottleneck</strong> checkbox.
+            </li>
+          </ol>
+        ),
+      },
+      {
+        heading: "Enabling bottleneck display",
+        body: (
+          <>
+            <p>
+              Bottleneck connectors are only visually distinguished when the
+              display is enabled:
+            </p>
+            <ol className="list-decimal list-inside space-y-1 mt-2">
+              <li>
+                Click <strong>Diagram Settings</strong> in the toolbar.
+              </li>
+              <li>
+                Check the <strong>Bottleneck Display</strong> checkbox.
+              </li>
+            </ol>
+            <p className="mt-2">
+              When enabled, connectors marked as bottlenecks are rendered in{" "}
+              <strong className="text-purple-600">purple</strong> instead of
+              the default colour, making them stand out in the process flow.
+            </p>
+          </>
+        ),
+        image: "/help/images/bottleneck.png",
+        imageAlt: "Bottleneck connector highlighting",
+        imageCaption: "A purple bottleneck connector highlighting a capacity constraint.",
+      },
+      {
+        heading: "When to use bottleneck highlighting",
+        body: (
+          <ul className="list-disc list-inside space-y-1">
+            <li>
+              Identifying the <strong>constraint</strong> in a process
+              (Theory of Constraints)
+            </li>
+            <li>
+              Marking flows with <strong>capacity issues</strong> during
+              process review workshops
+            </li>
+            <li>
+              Combining with <strong>Value Analysis</strong> to build a
+              complete process performance picture
+            </li>
+          </ul>
+        ),
+      },
+    ],
+  },
+
+  /* ──────────────────────────────────────────────── 19 ── */
   {
     slug: "tips",
     title: "Tips & Troubleshooting",
