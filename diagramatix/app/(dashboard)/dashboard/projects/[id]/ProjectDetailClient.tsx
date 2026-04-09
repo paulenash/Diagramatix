@@ -354,14 +354,29 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
   const [importedProjectId, setImportedProjectId] = useState<string | null>(null);
   const [projectColorConfig, setProjectColorConfig] = useState<SymbolColorConfig>((project.colorConfig as SymbolColorConfig | null) ?? {});
 
-  // Re-fetch project data (diagrams + folderTree) from the API
+  // Re-fetch project data (diagrams + folderTree) from the API.
+  // Only updates state when the data actually changed, so server-rendered
+  // props are used on first paint with no unnecessary re-render.
   const refreshProjectData = useCallback(async () => {
     try {
       const res = await fetch(`/api/projects/${project.id}`);
       if (!res.ok) return;
       const fresh = await res.json();
-      if (fresh.diagrams) setDiagrams(fresh.diagrams);
-      if (fresh.folderTree) setFolderTree(parseFolderTree(fresh.folderTree));
+      if (fresh.diagrams) {
+        setDiagrams(prev => {
+          const freshIds = fresh.diagrams.map((d: DiagramSummary) => d.id + d.updatedAt).join(",");
+          const prevIds = prev.map(d => d.id + d.updatedAt).join(",");
+          return freshIds === prevIds ? prev : fresh.diagrams;
+        });
+      }
+      if (fresh.folderTree) {
+        setFolderTree(prev => {
+          const freshTree = parseFolderTree(fresh.folderTree);
+          const freshKey = JSON.stringify(freshTree);
+          const prevKey = JSON.stringify(prev);
+          return freshKey === prevKey ? prev : freshTree;
+        });
+      }
     } catch { /* best-effort */ }
   }, [project.id]);
 
