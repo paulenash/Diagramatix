@@ -187,21 +187,91 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
   const [importProjectName, setImportProjectName] = useState("");
   const [showImportNameDialog, setShowImportNameDialog] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [importDropdownOpen, setImportDropdownOpen] = useState(false);
+  // Unified File menu (Import JSON / Import XML / Backup / Restore / Admin)
+  const [fileMenuOpen, setFileMenuOpen] = useState(false);
   const [importFormat, setImportFormat] = useState<"json" | "xml">("json");
-  const importDropdownRef = useRef<HTMLDivElement>(null);
+  const fileMenuRef = useRef<HTMLDivElement>(null);
 
-  // Close import dropdown on outside click
+  // Backup / Restore
+  const [backingUp, setBackingUp] = useState(false);
+  const [restoring, setRestoring] = useState(false);
+  const [restoreLog, setRestoreLog] = useState<string[]>([]);
+  const [restoreResult, setRestoreResult] = useState<"success" | "failed" | null>(null);
+  const restoreFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Close File menu on outside click
   useEffect(() => {
-    if (!importDropdownOpen) return;
+    if (!fileMenuOpen) return;
     function handleClick(e: MouseEvent) {
-      if (importDropdownRef.current && !importDropdownRef.current.contains(e.target as Node)) {
-        setImportDropdownOpen(false);
+      if (fileMenuRef.current && !fileMenuRef.current.contains(e.target as Node)) {
+        setFileMenuOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
-  }, [importDropdownOpen]);
+  }, [fileMenuOpen]);
+
+  async function handleBackupDownload() {
+    setBackingUp(true);
+    try {
+      const resp = await fetch("/api/backup");
+      if (!resp.ok) {
+        const msg = await resp.text();
+        alert(`Backup failed: ${msg || resp.statusText}`);
+        return;
+      }
+      const blob = await resp.blob();
+      // Filename comes from Content-Disposition (best-effort parse)
+      const cd = resp.headers.get("Content-Disposition") ?? "";
+      const m = cd.match(/filename="([^"]+)"/);
+      const filename = m?.[1] ?? `Diagramatix-backup-${new Date().toISOString().slice(0, 10)}.diag`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (err) {
+      alert(`Backup failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setBackingUp(false);
+    }
+  }
+
+  async function handleRestoreFile(file: File) {
+    setRestoring(true);
+    setRestoreLog([]);
+    setRestoreResult(null);
+    const log = (msg: string) => setRestoreLog(prev => [...prev, msg]);
+    log(`Reading ${file.name}\u2026`);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const resp = await fetch("/api/backup", { method: "POST", body: form });
+      const json = (await resp.json()) as
+        | { ok: true; result: { projectsRestored: number; diagramsRestored: number; unfiledDiagramsRestored: number; templatesRestored: number; log: string[] } }
+        | { error: string };
+      if (!resp.ok || "error" in json) {
+        log(`\u2718 Restore failed: ${"error" in json ? json.error : resp.statusText}`);
+        setRestoreResult("failed");
+        return;
+      }
+      for (const line of json.result.log) log(line);
+      log("");
+      log(`\u2714 ${json.result.projectsRestored} project(s) restored`);
+      log(`\u2714 ${json.result.diagramsRestored} diagram(s) in projects`);
+      log(`\u2714 ${json.result.unfiledDiagramsRestored} unfiled diagram(s)`);
+      log(`\u2714 ${json.result.templatesRestored} user template(s)`);
+      setRestoreResult("success");
+    } catch (err) {
+      log(`\u2718 Restore failed: ${err instanceof Error ? err.message : String(err)}`);
+      setRestoreResult("failed");
+    } finally {
+      setRestoring(false);
+    }
+  }
 
   function checkSchemaCompatibility(fileSchema: string): { ok: boolean; message?: string } {
     const [appMajor, appMinor] = SCHEMA_VERSION.split(".").map(Number);
@@ -521,19 +591,11 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
           </div>
           <span className="font-semibold text-gray-900">Diagramatix</span>
           {version ? <span className="text-xs text-gray-400 ml-1">v1.0.{version}</span> : null}
-          <span className="text-xs text-gray-400 ml-3">brought to you by: <strong className="text-gray-600">Nash AI</strong></span>
         </div>
         <div className="flex items-center gap-3">
-          {isSu && !readOnly && (
-            <a
-              href="/dashboard/admin"
-              className="text-xs text-orange-600 hover:text-orange-800 font-medium border border-orange-300 rounded px-2 py-1"
-            >
-              Admin
-            </a>
-          )}
           {!readOnly && (
             <>
+              {/* Hidden file inputs reused by the File menu */}
               <input
                 ref={fileInputRef}
                 type="file"
@@ -541,23 +603,43 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                 className="hidden"
                 onChange={e => { const f = e.target.files?.[0]; if (f) handleFileSelected(f); e.target.value = ""; }}
               />
-              <div className="relative" ref={importDropdownRef}>
+              <input
+                ref={restoreFileInputRef}
+                type="file"
+                accept=".diag"
+                className="hidden"
+                onChange={e => {
+                  const f = e.target.files?.[0];
+                  if (f) handleRestoreFile(f);
+                  e.target.value = "";
+                }}
+              />
+
+              {/* Unified File menu */}
+              <div className="relative" ref={fileMenuRef}>
                 <button
-                  onClick={() => setImportDropdownOpen(prev => !prev)}
-                  disabled={importing}
+                  onClick={() => setFileMenuOpen(prev => !prev)}
+                  disabled={importing || backingUp || restoring}
                   className={`text-xs font-medium rounded px-2 py-1 border ${
-                    importing ? "bg-green-600 text-white border-green-600" : "text-gray-600 border-gray-300 hover:bg-gray-50"
+                    importing || backingUp || restoring
+                      ? "bg-blue-600 text-white border-blue-600"
+                      : "text-gray-600 border-gray-300 hover:bg-gray-50"
                   }`}
                 >
-                  {importing ? "Importing\u2026" : "Import \u25BE"}
+                  {importing
+                    ? "Importing\u2026"
+                    : backingUp
+                      ? "Backing up\u2026"
+                      : restoring
+                        ? "Restoring\u2026"
+                        : "File \u25BE"}
                 </button>
-                {importDropdownOpen && !importing && (
-                  <div className="absolute right-0 top-full mt-1 w-40 bg-white border border-gray-200 rounded shadow-lg z-50">
+                {fileMenuOpen && !(importing || backingUp || restoring) && (
+                  <div className="absolute right-0 top-full mt-1 w-52 bg-white border border-gray-200 rounded shadow-lg z-50">
                     <button
                       onClick={() => {
-                        setImportDropdownOpen(false);
+                        setFileMenuOpen(false);
                         setImportFormat("json");
-                        // Update accept attribute then open file picker
                         if (fileInputRef.current) {
                           fileInputRef.current.accept = ".json";
                           fileInputRef.current.click();
@@ -569,7 +651,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                     </button>
                     <button
                       onClick={() => {
-                        setImportDropdownOpen(false);
+                        setFileMenuOpen(false);
                         setImportFormat("xml");
                         if (fileInputRef.current) {
                           fileInputRef.current.accept = ".xml";
@@ -580,18 +662,38 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                     >
                       Import XML
                     </button>
+                    <div className="border-t border-gray-100" />
+                    <button
+                      onClick={() => { setFileMenuOpen(false); handleBackupDownload(); }}
+                      title="Download a complete backup of all your projects, diagrams and templates"
+                      className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                    >
+                      {"Backup\u2026"}
+                    </button>
+                    <button
+                      onClick={() => { setFileMenuOpen(false); restoreFileInputRef.current?.click(); }}
+                      title="Restore a Diagramatix backup (.diag) — adds all projects alongside your existing ones"
+                      className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                    >
+                      {"Restore\u2026"}
+                    </button>
+                    {isSu && (
+                      <>
+                        <div className="border-t border-gray-100" />
+                        <a
+                          href="/dashboard/admin"
+                          onClick={() => setFileMenuOpen(false)}
+                          className="block w-full text-left px-3 py-2 text-xs text-orange-600 hover:bg-orange-50 font-medium"
+                        >
+                          Admin
+                        </a>
+                      </>
+                    )}
                   </div>
                 )}
               </div>
             </>
           )}
-          <button
-            onClick={() => window.location.reload()}
-            className="text-xs text-gray-500 hover:text-gray-700 border border-gray-300 rounded px-2 py-1 hover:bg-gray-50"
-            title="Refresh from database"
-          >
-            {"\u21BB"}
-          </button>
           {orgName && (
             <div
               className="text-xs text-gray-600 border border-gray-200 rounded px-2 py-1 bg-gray-50"
@@ -866,6 +968,54 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                   if (importResult === "success") router.refresh();
                 }}
                   className={`px-4 py-1.5 text-xs rounded-md text-white ${importResult === "success" ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700"}`}>
+                  Close
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Restore progress dialog */}
+      {(restoring || restoreLog.length > 0) && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md flex flex-col max-h-[70vh]">
+            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200">
+              <h2 className="text-sm font-semibold text-gray-900">
+                {restoreResult === "success" ? "\u2714 Restore Complete" :
+                 restoreResult === "failed" ? "\u2718 Restore Failed" :
+                 "Restoring Backup\u2026"}
+              </h2>
+              {restoreResult && (
+                <button onClick={() => {
+                  setRestoring(false);
+                  setRestoreLog([]);
+                  setRestoreResult(null);
+                }}
+                  className="text-gray-400 hover:text-gray-600 text-lg leading-none">&times;</button>
+              )}
+            </div>
+            <div className="flex-1 overflow-y-auto px-5 py-3 font-mono text-[10px] text-gray-600 space-y-0.5">
+              {restoreLog.map((line, i) => (
+                <p key={i} className={
+                  line.startsWith("\u2714") ? "text-green-600" :
+                  line.startsWith("\u2718") ? "text-red-600" :
+                  line.startsWith("  ") ? "text-gray-500 pl-2" : "text-gray-700"
+                }>{line}</p>
+              ))}
+              {!restoreResult && (
+                <p className="text-purple-500 animate-pulse">{"\u25CF"} Working...</p>
+              )}
+            </div>
+            {restoreResult && (
+              <div className="px-5 py-3 border-t border-gray-200 flex justify-end gap-2">
+                <button onClick={() => {
+                  setRestoring(false);
+                  setRestoreLog([]);
+                  setRestoreResult(null);
+                  if (restoreResult === "success") router.refresh();
+                }}
+                  className={`px-4 py-1.5 text-xs rounded-md text-white ${restoreResult === "success" ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700"}`}>
                   Close
                 </button>
               </div>
