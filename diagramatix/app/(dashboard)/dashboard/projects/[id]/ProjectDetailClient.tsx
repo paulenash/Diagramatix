@@ -342,8 +342,16 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
   const [exporting, setExporting] = useState(false);
   const [exportLog, setExportLog] = useState<string[]>([]);
   const [exportResult, setExportResult] = useState<"success" | "failed" | null>(null);
-  const [showExportMenu, setShowExportMenu] = useState(false);
-  const exportMenuRef = useRef<HTMLDivElement>(null);
+  // Renamed: this menu now also handles imports, so it's a generic File menu.
+  const [showFileMenu, setShowFileMenu] = useState(false);
+  const fileMenuRef = useRef<HTMLDivElement>(null);
+  const importJsonInputRef = useRef<HTMLInputElement>(null);
+  const importXmlInputRef = useRef<HTMLInputElement>(null);
+  // Import-progress modal state (mirrors the dashboard's import flow).
+  const [importing, setImporting] = useState(false);
+  const [importLog, setImportLog] = useState<string[]>([]);
+  const [importResult, setImportResult] = useState<"success" | "failed" | null>(null);
+  const [importedProjectId, setImportedProjectId] = useState<string | null>(null);
   const [projectColorConfig, setProjectColorConfig] = useState<SymbolColorConfig>((project.colorConfig as SymbolColorConfig | null) ?? {});
 
   // Folder tree state — initialize with defaults, load from localStorage in useEffect
@@ -388,14 +396,14 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
     if (savedFolder) setSelectedFolderId(savedFolder);
   }, [project.id, project.folderTree]);
 
-  // Close export menu on click outside
+  // Close File menu on click outside
   useEffect(() => {
     function handleClick(e: MouseEvent) {
-      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) setShowExportMenu(false);
+      if (fileMenuRef.current && !fileMenuRef.current.contains(e.target as Node)) setShowFileMenu(false);
     }
-    if (showExportMenu) document.addEventListener("mousedown", handleClick);
+    if (showFileMenu) document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
-  }, [showExportMenu]);
+  }, [showFileMenu]);
 
   // Get ordered diagrams in a specific folder
   function getOrderedDiagramsInFolder(folderId: string): DiagramSummary[] {
@@ -609,6 +617,160 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
       log(`\u2718 Export failed: ${err instanceof Error ? err.message : String(err)}`);
       setExportResult("failed");
     }
+  }
+
+  // ── Import (JSON / XML) ───────────────────────────────────────────────
+  // Mirrors the dashboard's import flow: parse the file, validate the
+  // schema version, then create a NEW project (alongside this one) with
+  // a "(imported)" suffix. After success, show the import-progress modal
+  // with a button to navigate into the new project.
+  async function handleImportFile(file: File, format: "json" | "xml") {
+    setImporting(true);
+    setImportLog([]);
+    setImportResult(null);
+    setImportedProjectId(null);
+    const log = (msg: string) => setImportLog(prev => [...prev, msg]);
+
+    let exportData: Record<string, unknown> | null = null;
+    try {
+      log(`Reading ${file.name}\u2026`);
+      const text = await file.text();
+      if (format === "xml") {
+        const { parseDiagramatixXml } = await import("@/app/lib/diagram/xmlExport");
+        exportData = parseDiagramatixXml(text);
+      } else {
+        exportData = JSON.parse(text);
+      }
+    } catch (err) {
+      log(`\u2718 Failed to read file: ${err instanceof Error ? err.message : String(err)}`);
+      setImportResult("failed");
+      return;
+    }
+
+    if (!exportData || !exportData.project || !exportData.diagrams) {
+      log("\u2718 Invalid export file \u2014 missing required fields");
+      setImportResult("failed");
+      return;
+    }
+
+    // Schema version check (additive: warn if older, block if newer major)
+    const schemaVer: string = (exportData.schemaVersion as string) ?? (exportData.version as string) ?? "";
+    if (schemaVer) {
+      const parts = schemaVer.split(".");
+      const fileMajor = parseInt(parts[0] ?? "0", 10);
+      const appMajor = parseInt(SCHEMA_VERSION.split(".")[0] ?? "0", 10);
+      if (fileMajor > appMajor) {
+        log(`\u2718 File schema version ${schemaVer} is newer than this app (${SCHEMA_VERSION}).`);
+        setImportResult("failed");
+        return;
+      }
+      if (fileMajor < appMajor) {
+        log(`Note: file uses older schema ${schemaVer}, will be upgraded to ${SCHEMA_VERSION}.`);
+      }
+    }
+
+    // Create new project
+    const sourceProject = exportData.project as Record<string, unknown>;
+    const importName = `${(sourceProject.name as string) ?? "Imported"} (imported)`;
+    log(`Creating new project "${importName}"\u2026`);
+    let newProject: { id: string };
+    try {
+      const pRes = await fetch("/api/projects", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: importName }),
+      });
+      if (!pRes.ok) {
+        log(`\u2718 Failed to create project: ${pRes.statusText}`);
+        setImportResult("failed");
+        return;
+      }
+      newProject = await pRes.json();
+    } catch (err) {
+      log(`\u2718 Failed to create project: ${err instanceof Error ? err.message : String(err)}`);
+      setImportResult("failed");
+      return;
+    }
+
+    // Update project metadata via PUT (description, ownerName, colorConfig)
+    try {
+      const meta: Record<string, unknown> = {};
+      if (sourceProject.description) meta.description = sourceProject.description;
+      if (sourceProject.ownerName) meta.ownerName = sourceProject.ownerName;
+      if (sourceProject.colorConfig && Object.keys(sourceProject.colorConfig as Record<string, unknown>).length > 0) {
+        meta.colorConfig = sourceProject.colorConfig;
+      }
+      if (Object.keys(meta).length > 0) {
+        await fetch(`/api/projects/${newProject.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(meta),
+        });
+      }
+    } catch { /* best-effort */ }
+
+    // Diagrams
+    const diags = (exportData.diagrams as Array<Record<string, unknown>>) ?? [];
+    log(`Importing ${diags.length} diagram(s)\u2026`);
+    const idMap = new Map<string, string>();
+    let successCount = 0;
+    for (let i = 0; i < diags.length; i++) {
+      const diag = diags[i];
+      log(`  Diagram ${i + 1}/${diags.length}: "${diag.name as string}"`);
+      try {
+        const dRes = await fetch("/api/diagrams", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: diag.name,
+            type: diag.type ?? "context",
+            projectId: newProject.id,
+            data: diag.data,
+            colorConfig: diag.colorConfig,
+            displayMode: diag.displayMode,
+          }),
+        });
+        if (dRes.ok) {
+          const created = await dRes.json();
+          idMap.set(diag.originalId as string, created.id);
+          successCount++;
+        } else {
+          log(`  \u2718 Failed: ${dRes.statusText}`);
+        }
+      } catch (err) {
+        log(`  \u2718 Failed: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+
+    // Folder tree (remap diagram IDs)
+    if (exportData.folderTree) {
+      const ft = exportData.folderTree as Record<string, unknown>;
+      const remappedMap: Record<string, string> = {};
+      for (const [oldId, folderId] of Object.entries((ft.diagramFolderMap as Record<string, string>) ?? {})) {
+        const newId = idMap.get(oldId);
+        if (newId) remappedMap[newId] = folderId;
+      }
+      const remappedOrder: Record<string, string[]> = {};
+      for (const [folderId, ids] of Object.entries((ft.diagramOrder as Record<string, string[]>) ?? {})) {
+        remappedOrder[folderId] = (ids as string[]).map(id => idMap.get(id) ?? id);
+      }
+      const remappedTree = {
+        folders: (ft.folders as unknown[]) ?? [],
+        diagramFolderMap: remappedMap,
+        diagramOrder: remappedOrder,
+        folderOrder: (ft.folderOrder as Record<string, string[]>) ?? {},
+      };
+      await fetch(`/api/projects/${newProject.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ folderTree: remappedTree }),
+      });
+    }
+
+    log("");
+    log(`\u2714 Import complete: ${successCount}/${diags.length} diagram(s) imported`);
+    setImportResult("success");
+    setImportedProjectId(newProject.id);
   }
 
   async function handleCreateDiagram() {
@@ -985,41 +1147,86 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
           )}
           {!readOnly && (
             <>
-              <div className="relative" ref={exportMenuRef}>
+              {/* Hidden file inputs for Import JSON / Import XML */}
+              <input
+                ref={importJsonInputRef}
+                type="file"
+                accept=".json"
+                className="hidden"
+                onChange={e => {
+                  const f = e.target.files?.[0];
+                  if (f) handleImportFile(f, "json");
+                  e.target.value = "";
+                }}
+              />
+              <input
+                ref={importXmlInputRef}
+                type="file"
+                accept=".xml"
+                className="hidden"
+                onChange={e => {
+                  const f = e.target.files?.[0];
+                  if (f) handleImportFile(f, "xml");
+                  e.target.value = "";
+                }}
+              />
+              {/* Unified File menu — Export JSON / Import JSON / Export XML / Import XML */}
+              <div className="relative" ref={fileMenuRef}>
                 <button
-                  onClick={() => { if (!exporting) setShowExportMenu(v => !v); }}
-                  disabled={exporting}
+                  onClick={() => { if (!exporting && !importing) setShowFileMenu(v => !v); }}
+                  disabled={exporting || importing}
                   className={`px-3 py-1 text-xs font-medium rounded-md border ${
-                    exporting ? "bg-green-600 text-white border-green-600 cursor-not-allowed" : "text-gray-700 border-gray-300 hover:bg-gray-50"
+                    exporting
+                      ? "bg-green-600 text-white border-green-600 cursor-not-allowed"
+                      : importing
+                        ? "bg-blue-600 text-white border-blue-600 cursor-not-allowed"
+                        : "text-gray-700 border-gray-300 hover:bg-gray-50"
                   }`}
                 >
-                  {exporting ? "Exporting\u2026" : "Export Project \u25BE"}
+                  {exporting
+                    ? "Exporting\u2026"
+                    : importing
+                      ? "Importing\u2026"
+                      : "File \u25BE"}
                 </button>
-                {showExportMenu && (
+                {showFileMenu && (
                   <div
                     className="fixed bg-white border border-gray-200 rounded-md shadow-lg py-1"
                     style={{
                       zIndex: 9999,
-                      top: exportMenuRef.current
-                        ? exportMenuRef.current.getBoundingClientRect().bottom + 4
+                      top: fileMenuRef.current
+                        ? fileMenuRef.current.getBoundingClientRect().bottom + 4
                         : 0,
-                      left: exportMenuRef.current
-                        ? exportMenuRef.current.getBoundingClientRect().left
+                      left: fileMenuRef.current
+                        ? fileMenuRef.current.getBoundingClientRect().left
                         : 0,
-                      minWidth: 140,
+                      minWidth: 160,
                     }}
                   >
                     <button
-                      className="block w-full text-left px-3 py-1.5 text-xs text-gray-700 font-medium hover:bg-gray-100"
-                      onClick={() => { setShowExportMenu(false); handleExportProject("json"); }}
+                      className="block w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100"
+                      onClick={() => { setShowFileMenu(false); handleExportProject("json"); }}
                     >
-                      Export as JSON
+                      Export JSON
                     </button>
                     <button
-                      className="block w-full text-left px-3 py-1.5 text-xs text-gray-700 font-medium hover:bg-gray-100"
-                      onClick={() => { setShowExportMenu(false); handleExportProject("xml"); }}
+                      className="block w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100"
+                      onClick={() => { setShowFileMenu(false); importJsonInputRef.current?.click(); }}
                     >
-                      Export as XML
+                      Import JSON
+                    </button>
+                    <div className="border-t border-gray-100" />
+                    <button
+                      className="block w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100"
+                      onClick={() => { setShowFileMenu(false); handleExportProject("xml"); }}
+                    >
+                      Export XML
+                    </button>
+                    <button
+                      className="block w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100"
+                      onClick={() => { setShowFileMenu(false); importXmlInputRef.current?.click(); }}
+                    >
+                      Import XML
                     </button>
                   </div>
                 )}
@@ -1128,6 +1335,81 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
               <div className="px-5 py-3 border-t border-gray-200 flex justify-end">
                 <button onClick={() => { setExporting(false); setExportLog([]); setExportResult(null); }}
                   className={`px-4 py-1.5 text-xs rounded-md text-white ${exportResult === "success" ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700"}`}>
+                  Close
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Import progress modal */}
+      {(importing || importLog.length > 0) && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md flex flex-col max-h-[70vh]">
+            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200">
+              <h2 className="text-sm font-semibold text-gray-900">
+                {importResult === "success"
+                  ? "\u2714 Import Complete"
+                  : importResult === "failed"
+                    ? "\u2718 Import Failed"
+                    : "Importing\u2026"}
+              </h2>
+              {importResult && (
+                <button
+                  onClick={() => {
+                    setImporting(false);
+                    setImportLog([]);
+                    setImportResult(null);
+                    setImportedProjectId(null);
+                  }}
+                  className="text-gray-400 hover:text-gray-600 text-lg leading-none"
+                >
+                  &times;
+                </button>
+              )}
+            </div>
+            <div className="flex-1 overflow-y-auto px-5 py-3 font-mono text-[10px] text-gray-600 space-y-0.5">
+              {importLog.map((line, i) => (
+                <p
+                  key={i}
+                  className={
+                    line.startsWith("\u2714") ? "text-green-600" :
+                    line.startsWith("\u2718") ? "text-red-600" :
+                    line.startsWith("  ") ? "text-gray-500 pl-2" : "text-gray-700"
+                  }
+                >
+                  {line}
+                </p>
+              ))}
+              {!importResult && (
+                <p className="text-blue-500 animate-pulse">{"\u25CF"} Working...</p>
+              )}
+            </div>
+            {importResult && (
+              <div className="px-5 py-3 border-t border-gray-200 flex justify-end gap-2">
+                {importResult === "success" && importedProjectId && (
+                  <button
+                    onClick={() => {
+                      setImporting(false);
+                      setImportLog([]);
+                      setImportResult(null);
+                      router.push(`/dashboard/projects/${importedProjectId}`);
+                    }}
+                    className="px-4 py-1.5 text-xs rounded-md text-white bg-blue-600 hover:bg-blue-700"
+                  >
+                    Open Imported Project
+                  </button>
+                )}
+                <button
+                  onClick={() => {
+                    setImporting(false);
+                    setImportLog([]);
+                    setImportResult(null);
+                    setImportedProjectId(null);
+                  }}
+                  className={`px-4 py-1.5 text-xs rounded-md text-white ${importResult === "success" ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700"}`}
+                >
                   Close
                 </button>
               </div>
