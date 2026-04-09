@@ -811,8 +811,23 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         return conn;
       });
 
-      // Step 2: Validate ALL connectors against ALL elements
-      connectors = validateConnectorsAgainstObstacles(connectors, elements);
+      // Step 2: Validate connectors against obstacles.
+      // For curvilinear connectors (transitions, flows) NOT attached to the
+      // moved element, skip obstacle validation — their Bezier control points
+      // may technically lie inside elements without the visible curve passing
+      // through, and rerouting them destroys the user's carefully shaped curves.
+      const curvilinearUnaffected = new Set(
+        connectors
+          .filter(c => c.routingType === "curvilinear" && !affectedIds.has(c.sourceId) && !affectedIds.has(c.targetId))
+          .map(c => c.id)
+      );
+      if (curvilinearUnaffected.size > 0) {
+        const toValidate = connectors.filter(c => !curvilinearUnaffected.has(c.id));
+        const unchanged  = connectors.filter(c => curvilinearUnaffected.has(c.id));
+        connectors = [...validateConnectorsAgainstObstacles(toValidate, elements), ...unchanged];
+      } else {
+        connectors = validateConnectorsAgainstObstacles(connectors, elements);
+      }
 
       return { ...state, elements: updatePoolTypes(elements), connectors };
     }
