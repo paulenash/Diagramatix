@@ -321,6 +321,7 @@ export function DiagramEditor({
     setTitleFontSize,
     elementMoveEnd,
     flipForkJoin,
+    addSelfTransition,
     splitConnector,
     applyTemplate,
     alignElements,
@@ -1378,6 +1379,7 @@ export function DiagramEditor({
           showValueDisplay={showValueDisplay}
           showBottleneck={showBottleneck}
           onInsertSpace={(diagramType === "bpmn" || diagramType === "state-machine") ? insertSpace : undefined}
+          onAddSelfTransition={diagramType === "state-machine" ? addSelfTransition : undefined}
         />
 
         {!readOnly && (

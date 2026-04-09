@@ -1380,7 +1380,11 @@ export function SymbolRenderer({
     const isTaskLike =
       element.type === "task" ||
       element.type === "subprocess" ||
-      element.type === "subprocess-expanded";
+      element.type === "subprocess-expanded" ||
+      element.type === "state" ||
+      element.type === "composite-state" ||
+      element.type === "gateway" ||
+      element.type === "fork-join";
     if (isTaskLike && !multiSelected && onEnterConnectionMode) {
       const MOVE_THRESHOLD = 4;
       const startClientX = e.clientX;

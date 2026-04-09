@@ -19,7 +19,7 @@ import type {
   Side,
   SymbolType,
 } from "@/app/lib/diagram/types";
-import { computeWaypoints, recomputeAllConnectors, consolidateWaypoints, rectifyWaypoints } from "@/app/lib/diagram/routing";
+import { computeWaypoints, recomputeAllConnectors, consolidateWaypoints, rectifyWaypoints, constrainControlPoint } from "@/app/lib/diagram/routing";
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
 
 const BPMN_EVENT_TYPES = new Set(["start-event", "intermediate-event", "end-event"]);
@@ -166,6 +166,13 @@ type Action =
   | { type: "NUDGE_CONNECTOR_ENDPOINT"; payload: { connectorId: string; endpoint: "source" | "target"; dx: number; dy: number } }
   | { type: "UPDATE_CONNECTOR"; payload: { id: string; directionType: DirectionType } }
   | { type: "UPDATE_CONNECTOR_TYPE"; payload: { id: string; connectorType: ConnectorType } }
+  | { type: "ADD_SELF_TRANSITION"; payload: {
+      elementId: string;
+      side: Side;
+      sourceOffsetAlong: number;
+      targetOffsetAlong: number;
+      bulge: number;
+    }}
   | { type: "FLIP_FORK_JOIN"; payload: { id: string } }
   | { type: "REVERSE_CONNECTOR"; payload: { id: string } }
   | { type: "UPDATE_CONNECTOR_WAYPOINTS"; payload: { id: string; waypoints: Point[] } }
@@ -870,6 +877,58 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       return { ...state, elements: updatePoolTypes(elements), connectors };
     }
 
+    case "ADD_SELF_TRANSITION": {
+      const { elementId, side, sourceOffsetAlong, targetOffsetAlong, bulge } = action.payload;
+      const el = state.elements.find(e => e.id === elementId);
+      if (!el) return state;
+
+      // Compute attachment points on the element boundary
+      function sidePoint(s: Side, offset: number): Point {
+        switch (s) {
+          case "top":    return { x: el!.x + el!.width * offset, y: el!.y };
+          case "bottom": return { x: el!.x + el!.width * offset, y: el!.y + el!.height };
+          case "left":   return { x: el!.x, y: el!.y + el!.height * offset };
+          case "right":  return { x: el!.x + el!.width, y: el!.y + el!.height * offset };
+        }
+      }
+      const srcPt = sidePoint(side, sourceOffsetAlong);
+      const tgtPt = sidePoint(side, targetOffsetAlong);
+
+      // Build the loop waypoints: src → control out → control back → tgt
+      // The bulge extends perpendicular to the side
+      let cp1: Point, cp2: Point;
+      switch (side) {
+        case "top":    cp1 = { x: srcPt.x, y: srcPt.y - bulge }; cp2 = { x: tgtPt.x, y: tgtPt.y - bulge }; break;
+        case "bottom": cp1 = { x: srcPt.x, y: srcPt.y + bulge }; cp2 = { x: tgtPt.x, y: tgtPt.y + bulge }; break;
+        case "left":   cp1 = { x: srcPt.x - bulge, y: srcPt.y }; cp2 = { x: tgtPt.x - bulge, y: tgtPt.y }; break;
+        case "right":  cp1 = { x: srcPt.x + bulge, y: srcPt.y }; cp2 = { x: tgtPt.x + bulge, y: tgtPt.y }; break;
+      }
+
+      const waypoints: Point[] = [srcPt, cp1, cp2, tgtPt];
+
+      const transitionCount = state.connectors.filter(c => c.type === "transition").length;
+      const newConnector: Connector = {
+        id: nanoid(),
+        sourceId: elementId,
+        targetId: elementId,
+        sourceSide: side,
+        targetSide: side,
+        sourceOffsetAlong,
+        targetOffsetAlong,
+        type: "transition",
+        directionType: "open-directed",
+        routingType: "curvilinear",
+        sourceInvisibleLeader: false,
+        targetInvisibleLeader: false,
+        waypoints,
+        label: `transition ${transitionCount + 1}`,
+        labelOffsetX: 0,
+        labelOffsetY: side === "top" || side === "left" ? -(bulge / 2 + 10) : (bulge / 2 + 10),
+      };
+
+      return { ...state, connectors: [...state.connectors, newConnector] };
+    }
+
     case "FLIP_FORK_JOIN": {
       const { id } = action.payload;
       const el = state.elements.find(e => e.id === id);
@@ -1559,19 +1618,37 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       return { ...state, connectors: validateConnectorsAgainstObstacles(updatedConns, state.elements) };
     }
 
-    case "UPDATE_CURVE_HANDLES":
+    case "UPDATE_CURVE_HANDLES": {
+      const { id: chId, waypoints: chWp, cp1RelOffset: chCp1, cp2RelOffset: chCp2 } = action.payload;
       return {
         ...state,
-        connectors: state.connectors.map((c) =>
-          c.id === action.payload.id
-            ? { ...c,
-                waypoints:    action.payload.waypoints,
-                cp1RelOffset: action.payload.cp1RelOffset,
-                cp2RelOffset: action.payload.cp2RelOffset,
-              }
-            : c
-        ),
+        connectors: state.connectors.map((c) => {
+          if (c.id !== chId) return c;
+          // For transition connectors, constrain control points to angle limits
+          if (c.type === "transition" && chWp.length >= 5) {
+            const srcEdge = chWp[1]; // srcEdge waypoint
+            const tgtEdge = chWp[chWp.length - 2]; // tgtEdge waypoint
+            const srcEl = state.elements.find(e => e.id === c.sourceId);
+            const tgtEl = state.elements.find(e => e.id === c.targetId);
+            const srcRatio = srcEl?.type === "gateway" ? 0 : 0.325;
+            const tgtRatio = tgtEl?.type === "gateway" ? 0 : 0.325;
+            const cp1Raw = chWp[2];
+            const cp2Raw = chWp[chWp.length - 3];
+            const cp1 = constrainControlPoint(srcEdge, cp1Raw, c.sourceSide, srcRatio);
+            const cp2 = constrainControlPoint(tgtEdge, cp2Raw, c.targetSide, tgtRatio);
+            const constrained = [...chWp];
+            constrained[2] = cp1;
+            constrained[chWp.length - 3] = cp2;
+            return { ...c,
+              waypoints: constrained,
+              cp1RelOffset: { x: cp1.x - srcEdge.x, y: cp1.y - srcEdge.y },
+              cp2RelOffset: { x: cp2.x - tgtEdge.x, y: cp2.y - tgtEdge.y },
+            };
+          }
+          return { ...c, waypoints: chWp, cp1RelOffset: chCp1, cp2RelOffset: chCp2 };
+        }),
       };
+    }
 
     case "UPDATE_CONNECTOR_LABEL":
       return {
@@ -2633,6 +2710,10 @@ export function useDiagram(initialData: DiagramData) {
         dispatch({ type: "SET_TITLE_FONT_SIZE", payload: size });
       }, []
     ),
+    addSelfTransition: useCallback((elementId: string, side: Side, sourceOffsetAlong: number, targetOffsetAlong: number, bulge: number) => {
+      pushHistory(snapshotData());
+      dispatch({ type: "ADD_SELF_TRANSITION", payload: { elementId, side, sourceOffsetAlong, targetOffsetAlong, bulge } });
+    }, []),
     flipForkJoin: useCallback((id: string) => {
       pushHistory(snapshotData());
       dispatch({ type: "FLIP_FORK_JOIN", payload: { id } });

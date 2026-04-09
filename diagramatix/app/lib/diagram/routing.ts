@@ -187,6 +187,40 @@ function radialControlPoint(edgePt: Point, el: DiagramElement, offset: number): 
   return { x: edgePt.x + (dx / len) * offset, y: edgePt.y + (dy / len) * offset };
 }
 
+/**
+ * Constrain a curvilinear control point so the tangent at the edge point
+ * stays within an angle tolerance of the perpendicular to the side.
+ *
+ * @param edgePt     The attachment point on the element boundary
+ * @param cp         The proposed control point
+ * @param side       Which side the connector exits from
+ * @param maxTanRatio  tan(maxAngle) — 0 = strictly perpendicular, 0.325 ≈ 18°
+ */
+export function constrainControlPoint(
+  edgePt: Point, cp: Point, side: Side, maxTanRatio: number
+): Point {
+  const dx = cp.x - edgePt.x;
+  const dy = cp.y - edgePt.y;
+  if (dx === 0 && dy === 0) return cp;
+
+  switch (side) {
+    case "top":    // perpendicular is -Y; constrain |dx/dy|
+    case "bottom": { // perpendicular is +Y
+      const absdy = Math.abs(dy);
+      if (absdy < 1) return { x: edgePt.x, y: cp.y }; // nearly zero dy → clamp to vertical
+      const maxDx = absdy * maxTanRatio;
+      return { x: edgePt.x + Math.max(-maxDx, Math.min(maxDx, dx)), y: cp.y };
+    }
+    case "left":   // perpendicular is -X; constrain |dy/dx|
+    case "right": { // perpendicular is +X
+      const absdx = Math.abs(dx);
+      if (absdx < 1) return { x: cp.x, y: edgePt.y }; // nearly zero dx → clamp to horizontal
+      const maxDy = absdx * maxTanRatio;
+      return { x: cp.x, y: edgePt.y + Math.max(-maxDy, Math.min(maxDy, dy)) };
+    }
+  }
+}
+
 function perpendicularExitScaled(pt: Point, side: Side, offset: number): Point {
   switch (side) {
     case "right":  return { x: pt.x + offset, y: pt.y };
@@ -646,8 +680,15 @@ export function recomputeAllConnectors(
       const tgtEdge = sidePoint(target, conn.targetSide, conn.targetOffsetAlong ?? 0.5);
       const startPt = { x: source.x + source.width / 2, y: source.y + source.height / 2 };
       const endPt   = { x: target.x + target.width / 2, y: target.y + target.height / 2 };
-      const cp1 = { x: srcEdge.x + conn.cp1RelOffset.x, y: srcEdge.y + conn.cp1RelOffset.y };
-      const cp2 = { x: tgtEdge.x + conn.cp2RelOffset.x, y: tgtEdge.y + conn.cp2RelOffset.y };
+      let cp1 = { x: srcEdge.x + conn.cp1RelOffset.x, y: srcEdge.y + conn.cp1RelOffset.y };
+      let cp2 = { x: tgtEdge.x + conn.cp2RelOffset.x, y: tgtEdge.y + conn.cp2RelOffset.y };
+      // State-machine angle constraints on transition connectors
+      if (conn.type === "transition") {
+        const srcRatio = source.type === "gateway" ? 0 : 0.325; // gateway: strictly perp; state: ±18°
+        const tgtRatio = target.type === "gateway" ? 0 : 0.325;
+        cp1 = constrainControlPoint(srcEdge, cp1, conn.sourceSide, srcRatio);
+        cp2 = constrainControlPoint(tgtEdge, cp2, conn.targetSide, tgtRatio);
+      }
       return { ...conn, waypoints: [startPt, srcEdge, cp1, cp2, tgtEdge, endPt] };
     }
 

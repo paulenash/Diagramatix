@@ -198,6 +198,7 @@ interface Props {
   showValueDisplay?: boolean;
   showBottleneck?: boolean;
   onInsertSpace?: (markerX: number, markerY: number, dx: number, dy: number) => void;
+  onAddSelfTransition?: (elementId: string, side: Side, srcOffset: number, tgtOffset: number, bulge: number) => void;
 }
 
 interface EditingLabel {
@@ -394,6 +395,7 @@ export function Canvas({
   showValueDisplay,
   showBottleneck,
   onInsertSpace,
+  onAddSelfTransition,
 }: Props) {
   const displayMode = displayModeProp ?? "normal";
   const svgRef = useRef<SVGSVGElement>(null);
@@ -612,16 +614,39 @@ export function Canvas({
 
     function onMouseUp(ev: MouseEvent) {
       const pos = clientToWorld(ev.clientX, ev.clientY);
-      // Abort if released over the source element's bounding box. We check
-      // the release position directly because findDropTarget intentionally
-      // skips the source element and would otherwise return a neighbour
-      // within its 30px proximity margin.
+      // Check if released over the source element's bounding box.
       const srcEl = data.elements.find((e) => e.id === elementId);
       if (
         srcEl &&
         pos.x >= srcEl.x && pos.x <= srcEl.x + srcEl.width &&
         pos.y >= srcEl.y && pos.y <= srcEl.y + srcEl.height
       ) {
+        // Self-transition for state elements: if drag started and ended on same state
+        if (srcEl.type === "state" && onAddSelfTransition) {
+          // Determine which long side is nearest to the release point
+          const distTop    = Math.abs(pos.y - srcEl.y);
+          const distBottom = Math.abs(pos.y - (srcEl.y + srcEl.height));
+          const distLeft   = Math.abs(pos.x - srcEl.x);
+          const distRight  = Math.abs(pos.x - (srcEl.x + srcEl.width));
+          const minDist = Math.min(distTop, distBottom, distLeft, distRight);
+          let side: Side;
+          if (minDist === distTop)         side = "top";
+          else if (minDist === distBottom) side = "bottom";
+          else if (minDist === distLeft)   side = "left";
+          else                             side = "right";
+
+          // Place source and target 40px apart centred on the midpoint
+          // For top/bottom: offset is along width; for left/right: along height
+          const dim = (side === "top" || side === "bottom") ? srcEl.width : srcEl.height;
+          const midFrac = (side === "top" || side === "bottom")
+            ? (pos.x - srcEl.x) / dim
+            : (pos.y - srcEl.y) / dim;
+          const halfGap = 20 / dim; // 40px apart → 20px each side
+          const srcOff = Math.max(0.05, Math.min(0.95, midFrac - halfGap));
+          const tgtOff = Math.max(0.05, Math.min(0.95, midFrac + halfGap));
+
+          onAddSelfTransition(elementId, side, srcOff, tgtOff, 60);
+        }
         setDraggingConnector(null);
         window.removeEventListener("mousemove", onMouseMove);
         window.removeEventListener("mouseup", onMouseUp);
@@ -2810,7 +2835,8 @@ export function Canvas({
             const skipBecauseOwnBoundary =
               draggingSourceEl?.type === "subprocess-expanded" &&
               el.boundaryHostId === draggingSourceEl.id;
-            if (isDraggingConnector && el.id !== draggingConnector!.fromId && !skipBecauseOwnBoundary
+            const isSelfStateTarget = el.id === draggingConnector?.fromId && el.type === "state";
+            if (isDraggingConnector && (el.id !== draggingConnector!.fromId || isSelfStateTarget) && !skipBecauseOwnBoundary
                 && !draggingFromFinalState && el.type !== "initial-state") {
               // Throwing/send boundary events excluded only if they already have an outgoing messageBPMN
               const bEvtIsSendLocked = (el.flowType === "throwing" || el.taskType === "send")
