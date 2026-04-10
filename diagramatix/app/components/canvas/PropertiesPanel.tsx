@@ -48,6 +48,7 @@ interface Props {
   siblingDiagrams?: { id: string; name: string; type: string }[];
   currentDiagramId?: string;
   onFlipForkJoin?: (id: string) => void;
+  onConvertTaskSubprocess?: (id: string) => void;
 }
 
 const TASK_TYPE_OPTIONS: { value: BpmnTaskType; label: string }[] = [
@@ -503,6 +504,7 @@ export function PropertiesPanel({
   siblingDiagrams,
   currentDiagramId,
   onFlipForkJoin,
+  onConvertTaskSubprocess,
 }: Props) {
   const [labelDraft, setLabelDraft] = useState("");
   const [panelCollapsed, setPanelCollapsed] = useState(false);
@@ -1461,6 +1463,24 @@ export function PropertiesPanel({
             </div>
           </div>
         </>
+      )}
+
+      {element.type === "task" && diagramType === "bpmn" && onConvertTaskSubprocess && (
+        <button
+          onClick={() => onConvertTaskSubprocess(element.id)}
+          className="px-2 py-1 text-xs rounded border text-blue-600 border-blue-300 hover:bg-blue-50 w-full text-left"
+        >
+          → Subprocess
+        </button>
+      )}
+
+      {element.type === "subprocess" && diagramType === "bpmn" && onConvertTaskSubprocess && (
+        <button
+          onClick={() => onConvertTaskSubprocess(element.id)}
+          className="px-2 py-1 text-xs rounded border text-blue-600 border-blue-300 hover:bg-blue-50 w-full text-left"
+        >
+          → Task
+        </button>
       )}
 
       {element.type === "task" && (

@@ -321,6 +321,7 @@ export function DiagramEditor({
     setTitleFontSize,
     elementMoveEnd,
     flipForkJoin,
+    convertTaskSubprocess,
     addSelfTransition,
     splitConnector,
     applyTemplate,
@@ -1420,6 +1421,7 @@ export function DiagramEditor({
             siblingDiagrams={siblingDiagrams}
             currentDiagramId={diagramId}
             onFlipForkJoin={flipForkJoin}
+            onConvertTaskSubprocess={convertTaskSubprocess}
           />
         )}
       </div>

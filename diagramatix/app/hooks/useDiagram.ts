@@ -166,6 +166,7 @@ type Action =
   | { type: "NUDGE_CONNECTOR_ENDPOINT"; payload: { connectorId: string; endpoint: "source" | "target"; dx: number; dy: number } }
   | { type: "UPDATE_CONNECTOR"; payload: { id: string; directionType: DirectionType } }
   | { type: "UPDATE_CONNECTOR_TYPE"; payload: { id: string; connectorType: ConnectorType } }
+  | { type: "CONVERT_TASK_SUBPROCESS"; payload: { id: string } }
   | { type: "ADD_SELF_TRANSITION"; payload: {
       elementId: string;
       side: Side;
@@ -875,6 +876,36 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       });
 
       return { ...state, elements: updatePoolTypes(elements), connectors };
+    }
+
+    case "CONVERT_TASK_SUBPROCESS": {
+      const { id } = action.payload;
+      const el = state.elements.find(e => e.id === id);
+      if (!el) return state;
+      const isTask = el.type === "task";
+      const isSub = el.type === "subprocess";
+      if (!isTask && !isSub) return state;
+
+      const newType = isTask ? "subprocess" : "task";
+      const elements = state.elements.map(e => {
+        if (e.id !== id) return e;
+        const converted = { ...e, type: newType as SymbolType };
+        if (newType === "task") {
+          // Clear subprocess-specific props, set taskType to none
+          converted.taskType = "none" as BpmnTaskType;
+          const props = { ...converted.properties };
+          delete props.subprocessType;
+          delete props.linkedDiagramId;
+          converted.properties = props;
+        } else {
+          // Clear task-specific props
+          converted.taskType = undefined;
+        }
+        return converted;
+      });
+      // Recompute connectors since element type changed (shape may differ)
+      const connectors = recomputeAllConnectors(state.connectors, elements);
+      return { ...state, elements, connectors };
     }
 
     case "ADD_SELF_TRANSITION": {
@@ -2710,6 +2741,10 @@ export function useDiagram(initialData: DiagramData) {
         dispatch({ type: "SET_TITLE_FONT_SIZE", payload: size });
       }, []
     ),
+    convertTaskSubprocess: useCallback((id: string) => {
+      pushHistory(snapshotData());
+      dispatch({ type: "CONVERT_TASK_SUBPROCESS", payload: { id } });
+    }, []),
     addSelfTransition: useCallback((elementId: string, side: Side, sourceOffsetAlong: number, targetOffsetAlong: number, bulge: number) => {
       pushHistory(snapshotData());
       dispatch({ type: "ADD_SELF_TRANSITION", payload: { elementId, side, sourceOffsetAlong, targetOffsetAlong, bulge } });
