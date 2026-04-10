@@ -220,8 +220,11 @@ const BPMN_CONTENT_TYPES = new Set<SymbolType>([
 
 function isContainerType(type: SymbolType): boolean {
   return type === "system-boundary" || type === "composite-state"
-      || type === "pool" || type === "lane" || type === "subprocess-expanded";
+      || type === "pool" || type === "lane" || type === "subprocess-expanded"
+      || type === "process-group";
 }
+
+const PROCESS_GROUP_CHILDREN = new Set<SymbolType>(["chevron", "chevron-collapsed", "process-group"]);
 
 function containerAccepts(containerType: SymbolType, childType: SymbolType): boolean {
   if (containerType === "system-boundary") return childType === "use-case" || childType === "hourglass";
@@ -229,6 +232,7 @@ function containerAccepts(containerType: SymbolType, childType: SymbolType): boo
   if (containerType === "pool") return childType === "lane" || BPMN_CONTENT_TYPES.has(childType);
   if (containerType === "lane") return childType === "lane" || BPMN_CONTENT_TYPES.has(childType);
   if (containerType === "subprocess-expanded") return BPMN_CONTENT_TYPES.has(childType);
+  if (containerType === "process-group") return PROCESS_GROUP_CHILDREN.has(childType);
   return false;
 }
 
@@ -658,15 +662,17 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         }
       }
 
-      // Check if newly dropped element is fully inside a subprocess-expanded
+      // Check if newly dropped element is fully inside a container
       if (!newEl.boundaryHostId) {
-        const container = state.elements.find(
+        const containers = state.elements.filter(
           (b) =>
-            b.type === "subprocess-expanded" &&
+            isContainerType(b.type) &&
             containerAccepts(b.type, newEl.type) &&
             newEl.x >= b.x && newEl.x + newEl.width <= b.x + b.width &&
             newEl.y >= b.y && newEl.y + newEl.height <= b.y + b.height
         );
+        // Prefer smallest (innermost) container
+        const container = containers.sort((a, b) => (a.width * a.height) - (b.width * b.height))[0];
         if (container) {
           newEl = { ...newEl, parentId: container.id };
         }
@@ -793,11 +799,14 @@ function reducer(state: DiagramData, action: Action): DiagramData {
               (x + e.width / 2) >= b.x && (x + e.width / 2) <= b.x + b.width &&
               (y + e.height / 2) >= b.y && (y + e.height / 2) <= b.y + b.height
           );
-          // Prefer innermost container: subprocess-expanded > lane > pool > other
+          // Prefer innermost container: subprocess-expanded > lane > pool > process-group (smallest) > other
           const potentialParent =
             potentialParents.find(b => b.type === "subprocess-expanded") ??
             potentialParents.find(b => b.type === "lane") ??
             potentialParents.find(b => b.type === "pool") ??
+            // For process-groups, prefer the smallest (innermost) one
+            (potentialParents.filter(b => b.type === "process-group")
+              .sort((a, b) => (a.width * a.height) - (b.width * b.height))[0]) ??
             potentialParents[0];
           if (potentialParent !== undefined || state.elements.some(b => isContainerType(b.type) && containerAccepts(b.type, e.type))) {
             parentId = potentialParent?.id;
@@ -1133,14 +1142,28 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         }
         return el;
       });
+      // When a process-group is resized, adopt/release children
+      let finalElements = elements;
+      if (target?.type === "process-group") {
+        finalElements = elements.map(el => {
+          if (el.id === id) return el;
+          if (!containerAccepts("process-group", el.type)) return el;
+          const cx = el.x + el.width / 2;
+          const cy = el.y + el.height / 2;
+          const inside = cx >= newX && cx <= newX + newW && cy >= newY && cy <= newY + newH;
+          if (inside && el.parentId !== id) return { ...el, parentId: id };
+          if (!inside && el.parentId === id) return { ...el, parentId: undefined };
+          return el;
+        });
+      }
       // Only recompute connectors attached to the resized element or its boundary events
       let connectors = state.connectors.map(conn => {
         if (!movedIds.has(conn.sourceId) && !movedIds.has(conn.targetId)) return conn;
-        return recomputeAllConnectors([conn], elements)[0] ?? conn;
+        return recomputeAllConnectors([conn], finalElements)[0] ?? conn;
       });
       // Validate ALL connectors against ALL elements
-      connectors = validateConnectorsAgainstObstacles(connectors, elements);
-      return { ...state, elements, connectors };
+      connectors = validateConnectorsAgainstObstacles(connectors, finalElements);
+      return { ...state, elements: finalElements, connectors };
     }
 
     case "UPDATE_LABEL": {
