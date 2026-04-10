@@ -16,7 +16,7 @@ import type {
   Side,
   SymbolType,
 } from "@/app/lib/diagram/types";
-import { SymbolRenderer, SublaneIdsCtx, type ResizeHandle } from "./SymbolRenderer";
+import { SymbolRenderer, SublaneIdsCtx, ProcessGroupDepthCtx, type ResizeHandle } from "./SymbolRenderer";
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
 import { PaletteSymbolPreview } from "./Palette";
 import { CHEVRON_THEMES } from "@/app/lib/diagram/chevronThemes";
@@ -2074,6 +2074,26 @@ export function Canvas({
     return [...otherContainersUnsorted].sort((a, b) => (depthMap.get(a.id) ?? 0) - (depthMap.get(b.id) ?? 0));
   })();
   const groupElements = data.elements.filter((el) => el.type === "group");
+
+  // Compute process-group nesting depth: how many process-group ancestors each has
+  const processGroupDepthMap = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const el of data.elements) {
+      if (el.type !== "process-group") continue;
+      let depth = 0;
+      let cur = el;
+      const visited = new Set<string>();
+      while (cur.parentId && !visited.has(cur.id)) {
+        visited.add(cur.id);
+        const parent = data.elements.find(p => p.id === cur.parentId);
+        if (!parent) break;
+        if (parent.type === "process-group") depth++;
+        cur = parent;
+      }
+      map.set(el.id, depth);
+    }
+    return map;
+  }, [data.elements]);
   // Sort non-containers by parent nesting depth so children of deeper subprocesses render on top
   const nonContainers = (() => {
     const items = data.elements.filter(
@@ -2290,6 +2310,7 @@ export function Canvas({
       <ConnectorFontScaleCtx.Provider value={((data.connectorFontSize ?? 10) / 10) * (displayMode === "hand-drawn" ? 1.3 : 1)}>
       <TitleFontSizeCtx.Provider value={data.titleFontSize ?? 14}>
       <SublaneIdsCtx.Provider value={sublaneIds}>
+      <ProcessGroupDepthCtx.Provider value={processGroupDepthMap}>
       <svg
         ref={svgRef}
         data-canvas
@@ -3449,6 +3470,7 @@ export function Canvas({
 
         </g>
       </svg>
+      </ProcessGroupDepthCtx.Provider>
       </SublaneIdsCtx.Provider>
       </TitleFontSizeCtx.Provider>
       </ConnectorFontScaleCtx.Provider>

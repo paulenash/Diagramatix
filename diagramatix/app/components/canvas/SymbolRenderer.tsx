@@ -116,6 +116,7 @@ const VALUE_COLORS: Record<string, string> = {
 };
 
 const ShowValueDisplayCtx = createContext(false);
+export const ProcessGroupDepthCtx = createContext<Map<string, number>>(new Map());
 
 function ValueBadge({ el, show: showProp }: { el: DiagramElement; show?: boolean }) {
   const showCtx = useContext(ShowValueDisplayCtx);
@@ -792,9 +793,23 @@ function ChevronCollapsedShape({ el }: { el: DiagramElement }) {
 
 function ProcessGroupShape({ el }: { el: DiagramElement }) {
   const colors = useContext(SymbolColorCtx);
+  const depthMap = useContext(ProcessGroupDepthCtx);
+  const depth = depthMap.get(el.id) ?? 0;
+  // Lighten the fill by blending toward white based on nesting depth
+  const baseFill = resolveColor("process-group", colors);
+  const lightenStep = 0.25; // 25% lighter per nesting level
+  const t = Math.min(depth * lightenStep, 0.9); // cap at 90% toward white
+  function lerpHex(hex: string, toward: string, frac: number): string {
+    const parse = (h: string) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+    const [r1, g1, b1] = parse(hex);
+    const [r2, g2, b2] = parse(toward);
+    const c = (a: number, b: number) => Math.round(a + (b - a) * frac).toString(16).padStart(2, "0");
+    return `#${c(r1, r2)}${c(g1, g2)}${c(b1, b2)}`;
+  }
+  const fill = depth > 0 ? lerpHex(baseFill, "#ffffff", t) : baseFill;
   return (
     <rect x={el.x} y={el.y} width={el.width} height={el.height}
-      rx={4} ry={4} fill={resolveColor("process-group", colors)} stroke="#374151" strokeWidth={1.5} />
+      rx={4} ry={4} fill={fill} stroke="#374151" strokeWidth={1.5} />
   );
 }
 
@@ -1110,11 +1125,11 @@ function UmlClassShape({ el }: { el: DiagramElement }) {
   const showOps = (el.properties.showOperations as boolean | undefined) ?? false;
 
   const PAD = 4;
-  const SECTION_PAD = 5; // buffer between last attribute text and divider line
+  const SECTION_PAD = 8; // buffer between last attribute text and divider line / boundary
   const attrsY = el.y + headerH;
   const attrsH = showAttrs ? attributes.length * lineH + (attributes.length > 0 ? SECTION_PAD : 0) : 0;
   const opsY = attrsY + attrsH;
-  const opsH = showOps ? operations.length * lineH : 0;
+  const opsH = showOps ? operations.length * lineH + (operations.length > 0 ? SECTION_PAD : 0) : 0;
 
   return (
     <g>

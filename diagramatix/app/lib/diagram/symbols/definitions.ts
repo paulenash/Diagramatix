@@ -223,14 +223,14 @@ export const ALL_SYMBOLS: SymbolDefinition[] = [
     type: "chevron",
     label: "Chevron",
     defaultWidth: 140,
-    defaultHeight: 60,
+    defaultHeight: 78,
     description: "A value chain process chevron",
   },
   {
     type: "chevron-collapsed",
     label: "Collapsed",
     defaultWidth: 140,
-    defaultHeight: 60,
+    defaultHeight: 78,
     description: "A collapsed value chain chevron with linked diagram",
   },
   {

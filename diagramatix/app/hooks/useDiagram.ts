@@ -520,11 +520,12 @@ function autoResizeUmlElement(el: DiagramElement): DiagramElement {
 
   const contentW = maxContentW + PAD * 2;
   const newWidth = Math.max(MIN_W, contentW);
-  const OPS_BOTTOM_PAD = 6;
+  const BOTTOM_PAD = 10;
   const SECTION_PAD = 5;
   const attrsH = showAttrs ? attributes.length * LINE_H + (attributes.length > 0 && showOps ? SECTION_PAD : 0) : 0;
-  const opsH = showOps ? operations.length * LINE_H + (operations.length > 0 ? OPS_BOTTOM_PAD : 0) : 0;
-  const bodyH = Math.max(LINE_H, attrsH + opsH);
+  const opsH = showOps ? operations.length * LINE_H : 0;
+  const hasContent = (showAttrs && attributes.length > 0) || (showOps && operations.length > 0);
+  const bodyH = Math.max(LINE_H, attrsH + opsH + (hasContent ? BOTTOM_PAD : 0));
   const newHeight = Math.max(MIN_H, headerH + bodyH);
   if (newWidth === el.width && newHeight === el.height) return el;
   return { ...el, width: newWidth, height: newHeight };
