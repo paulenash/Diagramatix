@@ -38,6 +38,7 @@ interface Props {
   readOnly?: boolean;
   viewingAsName?: string;
   viewingAsEmail?: string;
+  version?: number;
 }
 
 function useAutoSave(
@@ -223,6 +224,7 @@ export function DiagramEditor({
   readOnly,
   viewingAsName,
   viewingAsEmail,
+  version,
 }: Props) {
   const router = useRouter();
 
@@ -900,6 +902,7 @@ export function DiagramEditor({
           <span className="text-[10px] text-gray-400 px-1 py-0 bg-gray-100 rounded">
             {diagramType}
           </span>
+          {version ? <span className="text-[10px] text-gray-400">v1.0.{version}</span> : null}
         </div>
 
         <div className="flex-1" />

@@ -7,6 +7,7 @@ import type { DiagramData, DiagramType } from "@/app/lib/diagram/types";
 import { EMPTY_DIAGRAM } from "@/app/lib/diagram/types";
 import type { SymbolColorConfig } from "@/app/lib/diagram/colors";
 import type { DisplayMode } from "@/app/lib/diagram/displayMode";
+import { execSync } from "child_process";
 import { getEffectiveUserId, isImpersonating } from "@/app/lib/superuser";
 import { tryGetCurrentOrgId } from "@/app/lib/auth/orgContext";
 
@@ -59,6 +60,11 @@ export default async function DiagramPage({ params }: Props) {
     viewingAsEmail = target?.email ?? "";
   }
 
+  let commitCount = 0;
+  try {
+    commitCount = parseInt(execSync("git rev-list --count HEAD", { encoding: "utf8" }).trim(), 10) || 0;
+  } catch { /* fallback to 0 */ }
+
   return (
     <DiagramEditor
         diagramId={diagram.id}
@@ -74,6 +80,7 @@ export default async function DiagramPage({ params }: Props) {
         readOnly={viewing}
         viewingAsName={viewingAsName}
         viewingAsEmail={viewingAsEmail}
+        version={commitCount}
       />
   );
 }
