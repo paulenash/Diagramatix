@@ -157,6 +157,12 @@ export function PaletteSymbolPreview({ type, colorConfig }: { type: SymbolType; 
         </svg>
       );
     }
+    case "fork-join":
+      return (
+        <svg width={6} height={28} viewBox="0 0 6 28">
+          <rect x={0} y={0} width={6} height={28} rx={1} fill="#1f2937" />
+        </svg>
+      );
     case "composite-state":
       return (
         <svg width={36} height={24} viewBox="0 0 48 32">

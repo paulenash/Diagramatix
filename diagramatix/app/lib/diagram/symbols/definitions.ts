@@ -207,7 +207,7 @@ export const ALL_SYMBOLS: SymbolDefinition[] = [
   },
   {
     type: "fork-join",
-    label: "",
+    label: "Fork/Join",
     defaultWidth: 5,
     defaultHeight: 100,
     description: "A fork or join bar in a state machine diagram",

@@ -559,6 +559,8 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       } else if (action.payload.symbolType === "data-store") {
         const count = state.elements.filter((e) => e.type === "data-store").length;
         label = `Store ${count + 1}`;
+      } else if (action.payload.symbolType === "fork-join") {
+        label = "";
       } else if (action.payload.symbolType === "pool") {
         const count = state.elements.filter((e) => e.type === "pool").length;
         label = `Pool ${count + 1}`;
