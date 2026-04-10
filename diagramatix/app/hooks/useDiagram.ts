@@ -242,10 +242,24 @@ function getAllDescendantIds(elements: DiagramElement[], containerId: string): S
   while (queue.length) {
     const id = queue.shift()!;
     for (const e of elements) {
-      if (e.parentId === id) { result.add(e.id); queue.push(e.id); }
+      if (e.parentId === id && !result.has(e.id)) { result.add(e.id); queue.push(e.id); }
     }
   }
   return result;
+}
+
+/** Check if candidateParentId is a descendant of elementId (would create a cycle) */
+function wouldCreateCycle(elements: DiagramElement[], elementId: string, candidateParentId: string): boolean {
+  let cur = candidateParentId;
+  const visited = new Set<string>();
+  while (cur) {
+    if (cur === elementId) return true;
+    if (visited.has(cur)) return false;
+    visited.add(cur);
+    const el = elements.find(e => e.id === cur);
+    cur = el?.parentId ?? "";
+  }
+  return false;
 }
 
 function segmentIntersectsRect(
@@ -762,7 +776,16 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       }
 
       // CASE B + C: Normal move (host elements also carry their boundary events)
-      const dx = x - el.x, dy = y - el.y;
+      // Clamp child elements within their process-group parent
+      let effectiveX = x, effectiveY = y;
+      if (el.parentId) {
+        const parent = state.elements.find(p => p.id === el.parentId);
+        if (parent?.type === "process-group") {
+          effectiveX = Math.max(parent.x, Math.min(parent.x + parent.width - el.width, x));
+          effectiveY = Math.max(parent.y, Math.min(parent.y + parent.height - el.height, y));
+        }
+      }
+      const dx = effectiveX - el.x, dy = effectiveY - el.y;
       const movingIsContainer = isContainerType(el.type);
       const descendantIds = movingIsContainer ? getAllDescendantIds(state.elements, id) : new Set<string>();
       const attachedBoundaryIds = new Set(state.elements.filter(e => e.boundaryHostId === id).map(e => e.id));
@@ -791,13 +814,16 @@ function reducer(state: DiagramData, action: Action): DiagramData {
             };
           }
           let parentId = e.parentId;
+          const cx = effectiveX + e.width / 2;
+          const cy = effectiveY + e.height / 2;
           const potentialParents = state.elements.filter(
             (b) =>
               isContainerType(b.type) &&
               containerAccepts(b.type, e.type) &&
               b.id !== id &&
-              (x + e.width / 2) >= b.x && (x + e.width / 2) <= b.x + b.width &&
-              (y + e.height / 2) >= b.y && (y + e.height / 2) <= b.y + b.height
+              !wouldCreateCycle(state.elements, id, b.id) &&
+              cx >= b.x && cx <= b.x + b.width &&
+              cy >= b.y && cy <= b.y + b.height
           );
           // Prefer innermost container: subprocess-expanded > lane > pool > process-group (smallest) > other
           const potentialParent =
@@ -811,7 +837,7 @@ function reducer(state: DiagramData, action: Action): DiagramData {
           if (potentialParent !== undefined || state.elements.some(b => isContainerType(b.type) && containerAccepts(b.type, e.type))) {
             parentId = potentialParent?.id;
           }
-          return { ...e, x, y, parentId };
+          return { ...e, x: effectiveX, y: effectiveY, parentId };
         }
         // If moving a container, move all descendants
         if (movingIsContainer && (e.parentId === id || descendantIds.has(e.id))) {
@@ -1151,7 +1177,7 @@ function reducer(state: DiagramData, action: Action): DiagramData {
           const cx = el.x + el.width / 2;
           const cy = el.y + el.height / 2;
           const inside = cx >= newX && cx <= newX + newW && cy >= newY && cy <= newY + newH;
-          if (inside && el.parentId !== id) return { ...el, parentId: id };
+          if (inside && el.parentId !== id && !wouldCreateCycle(elements, el.id, id)) return { ...el, parentId: id };
           if (!inside && el.parentId === id) return { ...el, parentId: undefined };
           return el;
         });
