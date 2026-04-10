@@ -39,6 +39,10 @@ export const DEFAULT_SYMBOL_COLORS: Record<SymbolType, string> = {
   // Context Diagram
   "external-entity":     "#bfdbfe",   // light blue
   "process-system":      "#e9d5ff",   // light purple
+  // Value Chain Diagram
+  "chevron":             "#fbd7bb",   // warm peach (AccentColor5 60% tint)
+  "chevron-collapsed":   "#fbd7bb",   // same as chevron
+  "process-group":       "#fcebdd",   // lighter peach (AccentColor5 80% tint)
   // Domain Diagram
   "uml-class":           "#fed7aa",   // light orange
   "uml-enumeration":     "#bbf7d0",   // light green
@@ -81,6 +85,9 @@ export const BW_SYMBOL_COLORS: Record<SymbolType, string> = {
   "external-entity":     "#ffffff",
   "process-system":      "#ffffff",
   // Domain Diagram
+  "chevron":             "#ffffff",
+  "chevron-collapsed":   "#ffffff",
+  "process-group":       "#ffffff",
   "uml-class":           "#ffffff",
   "uml-enumeration":     "#ffffff",
 };

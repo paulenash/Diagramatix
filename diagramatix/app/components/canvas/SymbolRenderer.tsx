@@ -759,6 +759,45 @@ function SubmachineShape({ el }: { el: DiagramElement }) {
   );
 }
 
+function ChevronShape({ el }: { el: DiagramElement }) {
+  const colors = useContext(SymbolColorCtx);
+  const fill = resolveColor("chevron", colors);
+  const { x, y, width: w, height: h } = el;
+  const notch = Math.min(20, w * 0.15); // chevron point depth
+  const points = `${x},${y} ${x + w - notch},${y} ${x + w},${y + h / 2} ${x + w - notch},${y + h} ${x},${y + h} ${x + notch},${y + h / 2}`;
+  return <polygon points={points} fill={fill} stroke="#374151" strokeWidth={1.5} />;
+}
+
+function ChevronCollapsedShape({ el }: { el: DiagramElement }) {
+  const colors = useContext(SymbolColorCtx);
+  const fill = resolveColor("chevron-collapsed", colors);
+  const { x, y, width: w, height: h } = el;
+  const notch = Math.min(20, w * 0.15);
+  const points = `${x},${y} ${x + w - notch},${y} ${x + w},${y + h / 2} ${x + w - notch},${y + h} ${x},${y + h} ${x + notch},${y + h / 2}`;
+  const hasLink = !!(el.properties.linkedDiagramId as string | undefined);
+  const markerStroke = hasLink ? "#16a34a" : "#c0c0c0";
+  // "+" marker (same as subprocess), centred at bottom
+  const mw = 14, mh = 14;
+  const mx = x + w / 2 - mw / 2;
+  const my = y + h - mh - 3;
+  return (
+    <g>
+      <polygon points={points} fill={fill} stroke="#374151" strokeWidth={1.5} />
+      <rect x={mx} y={my} width={mw} height={mh} rx={2} fill="white" stroke={markerStroke} strokeWidth={1} />
+      <line x1={mx + mw / 2} y1={my + 3} x2={mx + mw / 2} y2={my + mh - 3} stroke={markerStroke} strokeWidth={1} />
+      <line x1={mx + 3} y1={my + mh / 2} x2={mx + mw - 3} y2={my + mh / 2} stroke={markerStroke} strokeWidth={1} />
+    </g>
+  );
+}
+
+function ProcessGroupShape({ el }: { el: DiagramElement }) {
+  const colors = useContext(SymbolColorCtx);
+  return (
+    <rect x={el.x} y={el.y} width={el.width} height={el.height}
+      rx={4} ry={4} fill={resolveColor("process-group", colors)} stroke="#374151" strokeWidth={1.5} />
+  );
+}
+
 function ForkJoinShape({ el }: { el: DiagramElement }) {
   return (
     <rect x={el.x} y={el.y} width={el.width} height={el.height}
@@ -1277,6 +1316,9 @@ function SymbolShape({ el }: { el: DiagramElement }) {
       case "initial-state": return <InitialStateShape el={el} />;
       case "final-state":   return <FinalStateShape el={el} />;
       case "submachine":      return <SubmachineShape el={el} />;
+      case "chevron":             return <ChevronShape el={el} />;
+      case "chevron-collapsed":   return <ChevronCollapsedShape el={el} />;
+      case "process-group":       return <ProcessGroupShape el={el} />;
       case "fork-join":     return <ForkJoinShape el={el} />;
       case "system-boundary":   return <SystemBoundaryShape el={el} />;
       case "composite-state":   return <CompositeStateShape el={el} />;
@@ -1411,7 +1453,9 @@ export function SymbolRenderer({
       element.type === "submachine" ||
       element.type === "composite-state" ||
       element.type === "gateway" ||
-      element.type === "fork-join";
+      element.type === "fork-join" ||
+      element.type === "chevron" ||
+      element.type === "chevron-collapsed";
     if (isTaskLike && !multiSelected && onEnterConnectionMode) {
       const MOVE_THRESHOLD = 4;
       const startClientX = e.clientX;
@@ -1585,6 +1629,29 @@ export function SymbolRenderer({
     >
       <SymbolShape el={element} />
 
+      {/* Chevron description box — shown below the chevron when showDescription is true */}
+      {(element.type === "chevron" || element.type === "chevron-collapsed") &&
+        !!element.properties.showDescription && !!(element.properties.description as string) && (() => {
+        const desc = element.properties.description as string;
+        const descY = element.y + element.height + 4;
+        const descW = element.width;
+        const lines = desc.split("\n");
+        const lineH = 13;
+        const descH = lines.length * lineH + 6;
+        return (
+          <g style={{ pointerEvents: "none" }}>
+            <rect x={element.x} y={descY} width={descW} height={descH}
+              rx={3} fill="white" stroke="#d1d5db" strokeWidth={0.5} />
+            {lines.map((line, i) => (
+              <text key={i} x={element.x + 4} y={descY + 12 + i * lineH}
+                fontSize={10} fill="#4b5563" style={{ userSelect: "none" }}>
+                {line}
+              </text>
+            ))}
+          </g>
+        );
+      })()}
+
       {/* Value analysis badge (task/subprocess only, when Value Display is on) */}
       {showValueDisplay && (element.type === "task" || element.type === "subprocess" || element.type === "subprocess-expanded") && (
         <ValueBadge el={element} show={true} />
@@ -1592,6 +1659,22 @@ export function SymbolRenderer({
 
       {/* Subprocess drill-through — hit area on the + marker (only when linked) */}
       {element.type === "subprocess" && (element.properties.linkedDiagramId as string | undefined) && (() => {
+        const mw = 14, mh = 14;
+        const pmx = element.x + element.width / 2 - mw / 2;
+        const pmy = element.y + element.height - mh - 3;
+        return (
+          <rect
+            x={pmx - 2} y={pmy - 2} width={mw + 4} height={mh + 4}
+            fill="transparent" stroke="none"
+            style={{ cursor: "pointer", pointerEvents: "all" }}
+            onMouseDown={(e) => e.stopPropagation()}
+            onDoubleClick={(e) => { e.stopPropagation(); onDoubleClick(); }}
+          />
+        );
+      })()}
+
+      {/* Collapsed chevron drill-through — hit area on the + marker (only when linked) */}
+      {element.type === "chevron-collapsed" && (element.properties.linkedDiagramId as string | undefined) && (() => {
         const mw = 14, mh = 14;
         const pmx = element.x + element.width / 2 - mw / 2;
         const pmy = element.y + element.height - mh - 3;

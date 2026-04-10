@@ -220,6 +220,27 @@ export const ALL_SYMBOLS: SymbolDefinition[] = [
     description: "A fork or join bar in a state machine diagram",
   },
   {
+    type: "chevron",
+    label: "Chevron",
+    defaultWidth: 140,
+    defaultHeight: 60,
+    description: "A value chain process chevron",
+  },
+  {
+    type: "chevron-collapsed",
+    label: "Collapsed",
+    defaultWidth: 140,
+    defaultHeight: 60,
+    description: "A collapsed value chain chevron with linked diagram",
+  },
+  {
+    type: "process-group",
+    label: "Process Group",
+    defaultWidth: 200,
+    defaultHeight: 120,
+    description: "A process group container in a value chain diagram",
+  },
+  {
     type: "uml-class",
     label: "Entity",
     defaultWidth: 80,
@@ -255,6 +276,7 @@ export const PALETTE_BY_DIAGRAM_TYPE: Record<DiagramType, SymbolType[]> = {
     "text-annotation",
   ],
   domain: ["uml-class", "uml-enumeration"],
+  "value-chain": ["chevron", "chevron-collapsed", "process-group"],
 };
 
 /** Colour-picker palette — includes body colour entries and lane that aren't in the drag palette. */
@@ -280,6 +302,7 @@ export const COLOR_PALETTE_BY_DIAGRAM_TYPE: Record<DiagramType, SymbolType[]> = 
     "text-annotation",
   ],
   domain: ["uml-class", "uml-enumeration"],
+  "value-chain": ["chevron", "chevron-collapsed", "process-group"],
 };
 
 export function getSymbolDefinition(type: SymbolType): SymbolDefinition {

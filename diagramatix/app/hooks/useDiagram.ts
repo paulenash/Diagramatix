@@ -562,6 +562,15 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       } else if (action.payload.symbolType === "submachine") {
         const count = state.elements.filter((e) => e.type === "submachine").length;
         label = `SubMachine ${count + 1}`;
+      } else if (action.payload.symbolType === "chevron") {
+        const count = state.elements.filter((e) => e.type === "chevron").length;
+        label = `Process ${count + 1}`;
+      } else if (action.payload.symbolType === "chevron-collapsed") {
+        const count = state.elements.filter((e) => e.type === "chevron-collapsed").length;
+        label = `Process ${count + 1}`;
+      } else if (action.payload.symbolType === "process-group") {
+        const count = state.elements.filter((e) => e.type === "process-group").length;
+        label = `Group ${count + 1}`;
       } else if (action.payload.symbolType === "fork-join") {
         label = "";
       } else if (action.payload.symbolType === "pool") {

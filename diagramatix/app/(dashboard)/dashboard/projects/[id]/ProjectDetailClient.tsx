@@ -316,6 +316,7 @@ const DIAGRAM_TYPE_LABELS: Record<string, string> = {
   "state-machine": "State Machine",
   bpmn: "BPMN",
   domain: "Domain",
+  "value-chain": "Value Chain",
 };
 
 const DIAGRAM_TYPES: { value: DiagramType; label: string; description: string }[] = [
@@ -324,6 +325,7 @@ const DIAGRAM_TYPES: { value: DiagramType; label: string; description: string }[
   { value: "state-machine", label: "State Machine", description: "States and transitions for entity lifecycle" },
   { value: "bpmn", label: "BPMN", description: "Full Business Process Model and Notation" },
   { value: "domain", label: "Domain", description: "UML class diagrams with classes, enumerations, and relationships" },
+  { value: "value-chain", label: "Value Chain", description: "Chevron-based process value chain with process groups" },
 ];
 
 export function ProjectDetailClient({ project, otherProjects, version, readOnly, viewingAsName, viewingAsEmail }: Props) {
@@ -1661,6 +1663,12 @@ function DiagramThumbnail({ data, colorConfig }: { data: unknown; colorConfig?: 
         if (type === "actor" || type === "team" || type === "hourglass" || type === "system") {
           return <rect key={el.id} x={x} y={y} width={w} height={h}
             fill="none" stroke={fill} strokeWidth={1} />;
+        }
+        if (type === "chevron" || type === "chevron-collapsed") {
+          const notch = Math.min(w * 0.15, 8);
+          return <polygon key={el.id}
+            points={`${x},${y} ${x+w-notch},${y} ${x+w},${y+h/2} ${x+w-notch},${y+h} ${x},${y+h} ${x+notch},${y+h/2}`}
+            fill={fill} stroke="#374151" strokeWidth={1} />;
         }
         if (type === "fork-join") {
           return <rect key={el.id} x={x} y={y} width={w} height={h}

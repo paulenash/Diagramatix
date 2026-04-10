@@ -1118,7 +1118,8 @@ export function Canvas({
       const elType = el!.type;
       const freeResize = elType === "task" || elType === "subprocess"
         || elType === "subprocess-expanded" || elType === "state"
-        || elType === "submachine" || elType === "composite-state";
+        || elType === "submachine" || elType === "composite-state"
+        || elType === "chevron" || elType === "chevron-collapsed" || elType === "process-group";
       if (!isContainer && !freeResize && ar > 0) {
         if (handle.includes("e") || handle.includes("w")) {
           // Width is primary — derive height to preserve aspect ratio
@@ -2291,7 +2292,7 @@ export function Canvas({
         onDragOver={(e) => e.preventDefault()}
         onKeyDown={handleKeyDown}
         onContextMenu={(e) => {
-          if (readOnly || (diagramType !== "bpmn" && diagramType !== "state-machine")) return;
+          if (readOnly || (diagramType !== "bpmn" && diagramType !== "state-machine" && diagramType !== "value-chain")) return;
           e.preventDefault();
           const rect = svgRef.current?.getBoundingClientRect();
           if (!rect) return;
@@ -2466,7 +2467,7 @@ export function Canvas({
                   // Gateway shape double-click never opens the label editor —
                   // the label rect has its own dblclick handler for that.
                   if (el.type === "gateway") return;
-                  const linkedId = (el.type === "subprocess" || el.type === "submachine") ? el.properties.linkedDiagramId as string | undefined : undefined;
+                  const linkedId = (el.type === "subprocess" || el.type === "submachine" || el.type === "chevron-collapsed") ? el.properties.linkedDiagramId as string | undefined : undefined;
                   if (linkedId && onDrillIntoSubprocess) {
                     onDrillIntoSubprocess(linkedId);
                   } else {
@@ -2478,7 +2479,7 @@ export function Canvas({
                   if (el.type === "final-state") return; // no connectors FROM final-state
                   handleConnectionPointDragStart(el.id, side, worldPos);
                 }}
-                showConnectionPoints={selectedElementIds.size <= 1 && !isWhiteBoxPool && el.type !== "final-state" && (selectedElementIds.has(el.id) || isDraggingConnector || isDraggingEndpoint)}
+                showConnectionPoints={selectedElementIds.size <= 1 && !isWhiteBoxPool && el.type !== "final-state" && diagramType !== "value-chain" && (selectedElementIds.has(el.id) || isDraggingConnector || isDraggingEndpoint)}
                 onResizeDragStart={(handle, e) => handleResizeDragStart(el.id, handle, e)}
                 svgToWorld={clientToWorld}
                 onUpdateProperties={onUpdateProperties}
@@ -2492,7 +2493,7 @@ export function Canvas({
                 onGroupMove={onMoveElements ? (dx, dy) => onMoveElements([...selectedElementIds], dx / zoom, dy / zoom) : undefined}
                 onGroupMoveEnd={onElementsMoveEnd}
                 colorConfig={colorConfig}
-                onEnterConnectionMode={el.type !== "final-state" ? () => setPendingConnSourceId(el.id) : undefined}
+                onEnterConnectionMode={el.type !== "final-state" && diagramType !== "value-chain" ? () => setPendingConnSourceId(el.id) : undefined}
                 onCancelConnectionMode={() => setPendingConnSourceId(null)}
                 inConnectionMode={pendingConnSourceId === el.id}
                 onDrillBack={(el.type === "start-event" || el.type === "initial-state") ? onDrillBack : undefined}
@@ -2774,7 +2775,7 @@ export function Canvas({
                 // Gateway shape double-click never opens the label editor —
                 // the label rect has its own dblclick handler for that.
                 if (el.type === "gateway") return;
-                const linkedId = (el.type === "subprocess" || el.type === "submachine") ? el.properties.linkedDiagramId as string | undefined : undefined;
+                const linkedId = (el.type === "subprocess" || el.type === "submachine" || el.type === "chevron-collapsed") ? el.properties.linkedDiagramId as string | undefined : undefined;
                 if (linkedId && onDrillIntoSubprocess) {
                   onDrillIntoSubprocess(linkedId);
                 } else {
@@ -2785,7 +2786,7 @@ export function Canvas({
                 if (el.type === "final-state") return;
                 handleConnectionPointDragStart(el.id, side, worldPos);
               }}
-              showConnectionPoints={selectedElementIds.size <= 1 && el.type !== "final-state" && (selectedElementIds.has(el.id) || isDraggingConnector || isDraggingEndpoint)}
+              showConnectionPoints={selectedElementIds.size <= 1 && el.type !== "final-state" && diagramType !== "value-chain" && (selectedElementIds.has(el.id) || isDraggingConnector || isDraggingEndpoint)}
               onResizeDragStart={(handle, e) => handleResizeDragStart(el.id, handle, e)}
               svgToWorld={clientToWorld}
               onUpdateProperties={onUpdateProperties}
@@ -2963,7 +2964,7 @@ export function Canvas({
                   if (el.type === "final-state") return;
                   handleConnectionPointDragStart(el.id, side, worldPos);
                 }}
-                showConnectionPoints={selectedElementIds.size <= 1 && el.type !== "final-state" && (selectedElementIds.has(el.id) || isDraggingConnector || isDraggingEndpoint)}
+                showConnectionPoints={selectedElementIds.size <= 1 && el.type !== "final-state" && diagramType !== "value-chain" && (selectedElementIds.has(el.id) || isDraggingConnector || isDraggingEndpoint)}
                 svgToWorld={clientToWorld}
                 onUpdateProperties={onUpdateProperties}
                 onUpdateLabel={onUpdateLabel}
@@ -2971,7 +2972,7 @@ export function Canvas({
                 onGroupMove={onMoveElements ? (dx, dy) => onMoveElements([...selectedElementIds], dx / zoom, dy / zoom) : undefined}
                 onGroupMoveEnd={onElementsMoveEnd}
                 colorConfig={colorConfig}
-                onEnterConnectionMode={el.type !== "final-state" ? () => setPendingConnSourceId(el.id) : undefined}
+                onEnterConnectionMode={el.type !== "final-state" && diagramType !== "value-chain" ? () => setPendingConnSourceId(el.id) : undefined}
                 onCancelConnectionMode={() => setPendingConnSourceId(null)}
                 inConnectionMode={pendingConnSourceId === el.id}
               />
@@ -3629,7 +3630,11 @@ export function Canvas({
         const SM_QUICK_ADD: SymbolType[] = [
           "state", "submachine", "initial-state", "final-state", "composite-state", "gateway", "fork-join",
         ];
-        const QUICK_ADD_TYPES = diagramType === "state-machine" ? SM_QUICK_ADD : BPMN_QUICK_ADD;
+        const VC_QUICK_ADD: SymbolType[] = [
+          "chevron", "chevron-collapsed", "process-group",
+        ];
+        const QUICK_ADD_TYPES = diagramType === "state-machine" ? SM_QUICK_ADD
+          : diagramType === "value-chain" ? VC_QUICK_ADD : BPMN_QUICK_ADD;
         const labels: Record<string, string> = {
           "start-event": "Start",
           "task": "Task",
@@ -3648,6 +3653,9 @@ export function Canvas({
           "gateway": "Gateway",
           "fork-join": "Fork/Join",
           "submachine": "SubMachine",
+          "chevron": "Chevron",
+          "chevron-collapsed": "Collapsed",
+          "process-group": "Group",
         };
         const COLS = 4;
         const BUTTON = 40;       // w-10 / h-10

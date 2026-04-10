@@ -515,12 +515,14 @@ export function DiagramEditor({
     isContext                            ? "open-directed" :
     diagramType === "process-context" ? "non-directed" :
     diagramType === "state-machine"   ? "open-directed" :
+    diagramType === "value-chain"     ? "directed" :
     "directed";
 
   const defaultRoutingType: RoutingType =
     isContext                            ? "curvilinear" :
     diagramType === "process-context" ? "direct" :
     diagramType === "state-machine"   ? "curvilinear" :
+    diagramType === "value-chain"     ? "rectilinear" :
     "rectilinear";
 
   const poolHasContent = selectedElement?.type === "pool"

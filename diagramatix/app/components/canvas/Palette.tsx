@@ -256,6 +256,27 @@ export function PaletteSymbolPreview({ type, colorConfig }: { type: SymbolType; 
           <circle cx={18} cy={18} r={16} fill={resolveColor("process-system", colorConfig)} stroke="#374151" strokeWidth={1.5} />
         </svg>
       );
+    case "chevron":
+      return (
+        <svg width={36} height={21} viewBox="0 0 48 28">
+          <polygon points="0,0 38,0 48,14 38,28 0,28 10,14" fill="#fbd7bb" stroke="#374151" strokeWidth={1.5} />
+        </svg>
+      );
+    case "chevron-collapsed":
+      return (
+        <svg width={36} height={21} viewBox="0 0 48 28">
+          <polygon points="0,0 38,0 48,14 38,28 0,28 10,14" fill="#fbd7bb" stroke="#374151" strokeWidth={1.5} />
+          <rect x={17} y={17} width={10} height={8} rx={1.5} fill="white" stroke="#c0c0c0" strokeWidth={0.8} />
+          <line x1={22} y1={19} x2={22} y2={23} stroke="#c0c0c0" strokeWidth={0.8} />
+          <line x1={19} y1={21} x2={25} y2={21} stroke="#c0c0c0" strokeWidth={0.8} />
+        </svg>
+      );
+    case "process-group":
+      return (
+        <svg width={36} height={24} viewBox="0 0 48 32">
+          <rect x={2} y={2} width={44} height={28} rx={3} fill="#fcebdd" stroke="#374151" strokeWidth={1.5} />
+        </svg>
+      );
     default:
       return (
         <svg width={36} height={21} viewBox="0 0 48 28">

@@ -1,4 +1,4 @@
-export type DiagramType = "context" | "basic" | "process-context" | "state-machine" | "bpmn" | "domain";
+export type DiagramType = "context" | "basic" | "process-context" | "state-machine" | "bpmn" | "domain" | "value-chain";
 
 export type SymbolType =
   | "task"
@@ -32,7 +32,10 @@ export type SymbolType =
   | "uml-enumeration"
   | "sublane"
   | "fork-join"
-  | "submachine";
+  | "submachine"
+  | "chevron"
+  | "chevron-collapsed"
+  | "process-group";
 
 export type BpmnTaskType =
   | "none"

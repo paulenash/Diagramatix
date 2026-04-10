@@ -1563,6 +1563,66 @@ export function PropertiesPanel({
         );
       })()}
 
+      {element.type === "chevron-collapsed" && siblingDiagrams && (() => {
+        const vcSiblings = siblingDiagrams.filter(d => d.type === "value-chain" || d.type === "bpmn");
+        return (
+        <div>
+          <label className="text-[10px] text-gray-500">Linked Diagram</label>
+          {(() => {
+            const linkedId = element.properties.linkedDiagramId as string | undefined;
+            const linkedExists = linkedId ? vcSiblings.some(d => d.id === linkedId) : true;
+            return (
+              <>
+                <select
+                  value={linkedId ?? ""}
+                  onChange={(e) => onUpdateProperties(element.id, { linkedDiagramId: e.target.value || null })}
+                  className="w-full text-[10px] border border-gray-300 rounded px-1.5 py-0.5 bg-white text-gray-700 cursor-pointer"
+                  onMouseDown={(e) => { e.stopPropagation(); }}
+                  onClick={(e) => { e.stopPropagation(); (e.target as HTMLSelectElement).focus(); }}
+                >
+                  <option value="">None</option>
+                  {vcSiblings.map((d) => (
+                    <option key={d.id} value={d.id}>{d.name} ({d.type === "bpmn" ? "BPMN" : "Value Chain"})</option>
+                  ))}
+                </select>
+                {linkedId && !linkedExists && (
+                  <p className="text-[10px] text-red-500 mt-0.5">Linked diagram not found</p>
+                )}
+                {linkedId && linkedExists && (
+                  <p className="text-[10px] text-gray-400 mt-0.5">Double-click marker to drill in</p>
+                )}
+              </>
+            );
+          })()}
+        </div>
+        );
+      })()}
+
+      {/* Description for chevrons */}
+      {(element.type === "chevron" || element.type === "chevron-collapsed") && (
+        <>
+          <div>
+            <label className="text-[10px] text-gray-500">Description</label>
+            <textarea
+              key={`desc-${element.id}`}
+              className="w-full text-[10px] border border-gray-300 rounded px-1.5 py-0.5 resize-y"
+              rows={2}
+              defaultValue={(element.properties.description as string | undefined) ?? ""}
+              onBlur={(e) => onUpdateProperties(element.id, { description: e.target.value || undefined })}
+              onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); (e.target as HTMLTextAreaElement).blur(); } }}
+            />
+          </div>
+          <label className="flex items-center gap-1 text-[10px] text-gray-700">
+            <input type="checkbox"
+              checked={!!element.properties.showDescription}
+              onChange={(e) => onUpdateProperties(element.id, { showDescription: e.target.checked })}
+              className="w-3 h-3"
+            />
+            Show description
+          </label>
+        </>
+      )}
+
       {(element.type === "task" || element.type === "subprocess" || element.type === "subprocess-expanded") && (
         <>
         <div className="flex items-center gap-1">
