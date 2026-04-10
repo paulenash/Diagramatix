@@ -615,7 +615,7 @@ export function PropertiesPanel({
 
   if (multiSelectionCount && multiSelectionCount > 1) {
     return (
-      <div className="w-56 border-l border-gray-200 bg-white p-3 overflow-y-auto relative">
+      <div className="w-56 border-l border-gray-200 bg-white p-2 overflow-y-auto relative">
         <CollapseButton />
         <SectionHeader label="Diagram Title" open={titleOpen} onToggle={() => setTitleOpen(!titleOpen)} />
         {titleOpen && <TitleSection />}
@@ -627,7 +627,7 @@ export function PropertiesPanel({
 
   if (!element && !connector) {
     return (
-      <div className="w-56 border-l border-gray-200 bg-white p-3 overflow-y-auto relative">
+      <div className="w-56 border-l border-gray-200 bg-white p-2 overflow-y-auto relative">
         <CollapseButton />
         <SectionHeader label="Diagram Title" open={titleOpen} onToggle={() => setTitleOpen(!titleOpen)} />
         {titleOpen && <TitleSection />}
@@ -638,12 +638,12 @@ export function PropertiesPanel({
 
   if (connector) {
     return (
-      <div className="w-56 border-l border-gray-200 bg-white p-3 overflow-y-auto relative">
+      <div className="w-56 border-l border-gray-200 bg-white p-2 overflow-y-auto relative">
         <CollapseButton />
         <SectionHeader label="Diagram Title" open={titleOpen} onToggle={() => setTitleOpen(!titleOpen)} />
         {titleOpen && <TitleSection />}
         <SectionHeader label="Connector" open={connectorOpen} onToggle={() => setConnectorOpen(!connectorOpen)} />
-        {connectorOpen && <div className="space-y-2">
+        {connectorOpen && <div className="space-y-1.5">
         <div>
           <p className="text-xs text-gray-600">Type: {connector.type}</p>
           {debugMode && (
@@ -1239,7 +1239,7 @@ export function PropertiesPanel({
       <SectionHeader label="Diagram Title" open={titleOpen} onToggle={() => setTitleOpen(!titleOpen)} />
       {titleOpen && <TitleSection />}
       <SectionHeader label="Properties" open={propsOpen} onToggle={() => setPropsOpen(!propsOpen)} />
-      {propsOpen && <div className="space-y-2">
+      {propsOpen && <div className="space-y-1.5">
       <div>
         <p className="text-[10px] text-gray-400 mb-0.5">Type: {element.type}</p>
         {debugMode && (
@@ -1266,7 +1266,7 @@ export function PropertiesPanel({
       </div>
 
       <div>
-        <label className="block text-xs font-medium text-gray-700 mb-1">
+        <label className="block text-[10px] font-medium text-gray-500 mb-0.5">
           {element.type === "uml-class" || element.type === "uml-enumeration" ? "Name" : "Label"}
         </label>
         {(element.type === "gateway" || isEventElement ||
@@ -1276,10 +1276,9 @@ export function PropertiesPanel({
           element.type === "external-entity" || element.type === "process-system" ||
           element.type === "uml-class" || element.type === "uml-enumeration" ||
           element.type === "text-annotation") ? (
-          <>
             <textarea
               key={element.id}
-              className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 resize-y overflow-y-auto"
+              className="w-full px-1.5 py-1 border border-gray-300 rounded text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-500 resize-y overflow-y-auto"
               rows={2}
               value={labelDraft}
               onFocus={(e) => { const l = e.target.value.length; e.target.setSelectionRange(l, l); }}
@@ -1299,8 +1298,6 @@ export function PropertiesPanel({
                 }
               }}
             />
-            <p className="text-xs text-gray-400 mt-0.5">Shift+Enter for new line</p>
-          </>
         ) : (
           <input
             type="text"
@@ -1311,88 +1308,52 @@ export function PropertiesPanel({
             onKeyDown={(e) => {
               if (e.key === "Enter") onUpdateLabel(element.id, labelDraft);
             }}
-            className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="w-full px-1.5 py-1 border border-gray-300 rounded text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
         )}
       </div>
 
       {element.type === "text-annotation" && (
-        <>
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Colour</label>
-            <div className="flex flex-wrap gap-1">
-              {([
-                { value: "black",  label: "Black",  bg: "#000000" },
-                { value: "green",  label: "Green",  bg: "#16a34a" },
-                { value: "orange", label: "Orange", bg: "#ea580c" },
-                { value: "red",    label: "Red",    bg: "#dc2626" },
-                { value: "purple", label: "Purple", bg: "#9333ea" },
-              ] as const).map(({ value, label, bg }) => (
-                <button
-                  key={value}
-                  onClick={() => onUpdateProperties(element.id, { annotationColor: value })}
-                  className={`px-2 py-1 text-xs rounded border font-medium ${
-                    ((element.properties.annotationColor as string | undefined) ?? "black") === value
-                      ? "text-white border-transparent"
-                      : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                  }`}
-                  style={((element.properties.annotationColor as string | undefined) ?? "black") === value
-                    ? { backgroundColor: bg }
-                    : undefined}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Font Style</label>
-            <div className="flex flex-wrap gap-1">
-              {(["normal", "italic"] as const).map((v) => (
-                <button
-                  key={v}
-                  onClick={() => onUpdateProperties(element.id, { annotationFontStyle: v })}
-                  className={`px-2 py-1 text-xs rounded border ${
-                    ((element.properties.annotationFontStyle as string | undefined) ?? "normal") === v
-                      ? "bg-blue-600 text-white border-blue-600"
-                      : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                  }`}
-                  style={v === "italic" ? { fontStyle: "italic" } : undefined}
-                >
-                  {v === "normal" ? "Normal" : "Italic"}
-                </button>
-              ))}
-            </div>
-          </div>
-        </>
+        <div className="flex items-center gap-1">
+          <label className="text-[10px] text-gray-500 whitespace-nowrap w-14 shrink-0">Colour</label>
+          <select
+            value={(element.properties.annotationColor as string | undefined) ?? "black"}
+            onChange={(e) => onUpdateProperties(element.id, { annotationColor: e.target.value })}
+            className="flex-1 text-[10px] border border-gray-300 rounded px-1.5 py-0.5 bg-white text-gray-700"
+          >
+            <option value="black">Black</option>
+            <option value="green">Green</option>
+            <option value="orange">Orange</option>
+            <option value="red">Red</option>
+            <option value="purple">Purple</option>
+          </select>
+          <select
+            value={(element.properties.annotationFontStyle as string | undefined) ?? "normal"}
+            onChange={(e) => onUpdateProperties(element.id, { annotationFontStyle: e.target.value })}
+            className="text-[10px] border border-gray-300 rounded px-1.5 py-0.5 bg-white text-gray-700"
+          >
+            <option value="normal">Normal</option>
+            <option value="italic">Italic</option>
+          </select>
+        </div>
       )}
 
       {element.type === "pool" && (
         <>
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Type</label>
-            <div className="flex flex-wrap gap-1">
-              {(["black-box", "white-box"] as const).map((v) => (
-                <button
-                  key={v}
-                  onClick={() => onUpdateProperties(element.id, { poolType: v })}
-                  className={`px-2 py-1 text-xs rounded border ${
-                    ((element.properties.poolType as string | undefined) ?? "black-box") === v
-                      ? "bg-blue-600 text-white border-blue-600"
-                      : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                  }`}
-                >
-                  {v === "black-box" ? "Black-box" : "White-box"}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {onAddLane && (
-            <button
-              onClick={() => onAddLane(element.id)}
-              className="w-full px-3 py-1.5 text-xs bg-blue-50 text-blue-700 border border-blue-200 rounded hover:bg-blue-100"
+          <div className="flex items-center gap-1">
+            <label className="text-[10px] text-gray-500 whitespace-nowrap w-14 shrink-0">Type</label>
+            <select
+              value={(element.properties.poolType as string | undefined) ?? "black-box"}
+              onChange={(e) => onUpdateProperties(element.id, { poolType: e.target.value })}
+              className="flex-1 text-[10px] border border-gray-300 rounded px-1.5 py-0.5 bg-white text-gray-700"
             >
+              <option value="black-box">Black-box</option>
+              <option value="white-box">White-box</option>
+            </select>
+          </div>
+          {onAddLane && (
+            <button onClick={() => onAddLane(element.id)}
+              className="w-full px-2 py-0.5 text-[10px] bg-blue-50 text-blue-700 border border-blue-200 rounded hover:bg-blue-100">
               + Add Lane
             </button>
           )}
@@ -1400,10 +1361,8 @@ export function PropertiesPanel({
       )}
 
       {element.type === "lane" && onAddSublane && (
-        <button
-          onClick={() => onAddSublane(element.id)}
-          className="w-full px-3 py-1.5 text-xs bg-blue-50 text-blue-700 border border-blue-200 rounded hover:bg-blue-100"
-        >
+        <button onClick={() => onAddSublane(element.id)}
+          className="w-full px-2 py-0.5 text-[10px] bg-blue-50 text-blue-700 border border-blue-200 rounded hover:bg-blue-100">
           + Add Sublane
         </button>
       )}
@@ -1466,73 +1425,60 @@ export function PropertiesPanel({
       )}
 
       {element.type === "task" && diagramType === "bpmn" && onConvertTaskSubprocess && (
-        <button
-          onClick={() => onConvertTaskSubprocess(element.id)}
-          className="px-2 py-1 text-xs rounded border text-blue-600 border-blue-300 hover:bg-blue-50 w-full text-left"
-        >
-          → Subprocess
-        </button>
+        <div className="flex items-center gap-1">
+          <label className="text-[10px] text-gray-500 whitespace-nowrap w-14 shrink-0">Convert</label>
+          <button onClick={() => onConvertTaskSubprocess(element.id)}
+            className="text-[10px] px-1.5 py-0.5 rounded border text-blue-600 border-blue-300 hover:bg-blue-50">
+            → Subprocess
+          </button>
+        </div>
       )}
 
       {element.type === "subprocess" && diagramType === "bpmn" && onConvertTaskSubprocess && (
-        <button
-          onClick={() => onConvertTaskSubprocess(element.id)}
-          className="px-2 py-1 text-xs rounded border text-blue-600 border-blue-300 hover:bg-blue-50 w-full text-left"
-        >
-          → Task
-        </button>
+        <div className="flex items-center gap-1">
+          <label className="text-[10px] text-gray-500 whitespace-nowrap w-14 shrink-0">Convert</label>
+          <button onClick={() => onConvertTaskSubprocess(element.id)}
+            className="text-[10px] px-1.5 py-0.5 rounded border text-blue-600 border-blue-300 hover:bg-blue-50">
+            → Task
+          </button>
+        </div>
       )}
 
       {element.type === "task" && (
-        <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">Task Type</label>
-          <div className="flex flex-wrap gap-1">
+        <div className="flex items-center gap-1">
+          <label className="text-[10px] text-gray-500 whitespace-nowrap w-14 shrink-0">Task Type</label>
+          <select
+            value={element.taskType ?? "none"}
+            onChange={(e) => onUpdateProperties(element.id, { taskType: e.target.value })}
+            className="flex-1 text-[10px] border border-gray-300 rounded px-1.5 py-0.5 bg-white text-gray-700"
+          >
             {TASK_TYPE_OPTIONS.map(({ value, label }) => (
-              <button
-                key={value}
-                onClick={() => onUpdateProperties(element.id, { taskType: value })}
-                className={`px-2 py-1 text-xs rounded border ${
-                  (element.taskType ?? "none") === value
-                    ? "bg-blue-600 text-white border-blue-600"
-                    : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                }`}
-              >
-                {label}
-              </button>
+              <option key={value} value={value}>{label}</option>
             ))}
-          </div>
+          </select>
         </div>
       )}
 
       {(element.type === "subprocess" || element.type === "subprocess-expanded") && (
         <>
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Type</label>
-            <div className="flex gap-1">
-              {(["normal", "call", "event", "transaction"] as const).map((v) => (
-                <button
-                  key={v}
-                  onClick={() => onUpdateProperties(element.id, { subprocessType: v })}
-                  className={`px-2 py-1 text-xs rounded border ${
-                    ((element.properties.subprocessType as string | undefined) ?? "normal") === v
-                      ? "bg-blue-600 text-white border-blue-600"
-                      : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                  }`}
-                >
-                  {v === "normal" ? "Normal" : v === "call" ? "Call" : v === "event" ? "Event" : "Transaction"}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div>
-            <label className="flex items-center gap-2 text-xs font-medium text-gray-700">
+          <div className="flex items-center gap-1">
+            <label className="text-[10px] text-gray-500 whitespace-nowrap w-14 shrink-0">Type</label>
+            <select
+              value={(element.properties.subprocessType as string | undefined) ?? "normal"}
+              onChange={(e) => onUpdateProperties(element.id, { subprocessType: e.target.value })}
+              className="flex-1 text-[10px] border border-gray-300 rounded px-1.5 py-0.5 bg-white text-gray-700"
+            >
+              <option value="normal">Normal</option>
+              <option value="call">Call</option>
+              <option value="event">Event</option>
+              <option value="transaction">Transaction</option>
+            </select>
+            <label className="flex items-center gap-1 text-[10px] text-gray-700 whitespace-nowrap">
               <input
                 type="checkbox"
                 checked={!!element.properties.adHoc}
-                onChange={(e) =>
-                  onUpdateProperties(element.id, { adHoc: e.target.checked })
-                }
-                className="cursor-pointer"
+                onChange={(e) => onUpdateProperties(element.id, { adHoc: e.target.checked })}
+                className="cursor-pointer w-3 h-3"
               />
               Ad-hoc
             </label>
@@ -1582,166 +1528,114 @@ export function PropertiesPanel({
 
       {(element.type === "task" || element.type === "subprocess" || element.type === "subprocess-expanded") && (
         <>
-        <div>
-          <p className="text-xs font-medium text-gray-500 mb-1">Repeat</p>
-          <div className="flex flex-wrap gap-1">
-            {([
-              { value: "none",          label: "None" },
-              { value: "loop",          label: "Loop" },
-              { value: "mi-sequential", label: "MI Sequential" },
-              { value: "mi-parallel",   label: "MI Parallel" },
-            ] as const).map(({ value, label }) => (
-              <button
-                key={value}
-                onClick={() => onUpdateProperties(element.id, { repeatType: value })}
-                className={`px-2 py-1 text-xs rounded border ${
-                  (element.repeatType ?? "none") === value
-                    ? "bg-blue-600 text-white border-blue-600"
-                    : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+        <div className="flex items-center gap-1">
+          <label className="text-[10px] text-gray-500 whitespace-nowrap w-14 shrink-0">Repeat</label>
+          <select
+            value={element.repeatType ?? "none"}
+            onChange={(e) => onUpdateProperties(element.id, { repeatType: e.target.value })}
+            className="flex-1 text-[10px] border border-gray-300 rounded px-1.5 py-0.5 bg-white text-gray-700"
+          >
+            <option value="none">None</option>
+            <option value="loop">Loop</option>
+            <option value="mi-sequential">MI Sequential</option>
+            <option value="mi-parallel">MI Parallel</option>
+          </select>
         </div>
-        <div>
-          <p className="text-xs font-medium text-gray-500 mb-1">Value</p>
-          <div className="flex gap-1">
-            {([
-              { value: "none", label: "None", color: "" },
-              { value: "VA", label: "VA", color: "bg-green-500 text-white border-green-500" },
-              { value: "NNVA", label: "NNVA", color: "bg-orange-500 text-white border-orange-500" },
-              { value: "NVA", label: "NVA", color: "bg-red-500 text-white border-red-500" },
-            ] as const).map(({ value, label, color }) => (
-              <button
-                key={value}
-                onClick={() => onUpdateProperties(element.id, { valueAnalysis: value })}
-                className={`px-2 py-1 text-xs rounded border ${
-                  ((element.properties.valueAnalysis as string | undefined) ?? "none") === value
-                    ? (color || "bg-blue-600 text-white border-blue-600")
-                    : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+        <div className="flex items-center gap-1">
+          <label className="text-[10px] text-gray-500 whitespace-nowrap w-14 shrink-0">Value</label>
+          <select
+            value={(element.properties.valueAnalysis as string | undefined) ?? "none"}
+            onChange={(e) => onUpdateProperties(element.id, { valueAnalysis: e.target.value })}
+            className="flex-1 text-[10px] border border-gray-300 rounded px-1.5 py-0.5 bg-white text-gray-700"
+          >
+            <option value="none">None</option>
+            <option value="VA">VA — Value Adding</option>
+            <option value="NNVA">NNVA — Non-Value Adding (Necessary)</option>
+            <option value="NVA">NVA — Non-Value Adding</option>
+          </select>
         </div>
-        <div className="flex gap-2">
-          <div className="flex-1">
-            <p className="text-xs font-medium text-gray-500 mb-1">Cycle Time</p>
-            <input
-              type="number"
-              min={0}
-              step="any"
-              value={(element.properties.cycleTime as number | undefined) ?? ""}
-              onChange={(e) => onUpdateProperties(element.id, { cycleTime: e.target.value ? Number(e.target.value) : undefined })}
-              placeholder="0"
-              className="w-full text-xs border border-gray-300 rounded px-2 py-1 outline-none focus:border-blue-400"
-            />
-          </div>
-          <div className="flex-1">
-            <p className="text-xs font-medium text-gray-500 mb-1">Wait Time</p>
-            <input
-              type="number"
-              min={0}
-              step="any"
-              value={(element.properties.waitTime as number | undefined) ?? ""}
-              onChange={(e) => onUpdateProperties(element.id, { waitTime: e.target.value ? Number(e.target.value) : undefined })}
-              placeholder="0"
-              className="w-full text-xs border border-gray-300 rounded px-2 py-1 outline-none focus:border-blue-400"
-            />
-          </div>
-        </div>
-        <div>
-          <p className="text-xs font-medium text-gray-500 mb-1">Time Units</p>
-          <div className="flex gap-1 items-center">
-            <select
-              value={
-                (element.properties.timeUnit as string | undefined) ?? "none"
+        <div className="flex items-center gap-1">
+          <label className="text-[10px] text-gray-500 whitespace-nowrap w-14 shrink-0">CT / WT</label>
+          <input type="number" min={0} step="any"
+            value={(element.properties.cycleTime as number | undefined) ?? ""}
+            onChange={(e) => onUpdateProperties(element.id, { cycleTime: e.target.value ? Number(e.target.value) : undefined })}
+            placeholder="CT" title="Cycle Time"
+            className="w-14 text-[10px] border border-gray-300 rounded px-1 py-0.5 outline-none focus:border-blue-400"
+          />
+          <input type="number" min={0} step="any"
+            value={(element.properties.waitTime as number | undefined) ?? ""}
+            onChange={(e) => onUpdateProperties(element.id, { waitTime: e.target.value ? Number(e.target.value) : undefined })}
+            placeholder="WT" title="Wait Time"
+            className="w-14 text-[10px] border border-gray-300 rounded px-1 py-0.5 outline-none focus:border-blue-400"
+          />
+          <select
+            value={(element.properties.timeUnit as string | undefined) ?? "none"}
+            onChange={(e) => {
+              const v = e.target.value;
+              if (v === "other") {
+                onUpdateProperties(element.id, { timeUnit: "other", timeUnitCustom: element.properties.timeUnitCustom ?? "" });
+              } else {
+                onUpdateProperties(element.id, { timeUnit: v, timeUnitCustom: undefined });
               }
-              onChange={(e) => {
-                const v = e.target.value;
-                if (v === "other") {
-                  onUpdateProperties(element.id, { timeUnit: "other", timeUnitCustom: element.properties.timeUnitCustom ?? "" });
-                } else {
-                  onUpdateProperties(element.id, { timeUnit: v, timeUnitCustom: undefined });
-                }
-              }}
-              className="text-xs border border-gray-300 rounded px-2 py-1 outline-none focus:border-blue-400"
-            >
-              <option value="none">None</option>
-              <option value="sec">sec</option>
-              <option value="min">min</option>
-              <option value="hrs">hrs</option>
-              <option value="days">days</option>
-              <option value="other">other</option>
-            </select>
-            {(element.properties.timeUnit as string) === "other" && (
-              <input
-                type="text"
-                value={(element.properties.timeUnitCustom as string | undefined) ?? ""}
-                onChange={(e) => onUpdateProperties(element.id, { timeUnitCustom: e.target.value })}
-                placeholder="unit"
-                className="flex-1 text-xs border border-gray-300 rounded px-2 py-1 outline-none focus:border-blue-400"
-              />
-            )}
-          </div>
+            }}
+            className="text-[10px] border border-gray-300 rounded px-1 py-0.5 outline-none focus:border-blue-400"
+          >
+            <option value="none">--</option>
+            <option value="sec">sec</option>
+            <option value="min">min</option>
+            <option value="hrs">hrs</option>
+            <option value="days">days</option>
+            <option value="other">other</option>
+          </select>
+          {(element.properties.timeUnit as string) === "other" && (
+            <input type="text"
+              value={(element.properties.timeUnitCustom as string | undefined) ?? ""}
+              onChange={(e) => onUpdateProperties(element.id, { timeUnitCustom: e.target.value })}
+              placeholder="unit"
+              className="w-12 text-[10px] border border-gray-300 rounded px-1 py-0.5 outline-none focus:border-blue-400"
+            />
+          )}
         </div>
         </>
       )}
 
       {element.type === "gateway" && diagramType !== "state-machine" && (
-        <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">Type</label>
-          <div className="flex flex-col gap-1">
+        <div className="flex items-center gap-1">
+          <label className="text-[10px] text-gray-500 whitespace-nowrap w-14 shrink-0">Type</label>
+          <select
+            value={element.gatewayType ?? "none"}
+            onChange={(e) => onUpdateProperties(element.id, { gatewayType: e.target.value })}
+            className="flex-1 text-[10px] border border-gray-300 rounded px-1.5 py-0.5 bg-white text-gray-700"
+          >
             {GATEWAY_TYPE_OPTIONS.map(({ value, label }) => (
-              <button
-                key={value}
-                onClick={() => onUpdateProperties(element.id, { gatewayType: value })}
-                className={`px-2 py-1 text-xs rounded border text-left ${
-                  element.gatewayType === value
-                    ? "bg-blue-600 text-white border-blue-600"
-                    : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                }`}
-              >
-                {label}
-              </button>
+              <option key={value} value={value}>{label}</option>
             ))}
-          </div>
+          </select>
         </div>
       )}
 
       {element.type === "gateway" && (
-        <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">Role</label>
-          <div className="flex gap-1">
-            {([{ value: "decision", label: "Decision" }, { value: "merge", label: "Merge" }] as const).map((opt) => (
-              <button
-                key={opt.value}
-                onClick={() => onUpdateProperties(element.id, { gatewayRole: opt.value })}
-                className={`px-2 py-1 text-xs rounded border ${
-                  ((element.properties.gatewayRole as string | undefined) ?? "decision") === opt.value
-                    ? "bg-blue-600 text-white border-blue-600"
-                    : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                }`}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
+        <div className="flex items-center gap-1">
+          <label className="text-[10px] text-gray-500 whitespace-nowrap w-14 shrink-0">Role</label>
+          <select
+            value={(element.properties.gatewayRole as string | undefined) ?? "decision"}
+            onChange={(e) => onUpdateProperties(element.id, { gatewayRole: e.target.value })}
+            className="flex-1 text-[10px] border border-gray-300 rounded px-1.5 py-0.5 bg-white text-gray-700"
+          >
+            <option value="decision">Decision</option>
+            <option value="merge">Merge</option>
+          </select>
         </div>
       )}
 
       {element.type === "fork-join" && onFlipForkJoin && (
-        <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">Orientation</label>
+        <div className="flex items-center gap-1">
+          <label className="text-[10px] text-gray-500 whitespace-nowrap w-14 shrink-0">Orient.</label>
           <button
             onClick={() => onFlipForkJoin(element.id)}
-            className="px-2 py-1 text-xs rounded border bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+            className="text-[10px] px-1.5 py-0.5 rounded border bg-white text-blue-600 border-blue-300 hover:bg-blue-50"
           >
-            {element.height >= element.width ? "Flip to Horizontal" : "Flip to Vertical"}
+            {element.height >= element.width ? "→ Horizontal" : "→ Vertical"}
           </button>
         </div>
       )}
