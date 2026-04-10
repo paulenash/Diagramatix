@@ -139,7 +139,7 @@ interface Props {
   data: DiagramData;
   diagramType: DiagramType;
   onAddElement: (type: SymbolType, position: Point, taskType?: BpmnTaskType, eventType?: EventType, id?: string) => void;
-  onMoveElement: (id: string, x: number, y: number) => void;
+  onMoveElement: (id: string, x: number, y: number, unconstrained?: boolean) => void;
   onResizeElement: (id: string, x: number, y: number, width: number, height: number) => void;
   onUpdateLabel: (id: string, label: string) => void;
   onDeleteElement: (id: string) => void;
@@ -2462,7 +2462,7 @@ export function Canvas({
                   }
                   onSelectConnector(null);
                 }}
-                onMove={(x, y) => onMoveElement(el.id, x, y)}
+                onMove={(x, y, uc) => onMoveElement(el.id, x, y, uc)}
                 onDoubleClick={() => {
                   if (tryGroupConnectToGateway(el)) return;
                   // Gateway shape double-click never opens the label editor —
@@ -2770,7 +2770,7 @@ export function Canvas({
                 }
                 onSelectConnector(null);
               }}
-              onMove={(x, y) => { setDraggingElementId(el.id); onMoveElement(el.id, x, y); }}
+              onMove={(x, y, uc) => { setDraggingElementId(el.id); onMoveElement(el.id, x, y, uc); }}
               onDoubleClick={() => {
                 if (tryGroupConnectToGateway(el)) return;
                 // Gateway shape double-click never opens the label editor —
@@ -2959,7 +2959,7 @@ export function Canvas({
                   }
                   onSelectConnector(null);
                 }}
-                onMove={(x, y) => onMoveElement(el.id, x, y)}
+                onMove={(x, y, uc) => onMoveElement(el.id, x, y, uc)}
                 onDoubleClick={() => { tryGroupConnectToGateway(el); }}
                 onConnectionPointDragStart={(side, worldPos) => {
                   if (el.type === "final-state") return;
@@ -2996,7 +2996,7 @@ export function Canvas({
                 }
                 onSelectConnector(null);
               }}
-              onMove={(x, y) => onMoveElement(el.id, x, y)}
+              onMove={(x, y, uc) => onMoveElement(el.id, x, y, uc)}
               onDoubleClick={() => startEditingLabel(el)}
               onConnectionPointDragStart={() => {}}
               showConnectionPoints={false}

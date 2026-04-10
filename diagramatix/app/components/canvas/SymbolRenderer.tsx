@@ -24,7 +24,7 @@ interface Props {
   isErrorTarget?: boolean;
   isElementDragTarget?: boolean;
   onSelect: (e?: React.MouseEvent) => void;
-  onMove: (x: number, y: number) => void;
+  onMove: (x: number, y: number, unconstrained?: boolean) => void;
   onDoubleClick: () => void;
   onConnectionPointDragStart: (side: Side, worldPos: Point) => void;
   showConnectionPoints: boolean;
@@ -1564,7 +1564,7 @@ export function SymbolRenderer({
       const curWorld = svgToWorld ? svgToWorld(ev.clientX, ev.clientY) : { x: ev.clientX, y: ev.clientY };
       lastX = dragStart.elX + (curWorld.x - startWorld.x);
       lastY = dragStart.elY + (curWorld.y - startWorld.y);
-      onMove(lastX, lastY);
+      onMove(lastX, lastY, ev.shiftKey);
     }
 
     function onMouseUp() {
@@ -1635,7 +1635,9 @@ export function SymbolRenderer({
         const desc = (element.properties.description as string | undefined) ?? "";
         if (!desc && !selected) return null;
         const descY = element.y + element.height + 4;
-        const descW = element.width;
+        const notch = Math.min(20, element.width * 0.15);
+        const descW = element.width - 2 * notch;
+        const descX = element.x; // starts under left corner of chevron
         const PAD = 4;
         const FONT_SIZE = 10;
         const LINE_H = 13;
@@ -1668,12 +1670,11 @@ export function SymbolRenderer({
 
         return (
           <g>
-            <rect x={element.x} y={descY} width={descW} height={descH}
+            <rect x={descX} y={descY} width={descW} height={descH}
               rx={3} fill="white" stroke="#d1d5db" strokeWidth={0.5}
               style={{ pointerEvents: "all", cursor: "text" }}
               onDoubleClick={(e) => {
                 e.stopPropagation();
-                // Trigger inline edit via onUpdateProperties — set a flag
                 onUpdateProperties?.(element.id, { _editingDescription: true });
               }}
             />
@@ -1681,13 +1682,13 @@ export function SymbolRenderer({
               <text fontSize={FONT_SIZE} fill="#4b5563"
                 style={{ userSelect: "none", pointerEvents: "none" }}>
                 {wrappedLines.map((line, i) => (
-                  <tspan key={i} x={element.x + PAD} y={descY + PAD + LINE_H * 0.85 + i * LINE_H}>
+                  <tspan key={i} x={descX + PAD} y={descY + PAD + LINE_H * 0.85 + i * LINE_H}>
                     {line || "\u00A0"}
                   </tspan>
                 ))}
               </text>
             ) : (
-              <foreignObject x={element.x} y={descY} width={descW} height={Math.max(descH, LINE_H * 3 + PAD * 2)}>
+              <foreignObject x={descX} y={descY} width={descW} height={Math.max(descH, LINE_H * 3 + PAD * 2)}>
                 <textarea
                   autoFocus
                   defaultValue={desc}

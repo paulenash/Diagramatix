@@ -138,7 +138,7 @@ function adjustMsgLabelOffset(
 type Action =
   | { type: "SET_DATA"; payload: DiagramData }
   | { type: "ADD_ELEMENT"; payload: { symbolType: SymbolType; position: Point; taskType?: BpmnTaskType; eventType?: EventType; id?: string } }
-  | { type: "MOVE_ELEMENT"; payload: { id: string; x: number; y: number } }
+  | { type: "MOVE_ELEMENT"; payload: { id: string; x: number; y: number; unconstrained?: boolean } }
   | { type: "RESIZE_ELEMENT"; payload: { id: string; x: number; y: number; width: number; height: number } }
   | { type: "UPDATE_LABEL"; payload: { id: string; label: string } }
   | { type: "UPDATE_PROPERTIES"; payload: { id: string; properties: Record<string, unknown> } }
@@ -695,7 +695,7 @@ function reducer(state: DiagramData, action: Action): DiagramData {
     }
 
     case "MOVE_ELEMENT": {
-      const { id, x, y } = action.payload;
+      const { id, x, y, unconstrained } = action.payload;
       const el = state.elements.find((e) => e.id === id);
       if (!el) return state;
 
@@ -776,9 +776,9 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       }
 
       // CASE B + C: Normal move (host elements also carry their boundary events)
-      // Clamp child elements within their process-group parent
+      // Clamp child elements within their process-group parent (unless unconstrained via Shift+drag)
       let effectiveX = x, effectiveY = y;
-      if (el.parentId) {
+      if (el.parentId && !unconstrained) {
         const parent = state.elements.find(p => p.id === el.parentId);
         if (parent?.type === "process-group") {
           effectiveX = Math.max(parent.x, Math.min(parent.x + parent.width - el.width, x));
@@ -2545,12 +2545,12 @@ export function useDiagram(initialData: DiagramData) {
     []
   );
 
-  const moveElement = useCallback((id: string, x: number, y: number) => {
+  const moveElement = useCallback((id: string, x: number, y: number, unconstrained?: boolean) => {
     if (draggingRef.current !== id) {
       draggingRef.current = id;
       preMoveRef.current = snapshotData(); // snapshot before drag starts
     }
-    dispatch({ type: "MOVE_ELEMENT", payload: { id, x, y } });
+    dispatch({ type: "MOVE_ELEMENT", payload: { id, x, y, unconstrained } });
   }, []);
 
   const moveElements = useCallback((ids: string[], dx: number, dy: number) => {
