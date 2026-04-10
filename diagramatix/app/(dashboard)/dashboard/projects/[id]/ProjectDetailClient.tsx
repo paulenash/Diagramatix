@@ -1662,11 +1662,15 @@ function DiagramThumbnail({ data, colorConfig }: { data: unknown; colorConfig?: 
           return <rect key={el.id} x={x} y={y} width={w} height={h}
             fill="none" stroke={fill} strokeWidth={1} />;
         }
+        if (type === "fork-join") {
+          return <rect key={el.id} x={x} y={y} width={w} height={h}
+            rx={1} fill="#1f2937" />;
+        }
         if (type === "group" || type === "text-annotation") {
           return <rect key={el.id} x={x} y={y} width={w} height={h}
             fill="none" stroke={fill} strokeWidth={1} strokeDasharray="4 2" />;
         }
-        const rx = type === "state" || type === "composite-state" ? 8 : 3;
+        const rx = type === "state" || type === "composite-state" || type === "submachine" ? 8 : 3;
         return <rect key={el.id} x={x} y={y} width={w} height={h}
           rx={rx} fill={fill} stroke="#374151" strokeWidth={1} />;
       })}
@@ -1696,11 +1700,12 @@ function DiagramCard({
   return (
     <div
       onClick={() => onOpen(diagram.id)}
-      className="bg-white border border-gray-200 rounded-md p-2.5 hover:border-blue-300 hover:shadow-sm cursor-pointer group transition-all relative"
+      className="bg-white border border-gray-200 rounded-md p-2 hover:border-blue-300 hover:shadow-sm cursor-pointer group transition-all relative"
     >
-      <div className="flex items-center justify-between mb-1">
-        <h3 className="font-medium text-gray-900 text-xs truncate flex-1">{diagram.name}</h3>
-        <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 ml-1">
+      {/* Row 1: Name + action icons */}
+      <div className="flex items-center justify-between">
+        <h3 className="font-medium text-gray-900 text-xs truncate flex-1" title={diagram.name}>{diagram.name}</h3>
+        <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 ml-1 shrink-0">
           <button
             onClick={(e) => { e.stopPropagation(); onClone(diagram.id); }}
             className="text-gray-400 hover:text-blue-500 px-0.5"
@@ -1739,13 +1744,16 @@ function DiagramCard({
           >{"\u2715"}</button>
         </div>
       </div>
-      <div className="flex items-center gap-2 text-[10px] text-gray-400">
-        <span>{DIAGRAM_TYPE_LABELS[diagram.type] ?? diagram.type}</span>
-        <span>{"\u00B7"}</span>
-        <span>{new Date(diagram.updatedAt).toLocaleDateString()}</span>
-      </div>
-      <div className="mt-1.5 ml-auto w-[90%] h-9 opacity-40 group-hover:opacity-70 transition-opacity pointer-events-none">
-        <DiagramThumbnail data={(diagram.data ?? { elements: [], connectors: [] }) as DiagramData} colorConfig={colorConfig} />
+      {/* Row 2: Type/date on left, thumbnail on right */}
+      <div className="flex items-start mt-0.5">
+        <div className="flex items-center gap-2 text-[10px] text-gray-400 pt-0.5">
+          <span>{DIAGRAM_TYPE_LABELS[diagram.type] ?? diagram.type}</span>
+          <span>{"\u00B7"}</span>
+          <span>{new Date(diagram.updatedAt).toLocaleDateString()}</span>
+        </div>
+        <div className="ml-auto w-16 h-10 opacity-40 group-hover:opacity-70 transition-opacity pointer-events-none shrink-0">
+          <DiagramThumbnail data={(diagram.data ?? { elements: [], connectors: [] }) as DiagramData} colorConfig={colorConfig} />
+        </div>
       </div>
     </div>
   );
