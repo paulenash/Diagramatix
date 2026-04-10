@@ -106,6 +106,7 @@
       <xs:enumeration value="state-machine"/>
       <xs:enumeration value="bpmn"/>
       <xs:enumeration value="domain"/>
+      <xs:enumeration value="value-chain"/>
     </xs:restriction>
   </xs:simpleType>
 
@@ -257,6 +258,9 @@
       <xs:enumeration value="sublane"/>
       <xs:enumeration value="fork-join"/>
       <xs:enumeration value="submachine"/>
+      <xs:enumeration value="chevron"/>
+      <xs:enumeration value="chevron-collapsed"/>
+      <xs:enumeration value="process-group"/>
     </xs:restriction>
   </xs:simpleType>
 
@@ -373,7 +377,12 @@
       multiplicity     : "single" | "collection"  — data object/store
       role             : "input" | "output" | "none" — data object I/O marker
       state            : string    — data object state badge
-      linkedDiagramId  : string    — collapsed subprocess / submachine drill-down link
+      linkedDiagramId  : string    — collapsed subprocess / submachine / chevron-collapsed drill-down link
+
+    Value-chain element properties:
+      fillColor        : string    — per-element fill colour (hex, from chevron theme)
+      description      : string    — chevron description text (multi-line)
+      showDescription  : boolean   — whether to display the description box below the chevron
   -->
 
 

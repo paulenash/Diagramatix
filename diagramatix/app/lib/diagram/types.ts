@@ -230,5 +230,8 @@ export interface TemplateData {
  *          multiplicity, role, state, linkedDiagramId).
  *    1.4 — added SymbolType values "fork-join" / "submachine" for state
  *          machine diagrams; linkedDiagramId now also used by submachine.
+ *    1.5 — added DiagramType "value-chain"; SymbolType values "chevron",
+ *          "chevron-collapsed", "process-group"; new properties fillColor,
+ *          description, showDescription for chevrons.
  */
-export const SCHEMA_VERSION = "1.4";
+export const SCHEMA_VERSION = "1.5";

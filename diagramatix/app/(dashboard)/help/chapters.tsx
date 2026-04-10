@@ -28,7 +28,7 @@ export const CHAPTERS: HelpChapter[] = [
               context diagrams, domain models and more.
             </p>
             <p className="mt-2 text-xs text-gray-500">
-              This guide covers version <strong>1.4</strong>.
+              This guide covers version <strong>1.5</strong>.
             </p>
             <p className="mt-2">
               After signing in you land on the <strong>Dashboard</strong> —
@@ -218,6 +218,28 @@ export const CHAPTERS: HelpChapter[] = [
             relationships (association, aggregation, composition,
             generalisation).
           </p>
+        ),
+      },
+      {
+        heading: "Value Chain",
+        body: (
+          <>
+            <p>
+              Chevron-based process value chain diagrams. Three element
+              types: <strong>Chevron</strong> (process step),{" "}
+              <strong>Collapsed Chevron</strong> (with linked diagram
+              drill-through), and <strong>Process Group</strong>{" "}
+              (container rectangle).
+            </p>
+            <p className="mt-2">
+              Features <strong>chevron colour themes</strong> (right-click
+              on 2+ selected chevrons), <strong>description boxes</strong>{" "}
+              below each chevron, automatic <strong>horizontal snap</strong>{" "}
+              with 10px overlap, and <strong>process group nesting</strong>{" "}
+              with automatic shade lightening. No connectors in this
+              diagram type.
+            </p>
+          </>
         ),
       },
     ],
@@ -1573,7 +1595,237 @@ export const CHAPTERS: HelpChapter[] = [
     ],
   },
 
-  /* ──────────────────────────────────────────────── 19 ── */
+  /* ──────────────────────────────────────────────── 20 ── */
+  {
+    slug: "value-chain",
+    title: "Value Chain Diagrams",
+    sections: [
+      {
+        body: (
+          <p>
+            Value chain diagrams model process flows using chevron shapes.
+            They have no connectors — the flow is implied by the
+            left-to-right arrangement of chevrons.
+          </p>
+        ),
+      },
+      {
+        heading: "Chevron",
+        body: (
+          <p>
+            The primary element. A pentagon-like shape with a notched left
+            side and pointed right side. Supports multi-line labels
+            (Shift+Enter for new line) and an optional{" "}
+            <strong>description box</strong> displayed below.
+          </p>
+        ),
+      },
+      {
+        heading: "Collapsed Chevron",
+        body: (
+          <>
+            <p>
+              Like a regular chevron but with a <strong>+</strong> marker
+              at the bottom centre (same as a BPMN subprocess). Can be
+              linked to another <strong>Value Chain</strong> or{" "}
+              <strong>BPMN</strong> diagram in the same project.
+            </p>
+            <p className="mt-2">
+              Double-click the + marker to drill into the linked diagram.
+              The marker turns green when linked, grey when unlinked.
+            </p>
+          </>
+        ),
+      },
+      {
+        heading: "Process Group",
+        body: (
+          <>
+            <p>
+              A rectangular container that groups related chevrons.
+              Process groups always render <strong>behind</strong> their
+              children.
+            </p>
+            <ul className="list-disc list-inside space-y-1 mt-2">
+              <li>
+                Chevrons dropped or moved inside a process group become
+                its children and move with it.
+              </li>
+              <li>
+                <strong>Shift+drag</strong> a child to move it outside
+                the parent boundary.
+              </li>
+              <li>
+                Nested process groups automatically{" "}
+                <strong>lighten in shade</strong> — each level is 25%
+                lighter than its parent.
+              </li>
+              <li>
+                Deleting a process group keeps all children on the diagram.
+              </li>
+            </ul>
+          </>
+        ),
+      },
+      {
+        heading: "Description boxes",
+        body: (
+          <>
+            <p>
+              Each chevron has an optional description box displayed below
+              it. The description auto-wraps to the chevron&apos;s width.
+            </p>
+            <ul className="list-disc list-inside space-y-1 mt-2">
+              <li>
+                Toggle visibility with the{" "}
+                <strong>Show description</strong> checkbox in the
+                Properties Panel (on by default).
+              </li>
+              <li>
+                Edit inline by <strong>double-clicking</strong> the
+                description box on the canvas.
+              </li>
+              <li>
+                Use <strong>Shift+Enter</strong> for explicit line breaks.
+              </li>
+            </ul>
+          </>
+        ),
+      },
+      {
+        heading: "Horizontal snap",
+        body: (
+          <p>
+            When dragging a chevron near another chevron with ≥75% vertical
+            overlap, it snaps to align horizontally with a{" "}
+            <strong>10px overlap</strong> — creating the classic
+            interlocking chevron chain appearance.
+          </p>
+        ),
+      },
+    ],
+  },
+
+  /* ──────────────────────────────────────────────── 21 ── */
+  {
+    slug: "chevron-themes",
+    title: "Chevron Colour Themes",
+    sections: [
+      {
+        body: (
+          <p>
+            Apply coordinated pastel colour schemes to groups of chevrons
+            for visual distinction between process areas.
+          </p>
+        ),
+      },
+      {
+        heading: "Applying a theme",
+        body: (
+          <ol className="list-decimal list-inside space-y-2">
+            <li>
+              Select <strong>2 or more chevrons</strong> (click + Shift+click,
+              or lasso selection).
+            </li>
+            <li>
+              <strong>Right-click</strong> — a theme picker popup appears
+              (instead of the quick-add popup).
+            </li>
+            <li>
+              Click a theme row — colours are applied left-to-right by
+              chevron position.
+            </li>
+          </ol>
+        ),
+      },
+      {
+        heading: "Available themes",
+        body: (
+          <ul className="list-disc list-inside space-y-1">
+            <li><strong>Sunrise</strong> — warm yellows through pinks to blues</li>
+            <li><strong>Ocean</strong> — cyans through blues to purples</li>
+            <li><strong>Garden</strong> — greens through teals to sky blues</li>
+            <li><strong>Berry</strong> — pinks through purples to blues</li>
+            <li><strong>Earth</strong> — yellows through peaches to greys</li>
+          </ul>
+        ),
+      },
+      {
+        heading: "Clearing colours",
+        body: (
+          <p>
+            Select the themed chevrons, right-click, and choose{" "}
+            <strong>Clear Colours</strong> at the bottom of the popup.
+            All chevrons revert to the default diagram colour.
+          </p>
+        ),
+      },
+    ],
+  },
+
+  /* ──────────────────────────────────────────────── 22 ── */
+  {
+    slug: "resize",
+    title: "Resize Menu",
+    sections: [
+      {
+        body: (
+          <p>
+            When <strong>2 or more elements</strong> are selected, a{" "}
+            <strong>Resize ▾</strong> dropdown appears in the toolbar
+            next to the Alignment dropdown.
+          </p>
+        ),
+      },
+      {
+        heading: "Options",
+        body: (
+          <ul className="list-disc list-inside space-y-1">
+            <li><strong>Resize to Tallest</strong> — all selected elements get the height of the tallest</li>
+            <li><strong>Resize to Shortest</strong> — all get the height of the shortest</li>
+            <li><strong>Resize to Widest</strong> — all get the width of the widest</li>
+            <li><strong>Resize to Thinnest</strong> — all get the width of the thinnest</li>
+          </ul>
+        ),
+      },
+    ],
+  },
+
+  /* ──────────────────────────────────────────────── 23 ── */
+  {
+    slug: "convert",
+    title: "Task ↔ Subprocess Conversion",
+    sections: [
+      {
+        body: (
+          <>
+            <p>
+              In BPMN diagrams, you can convert between a Task and a
+              collapsed Subprocess without losing common attributes.
+            </p>
+            <ul className="list-disc list-inside space-y-1 mt-2">
+              <li>
+                Select a <strong>Task</strong> — the Properties Panel shows
+                a <strong>→ Subprocess</strong> button.
+              </li>
+              <li>
+                Select a <strong>Subprocess</strong> — the Properties Panel
+                shows a <strong>→ Task</strong> button.
+              </li>
+            </ul>
+            <p className="mt-2">
+              The element changes type in place. Label, position, size,
+              and connectors are preserved. Task→Subprocess clears the
+              task type; Subprocess→Task sets task type to None and clears
+              the linked diagram.
+            </p>
+          </>
+        ),
+      },
+    ],
+  },
+
+  /* ──────────────────────────────────────────────── 24 ── */
   {
     slug: "tips",
     title: "Tips & Troubleshooting",
