@@ -34,6 +34,7 @@ export const DEFAULT_SYMBOL_COLORS: Record<SymbolType, string> = {
   "final-state":         "#374151",   // inner disc colour
   "composite-state":     "#ede9fe",   // header colour
   "composite-state-body": "#ede9fe",  // body fill colour (rendered with opacity)
+  "submachine":            "#bfdbfe",   // slightly darker blue than state (#dbeafe)
   "fork-join":           "#1f2937",   // dark grey bar
   // Context Diagram
   "external-entity":     "#bfdbfe",   // light blue
@@ -74,6 +75,7 @@ export const BW_SYMBOL_COLORS: Record<SymbolType, string> = {
   "final-state":         "#000000",
   "composite-state":     "#ffffff",
   "composite-state-body": "#ffffff",
+  "submachine":            "#ffffff",
   "fork-join":           "#000000",
   // Context Diagram
   "external-entity":     "#ffffff",

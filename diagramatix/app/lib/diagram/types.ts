@@ -31,7 +31,8 @@ export type SymbolType =
   | "uml-class"
   | "uml-enumeration"
   | "sublane"
-  | "fork-join";
+  | "fork-join"
+  | "submachine";
 
 export type BpmnTaskType =
   | "none"

@@ -1117,7 +1117,7 @@ export function Canvas({
       const elType = el!.type;
       const freeResize = elType === "task" || elType === "subprocess"
         || elType === "subprocess-expanded" || elType === "state"
-        || elType === "composite-state";
+        || elType === "submachine" || elType === "composite-state";
       if (!isContainer && !freeResize && ar > 0) {
         if (handle.includes("e") || handle.includes("w")) {
           // Width is primary — derive height to preserve aspect ratio
@@ -1620,13 +1620,13 @@ export function Canvas({
 
     // Check if dropped on a connector (split connector feature)
     const BPMN_SPLITTABLE = new Set(["gateway", "intermediate-event", "task", "subprocess"]);
-    const SM_SPLITTABLE = new Set(["gateway", "state", "composite-state", "fork-join"]);
+    const SM_SPLITTABLE = new Set(["gateway", "state", "submachine", "composite-state", "fork-join"]);
     const SPLITTABLE_DROPS = diagramType === "state-machine" ? SM_SPLITTABLE : BPMN_SPLITTABLE;
     if ((diagramType === "bpmn" || diagramType === "state-machine") && onSplitConnector && SPLITTABLE_DROPS.has(pendingDragSymbol)) {
       const hit = findConnectorNearPoint(data.connectors, worldPos);
       if (hit) {
         if (pendingDragSymbol === "gateway" || pendingDragSymbol === "task" || pendingDragSymbol === "subprocess"
-            || pendingDragSymbol === "state" || pendingDragSymbol === "composite-state" || pendingDragSymbol === "fork-join") {
+            || pendingDragSymbol === "state" || pendingDragSymbol === "submachine" || pendingDragSymbol === "composite-state" || pendingDragSymbol === "fork-join") {
           // These have no type picker — split immediately
           onSplitConnector(pendingDragSymbol, worldPos, hit.id);
           return;
@@ -1669,7 +1669,7 @@ export function Canvas({
       "start-event", "intermediate-event", "end-event",
     ]);
     const SM_AUTO_CONNECT_TYPES = new Set<SymbolType>([
-      "state", "initial-state", "final-state", "composite-state", "gateway", "fork-join",
+      "state", "submachine", "initial-state", "final-state", "composite-state", "gateway", "fork-join",
     ]);
     const AUTO_CONNECT_TYPES = diagramType === "state-machine" ? SM_AUTO_CONNECT_TYPES : BPMN_AUTO_CONNECT_TYPES;
 
@@ -2465,7 +2465,7 @@ export function Canvas({
                   // Gateway shape double-click never opens the label editor —
                   // the label rect has its own dblclick handler for that.
                   if (el.type === "gateway") return;
-                  const linkedId = el.type === "subprocess" ? el.properties.linkedDiagramId as string | undefined : undefined;
+                  const linkedId = (el.type === "subprocess" || el.type === "submachine") ? el.properties.linkedDiagramId as string | undefined : undefined;
                   if (linkedId && onDrillIntoSubprocess) {
                     onDrillIntoSubprocess(linkedId);
                   } else {
@@ -2773,7 +2773,7 @@ export function Canvas({
                 // Gateway shape double-click never opens the label editor —
                 // the label rect has its own dblclick handler for that.
                 if (el.type === "gateway") return;
-                const linkedId = el.type === "subprocess" ? el.properties.linkedDiagramId as string | undefined : undefined;
+                const linkedId = (el.type === "subprocess" || el.type === "submachine") ? el.properties.linkedDiagramId as string | undefined : undefined;
                 if (linkedId && onDrillIntoSubprocess) {
                   onDrillIntoSubprocess(linkedId);
                 } else {
@@ -3625,7 +3625,7 @@ export function Canvas({
           "text-annotation", "group",
         ];
         const SM_QUICK_ADD: SymbolType[] = [
-          "state", "initial-state", "final-state", "composite-state", "gateway", "fork-join",
+          "state", "submachine", "initial-state", "final-state", "composite-state", "gateway", "fork-join",
         ];
         const QUICK_ADD_TYPES = diagramType === "state-machine" ? SM_QUICK_ADD : BPMN_QUICK_ADD;
         const labels: Record<string, string> = {
@@ -3645,6 +3645,7 @@ export function Canvas({
           "composite-state": "Composite",
           "gateway": "Gateway",
           "fork-join": "Fork/Join",
+          "submachine": "SubMachine",
         };
         const COLS = 4;
         const BUTTON = 40;       // w-10 / h-10

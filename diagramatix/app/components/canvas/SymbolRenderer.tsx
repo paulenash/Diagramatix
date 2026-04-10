@@ -734,6 +734,31 @@ function FinalStateShape({ el }: { el: DiagramElement }) {
   );
 }
 
+function SubmachineShape({ el }: { el: DiagramElement }) {
+  const colors = useContext(SymbolColorCtx);
+  const hasLink = !!(el.properties.linkedDiagramId as string | undefined);
+  const markerStroke = hasLink ? "#16a34a" : "#c0c0c0";
+  // Marker: two small rounded-rect state shapes connected by a horizontal line
+  const sw = 10, sh = 7, sr = 2.5; // small state width, height, border-radius
+  const lineGap = 5; // line length between the two shapes
+  const mw = sw * 2 + lineGap;
+  const mx = el.x + el.width - mw - 6;
+  const my = el.y + el.height - sh - 5;
+  return (
+    <g>
+      <rect x={el.x} y={el.y} width={el.width} height={el.height}
+        rx={12} ry={12} fill={resolveColor("submachine", colors)} stroke="#374151" strokeWidth={1.5} />
+      {/* SubMachine marker: two small rounded-rect states connected by a line */}
+      <rect x={mx} y={my} width={sw} height={sh} rx={sr} ry={sr}
+        fill="white" stroke={markerStroke} strokeWidth={1.2} />
+      <line x1={mx + sw} y1={my + sh / 2} x2={mx + sw + lineGap} y2={my + sh / 2}
+        stroke={markerStroke} strokeWidth={1.2} />
+      <rect x={mx + sw + lineGap} y={my} width={sw} height={sh} rx={sr} ry={sr}
+        fill="white" stroke={markerStroke} strokeWidth={1.2} />
+    </g>
+  );
+}
+
 function ForkJoinShape({ el }: { el: DiagramElement }) {
   return (
     <rect x={el.x} y={el.y} width={el.width} height={el.height}
@@ -1251,6 +1276,7 @@ function SymbolShape({ el }: { el: DiagramElement }) {
       case "state":         return <StateShape el={el} />;
       case "initial-state": return <InitialStateShape el={el} />;
       case "final-state":   return <FinalStateShape el={el} />;
+      case "submachine":      return <SubmachineShape el={el} />;
       case "fork-join":     return <ForkJoinShape el={el} />;
       case "system-boundary":   return <SystemBoundaryShape el={el} />;
       case "composite-state":   return <CompositeStateShape el={el} />;
@@ -1382,6 +1408,7 @@ export function SymbolRenderer({
       element.type === "subprocess" ||
       element.type === "subprocess-expanded" ||
       element.type === "state" ||
+      element.type === "submachine" ||
       element.type === "composite-state" ||
       element.type === "gateway" ||
       element.type === "fork-join";
@@ -1579,8 +1606,24 @@ export function SymbolRenderer({
         );
       })()}
 
-      {/* Drill-back icon on start events when this diagram was navigated to from a subprocess */}
-      {element.type === "start-event" && onDrillBack && !element.boundaryHostId && (
+      {/* SubMachine drill-through — hit area on the marker (only when linked) */}
+      {element.type === "submachine" && (element.properties.linkedDiagramId as string | undefined) && (() => {
+        const mSize = 16;
+        const hmx = element.x + element.width - mSize - 4;
+        const hmy = element.y + element.height - mSize / 2 - 5;
+        return (
+          <rect
+            x={hmx - 4} y={hmy - 6} width={mSize + 8} height={mSize}
+            fill="transparent" stroke="none"
+            style={{ cursor: "pointer", pointerEvents: "all" }}
+            onMouseDown={(e) => e.stopPropagation()}
+            onDoubleClick={(e) => { e.stopPropagation(); onDoubleClick(); }}
+          />
+        );
+      })()}
+
+      {/* Drill-back icon on start events when this diagram was navigated to from a subprocess/substate */}
+      {(element.type === "start-event" || element.type === "initial-state") && onDrillBack && !element.boundaryHostId && (
         <g
           transform={`translate(${element.x - 2},${element.y - 2})`}
           style={{ cursor: "pointer", pointerEvents: "all" }}

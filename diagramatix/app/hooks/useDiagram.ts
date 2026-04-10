@@ -559,6 +559,9 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       } else if (action.payload.symbolType === "data-store") {
         const count = state.elements.filter((e) => e.type === "data-store").length;
         label = `Store ${count + 1}`;
+      } else if (action.payload.symbolType === "submachine") {
+        const count = state.elements.filter((e) => e.type === "submachine").length;
+        label = `SubMachine ${count + 1}`;
       } else if (action.payload.symbolType === "fork-join") {
         label = "";
       } else if (action.payload.symbolType === "pool") {
@@ -1217,7 +1220,7 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       // Connector bridging: if exactly 1 incoming and 1 outgoing sequence/transition connector,
       // create a new connector from the source of the incoming to the target of the outgoing
       const BRIDGE_TYPES = new Set(["task", "subprocess", "subprocess-expanded", "gateway", "intermediate-event",
-        "state", "initial-state", "final-state", "composite-state", "fork-join"]);
+        "state", "submachine", "initial-state", "final-state", "composite-state", "fork-join"]);
       const BRIDGE_CONN_TYPES = new Set(["sequence", "transition"]);
       let bridgeConnector: Connector | null = null;
       if (el && BRIDGE_TYPES.has(el.type)) {
@@ -1941,6 +1944,9 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       } else if (symbolType === "state") {
         const count = state.elements.filter(e => e.type === "state").length;
         label = `State ${count + 1}`;
+      } else if (symbolType === "submachine") {
+        const count = state.elements.filter(e => e.type === "submachine").length;
+        label = `SubMachine ${count + 1}`;
       } else if (symbolType === "composite-state") {
         const count = state.elements.filter(e => e.type === "composite-state").length;
         label = `Composite ${count + 1}`;

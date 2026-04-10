@@ -157,6 +157,16 @@ export function PaletteSymbolPreview({ type, colorConfig }: { type: SymbolType; 
         </svg>
       );
     }
+    case "submachine":
+      return (
+        <svg width={36} height={25} viewBox="0 0 48 34">
+          <rect x={2} y={2} width={44} height={30} rx={8} fill="#bfdbfe" stroke="#374151" strokeWidth={1.5} />
+          {/* Marker: two small rounded-rect states connected by line */}
+          <rect x={27} y={23} width={7} height={5} rx={1.5} fill="white" stroke="#c0c0c0" strokeWidth={0.8} />
+          <line x1={34} y1={25.5} x2={37} y2={25.5} stroke="#c0c0c0" strokeWidth={0.8} />
+          <rect x={37} y={23} width={7} height={5} rx={1.5} fill="white" stroke="#c0c0c0" strokeWidth={0.8} />
+        </svg>
+      );
     case "fork-join":
       return (
         <svg width={6} height={28} viewBox="0 0 6 28">

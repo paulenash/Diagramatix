@@ -1526,6 +1526,43 @@ export function PropertiesPanel({
         );
       })()}
 
+      {element.type === "submachine" && siblingDiagrams && (() => {
+        const smSiblings = siblingDiagrams.filter(d => d.type === "state-machine");
+        return (
+        <div>
+          <label className="text-[10px] text-gray-500">Linked Diagram</label>
+          {(() => {
+            const linkedId = element.properties.linkedDiagramId as string | undefined;
+            const linkedExists = linkedId ? smSiblings.some(d => d.id === linkedId) : true;
+            return (
+              <>
+                <select
+                  value={linkedId ?? ""}
+                  onChange={(e) => onUpdateProperties(element.id, {
+                    linkedDiagramId: e.target.value || null,
+                  })}
+                  className="w-full text-[10px] border border-gray-300 rounded px-1.5 py-0.5 bg-white text-gray-700 cursor-pointer"
+                  onMouseDown={(e) => { e.stopPropagation(); }}
+                  onClick={(e) => { e.stopPropagation(); (e.target as HTMLSelectElement).focus(); }}
+                >
+                  <option value="">None</option>
+                  {smSiblings.map((d) => (
+                    <option key={d.id} value={d.id}>{d.name}</option>
+                  ))}
+                </select>
+                {linkedId && !linkedExists && (
+                  <p className="text-[10px] text-red-500 mt-0.5">Linked diagram not found</p>
+                )}
+                {linkedId && linkedExists && (
+                  <p className="text-[10px] text-gray-400 mt-0.5">Double-click marker to drill in</p>
+                )}
+              </>
+            );
+          })()}
+        </div>
+        );
+      })()}
+
       {(element.type === "task" || element.type === "subprocess" || element.type === "subprocess-expanded") && (
         <>
         <div className="flex items-center gap-1">
