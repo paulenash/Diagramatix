@@ -2,16 +2,17 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import type {
-  ConnectorType,
-  DiagramData,
-  DiagramType,
-  DirectionType,
-  Point,
-  RoutingType,
-  Side,
-  SymbolType,
-  TemplateData,
+import {
+  SCHEMA_VERSION,
+  type ConnectorType,
+  type DiagramData,
+  type DiagramType,
+  type DirectionType,
+  type Point,
+  type RoutingType,
+  type Side,
+  type SymbolType,
+  type TemplateData,
 } from "@/app/lib/diagram/types";
 import { BW_SYMBOL_COLORS, DEFAULT_SYMBOL_COLORS, type SymbolColorConfig } from "@/app/lib/diagram/colors";
 import type { DisplayMode } from "@/app/lib/diagram/displayMode";
@@ -902,7 +903,7 @@ export function DiagramEditor({
           <span className="text-[10px] text-gray-400 px-1 py-0 bg-gray-100 rounded">
             {diagramType}
           </span>
-          {version ? <span className="text-[10px] text-gray-400">v1.0.{version}</span> : null}
+          {version ? <span className="text-[10px] text-gray-400">v{SCHEMA_VERSION}.{version}</span> : null}
         </div>
 
         <div className="flex-1" />

@@ -1238,7 +1238,7 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
           {projectOwner && (
             <span className="text-[10px] text-gray-400">Owner: <strong className="text-gray-600">{projectOwner}</strong></span>
           )}
-          {version ? <span className="text-[10px] text-gray-400">v1.0.{version}</span> : null}
+          {version ? <span className="text-[10px] text-gray-400">v{SCHEMA_VERSION}.{version}</span> : null}
           {!readOnly && (
             <button
               onClick={() => setShowMaintenance(true)}

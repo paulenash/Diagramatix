@@ -616,7 +616,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
             </svg>
           </div>
           <span className="font-semibold text-gray-900">Diagramatix</span>
-          {version ? <span className="text-xs text-gray-400 ml-1">v1.0.{version}</span> : null}
+          {version ? <span className="text-xs text-gray-400 ml-1">v{SCHEMA_VERSION}.{version}</span> : null}
         </div>
         <div className="flex items-center gap-3">
           {!readOnly && (
