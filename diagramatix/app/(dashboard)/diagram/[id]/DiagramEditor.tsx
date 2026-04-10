@@ -261,20 +261,23 @@ export function DiagramEditor({
       .catch(() => {});
   }, [projectId, diagramId]);
 
-  const handleDrillIntoSubprocess = useCallback((linkedDiagramId: string) => {
-    // Push current diagram onto stack before navigating
+  // Ref to saveNow so navigation callbacks can call it without stale closures
+  const saveNowRef = useRef<() => Promise<void>>(() => Promise.resolve());
+
+  const handleDrillIntoSubprocess = useCallback(async (linkedDiagramId: string) => {
+    // Save current diagram before navigating away
+    await saveNowRef.current();
     const stack = getDrillStack();
     stack.push({ id: diagramId, name: diagramName });
     sessionStorage.setItem(STACK_KEY, JSON.stringify(stack));
     router.push(`/diagram/${linkedDiagramId}`);
   }, [router, diagramId, diagramName]);
 
-  const handleDrillBack = useCallback(() => {
-    // Pop the stack and navigate to the parent diagram
+  const handleDrillBack = useCallback(async () => {
+    await saveNowRef.current();
     const stack = getDrillStack();
     stack.pop();
     sessionStorage.setItem(STACK_KEY, JSON.stringify(stack));
-    // Use back() to return to the cached parent page
     if (window.history.length > 1) {
       router.back();
     } else {
@@ -282,10 +285,9 @@ export function DiagramEditor({
     }
   }, [router, projectId]);
 
-  const handleBackToProject = useCallback(() => {
-    // Clear the entire stack and go to the project
+  const handleBackToProject = useCallback(async () => {
+    await saveNowRef.current();
     sessionStorage.removeItem(STACK_KEY);
-    // Use back() for instant return to cached project/dashboard screen
     if (window.history.length > 1) {
       router.back();
     } else {
@@ -349,6 +351,7 @@ export function DiagramEditor({
   } | null>(null);
 
   const { saveStatus, lastSavedAt, saveNow } = useAutoSave(diagramId, data, 1500, templateEditState !== null || !!readOnly);
+  saveNowRef.current = saveNow;
   const effectiveUpdatedAt = lastSavedAt ?? updatedAt;
 
   useEffect(() => {

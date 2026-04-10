@@ -940,7 +940,9 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         case "right":  cp1 = { x: srcPt.x + bulge, y: srcPt.y }; cp2 = { x: tgtPt.x + bulge, y: tgtPt.y }; break;
       }
 
-      const waypoints: Point[] = [srcPt, cp1, cp2, tgtPt];
+      // Standard 6-waypoint curvilinear format: [center, srcEdge, cp1, cp2, tgtEdge, center]
+      const center: Point = { x: el.x + el.width / 2, y: el.y + el.height / 2 };
+      const waypoints: Point[] = [center, srcPt, cp1, cp2, tgtPt, center];
 
       const transitionCount = state.connectors.filter(c => c.type === "transition").length;
       const newConnector: Connector = {
@@ -954,8 +956,8 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         type: "transition",
         directionType: "open-directed",
         routingType: "curvilinear",
-        sourceInvisibleLeader: false,
-        targetInvisibleLeader: false,
+        sourceInvisibleLeader: true,
+        targetInvisibleLeader: true,
         waypoints,
         label: `transition ${transitionCount + 1}`,
         labelOffsetX: 0,

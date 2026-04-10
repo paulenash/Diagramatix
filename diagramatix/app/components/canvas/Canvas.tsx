@@ -622,7 +622,8 @@ export function Canvas({
         pos.y >= srcEl.y && pos.y <= srcEl.y + srcEl.height
       ) {
         // Self-transition for state elements: if drag started and ended on same state
-        if (srcEl.type === "state" && onAddSelfTransition) {
+        const SELF_TRANS_TYPES = new Set(["state", "composite-state", "submachine"]);
+        if (SELF_TRANS_TYPES.has(srcEl.type) && onAddSelfTransition) {
           // Determine which long side is nearest to the release point
           const distTop    = Math.abs(pos.y - srcEl.y);
           const distBottom = Math.abs(pos.y - (srcEl.y + srcEl.height));
@@ -2425,7 +2426,7 @@ export function Canvas({
                 onSelect={(e) => {
                   // Connection-creation mode: clicking a different element commits the connector
                   if (pendingConnSourceId && el.type !== "initial-state"
-                      && (pendingConnSourceId !== el.id || el.type === "state")) {
+                      && (pendingConnSourceId !== el.id || el.type === "state" || el.type === "composite-state" || el.type === "submachine")) {
                     onAddConnector(
                       pendingConnSourceId, el.id,
                       "sequence", defaultDirectionType, defaultRoutingType,
@@ -2494,7 +2495,7 @@ export function Canvas({
                 onEnterConnectionMode={el.type !== "final-state" ? () => setPendingConnSourceId(el.id) : undefined}
                 onCancelConnectionMode={() => setPendingConnSourceId(null)}
                 inConnectionMode={pendingConnSourceId === el.id}
-                onDrillBack={el.type === "start-event" ? onDrillBack : undefined}
+                onDrillBack={(el.type === "start-event" || el.type === "initial-state") ? onDrillBack : undefined}
                 showValueDisplay={showValueDisplay}
               />
             );
@@ -2819,7 +2820,7 @@ export function Canvas({
                 }
                 return false;
               }}
-              onDrillBack={el.type === "start-event" ? onDrillBack : undefined}
+              onDrillBack={(el.type === "start-event" || el.type === "initial-state") ? onDrillBack : undefined}
               showValueDisplay={showValueDisplay}
             />
             );
@@ -2835,7 +2836,8 @@ export function Canvas({
             const skipBecauseOwnBoundary =
               draggingSourceEl?.type === "subprocess-expanded" &&
               el.boundaryHostId === draggingSourceEl.id;
-            const isSelfStateTarget = el.id === draggingConnector?.fromId && el.type === "state";
+            const SELF_TRANSITION_TYPES = new Set(["state", "composite-state", "submachine"]);
+            const isSelfStateTarget = el.id === draggingConnector?.fromId && SELF_TRANSITION_TYPES.has(el.type);
             if (isDraggingConnector && (el.id !== draggingConnector!.fromId || isSelfStateTarget) && !skipBecauseOwnBoundary
                 && !draggingFromFinalState && el.type !== "initial-state") {
               // Throwing/send boundary events excluded only if they already have an outgoing messageBPMN
@@ -2924,7 +2926,7 @@ export function Canvas({
                 isAssocBpmnTarget={elIsAssocTarget}
                 onSelect={(ev) => {
                   if (pendingConnSourceId && el.type !== "initial-state"
-                      && (pendingConnSourceId !== el.id || el.type === "state")) {
+                      && (pendingConnSourceId !== el.id || el.type === "state" || el.type === "composite-state" || el.type === "submachine")) {
                     onAddConnector(
                       pendingConnSourceId, el.id,
                       "sequence", defaultDirectionType, defaultRoutingType,

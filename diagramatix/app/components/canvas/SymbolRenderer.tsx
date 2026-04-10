@@ -737,7 +737,7 @@ function FinalStateShape({ el }: { el: DiagramElement }) {
 function SubmachineShape({ el }: { el: DiagramElement }) {
   const colors = useContext(SymbolColorCtx);
   const hasLink = !!(el.properties.linkedDiagramId as string | undefined);
-  const markerStroke = hasLink ? "#16a34a" : "#c0c0c0";
+  const markerStroke = hasLink ? "#2563eb" : "#c0c0c0";
   // Marker: two small rounded-rect state shapes connected by a horizontal line
   const sw = 10, sh = 7, sr = 2.5; // small state width, height, border-radius
   const lineGap = 5; // line length between the two shapes
