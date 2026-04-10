@@ -255,6 +255,8 @@
       <xs:enumeration value="uml-class"/>
       <xs:enumeration value="uml-enumeration"/>
       <xs:enumeration value="sublane"/>
+      <xs:enumeration value="fork-join"/>
+      <xs:enumeration value="submachine"/>
     </xs:restriction>
   </xs:simpleType>
 
@@ -371,7 +373,7 @@
       multiplicity     : "single" | "collection"  — data object/store
       role             : "input" | "output" | "none" — data object I/O marker
       state            : string    — data object state badge
-      linkedDiagramId  : string    — collapsed subprocess drill-down link
+      linkedDiagramId  : string    — collapsed subprocess / submachine drill-down link
   -->
 
 

@@ -225,5 +225,7 @@ export interface TemplateData {
  *          GatewayRoleEnum, SubprocessTypeEnum, PoolTypeEnum and the
  *          element.properties keys (adHoc, labelOffsetX/Y, labelWidth,
  *          multiplicity, role, state, linkedDiagramId).
+ *    1.4 — added SymbolType values "fork-join" / "submachine" for state
+ *          machine diagrams; linkedDiagramId now also used by submachine.
  */
-export const SCHEMA_VERSION = "1.3";
+export const SCHEMA_VERSION = "1.4";
