@@ -1636,12 +1636,12 @@ export function SymbolRenderer({
         if (!desc && !selected) return null;
         const descY = element.y + element.height + 4;
         const notch = Math.min(20, element.width * 0.15);
-        const descW = element.width - 2 * notch;
-        const descX = element.x; // starts under left corner of chevron
+        const descW = element.width - notch; // left corner to right end of bottom side
+        const descX = element.x;
         const PAD = 4;
         const FONT_SIZE = 10;
         const LINE_H = 13;
-        const CHAR_W = FONT_SIZE * 0.58; // approximate char width
+        const CHAR_W = FONT_SIZE * 0.48; // approximate average char width for sans-serif at 10px
         const maxChars = Math.floor((descW - PAD * 2) / CHAR_W);
 
         // Word-wrap: split on explicit newlines, then wrap each paragraph

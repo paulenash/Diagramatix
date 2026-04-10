@@ -1275,11 +1275,12 @@ export function PropertiesPanel({
           element.type === "subprocess-expanded" || element.type === "use-case" ||
           element.type === "external-entity" || element.type === "process-system" ||
           element.type === "uml-class" || element.type === "uml-enumeration" ||
-          element.type === "text-annotation") ? (
+          element.type === "text-annotation" ||
+          element.type === "chevron" || element.type === "chevron-collapsed") ? (
             <textarea
               key={element.id}
               className="w-full px-1.5 py-1 border border-gray-300 rounded text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-500 resize-y overflow-y-auto"
-              rows={2}
+              rows={element.type === "chevron" || element.type === "chevron-collapsed" ? 3 : 2}
               value={labelDraft}
               onFocus={(e) => { const l = e.target.value.length; e.target.setSelectionRange(l, l); }}
               onChange={(e) => {

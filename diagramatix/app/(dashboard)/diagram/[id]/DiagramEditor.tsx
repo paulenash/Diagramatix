@@ -412,6 +412,9 @@ export function DiagramEditor({
   // Alignment dropdown state
   const [alignDropdownOpen, setAlignDropdownOpen] = useState(false);
   const alignDropdownRef = useRef<HTMLDivElement>(null);
+  // Resize dropdown state
+  const [resizeDropdownOpen, setResizeDropdownOpen] = useState(false);
+  const resizeDropdownRef = useRef<HTMLDivElement>(null);
 
   // File menu state (Export, Import, PDF scale popover)
   const [fileMenuOpen, setFileMenuOpen] = useState(false);
@@ -487,6 +490,18 @@ export function DiagramEditor({
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, [alignDropdownOpen]);
+
+  // Close resize dropdown on outside click
+  useEffect(() => {
+    if (!resizeDropdownOpen) return;
+    function handleClick(e: MouseEvent) {
+      if (resizeDropdownRef.current && !resizeDropdownRef.current.contains(e.target as Node)) {
+        setResizeDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [resizeDropdownOpen]);
 
   // Close File menu on outside click (also dismisses any open PDF-scale popover)
   useEffect(() => {
@@ -983,6 +998,51 @@ export function DiagramEditor({
                 >
                   Align Smart!
                 </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {selectedElementIds.size > 1 && templateMode !== "editing" && (
+          <div className="relative" ref={resizeDropdownRef}>
+            <button
+              onClick={() => setResizeDropdownOpen((prev) => !prev)}
+              className="px-2 py-0.5 text-[11px] text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
+            >
+              Resize ▾
+            </button>
+            {resizeDropdownOpen && (
+              <div className="absolute right-0 top-full mt-1 w-44 bg-white border border-gray-200 rounded shadow-lg z-50">
+                {([
+                  { mode: "tallest", label: "Resize to Tallest" },
+                  { mode: "shortest", label: "Resize to Shortest" },
+                  { mode: "widest", label: "Resize to Widest" },
+                  { mode: "thinnest", label: "Resize to Thinnest" },
+                ] as const).map(({ mode, label }) => (
+                  <button key={mode}
+                    onClick={() => {
+                      const ids = [...selectedElementIds];
+                      const selected = data.elements.filter(e => ids.includes(e.id));
+                      if (selected.length < 2) return;
+                      let targetVal: number;
+                      switch (mode) {
+                        case "tallest":  targetVal = Math.max(...selected.map(e => e.height)); break;
+                        case "shortest": targetVal = Math.min(...selected.map(e => e.height)); break;
+                        case "widest":   targetVal = Math.max(...selected.map(e => e.width)); break;
+                        case "thinnest": targetVal = Math.min(...selected.map(e => e.width)); break;
+                      }
+                      for (const el of selected) {
+                        const newW = (mode === "widest" || mode === "thinnest") ? targetVal : el.width;
+                        const newH = (mode === "tallest" || mode === "shortest") ? targetVal : el.height;
+                        resizeElement(el.id, el.x, el.y, newW, newH);
+                      }
+                      setResizeDropdownOpen(false);
+                    }}
+                    className="w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50"
+                  >
+                    {label}
+                  </button>
+                ))}
               </div>
             )}
           </div>
