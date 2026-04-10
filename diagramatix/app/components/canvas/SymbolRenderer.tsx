@@ -1631,23 +1631,94 @@ export function SymbolRenderer({
 
       {/* Chevron description box — shown below the chevron when showDescription is true */}
       {(element.type === "chevron" || element.type === "chevron-collapsed") &&
-        !!element.properties.showDescription && !!(element.properties.description as string) && (() => {
-        const desc = element.properties.description as string;
+        !!element.properties.showDescription && (() => {
+        const desc = (element.properties.description as string | undefined) ?? "";
+        if (!desc && !selected) return null;
         const descY = element.y + element.height + 4;
         const descW = element.width;
-        const lines = desc.split("\n");
-        const lineH = 13;
-        const descH = lines.length * lineH + 6;
+        const PAD = 4;
+        const FONT_SIZE = 10;
+        const LINE_H = 13;
+        const CHAR_W = FONT_SIZE * 0.58; // approximate char width
+        const maxChars = Math.floor((descW - PAD * 2) / CHAR_W);
+
+        // Word-wrap: split on explicit newlines, then wrap each paragraph
+        function wrapText(text: string): string[] {
+          const result: string[] = [];
+          for (const paragraph of text.split("\n")) {
+            if (!paragraph) { result.push(""); continue; }
+            const words = paragraph.split(/\s+/);
+            let line = "";
+            for (const word of words) {
+              const test = line ? line + " " + word : word;
+              if (test.length > maxChars && line) {
+                result.push(line);
+                line = word;
+              } else {
+                line = test;
+              }
+            }
+            if (line) result.push(line);
+          }
+          return result.length ? result : [""];
+        }
+
+        const wrappedLines = wrapText(desc);
+        const descH = wrappedLines.length * LINE_H + PAD * 2;
+
         return (
-          <g style={{ pointerEvents: "none" }}>
+          <g>
             <rect x={element.x} y={descY} width={descW} height={descH}
-              rx={3} fill="white" stroke="#d1d5db" strokeWidth={0.5} />
-            {lines.map((line, i) => (
-              <text key={i} x={element.x + 4} y={descY + 12 + i * lineH}
-                fontSize={10} fill="#4b5563" style={{ userSelect: "none" }}>
-                {line}
+              rx={3} fill="white" stroke="#d1d5db" strokeWidth={0.5}
+              style={{ pointerEvents: "all", cursor: "text" }}
+              onDoubleClick={(e) => {
+                e.stopPropagation();
+                // Trigger inline edit via onUpdateProperties — set a flag
+                onUpdateProperties?.(element.id, { _editingDescription: true });
+              }}
+            />
+            {!(element.properties._editingDescription) ? (
+              <text fontSize={FONT_SIZE} fill="#4b5563"
+                style={{ userSelect: "none", pointerEvents: "none" }}>
+                {wrappedLines.map((line, i) => (
+                  <tspan key={i} x={element.x + PAD} y={descY + PAD + LINE_H * 0.85 + i * LINE_H}>
+                    {line || "\u00A0"}
+                  </tspan>
+                ))}
               </text>
-            ))}
+            ) : (
+              <foreignObject x={element.x} y={descY} width={descW} height={Math.max(descH, LINE_H * 3 + PAD * 2)}>
+                <textarea
+                  autoFocus
+                  defaultValue={desc}
+                  onFocus={(e) => { const t = e.target; setTimeout(() => t.setSelectionRange(t.value.length, t.value.length), 0); }}
+                  onBlur={(e) => {
+                    onUpdateProperties?.(element.id, {
+                      description: e.target.value || undefined,
+                      _editingDescription: undefined,
+                    });
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") {
+                      onUpdateProperties?.(element.id, { _editingDescription: undefined });
+                    }
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      (e.target as HTMLTextAreaElement).blur();
+                    }
+                  }}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  style={{
+                    width: "100%", height: "100%",
+                    fontSize: FONT_SIZE, fontFamily: "inherit", lineHeight: LINE_H + "px",
+                    resize: "none", border: "none", outline: "1px solid #93c5fd",
+                    background: "white", padding: PAD + "px",
+                    boxSizing: "border-box", overflow: "hidden",
+                    wordWrap: "break-word", whiteSpace: "pre-wrap",
+                  }}
+                />
+              </foreignObject>
+            )}
           </g>
         );
       })()}

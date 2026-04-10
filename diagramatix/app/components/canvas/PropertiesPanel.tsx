@@ -1602,14 +1602,21 @@ export function PropertiesPanel({
       {(element.type === "chevron" || element.type === "chevron-collapsed") && (
         <>
           <div>
-            <label className="text-[10px] text-gray-500">Description</label>
+            <label className="text-[10px] text-gray-500 mb-0.5 block">Description <span className="text-gray-400">(Shift+Enter for new line)</span></label>
             <textarea
               key={`desc-${element.id}`}
-              className="w-full text-[10px] border border-gray-300 rounded px-1.5 py-0.5 resize-y"
-              rows={2}
+              className="w-full text-[10px] border border-gray-300 rounded px-1.5 py-1 resize-none leading-[13px]"
+              rows={7}
+              style={{ wordWrap: "break-word", whiteSpace: "pre-wrap", overflowWrap: "break-word" }}
               defaultValue={(element.properties.description as string | undefined) ?? ""}
               onBlur={(e) => onUpdateProperties(element.id, { description: e.target.value || undefined })}
-              onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); (e.target as HTMLTextAreaElement).blur(); } }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  (e.target as HTMLTextAreaElement).blur();
+                }
+                // Shift+Enter inserts a newline (default browser behaviour)
+              }}
             />
           </div>
           <label className="flex items-center gap-1 text-[10px] text-gray-700">
