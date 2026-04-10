@@ -27,6 +27,9 @@ export const CHAPTERS: HelpChapter[] = [
               professional process diagrams, BPMN workflows, state machines,
               context diagrams, domain models and more.
             </p>
+            <p className="mt-2 text-xs text-gray-500">
+              This guide covers version <strong>1.4</strong>.
+            </p>
             <p className="mt-2">
               After signing in you land on the <strong>Dashboard</strong> —
               your home base for managing projects and diagrams.
@@ -180,12 +183,23 @@ export const CHAPTERS: HelpChapter[] = [
       {
         heading: "State Machine",
         body: (
-          <p>
-            Model the states and transitions of a system. Includes
-            rounded states, initial state (filled circle), final state
-            (bull&apos;s eye), composite states, and transitions with
-            guard labels.
-          </p>
+          <>
+            <p>
+              Model the states and transitions of a system. Includes
+              states, initial state (filled circle), final state
+              (bull&apos;s eye), composite states, sub-machine states
+              (with linked diagrams), decision/merge gateways,
+              fork/join bars, and curvilinear transitions with
+              guard labels.
+            </p>
+            <p className="mt-2">
+              State machine diagrams support <strong>auto-connect</strong>,{" "}
+              <strong>right-click quick-add</strong>,{" "}
+              <strong>drop-on-connector insertion</strong>,{" "}
+              <strong>self-transitions</strong>, and{" "}
+              <strong>insert space</strong>.
+            </p>
+          </>
         ),
       },
       {
@@ -329,20 +343,22 @@ export const CHAPTERS: HelpChapter[] = [
               the canvas. The element appears at the drop position.
             </p>
             <p className="mt-2">
-              In BPMN diagrams, dropping an element near existing elements
-              may trigger <strong>auto-connect</strong> (see the Auto-Connect
-              chapter).
+              In BPMN and State Machine diagrams, dropping an element near
+              existing elements may trigger <strong>auto-connect</strong>{" "}
+              (see the Auto-Connect chapter).
             </p>
           </>
         ),
       },
       {
-        heading: "Right-click quick-add (BPMN)",
+        heading: "Right-click quick-add",
         body: (
           <>
             <p>
-              In BPMN diagrams, <strong>right-click</strong> on empty canvas
-              to open a quick-add popup showing 10 common shapes in a grid:
+              In <strong>BPMN</strong> and <strong>State Machine</strong>{" "}
+              diagrams, <strong>right-click</strong> on empty canvas
+              to open a quick-add popup showing common shapes in a grid.
+              BPMN shows 10 shapes:
             </p>
             <ol className="list-decimal list-inside space-y-1 mt-2">
               <li>Start Event</li>
@@ -357,6 +373,10 @@ export const CHAPTERS: HelpChapter[] = [
               <li>Group</li>
             </ol>
             <p className="mt-2">
+              State Machine shows 7 shapes: State, SubMachine, Initial,
+              Final, Composite, Gateway, Fork/Join.
+            </p>
+            <p className="mt-2">
               Click a shape to place it at the right-click position. Auto-connect
               rules apply automatically.
             </p>
@@ -364,7 +384,7 @@ export const CHAPTERS: HelpChapter[] = [
         ),
         image: "/help/images/quick-add.png",
         imageAlt: "Quick-add popup",
-        imageCaption: "Right-click quick-add popup for BPMN diagrams.",
+        imageCaption: "Right-click quick-add popup.",
       },
       {
         heading: "Dropping into expanded subprocesses",
@@ -461,15 +481,16 @@ export const CHAPTERS: HelpChapter[] = [
   /* ──────────────────────────────────────────────── 7 ── */
   {
     slug: "auto-connect",
-    title: "Auto-Connect (BPMN)",
+    title: "Auto-Connect",
     sections: [
       {
         body: (
           <p>
-            When you add a new element to a BPMN diagram (by dragging from
-            the palette or using right-click quick-add), Diagramatix
+            When you add a new element to a <strong>BPMN</strong> or{" "}
+            <strong>State Machine</strong> diagram (by dragging from the
+            palette or using right-click quick-add), Diagramatix
             automatically connects it to nearby existing elements. This
-            dramatically speeds up process modelling.
+            dramatically speeds up modelling.
           </p>
         ),
       },
@@ -511,6 +532,42 @@ export const CHAPTERS: HelpChapter[] = [
         ),
       },
       {
+        heading: "State Machine rules",
+        body: (
+          <ul className="list-disc list-inside space-y-1">
+            <li>
+              <strong>Initial State</strong> with no outgoing transition takes
+              priority as the auto-connect source when a new element is added.
+            </li>
+            <li>
+              Never auto-connects <strong>TO</strong> an Initial State or
+              Final State.
+            </li>
+            <li>
+              Never auto-connects <strong>FROM</strong> a Final State.
+            </li>
+            <li>
+              Initial → Initial and Final → Final connections are blocked.
+            </li>
+            <li>
+              Prefers elements inside the same <strong>Composite State</strong>.
+            </li>
+          </ul>
+        ),
+      },
+      {
+        heading: "Self-transitions (State Machine)",
+        body: (
+          <p>
+            States, Composite States, and SubMachines support{" "}
+            <strong>self-transitions</strong>. Drag a connection from an
+            element and release on the <strong>same element</strong> — a
+            looping transition is created on the nearest side, extending
+            60px outward with source and target points 40px apart.
+          </p>
+        ),
+      },
+      {
         heading: "Cancelling auto-connect",
         body: (
           <p>
@@ -545,11 +602,15 @@ export const CHAPTERS: HelpChapter[] = [
           <ul className="list-disc list-inside space-y-1">
             <li><strong>Label</strong> — the display text</li>
             <li><strong>Task type</strong> (BPMN) — user, service, script, send, receive, manual, business-rule</li>
+            <li><strong>Convert Task ↔ Subprocess</strong> (BPMN) — change a task to a subprocess or vice versa</li>
             <li><strong>Gateway type</strong> (BPMN) — exclusive, inclusive, parallel, event-based</li>
+            <li><strong>Gateway role</strong> — decision or merge</li>
             <li><strong>Event type</strong> (BPMN) — message, timer, error, signal, terminate, etc.</li>
             <li><strong>Repeat marker</strong> — none, loop, multi-instance sequential, multi-instance parallel</li>
             <li><strong>Ad-hoc</strong> (subprocesses) — marks the subprocess as ad-hoc</li>
             <li><strong>Boundary events</strong> — intermediate events attached to task edges</li>
+            <li><strong>Linked Diagram</strong> (subprocess, SubMachine) — select a sibling diagram to drill into</li>
+            <li><strong>Fork/Join orientation</strong> — flip between vertical and horizontal</li>
           </ul>
         ),
       },
@@ -668,6 +729,45 @@ export const CHAPTERS: HelpChapter[] = [
             Drag an <strong>intermediate event</strong> onto the edge of a
             task or subprocess to create a boundary event. Boundary events
             snap to the nearest edge and move with their host element.
+          </p>
+        ),
+      },
+      {
+        heading: "SubMachine (State Machine)",
+        body: (
+          <>
+            <p>
+              A <strong>SubMachine</strong> is the state machine equivalent
+              of a collapsed subprocess. It can be linked to another
+              state machine diagram in the same project.
+            </p>
+            <ul className="list-disc list-inside space-y-1 mt-2">
+              <li>
+                The marker (two small rounded states connected by a line)
+                in the bottom-right corner turns <strong>blue</strong>{" "}
+                when linked, grey when unlinked.
+              </li>
+              <li>
+                <strong>Double-click</strong> the marker to drill into the
+                linked diagram.
+              </li>
+              <li>
+                The linked diagram&apos;s initial state shows a{" "}
+                <strong>back arrow</strong> — double-click it to return.
+              </li>
+            </ul>
+          </>
+        ),
+      },
+      {
+        heading: "Fork/Join (State Machine)",
+        body: (
+          <p>
+            A <strong>Fork/Join</strong> bar represents concurrent state
+            transitions. It appears as a thick black bar, initially vertical
+            (5 x 100px). Use the <strong>Flip</strong> button in the
+            Properties Panel to switch between vertical and horizontal
+            orientation. Resize by dragging the handles on the long ends.
           </p>
         ),
       },
@@ -1052,7 +1152,7 @@ export const CHAPTERS: HelpChapter[] = [
           <p>
             When a diagram gets crowded you can push elements apart by
             inserting horizontal or vertical space. This is available in
-            <strong> BPMN diagrams</strong>.
+            <strong>BPMN</strong> and <strong>State Machine</strong> diagrams.
           </p>
         ),
       },
@@ -1124,10 +1224,11 @@ export const CHAPTERS: HelpChapter[] = [
       {
         body: (
           <p>
-            In BPMN diagrams you can insert a new element into the middle
-            of an existing flow by dropping it directly onto a sequence
-            connector. When you later delete that element, the flow heals
-            itself automatically.
+            In <strong>BPMN</strong> and <strong>State Machine</strong>{" "}
+            diagrams you can insert a new element into the middle of an
+            existing flow by dropping it directly onto a connector. When
+            you later delete that element, the flow heals itself
+            automatically.
           </p>
         ),
       },
