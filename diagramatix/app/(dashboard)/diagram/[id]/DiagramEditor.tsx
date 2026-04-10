@@ -306,6 +306,7 @@ export function DiagramEditor({
     resizeElementEnd,
     updateLabel,
     updateProperties,
+    updatePropertiesBatch,
     deleteElement,
     addConnector,
     deleteConnector,
@@ -1423,6 +1424,7 @@ export function DiagramEditor({
           defaultDirectionType={defaultDirectionType}
           defaultRoutingType={defaultRoutingType}
           onUpdateProperties={updateProperties}
+          onUpdatePropertiesBatch={updatePropertiesBatch}
           onUpdateConnectorWaypoints={updateConnectorWaypoints}
           onUpdateConnectorLabel={updateConnectorLabel}
           onSplitConnector={splitConnector}

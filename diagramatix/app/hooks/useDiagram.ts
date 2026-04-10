@@ -2600,6 +2600,16 @@ export function useDiagram(initialData: DiagramData) {
     []
   );
 
+  const updatePropertiesBatch = useCallback(
+    (updates: Array<{ id: string; properties: Record<string, unknown> }>) => {
+      pushHistory(snapshotData());
+      for (const { id, properties } of updates) {
+        dispatch({ type: "UPDATE_PROPERTIES", payload: { id, properties } });
+      }
+    },
+    []
+  );
+
   const deleteElement = useCallback((id: string) => {
     pushHistory(snapshotData());
     dispatch({ type: "DELETE_ELEMENT", payload: { id } });
@@ -2815,6 +2825,7 @@ export function useDiagram(initialData: DiagramData) {
     resizeElementEnd,
     updateLabel,
     updateProperties,
+    updatePropertiesBatch,
     deleteElement,
     addConnector,
     deleteConnector,

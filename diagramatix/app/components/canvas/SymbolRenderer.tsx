@@ -761,7 +761,7 @@ function SubmachineShape({ el }: { el: DiagramElement }) {
 
 function ChevronShape({ el }: { el: DiagramElement }) {
   const colors = useContext(SymbolColorCtx);
-  const fill = resolveColor("chevron", colors);
+  const fill = (el.properties.fillColor as string | undefined) ?? resolveColor("chevron", colors);
   const { x, y, width: w, height: h } = el;
   const notch = Math.min(20, w * 0.15); // chevron point depth
   const points = `${x},${y} ${x + w - notch},${y} ${x + w},${y + h / 2} ${x + w - notch},${y + h} ${x},${y + h} ${x + notch},${y + h / 2}`;
@@ -770,7 +770,7 @@ function ChevronShape({ el }: { el: DiagramElement }) {
 
 function ChevronCollapsedShape({ el }: { el: DiagramElement }) {
   const colors = useContext(SymbolColorCtx);
-  const fill = resolveColor("chevron-collapsed", colors);
+  const fill = (el.properties.fillColor as string | undefined) ?? resolveColor("chevron-collapsed", colors);
   const { x, y, width: w, height: h } = el;
   const notch = Math.min(20, w * 0.15);
   const points = `${x},${y} ${x + w - notch},${y} ${x + w},${y + h / 2} ${x + w - notch},${y + h} ${x},${y + h} ${x + notch},${y + h / 2}`;

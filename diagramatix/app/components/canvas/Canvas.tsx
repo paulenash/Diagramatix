@@ -19,6 +19,7 @@ import type {
 import { SymbolRenderer, SublaneIdsCtx, type ResizeHandle } from "./SymbolRenderer";
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
 import { PaletteSymbolPreview } from "./Palette";
+import { CHEVRON_THEMES } from "@/app/lib/diagram/chevronThemes";
 import { DisplayModeCtx, FontScaleCtx, ConnectorFontScaleCtx, TitleFontSizeCtx, SketchyFilter } from "@/app/lib/diagram/displayMode";
 import { ConnectorRenderer } from "./ConnectorRenderer";
 
@@ -172,6 +173,7 @@ interface Props {
   defaultDirectionType: DirectionType;
   defaultRoutingType: RoutingType;
   onUpdateProperties?: (id: string, props: Record<string, unknown>) => void;
+  onUpdatePropertiesBatch?: (updates: Array<{ id: string; properties: Record<string, unknown> }>) => void;
   onUpdateConnectorWaypoints?: (id: string, waypoints: Point[]) => void;
   onUpdateConnectorLabel?: (id: string, label?: string, offsetX?: number, offsetY?: number, width?: number) => void;
   onSplitConnector?: (symbolType: SymbolType, position: Point, connectorId: string, taskType?: BpmnTaskType, eventType?: EventType) => void;
@@ -369,6 +371,7 @@ export function Canvas({
   defaultDirectionType,
   defaultRoutingType,
   onUpdateProperties,
+  onUpdatePropertiesBatch,
   onUpdateConnectorWaypoints,
   onUpdateConnectorLabel,
   onSplitConnector,
@@ -463,6 +466,7 @@ export function Canvas({
     screenX: number;
     screenY: number;
   } | null>(null);
+  const [themePicker, setThemePicker] = useState<{ screenX: number; screenY: number } | null>(null);
 
   // Fit-to-content on initial mount
   const hasFitted = useRef(false);
@@ -1212,6 +1216,10 @@ export function Canvas({
     }
     if (quickAdd) {
       setQuickAdd(null);
+      return;
+    }
+    if (themePicker) {
+      setThemePicker(null);
       return;
     }
 
@@ -2001,8 +2009,9 @@ export function Canvas({
       }
       // Cancel connection-creation mode
       if (pendingConnSourceId) setPendingConnSourceId(null);
-      // Dismiss right-click quick-add popup
+      // Dismiss right-click popups
       if (quickAdd) setQuickAdd(null);
+      if (themePicker) setThemePicker(null);
     }
     if (e.key === "Delete") {
       if (editingLabel) return;
@@ -2297,6 +2306,18 @@ export function Canvas({
           e.preventDefault();
           const rect = svgRef.current?.getBoundingClientRect();
           if (!rect) return;
+          // If 2+ chevrons selected, show theme picker instead of quick-add
+          const CHEVRON_SET = new Set(["chevron", "chevron-collapsed"]);
+          const selectedChevrons = data.elements.filter(
+            el => selectedElementIds.has(el.id) && CHEVRON_SET.has(el.type)
+          );
+          if (selectedChevrons.length >= 2 && onUpdatePropertiesBatch) {
+            setThemePicker({
+              screenX: e.clientX - rect.left,
+              screenY: e.clientY - rect.top,
+            });
+            return;
+          }
           const worldPos = svgToWorld(e.clientX - rect.left, e.clientY - rect.top);
           setQuickAdd({
             worldPos,
@@ -3703,6 +3724,77 @@ export function Canvas({
                 <PaletteSymbolPreview type={sym} colorConfig={colorConfig} />
               </button>
             ))}
+          </div>
+        );
+      })()}
+
+      {/* Chevron theme picker popup */}
+      {themePicker && onUpdatePropertiesBatch && (() => {
+        const CHEVRON_SET = new Set(["chevron", "chevron-collapsed"]);
+        const selectedChevrons = data.elements
+          .filter(el => selectedElementIds.has(el.id) && CHEVRON_SET.has(el.type))
+          .sort((a, b) => a.x - b.x || a.y - b.y);
+        if (selectedChevrons.length < 2) { setThemePicker(null); return null; }
+        const containerRect = svgRef.current?.parentElement?.getBoundingClientRect();
+        const containerW = containerRect?.width ?? window.innerWidth;
+        const containerH = containerRect?.height ?? window.innerHeight;
+        const POPUP_W = 220;
+        const POPUP_H = 5 * 32 + 36 + 12; // 5 themes + clear + padding
+        const left = Math.min(themePicker.screenX, containerW - POPUP_W - 4);
+        const top = Math.min(themePicker.screenY, containerH - POPUP_H - 4);
+        return (
+          <div
+            style={{ position: "absolute", left, top, zIndex: 50, width: POPUP_W }}
+            className="bg-white border border-gray-300 rounded shadow-lg p-1.5"
+            onMouseDown={(e) => e.stopPropagation()}
+            onContextMenu={(e) => e.preventDefault()}
+          >
+            <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide px-1 mb-1">
+              Colour Theme ({selectedChevrons.length} chevrons)
+            </p>
+            {CHEVRON_THEMES.map((theme) => (
+              <button
+                key={theme.name}
+                className="w-full flex items-center gap-2 px-1.5 py-1 rounded hover:bg-gray-50"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const updates = selectedChevrons.map((el, i) => ({
+                    id: el.id,
+                    properties: { fillColor: theme.colours[i % theme.colours.length] },
+                  }));
+                  onUpdatePropertiesBatch(updates);
+                  setThemePicker(null);
+                }}
+              >
+                <span className="text-[10px] text-gray-700 w-12 shrink-0">{theme.name}</span>
+                <div className="flex gap-0.5">
+                  {theme.colours.map((c, i) => (
+                    <div key={i}
+                      className={`w-4 h-4 rounded-sm border ${i < selectedChevrons.length ? "border-gray-400" : "border-gray-200 opacity-40"}`}
+                      style={{ backgroundColor: c }}
+                    />
+                  ))}
+                </div>
+              </button>
+            ))}
+            <div className="border-t border-gray-100 mt-1 pt-1">
+              <button
+                className="w-full text-left px-1.5 py-1 text-[10px] text-gray-500 hover:bg-gray-50 rounded"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const updates = selectedChevrons.map((el) => ({
+                    id: el.id,
+                    properties: { fillColor: undefined },
+                  }));
+                  onUpdatePropertiesBatch(updates);
+                  setThemePicker(null);
+                }}
+              >
+                Clear Colours
+              </button>
+            </div>
           </div>
         );
       })()}
