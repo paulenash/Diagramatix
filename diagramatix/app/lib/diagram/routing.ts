@@ -191,17 +191,44 @@ function radialControlPoint(edgePt: Point, el: DiagramElement, offset: number): 
  * Constrain a curvilinear control point so the tangent at the edge point
  * stays within an angle tolerance of the perpendicular to the side.
  *
- * @param edgePt     The attachment point on the element boundary
- * @param cp         The proposed control point
- * @param side       Which side the connector exits from
+ * For gateways, the perpendicular is to the actual diamond edge (which may
+ * be a diagonal), not to the bounding-box side.
+ *
+ * @param edgePt       The attachment point on the element boundary
+ * @param cp           The proposed control point
+ * @param side         Which side the connector exits from
  * @param maxTanRatio  tan(maxAngle) — 0 = strictly perpendicular, 0.325 ≈ 18°
+ * @param isGateway    If true, use diamond-edge perpendicular
+ * @param offsetAlong  The offset along the side (needed for gateway normal calc)
  */
 export function constrainControlPoint(
-  edgePt: Point, cp: Point, side: Side, maxTanRatio: number
+  edgePt: Point, cp: Point, side: Side, maxTanRatio: number,
+  isGateway = false, offsetAlong = 0.5
 ): Point {
   const dx = cp.x - edgePt.x;
   const dy = cp.y - edgePt.y;
   if (dx === 0 && dy === 0) return cp;
+
+  if (isGateway) {
+    // Project cp onto the diamond-edge normal direction, with tolerance
+    const n = gatewayEdgeNormal(side, offsetAlong);
+    // Distance along the normal
+    const projLen = dx * n.nx + dy * n.ny;
+    if (Math.abs(projLen) < 1) {
+      // Nearly zero projection — force along normal
+      return { x: edgePt.x + n.nx * 60, y: edgePt.y + n.ny * 60 };
+    }
+    // Tangential deviation from the normal direction
+    const tangDev = dx * (-n.ny) + dy * n.nx; // dot with tangent
+    const maxDev = Math.abs(projLen) * maxTanRatio;
+    const clampedDev = Math.max(-maxDev, Math.min(maxDev, tangDev));
+    // Reconstruct from normal + clamped tangent
+    const tx = -n.ny, ty = n.nx; // tangent direction
+    return {
+      x: edgePt.x + n.nx * projLen + tx * clampedDev,
+      y: edgePt.y + n.ny * projLen + ty * clampedDev,
+    };
+  }
 
   switch (side) {
     case "top":    // perpendicular is -Y; constrain |dx/dy|
@@ -218,6 +245,64 @@ export function constrainControlPoint(
       const maxDy = absdx * maxTanRatio;
       return { x: cp.x, y: edgePt.y + Math.max(-maxDy, Math.min(maxDy, dy)) };
     }
+  }
+}
+
+/**
+ * For a gateway (diamond), compute the outward-normal direction at a point on
+ * the diamond edge identified by (side, offset).
+ *
+ * At offset=0.5 the point is at the vertex → the normal is axis-aligned
+ * (straight up for top, straight right for right, etc.).
+ * At offset≠0.5 the point is on a diagonal edge → the normal is perpendicular
+ * to that edge.
+ */
+function gatewayEdgeNormal(side: Side, offset: number): { nx: number; ny: number } {
+  // Each side has two diagonal edges meeting at the vertex (offset=0.5).
+  // For a square diamond (w=h), the diagonals are at 45°.
+  // The edge direction and outward normal depend on which half.
+  //   top side, first half (offset<0.5): edge from left-vertex to top-vertex
+  //     edge direction: (+1, -1) normalised, outward normal: (-1, -1) normalised
+  //   top side, second half (offset>0.5): edge from top-vertex to right-vertex
+  //     edge direction: (+1, +1) normalised, outward normal: (-1, +1) → wait, outward is UP-LEFT and UP-RIGHT
+  //
+  // Actually: for a diamond centred at origin with vertices at (0,-h/2), (w/2,0), (0,h/2), (-w/2,0):
+  //   Top-left edge (left-vertex → top-vertex): direction (w/2, -h/2), outward normal (-h/2, -w/2) normalised
+  //   Top-right edge (top-vertex → right-vertex): direction (w/2, h/2), outward normal (-h/2, w/2) normalised
+  // For a square diamond (w=h), these simplify to 45° diagonals.
+  //
+  // We use unit normals. For simplicity with arbitrary aspect ratio diamonds
+  // we just use the 45° assumption (gateways are always square).
+  const INV_SQRT2 = 1 / Math.sqrt(2);
+
+  // At the vertex (offset ≈ 0.5), use axis-aligned normal
+  if (Math.abs(offset - 0.5) < 0.02) {
+    switch (side) {
+      case "top":    return { nx: 0, ny: -1 };
+      case "right":  return { nx: 1, ny: 0 };
+      case "bottom": return { nx: 0, ny: 1 };
+      case "left":   return { nx: -1, ny: 0 };
+    }
+  }
+
+  // On a diagonal edge — return the outward normal to that edge
+  switch (side) {
+    case "top":
+      return offset < 0.5
+        ? { nx: -INV_SQRT2, ny: -INV_SQRT2 }  // top-left edge
+        : { nx:  INV_SQRT2, ny: -INV_SQRT2 };  // top-right edge
+    case "right":
+      return offset < 0.5
+        ? { nx:  INV_SQRT2, ny: -INV_SQRT2 }  // right-upper edge
+        : { nx:  INV_SQRT2, ny:  INV_SQRT2 };  // right-lower edge
+    case "bottom":
+      return offset < 0.5
+        ? { nx:  INV_SQRT2, ny:  INV_SQRT2 }  // bottom-right edge
+        : { nx: -INV_SQRT2, ny:  INV_SQRT2 };  // bottom-left edge
+    case "left":
+      return offset < 0.5
+        ? { nx: -INV_SQRT2, ny:  INV_SQRT2 }  // left-lower edge
+        : { nx: -INV_SQRT2, ny: -INV_SQRT2 };  // left-upper edge
   }
 }
 
@@ -335,8 +420,17 @@ export function computeWaypoints(
     const dist   = euclideanDist(srcEdge, tgtEdge);
     const curveOffset = Math.max(60, dist / 3);
     // For circular elements, control point extends along the radial normal (outward from centre)
-    const cp1 = srcIsCirc ? radialControlPoint(srcEdge, source, curveOffset) : perpendicularExitScaled(srcEdge, sourceSide, curveOffset);
-    const cp2 = tgtIsCirc ? radialControlPoint(tgtEdge, target, curveOffset) : perpendicularExitScaled(tgtEdge, targetSide, curveOffset);
+    // For gateways, control point extends perpendicular to the diamond edge the point is on
+    function cpForElement(edge: Point, el: DiagramElement, side: Side, offset: number, isCirc: boolean): Point {
+      if (isCirc) return radialControlPoint(edge, el, curveOffset);
+      if (el.type === "gateway") {
+        const n = gatewayEdgeNormal(side, offset);
+        return { x: edge.x + n.nx * curveOffset, y: edge.y + n.ny * curveOffset };
+      }
+      return perpendicularExitScaled(edge, side, curveOffset);
+    }
+    const cp1 = cpForElement(srcEdge, source, sourceSide, sourceOffsetAlong, srcIsCirc);
+    const cp2 = cpForElement(tgtEdge, target, targetSide, targetOffsetAlong, tgtIsCirc);
     return {
       waypoints: [startPt, srcEdge, cp1, cp2, tgtEdge, endPt],
       sourceInvisibleLeader: true,
@@ -686,8 +780,10 @@ export function recomputeAllConnectors(
       if (conn.type === "transition") {
         const srcRatio = source.type === "gateway" ? 0 : 0.325; // gateway: strictly perp; state: ±18°
         const tgtRatio = target.type === "gateway" ? 0 : 0.325;
-        cp1 = constrainControlPoint(srcEdge, cp1, conn.sourceSide, srcRatio);
-        cp2 = constrainControlPoint(tgtEdge, cp2, conn.targetSide, tgtRatio);
+        cp1 = constrainControlPoint(srcEdge, cp1, conn.sourceSide, srcRatio,
+          source.type === "gateway", conn.sourceOffsetAlong ?? 0.5);
+        cp2 = constrainControlPoint(tgtEdge, cp2, conn.targetSide, tgtRatio,
+          target.type === "gateway", conn.targetOffsetAlong ?? 0.5);
       }
       return { ...conn, waypoints: [startPt, srcEdge, cp1, cp2, tgtEdge, endPt] };
     }

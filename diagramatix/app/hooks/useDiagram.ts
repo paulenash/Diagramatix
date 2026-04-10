@@ -1665,8 +1665,10 @@ function reducer(state: DiagramData, action: Action): DiagramData {
             const tgtRatio = tgtEl?.type === "gateway" ? 0 : 0.325;
             const cp1Raw = chWp[2];
             const cp2Raw = chWp[chWp.length - 3];
-            const cp1 = constrainControlPoint(srcEdge, cp1Raw, c.sourceSide, srcRatio);
-            const cp2 = constrainControlPoint(tgtEdge, cp2Raw, c.targetSide, tgtRatio);
+            const cp1 = constrainControlPoint(srcEdge, cp1Raw, c.sourceSide, srcRatio,
+              srcEl?.type === "gateway", c.sourceOffsetAlong ?? 0.5);
+            const cp2 = constrainControlPoint(tgtEdge, cp2Raw, c.targetSide, tgtRatio,
+              tgtEl?.type === "gateway", c.targetOffsetAlong ?? 0.5);
             const constrained = [...chWp];
             constrained[2] = cp1;
             constrained[chWp.length - 3] = cp2;
