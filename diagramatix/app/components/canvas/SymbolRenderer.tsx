@@ -1345,7 +1345,7 @@ function getLabelPos(el: DiagramElement): { x: number; y: number; baseline: "han
   if (el.type === "actor" || el.type === "team" || el.type === "hourglass" || el.type === "system") {
     return { x: el.x + el.width / 2, y: el.y + el.height + 12, baseline: "hanging" };
   }
-  if (el.type === "system-boundary" || el.type === "composite-state" || el.type === "group") {
+  if (el.type === "system-boundary" || el.type === "composite-state" || el.type === "group" || el.type === "process-group") {
     return { x: el.x + el.width / 2, y: el.y + HEADER_H / 2, baseline: "middle" };
   }
   if (el.type === "uml-class") {

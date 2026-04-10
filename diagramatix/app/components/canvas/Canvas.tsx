@@ -2046,7 +2046,7 @@ export function Canvas({
 
   const otherContainersUnsorted = data.elements.filter(
     (el) => el.type === "system-boundary" || el.type === "composite-state"
-         || el.type === "subprocess-expanded"
+         || el.type === "subprocess-expanded" || el.type === "process-group"
   );
   // Sort containers by nesting depth so parents render before (behind) children
   const otherContainers = (() => {
@@ -2072,6 +2072,7 @@ export function Canvas({
                 && el.type !== "pool" && el.type !== "lane"
                 && el.type !== "subprocess-expanded"
                 && el.type !== "group"
+                && el.type !== "process-group"
                 && !el.boundaryHostId
     );
     function getParentDepth(el: DiagramElement): number {

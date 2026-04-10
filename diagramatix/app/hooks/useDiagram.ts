@@ -606,6 +606,7 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         properties: action.payload.symbolType === "pool" ? { poolType: "black-box" }
           : action.payload.symbolType === "uml-class" ? { showAttributes: false, showOperations: false }
           : action.payload.symbolType === "gateway" ? { labelOffsetX: -30, labelOffsetY: -54 }
+          : (action.payload.symbolType === "chevron" || action.payload.symbolType === "chevron-collapsed") ? { showDescription: true }
           : {},
         taskType:  action.payload.taskType,
         eventType: action.payload.eventType,
@@ -773,7 +774,7 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         }
       }
 
-      const elements = state.elements.map((e) => {
+      let elements = state.elements.map((e) => {
         if (e.id === id) {
           if (snapResult) {
             const host = state.elements.find(h => h.id === snapResult!.hostId)!;
@@ -816,6 +817,48 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         }
         return e;
       });
+
+      // Chevron horizontal snap: when a chevron is moved near another chevron
+      // with ≥75% vertical overlap, snap to aligned Y-centre with 10px overlap.
+      const CHEVRON_TYPES = new Set(["chevron", "chevron-collapsed"]);
+      if (CHEVRON_TYPES.has(el.type)) {
+        const moved = elements.find(e => e.id === id)!;
+        const OVERLAP = 10; // chevrons overlap by this many pixels
+        let snapX: number | null = null;
+        let snapY: number | null = null;
+        let bestDist = Infinity;
+        const movedCx = moved.x + moved.width / 2;
+        const movedCy = moved.y + moved.height / 2;
+        for (const other of elements) {
+          if (other.id === id) continue;
+          if (!CHEVRON_TYPES.has(other.type)) continue;
+          // Check vertical overlap ≥ 75% of the shorter element's height
+          const overlapTop = Math.max(moved.y, other.y);
+          const overlapBot = Math.min(moved.y + moved.height, other.y + other.height);
+          const vOverlap = overlapBot - overlapTop;
+          const minH = Math.min(moved.height, other.height);
+          if (vOverlap < minH * 0.75) continue;
+          // Pick the nearest matching neighbour by centre distance
+          const otherCx = other.x + other.width / 2;
+          const otherCy = other.y + other.height / 2;
+          const dist = Math.hypot(movedCx - otherCx, movedCy - otherCy);
+          if (dist >= bestDist) continue;
+          bestDist = dist;
+          // Snap Y to align centres
+          snapY = otherCy - moved.height / 2;
+          // Snap X so chevrons overlap by OVERLAP px
+          if (movedCx > otherCx) {
+            snapX = other.x + other.width - OVERLAP;
+          } else {
+            snapX = other.x + OVERLAP - moved.width;
+          }
+        }
+        if (snapX !== null || snapY !== null) {
+          const finalX = snapX ?? moved.x;
+          const finalY = snapY ?? moved.y;
+          elements = elements.map(e => e.id === id ? { ...e, x: finalX, y: finalY } : e);
+        }
+      }
 
       const affectedIds = new Set([id, ...descendantIds, ...attachedBoundaryIds]);
 
