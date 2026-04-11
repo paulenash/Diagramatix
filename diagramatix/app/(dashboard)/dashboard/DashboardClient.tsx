@@ -216,6 +216,17 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
   const [importFormat, setImportFormat] = useState<"json" | "xml">("json");
   const fileMenuRef = useRef<HTMLDivElement>(null);
 
+  // DDL Import
+  const [showDdlImport, setShowDdlImport] = useState(false);
+  const [ddlDbType, setDdlDbType] = useState("postgres");
+  const [ddlProjectName, setDdlProjectName] = useState("");
+  const [ddlDiagramName, setDdlDiagramName] = useState("");
+  const [ddlFile, setDdlFile] = useState<File | null>(null);
+  const [ddlImporting, setDdlImporting] = useState(false);
+  const [ddlLog, setDdlLog] = useState<string[]>([]);
+  const [ddlResult, setDdlResult] = useState<"success" | "failed" | null>(null);
+  const ddlFileInputRef = useRef<HTMLInputElement>(null);
+
   // Backup / Restore
   const [backingUp, setBackingUp] = useState(false);
   const [restoring, setRestoring] = useState(false);
@@ -261,6 +272,74 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
       alert(`Backup failed: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setBackingUp(false);
+    }
+  }
+
+  async function handleDdlImport() {
+    if (!ddlFile || !ddlProjectName.trim()) return;
+    setDdlImporting(true);
+    setDdlLog([]);
+    setDdlResult(null);
+    const log = (msg: string) => setDdlLog(prev => [...prev, msg]);
+
+    try {
+      const text = await ddlFile.text();
+      log(`\u2714 Read ${ddlFile.name} (${(text.length / 1024).toFixed(1)} KB)`);
+
+      const { parseDDL, generateDiagramFromDDL } = await import("@/app/lib/diagram/ddlImport");
+      const parsed = parseDDL(text);
+      const entityCount = parsed.filter(t => !t.isEnum).length;
+      const enumCount = parsed.filter(t => t.isEnum).length;
+      log(`\u2714 Parsed ${parsed.length} tables (${entityCount} entities, ${enumCount} enumerations)`);
+
+      if (parsed.length === 0) {
+        log("\u2718 No CREATE TABLE statements found");
+        setDdlResult("failed");
+        return;
+      }
+
+      // Create project
+      const projRes = await fetch("/api/projects", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: ddlProjectName.trim() }),
+      });
+      if (!projRes.ok) {
+        log(`\u2718 Failed to create project: ${projRes.status}`);
+        setDdlResult("failed");
+        return;
+      }
+      const proj = await projRes.json();
+      log(`\u2714 Created project "${ddlProjectName.trim()}"`);
+
+      // Generate diagram data
+      const diagramData = generateDiagramFromDDL(parsed, ddlDbType);
+      const diagName = ddlDiagramName.trim() || `${ddlProjectName.trim()} Schema`;
+
+      // Create diagram
+      const diagRes = await fetch("/api/diagrams", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: diagName,
+          type: "domain",
+          projectId: proj.id,
+          data: diagramData,
+        }),
+      });
+      if (!diagRes.ok) {
+        log(`\u2718 Failed to create diagram: ${diagRes.status}`);
+        setDdlResult("failed");
+        return;
+      }
+      log(`\u2714 Created diagram "${diagName}" with ${diagramData.elements.length} elements, ${diagramData.connectors.length} connectors`);
+      setDdlResult("success");
+      reloadDashboardContent();
+    } catch (err) {
+      log(`\u2718 Error: ${err instanceof Error ? err.message : String(err)}`);
+      setDdlResult("failed");
+    } finally {
+      setDdlImporting(false);
     }
   }
 
@@ -688,6 +767,21 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                     >
                       Import XML
                     </button>
+                    <button
+                      onClick={() => {
+                        setFileMenuOpen(false);
+                        setDdlProjectName("");
+                        setDdlDiagramName("");
+                        setDdlFile(null);
+                        setDdlDbType("postgres");
+                        setDdlLog([]);
+                        setDdlResult(null);
+                        setShowDdlImport(true);
+                      }}
+                      className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                    >
+                      Import DDL
+                    </button>
                     <div className="border-t border-gray-100" />
                     <button
                       onClick={() => { setFileMenuOpen(false); handleBackupDownload(); }}
@@ -1053,6 +1147,99 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                 </button>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* DDL Import dialog */}
+      {showDdlImport && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md flex flex-col max-h-[80vh]">
+            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200">
+              <h2 className="text-sm font-semibold text-gray-900">
+                {ddlResult === "success" ? "\u2714 Import Complete" :
+                 ddlResult === "failed" ? "\u2718 Import Failed" :
+                 ddlImporting ? "Importing DDL\u2026" :
+                 "Import DDL"}
+              </h2>
+              {!ddlImporting && (
+                <button onClick={() => setShowDdlImport(false)}
+                  className="text-gray-400 hover:text-gray-600 text-lg leading-none">&times;</button>
+              )}
+            </div>
+
+            {!ddlImporting && !ddlResult && (
+              <div className="px-5 py-4 space-y-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Database Type</label>
+                  <select value={ddlDbType} onChange={e => setDdlDbType(e.target.value)}
+                    className="w-full text-xs border border-gray-300 rounded px-2 py-1.5 bg-white">
+                    <option value="postgres">PostgreSQL</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Project Name</label>
+                  <input type="text" value={ddlProjectName}
+                    onChange={e => setDdlProjectName(e.target.value)}
+                    placeholder="e.g. My Database Schema"
+                    className="w-full text-xs border border-gray-300 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Diagram Name <span className="text-gray-400">(optional)</span></label>
+                  <input type="text" value={ddlDiagramName}
+                    onChange={e => setDdlDiagramName(e.target.value)}
+                    placeholder="defaults to Project Name + Schema"
+                    className="w-full text-xs border border-gray-300 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">DDL File (.sql or .ddl)</label>
+                  <input ref={ddlFileInputRef} type="file" accept=".sql,.ddl"
+                    onChange={e => setDdlFile(e.target.files?.[0] ?? null)}
+                    className="w-full text-xs text-gray-600" />
+                </div>
+              </div>
+            )}
+
+            {(ddlImporting || ddlLog.length > 0) && (
+              <div className="flex-1 overflow-y-auto px-5 py-3 font-mono text-[10px] text-gray-600 space-y-0.5">
+                {ddlLog.map((line, i) => (
+                  <p key={i} className={
+                    line.startsWith("\u2714") ? "text-green-600" :
+                    line.startsWith("\u2718") ? "text-red-600" :
+                    "text-gray-700"
+                  }>{line}</p>
+                ))}
+                {ddlImporting && !ddlResult && (
+                  <p className="text-purple-500 animate-pulse">{"\u25CF"} Working...</p>
+                )}
+              </div>
+            )}
+
+            <div className="px-5 py-3 border-t border-gray-200 flex justify-end gap-2">
+              {!ddlImporting && !ddlResult && (
+                <>
+                  <button onClick={() => setShowDdlImport(false)}
+                    className="px-4 py-1.5 text-xs text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50">
+                    Cancel
+                  </button>
+                  <button onClick={handleDdlImport}
+                    disabled={!ddlFile || !ddlProjectName.trim()}
+                    className="px-4 py-1.5 text-xs text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">
+                    Import
+                  </button>
+                </>
+              )}
+              {ddlResult && (
+                <button onClick={() => {
+                  setShowDdlImport(false);
+                  setDdlLog([]);
+                  setDdlResult(null);
+                }}
+                  className={`px-4 py-1.5 text-xs rounded-md text-white ${ddlResult === "success" ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700"}`}>
+                  Close
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}
