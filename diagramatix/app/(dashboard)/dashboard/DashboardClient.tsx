@@ -232,10 +232,11 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
   const [acctName, setAcctName] = useState(userName);
   const [acctEmail, setAcctEmail] = useState(userEmail ?? "");
   const [acctOrgName, setAcctOrgName] = useState(orgName ?? "");
-  const [acctCurPwd, setAcctCurPwd] = useState(isSu ? "!Aardwolf2026" : "");
+  const isPaulAdmin = userEmail === "paul@nashcc.com.au";
+  const [acctCurPwd, setAcctCurPwd] = useState(isPaulAdmin ? "!Aardwolf2026" : "");
   const [acctNewPwd, setAcctNewPwd] = useState("");
   const [acctConfirmPwd, setAcctConfirmPwd] = useState("");
-  const [acctShowCurPwd, setAcctShowCurPwd] = useState(!!isSu);
+  const [acctShowCurPwd, setAcctShowCurPwd] = useState(isPaulAdmin);
   const [acctShowNewPwd, setAcctShowNewPwd] = useState(false);
   const [acctShowConfirmPwd, setAcctShowConfirmPwd] = useState(false);
   const [acctSaving, setAcctSaving] = useState(false);
@@ -890,17 +891,15 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
           )}
           <button
             onClick={() => setShowAccount(true)}
-            className="text-right hover:bg-gray-50 rounded px-1.5 py-0.5 -mx-1"
+            className="flex items-center gap-1.5 text-xs font-medium text-gray-600 border border-gray-300 rounded px-2 py-1 hover:bg-gray-50"
             title="Account settings"
           >
-            <span className="text-sm text-gray-700 font-medium">{userName}</span>
-            {userEmail && <p className="text-[10px] text-gray-400 leading-tight">{userEmail}</p>}
-          </button>
-          <button
-            onClick={() => signOut({ callbackUrl: "/login" })}
-            className="text-sm text-gray-500 hover:text-gray-700"
-          >
-            Sign out
+            <svg width={14} height={14} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+              <circle cx={8} cy={5} r={3} />
+              <path d="M2 14c0-3 2.5-5 6-5s6 2 6 5" />
+            </svg>
+            <span>{userName}</span>
+            {userEmail && <span className="text-gray-400 font-normal">{userEmail}</span>}
           </button>
         </div>
       </header>
@@ -1331,6 +1330,11 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                 <input type="email" value={acctEmail}
                   onChange={e => setAcctEmail(e.target.value)}
                   className="w-full text-xs border border-gray-300 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                {acctEmail !== (userEmail ?? "") && (
+                  <p className="text-[10px] text-amber-600 mt-0.5">
+                    Changing your email will update your sign-in credentials immediately.
+                  </p>
+                )}
               </div>
 
               {/* Organisation */}
@@ -1386,7 +1390,12 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
               )}
             </div>
 
-            <div className="px-5 py-3 border-t border-gray-200 flex justify-end gap-2">
+            <div className="px-5 py-3 border-t border-gray-200 flex items-center gap-2">
+              <button onClick={() => signOut({ callbackUrl: "/login" })}
+                className="px-4 py-1.5 text-xs text-red-600 border border-red-300 rounded-md hover:bg-red-50">
+                Sign Out
+              </button>
+              <div className="flex-1" />
               <button onClick={() => { setShowAccount(false); setAcctMsg(null); }}
                 className="px-4 py-1.5 text-xs text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50">
                 Cancel
