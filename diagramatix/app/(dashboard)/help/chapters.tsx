@@ -1996,6 +1996,7 @@ export const CHAPTERS: HelpChapter[] = [
   {
     slug: "generate-ddl",
     title: "Generate DDL",
+    adminOnly: true,
     sections: [
       {
         body: (

@@ -1,5 +1,8 @@
-/** The only email permitted to impersonate other users */
-export const SUPERUSER_EMAIL = "paul@nashcc.com.au";
+/** Emails permitted to access admin functions */
+export const SUPERUSER_EMAILS = new Set([
+  "paul@nashcc.com.au",
+  "greg.nash@getai.com.au",
+]);
 
 /** Cookie name used to store the impersonation target userId */
 export const IMPERSONATE_COOKIE = "dgx_view_as";
@@ -9,9 +12,9 @@ interface CookieStore {
   get(name: string): { value: string } | undefined;
 }
 
-/** Check whether the authenticated session belongs to the superuser */
+/** Check whether the authenticated session belongs to a superuser */
 export function isSuperuser(session: { user?: { email?: string | null } } | null): boolean {
-  return session?.user?.email === SUPERUSER_EMAIL;
+  return !!session?.user?.email && SUPERUSER_EMAILS.has(session.user.email);
 }
 
 /** If the superuser is impersonating another user, return that user's ID; otherwise null */

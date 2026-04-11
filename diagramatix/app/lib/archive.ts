@@ -1,13 +1,13 @@
 import { prisma, pgPool } from "@/app/lib/db";
-import { SUPERUSER_EMAIL } from "@/app/lib/superuser";
+import { SUPERUSER_EMAILS } from "@/app/lib/superuser";
 
 /** The name used to identify the system archive project */
 export const ARCHIVE_PROJECT_NAME = "__SYSTEM_ARCHIVE__";
 
-/** Get (or create) the system archive project, owned by the superuser */
+/** Get (or create) the system archive project, owned by the first superuser found */
 export async function getArchiveProject(): Promise<{ id: string; adminId: string }> {
-  const admin = await prisma.user.findUnique({
-    where: { email: SUPERUSER_EMAIL },
+  const admin = await prisma.user.findFirst({
+    where: { email: { in: [...SUPERUSER_EMAILS] } },
     select: { id: true },
   });
   if (!admin) throw new Error("Admin user not found");

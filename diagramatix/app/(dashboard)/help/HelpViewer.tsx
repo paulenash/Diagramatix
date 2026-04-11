@@ -6,6 +6,7 @@ export type HelpChapter = {
   slug: string;
   title: string;
   sections: HelpSection[];
+  adminOnly?: boolean;
 };
 
 export type HelpSection = {

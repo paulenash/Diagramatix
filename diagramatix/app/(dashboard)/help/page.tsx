@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { HelpViewer, type HelpChapter } from "./HelpViewer";
 import { CHAPTERS } from "./chapters";
+import { isSuperuser } from "@/app/lib/superuser";
 
 export const metadata = { title: "Diagramatix — User Guide" };
 
@@ -14,9 +15,14 @@ export default async function HelpPage({
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
+  const isAdmin = isSuperuser(session);
+  const visibleChapters = isAdmin
+    ? CHAPTERS
+    : CHAPTERS.filter(ch => !ch.adminOnly);
+
   const { c } = await searchParams;
   const current: HelpChapter =
-    CHAPTERS.find(ch => ch.slug === c) ?? CHAPTERS[0];
+    visibleChapters.find(ch => ch.slug === c) ?? visibleChapters[0];
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -33,7 +39,7 @@ export default async function HelpPage({
       <div className="max-w-6xl mx-auto px-6 py-6 grid grid-cols-[220px_1fr] gap-6">
         <nav className="text-sm">
           <ol className="space-y-1">
-            {CHAPTERS.map((ch, i) => {
+            {visibleChapters.map((ch, i) => {
               const active = ch.slug === current.slug;
               return (
                 <li key={ch.slug}>

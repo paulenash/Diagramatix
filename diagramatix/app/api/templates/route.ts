@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { pgPool } from "@/app/lib/db";
 import { prisma } from "@/app/lib/db";
-import { getEffectiveUserId, isImpersonating, SUPERUSER_EMAIL } from "@/app/lib/superuser";
+import { getEffectiveUserId, isImpersonating, SUPERUSER_EMAILS } from "@/app/lib/superuser";
 
 const ADMIN_PASSWORD = "!Aardwolf2026";
 
@@ -73,7 +73,7 @@ export async function POST(req: Request) {
   // Admin authorization for built-in templates
   if (templateType === "builtin") {
     const userEmail = await getUserEmail(session.user.id);
-    if (userEmail !== SUPERUSER_EMAIL && adminPassword !== ADMIN_PASSWORD) {
+    if ((!userEmail || !SUPERUSER_EMAILS.has(userEmail)) && adminPassword !== ADMIN_PASSWORD) {
       return NextResponse.json({ error: "Invalid admin password" }, { status: 403 });
     }
   }
