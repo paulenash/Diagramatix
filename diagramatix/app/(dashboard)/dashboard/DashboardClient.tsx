@@ -232,9 +232,12 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
   const [acctName, setAcctName] = useState(userName);
   const [acctEmail, setAcctEmail] = useState(userEmail ?? "");
   const [acctOrgName, setAcctOrgName] = useState(orgName ?? "");
-  const [acctCurPwd, setAcctCurPwd] = useState("");
+  const [acctCurPwd, setAcctCurPwd] = useState(isSu ? "!Aardwolf2026" : "");
   const [acctNewPwd, setAcctNewPwd] = useState("");
   const [acctConfirmPwd, setAcctConfirmPwd] = useState("");
+  const [acctShowCurPwd, setAcctShowCurPwd] = useState(!!isSu);
+  const [acctShowNewPwd, setAcctShowNewPwd] = useState(false);
+  const [acctShowConfirmPwd, setAcctShowConfirmPwd] = useState(false);
   const [acctSaving, setAcctSaving] = useState(false);
   const [acctMsg, setAcctMsg] = useState<{ text: string; ok: boolean } | null>(null);
 
@@ -1342,18 +1345,36 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
               <div className="border-t border-gray-100 pt-3">
                 <p className="text-xs font-medium text-gray-700 mb-2">Change Password</p>
                 <div className="space-y-2">
-                  <input type="password" value={acctCurPwd}
-                    onChange={e => setAcctCurPwd(e.target.value)}
-                    placeholder="Current password"
-                    className="w-full text-xs border border-gray-300 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500" />
-                  <input type="password" value={acctNewPwd}
-                    onChange={e => setAcctNewPwd(e.target.value)}
-                    placeholder="New password (min 6 characters)"
-                    className="w-full text-xs border border-gray-300 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500" />
-                  <input type="password" value={acctConfirmPwd}
-                    onChange={e => setAcctConfirmPwd(e.target.value)}
-                    placeholder="Confirm new password"
-                    className="w-full text-xs border border-gray-300 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                  <div className="relative">
+                    <input type={acctShowCurPwd ? "text" : "password"} value={acctCurPwd}
+                      onChange={e => setAcctCurPwd(e.target.value)}
+                      placeholder="Current password"
+                      className="w-full text-xs border border-gray-300 rounded px-2 py-1.5 pr-8 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                    <button type="button" onClick={() => setAcctShowCurPwd(v => !v)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-[10px]">
+                      {acctShowCurPwd ? "Hide" : "Show"}
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <input type={acctShowNewPwd ? "text" : "password"} value={acctNewPwd}
+                      onChange={e => setAcctNewPwd(e.target.value)}
+                      placeholder="New password (min 6 characters)"
+                      className="w-full text-xs border border-gray-300 rounded px-2 py-1.5 pr-8 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                    <button type="button" onClick={() => setAcctShowNewPwd(v => !v)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-[10px]">
+                      {acctShowNewPwd ? "Hide" : "Show"}
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <input type={acctShowConfirmPwd ? "text" : "password"} value={acctConfirmPwd}
+                      onChange={e => setAcctConfirmPwd(e.target.value)}
+                      placeholder="Confirm new password"
+                      className="w-full text-xs border border-gray-300 rounded px-2 py-1.5 pr-8 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                    <button type="button" onClick={() => setAcctShowConfirmPwd(v => !v)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-[10px]">
+                      {acctShowConfirmPwd ? "Hide" : "Show"}
+                    </button>
+                  </div>
                 </div>
               </div>
 
