@@ -993,6 +993,17 @@ export const CHAPTERS: HelpChapter[] = [
           </p>
         ),
       },
+      {
+        heading: "Import DDL",
+        body: (
+          <p>
+            From the Dashboard, <strong>File ▾ → Import DDL</strong>{" "}
+            imports a SQL DDL file and creates a new project with a
+            Domain Diagram. Supports PostgreSQL, MySQL, and SQL Server.
+            See the <strong>Import DDL</strong> chapter for details.
+          </p>
+        ),
+      },
     ],
   },
 
@@ -1826,6 +1837,212 @@ export const CHAPTERS: HelpChapter[] = [
   },
 
   /* ──────────────────────────────────────────────── 24 ── */
+  {
+    slug: "database-diagrams",
+    title: "Database Domain Diagrams",
+    sections: [
+      {
+        body: (
+          <p>
+            Domain diagrams can be configured as <strong>database schema
+            diagrams</strong> by setting a Database type in the Diagram
+            Title section. This changes stereotype labels, attribute types,
+            and enables database-specific features.
+          </p>
+        ),
+      },
+      {
+        heading: "Setting the database type",
+        body: (
+          <ol className="list-decimal list-inside space-y-1">
+            <li>
+              Click on empty canvas to open the Properties Panel.
+            </li>
+            <li>
+              In the <strong>Diagram Title</strong> section, set the{" "}
+              <strong>Database</strong> dropdown to PostgreSQL, MySQL,
+              or SQL Server.
+            </li>
+          </ol>
+        ),
+      },
+      {
+        heading: "What changes",
+        body: (
+          <ul className="list-disc list-inside space-y-1">
+            <li>
+              Entity stereotype changes from{" "}
+              <code className="text-xs bg-gray-100 px-1 rounded">
+                &laquo;entity&raquo;
+              </code>{" "}
+              to{" "}
+              <code className="text-xs bg-gray-100 px-1 rounded">
+                &laquo;table&raquo;
+              </code>
+            </li>
+            <li>
+              Attribute <strong>Type</strong> dropdown shows
+              database-specific types (e.g. TEXT, TIMESTAMPTZ for
+              PostgreSQL; NVARCHAR, DATETIME2 for SQL Server; VARCHAR,
+              ENUM for MySQL)
+            </li>
+            <li>
+              New attribute flags: <strong>NOT NULL</strong> (shows [1]
+              multiplicity), <strong>PK</strong> (shows &#123;PK&#125;),{" "}
+              <strong>FK</strong> (shows &#123;FK &rarr; table.column&#125;)
+            </li>
+            <li>
+              Red connector obstacle warnings are disabled
+            </li>
+            <li>
+              Database name shown in diagram title block
+            </li>
+          </ul>
+        ),
+      },
+    ],
+  },
+
+  /* ──────────────────────────────────────────────── 25 ── */
+  {
+    slug: "import-ddl",
+    title: "Import DDL",
+    sections: [
+      {
+        body: (
+          <p>
+            Import a SQL Data Definition Language file to automatically
+            create a Domain Diagram with tables, enumerations, foreign
+            key relationships, and multiplicities.
+          </p>
+        ),
+      },
+      {
+        heading: "How to import",
+        body: (
+          <ol className="list-decimal list-inside space-y-2">
+            <li>
+              On the Dashboard, click <strong>File ▾ → Import DDL</strong>.
+            </li>
+            <li>
+              Choose a <strong>Database Type</strong> (PostgreSQL, MySQL,
+              or SQL Server).
+            </li>
+            <li>
+              Enter a <strong>Project Name</strong> (a new project will
+              be created).
+            </li>
+            <li>
+              Optionally enter a <strong>Diagram Name</strong>.
+            </li>
+            <li>
+              Select a <strong>.sql</strong> or <strong>.ddl</strong> file.
+            </li>
+            <li>
+              Click <strong>Import</strong>.
+            </li>
+          </ol>
+        ),
+      },
+      {
+        heading: "What gets created",
+        body: (
+          <ul className="list-disc list-inside space-y-1">
+            <li>
+              A new project with a Domain Diagram set to the chosen
+              database type
+            </li>
+            <li>
+              <strong>Tables</strong> as UML classes with{" "}
+              <code className="text-xs bg-gray-100 px-1 rounded">
+                &laquo;table&raquo;
+              </code>{" "}
+              stereotype, all columns as attributes with PK/FK/NOT NULL markers
+            </li>
+            <li>
+              <strong>Lookup tables</strong> (single-column with INSERTs)
+              as UML enumerations
+            </li>
+            <li>
+              <strong>Association connectors</strong> for every foreign
+              key, with multiplicities (* → 1)
+            </li>
+          </ul>
+        ),
+      },
+      {
+        heading: "Supported SQL dialects",
+        body: (
+          <ul className="list-disc list-inside space-y-1">
+            <li>
+              <strong>PostgreSQL</strong> — TEXT, SERIAL, TIMESTAMPTZ,
+              JSONB, UUID, etc.
+            </li>
+            <li>
+              <strong>MySQL</strong> — backtick identifiers,
+              AUTO_INCREMENT, ENUM, DATETIME, BLOB variants
+            </li>
+            <li>
+              <strong>SQL Server</strong> — [bracket] identifiers,
+              IDENTITY, NVARCHAR, BIT, DATETIME2, GO terminators
+            </li>
+          </ul>
+        ),
+      },
+    ],
+  },
+
+  /* ──────────────────────────────────────────────── 26 ── */
+  {
+    slug: "generate-ddl",
+    title: "Generate DDL",
+    sections: [
+      {
+        body: (
+          <p>
+            Administrators can generate the complete Diagramatix
+            relational database schema as a SQL DDL file for any
+            supported database type.
+          </p>
+        ),
+      },
+      {
+        heading: "How to generate",
+        body: (
+          <ol className="list-decimal list-inside space-y-2">
+            <li>
+              Go to <strong>File ▾ → Admin</strong> on the Dashboard.
+            </li>
+            <li>
+              Click <strong>Generate Diagramatix DDL</strong>.
+            </li>
+            <li>
+              Choose a <strong>Database Type</strong> (PostgreSQL, MySQL,
+              or SQL Server).
+            </li>
+            <li>
+              Click <strong>Download</strong> — the DDL file is saved
+              with dialect-appropriate syntax.
+            </li>
+          </ol>
+        ),
+      },
+      {
+        heading: "What the DDL contains",
+        body: (
+          <ul className="list-disc list-inside space-y-1">
+            <li>29 reference/lookup tables with seed INSERT data</li>
+            <li>22 entity tables with full column definitions</li>
+            <li>All foreign keys, indexes, and unique constraints</li>
+            <li>No JSON columns — fully normalised relational schema</li>
+            <li>Schema version number in header comment</li>
+          </ul>
+        ),
+      },
+    ],
+  },
+
+  /* ──────────────────────────────────────────────── 27 ── */
   {
     slug: "tips",
     title: "Tips & Troubleshooting",
