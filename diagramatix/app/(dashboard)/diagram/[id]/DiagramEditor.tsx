@@ -325,6 +325,7 @@ export function DiagramEditor({
     setFontSize,
     setConnectorFontSize,
     setTitleFontSize,
+    setDatabase,
     elementMoveEnd,
     flipForkJoin,
     convertTaskSubprocess,
@@ -1486,6 +1487,8 @@ export function DiagramEditor({
             debugMode={debugMode}
             diagramName={diagramName}
             diagramTitle={data.title}
+            database={data.database}
+            onSetDatabase={diagramType === "domain" ? setDatabase : undefined}
             onUpdateDiagramTitle={updateDiagramTitle}
             createdAt={createdAt}
             updatedAt={effectiveUpdatedAt}

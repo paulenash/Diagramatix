@@ -80,6 +80,12 @@ export interface UmlAttribute {
   defaultValue?: string;
   propertyString?: string;
   isDerived?: boolean;
+  // Database-specific fields
+  notNull?: boolean;        // sets multiplicity to [1] and shows {NOT NULL}
+  primaryKey?: boolean;     // shows {PK} constraint
+  foreignKey?: boolean;     // shows {FK} constraint
+  fkTable?: string;         // referenced table name
+  fkColumn?: string;        // referenced column name
 }
 
 export interface UmlOperation {
@@ -193,6 +199,7 @@ export interface DiagramData {
   fontSize?: number; // element names/labels font size in px (default 12)
   connectorFontSize?: number; // connector labels font size in px (default 10)
   titleFontSize?: number; // diagram title font size in px (default 14)
+  database?: string; // domain diagram database type: "none" | "postgres" (default "none")
 }
 
 export const EMPTY_DIAGRAM: DiagramData = {

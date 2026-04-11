@@ -117,6 +117,7 @@ const VALUE_COLORS: Record<string, string> = {
 
 const ShowValueDisplayCtx = createContext(false);
 export const ProcessGroupDepthCtx = createContext<Map<string, number>>(new Map());
+export const DatabaseCtx = createContext<string | undefined>(undefined);
 
 function ValueBadge({ el, show: showProp }: { el: DiagramElement; show?: boolean }) {
   const showCtx = useContext(ShowValueDisplayCtx);
@@ -1085,9 +1086,20 @@ function formatUmlAttribute(attr: import("@/app/lib/diagram/types").UmlAttribute
   if (attr.isDerived) s += "/";
   s += attr.name;
   if (attr.type) s += " : " + attr.type;
-  if (attr.multiplicity) s += " [" + attr.multiplicity + "]";
+  // NOT NULL overrides multiplicity to show [1]
+  if (attr.notNull) s += " [1]";
+  else if (attr.multiplicity) s += " [" + attr.multiplicity + "]";
   if (attr.defaultValue) s += " = " + attr.defaultValue;
-  if (attr.propertyString) s += " " + attr.propertyString;
+  // Build constraints string: {PK}, {FK}, custom propertyString
+  const constraints: string[] = [];
+  if (attr.primaryKey) constraints.push("{PK}");
+  if (attr.foreignKey) {
+    let fk = "{FK}";
+    if (attr.fkTable) fk = attr.fkColumn ? `{FK → ${attr.fkTable}.${attr.fkColumn}}` : `{FK → ${attr.fkTable}}`;
+    constraints.push(fk);
+  }
+  if (attr.propertyString) constraints.push(attr.propertyString);
+  if (constraints.length > 0) s += " " + constraints.join(" ");
   return s;
 }
 
@@ -1102,8 +1114,10 @@ function UmlClassShape({ el }: { el: DiagramElement }) {
   const colors = useContext(SymbolColorCtx);
   const fsc = useContext(FontScaleCtx);
   const fill = resolveColor("uml-class", colors);
-  const showStereotype = (el.properties.showStereotype as boolean | undefined) ?? false;
-  const stereotype = (el.properties.stereotype as string | undefined) ?? "entity";
+  const db = useContext(DatabaseCtx);
+  const isDbDiagram = db && db !== "none";
+  const showStereotype = (el.properties.showStereotype as boolean | undefined) ?? !!isDbDiagram;
+  const stereotype = isDbDiagram ? "table" : ((el.properties.stereotype as string | undefined) ?? "entity");
   const labelLines = el.label.split("\n");
   const lineH = Math.round(14 * fsc);
   const labelFontSize = Math.round(12 * fsc * 10) / 10;

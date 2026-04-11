@@ -16,7 +16,7 @@ import type {
   Side,
   SymbolType,
 } from "@/app/lib/diagram/types";
-import { SymbolRenderer, SublaneIdsCtx, ProcessGroupDepthCtx, type ResizeHandle } from "./SymbolRenderer";
+import { SymbolRenderer, SublaneIdsCtx, ProcessGroupDepthCtx, DatabaseCtx, type ResizeHandle } from "./SymbolRenderer";
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
 import { PaletteSymbolPreview } from "./Palette";
 import { CHEVRON_THEMES } from "@/app/lib/diagram/chevronThemes";
@@ -2223,7 +2223,8 @@ export function Canvas({
     }
     return false;
   }
-  if (diagramType === "domain") for (const conn of data.connectors) {
+  const isDbDomain = diagramType === "domain" && data.database && data.database !== "none";
+  if (diagramType === "domain" && !isDbDomain) for (const conn of data.connectors) {
     const wp = conn.waypoints;
     if (wp.length < 3) continue;
     const vs = conn.sourceInvisibleLeader ? 1 : 0;
@@ -2311,6 +2312,7 @@ export function Canvas({
       <TitleFontSizeCtx.Provider value={data.titleFontSize ?? 14}>
       <SublaneIdsCtx.Provider value={sublaneIds}>
       <ProcessGroupDepthCtx.Provider value={processGroupDepthMap}>
+      <DatabaseCtx.Provider value={data.database}>
       <svg
         ref={svgRef}
         data-canvas
@@ -3470,6 +3472,7 @@ export function Canvas({
 
         </g>
       </svg>
+      </DatabaseCtx.Provider>
       </ProcessGroupDepthCtx.Provider>
       </SublaneIdsCtx.Provider>
       </TitleFontSizeCtx.Provider>

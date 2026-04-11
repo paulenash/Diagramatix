@@ -189,6 +189,7 @@ type Action =
   | { type: "SET_FONT_SIZE"; payload: number }
   | { type: "SET_CONNECTOR_FONT_SIZE"; payload: number }
   | { type: "SET_TITLE_FONT_SIZE"; payload: number }
+  | { type: "SET_DATABASE"; payload: string }
   | { type: "CORRECT_ALL_CONNECTORS" }
   | { type: "INSERT_SPACE"; payload: { markerX: number; markerY: number; dx: number; dy: number } }
   | { type: "SET_VIEWPORT"; payload: { x: number; y: number; zoom: number } }
@@ -1820,6 +1821,9 @@ function reducer(state: DiagramData, action: Action): DiagramData {
     case "SET_TITLE_FONT_SIZE":
       return { ...state, titleFontSize: action.payload };
 
+    case "SET_DATABASE":
+      return { ...state, database: action.payload || undefined };
+
     case "INSERT_SPACE": {
       const { markerX, markerY, dx, dy } = action.payload;
 
@@ -2864,6 +2868,11 @@ export function useDiagram(initialData: DiagramData) {
     setTitleFontSize: useCallback(
       (size: number) => {
         dispatch({ type: "SET_TITLE_FONT_SIZE", payload: size });
+      }, []
+    ),
+    setDatabase: useCallback(
+      (db: string) => {
+        dispatch({ type: "SET_DATABASE", payload: db });
       }, []
     ),
     convertTaskSubprocess: useCallback((id: string) => {

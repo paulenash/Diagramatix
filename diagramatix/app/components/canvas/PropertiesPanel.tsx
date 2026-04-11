@@ -49,6 +49,8 @@ interface Props {
   currentDiagramId?: string;
   onFlipForkJoin?: (id: string) => void;
   onConvertTaskSubprocess?: (id: string) => void;
+  database?: string;
+  onSetDatabase?: (db: string) => void;
 }
 
 const TASK_TYPE_OPTIONS: { value: BpmnTaskType; label: string }[] = [
@@ -155,6 +157,16 @@ function MultSelect({ value, onChange }: { value: string; onChange: (v: string) 
 
 const UML_TYPES = ["String", "Number", "Integer", "Date", "DateTime", "Duration", "Money", "Decimal", "Boolean"];
 
+const POSTGRES_TYPES = [
+  "TEXT", "VARCHAR", "CHAR",
+  "INT", "BIGINT", "SMALLINT", "SERIAL", "BIGSERIAL",
+  "NUMERIC", "DECIMAL", "REAL", "DOUBLE PRECISION",
+  "BOOLEAN",
+  "DATE", "TIME", "TIMESTAMP", "TIMESTAMPTZ", "INTERVAL",
+  "UUID", "JSON", "JSONB", "BYTEA", "INET", "CIDR", "MACADDR",
+  "ARRAY", "XML",
+];
+
 function formatAttrDisplay(attr: UmlAttribute): string {
   let s = "";
   if (attr.visibility) s += attr.visibility + " ";
@@ -167,10 +179,12 @@ function formatAttrDisplay(attr: UmlAttribute): string {
   return s;
 }
 
-function ClassAttributesList({ element, onUpdateProperties }: {
+function ClassAttributesList({ element, onUpdateProperties, database }: {
   element: DiagramElement;
   onUpdateProperties: (id: string, props: Record<string, unknown>) => void;
+  database?: string;
 }) {
+  const typeList = database === "postgres" ? POSTGRES_TYPES : UML_TYPES;
   const attrs: UmlAttribute[] = (element.properties.attributes as UmlAttribute[] | undefined) ?? [];
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [draft, setDraft] = useState<UmlAttribute | null>(null);
@@ -238,7 +252,7 @@ function ClassAttributesList({ element, onUpdateProperties }: {
                 <select value={draft.type ?? ""} onChange={e => setDraft({ ...draft, type: e.target.value || undefined })}
                   className="text-[9px] border border-gray-300 rounded px-0.5 py-0 flex-1">
                   <option value="">None</option>
-                  {UML_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                  {typeList.map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
               </div>
               <div className="flex items-center gap-1">
@@ -256,6 +270,40 @@ function ClassAttributesList({ element, onUpdateProperties }: {
                   onChange={e => setDraft({ ...draft, isDerived: e.target.checked })}
                   className="w-3 h-3" />
               </div>
+              {database === "postgres" && (
+                <>
+                  <div className="flex items-center gap-3">
+                    <label className="flex items-center gap-1 text-[9px] text-gray-500">
+                      <input type="checkbox" checked={draft.notNull ?? false}
+                        onChange={e => setDraft({ ...draft, notNull: e.target.checked })}
+                        className="w-3 h-3" />
+                      NOT NULL
+                    </label>
+                    <label className="flex items-center gap-1 text-[9px] text-gray-500">
+                      <input type="checkbox" checked={draft.primaryKey ?? false}
+                        onChange={e => setDraft({ ...draft, primaryKey: e.target.checked })}
+                        className="w-3 h-3" />
+                      PK
+                    </label>
+                    <label className="flex items-center gap-1 text-[9px] text-gray-500">
+                      <input type="checkbox" checked={draft.foreignKey ?? false}
+                        onChange={e => setDraft({ ...draft, foreignKey: e.target.checked })}
+                        className="w-3 h-3" />
+                      FK
+                    </label>
+                  </div>
+                  {draft.foreignKey && (
+                    <div className="flex items-center gap-1">
+                      <label className="text-[9px] text-gray-500 w-10 shrink-0">FK →</label>
+                      <input type="text" value={draft.fkTable ?? ""} onChange={e => setDraft({ ...draft, fkTable: e.target.value || undefined })}
+                        className="flex-1 text-[9px] border border-gray-300 rounded px-1 py-0 min-w-0" placeholder="table" />
+                      <span className="text-[9px] text-gray-400">.</span>
+                      <input type="text" value={draft.fkColumn ?? ""} onChange={e => setDraft({ ...draft, fkColumn: e.target.value || undefined })}
+                        className="flex-1 text-[9px] border border-gray-300 rounded px-1 py-0 min-w-0" placeholder="column" />
+                    </div>
+                  )}
+                </>
+              )}
               <div className="flex justify-end gap-1 pt-0.5">
                 <button onClick={cancelEdit}
                   className="px-2 py-0.5 text-[9px] text-gray-600 border border-gray-300 rounded hover:bg-gray-100">Cancel</button>
@@ -505,6 +553,8 @@ export function PropertiesPanel({
   currentDiagramId,
   onFlipForkJoin,
   onConvertTaskSubprocess,
+  database,
+  onSetDatabase,
 }: Props) {
   const [labelDraft, setLabelDraft] = useState("");
   const [panelCollapsed, setPanelCollapsed] = useState(false);
@@ -589,6 +639,17 @@ export function PropertiesPanel({
             ))}
           </select>
         </div>
+        {onSetDatabase && (
+          <div className="flex items-center gap-1 mb-0.5">
+            <span className="text-[9px] text-gray-500 w-12 shrink-0">Database</span>
+            <select value={database ?? "none"}
+              onChange={e => onSetDatabase(e.target.value)}
+              className="text-[9px] border border-gray-300 rounded px-0.5 py-0 bg-white text-gray-700 cursor-pointer">
+              <option value="none">None</option>
+              <option value="postgres">PostgreSQL</option>
+            </select>
+          </div>
+        )}
         <InlineField label="Name">
           <span className="text-[9px] text-gray-600 truncate">{diagramName ?? ""}</span>
         </InlineField>
@@ -1900,7 +1961,7 @@ export function PropertiesPanel({
             </label>
           </div>
           {((element.properties.showAttributes as boolean | undefined) ?? false) && (
-            <ClassAttributesList element={element} onUpdateProperties={onUpdateProperties} />
+            <ClassAttributesList element={element} onUpdateProperties={onUpdateProperties} database={database} />
           )}
           {((element.properties.showOperations as boolean | undefined) ?? false) && (
             <ClassOperationsList element={element} onUpdateProperties={onUpdateProperties} />
