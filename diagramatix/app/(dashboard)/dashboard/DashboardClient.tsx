@@ -227,6 +227,62 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
   const [ddlResult, setDdlResult] = useState<"success" | "failed" | null>(null);
   const ddlFileInputRef = useRef<HTMLInputElement>(null);
 
+  // Account modal
+  const [showAccount, setShowAccount] = useState(false);
+  const [acctName, setAcctName] = useState(userName);
+  const [acctEmail, setAcctEmail] = useState(userEmail ?? "");
+  const [acctOrgName, setAcctOrgName] = useState(orgName ?? "");
+  const [acctCurPwd, setAcctCurPwd] = useState("");
+  const [acctNewPwd, setAcctNewPwd] = useState("");
+  const [acctConfirmPwd, setAcctConfirmPwd] = useState("");
+  const [acctSaving, setAcctSaving] = useState(false);
+  const [acctMsg, setAcctMsg] = useState<{ text: string; ok: boolean } | null>(null);
+
+  async function handleAccountSave() {
+    setAcctSaving(true);
+    setAcctMsg(null);
+    try {
+      const body: Record<string, string> = {};
+      if (acctName !== userName) body.name = acctName;
+      if (acctEmail !== (userEmail ?? "")) body.email = acctEmail;
+      if (acctOrgName !== (orgName ?? "")) body.orgName = acctOrgName;
+      if (acctNewPwd) {
+        if (acctNewPwd !== acctConfirmPwd) {
+          setAcctMsg({ text: "New passwords do not match", ok: false });
+          setAcctSaving(false);
+          return;
+        }
+        body.currentPassword = acctCurPwd;
+        body.newPassword = acctNewPwd;
+      }
+      if (Object.keys(body).length === 0) {
+        setAcctMsg({ text: "No changes to save", ok: true });
+        setAcctSaving(false);
+        return;
+      }
+      const res = await fetch("/api/account", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Failed" }));
+        setAcctMsg({ text: err.error ?? "Failed to save", ok: false });
+      } else {
+        setAcctMsg({ text: "Saved successfully", ok: true });
+        setAcctCurPwd("");
+        setAcctNewPwd("");
+        setAcctConfirmPwd("");
+        // Refresh to pick up new name/email/org
+        setTimeout(() => window.location.reload(), 1000);
+      }
+    } catch (err) {
+      setAcctMsg({ text: err instanceof Error ? err.message : "Failed", ok: false });
+    } finally {
+      setAcctSaving(false);
+    }
+  }
+
   // Backup / Restore
   const [backingUp, setBackingUp] = useState(false);
   const [restoring, setRestoring] = useState(false);
@@ -829,10 +885,14 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
               {orgName}
             </div>
           )}
-          <div className="text-right">
+          <button
+            onClick={() => setShowAccount(true)}
+            className="text-right hover:bg-gray-50 rounded px-1.5 py-0.5 -mx-1"
+            title="Account settings"
+          >
             <span className="text-sm text-gray-700 font-medium">{userName}</span>
             {userEmail && <p className="text-[10px] text-gray-400 leading-tight">{userEmail}</p>}
-          </div>
+          </button>
           <button
             onClick={() => signOut({ callbackUrl: "/login" })}
             className="text-sm text-gray-500 hover:text-gray-700"
@@ -1241,6 +1301,79 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                   Close
                 </button>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Account settings modal */}
+      {showAccount && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-sm">
+            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200">
+              <h2 className="text-sm font-semibold text-gray-900">Account Settings</h2>
+              <button onClick={() => { setShowAccount(false); setAcctMsg(null); }}
+                className="text-gray-400 hover:text-gray-600 text-lg leading-none">&times;</button>
+            </div>
+            <div className="px-5 py-4 space-y-3">
+              {/* Profile */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Name</label>
+                <input type="text" value={acctName}
+                  onChange={e => setAcctName(e.target.value)}
+                  className="w-full text-xs border border-gray-300 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Email</label>
+                <input type="email" value={acctEmail}
+                  onChange={e => setAcctEmail(e.target.value)}
+                  className="w-full text-xs border border-gray-300 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+              </div>
+
+              {/* Organisation */}
+              <div className="border-t border-gray-100 pt-3">
+                <label className="block text-xs font-medium text-gray-700 mb-1">Organisation Name</label>
+                <input type="text" value={acctOrgName}
+                  onChange={e => setAcctOrgName(e.target.value)}
+                  className="w-full text-xs border border-gray-300 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+              </div>
+
+              {/* Change Password */}
+              <div className="border-t border-gray-100 pt-3">
+                <p className="text-xs font-medium text-gray-700 mb-2">Change Password</p>
+                <div className="space-y-2">
+                  <input type="password" value={acctCurPwd}
+                    onChange={e => setAcctCurPwd(e.target.value)}
+                    placeholder="Current password"
+                    className="w-full text-xs border border-gray-300 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                  <input type="password" value={acctNewPwd}
+                    onChange={e => setAcctNewPwd(e.target.value)}
+                    placeholder="New password (min 6 characters)"
+                    className="w-full text-xs border border-gray-300 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                  <input type="password" value={acctConfirmPwd}
+                    onChange={e => setAcctConfirmPwd(e.target.value)}
+                    placeholder="Confirm new password"
+                    className="w-full text-xs border border-gray-300 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                </div>
+              </div>
+
+              {/* Status message */}
+              {acctMsg && (
+                <p className={`text-xs ${acctMsg.ok ? "text-green-600" : "text-red-600"}`}>
+                  {acctMsg.text}
+                </p>
+              )}
+            </div>
+
+            <div className="px-5 py-3 border-t border-gray-200 flex justify-end gap-2">
+              <button onClick={() => { setShowAccount(false); setAcctMsg(null); }}
+                className="px-4 py-1.5 text-xs text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50">
+                Cancel
+              </button>
+              <button onClick={handleAccountSave} disabled={acctSaving}
+                className="px-4 py-1.5 text-xs text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50">
+                {acctSaving ? "Saving\u2026" : "Save"}
+              </button>
             </div>
           </div>
         </div>
