@@ -247,9 +247,9 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
     setAcctMsg(null);
     try {
       const body: Record<string, string> = {};
-      if (acctName !== userName) body.name = acctName;
-      if (acctEmail !== (userEmail ?? "")) body.email = acctEmail;
-      if (acctOrgName !== (orgName ?? "")) body.orgName = acctOrgName;
+      body.name = acctName;
+      body.email = acctEmail;
+      body.orgName = acctOrgName;
       if (acctNewPwd) {
         if (acctNewPwd !== acctConfirmPwd) {
           setAcctMsg({ text: "New passwords do not match", ok: false });
@@ -258,11 +258,6 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
         }
         body.currentPassword = acctCurPwd;
         body.newPassword = acctNewPwd;
-      }
-      if (Object.keys(body).length === 0) {
-        setAcctMsg({ text: "No changes to save", ok: true });
-        setAcctSaving(false);
-        return;
       }
       const res = await fetch("/api/account", {
         method: "PUT",
@@ -273,12 +268,10 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
         const err = await res.json().catch(() => ({ error: "Failed" }));
         setAcctMsg({ text: err.error ?? "Failed to save", ok: false });
       } else {
-        setAcctMsg({ text: "Saved successfully", ok: true });
-        setAcctCurPwd("");
-        setAcctNewPwd("");
-        setAcctConfirmPwd("");
-        // Refresh to pick up new name/email/org
-        setTimeout(() => window.location.reload(), 1000);
+        setShowAccount(false);
+        setAcctMsg(null);
+        // Refresh to pick up new name/email/org in session
+        window.location.reload();
       }
     } catch (err) {
       setAcctMsg({ text: err instanceof Error ? err.message : "Failed", ok: false });
