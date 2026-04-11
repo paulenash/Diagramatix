@@ -2390,6 +2390,10 @@ export function Canvas({
             if (title.authors) line2Segs.push({ label: "Author/s: ", value: title.authors });
             const line3Segs: Seg[] = [];
             line3Segs.push({ label: "Status: ", value: statusLabel });
+            if (data.database && data.database !== "none") {
+              const dbLabel = data.database === "postgres" ? "PostgreSQL" : data.database;
+              line3Segs.push({ label: "Database: ", value: dbLabel });
+            }
             if (createdAt) line3Segs.push({ label: "Created: ", value: formatAustralianDate(createdAt) });
             const line4Segs: Seg[] = updatedAt ? [{ label: "Modified: ", value: formatAustralianTime(updatedAt) }] : [];
             const subLines: Seg[][] = [line2Segs, line3Segs, line4Segs].filter(l => l.length > 0);
