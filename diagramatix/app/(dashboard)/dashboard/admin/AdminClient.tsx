@@ -45,7 +45,7 @@ export function AdminClient({ users, currentUserId }: Props) {
             href="/dashboard/admin/database"
             className="text-xs text-orange-600 hover:text-orange-800 font-medium border border-orange-300 rounded px-2 py-1"
           >
-            Database
+            Database Access
           </a>
           <a
             href="/dashboard/admin/archive"
