@@ -1175,6 +1175,8 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                   <select value={ddlDbType} onChange={e => setDdlDbType(e.target.value)}
                     className="w-full text-xs border border-gray-300 rounded px-2 py-1.5 bg-white">
                     <option value="postgres">PostgreSQL</option>
+                    <option value="mysql">MySQL</option>
+                    <option value="mssql">SQL Server</option>
                   </select>
                 </div>
                 <div>

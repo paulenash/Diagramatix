@@ -2391,7 +2391,8 @@ export function Canvas({
             const line3Segs: Seg[] = [];
             line3Segs.push({ label: "Status: ", value: statusLabel });
             if (data.database && data.database !== "none") {
-              const dbLabel = data.database === "postgres" ? "PostgreSQL" : data.database;
+              const DB_LABELS: Record<string, string> = { postgres: "PostgreSQL", mysql: "MySQL", mssql: "SQL Server" };
+              const dbLabel = DB_LABELS[data.database] ?? data.database;
               line3Segs.push({ label: "Database: ", value: dbLabel });
             }
             if (createdAt) line3Segs.push({ label: "Created: ", value: formatAustralianDate(createdAt) });

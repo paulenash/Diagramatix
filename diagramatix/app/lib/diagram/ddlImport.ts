@@ -1,6 +1,6 @@
 /**
  * Parse a SQL DDL file and produce a DiagramData for a Domain Diagram.
- * Supports PostgreSQL dialect.
+ * Supports PostgreSQL, MySQL, and Microsoft SQL Server dialects.
  */
 
 import type { DiagramData, DiagramElement, Connector, Point, UmlAttribute } from "./types";
@@ -18,30 +18,54 @@ interface ParsedColumn {
 interface ParsedTable {
   name: string;
   columns: ParsedColumn[];
-  isEnum: boolean; // INSERT-only table with a single "code" column → enumeration
+  isEnum: boolean;
   enumValues: string[];
 }
+
+// ── Identifier helpers ──────────────────────────────────────────────
+
+/** Strip quotes/backticks/brackets: "foo" → foo, `foo` → foo, [foo] → foo, dbo.foo → foo */
+function unquoteId(s: string): string {
+  let id = s.trim();
+  // Strip schema prefix (dbo.TableName, public.table_name)
+  const dotIdx = id.lastIndexOf(".");
+  if (dotIdx >= 0) id = id.substring(dotIdx + 1);
+  // Strip delimiters
+  if ((id.startsWith('"') && id.endsWith('"')) ||
+      (id.startsWith('`') && id.endsWith('`'))) return id.slice(1, -1);
+  if (id.startsWith('[') && id.endsWith(']')) return id.slice(1, -1);
+  return id;
+}
+
+/** Match a possibly-quoted identifier: word | "word" | `word` | [word] | schema.word */
+const ID = `(?:[\\w]+\\.)?(?:\\w+|"[^"]+"|` + "`[^`]+" + "`|\\[[^\\]]+\\])";
 
 // ── Parser ──────────────────────────────────────────────────────────
 
 export function parseDDL(sql: string): ParsedTable[] {
   const tables: ParsedTable[] = [];
-  // Normalise line endings
-  const text = sql.replace(/\r\n/g, "\n");
+  // Normalise: strip comments, normalise whitespace
+  let text = sql.replace(/\r\n/g, "\n");
+  // Strip single-line comments (-- ...) but not inside strings
+  text = text.replace(/--[^\n]*/g, "");
+  // Strip block comments (/* ... */)
+  text = text.replace(/\/\*[\s\S]*?\*\//g, "");
 
-  // Extract CREATE TABLE blocks
-  const createRe = /CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(\w+)\s*\(([\s\S]*?)\);/gi;
+  // Extract CREATE TABLE blocks — handle optional IF NOT EXISTS, schema prefixes,
+  // quoted identifiers, and both semicolon and GO terminators
+  const createRe = new RegExp(
+    `CREATE\\s+TABLE\\s+(?:IF\\s+NOT\\s+EXISTS\\s+)?(${ID})\\s*\\(([\\s\\S]*?)\\)\\s*(?:;|\\bGO\\b|$)`,
+    "gi"
+  );
   let m;
   while ((m = createRe.exec(text)) !== null) {
-    const tableName = m[1];
+    const tableName = unquoteId(m[1]);
     const body = m[2];
     const columns: ParsedColumn[] = [];
 
-    // Track table-level PKs and FKs
     const tablePKs = new Set<string>();
     const tableFKs = new Map<string, { table: string; column: string }>();
 
-    // Split body by commas, but respect parentheses
     const parts = splitTopLevel(body);
 
     for (const raw of parts) {
@@ -49,46 +73,53 @@ export function parseDDL(sql: string): ParsedTable[] {
       if (!part) continue;
 
       // Table-level PRIMARY KEY
-      const pkMatch = part.match(/^\s*PRIMARY\s+KEY\s*\(([^)]+)\)/i);
+      const pkMatch = part.match(/^\s*(?:CONSTRAINT\s+\S+\s+)?PRIMARY\s+KEY\s*(?:CLUSTERED\s*|NONCLUSTERED\s*)?\(([^)]+)\)/i);
       if (pkMatch) {
-        for (const col of pkMatch[1].split(",")) tablePKs.add(col.trim().replace(/"/g, ""));
+        for (const col of pkMatch[1].split(",")) tablePKs.add(unquoteId(col));
         continue;
       }
 
       // Table-level FOREIGN KEY
-      const fkMatch = part.match(/^\s*(?:CONSTRAINT\s+\w+\s+)?FOREIGN\s+KEY\s*\((\w+)\)\s*REFERENCES\s+(\w+)\s*\((\w+)\)/i);
+      const fkMatch = part.match(
+        new RegExp(`^\\s*(?:CONSTRAINT\\s+\\S+\\s+)?FOREIGN\\s+KEY\\s*\\((${ID})\\)\\s*REFERENCES\\s+(${ID})\\s*\\((${ID})\\)`, "i")
+      );
       if (fkMatch) {
-        tableFKs.set(fkMatch[1], { table: fkMatch[2], column: fkMatch[3] });
+        tableFKs.set(unquoteId(fkMatch[1]), { table: unquoteId(fkMatch[2]), column: unquoteId(fkMatch[3]) });
         continue;
       }
 
-      // Table-level UNIQUE, CHECK, INDEX — skip
-      if (/^\s*(UNIQUE|CHECK|INDEX|CONSTRAINT)/i.test(part)) continue;
+      // Skip UNIQUE, CHECK, INDEX, KEY (MySQL index), CONSTRAINT-only lines
+      if (/^\s*(UNIQUE|CHECK|INDEX|CONSTRAINT|KEY\s)/i.test(part)) continue;
 
-      // Column definition
-      const colMatch = part.match(/^\s*"?(\w+)"?\s+(\w[\w\s()]*?)(?:\s+(NOT\s+NULL|NULL|DEFAULT|PRIMARY\s+KEY|REFERENCES|UNIQUE|CHECK).*)?\s*$/i);
+      // Column definition — handle quoted names and types with parenthesised precision
+      const colRe = new RegExp(
+        `^\\s*(${ID})\\s+([A-Za-z][\\w\\s(),.]*?)(?:\\s+(NOT\\s+NULL|NULL|DEFAULT|PRIMARY\\s+KEY|REFERENCES|IDENTITY|AUTO_INCREMENT|UNIQUE|CHECK|COLLATE).*)?\s*$`,
+        "i"
+      );
+      const colMatch = part.match(colRe);
       if (!colMatch) continue;
 
-      const colName = colMatch[1];
-      let colType = colMatch[2].trim().toUpperCase();
-      const rest = part.substring(colMatch.index! + colMatch[0].indexOf(colMatch[2]) + colMatch[2].length);
+      const colName = unquoteId(colMatch[1]);
+      let colType = colMatch[2].trim().toUpperCase().replace(/\s+/g, " ");
 
-      // Clean up type
-      colType = colType.replace(/\s+/g, " ");
+      // Normalise common type aliases across dialects
+      colType = normaliseType(colType);
 
+      const rest = part.substring(part.indexOf(colMatch[2]) + colMatch[2].length);
       const notNull = /NOT\s+NULL/i.test(rest);
       const isPK = /PRIMARY\s+KEY/i.test(rest);
+      const isIdentity = /IDENTITY/i.test(rest) || /AUTO_INCREMENT/i.test(rest);
       let fkTable: string | undefined;
       let fkColumn: string | undefined;
-      const refMatch = rest.match(/REFERENCES\s+(\w+)\s*\((\w+)\)/i);
+      const refMatch = rest.match(new RegExp(`REFERENCES\\s+(${ID})\\s*\\((${ID})\\)`, "i"));
       if (refMatch) {
-        fkTable = refMatch[1];
-        fkColumn = refMatch[2];
+        fkTable = unquoteId(refMatch[1]);
+        fkColumn = unquoteId(refMatch[2]);
       }
 
       columns.push({
         name: colName,
-        type: colType,
+        type: colType + (isIdentity ? " IDENTITY" : ""),
         notNull: notNull || isPK,
         primaryKey: isPK,
         foreignKey: !!fkTable,
@@ -107,16 +138,24 @@ export function parseDDL(sql: string): ParsedTable[] {
     tables.push({ name: tableName, columns, isEnum: false, enumValues: [] });
   }
 
-  // Detect enumeration tables: tables with just a single PK "code" column + INSERT values
-  const insertRe = /INSERT\s+INTO\s+(\w+)\s*\([^)]*\)\s*VALUES\s*([\s\S]*?);/gi;
+  // Detect enumeration tables: single PK "code" column + INSERT values
+  const insertRe = new RegExp(
+    `INSERT\\s+INTO\\s+(${ID})\\s*\\([^)]*\\)\\s*VALUES\\s*([\\s\\S]*?);`,
+    "gi"
+  );
   const inserts = new Map<string, string[]>();
   while ((m = insertRe.exec(text)) !== null) {
-    const tbl = m[1];
+    const tbl = unquoteId(m[1]);
     const valBlock = m[2];
     const vals: string[] = [];
     const valRe = /\(\s*'([^']*)'\s*\)/g;
     let vm;
     while ((vm = valRe.exec(valBlock)) !== null) vals.push(vm[1]);
+    // Also try N'...' (SQL Server unicode strings)
+    if (vals.length === 0) {
+      const nValRe = /\(\s*N'([^']*)'\s*\)/g;
+      while ((vm = nValRe.exec(valBlock)) !== null) vals.push(vm[1]);
+    }
     if (vals.length > 0) inserts.set(tbl, vals);
   }
 
@@ -128,6 +167,36 @@ export function parseDDL(sql: string): ParsedTable[] {
   }
 
   return tables;
+}
+
+/** Normalise type names across SQL dialects to a canonical form */
+function normaliseType(t: string): string {
+  // Already uppercase and trimmed by caller
+  // MySQL → standard
+  if (t === "TINYINT(1)") return "BOOLEAN";
+  if (/^TINYINT/.test(t)) return "TINYINT";
+  if (/^MEDIUMINT/.test(t)) return "MEDIUMINT";
+  if (/^INT\b/.test(t) || t === "INTEGER") return "INT";
+  if (/^BIGINT/.test(t)) return "BIGINT";
+  if (/^SMALLINT/.test(t)) return "SMALLINT";
+  if (t === "DOUBLE" || t === "DOUBLE PRECISION") return "DOUBLE PRECISION";
+  if (t === "FLOAT") return "FLOAT";
+  if (/^ENUM\s*\(/.test(t)) return "ENUM";
+  if (t === "LONGTEXT" || t === "MEDIUMTEXT" || t === "TINYTEXT") return "TEXT";
+  if (t === "LONGBLOB" || t === "MEDIUMBLOB" || t === "TINYBLOB" || t === "BLOB") return "BLOB";
+  if (t === "DATETIME") return "DATETIME";
+  // SQL Server → standard
+  if (t === "NVARCHAR(MAX)" || t === "VARCHAR(MAX)") return "TEXT";
+  if (/^NVARCHAR/.test(t)) return t; // keep precision
+  if (t === "NTEXT") return "TEXT";
+  if (t === "BIT") return "BOOLEAN";
+  if (t === "DATETIME2" || t === "SMALLDATETIME") return "DATETIME";
+  if (t === "DATETIMEOFFSET") return "TIMESTAMPTZ";
+  if (t === "MONEY" || t === "SMALLMONEY") return "MONEY";
+  if (t === "UNIQUEIDENTIFIER") return "UUID";
+  if (t === "IMAGE" || t === "VARBINARY(MAX)") return "BYTEA";
+  if (t === "XML") return "XML";
+  return t;
 }
 
 /** Split a string by commas at the top level (not inside parentheses) */
@@ -172,7 +241,6 @@ export function generateDiagramFromDDL(
   const entityTables = parsedTables.filter(t => !t.isEnum);
   const enumTables = parsedTables.filter(t => t.isEnum);
 
-  // Compute sizes
   function classWidth(t: ParsedTable): number {
     const stereoW = "«table»".length * CHAR_W * 0.8;
     let maxW = Math.max(stereoW, t.name.length * CHAR_W);

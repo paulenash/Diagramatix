@@ -167,6 +167,32 @@ const POSTGRES_TYPES = [
   "ARRAY", "XML",
 ];
 
+const MYSQL_TYPES = [
+  "VARCHAR", "CHAR", "TEXT", "TINYTEXT", "MEDIUMTEXT", "LONGTEXT",
+  "INT", "BIGINT", "SMALLINT", "TINYINT", "MEDIUMINT",
+  "DECIMAL", "FLOAT", "DOUBLE",
+  "BOOLEAN",
+  "DATE", "TIME", "DATETIME", "TIMESTAMP", "YEAR",
+  "BLOB", "TINYBLOB", "MEDIUMBLOB", "LONGBLOB",
+  "ENUM", "SET", "JSON", "BINARY", "VARBINARY",
+];
+
+const MSSQL_TYPES = [
+  "NVARCHAR", "VARCHAR", "NCHAR", "CHAR", "TEXT", "NTEXT",
+  "INT", "BIGINT", "SMALLINT", "TINYINT",
+  "NUMERIC", "DECIMAL", "FLOAT", "REAL", "MONEY", "SMALLMONEY",
+  "BIT",
+  "DATE", "TIME", "DATETIME", "DATETIME2", "SMALLDATETIME", "DATETIMEOFFSET",
+  "UNIQUEIDENTIFIER", "XML", "VARBINARY", "IMAGE",
+  "SQL_VARIANT", "HIERARCHYID", "GEOGRAPHY", "GEOMETRY",
+];
+
+const DB_TYPE_LISTS: Record<string, string[]> = {
+  postgres: POSTGRES_TYPES,
+  mysql: MYSQL_TYPES,
+  mssql: MSSQL_TYPES,
+};
+
 function formatAttrDisplay(attr: UmlAttribute): string {
   let s = "";
   if (attr.visibility) s += attr.visibility + " ";
@@ -184,7 +210,7 @@ function ClassAttributesList({ element, onUpdateProperties, database }: {
   onUpdateProperties: (id: string, props: Record<string, unknown>) => void;
   database?: string;
 }) {
-  const typeList = database === "postgres" ? POSTGRES_TYPES : UML_TYPES;
+  const typeList = (database && database !== "none" && DB_TYPE_LISTS[database]) ? DB_TYPE_LISTS[database] : UML_TYPES;
   const attrs: UmlAttribute[] = (element.properties.attributes as UmlAttribute[] | undefined) ?? [];
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [draft, setDraft] = useState<UmlAttribute | null>(null);
@@ -270,7 +296,7 @@ function ClassAttributesList({ element, onUpdateProperties, database }: {
                   onChange={e => setDraft({ ...draft, isDerived: e.target.checked })}
                   className="w-3 h-3" />
               </div>
-              {database === "postgres" && (
+              {database && database !== "none" && (
                 <>
                   <div className="flex items-center gap-3">
                     <label className="flex items-center gap-1 text-[9px] text-gray-500">
@@ -647,6 +673,8 @@ export function PropertiesPanel({
               className="text-[9px] border border-gray-300 rounded px-0.5 py-0 bg-white text-gray-700 cursor-pointer">
               <option value="none">None</option>
               <option value="postgres">PostgreSQL</option>
+              <option value="mysql">MySQL</option>
+              <option value="mssql">SQL Server</option>
             </select>
           </div>
         )}
