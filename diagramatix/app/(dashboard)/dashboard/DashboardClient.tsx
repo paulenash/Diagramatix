@@ -872,7 +872,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
             className="text-xs text-gray-500 hover:text-blue-600"
             title="User Guide"
           >
-            Help
+            User Guide
           </a>
           {orgName && (
             <div

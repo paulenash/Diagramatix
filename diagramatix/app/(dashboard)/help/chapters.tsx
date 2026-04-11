@@ -2045,6 +2045,67 @@ export const CHAPTERS: HelpChapter[] = [
 
   /* ──────────────────────────────────────────────── 27 ── */
   {
+    slug: "account",
+    title: "Account Settings",
+    sections: [
+      {
+        body: (
+          <p>
+            Click your <strong>name and email</strong> in the dashboard
+            header to open Account Settings.
+          </p>
+        ),
+      },
+      {
+        heading: "Profile",
+        body: (
+          <ul className="list-disc list-inside space-y-1">
+            <li>
+              <strong>Name</strong> — your display name shown across the
+              application.
+            </li>
+            <li>
+              <strong>Email</strong> — your sign-in email address.
+              Changing this updates your credentials immediately.
+            </li>
+          </ul>
+        ),
+      },
+      {
+        heading: "Organisation",
+        body: (
+          <p>
+            Edit your <strong>Organisation Name</strong>. This is the
+            name shown in the dashboard header and used to identify your
+            workspace.
+          </p>
+        ),
+      },
+      {
+        heading: "Change Password",
+        body: (
+          <ol className="list-decimal list-inside space-y-1">
+            <li>Enter your <strong>current password</strong>.</li>
+            <li>Enter a <strong>new password</strong> (minimum 6 characters).</li>
+            <li>Confirm the new password.</li>
+            <li>Click <strong>Save</strong>.</li>
+          </ol>
+        ),
+      },
+      {
+        heading: "Sign Out",
+        body: (
+          <p>
+            The <strong>Sign Out</strong> button is in the Account Settings
+            dialog footer.
+          </p>
+        ),
+      },
+    ],
+  },
+
+  /* ──────────────────────────────────────────────── 28 ── */
+  {
     slug: "tips",
     title: "Tips & Troubleshooting",
     sections: [

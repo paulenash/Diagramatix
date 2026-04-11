@@ -45,6 +45,12 @@ export default async function DashboardPage() {
     );
   }
 
+  // Fetch current user name/email from DB (session JWT may be stale after profile edit)
+  const currentUser = await prisma.user.findUnique({
+    where: { id: effectiveUserId },
+    select: { name: true, email: true },
+  });
+
   const [projects, unorganized, org] = await Promise.all([
     prisma.project.findMany({
       where: { userId: effectiveUserId, orgId, name: { not: ARCHIVE_PROJECT_NAME } },
@@ -80,8 +86,8 @@ export default async function DashboardPage() {
     <DashboardClient
       projects={projects}
       unorganized={unorganized}
-      userName={session.user.name ?? "User"}
-      userEmail={session.user.email ?? ""}
+      userName={currentUser?.name ?? session.user.name ?? "User"}
+      userEmail={currentUser?.email ?? session.user.email ?? ""}
       orgName={org?.name ?? ""}
       version={commitCount}
       readOnly={viewing}
