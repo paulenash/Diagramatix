@@ -9,8 +9,7 @@ const globalForPrisma = globalThis as unknown as {
 
 function createPrismaClient() {
   const connectionString = process.env.DATABASE_URL!;
-  // PGlite is single-threaded — limit Prisma to 2 connections
-  const adapter = new PrismaPg({ connectionString, max: 2 });
+  const adapter = new PrismaPg({ connectionString, max: 10 });
   return new PrismaClient({
     adapter,
     log:
@@ -21,12 +20,12 @@ function createPrismaClient() {
 export const prisma = globalForPrisma.prisma ?? createPrismaClient();
 
 // Separate pool for raw SQL (templates, JSON field writes)
-// PGlite is single-threaded — keep this small to avoid connection starvation
+// Separate pool for raw SQL (templates, JSON field writes)
 export const pgPool = globalForPrisma.pgPool ?? new pg.Pool({
-  connectionString: process.env.DATABASE_URL!.split("?")[0] + "?sslmode=disable",
-  connectionTimeoutMillis: 120_000,
+  connectionString: process.env.DATABASE_URL!,
+  connectionTimeoutMillis: 10_000,
   idleTimeoutMillis: 30_000,
-  max: 2,
+  max: 5,
 });
 
 if (process.env.NODE_ENV !== "production") {

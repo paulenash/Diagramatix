@@ -24,6 +24,7 @@ import { Palette } from "@/app/components/canvas/Palette";
 import { PropertiesPanel } from "@/app/components/canvas/PropertiesPanel";
 import { captureTemplate, instantiateTemplate } from "@/app/lib/diagram/templates";
 import { ImpersonationBanner } from "@/app/components/ImpersonationBanner";
+import { AiPanel } from "./AiPanel";
 
 interface Props {
   diagramId: string;
@@ -388,6 +389,7 @@ export function DiagramEditor({
   const [diagramColorConfig, setDiagramColorConfig] = useState<SymbolColorConfig>(initialDiagramColorConfig ?? {});
   const [displayMode, setDisplayMode] = useState<DisplayMode>(initialDisplayMode ?? "normal");
   const [showDiagramMaintenance, setShowDiagramMaintenance] = useState(false);
+  const [showAiPanel, setShowAiPanel] = useState(false);
   const [debugMode, setDebugMode] = useState(false);
   const [showValueDisplay, setShowValueDisplay] = useState(false);
   const [showBottleneck, setShowBottleneck] = useState(false);
@@ -1207,6 +1209,19 @@ export function DiagramEditor({
           </button>
         )}
 
+        {!readOnly && diagramType === "bpmn" && (
+          <button
+            onClick={() => setShowAiPanel(prev => !prev)}
+            className={`px-2 py-0.5 text-[11px] rounded border ${
+              showAiPanel
+                ? "text-blue-700 border-blue-400 bg-blue-50"
+                : "text-gray-700 border-gray-300 hover:bg-gray-50"
+            }`}
+          >
+            AI Generate
+          </button>
+        )}
+
         {/* Hidden file inputs reused by the File menu */}
         <input
           ref={importJsonInputRef}
@@ -1496,6 +1511,24 @@ export function DiagramEditor({
             currentDiagramId={diagramId}
             onFlipForkJoin={flipForkJoin}
             onConvertTaskSubprocess={convertTaskSubprocess}
+          />
+        )}
+
+        {showAiPanel && diagramType === "bpmn" && (
+          <AiPanel
+            onApplyDiagram={(aiData: DiagramData) => {
+              // Replace: set entire diagram data
+              setData({
+                ...data,
+                elements: aiData.elements,
+                connectors: aiData.connectors,
+                viewport: aiData.viewport ?? data.viewport,
+              });
+            }}
+            onAddToDiagram={(elements, connectors) => {
+              applyTemplate(elements, connectors);
+            }}
+            onClose={() => setShowAiPanel(false)}
           />
         )}
       </div>

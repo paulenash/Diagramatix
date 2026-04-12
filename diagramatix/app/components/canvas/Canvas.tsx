@@ -593,9 +593,11 @@ export function Canvas({
       pos.y >= el.y && pos.y <= el.y + el.height
     );
     if (directHit) return directHit;
-    // No child directly under cursor — return the container (e.g. expanded subprocess boundary)
-    const nonContainer = matches.find(el => el.type !== "composite-state" && el.type !== "pool" && el.type !== "subprocess-expanded");
-    return nonContainer ?? matches[0];
+    // No child directly under cursor — prefer non-container within margin, then container
+    const nonContainer = matches.find(el => el.type !== "composite-state" && el.type !== "pool" && el.type !== "subprocess-expanded" && el.type !== "process-group");
+    if (nonContainer) return nonContainer;
+    // Return the smallest container (innermost) so expanded subprocesses are valid targets
+    return matches.sort((a, b) => (a.width * a.height) - (b.width * b.height))[0];
   }
 
   function handleConnectionPointDragStart(elementId: string, side: Side, worldPos: Point) {
