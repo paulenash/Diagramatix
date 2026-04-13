@@ -49,6 +49,7 @@ interface Props {
   currentDiagramId?: string;
   onFlipForkJoin?: (id: string) => void;
   onConvertTaskSubprocess?: (id: string) => void;
+  onConvertProcessCollapsed?: (id: string) => void;
   database?: string;
   onSetDatabase?: (db: string) => void;
   forceCollapseTitle?: boolean;
@@ -580,6 +581,7 @@ export function PropertiesPanel({
   currentDiagramId,
   onFlipForkJoin,
   onConvertTaskSubprocess,
+  onConvertProcessCollapsed,
   database,
   onSetDatabase,
   forceCollapseTitle,
@@ -1737,6 +1739,48 @@ export function PropertiesPanel({
             Show description
           </label>
         </>
+      )}
+
+      {/* Process ↔ Collapsed Process conversion */}
+      {element.type === "chevron" && diagramType === "value-chain" && onConvertProcessCollapsed && (
+        <div className="flex items-center gap-1">
+          <label className="text-[10px] text-gray-500 whitespace-nowrap w-14 shrink-0">Convert</label>
+          <button onClick={() => onConvertProcessCollapsed(element.id)}
+            className="text-[10px] px-1.5 py-0.5 rounded border text-blue-600 border-blue-300 hover:bg-blue-50">
+            → Collapsed Process
+          </button>
+        </div>
+      )}
+
+      {element.type === "chevron-collapsed" && diagramType === "value-chain" && onConvertProcessCollapsed && (
+        <div className="flex items-center gap-1">
+          <label className="text-[10px] text-gray-500 whitespace-nowrap w-14 shrink-0">Convert</label>
+          <button onClick={() => onConvertProcessCollapsed(element.id)}
+            className="text-[10px] px-1.5 py-0.5 rounded border text-blue-600 border-blue-300 hover:bg-blue-50">
+            → Process
+          </button>
+        </div>
+      )}
+
+      {/* Fill colour for value chain elements */}
+      {diagramType === "value-chain" && (element.type === "chevron" || element.type === "chevron-collapsed" || element.type === "process-group") && (
+        <div className="flex items-center gap-1">
+          <label className="text-[10px] text-gray-500 whitespace-nowrap w-14 shrink-0">Colour</label>
+          <input
+            type="color"
+            value={(element.properties.fillColor as string | undefined) ?? "#fbd7bb"}
+            onChange={(e) => onUpdateProperties(element.id, { fillColor: e.target.value })}
+            className="w-6 h-6 border border-gray-300 rounded cursor-pointer p-0"
+          />
+          <span className="text-[9px] text-gray-400 font-mono">{(element.properties.fillColor as string | undefined) ?? "default"}</span>
+          {!!(element.properties.fillColor as string | undefined) && (
+            <button
+              onClick={() => onUpdateProperties(element.id, { fillColor: undefined })}
+              className="text-[9px] text-gray-400 hover:text-red-500 ml-auto"
+              title="Reset to default"
+            >Reset</button>
+          )}
+        </div>
       )}
 
       {(element.type === "task" || element.type === "subprocess" || element.type === "subprocess-expanded") && (

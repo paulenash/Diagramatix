@@ -21,6 +21,7 @@ import type {
 } from "@/app/lib/diagram/types";
 import { computeWaypoints, recomputeAllConnectors, consolidateWaypoints, rectifyWaypoints, constrainControlPoint } from "@/app/lib/diagram/routing";
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
+import { CHEVRON_THEMES } from "@/app/lib/diagram/chevronThemes";
 
 const BPMN_EVENT_TYPES = new Set(["start-event", "intermediate-event", "end-event"]);
 
@@ -167,6 +168,7 @@ type Action =
   | { type: "UPDATE_CONNECTOR"; payload: { id: string; directionType: DirectionType } }
   | { type: "UPDATE_CONNECTOR_TYPE"; payload: { id: string; connectorType: ConnectorType } }
   | { type: "CONVERT_TASK_SUBPROCESS"; payload: { id: string } }
+  | { type: "CONVERT_PROCESS_COLLAPSED"; payload: { id: string } }
   | { type: "ADD_SELF_TRANSITION"; payload: {
       elementId: string;
       side: Side;
@@ -247,6 +249,106 @@ function getAllDescendantIds(elements: DiagramElement[], containerId: string): S
     }
   }
   return result;
+}
+
+/**
+ * Find the snapped group containing the given element.
+ * A snapped group = set of chevron/chevron-collapsed elements where each overlaps
+ * horizontally by ~10px and has ≥75% vertical overlap with at least one neighbour.
+ */
+const CHEVRON_SNAP_TYPES = new Set<SymbolType>(["chevron", "chevron-collapsed"]);
+const SNAP_TOLERANCE = 15; // max gap between right edge of one and left edge of next
+
+function findSnappedGroup(elements: DiagramElement[], seedId: string): DiagramElement[] {
+  const seed = elements.find(e => e.id === seedId);
+  if (!seed || !CHEVRON_SNAP_TYPES.has(seed.type)) return [];
+  const chevrons = elements.filter(e => CHEVRON_SNAP_TYPES.has(e.type));
+  const group = new Set<string>([seedId]);
+  const queue = [seed];
+  while (queue.length) {
+    const cur = queue.shift()!;
+    for (const other of chevrons) {
+      if (group.has(other.id)) continue;
+      // Check horizontal adjacency (overlap or small gap)
+      const gap = Math.min(
+        Math.abs((cur.x + cur.width) - other.x),
+        Math.abs((other.x + other.width) - cur.x),
+      );
+      if (gap > SNAP_TOLERANCE) continue;
+      // Check vertical overlap ≥ 75%
+      const overlapTop = Math.max(cur.y, other.y);
+      const overlapBot = Math.min(cur.y + cur.height, other.y + other.height);
+      const vOverlap = overlapBot - overlapTop;
+      const minH = Math.min(cur.height, other.height);
+      if (vOverlap < minH * 0.75) continue;
+      group.add(other.id);
+      queue.push(other);
+    }
+  }
+  if (group.size < 2) return [];
+  // Sort left-to-right
+  return chevrons.filter(e => group.has(e.id)).sort((a, b) => a.x - b.x);
+}
+
+/**
+ * Detect the theme currently applied to a snapped group by checking the first element's fillColor.
+ */
+function detectTheme(group: DiagramElement[]): { name: string; colours: readonly string[] } | null {
+  if (group.length === 0) return null;
+  const firstColor = group[0].properties.fillColor as string | undefined;
+  if (!firstColor) return null;
+  for (const theme of CHEVRON_THEMES) {
+    if (theme.colours.includes(firstColor)) return theme;
+  }
+  return null;
+}
+
+/**
+ * Reapply a theme to a snapped group (left-to-right order), returning updated elements.
+ * Also auto-tints any parent value chain container.
+ */
+function reapplyThemeToGroup(elements: DiagramElement[], group: DiagramElement[], theme: { colours: readonly string[] }): DiagramElement[] {
+  const groupIds = new Set(group.map(e => e.id));
+  // Build colour assignments
+  const colorMap = new Map<string, string>();
+  for (let i = 0; i < group.length; i++) {
+    colorMap.set(group[i].id, theme.colours[i % theme.colours.length]);
+  }
+  // Find parent process-groups that contain any group member and auto-tint
+  const parentIds = new Set<string>();
+  for (const el of group) {
+    if (el.parentId) parentIds.add(el.parentId);
+  }
+  const parentTints = new Map<string, string>();
+  for (const pid of parentIds) {
+    // Lighten the leftmost child's colour for the container
+    const leftmostChild = group.find(e => e.parentId === pid);
+    if (leftmostChild) {
+      const baseColor = colorMap.get(leftmostChild.id) ?? theme.colours[0];
+      parentTints.set(pid, lightenHex(baseColor, 0.6));
+    }
+  }
+
+  return elements.map(e => {
+    if (colorMap.has(e.id)) {
+      return { ...e, properties: { ...e.properties, fillColor: colorMap.get(e.id) } };
+    }
+    if (parentTints.has(e.id) && e.type === "process-group") {
+      return { ...e, properties: { ...e.properties, fillColor: parentTints.get(e.id) } };
+    }
+    return e;
+  });
+}
+
+/** Lighten a hex colour toward white by the given fraction (0=no change, 1=white). */
+function lightenHex(hex: string, frac: number): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  const lr = Math.round(r + (255 - r) * frac);
+  const lg = Math.round(g + (255 - g) * frac);
+  const lb = Math.round(b + (255 - b) * frac);
+  return `#${lr.toString(16).padStart(2, "0")}${lg.toString(16).padStart(2, "0")}${lb.toString(16).padStart(2, "0")}`;
 }
 
 /** Check if candidateParentId is a descendant of elementId (would create a cycle) */
@@ -894,6 +996,15 @@ function reducer(state: DiagramData, action: Action): DiagramData {
           const finalX = snapX ?? moved.x;
           const finalY = snapY ?? moved.y;
           elements = elements.map(e => e.id === id ? { ...e, x: finalX, y: finalY } : e);
+
+          // Auto-reapply theme: if snapped into an existing themed group, recolour
+          const group = findSnappedGroup(elements, id);
+          if (group.length >= 2) {
+            const theme = detectTheme(group.filter(e => e.id !== id));
+            if (theme) {
+              elements = reapplyThemeToGroup(elements, group, theme);
+            }
+          }
         }
       }
 
@@ -1000,6 +1111,29 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       // Recompute connectors since element type changed (shape may differ)
       const connectors = recomputeAllConnectors(state.connectors, elements);
       return { ...state, elements, connectors };
+    }
+
+    case "CONVERT_PROCESS_COLLAPSED": {
+      const { id } = action.payload;
+      const el = state.elements.find(e => e.id === id);
+      if (!el) return state;
+      const isProcess = el.type === "chevron";
+      const isCollapsed = el.type === "chevron-collapsed";
+      if (!isProcess && !isCollapsed) return state;
+
+      const newType = isProcess ? "chevron-collapsed" : "chevron";
+      const elements = state.elements.map(e => {
+        if (e.id !== id) return e;
+        const converted = { ...e, type: newType as SymbolType };
+        if (newType === "chevron") {
+          // Clear collapsed-specific props
+          const props = { ...converted.properties };
+          delete props.linkedDiagramId;
+          converted.properties = props;
+        }
+        return converted;
+      });
+      return { ...state, elements };
     }
 
     case "ADD_SELF_TRANSITION": {
@@ -2611,6 +2745,30 @@ export function useDiagram(initialData: DiagramData) {
       for (const { id, properties } of updates) {
         dispatch({ type: "UPDATE_PROPERTIES", payload: { id, properties } });
       }
+      // Auto-tint parent value chain containers when child fill colours change
+      const hasFillChange = updates.some(u => u.properties.fillColor !== undefined);
+      if (hasFillChange) {
+        // Find parent process-groups of updated elements
+        const snap = snapshotData();
+        const parentIds = new Set<string>();
+        for (const u of updates) {
+          const el = snap.elements.find(e => e.id === u.id);
+          if (el?.parentId) parentIds.add(el.parentId);
+        }
+        for (const pid of parentIds) {
+          const parent = snap.elements.find(e => e.id === pid && e.type === "process-group");
+          if (!parent) continue;
+          // Find leftmost themed child
+          const children = snap.elements
+            .filter(e => e.parentId === pid && CHEVRON_SNAP_TYPES.has(e.type) && e.properties.fillColor)
+            .sort((a, b) => a.x - b.x);
+          if (children.length > 0) {
+            const baseColor = children[0].properties.fillColor as string;
+            const tint = lightenHex(baseColor, 0.6);
+            dispatch({ type: "UPDATE_PROPERTIES", payload: { id: pid, properties: { fillColor: tint } } });
+          }
+        }
+      }
     },
     []
   );
@@ -2878,6 +3036,10 @@ export function useDiagram(initialData: DiagramData) {
     convertTaskSubprocess: useCallback((id: string) => {
       pushHistory(snapshotData());
       dispatch({ type: "CONVERT_TASK_SUBPROCESS", payload: { id } });
+    }, []),
+    convertProcessCollapsed: useCallback((id: string) => {
+      pushHistory(snapshotData());
+      dispatch({ type: "CONVERT_PROCESS_COLLAPSED", payload: { id } });
     }, []),
     addSelfTransition: useCallback((elementId: string, side: Side, sourceOffsetAlong: number, targetOffsetAlong: number, bulge: number) => {
       pushHistory(snapshotData());

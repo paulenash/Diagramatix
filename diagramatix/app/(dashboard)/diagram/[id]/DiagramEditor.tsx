@@ -316,6 +316,7 @@ export function DiagramEditor({
     elementMoveEnd,
     flipForkJoin,
     convertTaskSubprocess,
+    convertProcessCollapsed,
     addSelfTransition,
     splitConnector,
     applyTemplate,
@@ -1510,6 +1511,7 @@ export function DiagramEditor({
             currentDiagramId={diagramId}
             onFlipForkJoin={flipForkJoin}
             onConvertTaskSubprocess={convertTaskSubprocess}
+            onConvertProcessCollapsed={convertProcessCollapsed}
             forceCollapseTitle={showAiPanel}
           />
         )}
