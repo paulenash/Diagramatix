@@ -1208,7 +1208,7 @@ export function DiagramEditor({
           </button>
         )}
 
-        {!readOnly && diagramType === "bpmn" && (
+        {!readOnly && diagramType !== "basic" && (
           <button
             onClick={() => setShowAiPanel(prev => !prev)}
             className={`px-2 py-0.5 text-[11px] rounded border ${
@@ -1514,8 +1514,9 @@ export function DiagramEditor({
           />
         )}
 
-        {showAiPanel && diagramType === "bpmn" && (
+        {showAiPanel && (
           <AiPanel
+            diagramType={diagramType}
             onApplyDiagram={(aiData: DiagramData) => {
               // Replace: set entire diagram data
               setData({

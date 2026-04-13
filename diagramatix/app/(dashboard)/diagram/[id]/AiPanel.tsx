@@ -6,12 +6,13 @@ import type { DiagramData, DiagramElement, Connector } from "@/app/lib/diagram/t
 interface SavedPrompt { id: string; name: string; text: string; }
 
 interface Props {
+  diagramType: string;
   onApplyDiagram: (data: DiagramData) => void;
   onAddToDiagram: (elements: DiagramElement[], connectors: Connector[]) => void;
   onClose: () => void;
 }
 
-export function AiPanel({ onApplyDiagram, onAddToDiagram, onClose }: Props) {
+export function AiPanel({ diagramType, onApplyDiagram, onAddToDiagram, onClose }: Props) {
   const [prompt, setPrompt] = useState("");
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -39,10 +40,16 @@ export function AiPanel({ onApplyDiagram, onAddToDiagram, onClose }: Props) {
     setStatus("Generating diagram (this may take 15-30 seconds)...");
 
     try {
-      const res = await fetch("/api/ai/generate-bpmn", {
+      // Use BPMN-specific endpoint (with layout engine) for BPMN, generic for others
+      const endpoint = diagramType === "bpmn" ? "/api/ai/generate-bpmn" : "/api/ai/generate-diagram";
+      const body = diagramType === "bpmn"
+        ? { prompt: prompt.trim(), mode: "generate" }
+        : { prompt: prompt.trim(), diagramType };
+
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: prompt.trim(), mode: "generate" }),
+        body: JSON.stringify(body),
       });
 
       if (!res.ok) {
@@ -53,13 +60,24 @@ export function AiPanel({ onApplyDiagram, onAddToDiagram, onClose }: Props) {
       }
 
       const result = await res.json();
-      if (!result.diagramData?.elements) {
-        setError("AI returned unexpected format. Try rephrasing your prompt.");
-        setStatus(null);
-        return;
-      }
 
-      setStatus(`Generated ${result.elementCount} elements, ${result.connectionCount} connections`);
+      // BPMN has its own layout engine, other types use simple grid layout
+      if (diagramType === "bpmn") {
+        if (!result.diagramData?.elements) {
+          setError("AI returned unexpected format. Try rephrasing your prompt.");
+          setStatus(null);
+          return;
+        }
+        setStatus(`Generated ${result.elementCount} elements, ${result.connectionCount} connections`);
+      } else {
+        // Generic: apply simple layout to parsed elements
+        const { layoutGenericDiagram } = await import("@/app/lib/diagram/genericLayout");
+        const diagramData = layoutGenericDiagram(result.parsed, diagramType);
+        result.diagramData = diagramData;
+        result.elementCount = diagramData.elements.length;
+        result.connectionCount = diagramData.connectors.length;
+        setStatus(`Generated ${result.elementCount} elements, ${result.connectionCount} connections`);
+      }
       if (mode === "add") {
         onAddToDiagram(result.diagramData.elements, result.diagramData.connectors);
       } else {

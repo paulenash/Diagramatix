@@ -69,26 +69,29 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
   }
 
-  // Load user's BPMN rules (or system defaults)
+  // Load General rules + BPMN-specific rules (user's or defaults)
   let rules = "";
   try {
     let orgId: string | null = null;
     try { orgId = await getCurrentOrgId(session, await cookies()); } catch { /* no org */ }
 
-    if (orgId) {
-      const userRules = await prisma.bpmnRules.findFirst({
-        where: { userId: session.user.id, orgId },
-        select: { rules: true },
-      });
-      if (userRules) rules = userRules.rules;
-    }
-
-    if (!rules) {
-      const defaultRules = await prisma.bpmnRules.findFirst({
-        where: { isDefault: true },
-        select: { rules: true },
-      });
-      if (defaultRules) rules = defaultRules.rules;
+    for (const category of ["general", "bpmn"]) {
+      let catRules = "";
+      if (orgId) {
+        const userRules = await prisma.diagramRules.findFirst({
+          where: { category, userId: session.user.id, orgId },
+          select: { rules: true },
+        });
+        if (userRules) catRules = userRules.rules;
+      }
+      if (!catRules) {
+        const defaultRules = await prisma.diagramRules.findFirst({
+          where: { category, isDefault: true },
+          select: { rules: true },
+        });
+        if (defaultRules) catRules = defaultRules.rules;
+      }
+      if (catRules) rules += (rules ? "\n\n" : "") + catRules;
     }
   } catch { /* proceed without rules */ }
 

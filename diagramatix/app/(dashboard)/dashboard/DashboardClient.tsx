@@ -836,6 +836,14 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                       Import DDL
                     </button>
                     <div className="border-t border-gray-100" />
+                    <a
+                      href="/dashboard/rules"
+                      onClick={() => setFileMenuOpen(false)}
+                      className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                    >
+                      AI Rules &amp; Preferences
+                    </a>
+                    <div className="border-t border-gray-100" />
                     <button
                       onClick={() => { setFileMenuOpen(false); handleBackupDownload(); }}
                       title="Download a complete backup of all your projects, diagrams and templates"

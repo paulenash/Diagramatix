@@ -45,7 +45,7 @@ model Org {
   projects  Project[]
   diagrams  Diagram[]
   prompts   Prompt[]
-  bpmnRules BpmnRules[]
+  diagramRules DiagramRules[]
 }
 
 model OrgMember {
@@ -77,7 +77,7 @@ model User {
   templates        DiagramTemplate[]
   orgMembers       OrgMember[]
   prompts          Prompt[]
-  bpmnRules        BpmnRules[]
+  diagramRules     DiagramRules[]
   createdAt        DateTime  @default(now())
 }
 
@@ -147,14 +147,17 @@ model Prompt {
   @@index([orgId])
 }
 
-model BpmnRules {
+model DiagramRules {
   id        String   @id @default(cuid())
-  rules     String
-  isDefault Boolean  @default(false)
+  category  String   // "general", "bpmn", "state-machine", "value-chain", "domain", "context", "process-context"
+  rules     String   // multiline text — numbered rules in groups
+  isDefault Boolean  @default(false) // true = admin-set system default
   userId    String?
   user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
   orgId     String?
   org       Org?     @relation(fields: [orgId], references: [id], onDelete: Restrict)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@unique([category, userId, orgId]) // one set of rules per category per user per org
 }
