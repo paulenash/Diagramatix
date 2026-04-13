@@ -1,6 +1,6 @@
 /**
  * Layout engine for AI-generated BPMN diagrams.
- * Takes abstract process elements and produces positioned DiagramData.
+ * Handles pools, lanes, and element placement within lanes.
  */
 
 import type { DiagramData, DiagramElement, Connector, Point } from "./types";
@@ -8,28 +8,34 @@ import { getSymbolDefinition } from "./symbols/definitions";
 
 export interface AiElement {
   id: string;
-  type: "start-event" | "end-event" | "task" | "gateway" | "subprocess" | "intermediate-event";
+  type: string; // "start-event" | "end-event" | "task" | "gateway" | "subprocess" | "intermediate-event" | "pool" | "lane"
   label: string;
   taskType?: string;
   gatewayType?: string;
   eventType?: string;
+  pool?: string;      // pool ID this element belongs to
+  lane?: string;      // lane ID this element belongs to
+  poolType?: string;  // "white-box" | "black-box"
+  lanes?: { id: string; name: string }[];  // lanes within a pool
 }
 
 export interface AiConnection {
   sourceId: string;
   targetId: string;
   label?: string;
+  type?: string; // "sequence" | "message"
 }
 
-const H_GAP = 60;   // horizontal gap between elements
-const V_GAP = 80;   // vertical gap for parallel branches
-const START_X = 100;
-const START_Y = 200;
+// Layout constants
+const POOL_HEADER_W = 30;
+const LANE_H = 120;
+const LANE_PAD_X = 20;
+const LANE_PAD_Y = 15;
+const BLACK_BOX_H = 50;
+const BLACK_BOX_GAP = 30;
+const START_X = 50;
+const START_Y = 50;
 
-/**
- * Layout AI-generated elements in a left-to-right flow.
- * Handles sequential flow and gateway branches.
- */
 export function layoutBpmnDiagram(
   aiElements: AiElement[],
   aiConnections: AiConnection[],
@@ -37,7 +43,283 @@ export function layoutBpmnDiagram(
   const elements: DiagramElement[] = [];
   const connectors: Connector[] = [];
 
-  // Build adjacency from connections
+  // Separate pools from other elements
+  const pools = aiElements.filter(e => e.type === "pool");
+  const lanes = aiElements.filter(e => e.type === "lane");
+  const flowElements = aiElements.filter(e =>
+    e.type !== "pool" && e.type !== "lane"
+  );
+
+  // If no pools defined, create a simple left-to-right layout
+  if (pools.length === 0) {
+    return layoutFlat(flowElements, aiConnections);
+  }
+
+  // Identify white-box and black-box pools
+  const whiteBoxPools = pools.filter(p => (p.poolType ?? "white-box") === "white-box");
+  const blackBoxPools = pools.filter(p => p.poolType === "black-box");
+
+  // Separate black-box pools into external entities (top) and systems (bottom)
+  // Heuristic: if name contains common system names → bottom, else → top
+  const SYSTEM_KEYWORDS = /salesforce|xero|sap|erp|crm|sharepoint|database|api|system|server|aws|azure|google/i;
+  const topBlackBoxes = blackBoxPools.filter(p => !SYSTEM_KEYWORDS.test(p.label));
+  const bottomBlackBoxes = blackBoxPools.filter(p => SYSTEM_KEYWORDS.test(p.label));
+
+  // Build lane map: laneId → pool, and element → lane assignment
+  const laneToPool = new Map<string, string>();
+  const poolLanes = new Map<string, AiElement[]>();
+
+  for (const pool of whiteBoxPools) {
+    const poolLaneList: AiElement[] = [];
+    // Check if pool has inline lanes definition
+    if (pool.lanes && pool.lanes.length > 0) {
+      for (const l of pool.lanes) {
+        laneToPool.set(l.id, pool.id);
+        poolLaneList.push({ id: l.id, type: "lane", label: l.name });
+      }
+    }
+    // Also check standalone lane elements that reference this pool
+    for (const l of lanes) {
+      if (l.pool === pool.id && !laneToPool.has(l.id)) {
+        laneToPool.set(l.id, pool.id);
+        poolLaneList.push(l);
+      }
+    }
+    poolLanes.set(pool.id, poolLaneList);
+  }
+
+  // Assign elements to lanes/pools
+  const laneElements = new Map<string, AiElement[]>(); // laneId → elements
+  const unassigned: AiElement[] = [];
+
+  for (const el of flowElements) {
+    if (el.lane && laneToPool.has(el.lane)) {
+      if (!laneElements.has(el.lane)) laneElements.set(el.lane, []);
+      laneElements.get(el.lane)!.push(el);
+    } else if (el.pool) {
+      // Assigned to pool but no lane — put in first lane of that pool
+      const pLanes = poolLanes.get(el.pool);
+      if (pLanes && pLanes.length > 0) {
+        const firstLane = pLanes[0].id;
+        if (!laneElements.has(firstLane)) laneElements.set(firstLane, []);
+        laneElements.get(firstLane)!.push(el);
+      } else {
+        unassigned.push(el);
+      }
+    } else {
+      unassigned.push(el);
+    }
+  }
+
+  // If there are unassigned elements, put them in the first white-box pool's first lane
+  if (unassigned.length > 0 && whiteBoxPools.length > 0) {
+    const firstPool = whiteBoxPools[0];
+    const pLanes = poolLanes.get(firstPool.id);
+    if (pLanes && pLanes.length > 0) {
+      const firstLane = pLanes[0].id;
+      if (!laneElements.has(firstLane)) laneElements.set(firstLane, []);
+      laneElements.get(firstLane)!.push(...unassigned);
+    }
+  }
+
+  // Compute column positions for elements using BFS
+  const outgoing = new Map<string, AiConnection[]>();
+  const incoming = new Map<string, AiConnection[]>();
+  for (const c of aiConnections) {
+    if (c.type === "message") continue; // skip message flows for column layout
+    if (!outgoing.has(c.sourceId)) outgoing.set(c.sourceId, []);
+    outgoing.get(c.sourceId)!.push(c);
+    if (!incoming.has(c.targetId)) incoming.set(c.targetId, []);
+    incoming.get(c.targetId)!.push(c);
+  }
+
+  const colMap = new Map<string, number>();
+  const visited = new Set<string>();
+  const startEls = flowElements.filter(e =>
+    !incoming.has(e.id) || incoming.get(e.id)!.length === 0
+  );
+  if (startEls.length === 0 && flowElements.length > 0) startEls.push(flowElements[0]);
+
+  const queue: { id: string; col: number }[] = startEls.map(e => ({ id: e.id, col: 0 }));
+  while (queue.length > 0) {
+    const { id, col } = queue.shift()!;
+    if (visited.has(id)) {
+      // Update to later column if needed
+      if ((colMap.get(id) ?? 0) < col) colMap.set(id, col);
+      continue;
+    }
+    visited.add(id);
+    colMap.set(id, col);
+    for (const c of (outgoing.get(id) ?? [])) {
+      queue.push({ id: c.targetId, col: col + 1 });
+    }
+  }
+  // Unvisited elements
+  for (const el of flowElements) {
+    if (!colMap.has(el.id)) colMap.set(el.id, colMap.size);
+  }
+
+  const maxCol = Math.max(0, ...colMap.values());
+
+  // ── Layout top black-box pools ──
+  let curY = START_Y;
+  const poolWidth = POOL_HEADER_W + (maxCol + 1) * 160 + LANE_PAD_X * 2;
+
+  for (const bbp of topBlackBoxes) {
+    elements.push({
+      id: bbp.id, type: "pool" as DiagramElement["type"],
+      x: START_X, y: curY, width: poolWidth, height: BLACK_BOX_H,
+      label: bbp.label,
+      properties: { poolType: "black-box" },
+    });
+    curY += BLACK_BOX_H + BLACK_BOX_GAP;
+  }
+
+  // ── Layout white-box pools with lanes ──
+  for (const pool of whiteBoxPools) {
+    const pLanes = poolLanes.get(pool.id) ?? [];
+    const poolStartY = curY;
+
+    // Compute lane heights based on element count
+    const laneHeights: number[] = [];
+    for (const lane of pLanes) {
+      const els = laneElements.get(lane.id) ?? [];
+      const rows = Math.max(1, els.length);
+      laneHeights.push(Math.max(LANE_H, rows * 50 + LANE_PAD_Y * 2));
+    }
+    if (pLanes.length === 0) laneHeights.push(LANE_H);
+
+    const totalLaneH = laneHeights.reduce((s, h) => s + h, 0);
+
+    // Create pool element
+    elements.push({
+      id: pool.id, type: "pool" as DiagramElement["type"],
+      x: START_X, y: poolStartY, width: poolWidth, height: totalLaneH,
+      label: pool.label,
+      properties: { poolType: "white-box" },
+    });
+
+    // Create lanes
+    let laneY = poolStartY;
+    for (let i = 0; i < pLanes.length; i++) {
+      const lane = pLanes[i];
+      const laneH = laneHeights[i];
+
+      elements.push({
+        id: lane.id, type: "lane" as DiagramElement["type"],
+        x: START_X + POOL_HEADER_W, y: laneY, width: poolWidth - POOL_HEADER_W, height: laneH,
+        label: lane.label,
+        properties: {},
+        parentId: pool.id,
+      });
+
+      // Place elements within this lane
+      const laneEls = laneElements.get(lane.id) ?? [];
+      for (const el of laneEls) {
+        const col = colMap.get(el.id) ?? 0;
+        const def = getSymbolDefinition(el.type as DiagramElement["type"]);
+        const elX = START_X + POOL_HEADER_W + LANE_PAD_X + col * 160;
+        const elY = laneY + laneH / 2 - def.defaultHeight / 2;
+
+        elements.push({
+          id: el.id, type: el.type as DiagramElement["type"],
+          x: elX, y: elY, width: def.defaultWidth, height: def.defaultHeight,
+          label: el.label,
+          properties: {},
+          parentId: lane.id,
+          ...(el.taskType ? { taskType: el.taskType as DiagramElement["taskType"] } : {}),
+          ...(el.gatewayType ? { gatewayType: el.gatewayType as DiagramElement["gatewayType"] } : {}),
+          ...(el.eventType ? { eventType: el.eventType as DiagramElement["eventType"] } : {}),
+        });
+      }
+
+      laneY += laneH;
+    }
+
+    curY = poolStartY + totalLaneH + BLACK_BOX_GAP;
+  }
+
+  // ── Layout bottom black-box pools (systems) ──
+  for (const bbp of bottomBlackBoxes) {
+    elements.push({
+      id: bbp.id, type: "pool" as DiagramElement["type"],
+      x: START_X, y: curY, width: poolWidth, height: BLACK_BOX_H,
+      label: bbp.label,
+      properties: { poolType: "black-box" },
+    });
+    curY += BLACK_BOX_H + BLACK_BOX_GAP;
+  }
+
+  // ── Create connectors ──
+  const elMap = new Map(elements.map(e => [e.id, e]));
+  for (const c of aiConnections) {
+    const src = elMap.get(c.sourceId);
+    const tgt = elMap.get(c.targetId);
+    if (!src || !tgt) continue;
+
+    const isMessage = c.type === "message" ||
+      src.type === "pool" || tgt.type === "pool";
+
+    let connType: string;
+    let srcSide: string, tgtSide: string;
+
+    if (isMessage) {
+      connType = "messageBPMN";
+      // Message flow: determine vertical direction
+      const srcCy = src.y + src.height / 2;
+      const tgtCy = tgt.y + tgt.height / 2;
+      srcSide = srcCy < tgtCy ? "bottom" : "top";
+      tgtSide = srcCy < tgtCy ? "top" : "bottom";
+    } else {
+      connType = "sequence";
+      // Sequence flow: determine direction
+      const srcCx = src.x + src.width / 2;
+      const tgtCx = tgt.x + tgt.width / 2;
+      const srcCy = src.y + src.height / 2;
+      const tgtCy = tgt.y + tgt.height / 2;
+      if (Math.abs(tgtCy - srcCy) > Math.abs(tgtCx - srcCx) * 1.5) {
+        srcSide = tgtCy > srcCy ? "bottom" : "top";
+        tgtSide = tgtCy > srcCy ? "top" : "bottom";
+      } else {
+        srcSide = "right";
+        tgtSide = "left";
+      }
+    }
+
+    connectors.push({
+      id: `conn-${c.sourceId}-${c.targetId}`,
+      sourceId: c.sourceId,
+      targetId: c.targetId,
+      sourceSide: srcSide as Connector["sourceSide"],
+      targetSide: tgtSide as Connector["targetSide"],
+      type: connType as Connector["type"],
+      directionType: "directed",
+      routingType: isMessage ? "direct" : "rectilinear",
+      sourceInvisibleLeader: false,
+      targetInvisibleLeader: false,
+      waypoints: [] as Point[],
+      label: c.label ?? "",
+      ...(c.label ? { labelOffsetX: 0, labelOffsetY: -20, labelWidth: 80 } : {}),
+    } as Connector);
+  }
+
+  return {
+    elements,
+    connectors,
+    viewport: { x: 0, y: 0, zoom: 0.6 },
+    fontSize: 12,
+    connectorFontSize: 10,
+  };
+}
+
+/** Flat layout for diagrams without pools */
+function layoutFlat(
+  aiElements: AiElement[],
+  aiConnections: AiConnection[],
+): DiagramData {
+  const elements: DiagramElement[] = [];
+  const connectors: Connector[] = [];
+
   const outgoing = new Map<string, AiConnection[]>();
   const incoming = new Map<string, AiConnection[]>();
   for (const c of aiConnections) {
@@ -47,125 +329,64 @@ export function layoutBpmnDiagram(
     incoming.get(c.targetId)!.push(c);
   }
 
-  // Find start elements (no incoming connections)
-  const startIds = aiElements
-    .filter(e => !incoming.has(e.id) || incoming.get(e.id)!.length === 0)
-    .map(e => e.id);
-  if (startIds.length === 0 && aiElements.length > 0) startIds.push(aiElements[0].id);
-
-  // BFS to assign columns (x positions) and handle branching
-  const positions = new Map<string, { col: number; row: number }>();
+  const colMap = new Map<string, { col: number; row: number }>();
   const visited = new Set<string>();
-  const queue: { id: string; col: number; row: number }[] = [];
+  const starts = aiElements.filter(e => !incoming.has(e.id) || incoming.get(e.id)!.length === 0);
+  if (starts.length === 0 && aiElements.length > 0) starts.push(aiElements[0]);
 
-  for (const sid of startIds) {
-    queue.push({ id: sid, col: 0, row: 0 });
-  }
-
+  const queue: { id: string; col: number; row: number }[] = starts.map(e => ({ id: e.id, col: 0, row: 0 }));
   while (queue.length > 0) {
     const { id, col, row } = queue.shift()!;
     if (visited.has(id)) continue;
     visited.add(id);
-
-    // If position already assigned (from another path), keep the later column
-    const existing = positions.get(id);
-    if (existing && existing.col >= col) continue;
-    positions.set(id, { col, row });
-
+    colMap.set(id, { col, row });
     const outs = outgoing.get(id) ?? [];
     if (outs.length === 1) {
       queue.push({ id: outs[0].targetId, col: col + 1, row });
-    } else if (outs.length > 1) {
-      // Gateway branching: spread targets vertically
-      const midRow = row;
-      const halfSpread = (outs.length - 1) / 2;
-      outs.forEach((c, i) => {
-        const branchRow = midRow + (i - halfSpread);
-        queue.push({ id: c.targetId, col: col + 1, row: branchRow });
-      });
+    } else {
+      const half = (outs.length - 1) / 2;
+      outs.forEach((c, i) => queue.push({ id: c.targetId, col: col + 1, row: row + (i - half) }));
     }
   }
-
-  // Handle any unvisited elements (disconnected)
   for (const e of aiElements) {
-    if (!positions.has(e.id)) {
-      positions.set(e.id, { col: positions.size, row: 0 });
-    }
+    if (!colMap.has(e.id)) colMap.set(e.id, { col: colMap.size, row: 0 });
   }
 
-  // Convert positions to pixel coordinates
-  const elMap = new Map(aiElements.map(e => [e.id, e]));
-
-  for (const [id, pos] of positions) {
-    const ai = elMap.get(id);
+  for (const [id, pos] of colMap) {
+    const ai = aiElements.find(e => e.id === id);
     if (!ai) continue;
-
     const def = getSymbolDefinition(ai.type as DiagramElement["type"]);
-    const w = def.defaultWidth;
-    const h = def.defaultHeight;
-    const x = START_X + pos.col * (w + H_GAP);
-    const y = START_Y + pos.row * (h + V_GAP);
-
-    const el: DiagramElement = {
-      id: ai.id,
-      type: ai.type as DiagramElement["type"],
-      x, y, width: w, height: h,
-      label: ai.label,
-      properties: {},
+    elements.push({
+      id, type: ai.type as DiagramElement["type"],
+      x: 100 + pos.col * (def.defaultWidth + 60),
+      y: 200 + pos.row * (def.defaultHeight + 80),
+      width: def.defaultWidth, height: def.defaultHeight,
+      label: ai.label, properties: {},
       ...(ai.taskType ? { taskType: ai.taskType as DiagramElement["taskType"] } : {}),
       ...(ai.gatewayType ? { gatewayType: ai.gatewayType as DiagramElement["gatewayType"] } : {}),
       ...(ai.eventType ? { eventType: ai.eventType as DiagramElement["eventType"] } : {}),
-    };
-    elements.push(el);
+    });
   }
 
-  // Create connectors
+  const elMap = new Map(elements.map(e => [e.id, e]));
   for (const c of aiConnections) {
-    const src = elements.find(e => e.id === c.sourceId);
-    const tgt = elements.find(e => e.id === c.targetId);
+    const src = elMap.get(c.sourceId);
+    const tgt = elMap.get(c.targetId);
     if (!src || !tgt) continue;
-
-    // Determine sides based on relative position
-    let srcSide: "top" | "right" | "bottom" | "left" = "right";
-    let tgtSide: "top" | "right" | "bottom" | "left" = "left";
-
-    const srcCx = src.x + src.width / 2;
-    const srcCy = src.y + src.height / 2;
-    const tgtCx = tgt.x + tgt.width / 2;
-    const tgtCy = tgt.y + tgt.height / 2;
-
-    if (Math.abs(tgtCy - srcCy) > Math.abs(tgtCx - srcCx)) {
-      // Mostly vertical
-      if (tgtCy > srcCy) { srcSide = "bottom"; tgtSide = "top"; }
-      else { srcSide = "top"; tgtSide = "bottom"; }
-    }
-
     connectors.push({
       id: `conn-${c.sourceId}-${c.targetId}`,
-      sourceId: c.sourceId,
-      targetId: c.targetId,
-      sourceSide: srcSide,
-      targetSide: tgtSide,
-      type: "sequence",
-      directionType: "directed",
-      routingType: "rectilinear",
-      sourceInvisibleLeader: false,
-      targetInvisibleLeader: false,
+      sourceId: c.sourceId, targetId: c.targetId,
+      sourceSide: "right", targetSide: "left",
+      type: "sequence", directionType: "directed", routingType: "rectilinear",
+      sourceInvisibleLeader: false, targetInvisibleLeader: false,
       waypoints: [] as Point[],
       label: c.label ?? "",
-      ...(c.label ? {
-        labelOffsetX: 0,
-        labelOffsetY: -20,
-        labelWidth: 80,
-      } : {}),
     } as Connector);
   }
 
   return {
-    elements,
-    connectors,
+    elements, connectors,
     viewport: { x: 0, y: 0, zoom: 0.8 },
-    fontSize: 12,
-    connectorFontSize: 10,
+    fontSize: 12, connectorFontSize: 10,
   };
 }

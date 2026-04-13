@@ -6,55 +6,38 @@ import Anthropic from "@anthropic-ai/sdk";
 import { layoutBpmnDiagram, type AiElement, type AiConnection } from "@/app/lib/diagram/bpmnLayout";
 import { getCurrentOrgId } from "@/app/lib/auth/orgContext";
 
-function buildSystemPrompt(rules: string, mode: "plan" | "generate"): string {
-  const ruleBlock = rules ? `\n\nUSER RULES AND PREFERENCES:\n${rules}\n` : "";
+function buildSystemPrompt(rules: string): string {
+  return `You are a BPMN process modelling expert. Given a description of a business process, output a valid JSON object that defines the process as BPMN elements and connections.
 
-  if (mode === "plan") {
-    return `You are a BPMN process modelling expert. Given a description of a business process, create a structured PLAN for the BPMN diagram.
-${ruleBlock}
-Output ONLY valid JSON (no markdown, no explanation) in this format:
-{
-  "pools": [
-    { "id": "pool1", "name": "Company Name", "type": "white-box", "lanes": [
-      { "id": "lane1", "name": "Sales Team" },
-      { "id": "lane2", "name": "Finance Team" }
-    ]},
-    { "id": "pool2", "name": "Customer", "type": "black-box" },
-    { "id": "pool3", "name": "Salesforce", "type": "black-box" }
-  ],
-  "elements": [
-    { "id": "e1", "type": "start-event", "label": "Start", "pool": "pool1", "lane": "lane1" },
-    { "id": "e2", "type": "task", "label": "Check Order", "taskType": "user", "pool": "pool1", "lane": "lane1" },
-    { "id": "e3", "type": "gateway", "label": "Customer exists?", "gatewayType": "exclusive", "pool": "pool1", "lane": "lane1" },
-    { "id": "e4", "type": "end-event", "label": "End", "pool": "pool1", "lane": "lane2" }
-  ],
-  "connections": [
-    { "sourceId": "e1", "targetId": "e2", "type": "sequence" },
-    { "sourceId": "pool2", "targetId": "e1", "type": "message", "label": "Order Email" }
-  ]
-}
+${rules ? `USER RULES AND PREFERENCES (follow these strictly):\n${rules}\n\n` : ""}TECHNICAL REQUIREMENTS:
+- Every process MUST start with exactly one start-event and end with one or more end-events.
+- Use "task" for activities/steps. Set taskType to "user" for human tasks, "service" for automated/system tasks, "send" for sending messages, "receive" for receiving, "manual" for manual tasks, or "none" if unspecified.
+- Use "gateway" for decision points. Set gatewayType to "exclusive" for XOR (if/else), "parallel" for AND (fork/join), "inclusive" for OR. Every diverging gateway MUST have a matching merge gateway downstream.
+- Use "subprocess" for sub-processes that contain multiple steps.
+- Use "intermediate-event" for wait states or signals (set eventType: "timer", "message", "signal", etc.).
+- Each element needs a unique id (use short ids like "e1", "e2", etc.) and a descriptive label.
+- Connections go from sourceId to targetId. Add a label for gateway conditions (e.g., "Yes", "No", "Approved").
+- Keep the process realistic, complete, and professionally structured.
 
-Element types: start-event, end-event, task, gateway, subprocess, intermediate-event
-Task types: user, service, manual, script, send, receive, business-rule, none
-Gateway types: exclusive, parallel, inclusive, event-based
-Connection types: sequence (within same pool), message (between pools)
-Pool types: white-box (with lanes, for the main process), black-box (for external entities/systems)`;
-  }
-
-  return `You are a BPMN process modelling expert. Given a structured plan, output the final BPMN diagram as valid JSON.
-${ruleBlock}
-The plan will contain pools, elements with pool/lane assignments, and connections.
-Convert it to valid BPMN elements and connections.
-
-Output ONLY valid JSON (no markdown, no explanation) in this exact format:
+Output ONLY valid JSON in this exact format (no markdown, no explanation, no comments):
 {
   "elements": [
-    { "id": "e1", "type": "start-event", "label": "Start" },
-    { "id": "e2", "type": "task", "label": "Review Application", "taskType": "user" }
+    { "id": "e1", "type": "start-event", "label": "Order Received" },
+    { "id": "e2", "type": "task", "label": "Review Order", "taskType": "user" },
+    { "id": "e3", "type": "gateway", "label": "Valid?", "gatewayType": "exclusive" },
+    { "id": "e4", "type": "task", "label": "Process Order", "taskType": "service" },
+    { "id": "e5", "type": "task", "label": "Reject Order", "taskType": "user" },
+    { "id": "e6", "type": "gateway", "label": "", "gatewayType": "exclusive" },
+    { "id": "e7", "type": "end-event", "label": "Complete" }
   ],
   "connections": [
     { "sourceId": "e1", "targetId": "e2" },
-    { "sourceId": "e2", "targetId": "e3", "label": "Yes" }
+    { "sourceId": "e2", "targetId": "e3" },
+    { "sourceId": "e3", "targetId": "e4", "label": "Yes" },
+    { "sourceId": "e3", "targetId": "e5", "label": "No" },
+    { "sourceId": "e4", "targetId": "e6" },
+    { "sourceId": "e5", "targetId": "e6" },
+    { "sourceId": "e6", "targetId": "e7" }
   ]
 }`;
 }
@@ -70,7 +53,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "AI service not configured. Set ANTHROPIC_API_KEY in .env" }, { status: 503 });
   }
 
-  const { prompt, mode = "plan" } = await req.json();
+  const { prompt } = await req.json();
   if (!prompt?.trim()) {
     return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
   }
@@ -81,7 +64,6 @@ export async function POST(req: Request) {
     let orgId: string | null = null;
     try { orgId = await getCurrentOrgId(session, await cookies()); } catch { /* no org */ }
 
-    // Try user-specific first
     if (orgId) {
       const userRules = await prisma.bpmnRules.findFirst({
         where: { userId: session.user.id, orgId },
@@ -90,7 +72,6 @@ export async function POST(req: Request) {
       if (userRules) rules = userRules.rules;
     }
 
-    // Fall back to default
     if (!rules) {
       const defaultRules = await prisma.bpmnRules.findFirst({
         where: { isDefault: true },
@@ -102,7 +83,9 @@ export async function POST(req: Request) {
 
   try {
     const client = new Anthropic({ apiKey });
-    const systemPrompt = buildSystemPrompt(rules, mode as "plan" | "generate");
+    const systemPrompt = buildSystemPrompt(rules);
+
+    console.log("[AI] Generating BPMN with rules:", rules ? "yes" : "no (defaults)");
 
     const message = await client.messages.create({
       model: "claude-sonnet-4-20250514",
@@ -117,26 +100,30 @@ export async function POST(req: Request) {
     }
 
     let jsonStr = textBlock.text.trim();
+    console.log("[AI] Raw response length:", jsonStr.length);
+
+    // Strip markdown fences if present
     if (jsonStr.startsWith("```")) {
       jsonStr = jsonStr.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "").trim();
     }
 
-    if (mode === "plan") {
-      // Return the plan for user review
-      let plan;
-      try { plan = JSON.parse(jsonStr); }
-      catch { return NextResponse.json({ error: "Failed to parse AI plan", raw: jsonStr.substring(0, 1000) }, { status: 500 }); }
-      return NextResponse.json({ plan, raw: jsonStr });
-    }
-
-    // Generate mode — parse and layout
     let parsed: { elements: AiElement[]; connections: AiConnection[] };
-    try { parsed = JSON.parse(jsonStr); }
-    catch { return NextResponse.json({ error: "Failed to parse AI response", raw: jsonStr.substring(0, 500) }, { status: 500 }); }
+    try {
+      parsed = JSON.parse(jsonStr);
+    } catch (parseErr) {
+      console.error("[AI] JSON parse failed:", (parseErr as Error).message);
+      return NextResponse.json({
+        error: "Failed to parse AI response as JSON. Try again.",
+        raw: jsonStr.substring(0, 500),
+      }, { status: 500 });
+    }
 
     if (!Array.isArray(parsed.elements) || !Array.isArray(parsed.connections)) {
+      console.error("[AI] Invalid structure:", Object.keys(parsed));
       return NextResponse.json({ error: "Invalid AI response structure" }, { status: 500 });
     }
+
+    console.log("[AI] Parsed:", parsed.elements.length, "elements,", parsed.connections.length, "connections");
 
     const diagramData = layoutBpmnDiagram(parsed.elements, parsed.connections);
 
