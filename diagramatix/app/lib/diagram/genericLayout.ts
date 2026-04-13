@@ -302,55 +302,53 @@ function layoutContextDiagram(
     });
   }
 
-  // Create connectors with smart side selection
+  // Create connectors with angle-based side selection to avoid crossings
   const elMap = new Map(elements.map(e => [e.id, e]));
+  const centralEl = central ? elMap.get(central.id) : undefined;
 
-  // Track used sides per element to separate endpoints
-  const usedSides = new Map<string, Map<string, number>>(); // elId → side → count
+  // Determine the best side based on angle from one element's centre to another's
+  // This ensures connectors radiate outward naturally without crossing
+  function angleSide(fromX: number, fromY: number, toX: number, toY: number): string {
+    const angle = Math.atan2(toY - fromY, toX - fromX); // -PI to PI
+    // Map angle to nearest side:
+    //   right: -45° to 45°    (−π/4 to π/4)
+    //   bottom: 45° to 135°   (π/4 to 3π/4)
+    //   left: 135° to -135°   (3π/4 to π or -π to -3π/4)
+    //   top: -135° to -45°    (-3π/4 to -π/4)
+    if (angle >= -Math.PI / 4 && angle < Math.PI / 4) return "right";
+    if (angle >= Math.PI / 4 && angle < 3 * Math.PI / 4) return "bottom";
+    if (angle >= -3 * Math.PI / 4 && angle < -Math.PI / 4) return "top";
+    return "left";
+  }
 
-  function getBestSides(src: DiagramElement, tgt: DiagramElement): { srcSide: string; tgtSide: string } {
+  // Track offset along each side per element so multiple endpoints are spread out
+  const sideOffsets = new Map<string, Map<string, number>>(); // elId → side → next offset fraction
+
+  function getOffset(elId: string, side: string, total: number): number {
+    if (!sideOffsets.has(elId)) sideOffsets.set(elId, new Map());
+    const offsets = sideOffsets.get(elId)!;
+    const count = offsets.get(side) ?? 0;
+    offsets.set(side, count + 1);
+    // Spread evenly: if total connections on this side = n, positions are 1/(n+1), 2/(n+1), etc.
+    // But we don't know total in advance, so use incremental spacing
+    return 0.3 + count * 0.2; // 0.3, 0.5, 0.7 for up to 3 connections per side
+  }
+
+  function getBestSides(src: DiagramElement, tgt: DiagramElement): { srcSide: string; tgtSide: string; srcOffset: number; tgtOffset: number } {
     const srcCx = src.x + src.width / 2;
     const srcCy = src.y + src.height / 2;
     const tgtCx = tgt.x + tgt.width / 2;
     const tgtCy = tgt.y + tgt.height / 2;
-    const dx = tgtCx - srcCx;
-    const dy = tgtCy - srcCy;
 
-    // Determine the two nearest sides of each element to the other
-    function twoNearestSides(fromX: number, fromY: number, toX: number, toY: number): string[] {
-      const ddx = toX - fromX;
-      const ddy = toY - fromY;
-      const sides: { side: string; score: number }[] = [
-        { side: "right", score: ddx },
-        { side: "left", score: -ddx },
-        { side: "bottom", score: ddy },
-        { side: "top", score: -ddy },
-      ];
-      sides.sort((a, b) => b.score - a.score);
-      return [sides[0].side, sides[1].side];
-    }
+    // Source side: direction from source towards target
+    const srcSide = angleSide(srcCx, srcCy, tgtCx, tgtCy);
+    // Target side: direction from target towards source (opposite direction)
+    const tgtSide = angleSide(tgtCx, tgtCy, srcCx, srcCy);
 
-    const srcNearest = twoNearestSides(srcCx, srcCy, tgtCx, tgtCy);
-    const tgtNearest = twoNearestSides(tgtCx, tgtCy, srcCx, srcCy);
+    const srcOffset = getOffset(src.id, srcSide, 1);
+    const tgtOffset = getOffset(tgt.id, tgtSide, 1);
 
-    // Pick the side with fewer existing connections
-    function pickLeastUsed(elId: string, candidates: string[]): string {
-      if (!usedSides.has(elId)) usedSides.set(elId, new Map());
-      const counts = usedSides.get(elId)!;
-      let best = candidates[0];
-      let bestCount = counts.get(candidates[0]) ?? 0;
-      for (const s of candidates) {
-        const c = counts.get(s) ?? 0;
-        if (c < bestCount) { best = s; bestCount = c; }
-      }
-      counts.set(best, (counts.get(best) ?? 0) + 1);
-      return best;
-    }
-
-    const srcSide = pickLeastUsed(src.id, srcNearest);
-    const tgtSide = pickLeastUsed(tgt.id, tgtNearest);
-
-    return { srcSide, tgtSide };
+    return { srcSide, tgtSide, srcOffset, tgtOffset };
   }
 
   for (const c of aiConnections) {
@@ -358,7 +356,7 @@ function layoutContextDiagram(
     const tgt = elMap.get(c.targetId);
     if (!src || !tgt) continue;
 
-    const { srcSide, tgtSide } = getBestSides(src, tgt);
+    const { srcSide, tgtSide, srcOffset, tgtOffset } = getBestSides(src, tgt);
 
     connectors.push({
       id: `conn-${c.sourceId}-${c.targetId}`,
@@ -366,6 +364,8 @@ function layoutContextDiagram(
       targetId: c.targetId,
       sourceSide: srcSide as Connector["sourceSide"],
       targetSide: tgtSide as Connector["targetSide"],
+      sourceOffsetAlong: Math.max(0.1, Math.min(0.9, srcOffset)),
+      targetOffsetAlong: Math.max(0.1, Math.min(0.9, tgtOffset)),
       type: "flow",
       directionType: "open-directed",
       routingType: "curvilinear",
@@ -376,13 +376,14 @@ function layoutContextDiagram(
     } as Connector);
   }
 
-  // Compute waypoints
+  // Compute waypoints using offset values for separated endpoints
   const computed = connectors.map(conn => {
     const src = elMap.get(conn.sourceId);
     const tgt = elMap.get(conn.targetId);
     if (!src || !tgt) return conn;
     try {
-      const r = computeWaypoints(src, tgt, elements, conn.sourceSide, conn.targetSide, conn.routingType, 0.5, 0.5);
+      const r = computeWaypoints(src, tgt, elements, conn.sourceSide, conn.targetSide, conn.routingType,
+        conn.sourceOffsetAlong ?? 0.5, conn.targetOffsetAlong ?? 0.5);
       return { ...conn, waypoints: r.waypoints, sourceInvisibleLeader: r.sourceInvisibleLeader, targetInvisibleLeader: r.targetInvisibleLeader };
     } catch { return conn; }
   });
