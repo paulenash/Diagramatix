@@ -2765,13 +2765,15 @@ export function useDiagram(initialData: DiagramData) {
         dispatch({ type: "UPDATE_PROPERTIES", payload: { id, properties } });
       }
       // Auto-tint parent value chain containers when child fill colours change
-      const hasFillChange = updates.some(u => u.properties.fillColor !== undefined);
+      const hasFillChange = updates.some(u => "fillColor" in u.properties);
       if (hasFillChange) {
-        const snap = snapshotData();
-        // Build a map of new fill colours from the updates (snapshot is stale)
-        const newFillMap = new Map<string, string>();
+        const snap = snapshotData(); // note: dataRef is stale, but parentId values are stable
+        // Build a map of new fill colours from the updates
+        const newFillMap = new Map<string, string | undefined>();
         for (const u of updates) {
-          if (u.properties.fillColor) newFillMap.set(u.id, u.properties.fillColor as string);
+          if ("fillColor" in u.properties) {
+            newFillMap.set(u.id, u.properties.fillColor as string | undefined);
+          }
         }
         // Find parent process-groups of updated elements
         const parentIds = new Set<string>();
@@ -2782,15 +2784,24 @@ export function useDiagram(initialData: DiagramData) {
         for (const pid of parentIds) {
           const parent = snap.elements.find(e => e.id === pid && e.type === "process-group");
           if (!parent) continue;
-          // Find leftmost child, using new fill colours from updates
+          // Find leftmost child with a fill colour (prefer new colour from updates)
           const children = snap.elements
             .filter(e => e.parentId === pid && CHEVRON_SNAP_TYPES.has(e.type))
             .sort((a, b) => a.x - b.x);
-          const leftmost = children.find(e => newFillMap.has(e.id) || e.properties.fillColor);
+          // Resolve effective fill for each child: new value from updates, or existing
+          const leftmost = children.find(e => {
+            const newVal = newFillMap.get(e.id);
+            return newVal ?? (e.properties.fillColor as string | undefined);
+          });
           if (leftmost) {
-            const baseColor = newFillMap.get(leftmost.id) ?? (leftmost.properties.fillColor as string);
-            const tint = lightenHex(baseColor, 0.6);
-            dispatch({ type: "UPDATE_PROPERTIES", payload: { id: pid, properties: { fillColor: tint } } });
+            const baseColor = (newFillMap.get(leftmost.id) ?? leftmost.properties.fillColor) as string;
+            if (baseColor) {
+              const tint = lightenHex(baseColor, 0.6);
+              dispatch({ type: "UPDATE_PROPERTIES", payload: { id: pid, properties: { fillColor: tint } } });
+            } else {
+              // Colours cleared — reset container too
+              dispatch({ type: "UPDATE_PROPERTIES", payload: { id: pid, properties: { fillColor: undefined } } });
+            }
           }
         }
       }

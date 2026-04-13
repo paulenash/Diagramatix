@@ -10,6 +10,37 @@ import { CHEVRON_THEMES } from "./chevronThemes";
 
 const GARDEN_THEME = CHEVRON_THEMES.find(t => t.name === "Garden")!;
 const CHEVRON_OVERLAP = 10; // 10px overlap for snapped processes
+const CHARS_PER_PX = 0.14; // approximate characters per pixel at 12px font
+
+/**
+ * Wrap a label at word boundaries to fit within maxWidth pixels.
+ * Returns multi-line label (joined with \n) and the number of lines.
+ * If a single word is too long, it stays on one line (will need width expansion).
+ */
+function wrapLabel(label: string, maxWidth: number): { text: string; lines: number; fits: boolean } {
+  const maxChars = Math.floor(maxWidth * CHARS_PER_PX);
+  if (label.length <= maxChars) return { text: label, lines: 1, fits: true };
+
+  const words = label.split(/\s+/);
+  const result: string[] = [];
+  let current = "";
+
+  for (const word of words) {
+    if (!current) {
+      current = word;
+    } else if ((current + " " + word).length <= maxChars) {
+      current += " " + word;
+    } else {
+      result.push(current);
+      current = word;
+    }
+  }
+  if (current) result.push(current);
+
+  // Check if all lines fit
+  const fits = result.every(line => line.length <= maxChars);
+  return { text: result.join("\n"), lines: result.length, fits };
+}
 
 const GRID_GAP_X = 60;
 const GRID_GAP_Y = 40;
@@ -94,22 +125,43 @@ export function layoutGenericDiagram(
     const children = regularEls.filter(e =>
       e.group === containerId || e.parent === containerId
     );
-    let cx = container.x + 30;
     const cy = container.y + 40;
+
+    // For value chains, pre-wrap labels and determine if width expansion is needed
+    let chevronW = getSymbolDefinition("chevron").defaultWidth;
+    if (isValueChain) {
+      const textW = chevronW - 40; // usable text area inside chevron notches
+      let needsWider = false;
+      for (const ai of children) {
+        if (ai.type === "chevron" || ai.type === "chevron-collapsed") {
+          const rawLabel = ai.label ?? ai.name ?? ai.type;
+          const wrapped = wrapLabel(rawLabel, textW);
+          if (!wrapped.fits || wrapped.lines > 3) needsWider = true;
+        }
+      }
+      if (needsWider) chevronW = Math.min(220, chevronW + 60); // expand all chevrons
+    }
+
+    let cx = container.x + 30;
     for (const ai of children) {
       const def = getSymbolDefinition(ai.type as DiagramElement["type"]);
-      const label = ai.label ?? ai.name ?? ai.type;
+      let label = ai.label ?? ai.name ?? ai.type;
       const props = buildProperties(ai, diagramType);
+      let elW = def.defaultWidth;
 
-      // Value chain: apply Garden theme colour
+      // Value chain: wrap labels and apply Garden theme colour
       if (isValueChain && (ai.type === "chevron" || ai.type === "chevron-collapsed")) {
+        elW = chevronW;
+        const textW = elW - 40;
+        const wrapped = wrapLabel(label, textW);
+        label = wrapped.text;
         props.fillColor = GARDEN_THEME.colours[gardenIdx % GARDEN_THEME.colours.length];
         gardenIdx++;
       }
 
       const el: DiagramElement = {
         id: ai.id, type: ai.type as DiagramElement["type"],
-        x: cx, y: cy, width: def.defaultWidth, height: def.defaultHeight,
+        x: cx, y: cy, width: elW, height: def.defaultHeight,
         label, properties: props,
         parentId: containerId,
       };
@@ -118,9 +170,9 @@ export function layoutGenericDiagram(
 
       // Value chain: snap processes with 10px overlap; others: use gap
       if (isValueChain && (ai.type === "chevron" || ai.type === "chevron-collapsed")) {
-        cx += def.defaultWidth - CHEVRON_OVERLAP;
+        cx += elW - CHEVRON_OVERLAP;
       } else {
-        cx += def.defaultWidth + GRID_GAP_X;
+        cx += elW + GRID_GAP_X;
       }
     }
     // Resize container to fit children
@@ -138,30 +190,50 @@ export function layoutGenericDiagram(
   let rowH = 0;
   const MAX_COLS = diagramType === "value-chain" ? 8 : 4;
 
+  // For value chain uncontained, pre-check if width expansion needed
+  let unplacedChevronW = getSymbolDefinition("chevron").defaultWidth;
+  if (isValueChain) {
+    const textW = unplacedChevronW - 40;
+    let needsWider = false;
+    for (const ai of unplaced) {
+      if (ai.type === "chevron" || ai.type === "chevron-collapsed") {
+        const rawLabel = ai.label ?? ai.name ?? ai.type;
+        const wrapped = wrapLabel(rawLabel, textW);
+        if (!wrapped.fits || wrapped.lines > 3) needsWider = true;
+      }
+    }
+    if (needsWider) unplacedChevronW = Math.min(220, unplacedChevronW + 60);
+  }
+
   for (const ai of unplaced) {
     if (col >= MAX_COLS) { col = 0; curX = START_X; curY += rowH + GRID_GAP_Y; rowH = 0; }
     const def = getSymbolDefinition(ai.type as DiagramElement["type"]);
-    const label = ai.label ?? ai.name ?? ai.type;
+    let label = ai.label ?? ai.name ?? ai.type;
     const props = buildProperties(ai, diagramType);
+    let elW = def.defaultWidth;
 
-    // Value chain: apply Garden theme colour to uncontained processes too
+    // Value chain: wrap labels and apply Garden theme colour
     if (isValueChain && (ai.type === "chevron" || ai.type === "chevron-collapsed")) {
+      elW = unplacedChevronW;
+      const textW = elW - 40;
+      const wrapped = wrapLabel(label, textW);
+      label = wrapped.text;
       props.fillColor = GARDEN_THEME.colours[gardenIdx % GARDEN_THEME.colours.length];
       gardenIdx++;
     }
 
     const el: DiagramElement = {
       id: ai.id, type: ai.type as DiagramElement["type"],
-      x: curX, y: curY, width: def.defaultWidth, height: def.defaultHeight,
+      x: curX, y: curY, width: elW, height: def.defaultHeight,
       label, properties: props,
     };
     elements.push(el);
     rowH = Math.max(rowH, def.defaultHeight);
     // Value chain: snap; others: gap
     if (isValueChain && (ai.type === "chevron" || ai.type === "chevron-collapsed")) {
-      curX += def.defaultWidth - CHEVRON_OVERLAP;
+      curX += elW - CHEVRON_OVERLAP;
     } else {
-      curX += def.defaultWidth + GRID_GAP_X;
+      curX += elW + GRID_GAP_X;
     }
     col++;
   }
