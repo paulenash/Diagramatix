@@ -1503,6 +1503,25 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         (c) => c.sourceId !== id && c.targetId !== id
       );
       if (bridgeConnector) connectors = [...connectors, bridgeConnector];
+
+      // Re-theme snapped group if a process was removed from it
+      if (el && CHEVRON_SNAP_TYPES.has(el.type)) {
+        // Find any remaining neighbour that was snapped to the deleted element
+        const neighbours = elements.filter(e =>
+          CHEVRON_SNAP_TYPES.has(e.type) && e.properties.fillColor
+        );
+        for (const nb of neighbours) {
+          const group = findSnappedGroup(elements, nb.id);
+          if (group.length >= 2) {
+            const theme = detectTheme(group);
+            if (theme) {
+              elements = reapplyThemeToGroup(elements, group, theme);
+              break; // one group reapply is enough
+            }
+          }
+        }
+      }
+
       return { ...state, elements: updatePoolTypes(elements), connectors };
     }
 
@@ -2748,8 +2767,13 @@ export function useDiagram(initialData: DiagramData) {
       // Auto-tint parent value chain containers when child fill colours change
       const hasFillChange = updates.some(u => u.properties.fillColor !== undefined);
       if (hasFillChange) {
-        // Find parent process-groups of updated elements
         const snap = snapshotData();
+        // Build a map of new fill colours from the updates (snapshot is stale)
+        const newFillMap = new Map<string, string>();
+        for (const u of updates) {
+          if (u.properties.fillColor) newFillMap.set(u.id, u.properties.fillColor as string);
+        }
+        // Find parent process-groups of updated elements
         const parentIds = new Set<string>();
         for (const u of updates) {
           const el = snap.elements.find(e => e.id === u.id);
@@ -2758,12 +2782,13 @@ export function useDiagram(initialData: DiagramData) {
         for (const pid of parentIds) {
           const parent = snap.elements.find(e => e.id === pid && e.type === "process-group");
           if (!parent) continue;
-          // Find leftmost themed child
+          // Find leftmost child, using new fill colours from updates
           const children = snap.elements
-            .filter(e => e.parentId === pid && CHEVRON_SNAP_TYPES.has(e.type) && e.properties.fillColor)
+            .filter(e => e.parentId === pid && CHEVRON_SNAP_TYPES.has(e.type))
             .sort((a, b) => a.x - b.x);
-          if (children.length > 0) {
-            const baseColor = children[0].properties.fillColor as string;
+          const leftmost = children.find(e => newFillMap.has(e.id) || e.properties.fillColor);
+          if (leftmost) {
+            const baseColor = newFillMap.get(leftmost.id) ?? (leftmost.properties.fillColor as string);
             const tint = lightenHex(baseColor, 0.6);
             dispatch({ type: "UPDATE_PROPERTIES", payload: { id: pid, properties: { fillColor: tint } } });
           }

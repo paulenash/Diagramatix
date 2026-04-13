@@ -797,7 +797,7 @@ function ProcessGroupShape({ el }: { el: DiagramElement }) {
   const depthMap = useContext(ProcessGroupDepthCtx);
   const depth = depthMap.get(el.id) ?? 0;
   // Lighten the fill by blending toward white based on nesting depth
-  const baseFill = resolveColor("process-group", colors);
+  const baseFill = (el.properties.fillColor as string | undefined) ?? resolveColor("process-group", colors);
   const lightenStep = 0.25; // 25% lighter per nesting level
   const t = Math.min(depth * lightenStep, 0.9); // cap at 90% toward white
   function lerpHex(hex: string, toward: string, frac: number): string {
