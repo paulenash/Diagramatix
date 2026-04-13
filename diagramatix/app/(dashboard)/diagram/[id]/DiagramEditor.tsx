@@ -933,16 +933,16 @@ export function DiagramEditor({
             <button
               onClick={saveNow}
               disabled={saveStatus !== "unsaved"}
-              title="Save now (Ctrl+S)"
+              title="Save (Ctrl+S)"
               className={`px-2 py-0.5 text-[11px] font-medium rounded border ${
                 saveStatus === "unsaved"
-                  ? "bg-blue-600 text-white border-blue-600 hover:bg-blue-700"
+                  ? "bg-orange-500 text-white border-orange-500 hover:bg-orange-600"
                   : saveStatus === "saving"
                     ? "bg-yellow-50 text-yellow-700 border-yellow-300"
                     : "bg-green-50 text-green-600 border-green-200"
               }`}
             >
-              {saveStatus === "saving" ? "Saving\u2026" : saveStatus === "saved" ? "\u2713 Saved" : "Save"}
+              {saveStatus === "saving" ? "Saving\u2026" : saveStatus === "saved" ? "\u2713 Saved" : "\u25CF Unsaved — Click to Save"}
             </button>
 
             <div className="flex items-center gap-0.5">

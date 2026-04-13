@@ -134,26 +134,27 @@ export function layoutBpmnDiagram(
     incoming.get(c.targetId)!.push(c);
   }
 
+  // Assign columns using topological sort — ensures merge gateways come after all inputs
   const colMap = new Map<string, number>();
-  const visited = new Set<string>();
   const startEls = flowElements.filter(e =>
     !incoming.has(e.id) || incoming.get(e.id)!.length === 0
   );
   if (startEls.length === 0 && flowElements.length > 0) startEls.push(flowElements[0]);
 
+  // Multi-pass: keep updating columns until stable (handles merge gateways correctly)
   const queue: { id: string; col: number }[] = startEls.map(e => ({ id: e.id, col: 0 }));
-  while (queue.length > 0) {
-    const { id, col } = queue.shift()!;
-    if (visited.has(id)) {
-      // Update to later column if needed
-      if ((colMap.get(id) ?? 0) < col) colMap.set(id, col);
-      continue;
+  for (let pass = 0; pass < 20 && queue.length > 0; pass++) {
+    const next: typeof queue = [];
+    while (queue.length > 0) {
+      const { id, col } = queue.shift()!;
+      const existing = colMap.get(id) ?? -1;
+      if (col <= existing) continue; // already has a later column
+      colMap.set(id, col);
+      for (const c of (outgoing.get(id) ?? [])) {
+        next.push({ id: c.targetId, col: col + 1 });
+      }
     }
-    visited.add(id);
-    colMap.set(id, col);
-    for (const c of (outgoing.get(id) ?? [])) {
-      queue.push({ id: c.targetId, col: col + 1 });
-    }
+    queue.push(...next);
   }
   // Unvisited elements
   for (const el of flowElements) {
@@ -253,6 +254,21 @@ export function layoutBpmnDiagram(
 
   // ── Create connectors ──
   const elMap = new Map(elements.map(e => [e.id, e]));
+
+  // Helper: check if element is a gateway
+  const isGateway = (el: DiagramElement) => el.type === "gateway";
+  // Helper: check if gateway is a merge (has 2+ incoming sequence connectors)
+  const incomingCount = new Map<string, number>();
+  for (const c of aiConnections) {
+    if (c.type !== "message") {
+      incomingCount.set(c.targetId, (incomingCount.get(c.targetId) ?? 0) + 1);
+    }
+  }
+  const isMergeGateway = (el: DiagramElement) =>
+    isGateway(el) && (incomingCount.get(el.id) ?? 0) >= 2;
+  const isDecisionGateway = (el: DiagramElement) =>
+    isGateway(el) && !isMergeGateway(el);
+
   for (const c of aiConnections) {
     const src = elMap.get(c.sourceId);
     const tgt = elMap.get(c.targetId);
@@ -263,27 +279,83 @@ export function layoutBpmnDiagram(
 
     let connType: string;
     let srcSide: string, tgtSide: string;
+    let srcOffsetAlong: number | undefined;
 
     if (isMessage) {
       connType = "messageBPMN";
-      // Message flow: determine vertical direction
+      // Fix 1: Message flow — vertical, align x to the non-pool element's centre
       const srcCy = src.y + src.height / 2;
       const tgtCy = tgt.y + tgt.height / 2;
       srcSide = srcCy < tgtCy ? "bottom" : "top";
       tgtSide = srcCy < tgtCy ? "top" : "bottom";
+      // Compute offsetAlong so the pool attachment point is directly above/below the task
+      if (src.type === "pool" && tgt.type !== "pool") {
+        const taskCx = tgt.x + tgt.width / 2;
+        srcOffsetAlong = Math.max(0.02, Math.min(0.98, (taskCx - src.x) / src.width));
+      } else if (tgt.type === "pool" && src.type !== "pool") {
+        // Target pool offset handled below via tgtOffsetAlong
+      }
     } else {
       connType = "sequence";
-      // Sequence flow: determine direction
       const srcCx = src.x + src.width / 2;
       const tgtCx = tgt.x + tgt.width / 2;
       const srcCy = src.y + src.height / 2;
       const tgtCy = tgt.y + tgt.height / 2;
-      if (Math.abs(tgtCy - srcCy) > Math.abs(tgtCx - srcCx) * 1.5) {
+
+      // Fix 2: Decision gateway outgoing — use top/bottom for branching
+      if (isDecisionGateway(src)) {
+        if (tgtCy < srcCy) {
+          // Target is above → exit from top
+          srcSide = "top"; tgtSide = "left";
+        } else if (tgtCy > srcCy) {
+          // Target is below → exit from bottom
+          srcSide = "bottom"; tgtSide = "left";
+        } else {
+          // Same row → right to left
+          srcSide = "right"; tgtSide = "left";
+        }
+      }
+      // Fix 3: Merge gateway incoming — enter from top/bottom
+      else if (isMergeGateway(tgt)) {
+        if (srcCy < tgtCy) {
+          srcSide = "right"; tgtSide = "top";
+        } else if (srcCy > tgtCy) {
+          srcSide = "right"; tgtSide = "bottom";
+        } else {
+          srcSide = "right"; tgtSide = "left";
+        }
+      }
+      // Default: left-to-right or vertical
+      else if (Math.abs(tgtCy - srcCy) > Math.abs(tgtCx - srcCx) * 1.5) {
         srcSide = tgtCy > srcCy ? "bottom" : "top";
         tgtSide = tgtCy > srcCy ? "top" : "bottom";
       } else {
         srcSide = "right";
         tgtSide = "left";
+      }
+    }
+
+    // Compute target offset for message connectors to pools
+    let tgtOffsetAlong: number | undefined;
+    if (isMessage && tgt.type === "pool" && src.type !== "pool") {
+      const taskCx = src.x + src.width / 2;
+      tgtOffsetAlong = Math.max(0.02, Math.min(0.98, (taskCx - tgt.x) / tgt.width));
+    }
+
+    // Fix 4: Gateway label positioning
+    let labelOffsetX: number | undefined;
+    let labelOffsetY: number | undefined;
+    let labelWidth: number | undefined;
+    if (c.label) {
+      if (isDecisionGateway(src)) {
+        // Decision gateway condition labels on outgoing flows
+        labelOffsetX = 5;
+        labelOffsetY = -20;
+        labelWidth = 60;
+      } else {
+        labelOffsetX = 0;
+        labelOffsetY = -20;
+        labelWidth = 80;
       }
     }
 
@@ -300,7 +372,9 @@ export function layoutBpmnDiagram(
       targetInvisibleLeader: false,
       waypoints: [] as Point[],
       label: c.label ?? "",
-      ...(c.label ? { labelOffsetX: 0, labelOffsetY: -20, labelWidth: 80 } : {}),
+      ...(srcOffsetAlong !== undefined ? { sourceOffsetAlong: srcOffsetAlong } : {}),
+      ...(tgtOffsetAlong !== undefined ? { targetOffsetAlong: tgtOffsetAlong } : {}),
+      ...(labelOffsetX !== undefined ? { labelOffsetX, labelOffsetY, labelWidth } : {}),
     } as Connector);
   }
 
