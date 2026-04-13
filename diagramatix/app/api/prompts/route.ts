@@ -4,7 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { getCurrentOrgId, OrgContextError } from "@/app/lib/auth/orgContext";
 
-export async function GET() {
+export async function GET(req: Request) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -15,10 +15,13 @@ export async function GET() {
     throw err;
   }
 
+  const { searchParams } = new URL(req.url);
+  const diagramType = searchParams.get("diagramType");
+
   const prompts = await prisma.prompt.findMany({
-    where: { userId: session.user.id, orgId },
+    where: { userId: session.user.id, orgId, ...(diagramType ? { diagramType } : {}) },
     orderBy: { updatedAt: "desc" },
-    select: { id: true, name: true, text: true, createdAt: true, updatedAt: true },
+    select: { id: true, name: true, text: true, diagramType: true, createdAt: true, updatedAt: true },
   });
 
   return NextResponse.json(prompts);
@@ -35,13 +38,13 @@ export async function POST(req: Request) {
     throw err;
   }
 
-  const { name, text } = await req.json();
+  const { name, text, diagramType } = await req.json();
   if (!name?.trim() || !text?.trim()) {
     return NextResponse.json({ error: "Name and text are required" }, { status: 400 });
   }
 
   const prompt = await prisma.prompt.create({
-    data: { name: name.trim(), text: text.trim(), userId: session.user.id, orgId },
+    data: { name: name.trim(), text: text.trim(), diagramType: diagramType ?? "bpmn", userId: session.user.id, orgId },
   });
 
   return NextResponse.json(prompt, { status: 201 });

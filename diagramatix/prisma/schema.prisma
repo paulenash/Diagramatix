@@ -134,17 +134,19 @@ model DiagramTemplate {
 }
 
 model Prompt {
-  id        String   @id @default(cuid())
-  name      String
-  text      String
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  orgId     String
-  org       Org      @relation(fields: [orgId], references: [id], onDelete: Restrict)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String   @id @default(cuid())
+  name        String
+  text        String
+  diagramType String   @default("bpmn")
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orgId       String
+  org         Org      @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@index([orgId])
+  @@index([userId, diagramType])
 }
 
 model DiagramRules {

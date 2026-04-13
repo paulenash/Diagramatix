@@ -24,12 +24,14 @@ export function AiPanel({ diagramType, onApplyDiagram, onAddToDiagram, onClose }
   const [saveName, setSaveName] = useState("");
   const [showSave, setShowSave] = useState(false);
 
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
   const loadPrompts = useCallback(async () => {
     try {
-      const res = await fetch("/api/prompts");
+      const res = await fetch(`/api/prompts?diagramType=${encodeURIComponent(diagramType)}`);
       if (res.ok) setSavedPrompts(await res.json());
     } catch { /* ignore */ }
-  }, []);
+  }, [diagramType]);
 
   useEffect(() => { loadPrompts(); }, [loadPrompts]);
 
@@ -97,7 +99,7 @@ export function AiPanel({ diagramType, onApplyDiagram, onAddToDiagram, onClose }
       const res = await fetch("/api/prompts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: saveName.trim(), text: prompt.trim() }),
+        body: JSON.stringify({ name: saveName.trim(), text: prompt.trim(), diagramType }),
       });
       if (res.ok) { setShowSave(false); setSaveName(""); loadPrompts(); }
     } catch { /* ignore */ }
@@ -108,6 +110,7 @@ export function AiPanel({ diagramType, onApplyDiagram, onAddToDiagram, onClose }
       await fetch(`/api/prompts/${id}`, { method: "DELETE" });
       setSavedPrompts(prev => prev.filter(p => p.id !== id));
     } catch { /* ignore */ }
+    setConfirmDeleteId(null);
   }
 
   return (
@@ -123,11 +126,23 @@ export function AiPanel({ diagramType, onApplyDiagram, onAddToDiagram, onClose }
           <div className="space-y-0.5 max-h-28 overflow-y-auto">
             {savedPrompts.map(sp => (
               <div key={sp.id} className="flex items-center gap-1 group">
-                <button onClick={() => setPrompt(sp.text)}
-                  className="flex-1 text-left text-[11px] text-gray-700 truncate hover:text-blue-600 py-0.5"
-                  title={sp.text}>{sp.name}</button>
-                <button onClick={() => handleDeletePrompt(sp.id)}
-                  className="text-gray-300 hover:text-red-500 text-[10px] opacity-0 group-hover:opacity-100">&times;</button>
+                {confirmDeleteId === sp.id ? (
+                  <>
+                    <span className="flex-1 text-[10px] text-red-600 truncate">Delete &ldquo;{sp.name}&rdquo;?</span>
+                    <button onClick={() => handleDeletePrompt(sp.id)}
+                      className="text-[10px] text-red-600 font-medium hover:text-red-800 px-1">Yes</button>
+                    <button onClick={() => setConfirmDeleteId(null)}
+                      className="text-[10px] text-gray-500 hover:text-gray-700 px-1">No</button>
+                  </>
+                ) : (
+                  <>
+                    <button onClick={() => setPrompt(sp.text)}
+                      className="flex-1 text-left text-[11px] text-gray-700 truncate hover:text-blue-600 py-0.5"
+                      title={sp.text}>{sp.name}</button>
+                    <button onClick={() => setConfirmDeleteId(sp.id)}
+                      className="text-gray-300 hover:text-red-500 text-[10px] opacity-0 group-hover:opacity-100">&times;</button>
+                  </>
+                )}
               </div>
             ))}
           </div>
