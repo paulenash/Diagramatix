@@ -19,7 +19,7 @@ ${rules ? `USER RULES AND PREFERENCES (follow these strictly):\n${rules}\n\n` : 
 - Flow elements (tasks, gateways, events) MUST have: pool (pool id) and lane (lane id if applicable)
 - Tasks should have: taskType ("user", "service", "send", "receive", "manual", "none")
 - Gateways should have: gatewayType ("exclusive", "parallel", "inclusive")
-- Every diverging gateway MUST have a matching merge gateway downstream
+- CRITICAL: Every diverging gateway (with 2+ outgoing flows) MUST have a corresponding merge gateway downstream where ALL branches reconnect BEFORE any subsequent task. The merge gateway must have the same gatewayType as the diverging gateway. Even if one branch has only one task and the other has multiple, both MUST flow into the merge gateway.
 - Connections use: sourceId, targetId, and optionally label and type ("sequence" or "message")
 - Use "sequence" for flows within the same pool, "message" for flows between different pools
 

@@ -5,6 +5,7 @@
 
 import type { DiagramData, DiagramElement, Connector, Point } from "./types";
 import { getSymbolDefinition } from "./symbols/definitions";
+import { computeWaypoints } from "./routing";
 
 export interface AiElement {
   id: string;
@@ -29,7 +30,7 @@ export interface AiConnection {
 // Layout constants
 const POOL_HEADER_W = 30;
 const LANE_H = 120;
-const LANE_PAD_X = 20;
+const LANE_PAD_X = 50; // extra padding to clear lane header text
 const LANE_PAD_Y = 15;
 const BLACK_BOX_H = 50;
 const BLACK_BOX_GAP = 30;
@@ -170,7 +171,7 @@ export function layoutBpmnDiagram(
       id: bbp.id, type: "pool" as DiagramElement["type"],
       x: START_X, y: curY, width: poolWidth, height: BLACK_BOX_H,
       label: bbp.label,
-      properties: { poolType: "black-box" },
+      properties: { poolType: "black-box", isSystem: false },
     });
     curY += BLACK_BOX_H + BLACK_BOX_GAP;
   }
@@ -245,7 +246,7 @@ export function layoutBpmnDiagram(
       id: bbp.id, type: "pool" as DiagramElement["type"],
       x: START_X, y: curY, width: poolWidth, height: BLACK_BOX_H,
       label: bbp.label,
-      properties: { poolType: "black-box" },
+      properties: { poolType: "black-box", isSystem: true },
     });
     curY += BLACK_BOX_H + BLACK_BOX_GAP;
   }
@@ -303,9 +304,23 @@ export function layoutBpmnDiagram(
     } as Connector);
   }
 
+  // Compute waypoints for all connectors
+  const computedConnectors = connectors.map(conn => {
+    const src = elMap.get(conn.sourceId);
+    const tgt = elMap.get(conn.targetId);
+    if (!src || !tgt) return conn;
+    try {
+      const result = computeWaypoints(src, tgt, elements,
+        conn.sourceSide, conn.targetSide, conn.routingType, 0.5, 0.5);
+      return { ...conn, waypoints: result.waypoints,
+        sourceInvisibleLeader: result.sourceInvisibleLeader,
+        targetInvisibleLeader: result.targetInvisibleLeader };
+    } catch { return conn; }
+  });
+
   return {
     elements,
-    connectors,
+    connectors: computedConnectors,
     viewport: { x: 0, y: 0, zoom: 0.6 },
     fontSize: 12,
     connectorFontSize: 10,
@@ -384,8 +399,19 @@ function layoutFlat(
     } as Connector);
   }
 
+  // Compute waypoints
+  const computed = connectors.map(conn => {
+    const src = elMap.get(conn.sourceId);
+    const tgt = elMap.get(conn.targetId);
+    if (!src || !tgt) return conn;
+    try {
+      const r = computeWaypoints(src, tgt, elements, conn.sourceSide, conn.targetSide, conn.routingType, 0.5, 0.5);
+      return { ...conn, waypoints: r.waypoints, sourceInvisibleLeader: r.sourceInvisibleLeader, targetInvisibleLeader: r.targetInvisibleLeader };
+    } catch { return conn; }
+  });
+
   return {
-    elements, connectors,
+    elements, connectors: computed,
     viewport: { x: 0, y: 0, zoom: 0.8 },
     fontSize: 12, connectorFontSize: 10,
   };
