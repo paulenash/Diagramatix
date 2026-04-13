@@ -42,6 +42,11 @@ export function layoutGenericDiagram(
   const aiElements = parsed.elements ?? [];
   const aiConnections = parsed.connections ?? [];
 
+  // Context diagrams: special circular layout
+  if (diagramType === "context" || diagramType === "basic") {
+    return layoutContextDiagram(aiElements, aiConnections);
+  }
+
   const elements: DiagramElement[] = [];
   const connectors: Connector[] = [];
 
@@ -240,4 +245,153 @@ function buildProperties(ai: Record<string, unknown>, diagramType: string): Reco
   }
 
   return props;
+}
+
+/** Layout context diagrams: central process with entities arranged in a circle */
+function layoutContextDiagram(
+  aiElements: AiParsed["elements"] & object[],
+  aiConnections: AiParsed["connections"] & object[],
+): DiagramData {
+  const elements: DiagramElement[] = [];
+  const connectors: Connector[] = [];
+
+  // Find the central process (process-system) and entities (external-entity)
+  const central = aiElements.find(e => e.type === "process-system");
+  const entities = aiElements.filter(e => e.type === "external-entity");
+
+  // Central process: large, in the centre
+  const centerX = 500;
+  const centerY = 400;
+  const processW = 200;
+  const processH = 200;
+
+  if (central) {
+    elements.push({
+      id: central.id,
+      type: "process-system",
+      x: centerX - processW / 2,
+      y: centerY - processH / 2,
+      width: processW,
+      height: processH,
+      label: central.label ?? central.name ?? "System",
+      properties: {},
+    });
+  }
+
+  // Arrange entities in a circle around the process
+  const radius = 300; // distance from centre to entity centre
+  const entityCount = entities.length;
+
+  for (let i = 0; i < entityCount; i++) {
+    const ent = entities[i];
+    // Distribute evenly around the circle, starting from top
+    const angle = (i / entityCount) * 2 * Math.PI - Math.PI / 2;
+    const def = getSymbolDefinition("external-entity");
+    const ex = centerX + radius * Math.cos(angle) - def.defaultWidth / 2;
+    const ey = centerY + radius * Math.sin(angle) - def.defaultHeight / 2;
+
+    elements.push({
+      id: ent.id,
+      type: "external-entity",
+      x: ex,
+      y: ey,
+      width: def.defaultWidth,
+      height: def.defaultHeight,
+      label: ent.label ?? ent.name ?? "Entity",
+      properties: {},
+    });
+  }
+
+  // Create connectors with smart side selection
+  const elMap = new Map(elements.map(e => [e.id, e]));
+
+  // Track used sides per element to separate endpoints
+  const usedSides = new Map<string, Map<string, number>>(); // elId → side → count
+
+  function getBestSides(src: DiagramElement, tgt: DiagramElement): { srcSide: string; tgtSide: string } {
+    const srcCx = src.x + src.width / 2;
+    const srcCy = src.y + src.height / 2;
+    const tgtCx = tgt.x + tgt.width / 2;
+    const tgtCy = tgt.y + tgt.height / 2;
+    const dx = tgtCx - srcCx;
+    const dy = tgtCy - srcCy;
+
+    // Determine the two nearest sides of each element to the other
+    function twoNearestSides(fromX: number, fromY: number, toX: number, toY: number): string[] {
+      const ddx = toX - fromX;
+      const ddy = toY - fromY;
+      const sides: { side: string; score: number }[] = [
+        { side: "right", score: ddx },
+        { side: "left", score: -ddx },
+        { side: "bottom", score: ddy },
+        { side: "top", score: -ddy },
+      ];
+      sides.sort((a, b) => b.score - a.score);
+      return [sides[0].side, sides[1].side];
+    }
+
+    const srcNearest = twoNearestSides(srcCx, srcCy, tgtCx, tgtCy);
+    const tgtNearest = twoNearestSides(tgtCx, tgtCy, srcCx, srcCy);
+
+    // Pick the side with fewer existing connections
+    function pickLeastUsed(elId: string, candidates: string[]): string {
+      if (!usedSides.has(elId)) usedSides.set(elId, new Map());
+      const counts = usedSides.get(elId)!;
+      let best = candidates[0];
+      let bestCount = counts.get(candidates[0]) ?? 0;
+      for (const s of candidates) {
+        const c = counts.get(s) ?? 0;
+        if (c < bestCount) { best = s; bestCount = c; }
+      }
+      counts.set(best, (counts.get(best) ?? 0) + 1);
+      return best;
+    }
+
+    const srcSide = pickLeastUsed(src.id, srcNearest);
+    const tgtSide = pickLeastUsed(tgt.id, tgtNearest);
+
+    return { srcSide, tgtSide };
+  }
+
+  for (const c of aiConnections) {
+    const src = elMap.get(c.sourceId);
+    const tgt = elMap.get(c.targetId);
+    if (!src || !tgt) continue;
+
+    const { srcSide, tgtSide } = getBestSides(src, tgt);
+
+    connectors.push({
+      id: `conn-${c.sourceId}-${c.targetId}`,
+      sourceId: c.sourceId,
+      targetId: c.targetId,
+      sourceSide: srcSide as Connector["sourceSide"],
+      targetSide: tgtSide as Connector["targetSide"],
+      type: "flow",
+      directionType: "open-directed",
+      routingType: "curvilinear",
+      sourceInvisibleLeader: false,
+      targetInvisibleLeader: false,
+      waypoints: [] as Point[],
+      label: c.label ?? "",
+    } as Connector);
+  }
+
+  // Compute waypoints
+  const computed = connectors.map(conn => {
+    const src = elMap.get(conn.sourceId);
+    const tgt = elMap.get(conn.targetId);
+    if (!src || !tgt) return conn;
+    try {
+      const r = computeWaypoints(src, tgt, elements, conn.sourceSide, conn.targetSide, conn.routingType, 0.5, 0.5);
+      return { ...conn, waypoints: r.waypoints, sourceInvisibleLeader: r.sourceInvisibleLeader, targetInvisibleLeader: r.targetInvisibleLeader };
+    } catch { return conn; }
+  });
+
+  return {
+    elements,
+    connectors: computed,
+    viewport: { x: 0, y: 0, zoom: 0.7 },
+    fontSize: 12,
+    connectorFontSize: 10,
+  };
 }
