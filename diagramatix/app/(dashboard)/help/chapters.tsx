@@ -225,17 +225,17 @@ export const CHAPTERS: HelpChapter[] = [
         body: (
           <>
             <p>
-              Chevron-based process value chain diagrams. Three element
-              types: <strong>Chevron</strong> (process step),{" "}
-              <strong>Collapsed Chevron</strong> (with linked diagram
-              drill-through), and <strong>Process Group</strong>{" "}
+              Process-based value chain diagrams. Three element
+              types: <strong>Process</strong> (process step),{" "}
+              <strong>Collapsed Process</strong> (with linked diagram
+              drill-through), and <strong>Value Chain</strong>{" "}
               (container rectangle).
             </p>
             <p className="mt-2">
-              Features <strong>chevron colour themes</strong> (right-click
-              on 2+ selected chevrons), <strong>description boxes</strong>{" "}
-              below each chevron, automatic <strong>horizontal snap</strong>{" "}
-              with 10px overlap, and <strong>process group nesting</strong>{" "}
+              Features <strong>process colour themes</strong> (right-click
+              on 2+ selected processes), <strong>description boxes</strong>{" "}
+              below each process, automatic <strong>horizontal snap</strong>{" "}
+              with 10px overlap, and <strong>value chain nesting</strong>{" "}
               with automatic shade lightening. No connectors in this
               diagram type.
             </p>
@@ -1614,14 +1614,14 @@ export const CHAPTERS: HelpChapter[] = [
       {
         body: (
           <p>
-            Value chain diagrams model process flows using chevron shapes.
+            Value chain diagrams model process flows using process shapes.
             They have no connectors — the flow is implied by the
-            left-to-right arrangement of chevrons.
+            left-to-right arrangement of processes.
           </p>
         ),
       },
       {
-        heading: "Chevron",
+        heading: "Process",
         body: (
           <p>
             The primary element. A pentagon-like shape with a notched left
@@ -1632,11 +1632,11 @@ export const CHAPTERS: HelpChapter[] = [
         ),
       },
       {
-        heading: "Collapsed Chevron",
+        heading: "Collapsed Process",
         body: (
           <>
             <p>
-              Like a regular chevron but with a <strong>+</strong> marker
+              Like a regular process but with a <strong>+</strong> marker
               at the bottom centre (same as a BPMN subprocess). Can be
               linked to another <strong>Value Chain</strong> or{" "}
               <strong>BPMN</strong> diagram in the same project.
@@ -1649,17 +1649,17 @@ export const CHAPTERS: HelpChapter[] = [
         ),
       },
       {
-        heading: "Process Group",
+        heading: "Value Chain",
         body: (
           <>
             <p>
-              A rectangular container that groups related chevrons.
-              Process groups always render <strong>behind</strong> their
+              A rectangular container that groups related processes.
+              Value chains always render <strong>behind</strong> their
               children.
             </p>
             <ul className="list-disc list-inside space-y-1 mt-2">
               <li>
-                Chevrons dropped or moved inside a process group become
+                Processes dropped or moved inside a value chain become
                 its children and move with it.
               </li>
               <li>
@@ -1667,12 +1667,12 @@ export const CHAPTERS: HelpChapter[] = [
                 the parent boundary.
               </li>
               <li>
-                Nested process groups automatically{" "}
+                Nested value chains automatically{" "}
                 <strong>lighten in shade</strong> — each level is 25%
                 lighter than its parent.
               </li>
               <li>
-                Deleting a process group keeps all children on the diagram.
+                Deleting a value chain keeps all children on the diagram.
               </li>
             </ul>
           </>
@@ -1683,8 +1683,8 @@ export const CHAPTERS: HelpChapter[] = [
         body: (
           <>
             <p>
-              Each chevron has an optional description box displayed below
-              it. The description auto-wraps to the chevron&apos;s width.
+              Each process has an optional description box displayed below
+              it. The description auto-wraps to the process&apos;s width.
             </p>
             <ul className="list-disc list-inside space-y-1 mt-2">
               <li>
@@ -1707,10 +1707,10 @@ export const CHAPTERS: HelpChapter[] = [
         heading: "Horizontal snap",
         body: (
           <p>
-            When dragging a chevron near another chevron with ≥75% vertical
+            When dragging a process near another process with ≥75% vertical
             overlap, it snaps to align horizontally with a{" "}
             <strong>10px overlap</strong> — creating the classic
-            interlocking chevron chain appearance.
+            interlocking process chain appearance.
           </p>
         ),
       },
@@ -1720,12 +1720,12 @@ export const CHAPTERS: HelpChapter[] = [
   /* ──────────────────────────────────────────────── 21 ── */
   {
     slug: "chevron-themes",
-    title: "Chevron Colour Themes",
+    title: "Process Colour Themes",
     sections: [
       {
         body: (
           <p>
-            Apply coordinated pastel colour schemes to groups of chevrons
+            Apply coordinated pastel colour schemes to groups of processes
             for visual distinction between process areas.
           </p>
         ),
@@ -1735,7 +1735,7 @@ export const CHAPTERS: HelpChapter[] = [
         body: (
           <ol className="list-decimal list-inside space-y-2">
             <li>
-              Select <strong>2 or more chevrons</strong> (click + Shift+click,
+              Select <strong>2 or more processes</strong> (click + Shift+click,
               or lasso selection).
             </li>
             <li>
@@ -1744,7 +1744,7 @@ export const CHAPTERS: HelpChapter[] = [
             </li>
             <li>
               Click a theme row — colours are applied left-to-right by
-              chevron position.
+              process position.
             </li>
           </ol>
         ),
@@ -1765,9 +1765,9 @@ export const CHAPTERS: HelpChapter[] = [
         heading: "Clearing colours",
         body: (
           <p>
-            Select the themed chevrons, right-click, and choose{" "}
+            Select the themed processes, right-click, and choose{" "}
             <strong>Clear Colours</strong> at the bottom of the popup.
-            All chevrons revert to the default diagram colour.
+            All processes revert to the default diagram colour.
           </p>
         ),
       },

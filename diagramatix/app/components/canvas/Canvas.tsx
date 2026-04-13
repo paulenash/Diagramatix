@@ -2331,7 +2331,7 @@ export function Canvas({
           e.preventDefault();
           const rect = svgRef.current?.getBoundingClientRect();
           if (!rect) return;
-          // If 2+ chevrons selected, show theme picker instead of quick-add
+          // If 2+ process elements selected, show theme picker instead of quick-add
           const CHEVRON_SET = new Set(["chevron", "chevron-collapsed"]);
           const selectedChevrons = data.elements.filter(
             el => selectedElementIds.has(el.id) && CHEVRON_SET.has(el.type)
@@ -3707,9 +3707,9 @@ export function Canvas({
           "gateway": "Gateway",
           "fork-join": "Fork/Join",
           "submachine": "SubMachine",
-          "chevron": "Chevron",
+          "chevron": "Process",
           "chevron-collapsed": "Collapsed",
-          "process-group": "Group",
+          "process-group": "Value Chain",
         };
         const COLS = 4;
         const BUTTON = 40;       // w-10 / h-10
@@ -3760,7 +3760,7 @@ export function Canvas({
         );
       })()}
 
-      {/* Chevron theme picker popup */}
+      {/* Process colour theme picker popup */}
       {themePicker && onUpdatePropertiesBatch && (() => {
         const CHEVRON_SET = new Set(["chevron", "chevron-collapsed"]);
         const selectedChevrons = data.elements
@@ -3782,7 +3782,7 @@ export function Canvas({
             onContextMenu={(e) => e.preventDefault()}
           >
             <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide px-1 mb-1">
-              Colour Theme ({selectedChevrons.length} chevrons)
+              Colour Theme ({selectedChevrons.length} processes)
             </p>
             {CHEVRON_THEMES.map((theme) => (
               <button

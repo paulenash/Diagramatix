@@ -30,15 +30,16 @@ Output format:
 
   "value-chain": `You are a Value Chain diagram expert. Output ONLY valid JSON with elements.
 
-Element types: "chevron" (process step), "chevron-collapsed" (links to sub-diagram), "process-group" (container)
+Element types: "chevron-collapsed" (process — always use this type), "process-group" (value chain container)
 No connectors in value chain diagrams — flow is implied by left-to-right arrangement.
+Always use "chevron-collapsed" for every process element. Never use "chevron".
 
 Output format:
 {
   "elements": [
     { "id": "g1", "type": "process-group", "label": "Core Processes" },
-    { "id": "e1", "type": "chevron", "label": "Inbound Logistics", "group": "g1", "description": "Receiving and storing raw materials" },
-    { "id": "e2", "type": "chevron", "label": "Operations", "group": "g1", "description": "Manufacturing and assembly" },
+    { "id": "e1", "type": "chevron-collapsed", "label": "Inbound Logistics", "group": "g1", "description": "Receiving and storing raw materials" },
+    { "id": "e2", "type": "chevron-collapsed", "label": "Operations", "group": "g1", "description": "Manufacturing and assembly" },
     { "id": "e3", "type": "chevron-collapsed", "label": "Outbound Logistics", "group": "g1", "description": "Distribution to customers" }
   ],
   "connections": []

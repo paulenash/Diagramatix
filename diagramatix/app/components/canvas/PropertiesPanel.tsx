@@ -1707,7 +1707,7 @@ export function PropertiesPanel({
         );
       })()}
 
-      {/* Description for chevrons */}
+      {/* Description for process elements */}
       {(element.type === "chevron" || element.type === "chevron-collapsed") && (
         <>
           <div>

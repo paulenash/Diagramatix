@@ -6,6 +6,10 @@
 import type { DiagramData, DiagramElement, Connector, Point } from "./types";
 import { getSymbolDefinition } from "./symbols/definitions";
 import { computeWaypoints } from "./routing";
+import { CHEVRON_THEMES } from "./chevronThemes";
+
+const GARDEN_THEME = CHEVRON_THEMES.find(t => t.name === "Garden")!;
+const CHEVRON_OVERLAP = 10; // 10px overlap for snapped processes
 
 const GRID_GAP_X = 60;
 const GRID_GAP_Y = 40;
@@ -55,6 +59,8 @@ export function layoutGenericDiagram(
   const containers = aiElements.filter(e => CONTAINER_TYPES.has(e.type));
   const regularEls = aiElements.filter(e => !CONTAINER_TYPES.has(e.type));
 
+  const isValueChain = diagramType === "value-chain";
+
   // Layout containers first (large, in a row)
   let containerY = START_Y;
   const containerMap = new Map<string, DiagramElement>();
@@ -62,8 +68,13 @@ export function layoutGenericDiagram(
     const ai = containers[i];
     const label = ai.label ?? ai.name ?? ai.type;
     const childCount = regularEls.filter(e => e.group === ai.id || e.parent === ai.id).length;
-    const w = Math.max(200, (childCount + 1) * 180);
-    const h = Math.max(120, 100);
+    // Value chains: use snapped width calculation; others: spaced grid
+    const childWidth = isValueChain
+      ? childCount * 140 - (childCount - 1) * CHEVRON_OVERLAP + 60  // snapped processes + padding
+      : (childCount + 1) * 180;
+    const w = Math.max(200, childWidth);
+    // Value chains: extra bottom gap for descriptions
+    const h = isValueChain ? Math.max(200, 78 + 120 + 40) : Math.max(120, 100);
     const el: DiagramElement = {
       id: ai.id, type: ai.type as DiagramElement["type"],
       x: START_X, y: containerY, width: w, height: h,
@@ -76,6 +87,7 @@ export function layoutGenericDiagram(
 
   // Layout regular elements in a grid, grouped by container
   const placed = new Set<string>();
+  let gardenIdx = 0; // Garden theme colour index for value chain processes
 
   // Place elements within containers
   for (const [containerId, container] of containerMap) {
@@ -87,19 +99,33 @@ export function layoutGenericDiagram(
     for (const ai of children) {
       const def = getSymbolDefinition(ai.type as DiagramElement["type"]);
       const label = ai.label ?? ai.name ?? ai.type;
+      const props = buildProperties(ai, diagramType);
+
+      // Value chain: apply Garden theme colour
+      if (isValueChain && (ai.type === "chevron" || ai.type === "chevron-collapsed")) {
+        props.fillColor = GARDEN_THEME.colours[gardenIdx % GARDEN_THEME.colours.length];
+        gardenIdx++;
+      }
+
       const el: DiagramElement = {
         id: ai.id, type: ai.type as DiagramElement["type"],
         x: cx, y: cy, width: def.defaultWidth, height: def.defaultHeight,
-        label, properties: buildProperties(ai, diagramType),
+        label, properties: props,
         parentId: containerId,
       };
       elements.push(el);
       placed.add(ai.id);
-      cx += def.defaultWidth + GRID_GAP_X;
+
+      // Value chain: snap processes with 10px overlap; others: use gap
+      if (isValueChain && (ai.type === "chevron" || ai.type === "chevron-collapsed")) {
+        cx += def.defaultWidth - CHEVRON_OVERLAP;
+      } else {
+        cx += def.defaultWidth + GRID_GAP_X;
+      }
     }
     // Resize container to fit children
     if (children.length > 0) {
-      container.width = Math.max(container.width, cx - container.x + 20);
+      container.width = Math.max(container.width, cx - container.x + 30);
     }
   }
 
@@ -116,14 +142,27 @@ export function layoutGenericDiagram(
     if (col >= MAX_COLS) { col = 0; curX = START_X; curY += rowH + GRID_GAP_Y; rowH = 0; }
     const def = getSymbolDefinition(ai.type as DiagramElement["type"]);
     const label = ai.label ?? ai.name ?? ai.type;
+    const props = buildProperties(ai, diagramType);
+
+    // Value chain: apply Garden theme colour to uncontained processes too
+    if (isValueChain && (ai.type === "chevron" || ai.type === "chevron-collapsed")) {
+      props.fillColor = GARDEN_THEME.colours[gardenIdx % GARDEN_THEME.colours.length];
+      gardenIdx++;
+    }
+
     const el: DiagramElement = {
       id: ai.id, type: ai.type as DiagramElement["type"],
       x: curX, y: curY, width: def.defaultWidth, height: def.defaultHeight,
-      label, properties: buildProperties(ai, diagramType),
+      label, properties: props,
     };
     elements.push(el);
     rowH = Math.max(rowH, def.defaultHeight);
-    curX += def.defaultWidth + GRID_GAP_X;
+    // Value chain: snap; others: gap
+    if (isValueChain && (ai.type === "chevron" || ai.type === "chevron-collapsed")) {
+      curX += def.defaultWidth - CHEVRON_OVERLAP;
+    } else {
+      curX += def.defaultWidth + GRID_GAP_X;
+    }
     col++;
   }
 
@@ -218,7 +257,7 @@ export function layoutGenericDiagram(
 function buildProperties(ai: Record<string, unknown>, diagramType: string): Record<string, unknown> {
   const props: Record<string, unknown> = {};
 
-  // Value chain description
+  // Value chain process description
   if ((ai.type === "chevron" || ai.type === "chevron-collapsed") && ai.description) {
     props.description = ai.description;
     props.showDescription = true;

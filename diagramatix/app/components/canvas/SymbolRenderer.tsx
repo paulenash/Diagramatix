@@ -2007,19 +2007,36 @@ export function SymbolRenderer({
         element.type === 'lane' ||
         element.type === 'uml-class' ||
         element.type === 'uml-enumeration'
-      ) && !(element.type === 'gateway' && (element.properties.gatewayRole as string | undefined) === 'merge') && (
-        <text
-          x={labelInfo.x}
-          y={labelInfo.y}
-          textAnchor="middle"
-          dominantBaseline={labelInfo.baseline}
-          fontSize={fs(isActorOrTeam ? 11 : 12)}
-          fill="#111827"
-          style={{ userSelect: "none", pointerEvents: "none" }}
-        >
-          {element.label}
-        </text>
-      )}
+      ) && !(element.type === 'gateway' && (element.properties.gatewayRole as string | undefined) === 'merge') && (() => {
+        const isChevron = element.type === 'chevron' || element.type === 'chevron-collapsed';
+        const labelLines = element.label.split('\n');
+        const fSize = fs(isActorOrTeam ? 11 : 12);
+        const lineH = fSize * 1.3;
+        if (isChevron && labelLines.length > 1) {
+          const topY = labelInfo.y - ((labelLines.length - 1) * lineH) / 2;
+          return (
+            <text textAnchor="middle" fontSize={fSize} fill="#111827"
+              style={{ userSelect: "none", pointerEvents: "none" }}>
+              {labelLines.map((line, i) => (
+                <tspan key={i} x={labelInfo.x} y={topY + i * lineH}>{line}</tspan>
+              ))}
+            </text>
+          );
+        }
+        return (
+          <text
+            x={labelInfo.x}
+            y={labelInfo.y}
+            textAnchor="middle"
+            dominantBaseline={labelInfo.baseline}
+            fontSize={fSize}
+            fill="#111827"
+            style={{ userSelect: "none", pointerEvents: "none" }}
+          >
+            {element.label}
+          </text>
+        );
+      })()}
 
       {/* Selection outline */}
       {selected && !isContainer && (

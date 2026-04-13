@@ -590,7 +590,7 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         label = `Process ${count + 1}`;
       } else if (action.payload.symbolType === "process-group") {
         const count = state.elements.filter((e) => e.type === "process-group").length;
-        label = `Group ${count + 1}`;
+        label = `Value Chain ${count + 1}`;
       } else if (action.payload.symbolType === "fork-join") {
         label = "";
       } else if (action.payload.symbolType === "pool") {

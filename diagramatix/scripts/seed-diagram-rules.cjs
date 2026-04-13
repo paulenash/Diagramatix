@@ -62,25 +62,27 @@ S10: Initial State should be on the left, Final State(s) on the right.
 S11: States should flow generally left-to-right showing progression.
 S12: Composite States should be large enough to contain all sub-states clearly.`,
 
-  "value-chain": `## Group 1: Chevron Layout
-V01: Chevrons should be arranged left-to-right representing the value chain flow.
-V02: Related chevrons should overlap by 10px to create the interlocking chain appearance.
-V03: Each chevron should have a clear, concise process name.
-V04: Use Collapsed Chevrons for processes that link to detailed BPMN or Value Chain diagrams.
+  "value-chain": `## Group 1: Process Layout
+V01: Processes should be arranged left-to-right representing the value chain flow.
+V02: Related processes should overlap by 10px to create the interlocking chain appearance.
+V03: Each process should have a clear, concise name.
+V04: Always use Collapsed Process elements for generated Value Chain processes.
 
-## Group 2: Process Groups
-V05: Use Process Groups to visually group related chevrons.
-V06: Process Groups should have a descriptive name at the top.
-V07: Nested Process Groups automatically lighten in shade for visual hierarchy.
+## Group 2: Value Chains
+V05: Use Value Chain containers to visually group related processes.
+V06: Value Chain containers should have a descriptive name at the top.
+V07: Nested Value Chain containers automatically lighten in shade for visual hierarchy.
+V08: The enclosing Value Chain must allow enough gap at the bottom to comfortably enclose the processes and their descriptions.
 
 ## Group 3: Descriptions
-V08: Each chevron should have a description that summarises the process scope.
-V09: Descriptions are shown by default below each chevron.
-V10: Descriptions should auto-wrap within the chevron width.
+V09: Each process should have a description that summarises the process scope.
+V10: Descriptions are shown by default below each process.
+V11: Descriptions should auto-wrap within the process width.
 
 ## Group 4: Colour Themes
-V11: Use colour themes to distinguish different process areas or departments.
-V12: Apply themes by selecting multiple chevrons and right-clicking.`,
+V12: Use the Garden colouring theme by default for generated processes.
+V13: Use colour themes to distinguish different process areas or departments.
+V14: Apply themes by selecting multiple processes and right-clicking.`,
 
   domain: `## Group 1: Entities
 D01: Each table or entity should be represented as a UML Class with the <<entity>> or <<table>> stereotype.

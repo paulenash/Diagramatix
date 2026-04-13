@@ -325,7 +325,7 @@ const DIAGRAM_TYPES: { value: DiagramType; label: string; description: string }[
   { value: "state-machine", label: "State Machine", description: "States and transitions for entity lifecycle" },
   { value: "bpmn", label: "BPMN", description: "Full Business Process Model and Notation" },
   { value: "domain", label: "Domain", description: "UML class diagrams with classes, enumerations, and relationships" },
-  { value: "value-chain", label: "Value Chain", description: "Chevron-based process value chain with process groups" },
+  { value: "value-chain", label: "Value Chain", description: "Process-based value chain diagrams with value chain containers" },
 ];
 
 export function ProjectDetailClient({ project, otherProjects, version, readOnly, viewingAsName, viewingAsEmail }: Props) {
