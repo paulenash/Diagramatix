@@ -46,47 +46,23 @@ interface Props {
 function useAutoSave(
   diagramId: string,
   data: DiagramData,
-  delay = 1500,
+  _delay = 1500,
   disabled = false
 ) {
-  const saveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "unsaved">("saved");
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
   const lastSaved = useRef<string>(JSON.stringify(data));
 
+  // Track unsaved changes (no auto-save timer)
   useEffect(() => {
     if (disabled) return;
-
     const current = JSON.stringify(data);
-    if (current === lastSaved.current) return;
-
-    setSaveStatus("unsaved");
-
-    if (saveTimeout.current) clearTimeout(saveTimeout.current);
-
-    saveTimeout.current = setTimeout(async () => {
-      setSaveStatus("saving");
-      try {
-        await fetch(`/api/diagrams/${diagramId}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ data }),
-        });
-        lastSaved.current = current;
-        setLastSavedAt(new Date().toISOString());
-        setSaveStatus("saved");
-      } catch {
-        setSaveStatus("unsaved");
-      }
-    }, delay);
-
-    return () => {
-      if (saveTimeout.current) clearTimeout(saveTimeout.current);
-    };
-  }, [data, diagramId, delay, disabled]);
+    if (current !== lastSaved.current) {
+      setSaveStatus("unsaved");
+    }
+  }, [data, disabled]);
 
   const saveNow = useCallback(async () => {
-    if (saveTimeout.current) clearTimeout(saveTimeout.current);
     const current = JSON.stringify(data);
     if (current === lastSaved.current) return;
     setSaveStatus("saving");
@@ -268,9 +244,19 @@ export function DiagramEditor({
   // Ref to saveNow so navigation callbacks can call it without stale closures
   const saveNowRef = useRef<() => Promise<void>>(() => Promise.resolve());
 
+  // Ref for save status — populated after useAutoSave runs (below)
+  const saveStatusRef = useRef<"saved" | "saving" | "unsaved">("saved");
+  async function confirmSaveBeforeLeave(): Promise<boolean> {
+    if (saveStatusRef.current !== "unsaved") return true;
+    const choice = window.confirm("You have unsaved changes. Save before leaving?");
+    if (choice) {
+      await saveNowRef.current();
+    }
+    return true;
+  }
+
   const handleDrillIntoSubprocess = useCallback(async (linkedDiagramId: string) => {
-    // Save current diagram before navigating away
-    await saveNowRef.current();
+    await confirmSaveBeforeLeave();
     const stack = getDrillStack();
     stack.push({ id: diagramId, name: diagramName });
     sessionStorage.setItem(STACK_KEY, JSON.stringify(stack));
@@ -278,7 +264,7 @@ export function DiagramEditor({
   }, [router, diagramId, diagramName]);
 
   const handleDrillBack = useCallback(async () => {
-    await saveNowRef.current();
+    await confirmSaveBeforeLeave();
     const stack = getDrillStack();
     stack.pop();
     sessionStorage.setItem(STACK_KEY, JSON.stringify(stack));
@@ -290,7 +276,7 @@ export function DiagramEditor({
   }, [router, projectId]);
 
   const handleBackToProject = useCallback(async () => {
-    await saveNowRef.current();
+    await confirmSaveBeforeLeave();
     sessionStorage.removeItem(STACK_KEY);
     if (window.history.length > 1) {
       router.back();
@@ -358,7 +344,20 @@ export function DiagramEditor({
 
   const { saveStatus, lastSavedAt, saveNow } = useAutoSave(diagramId, data, 1500, templateEditState !== null || !!readOnly);
   saveNowRef.current = saveNow;
+  saveStatusRef.current = saveStatus;
   const effectiveUpdatedAt = lastSavedAt ?? updatedAt;
+
+  // Warn user about unsaved changes when leaving the page
+  useEffect(() => {
+    function handleBeforeUnload(e: BeforeUnloadEvent) {
+      if (saveStatus === "unsaved") {
+        e.preventDefault();
+        e.returnValue = "You have unsaved changes. Are you sure you want to leave?";
+      }
+    }
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [saveStatus]);
 
   useEffect(() => {
     function handleKeyDown(e: globalThis.KeyboardEvent) {

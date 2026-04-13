@@ -1441,7 +1441,16 @@ export function PropertiesPanel({
               <option value="white-box">White-box</option>
             </select>
           </div>
-          {onAddLane && (
+          {((element.properties.poolType as string | undefined) ?? "black-box") === "black-box" && (
+            <label className="flex items-center gap-1 text-[10px] text-gray-700">
+              <input type="checkbox"
+                checked={!!element.properties.isSystem}
+                onChange={(e) => onUpdateProperties(element.id, { isSystem: e.target.checked })}
+                className="w-3 h-3" />
+              System (IT application / database)
+            </label>
+          )}
+          {onAddLane && (element.properties.poolType === "white-box") && (
             <button onClick={() => onAddLane(element.id)}
               className="w-full px-2 py-0.5 text-[10px] bg-blue-50 text-blue-700 border border-blue-200 rounded hover:bg-blue-100">
               + Add Lane
