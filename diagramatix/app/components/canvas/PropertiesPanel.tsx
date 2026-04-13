@@ -51,6 +51,7 @@ interface Props {
   onConvertTaskSubprocess?: (id: string) => void;
   database?: string;
   onSetDatabase?: (db: string) => void;
+  forceCollapseTitle?: boolean;
 }
 
 const TASK_TYPE_OPTIONS: { value: BpmnTaskType; label: string }[] = [
@@ -581,6 +582,7 @@ export function PropertiesPanel({
   onConvertTaskSubprocess,
   database,
   onSetDatabase,
+  forceCollapseTitle,
 }: Props) {
   const [labelDraft, setLabelDraft] = useState("");
   const [panelCollapsed, setPanelCollapsed] = useState(false);
@@ -591,6 +593,14 @@ export function PropertiesPanel({
   useEffect(() => {
     if (element) setLabelDraft(element.label);
   }, [element]);
+
+  // Collapse title and panel when AI panel opens
+  useEffect(() => {
+    if (forceCollapseTitle) {
+      setTitleOpen(false);
+      setPanelCollapsed(true);
+    }
+  }, [forceCollapseTitle]);
 
   // Auto-collapse title when element/connector selected, auto-open when deselected
   useEffect(() => {

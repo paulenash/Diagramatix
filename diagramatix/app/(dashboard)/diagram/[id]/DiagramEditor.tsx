@@ -1510,6 +1510,7 @@ export function DiagramEditor({
             currentDiagramId={diagramId}
             onFlipForkJoin={flipForkJoin}
             onConvertTaskSubprocess={convertTaskSubprocess}
+            forceCollapseTitle={showAiPanel}
           />
         )}
 
