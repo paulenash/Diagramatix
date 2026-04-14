@@ -28,6 +28,7 @@ export function AiPanel({ diagramType, onApplyDiagram, onAddToDiagram, onClose }
   const [savedPrompts, setSavedPrompts] = useState<SavedPrompt[]>([]);
   const [saveName, setSaveName] = useState("");
   const [showSave, setShowSave] = useState(false);
+  const [editingPromptId, setEditingPromptId] = useState<string | null>(null);
 
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
@@ -144,12 +145,23 @@ export function AiPanel({ diagramType, onApplyDiagram, onAddToDiagram, onClose }
   async function handleSavePrompt() {
     if (!saveName.trim() || !prompt.trim()) return;
     try {
-      const res = await fetch("/api/prompts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: saveName.trim(), text: prompt.trim(), diagramType }),
-      });
-      if (res.ok) { setShowSave(false); setSaveName(""); loadPrompts(); }
+      if (editingPromptId) {
+        // Update existing prompt
+        const res = await fetch(`/api/prompts/${editingPromptId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: saveName.trim(), text: prompt.trim() }),
+        });
+        if (res.ok) { setShowSave(false); setSaveName(""); setEditingPromptId(null); loadPrompts(); }
+      } else {
+        // Create new prompt
+        const res = await fetch("/api/prompts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: saveName.trim(), text: prompt.trim(), diagramType }),
+        });
+        if (res.ok) { setShowSave(false); setSaveName(""); loadPrompts(); }
+      }
     } catch { /* ignore */ }
   }
 
@@ -184,9 +196,9 @@ export function AiPanel({ diagramType, onApplyDiagram, onAddToDiagram, onClose }
                   </>
                 ) : (
                   <>
-                    <button onClick={() => setPrompt(sp.text)}
-                      className="flex-1 text-left text-[11px] text-gray-700 truncate hover:text-blue-600 py-0.5"
-                      title={sp.text}>{sp.name}</button>
+                    <button onClick={() => { setPrompt(sp.text); setEditingPromptId(sp.id); setSaveName(sp.name); }}
+                      className={`flex-1 text-left text-[11px] truncate py-0.5 ${editingPromptId === sp.id ? "text-blue-600 font-medium" : "text-gray-700 hover:text-blue-600"}`}
+                      title={sp.text}>{sp.name}{editingPromptId === sp.id ? " (editing)" : ""}</button>
                     <button onClick={() => setConfirmDeleteId(sp.id)}
                       className="text-gray-300 hover:text-red-500 text-[10px] opacity-0 group-hover:opacity-100">&times;</button>
                   </>
@@ -245,9 +257,21 @@ export function AiPanel({ diagramType, onApplyDiagram, onAddToDiagram, onClose }
             className="flex-1 px-3 py-1.5 text-xs text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">
             {generating ? "Generating\u2026" : "Generate"}
           </button>
-          <button onClick={() => setShowSave(!showSave)} disabled={!prompt.trim()}
-            className="px-2 py-1.5 text-xs text-gray-600 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50"
-            title="Save this prompt">Save</button>
+          {editingPromptId ? (
+            <>
+              <button onClick={() => { setShowSave(true); }}
+                disabled={!prompt.trim()}
+                className="px-2 py-1.5 text-xs text-white bg-green-600 rounded hover:bg-green-700 disabled:opacity-50"
+                title="Update saved prompt">Update</button>
+              <button onClick={() => { setEditingPromptId(null); setSaveName(""); setShowSave(false); }}
+                className="px-2 py-1.5 text-xs text-gray-500 border border-gray-300 rounded hover:bg-gray-50"
+                title="Stop editing, save as new instead">New</button>
+            </>
+          ) : (
+            <button onClick={() => { setShowSave(!showSave); setEditingPromptId(null); }} disabled={!prompt.trim()}
+              className="px-2 py-1.5 text-xs text-gray-600 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50"
+              title="Save this prompt">Save</button>
+          )}
         </div>
 
         {showSave && (
@@ -256,8 +280,9 @@ export function AiPanel({ diagramType, onApplyDiagram, onAddToDiagram, onClose }
               placeholder="Prompt name" className="flex-1 text-xs border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
               onKeyDown={e => { if (e.key === "Enter") handleSavePrompt(); }} />
             <button onClick={handleSavePrompt} disabled={!saveName.trim()}
-              className="px-2 py-1 text-xs text-white bg-green-600 rounded hover:bg-green-700 disabled:opacity-50">{"\u2713"}</button>
-            <button onClick={() => { setShowSave(false); setSaveName(""); }}
+              className="px-2 py-1 text-xs text-white bg-green-600 rounded hover:bg-green-700 disabled:opacity-50">
+              {editingPromptId ? "Update" : "\u2713"}</button>
+            <button onClick={() => { setShowSave(false); setSaveName(""); setEditingPromptId(null); }}
               className="px-2 py-1 text-xs text-gray-500 border border-gray-300 rounded hover:bg-gray-50">{"\u2715"}</button>
           </div>
         )}

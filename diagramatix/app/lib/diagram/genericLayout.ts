@@ -108,19 +108,19 @@ export function layoutGenericDiagram(
       w = Math.max(200, childWidth);
       h = Math.max(200, 78 + 120 + 40);
     } else if (isProcessContext) {
-      // Portrait: 2 use-cases wide, stack rows vertically with gaps
-      const cols = 2;
-      const ucW = 120, ucH = 60;
-      const rows = Math.ceil(childCount / cols);
-      w = cols * ucW + (cols - 1) * 30 + 80; // 2 columns + gaps + padding
-      h = Math.max(200, rows * ucH + (rows - 1) * 30 + 80); // rows + gaps + header + bottom padding
+      // Portrait: 1 process per row, zigzag left/right, with space for actors outside
+      const ucW = 120, ucH = 60, rowGap = 25;
+      w = ucW * 2 + 100; // wide enough for zigzag left/right + padding
+      h = Math.max(250, childCount * (ucH + rowGap) + 70); // rows stacked + header + bottom
     } else {
       w = Math.max(200, (childCount + 1) * 180);
       h = Math.max(120, 100);
     }
+    // Process-context: offset boundary right to leave room for actors on the left
+    const elX = isProcessContext ? START_X + 160 : START_X;
     const el: DiagramElement = {
       id: ai.id, type: ai.type as DiagramElement["type"],
-      x: START_X, y: containerY, width: w, height: h,
+      x: elX, y: containerY, width: w, height: h,
       label, properties: {},
     };
     elements.push(el);
@@ -138,18 +138,20 @@ export function layoutGenericDiagram(
       e.group === containerId || e.parent === containerId
     );
 
-    // Process-context: 2-column portrait grid within the boundary
+    // Process-context: zigzag layout — 1 process per row, alternating left/right
     if (isProcessContext) {
-      const cols = 2;
-      const padX = 40, padTop = 50, gapX = 30, gapY = 30;
       const ucDef = getSymbolDefinition("use-case");
+      const ucW = ucDef.defaultWidth, ucH = ucDef.defaultHeight;
+      const padTop = 50, rowGap = 25;
+      const leftX = container.x + 40; // left-side process position
+      const rightX = container.x + container.width - ucW - 40; // right-side position
+
       for (let ci = 0; ci < children.length; ci++) {
         const ai = children[ci];
         const def = getSymbolDefinition(ai.type as DiagramElement["type"]);
-        const col = ci % cols;
-        const row = Math.floor(ci / cols);
-        const ex = container.x + padX + col * (ucDef.defaultWidth + gapX);
-        const ey = container.y + padTop + row * (ucDef.defaultHeight + gapY);
+        const isLeft = ci % 2 === 0;
+        const ex = isLeft ? leftX : rightX;
+        const ey = container.y + padTop + ci * (ucH + rowGap);
         const label = ai.label ?? ai.name ?? ai.type;
         const el: DiagramElement = {
           id: ai.id, type: ai.type as DiagramElement["type"],
@@ -162,8 +164,7 @@ export function layoutGenericDiagram(
       }
       // Resize container to fit children if needed
       if (children.length > 0) {
-        const rows = Math.ceil(children.length / cols);
-        const neededH = padTop + rows * (ucDef.defaultHeight + gapY) + 20;
+        const neededH = padTop + children.length * (ucH + rowGap) + 20;
         container.height = Math.max(container.height, neededH);
       }
     } else {
@@ -222,6 +223,72 @@ export function layoutGenericDiagram(
       if (children.length > 0) {
         container.width = Math.max(container.width, cx - container.x + 30);
       }
+    }
+  }
+
+  // Process-context: position actors/teams/systems next to their connected processes
+  if (isProcessContext) {
+    const ACTOR_TYPES = new Set(["actor", "team", "system"]);
+    const actorEls = regularEls.filter(e => !placed.has(e.id) && ACTOR_TYPES.has(e.type));
+    const elMap = new Map(elements.map(e => [e.id, e]));
+    const aiConns = aiConnections;
+
+    // Track vertical positions used on each side to avoid overlap
+    let leftActorY = START_Y;
+    let rightActorY = START_Y;
+
+    for (const ai of actorEls) {
+      const def = getSymbolDefinition(ai.type as DiagramElement["type"]);
+      const label = ai.label ?? ai.name ?? ai.type;
+
+      // Find which processes this actor connects to
+      const connectedProcessIds = aiConns
+        .filter(c => c.sourceId === ai.id || c.targetId === ai.id)
+        .map(c => c.sourceId === ai.id ? c.targetId : c.sourceId);
+      const connectedProcesses = connectedProcessIds
+        .map(pid => elMap.get(pid))
+        .filter((e): e is DiagramElement => !!e);
+
+      // Determine side: actor goes on the same side as its connected process
+      // If connected to a left-side process, actor on the left; right-side, actor on the right
+      let placeRight = false;
+      if (connectedProcesses.length > 0) {
+        // Check if most connected processes are on the right side of the boundary
+        const container = [...containerMap.values()][0];
+        if (container) {
+          const midX = container.x + container.width / 2;
+          const rightCount = connectedProcesses.filter(p => p.x + p.width / 2 > midX).length;
+          placeRight = rightCount > connectedProcesses.length / 2;
+        }
+      }
+
+      // Find the average Y of connected processes for vertical alignment
+      let targetY: number;
+      if (connectedProcesses.length > 0) {
+        targetY = connectedProcesses.reduce((sum, p) => sum + p.y + p.height / 2, 0) / connectedProcesses.length - def.defaultHeight / 2;
+      } else {
+        targetY = placeRight ? rightActorY : leftActorY;
+      }
+
+      const container = [...containerMap.values()][0];
+      let ex: number;
+      if (placeRight) {
+        ex = container ? container.x + container.width + 60 : START_X + 500;
+        targetY = Math.max(rightActorY, targetY);
+        rightActorY = targetY + def.defaultHeight + 20;
+      } else {
+        ex = container ? container.x - def.defaultWidth - 60 : START_X;
+        targetY = Math.max(leftActorY, targetY);
+        leftActorY = targetY + def.defaultHeight + 20;
+      }
+
+      const el: DiagramElement = {
+        id: ai.id, type: ai.type as DiagramElement["type"],
+        x: ex, y: targetY, width: def.defaultWidth, height: def.defaultHeight,
+        label, properties: buildProperties(ai, diagramType),
+      };
+      elements.push(el);
+      placed.add(ai.id);
     }
   }
 

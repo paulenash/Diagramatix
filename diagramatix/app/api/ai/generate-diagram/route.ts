@@ -85,24 +85,32 @@ Output format:
   "process-context": `You are a Process Context diagram expert. This is NOT a standard Use Case Diagram — it shows processes in context with their actors, teams, and systems.
 Output ONLY valid JSON with elements and connections.
 
-Element types: "use-case" (process), "actor" (role/person), "team" (group), "system" (IT system), "system-boundary" (process group container)
+Element types: "use-case" (process), "actor" (role/person), "team" (group/department), "system" (IT system), "system-boundary" (process group container)
 Connection type: "association" with optional label
 
 IMPORTANT rules:
 - The "system-boundary" label MUST always include the words "Process Group" (e.g. "Order Management Process Group", "HR Process Group").
 - Place related use-case processes inside a system-boundary using the "parent" field.
 - Actors, teams, and systems go OUTSIDE the boundary.
+- Create a short 2-3 character process ID prefix for the process group (e.g. "HR" for Human Resources, "FI" for Finance, "OM" for Order Management).
+- Each process label MUST start with its numbered ID (e.g. "HR01 Recruit Staff", "HR02 Onboard Employee", "FI01 Process Invoice").
+- If a team or department is mentioned, use "team" type, NOT "actor".
+- If an IT system is mentioned that the process interacts with, use "system" type with the system name.
 
 Output format:
 {
   "elements": [
     { "id": "sb1", "type": "system-boundary", "label": "Order Management Process Group" },
-    { "id": "e1", "type": "use-case", "label": "Place Order", "parent": "sb1" },
-    { "id": "e2", "type": "use-case", "label": "Check Stock", "parent": "sb1" },
-    { "id": "e3", "type": "actor", "label": "Customer" }
+    { "id": "e1", "type": "use-case", "label": "OM01 Place Order", "parent": "sb1" },
+    { "id": "e2", "type": "use-case", "label": "OM02 Check Stock", "parent": "sb1" },
+    { "id": "e3", "type": "actor", "label": "Customer" },
+    { "id": "e4", "type": "team", "label": "Warehouse Team" },
+    { "id": "e5", "type": "system", "label": "ERP System" }
   ],
   "connections": [
-    { "sourceId": "e3", "targetId": "e1" }
+    { "sourceId": "e3", "targetId": "e1" },
+    { "sourceId": "e4", "targetId": "e2" },
+    { "sourceId": "e5", "targetId": "e2" }
   ]
 }`,
 };
