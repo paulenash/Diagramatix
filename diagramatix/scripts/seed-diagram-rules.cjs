@@ -134,7 +134,7 @@ P12: The process group boundary should be portrait in shape with enough room for
 P13: Actor placement should try to eliminate or at least minimise association line crossings.
 
 ## Group 3: Connectors
-P14: Hourglass actor connectors must be directed (arrow) pointing from the hourglass toward the process it triggers.
+P14: Hourglass actor connectors must be open-directed (open arrowhead) pointing from the hourglass toward the process it triggers.
 P15: All other actor/team/system associations are non-directed (no arrows).`,
 };
 

@@ -404,7 +404,7 @@ export function layoutGenericDiagram(
       const srcIsHourglass = src.type === "hourglass";
       const tgtIsHourglass = tgt.type === "hourglass";
       if (srcIsHourglass || tgtIsHourglass) {
-        direction = "directed";
+        direction = "open-directed";
         // Ensure hourglass is the source (initiator)
         if (tgtIsHourglass && !srcIsHourglass) {
           const tmp = src; src = tgt; tgt = tmp;
