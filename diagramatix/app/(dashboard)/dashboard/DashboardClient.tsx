@@ -790,7 +790,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                       ? "Backing up\u2026"
                       : restoring
                         ? "Restoring\u2026"
-                        : "File \u25BE"}
+                        : "System \u25BE"}
                 </button>
                 {fileMenuOpen && !(importing || backingUp || restoring) && (
                   <div className="absolute right-0 top-full mt-1 w-52 bg-white border border-gray-200 rounded shadow-lg z-50">
@@ -842,6 +842,13 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                       className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
                     >
                       AI Rules &amp; Preferences
+                    </a>
+                    <a
+                      href="/dashboard/prompts"
+                      onClick={() => setFileMenuOpen(false)}
+                      className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                    >
+                      AI Prompt Maintenance
                     </a>
                     <div className="border-t border-gray-100" />
                     <button

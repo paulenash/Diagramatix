@@ -72,7 +72,7 @@ export function DiagramMaintenanceModal({ projectId, initialColorConfig, onClose
 
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 flex-shrink-0">
-          <h2 className="text-lg font-semibold text-gray-900">Project Settings</h2>
+          <h2 className="text-lg font-semibold text-gray-900">Project Config</h2>
           <div className="flex items-center gap-3">
             <button
               onClick={handleBlackAndWhite}

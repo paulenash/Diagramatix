@@ -1246,7 +1246,7 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
               onClick={() => setShowMaintenance(true)}
               className="px-3 py-1 text-xs font-medium text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50"
             >
-              Project Settings
+              Project Config
             </button>
           )}
           {!readOnly && (
@@ -1523,7 +1523,7 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
         </div>
       )}
 
-      {/* Diagram Settings modal */}
+      {/* Project Config modal */}
       {showMaintenance && (
         <DiagramMaintenanceModal
           projectId={project.id}

@@ -106,7 +106,7 @@ export function DiagramColorModal({
 
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-2.5 border-b border-gray-200 flex-shrink-0">
-          <h2 className="text-sm font-semibold text-gray-900">Diagram Settings</h2>
+          <h2 className="text-sm font-semibold text-gray-900">Diagram Config</h2>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 text-lg leading-none"
