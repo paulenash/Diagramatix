@@ -1,7 +1,12 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import type { DiagramData, DiagramElement, Connector } from "@/app/lib/diagram/types";
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+declare global {
+  interface Window { SpeechRecognition: any; webkitSpeechRecognition: any; }
+}
 
 interface SavedPrompt { id: string; name: string; text: string; }
 
@@ -25,6 +30,49 @@ export function AiPanel({ diagramType, onApplyDiagram, onAddToDiagram, onClose }
   const [showSave, setShowSave] = useState(false);
 
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
+  // Speech-to-text dictation
+  const [listening, setListening] = useState(false);
+  const recognitionRef = useRef<any>(null);
+  const promptRef = useRef(prompt);
+  promptRef.current = prompt;
+  const speechSupported = typeof window !== "undefined"
+    && !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+
+  function toggleDictation() {
+    if (listening && recognitionRef.current) {
+      recognitionRef.current.stop();
+      return;
+    }
+    const SR = (window as any).SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) return;
+    const recognition = new SR();
+    recognition.continuous = true;
+    recognition.interimResults = false;
+    recognition.lang = "en-AU";
+
+    recognition.onresult = (event: any) => {
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        if (event.results[i].isFinal) {
+          const text = event.results[i][0].transcript;
+          setPrompt(prev => {
+            const base = prev && !prev.endsWith(" ") && !prev.endsWith("\n") ? prev + " " : prev;
+            return base + text;
+          });
+        }
+      }
+    };
+    recognition.onend = () => setListening(false);
+    recognition.onerror = () => setListening(false);
+    recognitionRef.current = recognition;
+    recognition.start();
+    setListening(true);
+  }
+
+  // Stop dictation on unmount
+  useEffect(() => {
+    return () => { recognitionRef.current?.stop(); };
+  }, []);
 
   const loadPrompts = useCallback(async () => {
     try {
@@ -151,10 +199,34 @@ export function AiPanel({ diagramType, onApplyDiagram, onAddToDiagram, onClose }
 
       <div className="flex-1 px-3 py-2 flex flex-col gap-2 overflow-y-auto">
         <div>
-          <label className="text-[10px] text-gray-500 font-medium block mb-1">Describe the process</label>
+          <div className="flex items-center justify-between mb-1">
+            <label className="text-[10px] text-gray-500 font-medium">Describe the process</label>
+            {speechSupported && (
+              <button
+                onClick={toggleDictation}
+                className={`flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border ${
+                  listening
+                    ? "text-red-600 border-red-300 bg-red-50 hover:bg-red-100"
+                    : "text-gray-500 border-gray-300 hover:bg-gray-50"
+                }`}
+                title={listening ? "Stop dictation" : "Dictate prompt"}
+              >
+                <svg width={10} height={10} viewBox="0 0 16 16" fill="currentColor">
+                  <path d="M8 11a3 3 0 0 0 3-3V4a3 3 0 1 0-6 0v4a3 3 0 0 0 3 3z" />
+                  <path d="M13 8a1 1 0 1 0-2 0 3 3 0 0 1-6 0 1 1 0 1 0-2 0 5 5 0 0 0 4 4.9V14H5.5a.5.5 0 0 0 0 1h5a.5.5 0 0 0 0-1H9v-1.1A5 5 0 0 0 13 8z" />
+                </svg>
+                {listening ? "Stop" : "Dictate"}
+              </button>
+            )}
+          </div>
           <textarea value={prompt} onChange={e => setPrompt(e.target.value)} rows={10}
             placeholder="e.g. A customer places an order. The Sales Team checks the order..."
-            className="w-full text-xs border border-gray-300 rounded px-2 py-1.5 resize-y focus:outline-none focus:ring-1 focus:ring-blue-500 leading-relaxed" />
+            className={`w-full text-xs border rounded px-2 py-1.5 resize-y focus:outline-none focus:ring-1 focus:ring-blue-500 leading-relaxed ${
+              listening ? "border-red-300 bg-red-50/30" : "border-gray-300"
+            }`} />
+          {listening && (
+            <p className="text-[9px] text-red-500 mt-0.5 animate-pulse">Listening...</p>
+          )}
         </div>
 
         <div className="flex items-center gap-2">
