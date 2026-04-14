@@ -120,15 +120,22 @@ C06: Use bi-directional flows where data moves in both directions.`,
 P01: Use Cases should represent the main processes or functions.
 P02: If a team or department is mentioned, use the Team element, NOT Actor.
 P03: If an IT system is mentioned that a process interacts with, use the System element with the system name.
-P04: The container name MUST always include the words "Process Group" (e.g. "HR Process Group"). This is a Process Context diagram, NOT a Use Case diagram.
-P05: Process numbering format is P-XX-NN where XX is a 2-3 character code (e.g. P-HR-01, P-HR-02, P-FI-01).
+P04: If a scheduler, timer, or automated trigger is mentioned, use the Hourglass (Auto Scheduler) element.
+P05: The container name MUST always include the words "Process Group" (e.g. "HR Process Group"). This is a Process Context diagram, NOT a Use Case diagram.
+P06: Process numbering format is P-XX-NN where XX is a 2-3 character code (e.g. P-HR-01, P-HR-02, P-FI-01).
 
 ## Group 2: Layout
-P06: Processes should be laid out 1 per horizontal row, zigzagging left and right down the page to maximise clear connection availability.
-P07: Actors should be placed between the processes they are connected to, to minimise association crossings.
-P08: All Actors must be shown to the left for processes shown on the left, and to the right for processes shown on the right.
-P09: The process group boundary should be portrait in shape with enough room for processes with gaps to the vertical boundaries.
-P10: Actor placement should try to eliminate or at least minimise association line crossings.`,
+P07: Processes should be laid out 1 per horizontal row, zigzagging left and right down the page to maximise clear connection availability.
+P08: Actors should be placed between the processes they are connected to, to minimise association crossings.
+P09: Actors and Teams should be shown to the left for processes on the left, and to the right for processes on the right.
+P10: System actors should be placed to the right of the process group boundary, in empty space where possible.
+P11: Hourglass (Auto Scheduler) actors should be placed to the right of the process group boundary.
+P12: The process group boundary should be portrait in shape with enough room for processes with gaps to the vertical boundaries.
+P13: Actor placement should try to eliminate or at least minimise association line crossings.
+
+## Group 3: Connectors
+P14: Hourglass actor connectors must be directed (arrow) pointing from the hourglass toward the process it triggers.
+P15: All other actor/team/system associations are non-directed (no arrows).`,
 };
 
 async function seed() {

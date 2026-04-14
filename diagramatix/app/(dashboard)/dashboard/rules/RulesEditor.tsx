@@ -41,7 +41,7 @@ function classifyLines(text: string): Array<{ line: string; isGroup: boolean; is
   });
 }
 
-export function RulesEditor({ isAdmin }: { isAdmin: boolean }) {
+export function RulesEditor({ isAdmin: _isAdmin }: { isAdmin: boolean }) {
   const [ruleSets, setRuleSets] = useState<RuleSet[]>([]);
   const [activeCategory, setActiveCategory] = useState("general");
   const [editText, setEditText] = useState("");
@@ -166,9 +166,6 @@ export function RulesEditor({ isAdmin }: { isAdmin: boolean }) {
                 >
                   {CATEGORY_LABELS[cat] ?? cat}
                   <span className="ml-1 text-gray-400">({count})</span>
-                  {rs && !rs.isDefault && (
-                    <span className="ml-1 text-blue-500 text-[9px]">customised</span>
-                  )}
                 </button>
               );
             })}
@@ -205,7 +202,6 @@ export function RulesEditor({ isAdmin }: { isAdmin: boolean }) {
                 {ruleCount} rules
                 {codeCount > 0 && <> &middot; <span className="text-red-500">{codeCount} code-backed</span></>}
                 {aiCount > 0 && <> &middot; <span className="text-green-600">{aiCount} AI-enforced</span></>}
-                {" "}&middot; {activeRuleSet?.isDefault ? "System default" : "Your customisation"}
               </p>
             </div>
             <div className="flex gap-2 items-center">
@@ -213,22 +209,10 @@ export function RulesEditor({ isAdmin }: { isAdmin: boolean }) {
                 <input type="checkbox" checked={showPreview} onChange={e => setShowPreview(e.target.checked)} className="w-3 h-3" />
                 Preview
               </label>
-              {!activeRuleSet?.isDefault && (
-                <button onClick={handleReset} disabled={saving}
-                  className="px-3 py-1 text-xs text-gray-600 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50">
-                  Reset to Default
-                </button>
-              )}
-              <button onClick={() => handleSave(false)} disabled={saving}
+              <button onClick={() => handleSave(true)} disabled={saving}
                 className="px-3 py-1 text-xs text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50">
-                {saving ? "Saving\u2026" : "Save My Rules"}
+                {saving ? "Saving\u2026" : "Save Rules"}
               </button>
-              {isAdmin && (
-                <button onClick={() => handleSave(true)} disabled={saving}
-                  className="px-3 py-1 text-xs text-white bg-orange-600 rounded hover:bg-orange-700 disabled:opacity-50">
-                  Save as Default
-                </button>
-              )}
             </div>
           </div>
 

@@ -268,9 +268,9 @@ export function layoutGenericDiagram(
         .map(pid => elMap.get(pid))
         .filter((e): e is DiagramElement => !!e);
 
-      // Determine side: prefer the side where most connected processes sit
-      let placeRight = false;
-      if (connectedProcesses.length > 0) {
+      // Determine side: system and hourglass actors prefer the right; others follow connected processes
+      let placeRight = ai.type === "system" || ai.type === "hourglass";
+      if (connectedProcesses.length > 0 && ai.type !== "system" && ai.type !== "hourglass") {
         const rightCount = connectedProcesses.filter(p => p.x + p.width / 2 > midX).length;
         placeRight = rightCount > connectedProcesses.length / 2;
       }
@@ -391,13 +391,26 @@ export function layoutGenericDiagram(
   };
 
   for (const c of aiConnections) {
-    const src = elMap.get(c.sourceId);
-    const tgt = elMap.get(c.targetId);
+    let src = elMap.get(c.sourceId);
+    let tgt = elMap.get(c.targetId);
     if (!src || !tgt) continue;
 
     const connType = c.type ?? defaultConnType[diagramType] ?? "sequence";
     const routing = defaultRouting[diagramType] ?? "rectilinear";
-    const direction = defaultDirection[diagramType] ?? "directed";
+    let direction = defaultDirection[diagramType] ?? "directed";
+
+    // Hourglass actors: ensure connector is directed from hourglass → process
+    if (diagramType === "process-context") {
+      const srcIsHourglass = src.type === "hourglass";
+      const tgtIsHourglass = tgt.type === "hourglass";
+      if (srcIsHourglass || tgtIsHourglass) {
+        direction = "directed";
+        // Ensure hourglass is the source (initiator)
+        if (tgtIsHourglass && !srcIsHourglass) {
+          const tmp = src; src = tgt; tgt = tmp;
+        }
+      }
+    }
 
     // Determine sides
     const srcCx = src.x + src.width / 2;
@@ -414,8 +427,8 @@ export function layoutGenericDiagram(
     }
 
     const conn: Connector = {
-      id: `conn-${c.sourceId}-${c.targetId}`,
-      sourceId: c.sourceId, targetId: c.targetId,
+      id: `conn-${src.id}-${tgt.id}`,
+      sourceId: src.id, targetId: tgt.id,
       sourceSide: srcSide as Connector["sourceSide"],
       targetSide: tgtSide as Connector["targetSide"],
       type: connType as Connector["type"],
