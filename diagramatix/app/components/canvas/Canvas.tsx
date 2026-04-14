@@ -1429,17 +1429,32 @@ export function Canvas({
     const newIsInitial = newSymbolType === "initial-state";
     const newIsFinal = newSymbolType === "final-state";
     const newIsStartEvent = newSymbolType === "start-event";
+    // BPMN: never auto-connect to/from event/transaction expanded subprocesses
+    const isEventOrTxnSub = (el: DiagramElement) =>
+      el.type === "subprocess-expanded" &&
+      ((el.properties.subprocessType as string | undefined) === "event" ||
+       (el.properties.subprocessType as string | undefined) === "transaction");
+
+    // Valid targets for edge-mounted start events: only task, subprocess, subprocess-expanded (not events)
+    const EDGE_START_TARGETS = new Set<SymbolType>(["task", "subprocess", "subprocess-expanded"]);
+
     const candidates = data.elements.filter((e) => {
       if (!AUTO_CONNECT_TYPES.has(e.type)) return false;
       // Allow edge-mounted start events on the new element's parent expanded subprocess
+      // but only if the new element is a valid target (task, subprocess, expanded subprocess)
       if (e.boundaryHostId) {
-        if (e.type === "start-event" && e.boundaryHostId === newExpandedScope) return true;
+        if (e.type === "start-event" && e.boundaryHostId === newExpandedScope
+            && newSymbolType && EDGE_START_TARGETS.has(newSymbolType)
+            && !isEventOrTxnSub({ type: newSymbolType } as DiagramElement)) return true;
         return false;
       }
       // BPMN: never auto-connect FROM an end event (end events have no outgoing)
       if (isBpmn && e.type === "end-event") return false;
       // BPMN: never auto-connect TO a start event
       if (isBpmn && newIsStartEvent) return false;
+      // BPMN: never auto-connect to/from event or transaction expanded subprocesses
+      if (isBpmn && isEventOrTxnSub(e)) return false;
+      if (isBpmn && newSymbolType === "subprocess-expanded") return false; // can't know subtype yet; skip
       // State-machine: never auto-connect initial → initial or final → final
       if (isStateMachine && newIsInitial && e.type === "initial-state") return false;
       if (isStateMachine && newIsFinal && e.type === "final-state") return false;
@@ -2092,9 +2107,10 @@ export function Canvas({
 
   // Compute process-group nesting depth: how many process-group ancestors each has
   const processGroupDepthMap = useMemo(() => {
+    const DEPTH_TYPES = new Set(["process-group", "subprocess-expanded"]);
     const map = new Map<string, number>();
     for (const el of data.elements) {
-      if (el.type !== "process-group") continue;
+      if (!DEPTH_TYPES.has(el.type)) continue;
       let depth = 0;
       let cur = el;
       const visited = new Set<string>();
@@ -2102,7 +2118,7 @@ export function Canvas({
         visited.add(cur.id);
         const parent = data.elements.find(p => p.id === cur.parentId);
         if (!parent) break;
-        if (parent.type === "process-group") depth++;
+        if (parent.type === el.type) depth++; // count ancestors of the same type
         cur = parent;
       }
       map.set(el.id, depth);

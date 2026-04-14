@@ -867,8 +867,21 @@ function SubprocessShape({ el }: { el: DiagramElement }) {
 
 function ExpandedSubprocessShape({ el }: { el: DiagramElement }) {
   const colors = useContext(SymbolColorCtx);
+  const depthMap = useContext(ProcessGroupDepthCtx);
+  const depth = depthMap.get(el.id) ?? 0;
   const spType = (el.properties.subprocessType as string | undefined) ?? "normal";
-  const fill = resolveColor("subprocess-expanded", colors);
+  const baseFill = resolveColor("subprocess-expanded", colors);
+  // Lighten nested expanded subprocesses toward white
+  const lightenStep = 0.25;
+  const t = Math.min(depth * lightenStep, 0.9);
+  function lerpHex(hex: string, toward: string, frac: number): string {
+    const parse = (h: string) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+    const [r1, g1, b1] = parse(hex);
+    const [r2, g2, b2] = parse(toward);
+    const c = (a: number, b: number) => Math.round(a + (b - a) * frac).toString(16).padStart(2, "0");
+    return `#${c(r1, r2)}${c(g1, g2)}${c(b1, b2)}`;
+  }
+  const fill = depth > 0 ? lerpHex(baseFill, "#ffffff", t) : baseFill;
   // Centre one or two bottom markers (Repeat and/or Ad-hoc) about the
   // shape's horizontal centre. With two markers, they sit symmetrically
   // 7px either side of centre; with one, it sits exactly on centre.

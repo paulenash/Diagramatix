@@ -924,12 +924,14 @@ function reducer(state: DiagramData, action: Action): DiagramData {
               cx >= b.x && cx <= b.x + b.width &&
               cy >= b.y && cy <= b.y + b.height
           );
-          // Prefer innermost container: subprocess-expanded > lane > pool > process-group (smallest) > other
+          // Prefer innermost (smallest) container by type priority
           const potentialParent =
-            potentialParents.find(b => b.type === "subprocess-expanded") ??
+            // subprocess-expanded: pick smallest (innermost)
+            (potentialParents.filter(b => b.type === "subprocess-expanded")
+              .sort((a, b) => (a.width * a.height) - (b.width * b.height))[0]) ??
             potentialParents.find(b => b.type === "lane") ??
             potentialParents.find(b => b.type === "pool") ??
-            // For process-groups, prefer the smallest (innermost) one
+            // process-groups: pick smallest (innermost)
             (potentialParents.filter(b => b.type === "process-group")
               .sort((a, b) => (a.width * a.height) - (b.width * b.height))[0]) ??
             potentialParents[0];
