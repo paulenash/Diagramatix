@@ -1426,7 +1426,11 @@ export function Canvas({
     const newIsFinal = newSymbolType === "final-state";
     const candidates = data.elements.filter((e) => {
       if (!AUTO_CONNECT_TYPES.has(e.type)) return false;
-      if (e.boundaryHostId) return false;
+      // Allow edge-mounted start events on the new element's parent expanded subprocess
+      if (e.boundaryHostId) {
+        if (e.type === "start-event" && e.boundaryHostId === newExpandedScope) return true;
+        return false;
+      }
       // State-machine: never auto-connect initial → initial or final → final
       if (isStateMachine && newIsInitial && e.type === "initial-state") return false;
       if (isStateMachine && newIsFinal && e.type === "final-state") return false;
@@ -3873,6 +3877,54 @@ export function Canvas({
           </button>
         </div>
       )}
+
+      {/* Zoom slider bar at bottom of canvas */}
+      <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-white/90 border border-gray-200 rounded-full px-3 py-1 shadow-sm backdrop-blur-sm z-30 select-none">
+        <button
+          onClick={() => {
+            const newZ = Math.max(0.2, zoom * 0.8);
+            const rect = svgRef.current?.getBoundingClientRect();
+            if (rect) {
+              const cx = rect.width / 2, cy = rect.height / 2;
+              setPan(prev => ({ x: cx - (cx - prev.x) * (newZ / zoom), y: cy - (cy - prev.y) * (newZ / zoom) }));
+            }
+            setZoom(newZ);
+          }}
+          className="text-gray-500 hover:text-gray-800 text-xs font-bold w-5 h-5 flex items-center justify-center"
+          title="Zoom out"
+        >&minus;</button>
+        <input
+          type="range"
+          min={20}
+          max={400}
+          value={Math.round(zoom * 100)}
+          onChange={(e) => {
+            const newZ = parseInt(e.target.value) / 100;
+            const rect = svgRef.current?.getBoundingClientRect();
+            if (rect) {
+              const cx = rect.width / 2, cy = rect.height / 2;
+              setPan(prev => ({ x: cx - (cx - prev.x) * (newZ / zoom), y: cy - (cy - prev.y) * (newZ / zoom) }));
+            }
+            setZoom(newZ);
+          }}
+          className="w-28 h-1 accent-blue-500 cursor-pointer"
+          title={`${Math.round(zoom * 100)}%`}
+        />
+        <button
+          onClick={() => {
+            const newZ = Math.min(4, zoom * 1.25);
+            const rect = svgRef.current?.getBoundingClientRect();
+            if (rect) {
+              const cx = rect.width / 2, cy = rect.height / 2;
+              setPan(prev => ({ x: cx - (cx - prev.x) * (newZ / zoom), y: cy - (cy - prev.y) * (newZ / zoom) }));
+            }
+            setZoom(newZ);
+          }}
+          className="text-gray-500 hover:text-gray-800 text-xs font-bold w-5 h-5 flex items-center justify-center"
+          title="Zoom in"
+        >+</button>
+        <span className="text-[10px] text-gray-500 w-8 text-center tabular-nums">{Math.round(zoom * 100)}%</span>
+      </div>
     </div>
   );
 }

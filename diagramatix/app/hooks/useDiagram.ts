@@ -753,12 +753,9 @@ function reducer(state: DiagramData, action: Action): DiagramData {
           };
         }
       }
-      // If a Task / Subprocess / Expanded Subprocess is dropped inside an
-      // existing Expanded Subprocess, shrink it to 75% of its default size so
-      // it fits naturally within the container. The drop centre stays under
-      // the cursor.
-      const SHRINK_TYPES = new Set<SymbolType>(["task", "subprocess", "subprocess-expanded"]);
-      if (!newEl.boundaryHostId && SHRINK_TYPES.has(newEl.type)) {
+      // Elements dropped inside an Expanded Subprocess use their default size
+      // (no shrinking).
+      if (!newEl.boundaryHostId) {
         const dropCx = action.payload.position.x;
         const dropCy = action.payload.position.y;
         const insideExpanded = state.elements.find(
@@ -768,14 +765,11 @@ function reducer(state: DiagramData, action: Action): DiagramData {
             dropCy >= b.y && dropCy <= b.y + b.height
         );
         if (insideExpanded) {
-          const newW = Math.round(newEl.width * 0.75);
-          const newH = Math.round(newEl.height * 0.75);
+          // Keep default size, just centre on drop point
           newEl = {
             ...newEl,
-            x: dropCx - newW / 2,
-            y: dropCy - newH / 2,
-            width: newW,
-            height: newH,
+            x: dropCx - newEl.width / 2,
+            y: dropCy - newEl.height / 2,
           };
         }
       }
