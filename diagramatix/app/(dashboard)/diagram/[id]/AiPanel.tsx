@@ -32,6 +32,27 @@ export function AiPanel({ diagramType, onApplyDiagram, onAddToDiagram, onClose }
 
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
+  // File attachment
+  const [attachment, setAttachment] = useState<{ name: string; type: string; data: string } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  async function handleFileAttach(file: File) {
+    const MAX_SIZE = 10 * 1024 * 1024; // 10MB
+    if (file.size > MAX_SIZE) { setError("File too large (max 10MB)"); return; }
+
+    if (file.type === "application/pdf") {
+      // Send as base64 for Claude's native PDF support
+      const buffer = await file.arrayBuffer();
+      const base64 = btoa(String.fromCharCode(...new Uint8Array(buffer)));
+      setAttachment({ name: file.name, type: "pdf", data: base64 });
+    } else {
+      // Read as text for .txt, .md, .csv, .doc, .rtf, etc.
+      const text = await file.text();
+      setAttachment({ name: file.name, type: "text", data: text });
+    }
+    setError(null);
+  }
+
   // Speech-to-text dictation
   const [listening, setListening] = useState(false);
   const recognitionRef = useRef<any>(null);
@@ -94,8 +115,8 @@ export function AiPanel({ diagramType, onApplyDiagram, onAddToDiagram, onClose }
       // Use BPMN-specific endpoint (with layout engine) for BPMN, generic for others
       const endpoint = diagramType === "bpmn" ? "/api/ai/generate-bpmn" : "/api/ai/generate-diagram";
       const body = diagramType === "bpmn"
-        ? { prompt: prompt.trim(), mode: "generate" }
-        : { prompt: prompt.trim(), diagramType };
+        ? { prompt: prompt.trim(), mode: "generate", attachment: attachment ?? undefined }
+        : { prompt: prompt.trim(), diagramType, attachment: attachment ?? undefined };
 
       const res = await fetch(endpoint, {
         method: "POST",
@@ -239,6 +260,27 @@ export function AiPanel({ diagramType, onApplyDiagram, onAddToDiagram, onClose }
           {listening && (
             <p className="text-[9px] text-red-500 mt-0.5 animate-pulse">Listening...</p>
           )}
+
+          {/* File attachment */}
+          <div className="flex items-center gap-1.5 mt-1">
+            <input ref={fileInputRef} type="file" className="hidden"
+              accept=".pdf,.txt,.md,.csv,.rtf,.doc,.docx"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFileAttach(f); e.target.value = ""; }} />
+            <button onClick={() => fileInputRef.current?.click()}
+              className="flex items-center gap-1 text-[10px] text-gray-500 border border-gray-300 rounded px-1.5 py-0.5 hover:bg-gray-50"
+              title="Attach a document (PDF, TXT, MD, CSV)">
+              <svg width={10} height={10} viewBox="0 0 16 16" fill="currentColor">
+                <path d="M4.5 3a2.5 2.5 0 0 1 5 0v9a1.5 1.5 0 0 1-3 0V5a.5.5 0 0 1 1 0v7a.5.5 0 0 0 1 0V3a1.5 1.5 0 0 0-3 0v9a2.5 2.5 0 0 0 5 0V5a.5.5 0 0 1 1 0v7a3.5 3.5 0 0 1-7 0V3z" />
+              </svg>
+              Attach
+            </button>
+            {attachment && (
+              <div className="flex items-center gap-1 flex-1 min-w-0">
+                <span className="text-[10px] text-blue-600 truncate flex-1">{attachment.name}</span>
+                <button onClick={() => setAttachment(null)} className="text-gray-400 hover:text-red-500 text-[10px] shrink-0" title="Remove attachment">&times;</button>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="flex items-center gap-2">

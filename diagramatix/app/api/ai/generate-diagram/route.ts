@@ -137,7 +137,7 @@ export async function POST(req: Request) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return NextResponse.json({ error: "AI not configured. Set ANTHROPIC_API_KEY in .env" }, { status: 503 });
 
-  const { prompt, diagramType } = await req.json();
+  const { prompt, diagramType, attachment } = await req.json();
   if (!prompt?.trim()) return NextResponse.json({ error: "Prompt required" }, { status: 400 });
   if (!diagramType) return NextResponse.json({ error: "diagramType required" }, { status: 400 });
 
@@ -157,11 +157,23 @@ export async function POST(req: Request) {
     const client = new Anthropic({ apiKey });
     const systemPrompt = buildSystemPrompt(diagramType, rules);
 
+    // Build user message content: text prompt + optional document attachment
+    const userContent: Anthropic.Messages.ContentBlockParam[] = [];
+    if (attachment?.type === "pdf" && attachment.data) {
+      userContent.push({
+        type: "document",
+        source: { type: "base64", media_type: "application/pdf", data: attachment.data },
+      } as Anthropic.Messages.ContentBlockParam);
+    } else if (attachment?.type === "text" && attachment.data) {
+      userContent.push({ type: "text", text: `--- ATTACHED DOCUMENT: ${attachment.name ?? "document"} ---\n${attachment.data}\n--- END DOCUMENT ---` });
+    }
+    userContent.push({ type: "text", text: prompt.trim() });
+
     const message = await client.messages.create({
       model: "claude-sonnet-4-20250514",
       max_tokens: 8192,
       system: systemPrompt,
-      messages: [{ role: "user", content: prompt.trim() }],
+      messages: [{ role: "user", content: userContent }],
     });
 
     const textBlock = message.content.find(b => b.type === "text");

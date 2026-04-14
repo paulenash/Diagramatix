@@ -62,7 +62,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "AI service not configured. Set ANTHROPIC_API_KEY in .env" }, { status: 503 });
   }
 
-  const { prompt } = await req.json();
+  const { prompt, attachment } = await req.json();
   if (!prompt?.trim()) {
     return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
   }
@@ -85,11 +85,23 @@ export async function POST(req: Request) {
 
     console.log("[AI] Generating BPMN with rules:", rules ? "yes" : "no (defaults)");
 
+    // Build user message content: text prompt + optional document attachment
+    const userContent: Anthropic.Messages.ContentBlockParam[] = [];
+    if (attachment?.type === "pdf" && attachment.data) {
+      userContent.push({
+        type: "document",
+        source: { type: "base64", media_type: "application/pdf", data: attachment.data },
+      } as Anthropic.Messages.ContentBlockParam);
+    } else if (attachment?.type === "text" && attachment.data) {
+      userContent.push({ type: "text", text: `--- ATTACHED DOCUMENT: ${attachment.name ?? "document"} ---\n${attachment.data}\n--- END DOCUMENT ---` });
+    }
+    userContent.push({ type: "text", text: prompt.trim() });
+
     const message = await client.messages.create({
       model: "claude-sonnet-4-20250514",
       max_tokens: 8192,
       system: systemPrompt,
-      messages: [{ role: "user", content: prompt.trim() }],
+      messages: [{ role: "user", content: userContent }],
     });
 
     const textBlock = message.content.find(b => b.type === "text");
