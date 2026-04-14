@@ -228,7 +228,7 @@ export function layoutGenericDiagram(
 
   // Process-context: position actors/teams/systems between their connected processes
   if (isProcessContext) {
-    const ACTOR_TYPES = new Set(["actor", "team", "system"]);
+    const ACTOR_TYPES = new Set(["actor", "team", "system", "hourglass"]);
     const actorEls = regularEls.filter(e => !placed.has(e.id) && ACTOR_TYPES.has(e.type));
     const elMap = new Map(elements.map(e => [e.id, e]));
     const aiConns = aiConnections;

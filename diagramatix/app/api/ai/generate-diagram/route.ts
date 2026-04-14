@@ -85,13 +85,20 @@ Output format:
   "process-context": `You are a Process Context diagram expert. This is NOT a standard Use Case Diagram — it shows processes in context with their actors, teams, and systems.
 Output ONLY valid JSON with elements and connections.
 
-Element types: "use-case" (process), "actor" (role/person), "team" (group/department), "system" (IT system), "system-boundary" (process group container)
+Element types:
+- "use-case" — a process (ellipse shape)
+- "actor" — a person/role (stick figure shape). Use ONLY for individual human roles.
+- "team" — a group/department (group-of-people shape). Use for any team, department, or organisational unit.
+- "system" — an IT system or application (computer/monitor shape). Use for software systems, tools, databases, platforms.
+- "hourglass" — a time-based trigger or auto-scheduler (hourglass shape). Use for ANY scheduled, time-triggered, recurring, periodic, or automated timing mechanism (e.g. "Auto Scheduler", "Daily Timer", "Monthly Trigger", "Cron Job", "Scheduled Task").
+- "system-boundary" — process group container (rectangle)
 Connection type: "association" with optional label
 
 IMPORTANT rules:
 - The "system-boundary" label MUST always include the words "Process Group" (e.g. "Order Management Process Group", "HR Process Group").
 - Place related use-case processes inside a system-boundary using the "parent" field.
 - Actors, teams, and systems go OUTSIDE the boundary.
+- CRITICAL: If something is a software system, scheduler, application, platform, database, tool, or automated service, it MUST use type "system", NOT "actor". Examples: "Auto Scheduler" → system, "ERP" → system, "CRM" → system, "Email System" → system, "Payroll System" → system.
 - Create a short 2-3 character process ID prefix for the process group (e.g. "HR" for Human Resources, "FI" for Finance, "OM" for Order Management).
 - Each process label MUST start with its numbered ID in format P-XX-NN (e.g. "P-HR-01 Recruit Staff", "P-HR-02 Onboard Employee", "P-FI-01 Process Invoice").
 - If a team or department is mentioned, use "team" type, NOT "actor".
@@ -106,13 +113,15 @@ Output format:
     { "id": "e3", "type": "actor", "label": "Customer" },
     { "id": "e2", "type": "use-case", "label": "P-OM-02 Check Stock", "parent": "sb1" },
     { "id": "e4", "type": "team", "label": "Warehouse Team" },
-    { "id": "e5", "type": "system", "label": "ERP System" }
+    { "id": "e5", "type": "system", "label": "ERP System" },
+    { "id": "e6", "type": "hourglass", "label": "Auto Scheduler" }
   ],
   "connections": [
     { "sourceId": "e3", "targetId": "e1" },
     { "sourceId": "e3", "targetId": "e2" },
     { "sourceId": "e4", "targetId": "e2" },
-    { "sourceId": "e5", "targetId": "e2" }
+    { "sourceId": "e5", "targetId": "e2" },
+    { "sourceId": "e6", "targetId": "e2" }
   ]
 }`,
 };
@@ -185,6 +194,20 @@ export async function POST(req: Request) {
     let parsed;
     try { parsed = JSON.parse(jsonStr); }
     catch { return NextResponse.json({ error: "Failed to parse AI JSON", raw: jsonStr.substring(0, 500) }, { status: 500 }); }
+
+    // Normalize process-context: auto-correct actors that should be systems or hourglasses
+    if (diagramType === "process-context" && Array.isArray(parsed.elements)) {
+      const HOURGLASS_KEYWORDS = /\b(scheduler|schedule|scheduled|timer|timed|cron|periodic|recurring|daily|weekly|monthly|yearly|annual|trigger|auto.?schedul)/i;
+      const SYSTEM_KEYWORDS = /\b(system|app|application|platform|database|db|erp|crm|saas|api|server|service|tool|software|engine|portal|gateway)\b/i;
+      for (const el of parsed.elements) {
+        if (typeof el.label !== "string") continue;
+        if ((el.type === "actor" || el.type === "system") && HOURGLASS_KEYWORDS.test(el.label)) {
+          el.type = "hourglass";
+        } else if (el.type === "actor" && SYSTEM_KEYWORDS.test(el.label)) {
+          el.type = "system";
+        }
+      }
+    }
 
     return NextResponse.json({ parsed, diagramType });
   } catch (err) {
