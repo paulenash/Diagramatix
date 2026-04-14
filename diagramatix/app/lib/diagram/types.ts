@@ -240,5 +240,13 @@ export interface TemplateData {
  *    1.5 — added DiagramType "value-chain"; SymbolType values "chevron",
  *          "chevron-collapsed", "process-group"; new properties fillColor,
  *          description, showDescription for chevrons.
+ *    1.6 — value chain display labels renamed: Chevron→Process,
+ *          Collapsed→Collapsed Process, Process Group→Value Chain.
+ *          Process Context diagrams: zigzag layout, process numbering
+ *          (P-XX-NN), hourglass auto-scheduler with open-directed connectors,
+ *          system/team/hourglass actor type auto-detection.
+ *          AI prompts: diagramType field, dictation support.
+ *          Process ↔ Collapsed Process conversion.
+ *          Theme auto-reapply on snap/delete, auto-tint value chain containers.
  */
-export const SCHEMA_VERSION = "1.5";
+export const SCHEMA_VERSION = "1.6";

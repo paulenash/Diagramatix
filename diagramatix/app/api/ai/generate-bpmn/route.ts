@@ -1,10 +1,8 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import Anthropic from "@anthropic-ai/sdk";
 import { layoutBpmnDiagram, type AiElement, type AiConnection } from "@/app/lib/diagram/bpmnLayout";
-import { getCurrentOrgId } from "@/app/lib/auth/orgContext";
 
 function buildSystemPrompt(rules: string): string {
   return `You are a BPMN process modelling expert. Given a description of a business process, output a valid JSON object that defines the process as BPMN elements and connections.
@@ -69,29 +67,15 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
   }
 
-  // Load General rules + BPMN-specific rules (user's or defaults)
+  // Load General + BPMN-specific default rules
   let rules = "";
   try {
-    let orgId: string | null = null;
-    try { orgId = await getCurrentOrgId(session, await cookies()); } catch { /* no org */ }
-
     for (const category of ["general", "bpmn"]) {
-      let catRules = "";
-      if (orgId) {
-        const userRules = await prisma.diagramRules.findFirst({
-          where: { category, userId: session.user.id, orgId },
-          select: { rules: true },
-        });
-        if (userRules) catRules = userRules.rules;
-      }
-      if (!catRules) {
-        const defaultRules = await prisma.diagramRules.findFirst({
-          where: { category, isDefault: true },
-          select: { rules: true },
-        });
-        if (defaultRules) catRules = defaultRules.rules;
-      }
-      if (catRules) rules += (rules ? "\n\n" : "") + catRules;
+      const dr = await prisma.diagramRules.findFirst({
+        where: { category, isDefault: true },
+        select: { rules: true },
+      });
+      if (dr?.rules) rules += (rules ? "\n\n" : "") + dr.rules;
     }
   } catch { /* proceed without rules */ }
 

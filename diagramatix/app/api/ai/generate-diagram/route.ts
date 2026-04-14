@@ -1,10 +1,7 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import Anthropic from "@anthropic-ai/sdk";
-import { getCurrentOrgId } from "@/app/lib/auth/orgContext";
-import type { DiagramType } from "@/app/lib/diagram/types";
 
 const DIAGRAM_PROMPTS: Record<string, string> = {
   "state-machine": `You are a UML State Machine diagram expert. Output ONLY valid JSON with elements and connections.
@@ -144,29 +141,15 @@ export async function POST(req: Request) {
   if (!prompt?.trim()) return NextResponse.json({ error: "Prompt required" }, { status: 400 });
   if (!diagramType) return NextResponse.json({ error: "diagramType required" }, { status: 400 });
 
-  // Load General + diagram-specific rules
+  // Load General + diagram-specific default rules
   let rules = "";
   try {
-    let orgId: string | null = null;
-    try { orgId = await getCurrentOrgId(session, await cookies()); } catch {}
-
     for (const category of ["general", diagramType]) {
-      let catRules = "";
-      if (orgId) {
-        const ur = await prisma.diagramRules.findFirst({
-          where: { category, userId: session.user.id, orgId },
-          select: { rules: true },
-        });
-        if (ur) catRules = ur.rules;
-      }
-      if (!catRules) {
-        const dr = await prisma.diagramRules.findFirst({
-          where: { category, isDefault: true },
-          select: { rules: true },
-        });
-        if (dr) catRules = dr.rules;
-      }
-      if (catRules) rules += (rules ? "\n\n" : "") + catRules;
+      const dr = await prisma.diagramRules.findFirst({
+        where: { category, isDefault: true },
+        select: { rules: true },
+      });
+      if (dr?.rules) rules += (rules ? "\n\n" : "") + dr.rules;
     }
   } catch {}
 

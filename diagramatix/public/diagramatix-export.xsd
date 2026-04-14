@@ -377,12 +377,19 @@
       multiplicity     : "single" | "collection"  — data object/store
       role             : "input" | "output" | "none" — data object I/O marker
       state            : string    — data object state badge
-      linkedDiagramId  : string    — collapsed subprocess / submachine / chevron-collapsed drill-down link
+      linkedDiagramId  : string    — collapsed subprocess / submachine / collapsed process drill-down link
 
-    Value-chain element properties:
-      fillColor        : string    — per-element fill colour (hex, from chevron theme)
-      description      : string    — chevron description text (multi-line)
-      showDescription  : boolean   — whether to display the description box below the chevron
+    Value-chain element properties (chevron = Process, chevron-collapsed = Collapsed Process,
+    process-group = Value Chain container):
+      fillColor        : string    — per-element fill colour (hex, from process colour theme or auto-tint)
+      description      : string    — process description text (multi-line)
+      showDescription  : boolean   — whether to display the description box below the process
+
+    Process-context element properties:
+      Processes (use-case) support P-XX-NN numbering (e.g. P-HR-01).
+      Hourglass (auto-scheduler) connectors use open-directed arrow type.
+      System and hourglass actors are positioned to the right of the process group.
+      Teams and actors are positioned based on their connected process side.
   -->
 
 
