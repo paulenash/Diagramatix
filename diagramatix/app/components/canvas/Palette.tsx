@@ -289,7 +289,9 @@ export function PaletteSymbolPreview({ type, colorConfig }: { type: SymbolType; 
 export function Palette({ diagramType, onDragStart, disabledSymbols = [], colorConfig }: Props) {
   const [collapsed, setCollapsed] = useState(false);
   const paletteTypes = PALETTE_BY_DIAGRAM_TYPE[diagramType] ?? ["task"];
-  const symbols = ALL_SYMBOLS.filter((s) => paletteTypes.includes(s.type));
+  const symbols = paletteTypes
+    .map((t) => ALL_SYMBOLS.find((s) => s.type === t))
+    .filter((s): s is (typeof ALL_SYMBOLS)[number] => !!s);
 
   // Compute expanded width based on longest label
   const expandedWidth = useMemo(() => {

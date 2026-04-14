@@ -1421,11 +1421,14 @@ export function Canvas({
 
     // Never auto-connect to/from edge-mounted (boundary) events, and never
     // cross a container boundary (expanded-subprocess or composite-state).
+    // BPMN rules: never auto-connect TO a start event, never FROM an end event.
     // State-machine rules: never auto-connect TO an initial-state, never
     // connect initial → initial, never connect final → final.
+    const isBpmn = diagramType === "bpmn";
     const isStateMachine = diagramType === "state-machine";
     const newIsInitial = newSymbolType === "initial-state";
     const newIsFinal = newSymbolType === "final-state";
+    const newIsStartEvent = newSymbolType === "start-event";
     const candidates = data.elements.filter((e) => {
       if (!AUTO_CONNECT_TYPES.has(e.type)) return false;
       // Allow edge-mounted start events on the new element's parent expanded subprocess
@@ -1433,6 +1436,10 @@ export function Canvas({
         if (e.type === "start-event" && e.boundaryHostId === newExpandedScope) return true;
         return false;
       }
+      // BPMN: never auto-connect FROM an end event (end events have no outgoing)
+      if (isBpmn && e.type === "end-event") return false;
+      // BPMN: never auto-connect TO a start event
+      if (isBpmn && newIsStartEvent) return false;
       // State-machine: never auto-connect initial → initial or final → final
       if (isStateMachine && newIsInitial && e.type === "initial-state") return false;
       if (isStateMachine && newIsFinal && e.type === "final-state") return false;
@@ -2412,7 +2419,7 @@ export function Canvas({
             const titleH = (1 + subLines.length) * lineH + 8;
             const topY = minY - titleH - 20;
             return (
-              <g style={{ pointerEvents: "none", fontStyle: "normal" }}>
+              <g data-title-block="true" style={{ pointerEvents: "none", fontStyle: "normal" }}>
                 <text textAnchor="middle" x={cx} y={topY + lineH * 0.85}
                   fontSize={tfs} fill="#1f2937" fontWeight="bold" style={{ userSelect: "none" }}>
                   {diagramName ?? "Untitled"}

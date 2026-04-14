@@ -136,6 +136,18 @@ async function exportPdf(svgEl: SVGSVGElement, name: string, data: DiagramData, 
 
   const bounds = getDiagramBounds(data);
 
+  // Reserve space for the title header above the diagram
+  const tfs = data.titleFontSize ?? 14;
+  const lineH = Math.round(tfs * 1.15);
+  const title = data.title;
+  const hasVersion = !!title?.version;
+  const hasAuthors = !!title?.authors;
+  const subLineCount = (hasVersion || hasAuthors ? 1 : 0) + 1; // status line always, version/authors optional
+  const titleH = (1 + subLineCount) * lineH + 16;
+  // Expand bounds upward to include the title
+  bounds.y -= titleH;
+  bounds.height += titleH;
+
   const clone = svgEl.cloneNode(true) as SVGSVGElement;
   clone.removeAttribute("tabindex");
   clone.removeAttribute("class");
@@ -164,6 +176,64 @@ async function exportPdf(svgEl: SVGSVGElement, name: string, data: DiagramData, 
 
   // Remove interactive-only elements (selection handles, drag lines, etc.)
   clone.querySelectorAll("[data-interactive]").forEach((el) => el.remove());
+
+  // Inject PDF title at the top of the diagram (always shown in PDF)
+  {
+    const origBounds = getDiagramBounds(data);
+    const els = data.elements;
+    let minX2 = Infinity, maxX2 = -Infinity;
+    for (const el of els) { if (el.x < minX2) minX2 = el.x; if (el.x + el.width > maxX2) maxX2 = el.x + el.width; }
+    const cx = els.length > 0 ? (minX2 + maxX2) / 2 : bounds.x + bounds.width / 2;
+    const titleTopY = origBounds.y - titleH - 20 + 8;
+    const subFs = Math.round(tfs * 0.79);
+    const statusLabel = (title?.status ?? "draft").charAt(0).toUpperCase() + (title?.status ?? "draft").slice(1);
+
+    const ns = "http://www.w3.org/2000/svg";
+    const g = document.createElementNS(ns, "g");
+    g.setAttribute("data-pdf-title", "true");
+
+    // Line 1: Diagram name (bold)
+    const t1 = document.createElementNS(ns, "text");
+    t1.setAttribute("text-anchor", "middle");
+    t1.setAttribute("x", String(cx));
+    t1.setAttribute("y", String(titleTopY + lineH * 0.85));
+    t1.setAttribute("font-size", String(tfs));
+    t1.setAttribute("font-weight", "bold");
+    t1.setAttribute("fill", "#1f2937");
+    t1.textContent = name || "Untitled";
+    g.appendChild(t1);
+
+    // Line 2: Version + Authors (if any)
+    let lineIdx = 1;
+    const line2Parts: string[] = [];
+    if (title?.version) line2Parts.push(`Version ${title.version}`);
+    if (title?.authors) line2Parts.push(`Author/s: ${title.authors}`);
+    if (line2Parts.length > 0) {
+      const t2 = document.createElementNS(ns, "text");
+      t2.setAttribute("text-anchor", "middle");
+      t2.setAttribute("x", String(cx));
+      t2.setAttribute("y", String(titleTopY + lineIdx * lineH + lineH * 0.85));
+      t2.setAttribute("font-size", String(subFs));
+      t2.setAttribute("fill", "#6b7280");
+      t2.textContent = line2Parts.join("    ");
+      g.appendChild(t2);
+      lineIdx++;
+    }
+
+    // Line 3: Status
+    const t3 = document.createElementNS(ns, "text");
+    t3.setAttribute("text-anchor", "middle");
+    t3.setAttribute("x", String(cx));
+    t3.setAttribute("y", String(titleTopY + lineIdx * lineH + lineH * 0.85));
+    t3.setAttribute("font-size", String(subFs));
+    t3.setAttribute("fill", "#6b7280");
+    t3.textContent = `Status: ${statusLabel}`;
+    g.appendChild(t3);
+
+    // Remove any existing canvas title from clone to avoid duplication
+    clone.querySelectorAll("[data-title-block]").forEach((el) => el.remove());
+    clone.appendChild(g);
+  }
 
   // Insert clone off-screen so svg2pdf.js can compute styles via getComputedStyle/getBBox
   clone.style.position = "absolute";
@@ -317,6 +387,7 @@ export function DiagramEditor({
     flipForkJoin,
     convertTaskSubprocess,
     convertProcessCollapsed,
+    convertEventType,
     addSelfTransition,
     splitConnector,
     applyTemplate,
@@ -1254,7 +1325,7 @@ export function DiagramEditor({
             }}
             className="px-2 py-0.5 text-[11px] text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
           >
-            File ▾
+            Import/Export ▾
           </button>
           {fileMenuOpen && (
             <div className="absolute right-0 top-full mt-1 w-44 bg-white border border-gray-200 rounded shadow-lg z-50">
@@ -1512,6 +1583,7 @@ export function DiagramEditor({
             onFlipForkJoin={flipForkJoin}
             onConvertTaskSubprocess={convertTaskSubprocess}
             onConvertProcessCollapsed={convertProcessCollapsed}
+            onConvertEventType={convertEventType}
             forceCollapseTitle={showAiPanel}
           />
         )}

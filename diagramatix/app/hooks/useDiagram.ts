@@ -169,6 +169,7 @@ type Action =
   | { type: "UPDATE_CONNECTOR_TYPE"; payload: { id: string; connectorType: ConnectorType } }
   | { type: "CONVERT_TASK_SUBPROCESS"; payload: { id: string } }
   | { type: "CONVERT_PROCESS_COLLAPSED"; payload: { id: string } }
+  | { type: "CONVERT_EVENT_TYPE"; payload: { id: string; newEventType: "start-event" | "intermediate-event" | "end-event" } }
   | { type: "ADD_SELF_TRANSITION"; payload: {
       elementId: string;
       side: Side;
@@ -1128,6 +1129,37 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         return converted;
       });
       return { ...state, elements };
+    }
+
+    case "CONVERT_EVENT_TYPE": {
+      const { id, newEventType } = action.payload;
+      const el = state.elements.find(e => e.id === id);
+      if (!el) return state;
+      const EVENT_TYPES = new Set(["start-event", "intermediate-event", "end-event"]);
+      if (!EVENT_TYPES.has(el.type)) return state;
+      if (el.type === newEventType) return state;
+
+      const def = getSymbolDefinition(newEventType);
+      const elements = state.elements.map(e => {
+        if (e.id !== id) return e;
+        // Preserve position, label, and common properties; clear type-specific ones
+        const props = { ...e.properties };
+        // Clear eventType trigger if it's not valid for the new type
+        if (newEventType === "end-event") {
+          if (e.eventType === "timer" || e.eventType === "conditional") {
+            return { ...e, type: newEventType as SymbolType, width: def.defaultWidth, height: def.defaultHeight, eventType: "none" as EventType, properties: props };
+          }
+        }
+        if (newEventType !== "end-event" && e.eventType === "terminate") {
+          return { ...e, type: newEventType as SymbolType, width: def.defaultWidth, height: def.defaultHeight, eventType: "none" as EventType, properties: props };
+        }
+        if (newEventType !== "intermediate-event" && e.eventType === "link") {
+          return { ...e, type: newEventType as SymbolType, width: def.defaultWidth, height: def.defaultHeight, eventType: "none" as EventType, properties: props };
+        }
+        return { ...e, type: newEventType as SymbolType, width: def.defaultWidth, height: def.defaultHeight, properties: props };
+      });
+      const connectors = recomputeAllConnectors(state.connectors, elements);
+      return { ...state, elements, connectors };
     }
 
     case "ADD_SELF_TRANSITION": {
@@ -3070,6 +3102,10 @@ export function useDiagram(initialData: DiagramData) {
     convertProcessCollapsed: useCallback((id: string) => {
       pushHistory(snapshotData());
       dispatch({ type: "CONVERT_PROCESS_COLLAPSED", payload: { id } });
+    }, []),
+    convertEventType: useCallback((id: string, newEventType: "start-event" | "intermediate-event" | "end-event") => {
+      pushHistory(snapshotData());
+      dispatch({ type: "CONVERT_EVENT_TYPE", payload: { id, newEventType } });
     }, []),
     addSelfTransition: useCallback((elementId: string, side: Side, sourceOffsetAlong: number, targetOffsetAlong: number, bulge: number) => {
       pushHistory(snapshotData());

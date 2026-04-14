@@ -50,6 +50,7 @@ interface Props {
   onFlipForkJoin?: (id: string) => void;
   onConvertTaskSubprocess?: (id: string) => void;
   onConvertProcessCollapsed?: (id: string) => void;
+  onConvertEventType?: (id: string, newEventType: "start-event" | "intermediate-event" | "end-event") => void;
   database?: string;
   onSetDatabase?: (db: string) => void;
   forceCollapseTitle?: boolean;
@@ -80,7 +81,7 @@ const FLOW_TYPE_OPTIONS: { value: FlowType; label: string }[] = [
   { value: "throwing", label: "Throwing" },
 ];
 
-const EVENT_TYPE_OPTIONS: { value: EventType; label: string }[] = [
+const TRIGGER_OPTIONS: { value: EventType; label: string }[] = [
   { value: "none",        label: "None" },
   { value: "message",     label: "Message" },
   { value: "timer",       label: "Timer" },
@@ -582,6 +583,7 @@ export function PropertiesPanel({
   onFlipForkJoin,
   onConvertTaskSubprocess,
   onConvertProcessCollapsed,
+  onConvertEventType,
   database,
   onSetDatabase,
   forceCollapseTitle,
@@ -1897,15 +1899,30 @@ export function PropertiesPanel({
         </div>
       )}
 
-      {isEventElement && (
+      {isEventElement && onConvertEventType && diagramType === "bpmn" && (
         <div>
           <label className="block text-xs font-medium text-gray-700 mb-1">Event Type</label>
+          <select
+            value={element.type}
+            onChange={(e) => onConvertEventType(element.id, e.target.value as "start-event" | "intermediate-event" | "end-event")}
+            className="w-full text-xs border border-gray-300 rounded px-2 py-1 outline-none focus:border-blue-400"
+          >
+            <option value="start-event">Start</option>
+            <option value="intermediate-event">Intermediate</option>
+            <option value="end-event">End</option>
+          </select>
+        </div>
+      )}
+
+      {isEventElement && (
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1">Trigger</label>
           <select
             value={element.eventType ?? "none"}
             onChange={(e) => onUpdateProperties(element.id, { eventType: e.target.value })}
             className="w-full text-xs border border-gray-300 rounded px-2 py-1 outline-none focus:border-blue-400"
           >
-            {EVENT_TYPE_OPTIONS
+            {TRIGGER_OPTIONS
               .filter(o => {
                 if (element.type !== "end-event" && o.value === "terminate") return false;
                 if (element.type === "end-event" && (o.value === "timer" || o.value === "conditional")) return false;
