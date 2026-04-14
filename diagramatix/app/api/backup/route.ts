@@ -40,11 +40,12 @@ export async function GET() {
   try {
     const bytes = await buildUserBackup(userId, appVersion());
 
-    // Build filename: Diagramatix-backup-<email>-<YYYY-MM-DD>.diag
+    // Build filename: Diagramatix-backup-<email>-<version>-<YYYY-MM-DD>.diag
     const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
     const safeEmail = (user?.email ?? "user").replace(/[^a-zA-Z0-9_.-]+/g, "_");
     const today = new Date().toISOString().slice(0, 10);
-    const filename = `Diagramatix-backup-${safeEmail}-${today}.diag`;
+    const version = appVersion();
+    const filename = `Diagramatix-backup-${safeEmail}-v${version}-${today}.diag`;
 
     return new NextResponse(bytes as any, {
       headers: {

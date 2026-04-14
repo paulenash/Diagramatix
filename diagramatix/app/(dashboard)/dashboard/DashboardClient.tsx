@@ -312,7 +312,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
       // Filename comes from Content-Disposition (best-effort parse)
       const cd = resp.headers.get("Content-Disposition") ?? "";
       const m = cd.match(/filename="([^"]+)"/);
-      const filename = m?.[1] ?? `Diagramatix-backup-${new Date().toISOString().slice(0, 10)}.diag`;
+      const filename = m?.[1] ?? `Diagramatix-backup-${new Date().toISOString().slice(0, 10)}.diag`; // server provides versioned name
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -949,7 +949,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                     setEditDesc(p.description ?? "");
                     setEditOwner(p.ownerName ?? "");
                   }}
-                  onDoubleClick={() => router.push(`/dashboard/projects/${p.id}`)}
+                  onDoubleClick={(e) => { e.preventDefault(); router.push(`/dashboard/projects/${p.id}`); }}
                   onDragOver={(e) => { if (dragDiagramId) { e.preventDefault(); setDropTargetProjectId(p.id); } }}
                   onDragLeave={() => { if (dropTargetProjectId === p.id) setDropTargetProjectId(null); }}
                   onDrop={(e) => {
@@ -960,7 +960,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                       setDropTargetProjectId(null);
                     }
                   }}
-                  className={`bg-white border rounded px-3 py-2 hover:shadow-sm cursor-pointer group transition-all ${
+                  className={`bg-white border rounded px-3 py-2 hover:shadow-sm cursor-pointer group transition-all select-none ${
                     dropTargetProjectId === p.id ? "border-blue-500 ring-2 ring-blue-300 bg-blue-50" :
                     selectedProjectId === p.id ? "border-blue-500 ring-1 ring-blue-300" : "border-gray-200 hover:border-blue-300"
                   }`}
