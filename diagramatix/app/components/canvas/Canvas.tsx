@@ -405,6 +405,7 @@ export function Canvas({
 
   const [pan, setPan] = useState<Point>({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
+  const baseZoomRef = useRef<number | null>(null); // the "100%" reference zoom
   const [editingLabel, setEditingLabel] = useState<EditingLabel | null>(null);
   const [draggingConnector, setDraggingConnector] = useState<DraggingConnector | null>(null);
   const [draggingEndpoint, setDraggingEndpoint] = useState<DraggingEndpoint | null>(null);
@@ -493,11 +494,12 @@ export function Canvas({
     const contentW = maxX - minX;
     const contentH = maxY - minY;
     if (contentW < 1 || contentH < 1) return;
-    const fitZoom = Math.min(rect.width / contentW, rect.height / contentH, 1);
+    const fitZoom = Math.min(rect.width / contentW, rect.height / contentH, 1) * 0.8;
     const cx = (minX + maxX) / 2;
     const cy = (minY + maxY) / 2;
     setPan({ x: rect.width / 2 - cx * fitZoom, y: rect.height / 2 - cy * fitZoom });
     setZoom(fitZoom);
+    baseZoomRef.current = fitZoom; // this zoom level = 100% on the slider
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Reset picker offset when a new pending drop appears
@@ -3512,7 +3514,7 @@ export function Canvas({
             <textarea
               autoFocus
               value={editingLabel.value}
-              onFocus={(e) => { const t = e.target; setTimeout(() => { t.setSelectionRange(t.value.length, t.value.length); }, 0); }}
+              onFocus={(e) => { const t = e.target; setTimeout(() => t.select(), 0); }}
               onChange={commonChange as React.ChangeEventHandler<HTMLTextAreaElement>}
               onBlur={commitLabel}
               onKeyDown={(e) => {
@@ -3546,7 +3548,7 @@ export function Canvas({
             <textarea
               autoFocus
               value={editingLabel.value}
-              onFocus={(e) => { const t = e.target; setTimeout(() => { t.setSelectionRange(t.value.length, t.value.length); }, 0); }}
+              onFocus={(e) => { const t = e.target; setTimeout(() => t.select(), 0); }}
               onChange={commonChange as React.ChangeEventHandler<HTMLTextAreaElement>}
               onBlur={commitLabel}
               onKeyDown={(e) => {
@@ -3579,7 +3581,7 @@ export function Canvas({
           <textarea
             autoFocus
             value={editingLabel.value}
-            onFocus={(e) => { const t = e.target; setTimeout(() => { t.setSelectionRange(t.value.length, t.value.length); }, 0); }}
+            onFocus={(e) => { const t = e.target; setTimeout(() => t.select(), 0); }}
             onChange={commonChange as React.ChangeEventHandler<HTMLTextAreaElement>}
             onBlur={commitLabel}
             onKeyDown={(e) => {
@@ -3879,52 +3881,46 @@ export function Canvas({
       )}
 
       {/* Zoom slider bar at bottom of canvas */}
-      <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-white/90 border border-gray-200 rounded-full px-3 py-1 shadow-sm backdrop-blur-sm z-30 select-none">
-        <button
-          onClick={() => {
-            const newZ = Math.max(0.2, zoom * 0.8);
-            const rect = svgRef.current?.getBoundingClientRect();
-            if (rect) {
-              const cx = rect.width / 2, cy = rect.height / 2;
-              setPan(prev => ({ x: cx - (cx - prev.x) * (newZ / zoom), y: cy - (cy - prev.y) * (newZ / zoom) }));
-            }
-            setZoom(newZ);
-          }}
-          className="text-gray-500 hover:text-gray-800 text-xs font-bold w-5 h-5 flex items-center justify-center"
-          title="Zoom out"
-        >&minus;</button>
-        <input
-          type="range"
-          min={20}
-          max={400}
-          value={Math.round(zoom * 100)}
-          onChange={(e) => {
-            const newZ = parseInt(e.target.value) / 100;
-            const rect = svgRef.current?.getBoundingClientRect();
-            if (rect) {
-              const cx = rect.width / 2, cy = rect.height / 2;
-              setPan(prev => ({ x: cx - (cx - prev.x) * (newZ / zoom), y: cy - (cy - prev.y) * (newZ / zoom) }));
-            }
-            setZoom(newZ);
-          }}
-          className="w-28 h-1 accent-blue-500 cursor-pointer"
-          title={`${Math.round(zoom * 100)}%`}
-        />
-        <button
-          onClick={() => {
-            const newZ = Math.min(4, zoom * 1.25);
-            const rect = svgRef.current?.getBoundingClientRect();
-            if (rect) {
-              const cx = rect.width / 2, cy = rect.height / 2;
-              setPan(prev => ({ x: cx - (cx - prev.x) * (newZ / zoom), y: cy - (cy - prev.y) * (newZ / zoom) }));
-            }
-            setZoom(newZ);
-          }}
-          className="text-gray-500 hover:text-gray-800 text-xs font-bold w-5 h-5 flex items-center justify-center"
-          title="Zoom in"
-        >+</button>
-        <span className="text-[10px] text-gray-500 w-8 text-center tabular-nums">{Math.round(zoom * 100)}%</span>
-      </div>
+      {(() => {
+        const base = baseZoomRef.current ?? zoom;
+        const displayPct = Math.round((zoom / base) * 100);
+        const MIN_PCT = 25, MAX_PCT = 250;
+
+        function applyZoomPct(pct: number) {
+          const newZ = base * (pct / 100);
+          const rect = svgRef.current?.getBoundingClientRect();
+          if (rect) {
+            const cx = rect.width / 2, cy = rect.height / 2;
+            setPan(prev => ({ x: cx - (cx - prev.x) * (newZ / zoom), y: cy - (cy - prev.y) * (newZ / zoom) }));
+          }
+          setZoom(newZ);
+        }
+
+        return (
+          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-white/90 border border-gray-200 rounded-full px-3 py-1 shadow-sm backdrop-blur-sm z-30 select-none">
+            <button
+              onClick={() => applyZoomPct(Math.max(MIN_PCT, displayPct - 10))}
+              className="text-gray-500 hover:text-gray-800 text-xs font-bold w-5 h-5 flex items-center justify-center"
+              title="Zoom out"
+            >&minus;</button>
+            <input
+              type="range"
+              min={MIN_PCT}
+              max={MAX_PCT}
+              value={Math.min(MAX_PCT, Math.max(MIN_PCT, displayPct))}
+              onChange={(e) => applyZoomPct(parseInt(e.target.value))}
+              className="w-32 h-1 accent-blue-500 cursor-pointer"
+              title={`${displayPct}%`}
+            />
+            <button
+              onClick={() => applyZoomPct(Math.min(MAX_PCT, displayPct + 10))}
+              className="text-gray-500 hover:text-gray-800 text-xs font-bold w-5 h-5 flex items-center justify-center"
+              title="Zoom in"
+            >+</button>
+            <span className="text-[10px] text-gray-500 w-10 text-center tabular-nums">{displayPct}%</span>
+          </div>
+        );
+      })()}
     </div>
   );
 }

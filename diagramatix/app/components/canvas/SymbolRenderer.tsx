@@ -1721,7 +1721,7 @@ export function SymbolRenderer({
                 <textarea
                   autoFocus
                   defaultValue={desc}
-                  onFocus={(e) => { const t = e.target; setTimeout(() => t.setSelectionRange(t.value.length, t.value.length), 0); }}
+                  onFocus={(e) => { const t = e.target; setTimeout(() => t.select(), 0); }}
                   onBlur={(e) => {
                     onUpdateProperties?.(element.id, {
                       description: e.target.value || undefined,
@@ -1943,7 +1943,7 @@ export function SymbolRenderer({
               <foreignObject x={hitRectX} y={hitRectY} width={labelWidth} height={Math.max(totalLabelH, 28)}>
                 <textarea
                   autoFocus
-                  onFocus={(e) => { const t = e.target; setTimeout(() => { t.setSelectionRange(t.value.length, t.value.length); }, 0); }}
+                  onFocus={(e) => { const t = e.target; setTimeout(() => t.select(), 0); }}
                   value={editGatewayLabelValue}
                   onChange={(e) => setEditGatewayLabelValue(e.target.value)}
                   onBlur={(e) => {

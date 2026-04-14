@@ -1201,7 +1201,7 @@ export function PropertiesPanel({
                     className="w-full text-xs border border-gray-300 rounded px-2 py-1 resize-y"
                     rows={2}
                     defaultValue={connector.label ?? ""}
-                    onFocus={(e) => { const l = e.target.value.length; e.target.setSelectionRange(l, l); }}
+                    onFocus={(e) => e.target.select()}
                     onBlur={(e) => onUpdateConnectorLabel(connector.id, e.target.value)}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); (e.target as HTMLTextAreaElement).blur(); }
@@ -1293,7 +1293,7 @@ export function PropertiesPanel({
               className="w-full text-xs border border-gray-300 rounded px-2 py-1 resize-y"
               rows={3}
               defaultValue={connector.label ?? ""}
-              onFocus={(e) => { const l = e.target.value.length; e.target.setSelectionRange(l, l); }}
+              onFocus={(e) => e.target.select()}
               onBlur={(e) => onUpdateConnectorLabel(connector.id, e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
@@ -1383,7 +1383,7 @@ export function PropertiesPanel({
               className="w-full px-1.5 py-1 border border-gray-300 rounded text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-500 resize-y overflow-y-auto"
               rows={element.type === "chevron" || element.type === "chevron-collapsed" ? 3 : 2}
               value={labelDraft}
-              onFocus={(e) => { const l = e.target.value.length; e.target.setSelectionRange(l, l); }}
+              onFocus={(e) => e.target.select()}
               onChange={(e) => {
                 let val = e.target.value;
                 if (element.type === "uml-class" || element.type === "uml-enumeration") {
@@ -1404,7 +1404,7 @@ export function PropertiesPanel({
           <input
             type="text"
             value={labelDraft}
-            onFocus={(e) => { const l = e.target.value.length; e.target.setSelectionRange(l, l); }}
+            onFocus={(e) => e.target.select()}
             onChange={(e) => setLabelDraft(e.target.value)}
             onBlur={() => { if (labelDraft !== element.label) onUpdateLabel(element.id, labelDraft); }}
             onKeyDown={(e) => {
