@@ -390,6 +390,20 @@
       Hourglass (auto-scheduler) connectors use open-directed arrow type.
       System and hourglass actors are positioned to the right of the process group.
       Teams and actors are positioned based on their connected process side.
+
+    BPMN event properties (schema 1.6):
+      Event Type dropdown converts between start-event, intermediate-event, end-event.
+      Trigger (formerly "Event Type") sets the event trigger (message, timer, error, etc.).
+      Auto-connect rules: never TO a start event, never FROM an end event.
+      Expanded Subprocesses of type event or transaction excluded from auto-connect.
+      Nested expanded subprocesses lighten in shade (25% per level toward white).
+
+    AI generation features (schema 1.6):
+      All diagram types support AI-assisted generation via the AI Generate panel.
+      Users can type a prompt, dictate via speech-to-text, or attach a document
+      (PDF with native document understanding, or text files: .txt, .md, .csv, .rtf).
+      Saved prompts are filtered by diagram type and support edit/update.
+      AI Rules & Preferences (admin) control generation behaviour per diagram type.
   -->
 
 

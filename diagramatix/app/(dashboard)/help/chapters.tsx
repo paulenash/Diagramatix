@@ -2234,6 +2234,99 @@ export const CHAPTERS: HelpChapter[] = [
 
   /* ──────────────────────────────────────────────── 28 ── */
   {
+    slug: "ai-generate",
+    title: "AI Diagram Generation",
+    sections: [
+      {
+        body: (
+          <p>
+            Generate diagrams from natural language descriptions using AI.
+            Available for all diagram types via the{" "}
+            <strong>AI Generate</strong> button in the diagram editor toolbar.
+          </p>
+        ),
+      },
+      {
+        heading: "Prompt input",
+        body: (
+          <ul className="list-disc list-inside space-y-1">
+            <li>
+              Type a description of the process, system, or model you want
+              to create in the prompt textarea.
+            </li>
+            <li>
+              <strong>Dictate</strong> — click the microphone button to
+              speak your prompt (Chrome/Edge/Safari). Speech is appended
+              to existing text.
+            </li>
+            <li>
+              <strong>Attach a document</strong> — click <strong>Attach</strong>{" "}
+              to upload a file that describes the diagram. Supported formats:
+              PDF (native document understanding), TXT, MD, CSV, RTF.
+              Max 10MB. The document content is sent to the AI alongside
+              your prompt.
+            </li>
+          </ul>
+        ),
+      },
+      {
+        heading: "Replace vs Add",
+        body: (
+          <p>
+            <strong>Replace</strong> clears the current diagram and replaces
+            it with the AI-generated result. <strong>Add to diagram</strong>{" "}
+            appends the generated elements alongside existing content.
+            Both are undoable with Ctrl+Z.
+          </p>
+        ),
+      },
+      {
+        heading: "Saved prompts",
+        body: (
+          <ul className="list-disc list-inside space-y-1">
+            <li>
+              Click <strong>Save</strong> to save the current prompt for
+              reuse. Prompts are filtered by diagram type — each type
+              shows only its own saved prompts.
+            </li>
+            <li>
+              Click a saved prompt to load it. The panel enters{" "}
+              <strong>edit mode</strong> — modify the text and click{" "}
+              <strong>Update</strong> to save changes, or{" "}
+              <strong>New</strong> to save as a fresh prompt.
+            </li>
+            <li>
+              Delete prompts with the <strong>&times;</strong> button
+              (requires confirmation).
+            </li>
+            <li>
+              Manage all prompts from{" "}
+              <strong>System &rarr; AI Prompt Maintenance</strong> on the
+              Dashboard.
+            </li>
+          </ul>
+        ),
+      },
+      {
+        heading: "AI Rules & Preferences",
+        body: (
+          <p>
+            Admins can configure rules that guide AI generation for each
+            diagram type via{" "}
+            <strong>System &rarr; AI Rules &amp; Preferences</strong>.
+            Rules are grouped and colour-coded:{" "}
+            <span className="text-green-600 font-medium">green</span> rules
+            are enforced by the AI model,{" "}
+            <span className="text-red-600 font-medium">red</span> rules
+            (under Layout groups) are implemented in the layout engine code.
+          </p>
+        ),
+      },
+    ],
+  },
+
+  /* ──────────────────────────────────────────────── 29 ── */
+  {
     slug: "tips",
     title: "Tips & Troubleshooting",
     sections: [
