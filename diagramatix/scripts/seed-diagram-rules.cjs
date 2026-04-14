@@ -119,11 +119,11 @@ C06: Use bi-directional flows where data moves in both directions.`,
   "process-context": `## Group 1: Elements
 P01: Use Cases should represent the main processes or functions.
 P02: Actors should represent the roles or teams that interact with processes.
-P03: System boundaries should enclose related use cases.
+P03: The container name MUST always include the words "Process Group" (e.g. "Order Management Process Group"). This is a Process Context diagram, NOT a standard Use Case diagram.
 
 ## Group 2: Layout
-P04: Actors should be positioned outside the system boundary.
-P05: Use Cases should be arranged logically within the boundary.
+P04: Actors should be positioned outside the process group boundary.
+P05: Use Cases should be arranged logically within the process group in a portrait-shaped boundary with room for 2 use cases side by side and gaps to the vertical boundaries.
 P06: Association lines should connect actors to their relevant use cases.`,
 };
 

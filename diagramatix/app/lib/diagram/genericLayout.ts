@@ -91,21 +91,33 @@ export function layoutGenericDiagram(
   const regularEls = aiElements.filter(e => !CONTAINER_TYPES.has(e.type));
 
   const isValueChain = diagramType === "value-chain";
+  const isProcessContext = diagramType === "process-context";
 
   // Layout containers first (large, in a row)
+  let containerX = START_X;
   let containerY = START_Y;
   const containerMap = new Map<string, DiagramElement>();
   for (let i = 0; i < containers.length; i++) {
     const ai = containers[i];
     const label = ai.label ?? ai.name ?? ai.type;
     const childCount = regularEls.filter(e => e.group === ai.id || e.parent === ai.id).length;
-    // Value chains: use snapped width calculation; others: spaced grid
-    const childWidth = isValueChain
-      ? childCount * 140 - (childCount - 1) * CHEVRON_OVERLAP + 60  // snapped processes + padding
-      : (childCount + 1) * 180;
-    const w = Math.max(200, childWidth);
-    // Value chains: extra bottom gap for descriptions
-    const h = isValueChain ? Math.max(200, 78 + 120 + 40) : Math.max(120, 100);
+    let w: number, h: number;
+
+    if (isValueChain) {
+      const childWidth = childCount * 140 - (childCount - 1) * CHEVRON_OVERLAP + 60;
+      w = Math.max(200, childWidth);
+      h = Math.max(200, 78 + 120 + 40);
+    } else if (isProcessContext) {
+      // Portrait: 2 use-cases wide, stack rows vertically with gaps
+      const cols = 2;
+      const ucW = 120, ucH = 60;
+      const rows = Math.ceil(childCount / cols);
+      w = cols * ucW + (cols - 1) * 30 + 80; // 2 columns + gaps + padding
+      h = Math.max(200, rows * ucH + (rows - 1) * 30 + 80); // rows + gaps + header + bottom padding
+    } else {
+      w = Math.max(200, (childCount + 1) * 180);
+      h = Math.max(120, 100);
+    }
     const el: DiagramElement = {
       id: ai.id, type: ai.type as DiagramElement["type"],
       x: START_X, y: containerY, width: w, height: h,
@@ -125,59 +137,91 @@ export function layoutGenericDiagram(
     const children = regularEls.filter(e =>
       e.group === containerId || e.parent === containerId
     );
-    const cy = container.y + 40;
 
-    // For value chains, pre-wrap labels and determine if width expansion is needed
-    let chevronW = getSymbolDefinition("chevron").defaultWidth;
-    if (isValueChain) {
-      const textW = chevronW - 40; // usable text area inside chevron notches
-      let needsWider = false;
+    // Process-context: 2-column portrait grid within the boundary
+    if (isProcessContext) {
+      const cols = 2;
+      const padX = 40, padTop = 50, gapX = 30, gapY = 30;
+      const ucDef = getSymbolDefinition("use-case");
+      for (let ci = 0; ci < children.length; ci++) {
+        const ai = children[ci];
+        const def = getSymbolDefinition(ai.type as DiagramElement["type"]);
+        const col = ci % cols;
+        const row = Math.floor(ci / cols);
+        const ex = container.x + padX + col * (ucDef.defaultWidth + gapX);
+        const ey = container.y + padTop + row * (ucDef.defaultHeight + gapY);
+        const label = ai.label ?? ai.name ?? ai.type;
+        const el: DiagramElement = {
+          id: ai.id, type: ai.type as DiagramElement["type"],
+          x: ex, y: ey, width: def.defaultWidth, height: def.defaultHeight,
+          label, properties: buildProperties(ai, diagramType),
+          parentId: containerId,
+        };
+        elements.push(el);
+        placed.add(ai.id);
+      }
+      // Resize container to fit children if needed
+      if (children.length > 0) {
+        const rows = Math.ceil(children.length / cols);
+        const neededH = padTop + rows * (ucDef.defaultHeight + gapY) + 20;
+        container.height = Math.max(container.height, neededH);
+      }
+    } else {
+      // Value chains and other diagram types: horizontal row
+      const cy = container.y + 40;
+
+      // For value chains, pre-wrap labels and determine if width expansion is needed
+      let chevronW = getSymbolDefinition("chevron").defaultWidth;
+      if (isValueChain) {
+        const textW = chevronW - 40;
+        let needsWider = false;
+        for (const ai of children) {
+          if (ai.type === "chevron" || ai.type === "chevron-collapsed") {
+            const rawLabel = ai.label ?? ai.name ?? ai.type;
+            const wrapped = wrapLabel(rawLabel, textW);
+            if (!wrapped.fits || wrapped.lines > 3) needsWider = true;
+          }
+        }
+        if (needsWider) chevronW = Math.min(220, chevronW + 60);
+      }
+
+      let cx = container.x + 30;
       for (const ai of children) {
-        if (ai.type === "chevron" || ai.type === "chevron-collapsed") {
-          const rawLabel = ai.label ?? ai.name ?? ai.type;
-          const wrapped = wrapLabel(rawLabel, textW);
-          if (!wrapped.fits || wrapped.lines > 3) needsWider = true;
+        const def = getSymbolDefinition(ai.type as DiagramElement["type"]);
+        let label = ai.label ?? ai.name ?? ai.type;
+        const props = buildProperties(ai, diagramType);
+        let elW = def.defaultWidth;
+
+        // Value chain: wrap labels and apply Garden theme colour
+        if (isValueChain && (ai.type === "chevron" || ai.type === "chevron-collapsed")) {
+          elW = chevronW;
+          const textW = elW - 40;
+          const wrapped = wrapLabel(label, textW);
+          label = wrapped.text;
+          props.fillColor = GARDEN_THEME.colours[gardenIdx % GARDEN_THEME.colours.length];
+          gardenIdx++;
+        }
+
+        const el: DiagramElement = {
+          id: ai.id, type: ai.type as DiagramElement["type"],
+          x: cx, y: cy, width: elW, height: def.defaultHeight,
+          label, properties: props,
+          parentId: containerId,
+        };
+        elements.push(el);
+        placed.add(ai.id);
+
+        // Value chain: snap processes with 10px overlap; others: use gap
+        if (isValueChain && (ai.type === "chevron" || ai.type === "chevron-collapsed")) {
+          cx += elW - CHEVRON_OVERLAP;
+        } else {
+          cx += elW + GRID_GAP_X;
         }
       }
-      if (needsWider) chevronW = Math.min(220, chevronW + 60); // expand all chevrons
-    }
-
-    let cx = container.x + 30;
-    for (const ai of children) {
-      const def = getSymbolDefinition(ai.type as DiagramElement["type"]);
-      let label = ai.label ?? ai.name ?? ai.type;
-      const props = buildProperties(ai, diagramType);
-      let elW = def.defaultWidth;
-
-      // Value chain: wrap labels and apply Garden theme colour
-      if (isValueChain && (ai.type === "chevron" || ai.type === "chevron-collapsed")) {
-        elW = chevronW;
-        const textW = elW - 40;
-        const wrapped = wrapLabel(label, textW);
-        label = wrapped.text;
-        props.fillColor = GARDEN_THEME.colours[gardenIdx % GARDEN_THEME.colours.length];
-        gardenIdx++;
+      // Resize container to fit children
+      if (children.length > 0) {
+        container.width = Math.max(container.width, cx - container.x + 30);
       }
-
-      const el: DiagramElement = {
-        id: ai.id, type: ai.type as DiagramElement["type"],
-        x: cx, y: cy, width: elW, height: def.defaultHeight,
-        label, properties: props,
-        parentId: containerId,
-      };
-      elements.push(el);
-      placed.add(ai.id);
-
-      // Value chain: snap processes with 10px overlap; others: use gap
-      if (isValueChain && (ai.type === "chevron" || ai.type === "chevron-collapsed")) {
-        cx += elW - CHEVRON_OVERLAP;
-      } else {
-        cx += elW + GRID_GAP_X;
-      }
-    }
-    // Resize container to fit children
-    if (children.length > 0) {
-      container.width = Math.max(container.width, cx - container.x + 30);
     }
   }
 

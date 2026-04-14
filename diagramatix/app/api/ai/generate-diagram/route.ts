@@ -82,20 +82,27 @@ Output format:
   ]
 }`,
 
-  "process-context": `You are a Process Context (Use Case) diagram expert. Output ONLY valid JSON with elements and connections.
+  "process-context": `You are a Process Context diagram expert. This is NOT a standard Use Case Diagram — it shows processes in context with their actors, teams, and systems.
+Output ONLY valid JSON with elements and connections.
 
-Element types: "use-case" (process), "actor" (role/person), "team" (group), "system" (IT system), "system-boundary" (container)
+Element types: "use-case" (process), "actor" (role/person), "team" (group), "system" (IT system), "system-boundary" (process group container)
 Connection type: "association" with optional label
+
+IMPORTANT rules:
+- The "system-boundary" label MUST always include the words "Process Group" (e.g. "Order Management Process Group", "HR Process Group").
+- Place related use-case processes inside a system-boundary using the "parent" field.
+- Actors, teams, and systems go OUTSIDE the boundary.
 
 Output format:
 {
   "elements": [
-    { "id": "sb1", "type": "system-boundary", "label": "Order System" },
+    { "id": "sb1", "type": "system-boundary", "label": "Order Management Process Group" },
     { "id": "e1", "type": "use-case", "label": "Place Order", "parent": "sb1" },
-    { "id": "e2", "type": "actor", "label": "Customer" }
+    { "id": "e2", "type": "use-case", "label": "Check Stock", "parent": "sb1" },
+    { "id": "e3", "type": "actor", "label": "Customer" }
   ],
   "connections": [
-    { "sourceId": "e2", "targetId": "e1" }
+    { "sourceId": "e3", "targetId": "e1" }
   ]
 }`,
 };
