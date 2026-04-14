@@ -226,22 +226,41 @@ export function layoutGenericDiagram(
     }
   }
 
-  // Process-context: position actors/teams/systems next to their connected processes
+  // Process-context: position actors/teams/systems between their connected processes
   if (isProcessContext) {
     const ACTOR_TYPES = new Set(["actor", "team", "system"]);
     const actorEls = regularEls.filter(e => !placed.has(e.id) && ACTOR_TYPES.has(e.type));
     const elMap = new Map(elements.map(e => [e.id, e]));
     const aiConns = aiConnections;
+    const container = [...containerMap.values()][0];
+    const midX = container ? container.x + container.width / 2 : START_X + 200;
 
-    // Track vertical positions used on each side to avoid overlap
-    let leftActorY = START_Y;
-    let rightActorY = START_Y;
+    // Collect occupied Y ranges per side to avoid overlap
+    const leftOccupied: Array<{ top: number; bottom: number }> = [];
+    const rightOccupied: Array<{ top: number; bottom: number }> = [];
+
+    function findFreeY(occupied: Array<{ top: number; bottom: number }>, idealY: number, height: number): number {
+      const GAP = 15;
+      let y = idealY;
+      // Push down if overlapping with any existing placement
+      let conflict = true;
+      while (conflict) {
+        conflict = false;
+        for (const r of occupied) {
+          if (y < r.bottom + GAP && y + height > r.top - GAP) {
+            y = r.bottom + GAP;
+            conflict = true;
+          }
+        }
+      }
+      return y;
+    }
 
     for (const ai of actorEls) {
       const def = getSymbolDefinition(ai.type as DiagramElement["type"]);
       const label = ai.label ?? ai.name ?? ai.type;
 
-      // Find which processes this actor connects to
+      // Find connected processes
       const connectedProcessIds = aiConns
         .filter(c => c.sourceId === ai.id || c.targetId === ai.id)
         .map(c => c.sourceId === ai.id ? c.targetId : c.sourceId);
@@ -249,37 +268,33 @@ export function layoutGenericDiagram(
         .map(pid => elMap.get(pid))
         .filter((e): e is DiagramElement => !!e);
 
-      // Determine side: actor goes on the same side as its connected process
-      // If connected to a left-side process, actor on the left; right-side, actor on the right
+      // Determine side: prefer the side where most connected processes sit
       let placeRight = false;
       if (connectedProcesses.length > 0) {
-        // Check if most connected processes are on the right side of the boundary
-        const container = [...containerMap.values()][0];
-        if (container) {
-          const midX = container.x + container.width / 2;
-          const rightCount = connectedProcesses.filter(p => p.x + p.width / 2 > midX).length;
-          placeRight = rightCount > connectedProcesses.length / 2;
-        }
+        const rightCount = connectedProcesses.filter(p => p.x + p.width / 2 > midX).length;
+        placeRight = rightCount > connectedProcesses.length / 2;
       }
 
-      // Find the average Y of connected processes for vertical alignment
-      let targetY: number;
+      // Target Y: midpoint between the topmost and bottommost connected processes
+      // This places the actor "between" its connected processes
+      let idealY: number;
       if (connectedProcesses.length > 0) {
-        targetY = connectedProcesses.reduce((sum, p) => sum + p.y + p.height / 2, 0) / connectedProcesses.length - def.defaultHeight / 2;
+        const minY = Math.min(...connectedProcesses.map(p => p.y));
+        const maxY = Math.max(...connectedProcesses.map(p => p.y + p.height));
+        idealY = (minY + maxY) / 2 - def.defaultHeight / 2;
       } else {
-        targetY = placeRight ? rightActorY : leftActorY;
+        idealY = container ? container.y + 50 : START_Y;
       }
 
-      const container = [...containerMap.values()][0];
+      const occupied = placeRight ? rightOccupied : leftOccupied;
+      const targetY = findFreeY(occupied, idealY, def.defaultHeight);
+      occupied.push({ top: targetY, bottom: targetY + def.defaultHeight });
+
       let ex: number;
       if (placeRight) {
         ex = container ? container.x + container.width + 60 : START_X + 500;
-        targetY = Math.max(rightActorY, targetY);
-        rightActorY = targetY + def.defaultHeight + 20;
       } else {
         ex = container ? container.x - def.defaultWidth - 60 : START_X;
-        targetY = Math.max(leftActorY, targetY);
-        leftActorY = targetY + def.defaultHeight + 20;
       }
 
       const el: DiagramElement = {

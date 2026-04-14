@@ -93,22 +93,24 @@ IMPORTANT rules:
 - Place related use-case processes inside a system-boundary using the "parent" field.
 - Actors, teams, and systems go OUTSIDE the boundary.
 - Create a short 2-3 character process ID prefix for the process group (e.g. "HR" for Human Resources, "FI" for Finance, "OM" for Order Management).
-- Each process label MUST start with its numbered ID (e.g. "HR01 Recruit Staff", "HR02 Onboard Employee", "FI01 Process Invoice").
+- Each process label MUST start with its numbered ID in format P-XX-NN (e.g. "P-HR-01 Recruit Staff", "P-HR-02 Onboard Employee", "P-FI-01 Process Invoice").
 - If a team or department is mentioned, use "team" type, NOT "actor".
 - If an IT system is mentioned that the process interacts with, use "system" type with the system name.
+- ORDER the elements array so that actors/teams/systems appear in the JSON between the processes they connect to. This helps the layout engine place them optimally to minimise crossing lines.
 
 Output format:
 {
   "elements": [
     { "id": "sb1", "type": "system-boundary", "label": "Order Management Process Group" },
-    { "id": "e1", "type": "use-case", "label": "OM01 Place Order", "parent": "sb1" },
-    { "id": "e2", "type": "use-case", "label": "OM02 Check Stock", "parent": "sb1" },
+    { "id": "e1", "type": "use-case", "label": "P-OM-01 Place Order", "parent": "sb1" },
     { "id": "e3", "type": "actor", "label": "Customer" },
+    { "id": "e2", "type": "use-case", "label": "P-OM-02 Check Stock", "parent": "sb1" },
     { "id": "e4", "type": "team", "label": "Warehouse Team" },
     { "id": "e5", "type": "system", "label": "ERP System" }
   ],
   "connections": [
     { "sourceId": "e3", "targetId": "e1" },
+    { "sourceId": "e3", "targetId": "e2" },
     { "sourceId": "e4", "targetId": "e2" },
     { "sourceId": "e5", "targetId": "e2" }
   ]

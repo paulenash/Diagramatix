@@ -121,13 +121,14 @@ P01: Use Cases should represent the main processes or functions.
 P02: If a team or department is mentioned, use the Team element, NOT Actor.
 P03: If an IT system is mentioned that a process interacts with, use the System element with the system name.
 P04: The container name MUST always include the words "Process Group" (e.g. "HR Process Group"). This is a Process Context diagram, NOT a Use Case diagram.
-P05: Always create a 2-3 character process ID prefix for the process group (e.g. HR for Human Resources, FI for Finance) and number each process (e.g. HR01, HR02).
+P05: Process numbering format is P-XX-NN where XX is a 2-3 character code (e.g. P-HR-01, P-HR-02, P-FI-01).
 
 ## Group 2: Layout
 P06: Processes should be laid out 1 per horizontal row, zigzagging left and right down the page to maximise clear connection availability.
-P07: All Actors must be shown to the left for processes shown on the left, and to the right for processes shown on the right.
-P08: The process group boundary should be portrait in shape with enough room for processes with gaps to the vertical boundaries.
-P09: Association lines should connect actors, teams, and systems to their relevant processes.`,
+P07: Actors should be placed between the processes they are connected to, to minimise association crossings.
+P08: All Actors must be shown to the left for processes shown on the left, and to the right for processes shown on the right.
+P09: The process group boundary should be portrait in shape with enough room for processes with gaps to the vertical boundaries.
+P10: Actor placement should try to eliminate or at least minimise association line crossings.`,
 };
 
 async function seed() {
