@@ -23,6 +23,24 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 const CATEGORY_ORDER = ["general", "bpmn", "state-machine", "value-chain", "domain", "context", "process-context"];
 
+/** Group headings that indicate code-backed (layout) rules */
+const CODE_REQUIRED_GROUPS = /\b(layout|positioning|placement|spacing|sizing|arrangement|connector routing)\b/i;
+
+/** Determine if a rule line is under a code-required group */
+function classifyLines(text: string): Array<{ line: string; isGroup: boolean; isRule: boolean; codeRequired: boolean }> {
+  const lines = text.split("\n");
+  let currentGroupIsCode = false;
+  return lines.map(line => {
+    const trimmed = line.trim();
+    const isGroup = trimmed.startsWith("##");
+    const isRule = /^[A-Z]\d+:/.test(trimmed);
+    if (isGroup) {
+      currentGroupIsCode = CODE_REQUIRED_GROUPS.test(trimmed);
+    }
+    return { line, isGroup, isRule, codeRequired: isRule ? currentGroupIsCode : false };
+  });
+}
+
 export function RulesEditor({ isAdmin }: { isAdmin: boolean }) {
   const [ruleSets, setRuleSets] = useState<RuleSet[]>([]);
   const [activeCategory, setActiveCategory] = useState("general");
@@ -30,6 +48,7 @@ export function RulesEditor({ isAdmin }: { isAdmin: boolean }) {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showPreview, setShowPreview] = useState(true);
 
   useEffect(() => {
     fetch("/api/bpmn-rules", {
@@ -72,7 +91,6 @@ export function RulesEditor({ isAdmin }: { isAdmin: boolean }) {
         setMessage({ text: err.error ?? "Save failed", ok: false });
       } else {
         setMessage({ text: asDefault ? "Default rules updated" : "Your rules saved", ok: true });
-        // Update local state
         setRuleSets(prev => prev.map(r =>
           r.category === activeCategory ? { ...r, rules: editText } : r
         ));
@@ -93,7 +111,6 @@ export function RulesEditor({ isAdmin }: { isAdmin: boolean }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "reset", category: activeCategory }),
       });
-      // Reload
       const res = await fetch("/api/bpmn-rules", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -109,7 +126,10 @@ export function RulesEditor({ isAdmin }: { isAdmin: boolean }) {
   }
 
   const activeRuleSet = ruleSets.find(r => r.category === activeCategory);
-  const ruleCount = editText.split("\n").filter(l => /^[A-Z]\d+:/.test(l.trim())).length;
+  const classified = classifyLines(editText);
+  const ruleCount = classified.filter(l => l.isRule).length;
+  const codeCount = classified.filter(l => l.isRule && l.codeRequired).length;
+  const aiCount = ruleCount - codeCount;
 
   if (loading) return <div className="p-8 text-gray-500">Loading rules...</div>;
 
@@ -118,9 +138,9 @@ export function RulesEditor({ isAdmin }: { isAdmin: boolean }) {
       <header className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Link href="/dashboard" className="text-sm text-blue-600 hover:underline">
-            ← Dashboard
+            &larr; Dashboard
           </Link>
-          <h1 className="text-lg font-semibold text-gray-900">AI Rules & Preferences</h1>
+          <h1 className="text-lg font-semibold text-gray-900">AI Rules &amp; Preferences</h1>
         </div>
         <p className="text-xs text-gray-400">
           Rules are sent with every AI generation request to guide diagram creation
@@ -129,9 +149,9 @@ export function RulesEditor({ isAdmin }: { isAdmin: boolean }) {
 
       <div className="flex-1 flex">
         {/* Sidebar — category list */}
-        <nav className="w-52 bg-white border-r border-gray-200 p-3">
+        <nav className="w-52 bg-white border-r border-gray-200 p-3 flex flex-col">
           <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide mb-2">Categories</p>
-          <div className="space-y-1">
+          <div className="space-y-1 flex-1">
             {CATEGORY_ORDER.map(cat => {
               const rs = ruleSets.find(r => r.category === cat);
               const count = (rs?.rules ?? "").split("\n").filter(l => /^[A-Z]\d+:/.test(l.trim())).length;
@@ -153,9 +173,28 @@ export function RulesEditor({ isAdmin }: { isAdmin: boolean }) {
               );
             })}
           </div>
+
+          {/* Legend */}
+          <div className="border-t border-gray-200 pt-3 mt-3">
+            <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide mb-2">Legend</p>
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-green-500 shrink-0" />
+                <span className="text-[10px] text-gray-600">AI-enforced rule</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-red-500 shrink-0" />
+                <span className="text-[10px] text-gray-600">Code-backed rule</span>
+              </div>
+              <p className="text-[9px] text-gray-400 mt-1">
+                Rules under Layout groups require code implementation and are shown in red.
+                All other rules are enforced by the AI model and shown in green.
+              </p>
+            </div>
+          </div>
         </nav>
 
-        {/* Editor */}
+        {/* Editor + Preview */}
         <main className="flex-1 p-4 flex flex-col">
           <div className="flex items-center justify-between mb-2">
             <div>
@@ -163,10 +202,17 @@ export function RulesEditor({ isAdmin }: { isAdmin: boolean }) {
                 {CATEGORY_LABELS[activeCategory] ?? activeCategory} Rules
               </h2>
               <p className="text-[10px] text-gray-400">
-                {ruleCount} rules · {activeRuleSet?.isDefault ? "System default" : "Your customisation"}
+                {ruleCount} rules
+                {codeCount > 0 && <> &middot; <span className="text-red-500">{codeCount} code-backed</span></>}
+                {aiCount > 0 && <> &middot; <span className="text-green-600">{aiCount} AI-enforced</span></>}
+                {" "}&middot; {activeRuleSet?.isDefault ? "System default" : "Your customisation"}
               </p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-center">
+              <label className="flex items-center gap-1 text-[10px] text-gray-500 cursor-pointer">
+                <input type="checkbox" checked={showPreview} onChange={e => setShowPreview(e.target.checked)} className="w-3 h-3" />
+                Preview
+              </label>
               {!activeRuleSet?.isDefault && (
                 <button onClick={handleReset} disabled={saving}
                   className="px-3 py-1 text-xs text-gray-600 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50">
@@ -175,7 +221,7 @@ export function RulesEditor({ isAdmin }: { isAdmin: boolean }) {
               )}
               <button onClick={() => handleSave(false)} disabled={saving}
                 className="px-3 py-1 text-xs text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50">
-                {saving ? "Saving…" : "Save My Rules"}
+                {saving ? "Saving\u2026" : "Save My Rules"}
               </button>
               {isAdmin && (
                 <button onClick={() => handleSave(true)} disabled={saving}
@@ -186,12 +232,50 @@ export function RulesEditor({ isAdmin }: { isAdmin: boolean }) {
             </div>
           </div>
 
-          <textarea
-            value={editText}
-            onChange={e => setEditText(e.target.value)}
-            className="flex-1 w-full font-mono text-xs border border-gray-300 rounded p-3 resize-none focus:outline-none focus:ring-1 focus:ring-blue-500 leading-relaxed"
-            placeholder="Enter rules here. Use ## Group N: Name for groups and R01: for individual rules."
-          />
+          <div className={`flex-1 flex ${showPreview ? "gap-3" : ""}`}>
+            {/* Textarea editor */}
+            <textarea
+              value={editText}
+              onChange={e => setEditText(e.target.value)}
+              className={`${showPreview ? "w-1/2" : "w-full"} font-mono text-xs border border-gray-300 rounded p-3 resize-none focus:outline-none focus:ring-1 focus:ring-blue-500 leading-relaxed`}
+              placeholder="Enter rules here. Use ## Group N: Name for groups and R01: for individual rules."
+            />
+
+            {/* Coloured preview */}
+            {showPreview && (
+              <div className="w-1/2 border border-gray-200 rounded bg-white p-3 overflow-y-auto">
+                <div className="space-y-0.5">
+                  {classified.map((cl, i) => {
+                    if (cl.isGroup) {
+                      const isLayoutGroup = CODE_REQUIRED_GROUPS.test(cl.line);
+                      return (
+                        <div key={i} className="mt-2 first:mt-0">
+                          <p className={`text-xs font-semibold ${isLayoutGroup ? "text-red-700" : "text-green-700"}`}>
+                            {cl.line}
+                            {isLayoutGroup && <span className="ml-2 text-[9px] font-normal text-red-400">(code-backed)</span>}
+                          </p>
+                        </div>
+                      );
+                    }
+                    if (cl.isRule) {
+                      return (
+                        <div key={i} className="flex items-start gap-2 py-0.5">
+                          <span className={`w-2 h-2 rounded-full mt-1 shrink-0 ${cl.codeRequired ? "bg-red-500" : "bg-green-500"}`} />
+                          <p className={`text-[11px] leading-snug ${cl.codeRequired ? "text-red-700" : "text-green-800"}`}>
+                            {cl.line}
+                          </p>
+                        </div>
+                      );
+                    }
+                    if (cl.line.trim()) {
+                      return <p key={i} className="text-[11px] text-gray-500 leading-snug">{cl.line}</p>;
+                    }
+                    return <div key={i} className="h-2" />;
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
 
           {message && (
             <p className={`mt-2 text-xs ${message.ok ? "text-green-600" : "text-red-600"}`}>

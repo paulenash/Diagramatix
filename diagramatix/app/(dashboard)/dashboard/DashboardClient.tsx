@@ -837,13 +837,6 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                     </button>
                     <div className="border-t border-gray-100" />
                     <a
-                      href="/dashboard/rules"
-                      onClick={() => setFileMenuOpen(false)}
-                      className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
-                    >
-                      AI Rules &amp; Preferences
-                    </a>
-                    <a
                       href="/dashboard/prompts"
                       onClick={() => setFileMenuOpen(false)}
                       className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
@@ -868,6 +861,13 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                     {isSu && (
                       <>
                         <div className="border-t border-gray-100" />
+                        <a
+                          href="/dashboard/rules"
+                          onClick={() => setFileMenuOpen(false)}
+                          className="block w-full text-left px-3 py-2 text-xs text-orange-600 hover:bg-orange-50 font-medium"
+                        >
+                          AI Rules &amp; Preferences
+                        </a>
                         <a
                           href="/dashboard/admin"
                           onClick={() => setFileMenuOpen(false)}
