@@ -31,7 +31,6 @@ export interface AiConnection {
 const POOL_HEADER_W = 30;
 const LANE_H = 120;
 const LANE_PAD_X = 50; // extra padding to clear lane header text
-const LANE_PAD_Y = 15;
 const BLACK_BOX_H = 50;
 const POOL_GAP = 90; // gap between pool boundaries (3x original 30)
 const COL_SPACING = 160; // horizontal spacing between columns
@@ -172,13 +171,16 @@ export function layoutBpmnDiagram(
   const poolWidth = POOL_HEADER_W + contentWidth + LANE_PAD_X + TASK_W;
 
   for (const bbp of topBlackBoxes) {
+    // R20: black-box pool height = horizontal text width (rotated vertical) + buffer
+    const textW = bbp.label.length * 7 + 40; // ~7px per char at 12px font + 20px buffer each side
+    const bbH = Math.max(BLACK_BOX_H, textW);
     elements.push({
       id: bbp.id, type: "pool" as DiagramElement["type"],
-      x: START_X, y: curY, width: poolWidth, height: BLACK_BOX_H,
+      x: START_X, y: curY, width: poolWidth, height: bbH,
       label: bbp.label,
       properties: { poolType: "black-box", isSystem: false },
     });
-    curY += BLACK_BOX_H + POOL_GAP;
+    curY += bbH + POOL_GAP;
   }
 
   // ── Layout white-box pools with lanes ──
@@ -187,10 +189,10 @@ export function layoutBpmnDiagram(
     const poolStartY = curY;
 
     // R21: Compute lane heights — each lane needs room for its elements + vertical padding
+    const taskDef = getSymbolDefinition("task");
     const laneHeights: number[] = [];
     for (const lane of pLanes) {
       const els = laneElements.get(lane.id) ?? [];
-      // Count rows: elements in same column share a row, different columns are separate
       // Find max stacked elements per column
       const colCounts = new Map<number, number>();
       for (const e of els) {
@@ -198,25 +200,36 @@ export function layoutBpmnDiagram(
         colCounts.set(c, (colCounts.get(c) ?? 0) + 1);
       }
       const maxStack = Math.max(1, ...colCounts.values());
-      // Each stacked element needs ~60px (element height + gap)
-      const taskDef = getSymbolDefinition("task");
-      laneHeights.push(Math.max(LANE_H, maxStack * (taskDef.defaultHeight + 20) + LANE_PAD_Y * 2));
+      // Each lane needs at least room for 1 task height + generous vertical buffer
+      const vertBuffer = 40; // buffer above and below content
+      const minLaneH = taskDef.defaultHeight + vertBuffer * 2;
+      laneHeights.push(Math.max(minLaneH, maxStack * (taskDef.defaultHeight + 30) + vertBuffer * 2));
     }
-    if (pLanes.length === 0) laneHeights.push(LANE_H);
+    if (pLanes.length === 0) laneHeights.push(taskDef.defaultHeight + 80);
 
     let totalLaneH = laneHeights.reduce((s, h) => s + h, 0);
 
-    // R20: Ensure pool is tall enough to comfortably display the vertical pool name
-    // Pool name is rendered vertically — needs generous spacing per character
-    const nameH = pool.label.length * 14 + 60;
+    // R20: Ensure pool is tall enough to display the vertical pool name
+    // Same formula as black-box: horizontal text width + buffer, used as height
+    const nameH = pool.label.length * 7 + 40;
+    // Always apply: expand lanes if pool name needs more room
     if (totalLaneH < nameH) {
       const extra = nameH - totalLaneH;
       const perLane = Math.ceil(extra / laneHeights.length);
       for (let li = 0; li < laneHeights.length; li++) laneHeights[li] += perLane;
       totalLaneH = laneHeights.reduce((s, h) => s + h, 0);
     }
+    // Minimum total pool height — at least 2x the default pool height
+    const minPoolH = 200;
+    if (totalLaneH < minPoolH) {
+      const extra = minPoolH - totalLaneH;
+      const perLane = Math.ceil(extra / laneHeights.length);
+      for (let li = 0; li < laneHeights.length; li++) laneHeights[li] += perLane;
+      totalLaneH = laneHeights.reduce((s, h) => s + h, 0);
+    }
 
     // Create pool element
+    console.log(`[BPMN Layout] Pool "${pool.label}" (${pool.label.length} chars): nameH=${nameH}, totalLaneH=${totalLaneH}, lanes=${pLanes.length}`);
     elements.push({
       id: pool.id, type: "pool" as DiagramElement["type"],
       x: START_X, y: poolStartY, width: poolWidth, height: totalLaneH,
@@ -266,13 +279,15 @@ export function layoutBpmnDiagram(
 
   // ── Layout bottom black-box pools (systems) ──
   for (const bbp of bottomBlackBoxes) {
+    const textW = bbp.label.length * 7 + 40;
+    const bbH = Math.max(BLACK_BOX_H, textW);
     elements.push({
       id: bbp.id, type: "pool" as DiagramElement["type"],
-      x: START_X, y: curY, width: poolWidth, height: BLACK_BOX_H,
+      x: START_X, y: curY, width: poolWidth, height: bbH,
       label: bbp.label,
       properties: { poolType: "black-box", isSystem: true },
     });
-    curY += BLACK_BOX_H + POOL_GAP;
+    curY += bbH + POOL_GAP;
   }
 
   // ── Create connectors ──
