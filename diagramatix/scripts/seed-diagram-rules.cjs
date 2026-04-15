@@ -42,7 +42,12 @@ R15: Pool and Lane names should match the entity or role names mentioned in the 
 R16: The process should flow left-to-right within the main Pool.
 R17: External entity (non-System) Pools should be positioned above the main Pool.
 R18: System/application Pools should be positioned below the main Pool.
-R19: Lanes should be ordered top-to-bottom in logical process flow order.`,
+R19: Lanes should be ordered top-to-bottom in logical process flow order.
+
+## Group 6: Layout Sizing
+R20: Pool height must accommodate the vertical pool name text with comfortable spacing.
+R21: Lane width should be content width plus one task width of padding for later adjustment.
+R22: Message flows must attach at points that produce vertical connectors between pools.`,
 
   "state-machine": `## Group 1: States
 S01: Every state machine must have exactly one Initial State (filled circle) and at least one Final State (bull's eye).

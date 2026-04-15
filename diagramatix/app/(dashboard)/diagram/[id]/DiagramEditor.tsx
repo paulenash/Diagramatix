@@ -144,9 +144,10 @@ async function exportPdf(svgEl: SVGSVGElement, name: string, data: DiagramData, 
   const hasAuthors = !!title?.authors;
   const subLineCount = (hasVersion || hasAuthors ? 1 : 0) + 1; // status line always, version/authors optional
   const titleH = (1 + subLineCount) * lineH + 16;
-  // Expand bounds upward to include the title
-  bounds.y -= titleH;
-  bounds.height += titleH;
+  const titlePad = 30; // extra padding above the title text
+  // Expand bounds upward to include the title + padding
+  bounds.y -= (titleH + titlePad);
+  bounds.height += (titleH + titlePad);
 
   const clone = svgEl.cloneNode(true) as SVGSVGElement;
   clone.removeAttribute("tabindex");

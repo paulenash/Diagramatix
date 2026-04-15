@@ -33,7 +33,9 @@ const LANE_H = 120;
 const LANE_PAD_X = 50; // extra padding to clear lane header text
 const LANE_PAD_Y = 15;
 const BLACK_BOX_H = 50;
-const BLACK_BOX_GAP = 30;
+const POOL_GAP = 90; // gap between pool boundaries (3x original 30)
+const COL_SPACING = 160; // horizontal spacing between columns
+const TASK_W = 100; // standard task width for padding
 const START_X = 50;
 const START_Y = 50;
 
@@ -163,9 +165,9 @@ export function layoutBpmnDiagram(
 
   const maxCol = Math.max(0, ...colMap.values());
 
-  // ── Layout top black-box pools ──
+  // ── Pool width: content columns + 1 task width padding for user adjustment room ──
   let curY = START_Y;
-  const poolWidth = POOL_HEADER_W + (maxCol + 1) * 160 + LANE_PAD_X * 2;
+  const poolWidth = POOL_HEADER_W + (maxCol + 1) * COL_SPACING + LANE_PAD_X * 2 + TASK_W;
 
   for (const bbp of topBlackBoxes) {
     elements.push({
@@ -174,7 +176,7 @@ export function layoutBpmnDiagram(
       label: bbp.label,
       properties: { poolType: "black-box", isSystem: false },
     });
-    curY += BLACK_BOX_H + BLACK_BOX_GAP;
+    curY += BLACK_BOX_H + POOL_GAP;
   }
 
   // ── Layout white-box pools with lanes ──
@@ -191,7 +193,18 @@ export function layoutBpmnDiagram(
     }
     if (pLanes.length === 0) laneHeights.push(LANE_H);
 
-    const totalLaneH = laneHeights.reduce((s, h) => s + h, 0);
+    let totalLaneH = laneHeights.reduce((s, h) => s + h, 0);
+
+    // Ensure pool is tall enough to comfortably display the vertical pool name
+    // Pool name is rendered vertically in the 30px header — approximate 8px per character
+    const nameH = pool.label.length * 8 + 30;
+    if (totalLaneH < nameH) {
+      // Distribute extra height evenly across lanes
+      const extra = nameH - totalLaneH;
+      const perLane = Math.ceil(extra / laneHeights.length);
+      for (let li = 0; li < laneHeights.length; li++) laneHeights[li] += perLane;
+      totalLaneH = laneHeights.reduce((s, h) => s + h, 0);
+    }
 
     // Create pool element
     elements.push({
@@ -238,7 +251,7 @@ export function layoutBpmnDiagram(
       laneY += laneH;
     }
 
-    curY = poolStartY + totalLaneH + BLACK_BOX_GAP;
+    curY = poolStartY + totalLaneH + POOL_GAP;
   }
 
   // ── Layout bottom black-box pools (systems) ──
@@ -249,7 +262,7 @@ export function layoutBpmnDiagram(
       label: bbp.label,
       properties: { poolType: "black-box", isSystem: true },
     });
-    curY += BLACK_BOX_H + BLACK_BOX_GAP;
+    curY += BLACK_BOX_H + POOL_GAP;
   }
 
   // ── Create connectors ──
@@ -283,17 +296,18 @@ export function layoutBpmnDiagram(
 
     if (isMessage) {
       connType = "messageBPMN";
-      // Fix 1: Message flow — vertical, align x to the non-pool element's centre
+      // Message flow — always vertical
       const srcCy = src.y + src.height / 2;
       const tgtCy = tgt.y + tgt.height / 2;
       srcSide = srcCy < tgtCy ? "bottom" : "top";
       tgtSide = srcCy < tgtCy ? "top" : "bottom";
-      // Compute offsetAlong so the pool attachment point is directly above/below the task
+      // Compute offsetAlong so pool attachment points align vertically with the non-pool element
       if (src.type === "pool" && tgt.type !== "pool") {
         const taskCx = tgt.x + tgt.width / 2;
         srcOffsetAlong = Math.max(0.02, Math.min(0.98, (taskCx - src.x) / src.width));
-      } else if (tgt.type === "pool" && src.type !== "pool") {
-        // Target pool offset handled below via tgtOffsetAlong
+      } else if (src.type !== "pool" && tgt.type !== "pool") {
+        // Both are non-pool elements — use 0.5 (centre) for both
+        srcOffsetAlong = 0.5;
       }
     } else {
       connType = "sequence";
@@ -335,11 +349,15 @@ export function layoutBpmnDiagram(
       }
     }
 
-    // Compute target offset for message connectors to pools
+    // Compute target offset for message connectors
     let tgtOffsetAlong: number | undefined;
-    if (isMessage && tgt.type === "pool" && src.type !== "pool") {
-      const taskCx = src.x + src.width / 2;
-      tgtOffsetAlong = Math.max(0.02, Math.min(0.98, (taskCx - tgt.x) / tgt.width));
+    if (isMessage) {
+      if (tgt.type === "pool" && src.type !== "pool") {
+        const taskCx = src.x + src.width / 2;
+        tgtOffsetAlong = Math.max(0.02, Math.min(0.98, (taskCx - tgt.x) / tgt.width));
+      } else if (tgt.type !== "pool") {
+        tgtOffsetAlong = 0.5; // centre of target element
+      }
     }
 
     // Fix 4: Gateway label positioning
