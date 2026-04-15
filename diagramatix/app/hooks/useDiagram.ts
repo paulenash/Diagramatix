@@ -718,11 +718,18 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         // Exclusive/Inclusive get "Test?", Parallel/Event-based get no label
         label = "Test?";
       }
+      // Pools: place header near the drop point instead of centring the full width
+      const isPool = action.payload.symbolType === "pool";
+      const dropX = isPool
+        ? action.payload.position.x - 15  // header is 30px wide, put its centre at drop
+        : action.payload.position.x - def.defaultWidth / 2;
+      const dropY = action.payload.position.y - def.defaultHeight / 2;
+
       let newEl: DiagramElement = {
         id: action.payload.id ?? nanoid(),
         type: action.payload.symbolType,
-        x: action.payload.position.x - def.defaultWidth / 2,
-        y: action.payload.position.y - def.defaultHeight / 2,
+        x: dropX,
+        y: dropY,
         width: def.defaultWidth,
         height: def.defaultHeight,
         label,
