@@ -207,8 +207,8 @@ export function layoutBpmnDiagram(
     let totalLaneH = laneHeights.reduce((s, h) => s + h, 0);
 
     // R20: Ensure pool is tall enough to comfortably display the vertical pool name
-    // Pool name is rendered vertically at ~12px font — each character needs ~12px height
-    const nameH = pool.label.length * 12 + 40;
+    // Pool name is rendered vertically — needs generous spacing per character
+    const nameH = pool.label.length * 14 + 60;
     if (totalLaneH < nameH) {
       const extra = nameH - totalLaneH;
       const perLane = Math.ceil(extra / laneHeights.length);
@@ -395,7 +395,7 @@ export function layoutBpmnDiagram(
       targetSide: tgtSide as Connector["targetSide"],
       type: connType as Connector["type"],
       directionType: "directed",
-      routingType: isMessage ? "direct" : "rectilinear",
+      routingType: "rectilinear",
       sourceInvisibleLeader: false,
       targetInvisibleLeader: false,
       waypoints: [] as Point[],
@@ -414,6 +414,31 @@ export function layoutBpmnDiagram(
     try {
       const srcOffset = conn.sourceOffsetAlong ?? 0.5;
       const tgtOffset = conn.targetOffsetAlong ?? 0.5;
+
+      // Message connectors: compute vertical waypoints manually so they display correctly
+      if (conn.type === "messageBPMN") {
+        const srcSide = conn.sourceSide;
+        const tgtSide = conn.targetSide;
+        // Compute attachment points using offset along the side
+        const srcX = src.x + srcOffset * src.width;
+        const srcY = srcSide === "bottom" ? src.y + src.height : src.y;
+        const tgtX = tgt.x + tgtOffset * tgt.width;
+        const tgtY = tgtSide === "top" ? tgt.y : tgt.y + tgt.height;
+        // Use the non-pool element's X for vertical alignment
+        const alignX = src.type === "pool" ? tgtX : tgt.type === "pool" ? srcX : (srcX + tgtX) / 2;
+        return {
+          ...conn,
+          waypoints: [
+            { x: alignX, y: srcY },
+            { x: alignX, y: tgtY },
+          ],
+          sourceOffsetAlong: (alignX - src.x) / src.width,
+          targetOffsetAlong: (alignX - tgt.x) / tgt.width,
+          sourceInvisibleLeader: false,
+          targetInvisibleLeader: false,
+        };
+      }
+
       const result = computeWaypoints(src, tgt, elements,
         conn.sourceSide, conn.targetSide, conn.routingType, srcOffset, tgtOffset);
       return { ...conn, waypoints: result.waypoints,
