@@ -1280,7 +1280,7 @@ function PoolShape({ el }: { el: DiagramElement }) {
   const colors = useContext(SymbolColorCtx);
   const fsc = useContext(FontScaleCtx);
   const { x, y, width: w, height: h } = el;
-  const LW = 30;
+  const LW = 45;
   const cx = x + LW / 2 + 3;
   const cy = y + h / 2;
   const lines = el.label.split('\n');
@@ -1319,7 +1319,7 @@ function LaneShape({ el, isSublane }: { el: DiagramElement; isSublane?: boolean 
   const colors = useContext(SymbolColorCtx);
   const fsc = useContext(FontScaleCtx);
   const { x, y, width: w, height: h } = el;
-  const LW = 24;
+  const LW = 36;
   const cx = x + LW / 2 + 3;
   const cy = y + h / 2;
   const lines = el.label.split('\n');
@@ -1660,10 +1660,10 @@ export function SymbolRenderer({
       onMouseDown={handleMouseDown}
       onDoubleClick={(e) => {
         e.stopPropagation();
-        // For pools, only trigger label edit when double-clicking the header strip (left 30px)
+        // For pools, only trigger label edit when double-clicking the header strip (left 45px)
         if (element.type === "pool" && svgToWorld) {
           const world = svgToWorld(e.clientX, e.clientY);
-          if (world.x > element.x + 30) return;
+          if (world.x > element.x + 45) return;
         }
         onDoubleClick();
       }}

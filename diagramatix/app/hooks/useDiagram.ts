@@ -421,7 +421,7 @@ function updatePoolTypes(elements: DiagramElement[]): DiagramElement[] {
 }
 
 function clampChildrenToLane(elements: DiagramElement[], lane: DiagramElement): DiagramElement[] {
-  const LANE_LW = 24;
+  const LANE_LW = 36;
   const minX = lane.x + LANE_LW;
   const minY = lane.y;
   const maxX = lane.x + lane.width;
@@ -721,7 +721,7 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       // Pools: place header near the drop point instead of centring the full width
       const isPool = action.payload.symbolType === "pool";
       const dropX = isPool
-        ? action.payload.position.x - 15  // header is 30px wide, put its centre at drop
+        ? action.payload.position.x - 22  // header is 45px wide, put its centre at drop
         : action.payload.position.x - def.defaultWidth / 2;
       const dropY = action.payload.position.y - def.defaultHeight / 2;
 
@@ -1288,7 +1288,7 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         // Also proportionally resize sub-lanes within each lane
         const sublaneUpdates = new Map<string, DiagramElement>();
         for (const [laneId, updatedLane] of laneUpdates) {
-          const LANE_LW = 24;
+          const LANE_LW = 36;
           const sublanes = state.elements
             .filter((e) => e.type === "lane" && e.parentId === laneId)
             .sort((a, b) => a.y - b.y);
@@ -1444,7 +1444,7 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         const parent = elements.find((e) => e.id === el.parentId);
         if (parent) {
           const parentIsPool = parent.type === "pool";
-          const headerW = parentIsPool ? 30 : 24;
+          const headerW = parentIsPool ? 45 : 36;
           const siblings = elements
             .filter((e) => e.type === "lane" && e.parentId === parent.id)
             .sort((a, b) => a.y - b.y);
@@ -1459,7 +1459,7 @@ function reducer(state: DiagramData, action: Action): DiagramData {
               .filter((e) => e.type === "lane" && e.parentId === sib.id)
               .sort((a, b) => a.y - b.y);
             if (subLanes.length > 0) {
-              const SUBLANE_LW = 24;
+              const SUBLANE_LW = 36;
               const oldTotalSubH = subLanes.reduce((s, l) => s + l.height, 0) || 1;
               let subStackY = updated.y;
               for (const sub of subLanes) {
@@ -2362,7 +2362,7 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       const { laneId } = action.payload;
       const parentLane = state.elements.find((e) => e.id === laneId && e.type === "lane");
       if (!parentLane) return state;
-      const LANE_LW = 24;
+      const LANE_LW = 36;
       const existingSublanes = state.elements.filter((e) => e.type === "lane" && e.parentId === laneId);
       if (existingSublanes.length > 0) {
         // Add one more sublane at the bottom
@@ -2451,7 +2451,7 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       }
 
       // Proportionally resize sub-lanes within the resized lanes
-      const LANE_LW = 24;
+      const LANE_LW = 36;
       function resizeSublanes(elements: DiagramElement[], laneId: string, newLaneY: number, newLaneH: number, newLaneX: number, newLaneW: number): DiagramElement[] {
         const subs = elements.filter((e) => e.type === "lane" && e.parentId === laneId).sort((a, b) => a.y - b.y);
         if (subs.length === 0) return elements;

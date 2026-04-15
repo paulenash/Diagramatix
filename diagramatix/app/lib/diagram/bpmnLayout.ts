@@ -28,7 +28,7 @@ export interface AiConnection {
 }
 
 // Layout constants
-const POOL_HEADER_W = 30;
+const POOL_HEADER_W = 45;
 const LANE_H = 120;
 const LANE_PAD_X = 50; // extra padding to clear lane header text
 const BLACK_BOX_H = 50;
@@ -172,7 +172,7 @@ export function layoutBpmnDiagram(
 
   for (const bbp of topBlackBoxes) {
     // R20: black-box pool height = horizontal text width (rotated vertical) + buffer
-    const textW = bbp.label.length * 7 + 40; // ~7px per char at 12px font + 20px buffer each side
+    const textW = bbp.label.length * 7 + 20; // ~7px per char at 12px font + 20px buffer each side
     const bbH = Math.max(BLACK_BOX_H, textW);
     elements.push({
       id: bbp.id, type: "pool" as DiagramElement["type"],
@@ -229,7 +229,6 @@ export function layoutBpmnDiagram(
     }
 
     // Create pool element
-    console.log(`[BPMN Layout] Pool "${pool.label}" (${pool.label.length} chars): nameH=${nameH}, totalLaneH=${totalLaneH}, lanes=${pLanes.length}`);
     elements.push({
       id: pool.id, type: "pool" as DiagramElement["type"],
       x: START_X, y: poolStartY, width: poolWidth, height: totalLaneH,
@@ -279,7 +278,7 @@ export function layoutBpmnDiagram(
 
   // ── Layout bottom black-box pools (systems) ──
   for (const bbp of bottomBlackBoxes) {
-    const textW = bbp.label.length * 7 + 40;
+    const textW = bbp.label.length * 7 + 20;
     const bbH = Math.max(BLACK_BOX_H, textW);
     elements.push({
       id: bbp.id, type: "pool" as DiagramElement["type"],

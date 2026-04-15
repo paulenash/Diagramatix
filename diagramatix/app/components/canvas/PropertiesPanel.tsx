@@ -1379,7 +1379,8 @@ export function PropertiesPanel({
           element.type === "external-entity" || element.type === "process-system" ||
           element.type === "uml-class" || element.type === "uml-enumeration" ||
           element.type === "text-annotation" ||
-          element.type === "chevron" || element.type === "chevron-collapsed") ? (
+          element.type === "chevron" || element.type === "chevron-collapsed" ||
+          element.type === "pool" || element.type === "lane") ? (
             <textarea
               key={element.id}
               className="w-full px-1.5 py-1 border border-gray-300 rounded text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-500 resize-y overflow-y-auto"

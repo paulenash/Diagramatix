@@ -2636,7 +2636,7 @@ export function Canvas({
               .filter((l) => l.parentId === parentLane.id)
               .sort((a, b) => a.y - b.y);
             if (sublanes.length < 2) return [];
-            const LANE_LW = 24;
+            const LANE_LW = 36;
             return sublanes.slice(0, -1).map((sub, i) => {
               const nextSub = sublanes[i + 1];
               const boundaryY = sub.y + sub.height;
