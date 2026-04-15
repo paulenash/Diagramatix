@@ -167,7 +167,9 @@ export function layoutBpmnDiagram(
 
   // ── Pool width: content columns + 1 task width padding for user adjustment room ──
   let curY = START_Y;
-  const poolWidth = POOL_HEADER_W + (maxCol + 1) * COL_SPACING + LANE_PAD_X * 2 + TASK_W;
+  // R21: content width + 1 task width padding
+  const contentWidth = (maxCol + 1) * COL_SPACING;
+  const poolWidth = POOL_HEADER_W + contentWidth + LANE_PAD_X + TASK_W;
 
   for (const bbp of topBlackBoxes) {
     elements.push({
@@ -184,22 +186,30 @@ export function layoutBpmnDiagram(
     const pLanes = poolLanes.get(pool.id) ?? [];
     const poolStartY = curY;
 
-    // Compute lane heights based on element count
+    // R21: Compute lane heights — each lane needs room for its elements + vertical padding
     const laneHeights: number[] = [];
     for (const lane of pLanes) {
       const els = laneElements.get(lane.id) ?? [];
-      const rows = Math.max(1, els.length);
-      laneHeights.push(Math.max(LANE_H, rows * 50 + LANE_PAD_Y * 2));
+      // Count rows: elements in same column share a row, different columns are separate
+      // Find max stacked elements per column
+      const colCounts = new Map<number, number>();
+      for (const e of els) {
+        const c = colMap.get(e.id) ?? 0;
+        colCounts.set(c, (colCounts.get(c) ?? 0) + 1);
+      }
+      const maxStack = Math.max(1, ...colCounts.values());
+      // Each stacked element needs ~60px (element height + gap)
+      const taskDef = getSymbolDefinition("task");
+      laneHeights.push(Math.max(LANE_H, maxStack * (taskDef.defaultHeight + 20) + LANE_PAD_Y * 2));
     }
     if (pLanes.length === 0) laneHeights.push(LANE_H);
 
     let totalLaneH = laneHeights.reduce((s, h) => s + h, 0);
 
-    // Ensure pool is tall enough to comfortably display the vertical pool name
-    // Pool name is rendered vertically in the 30px header — approximate 8px per character
-    const nameH = pool.label.length * 8 + 30;
+    // R20: Ensure pool is tall enough to comfortably display the vertical pool name
+    // Pool name is rendered vertically at ~12px font — each character needs ~12px height
+    const nameH = pool.label.length * 12 + 40;
     if (totalLaneH < nameH) {
-      // Distribute extra height evenly across lanes
       const extra = nameH - totalLaneH;
       const perLane = Math.ceil(extra / laneHeights.length);
       for (let li = 0; li < laneHeights.length; li++) laneHeights[li] += perLane;
@@ -233,7 +243,7 @@ export function layoutBpmnDiagram(
       for (const el of laneEls) {
         const col = colMap.get(el.id) ?? 0;
         const def = getSymbolDefinition(el.type as DiagramElement["type"]);
-        const elX = START_X + POOL_HEADER_W + LANE_PAD_X + col * 160;
+        const elX = START_X + POOL_HEADER_W + LANE_PAD_X + col * COL_SPACING;
         const elY = laneY + laneH / 2 - def.defaultHeight / 2;
 
         elements.push({
@@ -402,8 +412,10 @@ export function layoutBpmnDiagram(
     const tgt = elMap.get(conn.targetId);
     if (!src || !tgt) return conn;
     try {
+      const srcOffset = conn.sourceOffsetAlong ?? 0.5;
+      const tgtOffset = conn.targetOffsetAlong ?? 0.5;
       const result = computeWaypoints(src, tgt, elements,
-        conn.sourceSide, conn.targetSide, conn.routingType, 0.5, 0.5);
+        conn.sourceSide, conn.targetSide, conn.routingType, srcOffset, tgtOffset);
       return { ...conn, waypoints: result.waypoints,
         sourceInvisibleLeader: result.sourceInvisibleLeader,
         targetInvisibleLeader: result.targetInvisibleLeader };
