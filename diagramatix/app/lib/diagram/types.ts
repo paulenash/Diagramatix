@@ -248,5 +248,16 @@ export interface TemplateData {
  *          AI prompts: diagramType field, dictation support.
  *          Process ↔ Collapsed Process conversion.
  *          Theme auto-reapply on snap/delete, auto-tint value chain containers.
+ *    1.7 — BPMN: Event Type conversion dropdown, Trigger rename,
+ *          palette reorder, pool/lane headers 50% wider (45/36px),
+ *          pool height accommodates vertical name text,
+ *          sequence connector rules (S1-S8), Event Expanded Subprocess
+ *          isolation, force-connect override (Shift+Ctrl+Click),
+ *          target highlighting synced with validation,
+ *          message connector task type auto-set (Send/Receive/User),
+ *          nested expanded subprocess shade lightening.
+ *          AI: document attachment, speech dictation.
+ *          UI: zoom slider, PDF title export, select-all on focus,
+ *          no inline edit for events/data elements, Import/Export menu rename.
  */
-export const SCHEMA_VERSION = "1.6";
+export const SCHEMA_VERSION = "1.7";

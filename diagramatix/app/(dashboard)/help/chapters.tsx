@@ -29,7 +29,7 @@ export const CHAPTERS: HelpChapter[] = [
               domain models and more.
             </p>
             <p className="mt-2 text-xs text-gray-500">
-              This guide covers version <strong>1.6</strong>.
+              This guide covers version <strong>1.7</strong>.
             </p>
             <p className="mt-2">
               After signing in you land on the <strong>Dashboard</strong> —
