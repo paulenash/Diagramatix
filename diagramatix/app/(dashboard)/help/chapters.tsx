@@ -964,6 +964,7 @@ export const CHAPTERS: HelpChapter[] = [
                 <tr><td className="py-1.5 pr-4 font-mono text-xs">Shift+lasso</td><td>Add lassoed elements to existing selection</td></tr>
                 <tr><td className="py-1.5 pr-4 font-mono text-xs">Ctrl+click canvas</td><td>Place space-insertion marker (BPMN only)</td></tr>
                 <tr><td className="py-1.5 pr-4 font-mono text-xs">Shift+drag marker</td><td>Insert horizontal or vertical space</td></tr>
+                <tr><td className="py-1.5 pr-4 font-mono text-xs">Shift+Ctrl+click</td><td>Force-connect sequence connector (BPMN)</td></tr>
                 <tr><td className="py-1.5 pr-4 font-mono text-xs">Right-click</td><td>Quick-add popup (BPMN only)</td></tr>
                 <tr><td className="py-1.5 pr-4 font-mono text-xs">Mouse wheel</td><td>Zoom in / out</td></tr>
               </tbody>

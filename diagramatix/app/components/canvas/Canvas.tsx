@@ -1931,7 +1931,7 @@ export function Canvas({
 
     const isOldContainer = el.type === "system-boundary" || el.type === "composite-state" || el.type === "subprocess-expanded" || el.type === "group";
     if (el.type === "pool" || el.type === "lane") {
-      const lw = el.type === "pool" ? 30 : 24;
+      const lw = el.type === "pool" ? 45 : 36;
       setEditingLabel({
         elementId: el.id,
         x: (el.x + lw) * zoom + pan.x,
@@ -4017,14 +4017,15 @@ export function Canvas({
         </div>
       )}
 
-      {/* Zoom slider bar at bottom of canvas */}
+      {/* Zoom slider bar at bottom-right of canvas */}
       {(() => {
         const base = baseZoomRef.current ?? zoom;
         const displayPct = Math.round((zoom / base) * 100);
         const MIN_PCT = 25, MAX_PCT = 250;
 
         function applyZoomPct(pct: number) {
-          const newZ = base * (pct / 100);
+          const clamped = Math.max(MIN_PCT, Math.min(MAX_PCT, pct));
+          const newZ = base * (clamped / 100);
           const rect = svgRef.current?.getBoundingClientRect();
           if (rect) {
             const cx = rect.width / 2, cy = rect.height / 2;
@@ -4034,9 +4035,9 @@ export function Canvas({
         }
 
         return (
-          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-white/90 border border-gray-200 rounded-full px-3 py-1 shadow-sm backdrop-blur-sm z-30 select-none">
+          <div className="absolute bottom-2 right-2 flex items-center gap-1.5 bg-white/90 border border-gray-200 rounded-full px-2 py-1 shadow-sm backdrop-blur-sm z-30 select-none">
             <button
-              onClick={() => applyZoomPct(Math.max(MIN_PCT, displayPct - 10))}
+              onClick={() => applyZoomPct(displayPct - 10)}
               className="text-gray-500 hover:text-gray-800 text-xs font-bold w-5 h-5 flex items-center justify-center"
               title="Zoom out"
             >&minus;</button>
@@ -4046,15 +4047,22 @@ export function Canvas({
               max={MAX_PCT}
               value={Math.min(MAX_PCT, Math.max(MIN_PCT, displayPct))}
               onChange={(e) => applyZoomPct(parseInt(e.target.value))}
-              className="w-32 h-1 accent-blue-500 cursor-pointer"
+              className="w-24 h-1 accent-blue-500 cursor-pointer"
               title={`${displayPct}%`}
             />
             <button
-              onClick={() => applyZoomPct(Math.min(MAX_PCT, displayPct + 10))}
+              onClick={() => applyZoomPct(displayPct + 10)}
               className="text-gray-500 hover:text-gray-800 text-xs font-bold w-5 h-5 flex items-center justify-center"
               title="Zoom in"
             >+</button>
-            <span className="text-[10px] text-gray-500 w-10 text-center tabular-nums">{displayPct}%</span>
+            <input
+              type="text"
+              className="w-10 text-[10px] text-gray-600 text-center border border-gray-300 rounded px-0.5 py-0 bg-white tabular-nums select-text"
+              value={`${displayPct}%`}
+              onFocus={(e) => { e.target.value = String(displayPct); e.target.select(); }}
+              onBlur={(e) => { const v = parseInt(e.target.value); if (!isNaN(v)) applyZoomPct(v); }}
+              onKeyDown={(e) => { if (e.key === "Enter") { const v = parseInt((e.target as HTMLInputElement).value); if (!isNaN(v)) applyZoomPct(v); (e.target as HTMLInputElement).blur(); } }}
+            />
           </div>
         );
       })()}

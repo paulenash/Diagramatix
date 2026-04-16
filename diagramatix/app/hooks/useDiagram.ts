@@ -2402,7 +2402,7 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       const { poolId } = action.payload;
       const pool = state.elements.find((e) => e.id === poolId && e.type === "pool");
       if (!pool) return state;
-      const POOL_LABEL_W = 30;
+      const POOL_LABEL_W = 45;
       const LANE_HEADER_H = 28;
       const MIN_LANE_H = 80;
       const existingLanes = state.elements

@@ -1381,6 +1381,7 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
               </button>
             </>
           )}
+          <a href="/help" className="text-xs text-blue-600 hover:underline ml-1" title="User Guide">User Guide</a>
         </div>
         {projectDescription && (
           <p className="text-[10px] text-gray-500 mt-1 ml-20 truncate" title={projectDescription}>{projectDescription}</p>

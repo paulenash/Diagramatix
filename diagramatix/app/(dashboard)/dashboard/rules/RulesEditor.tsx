@@ -142,9 +142,12 @@ export function RulesEditor({ isAdmin: _isAdmin }: { isAdmin: boolean }) {
           </Link>
           <h1 className="text-lg font-semibold text-gray-900">AI Rules &amp; Preferences</h1>
         </div>
-        <p className="text-xs text-gray-400">
-          Rules are sent with every AI generation request to guide diagram creation
-        </p>
+        <div className="flex items-center gap-3">
+          <p className="text-xs text-gray-400">
+            Rules are sent with every AI generation request to guide diagram creation
+          </p>
+          <Link href="/help" className="text-xs text-blue-600 hover:underline shrink-0">User Guide</Link>
+        </div>
       </header>
 
       <div className="flex-1 flex">

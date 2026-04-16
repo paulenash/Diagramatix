@@ -124,9 +124,12 @@ export function PromptMaintenance() {
           </Link>
           <h1 className="text-lg font-semibold text-gray-900">AI Prompt Maintenance</h1>
         </div>
-        <p className="text-xs text-gray-400">
-          Manage saved prompts for AI diagram generation
-        </p>
+        <div className="flex items-center gap-3">
+          <p className="text-xs text-gray-400">
+            Manage saved prompts for AI diagram generation
+          </p>
+          <a href="/help" className="text-xs text-blue-600 hover:underline shrink-0">User Guide</a>
+        </div>
       </header>
 
       <div className="flex-1 flex">
