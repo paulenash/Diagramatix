@@ -2,13 +2,6 @@
 
 import type { ReactNode } from "react";
 
-export type HelpChapter = {
-  slug: string;
-  title: string;
-  sections: HelpSection[];
-  adminOnly?: boolean;
-};
-
 export type HelpSection = {
   heading?: string;
   body: ReactNode;
@@ -19,30 +12,21 @@ export type HelpSection = {
   imageCaption?: string;
 };
 
-/* ---------- screenshot helper ---------- */
-function Screenshot({
-  src,
-  alt,
-  caption,
-}: {
-  src: string;
-  alt: string;
-  caption?: string;
-}) {
+export type HelpChapter = {
+  slug: string;
+  title: string;
+  sections: HelpSection[];
+  adminOnly?: boolean;
+};
+
+/* ---------- diagram placeholder ---------- */
+function DiagramPlaceholder({ caption }: { caption: string }) {
   return (
-    <figure className="my-4 border border-gray-200 rounded-lg overflow-hidden bg-gray-50">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={src}
-        alt={alt}
-        className="w-full h-auto"
-      />
-      {caption && (
-        <figcaption className="text-xs text-gray-500 px-3 py-2 border-t border-gray-100">
-          {caption}
-        </figcaption>
-      )}
-    </figure>
+    <div className="my-4">
+      <p className="text-sm text-orange-500 font-medium italic">
+        &laquo;Diagram: {caption}&raquo;
+      </p>
+    </div>
   );
 }
 
@@ -60,12 +44,8 @@ export function HelpViewer({ chapter }: { chapter: HelpChapter }) {
             </h3>
           )}
           <div className="text-gray-700 leading-relaxed">{sec.body}</div>
-          {sec.image && (
-            <Screenshot
-              src={sec.image}
-              alt={sec.imageAlt ?? sec.heading ?? "screenshot"}
-              caption={sec.imageCaption}
-            />
+          {sec.imageCaption && (
+            <DiagramPlaceholder caption={sec.imageCaption} />
           )}
         </section>
       ))}

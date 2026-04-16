@@ -266,6 +266,7 @@ export const CHAPTERS: HelpChapter[] = [
             It is an SVG-based surface with pan, zoom and selection.
           </p>
         ),
+        imageCaption: "The canvas with zoom slider, palette, and properties panel.",
       },
       {
         heading: "Panning",
@@ -443,6 +444,7 @@ export const CHAPTERS: HelpChapter[] = [
             obstacle avoidance to produce clean, professional diagrams.
           </p>
         ),
+        imageCaption: "Sequence, message, and association connectors between BPMN elements.",
       },
       {
         heading: "Drawing a connector",
@@ -1704,6 +1706,7 @@ export const CHAPTERS: HelpChapter[] = [
             left-to-right arrangement of processes.
           </p>
         ),
+        imageCaption: "A value chain diagram with themed processes inside a Value Chain container.",
       },
       {
         heading: "Process",
