@@ -153,7 +153,8 @@ interface Props {
     sourceSide: Side,
     targetSide: Side,
     sourceOffsetAlong?: number,
-    targetOffsetAlong?: number
+    targetOffsetAlong?: number,
+    force?: boolean
   ) => void;
   onDeleteConnector: (id: string) => void;
   onUpdateConnectorEndpoint: (
@@ -441,6 +442,15 @@ export function Canvas({
   // already-selected task/subprocess. Cleared by Esc, background click, or
   // successful connector creation.
   const [pendingConnSourceId, setPendingConnSourceId] = useState<string | null>(null);
+
+  // Force-connect override (Shift+Ctrl+Click drag): bypasses all validation
+  const [forceConnect, setForceConnect] = useState<{
+    sourceId: string;
+    dragging: boolean;
+    targetId?: string;
+    screenX?: number;
+    screenY?: number;
+  } | null>(null);
 
   // Group-Connect-to-Gateway support: a click on a gateway clears any
   // pre-existing multi-selection before the double-click event fires. We
@@ -1281,6 +1291,7 @@ export function Canvas({
           onSetSelectedElements(new Set());
           onSelectConnector(null);
           if (pendingConnSourceId) setPendingConnSourceId(null);
+          if (forceConnect) setForceConnect(null);
         }
       }
 
@@ -1905,6 +1916,19 @@ export function Canvas({
   }
 
   function startEditingLabel(el: DiagramElement) {
+    // Events, data objects, data stores: skip inline editor — focus Properties Panel label instead
+    const SKIP_INLINE_EDIT = new Set(["start-event", "intermediate-event", "end-event", "data-store", "data-object"]);
+    if (SKIP_INLINE_EDIT.has(el.type)) {
+      // Element is already selected from the first click — focus the Properties Panel label field
+      setTimeout(() => {
+        const labelField = document.querySelector<HTMLTextAreaElement | HTMLInputElement>(
+          "[data-properties-label]"
+        );
+        if (labelField) { labelField.focus(); labelField.select(); }
+      }, 50);
+      return;
+    }
+
     const isOldContainer = el.type === "system-boundary" || el.type === "composite-state" || el.type === "subprocess-expanded" || el.type === "group";
     if (el.type === "pool" || el.type === "lane") {
       const lw = el.type === "pool" ? 30 : 24;
@@ -2039,6 +2063,7 @@ export function Canvas({
       }
       // Cancel connection-creation mode
       if (pendingConnSourceId) setPendingConnSourceId(null);
+      if (forceConnect) setForceConnect(null);
       // Dismiss right-click popups
       if (quickAdd) setQuickAdd(null);
       if (themePicker) setThemePicker(null);
@@ -2302,6 +2327,40 @@ export function Canvas({
       ? (data.connectors.find((c) => c.id === selectedConnectorId) ?? null)
       : null;
 
+  // Force-connect handler: Shift+Ctrl+Click starts, next click on target creates forced sequence connector
+  function handleForceConnectSelect(elId: string, ev?: React.MouseEvent): boolean {
+    if (diagramType !== "bpmn") return false;
+    // Start force-connect: Shift+Ctrl+Click on an element
+    if (ev?.shiftKey && ev?.ctrlKey) {
+      setForceConnect({ sourceId: elId, dragging: true });
+      onSetSelectedElements(new Set([elId]));
+      return true;
+    }
+    // Complete force-connect: click on target while in force-connect mode
+    if (forceConnect?.dragging && forceConnect.sourceId !== elId) {
+      const src = data.elements.find(e => e.id === forceConnect.sourceId);
+      const tgt = data.elements.find(e => e.id === elId);
+      if (src && tgt) {
+        const srcCx = src.x + src.width / 2;
+        const tgtCx = tgt.x + tgt.width / 2;
+        const srcCy = src.y + src.height / 2;
+        const tgtCy = tgt.y + tgt.height / 2;
+        let srcSide: Side, tgtSide: Side;
+        if (Math.abs(tgtCy - srcCy) > Math.abs(tgtCx - srcCx)) {
+          srcSide = tgtCy > srcCy ? "bottom" : "top";
+          tgtSide = tgtCy > srcCy ? "top" : "bottom";
+        } else {
+          srcSide = "right";
+          tgtSide = "left";
+        }
+        onAddConnector(forceConnect.sourceId, elId, "sequence", "directed", "rectilinear", srcSide, tgtSide, 0.5, 0.5, true);
+      }
+      setForceConnect(null);
+      return true;
+    }
+    return false;
+  }
+
   const endpointHandles = selectedConnector && selectedConnector.waypoints.length >= 2
     ? {
         source: selectedConnector.waypoints[1],                                      // srcEdge
@@ -2331,7 +2390,7 @@ export function Canvas({
 
   return (
     <div
-      className="relative flex-1 overflow-hidden bg-gray-50"
+      className="relative flex-1 overflow-hidden bg-gray-50 select-none"
       style={{
         backgroundImage: "radial-gradient(#d1d5db 1px, transparent 1px)",
         backgroundSize: "20px 20px",
@@ -2472,8 +2531,11 @@ export function Canvas({
                 ((el.properties.poolType as string | undefined) ?? "black-box") === "black-box");
             const isWhiteBoxPool = el.type === "pool" &&
               ((el.properties.poolType as string | undefined) ?? "black-box") === "white-box";
+            const isEventSubprocess = el.type === "subprocess-expanded" &&
+              (el.properties.subprocessType as string | undefined) === "event";
             const isSubExpDropTarget = isDraggingConnector && !draggingSourceIsData &&
               el.type === "subprocess-expanded" &&
+              !isEventSubprocess && // never highlight Event Expanded Subprocesses as sequence targets
               el.id !== draggingConnector!.fromId &&
               el.id !== (draggingSourceEl?.parentId ?? "") && // rule 4: child cannot target its own parent subprocess
               !draggingFromEdgeMountedStartEvent &&
@@ -2506,6 +2568,8 @@ export function Canvas({
                 isAssocBpmnTarget={isSubExpAssocTarget}
                 isElementDragTarget={isElementDragTarget}
                 onSelect={(e) => {
+                  // Force-connect override (Shift+Ctrl+Click)
+                  if (handleForceConnectSelect(el.id, e)) return;
                   // Connection-creation mode: clicking a different element commits the connector
                   if (pendingConnSourceId && el.type !== "initial-state"
                       && (pendingConnSourceId !== el.id || el.type === "state" || el.type === "composite-state" || el.type === "submachine")) {
@@ -2818,9 +2882,23 @@ export function Canvas({
               if (epDragFixedIsData && !elIsData) elIsAssocTarget = true;
               else if (!epDragFixedIsData && elIsData) elIsAssocTarget = true;
             }
-            // Start events are never valid sequence-flow targets, but they
-            // can still be association or message-flow targets.
-            if (el.type === "start-event") elIsDropTarget = false;
+            // Sequence target validation — sync with ADD_CONNECTOR rules
+            // Non-boundary start events cannot be sequence targets (boundary ones CAN from outside)
+            if (el.type === "start-event" && !el.boundaryHostId) elIsDropTarget = false;
+            // Elements inside an Event Expanded Subprocess: no sequence from outside
+            if (elIsDropTarget && el.parentId) {
+              const _elP = data.elements.find(p => p.id === el.parentId);
+              if (_elP?.type === "subprocess-expanded" && (_elP.properties.subprocessType as string | undefined) === "event") {
+                if (draggingConnector && draggingSourceEl?.parentId !== _elP.id) elIsDropTarget = false;
+              }
+            }
+            // Source is inside an Event Expanded Subprocess: no sequence to outside
+            if (elIsDropTarget && draggingSourceEl?.parentId) {
+              const _srcP = data.elements.find(p => p.id === draggingSourceEl!.parentId);
+              if (_srcP?.type === "subprocess-expanded" && (_srcP.properties.subprocessType as string | undefined) === "event") {
+                if (el.parentId !== _srcP.id) elIsDropTarget = false;
+              }
+            }
             return (
             <SymbolRenderer
               key={el.id}
@@ -2831,6 +2909,8 @@ export function Canvas({
               isAssocBpmnTarget={elIsAssocTarget}
               isErrorTarget={errorTargetIds.has(el.id) || obstacleViolationElementIds.has(el.id)}
               onSelect={(ev) => {
+                // Force-connect override (Shift+Ctrl+Click)
+                if (handleForceConnectSelect(el.id, ev)) return;
                 // Group-Connect-to-Gateway: capture pre-click multi-selection
                 if (
                   el.type === "gateway" &&
@@ -2843,7 +2923,7 @@ export function Canvas({
                     expiresAt: Date.now() + GROUP_CONNECT_CAPTURE_MS,
                   };
                 }
-                if (ev?.shiftKey) {
+                if (ev?.shiftKey && !ev?.ctrlKey) {
                   onSetSelectedElements((prev) => { const next = new Set(prev); if (next.has(el.id)) next.delete(el.id); else next.add(el.id); return next; });
                 } else if (!selectedElementIds.has(el.id)) {
                   onSetSelectedElements(new Set([el.id]));
@@ -2994,9 +3074,23 @@ export function Canvas({
               if (epDragFixedIsData && !elIsData) elIsAssocTarget = true;
               else if (!epDragFixedIsData && elIsData) elIsAssocTarget = true;
             }
-            // Start events are never valid sequence-flow targets, but they
-            // can still be association or message-flow targets.
-            if (el.type === "start-event") elIsDropTarget = false;
+            // Sequence target validation — sync with ADD_CONNECTOR rules
+            // Non-boundary start events cannot be sequence targets (boundary ones CAN from outside)
+            if (el.type === "start-event" && !el.boundaryHostId) elIsDropTarget = false;
+            // Elements inside an Event Expanded Subprocess: no sequence from outside
+            if (elIsDropTarget && el.parentId) {
+              const _elP = data.elements.find(p => p.id === el.parentId);
+              if (_elP?.type === "subprocess-expanded" && (_elP.properties.subprocessType as string | undefined) === "event") {
+                if (draggingConnector && draggingSourceEl?.parentId !== _elP.id) elIsDropTarget = false;
+              }
+            }
+            // Source is inside an Event Expanded Subprocess: no sequence to outside
+            if (elIsDropTarget && draggingSourceEl?.parentId) {
+              const _srcP = data.elements.find(p => p.id === draggingSourceEl!.parentId);
+              if (_srcP?.type === "subprocess-expanded" && (_srcP.properties.subprocessType as string | undefined) === "event") {
+                if (el.parentId !== _srcP.id) elIsDropTarget = false;
+              }
+            }
             return (
               <SymbolRenderer
                 key={el.id}
@@ -3007,6 +3101,8 @@ export function Canvas({
                 isMessageBpmnTarget={elIsMsgTarget}
                 isAssocBpmnTarget={elIsAssocTarget}
                 onSelect={(ev) => {
+                  // Force-connect override (Shift+Ctrl+Click)
+                  if (handleForceConnectSelect(el.id, ev)) return;
                   if (pendingConnSourceId && el.type !== "initial-state"
                       && (pendingConnSourceId !== el.id || el.type === "state" || el.type === "composite-state" || el.type === "submachine")) {
                     onAddConnector(
@@ -3900,6 +3996,13 @@ export function Canvas({
           >
             Association
           </button>
+        </div>
+      )}
+
+      {/* Force-connect mode indicator */}
+      {forceConnect?.dragging && (
+        <div className="absolute top-2 left-1/2 -translate-x-1/2 bg-orange-500 text-white text-[10px] font-medium px-3 py-1 rounded-full shadow-sm z-30 select-none animate-pulse">
+          Force Connect: click target element (Esc to cancel)
         </div>
       )}
 

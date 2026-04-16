@@ -1383,6 +1383,7 @@ export function PropertiesPanel({
           element.type === "pool" || element.type === "lane") ? (
             <textarea
               key={element.id}
+              data-properties-label="true"
               className="w-full px-1.5 py-1 border border-gray-300 rounded text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-500 resize-y overflow-y-auto"
               rows={element.type === "chevron" || element.type === "chevron-collapsed" ? 3 : 2}
               value={labelDraft}
@@ -1406,6 +1407,7 @@ export function PropertiesPanel({
         ) : (
           <input
             type="text"
+            data-properties-label="true"
             value={labelDraft}
             onFocus={(e) => e.target.select()}
             onChange={(e) => setLabelDraft(e.target.value)}

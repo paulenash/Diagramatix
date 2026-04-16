@@ -1660,6 +1660,7 @@ export function SymbolRenderer({
       onMouseDown={handleMouseDown}
       onDoubleClick={(e) => {
         e.stopPropagation();
+        e.preventDefault();
         // For pools, only trigger label edit when double-clicking the header strip (left 45px)
         if (element.type === "pool" && svgToWorld) {
           const world = svgToWorld(e.clientX, e.clientY);

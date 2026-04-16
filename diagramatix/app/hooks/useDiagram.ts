@@ -154,6 +154,7 @@ type Action =
       targetSide: Side;
       sourceOffsetAlong?: number;
       targetOffsetAlong?: number;
+      force?: boolean;
     }}
   | { type: "DELETE_CONNECTOR"; payload: { id: string } }
   | { type: "UPDATE_CONNECTOR_ENDPOINT"; payload: {
@@ -1561,22 +1562,86 @@ function reducer(state: DiagramData, action: Action): DiagramData {
     }
 
     case "ADD_CONNECTOR": {
-      const { sourceId, targetId, connectorType, directionType, routingType, sourceSide, targetSide, sourceOffsetAlong, targetOffsetAlong } = action.payload;
+      const { sourceId, targetId, connectorType, directionType, routingType, sourceSide, targetSide, sourceOffsetAlong, targetOffsetAlong, force } = action.payload;
       const source = state.elements.find((el) => el.id === sourceId);
       const target = state.elements.find((el) => el.id === targetId);
       if (!source || !target) return state;
+
+      // Data elements may only use associationBPMN connectors
+      const isDataConn = DATA_ELEMENT_TYPES.has(source.type) || DATA_ELEMENT_TYPES.has(target.type);
+
+      // Force mode: skip all validation (used by Shift+Ctrl+Click override)
+      if (!force) {
 
       // State-machine rules: never connect FROM a final-state or TO an initial-state
       if (source.type === "final-state") return state;
       if (target.type === "initial-state") return state;
 
-      // Data elements may only use associationBPMN connectors
-      const isDataConn = DATA_ELEMENT_TYPES.has(source.type) || DATA_ELEMENT_TYPES.has(target.type);
       if (isDataConn && connectorType !== "associationBPMN") return state;
       // Allow associationBPMN between event elements (child/boundary event connections)
       const EVENT_CONN_TYPES = new Set<SymbolType>(["start-event", "intermediate-event", "end-event"]);
       const isEventToEvent = EVENT_CONN_TYPES.has(source.type) && EVENT_CONN_TYPES.has(target.type);
       if (!isDataConn && !isEventToEvent && connectorType === "associationBPMN") return state;
+
+      // ── BPMN sequence connector rules ──
+      const isSeqConn = connectorType === "sequence";
+      if (isSeqConn) {
+        // Helper: find the expanded subprocess ancestor of an element
+        const findExpandedSubParent = (el: DiagramElement): DiagramElement | undefined => {
+          let cur = el;
+          for (let i = 0; i < 10; i++) {
+            if (!cur.parentId) return undefined;
+            const parent = state.elements.find(e => e.id === cur.parentId);
+            if (!parent) return undefined;
+            if (parent.type === "subprocess-expanded") return parent;
+            cur = parent;
+          }
+          return undefined;
+        };
+        const isEventExpandedSub = (el: DiagramElement) =>
+          el.type === "subprocess-expanded" &&
+          (el.properties.subprocessType as string | undefined) === "event";
+
+        // Rule: No sequence connector TO a non-boundary start event
+        // (boundary start events CAN receive sequence from outside their host subprocess)
+        if (target.type === "start-event" && !target.boundaryHostId) return state;
+
+        // Rule: No sequence connector FROM an end event (end events have no outgoing sequence)
+        // Exception: boundary-mounted end events can't connect inside either (handled below)
+        if (source.type === "end-event" && !source.boundaryHostId) return state;
+
+        // Rule: No sequence connector TO or FROM an Event Expanded Subprocess
+        if (isEventExpandedSub(target)) return state;
+        if (isEventExpandedSub(source)) return state;
+        const targetParentExp = findExpandedSubParent(target);
+        if (targetParentExp && isEventExpandedSub(targetParentExp)) {
+          // Target is inside an event subprocess — only allow if source is also inside the same one
+          const sourceParentExp = findExpandedSubParent(source);
+          if (sourceParentExp?.id !== targetParentExp.id) return state;
+        }
+
+        // Rule: Nothing inside an Event Expanded Subprocess can connect out
+        const sourceParentExp = findExpandedSubParent(source);
+        if (sourceParentExp && isEventExpandedSub(sourceParentExp)) {
+          const targetParentExp2 = findExpandedSubParent(target);
+          if (targetParentExp2?.id !== sourceParentExp.id) return state;
+        }
+
+        // Rule: Edge-mounted End/Intermediate events cannot connect inside their host subprocess
+        if (source.boundaryHostId && (source.type === "end-event" || source.type === "intermediate-event")) {
+          const hostSub = state.elements.find(e => e.id === source.boundaryHostId);
+          if (hostSub) {
+            // Check if target is inside the host subprocess
+            let cur: DiagramElement | undefined = target;
+            for (let i = 0; i < 10 && cur; i++) {
+              if (cur.id === hostSub.id || cur.parentId === hostSub.id) return state;
+              cur = cur.parentId ? state.elements.find(e => e.id === cur!.parentId) : undefined;
+            }
+          }
+        }
+      }
+
+      } // end if (!force)
 
       const { waypoints, sourceInvisibleLeader, targetInvisibleLeader } =
         connectorType === "messageBPMN"
@@ -1668,15 +1733,42 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       };
 
       const isSeq = connectorType === "sequence";
+      // Determine if the other end of a message connector is a system pool
+      function findPoolOf(el: DiagramElement): DiagramElement | undefined {
+        if (el.type === "pool") return el;
+        let cur = el;
+        for (let i = 0; i < 10; i++) {
+          if (!cur.parentId) break;
+          const parent = state.elements.find(e => e.id === cur.parentId);
+          if (!parent) break;
+          if (parent.type === "pool") return parent;
+          cur = parent;
+        }
+        return state.elements.find(e => e.type === "pool"
+          && el.x >= e.x && el.x + el.width <= e.x + e.width
+          && el.y >= e.y && el.y + el.height <= e.y + e.height);
+      }
+      const isSystemPool = (el: DiagramElement): boolean => {
+        const pool = findPoolOf(el);
+        return !!pool && !!pool.properties.isSystem;
+      };
+
       const updatedElements = state.elements.map((el) => {
         if (isMsgBpmn) {
+          // For tasks: system pool → "user", non-system pool → "send"/"receive"
           if (el.id === sourceId) {
-            if (el.type === "task")               return { ...el, taskType: "send" as BpmnTaskType };
+            if (el.type === "task") {
+              const otherIsSystem = isSystemPool(target);
+              return { ...el, taskType: (otherIsSystem ? "user" : "send") as BpmnTaskType };
+            }
             if (el.type === "end-event")          return { ...el, eventType: "message" as EventType, flowType: "throwing" as FlowType };
             if (el.type === "intermediate-event") return { ...el, eventType: "message" as EventType, taskType: "send" as BpmnTaskType, flowType: "throwing" as FlowType };
           }
           if (el.id === targetId) {
-            if (el.type === "task")               return { ...el, taskType: "receive" as BpmnTaskType };
+            if (el.type === "task") {
+              const otherIsSystem = isSystemPool(source);
+              return { ...el, taskType: (otherIsSystem ? "user" : "receive") as BpmnTaskType };
+            }
             if (el.type === "start-event")        return { ...el, eventType: "message" as EventType, flowType: "catching" as FlowType };
             if (el.type === "intermediate-event") return { ...el, eventType: "message" as EventType, flowType: "catching" as FlowType };
           }
@@ -2859,12 +2951,13 @@ export function useDiagram(initialData: DiagramData) {
       sourceSide: Side = "right",
       targetSide: Side = "left",
       sourceOffsetAlong?: number,
-      targetOffsetAlong?: number
+      targetOffsetAlong?: number,
+      force?: boolean
     ) => {
       pushHistory(snapshotData());
       dispatch({
         type: "ADD_CONNECTOR",
-        payload: { sourceId, targetId, connectorType, directionType, routingType, sourceSide, targetSide, sourceOffsetAlong, targetOffsetAlong },
+        payload: { sourceId, targetId, connectorType, directionType, routingType, sourceSide, targetSide, sourceOffsetAlong, targetOffsetAlong, force },
       });
     },
     []
