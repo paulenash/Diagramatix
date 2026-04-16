@@ -990,6 +990,26 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
     }));
   }
 
+  /** Expand or collapse all descendant folders under a given parent */
+  function setAllDescendantsCollapsed(parentId: string, collapsed: boolean) {
+    // Collect all descendant folder IDs
+    const descendantIds = new Set<string>();
+    function collect(pid: string) {
+      for (const f of folderTree.folders) {
+        if ((f.parentId ?? ROOT_ID) === pid && !descendantIds.has(f.id)) {
+          descendantIds.add(f.id);
+          collect(f.id);
+        }
+      }
+    }
+    collect(parentId);
+    if (descendantIds.size === 0) return;
+    updateTree(t => ({
+      ...t,
+      folders: t.folders.map(f => descendantIds.has(f.id) ? { ...f, collapsed } : f),
+    }));
+  }
+
   function moveDiagramToFolder(diagramId: string, folderId: string) {
     updateTree(t => {
       const map = { ...t.diagramFolderMap };
@@ -1083,10 +1103,10 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
             if (dragDiagramId) { moveDiagramToFolder(dragDiagramId, folderId); setDragDiagramId(null); }
           }}
         >
-          {hasChildren && !isRoot ? (
+          {hasChildren ? (
             <span className="w-3 text-center text-gray-400 cursor-pointer text-[9px]"
-              onClick={(e) => { e.stopPropagation(); toggleFolderCollapse(folderId); }}>
-              {isCollapsed ? "\u25B6" : "\u25BC"}
+              onClick={(e) => { e.stopPropagation(); if (isRoot) { /* root always open */ } else toggleFolderCollapse(folderId); }}>
+              {isRoot ? "\u25BC" : isCollapsed ? "\u25B6" : "\u25BC"}
             </span>
           ) : <span className="w-3" />}
           {/* Folder icon */}
@@ -1102,7 +1122,7 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
               onClick={e => e.stopPropagation()}
               className="flex-1 text-[11px] font-medium border border-blue-400 rounded px-1 py-0 outline-none min-w-0" />
           ) : (
-            <span className="truncate flex-1 font-medium">{name}</span>
+            <span className="truncate flex-1 font-medium" title={name}>{name}</span>
           )}
           {/* Refresh icon on root folder */}
           {isRoot && (
@@ -1130,6 +1150,24 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
             title="Add subfolder"
             style={{ opacity: selectedTreeItem === folderId || isSelected ? 1 : undefined }}
           >+</button>
+          {childFolders.length > 0 && (
+            <>
+              <button onClick={(e) => { e.stopPropagation(); setAllDescendantsCollapsed(folderId, false); }}
+                className="opacity-0 group-hover:opacity-100 hover:!opacity-100 text-gray-400 hover:text-blue-500 text-[9px] px-0.5"
+                title="Expand all subfolders"
+                style={{ opacity: selectedTreeItem === folderId || isSelected ? 1 : undefined }}
+              >
+                <svg width={10} height={10} viewBox="0 0 16 16" fill="currentColor"><path d="M1 4l7 8 7-8H1z" /></svg>
+              </button>
+              <button onClick={(e) => { e.stopPropagation(); setAllDescendantsCollapsed(folderId, true); }}
+                className="opacity-0 group-hover:opacity-100 hover:!opacity-100 text-gray-400 hover:text-blue-500 text-[9px] px-0.5"
+                title="Collapse all subfolders"
+                style={{ opacity: selectedTreeItem === folderId || isSelected ? 1 : undefined }}
+              >
+                <svg width={10} height={10} viewBox="0 0 16 16" fill="currentColor"><path d="M4 1l8 7-8 7V1z" /></svg>
+              </button>
+            </>
+          )}
           {!isRoot && (() => {
             const hasContent = folderHasContent(folderId);
             return (
@@ -1184,7 +1222,7 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
                     className="flex-1 text-[10px] border border-blue-400 rounded px-1 py-0 outline-none min-w-0" />
                 ) : (
                   <>
-                    <span className="truncate flex-1">{d.name}</span>
+                    <span className="truncate flex-1" title={d.name}>{d.name}</span>
                     <button onClick={(e) => { e.stopPropagation(); startRename(d.id, d.name); }}
                       className="opacity-0 group-hover:opacity-100 hover:!opacity-100 text-gray-400 hover:text-blue-500 px-0.5"
                       title="Rename diagram"
