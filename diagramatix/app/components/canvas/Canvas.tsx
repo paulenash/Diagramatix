@@ -1931,7 +1931,7 @@ export function Canvas({
 
     const isOldContainer = el.type === "system-boundary" || el.type === "composite-state" || el.type === "subprocess-expanded" || el.type === "group";
     if (el.type === "pool" || el.type === "lane") {
-      const lw = el.type === "pool" ? 45 : 36;
+      const lw = 36; // same header width for pools and lanes
       setEditingLabel({
         elementId: el.id,
         x: (el.x + lw) * zoom + pan.x,
@@ -4057,11 +4057,14 @@ export function Canvas({
             >+</button>
             <input
               type="text"
-              className="w-10 text-[10px] text-gray-600 text-center border border-gray-300 rounded px-0.5 py-0 bg-white tabular-nums select-text"
-              value={`${displayPct}%`}
+              className="w-10 text-[10px] text-gray-600 text-center border border-gray-300 rounded px-0.5 py-0 bg-white tabular-nums"
+              style={{ userSelect: "text" }}
+              key={`zoom-${displayPct}`}
+              defaultValue={`${displayPct}%`}
+              onMouseDown={(e) => e.stopPropagation()}
               onFocus={(e) => { e.target.value = String(displayPct); e.target.select(); }}
               onBlur={(e) => { const v = parseInt(e.target.value); if (!isNaN(v)) applyZoomPct(v); }}
-              onKeyDown={(e) => { if (e.key === "Enter") { const v = parseInt((e.target as HTMLInputElement).value); if (!isNaN(v)) applyZoomPct(v); (e.target as HTMLInputElement).blur(); } }}
+              onKeyDown={(e) => { if (e.key === "Enter") { const v = parseInt((e.target as HTMLInputElement).value); if (!isNaN(v)) applyZoomPct(v); (e.target as HTMLInputElement).blur(); } if (e.key === "Escape") (e.target as HTMLInputElement).blur(); }}
             />
           </div>
         );

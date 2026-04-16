@@ -1280,7 +1280,7 @@ function PoolShape({ el }: { el: DiagramElement }) {
   const colors = useContext(SymbolColorCtx);
   const fsc = useContext(FontScaleCtx);
   const { x, y, width: w, height: h } = el;
-  const LW = 45;
+  const LW = 36;
   const cx = x + LW / 2 + 3;
   const cy = y + h / 2;
   const lines = el.label.split('\n');
@@ -1661,10 +1661,10 @@ export function SymbolRenderer({
       onDoubleClick={(e) => {
         e.stopPropagation();
         e.preventDefault();
-        // For pools, only trigger label edit when double-clicking the header strip (left 45px)
+        // For pools, only trigger label edit when double-clicking the header strip (left 36px)
         if (element.type === "pool" && svgToWorld) {
           const world = svgToWorld(e.clientX, e.clientY);
-          if (world.x > element.x + 45) return;
+          if (world.x > element.x + 36) return;
         }
         onDoubleClick();
       }}

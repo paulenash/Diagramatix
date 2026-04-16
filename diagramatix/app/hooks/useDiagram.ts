@@ -722,7 +722,7 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       // Pools: place header near the drop point instead of centring the full width
       const isPool = action.payload.symbolType === "pool";
       const dropX = isPool
-        ? action.payload.position.x - 22  // header is 45px wide, put its centre at drop
+        ? action.payload.position.x - 18  // header is 36px wide, put its centre at drop
         : action.payload.position.x - def.defaultWidth / 2;
       const dropY = action.payload.position.y - def.defaultHeight / 2;
 
@@ -1382,6 +1382,44 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         });
         return { ...state, elements: resizedElements, connectors };
       }
+      // Auto-resize pool height to fit vertical label text + buffer
+      if (labelEl && labelEl.type === "pool") {
+        const label = action.payload.label;
+        const textH = label.length * 7 + 20; // ~7px per char + 10px buffer each side
+        const hasLanes = elements.some(e => e.type === "lane" && e.parentId === labelEl.id);
+        // Only auto-resize if the pool has no lanes (black-box or empty white-box)
+        if (!hasLanes) {
+          const minH = Math.max(50, textH);
+          if (labelEl.height < minH) {
+            const resized = elements.map(e =>
+              e.id === labelEl.id ? { ...e, height: minH } : e
+            );
+            return { ...state, elements: resized };
+          }
+        } else {
+          // With lanes: expand lanes if pool is too short for the label
+          const totalLaneH = elements
+            .filter(e => e.type === "lane" && e.parentId === labelEl.id)
+            .reduce((s, e) => s + e.height, 0);
+          if (totalLaneH < textH) {
+            const extra = textH - totalLaneH;
+            const lanes = elements.filter(e => e.type === "lane" && e.parentId === labelEl.id);
+            const perLane = Math.ceil(extra / lanes.length);
+            let offsetY = 0;
+            const resized = elements.map(e => {
+              if (e.type === "lane" && e.parentId === labelEl.id) {
+                const newH = e.height + perLane;
+                const newE = { ...e, y: e.y + offsetY, height: newH };
+                offsetY += perLane;
+                return newE;
+              }
+              if (e.id === labelEl.id) return { ...e, height: totalLaneH + extra };
+              return e;
+            });
+            return { ...state, elements: resized };
+          }
+        }
+      }
       return { ...state, elements };
     }
 
@@ -1445,7 +1483,7 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         const parent = elements.find((e) => e.id === el.parentId);
         if (parent) {
           const parentIsPool = parent.type === "pool";
-          const headerW = parentIsPool ? 45 : 36;
+          const headerW = 36; // same for pools and lanes
           const siblings = elements
             .filter((e) => e.type === "lane" && e.parentId === parent.id)
             .sort((a, b) => a.y - b.y);
@@ -2402,7 +2440,7 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       const { poolId } = action.payload;
       const pool = state.elements.find((e) => e.id === poolId && e.type === "pool");
       if (!pool) return state;
-      const POOL_LABEL_W = 45;
+      const POOL_LABEL_W = 36;
       const LANE_HEADER_H = 28;
       const MIN_LANE_H = 80;
       const existingLanes = state.elements

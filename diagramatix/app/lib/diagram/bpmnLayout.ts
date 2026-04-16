@@ -28,7 +28,7 @@ export interface AiConnection {
 }
 
 // Layout constants
-const POOL_HEADER_W = 45;
+const POOL_HEADER_W = 36;
 const LANE_H = 120;
 const LANE_PAD_X = 50; // extra padding to clear lane header text
 const BLACK_BOX_H = 50;
