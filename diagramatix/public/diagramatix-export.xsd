@@ -398,6 +398,25 @@
       Expanded Subprocesses of type event or transaction excluded from auto-connect.
       Nested expanded subprocesses lighten in shade (25% per level toward white).
 
+    BPMN sequence connector rules (schema 1.6):
+      S1: No sequence TO a non-boundary start event (auto-converts to intermediate).
+      S2: Sequence TO a boundary start event IS allowed (from outside the host subprocess).
+      S3: No sequence FROM a non-boundary end event (auto-converts to intermediate).
+      S4: No sequence TO or FROM an Event Expanded Subprocess.
+      S5: No sequence TO anything inside an Event Expanded Subprocess (from outside).
+      S6: No sequence FROM anything inside an Event Expanded Subprocess (to outside).
+      S7: Internal connections within an Event Expanded Subprocess ARE allowed.
+      S8: Edge-mounted End/Intermediate Events cannot connect INTO their host subprocess.
+      R23: Task type auto-set on message connector: non-System pool → Send/Receive,
+           System pool → User regardless of direction.
+      Force-connect override: Shift+Ctrl+Click bypasses all validation rules.
+      Target highlighting synced with validation: green highlights match actual connectable targets.
+
+    BPMN palette order (schema 1.6):
+      Start, Intermediate, End, Task, Subprocess, Expanded Sub, Gateway, Pool,
+      Data Object, Data Store, Annotation, Group.
+    Pool/Lane header widths: Pool 45px, Lane/Sublane 36px (50% wider than original).
+
     AI generation features (schema 1.6):
       All diagram types support AI-assisted generation via the AI Generate panel.
       Users can type a prompt, dictate via speech-to-text, or attach a document

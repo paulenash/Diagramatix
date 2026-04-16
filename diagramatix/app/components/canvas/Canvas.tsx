@@ -2207,6 +2207,15 @@ export function Canvas({
   const draggingSourceBoundaryHostId = draggingSourceEl?.boundaryHostId ?? null;
   // State-machine: no connections FROM final-state or TO initial-state
   const draggingFromFinalState = draggingSourceEl?.type === "final-state";
+  // BPMN: no sequence from Event Expanded Subprocess
+  const draggingFromEventSubprocess = draggingSourceEl?.type === "subprocess-expanded" &&
+    (draggingSourceEl.properties.subprocessType as string | undefined) === "event";
+  // BPMN: no sequence from inside an Event Expanded Subprocess to outside
+  const draggingFromInsideEventSubprocess = (() => {
+    if (!draggingSourceEl?.parentId) return false;
+    const p = data.elements.find(e => e.id === draggingSourceEl!.parentId);
+    return p?.type === "subprocess-expanded" && (p.properties.subprocessType as string | undefined) === "event";
+  })();
   const CHILD_EVENT_TYPES_HIGHLIGHT = new Set(["start-event", "intermediate-event", "end-event"]);
   // Compute ancestor IDs for dragging source (treating boundaryHostId as parent)
   const draggingSourceAncestorIds = (() => {
@@ -2536,6 +2545,8 @@ export function Canvas({
             const isSubExpDropTarget = isDraggingConnector && !draggingSourceIsData &&
               el.type === "subprocess-expanded" &&
               !isEventSubprocess && // never highlight Event Expanded Subprocesses as sequence targets
+              !draggingFromEventSubprocess && // Event Expanded Subprocesses cannot create sequence connectors
+              !draggingFromInsideEventSubprocess && // elements inside Event subprocesses cannot connect out
               el.id !== draggingConnector!.fromId &&
               el.id !== (draggingSourceEl?.parentId ?? "") && // rule 4: child cannot target its own parent subprocess
               !draggingFromEdgeMountedStartEvent &&
@@ -2885,18 +2896,18 @@ export function Canvas({
             // Sequence target validation — sync with ADD_CONNECTOR rules
             // Non-boundary start events cannot be sequence targets (boundary ones CAN from outside)
             if (el.type === "start-event" && !el.boundaryHostId) elIsDropTarget = false;
-            // Elements inside an Event Expanded Subprocess: no sequence from outside
+            // Event Expanded Subprocess as source: no sequence to anything
+            if (elIsDropTarget && draggingFromEventSubprocess) elIsDropTarget = false;
+            // Source inside an Event Expanded Subprocess: no sequence to outside
+            if (elIsDropTarget && draggingFromInsideEventSubprocess) {
+              const srcParent = data.elements.find(p => p.id === draggingSourceEl!.parentId);
+              if (srcParent && el.parentId !== srcParent.id) elIsDropTarget = false;
+            }
+            // Target inside an Event Expanded Subprocess: no sequence from outside
             if (elIsDropTarget && el.parentId) {
               const _elP = data.elements.find(p => p.id === el.parentId);
               if (_elP?.type === "subprocess-expanded" && (_elP.properties.subprocessType as string | undefined) === "event") {
                 if (draggingConnector && draggingSourceEl?.parentId !== _elP.id) elIsDropTarget = false;
-              }
-            }
-            // Source is inside an Event Expanded Subprocess: no sequence to outside
-            if (elIsDropTarget && draggingSourceEl?.parentId) {
-              const _srcP = data.elements.find(p => p.id === draggingSourceEl!.parentId);
-              if (_srcP?.type === "subprocess-expanded" && (_srcP.properties.subprocessType as string | undefined) === "event") {
-                if (el.parentId !== _srcP.id) elIsDropTarget = false;
               }
             }
             return (
@@ -3077,18 +3088,18 @@ export function Canvas({
             // Sequence target validation — sync with ADD_CONNECTOR rules
             // Non-boundary start events cannot be sequence targets (boundary ones CAN from outside)
             if (el.type === "start-event" && !el.boundaryHostId) elIsDropTarget = false;
-            // Elements inside an Event Expanded Subprocess: no sequence from outside
+            // Event Expanded Subprocess as source: no sequence to anything
+            if (elIsDropTarget && draggingFromEventSubprocess) elIsDropTarget = false;
+            // Source inside an Event Expanded Subprocess: no sequence to outside
+            if (elIsDropTarget && draggingFromInsideEventSubprocess) {
+              const srcParent = data.elements.find(p => p.id === draggingSourceEl!.parentId);
+              if (srcParent && el.parentId !== srcParent.id) elIsDropTarget = false;
+            }
+            // Target inside an Event Expanded Subprocess: no sequence from outside
             if (elIsDropTarget && el.parentId) {
               const _elP = data.elements.find(p => p.id === el.parentId);
               if (_elP?.type === "subprocess-expanded" && (_elP.properties.subprocessType as string | undefined) === "event") {
                 if (draggingConnector && draggingSourceEl?.parentId !== _elP.id) elIsDropTarget = false;
-              }
-            }
-            // Source is inside an Event Expanded Subprocess: no sequence to outside
-            if (elIsDropTarget && draggingSourceEl?.parentId) {
-              const _srcP = data.elements.find(p => p.id === draggingSourceEl!.parentId);
-              if (_srcP?.type === "subprocess-expanded" && (_srcP.properties.subprocessType as string | undefined) === "event") {
-                if (el.parentId !== _srcP.id) elIsDropTarget = false;
               }
             }
             return (

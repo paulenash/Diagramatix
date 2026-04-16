@@ -599,6 +599,82 @@ export const CHAPTERS: HelpChapter[] = [
         ),
       },
       {
+        heading: "BPMN sequence connector rules",
+        body: (
+          <ul className="list-disc list-inside space-y-1">
+            <li>
+              Never auto-connect <strong>TO</strong> a Start Event
+              (exception: boundary-mounted start events can receive
+              from outside their host subprocess).
+            </li>
+            <li>
+              Never auto-connect <strong>FROM</strong> an End Event.
+            </li>
+            <li>
+              No sequence connectors <strong>to or from</strong> an
+              Event Expanded Subprocess.
+            </li>
+            <li>
+              No sequence connectors <strong>into or out of</strong> an
+              Event Expanded Subprocess — internal connections only.
+            </li>
+            <li>
+              Edge-mounted End/Intermediate Events cannot connect{" "}
+              <strong>inside</strong> their host subprocess.
+            </li>
+            <li>
+              Target highlighting (green) is synced with these rules —
+              only valid targets are highlighted.
+            </li>
+          </ul>
+        ),
+      },
+      {
+        heading: "BPMN message connector behaviour",
+        body: (
+          <ul className="list-disc list-inside space-y-1">
+            <li>
+              Connecting a task to a <strong>non-System</strong> black-box
+              pool sets the task type to <strong>Send</strong> (source)
+              or <strong>Receive</strong> (target).
+            </li>
+            <li>
+              Connecting a task to a <strong>System</strong> black-box
+              pool sets the task type to <strong>User</strong> regardless
+              of direction.
+            </li>
+          </ul>
+        ),
+      },
+      {
+        heading: "Force-connect override (BPMN)",
+        body: (
+          <>
+            <p>
+              To create a sequence connector that bypasses all validation
+              rules:
+            </p>
+            <ol className="list-decimal list-inside space-y-1 mt-2">
+              <li>
+                Click to select the <strong>source</strong> element.
+              </li>
+              <li>
+                <strong>Shift+Ctrl+Click</strong> the source — an orange
+                &ldquo;Force Connect&rdquo; banner appears.
+              </li>
+              <li>
+                Click the <strong>target</strong> element — a forced
+                sequence connector is created.
+              </li>
+            </ol>
+            <p className="mt-2">
+              Press <strong>Escape</strong> or click the background to
+              cancel force-connect mode.
+            </p>
+          </>
+        ),
+      },
+      {
         heading: "Cancelling auto-connect",
         body: (
           <p>
@@ -1932,6 +2008,25 @@ export const CHAPTERS: HelpChapter[] = [
               and connectors are preserved. Task→Subprocess clears the
               task type; Subprocess→Task sets task type to None and clears
               the linked diagram.
+            </p>
+          </>
+        ),
+      },
+      {
+        heading: "Event Type conversion (BPMN)",
+        body: (
+          <>
+            <p>
+              All BPMN events show an <strong>Event Type</strong> dropdown
+              in the Properties Panel with options: Start, Intermediate, End.
+              Selecting a different type converts the event in place.
+            </p>
+            <p className="mt-2">
+              Label, position, and connectors are preserved. Invalid triggers
+              are cleared on conversion (e.g. Timer cleared when converting
+              to End Event, Terminate cleared when converting away from End).
+              The former &ldquo;Event Type&rdquo; dropdown is now called{" "}
+              <strong>Trigger</strong> (Message, Timer, Error, etc.).
             </p>
           </>
         ),
