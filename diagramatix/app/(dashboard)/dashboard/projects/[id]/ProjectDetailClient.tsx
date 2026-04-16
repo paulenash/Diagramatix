@@ -1291,7 +1291,7 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
                     ? "Exporting\u2026"
                     : importing
                       ? "Importing\u2026"
-                      : "File \u25BE"}
+                      : "Import/Export \u25BE"}
                 </button>
                 {showFileMenu && (
                   <div
