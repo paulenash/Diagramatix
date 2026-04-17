@@ -9,15 +9,19 @@ import { computeWaypoints } from "./routing";
 
 export interface AiElement {
   id: string;
-  type: string; // "start-event" | "end-event" | "task" | "gateway" | "subprocess" | "intermediate-event" | "pool" | "lane"
+  type: string; // "start-event" | "end-event" | "task" | "gateway" | "subprocess" | "subprocess-expanded" | "intermediate-event" | "pool" | "lane" | "data-object" | "data-store" | "text-annotation" | "group"
   label: string;
   taskType?: string;
   gatewayType?: string;
   eventType?: string;
-  pool?: string;      // pool ID this element belongs to
-  lane?: string;      // lane ID this element belongs to
-  poolType?: string;  // "white-box" | "black-box"
+  pool?: string;              // pool ID this element belongs to
+  lane?: string;              // lane ID this element belongs to
+  poolType?: string;          // "white-box" | "black-box"
   lanes?: { id: string; name: string }[];  // lanes within a pool
+  parentSubprocess?: string;  // subprocess-expanded ID this element belongs to
+  boundaryHost?: string;      // host element ID for edge-mounted events
+  boundarySide?: "left" | "right" | "top" | "bottom"; // where on the host boundary
+  parentPool?: string;        // for lanes — the pool they belong to
 }
 
 export interface AiConnection {
@@ -48,8 +52,10 @@ export function layoutBpmnDiagram(
   // Separate pools from other elements
   const pools = aiElements.filter(e => e.type === "pool");
   const lanes = aiElements.filter(e => e.type === "lane");
+  // Flow elements = top-level BPMN content (exclude subprocess children and boundary events — these are placed separately)
   const flowElements = aiElements.filter(e =>
-    e.type !== "pool" && e.type !== "lane"
+    e.type !== "pool" && e.type !== "lane" &&
+    !e.parentSubprocess && !e.boundaryHost
   );
 
   // If no pools defined, create a simple left-to-right layout
@@ -287,6 +293,129 @@ export function layoutBpmnDiagram(
       properties: { poolType: "black-box", isSystem: true },
     });
     curY += bbH + POOL_GAP;
+  }
+
+  // ── Handle children of expanded subprocesses and edge-mounted boundary events ──
+  // Find all expanded subprocesses that have declared children
+  const subprocessChildren = new Map<string, AiElement[]>();
+  const boundaryEvents = new Map<string, AiElement[]>(); // hostId → events
+  for (const ai of aiElements) {
+    if (ai.parentSubprocess) {
+      if (!subprocessChildren.has(ai.parentSubprocess)) subprocessChildren.set(ai.parentSubprocess, []);
+      subprocessChildren.get(ai.parentSubprocess)!.push(ai);
+    }
+    if (ai.boundaryHost) {
+      if (!boundaryEvents.has(ai.boundaryHost)) boundaryEvents.set(ai.boundaryHost, []);
+      boundaryEvents.get(ai.boundaryHost)!.push(ai);
+    }
+  }
+
+  // For each expanded subprocess with children, enlarge it and place children inside
+  const EXPANDED_PAD_X = 40, EXPANDED_PAD_Y = 50;
+  const CHILD_COL_SPACING = 140, CHILD_ROW_SPACING = 90;
+  const CHILD_COLS = 5; // up to 5 tasks wide
+  for (const [spId, children] of subprocessChildren) {
+    const spEl = elements.find(e => e.id === spId);
+    if (!spEl) continue;
+    const rows = Math.max(1, Math.ceil(children.length / CHILD_COLS));
+    const cols = Math.min(CHILD_COLS, children.length);
+    // Size: always at least 5 tasks wide × 4 tasks tall for "large" expanded subprocess
+    const minCols = Math.max(5, cols);
+    const minRows = Math.max(4, rows);
+    const neededW = minCols * CHILD_COL_SPACING + EXPANDED_PAD_X * 2;
+    const neededH = minRows * CHILD_ROW_SPACING + EXPANDED_PAD_Y * 2;
+    // Enlarge the subprocess
+    spEl.width = Math.max(spEl.width, neededW);
+    spEl.height = Math.max(spEl.height, neededH);
+    // Place children in a grid
+    for (let i = 0; i < children.length; i++) {
+      const ai = children[i];
+      const col = i % CHILD_COLS;
+      const row = Math.floor(i / CHILD_COLS);
+      const def = getSymbolDefinition(ai.type as DiagramElement["type"]);
+      const cx = EXPANDED_PAD_X + col * CHILD_COL_SPACING + CHILD_COL_SPACING / 2;
+      const cy = EXPANDED_PAD_Y + row * CHILD_ROW_SPACING + CHILD_ROW_SPACING / 2;
+      elements.push({
+        id: ai.id, type: ai.type as DiagramElement["type"],
+        x: spEl.x + cx - def.defaultWidth / 2,
+        y: spEl.y + cy - def.defaultHeight / 2,
+        width: def.defaultWidth, height: def.defaultHeight,
+        label: ai.label, properties: {}, parentId: spEl.id,
+        ...(ai.taskType ? { taskType: ai.taskType as DiagramElement["taskType"] } : {}),
+        ...(ai.gatewayType ? { gatewayType: ai.gatewayType as DiagramElement["gatewayType"] } : {}),
+        ...(ai.eventType ? { eventType: ai.eventType as DiagramElement["eventType"] } : {}),
+      });
+    }
+  }
+
+  // Place boundary-mounted events on host edges
+  for (const [hostId, events] of boundaryEvents) {
+    const host = elements.find(e => e.id === hostId);
+    if (!host) continue;
+    // Group by side
+    const bySide: Record<string, AiElement[]> = { left: [], right: [], top: [], bottom: [] };
+    for (const ev of events) {
+      // Determine default side from event type
+      let side = ev.boundarySide;
+      if (!side) {
+        if (ev.type === "start-event") side = "left";
+        else if (ev.type === "end-event") side = "right";
+        else side = "top"; // intermediate events default to top
+      }
+      bySide[side].push(ev);
+    }
+    for (const [side, evs] of Object.entries(bySide)) {
+      for (let i = 0; i < evs.length; i++) {
+        const ev = evs[i];
+        const def = getSymbolDefinition(ev.type as DiagramElement["type"]);
+        const W = def.defaultWidth, H = def.defaultHeight;
+        let ex = 0, ey = 0;
+        if (side === "left") {
+          ex = host.x - W / 2;
+          ey = host.y + host.height / 2 - H / 2 + (i - (evs.length - 1) / 2) * (H + 10);
+        } else if (side === "right") {
+          ex = host.x + host.width - W / 2;
+          ey = host.y + host.height / 2 - H / 2 + (i - (evs.length - 1) / 2) * (H + 10);
+        } else if (side === "top") {
+          // Near right corner for intermediate events (timers/interrupts)
+          ex = host.x + host.width - W - 30 - i * (W + 10);
+          ey = host.y - H / 2;
+        } else { // bottom
+          ex = host.x + host.width - W - 30 - i * (W + 10);
+          ey = host.y + host.height - H / 2;
+        }
+        elements.push({
+          id: ev.id, type: ev.type as DiagramElement["type"],
+          x: ex, y: ey, width: W, height: H,
+          label: ev.label, properties: {}, boundaryHostId: host.id,
+          ...(ev.taskType ? { taskType: ev.taskType as DiagramElement["taskType"] } : {}),
+          ...(ev.eventType ? { eventType: ev.eventType as DiagramElement["eventType"] } : {}),
+        });
+      }
+    }
+  }
+
+  // Place any unconnected / unassigned elements that were still skipped
+  // (elements with no pool/lane/parentSubprocess/boundaryHost that we haven't placed yet)
+  const placedIds = new Set(elements.map(e => e.id));
+  const unplacedEls = aiElements.filter(ai =>
+    ai.type !== "pool" && ai.type !== "lane" && !placedIds.has(ai.id)
+  );
+  if (unplacedEls.length > 0) {
+    let floatY = 100;
+    const floatX = 50;
+    for (const ai of unplacedEls) {
+      const def = getSymbolDefinition(ai.type as DiagramElement["type"]);
+      elements.push({
+        id: ai.id, type: ai.type as DiagramElement["type"],
+        x: floatX, y: floatY, width: def.defaultWidth, height: def.defaultHeight,
+        label: ai.label, properties: {},
+        ...(ai.taskType ? { taskType: ai.taskType as DiagramElement["taskType"] } : {}),
+        ...(ai.gatewayType ? { gatewayType: ai.gatewayType as DiagramElement["gatewayType"] } : {}),
+        ...(ai.eventType ? { eventType: ai.eventType as DiagramElement["eventType"] } : {}),
+      });
+      floatY += def.defaultHeight + 20;
+    }
   }
 
   // ── Create connectors ──

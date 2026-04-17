@@ -8,7 +8,7 @@ function buildSystemPrompt(rules: string): string {
   return `You are a BPMN process modelling expert. Given a description of a business process, output a valid JSON object that defines the process as BPMN elements and connections.
 
 ${rules ? `USER RULES AND PREFERENCES (follow these strictly):\n${rules}\n\n` : ""}CRITICAL FORMAT RULES — you MUST follow these exactly:
-- Use ONLY these type values: "pool", "lane", "start-event", "end-event", "task", "gateway", "subprocess", "intermediate-event"
+- Use ONLY these type values: "pool", "lane", "start-event", "end-event", "task", "gateway", "subprocess", "subprocess-expanded", "intermediate-event", "data-object", "data-store", "text-annotation", "group"
 - NEVER use "startEvent", "endEvent", "exclusiveGateway", "sendTask" etc. — use the hyphenated forms above
 - Use "label" (not "name") for all element labels
 - Every element MUST have: id, type, label
@@ -17,6 +17,12 @@ ${rules ? `USER RULES AND PREFERENCES (follow these strictly):\n${rules}\n\n` : 
 - Flow elements (tasks, gateways, events) MUST have: pool (pool id) and lane (lane id if applicable)
 - Tasks should have: taskType ("user", "service", "send", "receive", "manual", "none")
 - Gateways should have: gatewayType ("exclusive", "parallel", "inclusive")
+- Expanded subprocesses use type "subprocess-expanded". They CAN contain child elements: set their "parentSubprocess" property to the subprocess id instead of "lane"
+- CRITICAL: Always place EVERY element mentioned in the prompt, EVEN IF it is not connected to anything. Unconnected elements still appear on the canvas.
+- Boundary events (edge-mounted on a task, subprocess, or expanded subprocess): add "boundaryHost": "<elementId>" to the event. Choose placement via "boundarySide":
+  * Start events → "left" (default: middle of left edge)
+  * End events → "right" (default: middle of right edge)
+  * Intermediate events (timers, interrupts, escalations) → "top" or "bottom" near right corner
 - CRITICAL: Every diverging gateway (with 2+ outgoing flows) MUST have a corresponding merge gateway downstream where ALL branches reconnect BEFORE any subsequent task. The merge gateway must have the same gatewayType as the diverging gateway. Even if one branch has only one task and the other has multiple, both MUST flow into the merge gateway.
 - Connections use: sourceId, targetId, and optionally label and type ("sequence" or "message")
 - Use "sequence" for flows within the same pool, "message" for flows between different pools
@@ -24,29 +30,22 @@ ${rules ? `USER RULES AND PREFERENCES (follow these strictly):\n${rules}\n\n` : 
 Output ONLY valid JSON (no markdown, no explanation, no comments):
 {
   "elements": [
-    { "id": "p1", "type": "pool", "label": "Customer", "poolType": "black-box" },
     { "id": "p2", "type": "pool", "label": "Company", "poolType": "white-box" },
-    { "id": "p3", "type": "pool", "label": "Salesforce", "poolType": "black-box" },
-    { "id": "l1", "type": "lane", "label": "Sales Team", "parentPool": "p2" },
-    { "id": "l2", "type": "lane", "label": "Finance Team", "parentPool": "p2" },
-    { "id": "e1", "type": "start-event", "label": "Order Received", "pool": "p2", "lane": "l1" },
-    { "id": "e2", "type": "task", "label": "Check Order", "taskType": "user", "pool": "p2", "lane": "l1" },
-    { "id": "e3", "type": "gateway", "label": "Approved?", "gatewayType": "exclusive", "pool": "p2", "lane": "l1" },
-    { "id": "e4", "type": "task", "label": "Process Payment", "taskType": "service", "pool": "p2", "lane": "l2" },
-    { "id": "e5", "type": "task", "label": "Send Rejection", "taskType": "send", "pool": "p2", "lane": "l1" },
-    { "id": "e6", "type": "gateway", "label": "", "gatewayType": "exclusive", "pool": "p2", "lane": "l2" },
-    { "id": "e7", "type": "end-event", "label": "Complete", "pool": "p2", "lane": "l2" }
+    { "id": "l1", "type": "lane", "label": "Team", "parentPool": "p2" },
+    { "id": "e1", "type": "start-event", "label": "Start", "pool": "p2", "lane": "l1" },
+    { "id": "sp1", "type": "subprocess-expanded", "label": "Database Operations", "pool": "p2", "lane": "l1" },
+    { "id": "bs1", "type": "start-event", "label": "", "boundaryHost": "sp1", "boundarySide": "left" },
+    { "id": "bt1", "type": "intermediate-event", "label": "Timeout", "eventType": "timer", "boundaryHost": "sp1", "boundarySide": "top" },
+    { "id": "be1", "type": "end-event", "label": "", "boundaryHost": "sp1", "boundarySide": "right" },
+    { "id": "t1", "type": "task", "label": "Check Database", "taskType": "service", "parentSubprocess": "sp1" },
+    { "id": "t2", "type": "task", "label": "Update Database", "taskType": "service", "parentSubprocess": "sp1" },
+    { "id": "t3", "type": "task", "label": "Finalize Database", "taskType": "service", "parentSubprocess": "sp1" },
+    { "id": "e2", "type": "end-event", "label": "End", "pool": "p2", "lane": "l1" }
   ],
   "connections": [
-    { "sourceId": "p1", "targetId": "e1", "type": "message", "label": "Order Email" },
-    { "sourceId": "e1", "targetId": "e2", "type": "sequence" },
-    { "sourceId": "e2", "targetId": "e3", "type": "sequence" },
-    { "sourceId": "e3", "targetId": "e4", "type": "sequence", "label": "Yes" },
-    { "sourceId": "e3", "targetId": "e5", "type": "sequence", "label": "No" },
-    { "sourceId": "e4", "targetId": "e6", "type": "sequence" },
-    { "sourceId": "e5", "targetId": "e6", "type": "sequence" },
-    { "sourceId": "e6", "targetId": "e7", "type": "sequence" },
-    { "sourceId": "e5", "targetId": "p1", "type": "message", "label": "Rejection Notice" }
+    { "sourceId": "e1", "targetId": "sp1", "type": "sequence" },
+    { "sourceId": "t1", "targetId": "t2", "type": "sequence" },
+    { "sourceId": "sp1", "targetId": "e2", "type": "sequence" }
   ]
 }`;
 }
