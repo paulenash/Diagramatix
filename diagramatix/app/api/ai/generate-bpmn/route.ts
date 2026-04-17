@@ -14,10 +14,12 @@ ${rules ? `USER RULES AND PREFERENCES (follow these strictly):\n${rules}\n\n` : 
 - Every element MUST have: id, type, label
 - Pools MUST have: poolType ("white-box" or "black-box")
 - Lanes MUST have: parentPool (the pool id they belong to)
-- Flow elements (tasks, gateways, events) MUST have: pool (pool id) and lane (lane id if applicable)
+- Flow elements (tasks, gateways, events) MUST have: pool (pool id). Include "lane" ONLY if the prompt mentions specific roles, teams, or performers responsible for elements.
+- DO NOT create default/placeholder lanes (e.g. "Team", "Process Team", "Main Lane"). Only create lanes when the prompt implies multiple performers/roles. If no roles are mentioned, elements go directly in the pool with NO lane.
 - Tasks should have: taskType ("user", "service", "send", "receive", "manual", "none")
 - Gateways should have: gatewayType ("exclusive", "parallel", "inclusive")
 - Expanded subprocesses use type "subprocess-expanded". They CAN contain child elements: set their "parentSubprocess" property to the subprocess id instead of "lane"
+- If the prompt mentions an "Event Subprocess" or "Event Expanded Subprocess": set properties.subprocessType = "event" AND add an INTERNAL (non-boundary) non-interrupting start event inside it with eventType "signal" or "message" (use "none" if unspecified) and properties: { interrupting: false }
 - CRITICAL: Always place EVERY element mentioned in the prompt, EVEN IF it is not connected to anything. Unconnected elements still appear on the canvas.
 - Boundary events (edge-mounted on a task, subprocess, or expanded subprocess): add "boundaryHost": "<elementId>" to the event. Choose placement via "boundarySide":
   * Start events → "left" (default: middle of left edge)
@@ -28,24 +30,42 @@ ${rules ? `USER RULES AND PREFERENCES (follow these strictly):\n${rules}\n\n` : 
 - Use "sequence" for flows within the same pool, "message" for flows between different pools
 
 Output ONLY valid JSON (no markdown, no explanation, no comments):
+
+Example 1 — NO roles mentioned, so NO lanes (elements go directly in pool):
 {
   "elements": [
-    { "id": "p2", "type": "pool", "label": "Company", "poolType": "white-box" },
-    { "id": "l1", "type": "lane", "label": "Team", "parentPool": "p2" },
-    { "id": "e1", "type": "start-event", "label": "Start", "pool": "p2", "lane": "l1" },
-    { "id": "sp1", "type": "subprocess-expanded", "label": "Database Operations", "pool": "p2", "lane": "l1" },
+    { "id": "p1", "type": "pool", "label": "Company", "poolType": "white-box" },
+    { "id": "e1", "type": "start-event", "label": "Start", "pool": "p1" },
+    { "id": "sp1", "type": "subprocess-expanded", "label": "Database Operations", "pool": "p1" },
     { "id": "bs1", "type": "start-event", "label": "", "boundaryHost": "sp1", "boundarySide": "left" },
     { "id": "bt1", "type": "intermediate-event", "label": "Timeout", "eventType": "timer", "boundaryHost": "sp1", "boundarySide": "top" },
     { "id": "be1", "type": "end-event", "label": "", "boundaryHost": "sp1", "boundarySide": "right" },
     { "id": "t1", "type": "task", "label": "Check Database", "taskType": "service", "parentSubprocess": "sp1" },
     { "id": "t2", "type": "task", "label": "Update Database", "taskType": "service", "parentSubprocess": "sp1" },
-    { "id": "t3", "type": "task", "label": "Finalize Database", "taskType": "service", "parentSubprocess": "sp1" },
-    { "id": "e2", "type": "end-event", "label": "End", "pool": "p2", "lane": "l1" }
+    { "id": "e2", "type": "end-event", "label": "End", "pool": "p1" }
   ],
   "connections": [
     { "sourceId": "e1", "targetId": "sp1", "type": "sequence" },
     { "sourceId": "t1", "targetId": "t2", "type": "sequence" },
     { "sourceId": "sp1", "targetId": "e2", "type": "sequence" }
+  ]
+}
+
+Example 2 — Roles mentioned (Sales, Finance), so lanes are created:
+{
+  "elements": [
+    { "id": "p1", "type": "pool", "label": "Company", "poolType": "white-box" },
+    { "id": "l1", "type": "lane", "label": "Sales", "parentPool": "p1" },
+    { "id": "l2", "type": "lane", "label": "Finance", "parentPool": "p1" },
+    { "id": "e1", "type": "start-event", "label": "Start", "pool": "p1", "lane": "l1" },
+    { "id": "t1", "type": "task", "label": "Check Order", "taskType": "user", "pool": "p1", "lane": "l1" },
+    { "id": "t2", "type": "task", "label": "Process Payment", "taskType": "service", "pool": "p1", "lane": "l2" },
+    { "id": "e2", "type": "end-event", "label": "End", "pool": "p1", "lane": "l2" }
+  ],
+  "connections": [
+    { "sourceId": "e1", "targetId": "t1", "type": "sequence" },
+    { "sourceId": "t1", "targetId": "t2", "type": "sequence" },
+    { "sourceId": "t2", "targetId": "e2", "type": "sequence" }
   ]
 }`;
 }

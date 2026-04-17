@@ -22,6 +22,8 @@ export interface AiElement {
   boundaryHost?: string;      // host element ID for edge-mounted events
   boundarySide?: "left" | "right" | "top" | "bottom"; // where on the host boundary
   parentPool?: string;        // for lanes — the pool they belong to
+  subprocessType?: string;    // "normal" | "event" | "transaction" | "call"
+  properties?: Record<string, unknown>; // additional properties pass-through
 }
 
 export interface AiConnection {
@@ -42,12 +44,51 @@ const TASK_W = 100; // standard task width for padding
 const START_X = 50;
 const START_Y = 50;
 
+// Build properties object for a DiagramElement from an AiElement.
+// Merges ai.properties pass-through with specific fields like subprocessType.
+function buildProps(ai: AiElement): Record<string, unknown> {
+  const props: Record<string, unknown> = { ...(ai.properties ?? {}) };
+  if (ai.subprocessType) props.subprocessType = ai.subprocessType;
+  return props;
+}
+
 export function layoutBpmnDiagram(
   aiElements: AiElement[],
   aiConnections: AiConnection[],
 ): DiagramData {
   const elements: DiagramElement[] = [];
   const connectors: Connector[] = [];
+
+  // ── R26: Auto-detect event subprocesses and inject non-interrupting internal start event ──
+  // If an AI-provided subprocess-expanded has subprocessType=event (or its label mentions "event"),
+  // and has no internal start event, add one.
+  const addedInternalStarts: AiElement[] = [];
+  for (const ai of aiElements) {
+    if (ai.type !== "subprocess-expanded") continue;
+    const labelLower = (ai.label || "").toLowerCase();
+    const isEventSub = ai.subprocessType === "event" ||
+      (ai.properties?.subprocessType === "event") ||
+      labelLower.includes("event subprocess") ||
+      labelLower.includes("event expanded");
+    if (!isEventSub) continue;
+    // Ensure subprocessType is set
+    if (!ai.subprocessType) ai.subprocessType = "event";
+    // Check for an existing internal start event (parentSubprocess === ai.id, type === start-event, not boundary)
+    const hasInternalStart = aiElements.some(e =>
+      e.parentSubprocess === ai.id && e.type === "start-event" && !e.boundaryHost
+    );
+    if (!hasInternalStart) {
+      addedInternalStarts.push({
+        id: `_ev_start_${ai.id}`,
+        type: "start-event",
+        label: "",
+        parentSubprocess: ai.id,
+        eventType: "none",
+        properties: { interrupting: false },
+      });
+    }
+  }
+  aiElements = [...aiElements, ...addedInternalStarts];
 
   // Separate pools from other elements
   const pools = aiElements.filter(e => e.type === "pool");
@@ -242,41 +283,66 @@ export function layoutBpmnDiagram(
       properties: { poolType: "white-box" },
     });
 
-    // Create lanes
+    // Create lanes (if any)
     let laneY = poolStartY;
-    for (let i = 0; i < pLanes.length; i++) {
-      const lane = pLanes[i];
-      const laneH = laneHeights[i];
-
-      elements.push({
-        id: lane.id, type: "lane" as DiagramElement["type"],
-        x: START_X + POOL_HEADER_W, y: laneY, width: poolWidth - POOL_HEADER_W, height: laneH,
-        label: lane.label,
-        properties: {},
-        parentId: pool.id,
-      });
-
-      // Place elements within this lane
-      const laneEls = laneElements.get(lane.id) ?? [];
-      for (const el of laneEls) {
+    if (pLanes.length === 0) {
+      // No lanes: place elements directly in pool (assigned to pool, no lane)
+      const poolEls = [
+        ...(laneElements.get("__pool_" + pool.id) ?? []),
+        ...flowElements.filter(e => e.pool === pool.id && !e.lane && !e.parentSubprocess && !e.boundaryHost),
+      ];
+      // Dedupe in case both paths added the same
+      const seen = new Set<string>();
+      const uniquePoolEls = poolEls.filter(e => { if (seen.has(e.id)) return false; seen.add(e.id); return true; });
+      for (const el of uniquePoolEls) {
         const col = colMap.get(el.id) ?? 0;
         const def = getSymbolDefinition(el.type as DiagramElement["type"]);
         const elX = START_X + POOL_HEADER_W + LANE_PAD_X + col * COL_SPACING;
-        const elY = laneY + laneH / 2 - def.defaultHeight / 2;
-
+        const elY = poolStartY + totalLaneH / 2 - def.defaultHeight / 2;
         elements.push({
           id: el.id, type: el.type as DiagramElement["type"],
           x: elX, y: elY, width: def.defaultWidth, height: def.defaultHeight,
-          label: el.label,
-          properties: {},
-          parentId: lane.id,
+          label: el.label, properties: buildProps(el), parentId: pool.id,
           ...(el.taskType ? { taskType: el.taskType as DiagramElement["taskType"] } : {}),
           ...(el.gatewayType ? { gatewayType: el.gatewayType as DiagramElement["gatewayType"] } : {}),
           ...(el.eventType ? { eventType: el.eventType as DiagramElement["eventType"] } : {}),
         });
       }
+    } else {
+      for (let i = 0; i < pLanes.length; i++) {
+        const lane = pLanes[i];
+        const laneH = laneHeights[i];
 
-      laneY += laneH;
+        elements.push({
+          id: lane.id, type: "lane" as DiagramElement["type"],
+          x: START_X + POOL_HEADER_W, y: laneY, width: poolWidth - POOL_HEADER_W, height: laneH,
+          label: lane.label,
+          properties: {},
+          parentId: pool.id,
+        });
+
+        // Place elements within this lane
+        const laneEls = laneElements.get(lane.id) ?? [];
+        for (const el of laneEls) {
+          const col = colMap.get(el.id) ?? 0;
+          const def = getSymbolDefinition(el.type as DiagramElement["type"]);
+          const elX = START_X + POOL_HEADER_W + LANE_PAD_X + col * COL_SPACING;
+          const elY = laneY + laneH / 2 - def.defaultHeight / 2;
+
+          elements.push({
+            id: el.id, type: el.type as DiagramElement["type"],
+            x: elX, y: elY, width: def.defaultWidth, height: def.defaultHeight,
+            label: el.label,
+            properties: buildProps(el),
+            parentId: lane.id,
+            ...(el.taskType ? { taskType: el.taskType as DiagramElement["taskType"] } : {}),
+            ...(el.gatewayType ? { gatewayType: el.gatewayType as DiagramElement["gatewayType"] } : {}),
+            ...(el.eventType ? { eventType: el.eventType as DiagramElement["eventType"] } : {}),
+          });
+        }
+
+        laneY += laneH;
+      }
     }
 
     curY = poolStartY + totalLaneH + POOL_GAP;
@@ -331,21 +397,29 @@ export function layoutBpmnDiagram(
     spEl.height = Math.max(spEl.height, neededH);
     const newRight = spEl.x + spEl.width;
     const newBottom = spEl.y + spEl.height;
-    // Shift sibling elements to the right of this subprocess so they don't overlap
+    // Shift sibling elements that overlap the enlarged subprocess so they sit to the right
     const shiftX = newRight - oldRight;
     const shiftY = newBottom - oldBottom;
     if (shiftX > 0 || shiftY > 0) {
+      const epLeft = spEl.x;
       for (const other of elements) {
         if (other.id === spEl.id) continue;
         if (other.parentId === spEl.id) continue; // its children
         if (other.boundaryHostId === spEl.id) continue; // its boundary events
-        // Only shift siblings in the same parent (lane/pool)
+        // Only consider siblings in the same parent (lane/pool)
         if (other.parentId !== spEl.parentId) continue;
-        // Horizontal: only elements to the right of the old EP right edge
-        if (shiftX > 0 && other.x >= oldRight - 1) {
-          other.x += shiftX;
+        // Horizontal: any element whose LEFT edge is at or right of the EP's left edge
+        // AND whose centre is past the EP's original centre — treat as "downstream" and shift
+        const otherCx = other.x + other.width / 2;
+        const epOldCx = epLeft + (oldRight - epLeft) / 2;
+        if (shiftX > 0 && otherCx >= epOldCx) {
+          // Shift so the element sits past the EP's new right edge
+          const minX = spEl.x + spEl.width + 30; // 30px gap after EP
+          if (other.x < minX) {
+            other.x = minX + (other.x - oldRight > 0 ? (other.x - oldRight) : 0);
+          }
         }
-        // Vertical: only elements below the old EP bottom (rare case)
+        // Vertical: elements below the old EP bottom (rare case)
         if (shiftY > 0 && other.y >= oldBottom - 1) {
           other.y += shiftY;
         }
@@ -364,7 +438,7 @@ export function layoutBpmnDiagram(
         x: spEl.x + cx - def.defaultWidth / 2,
         y: spEl.y + cy - def.defaultHeight / 2,
         width: def.defaultWidth, height: def.defaultHeight,
-        label: ai.label, properties: {}, parentId: spEl.id,
+        label: ai.label, properties: buildProps(ai), parentId: spEl.id,
         ...(ai.taskType ? { taskType: ai.taskType as DiagramElement["taskType"] } : {}),
         ...(ai.gatewayType ? { gatewayType: ai.gatewayType as DiagramElement["gatewayType"] } : {}),
         ...(ai.eventType ? { eventType: ai.eventType as DiagramElement["eventType"] } : {}),
@@ -411,7 +485,7 @@ export function layoutBpmnDiagram(
         elements.push({
           id: ev.id, type: ev.type as DiagramElement["type"],
           x: ex, y: ey, width: W, height: H,
-          label: ev.label, properties: {}, boundaryHostId: host.id,
+          label: ev.label, properties: buildProps(ev), boundaryHostId: host.id,
           ...(ev.taskType ? { taskType: ev.taskType as DiagramElement["taskType"] } : {}),
           ...(ev.eventType ? { eventType: ev.eventType as DiagramElement["eventType"] } : {}),
         });
@@ -433,7 +507,7 @@ export function layoutBpmnDiagram(
       elements.push({
         id: ai.id, type: ai.type as DiagramElement["type"],
         x: floatX, y: floatY, width: def.defaultWidth, height: def.defaultHeight,
-        label: ai.label, properties: {},
+        label: ai.label, properties: buildProps(ai),
         ...(ai.taskType ? { taskType: ai.taskType as DiagramElement["taskType"] } : {}),
         ...(ai.gatewayType ? { gatewayType: ai.gatewayType as DiagramElement["gatewayType"] } : {}),
         ...(ai.eventType ? { eventType: ai.eventType as DiagramElement["eventType"] } : {}),
@@ -482,14 +556,20 @@ export function layoutBpmnDiagram(
       // Pool height must cover all its lanes exactly (lanes already grew to fit content)
       const directLanes = elements.filter(e => e.type === "lane" && e.parentId === container.id).sort((a, b) => a.y - b.y);
       if (directLanes.length > 0) {
-        // Ensure lanes are stacked contiguously starting at pool.y
+        // If neededH (based on descendants) exceeds what the lanes currently cover,
+        // expand the last lane to absorb the difference
+        let laneTotalH = directLanes.reduce((s, l) => s + l.height, 0);
+        if (neededH > laneTotalH) {
+          directLanes[directLanes.length - 1].height += (neededH - laneTotalH);
+          laneTotalH = neededH;
+        }
+        // Stack lanes contiguously starting at pool.y
         let stackY = container.y;
         for (const lane of directLanes) {
           lane.y = stackY;
           stackY += lane.height;
         }
-        const laneTotalH = directLanes.reduce((s, l) => s + l.height, 0);
-        container.height = Math.max(laneTotalH, neededH);
+        container.height = laneTotalH;
       } else {
         if (neededH > container.height) container.height = neededH;
       }
@@ -531,7 +611,41 @@ export function layoutBpmnDiagram(
   const isDecisionGateway = (el: DiagramElement) =>
     isGateway(el) && !isMergeGateway(el);
 
-  for (const c of aiConnections) {
+  // ── R27/R28: Auto-connect boundary start/end events to nearest internal task/subprocess ──
+  // Boundary start events → connect FROM start TO nearest child task/subprocess
+  // Boundary end events → connect FROM nearest child task/subprocess TO end event
+  const TASK_LIKE_TYPES = new Set(["task", "subprocess", "subprocess-expanded"]);
+  const existingConnKeys = new Set(aiConnections.map(c => `${c.sourceId}->${c.targetId}`));
+  const autoConns: AiConnection[] = [];
+  for (const el of elements) {
+    if (!el.boundaryHostId) continue;
+    if (el.type !== "start-event" && el.type !== "end-event") continue;
+    const host = elements.find(h => h.id === el.boundaryHostId);
+    if (!host || host.type !== "subprocess-expanded") continue;
+    // Find children of the host that are task-like
+    const candidates = elements.filter(c =>
+      c.parentId === host.id && TASK_LIKE_TYPES.has(c.type)
+    );
+    if (candidates.length === 0) continue;
+    // Pick the nearest by centre-to-centre distance
+    const ex = el.x + el.width / 2, ey = el.y + el.height / 2;
+    let nearest = candidates[0];
+    let bestDist = Infinity;
+    for (const c of candidates) {
+      const d = Math.hypot((c.x + c.width / 2) - ex, (c.y + c.height / 2) - ey);
+      if (d < bestDist) { bestDist = d; nearest = c; }
+    }
+    if (el.type === "start-event") {
+      const key = `${el.id}->${nearest.id}`;
+      if (!existingConnKeys.has(key)) { autoConns.push({ sourceId: el.id, targetId: nearest.id, type: "sequence" }); existingConnKeys.add(key); }
+    } else { // end-event
+      const key = `${nearest.id}->${el.id}`;
+      if (!existingConnKeys.has(key)) { autoConns.push({ sourceId: nearest.id, targetId: el.id, type: "sequence" }); existingConnKeys.add(key); }
+    }
+  }
+  const finalConnections = [...aiConnections, ...autoConns];
+
+  for (const c of finalConnections) {
     const src = elMap.get(c.sourceId);
     const tgt = elMap.get(c.targetId);
     if (!src || !tgt) continue;
@@ -744,7 +858,7 @@ function layoutFlat(
       x: 100 + pos.col * (def.defaultWidth + 60),
       y: 200 + pos.row * (def.defaultHeight + 80),
       width: def.defaultWidth, height: def.defaultHeight,
-      label: ai.label, properties: {},
+      label: ai.label, properties: buildProps(ai),
       ...(ai.taskType ? { taskType: ai.taskType as DiagramElement["taskType"] } : {}),
       ...(ai.gatewayType ? { gatewayType: ai.gatewayType as DiagramElement["gatewayType"] } : {}),
       ...(ai.eventType ? { eventType: ai.eventType as DiagramElement["eventType"] } : {}),
