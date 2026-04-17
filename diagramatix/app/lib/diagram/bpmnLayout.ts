@@ -324,9 +324,33 @@ export function layoutBpmnDiagram(
     const minRows = Math.max(4, rows);
     const neededW = minCols * CHILD_COL_SPACING + EXPANDED_PAD_X * 2;
     const neededH = minRows * CHILD_ROW_SPACING + EXPANDED_PAD_Y * 2;
+    const oldRight = spEl.x + spEl.width;
+    const oldBottom = spEl.y + spEl.height;
     // Enlarge the subprocess
     spEl.width = Math.max(spEl.width, neededW);
     spEl.height = Math.max(spEl.height, neededH);
+    const newRight = spEl.x + spEl.width;
+    const newBottom = spEl.y + spEl.height;
+    // Shift sibling elements to the right of this subprocess so they don't overlap
+    const shiftX = newRight - oldRight;
+    const shiftY = newBottom - oldBottom;
+    if (shiftX > 0 || shiftY > 0) {
+      for (const other of elements) {
+        if (other.id === spEl.id) continue;
+        if (other.parentId === spEl.id) continue; // its children
+        if (other.boundaryHostId === spEl.id) continue; // its boundary events
+        // Only shift siblings in the same parent (lane/pool)
+        if (other.parentId !== spEl.parentId) continue;
+        // Horizontal: only elements to the right of the old EP right edge
+        if (shiftX > 0 && other.x >= oldRight - 1) {
+          other.x += shiftX;
+        }
+        // Vertical: only elements below the old EP bottom (rare case)
+        if (shiftY > 0 && other.y >= oldBottom - 1) {
+          other.y += shiftY;
+        }
+      }
+    }
     // Place children in a grid
     for (let i = 0; i < children.length; i++) {
       const ai = children[i];
@@ -442,8 +466,8 @@ export function layoutBpmnDiagram(
     if (childIds.size === 0) return;
 
     // Compute child bounds (including boundary events which stick outside their host)
-    let maxRight = container.x + container.width;
-    let maxBottom = container.y + container.height;
+    let maxRight = container.x;
+    let maxBottom = container.y;
     for (const id of childIds) {
       const child = elements.find(e => e.id === id);
       if (!child) continue;
