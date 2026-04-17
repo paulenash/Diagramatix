@@ -3816,9 +3816,9 @@ export function Canvas({
       {/* Right-click quick-add popup */}
       {quickAdd && (() => {
         const BPMN_QUICK_ADD: SymbolType[] = [
-          "start-event", "task", "subprocess", "subprocess-expanded",
-          "intermediate-event", "end-event", "data-object", "data-store",
-          "text-annotation", "group",
+          "start-event", "intermediate-event", "end-event",
+          "task", "subprocess", "subprocess-expanded", "gateway",
+          "data-object", "data-store", "text-annotation", "group",
         ];
         const SM_QUICK_ADD: SymbolType[] = [
           "state", "submachine", "initial-state", "final-state", "composite-state", "gateway", "fork-join",
