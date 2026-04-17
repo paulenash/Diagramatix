@@ -783,17 +783,25 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         }
       }
 
-      // Check if newly dropped element is fully inside a container
+      // Check if newly dropped element is inside a container
+      // For containers dropped inside other containers, use centre-point containment
+      // (they may not fit fully inside). For regular elements, use full bounds.
       if (!newEl.boundaryHostId) {
+        const newCx = newEl.x + newEl.width / 2;
+        const newCy = newEl.y + newEl.height / 2;
+        const isNewContainer = isContainerType(newEl.type);
         const containers = state.elements.filter(
           (b) =>
             isContainerType(b.type) &&
             containerAccepts(b.type, newEl.type) &&
-            newEl.x >= b.x && newEl.x + newEl.width <= b.x + b.width &&
-            newEl.y >= b.y && newEl.y + newEl.height <= b.y + b.height
+            (isNewContainer
+              ? (newCx >= b.x && newCx <= b.x + b.width && newCy >= b.y && newCy <= b.y + b.height)
+              : (newEl.x >= b.x && newEl.x + newEl.width <= b.x + b.width &&
+                 newEl.y >= b.y && newEl.y + newEl.height <= b.y + b.height))
         );
         // Prefer smallest (innermost) container
         const container = containers.sort((a, b) => (a.width * a.height) - (b.width * b.height))[0];
+        console.log(`[ADD_ELEMENT] type=${newEl.type} isContainer=${isNewContainer} cx=${newCx.toFixed(0)} cy=${newCy.toFixed(0)} matchingContainers=${containers.length} parent=${container?.id ?? 'none'} (${container?.type ?? ''})`);
         if (container) {
           newEl = { ...newEl, parentId: container.id };
         }

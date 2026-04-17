@@ -1456,7 +1456,7 @@ export function Canvas({
       if (e.boundaryHostId) {
         if (e.type === "start-event" && e.boundaryHostId === newExpandedScope
             && newSymbolType && EDGE_START_TARGETS.has(newSymbolType)
-            && !isEventOrTxnSub({ type: newSymbolType } as DiagramElement)) return true;
+            && newSymbolType !== "subprocess-expanded") return true; // can't know subtype yet; allow non-expanded-sub
         return false;
       }
       // BPMN: never auto-connect FROM an end event (end events have no outgoing)
@@ -1466,6 +1466,13 @@ export function Canvas({
       // BPMN: never auto-connect to/from event or transaction expanded subprocesses
       if (isBpmn && isEventOrTxnSub(e)) return false;
       if (isBpmn && newSymbolType === "subprocess-expanded") return false; // can't know subtype yet; skip
+      // BPMN: never auto-connect from elements inside an Event Expanded Subprocess to outside (or vice versa)
+      if (isBpmn) {
+        const candParent = e.parentId ? data.elements.find(p => p.id === e.parentId) : null;
+        const candInEventSub = candParent?.type === "subprocess-expanded" &&
+          (candParent.properties.subprocessType as string | undefined) === "event";
+        if (candInEventSub && candParent.id !== newExpandedScope) return false;
+      }
       // State-machine: never auto-connect initial → initial or final → final
       if (isStateMachine && newIsInitial && e.type === "initial-state") return false;
       if (isStateMachine && newIsFinal && e.type === "final-state") return false;
@@ -2617,7 +2624,7 @@ export function Canvas({
                   }
                   onSelectConnector(null);
                 }}
-                onMove={(x, y, uc) => onMoveElement(el.id, x, y, uc)}
+                onMove={(x, y, uc) => { setDraggingElementId(el.id); onMoveElement(el.id, x, y, uc); }}
                 onDoubleClick={() => {
                   if (tryGroupConnectToGateway(el)) return;
                   // Gateway shape double-click never opens the label editor —
@@ -2640,11 +2647,7 @@ export function Canvas({
                 svgToWorld={clientToWorld}
                 onUpdateProperties={onUpdateProperties}
                 onUpdateLabel={onUpdateLabel}
-                onMoveEnd={
-                  (el.type === "gateway" || el.type === "intermediate-event" || el.type === "task" || el.type === "subprocess")
-                    ? () => onElementMoveEnd?.(el.id)
-                    : undefined
-                }
+                onMoveEnd={() => { setDraggingElementId(null); onElementMoveEnd?.(el.id); }}
                 multiSelected={selectedElementIds.size > 1 && selectedElementIds.has(el.id)}
                 onGroupMove={onMoveElements ? (dx, dy) => onMoveElements([...selectedElementIds], dx / zoom, dy / zoom) : undefined}
                 onGroupMoveEnd={onElementsMoveEnd}
@@ -3146,7 +3149,7 @@ export function Canvas({
                   }
                   onSelectConnector(null);
                 }}
-                onMove={(x, y, uc) => onMoveElement(el.id, x, y, uc)}
+                onMove={(x, y, uc) => { setDraggingElementId(el.id); onMoveElement(el.id, x, y, uc); }}
                 onDoubleClick={() => { tryGroupConnectToGateway(el); }}
                 onConnectionPointDragStart={(side, worldPos) => {
                   if (el.type === "final-state") return;
