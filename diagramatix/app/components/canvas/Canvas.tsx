@@ -16,7 +16,7 @@ import type {
   Side,
   SymbolType,
 } from "@/app/lib/diagram/types";
-import { SymbolRenderer, SublaneIdsCtx, ProcessGroupDepthCtx, DatabaseCtx, type ResizeHandle } from "./SymbolRenderer";
+import { SymbolRenderer, SublaneIdsCtx, ProcessGroupDepthCtx, LaneDepthCtx, DatabaseCtx, type ResizeHandle } from "./SymbolRenderer";
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
 import { PaletteSymbolPreview } from "./Palette";
 import { CHEVRON_THEMES } from "@/app/lib/diagram/chevronThemes";
@@ -2115,6 +2115,27 @@ export function Canvas({
     return result;
   }, [data.elements]);
 
+  // Lane nesting depth (0 = top-level lane, 1 = sublane, 2 = sub-sublane, etc.)
+  const laneDepthMap = useMemo(() => {
+    const map = new Map<string, number>();
+    const byId = new Map(data.elements.map(e => [e.id, e]));
+    for (const el of data.elements) {
+      if (el.type !== "lane") continue;
+      let depth = 0;
+      let cur: typeof el | undefined = el;
+      const visited = new Set<string>();
+      while (cur?.parentId && !visited.has(cur.id)) {
+        visited.add(cur.id);
+        const parent = byId.get(cur.parentId);
+        if (!parent) break;
+        if (parent.type === "lane") depth++;
+        cur = parent;
+      }
+      map.set(el.id, depth);
+    }
+    return map;
+  }, [data.elements]);
+
   const otherContainersUnsorted = data.elements.filter(
     (el) => el.type === "system-boundary" || el.type === "composite-state"
          || el.type === "subprocess-expanded" || el.type === "process-group"
@@ -2418,6 +2439,7 @@ export function Canvas({
       <TitleFontSizeCtx.Provider value={data.titleFontSize ?? 14}>
       <SublaneIdsCtx.Provider value={sublaneIds}>
       <ProcessGroupDepthCtx.Provider value={processGroupDepthMap}>
+      <LaneDepthCtx.Provider value={laneDepthMap}>
       <DatabaseCtx.Provider value={data.database}>
       <svg
         ref={svgRef}
@@ -3619,6 +3641,7 @@ export function Canvas({
         </g>
       </svg>
       </DatabaseCtx.Provider>
+      </LaneDepthCtx.Provider>
       </ProcessGroupDepthCtx.Provider>
       </SublaneIdsCtx.Provider>
       </TitleFontSizeCtx.Provider>

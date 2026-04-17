@@ -2609,7 +2609,7 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         if (above.y < parent.y - 1) return state;
       }
 
-      // Proportionally resize sub-lanes within the resized lanes
+      // Proportionally resize sub-lanes within the resized lanes (recurse into deeper nesting)
       const LANE_LW = 36;
       function resizeSublanes(elements: DiagramElement[], laneId: string, newLaneY: number, newLaneH: number, newLaneX: number, newLaneW: number): DiagramElement[] {
         const subs = elements.filter((e) => e.type === "lane" && e.parentId === laneId).sort((a, b) => a.y - b.y);
@@ -2618,8 +2618,12 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         let stackY = newLaneY;
         for (const sub of subs) {
           const newSubH = Math.max(28, Math.round(newLaneH * (sub.height / totalSubH)));
-          const updatedSub = { ...sub, x: newLaneX + LANE_LW, y: stackY, width: newLaneW - LANE_LW, height: newSubH };
+          const newSubX = newLaneX + LANE_LW;
+          const newSubW = newLaneW - LANE_LW;
+          const updatedSub = { ...sub, x: newSubX, y: stackY, width: newSubW, height: newSubH };
           elements = elements.map((e) => e.id === sub.id ? updatedSub : e);
+          // Recurse — resize this sublane's own children
+          elements = resizeSublanes(elements, sub.id, stackY, newSubH, newSubX, newSubW);
           stackY += newSubH;
         }
         return elements;

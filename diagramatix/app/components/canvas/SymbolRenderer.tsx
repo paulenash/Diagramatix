@@ -117,6 +117,7 @@ const VALUE_COLORS: Record<string, string> = {
 
 const ShowValueDisplayCtx = createContext(false);
 export const ProcessGroupDepthCtx = createContext<Map<string, number>>(new Map());
+export const LaneDepthCtx = createContext<Map<string, number>>(new Map());
 export const DatabaseCtx = createContext<string | undefined>(undefined);
 
 function ValueBadge({ el, show: showProp }: { el: DiagramElement; show?: boolean }) {
@@ -1318,16 +1319,29 @@ function PoolShape({ el }: { el: DiagramElement }) {
 function LaneShape({ el, isSublane }: { el: DiagramElement; isSublane?: boolean }) {
   const colors = useContext(SymbolColorCtx);
   const fsc = useContext(FontScaleCtx);
+  const laneDepth = useContext(LaneDepthCtx).get(el.id) ?? 0;
   const { x, y, width: w, height: h } = el;
   const LW = 36;
   const cx = x + LW / 2 + 3;
   const cy = y + h / 2;
   const lines = el.label.split('\n');
   const lineH = 12;
+  // Lighten fill based on nesting depth beyond direct sublane (depth 1)
+  const baseFill = resolveColor(isSublane ? "sublane" : "lane", colors);
+  function lerpHex(hex: string, toward: string, frac: number): string {
+    const parse = (h: string) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+    const [r1, g1, b1] = parse(hex);
+    const [r2, g2, b2] = parse(toward);
+    const c = (a: number, b: number) => Math.round(a + (b - a) * frac).toString(16).padStart(2, "0");
+    return `#${c(r1, r2)}${c(g1, g2)}${c(b1, b2)}`;
+  }
+  // depth 0 = top-level lane, 1 = sublane (baseFill already), 2+ = sub-sublane (lighten)
+  const lightenFrac = Math.min((laneDepth - 1) * 0.25, 0.8);
+  const fill = laneDepth > 1 ? lerpHex(baseFill, "#ffffff", lightenFrac) : baseFill;
   return (
     <g>
       <rect x={x} y={y} width={w} height={h} fill="none" stroke="#374151" strokeWidth={1} />
-      <rect x={x} y={y} width={LW} height={h} fill={resolveColor(isSublane ? "sublane" : "lane", colors)} stroke="#374151" strokeWidth={1} />
+      <rect x={x} y={y} width={LW} height={h} fill={fill} stroke="#374151" strokeWidth={1} />
       <text textAnchor="middle" fontSize={Math.round(10 * fsc * 10) / 10} fill="#3b1a08" fontWeight="bold"
             transform={`rotate(-90,${cx},${cy})`}
             style={{ userSelect: "none", pointerEvents: "none" }}>
