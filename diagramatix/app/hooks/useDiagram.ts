@@ -489,8 +489,29 @@ function connectorHitsAnyElement(conn: Connector, elements: DiagramElement[]): b
   // Check interior waypoints (skip srcEdge and tgtEdge — they're ON the boundary)
   const interior = wp.slice(vs + 1, ve);
 
-  const obsEls = elements.filter(el =>
-    el.type !== "pool" && el.type !== "lane");
+  // Collect ancestors of source/target so we can exclude container elements that contain them
+  function ancestorsOf(id: string): Set<string> {
+    const result = new Set<string>();
+    let cur = elements.find(e => e.id === id);
+    while (cur?.parentId) {
+      result.add(cur.parentId);
+      cur = elements.find(e => e.id === cur!.parentId);
+    }
+    return result;
+  }
+  const srcAncestors = ancestorsOf(conn.sourceId);
+  const tgtAncestors = ancestorsOf(conn.targetId);
+
+  const CONTAINER_TYPES = new Set(["pool", "lane", "subprocess-expanded", "composite-state", "system-boundary", "process-group", "group"]);
+  const obsEls = elements.filter(el => {
+    // Pools and lanes are never obstacles
+    if (el.type === "pool" || el.type === "lane") return false;
+    // Other containers are obstacles only if they don't contain either endpoint
+    if (CONTAINER_TYPES.has(el.type)) {
+      if (srcAncestors.has(el.id) || tgtAncestors.has(el.id)) return false;
+    }
+    return true;
+  });
 
   for (const obs of obsEls) {
     const b = getBounds(obs);

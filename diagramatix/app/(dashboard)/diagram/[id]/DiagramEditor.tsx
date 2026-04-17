@@ -1601,7 +1601,7 @@ export function DiagramEditor({
             onConvertTaskSubprocess={convertTaskSubprocess}
             onConvertProcessCollapsed={convertProcessCollapsed}
             onConvertEventType={convertEventType}
-            forceCollapseTitle={showAiPanel}
+            forceCollapseTitle={showAiPanel || showHistoryPanel}
           />
         )}
 
