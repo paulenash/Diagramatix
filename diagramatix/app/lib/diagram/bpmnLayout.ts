@@ -59,10 +59,11 @@ export function layoutBpmnDiagram(
   const elements: DiagramElement[] = [];
   const connectors: Connector[] = [];
 
-  // ── R26: Auto-detect event subprocesses and inject non-interrupting internal start event ──
-  // If an AI-provided subprocess-expanded has subprocessType=event (or its label mentions "event"),
-  // and has no internal start event, add one.
-  const addedInternalStarts: AiElement[] = [];
+  // ── R26/R29/R30: Event Subprocess handling ──
+  // - Auto-detect event subprocesses
+  // - Ensure they are wrapped in a Normal Expanded Subprocess
+  // - Auto-inject a non-interrupting internal start event and internal end event if missing
+  const injected: AiElement[] = [];
   for (const ai of aiElements) {
     if (ai.type !== "subprocess-expanded") continue;
     const labelLower = (ai.label || "").toLowerCase();
@@ -73,12 +74,36 @@ export function layoutBpmnDiagram(
     if (!isEventSub) continue;
     // Ensure subprocessType is set
     if (!ai.subprocessType) ai.subprocessType = "event";
-    // Check for an existing internal start event (parentSubprocess === ai.id, type === start-event, not boundary)
+
+    // R29: Ensure the event subprocess is inside a Normal Expanded Subprocess
+    // If parentSubprocess is not set, or it's set to a pool/lane context, wrap it
+    const parentSub = ai.parentSubprocess
+      ? aiElements.find(e => e.id === ai.parentSubprocess)
+      : undefined;
+    const parentIsNormalSub = parentSub?.type === "subprocess-expanded" &&
+      (parentSub.subprocessType ?? "normal") !== "event";
+    if (!parentIsNormalSub) {
+      // Create a wrapping Normal Expanded Subprocess
+      const wrapperId = `_wrapper_${ai.id}`;
+      injected.push({
+        id: wrapperId,
+        type: "subprocess-expanded",
+        label: "Main Process",
+        subprocessType: "normal",
+        pool: ai.pool,
+        lane: ai.lane,
+      });
+      ai.parentSubprocess = wrapperId;
+      ai.pool = undefined;
+      ai.lane = undefined;
+    }
+
+    // R30: Ensure internal non-interrupting start event exists
     const hasInternalStart = aiElements.some(e =>
       e.parentSubprocess === ai.id && e.type === "start-event" && !e.boundaryHost
     );
     if (!hasInternalStart) {
-      addedInternalStarts.push({
+      injected.push({
         id: `_ev_start_${ai.id}`,
         type: "start-event",
         label: "",
@@ -87,8 +112,21 @@ export function layoutBpmnDiagram(
         properties: { interrupting: false },
       });
     }
+    // R30: Ensure internal end event exists
+    const hasInternalEnd = aiElements.some(e =>
+      e.parentSubprocess === ai.id && e.type === "end-event" && !e.boundaryHost
+    );
+    if (!hasInternalEnd) {
+      injected.push({
+        id: `_ev_end_${ai.id}`,
+        type: "end-event",
+        label: "",
+        parentSubprocess: ai.id,
+        eventType: "none",
+      });
+    }
   }
-  aiElements = [...aiElements, ...addedInternalStarts];
+  aiElements = [...aiElements, ...injected];
 
   // Separate pools from other elements
   const pools = aiElements.filter(e => e.type === "pool");
@@ -380,16 +418,34 @@ export function layoutBpmnDiagram(
   const EXPANDED_PAD_X = 40, EXPANDED_PAD_Y = 50;
   const CHILD_COL_SPACING = 140, CHILD_ROW_SPACING = 90;
   const CHILD_COLS = 5; // up to 5 tasks wide
-  for (const [spId, children] of subprocessChildren) {
+  // Process event subprocesses LAST so normal subprocesses size first and event subs can nest inside
+  const sortedSpIds = Array.from(subprocessChildren.keys()).sort((a, b) => {
+    const aEl = elements.find(e => e.id === a);
+    const bEl = elements.find(e => e.id === b);
+    const aEvent = aEl && (aEl.properties.subprocessType as string | undefined) === "event";
+    const bEvent = bEl && (bEl.properties.subprocessType as string | undefined) === "event";
+    return (aEvent ? 1 : 0) - (bEvent ? 1 : 0);
+  });
+  for (const spId of sortedSpIds) {
+    const children = subprocessChildren.get(spId)!;
     const spEl = elements.find(e => e.id === spId);
     if (!spEl) continue;
+    const isEventSub = (spEl.properties.subprocessType as string | undefined) === "event";
     const rows = Math.max(1, Math.ceil(children.length / CHILD_COLS));
     const cols = Math.min(CHILD_COLS, children.length);
-    // Size: always at least 5 tasks wide × 4 tasks tall for "large" expanded subprocess
-    const minCols = Math.max(5, cols);
-    const minRows = Math.max(4, rows);
-    const neededW = minCols * CHILD_COL_SPACING + EXPANDED_PAD_X * 2;
-    const neededH = minRows * CHILD_ROW_SPACING + EXPANDED_PAD_Y * 2;
+    // Event subprocess: 4 task widths × 2 task heights (small)
+    // Normal subprocess: at least 5 tasks × 4 tasks (large)
+    let neededW: number, neededH: number;
+    if (isEventSub) {
+      const taskDef = getSymbolDefinition("task");
+      neededW = taskDef.defaultWidth * 4;
+      neededH = taskDef.defaultHeight * 2 + 40;
+    } else {
+      const minCols = Math.max(5, cols);
+      const minRows = Math.max(4, rows);
+      neededW = minCols * CHILD_COL_SPACING + EXPANDED_PAD_X * 2;
+      neededH = minRows * CHILD_ROW_SPACING + EXPANDED_PAD_Y * 2;
+    }
     const oldRight = spEl.x + spEl.width;
     const oldBottom = spEl.y + spEl.height;
     // Enlarge the subprocess
@@ -425,24 +481,51 @@ export function layoutBpmnDiagram(
         }
       }
     }
-    // Place children in a grid
-    for (let i = 0; i < children.length; i++) {
-      const ai = children[i];
-      const col = i % CHILD_COLS;
-      const row = Math.floor(i / CHILD_COLS);
-      const def = getSymbolDefinition(ai.type as DiagramElement["type"]);
-      const cx = EXPANDED_PAD_X + col * CHILD_COL_SPACING + CHILD_COL_SPACING / 2;
-      const cy = EXPANDED_PAD_Y + row * CHILD_ROW_SPACING + CHILD_ROW_SPACING / 2;
-      elements.push({
-        id: ai.id, type: ai.type as DiagramElement["type"],
-        x: spEl.x + cx - def.defaultWidth / 2,
-        y: spEl.y + cy - def.defaultHeight / 2,
-        width: def.defaultWidth, height: def.defaultHeight,
-        label: ai.label, properties: buildProps(ai), parentId: spEl.id,
-        ...(ai.taskType ? { taskType: ai.taskType as DiagramElement["taskType"] } : {}),
-        ...(ai.gatewayType ? { gatewayType: ai.gatewayType as DiagramElement["gatewayType"] } : {}),
-        ...(ai.eventType ? { eventType: ai.eventType as DiagramElement["eventType"] } : {}),
-      });
+    if (isEventSub) {
+      // Event subprocess: start event near left edge, end event near right edge, both vertically centred
+      const cyCentre = spEl.height / 2;
+      for (const ai of children) {
+        const def = getSymbolDefinition(ai.type as DiagramElement["type"]);
+        let cx: number;
+        if (ai.type === "start-event") {
+          cx = 25; // near left inside boundary
+        } else if (ai.type === "end-event") {
+          cx = spEl.width - 25 - def.defaultWidth / 2 + def.defaultWidth / 2; // near right inside boundary
+          cx = spEl.width - 25;
+        } else {
+          cx = spEl.width / 2; // middle for any other elements
+        }
+        elements.push({
+          id: ai.id, type: ai.type as DiagramElement["type"],
+          x: spEl.x + cx - def.defaultWidth / 2,
+          y: spEl.y + cyCentre - def.defaultHeight / 2,
+          width: def.defaultWidth, height: def.defaultHeight,
+          label: ai.label, properties: buildProps(ai), parentId: spEl.id,
+          ...(ai.taskType ? { taskType: ai.taskType as DiagramElement["taskType"] } : {}),
+          ...(ai.gatewayType ? { gatewayType: ai.gatewayType as DiagramElement["gatewayType"] } : {}),
+          ...(ai.eventType ? { eventType: ai.eventType as DiagramElement["eventType"] } : {}),
+        });
+      }
+    } else {
+      // Normal subprocess: grid layout
+      for (let i = 0; i < children.length; i++) {
+        const ai = children[i];
+        const col = i % CHILD_COLS;
+        const row = Math.floor(i / CHILD_COLS);
+        const def = getSymbolDefinition(ai.type as DiagramElement["type"]);
+        const cx = EXPANDED_PAD_X + col * CHILD_COL_SPACING + CHILD_COL_SPACING / 2;
+        const cy = EXPANDED_PAD_Y + row * CHILD_ROW_SPACING + CHILD_ROW_SPACING / 2;
+        elements.push({
+          id: ai.id, type: ai.type as DiagramElement["type"],
+          x: spEl.x + cx - def.defaultWidth / 2,
+          y: spEl.y + cy - def.defaultHeight / 2,
+          width: def.defaultWidth, height: def.defaultHeight,
+          label: ai.label, properties: buildProps(ai), parentId: spEl.id,
+          ...(ai.taskType ? { taskType: ai.taskType as DiagramElement["taskType"] } : {}),
+          ...(ai.gatewayType ? { gatewayType: ai.gatewayType as DiagramElement["gatewayType"] } : {}),
+          ...(ai.eventType ? { eventType: ai.eventType as DiagramElement["eventType"] } : {}),
+        });
+      }
     }
   }
 

@@ -19,7 +19,13 @@ ${rules ? `USER RULES AND PREFERENCES (follow these strictly):\n${rules}\n\n` : 
 - Tasks should have: taskType ("user", "service", "send", "receive", "manual", "none")
 - Gateways should have: gatewayType ("exclusive", "parallel", "inclusive")
 - Expanded subprocesses use type "subprocess-expanded". They CAN contain child elements: set their "parentSubprocess" property to the subprocess id instead of "lane"
-- If the prompt mentions an "Event Subprocess" or "Event Expanded Subprocess": set properties.subprocessType = "event" AND add an INTERNAL (non-boundary) non-interrupting start event inside it with eventType "signal" or "message" (use "none" if unspecified) and properties: { interrupting: false }
+- If the prompt mentions an "Event Subprocess" or "Event Expanded Subprocess":
+  * Set properties.subprocessType = "event" on the subprocess-expanded element
+  * An Event Subprocess MUST be placed INSIDE a containing Normal Expanded Subprocess (parentSubprocess = normal subprocess id). Create a wrapping Normal Expanded Subprocess if the user only mentioned the event subprocess.
+  * Inside the Event Subprocess, add TWO child elements (not boundary events):
+    - A non-interrupting start event (parentSubprocess = event subprocess id, properties: { interrupting: false })
+    - An end event (parentSubprocess = event subprocess id)
+  * Event subprocesses are small (about 4 task widths wide × 2 task heights tall) — the layout engine will size them automatically
 - CRITICAL: Always place EVERY element mentioned in the prompt, EVEN IF it is not connected to anything. Unconnected elements still appear on the canvas.
 - Boundary events (edge-mounted on a task, subprocess, or expanded subprocess): add "boundaryHost": "<elementId>" to the event. Choose placement via "boundarySide":
   * Start events → "left" (default: middle of left edge)

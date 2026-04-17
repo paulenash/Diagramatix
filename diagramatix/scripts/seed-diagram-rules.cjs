@@ -53,7 +53,9 @@ R24: All process elements (tasks, events, gateways, subprocesses) must be FULLY 
 R25: Elements are divided between Lanes/Sublanes based on the performer (role or team) responsible for each element.
 R26: Any mention of an Event Expanded Subprocess sets its Usage to "Event" AND automatically places a non-interrupting Start Event inside it (not on the boundary).
 R27: The nearest internal Task or Subprocess to an edge-mounted End Event is auto-connected to that End Event with a sequence connector.
-R28: The nearest internal Task or Subprocess to an edge-mounted Start Event is auto-connected from that Start Event with a sequence connector.`,
+R28: The nearest internal Task or Subprocess to an edge-mounted Start Event is auto-connected from that Start Event with a sequence connector.
+R29: Event Expanded Subprocesses are always created INSIDE a containing Normal Expanded Subprocess (never at pool/lane level).
+R30: Event Expanded Subprocesses are smaller than Normal ones: 4 x Task width wide and 2 x Task height tall. They contain a Non-Interrupting Start Event near the left boundary and an End Event near the right boundary — both INSIDE the event subprocess (not boundary events).`,
 
   "state-machine": `## Group 1: States
 S01: Every state machine must have exactly one Initial State (filled circle) and at least one Final State (bull's eye).
