@@ -1578,7 +1578,7 @@ export function PropertiesPanel({
       {(element.type === "subprocess" || element.type === "subprocess-expanded") && (
         <>
           <div className="flex items-center gap-1">
-            <label className="text-[10px] text-gray-500 whitespace-nowrap w-14 shrink-0">Element</label>
+            <label className="text-[10px] text-gray-500 whitespace-nowrap w-14 shrink-0">Usage</label>
             <select
               value={(element.properties.subprocessType as string | undefined) ?? "normal"}
               onChange={(e) => onUpdateProperties(element.id, { subprocessType: e.target.value })}

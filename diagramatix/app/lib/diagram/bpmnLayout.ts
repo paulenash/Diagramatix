@@ -478,27 +478,23 @@ export function layoutBpmnDiagram(
     const neededW = maxRight - container.x + PAD;
     const neededH = maxBottom - container.y + PAD;
     if (neededW > container.width) container.width = neededW;
-    if (neededH > container.height) {
-      if (containerType === "pool") {
-        // Distribute extra height across direct lane children proportionally
-        const directLanes = elements.filter(e => e.type === "lane" && e.parentId === container.id).sort((a, b) => a.y - b.y);
-        if (directLanes.length > 0) {
-          const extra = neededH - container.height;
-          const totalCurrentH = directLanes.reduce((s, l) => s + l.height, 0);
-          let offsetY = 0;
-          for (const lane of directLanes) {
-            const share = Math.ceil(extra * (lane.height / totalCurrentH));
-            lane.y += offsetY;
-            lane.height += share;
-            offsetY += share;
-          }
-          container.height = container.height + extra;
-        } else {
-          container.height = neededH;
+    if (containerType === "pool") {
+      // Pool height must cover all its lanes exactly (lanes already grew to fit content)
+      const directLanes = elements.filter(e => e.type === "lane" && e.parentId === container.id).sort((a, b) => a.y - b.y);
+      if (directLanes.length > 0) {
+        // Ensure lanes are stacked contiguously starting at pool.y
+        let stackY = container.y;
+        for (const lane of directLanes) {
+          lane.y = stackY;
+          stackY += lane.height;
         }
+        const laneTotalH = directLanes.reduce((s, l) => s + l.height, 0);
+        container.height = Math.max(laneTotalH, neededH);
       } else {
-        container.height = neededH;
+        if (neededH > container.height) container.height = neededH;
       }
+    } else {
+      if (neededH > container.height) container.height = neededH;
     }
   }
 
