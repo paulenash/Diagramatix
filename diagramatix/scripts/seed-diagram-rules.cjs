@@ -48,7 +48,9 @@ R19: Lanes should be ordered top-to-bottom in logical process flow order.
 R20: Pool height must accommodate the vertical pool name text with comfortable spacing.
 R21: Lane width should be content width plus one task width of padding for later adjustment.
 R22: Message flows must attach at points that produce vertical connectors between pools.
-R23: When a message connector is created from a task to a non-System black-box pool, the task type is set to Send (source) or Receive (target). When connecting to a System black-box pool, the task type is set to User regardless of direction.`,
+R23: When a message connector is created from a task to a non-System black-box pool, the task type is set to Send (source) or Receive (target). When connecting to a System black-box pool, the task type is set to User regardless of direction.
+R24: All process elements (tasks, events, gateways, subprocesses) must be FULLY contained within their Pool and Lane structure. The Pool and Lanes must grow to accommodate their content — including large Expanded Subprocesses and their boundary events.
+R25: Elements are divided between Lanes/Sublanes based on the performer (role or team) responsible for each element.`,
 
   "state-machine": `## Group 1: States
 S01: Every state machine must have exactly one Initial State (filled circle) and at least one Final State (bull's eye).

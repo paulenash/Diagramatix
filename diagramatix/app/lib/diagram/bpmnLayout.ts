@@ -418,6 +418,82 @@ export function layoutBpmnDiagram(
     }
   }
 
+  // ── R24: Grow pools and lanes to contain all their elements ──
+  // After all placement (including enlarged expanded subprocesses and boundary events),
+  // expand pools and lanes so every process element fits fully inside.
+  function expandContainerToFitChildren(containerId: string, containerType: "pool" | "lane") {
+    const container = elements.find(e => e.id === containerId);
+    if (!container) return;
+    // Collect direct and transitive children
+    const childIds = new Set<string>();
+    function collect(parentId: string) {
+      for (const e of elements) {
+        if (e.parentId === parentId && !childIds.has(e.id)) {
+          childIds.add(e.id);
+          collect(e.id);
+        }
+        // Also include boundary events mounted on any descendant
+        if (e.boundaryHostId && childIds.has(e.boundaryHostId) && !childIds.has(e.id)) {
+          childIds.add(e.id);
+        }
+      }
+    }
+    collect(containerId);
+    if (childIds.size === 0) return;
+
+    // Compute child bounds (including boundary events which stick outside their host)
+    let maxRight = container.x + container.width;
+    let maxBottom = container.y + container.height;
+    for (const id of childIds) {
+      const child = elements.find(e => e.id === id);
+      if (!child) continue;
+      maxRight = Math.max(maxRight, child.x + child.width);
+      maxBottom = Math.max(maxBottom, child.y + child.height);
+    }
+    const PAD = 30;
+    const neededW = maxRight - container.x + PAD;
+    const neededH = maxBottom - container.y + PAD;
+    if (neededW > container.width) container.width = neededW;
+    if (neededH > container.height) {
+      if (containerType === "pool") {
+        // Distribute extra height across direct lane children proportionally
+        const directLanes = elements.filter(e => e.type === "lane" && e.parentId === container.id).sort((a, b) => a.y - b.y);
+        if (directLanes.length > 0) {
+          const extra = neededH - container.height;
+          const totalCurrentH = directLanes.reduce((s, l) => s + l.height, 0);
+          let offsetY = 0;
+          for (const lane of directLanes) {
+            const share = Math.ceil(extra * (lane.height / totalCurrentH));
+            lane.y += offsetY;
+            lane.height += share;
+            offsetY += share;
+          }
+          container.height = container.height + extra;
+        } else {
+          container.height = neededH;
+        }
+      } else {
+        container.height = neededH;
+      }
+    }
+  }
+
+  // Grow lanes to fit their children first
+  for (const el of elements) {
+    if (el.type === "lane") expandContainerToFitChildren(el.id, "lane");
+  }
+  // Then grow pools to fit their lanes (and any direct children)
+  for (const el of elements) {
+    if (el.type === "pool") expandContainerToFitChildren(el.id, "pool");
+  }
+  // Match lane widths to their parent pool's new width
+  for (const pool of elements.filter(e => e.type === "pool")) {
+    const poolLanes = elements.filter(e => e.type === "lane" && e.parentId === pool.id);
+    for (const lane of poolLanes) {
+      lane.width = pool.width - POOL_HEADER_W;
+    }
+  }
+
   // ── Create connectors ──
   const elMap = new Map(elements.map(e => [e.id, e]));
 
