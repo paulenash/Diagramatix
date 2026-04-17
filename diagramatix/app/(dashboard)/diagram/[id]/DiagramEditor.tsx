@@ -25,6 +25,7 @@ import { PropertiesPanel } from "@/app/components/canvas/PropertiesPanel";
 import { captureTemplate, instantiateTemplate } from "@/app/lib/diagram/templates";
 import { ImpersonationBanner } from "@/app/components/ImpersonationBanner";
 import { AiPanel } from "./AiPanel";
+import { HistoryPanel } from "./HistoryPanel";
 
 interface Props {
   diagramId: string;
@@ -462,6 +463,7 @@ export function DiagramEditor({
   const [displayMode, setDisplayMode] = useState<DisplayMode>(initialDisplayMode ?? "normal");
   const [showDiagramMaintenance, setShowDiagramMaintenance] = useState(false);
   const [showAiPanel, setShowAiPanel] = useState(false);
+  const [showHistoryPanel, setShowHistoryPanel] = useState(false);
   const [debugMode, setDebugMode] = useState(false);
   const [showValueDisplay, setShowValueDisplay] = useState(false);
   const [showBottleneck, setShowBottleneck] = useState(false);
@@ -1284,7 +1286,7 @@ export function DiagramEditor({
 
         {!readOnly && diagramType !== "basic" && (
           <button
-            onClick={() => setShowAiPanel(prev => !prev)}
+            onClick={() => { setShowAiPanel(prev => !prev); if (!showAiPanel) setShowHistoryPanel(false); }}
             className={`px-2 py-0.5 text-[11px] rounded border ${
               showAiPanel
                 ? "text-blue-700 border-blue-400 bg-blue-50"
@@ -1292,6 +1294,19 @@ export function DiagramEditor({
             }`}
           >
             AI Generate
+          </button>
+        )}
+        {!readOnly && (
+          <button
+            onClick={() => { setShowHistoryPanel(prev => !prev); if (!showHistoryPanel) setShowAiPanel(false); }}
+            className={`px-2 py-0.5 text-[11px] rounded border ${
+              showHistoryPanel
+                ? "text-blue-700 border-blue-400 bg-blue-50"
+                : "text-gray-700 border-gray-300 hover:bg-gray-50"
+            }`}
+            title="View and restore previous versions"
+          >
+            History
           </button>
         )}
 
@@ -1606,6 +1621,39 @@ export function DiagramEditor({
               applyTemplate(elements, connectors);
             }}
             onClose={() => setShowAiPanel(false)}
+          />
+        )}
+
+        {showHistoryPanel && (
+          <HistoryPanel
+            diagramId={diagramId}
+            hasUnsavedChanges={saveStatus === "unsaved"}
+            onPreview={(previewData) => {
+              // Load the snapshot into the canvas but do NOT save — user can save/discard
+              setData({
+                ...data,
+                elements: previewData.elements,
+                connectors: previewData.connectors,
+                viewport: previewData.viewport ?? data.viewport,
+                fontSize: previewData.fontSize ?? data.fontSize,
+                connectorFontSize: previewData.connectorFontSize ?? data.connectorFontSize,
+                titleFontSize: previewData.titleFontSize ?? data.titleFontSize,
+                title: previewData.title ?? data.title,
+                database: previewData.database ?? data.database,
+              });
+            }}
+            onRestored={async () => {
+              // Reload diagram from server (restore replaced it in DB)
+              try {
+                const res = await fetch(`/api/diagrams/${diagramId}`);
+                if (res.ok) {
+                  const fresh = await res.json();
+                  setData(fresh.data);
+                }
+              } catch { /* ignore */ }
+              setShowHistoryPanel(false);
+            }}
+            onClose={() => setShowHistoryPanel(false)}
           />
         )}
       </div>

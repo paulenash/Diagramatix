@@ -105,6 +105,34 @@ export async function PUT(req: Request, { params }: Params) {
           ...(displayMode !== undefined && { displayMode }),
         },
       });
+
+      // Auto-snapshot: create history entry on every data-changing save
+      if (data !== undefined) {
+        const current = await prisma.diagram.findUnique({ where: { id } });
+        if (current) {
+          const snapshot = {
+            name: current.name,
+            type: current.type,
+            data: current.data,
+            colorConfig: current.colorConfig,
+            displayMode: current.displayMode,
+          };
+          await prisma.diagramHistory.create({
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            data: { diagramId: id, snapshot: snapshot as any, userId: session.user.id },
+          });
+          // Auto-prune: keep only the most recent 50 entries
+          const all = await prisma.diagramHistory.findMany({
+            where: { diagramId: id },
+            select: { id: true, createdAt: true },
+            orderBy: { createdAt: "desc" },
+          });
+          if (all.length > 50) {
+            const toDelete = all.slice(50).map(h => h.id);
+            await prisma.diagramHistory.deleteMany({ where: { id: { in: toDelete } } });
+          }
+        }
+      }
     }
 
     const updated = await prisma.diagram.findFirst({ where: { id } });

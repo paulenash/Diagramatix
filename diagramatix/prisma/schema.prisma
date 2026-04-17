@@ -115,10 +115,22 @@ model Diagram {
   // application layer. Required after Phase 0 backfill.
   orgId       String
   org         Org      @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  history     DiagramHistory[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   @@index([orgId])
+}
+
+model DiagramHistory {
+  id          String   @id @default(cuid())
+  diagramId   String
+  diagram     Diagram  @relation(fields: [diagramId], references: [id], onDelete: Cascade)
+  snapshot    Json     // full diagram data { name, type, data, colorConfig, displayMode }
+  userId      String?  // who triggered the save (nullable for legacy)
+  createdAt   DateTime @default(now())
+
+  @@index([diagramId, createdAt])
 }
 
 model DiagramTemplate {
