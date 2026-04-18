@@ -950,17 +950,22 @@ export function Canvas({
         onSelectConnector(null);
       } else if (isMsgBPMN) {
         // messageBPMN endpoint reconnection — must remain cross-pool
+        // and must not be re-pinned to another boundary of the same element.
         const fixedId  = endpoint === "source" ? conn!.targetId  : conn!.sourceId;
         const fixedEl  = data.elements.find(e => e.id === fixedId);
         const fixedPoolId = fixedEl ? getElementPoolId(fixedEl, data.elements) : null;
         const targetEl = findDropTarget(pos, fromId);
         if (targetEl) {
           const targetPoolId = getElementPoolId(targetEl, data.elements);
-          // Valid if cross-pool: target's pool ≠ fixed end's pool, or one of them is a pool itself
+          // Strict cross-pool: both ends must resolve to pools, and those pools must differ.
+          // Rejects: same element (fromId already excluded by findDropTarget), same pool as fixed end,
+          // or dropping onto the fixed end itself.
           const isCross =
-            targetEl.type === "pool" ||
-            fixedEl?.type === "pool" ||
-            (targetPoolId !== null && targetPoolId !== fixedPoolId);
+            targetEl.id !== fixedId &&
+            targetEl.id !== fromId &&
+            targetPoolId !== null &&
+            fixedPoolId !== null &&
+            targetPoolId !== fixedPoolId;
           if (isCross) {
             // Top/bottom sides computed from vertical positions of new source & target
             const newSourceEl = endpoint === "source" ? targetEl : fixedEl!;
@@ -3343,8 +3348,10 @@ export function Canvas({
             );
           })()}
 
-          {/* Connector endpoint handles when a non-messageBPMN connector is selected */}
-          {endpointHandles && (() => {
+          {/* Connector endpoint handles when a non-messageBPMN connector is selected.
+              messageBPMN is locked to its original boundaries — users reposition it
+              via the middle ew-resize handle (horizontal only); endpoints never move. */}
+          {endpointHandles && selectedConnector?.type !== "messageBPMN" && (() => {
             function makeEndpointHandler(endpoint: "source" | "target", pos: Point) {
               return (e: React.MouseEvent) => {
                 e.stopPropagation();

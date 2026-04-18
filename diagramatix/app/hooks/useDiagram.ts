@@ -549,6 +549,9 @@ function validateConnectorsAgainstObstacles(connectors: Connector[], elements: D
   for (let pass = 0; pass < 3; pass++) {
     let anyChanged = false;
     result = result.map(conn => {
+      // Message and association connectors ignore obstacle avoidance — they
+      // always render on top and keep their waypoints unchanged when elements move.
+      if (conn.type === "messageBPMN" || conn.type === "associationBPMN") return conn;
       if (!connectorHitsAnyElement(conn, elements)) return conn;
       anyChanged = true;
       const source = elements.find(e => e.id === conn.sourceId);
