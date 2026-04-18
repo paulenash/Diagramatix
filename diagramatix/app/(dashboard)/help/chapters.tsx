@@ -288,6 +288,27 @@ export const CHAPTERS: HelpChapter[] = [
         ),
       },
       {
+        heading: "Initial zoom when opening a diagram",
+        body: (
+          <>
+            <p>
+              Diagrams open at <strong>70% zoom</strong> by default — chosen to
+              keep element text legible on most screens. Small diagrams that
+              fit the viewport at that zoom are <strong>centred</strong>;
+              larger diagrams are <strong>anchored to the top-left</strong>{" "}
+              so you start reading at the process&rsquo;s natural entry point.
+            </p>
+            <p className="mt-2">
+              To change the default, go to{" "}
+              <strong>Dashboard &rarr; File &rarr; Initial Zoom&hellip;</strong>{" "}
+              and enter a percentage (e.g. 50, 75, 100). The value is stored
+              per-browser and becomes the slider&rsquo;s &ldquo;100%&rdquo;
+              reference. Leave the field blank to revert to the 70% default.
+            </p>
+          </>
+        ),
+      },
+      {
         heading: "Selecting",
         body: (
           <>
@@ -2412,7 +2433,7 @@ export const CHAPTERS: HelpChapter[] = [
           <p>
             Admins can configure rules that guide AI generation for each
             diagram type via{" "}
-            <strong>System &rarr; AI Rules &amp; Preferences</strong>.
+            <strong>File &rarr; Admin &rarr; AI Rules &amp; Preferences</strong>.
             Rules are grouped and colour-coded:{" "}
             <span className="text-green-600 font-medium">green</span> rules
             are enforced by the AI model,{" "}
