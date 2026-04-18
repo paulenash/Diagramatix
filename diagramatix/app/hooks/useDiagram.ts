@@ -208,6 +208,7 @@ type Action =
   | { type: "ADD_LANE"; payload: { poolId: string } }
   | { type: "ADD_SUBLANE"; payload: { laneId: string } }
   | { type: "MOVE_LANE_BOUNDARY"; payload: { aboveLaneId: string; belowLaneId: string; dy: number } }
+  | { type: "REORDER_LANE"; payload: { laneId: string; direction: "up" | "down" } }
   | { type: "MOVE_ELEMENTS"; payload: { ids: string[]; dx: number; dy: number } }
   | { type: "APPLY_TEMPLATE"; payload: { elements: DiagramElement[]; connectors: Connector[] } }
   | { type: "ALIGN_ELEMENTS"; payload: { ids: string[]; mode: "center" | "top" | "bottom" | "vcenter" | "left" | "right" | "smart" } };
@@ -2584,6 +2585,86 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       }
     }
 
+    case "REORDER_LANE": {
+      const { laneId, direction } = action.payload;
+      const lane = state.elements.find(e => e.id === laneId && e.type === "lane");
+      if (!lane || !lane.parentId) return state;
+
+      // Find sibling lanes in the same parent, sorted by y
+      const siblings = state.elements
+        .filter(e => e.type === "lane" && e.parentId === lane.parentId)
+        .sort((a, b) => a.y - b.y);
+      const idx = siblings.findIndex(s => s.id === laneId);
+      if (idx < 0) return state;
+      const swapIdx = direction === "up" ? idx - 1 : idx + 1;
+      if (swapIdx < 0 || swapIdx >= siblings.length) return state;
+
+      const A = siblings[idx];
+      const B = siblings[swapIdx];
+      // Determine new y positions: swap A and B's positions, keeping their heights
+      const Ay = direction === "up" ? B.y : B.y + B.height - A.height;
+      const By = direction === "up" ? A.y + A.height - B.height + (A.y - B.y) + (B.height - A.height) : A.y;
+      // Simpler: swap them so A takes B's y and B takes A's y, but heights differ
+      const newAy = direction === "up" ? B.y : B.y + B.height - A.height;
+      const newBy = direction === "up" ? A.y + A.height - B.height : A.y;
+      // Compute delta for each lane's children
+      const deltaA = newAy - A.y;
+      const deltaB = newBy - B.y;
+
+      // Collect all transitive descendants of each lane (for moving their content)
+      function descendantIds(rootId: string): Set<string> {
+        const result = new Set<string>();
+        const stack = [rootId];
+        while (stack.length) {
+          const cur = stack.pop()!;
+          for (const e of state.elements) {
+            if (e.parentId === cur && !result.has(e.id)) {
+              result.add(e.id);
+              stack.push(e.id);
+            }
+            if (e.boundaryHostId === cur && !result.has(e.id)) result.add(e.id);
+          }
+        }
+        return result;
+      }
+      const aDescendants = descendantIds(A.id);
+      const bDescendants = descendantIds(B.id);
+
+      const elements = state.elements.map(e => {
+        if (e.id === A.id) return { ...e, y: newAy };
+        if (e.id === B.id) return { ...e, y: newBy };
+        if (aDescendants.has(e.id)) return { ...e, y: e.y + deltaA };
+        if (bDescendants.has(e.id)) return { ...e, y: e.y + deltaB };
+        return e;
+      });
+      // Update connector waypoints for moved elements
+      const movedIds = new Set([A.id, B.id, ...aDescendants, ...bDescendants]);
+      const connectors = state.connectors.map(conn => {
+        const srcIn = movedIds.has(conn.sourceId);
+        const tgtIn = movedIds.has(conn.targetId);
+        if (srcIn && tgtIn) {
+          // Both ends moved — shift waypoints by the larger lane's delta if they match
+          // Actually pick the correct delta per endpoint
+          const srcDelta = aDescendants.has(conn.sourceId) || conn.sourceId === A.id ? deltaA : deltaB;
+          const tgtDelta = aDescendants.has(conn.targetId) || conn.targetId === A.id ? deltaA : deltaB;
+          if (srcDelta === tgtDelta) {
+            return { ...conn, waypoints: conn.waypoints.map(pt => ({ x: pt.x, y: pt.y + srcDelta })) };
+          }
+          return { ...conn, waypoints: recomputeAllConnectors([conn], elements)[0]?.waypoints ?? conn.waypoints };
+        }
+        if (srcIn || tgtIn) {
+          const recomputed = recomputeAllConnectors([conn], elements)[0];
+          return recomputed ?? conn;
+        }
+        return conn;
+      });
+
+      // Ignore unused computed values
+      void Ay; void By;
+
+      return { ...state, elements, connectors };
+    }
+
     case "MOVE_LANE_BOUNDARY": {
       const { aboveLaneId, belowLaneId, dy } = action.payload;
       const MIN_H = 40;
@@ -3188,6 +3269,11 @@ export function useDiagram(initialData: DiagramData) {
     []
   );
 
+  const reorderLane = useCallback((laneId: string, direction: "up" | "down") => {
+    pushHistory(snapshotData());
+    dispatch({ type: "REORDER_LANE", payload: { laneId, direction } });
+  }, []);
+
   const laneBoundaryMoveEnd = useCallback(() => {
     if (preLaneRef.current) {
       pushHistory(preLaneRef.current);
@@ -3299,6 +3385,7 @@ export function useDiagram(initialData: DiagramData) {
     addLane,
     addSublane,
     moveLaneBoundary,
+    reorderLane,
     laneBoundaryMoveEnd,
     undo,
     redo,

@@ -399,6 +399,7 @@ export function DiagramEditor({
     insertSpace,
     addLane,
     addSublane,
+    reorderLane,
     moveLaneBoundary,
     laneBoundaryMoveEnd,
     moveElements,
@@ -1581,6 +1582,7 @@ export function DiagramEditor({
             }}
             onAddLane={addLane}
             onAddSublane={addSublane}
+            onReorderLane={reorderLane}
             parentName={parentName}
             poolHasContent={poolHasContent}
             laneHasContent={laneHasContent}

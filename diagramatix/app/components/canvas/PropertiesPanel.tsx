@@ -31,6 +31,7 @@ interface Props {
   onUpdateConnectorLabel?: (id: string, label: string) => void;
   onAddLane?: (poolId: string) => void;
   onAddSublane?: (laneId: string) => void;
+  onReorderLane?: (laneId: string, direction: "up" | "down") => void;
   onUpdateConnectorFields?: (id: string, fields: Partial<Connector>) => void;
   parentName?: string;
   poolHasContent?: boolean;
@@ -564,6 +565,7 @@ export function PropertiesPanel({
   onUpdateConnectorLabel,
   onAddLane,
   onAddSublane,
+  onReorderLane,
   onUpdateConnectorFields,
   parentName,
   poolHasContent,
@@ -1482,6 +1484,31 @@ export function PropertiesPanel({
           + Add Sublane
         </button>
       )}
+
+      {element.type === "lane" && onReorderLane && (() => {
+        const siblings = (allElements ?? [])
+          .filter(e => e.type === "lane" && e.parentId === element.parentId)
+          .sort((a, b) => a.y - b.y);
+        const idx = siblings.findIndex(s => s.id === element.id);
+        const canUp = idx > 0;
+        const canDown = idx >= 0 && idx < siblings.length - 1;
+        if (!canUp && !canDown) return null;
+        return (
+          <div className="flex items-center gap-1">
+            <label className="text-[10px] text-gray-500 whitespace-nowrap w-14 shrink-0">Reorder</label>
+            <button onClick={() => onReorderLane(element.id, "up")} disabled={!canUp}
+              className="flex-1 px-2 py-0.5 text-[10px] text-gray-700 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              title="Move lane up">
+              &uarr; Up
+            </button>
+            <button onClick={() => onReorderLane(element.id, "down")} disabled={!canDown}
+              className="flex-1 px-2 py-0.5 text-[10px] text-gray-700 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              title="Move lane down">
+              &darr; Down
+            </button>
+          </div>
+        );
+      })()}
 
       {(element.type === "data-object" || element.type === "pool" || element.type === "data-store") && (
         <>
