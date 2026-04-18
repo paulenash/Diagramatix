@@ -137,9 +137,22 @@ export function layoutBpmnDiagram(
     !e.parentSubprocess && !e.boundaryHost
   );
 
-  // If no pools defined, create a simple left-to-right layout
+  // If no pools defined, inject a default Pool so all subprocess/boundary handling still runs.
+  // Attach every flow element (that isn't a subprocess child or boundary event) to this pool.
   if (pools.length === 0) {
-    return layoutFlat(flowElements, aiConnections);
+    const defaultPoolId = "_default_pool";
+    const defaultPool: AiElement = {
+      id: defaultPoolId, type: "pool", label: "Process", poolType: "white-box",
+    };
+    aiElements = [defaultPool, ...aiElements];
+    for (const el of aiElements) {
+      if (el === defaultPool) continue;
+      if (el.type === "pool" || el.type === "lane") continue;
+      // Only top-level elements get a pool assignment
+      if (el.parentSubprocess || el.boundaryHost) continue;
+      if (!el.pool) el.pool = defaultPoolId;
+    }
+    pools.push(defaultPool);
   }
 
   // Identify white-box and black-box pools

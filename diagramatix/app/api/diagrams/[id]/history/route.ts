@@ -24,8 +24,17 @@ export async function GET(_req: Request, { params }: Params) {
 
   const { id } = await params;
 
-  // Verify diagram access
-  const diagram = await prisma.diagram.findFirst({ where: { id, userId, orgId } });
+  // Verify diagram access — normal path (owner, current org)
+  let diagram = await prisma.diagram.findFirst({ where: { id, userId, orgId } });
+  if (!diagram) {
+    // Archived-diagram path: allow access if the original owner was this user
+    const archived = await prisma.diagram.findUnique({ where: { id } });
+    if (archived) {
+      const data = (archived.data as Record<string, unknown>) ?? {};
+      const meta = (data._archive as Record<string, unknown>) ?? {};
+      if (meta._archivedFromUserId === userId) diagram = archived;
+    }
+  }
   if (!diagram) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const history = await prisma.diagramHistory.findMany({
