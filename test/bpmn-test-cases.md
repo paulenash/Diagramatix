@@ -119,6 +119,16 @@ Core single-pool process flows with tasks, events, gateways, and sequence connec
 | P-BE-004 | Intermediate event trigger types | Boundary intermediate | Properties → Trigger → Timer | Shape changes to timer icon |
 | P-BE-005 | No auto-connect from boundary end into host | Boundary end + task inside host | Drop new task inside host | No flash from boundary end event to new task |
 
+### 1.9 Data Object & Data Store Associations (associationBPMN)
+
+| ID | Description | Preconditions | Steps | Expected Result |
+|----|------|---------------|-------|-----------------|
+| P-DA-001 | Create association task → data object | Task and data object on canvas | Drag connector from task to data object | Dotted `associationBPMN` connector created with arrowhead on data object |
+| P-DA-002 | Create association data object → task | Data object and task on canvas | Drag connector from data object to task | Association connector with arrowhead on task |
+| P-DA-003 | Sides preserved on data object move | Data object with association to a task, stored sides (e.g. bottom → top) | Move data object across its connector's path | `sourceSide`/`targetSide` unchanged; connector stays attached to the original boundaries (no flip to "nearest side / pointing to centre") |
+| P-DA-004 | Obstacle crossing ignored | Association connector between data object and task, other elements moved across it | Move unrelated elements across the line | Connector waypoints UNCHANGED; renders on top |
+| P-DA-005 | Associations are dual-use data objects | Data object with both inbound and outbound associations | Connect via both directions | Data object retains both connectors; role resolves correctly |
+
 ---
 
 ## 2. BPMN Communication / Collaboration Diagrams
@@ -160,6 +170,9 @@ Multi-pool diagrams emphasising message flows between participants.
 | C-M-006 | Message flow start event | Start event → task in another pool | Create message | Start event becomes Message trigger (catching) |
 | C-M-007 | Message flow end event | Task → end event in another pool | Create message | End event becomes Message trigger (throwing) |
 | C-M-008 | Message connector initial render | Newly AI-generated message connector | Open diagram | Connector displays correctly from first render (no need to move elements) |
+| C-M-009 | Message endpoints locked | Message flow selected | Observe selection | NO blue endpoint handles on either end; only the middle ew-resize bar/circle is draggable |
+| C-M-010 | Message connector ignores obstacle crossing | Message flow between two pools, element moved across the flow's line | Move a third element across the connector path | Connector waypoints UNCHANGED; renders on top of the moving element |
+| C-M-011 | Message sides survive element move | Message flow on pool top/bottom; move another element around | Move elements around | `sourceSide` and `targetSide` never flip to track other elements |
 
 ### 2.3 Collaboration Layout
 
@@ -196,8 +209,8 @@ Admin-only functions accessible via **Dashboard → System menu → Admin sectio
 
 | ID | Description | Preconditions | Steps | Expected Result |
 |----|------|---------------|-------|-----------------|
-| A-R-001 | Access restricted to admins | Non-admin user | Open System menu | **AI Rules & Preferences** link NOT visible |
-| A-R-002 | Admin sees link | Admin user | Open System menu | Link visible (orange, under admin section) |
+| A-R-001 | Access restricted to admins | Non-admin user | Open File menu | No **Admin** link visible; `/dashboard/admin/*` URLs also blocked |
+| A-R-002 | Admin sees AI Rules link | Admin user | File → Admin → header | **AI Rules & Preferences** button visible (orange, top-right of Admin page header) |
 | A-R-003 | View all categories | Open /dashboard/rules | Sidebar | 7 categories listed (General, BPMN, State Machine, Value Chain, Domain, Context, Process Context) |
 | A-R-004 | BPMN rules load | Click BPMN in sidebar | Content loads | R01–R23 displayed; groups rendered |
 | A-R-005 | Edit rule | BPMN rules open | Modify rule text → Save | Rule text updated in DB |
@@ -276,9 +289,18 @@ Admin-only functions accessible via **Dashboard → System menu → Admin sectio
 | CAN-003 | Zoom via slider | BPMN diagram | Drag zoom slider (bottom-right) | Zoom updates; % display updates |
 | CAN-004 | Manual % zoom entry | Zoom bar visible | Click % field → type 150 → Enter | Zoom set to 150% |
 | CAN-005 | Zoom bar position | BPMN diagram | Observe | Bar at bottom-right corner |
-| CAN-006 | 100% = opening view | Fresh diagram load | Zoom bar | Shows 100% as default |
+| CAN-006 | 100% = configured initial zoom | Fresh diagram load, no override set | Zoom bar | Shows 100%, which equals 70% actual size (the default initial zoom) |
 | CAN-007 | Ctrl+click to place insert-space marker | BPMN diagram with content | Ctrl+click empty canvas | Red/blue crosshair marker appears |
 | CAN-008 | Shift+drag marker to insert space | Marker placed | Shift+drag horizontally or vertically | Elements past marker move; new space inserted |
+| CAN-009 | Default initial zoom = 70% | No `initialZoom` in localStorage | Open any diagram | Canvas renders at 70% actual size |
+| CAN-010 | Small diagram centred | Diagram whose content fits viewport at the chosen initial zoom | Open diagram | Diagram centred horizontally and vertically in viewport |
+| CAN-011 | Large diagram top-left anchored | Diagram whose content exceeds viewport at the chosen initial zoom | Open diagram | Diagram's top-left corner sits ~40 px from viewport's top-left |
+| CAN-012 | Initial Zoom menu item | Dashboard | File menu → observe | **Initial Zoom…** item visible (between Restore… and Admin/superuser section) |
+| CAN-013 | Initial Zoom dialog opens | Dashboard | File → Initial Zoom… | Dialog opens pre-filled with 70 (or current override) |
+| CAN-014 | Set custom initial zoom | Initial Zoom dialog open | Enter 100 → Save | `localStorage.initialZoom = "1"`; next diagram opens at 100% |
+| CAN-015 | Revert to default | Override previously set | Initial Zoom dialog → clear field → Save | `localStorage.initialZoom` removed; next diagram opens at 70% |
+| CAN-016 | Zoom override persists across reloads | Set 125% via dialog | Refresh browser, open diagram | Still opens at 125% |
+| CAN-017 | Clamp to sensible range | Initial Zoom dialog | Enter 5000 → Save | Value clamped to max (500%); stored as `"5"` |
 
 ### 6.2 Labels & Editing
 
