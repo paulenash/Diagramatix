@@ -155,6 +155,34 @@ export function layoutBpmnDiagram(
     pools.push(defaultPool);
   }
 
+  // R32: Every process must have a process-level Start Event and End Event in each white-box pool.
+  // Check each white-box pool; if missing, inject them at top level.
+  const processLevelInjections: AiElement[] = [];
+  for (const pool of pools.filter(p => (p.poolType ?? "white-box") === "white-box")) {
+    const poolTopLevelEls = aiElements.filter(e =>
+      e.pool === pool.id && !e.parentSubprocess && !e.boundaryHost
+    );
+    const hasStart = poolTopLevelEls.some(e => e.type === "start-event");
+    const hasEnd = poolTopLevelEls.some(e => e.type === "end-event");
+    if (!hasStart) {
+      processLevelInjections.push({
+        id: `_proc_start_${pool.id}`,
+        type: "start-event",
+        label: "Start",
+        pool: pool.id,
+      });
+    }
+    if (!hasEnd) {
+      processLevelInjections.push({
+        id: `_proc_end_${pool.id}`,
+        type: "end-event",
+        label: "End",
+        pool: pool.id,
+      });
+    }
+  }
+  aiElements = [...aiElements, ...processLevelInjections];
+
   // Identify white-box and black-box pools
   const whiteBoxPools = pools.filter(p => (p.poolType ?? "white-box") === "white-box");
   const blackBoxPools = pools.filter(p => p.poolType === "black-box");
@@ -739,7 +767,16 @@ export function layoutBpmnDiagram(
       if (!existingConnKeys.has(key)) { autoConns.push({ sourceId: nearest.id, targetId: el.id, type: "sequence" }); existingConnKeys.add(key); }
     }
   }
-  const finalConnections = [...aiConnections, ...autoConns];
+  // R31: Drop any sequence connectors that touch an Event Expanded Subprocess
+  const isEventSub = (id: string): boolean => {
+    const el = elements.find(e => e.id === id);
+    return el?.type === "subprocess-expanded" &&
+      (el.properties.subprocessType as string | undefined) === "event";
+  };
+  const filteredAi = aiConnections.filter(c =>
+    !(c.type === "sequence" && (isEventSub(c.sourceId) || isEventSub(c.targetId)))
+  );
+  const finalConnections = [...filteredAi, ...autoConns];
 
   for (const c of finalConnections) {
     const src = elMap.get(c.sourceId);

@@ -55,7 +55,9 @@ R26: Any mention of an Event Expanded Subprocess sets its Usage to "Event" AND a
 R27: The nearest internal Task or Subprocess to an edge-mounted End Event is auto-connected to that End Event with a sequence connector.
 R28: The nearest internal Task or Subprocess to an edge-mounted Start Event is auto-connected from that Start Event with a sequence connector.
 R29: Event Expanded Subprocesses are always created INSIDE a containing Normal Expanded Subprocess (never at pool/lane level).
-R30: Event Expanded Subprocesses are smaller than Normal ones: 4 x Task width wide and 2 x Task height tall. They contain a Non-Interrupting Start Event near the left boundary and an End Event near the right boundary — both INSIDE the event subprocess (not boundary events).`,
+R30: Event Expanded Subprocesses are smaller than Normal ones: 4 x Task width wide and 2 x Task height tall. They contain a Non-Interrupting Start Event near the left boundary and an End Event near the right boundary — both INSIDE the event subprocess (not boundary events).
+R31: NEVER create sequence connectors TO or FROM an Event Expanded Subprocess. Event subprocesses are triggered by events, not by sequence flow.
+R32: Every process must include a Start Event and at least one End Event at the main Process Pool level (outside any subprocess). These represent the overall process entry and exit.`,
 
   "state-machine": `## Group 1: States
 S01: Every state machine must have exactly one Initial State (filled circle) and at least one Final State (bull's eye).
