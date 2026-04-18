@@ -667,6 +667,9 @@ function autoResizeUmlElement(el: DiagramElement): DiagramElement {
 }
 
 function reducer(state: DiagramData, action: Action): DiagramData {
+  if (typeof window !== "undefined" && (window as unknown as { __DIAGRAMATIX_TRACE?: boolean }).__DIAGRAMATIX_TRACE) {
+    console.log(`[TRACE reducer] action=${action.type}`);
+  }
   switch (action.type) {
     case "SET_DATA":
       return action.payload;
@@ -2967,6 +2970,12 @@ function reducer(state: DiagramData, action: Action): DiagramData {
 
 export function useDiagram(initialData: DiagramData) {
   const [data, dispatch] = useReducer(reducer, initialData);
+
+  // Build marker so we can confirm the latest build is live.
+  if (typeof window !== "undefined" && !(window as unknown as { __DIAGRAMATIX_BUILD?: string }).__DIAGRAMATIX_BUILD) {
+    (window as unknown as { __DIAGRAMATIX_BUILD?: string }).__DIAGRAMATIX_BUILD = "trace-2026-04-18-a";
+    console.log("[Diagramatix] build=trace-2026-04-18-a — set window.__DIAGRAMATIX_TRACE=true to see trace logs");
+  }
 
   // ── Undo / Redo infrastructure ──────────────────────────────────────────────
   type Snapshot = { elements: DiagramElement[]; connectors: Connector[] };

@@ -43,6 +43,12 @@ export function AdminClient({ users, currentUserId }: Props) {
         </div>
         <div className="flex items-center gap-2">
           <a
+            href="/dashboard/rules"
+            className="text-xs text-orange-600 hover:text-orange-800 font-medium border border-orange-300 rounded px-2 py-1"
+          >
+            AI Rules &amp; Preferences
+          </a>
+          <a
             href="/dashboard/admin/database"
             className="text-xs text-orange-600 hover:text-orange-800 font-medium border border-orange-300 rounded px-2 py-1"
           >

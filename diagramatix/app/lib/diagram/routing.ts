@@ -777,6 +777,9 @@ export function recomputeAllConnectors(
       const tgtEdge = sidePoint(target, conn.targetSide, conn.targetOffsetAlong ?? 0.5);
       const startPt = { x: source.x + source.width / 2, y: source.y + source.height / 2 };
       const endPt   = { x: target.x + target.width / 2, y: target.y + target.height / 2 };
+      if (typeof window !== "undefined" && (window as unknown as { __DIAGRAMATIX_TRACE?: boolean }).__DIAGRAMATIX_TRACE) {
+        console.log(`[TRACE routing.associationBPMN] ${conn.id} src=${conn.sourceId}(${conn.sourceSide}@${conn.sourceOffsetAlong}) tgt=${conn.targetId}(${conn.targetSide}@${conn.targetOffsetAlong}) srcEdge=${JSON.stringify(srcEdge)} tgtEdge=${JSON.stringify(tgtEdge)}`);
+      }
       return { ...conn, waypoints: [startPt, srcEdge, tgtEdge, endPt],
         sourceInvisibleLeader: true, targetInvisibleLeader: true };
     }

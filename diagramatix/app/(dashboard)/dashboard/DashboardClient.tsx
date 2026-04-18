@@ -227,6 +227,26 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
   const [ddlResult, setDdlResult] = useState<"success" | "failed" | null>(null);
   const ddlFileInputRef = useRef<HTMLInputElement>(null);
 
+  // Initial Zoom settings (stored in localStorage; read by Canvas.tsx on mount)
+  const [showInitialZoom, setShowInitialZoom] = useState(false);
+  const [initialZoomInput, setInitialZoomInput] = useState<string>(() => {
+    if (typeof window === "undefined") return "";
+    const stored = window.localStorage.getItem("initialZoom");
+    if (!stored) return "";
+    const n = parseFloat(stored);
+    return Number.isFinite(n) && n > 0 ? String(Math.round(n * 100)) : "";
+  });
+
+  function handleInitialZoomSave() {
+    const n = parseFloat(initialZoomInput);
+    if (!Number.isFinite(n) || n <= 0) {
+      window.localStorage.removeItem("initialZoom");
+    } else {
+      window.localStorage.setItem("initialZoom", String(Math.max(0.1, Math.min(5, n / 100))));
+    }
+    setShowInitialZoom(false);
+  }
+
   // Account modal
   const [showAccount, setShowAccount] = useState(false);
   const [acctName, setAcctName] = useState(userName);
@@ -865,16 +885,17 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                     >
                       {"Restore\u2026"}
                     </button>
+                    <div className="border-t border-gray-100" />
+                    <button
+                      onClick={() => { setFileMenuOpen(false); setShowInitialZoom(true); }}
+                      title="Zoom level used when opening a diagram. Small diagrams centre; large diagrams anchor to top-left."
+                      className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                    >
+                      {"Initial Zoom\u2026"}
+                    </button>
                     {isSu && (
                       <>
                         <div className="border-t border-gray-100" />
-                        <a
-                          href="/dashboard/rules"
-                          onClick={() => setFileMenuOpen(false)}
-                          className="block w-full text-left px-3 py-2 text-xs text-orange-600 hover:bg-orange-50 font-medium"
-                        >
-                          AI Rules &amp; Preferences
-                        </a>
                         <a
                           href="/dashboard/admin"
                           onClick={() => setFileMenuOpen(false)}
@@ -1418,6 +1439,49 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
               <button onClick={handleAccountSave} disabled={acctSaving}
                 className="px-4 py-1.5 text-xs text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50">
                 {acctSaving ? "Saving\u2026" : "Save"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Initial Zoom dialog */}
+      {showInitialZoom && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm">
+            <h2 className="text-lg font-semibold text-gray-900 mb-2">Initial Zoom</h2>
+            <p className="text-xs text-gray-500 mb-4">
+              Zoom percentage used when you open a diagram.
+              Small diagrams that fit the viewport are centred; larger diagrams anchor to the top-left corner.
+              Leave blank to use the legacy fit-to-page behaviour.
+            </p>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Zoom %</label>
+              <input
+                autoFocus
+                type="number"
+                min={25}
+                max={300}
+                step={5}
+                value={initialZoomInput}
+                onChange={(e) => setInitialZoomInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleInitialZoomSave()}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="e.g. 100"
+              />
+            </div>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setShowInitialZoom(false)}
+                className="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleInitialZoomSave}
+                className="px-4 py-2 text-sm text-white bg-blue-600 rounded-md hover:bg-blue-700"
+              >
+                Save
               </button>
             </div>
           </div>
