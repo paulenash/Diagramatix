@@ -481,11 +481,12 @@ export function Canvas({
 
   // Fit-to-content on initial mount.
   //
-  // Two presentation modes, controlled by localStorage key "initialZoom":
-  //   • unset/0 → legacy fit-to-content (whole diagram scaled to fit, centred)
-  //   • >0      → fixed readable zoom. Small diagrams centre; diagrams larger
-  //               than the viewport anchor to top-left with a margin.
-  // The chosen zoom becomes the "100%" reference for the slider.
+  // Default initial zoom is 70% (readable text at most element sizes).
+  // Users can override via System Menu → Initial Zoom…, stored in
+  // localStorage key "initialZoom" as a decimal (e.g. 0.7 = 70%).
+  // Small diagrams that fit the viewport at the chosen zoom are centred;
+  // larger diagrams anchor to the top-left with a margin. The chosen zoom
+  // becomes the "100%" reference on the zoom slider.
   const hasFitted = useRef(false);
   useEffect(() => {
     if (hasFitted.current || !svgRef.current || data.elements.length === 0) return;
@@ -511,31 +512,22 @@ export function Canvas({
     const contentH = maxY - minY;
     if (contentW < 1 || contentH < 1) return;
 
+    const DEFAULT_INITIAL_ZOOM = 0.7;
     const storedZoomRaw = typeof window !== "undefined"
       ? parseFloat(window.localStorage.getItem("initialZoom") ?? "") : NaN;
-    const storedZoom = Number.isFinite(storedZoomRaw) && storedZoomRaw > 0 ? storedZoomRaw : null;
+    const initialZoom = Number.isFinite(storedZoomRaw) && storedZoomRaw > 0
+      ? storedZoomRaw : DEFAULT_INITIAL_ZOOM;
 
-    if (storedZoom) {
-      // Fixed readable zoom. Centre if content fits, top-left-anchor if larger.
-      const EDGE_MARGIN = 40;
-      const fitsHorizontally = contentW * storedZoom <= rect.width;
-      const fitsVertically   = contentH * storedZoom <= rect.height;
-      const cx = (minX + maxX) / 2;
-      const cy = (minY + maxY) / 2;
-      const panX = fitsHorizontally ? rect.width / 2 - cx * storedZoom : EDGE_MARGIN - minX * storedZoom;
-      const panY = fitsVertically   ? rect.height / 2 - cy * storedZoom : EDGE_MARGIN - minY * storedZoom;
-      setPan({ x: panX, y: panY });
-      setZoom(storedZoom);
-      baseZoomRef.current = storedZoom;
-    } else {
-      // Legacy fit-to-content.
-      const fitZoom = Math.min(rect.width / contentW, rect.height / contentH, 1) * 0.8;
-      const cx = (minX + maxX) / 2;
-      const cy = (minY + maxY) / 2;
-      setPan({ x: rect.width / 2 - cx * fitZoom, y: rect.height / 2 - cy * fitZoom });
-      setZoom(fitZoom);
-      baseZoomRef.current = fitZoom; // this zoom level = 100% on the slider
-    }
+    const EDGE_MARGIN = 40;
+    const fitsHorizontally = contentW * initialZoom <= rect.width;
+    const fitsVertically   = contentH * initialZoom <= rect.height;
+    const cx = (minX + maxX) / 2;
+    const cy = (minY + maxY) / 2;
+    const panX = fitsHorizontally ? rect.width / 2 - cx * initialZoom : EDGE_MARGIN - minX * initialZoom;
+    const panY = fitsVertically   ? rect.height / 2 - cy * initialZoom : EDGE_MARGIN - minY * initialZoom;
+    setPan({ x: panX, y: panY });
+    setZoom(initialZoom);
+    baseZoomRef.current = initialZoom;
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Reset picker offset when a new pending drop appears

@@ -227,20 +227,24 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
   const [ddlResult, setDdlResult] = useState<"success" | "failed" | null>(null);
   const ddlFileInputRef = useRef<HTMLInputElement>(null);
 
-  // Initial Zoom settings (stored in localStorage; read by Canvas.tsx on mount)
+  // Initial Zoom settings (stored in localStorage; read by Canvas.tsx on mount).
+  // Default is 70% if the user hasn't overridden it.
+  const INITIAL_ZOOM_DEFAULT_PCT = 70;
   const [showInitialZoom, setShowInitialZoom] = useState(false);
   const [initialZoomInput, setInitialZoomInput] = useState<string>(() => {
-    if (typeof window === "undefined") return "";
+    if (typeof window === "undefined") return String(INITIAL_ZOOM_DEFAULT_PCT);
     const stored = window.localStorage.getItem("initialZoom");
-    if (!stored) return "";
+    if (!stored) return String(INITIAL_ZOOM_DEFAULT_PCT);
     const n = parseFloat(stored);
-    return Number.isFinite(n) && n > 0 ? String(Math.round(n * 100)) : "";
+    return Number.isFinite(n) && n > 0 ? String(Math.round(n * 100)) : String(INITIAL_ZOOM_DEFAULT_PCT);
   });
 
   function handleInitialZoomSave() {
     const n = parseFloat(initialZoomInput);
     if (!Number.isFinite(n) || n <= 0) {
+      // Blank/invalid → revert to default (clear override so 70% takes effect).
       window.localStorage.removeItem("initialZoom");
+      setInitialZoomInput(String(INITIAL_ZOOM_DEFAULT_PCT));
     } else {
       window.localStorage.setItem("initialZoom", String(Math.max(0.1, Math.min(5, n / 100))));
     }
@@ -1451,9 +1455,9 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
           <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm">
             <h2 className="text-lg font-semibold text-gray-900 mb-2">Initial Zoom</h2>
             <p className="text-xs text-gray-500 mb-4">
-              Zoom percentage used when you open a diagram.
+              Zoom percentage used when you open a diagram. Default is 70%.
               Small diagrams that fit the viewport are centred; larger diagrams anchor to the top-left corner.
-              Leave blank to use the legacy fit-to-page behaviour.
+              Leave blank to revert to the 70% default.
             </p>
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-1">Zoom %</label>
