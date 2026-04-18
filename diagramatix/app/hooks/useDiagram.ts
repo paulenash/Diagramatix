@@ -551,7 +551,12 @@ function validateConnectorsAgainstObstacles(connectors: Connector[], elements: D
     result = result.map(conn => {
       // Message and association connectors ignore obstacle avoidance — they
       // always render on top and keep their waypoints unchanged when elements move.
-      if (conn.type === "messageBPMN" || conn.type === "associationBPMN") return conn;
+      if (conn.type === "messageBPMN" || conn.type === "associationBPMN") {
+        if (typeof window !== "undefined" && (window as unknown as { __DIAGRAMATIX_TRACE?: boolean }).__DIAGRAMATIX_TRACE) {
+          console.log(`[TRACE validateObstacles] skipping ${conn.type} ${conn.id} srcSide=${conn.sourceSide} tgtSide=${conn.targetSide} wpCount=${conn.waypoints.length}`);
+        }
+        return conn;
+      }
       if (!connectorHitsAnyElement(conn, elements)) return conn;
       anyChanged = true;
       const source = elements.find(e => e.id === conn.sourceId);
@@ -1048,6 +1053,16 @@ function reducer(state: DiagramData, action: Action): DiagramData {
 
       const affectedIds = new Set([id, ...descendantIds, ...attachedBoundaryIds]);
 
+      const trace = typeof window !== "undefined" && (window as unknown as { __DIAGRAMATIX_TRACE?: boolean }).__DIAGRAMATIX_TRACE;
+      if (trace) {
+        console.log(`[TRACE MOVE_ELEMENT] id=${id} type=${el.type} dx=${dx} dy=${dy} affected=[${[...affectedIds].join(",")}]`);
+        for (const conn of state.connectors) {
+          if (conn.type === "messageBPMN" || conn.type === "associationBPMN") {
+            console.log(`  pre ${conn.type} ${conn.id} src=${conn.sourceId}(${conn.sourceSide}@${conn.sourceOffsetAlong}) tgt=${conn.targetId}(${conn.targetSide}@${conn.targetOffsetAlong}) wp=${JSON.stringify(conn.waypoints)}`);
+          }
+        }
+      }
+
       // Step 1: Initial connector update
       let connectors = state.connectors.map(conn => {
         const srcIn = affectedIds.has(conn.sourceId);
@@ -1057,6 +1072,9 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         }
         if (srcIn || tgtIn) {
           const recomputed = recomputeAllConnectors([conn], elements)[0] ?? conn;
+          if (trace && (conn.type === "messageBPMN" || conn.type === "associationBPMN")) {
+            console.log(`  recomputed ${conn.type} ${conn.id} src=${recomputed.sourceId}(${recomputed.sourceSide}@${recomputed.sourceOffsetAlong}) tgt=${recomputed.targetId}(${recomputed.targetSide}@${recomputed.targetOffsetAlong}) wp=${JSON.stringify(recomputed.waypoints)}`);
+          }
           const labelAdj = adjustMsgLabelOffset(conn, conn.waypoints, recomputed.waypoints);
           return Object.keys(labelAdj).length > 0 ? { ...recomputed, ...labelAdj } : recomputed;
         }
@@ -1079,6 +1097,14 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         connectors = [...validateConnectorsAgainstObstacles(toValidate, elements), ...unchanged];
       } else {
         connectors = validateConnectorsAgainstObstacles(connectors, elements);
+      }
+
+      if (trace) {
+        for (const conn of connectors) {
+          if (conn.type === "messageBPMN" || conn.type === "associationBPMN") {
+            console.log(`  post ${conn.type} ${conn.id} src=${conn.sourceId}(${conn.sourceSide}@${conn.sourceOffsetAlong}) tgt=${conn.targetId}(${conn.targetSide}@${conn.targetOffsetAlong}) wp=${JSON.stringify(conn.waypoints)}`);
+          }
+        }
       }
 
       return { ...state, elements: updatePoolTypes(elements), connectors };

@@ -768,6 +768,19 @@ export function recomputeAllConnectors(
         sourceOffsetAlong: repairedSrcOffset };
     }
 
+    // associationBPMN: keep stored sides and offsets. When an endpoint element
+    // moves, recompute waypoints straight from side-midpoint to side-midpoint so
+    // the connector stays attached to its original boundaries rather than flipping
+    // to the nearest side (which produced the "diagonal pointing to centre" bug).
+    if (conn.type === "associationBPMN") {
+      const srcEdge = sidePoint(source, conn.sourceSide, conn.sourceOffsetAlong ?? 0.5);
+      const tgtEdge = sidePoint(target, conn.targetSide, conn.targetOffsetAlong ?? 0.5);
+      const startPt = { x: source.x + source.width / 2, y: source.y + source.height / 2 };
+      const endPt   = { x: target.x + target.width / 2, y: target.y + target.height / 2 };
+      return { ...conn, waypoints: [startPt, srcEdge, tgtEdge, endPt],
+        sourceInvisibleLeader: true, targetInvisibleLeader: true };
+    }
+
     // Curvilinear: if the user has adjusted handles, preserve control points relative to edges
     if (conn.routingType === "curvilinear" && conn.cp1RelOffset && conn.cp2RelOffset) {
       const srcEdge = sidePoint(source, conn.sourceSide, conn.sourceOffsetAlong ?? 0.5);
