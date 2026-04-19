@@ -259,5 +259,14 @@ export interface TemplateData {
  *          AI: document attachment, speech dictation.
  *          UI: zoom slider, PDF title export, select-all on focus,
  *          no inline edit for events/data elements, Import/Export menu rename.
+ * v1.8:    BPMN: pool.properties.isSystem now first-class (set by AI Plan;
+ *          falls back to label regex). Two-phase AI Plan workflow for BPMN
+ *          (Plan + Apply Layout endpoints, 4-tab structural editor, plan
+ *          JSON persisted alongside saved Prompts via Prompt.planJson).
+ *          Pool behaviour: message connectors blocked on white-box pools;
+ *          orphan messages to white-box pools highlighted red; deleting
+ *          a lane shrinks the pool height; right-edge resize grip appears
+ *          only during an active drag. Click model: white-box pool header
+ *          and lane header are the only selection hit zones (bodies bubble).
  */
-export const SCHEMA_VERSION = "1.7";
+export const SCHEMA_VERSION = "1.8";

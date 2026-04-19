@@ -1093,6 +1093,23 @@ function reducer(state: DiagramData, action: Action): DiagramData {
           return { ...conn, waypoints: conn.waypoints.map(pt => ({ x: pt.x + dx, y: pt.y + dy })) };
         }
         if (srcIn || tgtIn) {
+          // messageBPMN: shift the shared-x by dx so both ends follow whichever
+          // endpoint is the moving one. recomputeAllConnectors's messageBPMN
+          // branch derives x purely from sourceOffsetAlong, which leaves the
+          // target's attachment drifting when the target is what moved.
+          if (conn.type === "messageBPMN") {
+            const source = elements.find(e => e.id === conn.sourceId);
+            const target = elements.find(e => e.id === conn.targetId);
+            if (source && target) {
+              const priorX = conn.waypoints[1]?.x ?? (source.x + source.width * (conn.sourceOffsetAlong ?? 0.5));
+              const newSharedX = priorX + dx;
+              const newSrcOffset = source.width > 0 ? (newSharedX - source.x) / source.width : 0.5;
+              const wp = messageBpmnWaypoints(source, target, conn.sourceSide, conn.targetSide, newSrcOffset);
+              const labelAdj = adjustMsgLabelOffset(conn, conn.waypoints, wp.waypoints);
+              return { ...conn, sourceOffsetAlong: newSrcOffset, waypoints: wp.waypoints,
+                sourceInvisibleLeader: wp.sourceInvisibleLeader, targetInvisibleLeader: wp.targetInvisibleLeader, ...labelAdj };
+            }
+          }
           const recomputed = recomputeAllConnectors([conn], elements)[0] ?? conn;
           if (trace && (conn.type === "messageBPMN" || conn.type === "associationBPMN")) {
             console.log(`  recomputed ${conn.type} ${conn.id} src=${recomputed.sourceId}(${recomputed.sourceSide}@${recomputed.sourceOffsetAlong}) tgt=${recomputed.targetId}(${recomputed.targetSide}@${recomputed.targetOffsetAlong}) wp=${JSON.stringify(recomputed.waypoints)}`);
@@ -1156,21 +1173,36 @@ function reducer(state: DiagramData, action: Action): DiagramData {
 
       // Connector updates during multi-element drag:
       //   • fully-contained (both ends in the moved group) → translate waypoints
-      //   • partial messageBPMN / associationBPMN (one end in the moved group) →
-      //     recompute so the connector tracks the moving endpoint. Both types
-      //     have side-preserving branches in routing.ts.
-      //   • other partial connectors are left stale during drag; the final
-      //     recompute runs on ELEMENTS_MOVE_END (CORRECT_ALL_CONNECTORS).
+      //   • partial messageBPMN → shift the vertical line's shared-x by dx and
+      //     update sourceOffsetAlong so the stored model matches the visual.
+      //     Without this, recomputeAllConnectors would re-derive x from the
+      //     unchanged source offset when the TARGET is the moving one, and the
+      //     target's attachment would drift.
+      //   • any other partial connector (sequence, transition, association,
+      //     associationBPMN, uml-*, etc.) → recompute via recomputeAllConnectors
+      //     so the route tracks whichever endpoint moved. Other partials used
+      //     to be deferred to ELEMENTS_MOVE_END, which left a visible lag.
       const connectors = state.connectors.map(conn => {
         const srcIn = expandedIds.has(conn.sourceId);
         const tgtIn = expandedIds.has(conn.targetId);
         if (srcIn && tgtIn) {
           return { ...conn, waypoints: conn.waypoints.map(pt => ({ x: pt.x + dx, y: pt.y + dy })) };
         }
-        if ((srcIn || tgtIn) && (conn.type === "messageBPMN" || conn.type === "associationBPMN")) {
-          return recomputeAllConnectors([conn], elements)[0] ?? conn;
+        if (!srcIn && !tgtIn) return conn;
+        if (conn.type === "messageBPMN") {
+          const source = elements.find(e => e.id === conn.sourceId);
+          const target = elements.find(e => e.id === conn.targetId);
+          if (source && target) {
+            const priorX = conn.waypoints[1]?.x ?? (source.x + source.width * (conn.sourceOffsetAlong ?? 0.5));
+            const newSharedX = priorX + dx;
+            const newSrcOffset = source.width > 0 ? (newSharedX - source.x) / source.width : 0.5;
+            const wp = messageBpmnWaypoints(source, target, conn.sourceSide, conn.targetSide, newSrcOffset);
+            const labelAdj = adjustMsgLabelOffset(conn, conn.waypoints, wp.waypoints);
+            return { ...conn, sourceOffsetAlong: newSrcOffset, waypoints: wp.waypoints,
+              sourceInvisibleLeader: wp.sourceInvisibleLeader, targetInvisibleLeader: wp.targetInvisibleLeader, ...labelAdj };
+          }
         }
-        return conn;
+        return recomputeAllConnectors([conn], elements)[0] ?? conn;
       });
 
       return { ...state, elements: updatePoolTypes(elements), connectors };

@@ -2359,11 +2359,78 @@ export const CHAPTERS: HelpChapter[] = [
     sections: [
       {
         body: (
-          <p>
-            Generate diagrams from natural language descriptions using AI.
-            Available for all diagram types via the{" "}
-            <strong>AI Generate</strong> button in the diagram editor toolbar.
-          </p>
+          <>
+            <p>
+              Generate diagrams from natural language descriptions using AI.
+              Available for all diagram types via the{" "}
+              <strong>AI Generate</strong> button in the diagram editor toolbar.
+            </p>
+            <p className="mt-2">
+              <strong>BPMN</strong> uses a two-phase workflow (Plan then Apply
+              Layout) that lets you review and edit the AI&rsquo;s structural
+              plan before any layout work runs. Other diagram types use a
+              one-shot workflow that returns a finished diagram directly.
+            </p>
+          </>
+        ),
+      },
+      {
+        heading: "Two-phase flow (BPMN only)",
+        body: (
+          <>
+            <p>
+              BPMN diagram generation has two steps:
+            </p>
+            <ol className="list-decimal list-inside space-y-1 mt-1">
+              <li>
+                <strong>Plan</strong> — your prompt (and any attachment) is
+                sent to Sonnet along with the BPMN rules. Sonnet returns a
+                structured JSON plan describing pools, lanes, elements, and
+                connectors. No diagram is rendered yet.
+              </li>
+              <li>
+                <strong>Apply Layout</strong> — the (possibly edited) plan is
+                handed to the BPMN layout engine which positions every element
+                and applies the layout rules (R16–R32). This second step is
+                local and fast; no AI call.
+              </li>
+            </ol>
+            <p className="mt-2">
+              The plan is shown in four synchronised tabs. Edit on any tab;
+              changes propagate to the others.
+            </p>
+            <ul className="list-disc list-inside space-y-1 mt-1">
+              <li>
+                <strong>Pools / Lanes</strong> — pools with nested lanes.
+                Rename inline, delete with <strong>&times;</strong>.
+                Black-box vs white-box is shown via the BB/WB badge.
+              </li>
+              <li>
+                <strong>Elements</strong> — flow elements grouped by their
+                container (pool → lane → subprocess), with a type badge
+                (task / gw / start / end / &hellip;) on each row.
+                Boundary events appear in their own section. Deleting an
+                element also removes its connectors.
+              </li>
+              <li>
+                <strong>Connectors</strong> — grouped into Sequence, Message,
+                and Other sections. Shows source → target with editable
+                label.
+              </li>
+              <li>
+                <strong>Raw JSON</strong> — full editable textarea. Typing
+                doesn&rsquo;t clobber structured state mid-edit — changes
+                are committed back to the model on blur or by clicking{" "}
+                <strong>Apply JSON to structured tabs</strong>.
+              </li>
+            </ul>
+            <p className="mt-2">
+              <strong>Re-send to Sonnet</strong> runs the Plan step again with
+              the current prompt (asks for confirmation if you have unsynced
+              edits). <strong>Apply Layout</strong> runs the second phase and
+              replaces the canvas with the result.
+            </p>
+          </>
         ),
       },
       {
@@ -2414,6 +2481,13 @@ export const CHAPTERS: HelpChapter[] = [
               <strong>edit mode</strong> — modify the text and click{" "}
               <strong>Update</strong> to save changes, or{" "}
               <strong>New</strong> to save as a fresh prompt.
+            </li>
+            <li>
+              <strong>BPMN two-phase:</strong> saving also stores the current
+              plan JSON (with any structural edits) alongside the prompt text.
+              Reloading the prompt later restores both the prompt AND the plan,
+              so you can keep iterating on the same structural draft without
+              re-calling Sonnet.
             </li>
             <li>
               Delete prompts with the <strong>&times;</strong> button

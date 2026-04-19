@@ -371,6 +371,13 @@
     flexible PropertiesType key/value pairs):
 
       adHoc            : boolean   — subprocess/subprocess-expanded marker (BPMN 2 §13.5)
+      isSystem         : boolean   — black-box pool only (schema 1.8). true = IT system
+                                     (positioned below the main process pool and kept with
+                                     task.taskType "user" / "service" per R07); false =
+                                     external entity / person / organisation (positioned
+                                     above the main pool, R06 Send/Receive task typing).
+                                     Set explicitly by the AI Plan workflow; falls back
+                                     to a label-keyword regex for legacy/manual pools.
       labelOffsetX     : decimal   — gateway/event/data external label X offset
       labelOffsetY     : decimal   — gateway/event/data external label Y offset
       labelWidth       : decimal   — gateway/event/data external label width
@@ -423,6 +430,30 @@
       (PDF with native document understanding, or text files: .txt, .md, .csv, .rtf).
       Saved prompts are filtered by diagram type and support edit/update.
       AI Rules & Preferences (admin) control generation behaviour per diagram type.
+
+    AI Plan (two-phase) workflow for BPMN (schema 1.8):
+      BPMN diagrams use a two-phase flow. Phase 1 (POST /api/ai/bpmn/plan)
+      sends the prompt + rules to Sonnet and returns a normalised JSON plan
+      ({ elements: AiElement[], connections: AiConnection[] }) without running
+      layout. Phase 2 (POST /api/ai/bpmn/apply-layout) takes a (possibly
+      user-edited) plan, validates via Zod, and runs the deterministic layout
+      engine. The plan is exposed in the Diagram Editor via four synchronised
+      tabs (Pools/Lanes, Elements, Connectors, Raw JSON) — edits made on any
+      tab propagate to the others. The plan JSON is persisted alongside the
+      saved Prompt record (Prompt.planJson column) so reloading a prompt
+      restores both the text and the last structural draft.
+
+      Green vs red rule split: rules under BPMN groups whose heading matches
+      /layout|positioning|placement|spacing|sizing|arrangement|connector routing/i
+      are categorised as layout-engine-enforced (red); all others are
+      AI-enforced (green). Currently both sets are sent to Sonnet; future
+      work will send only green rules to Sonnet with layout-only rules
+      applied locally.
+
+      R31 (no sequence to/from Event Expanded Subprocess) is enforced in four
+      places: AI system prompt, layout engine filter, manual ADD_CONNECTOR
+      reducer, UI drop-target highlighting. The layout filter treats a
+      connection with no explicit type as sequence (matches downstream default).
   -->
 
 
