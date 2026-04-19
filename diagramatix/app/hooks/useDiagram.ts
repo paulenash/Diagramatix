@@ -1154,14 +1154,21 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         return { ...e, x: e.x + dx, y: e.y + dy };
       });
 
-      // Only update connectors that are fully within the moved group (translate waypoints)
-      // Skip recomputing partial connectors and obstacle validation during drag
-      // — full recomputation runs on ELEMENTS_MOVE_END
+      // Connector updates during multi-element drag:
+      //   • fully-contained (both ends in the moved group) → translate waypoints
+      //   • partial messageBPMN / associationBPMN (one end in the moved group) →
+      //     recompute so the connector tracks the moving endpoint. Both types
+      //     have side-preserving branches in routing.ts.
+      //   • other partial connectors are left stale during drag; the final
+      //     recompute runs on ELEMENTS_MOVE_END (CORRECT_ALL_CONNECTORS).
       const connectors = state.connectors.map(conn => {
         const srcIn = expandedIds.has(conn.sourceId);
         const tgtIn = expandedIds.has(conn.targetId);
         if (srcIn && tgtIn) {
           return { ...conn, waypoints: conn.waypoints.map(pt => ({ x: pt.x + dx, y: pt.y + dy })) };
+        }
+        if ((srcIn || tgtIn) && (conn.type === "messageBPMN" || conn.type === "associationBPMN")) {
+          return recomputeAllConnectors([conn], elements)[0] ?? conn;
         }
         return conn;
       });

@@ -1474,6 +1474,9 @@ export function SymbolRenderer({
   const [isEditingGatewayLabel, setIsEditingGatewayLabel] = useState(false);
   const [editGatewayLabelValue, setEditGatewayLabelValue] = useState("");
   const [labelHighlighted, setLabelHighlighted] = useState(false);
+  // Pool right-edge resize: visible grip only appears while the user is actively
+  // dragging it. Hit-zone stays invisible & click-catching; grip fades out on mouseup.
+  const [poolResizeActive, setPoolResizeActive] = useState(false);
   // Clear label highlight when element is deselected
   if (!selected && labelHighlighted) setLabelHighlighted(false);
   let dragStart: { mouseX: number; mouseY: number; elX: number; elY: number } | null = null;
@@ -2188,10 +2191,10 @@ export function SymbolRenderer({
         })
       }
 
-      {/* Always-visible right-edge resize handle for pools — a wide blue band
-          with a ↔ glyph. Lets the user grow/shrink pool width (and enclosed
-          lanes, via the existing pool-resize reflow in RESIZE_ELEMENT) without
-          having to select the pool first. */}
+      {/* Pool right-edge resize handle. Hit zone (invisible) is always active,
+          so a click near the right edge initiates a drag; the visible grip +
+          ↔ glyph only render WHILE the drag is active, then disappear on
+          mouseup. Gives a clean visual with no always-on chrome. */}
       {element.type === "pool" && onResizeDragStart && (() => {
         const HANDLE_W = 10;
         const gripH = Math.min(40, element.height * 0.5);
@@ -2207,21 +2210,34 @@ export function SymbolRenderer({
               width={HANDLE_W * 2} height={element.height}
               fill="transparent"
               style={{ cursor: "ew-resize" }}
-              onMouseDown={(e) => { e.stopPropagation(); onResizeDragStart("e", e); }}
+              onMouseDown={(e) => {
+                e.stopPropagation();
+                setPoolResizeActive(true);
+                onResizeDragStart("e", e);
+                const onUp = () => {
+                  setPoolResizeActive(false);
+                  window.removeEventListener("mouseup", onUp);
+                };
+                window.addEventListener("mouseup", onUp);
+              }}
             />
-            {/* Visible blue grip */}
-            <rect
-              x={hx} y={hy}
-              width={HANDLE_W} height={gripH}
-              fill="#2563eb" fillOpacity={0.75} stroke="white" strokeWidth={1} rx={2}
-              style={{ cursor: "ew-resize", pointerEvents: "none" }}
-            />
-            {/* ↔ glyph — two white triangles */}
-            <path
-              d={`M ${cx - 4} ${cy} L ${cx - 1} ${cy - 3} L ${cx - 1} ${cy + 3} Z M ${cx + 4} ${cy} L ${cx + 1} ${cy - 3} L ${cx + 1} ${cy + 3} Z`}
-              fill="white"
-              style={{ pointerEvents: "none" }}
-            />
+            {poolResizeActive && (
+              <>
+                {/* Visible blue grip */}
+                <rect
+                  x={hx} y={hy}
+                  width={HANDLE_W} height={gripH}
+                  fill="#2563eb" fillOpacity={0.75} stroke="white" strokeWidth={1} rx={2}
+                  style={{ cursor: "ew-resize", pointerEvents: "none" }}
+                />
+                {/* ↔ glyph — two white triangles */}
+                <path
+                  d={`M ${cx - 4} ${cy} L ${cx - 1} ${cy - 3} L ${cx - 1} ${cy + 3} Z M ${cx + 4} ${cy} L ${cx + 1} ${cy - 3} L ${cx + 1} ${cy + 3} Z`}
+                  fill="white"
+                  style={{ pointerEvents: "none" }}
+                />
+              </>
+            )}
           </g>
         );
       })()}
