@@ -57,7 +57,11 @@ R28: The nearest internal Task or Subprocess to an edge-mounted Start Event is a
 R29: Event Expanded Subprocesses are always created INSIDE a containing Normal Expanded Subprocess (never at pool/lane level).
 R30: Event Expanded Subprocesses are smaller than Normal ones: 4 x Task width wide and 2 x Task height tall. They contain a Non-Interrupting Start Event near the left boundary and an End Event near the right boundary — both INSIDE the event subprocess (not boundary events).
 R31: NEVER create sequence connectors TO or FROM an Event Expanded Subprocess. Event subprocesses are triggered by events, not by sequence flow.
-R32: Every process must include a Start Event and at least one End Event at the main Process Pool level (outside any subprocess). These represent the overall process entry and exit.`,
+R32: Every process must include a Start Event and at least one End Event at the main Process Pool level (outside any subprocess). These represent the overall process entry and exit.
+R33: A Gateway with one (or zero) incoming sequence connector and two or more outgoing sequence connectors must have gatewayType="none" and gatewayRole="decision" (unless an explicit marker such as parallel or inclusive was set).
+R34: A Gateway with two or more incoming sequence connectors and one (or zero) outgoing sequence connector must have gatewayType="none" and gatewayRole="merge" (unless an explicit marker was set).
+R35: Decision gateway wiring — the incoming sequence connector attaches to the left diamond point; outgoing connectors attach in AI order to top, then bottom, then right (for up to three outgoing branches).
+R36: Merge gateway wiring — the outgoing sequence connector attaches to the right diamond point; incoming connectors attach in AI order to top, then bottom, then left (for up to three incoming branches).`,
 
   "state-machine": `## Group 1: States
 S01: Every state machine must have exactly one Initial State (filled circle) and at least one Final State (bull's eye).

@@ -731,17 +731,69 @@ export function layoutBpmnDiagram(
 
   // Helper: check if element is a gateway
   const isGateway = (el: DiagramElement) => el.type === "gateway";
-  // Helper: check if gateway is a merge (has 2+ incoming sequence connectors)
+
+  // Gateway classification — strict topology test per AI layout rules R33/R34:
+  //   Decision: exactly one (or zero) sequence inputs, two or more sequence outputs.
+  //   Merge:    two or more sequence inputs, exactly one (or zero) sequence outputs.
+  //   Neither:  falls through to default wiring.
   const incomingCount = new Map<string, number>();
+  const outgoingCount = new Map<string, number>();
+  // Ordered per-gateway connector lists (sequence flows only) — preserve the
+  // AI's ordering so wiring (R35/R36) is deterministic across re-layouts.
+  const decisionOutgoings = new Map<string, AiConnection[]>();
+  const mergeIncomings    = new Map<string, AiConnection[]>();
   for (const c of aiConnections) {
-    if (c.type !== "message") {
-      incomingCount.set(c.targetId, (incomingCount.get(c.targetId) ?? 0) + 1);
+    if (c.type === "message") continue;
+    incomingCount.set(c.targetId, (incomingCount.get(c.targetId) ?? 0) + 1);
+    outgoingCount.set(c.sourceId, (outgoingCount.get(c.sourceId) ?? 0) + 1);
+  }
+  const isDecisionGateway = (el: DiagramElement) =>
+    isGateway(el) && (outgoingCount.get(el.id) ?? 0) >= 2 && (incomingCount.get(el.id) ?? 0) <= 1;
+  const isMergeGateway = (el: DiagramElement) =>
+    isGateway(el) && (incomingCount.get(el.id) ?? 0) >= 2 && (outgoingCount.get(el.id) ?? 0) <= 1;
+
+  // R33/R34: patch classified gateways' properties so rendering and downstream
+  // checks (e.g. Canvas.tsx gatewayRole reads) see the correct role. We only
+  // OVERRIDE gatewayType when it's unset or "exclusive" default from the AI —
+  // if the user / AI explicitly set a specific marker (parallel, inclusive),
+  // preserve it since that's a deliberate semantic choice.
+  for (const el of elements) {
+    if (!isGateway(el)) continue;
+    if (isDecisionGateway(el)) {
+      const t = (el.properties.gatewayType as string | undefined) ?? el.gatewayType ?? "exclusive";
+      if (t === "exclusive" || t === "none") {
+        el.properties = { ...el.properties, gatewayType: "none", gatewayRole: "decision" };
+        el.gatewayType = "none";
+      } else {
+        el.properties = { ...el.properties, gatewayRole: "decision" };
+      }
+    } else if (isMergeGateway(el)) {
+      const t = (el.properties.gatewayType as string | undefined) ?? el.gatewayType ?? "exclusive";
+      if (t === "exclusive" || t === "none") {
+        el.properties = { ...el.properties, gatewayType: "none", gatewayRole: "merge" };
+        el.gatewayType = "none";
+      } else {
+        el.properties = { ...el.properties, gatewayRole: "merge" };
+      }
     }
   }
-  const isMergeGateway = (el: DiagramElement) =>
-    isGateway(el) && (incomingCount.get(el.id) ?? 0) >= 2;
-  const isDecisionGateway = (el: DiagramElement) =>
-    isGateway(el) && !isMergeGateway(el);
+
+  // Build the ordered lists for the wiring pass (R35/R36).
+  for (const c of aiConnections) {
+    if (c.type === "message") continue;
+    const srcEl = elements.find(e => e.id === c.sourceId);
+    const tgtEl = elements.find(e => e.id === c.targetId);
+    if (srcEl && isDecisionGateway(srcEl)) {
+      const list = decisionOutgoings.get(srcEl.id) ?? [];
+      list.push(c);
+      decisionOutgoings.set(srcEl.id, list);
+    }
+    if (tgtEl && isMergeGateway(tgtEl)) {
+      const list = mergeIncomings.get(tgtEl.id) ?? [];
+      list.push(c);
+      mergeIncomings.set(tgtEl.id, list);
+    }
+  }
 
   // ── R27/R28: Auto-connect boundary start/end events to nearest internal task/subprocess ──
   // Boundary start events → connect FROM start TO nearest child task/subprocess
@@ -822,27 +874,37 @@ export function layoutBpmnDiagram(
       const srcCy = src.y + src.height / 2;
       const tgtCy = tgt.y + tgt.height / 2;
 
-      // Fix 2: Decision gateway outgoing — use top/bottom for branching
-      if (isDecisionGateway(src)) {
-        if (tgtCy < srcCy) {
-          // Target is above → exit from top
-          srcSide = "top"; tgtSide = "left";
-        } else if (tgtCy > srcCy) {
-          // Target is below → exit from bottom
-          srcSide = "bottom"; tgtSide = "left";
+      // R35/R36: Gateway wiring is ORDER-based — sides assigned by the AI's
+      // connection order in the input array, giving a deterministic layout.
+      //   Decision gateway: incoming → left; outgoing → top, bottom, right (1st..3rd)
+      //   Merge gateway:    outgoing → right; incoming → top, bottom, left (1st..3rd)
+      // Each end is resolved independently so a decision-to-merge connector
+      // picks the correct side at BOTH ends.
+      const decisionOrder: Array<"top" | "bottom" | "right"> = ["top", "bottom", "right"];
+      const mergeOrder:    Array<"top" | "bottom" | "left">  = ["top", "bottom", "left"];
+      const srcIsDecision = isDecisionGateway(src);
+      const tgtIsMerge    = isMergeGateway(tgt);
+      const srcIsMerge    = isMergeGateway(src);    // merge's outgoing → right
+      const tgtIsDecision = isDecisionGateway(tgt); // decision's incoming → left
+
+      if (srcIsDecision || tgtIsMerge || srcIsMerge || tgtIsDecision) {
+        if (srcIsDecision) {
+          const list = decisionOutgoings.get(src.id) ?? [];
+          const idx = list.indexOf(c);
+          srcSide = (idx >= 0 && idx < 3 ? decisionOrder[idx] : "right");
+        } else if (srcIsMerge) {
+          srcSide = "right";
         } else {
-          // Same row → right to left
-          srcSide = "right"; tgtSide = "left";
+          srcSide = "right";
         }
-      }
-      // Fix 3: Merge gateway incoming — enter from top/bottom
-      else if (isMergeGateway(tgt)) {
-        if (srcCy < tgtCy) {
-          srcSide = "right"; tgtSide = "top";
-        } else if (srcCy > tgtCy) {
-          srcSide = "right"; tgtSide = "bottom";
+        if (tgtIsMerge) {
+          const list = mergeIncomings.get(tgt.id) ?? [];
+          const idx = list.indexOf(c);
+          tgtSide = (idx >= 0 && idx < 3 ? mergeOrder[idx] : "left");
+        } else if (tgtIsDecision) {
+          tgtSide = "left";
         } else {
-          srcSide = "right"; tgtSide = "left";
+          tgtSide = "left";
         }
       }
       // Default: left-to-right or vertical
