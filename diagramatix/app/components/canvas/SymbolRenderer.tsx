@@ -49,6 +49,8 @@ interface Props {
   /** True if this element is the source for an in-progress connection-creation
    *  mode (set by Canvas after onEnterConnectionMode fires). */
   inConnectionMode?: boolean;
+  /** Debug mode — overlays live poolH/elemH labels on pools and elements. */
+  debugMode?: boolean;
 }
 
 function ellipseOctagonPoints(cx: number, cy: number, rx: number, ry: number): string {
@@ -1468,6 +1470,7 @@ export function SymbolRenderer({
   onEnterConnectionMode,
   onCancelConnectionMode,
   inConnectionMode,
+  debugMode,
 }: Props) {
   const fontScale = useContext(FontScaleCtx);
   const fs = (base: number) => Math.round(base * fontScale * 10) / 10;
@@ -2475,6 +2478,27 @@ export function SymbolRenderer({
               />
             )}
           </g>
+        );
+      })()}
+
+      {/* Debug overlay: live height readout so the user can see poolH / elemH
+          update as they drag resize handles or reorder lanes. Placed at the
+          top-right corner of the element so it doesn't cover the main shape. */}
+      {debugMode && (() => {
+        const tag = element.type === "pool"
+          ? `poolH=${element.height.toFixed(0)}`
+          : `elemH=${element.height.toFixed(0)}`;
+        return (
+          <text
+            x={element.x + element.width - 4}
+            y={element.y + 10}
+            textAnchor="end"
+            fontSize={9}
+            fill="#b91c1c"
+            style={{ pointerEvents: "none", userSelect: "none" }}
+          >
+            {tag}
+          </text>
         );
       })()}
     </g>

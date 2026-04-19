@@ -2708,6 +2708,7 @@ export function Canvas({
                 onGroupMove={onMoveElements ? (dx, dy) => onMoveElements([...selectedElementIds], dx / zoom, dy / zoom) : undefined}
                 onGroupMoveEnd={onElementsMoveEnd}
                 colorConfig={colorConfig}
+                debugMode={debugMode}
                 onEnterConnectionMode={el.type !== "final-state" && diagramType !== "value-chain" ? () => setPendingConnSourceId(el.id) : undefined}
                 onCancelConnectionMode={() => setPendingConnSourceId(null)}
                 inConnectionMode={pendingConnSourceId === el.id}
@@ -2736,6 +2737,7 @@ export function Canvas({
               onUpdateProperties={onUpdateProperties}
               onUpdateLabel={onUpdateLabel}
               colorConfig={colorConfig}
+              debugMode={debugMode}
             />
           ))}
 
@@ -3027,6 +3029,7 @@ export function Canvas({
               onGroupMove={onMoveElements ? (dx, dy) => onMoveElements([...selectedElementIds], dx / zoom, dy / zoom) : undefined}
               onGroupMoveEnd={onElementsMoveEnd}
               colorConfig={colorConfig}
+              debugMode={debugMode}
               shouldSnapBack={(x, y) => {
                 const cx = x + el.width / 2;
                 const cy = y + el.height / 2;
@@ -3219,6 +3222,7 @@ export function Canvas({
                 onGroupMove={onMoveElements ? (dx, dy) => onMoveElements([...selectedElementIds], dx / zoom, dy / zoom) : undefined}
                 onGroupMoveEnd={onElementsMoveEnd}
                 colorConfig={colorConfig}
+                debugMode={debugMode}
                 onEnterConnectionMode={el.type !== "final-state" && diagramType !== "value-chain" ? () => setPendingConnSourceId(el.id) : undefined}
                 onCancelConnectionMode={() => setPendingConnSourceId(null)}
                 inConnectionMode={pendingConnSourceId === el.id}
@@ -3254,6 +3258,7 @@ export function Canvas({
               onGroupMove={onMoveElements ? (dx, dy) => onMoveElements([...selectedElementIds], dx / zoom, dy / zoom) : undefined}
               onGroupMoveEnd={onElementsMoveEnd}
               colorConfig={colorConfig}
+              debugMode={debugMode}
             />
           ))}
 
@@ -3263,6 +3268,26 @@ export function Canvas({
             const tgtEl = data.elements.find(e => e.id === conn.targetId);
             const srcBounds = srcEl ? { x: srcEl.x, y: srcEl.y, width: srcEl.width, height: srcEl.height } : undefined;
             const tgtBounds = tgtEl ? { x: tgtEl.x, y: tgtEl.y, width: tgtEl.width, height: tgtEl.height } : undefined;
+            // Walk parentId chain to the containing pool (or use the element
+            // itself if it IS a pool). Debug-only — drives the poolH field in
+            // the debug overlay so the reflection maths can be verified.
+            function containingPoolHeight(el: DiagramElement | undefined): number | undefined {
+              if (!el) return undefined;
+              if (el.type === "pool") return el.height;
+              let cur: DiagramElement | undefined = el;
+              for (let i = 0; i < 10 && cur; i++) {
+                if (!cur.parentId) break;
+                const parent = data.elements.find(e => e.id === cur!.parentId);
+                if (!parent) break;
+                if (parent.type === "pool") return parent.height;
+                cur = parent;
+              }
+              return undefined;
+            }
+            const srcPoolH = containingPoolHeight(srcEl);
+            const tgtPoolH = containingPoolHeight(tgtEl);
+            const srcIsPool = srcEl?.type === "pool";
+            const tgtIsPool = tgtEl?.type === "pool";
             return (
               <ConnectorRenderer
                 key={conn.id}
@@ -3284,6 +3309,10 @@ export function Canvas({
                 onUpdateEndOffset={handleUpdateEndOffset}
                 sourceBounds={srcBounds}
                 targetBounds={tgtBounds}
+                sourcePoolHeight={srcPoolH}
+                targetPoolHeight={tgtPoolH}
+                sourceIsPool={srcIsPool}
+                targetIsPool={tgtIsPool}
               />
             );
           })}

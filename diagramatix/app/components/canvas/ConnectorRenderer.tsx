@@ -24,6 +24,14 @@ interface Props {
    *  the element rather than the connector. */
   sourceBounds?: { x: number; y: number; width: number; height: number };
   targetBounds?: { x: number; y: number; width: number; height: number };
+  /** Height of the pool that contains the source endpoint (pool itself if source is a pool). Debug only. */
+  sourcePoolHeight?: number;
+  /** Height of the pool that contains the target endpoint (pool itself if target is a pool). Debug only. */
+  targetPoolHeight?: number;
+  /** True if the source element IS a pool (not a task inside one). Debug only. */
+  sourceIsPool?: boolean;
+  /** True if the target element IS a pool (not a task inside one). Debug only. */
+  targetIsPool?: boolean;
 }
 
 // Line segment intersection: returns the parameter t along segment (a1→a2) where it crosses (b1→b2), or null
@@ -471,7 +479,7 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
   );
 }
 
-export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, onUpdateWaypoints, onWaypointsDragEnd, onUpdateLabel, onUpdateCurveHandles, misaligned, otherConnectorWaypoints, debugMode, onUpdateEndOffset, showBottleneck, sourceBounds, targetBounds }: Props) {
+export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, onUpdateWaypoints, onWaypointsDragEnd, onUpdateLabel, onUpdateCurveHandles, misaligned, otherConnectorWaypoints, debugMode, onUpdateEndOffset, showBottleneck, sourceBounds, targetBounds, sourcePoolHeight, targetPoolHeight, sourceIsPool, targetIsPool }: Props) {
   const displayMode = useContext(DisplayModeCtx);
   const connFontScale = useContext(ConnectorFontScaleCtx);
   const [draggingEndLabel, setDraggingEndLabel] = useState<string | null>(null);
@@ -1228,6 +1236,53 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
           style={{ pointerEvents: "none" }}
         />
       ))}
+
+      {/* Debug: coordinates of message/association connector endpoints and
+          label centre. Shown in debug mode only. Gives direct numbers to
+          verify the label-reflection maths during pool cross-overs.
+          Label centre is recomputed locally because `labelCenter` from the
+          InteractionLabel sub-component isn't in this scope. */}
+      {debugMode && (isMessageBPMN || isAssocBPMN) && (() => {
+        const p0 = visibleWaypoints[0];
+        const pN = visibleWaypoints[visibleWaypoints.length - 1];
+        const dbgAnchor = { x: (p0.x + pN.x) / 2, y: (p0.y + pN.y) / 2 };
+        const dbgOffsetX = connector.labelOffsetX ?? 0;
+        const dbgOffsetY = connector.labelOffsetY ?? -30;
+        const dbgLines = (connector.label ?? "").split("\n").length || 1;
+        const dbgLineH = 14;
+        const dbgH = Math.max(dbgLineH, dbgLines * dbgLineH);
+        const lblCx = dbgAnchor.x + dbgOffsetX;
+        const lblCy = dbgAnchor.y + dbgOffsetY + dbgH / 2;
+        const srcDims = sourceBounds ? `${sourceBounds.width.toFixed(0)}×${sourceBounds.height.toFixed(0)}` : "";
+        const tgtDims = targetBounds ? `${targetBounds.width.toFixed(0)}×${targetBounds.height.toFixed(0)}` : "";
+        const srcPool = sourcePoolHeight != null ? ` poolH=${sourcePoolHeight.toFixed(0)}` : "";
+        const tgtPool = targetPoolHeight != null ? ` poolH=${targetPoolHeight.toFixed(0)}` : "";
+        // Offset from the pool attachment — for messageBPMN the attachment is
+        // the end that sits directly on a pool. If both ends are pools (rare)
+        // or neither, fall back to source.
+        const attachEnd: "src" | "tgt" =
+          sourceIsPool && !targetIsPool ? "src"
+          : targetIsPool && !sourceIsPool ? "tgt"
+          : "src";
+        const attachPt = attachEnd === "src" ? p0 : pN;
+        const offFromAttachX = lblCx - attachPt.x;
+        const offFromAttachY = lblCy - attachPt.y;
+        return (
+          <g style={{ pointerEvents: "none" }} fontSize={9} fill="#b91c1c">
+            <circle cx={p0.x} cy={p0.y} r={3} fill="#22c55e" stroke="white" strokeWidth={1} />
+            <text x={p0.x + 6} y={p0.y - 4}>{`src (${p0.x.toFixed(0)}, ${p0.y.toFixed(0)}) elem=${srcDims}${srcPool}`}</text>
+            <circle cx={pN.x} cy={pN.y} r={3} fill="#3b82f6" stroke="white" strokeWidth={1} />
+            <text x={pN.x + 6} y={pN.y - 4}>{`tgt (${pN.x.toFixed(0)}, ${pN.y.toFixed(0)}) elem=${tgtDims}${tgtPool}`}</text>
+            <circle cx={lblCx} cy={lblCy} r={3} fill="#f59e0b" stroke="white" strokeWidth={1} />
+            <text x={lblCx + 6} y={lblCy + 12}>
+              {`label (${lblCx.toFixed(0)}, ${lblCy.toFixed(0)})`}
+            </text>
+            <text x={lblCx + 6} y={lblCy + 24}>
+              {`off-from-attach:${attachEnd} (${offFromAttachX.toFixed(0)}, ${offFromAttachY.toFixed(0)})`}
+            </text>
+          </g>
+        );
+      })()}
     </>
   );
 }

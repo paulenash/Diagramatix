@@ -105,8 +105,21 @@ function messageBpmnWaypoints(
 
 /**
  * When messageBPMN waypoints change (endpoint move, space insertion, etc.),
- * adjust labelOffsetY so the label stays at the same absolute Y relative to
- * its nearest original endpoint rather than drifting with the midpoint.
+ * adjust labelOffsetY so the label stays at the same signed distance from
+ * its nearest original endpoint.
+ *
+ * Does NOT try to detect "sides flipped" — that's CASE A2's job and it uses
+ * the stored-side-vs-optimal-side comparison, which is reliable. Doing flip
+ * detection here by waypoint Y-ordering would double-fire (once at the real
+ * flip and again when the pool's far edge crosses the task's far edge) and
+ * reflect the label a second time.
+ *
+ * Waypoint formats:
+ *   - 4 points [srcCenter, srcEdge, tgtEdge, tgtCenter] with both
+ *     invisible-leader flags true (messageBpmnWaypoints runtime helper).
+ *   - 2 points [srcEdge, tgtEdge] with both leaders false
+ *     (bpmnLayout.ts AI output).
+ * Edge indices are picked from the leader flags so either format works.
  */
 function adjustMsgLabelOffset(
   conn: Connector,
@@ -114,26 +127,47 @@ function adjustMsgLabelOffset(
   newWaypoints: Point[]
 ): { labelOffsetY?: number } {
   if (conn.type !== "messageBPMN") return {};
-  if (oldWaypoints.length < 3 || newWaypoints.length < 3) return {};
-  const oldSrcY = oldWaypoints[1].y;  // source edge
-  const oldTgtY = oldWaypoints[oldWaypoints.length - 2].y;  // target edge
-  const newSrcY = newWaypoints[1].y;
-  const newTgtY = newWaypoints[newWaypoints.length - 2].y;
+  if (oldWaypoints.length < 2 || newWaypoints.length < 2) return {};
+  const oldSrcIdx = conn.sourceInvisibleLeader ? 1 : 0;
+  const oldTgtIdx = conn.targetInvisibleLeader ? oldWaypoints.length - 2 : oldWaypoints.length - 1;
+  // messageBpmnWaypoints always returns 4 points with both leaders; for
+  // NEW waypoints use 1 / length-2 regardless of the OLD format.
+  const newSrcIdx = 1;
+  const newTgtIdx = newWaypoints.length - 2;
+  const oldSrcY = oldWaypoints[oldSrcIdx].y;
+  const oldTgtY = oldWaypoints[oldTgtIdx].y;
+  const newSrcY = newWaypoints[newSrcIdx]?.y ?? 0;
+  const newTgtY = newWaypoints[newTgtIdx]?.y ?? 0;
   const oldMidY = (oldSrcY + oldTgtY) / 2;
   const newMidY = (newSrcY + newTgtY) / 2;
-  if (oldMidY === newMidY) return {};
+  if (oldSrcY === newSrcY && oldTgtY === newTgtY) return {};
+
+  // Label height from the text content (match ConnectorRenderer's line height).
+  const LINE_H = 14;
+  const lineCount = ((conn.label ?? "").split("\n").length) || 1;
+  const halfLabelH = (lineCount * LINE_H) / 2;
+
   const labelOY = conn.labelOffsetY ?? 0;
-  // Absolute Y of label = oldMidY + labelOY
-  const labelAbsY = oldMidY + labelOY;
-  // Which endpoint was the label closer to?
-  const distToSrc = Math.abs(labelAbsY - oldSrcY);
-  const distToTgt = Math.abs(labelAbsY - oldTgtY);
-  // Keep label at the same offset from that nearest endpoint
-  const nearestOldY = distToSrc <= distToTgt ? oldSrcY : oldTgtY;
-  const nearestNewY = distToSrc <= distToTgt ? newSrcY : newTgtY;
-  const relativeOffset = labelAbsY - nearestOldY;
-  const newAbsY = nearestNewY + relativeOffset;
-  return { labelOffsetY: newAbsY - newMidY };
+  const oldLabelTopY = oldMidY + labelOY;
+  const oldLabelCentreY = oldLabelTopY + halfLabelH;
+
+  // Which endpoint was the label closer to? (Compare to the CENTRE, so the
+  // detection lines up with the user's visual judgement of proximity.)
+  const distToSrc = Math.abs(oldLabelCentreY - oldSrcY);
+  const distToTgt = Math.abs(oldLabelCentreY - oldTgtY);
+  const [nearestOldY, nearestNewY] = distToSrc <= distToTgt
+    ? [oldSrcY, newSrcY]
+    : [oldTgtY, newTgtY];
+
+  // Preserve signed distance from the nearest endpoint — no flip detection.
+  const relativeOffset = oldLabelCentreY - nearestOldY;
+  const newLabelCentreY = nearestNewY + relativeOffset;
+  const newLabelTopY = newLabelCentreY - halfLabelH;
+  const result = newLabelTopY - newMidY;
+  if (typeof window !== "undefined" && (window as unknown as { __DIAGRAMATIX_TRACE?: boolean }).__DIAGRAMATIX_TRACE) {
+    console.log(`[TRACE adjustMsgLabelOffset] conn=${conn.id} label="${conn.label}" nearest=${distToSrc <= distToTgt ? "src" : "tgt"} nearestOldY=${nearestOldY} nearestNewY=${nearestNewY} oldLblCentre=${oldLabelCentreY.toFixed(1)} → newLblCentre=${newLabelCentreY.toFixed(1)} RESULT labelOffsetY=${result.toFixed(1)}`);
+  }
+  return { labelOffsetY: result };
 }
 
 type Action =
@@ -937,48 +971,73 @@ function reducer(state: DiagramData, action: Action): DiagramData {
           const wp = messageBpmnWaypoints(source, target,
             updated.sourceSide, updated.targetSide, newSrcOffset);
 
-          // Label handling when the pool has CROSSED OVER its partner.
+          // Label handling — anchor to the MOVING POOL'S attachment so the
+          // label's distance from the pool edge is preserved every dispatch.
+          // `isSrc` tells us which waypoint is on the moving pool.
           //
-          // Rule: the label's CENTRE is reflected about the midpoint of the
-          // attachment's Y-axis move. Given old attachment yA, new yA',
-          // M = (yA + yA') / 2, the new label centre is at 2M − oldCentre,
-          // which keeps the label the same distance from the boundary but
-          // on the opposite face.
+          //   oldOff  = oldLabel − oldAttach(moving pool)       [signed]
+          //   non-flip:  newLabel = newAttach + oldOff          (move with pool)
+          //   flip:      newLabel = newAttach − oldOff          (mirror across attachment)
           //
-          // Subtlety: labelOffsetY is the TOP of the label relative to the
-          // connector anchor (midpoint), not the centre. The renderer uses
-          // `top = anchor + offsetY`, then centre = top + labelHeight/2.
-          // Reflecting the TOP instead of the centre would leave the label
-          // one label-height too close to the boundary — hence the explicit
-          // half-height conversion below.
+          // Because the anchor is always on the moving pool, oldOff stays
+          // constant across pre-flip dispatches — no drift. At the flip
+          // dispatch, mirroring puts the label the same distance from the
+          // (new-side) attachment as it was from the (old-side) attachment,
+          // which places it in the gap between the pool and its partner on
+          // the new side.
           //
-          // When sides don't flip (pool moved but didn't cross), defer to
-          // adjustMsgLabelOffset which preserves offset from the nearest
-          // endpoint.
+          // This formulation does not use `moveH` at all: the attachment Y
+          // already carries the pool's displacement.
           let labelAdj: { labelOffsetY?: number } = {};
-          if (sidesFlipped && conn.labelOffsetY != null) {
+          if (conn.labelOffsetY != null) {
             const oldSrcIdx = conn.sourceInvisibleLeader ? 1 : 0;
             const oldTgtIdx = conn.targetInvisibleLeader ? conn.waypoints.length - 2 : conn.waypoints.length - 1;
+            const oldSrcX = conn.waypoints[oldSrcIdx]?.x ?? 0;
             const oldSrcY = conn.waypoints[oldSrcIdx]?.y ?? 0;
+            const oldTgtX = conn.waypoints[oldTgtIdx]?.x ?? 0;
             const oldTgtY = conn.waypoints[oldTgtIdx]?.y ?? 0;
             const oldMidY = (oldSrcY + oldTgtY) / 2;
-            // Match the renderer's line height; default single-line → 14 px.
             const LINE_H = 14;
             const lineCount = ((conn.label ?? "").split("\n").length) || 1;
             const halfLabelH = (lineCount * LINE_H) / 2;
+            const labelOX = conn.labelOffsetX ?? 0;
+            const oldMidX = (oldSrcX + oldTgtX) / 2;
+            const oldLabelCentreX = oldMidX + labelOX;
             const oldLabelCentreY = oldMidY + conn.labelOffsetY + halfLabelH;
-            const oldAttachY = isSrc ? oldSrcY : oldTgtY;
             // messageBpmnWaypoints always returns 4 points with both invisible leaders.
+            const newSrcX = wp.waypoints[1].x;
             const newSrcY = wp.waypoints[1].y;
+            const newTgtX = wp.waypoints[2].x;
             const newTgtY = wp.waypoints[2].y;
+            const newMidX = (newSrcX + newTgtX) / 2;
             const newMidY = (newSrcY + newTgtY) / 2;
+            const oldAttachX = isSrc ? oldSrcX : oldTgtX;
+            const oldAttachY = isSrc ? oldSrcY : oldTgtY;
+            const newAttachX = isSrc ? newSrcX : newTgtX;
             const newAttachY = isSrc ? newSrcY : newTgtY;
-            // Reflect the label CENTRE about the midpoint of the attachment move.
-            const newLabelCentreY = oldAttachY + newAttachY - oldLabelCentreY;
+            const oldOffsetX = oldLabelCentreX - oldAttachX;
+            const oldOffsetY = oldLabelCentreY - oldAttachY;
+            const newLabelCentreY = sidesFlipped
+              ? newAttachY - oldOffsetY
+              : newAttachY + oldOffsetY;
+            const newLabelCentreX = oldLabelCentreX; // label x is unchanged by a Y-only pool move
+            const newOffsetX = newLabelCentreX - newAttachX;
+            const newOffsetY = newLabelCentreY - newAttachY;
             const newLabelTopY = newLabelCentreY - halfLabelH;
             labelAdj = { labelOffsetY: newLabelTopY - newMidY };
-          } else {
-            labelAdj = adjustMsgLabelOffset(conn, conn.waypoints, wp.waypoints);
+            const connName = conn.label ? conn.label.replace(/\s+/g, " ").trim() : conn.id;
+            if (traceA2) console.log(`[TRACE A2-label] "${connName}" isSrc=${isSrc} flipped=${sidesFlipped}`
+              + ` oldSrc=(${oldSrcX.toFixed(0)}, ${oldSrcY.toFixed(0)})`
+              + ` oldTgt=(${oldTgtX.toFixed(0)}, ${oldTgtY.toFixed(0)})`
+              + ` newSrc=(${newSrcX.toFixed(0)}, ${newSrcY.toFixed(0)})`
+              + ` newTgt=(${newTgtX.toFixed(0)}, ${newTgtY.toFixed(0)})`
+              + ` oldLabel=(${oldLabelCentreX.toFixed(0)}, ${oldLabelCentreY.toFixed(0)})`
+              + ` newLabel=(${newLabelCentreX.toFixed(0)}, ${newLabelCentreY.toFixed(0)})`
+              + ` oldAttach=(${oldAttachX.toFixed(0)}, ${oldAttachY.toFixed(0)})`
+              + ` newAttach=(${newAttachX.toFixed(0)}, ${newAttachY.toFixed(0)})`
+              + ` oldOff-from-attach=(${oldOffsetX.toFixed(0)}, ${oldOffsetY.toFixed(0)})`
+              + ` newOff-from-attach=(${newOffsetX.toFixed(0)}, ${newOffsetY.toFixed(0)})`
+              + ` → offsetY=${labelAdj.labelOffsetY?.toFixed(1)}`);
           }
 
           return { ...updated, waypoints: wp.waypoints,
