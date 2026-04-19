@@ -25,6 +25,7 @@ import { PropertiesPanel } from "@/app/components/canvas/PropertiesPanel";
 import { captureTemplate, instantiateTemplate } from "@/app/lib/diagram/templates";
 import { ImpersonationBanner } from "@/app/components/ImpersonationBanner";
 import { AiPanel } from "./AiPanel";
+import { PlanPanel } from "./PlanPanel";
 import { HistoryPanel } from "./HistoryPanel";
 
 interface Props {
@@ -464,6 +465,7 @@ export function DiagramEditor({
   const [displayMode, setDisplayMode] = useState<DisplayMode>(initialDisplayMode ?? "normal");
   const [showDiagramMaintenance, setShowDiagramMaintenance] = useState(false);
   const [showAiPanel, setShowAiPanel] = useState(false);
+  const [showPlanPanel, setShowPlanPanel] = useState(false);
   const [showHistoryPanel, setShowHistoryPanel] = useState(false);
   const [debugMode, setDebugMode] = useState(false);
   const [showValueDisplay, setShowValueDisplay] = useState(false);
@@ -1287,7 +1289,10 @@ export function DiagramEditor({
 
         {!readOnly && diagramType !== "basic" && (
           <button
-            onClick={() => { setShowAiPanel(prev => !prev); if (!showAiPanel) setShowHistoryPanel(false); }}
+            onClick={() => {
+              setShowAiPanel(prev => !prev);
+              if (!showAiPanel) { setShowHistoryPanel(false); setShowPlanPanel(false); }
+            }}
             className={`px-2 py-0.5 text-[11px] rounded border ${
               showAiPanel
                 ? "text-blue-700 border-blue-400 bg-blue-50"
@@ -1297,9 +1302,28 @@ export function DiagramEditor({
             AI Generate
           </button>
         )}
+        {!readOnly && diagramType === "bpmn" && (
+          <button
+            onClick={() => {
+              setShowPlanPanel(prev => !prev);
+              if (!showPlanPanel) { setShowAiPanel(false); setShowHistoryPanel(false); }
+            }}
+            className={`px-2 py-0.5 text-[11px] rounded border ${
+              showPlanPanel
+                ? "text-blue-700 border-blue-400 bg-blue-50"
+                : "text-gray-700 border-gray-300 hover:bg-gray-50"
+            }`}
+            title="Two-phase AI generation: plan first, then apply layout"
+          >
+            AI Plan
+          </button>
+        )}
         {!readOnly && (
           <button
-            onClick={() => { setShowHistoryPanel(prev => !prev); if (!showHistoryPanel) setShowAiPanel(false); }}
+            onClick={() => {
+              setShowHistoryPanel(prev => !prev);
+              if (!showHistoryPanel) { setShowAiPanel(false); setShowPlanPanel(false); }
+            }}
             className={`px-2 py-0.5 text-[11px] rounded border ${
               showHistoryPanel
                 ? "text-blue-700 border-blue-400 bg-blue-50"
@@ -1603,7 +1627,7 @@ export function DiagramEditor({
             onConvertTaskSubprocess={convertTaskSubprocess}
             onConvertProcessCollapsed={convertProcessCollapsed}
             onConvertEventType={convertEventType}
-            forceCollapseTitle={showAiPanel || showHistoryPanel}
+            forceCollapseTitle={showAiPanel || showPlanPanel || showHistoryPanel}
           />
         )}
 
@@ -1623,6 +1647,21 @@ export function DiagramEditor({
               applyTemplate(elements, connectors);
             }}
             onClose={() => setShowAiPanel(false)}
+          />
+        )}
+
+        {showPlanPanel && (
+          <PlanPanel
+            diagramType={diagramType}
+            onApplyDiagram={(aiData: DiagramData) => {
+              setData({
+                ...data,
+                elements: aiData.elements,
+                connectors: aiData.connectors,
+                viewport: aiData.viewport ?? data.viewport,
+              });
+            }}
+            onClose={() => setShowPlanPanel(false)}
           />
         )}
 
