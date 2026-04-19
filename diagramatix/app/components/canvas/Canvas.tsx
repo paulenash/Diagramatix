@@ -2298,15 +2298,26 @@ export function Canvas({
     ? data.elements.find(e => e.id === draggingSourceEl!.boundaryHostId)?.parentId ?? null
     : null;
 
-  // Compute misaligned messageBPMN connectors (no x-overlap between source and target)
+  // Compute misaligned messageBPMN connectors: (a) no x-overlap between source
+  // and target, or (b) attached to a white-box pool (messages can only touch
+  // black-box pools or flow elements, not white-box pools). Both cases flag
+  // the connector for red rendering so the user can see the orphan.
   const misalignedConnectorIds = new Set<string>();
   const errorTargetIds = new Set<string>();
+  const isWhiteBoxPool = (el: DiagramElement | undefined): boolean =>
+    !!el && el.type === "pool"
+      && ((el.properties.poolType as string | undefined) ?? "black-box") === "white-box";
   data.connectors
     .filter((c) => c.type === "messageBPMN")
     .forEach((c) => {
       const src = data.elements.find((e) => e.id === c.sourceId);
       const tgt = data.elements.find((e) => e.id === c.targetId);
       if (src && tgt) {
+        if (isWhiteBoxPool(src) || isWhiteBoxPool(tgt)) {
+          misalignedConnectorIds.add(c.id);
+          errorTargetIds.add(c.targetId);
+          return;
+        }
         const overlapMax = Math.min(src.x + src.width, tgt.x + tgt.width);
         const overlapMin = Math.max(src.x, tgt.x);
         if (overlapMax <= overlapMin) {

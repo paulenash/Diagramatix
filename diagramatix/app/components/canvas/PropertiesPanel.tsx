@@ -596,6 +596,9 @@ export function PropertiesPanel({
   const [connectorOpen, setConnectorOpen] = useState(true);
   const [propsOpen, setPropsOpen] = useState(true);
 
+  // Confirm-and-delete modal for switching black-box (with messages) → white-box.
+  const [poolTypeConfirm, setPoolTypeConfirm] = useState<null | { poolId: string; messageIds: string[] }>(null);
+
   useEffect(() => {
     if (element) setLabelDraft(element.label);
   }, [element]);
@@ -1470,14 +1473,10 @@ export function PropertiesPanel({
                   // Guard: switching black-box (with message connectors) to white-box
                   // is destructive — messages can't survive because a white-box pool
                   // holds internal elements, not external-message attachment points.
+                  // Routed through a Diagramatix-styled confirm modal (state below).
                   if (poolType === "black-box" && newType === "white-box" && hasMessageConns) {
-                    const n = poolMessageConns.length;
-                    const ok = confirm(
-                      `This pool has ${n} message connector${n === 1 ? "" : "s"} attached. ` +
-                      `Changing it to White-box will delete ${n === 1 ? "that connector" : "those connectors"}. Continue?`,
-                    );
-                    if (!ok) return;
-                    for (const c of poolMessageConns) onDeleteConnector(c.id);
+                    setPoolTypeConfirm({ poolId: element.id, messageIds: poolMessageConns.map(c => c.id) });
+                    return;
                   }
                   onUpdateProperties(element.id, { poolType: newType });
                 }}
@@ -2190,6 +2189,39 @@ export function PropertiesPanel({
         </button>
       )}
     </div>}
+
+    {poolTypeConfirm && (
+      <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+        <div className="bg-white rounded-lg shadow-xl w-full max-w-sm">
+          <div className="px-5 pt-4 pb-2">
+            <h2 className="text-base font-semibold text-gray-900">Change to White-box?</h2>
+            <p className="mt-1 text-sm text-gray-600">
+              This pool has {poolTypeConfirm.messageIds.length} message connector{poolTypeConfirm.messageIds.length === 1 ? "" : "s"} attached.
+              White-box pools can&rsquo;t have message connectors — continuing will delete {poolTypeConfirm.messageIds.length === 1 ? "it" : "them"}.
+            </p>
+          </div>
+          <div className="px-5 pb-4 pt-2 flex gap-2 justify-end">
+            <button
+              onClick={() => setPoolTypeConfirm(null)}
+              className="px-3 py-1.5 text-sm text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => {
+                for (const id of poolTypeConfirm.messageIds) onDeleteConnector(id);
+                onUpdateProperties(poolTypeConfirm.poolId, { poolType: "white-box" });
+                setPoolTypeConfirm(null);
+              }}
+              className="px-3 py-1.5 text-sm text-white bg-red-600 rounded hover:bg-red-700"
+              autoFocus
+            >
+              Delete &amp; Change
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
     </div>
   );
 }

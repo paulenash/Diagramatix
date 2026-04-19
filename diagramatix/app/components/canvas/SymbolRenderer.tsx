@@ -1479,15 +1479,21 @@ export function SymbolRenderer({
   let dragStart: { mouseX: number; mouseY: number; elX: number; elY: number } | null = null;
 
   function handleMouseDown(e: React.MouseEvent) {
-    // White-box pool: only the 30px header sidebar accepts interaction
+    // Header-only selection model (matches PoolShape / LaneShape LW = 36):
+    //   - White-box pool: only the 36px left header sidebar selects the pool.
+    //     Body clicks bubble so lanes / child elements / bg-deselect can win.
+    //   - Lane: only the 36px left header selects the lane. Body clicks bubble
+    //     so tasks inside can be clicked, or empty lane body deselects.
+    //   - Black-box pools are solid click-to-select anywhere (no change).
     const isWhiteBoxPool = element.type === "pool" &&
       ((element.properties.poolType as string | undefined) ?? "black-box") === "white-box";
-    if (isWhiteBoxPool) {
-      const POOL_LW = 30;
+    const isLane = element.type === "lane";
+    if (isWhiteBoxPool || isLane) {
+      const HEADER_LW = 36;
       const worldPos = svgToWorld ? svgToWorld(e.clientX, e.clientY) : null;
-      if (worldPos && worldPos.x > element.x + POOL_LW) return; // body click — bubble to bg handler to deselect
+      if (worldPos && worldPos.x > element.x + HEADER_LW) return; // body click — bubble
       e.stopPropagation();
-      if (selected) { onSelect(); return; }                      // header re-click — deselect, no drag
+      if (selected) { onSelect(); return; }                        // header re-click — deselect, no drag
     } else {
       e.stopPropagation();
     }
@@ -2181,6 +2187,44 @@ export function SymbolRenderer({
           );
         })
       }
+
+      {/* Always-visible right-edge resize handle for pools — a wide blue band
+          with a ↔ glyph. Lets the user grow/shrink pool width (and enclosed
+          lanes, via the existing pool-resize reflow in RESIZE_ELEMENT) without
+          having to select the pool first. */}
+      {element.type === "pool" && onResizeDragStart && (() => {
+        const HANDLE_W = 10;
+        const gripH = Math.min(40, element.height * 0.5);
+        const hx = element.x + element.width - HANDLE_W / 2;
+        const hy = element.y + element.height / 2 - gripH / 2;
+        const cx = element.x + element.width;
+        const cy = element.y + element.height / 2;
+        return (
+          <g data-interactive>
+            {/* Wide invisible hit zone straddling the right edge */}
+            <rect
+              x={element.x + element.width - HANDLE_W} y={element.y}
+              width={HANDLE_W * 2} height={element.height}
+              fill="transparent"
+              style={{ cursor: "ew-resize" }}
+              onMouseDown={(e) => { e.stopPropagation(); onResizeDragStart("e", e); }}
+            />
+            {/* Visible blue grip */}
+            <rect
+              x={hx} y={hy}
+              width={HANDLE_W} height={gripH}
+              fill="#2563eb" fillOpacity={0.75} stroke="white" strokeWidth={1} rx={2}
+              style={{ cursor: "ew-resize", pointerEvents: "none" }}
+            />
+            {/* ↔ glyph — two white triangles */}
+            <path
+              d={`M ${cx - 4} ${cy} L ${cx - 1} ${cy - 3} L ${cx - 1} ${cy + 3} Z M ${cx + 4} ${cy} L ${cx + 1} ${cy - 3} L ${cx + 1} ${cy + 3} Z`}
+              fill="white"
+              style={{ pointerEvents: "none" }}
+            />
+          </g>
+        );
+      })()}
 
       {/* Full-body connection overlay for all non-boundary elements */}
       {showConnectionPoints && !isBoundary && element.type !== "lane" && (element.type === "use-case" || element.type === "process-system") && (() => {

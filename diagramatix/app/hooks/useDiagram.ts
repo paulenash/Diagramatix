@@ -1559,40 +1559,18 @@ function reducer(state: DiagramData, action: Action): DiagramData {
           deletingIsContainer && e.parentId === id ? { ...e, parentId: undefined } : e
         );
 
-      // If deleting a lane, reflow remaining sibling lanes to fill the parent
+      // If deleting a lane: shrink each ancestor container by the deleted
+      // height and re-stack the surviving siblings at their ORIGINAL heights
+      // (content moves with them). This replaces the earlier reflow-to-fill
+      // behaviour that silently scaled siblings proportionally — users now
+      // see the pool shrink to match the new lane count.
       if (el?.type === "lane" && el.parentId) {
         const parent = elements.find((e) => e.id === el.parentId);
         if (parent) {
-          const parentIsPool = parent.type === "pool";
           const headerW = 36; // same for pools and lanes
-          const siblings = elements
-            .filter((e) => e.type === "lane" && e.parentId === parent.id)
-            .sort((a, b) => a.y - b.y);
-          const totalSibH = siblings.reduce((s, l) => s + l.height, 0) || 1;
-          let stackY = parent.y;
-          for (const sib of siblings) {
-            const newH = Math.max(40, Math.round(parent.height * (sib.height / totalSibH)));
-            const updated = { ...sib, x: parent.x + headerW, y: stackY, width: parent.width - headerW, height: newH };
-            elements = elements.map((e) => e.id === sib.id ? updated : e);
-            // Proportionally resize sub-lanes within this resized lane
-            const subLanes = elements
-              .filter((e) => e.type === "lane" && e.parentId === sib.id)
-              .sort((a, b) => a.y - b.y);
-            if (subLanes.length > 0) {
-              const SUBLANE_LW = 36;
-              const oldTotalSubH = subLanes.reduce((s, l) => s + l.height, 0) || 1;
-              let subStackY = updated.y;
-              for (const sub of subLanes) {
-                const subNewH = Math.max(28, Math.round(newH * (sub.height / oldTotalSubH)));
-                const updatedSub = { ...sub, x: updated.x + SUBLANE_LW, y: subStackY, width: updated.width - SUBLANE_LW, height: subNewH };
-                elements = elements.map((e) => e.id === sub.id ? updatedSub : e);
-                subStackY += subNewH;
-              }
-            }
-            elements = clampChildrenToLane(elements, updated);
-            stackY += newH;
-          }
-          // Also delete any sub-lanes of the deleted lane
+          const deletedH = el.height;
+
+          // First, remove any sub-lanes of the deleted lane (cascades content removal).
           const sublanesToDelete = new Set<string>();
           function collectSublanes(parentId: string) {
             for (const e of elements) {
@@ -1607,6 +1585,72 @@ function reducer(state: DiagramData, action: Action): DiagramData {
             elements = elements
               .filter((e) => !sublanesToDelete.has(e.id))
               .map((e) => sublanesToDelete.has(e.parentId ?? "") ? { ...e, parentId: undefined } : e);
+          }
+
+          // Walk up the container chain (immediate parent → grandparent → …):
+          //   - shrink the container by deletedH
+          //   - re-stack its direct lane children at their own heights, moving
+          //     each lane's descendants along by the same Δy so content travels
+          //     with its lane.
+          // Stops once we hit a non-lane ancestor (the pool terminates the chain).
+          let cursor: DiagramElement | undefined = parent;
+          while (cursor) {
+            const curId = cursor.id;
+            const curBefore = elements.find(e => e.id === curId);
+            if (!curBefore) break;
+            const newH = Math.max(40, curBefore.height - deletedH);
+            elements = elements.map(e => e.id === curId ? { ...e, height: newH } : e);
+            const curAfter = elements.find(e => e.id === curId)!;
+
+            const childLanes = elements
+              .filter(e => e.type === "lane" && e.parentId === curId)
+              .sort((a, b) => a.y - b.y);
+            let stackY = curAfter.y;
+            for (const lane of childLanes) {
+              const deltaY = stackY - lane.y;
+              const laneNewX = curAfter.x + headerW;
+              const laneNewW = curAfter.width - headerW;
+              if (deltaY !== 0) {
+                const descIds = getAllDescendantIds(elements, lane.id);
+                elements = elements.map(e => {
+                  if (e.id === lane.id) return { ...e, y: lane.y + deltaY, x: laneNewX, width: laneNewW };
+                  if (descIds.has(e.id)) return { ...e, y: e.y + deltaY };
+                  return e;
+                });
+              } else {
+                elements = elements.map(e => e.id === lane.id ? { ...e, x: laneNewX, width: laneNewW } : e);
+              }
+              stackY += lane.height;
+            }
+
+            // Ascend only through lane→lane. Pools (and any other container type)
+            // terminate the cascade — the pool has just shrunk to fit.
+            cursor = cursor.type === "lane" && cursor.parentId
+              ? elements.find(e => e.id === cursor!.parentId)
+              : undefined;
+          }
+
+          // Second-last-lane rule: if only one lane remains in the parent and
+          // it is empty, delete it too so the pool returns to its laneless state.
+          const remainingLanes = elements.filter(e => e.type === "lane" && e.parentId === parent.id);
+          if (remainingLanes.length === 1) {
+            const lastLane = remainingLanes[0];
+            const lastHasChildren = elements.some(e => e.parentId === lastLane.id);
+            if (!lastHasChildren) {
+              const lastH = lastLane.height;
+              elements = elements.filter(e => e.id !== lastLane.id);
+              // Shrink the parent (and above, if parent is itself a lane) by the last lane's height too.
+              let cursor2: DiagramElement | undefined = elements.find(e => e.id === parent.id);
+              while (cursor2) {
+                const curId = cursor2.id;
+                const curBefore = elements.find(e => e.id === curId);
+                if (!curBefore) break;
+                elements = elements.map(e => e.id === curId ? { ...e, height: Math.max(40, curBefore.height - lastH) } : e);
+                cursor2 = cursor2.type === "lane" && cursor2.parentId
+                  ? elements.find(e => e.id === cursor2!.parentId)
+                  : undefined;
+              }
+            }
           }
         }
       }
@@ -1701,6 +1745,18 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       const EVENT_CONN_TYPES = new Set<SymbolType>(["start-event", "intermediate-event", "end-event"]);
       const isEventToEvent = EVENT_CONN_TYPES.has(source.type) && EVENT_CONN_TYPES.has(target.type);
       if (!isDataConn && !isEventToEvent && connectorType === "associationBPMN") return state;
+
+      // Message flows attach only to black-box pools (or to flow elements
+      // inside any pool). A white-box pool ITSELF is not a valid endpoint —
+      // white-box pools expose internal elements instead. Reject to prevent
+      // orphan connectors that the layout engine can't sensibly render.
+      if (connectorType === "messageBPMN") {
+        const srcIsWhiteBoxPool = source.type === "pool"
+          && ((source.properties.poolType as string | undefined) ?? "black-box") === "white-box";
+        const tgtIsWhiteBoxPool = target.type === "pool"
+          && ((target.properties.poolType as string | undefined) ?? "black-box") === "white-box";
+        if (srcIsWhiteBoxPool || tgtIsWhiteBoxPool) return state;
+      }
 
       // ── BPMN sequence connector rules ──
       const isSeqConn = connectorType === "sequence";
