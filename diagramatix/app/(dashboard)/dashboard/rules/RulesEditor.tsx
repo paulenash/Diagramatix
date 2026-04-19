@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { CODE_REQUIRED_GROUPS } from "@/app/lib/ai/splitRules";
 
 interface RuleSet {
   id: string | null;
@@ -22,9 +23,6 @@ const CATEGORY_LABELS: Record<string, string> = {
 };
 
 const CATEGORY_ORDER = ["general", "bpmn", "state-machine", "value-chain", "domain", "context", "process-context"];
-
-/** Group headings that indicate code-backed (layout) rules */
-const CODE_REQUIRED_GROUPS = /\b(layout|positioning|placement|spacing|sizing|arrangement|connector routing)\b/i;
 
 /** Determine if a rule line is under a code-required group */
 function classifyLines(text: string): Array<{ line: string; isGroup: boolean; isRule: boolean; codeRequired: boolean }> {
