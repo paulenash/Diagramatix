@@ -1,0 +1,177 @@
+"use client";
+
+/**
+ * Flow-element view grouped by their container:
+ *   pool → (lane → (subprocess →)) elements.
+ * Rename inline; delete via ×; boundary events render as an indented child
+ * of their host. Non-flow elements (pool, lane) are not listed here — use
+ * Pools & Lanes Tree tab for those.
+ */
+import { useMemo } from "react";
+import type { AiElement } from "@/app/lib/diagram/bpmnLayout";
+
+interface Props {
+  elements: AiElement[];
+  onRename: (id: string, label: string) => void;
+  onDelete: (id: string) => void;
+}
+
+const FLOW_TYPES = new Set([
+  "task", "gateway", "start-event", "end-event", "intermediate-event",
+  "subprocess", "subprocess-expanded", "data-object", "data-store",
+  "text-annotation", "group",
+]);
+
+function typeBadge(type: string): { short: string; tone: string } {
+  const map: Record<string, { short: string; tone: string }> = {
+    "task":                { short: "task",    tone: "bg-blue-50 text-blue-700 border-blue-200" },
+    "gateway":             { short: "gw",      tone: "bg-yellow-50 text-yellow-700 border-yellow-200" },
+    "start-event":         { short: "start",   tone: "bg-green-50 text-green-700 border-green-200" },
+    "end-event":           { short: "end",     tone: "bg-red-50 text-red-700 border-red-200" },
+    "intermediate-event":  { short: "interm",  tone: "bg-orange-50 text-orange-700 border-orange-200" },
+    "subprocess":          { short: "subp",    tone: "bg-indigo-50 text-indigo-700 border-indigo-200" },
+    "subprocess-expanded": { short: "subp-ex", tone: "bg-indigo-50 text-indigo-700 border-indigo-200" },
+    "data-object":         { short: "data",    tone: "bg-purple-50 text-purple-700 border-purple-200" },
+    "data-store":          { short: "store",   tone: "bg-purple-50 text-purple-700 border-purple-200" },
+    "text-annotation":     { short: "anno",    tone: "bg-gray-50 text-gray-600 border-gray-200" },
+    "group":               { short: "group",   tone: "bg-gray-50 text-gray-600 border-gray-200" },
+  };
+  return map[type] ?? { short: type, tone: "bg-gray-100 text-gray-600 border-gray-200" };
+}
+
+export function ElementsByContainerView({ elements, onRename, onDelete }: Props) {
+  // Grouping: pool → [lane? → [subprocess? → [elements...]]]
+  const grouped = useMemo(() => {
+    const pools = elements.filter(e => e.type === "pool");
+    const flowElements = elements.filter(e => FLOW_TYPES.has(e.type));
+    const subs = new Map<string, AiElement>();
+    for (const e of flowElements) if (e.type === "subprocess-expanded") subs.set(e.id, e);
+
+    function containerForElement(e: AiElement): { poolId?: string; laneId?: string; subId?: string; hostId?: string } {
+      if (e.boundaryHost) return { hostId: e.boundaryHost };
+      if (e.parentSubprocess) return { subId: e.parentSubprocess };
+      return { poolId: e.pool, laneId: e.lane };
+    }
+
+    const poolBuckets = pools.map(pool => {
+      const laneMap = new Map<string | undefined, AiElement[]>();
+      const unclaimed: AiElement[] = [];
+      for (const e of flowElements) {
+        const ctr = containerForElement(e);
+        if (ctr.poolId !== pool.id) continue;
+        const list = laneMap.get(ctr.laneId) ?? [];
+        list.push(e);
+        laneMap.set(ctr.laneId, list);
+      }
+      // Lanes inside this pool (for heading names)
+      const lanes = elements.filter(e => e.type === "lane" && (e.parentPool ?? e.pool) === pool.id);
+      return {
+        pool,
+        laneGroups: [
+          { lane: null as AiElement | null, items: laneMap.get(undefined) ?? [] },
+          ...lanes.map(lane => ({ lane, items: laneMap.get(lane.id) ?? [] })),
+        ].filter(g => g.items.length > 0 || g.lane),
+      };
+    });
+
+    // Subprocess buckets: flow elements with parentSubprocess
+    const subprocessBuckets = Array.from(subs.values()).map(sp => ({
+      sp,
+      items: flowElements.filter(e => e.parentSubprocess === sp.id),
+    })).filter(b => b.items.length > 0);
+
+    // Boundary-event buckets: elements hosted on an existing element
+    const boundaryBuckets = flowElements.filter(e => e.boundaryHost != null);
+
+    return { poolBuckets, subprocessBuckets, boundaryBuckets };
+  }, [elements]);
+
+  const { poolBuckets, subprocessBuckets, boundaryBuckets } = grouped;
+  if (poolBuckets.length === 0 && subprocessBuckets.length === 0 && boundaryBuckets.length === 0) {
+    return <p className="text-[11px] text-gray-400 italic">No elements in the plan yet.</p>;
+  }
+
+  return (
+    <div className="space-y-3">
+      {poolBuckets.map(bucket => (
+        <div key={bucket.pool.id} className="border border-gray-200 rounded overflow-hidden">
+          <div className="px-2 py-1 bg-gray-50 text-[10px] font-semibold uppercase text-gray-600">
+            Pool: {bucket.pool.label}
+          </div>
+          {bucket.laneGroups.map((g, gi) => (
+            <div key={gi}>
+              {g.lane && (
+                <div className="px-3 py-0.5 bg-amber-50 text-[10px] font-medium text-amber-700 border-t border-b border-amber-100">
+                  Lane: {g.lane.label}
+                </div>
+              )}
+              {g.items.length === 0 ? (
+                <p className="px-3 py-1 text-[10px] text-gray-400 italic">(empty)</p>
+              ) : (
+                g.items.map(el => <ElementRow key={el.id} el={el} onRename={onRename} onDelete={onDelete} />)
+              )}
+            </div>
+          ))}
+        </div>
+      ))}
+
+      {subprocessBuckets.length > 0 && (
+        <div className="border border-gray-200 rounded overflow-hidden">
+          <div className="px-2 py-1 bg-indigo-50 text-[10px] font-semibold uppercase text-indigo-700">
+            Inside Expanded Subprocesses
+          </div>
+          {subprocessBuckets.map(b => (
+            <div key={b.sp.id}>
+              <div className="px-3 py-0.5 text-[10px] font-medium text-indigo-700 border-t border-indigo-100">
+                {b.sp.label} {b.sp.subprocessType === "event" ? "(Event)" : ""}
+              </div>
+              {b.items.map(el => <ElementRow key={el.id} el={el} onRename={onRename} onDelete={onDelete} />)}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {boundaryBuckets.length > 0 && (
+        <div className="border border-gray-200 rounded overflow-hidden">
+          <div className="px-2 py-1 bg-orange-50 text-[10px] font-semibold uppercase text-orange-700">
+            Boundary Events
+          </div>
+          {boundaryBuckets.map(el => (
+            <ElementRow key={el.id} el={el} onRename={onRename} onDelete={onDelete} boundaryInfo={el.boundaryHost} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ElementRow({
+  el, onRename, onDelete, boundaryInfo,
+}: {
+  el: AiElement;
+  onRename: (id: string, label: string) => void;
+  onDelete: (id: string) => void;
+  boundaryInfo?: string;
+}) {
+  const badge = typeBadge(el.type);
+  return (
+    <div className="flex items-center gap-1.5 px-3 py-1 text-[11px] group hover:bg-gray-50 border-t border-gray-100">
+      <span className={`px-1 py-0.5 rounded border text-[9px] font-mono uppercase ${badge.tone}`}>{badge.short}</span>
+      <input
+        value={el.label}
+        onChange={e => onRename(el.id, e.target.value)}
+        className="flex-1 bg-transparent border-0 border-b border-transparent focus:border-blue-400 outline-none px-0.5 py-0"
+        spellCheck={false}
+        placeholder="(no label)"
+      />
+      {boundaryInfo && (
+        <span className="text-[9px] text-orange-700" title="Hosted on element id">on {boundaryInfo}</span>
+      )}
+      <button
+        onClick={() => onDelete(el.id)}
+        className="text-gray-300 hover:text-red-600 opacity-0 group-hover:opacity-100 text-xs px-1"
+        title="Delete element"
+      >&times;</button>
+    </div>
+  );
+}

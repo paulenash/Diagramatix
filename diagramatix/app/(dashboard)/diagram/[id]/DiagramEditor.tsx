@@ -319,17 +319,25 @@ export function DiagramEditor({
 
   // Ref for save status — populated after useAutoSave runs (below)
   const saveStatusRef = useRef<"saved" | "saving" | "unsaved">("saved");
-  async function confirmSaveBeforeLeave(): Promise<boolean> {
-    if (saveStatusRef.current !== "unsaved") return true;
-    const choice = window.confirm("You have unsaved changes. Save before leaving?");
-    if (choice) {
-      await saveNowRef.current();
-    }
-    return true;
+
+  // Diagramatix-styled unsaved-changes dialog. Three outcomes: save+leave,
+  // discard+leave, cancel (stay). Opened via showUnsavedDialog, resolved
+  // when the user clicks a button. Replaces the window.confirm pattern that
+  // never actually saved reliably.
+  const [unsavedDialog, setUnsavedDialog] = useState<null | { resolve: (choice: "save" | "discard" | "cancel") => void }>(null);
+  async function confirmSaveBeforeLeave(): Promise<"proceed" | "cancel"> {
+    if (saveStatusRef.current !== "unsaved") return "proceed";
+    const choice = await new Promise<"save" | "discard" | "cancel">(resolve => {
+      setUnsavedDialog({ resolve });
+    });
+    setUnsavedDialog(null);
+    if (choice === "cancel") return "cancel";
+    if (choice === "save") await saveNowRef.current();
+    return "proceed";
   }
 
   const handleDrillIntoSubprocess = useCallback(async (linkedDiagramId: string) => {
-    await confirmSaveBeforeLeave();
+    if ((await confirmSaveBeforeLeave()) === "cancel") return;
     const stack = getDrillStack();
     stack.push({ id: diagramId, name: diagramName });
     sessionStorage.setItem(STACK_KEY, JSON.stringify(stack));
@@ -337,7 +345,7 @@ export function DiagramEditor({
   }, [router, diagramId, diagramName]);
 
   const handleDrillBack = useCallback(async () => {
-    await confirmSaveBeforeLeave();
+    if ((await confirmSaveBeforeLeave()) === "cancel") return;
     const stack = getDrillStack();
     stack.pop();
     sessionStorage.setItem(STACK_KEY, JSON.stringify(stack));
@@ -349,7 +357,7 @@ export function DiagramEditor({
   }, [router, projectId]);
 
   const handleBackToProject = useCallback(async () => {
-    await confirmSaveBeforeLeave();
+    if ((await confirmSaveBeforeLeave()) === "cancel") return;
     sessionStorage.removeItem(STACK_KEY);
     if (window.history.length > 1) {
       router.back();
@@ -1706,6 +1714,41 @@ export function DiagramEditor({
           initialName={templateEditState?.templateName}
           title={templateEditState ? "Update Template" : templateMode === "capturing-builtin" ? "Save Built-In Template" : "Save User Template"}
         />
+      )}
+
+      {unsavedDialog && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-sm">
+            <div className="px-5 pt-4 pb-2">
+              <h2 className="text-base font-semibold text-gray-900">Unsaved changes</h2>
+              <p className="mt-1 text-sm text-gray-600">
+                This diagram has unsaved edits. Save them before leaving?
+              </p>
+            </div>
+            <div className="px-5 pb-4 pt-2 flex gap-2 justify-end">
+              <button
+                onClick={() => unsavedDialog.resolve("cancel")}
+                className="px-3 py-1.5 text-sm text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => unsavedDialog.resolve("discard")}
+                className="px-3 py-1.5 text-sm text-red-700 border border-red-300 rounded hover:bg-red-50"
+                title="Leave without saving — your changes will be lost"
+              >
+                Discard &amp; Leave
+              </button>
+              <button
+                onClick={() => unsavedDialog.resolve("save")}
+                className="px-3 py-1.5 text-sm text-white bg-blue-600 rounded hover:bg-blue-700"
+                autoFocus
+              >
+                Save &amp; Leave
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {showAdminPasswordModal && (
