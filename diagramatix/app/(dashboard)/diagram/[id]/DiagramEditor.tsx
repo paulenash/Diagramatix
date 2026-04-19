@@ -325,6 +325,44 @@ export function DiagramEditor({
   // when the user clicks a button. Replaces the window.confirm pattern that
   // never actually saved reliably.
   const [unsavedDialog, setUnsavedDialog] = useState<null | { resolve: (choice: "save" | "discard" | "cancel") => void }>(null);
+
+  // Save As dialog — clone the current diagram (data + colour/display config)
+  // into the same project under a new name, then navigate to it.
+  const [showSaveAs, setShowSaveAs] = useState(false);
+  const [saveAsName, setSaveAsName] = useState("");
+  const [saveAsBusy, setSaveAsBusy] = useState(false);
+  const [saveAsError, setSaveAsError] = useState<string | null>(null);
+  async function handleSaveAs() {
+    if (!saveAsName.trim() || saveAsBusy) return;
+    setSaveAsBusy(true);
+    setSaveAsError(null);
+    try {
+      const res = await fetch("/api/diagrams", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: saveAsName.trim(),
+          type: diagramType,
+          projectId: projectId ?? undefined,
+          data,
+          colorConfig: diagramColorConfig,
+          displayMode,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Failed" }));
+        setSaveAsError(err.error ?? "Save As failed");
+        return;
+      }
+      const created = await res.json();
+      setShowSaveAs(false);
+      router.push(`/diagram/${created.id}`);
+    } catch (err) {
+      setSaveAsError(err instanceof Error ? err.message : "Network error");
+    } finally {
+      setSaveAsBusy(false);
+    }
+  }
   async function confirmSaveBeforeLeave(): Promise<"proceed" | "cancel"> {
     if (saveStatusRef.current !== "unsaved") return "proceed";
     const choice = await new Promise<"save" | "discard" | "cancel">(resolve => {
@@ -1463,6 +1501,19 @@ export function DiagramEditor({
                 Export XML
               </button>
               <div className="border-t border-gray-100" />
+              {/* Save As — clone current diagram into the same project under a new name */}
+              <button
+                onClick={() => {
+                  setFileMenuOpen(false);
+                  setSaveAsName(`${diagramName} (copy)`);
+                  setShowSaveAs(true);
+                }}
+                className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                title="Save a copy of this diagram in the same project under a new name"
+              >
+                Save As&hellip;
+              </button>
+              <div className="border-t border-gray-100" />
               {/* Imports */}
               <button
                 onClick={() => { setFileMenuOpen(false); importJsonInputRef.current?.click(); }}
@@ -1706,6 +1757,50 @@ export function DiagramEditor({
           initialName={templateEditState?.templateName}
           title={templateEditState ? "Update Template" : templateMode === "capturing-builtin" ? "Save Built-In Template" : "Save User Template"}
         />
+      )}
+
+      {showSaveAs && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-sm">
+            <div className="px-5 pt-4 pb-2">
+              <h2 className="text-base font-semibold text-gray-900">Save As</h2>
+              <p className="mt-1 text-sm text-gray-600">
+                Clones this diagram into the same project under a new name.
+                The current diagram is not modified.
+              </p>
+            </div>
+            <div className="px-5 py-2">
+              <label className="block text-xs font-medium text-gray-700 mb-1">New diagram name</label>
+              <input
+                autoFocus
+                type="text"
+                value={saveAsName}
+                onChange={(e) => setSaveAsName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleSaveAs();
+                  if (e.key === "Escape") { setShowSaveAs(false); setSaveAsError(null); }
+                }}
+                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+              {saveAsError && <p className="mt-2 text-xs text-red-600">{saveAsError}</p>}
+            </div>
+            <div className="px-5 pb-4 pt-2 flex gap-2 justify-end">
+              <button
+                onClick={() => { setShowSaveAs(false); setSaveAsError(null); }}
+                className="px-3 py-1.5 text-sm text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveAs}
+                disabled={!saveAsName.trim() || saveAsBusy}
+                className="px-3 py-1.5 text-sm text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {saveAsBusy ? "Saving\u2026" : "Save As"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {unsavedDialog && (

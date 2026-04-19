@@ -332,6 +332,27 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
   const router = useRouter();
   const [diagrams, setDiagrams] = useState(project.diagrams);
   const [projectName, setProjectName] = useState(project.name);
+
+  // Tile grid column count — computed from the grid container's actual width
+  // (not the viewport). This gives "primacy" to the nav-tree width: when the
+  // user drags the tree wider, the main pane shrinks and the tile count
+  // re-flows automatically, rather than tiles staying fixed and getting cut off.
+  const tileGridRef = useRef<HTMLDivElement | null>(null);
+  const [tileColumns, setTileColumns] = useState(3);
+  useEffect(() => {
+    const el = tileGridRef.current;
+    if (!el) return;
+    const TILE_MIN = 240; // matches the target column width used by DiagramCard
+    function recompute(width: number) {
+      setTileColumns(Math.max(1, Math.floor(width / TILE_MIN)));
+    }
+    recompute(el.clientWidth);
+    const ro = new ResizeObserver(entries => {
+      for (const ent of entries) recompute(ent.contentRect.width);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   const [projectDescription, setProjectDescription] = useState(project.description ?? "");
   const [projectOwner, setProjectOwner] = useState(project.ownerName ?? "");
   const [editingProjectName, setEditingProjectName] = useState(false);
@@ -1432,7 +1453,11 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+            <div
+              ref={tileGridRef}
+              className="grid gap-2"
+              style={{ gridTemplateColumns: `repeat(${tileColumns}, minmax(0, 1fr))` }}
+            >
               {visibleDiagrams.map((d) => (
                 <DiagramCard
                   key={d.id}
@@ -1747,11 +1772,12 @@ function DiagramCard({
   return (
     <div
       onClick={() => onOpen(diagram.id)}
-      className="bg-white border border-gray-200 rounded-md p-2 hover:border-blue-300 hover:shadow-sm cursor-pointer group transition-all relative"
+      title={diagram.name}
+      className="bg-white border border-gray-200 rounded-md px-2 py-1.5 hover:border-blue-300 hover:shadow-sm cursor-pointer group transition-all relative"
     >
       {/* Row 1: Name + action icons */}
       <div className="flex items-center justify-between">
-        <h3 className="font-medium text-gray-900 text-xs truncate flex-1" title={diagram.name}>{diagram.name}</h3>
+        <h3 className="font-medium text-gray-900 text-[11px] leading-tight truncate flex-1" title={diagram.name}>{diagram.name}</h3>
         <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 ml-1 shrink-0">
           <button
             onClick={(e) => { e.stopPropagation(); onClone(diagram.id); }}
@@ -1793,12 +1819,12 @@ function DiagramCard({
       </div>
       {/* Row 2: Type/date on left, thumbnail on right */}
       <div className="flex items-start mt-0.5">
-        <div className="flex items-center gap-2 text-[10px] text-gray-400 pt-0.5">
+        <div className="flex items-center gap-1.5 text-[9px] text-gray-400 pt-0.5">
           <span>{DIAGRAM_TYPE_LABELS[diagram.type] ?? diagram.type}</span>
           <span>{"\u00B7"}</span>
           <span>{new Date(diagram.updatedAt).toLocaleDateString()}</span>
         </div>
-        <div className="ml-auto w-16 h-10 opacity-[0.55] group-hover:opacity-[0.85] transition-opacity pointer-events-none shrink-0">
+        <div className="ml-auto w-14 h-8 opacity-[0.55] group-hover:opacity-[0.85] transition-opacity pointer-events-none shrink-0">
           <DiagramThumbnail data={(diagram.data ?? { elements: [], connectors: [] }) as DiagramData} colorConfig={colorConfig} />
         </div>
       </div>

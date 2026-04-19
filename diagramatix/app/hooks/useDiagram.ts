@@ -926,11 +926,20 @@ function reducer(state: DiagramData, action: Action): DiagramData {
           const optSourceSide: Side = srcCy <= tgtCy ? "bottom" : "top";
           const optTargetSide: Side = srcCy <= tgtCy ? "top"    : "bottom";
           if (traceA2) console.log(`[TRACE MOVE_ELEMENT/A2-flip] conn=${conn.id} srcCy=${srcCy} tgtCy=${tgtCy} oldSides=${conn.sourceSide}/${conn.targetSide} newSides=${optSourceSide}/${optTargetSide}`);
+          // When the sides flip (pool crossed over its partner), the label's
+          // relative position flips with them so a label that sat "below the
+          // attachment point" before now sits "above the new attachment point"
+          // — which visually keeps it in the (new) inter-pool gap.
+          const sidesFlipped = conn.sourceSide !== optSourceSide;
+          const flippedLabelOffsetY = sidesFlipped && conn.labelOffsetY != null
+            ? -conn.labelOffsetY
+            : conn.labelOffsetY;
           const updated = {
             ...conn,
             sourceOffsetAlong: newSrcOffset,
             sourceSide: optSourceSide,
             targetSide: optTargetSide,
+            ...(flippedLabelOffsetY !== undefined ? { labelOffsetY: flippedLabelOffsetY } : {}),
           };
           const wp = messageBpmnWaypoints(source, target,
             updated.sourceSide, updated.targetSide, newSrcOffset);
