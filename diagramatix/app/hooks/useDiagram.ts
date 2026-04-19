@@ -926,24 +926,61 @@ function reducer(state: DiagramData, action: Action): DiagramData {
           const optSourceSide: Side = srcCy <= tgtCy ? "bottom" : "top";
           const optTargetSide: Side = srcCy <= tgtCy ? "top"    : "bottom";
           if (traceA2) console.log(`[TRACE MOVE_ELEMENT/A2-flip] conn=${conn.id} srcCy=${srcCy} tgtCy=${tgtCy} oldSides=${conn.sourceSide}/${conn.targetSide} newSides=${optSourceSide}/${optTargetSide}`);
-          // When the sides flip (pool crossed over its partner), the label's
-          // relative position flips with them so a label that sat "below the
-          // attachment point" before now sits "above the new attachment point"
-          // — which visually keeps it in the (new) inter-pool gap.
           const sidesFlipped = conn.sourceSide !== optSourceSide;
-          const flippedLabelOffsetY = sidesFlipped && conn.labelOffsetY != null
-            ? -conn.labelOffsetY
-            : conn.labelOffsetY;
+
           const updated = {
             ...conn,
             sourceOffsetAlong: newSrcOffset,
             sourceSide: optSourceSide,
             targetSide: optTargetSide,
-            ...(flippedLabelOffsetY !== undefined ? { labelOffsetY: flippedLabelOffsetY } : {}),
           };
           const wp = messageBpmnWaypoints(source, target,
             updated.sourceSide, updated.targetSide, newSrcOffset);
-          const labelAdj = adjustMsgLabelOffset(conn, conn.waypoints, wp.waypoints);
+
+          // Label handling when the pool has CROSSED OVER its partner.
+          //
+          // Rule: the label's CENTRE is reflected about the midpoint of the
+          // attachment's Y-axis move. Given old attachment yA, new yA',
+          // M = (yA + yA') / 2, the new label centre is at 2M − oldCentre,
+          // which keeps the label the same distance from the boundary but
+          // on the opposite face.
+          //
+          // Subtlety: labelOffsetY is the TOP of the label relative to the
+          // connector anchor (midpoint), not the centre. The renderer uses
+          // `top = anchor + offsetY`, then centre = top + labelHeight/2.
+          // Reflecting the TOP instead of the centre would leave the label
+          // one label-height too close to the boundary — hence the explicit
+          // half-height conversion below.
+          //
+          // When sides don't flip (pool moved but didn't cross), defer to
+          // adjustMsgLabelOffset which preserves offset from the nearest
+          // endpoint.
+          let labelAdj: { labelOffsetY?: number } = {};
+          if (sidesFlipped && conn.labelOffsetY != null) {
+            const oldSrcIdx = conn.sourceInvisibleLeader ? 1 : 0;
+            const oldTgtIdx = conn.targetInvisibleLeader ? conn.waypoints.length - 2 : conn.waypoints.length - 1;
+            const oldSrcY = conn.waypoints[oldSrcIdx]?.y ?? 0;
+            const oldTgtY = conn.waypoints[oldTgtIdx]?.y ?? 0;
+            const oldMidY = (oldSrcY + oldTgtY) / 2;
+            // Match the renderer's line height; default single-line → 14 px.
+            const LINE_H = 14;
+            const lineCount = ((conn.label ?? "").split("\n").length) || 1;
+            const halfLabelH = (lineCount * LINE_H) / 2;
+            const oldLabelCentreY = oldMidY + conn.labelOffsetY + halfLabelH;
+            const oldAttachY = isSrc ? oldSrcY : oldTgtY;
+            // messageBpmnWaypoints always returns 4 points with both invisible leaders.
+            const newSrcY = wp.waypoints[1].y;
+            const newTgtY = wp.waypoints[2].y;
+            const newMidY = (newSrcY + newTgtY) / 2;
+            const newAttachY = isSrc ? newSrcY : newTgtY;
+            // Reflect the label CENTRE about the midpoint of the attachment move.
+            const newLabelCentreY = oldAttachY + newAttachY - oldLabelCentreY;
+            const newLabelTopY = newLabelCentreY - halfLabelH;
+            labelAdj = { labelOffsetY: newLabelTopY - newMidY };
+          } else {
+            labelAdj = adjustMsgLabelOffset(conn, conn.waypoints, wp.waypoints);
+          }
+
           return { ...updated, waypoints: wp.waypoints,
             sourceInvisibleLeader: wp.sourceInvisibleLeader,
             targetInvisibleLeader: wp.targetInvisibleLeader, ...labelAdj };
