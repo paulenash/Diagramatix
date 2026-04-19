@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
-import { prisma } from "@/app/lib/db";
+import { prisma, pgPool } from "@/app/lib/db";
 import { getCurrentOrgId, OrgContextError } from "@/app/lib/auth/orgContext";
 
 export async function GET(req: Request) {
@@ -38,7 +38,7 @@ export async function POST(req: Request) {
     throw err;
   }
 
-  const { name, text, diagramType } = await req.json();
+  const { name, text, diagramType, planJson } = await req.json();
   if (!name?.trim() || !text?.trim()) {
     return NextResponse.json({ error: "Name and text are required" }, { status: 400 });
   }
@@ -46,6 +46,15 @@ export async function POST(req: Request) {
   const prompt = await prisma.prompt.create({
     data: { name: name.trim(), text: text.trim(), diagramType: diagramType ?? "bpmn", userId: session.user.id, orgId },
   });
+
+  // planJson is a JSON column and Prisma 7 doesn't parameterise it in the update
+  // input schema. Use raw SQL through pgPool when the caller supplies it.
+  if (planJson !== undefined) {
+    await pgPool.query(
+      `UPDATE "Prompt" SET "planJson" = $1::jsonb, "planUpdatedAt" = NOW() WHERE id = $2`,
+      [planJson === null ? null : JSON.stringify(planJson), prompt.id],
+    );
+  }
 
   return NextResponse.json(prompt, { status: 201 });
 }

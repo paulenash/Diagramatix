@@ -1295,35 +1295,27 @@ export function DiagramEditor({
           </button>
         )}
 
+        {/* AI Generate button. For BPMN this opens the 2-phase Plan panel;
+            for other diagram types it opens the legacy one-shot AI panel. */}
         {!readOnly && diagramType !== "basic" && (
           <button
             onClick={() => {
-              setShowAiPanel(prev => !prev);
-              if (!showAiPanel) { setShowHistoryPanel(false); setShowPlanPanel(false); }
+              if (diagramType === "bpmn") {
+                setShowPlanPanel(prev => !prev);
+                if (!showPlanPanel) { setShowAiPanel(false); setShowHistoryPanel(false); }
+              } else {
+                setShowAiPanel(prev => !prev);
+                if (!showAiPanel) { setShowHistoryPanel(false); setShowPlanPanel(false); }
+              }
             }}
             className={`px-2 py-0.5 text-[11px] rounded border ${
-              showAiPanel
+              (diagramType === "bpmn" ? showPlanPanel : showAiPanel)
                 ? "text-blue-700 border-blue-400 bg-blue-50"
                 : "text-gray-700 border-gray-300 hover:bg-gray-50"
             }`}
+            title={diagramType === "bpmn" ? "Two-phase AI generation: plan first, then apply layout" : "Generate a diagram from a natural-language description"}
           >
             AI Generate
-          </button>
-        )}
-        {!readOnly && diagramType === "bpmn" && (
-          <button
-            onClick={() => {
-              setShowPlanPanel(prev => !prev);
-              if (!showPlanPanel) { setShowAiPanel(false); setShowHistoryPanel(false); }
-            }}
-            className={`px-2 py-0.5 text-[11px] rounded border ${
-              showPlanPanel
-                ? "text-blue-700 border-blue-400 bg-blue-50"
-                : "text-gray-700 border-gray-300 hover:bg-gray-50"
-            }`}
-            title="Two-phase AI generation: plan first, then apply layout"
-          >
-            AI Plan
           </button>
         )}
         {!readOnly && (

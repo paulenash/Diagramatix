@@ -1447,36 +1447,67 @@ export function PropertiesPanel({
         </div>
       )}
 
-      {element.type === "pool" && (
-        <>
-          <div className="flex items-center gap-1">
-            <label className="text-[10px] text-gray-500 whitespace-nowrap w-14 shrink-0">Element</label>
-            <select
-              value={(element.properties.poolType as string | undefined) ?? "black-box"}
-              onChange={(e) => onUpdateProperties(element.id, { poolType: e.target.value })}
-              className="flex-1 text-[10px] border border-gray-300 rounded px-1.5 py-0.5 bg-white text-gray-700"
-            >
-              <option value="black-box">Black-box</option>
-              <option value="white-box">White-box</option>
-            </select>
-          </div>
-          {((element.properties.poolType as string | undefined) ?? "black-box") === "black-box" && (
-            <label className="flex items-center gap-1 text-[10px] text-gray-700">
-              <input type="checkbox"
-                checked={!!element.properties.isSystem}
-                onChange={(e) => onUpdateProperties(element.id, { isSystem: e.target.checked })}
-                className="w-3 h-3" />
-              System (IT application / database)
-            </label>
-          )}
-          {onAddLane && (element.properties.poolType === "white-box") && (
-            <button onClick={() => onAddLane(element.id)}
-              className="w-full px-2 py-0.5 text-[10px] bg-blue-50 text-blue-700 border border-blue-200 rounded hover:bg-blue-100">
-              + Add Lane
-            </button>
-          )}
-        </>
-      )}
+      {element.type === "pool" && (() => {
+        const poolType = (element.properties.poolType as string | undefined) ?? "black-box";
+        // Message connectors whose source OR target is this pool (directly).
+        // Used to gate both the Add Lane button and the black-box→white-box
+        // pool-type change confirm.
+        const poolMessageConns = (allConnectors ?? []).filter(
+          c => c.type === "messageBPMN" && (c.sourceId === element.id || c.targetId === element.id),
+        );
+        const hasMessageConns = poolMessageConns.length > 0;
+        // Add Lane is allowed for white-box pools OR for black-box pools that
+        // have no message connectors yet (pool is still "empty" / unclassified).
+        const canAddLane = poolType === "white-box" || !hasMessageConns;
+        return (
+          <>
+            <div className="flex items-center gap-1">
+              <label className="text-[10px] text-gray-500 whitespace-nowrap w-14 shrink-0">Element</label>
+              <select
+                value={poolType}
+                onChange={(e) => {
+                  const newType = e.target.value;
+                  // Guard: switching black-box (with message connectors) to white-box
+                  // is destructive — messages can't survive because a white-box pool
+                  // holds internal elements, not external-message attachment points.
+                  if (poolType === "black-box" && newType === "white-box" && hasMessageConns) {
+                    const n = poolMessageConns.length;
+                    const ok = confirm(
+                      `This pool has ${n} message connector${n === 1 ? "" : "s"} attached. ` +
+                      `Changing it to White-box will delete ${n === 1 ? "that connector" : "those connectors"}. Continue?`,
+                    );
+                    if (!ok) return;
+                    for (const c of poolMessageConns) onDeleteConnector(c.id);
+                  }
+                  onUpdateProperties(element.id, { poolType: newType });
+                }}
+                className="flex-1 text-[10px] border border-gray-300 rounded px-1.5 py-0.5 bg-white text-gray-700"
+              >
+                <option value="black-box">Black-box</option>
+                <option value="white-box">White-box</option>
+              </select>
+            </div>
+            {poolType === "black-box" && (
+              <label className="flex items-center gap-1 text-[10px] text-gray-700">
+                <input type="checkbox"
+                  checked={!!element.properties.isSystem}
+                  onChange={(e) => onUpdateProperties(element.id, { isSystem: e.target.checked })}
+                  className="w-3 h-3" />
+                System (IT application / database)
+              </label>
+            )}
+            {onAddLane && canAddLane && (
+              <button onClick={() => onAddLane(element.id)}
+                className="w-full px-2 py-0.5 text-[10px] bg-blue-50 text-blue-700 border border-blue-200 rounded hover:bg-blue-100"
+                title={poolType === "black-box"
+                  ? "Adding a lane will convert this pool to White-box"
+                  : "Add a new lane to this pool"}>
+                + Add Lane
+              </button>
+            )}
+          </>
+        );
+      })()}
 
       {element.type === "lane" && onAddSublane && (
         <button onClick={() => onAddSublane(element.id)}

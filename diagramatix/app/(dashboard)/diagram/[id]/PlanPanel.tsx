@@ -23,16 +23,25 @@ interface Props {
   onClose: () => void;
 }
 
+interface SavedPrompt { id: string; name: string; text: string; }
+
 type Tab = "pools" | "elements" | "connectors" | "json";
 
 export function PlanPanel({ diagramType, onApplyDiagram, onClose }: Props) {
   const [prompt, setPrompt] = useState("");
   const { plan, setPlan, updateElement, deleteElement, updateConnection, deleteConnection, asJson } = usePlanState();
   const [activeTab, setActiveTab] = useState<Tab>("pools");
-  const [busy, setBusy] = useState<"plan" | "apply" | null>(null);
+  const [busy, setBusy] = useState<"plan" | "apply" | "save" | "load" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [issues, setIssues] = useState<string[] | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+
+  // Saved prompts (with optional persisted plan JSON — Milestone D).
+  const [savedPrompts, setSavedPrompts] = useState<SavedPrompt[]>([]);
+  const [editingPromptId, setEditingPromptId] = useState<string | null>(null);
+  const [saveName, setSaveName] = useState("");
+  const [showSave, setShowSave] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   // Raw JSON tab has its own draft so mid-typing doesn't nuke structured state.
   // It syncs FROM `asJson` whenever the tab is NOT focused; pushes BACK to
@@ -61,6 +70,96 @@ export function PlanPanel({ diagramType, onApplyDiagram, onClose }: Props) {
 
   const hasPlan = plan.elements.length > 0 || plan.connections.length > 0;
   const lastSonnetResponseRef = useRef<string | null>(null);
+
+  // Load the saved-prompts list on mount.
+  const loadPromptList = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/prompts?diagramType=${encodeURIComponent(diagramType)}`);
+      if (res.ok) setSavedPrompts(await res.json());
+    } catch { /* ignore */ }
+  }, [diagramType]);
+  useEffect(() => { loadPromptList(); }, [loadPromptList]);
+
+  // Select a saved prompt → fetch its planJson and load into state.
+  const loadSavedPrompt = useCallback(async (sp: SavedPrompt) => {
+    if (busy) return;
+    setBusy("load");
+    setError(null);
+    setStatus(null);
+    try {
+      const res = await fetch(`/api/prompts/${sp.id}`);
+      if (!res.ok) throw new Error("Could not load prompt");
+      const row = await res.json();
+      setPrompt(row.text ?? sp.text);
+      setEditingPromptId(sp.id);
+      setSaveName(sp.name);
+      if (row.planJson && Array.isArray(row.planJson.elements) && Array.isArray(row.planJson.connections)) {
+        setPlan(row.planJson);
+        lastSonnetResponseRef.current = JSON.stringify(row.planJson, null, 2);
+        setStatus(`Loaded "${sp.name}" (${row.planJson.elements.length} elements, ${row.planJson.connections.length} connections)`);
+      } else {
+        setPlan({ elements: [], connections: [] });
+        lastSonnetResponseRef.current = null;
+        setStatus(`Loaded "${sp.name}" — no saved plan yet, click Plan to generate`);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Load failed");
+    } finally {
+      setBusy(null);
+    }
+  }, [busy, setPlan]);
+
+  // Save the current prompt text + plan JSON. Creates a new prompt or updates
+  // the existing one based on editingPromptId. planJson is sent as-is (can be
+  // null for a prompt with no plan yet).
+  const savePrompt = useCallback(async () => {
+    if (!saveName.trim() || !prompt.trim() || busy) return;
+    setBusy("save");
+    setError(null);
+    try {
+      const body: Record<string, unknown> = {
+        name: saveName.trim(),
+        text: prompt.trim(),
+        planJson: hasPlan ? plan : null,
+      };
+      let res: Response;
+      if (editingPromptId) {
+        res = await fetch(`/api/prompts/${editingPromptId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+      } else {
+        res = await fetch("/api/prompts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...body, diagramType }),
+        });
+      }
+      if (!res.ok) throw new Error("Save failed");
+      const saved = await res.json();
+      setEditingPromptId(saved.id);
+      setShowSave(false);
+      setStatus(`Saved "${saveName.trim()}"`);
+      await loadPromptList();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Save failed");
+    } finally {
+      setBusy(null);
+    }
+  }, [saveName, prompt, busy, editingPromptId, diagramType, hasPlan, plan, loadPromptList]);
+
+  const deletePrompt = useCallback(async (id: string) => {
+    try {
+      await fetch(`/api/prompts/${id}`, { method: "DELETE" });
+      if (editingPromptId === id) {
+        setEditingPromptId(null);
+        setSaveName("");
+      }
+      setConfirmDeleteId(null);
+      await loadPromptList();
+    } catch { /* ignore */ }
+  }, [editingPromptId, loadPromptList]);
 
   const callPlan = useCallback(async () => {
     if (!prompt.trim() || busy) return;
@@ -150,6 +249,40 @@ export function PlanPanel({ diagramType, onApplyDiagram, onClose }: Props) {
           </p>
         )}
 
+        {savedPrompts.length > 0 && (
+          <div className="shrink-0">
+            <p className="text-[10px] text-gray-400 font-medium uppercase mb-1">Saved Prompts</p>
+            <div className="space-y-0.5 max-h-28 overflow-y-auto border border-gray-100 rounded">
+              {savedPrompts.map(sp => (
+                <div key={sp.id} className="flex items-center gap-1 group px-1">
+                  {confirmDeleteId === sp.id ? (
+                    <>
+                      <span className="flex-1 text-[10px] text-red-600 truncate">Delete &ldquo;{sp.name}&rdquo;?</span>
+                      <button onClick={() => deletePrompt(sp.id)}
+                        className="text-[10px] text-red-600 font-medium hover:text-red-800 px-1">Yes</button>
+                      <button onClick={() => setConfirmDeleteId(null)}
+                        className="text-[10px] text-gray-500 hover:text-gray-700 px-1">No</button>
+                    </>
+                  ) : (
+                    <>
+                      <button onClick={() => loadSavedPrompt(sp)}
+                        className={`flex-1 text-left text-[11px] truncate py-0.5 ${editingPromptId === sp.id ? "text-blue-600 font-medium" : "text-gray-700 hover:text-blue-600"}`}
+                        title={sp.text}
+                      >
+                        {sp.name}{editingPromptId === sp.id ? " (editing)" : ""}
+                      </button>
+                      <button onClick={() => setConfirmDeleteId(sp.id)}
+                        className="text-gray-300 hover:text-red-500 text-[10px] opacity-0 group-hover:opacity-100 px-1"
+                        title="Delete saved prompt"
+                      >&times;</button>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="shrink-0">
           <label className="text-[10px] text-gray-500 font-medium mb-1 block">Describe the process</label>
           <textarea
@@ -177,7 +310,43 @@ export function PlanPanel({ diagramType, onApplyDiagram, onClose }: Props) {
           >
             {busy === "apply" ? "Applying…" : "Apply Layout"}
           </button>
+          <button
+            onClick={() => {
+              if (editingPromptId) {
+                // Fast-path: update the already-open prompt without reopening the name dialog.
+                savePrompt();
+              } else {
+                setShowSave(true);
+              }
+            }}
+            disabled={!prompt.trim() || busy !== null}
+            className="px-2 py-1 text-[11px] font-medium text-gray-700 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50"
+            title="Save this prompt (including the current plan) for later"
+          >
+            {busy === "save" ? "Saving…" : editingPromptId ? "Update" : "Save…"}
+          </button>
         </div>
+
+        {showSave && (
+          <div className="shrink-0 flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded px-2 py-1.5">
+            <input
+              autoFocus
+              value={saveName}
+              onChange={e => setSaveName(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter") savePrompt(); if (e.key === "Escape") { setShowSave(false); setSaveName(""); } }}
+              placeholder="Name for saved prompt"
+              className="flex-1 px-2 py-1 text-[11px] border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+            <button onClick={savePrompt} disabled={!saveName.trim() || busy !== null}
+              className="px-2 py-1 text-[11px] font-medium text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50">
+              Save
+            </button>
+            <button onClick={() => { setShowSave(false); setSaveName(""); }}
+              className="px-2 py-1 text-[11px] text-gray-700 border border-gray-300 rounded hover:bg-gray-50">
+              Cancel
+            </button>
+          </div>
+        )}
 
         {status && <p className="text-[10px] text-gray-500 shrink-0">{status}</p>}
         {error && (
