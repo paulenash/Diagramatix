@@ -17,6 +17,7 @@ export interface AiElement {
   pool?: string;              // pool ID this element belongs to
   lane?: string;              // lane ID this element belongs to
   poolType?: string;          // "white-box" | "black-box"
+  isSystem?: boolean;         // only meaningful for black-box pools: true = IT system (below main), false = external entity (above main)
   lanes?: { id: string; name: string }[];  // lanes within a pool
   parentSubprocess?: string;  // subprocess-expanded ID this element belongs to
   boundaryHost?: string;      // host element ID for edge-mounted events
@@ -187,11 +188,18 @@ export function layoutBpmnDiagram(
   const whiteBoxPools = pools.filter(p => (p.poolType ?? "white-box") === "white-box");
   const blackBoxPools = pools.filter(p => p.poolType === "black-box");
 
-  // Separate black-box pools into external entities (top) and systems (bottom)
-  // Heuristic: if name contains common system names → bottom, else → top
+  // Separate black-box pools into external entities (top) and systems (bottom).
+  // Prefer the AI-set isSystem flag; fall back to a label keyword heuristic
+  // only when the flag is undefined (legacy JSON or hand-written plans).
   const SYSTEM_KEYWORDS = /salesforce|xero|sap|erp|crm|sharepoint|database|api|system|server|aws|azure|google/i;
-  const topBlackBoxes = blackBoxPools.filter(p => !SYSTEM_KEYWORDS.test(p.label));
-  const bottomBlackBoxes = blackBoxPools.filter(p => SYSTEM_KEYWORDS.test(p.label));
+  function isSystemPool(p: AiElement): boolean {
+    if (typeof p.isSystem === "boolean") return p.isSystem;
+    const fromProps = (p.properties as { isSystem?: unknown } | undefined)?.isSystem;
+    if (typeof fromProps === "boolean") return fromProps;
+    return SYSTEM_KEYWORDS.test(p.label);
+  }
+  const topBlackBoxes = blackBoxPools.filter(p => !isSystemPool(p));
+  const bottomBlackBoxes = blackBoxPools.filter(p => isSystemPool(p));
 
   // Build lane map: laneId → pool, and element → lane assignment
   const laneToPool = new Map<string, string>();
@@ -767,14 +775,16 @@ export function layoutBpmnDiagram(
       if (!existingConnKeys.has(key)) { autoConns.push({ sourceId: nearest.id, targetId: el.id, type: "sequence" }); existingConnKeys.add(key); }
     }
   }
-  // R31: Drop any sequence connectors that touch an Event Expanded Subprocess
+  // R31: Drop any sequence connector that touches an Event Expanded Subprocess.
+  // Treat connections with no explicit type as sequence (same default used below).
   const isEventSub = (id: string): boolean => {
     const el = elements.find(e => e.id === id);
     return el?.type === "subprocess-expanded" &&
       (el.properties.subprocessType as string | undefined) === "event";
   };
+  const isSequenceConn = (c: AiConnection) => c.type === "sequence" || c.type == null;
   const filteredAi = aiConnections.filter(c =>
-    !(c.type === "sequence" && (isEventSub(c.sourceId) || isEventSub(c.targetId)))
+    !(isSequenceConn(c) && (isEventSub(c.sourceId) || isEventSub(c.targetId)))
   );
   const finalConnections = [...filteredAi, ...autoConns];
 

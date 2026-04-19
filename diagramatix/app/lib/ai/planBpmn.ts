@@ -48,6 +48,10 @@ ${rules ? `USER RULES AND PREFERENCES (follow these strictly):\n${rules}\n\n` : 
 - Use "label" (not "name") for all element labels
 - Every element MUST have: id, type, label
 - Pools MUST have: poolType ("white-box" or "black-box")
+- Black-box pools MUST also include "isSystem": true | false so downstream code can position them correctly without name guessing:
+  * isSystem=true → IT systems / business applications (Salesforce, XERO, SAP, SharePoint, databases, APIs, ERP, CRM, etc.). Positioned BELOW the main pool.
+  * isSystem=false → external entities that are people or organisations (Customer, Client, Supplier, Government Department, etc.). Positioned ABOVE the main pool.
+  * White-box pools do not need isSystem.
 - Lanes MUST have: parentPool (the pool id they belong to)
 - Flow elements (tasks, gateways, events) MUST have: pool (pool id). Include "lane" ONLY if the prompt mentions specific roles, teams, or performers responsible for elements.
 - DO NOT create default/placeholder lanes (e.g. "Team", "Process Team", "Main Lane"). Only create lanes when the prompt implies multiple performers/roles. If no roles are mentioned, elements go directly in the pool with NO lane.
@@ -94,20 +98,24 @@ Example 1 — NO roles mentioned, so NO lanes (elements go directly in pool):
   ]
 }
 
-Example 2 — Roles mentioned (Sales, Finance), so lanes are created:
+Example 2 — Roles mentioned (Sales, Finance), message flows to Customer (external, non-system) and Salesforce (IT system):
 {
   "elements": [
+    { "id": "pC", "type": "pool", "label": "Customer", "poolType": "black-box", "isSystem": false },
     { "id": "p1", "type": "pool", "label": "Company", "poolType": "white-box" },
     { "id": "l1", "type": "lane", "label": "Sales", "parentPool": "p1" },
     { "id": "l2", "type": "lane", "label": "Finance", "parentPool": "p1" },
+    { "id": "pS", "type": "pool", "label": "Salesforce", "poolType": "black-box", "isSystem": true },
     { "id": "e1", "type": "start-event", "label": "Start", "pool": "p1", "lane": "l1" },
-    { "id": "t1", "type": "task", "label": "Check Order", "taskType": "user", "pool": "p1", "lane": "l1" },
-    { "id": "t2", "type": "task", "label": "Process Payment", "taskType": "service", "pool": "p1", "lane": "l2" },
+    { "id": "t1", "type": "task", "label": "Notify Customer", "taskType": "send", "pool": "p1", "lane": "l1" },
+    { "id": "t2", "type": "task", "label": "Record Payment", "taskType": "user", "pool": "p1", "lane": "l2" },
     { "id": "e2", "type": "end-event", "label": "End", "pool": "p1", "lane": "l2" }
   ],
   "connections": [
     { "sourceId": "e1", "targetId": "t1", "type": "sequence" },
+    { "sourceId": "t1", "targetId": "pC", "type": "message" },
     { "sourceId": "t1", "targetId": "t2", "type": "sequence" },
+    { "sourceId": "t2", "targetId": "pS", "type": "message" },
     { "sourceId": "t2", "targetId": "e2", "type": "sequence" }
   ]
 }`;

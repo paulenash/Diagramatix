@@ -37,6 +37,7 @@ export const AiElementSchema = z.object({
   pool: z.string().optional(),
   lane: z.string().optional(),
   poolType: z.enum(["white-box", "black-box"]).optional(),
+  isSystem: z.boolean().optional(),
   lanes: z.array(z.object({ id: z.string(), name: z.string() })).optional(),
   parentSubprocess: z.string().optional(),
   boundaryHost: z.string().optional(),

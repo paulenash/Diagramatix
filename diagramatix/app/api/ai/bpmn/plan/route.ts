@@ -8,7 +8,6 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { planBpmn } from "@/app/lib/ai/planBpmn";
-import { splitRulesByEnforcement } from "@/app/lib/ai/splitRules";
 
 export async function POST(req: Request) {
   const session = await auth();
@@ -26,7 +25,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
   }
 
-  // Load General + BPMN default rules, then keep only the AI-enforceable slice.
+  // Load General + BPMN default rules.
+  // NOTE: we currently send ALL rules (same as AI Generate) because some rules
+  // under "Layout Sizing" (R23, R25) are semantic, not layout. Next session:
+  // reorganise Group 6 so the splitRulesByEnforcement() filter can be
+  // re-enabled safely. Tracked via memory "project_ai_plan_rule_reorg".
   let fullRules = "";
   try {
     for (const category of ["general", "bpmn"]) {
@@ -37,12 +40,11 @@ export async function POST(req: Request) {
       if (dr?.rules) fullRules += (fullRules ? "\n\n" : "") + dr.rules;
     }
   } catch { /* proceed without rules */ }
-  const { aiRules } = splitRulesByEnforcement(fullRules);
 
-  console.log("[AI plan] rules: full", fullRules.length, "chars → ai-only", aiRules.length, "chars");
+  console.log("[AI plan] sending full rules:", fullRules.length, "chars");
 
   try {
-    const result = await planBpmn({ apiKey, prompt, attachment, rules: aiRules });
+    const result = await planBpmn({ apiKey, prompt, attachment, rules: fullRules });
     if (!result.ok) {
       return NextResponse.json({ error: result.error, raw: result.raw }, { status: result.status });
     }

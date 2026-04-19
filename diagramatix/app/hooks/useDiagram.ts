@@ -867,6 +867,8 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       // The pool is clamped so no messageBPMN attachment point falls outside its boundary.
       const isBlackBoxPool = el.type === "pool" &&
         ((el.properties.poolType as string | undefined) ?? "black-box") === "black-box";
+      const traceA2 = typeof window !== "undefined" && (window as unknown as { __DIAGRAMATIX_TRACE?: boolean }).__DIAGRAMATIX_TRACE;
+      if (traceA2) console.log(`[TRACE MOVE_ELEMENT/A2-check] id=${id} type=${el.type} poolType=${el.properties?.poolType} isBlackBoxPool=${isBlackBoxPool} target=(${x},${y})`);
       if (isBlackBoxPool) {
         let rawDx = x - el.x;
         const rawDy = y - el.y;
@@ -898,7 +900,11 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         const elements = state.elements.map(e =>
           e.id === id ? { ...e, x: clampedX, y: clampedY } : e
         );
-        // Update messageBPMN connectors: keep attachment world-x fixed, adjust offsets
+        // Update messageBPMN connectors: keep attachment world-x fixed, adjust offsets.
+        // If the move put this pool on the opposite side of its message partner
+        // (e.g. the black-box pool used to be ABOVE the white-box process pool and
+        // is now BELOW it), flip sourceSide ↔ targetSide so the connector still
+        // exits the nearer face of each element instead of going "through" them.
         const connectors = state.connectors.map(conn => {
           if (conn.type !== "messageBPMN") return conn;
           const isSrc = conn.sourceId === id;
@@ -912,7 +918,20 @@ function reducer(state: DiagramData, action: Action): DiagramData {
           // (possibly moved) source element
           const newSrcOffset = source.width > 0
             ? (worldX - source.x) / source.width : 0.5;
-          const updated = { ...conn, sourceOffsetAlong: newSrcOffset };
+
+          // Determine optimal sides from the new element positions.
+          // source above target → source-bottom → target-top; otherwise flip.
+          const srcCy = source.y + source.height / 2;
+          const tgtCy = target.y + target.height / 2;
+          const optSourceSide: Side = srcCy <= tgtCy ? "bottom" : "top";
+          const optTargetSide: Side = srcCy <= tgtCy ? "top"    : "bottom";
+          if (traceA2) console.log(`[TRACE MOVE_ELEMENT/A2-flip] conn=${conn.id} srcCy=${srcCy} tgtCy=${tgtCy} oldSides=${conn.sourceSide}/${conn.targetSide} newSides=${optSourceSide}/${optTargetSide}`);
+          const updated = {
+            ...conn,
+            sourceOffsetAlong: newSrcOffset,
+            sourceSide: optSourceSide,
+            targetSide: optTargetSide,
+          };
           const wp = messageBpmnWaypoints(source, target,
             updated.sourceSide, updated.targetSide, newSrcOffset);
           const labelAdj = adjustMsgLabelOffset(conn, conn.waypoints, wp.waypoints);
