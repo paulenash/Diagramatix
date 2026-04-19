@@ -388,7 +388,7 @@ export function PlanPanel({ diagramType, onApplyDiagram, onClose }: Props) {
             <PoolsLanesTree elements={plan.elements} onRename={(id, label) => updateElement(id, { label })} onDelete={deleteElement} />
           )}
           {activeTab === "elements" && (
-            <ElementsByContainerView elements={plan.elements} onRename={(id, label) => updateElement(id, { label })} onDelete={deleteElement} />
+            <ElementsByContainerView elements={plan.elements} connections={plan.connections} onRename={(id, label) => updateElement(id, { label })} onDelete={deleteElement} />
           )}
           {activeTab === "connectors" && (
             <ConnectorsByTypeView elements={plan.elements} connections={plan.connections} onRenameLabel={(idx, label) => updateConnection(idx, { label })} onDelete={deleteConnection} />

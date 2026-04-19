@@ -37,7 +37,7 @@ export interface AiConnection {
 // Layout constants
 const POOL_HEADER_W = 36;
 const LANE_H = 120;
-const LANE_PAD_X = 50; // extra padding to clear lane header text
+const LANE_PAD_X = 54; // 1.5 × start-event width (36) — gap between pool/lane header right edge and the first start event
 const BLACK_BOX_H = 50;
 const POOL_GAP = 90; // gap between pool boundaries (3x original 30)
 const COL_SPACING = 160; // horizontal spacing between columns
@@ -757,15 +757,22 @@ export function layoutBpmnDiagram(
   // OVERRIDE gatewayType when it's unset or "exclusive" default from the AI —
   // if the user / AI explicitly set a specific marker (parallel, inclusive),
   // preserve it since that's a deliberate semantic choice.
+  // R40: decision-gateway labels are placed upper-left of the gateway diamond
+  //      (above the top edge, offset left) rather than centred below it.
   for (const el of elements) {
     if (!isGateway(el)) continue;
+    const decisionLabelPlacement = {
+      labelOffsetX: -(el.width / 2 + 40),
+      labelOffsetY: -(el.height + 15),
+      labelWidth: 80,
+    };
     if (isDecisionGateway(el)) {
       const t = (el.properties.gatewayType as string | undefined) ?? el.gatewayType ?? "exclusive";
       if (t === "exclusive" || t === "none") {
-        el.properties = { ...el.properties, gatewayType: "none", gatewayRole: "decision" };
+        el.properties = { ...el.properties, gatewayType: "none", gatewayRole: "decision", ...decisionLabelPlacement };
         el.gatewayType = "none";
       } else {
-        el.properties = { ...el.properties, gatewayRole: "decision" };
+        el.properties = { ...el.properties, gatewayRole: "decision", ...decisionLabelPlacement };
       }
     } else if (isMergeGateway(el)) {
       const t = (el.properties.gatewayType as string | undefined) ?? el.gatewayType ?? "exclusive";
@@ -779,6 +786,10 @@ export function layoutBpmnDiagram(
   }
 
   // Build the ordered lists for the wiring pass (R35/R36).
+  //   Decision outgoings: AI order (aiConnections order).
+  //   Merge incomings:    sorted by source element vertical position so the
+  //                       topmost source enters at "top", bottommost at "bottom",
+  //                       and any middle sources enter at "left" (R37).
   for (const c of aiConnections) {
     if (c.type === "message") continue;
     const srcEl = elements.find(e => e.id === c.sourceId);
@@ -793,6 +804,17 @@ export function layoutBpmnDiagram(
       list.push(c);
       mergeIncomings.set(tgtEl.id, list);
     }
+  }
+  // Sort each merge gateway's incoming list by source element's centre Y so
+  // the wiring pass can assign sides by vertical position.
+  for (const [mergeId, list] of mergeIncomings) {
+    list.sort((a, b) => {
+      const aSrc = elements.find(e => e.id === a.sourceId);
+      const bSrc = elements.find(e => e.id === b.sourceId);
+      if (!aSrc || !bSrc) return 0;
+      return (aSrc.y + aSrc.height / 2) - (bSrc.y + bSrc.height / 2);
+    });
+    mergeIncomings.set(mergeId, list);
   }
 
   // ── R27/R28: Auto-connect boundary start/end events to nearest internal task/subprocess ──
@@ -874,14 +896,15 @@ export function layoutBpmnDiagram(
       const srcCy = src.y + src.height / 2;
       const tgtCy = tgt.y + tgt.height / 2;
 
-      // R35/R36: Gateway wiring is ORDER-based — sides assigned by the AI's
-      // connection order in the input array, giving a deterministic layout.
-      //   Decision gateway: incoming → left; outgoing → top, bottom, right (1st..3rd)
-      //   Merge gateway:    outgoing → right; incoming → top, bottom, left (1st..3rd)
-      // Each end is resolved independently so a decision-to-merge connector
-      // picks the correct side at BOTH ends.
+      // Gateway wiring (R35/R36/R37):
+      //   Decision gateway: incoming → left; outgoing → top, bottom, right
+      //                     (AI order, 1st..3rd). R35.
+      //   Merge gateway:    outgoing → right; incoming assigned by source
+      //                     vertical position — topmost source → top,
+      //                     bottommost → bottom, any middles → left. R37.
+      // Each end is resolved independently so decision-to-merge connectors
+      // pick the correct side at BOTH ends.
       const decisionOrder: Array<"top" | "bottom" | "right"> = ["top", "bottom", "right"];
-      const mergeOrder:    Array<"top" | "bottom" | "left">  = ["top", "bottom", "left"];
       const srcIsDecision = isDecisionGateway(src);
       const tgtIsMerge    = isMergeGateway(tgt);
       const srcIsMerge    = isMergeGateway(src);    // merge's outgoing → right
@@ -900,7 +923,14 @@ export function layoutBpmnDiagram(
         if (tgtIsMerge) {
           const list = mergeIncomings.get(tgt.id) ?? [];
           const idx = list.indexOf(c);
-          tgtSide = (idx >= 0 && idx < 3 ? mergeOrder[idx] : "left");
+          const n = list.length;
+          // First (topmost source) → top; last (bottommost source) → bottom;
+          // any middle rows → left. Degenerate cases (single incoming) fall
+          // through with tgtSide=top which is fine for a visibly-empty merge.
+          if (idx < 0) tgtSide = "left";
+          else if (idx === 0) tgtSide = "top";
+          else if (idx === n - 1) tgtSide = "bottom";
+          else tgtSide = "left";
         } else if (tgtIsDecision) {
           tgtSide = "left";
         } else {
@@ -928,16 +958,61 @@ export function layoutBpmnDiagram(
       }
     }
 
-    // Fix 4: Gateway label positioning
+    // Connector label positioning:
+    //   - Decision gateway outgoing → anchor to source edge, offset outward
+    //     from whichever face the connector exits (R38).
+    //   - Message flow → position the label vertically in the GAP between
+    //     source and target pools so it reads cleanly in the inter-pool
+    //     space (R39). Offset relative to connector midpoint.
+    //   - Other (sequence fallback) → minor offset above the line.
     let labelOffsetX: number | undefined;
     let labelOffsetY: number | undefined;
     let labelWidth: number | undefined;
+    let labelAnchor: "source" | "target" | undefined;
     if (c.label) {
       if (isDecisionGateway(src)) {
-        // Decision gateway condition labels on outgoing flows
-        labelOffsetX = 5;
-        labelOffsetY = -20;
         labelWidth = 60;
+        labelAnchor = "source";
+        switch (srcSide) {
+          case "top":    labelOffsetX = -labelWidth / 2; labelOffsetY = -22; break;
+          case "bottom": labelOffsetX = -labelWidth / 2; labelOffsetY = 10;  break;
+          case "right":  labelOffsetX = 8;               labelOffsetY = -6;  break;
+          case "left":   labelOffsetX = -labelWidth - 8; labelOffsetY = -6;  break;
+          default:       labelOffsetX = 5;               labelOffsetY = -20; break;
+        }
+      } else if (isMessage) {
+        // Find the containing pool for each end, then centre the label in the gap.
+        function containingPool(el: DiagramElement): DiagramElement | undefined {
+          if (el.type === "pool") return el;
+          let cur: DiagramElement | undefined = el;
+          for (let i = 0; i < 10 && cur; i++) {
+            if (!cur.parentId) break;
+            const parent = elements.find(e => e.id === cur!.parentId);
+            if (!parent) break;
+            if (parent.type === "pool") return parent;
+            cur = parent;
+          }
+          return undefined;
+        }
+        const srcPool = containingPool(src);
+        const tgtPool = containingPool(tgt);
+        labelWidth = 80;
+        labelOffsetX = 20;
+        if (srcPool && tgtPool) {
+          const goingDown = srcSide === "bottom";
+          const srcPoolEdgeY = goingDown ? srcPool.y + srcPool.height : srcPool.y;
+          const tgtPoolEdgeY = goingDown ? tgtPool.y : tgtPool.y + tgtPool.height;
+          const gapCentreY = (srcPoolEdgeY + tgtPoolEdgeY) / 2;
+          // The connector's visible midpoint is between srcEdge and tgtEdge
+          // (computed later). Approximate its Y here using the pool edges for
+          // pool endpoints, or element edges otherwise.
+          const srcY = src.type === "pool" ? srcPoolEdgeY : (srcSide === "bottom" ? src.y + src.height : src.y);
+          const tgtY = tgt.type === "pool" ? tgtPoolEdgeY : (srcSide === "bottom" ? tgt.y : tgt.y + tgt.height);
+          const midY = (srcY + tgtY) / 2;
+          labelOffsetY = gapCentreY - midY - 7;
+        } else {
+          labelOffsetY = 0;
+        }
       } else {
         labelOffsetX = 0;
         labelOffsetY = -20;
@@ -961,6 +1036,7 @@ export function layoutBpmnDiagram(
       ...(srcOffsetAlong !== undefined ? { sourceOffsetAlong: srcOffsetAlong } : {}),
       ...(tgtOffsetAlong !== undefined ? { targetOffsetAlong: tgtOffsetAlong } : {}),
       ...(labelOffsetX !== undefined ? { labelOffsetX, labelOffsetY, labelWidth } : {}),
+      ...(labelAnchor ? { labelAnchor } : {}),
     } as Connector);
   }
 

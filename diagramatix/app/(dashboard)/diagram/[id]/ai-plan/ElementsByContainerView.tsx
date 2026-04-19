@@ -8,10 +8,11 @@
  * Pools & Lanes Tree tab for those.
  */
 import { useMemo } from "react";
-import type { AiElement } from "@/app/lib/diagram/bpmnLayout";
+import type { AiElement, AiConnection } from "@/app/lib/diagram/bpmnLayout";
 
 interface Props {
   elements: AiElement[];
+  connections: AiConnection[];
   onRename: (id: string, label: string) => void;
   onDelete: (id: string) => void;
 }
@@ -22,10 +23,40 @@ const FLOW_TYPES = new Set([
   "text-annotation", "group",
 ]);
 
-function typeBadge(type: string): { short: string; tone: string } {
+const GW_TONE_YELLOW   = "bg-yellow-50 text-yellow-700 border-yellow-200";
+const GW_TONE_ORANGE   = "bg-orange-50 text-orange-700 border-orange-200";
+const GW_TONE_SKY      = "bg-sky-50 text-sky-700 border-sky-200";
+const GW_TONE_PURPLE   = "bg-purple-50 text-purple-700 border-purple-200";
+const GW_TONE_FUCHSIA  = "bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200";
+const GW_TONE_EMERALD  = "bg-emerald-50 text-emerald-700 border-emerald-200";
+
+/**
+ * Badge text/tone for a flow element. Gateways distinguish their role
+ * (decision / merge, derived from plan topology) and their marker type
+ * (exclusive / parallel / inclusive / event-based) so the user can tell
+ * apart the different gateway variants at a glance.
+ */
+function typeBadge(el: AiElement, inCount: number, outCount: number): { short: string; tone: string } {
+  if (el.type === "gateway") {
+    const gwType = (el.gatewayType ?? (el.properties?.gatewayType as string | undefined) ?? "").toLowerCase();
+    const gwRole = (el.properties?.gatewayRole as string | undefined)?.toLowerCase();
+    // Derived role from topology — matches R33/R34 so the UI label stays
+    // consistent with what the layout engine will classify as.
+    const topoRole =
+      outCount >= 2 && inCount <= 1 ? "decision" :
+      inCount  >= 2 && outCount <= 1 ? "merge"    :
+      undefined;
+    const role = gwRole ?? topoRole;
+    if (gwType === "parallel")    return { short: "parallel",  tone: GW_TONE_SKY };
+    if (gwType === "inclusive")   return { short: "inclusive", tone: GW_TONE_FUCHSIA };
+    if (gwType === "event-based") return { short: "event-gw",  tone: GW_TONE_EMERALD };
+    if (gwType === "exclusive")   return { short: "exclusive", tone: GW_TONE_PURPLE };
+    if (role === "decision")      return { short: "decision",  tone: GW_TONE_YELLOW };
+    if (role === "merge")         return { short: "merge",     tone: GW_TONE_ORANGE };
+    return { short: "gw", tone: GW_TONE_YELLOW };
+  }
   const map: Record<string, { short: string; tone: string }> = {
     "task":                { short: "task",    tone: "bg-blue-50 text-blue-700 border-blue-200" },
-    "gateway":             { short: "gw",      tone: "bg-yellow-50 text-yellow-700 border-yellow-200" },
     "start-event":         { short: "start",   tone: "bg-green-50 text-green-700 border-green-200" },
     "end-event":           { short: "end",     tone: "bg-red-50 text-red-700 border-red-200" },
     "intermediate-event":  { short: "interm",  tone: "bg-orange-50 text-orange-700 border-orange-200" },
@@ -36,10 +67,23 @@ function typeBadge(type: string): { short: string; tone: string } {
     "text-annotation":     { short: "anno",    tone: "bg-gray-50 text-gray-600 border-gray-200" },
     "group":               { short: "group",   tone: "bg-gray-50 text-gray-600 border-gray-200" },
   };
-  return map[type] ?? { short: type, tone: "bg-gray-100 text-gray-600 border-gray-200" };
+  return map[el.type] ?? { short: el.type, tone: "bg-gray-100 text-gray-600 border-gray-200" };
 }
 
-export function ElementsByContainerView({ elements, onRename, onDelete }: Props) {
+export function ElementsByContainerView({ elements, connections, onRename, onDelete }: Props) {
+  // Per-element incoming/outgoing sequence-connector counts, used to classify
+  // gateways as decision vs merge in the badge renderer.
+  const gwCounts = useMemo(() => {
+    const inMap  = new Map<string, number>();
+    const outMap = new Map<string, number>();
+    for (const c of connections) {
+      if (c.type === "message") continue;
+      inMap.set(c.targetId,  (inMap.get(c.targetId)  ?? 0) + 1);
+      outMap.set(c.sourceId, (outMap.get(c.sourceId) ?? 0) + 1);
+    }
+    return { inMap, outMap };
+  }, [connections]);
+
   // Grouping: pool → [lane? → [subprocess? → [elements...]]]
   const grouped = useMemo(() => {
     const pools = elements.filter(e => e.type === "pool");
@@ -108,7 +152,7 @@ export function ElementsByContainerView({ elements, onRename, onDelete }: Props)
               {g.items.length === 0 ? (
                 <p className="px-3 py-1 text-[10px] text-gray-400 italic">(empty)</p>
               ) : (
-                g.items.map(el => <ElementRow key={el.id} el={el} onRename={onRename} onDelete={onDelete} />)
+                g.items.map(el => <ElementRow key={el.id} el={el} inCount={gwCounts.inMap.get(el.id) ?? 0} outCount={gwCounts.outMap.get(el.id) ?? 0} onRename={onRename} onDelete={onDelete} />)
               )}
             </div>
           ))}
@@ -125,7 +169,7 @@ export function ElementsByContainerView({ elements, onRename, onDelete }: Props)
               <div className="px-3 py-0.5 text-[10px] font-medium text-indigo-700 border-t border-indigo-100">
                 {b.sp.label} {b.sp.subprocessType === "event" ? "(Event)" : ""}
               </div>
-              {b.items.map(el => <ElementRow key={el.id} el={el} onRename={onRename} onDelete={onDelete} />)}
+              {b.items.map(el => <ElementRow key={el.id} el={el} inCount={gwCounts.inMap.get(el.id) ?? 0} outCount={gwCounts.outMap.get(el.id) ?? 0} onRename={onRename} onDelete={onDelete} />)}
             </div>
           ))}
         </div>
@@ -137,7 +181,7 @@ export function ElementsByContainerView({ elements, onRename, onDelete }: Props)
             Boundary Events
           </div>
           {boundaryBuckets.map(el => (
-            <ElementRow key={el.id} el={el} onRename={onRename} onDelete={onDelete} boundaryInfo={el.boundaryHost} />
+            <ElementRow key={el.id} el={el} inCount={gwCounts.inMap.get(el.id) ?? 0} outCount={gwCounts.outMap.get(el.id) ?? 0} onRename={onRename} onDelete={onDelete} boundaryInfo={el.boundaryHost} />
           ))}
         </div>
       )}
@@ -146,14 +190,16 @@ export function ElementsByContainerView({ elements, onRename, onDelete }: Props)
 }
 
 function ElementRow({
-  el, onRename, onDelete, boundaryInfo,
+  el, inCount, outCount, onRename, onDelete, boundaryInfo,
 }: {
   el: AiElement;
+  inCount: number;
+  outCount: number;
   onRename: (id: string, label: string) => void;
   onDelete: (id: string) => void;
   boundaryInfo?: string;
 }) {
-  const badge = typeBadge(el.type);
+  const badge = typeBadge(el, inCount, outCount);
   return (
     <div className="flex items-center gap-1.5 px-3 py-1 text-[11px] group hover:bg-gray-50 border-t border-gray-100">
       <span className={`px-1 py-0.5 rounded border text-[9px] font-mono uppercase ${badge.tone}`}>{badge.short}</span>

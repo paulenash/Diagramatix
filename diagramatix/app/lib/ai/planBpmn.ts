@@ -75,6 +75,7 @@ ${rules ? `USER RULES AND PREFERENCES (follow these strictly):\n${rules}\n\n` : 
 - CRITICAL: Every diverging gateway (with 2+ outgoing flows) MUST have a corresponding merge gateway downstream where ALL branches reconnect BEFORE any subsequent task. The merge gateway must have the same gatewayType as the diverging gateway. Even if one branch has only one task and the other has multiple, both MUST flow into the merge gateway.
 - Connections use: sourceId, targetId, and optionally label and type ("sequence" or "message")
 - Use "sequence" for flows within the same pool, "message" for flows between different pools
+- Every message connector MUST have a descriptive label (e.g. "Order details", "Payment receipt"). The label will be rendered in the gap between the two pools.
 
 Output ONLY valid JSON (no markdown, no explanation, no comments):
 
