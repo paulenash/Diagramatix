@@ -29,7 +29,7 @@ export const CHAPTERS: HelpChapter[] = [
               domain models and more.
             </p>
             <p className="mt-2 text-xs text-gray-500">
-              This guide covers version <strong>1.7</strong>.
+              This guide covers version <strong>1.8</strong>.
             </p>
             <p className="mt-2">
               After signing in you land on the <strong>Dashboard</strong> —
@@ -632,6 +632,12 @@ export const CHAPTERS: HelpChapter[] = [
             </li>
             <li>
               Never auto-connect <strong>FROM</strong> an End Event.
+            </li>
+            <li>
+              Never auto-connect <strong>between elements in different
+              white-box pools</strong> — sequence flows don&rsquo;t cross
+              pool boundaries in BPMN; cross-pool links must be message
+              connectors (dragged manually).
             </li>
             <li>
               No sequence connectors <strong>to or from</strong> an
@@ -2404,13 +2410,19 @@ export const CHAPTERS: HelpChapter[] = [
                 <strong>Pools / Lanes</strong> — pools with nested lanes.
                 Rename inline, delete with <strong>&times;</strong>.
                 Black-box vs white-box is shown via the BB/WB badge.
+                Drag the <strong>⋮⋮</strong> handle on a row to reorder:
+                pools can move anywhere in the pool list; lanes can move
+                within their parent pool (cross-pool drops are refused).
               </li>
               <li>
                 <strong>Elements</strong> — flow elements grouped by their
                 container (pool → lane → subprocess), with a type badge
                 (task / gw / start / end / &hellip;) on each row.
                 Boundary events appear in their own section. Deleting an
-                element also removes its connectors.
+                element also removes its connectors. Drag the{" "}
+                <strong>⋮⋮</strong> handle to reorder within the same
+                lane or subprocess group; boundary events move with their
+                host and are not draggable.
               </li>
               <li>
                 <strong>Connectors</strong> — grouped into Sequence, Message,
