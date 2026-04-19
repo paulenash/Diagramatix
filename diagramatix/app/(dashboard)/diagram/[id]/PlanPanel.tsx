@@ -29,7 +29,7 @@ type Tab = "pools" | "elements" | "connectors" | "json";
 
 export function PlanPanel({ diagramType, onApplyDiagram, onClose }: Props) {
   const [prompt, setPrompt] = useState("");
-  const { plan, setPlan, updateElement, deleteElement, updateConnection, deleteConnection, asJson } = usePlanState();
+  const { plan, setPlan, updateElement, deleteElement, updateConnection, deleteConnection, moveElementRelativeTo, asJson } = usePlanState();
   const [activeTab, setActiveTab] = useState<Tab>("pools");
   const [busy, setBusy] = useState<"plan" | "apply" | "save" | "load" | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -385,10 +385,10 @@ export function PlanPanel({ diagramType, onApplyDiagram, onClose }: Props) {
 
         <div className="flex-1 overflow-y-auto text-[11px]">
           {activeTab === "pools" && (
-            <PoolsLanesTree elements={plan.elements} onRename={(id, label) => updateElement(id, { label })} onDelete={deleteElement} />
+            <PoolsLanesTree elements={plan.elements} onRename={(id, label) => updateElement(id, { label })} onDelete={deleteElement} onMove={moveElementRelativeTo} />
           )}
           {activeTab === "elements" && (
-            <ElementsByContainerView elements={plan.elements} connections={plan.connections} onRename={(id, label) => updateElement(id, { label })} onDelete={deleteElement} />
+            <ElementsByContainerView elements={plan.elements} connections={plan.connections} onRename={(id, label) => updateElement(id, { label })} onDelete={deleteElement} onMove={moveElementRelativeTo} />
           )}
           {activeTab === "connectors" && (
             <ConnectorsByTypeView elements={plan.elements} connections={plan.connections} onRenameLabel={(idx, label) => updateConnection(idx, { label })} onDelete={deleteConnection} />

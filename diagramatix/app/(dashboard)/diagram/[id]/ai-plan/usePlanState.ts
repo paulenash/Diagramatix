@@ -57,8 +57,35 @@ export function usePlanState(initial: Plan = { elements: [], connections: [] }) 
     }));
   }, []);
 
+  /**
+   * Reorder: move `draggedId` to sit before or after `targetId` in
+   * plan.elements. Caller is responsible for constraining drops to meaningful
+   * groups (same pool for lanes, same container for flow elements). The
+   * layout engine reads elements[] order for same-group placement.
+   */
+  const moveElementRelativeTo = useCallback(
+    (draggedId: string, targetId: string, position: "before" | "after") => {
+      setPlanInternal(prev => {
+        if (draggedId === targetId) return prev;
+        const dragged = prev.elements.find(e => e.id === draggedId);
+        if (!dragged) return prev;
+        const without = prev.elements.filter(e => e.id !== draggedId);
+        const tgtIdx = without.findIndex(e => e.id === targetId);
+        if (tgtIdx < 0) return prev;
+        const insertAt = position === "before" ? tgtIdx : tgtIdx + 1;
+        const next = [
+          ...without.slice(0, insertAt),
+          dragged,
+          ...without.slice(insertAt),
+        ];
+        return { ...prev, elements: next };
+      });
+    },
+    []
+  );
+
   /** Serialise to pretty JSON for the Raw JSON textarea. */
   const asJson = useMemo(() => JSON.stringify(plan, null, 2), [plan]);
 
-  return { plan, setPlan, updateElement, deleteElement, updateConnection, deleteConnection, asJson };
+  return { plan, setPlan, updateElement, deleteElement, updateConnection, deleteConnection, moveElementRelativeTo, asJson };
 }

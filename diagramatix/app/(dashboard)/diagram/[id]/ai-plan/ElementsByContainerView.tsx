@@ -7,14 +7,16 @@
  * of their host. Non-flow elements (pool, lane) are not listed here — use
  * Pools & Lanes Tree tab for those.
  */
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import type { AiElement, AiConnection } from "@/app/lib/diagram/bpmnLayout";
+import { setDrag, getDrag } from "./dragContext";
 
 interface Props {
   elements: AiElement[];
   connections: AiConnection[];
   onRename: (id: string, label: string) => void;
   onDelete: (id: string) => void;
+  onMove: (draggedId: string, targetId: string, position: "before" | "after") => void;
 }
 
 const FLOW_TYPES = new Set([
@@ -70,7 +72,7 @@ function typeBadge(el: AiElement, inCount: number, outCount: number): { short: s
   return map[el.type] ?? { short: el.type, tone: "bg-gray-100 text-gray-600 border-gray-200" };
 }
 
-export function ElementsByContainerView({ elements, connections, onRename, onDelete }: Props) {
+export function ElementsByContainerView({ elements, connections, onRename, onDelete, onMove }: Props) {
   // Per-element incoming/outgoing sequence-connector counts, used to classify
   // gateways as decision vs merge in the badge renderer.
   const gwCounts = useMemo(() => {
@@ -152,7 +154,7 @@ export function ElementsByContainerView({ elements, connections, onRename, onDel
               {g.items.length === 0 ? (
                 <p className="px-3 py-1 text-[10px] text-gray-400 italic">(empty)</p>
               ) : (
-                g.items.map(el => <ElementRow key={el.id} el={el} inCount={gwCounts.inMap.get(el.id) ?? 0} outCount={gwCounts.outMap.get(el.id) ?? 0} onRename={onRename} onDelete={onDelete} />)
+                g.items.map(el => <ElementRow key={el.id} el={el} inCount={gwCounts.inMap.get(el.id) ?? 0} outCount={gwCounts.outMap.get(el.id) ?? 0} groupKey={`elem:${bucket.pool.id}:${g.lane?.id ?? ""}`} onRename={onRename} onDelete={onDelete} onMove={onMove} />)
               )}
             </div>
           ))}
@@ -169,7 +171,7 @@ export function ElementsByContainerView({ elements, connections, onRename, onDel
               <div className="px-3 py-0.5 text-[10px] font-medium text-indigo-700 border-t border-indigo-100">
                 {b.sp.label} {b.sp.subprocessType === "event" ? "(Event)" : ""}
               </div>
-              {b.items.map(el => <ElementRow key={el.id} el={el} inCount={gwCounts.inMap.get(el.id) ?? 0} outCount={gwCounts.outMap.get(el.id) ?? 0} onRename={onRename} onDelete={onDelete} />)}
+              {b.items.map(el => <ElementRow key={el.id} el={el} inCount={gwCounts.inMap.get(el.id) ?? 0} outCount={gwCounts.outMap.get(el.id) ?? 0} groupKey={`sp:${b.sp.id}`} onRename={onRename} onDelete={onDelete} onMove={onMove} />)}
             </div>
           ))}
         </div>
@@ -181,7 +183,7 @@ export function ElementsByContainerView({ elements, connections, onRename, onDel
             Boundary Events
           </div>
           {boundaryBuckets.map(el => (
-            <ElementRow key={el.id} el={el} inCount={gwCounts.inMap.get(el.id) ?? 0} outCount={gwCounts.outMap.get(el.id) ?? 0} onRename={onRename} onDelete={onDelete} boundaryInfo={el.boundaryHost} />
+            <ElementRow key={el.id} el={el} inCount={gwCounts.inMap.get(el.id) ?? 0} outCount={gwCounts.outMap.get(el.id) ?? 0} groupKey={null} onRename={onRename} onDelete={onDelete} onMove={onMove} boundaryInfo={el.boundaryHost} />
           ))}
         </div>
       )}
@@ -190,18 +192,77 @@ export function ElementsByContainerView({ elements, connections, onRename, onDel
 }
 
 function ElementRow({
-  el, inCount, outCount, onRename, onDelete, boundaryInfo,
+  el, inCount, outCount, groupKey, onRename, onDelete, onMove, boundaryInfo,
 }: {
   el: AiElement;
   inCount: number;
   outCount: number;
+  /** Same-group key for drop constraint. Null = not draggable (boundary events). */
+  groupKey: string | null;
   onRename: (id: string, label: string) => void;
   onDelete: (id: string) => void;
+  onMove: (draggedId: string, targetId: string, position: "before" | "after") => void;
   boundaryInfo?: string;
 }) {
   const badge = typeBadge(el, inCount, outCount);
+  const [dropPos, setDropPos] = useState<null | "before" | "after">(null);
+  const [dragging, setDragging] = useState(false);
+
+  const onHandleDragStart = (e: React.DragEvent) => {
+    if (!groupKey) return;
+    setDrag({ id: el.id, groupKey });
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", el.id);
+    setDragging(true);
+  };
+  const onHandleDragEnd = () => {
+    setDrag(null);
+    setDragging(false);
+    setDropPos(null);
+  };
+  const onRowDragOver = (e: React.DragEvent) => {
+    if (!groupKey) return;
+    const drag = getDrag();
+    if (!drag || drag.groupKey !== groupKey || drag.id === el.id) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    const rect = e.currentTarget.getBoundingClientRect();
+    const midY = rect.top + rect.height / 2;
+    setDropPos(e.clientY < midY ? "before" : "after");
+  };
+  const onRowDragLeave = () => setDropPos(null);
+  const onRowDrop = (e: React.DragEvent) => {
+    if (!groupKey) return;
+    const drag = getDrag();
+    if (!drag || drag.groupKey !== groupKey || drag.id === el.id) return;
+    e.preventDefault();
+    onMove(drag.id, el.id, dropPos ?? "after");
+    setDropPos(null);
+  };
+
+  const indicatorCls =
+    dropPos === "before" ? "border-t-2 border-t-blue-500"
+    : dropPos === "after" ? "border-b-2 border-b-blue-500"
+    : "border-t border-gray-100";
+
   return (
-    <div className="flex items-center gap-1.5 px-3 py-1 text-[11px] group hover:bg-gray-50 border-t border-gray-100">
+    <div
+      className={`flex items-center gap-1.5 px-3 py-1 text-[11px] group hover:bg-gray-50 ${indicatorCls} ${dragging ? "opacity-40" : ""}`}
+      onDragOver={onRowDragOver}
+      onDragLeave={onRowDragLeave}
+      onDrop={onRowDrop}
+    >
+      {groupKey ? (
+        <span
+          draggable
+          onDragStart={onHandleDragStart}
+          onDragEnd={onHandleDragEnd}
+          className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 select-none px-0.5"
+          title="Drag to reorder"
+        >⋮⋮</span>
+      ) : (
+        <span className="px-0.5 text-transparent select-none">⋮⋮</span>
+      )}
       <span className={`px-1 py-0.5 rounded border text-[9px] font-mono uppercase ${badge.tone}`}>{badge.short}</span>
       <input
         value={el.label}

@@ -1453,6 +1453,40 @@ export function Canvas({
       }
     }
 
+    // Infer the pool the new element would land in (spatial containment):
+    // prefer the deepest lane hit, otherwise a pool directly.
+    let newPool: DiagramElement | null = null;
+    for (const cand of data.elements) {
+      if (cand.type !== "lane") continue;
+      if (newX >= cand.x && newRight2 <= cand.x + cand.width &&
+          newY >= cand.y && newBottom2 <= cand.y + cand.height) {
+        newPool = cand.parentId ? data.elements.find(e => e.id === cand.parentId) ?? null : null;
+        break;
+      }
+    }
+    if (!newPool) {
+      for (const cand of data.elements) {
+        if (cand.type !== "pool") continue;
+        if (newX >= cand.x && newRight2 <= cand.x + cand.width &&
+            newY >= cand.y && newBottom2 <= cand.y + cand.height) {
+          newPool = cand;
+          break;
+        }
+      }
+    }
+    const isWhiteBoxPool = (p: DiagramElement | null): boolean =>
+      !!p && p.type === "pool" &&
+      (((p.properties.poolType as string | undefined) ?? "black-box") === "white-box");
+    function containingPool(el: DiagramElement): DiagramElement | null {
+      let cur: DiagramElement | undefined = el;
+      for (let i = 0; i < 10 && cur; i++) {
+        if (cur.type === "pool") return cur;
+        if (!cur.parentId) return null;
+        cur = data.elements.find(e => e.id === cur!.parentId);
+      }
+      return null;
+    }
+
     // Never auto-connect to/from edge-mounted (boundary) events, and never
     // cross a container boundary (expanded-subprocess or composite-state).
     // BPMN rules: never auto-connect TO a start event, never FROM an end event.
@@ -1495,6 +1529,17 @@ export function Canvas({
         const candInEventSub = candParent?.type === "subprocess-expanded" &&
           (candParent.properties.subprocessType as string | undefined) === "event";
         if (candInEventSub && candParent.id !== newExpandedScope) return false;
+      }
+      // BPMN: sequence flows cannot cross white-box pool boundaries.
+      // If the candidate and the new element both sit inside pools that are
+      // different and both are white-box, skip — message flows (dragged
+      // manually) are the only BPMN-legal cross-pool link.
+      if (isBpmn) {
+        const candPool = containingPool(e);
+        if (candPool && newPool && candPool.id !== newPool.id &&
+            isWhiteBoxPool(candPool) && isWhiteBoxPool(newPool)) {
+          return false;
+        }
       }
       // State-machine: never auto-connect initial → initial or final → final
       if (isStateMachine && newIsInitial && e.type === "initial-state") return false;
