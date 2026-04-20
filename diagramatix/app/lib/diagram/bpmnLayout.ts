@@ -7,16 +7,11 @@ import type { DiagramData, DiagramElement, Connector, Point } from "./types";
 import { getSymbolDefinition } from "./symbols/definitions";
 import { computeWaypoints } from "./routing";
 
-// Phase-trace writer: stderr + append to a known log file so the server's
-// layout progress is visible even when Next.js buffers stdout.
+// Phase-trace writer: stderr only — no file I/O to avoid Windows file-lock
+// contention when many phase() calls fire from a single request.
 function layoutTrace(line: string) {
   const stamped = `${new Date().toISOString()} ${line}\n`;
   try { process.stderr.write(stamped); } catch { /* ignore */ }
-  try {
-    // Dynamic require to keep this file Edge-runtime-safe in case it's ever imported there.
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    require("fs").appendFileSync("C:\\Git\\Diagramatix\\diagramatix\\apply-layout.log", stamped);
-  } catch { /* ignore */ }
 }
 
 export interface AiElement {
@@ -431,24 +426,42 @@ export function layoutBpmnDiagram(
           parentId: pool.id,
         });
 
-        // Place elements within this lane
+        // Place elements within this lane. Group by column; when multiple
+        // elements share a column (e.g. gateway branches landing on targets
+        // assigned to the same lane) stack them vertically around the lane
+        // centre so they don't overlap. Stack order follows the AI's
+        // emission sequence — combined with Option B's Y-sort on decision
+        // outgoings (topmost target → top side, etc.) this gives a visually
+        // consistent layout where branch connectors fan out cleanly.
         const laneEls = laneElements.get(lane.id) ?? [];
+        const elsByCol = new Map<number, AiElement[]>();
         for (const el of laneEls) {
           const col = colMap.get(el.id) ?? 0;
-          const def = getSymbolDefinition(el.type as DiagramElement["type"]);
-          const elX = START_X + POOL_HEADER_W + LANE_PAD_X + col * COL_SPACING;
-          const elY = laneY + laneH / 2 - def.defaultHeight / 2;
+          const list = elsByCol.get(col) ?? [];
+          list.push(el);
+          elsByCol.set(col, list);
+        }
+        for (const [col, list] of elsByCol) {
+          const n = list.length;
+          for (let i = 0; i < n; i++) {
+            const el = list[i];
+            const def = getSymbolDefinition(el.type as DiagramElement["type"]);
+            const elX = START_X + POOL_HEADER_W + LANE_PAD_X + col * COL_SPACING;
+            const stackSpacing = def.defaultHeight + 30;
+            const stackOffset = (i - (n - 1) / 2) * stackSpacing;
+            const elY = laneY + laneH / 2 - def.defaultHeight / 2 + stackOffset;
 
-          elements.push({
-            id: el.id, type: el.type as DiagramElement["type"],
-            x: elX, y: elY, width: def.defaultWidth, height: def.defaultHeight,
-            label: el.label,
-            properties: buildProps(el),
-            parentId: lane.id,
-            ...(el.taskType ? { taskType: el.taskType as DiagramElement["taskType"] } : {}),
-            ...(el.gatewayType ? { gatewayType: el.gatewayType as DiagramElement["gatewayType"] } : {}),
-            ...(el.eventType ? { eventType: el.eventType as DiagramElement["eventType"] } : {}),
-          });
+            elements.push({
+              id: el.id, type: el.type as DiagramElement["type"],
+              x: elX, y: elY, width: def.defaultWidth, height: def.defaultHeight,
+              label: el.label,
+              properties: buildProps(el),
+              parentId: lane.id,
+              ...(el.taskType ? { taskType: el.taskType as DiagramElement["taskType"] } : {}),
+              ...(el.gatewayType ? { gatewayType: el.gatewayType as DiagramElement["gatewayType"] } : {}),
+              ...(el.eventType ? { eventType: el.eventType as DiagramElement["eventType"] } : {}),
+            });
+          }
         }
 
         laneY += laneH;
@@ -814,6 +827,9 @@ export function layoutBpmnDiagram(
     };
     if (isDecisionGateway(el)) {
       const t = (el.properties.gatewayType as string | undefined) ?? el.gatewayType ?? "exclusive";
+      // R41: decision gateways without a label get a default "Test?" so the
+      // diagram always asks a clear question at the branch point.
+      if (!el.label || !el.label.trim()) el.label = "Test?";
       if (t === "exclusive" || t === "none") {
         el.properties = { ...el.properties, gatewayType: "none", gatewayRole: "decision", ...decisionLabelPlacement };
         el.gatewayType = "none";
@@ -832,7 +848,12 @@ export function layoutBpmnDiagram(
   }
 
   // Build the ordered lists for the wiring pass (R35/R36).
-  //   Decision outgoings: AI order (aiConnections order).
+  //   Decision outgoings: sorted by target element vertical position — topmost
+  //                       target exits at "top", bottommost at "bottom", any
+  //                       middles exit at "right" (mirrors R37 for merges).
+  //                       This prevents branch connectors from criss-crossing
+  //                       when the AI's emission order differs from the
+  //                       physical lane/row order of the branch targets.
   //   Merge incomings:    sorted by source element vertical position so the
   //                       topmost source enters at "top", bottommost at "bottom",
   //                       and any middle sources enter at "left" (R37).
@@ -850,6 +871,16 @@ export function layoutBpmnDiagram(
       list.push(c);
       mergeIncomings.set(tgtEl.id, list);
     }
+  }
+  // Sort each decision gateway's outgoing list by target's centre Y.
+  for (const [decId, list] of decisionOutgoings) {
+    list.sort((a, b) => {
+      const aTgt = elements.find(e => e.id === a.targetId);
+      const bTgt = elements.find(e => e.id === b.targetId);
+      if (!aTgt || !bTgt) return 0;
+      return (aTgt.y + aTgt.height / 2) - (bTgt.y + bTgt.height / 2);
+    });
+    decisionOutgoings.set(decId, list);
   }
   // Sort each merge gateway's incoming list by source element's centre Y so
   // the wiring pass can assign sides by vertical position.
@@ -943,14 +974,14 @@ export function layoutBpmnDiagram(
       const tgtCy = tgt.y + tgt.height / 2;
 
       // Gateway wiring (R35/R36/R37):
-      //   Decision gateway: incoming → left; outgoing → top, bottom, right
-      //                     (AI order, 1st..3rd). R35.
+      //   Decision gateway: incoming → left; outgoing assigned by target
+      //                     vertical position — topmost target → top,
+      //                     bottommost target → bottom, any middles → right.
       //   Merge gateway:    outgoing → right; incoming assigned by source
       //                     vertical position — topmost source → top,
       //                     bottommost → bottom, any middles → left. R37.
       // Each end is resolved independently so decision-to-merge connectors
       // pick the correct side at BOTH ends.
-      const decisionOrder: Array<"top" | "bottom" | "right"> = ["top", "bottom", "right"];
       const srcIsDecision = isDecisionGateway(src);
       const tgtIsMerge    = isMergeGateway(tgt);
       const srcIsMerge    = isMergeGateway(src);    // merge's outgoing → right
@@ -960,7 +991,11 @@ export function layoutBpmnDiagram(
         if (srcIsDecision) {
           const list = decisionOutgoings.get(src.id) ?? [];
           const idx = list.indexOf(c);
-          srcSide = (idx >= 0 && idx < 3 ? decisionOrder[idx] : "right");
+          const n = list.length;
+          if (idx < 0) srcSide = "right";
+          else if (idx === 0) srcSide = "top";
+          else if (idx === n - 1) srcSide = "bottom";
+          else srcSide = "right";
         } else if (srcIsMerge) {
           srcSide = "right";
         } else {
@@ -1017,14 +1052,19 @@ export function layoutBpmnDiagram(
     let labelAnchor: "source" | "target" | undefined;
     if (c.label) {
       if (isDecisionGateway(src)) {
+        // R42: all outgoing sequence connectors from a decision gateway anchor
+        // their labels to the RIGHT of the source attachment point, close to
+        // where the line leaves the gateway. Top/bottom exits get a small
+        // extra vertical offset so the label doesn't sit on top of the
+        // gateway diamond edge.
         labelWidth = 60;
         labelAnchor = "source";
         switch (srcSide) {
-          case "top":    labelOffsetX = -labelWidth / 2; labelOffsetY = -22; break;
-          case "bottom": labelOffsetX = -labelWidth / 2; labelOffsetY = 10;  break;
+          case "top":    labelOffsetX = 8;               labelOffsetY = -22; break;
+          case "bottom": labelOffsetX = 8;               labelOffsetY = 10;  break;
           case "right":  labelOffsetX = 8;               labelOffsetY = -6;  break;
           case "left":   labelOffsetX = -labelWidth - 8; labelOffsetY = -6;  break;
-          default:       labelOffsetX = 5;               labelOffsetY = -20; break;
+          default:       labelOffsetX = 8;               labelOffsetY = -20; break;
         }
       } else if (isMessage) {
         // Find the containing pool for each end, then centre the label in the gap.

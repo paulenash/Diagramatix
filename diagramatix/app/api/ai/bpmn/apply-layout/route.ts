@@ -9,20 +9,17 @@ import { auth } from "@/auth";
 import { layoutBpmnDiagram, type AiElement, type AiConnection } from "@/app/lib/diagram/bpmnLayout";
 import { validatePlan } from "@/app/lib/ai/planSchema";
 import { normaliseAiPlan } from "@/app/lib/ai/planBpmn";
-import { appendFileSync } from "fs";
-
-// Unbuffered diagnostic writer: stderr + append to a fixed log file so the
-// user can inspect the trace regardless of how Next.js buffers stdout.
-const LOG_FILE = "C:\\Git\\Diagramatix\\diagramatix\\apply-layout.log";
+// Diagnostic writer — stderr only (no file I/O) to avoid Windows file-lock
+// contention under load.
 function trace(line: string) {
   const stamped = `${new Date().toISOString()} ${line}\n`;
   try { process.stderr.write(stamped); } catch { /* ignore */ }
-  try { appendFileSync(LOG_FILE, stamped); } catch { /* ignore */ }
 }
 
 export async function POST(req: Request) {
   trace("[apply-layout] request received");
   const session = await auth();
+  trace(`[apply-layout] auth done, session=${session?.user?.id ? "ok" : "none"}`);
   if (!session?.user?.id) {
     trace("[apply-layout] unauthorized");
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -31,6 +28,7 @@ export async function POST(req: Request) {
   let body: unknown;
   try {
     body = await req.json();
+    trace("[apply-layout] body parsed");
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
@@ -40,11 +38,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Missing 'plan' in request body" }, { status: 400 });
   }
 
+  trace("[apply-layout] validating plan");
   const result = validatePlan(plan);
   if (!result.ok) {
+    trace(`[apply-layout] validation failed: ${JSON.stringify(result.issues?.slice(0, 3))}`);
     return NextResponse.json({ error: "Plan failed validation", issues: result.issues }, { status: 400 });
   }
 
+  trace("[apply-layout] normalising");
   // Defence-in-depth: run the same normaliser the Sonnet path uses so any
   // camelCase-typed plan hand-edited in the JSON view still lays out correctly.
   const normalised = {
