@@ -967,34 +967,41 @@ export function Canvas({
         }
         onSelectConnector(null);
       } else if (isMsgBPMN) {
-        // messageBPMN endpoint reconnection — must remain cross-pool
-        // and must not be re-pinned to another boundary of the same element.
-        const fixedId  = endpoint === "source" ? conn!.targetId  : conn!.sourceId;
-        const fixedEl  = data.elements.find(e => e.id === fixedId);
-        const fixedPoolId = fixedEl ? getElementPoolId(fixedEl, data.elements) : null;
-        const targetEl = findDropTarget(pos, fromId);
-        if (targetEl) {
-          const targetPoolId = getElementPoolId(targetEl, data.elements);
-          // Strict cross-pool: both ends must resolve to pools, and those pools must differ.
-          // Rejects: same element (fromId already excluded by findDropTarget), same pool as fixed end,
-          // or dropping onto the fixed end itself.
-          const isCross =
-            targetEl.id !== fixedId &&
-            targetEl.id !== fromId &&
-            targetPoolId !== null &&
-            fixedPoolId !== null &&
-            targetPoolId !== fixedPoolId;
-          if (isCross) {
-            // Top/bottom sides computed from vertical positions of new source & target
-            const newSourceEl = endpoint === "source" ? targetEl : fixedEl!;
-            const newTargetEl = endpoint === "target" ? targetEl : fixedEl!;
-            const srcCy = newSourceEl.y + newSourceEl.height / 2;
-            const tgtCy = newTargetEl.y + newTargetEl.height / 2;
-            const newSide = endpoint === "source"
-              ? ((srcCy <= tgtCy ? "bottom" : "top") as Side)
-              : ((srcCy <= tgtCy ? "top"    : "bottom") as Side);
-            onUpdateConnectorEndpoint(connectorId, endpoint, targetEl.id, newSide, 0.5);
+        // messageBPMN endpoint reconnection — rules mirror the highlight logic:
+        //   - If the moving end is currently on a Pool, the drop target must
+        //     be another (black-box) pool.
+        //   - If the moving end is currently on a Task/Subprocess, the drop
+        //     target must be another Task/Subprocess inside any white-box pool.
+        // In both cases, the target must not be the fixed end itself.
+        const fixedId   = endpoint === "source" ? conn!.targetId : conn!.sourceId;
+        const fixedEl   = data.elements.find(e => e.id === fixedId);
+        const movingEl  = data.elements.find(e => e.id === fromId);
+        const movingIsPool    = movingEl?.type === "pool";
+        const movingIsTaskSub = !!movingEl && MSG_TASKSUB_TYPES.has(movingEl.type);
+        const targetEl  = findDropTarget(pos, fromId);
+        let valid = false;
+        if (targetEl && targetEl.id !== fixedId && targetEl.id !== fromId) {
+          if (movingIsPool && targetEl.type === "pool") {
+            const ptype = (targetEl.properties.poolType as string | undefined) ?? "black-box";
+            if (ptype === "black-box") valid = true;
+          } else if (movingIsTaskSub && MSG_TASKSUB_TYPES.has(targetEl.type)) {
+            const tPoolId = getElementPoolId(targetEl, data.elements);
+            const tPool   = tPoolId ? data.elements.find(p => p.id === tPoolId) : null;
+            if (((tPool?.properties.poolType as string | undefined) ?? "black-box") === "white-box") {
+              valid = true;
+            }
           }
+        }
+        if (valid && targetEl && fixedEl) {
+          // Top/bottom sides computed from vertical positions of new source & target
+          const newSourceEl = endpoint === "source" ? targetEl : fixedEl;
+          const newTargetEl = endpoint === "target" ? targetEl : fixedEl;
+          const srcCy = newSourceEl.y + newSourceEl.height / 2;
+          const tgtCy = newTargetEl.y + newTargetEl.height / 2;
+          const newSide = endpoint === "source"
+            ? ((srcCy <= tgtCy ? "bottom" : "top") as Side)
+            : ((srcCy <= tgtCy ? "top"    : "bottom") as Side);
+          onUpdateConnectorEndpoint(connectorId, endpoint, targetEl.id, newSide, 0.5);
         }
         onSelectConnector(null);
       } else {
@@ -2478,10 +2485,16 @@ export function Canvas({
   }
 
   const endpointHandles = selectedConnector && selectedConnector.waypoints.length >= 2
-    ? {
-        source: selectedConnector.waypoints[1],                                      // srcEdge
-        target: selectedConnector.waypoints[selectedConnector.waypoints.length - 2], // tgtEdge
-      }
+    ? (() => {
+        const wp = selectedConnector.waypoints;
+        // messageBPMN has two waypoint formats (2-point AI import and 4-point
+        // runtime). The edge points are determined by the invisible-leader
+        // flags. All other connector types use [1] and [length-2].
+        const isMsg = selectedConnector.type === "messageBPMN";
+        const srcIdx = isMsg && !selectedConnector.sourceInvisibleLeader ? 0 : 1;
+        const tgtIdx = isMsg && !selectedConnector.targetInvisibleLeader ? wp.length - 1 : wp.length - 2;
+        return { source: wp[srcIdx], target: wp[tgtIdx] };
+      })()
     : null;
 
   // Context for highlighting valid drop targets during messageBPMN endpoint drag
@@ -2503,6 +2516,17 @@ export function Canvas({
     ? (draggingEndpoint.endpoint === "source" ? draggingEndpointConn.sourceId : draggingEndpointConn.targetId)
     : null;
   const epDragFixedIsData = epDragFixedEl ? DATA_ELEMENT_TYPES.has(epDragFixedEl.type) : false;
+
+  // For messageBPMN endpoint drag: the element the moving end is currently
+  // attached to. User rule: a pool endpoint can only move to another pool;
+  // a task/subprocess endpoint can only move to another task/subprocess
+  // inside a white-box pool.
+  const MSG_TASKSUB_TYPES: Set<SymbolType> = new Set(["task", "subprocess", "subprocess-expanded"]);
+  const epDragMovingEl = epDragMovingId
+    ? data.elements.find(e => e.id === epDragMovingId) ?? null
+    : null;
+  const epDragMovingIsPool = isMessageBpmnEndpointDrag && epDragMovingEl?.type === "pool";
+  const epDragMovingIsTaskSub = isMessageBpmnEndpointDrag && epDragMovingEl ? MSG_TASKSUB_TYPES.has(epDragMovingEl.type) : false;
 
   return (
     <div
@@ -2641,9 +2665,10 @@ export function Canvas({
                 !draggingFromEdgeMountedStartEvent &&
                 !draggingFromEdgeMountedIntermediateReceiveEvent) // receive can only target subprocess children
               ||
-              (isMessageBpmnEndpointDrag &&
+              (isMessageBpmnEndpointDrag && epDragMovingIsPool &&
                 el.type === "pool" &&
-                el.id !== epDragFixedEl?.id &&       // not the fixed end itself (if it's a pool)
+                el.id !== epDragMovingEl?.id &&       // not the pool currently connected
+                el.id !== epDragFixedEl?.id &&        // not the fixed end itself (if it's a pool)
                 el.id !== epDragFixedPoolId &&        // not the pool the fixed end belongs to
                 ((el.properties.poolType as string | undefined) ?? "black-box") === "black-box");
             const isWhiteBoxPool = el.type === "pool" &&
@@ -2978,15 +3003,16 @@ export function Canvas({
                   if (elPoolIsWhiteBox) elIsMsgTarget = true;
                 }
               }
-            } else if (isMessageBpmnEndpointDrag) {
-              // Highlight elements in white-box pools that differ from the fixed end's pool
-              // Exclude data elements and send elements (send tasks, throwing events, end events)
-              const epElIsSendLocked = el.type === "end-event"
-                || ((el.taskType === "send" || el.flowType === "throwing")
-                    && data.connectors.some(c => c.type === "messageBPMN" && c.sourceId === el.id));
-              if (!DATA_ELEMENT_TYPES.has(el.type) && !epElIsSendLocked) {
+            } else if (isMessageBpmnEndpointDrag && epDragMovingIsTaskSub) {
+              // User rule: a task/subprocess endpoint can only move to another
+              // task/subprocess inside any white-box pool. No restriction on
+              // the fixed end's pool — the message may land inside the same
+              // or a different white-box pool.
+              if (MSG_TASKSUB_TYPES.has(el.type)
+                  && el.id !== epDragMovingEl?.id
+                  && el.id !== epDragFixedEl?.id) {
                 const elPoolId = getElementPoolId(el, data.elements);
-                if (elPoolId && elPoolId !== epDragFixedPoolId) {
+                if (elPoolId) {
                   const elPool = data.elements.find(p => p.id === elPoolId);
                   if (((elPool?.properties.poolType as string | undefined) ?? "black-box") === "white-box") {
                     elIsMsgTarget = true;
@@ -3451,10 +3477,12 @@ export function Canvas({
             );
           })()}
 
-          {/* Connector endpoint handles when a non-messageBPMN connector is selected.
-              messageBPMN is locked to its original boundaries — users reposition it
-              via the middle ew-resize handle (horizontal only); endpoints never move. */}
-          {endpointHandles && selectedConnector?.type !== "messageBPMN" && (() => {
+          {/* Connector endpoint handles when a connector is selected.
+              For messageBPMN: endpoints can be rewired to other pools
+              (if currently on a pool) or other tasks/subprocesses inside
+              white-box pools (if currently on a task/subprocess). The
+              middle ew-resize handle still moves the whole connector. */}
+          {endpointHandles && (() => {
             function makeEndpointHandler(endpoint: "source" | "target", pos: Point) {
               return (e: React.MouseEvent) => {
                 e.stopPropagation();
