@@ -2401,6 +2401,11 @@ export const CHAPTERS: HelpChapter[] = [
                 local and fast; no AI call.
               </li>
             </ol>
+            <p className="mt-2 text-xs text-gray-600">
+              Layout rules referenced below (R42–R44) are enforced by the
+              engine in the Apply Layout step, regardless of what the AI
+              emitted.
+            </p>
             <p className="mt-2">
               The plan is shown in four synchronised tabs. Edit on any tab;
               changes propagate to the others.
@@ -2526,6 +2531,60 @@ export const CHAPTERS: HelpChapter[] = [
             <span className="text-red-600 font-medium">red</span> rules
             (under Layout groups) are implemented in the layout engine code.
           </p>
+        ),
+      },
+      {
+        heading: "BPMN layout rules (decision gateways)",
+        body: (
+          <>
+            <p>
+              The Apply Layout step enforces these rules for decision
+              gateways regardless of the AI plan&rsquo;s output.
+            </p>
+            <ul className="list-disc list-inside space-y-2 mt-2">
+              <li>
+                <strong>R42 — Decision-gateway outgoing label placement.</strong>{" "}
+                Labels on outgoing sequence connectors from a decision
+                gateway are anchored to the gateway&rsquo;s source
+                attachment point, not the connector midpoint:
+                <ul className="list-disc list-inside ml-5 mt-1 space-y-1">
+                  <li>
+                    <strong>Top exit</strong> — left edge of the label text
+                    is 6px right of the connector; bottom of the text box
+                    is 10px above the gateway top connection point.
+                  </li>
+                  <li>
+                    <strong>Bottom exit</strong> — left edge 6px right of
+                    the connector; top of the text box 10px below the
+                    gateway bottom connection point.
+                  </li>
+                  <li>
+                    <strong>Middle-right exit</strong> — left edge 3px
+                    right of the gateway right connection point; top of
+                    the text box 2px below the connector line.
+                  </li>
+                </ul>
+              </li>
+              <li>
+                <strong>R43 — Start Event in topmost lane.</strong>{" "}
+                Every process-level Start Event is placed in the topmost
+                lane of its pool. If the AI plan assigned the Start Event
+                to a different lane, the layout engine moves it. Boundary
+                start events and event-subprocess internal starts are
+                unaffected.
+              </li>
+              <li>
+                <strong>R44 — Nested gateway Y alignment.</strong>{" "}
+                A decision gateway (and its paired merge gateway) is
+                positioned at the same Y as its immediate sequence-flow
+                predecessor. This keeps a nested diamond on the branch row
+                it entered on, so the flow doesn&rsquo;t zig-zag back to
+                the lane centre. Pairing is inferred from topology — the
+                merge reached by all of the decision&rsquo;s branches with
+                a matching in-degree.
+              </li>
+            </ul>
+          </>
         ),
       },
     ],
