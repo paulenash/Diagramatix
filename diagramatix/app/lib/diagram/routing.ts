@@ -768,19 +768,36 @@ export function recomputeAllConnectors(
         sourceOffsetAlong: repairedSrcOffset };
     }
 
-    // associationBPMN: keep stored sides and offsets. When an endpoint element
-    // moves, recompute waypoints straight from side-midpoint to side-midpoint so
-    // the connector stays attached to its original boundaries rather than flipping
-    // to the nearest side (which produced the "diagonal pointing to centre" bug).
+    // associationBPMN: when either endpoint is a Data Object / Data Store,
+    // both endpoints auto-optimise onto the centre-to-centre line (so moving
+    // the data element slides both attachment points). For non-data
+    // associations the stored sides/offsets are preserved.
     if (conn.type === "associationBPMN") {
-      const srcEdge = sidePoint(source, conn.sourceSide, conn.sourceOffsetAlong ?? 0.5);
-      const tgtEdge = sidePoint(target, conn.targetSide, conn.targetOffsetAlong ?? 0.5);
-      const startPt = { x: source.x + source.width / 2, y: source.y + source.height / 2 };
-      const endPt   = { x: target.x + target.width / 2, y: target.y + target.height / 2 };
-      if (typeof window !== "undefined" && (window as unknown as { __DIAGRAMATIX_TRACE?: boolean }).__DIAGRAMATIX_TRACE) {
-        console.log(`[TRACE routing.associationBPMN] ${conn.id} src=${conn.sourceId}(${conn.sourceSide}@${conn.sourceOffsetAlong}) tgt=${conn.targetId}(${conn.targetSide}@${conn.targetOffsetAlong}) srcEdge=${JSON.stringify(srcEdge)} tgtEdge=${JSON.stringify(tgtEdge)}`);
+      const DATA_TYPES = new Set<string>(["data-object", "data-store"]);
+      const involvesData = DATA_TYPES.has(source.type) || DATA_TYPES.has(target.type);
+      let srcSide = conn.sourceSide;
+      let tgtSide = conn.targetSide;
+      let srcOffset = conn.sourceOffsetAlong ?? 0.5;
+      let tgtOffset = conn.targetOffsetAlong ?? 0.5;
+      const srcCx = source.x + source.width / 2, srcCy = source.y + source.height / 2;
+      const tgtCx = target.x + target.width / 2, tgtCy = target.y + target.height / 2;
+      if (involvesData) {
+        srcSide   = getClosestSideOfElement(tgtCx, tgtCy, source);
+        tgtSide   = getClosestSideOfElement(srcCx, srcCy, target);
+        srcOffset = getOffsetAlong(source, srcSide, { x: tgtCx, y: tgtCy });
+        tgtOffset = getOffsetAlong(target, tgtSide, { x: srcCx, y: srcCy });
       }
-      return { ...conn, waypoints: [startPt, srcEdge, tgtEdge, endPt],
+      const srcEdge = sidePoint(source, srcSide, srcOffset);
+      const tgtEdge = sidePoint(target, tgtSide, tgtOffset);
+      const startPt = { x: srcCx, y: srcCy };
+      const endPt   = { x: tgtCx, y: tgtCy };
+      if (typeof window !== "undefined" && (window as unknown as { __DIAGRAMATIX_TRACE?: boolean }).__DIAGRAMATIX_TRACE) {
+        console.log(`[TRACE routing.associationBPMN] ${conn.id} src=${conn.sourceId}(${srcSide}@${srcOffset}) tgt=${conn.targetId}(${tgtSide}@${tgtOffset}) involvesData=${involvesData}`);
+      }
+      return { ...conn,
+        sourceSide: srcSide, targetSide: tgtSide,
+        sourceOffsetAlong: srcOffset, targetOffsetAlong: tgtOffset,
+        waypoints: [startPt, srcEdge, tgtEdge, endPt],
         sourceInvisibleLeader: true, targetInvisibleLeader: true };
     }
 
