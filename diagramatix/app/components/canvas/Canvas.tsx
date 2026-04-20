@@ -2286,7 +2286,15 @@ export function Canvas({
       }
       return depth;
     }
-    return items.sort((a, b) => getParentDepth(a) - getParentDepth(b));
+    return items.sort((a, b) => {
+      // Dragging text-annotation renders LAST so it sits above all other
+      // non-container elements while the user moves it (requested UX).
+      const aDragAnno = a.id === draggingElementId && a.type === "text-annotation";
+      const bDragAnno = b.id === draggingElementId && b.type === "text-annotation";
+      if (aDragAnno && !bDragAnno) return 1;
+      if (bDragAnno && !aDragAnno) return -1;
+      return getParentDepth(a) - getParentDepth(b);
+    });
   })();
   const boundaryEvents = data.elements.filter((el) => !!el.boundaryHostId);
 

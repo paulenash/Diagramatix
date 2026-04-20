@@ -626,6 +626,25 @@ function validateConnectorsAgainstObstacles(connectors: Connector[], elements: D
   return result;
 }
 
+/** Auto-resize a text-annotation element so the bounding rect hugs its text.
+ *  Width = longest line in characters × avg char width + left bracket cap +
+ *  horizontal pad. Height = line count × line height + top/bottom pad. User
+ *  newlines are honoured; no auto-wrapping — the box grows sideways instead. */
+function autoResizeTextAnnotation(el: DiagramElement): DiagramElement {
+  const LINE_H = 14;
+  const CHAR_W = 12 * 0.55;         // matches wrapText's avgCharWidth
+  const LEFT_BRACKET = 24;          // matches TextAnnotationShape capLen
+  const RIGHT_PAD = 10;
+  const VERT_PAD = 8 * 2 + 6;       // top/bottom 8-px bracket caps + extra
+  const MIN_W = 60;
+  const MIN_H = 26;
+  const lines = (el.label ?? "").split("\n");
+  const longest = Math.max(1, ...lines.map(l => l.length));
+  const width  = Math.max(MIN_W, Math.round(LEFT_BRACKET + longest * CHAR_W + RIGHT_PAD));
+  const height = Math.max(MIN_H, lines.length * LINE_H + VERT_PAD);
+  return { ...el, width, height };
+}
+
 /** Auto-resize a uml-enumeration or uml-class element to fit its label and content */
 function autoResizeUmlElement(el: DiagramElement): DiagramElement {
   const BASE_HEADER_H = 28;
@@ -874,6 +893,10 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         if (container) {
           newEl = { ...newEl, parentId: container.id };
         }
+      }
+      // Text annotations start already tight around their default label
+      if (newEl.type === "text-annotation") {
+        newEl = autoResizeTextAnnotation(newEl);
       }
       return { ...state, elements: [...state.elements, newEl] };
     }
@@ -1602,6 +1625,17 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       if (labelEl && (labelEl.type === "uml-enumeration" || labelEl.type === "uml-class")) {
         const resizedElements = elements.map(e =>
           e.id === action.payload.id ? autoResizeUmlElement(e) : e
+        );
+        const connectors = state.connectors.map(conn => {
+          if (conn.sourceId !== action.payload.id && conn.targetId !== action.payload.id) return conn;
+          return recomputeAllConnectors([conn], resizedElements)[0] ?? conn;
+        });
+        return { ...state, elements: resizedElements, connectors };
+      }
+      // Auto-resize text annotations so the bounding rect hugs the text
+      if (labelEl && labelEl.type === "text-annotation") {
+        const resizedElements = elements.map(e =>
+          e.id === action.payload.id ? autoResizeTextAnnotation(e) : e
         );
         const connectors = state.connectors.map(conn => {
           if (conn.sourceId !== action.payload.id && conn.targetId !== action.payload.id) return conn;

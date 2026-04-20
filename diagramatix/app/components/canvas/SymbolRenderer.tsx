@@ -623,14 +623,15 @@ const ANNOTATION_COLORS: Record<string, string> = {
 function TextAnnotationShape({ el }: { el: DiagramElement }) {
   const annotationColor = (el.properties.annotationColor as string | undefined) ?? "black";
   const bracketColor = ANNOTATION_COLORS[annotationColor] ?? "#000000";
-  const capLen = 12;
+  const capLen = 24; // doubled horizontal cap length
   // Compute visible text height so bracket matches the rendered text
   const PAD = 10;
   const lineH = 14;
   const lines = wrapText(el.label, el.width - PAD - 4);
   const totalH = lines.length * lineH;
-  const topY = el.y + el.height / 2 - totalH / 2 - 3;
-  const botY = el.y + el.height / 2 + totalH / 2 + 3;
+  // 8 px padding above/below the text (3 original + 5 requested extra)
+  const topY = el.y + el.height / 2 - totalH / 2 - 8;
+  const botY = el.y + el.height / 2 + totalH / 2 + 8;
   return (
     <g>
       {/* Invisible hit target for the entire bounding box */}
