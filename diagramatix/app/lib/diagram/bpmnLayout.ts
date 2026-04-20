@@ -461,7 +461,13 @@ export function layoutBpmnDiagram(
             const def = getSymbolDefinition(el.type as DiagramElement["type"]);
             const elX = START_X + POOL_HEADER_W + LANE_PAD_X + col * COL_SPACING;
             const stackSpacing = def.defaultHeight + 30;
-            const stackOffset = (i - (n - 1) / 2) * stackSpacing;
+            // R45 (Y stacking): for n ≥ 3, stack asymmetrically to mirror
+            // decision-gateway exit placement — index 0 above, index 1
+            // level with the lane centre, index 2+ below (one row each).
+            // n ≤ 2 keeps the original symmetric split.
+            const stackOffset = n <= 2
+              ? (i - (n - 1) / 2) * stackSpacing
+              : (i - 1) * stackSpacing;
             const elY = laneY + laneH / 2 - def.defaultHeight / 2 + stackOffset;
 
             elements.push({
@@ -526,25 +532,47 @@ export function layoutBpmnDiagram(
     const bEvent = bEl && (bEl.properties.subprocessType as string | undefined) === "event";
     return (aEvent ? 1 : 0) - (bEvent ? 1 : 0);
   });
+  // Pre-compute event-subprocess size (used for both bottom-stack budget
+  // and the event sub's own resize later). Matches the formula below.
+  const taskDefForEvSub = getSymbolDefinition("task");
+  const EVENT_SUB_W = taskDefForEvSub.defaultWidth * 4;
+  const EVENT_SUB_H = taskDefForEvSub.defaultHeight * 2 + 40;
+  const EVENT_SUB_GAP = 20;
+
   for (const spId of sortedSpIds) {
     const children = subprocessChildren.get(spId)!;
     const spEl = elements.find(e => e.id === spId);
     if (!spEl) continue;
     const isEventSub = (spEl.properties.subprocessType as string | undefined) === "event";
-    const rows = Math.max(1, Math.ceil(children.length / CHILD_COLS));
-    const cols = Math.min(CHILD_COLS, children.length);
+
+    // R49: inside a NORMAL outer expanded subprocess, separate embedded
+    // Event Expanded Subprocesses from the other children. Grid-place the
+    // normal children at the top; stack the event subs at the bottom.
+    const isChildEventSub = (ai: AiElement) =>
+      ai.type === "subprocess-expanded" &&
+      (ai.subprocessType === "event" || ai.properties?.subprocessType === "event");
+    const normalChildren = isEventSub ? children : children.filter(ai => !isChildEventSub(ai));
+    const eventSubChildren = isEventSub ? [] : children.filter(ai => isChildEventSub(ai));
+
+    const rows = Math.max(1, Math.ceil(normalChildren.length / CHILD_COLS));
+    const cols = Math.min(CHILD_COLS, normalChildren.length);
     // Event subprocess: 4 task widths × 2 task heights (small)
-    // Normal subprocess: at least 5 tasks × 4 tasks (large)
+    // Normal subprocess: at least 5 tasks × 4 tasks (large), plus room
+    // below the grid for any embedded event subs stacked vertically.
     let neededW: number, neededH: number;
     if (isEventSub) {
-      const taskDef = getSymbolDefinition("task");
-      neededW = taskDef.defaultWidth * 4;
-      neededH = taskDef.defaultHeight * 2 + 40;
+      neededW = EVENT_SUB_W;
+      neededH = EVENT_SUB_H;
     } else {
       const minCols = Math.max(5, cols);
       const minRows = Math.max(4, rows);
       neededW = minCols * CHILD_COL_SPACING + EXPANDED_PAD_X * 2;
       neededH = minRows * CHILD_ROW_SPACING + EXPANDED_PAD_Y * 2;
+      if (eventSubChildren.length > 0) {
+        // Room for stacked event subs plus padding above the stack
+        neededH += eventSubChildren.length * (EVENT_SUB_H + EVENT_SUB_GAP) + EVENT_SUB_GAP;
+        neededW = Math.max(neededW, EVENT_SUB_W + EXPANDED_PAD_X * 2);
+      }
     }
     const oldRight = spEl.x + spEl.width;
     const oldBottom = spEl.y + spEl.height;
@@ -607,9 +635,9 @@ export function layoutBpmnDiagram(
         });
       }
     } else {
-      // Normal subprocess: grid layout
-      for (let i = 0; i < children.length; i++) {
-        const ai = children[i];
+      // Normal subprocess: grid layout for regular children
+      for (let i = 0; i < normalChildren.length; i++) {
+        const ai = normalChildren[i];
         const col = i % CHILD_COLS;
         const row = Math.floor(i / CHILD_COLS);
         const def = getSymbolDefinition(ai.type as DiagramElement["type"]);
@@ -625,6 +653,28 @@ export function layoutBpmnDiagram(
           ...(ai.gatewayType ? { gatewayType: ai.gatewayType as DiagramElement["gatewayType"] } : {}),
           ...(ai.eventType ? { eventType: ai.eventType as DiagramElement["eventType"] } : {}),
         });
+      }
+      // R49: stack embedded event subprocesses at the BOTTOM of the outer
+      // subprocess, one above the next. Centred horizontally.
+      if (eventSubChildren.length > 0) {
+        const stackTotalH = eventSubChildren.length * EVENT_SUB_H
+          + (eventSubChildren.length - 1) * EVENT_SUB_GAP;
+        const stackTopY = spEl.y + spEl.height - EVENT_SUB_GAP - stackTotalH;
+        const stackCx = spEl.x + spEl.width / 2;
+        for (let i = 0; i < eventSubChildren.length; i++) {
+          const ai = eventSubChildren[i];
+          const y = stackTopY + i * (EVENT_SUB_H + EVENT_SUB_GAP);
+          elements.push({
+            id: ai.id, type: ai.type as DiagramElement["type"],
+            x: stackCx - EVENT_SUB_W / 2,
+            y,
+            width: EVENT_SUB_W, height: EVENT_SUB_H,
+            label: ai.label, properties: buildProps(ai), parentId: spEl.id,
+            ...(ai.taskType ? { taskType: ai.taskType as DiagramElement["taskType"] } : {}),
+            ...(ai.gatewayType ? { gatewayType: ai.gatewayType as DiagramElement["gatewayType"] } : {}),
+            ...(ai.eventType ? { eventType: ai.eventType as DiagramElement["eventType"] } : {}),
+          });
+        }
       }
     }
   }
@@ -668,7 +718,11 @@ export function layoutBpmnDiagram(
         elements.push({
           id: ev.id, type: ev.type as DiagramElement["type"],
           x: ex, y: ey, width: W, height: H,
-          label: ev.label, properties: buildProps(ev), boundaryHostId: host.id,
+          label: ev.label,
+          // R47: store boundarySide on the placed element so the wiring
+          // pass can anchor outgoing connectors to the outer-facing side.
+          properties: { ...buildProps(ev), boundarySide: side },
+          boundaryHostId: host.id,
           ...(ev.taskType ? { taskType: ev.taskType as DiagramElement["taskType"] } : {}),
           ...(ev.eventType ? { eventType: ev.eventType as DiagramElement["eventType"] } : {}),
         });
@@ -997,16 +1051,16 @@ export function layoutBpmnDiagram(
       if (!existingConnKeys.has(key)) { autoConns.push({ sourceId: nearest.id, targetId: el.id, type: "sequence" }); existingConnKeys.add(key); }
     }
   }
-  // R31: Drop any sequence connector that touches an Event Expanded Subprocess.
-  // Treat connections with no explicit type as sequence (same default used below).
+  // R31/R48: Drop ANY connector (sequence OR message) that touches an Event
+  // Expanded Subprocess. Event subs are triggered by events, not by any kind
+  // of flow — the rule is broader than R31's original sequence-only scope.
   const isEventSub = (id: string): boolean => {
     const el = elements.find(e => e.id === id);
     return el?.type === "subprocess-expanded" &&
       (el.properties.subprocessType as string | undefined) === "event";
   };
-  const isSequenceConn = (c: AiConnection) => c.type === "sequence" || c.type == null;
   const filteredAi = aiConnections.filter(c =>
-    !(isSequenceConn(c) && (isEventSub(c.sourceId) || isEventSub(c.targetId)))
+    !(isEventSub(c.sourceId) || isEventSub(c.targetId))
   );
   const finalConnections = [...filteredAi, ...autoConns];
 
@@ -1060,29 +1114,32 @@ export function layoutBpmnDiagram(
 
       if (srcIsDecision || tgtIsMerge || srcIsMerge || tgtIsDecision) {
         if (srcIsDecision) {
+          // R45 (decision side): idx 0 → top, idx 1 → right (when n ≥ 3),
+          // idx ≥ 2 → bottom. For n=2 fall back to top/bottom.
           const list = decisionOutgoings.get(src.id) ?? [];
           const idx = list.indexOf(c);
           const n = list.length;
-          if (idx < 0) srcSide = "right";
+          if (idx < 0 || n <= 1) srcSide = "right";
+          else if (n === 2) srcSide = idx === 0 ? "top" : "bottom";
           else if (idx === 0) srcSide = "top";
-          else if (idx === n - 1) srcSide = "bottom";
-          else srcSide = "right";
+          else if (idx === 1) srcSide = "right";
+          else srcSide = "bottom";
         } else if (srcIsMerge) {
           srcSide = "right";
         } else {
           srcSide = "right";
         }
         if (tgtIsMerge) {
+          // R45 (merge side): mirror — idx 0 → top, idx 1 → left (when n ≥ 3),
+          // idx ≥ 2 → bottom.
           const list = mergeIncomings.get(tgt.id) ?? [];
           const idx = list.indexOf(c);
           const n = list.length;
-          // First (topmost source) → top; last (bottommost source) → bottom;
-          // any middle rows → left. Degenerate cases (single incoming) fall
-          // through with tgtSide=top which is fine for a visibly-empty merge.
-          if (idx < 0) tgtSide = "left";
+          if (idx < 0 || n <= 1) tgtSide = "left";
+          else if (n === 2) tgtSide = idx === 0 ? "top" : "bottom";
           else if (idx === 0) tgtSide = "top";
-          else if (idx === n - 1) tgtSide = "bottom";
-          else tgtSide = "left";
+          else if (idx === 1) tgtSide = "left";
+          else tgtSide = "bottom";
         } else if (tgtIsDecision) {
           tgtSide = "left";
         } else {
@@ -1096,6 +1153,16 @@ export function layoutBpmnDiagram(
       } else {
         srcSide = "right";
         tgtSide = "left";
+      }
+    }
+
+    // R47: connectors from an edge-mounted intermediate event must exit
+    // from the event's outer-facing side (the side the event sits on the
+    // host boundary). Override whatever the generic rules chose.
+    if (src.boundaryHostId && src.type === "intermediate-event") {
+      const stored = (src.properties?.boundarySide as string | undefined);
+      if (stored === "top" || stored === "bottom" || stored === "left" || stored === "right") {
+        srcSide = stored;
       }
     }
 

@@ -159,6 +159,15 @@ export function normaliseAiPlan(parsed: { elements: AiElement[]; connections: Ai
     if (el.type === "lane" && !el.pool && (el as unknown as Record<string, unknown>).parentPool) {
       el.pool = (el as unknown as Record<string, unknown>).parentPool as string;
     }
+    // R46: any event whose label mentions "non-interrupting" gets its
+    // interrupting attribute set to false. Handles the common spellings
+    // "non-interrupting", "non interrupting", "noninterrupting".
+    if (el.type === "start-event" || el.type === "end-event" || el.type === "intermediate-event") {
+      const label = (el.label ?? "").toLowerCase();
+      if (/non[-\s]?interrupting/.test(label)) {
+        el.properties = { ...(el.properties ?? {}), interrupting: false };
+      }
+    }
   }
 }
 
