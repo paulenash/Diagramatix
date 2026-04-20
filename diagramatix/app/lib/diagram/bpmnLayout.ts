@@ -125,7 +125,7 @@ export function layoutBpmnDiagram(
         label: "",
         parentSubprocess: ai.id,
         eventType: "none",
-        properties: { interrupting: false },
+        properties: { interruptionType: "non-interrupting" },
       });
     }
     // R30: Ensure internal end event exists
