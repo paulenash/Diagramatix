@@ -28,6 +28,29 @@ function closestEdgePoint(from: Point, b: Bounds): Point {
   };
 }
 
+/** Given a point that lies on an element's rectangular boundary, return
+ *  which side it's on. Picks whichever edge the point is closest to so it
+ *  tolerates sub-pixel offsets from `closestEdgePoint`. */
+function sideFromPoint(el: DiagramElement, pt: Point): Side {
+  const dLeft   = Math.abs(pt.x - el.x);
+  const dRight  = Math.abs(pt.x - (el.x + el.width));
+  const dTop    = Math.abs(pt.y - el.y);
+  const dBottom = Math.abs(pt.y - (el.y + el.height));
+  const min = Math.min(dLeft, dRight, dTop, dBottom);
+  if (min === dLeft)  return "left";
+  if (min === dRight) return "right";
+  if (min === dTop)   return "top";
+  return "bottom";
+}
+
+/** Fractional offset (0..1) of a boundary point along a given side. */
+function offsetAlongFromPoint(el: DiagramElement, side: Side, pt: Point): number {
+  const raw = (side === "top" || side === "bottom")
+    ? (pt.x - el.x) / el.width
+    : (pt.y - el.y) / el.height;
+  return Math.max(0, Math.min(1, raw));
+}
+
 function ellipseEdgePoint(from: Point, el: { x: number; y: number; width: number; height: number }): Point {
   const cx = el.x + el.width / 2;
   const cy = el.y + el.height / 2;
@@ -769,30 +792,40 @@ export function recomputeAllConnectors(
     }
 
     // associationBPMN: when either endpoint is a Data Object / Data Store,
-    // both endpoints auto-optimise onto the centre-to-centre line (so moving
-    // the data element slides both attachment points). For non-data
-    // associations the stored sides/offsets are preserved.
+    // both endpoints auto-attach exactly where the centre-to-centre line
+    // crosses each element's boundary. `closestEdgePoint` returns that
+    // intersection directly; `getOffsetAlong` would instead project the
+    // other element's coordinate (wrong for anything but horizontally or
+    // vertically aligned centres). For non-data associations the stored
+    // sides/offsets are preserved.
     if (conn.type === "associationBPMN") {
       const DATA_TYPES = new Set<string>(["data-object", "data-store"]);
       const involvesData = DATA_TYPES.has(source.type) || DATA_TYPES.has(target.type);
+      const srcCx = source.x + source.width / 2, srcCy = source.y + source.height / 2;
+      const tgtCx = target.x + target.width / 2, tgtCy = target.y + target.height / 2;
       let srcSide = conn.sourceSide;
       let tgtSide = conn.targetSide;
       let srcOffset = conn.sourceOffsetAlong ?? 0.5;
       let tgtOffset = conn.targetOffsetAlong ?? 0.5;
-      const srcCx = source.x + source.width / 2, srcCy = source.y + source.height / 2;
-      const tgtCx = target.x + target.width / 2, tgtCy = target.y + target.height / 2;
+      let srcEdge: Point;
+      let tgtEdge: Point;
       if (involvesData) {
-        srcSide   = getClosestSideOfElement(tgtCx, tgtCy, source);
-        tgtSide   = getClosestSideOfElement(srcCx, srcCy, target);
-        srcOffset = getOffsetAlong(source, srcSide, { x: tgtCx, y: tgtCy });
-        tgtOffset = getOffsetAlong(target, tgtSide, { x: srcCx, y: srcCy });
+        // Boundary point along the ray from this element's centre toward the other's centre
+        srcEdge = closestEdgePoint({ x: tgtCx, y: tgtCy }, getBounds(source));
+        tgtEdge = closestEdgePoint({ x: srcCx, y: srcCy }, getBounds(target));
+        // Derive persisted side/offset from the boundary point
+        srcSide = sideFromPoint(source, srcEdge);
+        tgtSide = sideFromPoint(target, tgtEdge);
+        srcOffset = offsetAlongFromPoint(source, srcSide, srcEdge);
+        tgtOffset = offsetAlongFromPoint(target, tgtSide, tgtEdge);
+      } else {
+        srcEdge = sidePoint(source, srcSide, srcOffset);
+        tgtEdge = sidePoint(target, tgtSide, tgtOffset);
       }
-      const srcEdge = sidePoint(source, srcSide, srcOffset);
-      const tgtEdge = sidePoint(target, tgtSide, tgtOffset);
       const startPt = { x: srcCx, y: srcCy };
       const endPt   = { x: tgtCx, y: tgtCy };
       if (typeof window !== "undefined" && (window as unknown as { __DIAGRAMATIX_TRACE?: boolean }).__DIAGRAMATIX_TRACE) {
-        console.log(`[TRACE routing.associationBPMN] ${conn.id} src=${conn.sourceId}(${srcSide}@${srcOffset}) tgt=${conn.targetId}(${tgtSide}@${tgtOffset}) involvesData=${involvesData}`);
+        console.log(`[TRACE routing.associationBPMN] ${conn.id} involvesData=${involvesData} srcEdge=${JSON.stringify(srcEdge)} tgtEdge=${JSON.stringify(tgtEdge)} side=${srcSide}/${tgtSide} off=${srcOffset.toFixed(2)}/${tgtOffset.toFixed(2)}`);
       }
       return { ...conn,
         sourceSide: srcSide, targetSide: tgtSide,

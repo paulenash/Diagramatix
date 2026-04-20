@@ -199,6 +199,8 @@ export interface DiagramData {
   fontSize?: number; // element names/labels font size in px (default 12)
   connectorFontSize?: number; // connector labels font size in px (default 10)
   titleFontSize?: number; // diagram title font size in px (default 14)
+  poolFontSize?: number; // pool header labels font size in px (default 12)
+  laneFontSize?: number; // lane header labels font size in px (default 12)
   database?: string; // domain diagram database type: "none" | "postgres" (default "none")
 }
 

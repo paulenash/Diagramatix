@@ -20,7 +20,7 @@ import { SymbolRenderer, SublaneIdsCtx, ProcessGroupDepthCtx, LaneDepthCtx, Data
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
 import { PaletteSymbolPreview } from "./Palette";
 import { CHEVRON_THEMES } from "@/app/lib/diagram/chevronThemes";
-import { DisplayModeCtx, FontScaleCtx, ConnectorFontScaleCtx, TitleFontSizeCtx, SketchyFilter } from "@/app/lib/diagram/displayMode";
+import { DisplayModeCtx, FontScaleCtx, ConnectorFontScaleCtx, TitleFontSizeCtx, PoolFontSizeCtx, LaneFontSizeCtx, SketchyFilter } from "@/app/lib/diagram/displayMode";
 import { ConnectorRenderer } from "./ConnectorRenderer";
 
 const HEADER_H = 28;
@@ -2116,10 +2116,20 @@ export function Canvas({
       if (e.key === "ArrowUp")    { e.preventDefault(); onMoveElements(ids, 0, -NUDGE); return; }
       if (e.key === "ArrowDown")  { e.preventDefault(); onMoveElements(ids, 0, NUDGE); return; }
     }
-    // Nudge selected connector or focused endpoint with arrow keys
+    // Nudge selected connector or focused endpoint with arrow keys.
+    // Skip endpoint nudging when the connector attaches centre-to-centre
+    // (direct-routing connectors, and associationBPMN involving a data
+    // element) — there's no stable boundary offset to nudge against.
     if (selectedConnectorId && selectedElementIds.size === 0 && !editingLabel) {
       const NUDGE = e.shiftKey ? 1 : 5;
-      if (focusedEndpoint && onNudgeConnectorEndpoint) {
+      const endpointNudgeBlocked = selectedConnector?.routingType === "direct"
+        || (selectedConnector?.type === "associationBPMN" && (() => {
+            const DATA = new Set<string>(["data-object", "data-store"]);
+            const s = data.elements.find(el => el.id === selectedConnector.sourceId);
+            const t = data.elements.find(el => el.id === selectedConnector.targetId);
+            return (s && DATA.has(s.type)) || (t && DATA.has(t.type));
+          })());
+      if (focusedEndpoint && onNudgeConnectorEndpoint && !endpointNudgeBlocked) {
         if (e.key === "ArrowLeft")  { e.preventDefault(); onNudgeConnectorEndpoint(selectedConnectorId, focusedEndpoint, -NUDGE, 0); return; }
         if (e.key === "ArrowRight") { e.preventDefault(); onNudgeConnectorEndpoint(selectedConnectorId, focusedEndpoint, NUDGE, 0); return; }
         if (e.key === "ArrowUp")    { e.preventDefault(); onNudgeConnectorEndpoint(selectedConnectorId, focusedEndpoint, 0, -NUDGE); return; }
@@ -2540,6 +2550,8 @@ export function Canvas({
       <FontScaleCtx.Provider value={((data.fontSize ?? 12) / 12) * (displayMode === "hand-drawn" ? 1.3 : 1)}>
       <ConnectorFontScaleCtx.Provider value={((data.connectorFontSize ?? 10) / 10) * (displayMode === "hand-drawn" ? 1.3 : 1)}>
       <TitleFontSizeCtx.Provider value={data.titleFontSize ?? 14}>
+      <PoolFontSizeCtx.Provider value={(data.poolFontSize ?? 12) * (displayMode === "hand-drawn" ? 1.3 : 1)}>
+      <LaneFontSizeCtx.Provider value={(data.laneFontSize ?? 12) * (displayMode === "hand-drawn" ? 1.3 : 1)}>
       <SublaneIdsCtx.Provider value={sublaneIds}>
       <ProcessGroupDepthCtx.Provider value={processGroupDepthMap}>
       <LaneDepthCtx.Provider value={laneDepthMap}>
@@ -3782,6 +3794,8 @@ export function Canvas({
       </LaneDepthCtx.Provider>
       </ProcessGroupDepthCtx.Provider>
       </SublaneIdsCtx.Provider>
+      </LaneFontSizeCtx.Provider>
+      </PoolFontSizeCtx.Provider>
       </TitleFontSizeCtx.Provider>
       </ConnectorFontScaleCtx.Provider>
       </FontScaleCtx.Provider>

@@ -227,6 +227,8 @@ type Action =
   | { type: "SET_FONT_SIZE"; payload: number }
   | { type: "SET_CONNECTOR_FONT_SIZE"; payload: number }
   | { type: "SET_TITLE_FONT_SIZE"; payload: number }
+  | { type: "SET_POOL_FONT_SIZE"; payload: number }
+  | { type: "SET_LANE_FONT_SIZE"; payload: number }
   | { type: "SET_DATABASE"; payload: string }
   | { type: "CORRECT_ALL_CONNECTORS" }
   | { type: "INSERT_SPACE"; payload: { markerX: number; markerY: number; dx: number; dy: number } }
@@ -2420,6 +2422,12 @@ function reducer(state: DiagramData, action: Action): DiagramData {
     case "SET_TITLE_FONT_SIZE":
       return { ...state, titleFontSize: action.payload };
 
+    case "SET_POOL_FONT_SIZE":
+      return { ...state, poolFontSize: action.payload };
+
+    case "SET_LANE_FONT_SIZE":
+      return { ...state, laneFontSize: action.payload };
+
     case "SET_DATABASE":
       return { ...state, database: action.payload || undefined };
 
@@ -3604,6 +3612,16 @@ export function useDiagram(initialData: DiagramData) {
     setTitleFontSize: useCallback(
       (size: number) => {
         dispatch({ type: "SET_TITLE_FONT_SIZE", payload: size });
+      }, []
+    ),
+    setPoolFontSize: useCallback(
+      (size: number) => {
+        dispatch({ type: "SET_POOL_FONT_SIZE", payload: size });
+      }, []
+    ),
+    setLaneFontSize: useCallback(
+      (size: number) => {
+        dispatch({ type: "SET_LANE_FONT_SIZE", payload: size });
       }, []
     ),
     setDatabase: useCallback(

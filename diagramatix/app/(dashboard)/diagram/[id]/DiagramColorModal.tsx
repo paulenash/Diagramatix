@@ -25,12 +25,18 @@ interface Props {
   onConnectorFontSizeChange?: (size: number) => void;
   titleFontSize?: number;
   onTitleFontSizeChange?: (size: number) => void;
+  poolFontSize?: number;
+  onPoolFontSizeChange?: (size: number) => void;
+  laneFontSize?: number;
+  onLaneFontSizeChange?: (size: number) => void;
   onClose: () => void;
   onSaved: (config: SymbolColorConfig, settings?: {
     displayMode?: DisplayMode;
     fontSize?: number;
     connectorFontSize?: number;
     titleFontSize?: number;
+    poolFontSize?: number;
+    laneFontSize?: number;
   }) => void;
 }
 
@@ -53,6 +59,10 @@ export function DiagramColorModal({
   onConnectorFontSizeChange,
   titleFontSize,
   onTitleFontSizeChange,
+  poolFontSize,
+  onPoolFontSizeChange,
+  laneFontSize,
+  onLaneFontSizeChange,
   onClose,
   onSaved,
 }: Props) {
@@ -65,6 +75,8 @@ export function DiagramColorModal({
   const [workingFontSize, setWorkingFontSize] = useState(fontSize ?? 12);
   const [workingConnectorFontSize, setWorkingConnectorFontSize] = useState(connectorFontSize ?? 10);
   const [workingTitleFontSize, setWorkingTitleFontSize] = useState(titleFontSize ?? 14);
+  const [workingPoolFontSize, setWorkingPoolFontSize] = useState(poolFontSize ?? 12);
+  const [workingLaneFontSize, setWorkingLaneFontSize] = useState(laneFontSize ?? 12);
   // saving/saveError no longer needed — save happens in background after modal closes
 
   const symbols: SymbolType[] = COLOR_PALETTE_BY_DIAGRAM_TYPE[diagramType];
@@ -87,6 +99,8 @@ export function DiagramColorModal({
     if (onFontSizeChange) onFontSizeChange(workingFontSize);
     if (onConnectorFontSizeChange) onConnectorFontSizeChange(workingConnectorFontSize);
     if (onTitleFontSizeChange) onTitleFontSizeChange(workingTitleFontSize);
+    if (onPoolFontSizeChange) onPoolFontSizeChange(workingPoolFontSize);
+    if (onLaneFontSizeChange) onLaneFontSizeChange(workingLaneFontSize);
     onSaved(workingColors);
     onClose();
 
@@ -174,7 +188,7 @@ export function DiagramColorModal({
         </div>
 
         {/* 3. Font Sizes */}
-        {(onFontSizeChange || onConnectorFontSizeChange || onTitleFontSizeChange) && (
+        {(onFontSizeChange || onConnectorFontSizeChange || onTitleFontSizeChange || onPoolFontSizeChange || onLaneFontSizeChange) && (
           <div className="px-5 py-1.5 border-t border-gray-200 flex-shrink-0 space-y-1">
             <span className="text-xs font-medium text-gray-700">Font Sizes</span>
             {onFontSizeChange && (
@@ -215,6 +229,34 @@ export function DiagramColorModal({
                     className="w-5 h-5 flex items-center justify-center text-[10px] font-bold text-gray-700 border border-gray-400 rounded hover:bg-gray-100">-</button>
                   <span className="text-xs font-mono font-semibold text-gray-800 w-6 text-center">{workingTitleFontSize}</span>
                   <button onClick={() => setWorkingTitleFontSize(Math.min(30, workingTitleFontSize + 1))}
+                    className="w-5 h-5 flex items-center justify-center text-[10px] font-bold text-gray-700 border border-gray-400 rounded hover:bg-gray-100">+</button>
+                </div>
+              </div>
+            )}
+            {onPoolFontSizeChange && (
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] text-gray-500">Pools</span>
+                <div className="flex items-center gap-1">
+                  <button onClick={() => setWorkingPoolFontSize(12)} disabled={workingPoolFontSize === 12} title="Default (12px)"
+                    className="text-[10px] text-gray-400 hover:text-gray-600 disabled:opacity-30">{"\u21BA"}</button>
+                  <button onClick={() => setWorkingPoolFontSize(Math.max(6, workingPoolFontSize - 1))}
+                    className="w-5 h-5 flex items-center justify-center text-[10px] font-bold text-gray-700 border border-gray-400 rounded hover:bg-gray-100">-</button>
+                  <span className="text-xs font-mono font-semibold text-gray-800 w-6 text-center">{workingPoolFontSize}</span>
+                  <button onClick={() => setWorkingPoolFontSize(Math.min(24, workingPoolFontSize + 1))}
+                    className="w-5 h-5 flex items-center justify-center text-[10px] font-bold text-gray-700 border border-gray-400 rounded hover:bg-gray-100">+</button>
+                </div>
+              </div>
+            )}
+            {onLaneFontSizeChange && (
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] text-gray-500">Lanes</span>
+                <div className="flex items-center gap-1">
+                  <button onClick={() => setWorkingLaneFontSize(12)} disabled={workingLaneFontSize === 12} title="Default (12px)"
+                    className="text-[10px] text-gray-400 hover:text-gray-600 disabled:opacity-30">{"\u21BA"}</button>
+                  <button onClick={() => setWorkingLaneFontSize(Math.max(6, workingLaneFontSize - 1))}
+                    className="w-5 h-5 flex items-center justify-center text-[10px] font-bold text-gray-700 border border-gray-400 rounded hover:bg-gray-100">-</button>
+                  <span className="text-xs font-mono font-semibold text-gray-800 w-6 text-center">{workingLaneFontSize}</span>
+                  <button onClick={() => setWorkingLaneFontSize(Math.min(24, workingLaneFontSize + 1))}
                     className="w-5 h-5 flex items-center justify-center text-[10px] font-bold text-gray-700 border border-gray-400 rounded hover:bg-gray-100">+</button>
                 </div>
               </div>

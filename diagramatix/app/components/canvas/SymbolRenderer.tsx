@@ -3,7 +3,7 @@
 import { useState, createContext, useContext } from "react";
 import type { BpmnTaskType, GatewayType, EventType, DiagramElement, Point, Side, SymbolType } from "@/app/lib/diagram/types";
 import { type SymbolColorConfig, resolveColor } from "@/app/lib/diagram/colors";
-import { DisplayModeCtx, FontScaleCtx, sketchyFilter } from "@/app/lib/diagram/displayMode";
+import { DisplayModeCtx, FontScaleCtx, PoolFontSizeCtx, LaneFontSizeCtx, sketchyFilter } from "@/app/lib/diagram/displayMode";
 
 /** React context carrying the active project colour config.  Shape components
  *  read from it; when undefined, resolveColor falls back to defaults. */
@@ -1292,13 +1292,14 @@ function ProcessSystemShape({ el }: { el: DiagramElement }) {
 
 function PoolShape({ el }: { el: DiagramElement }) {
   const colors = useContext(SymbolColorCtx);
-  const fsc = useContext(FontScaleCtx);
+  const poolFs = useContext(PoolFontSizeCtx);
   const { x, y, width: w, height: h } = el;
   const LW = 36;
   const cx = x + LW / 2 + 3;
   const cy = y + h / 2;
   const lines = el.label.split('\n');
-  const lineH = 13;
+  const fontSize = Math.round(poolFs * 10) / 10;
+  const lineH = Math.round(poolFs * 1.18);
   const isWhiteBox = ((el.properties.poolType as string | undefined) ?? "black-box") === "white-box";
   const multiplicity = (el.properties.multiplicity as string | undefined) ?? "single";
   const mLineH   = 18;
@@ -1313,7 +1314,7 @@ function PoolShape({ el }: { el: DiagramElement }) {
       <rect x={x} y={y} width={w} height={h} fill={poolBodyTint} stroke="#374151" strokeWidth={1.5} />
       <rect x={x} y={y} width={LW} height={h} fill={poolHeaderColour} stroke="#374151" strokeWidth={1.5}
         style={isWhiteBox ? { cursor: "pointer" } : undefined} />
-      <text textAnchor="middle" fontSize={Math.round(11 * fsc * 10) / 10} fill="#3b1a08" fontWeight="bold"
+      <text textAnchor="middle" fontSize={fontSize} fill="#3b1a08" fontWeight="bold"
             transform={`rotate(-90,${cx},${cy})`}
             style={{ userSelect: "none", pointerEvents: "none" }}>
         {lines.map((line, i) => (
@@ -1333,14 +1334,15 @@ function PoolShape({ el }: { el: DiagramElement }) {
 
 function LaneShape({ el, isSublane }: { el: DiagramElement; isSublane?: boolean }) {
   const colors = useContext(SymbolColorCtx);
-  const fsc = useContext(FontScaleCtx);
+  const laneFs = useContext(LaneFontSizeCtx);
   const laneDepth = useContext(LaneDepthCtx).get(el.id) ?? 0;
   const { x, y, width: w, height: h } = el;
   const LW = 36;
   const cx = x + LW / 2 + 3;
   const cy = y + h / 2;
   const lines = el.label.split('\n');
-  const lineH = 12;
+  const fontSize = Math.round(laneFs * 10) / 10;
+  const lineH = Math.round(laneFs * 1.2);
   // Lighten fill based on nesting depth beyond direct sublane (depth 1)
   const baseFill = resolveColor(isSublane ? "sublane" : "lane", colors);
   // depth 0 = top-level lane, 1 = sublane (baseFill already), 2+ = sub-sublane (lighten)
@@ -1351,7 +1353,7 @@ function LaneShape({ el, isSublane }: { el: DiagramElement; isSublane?: boolean 
     <g>
       <rect x={x} y={y} width={w} height={h} fill={bodyTint} stroke="#374151" strokeWidth={1} />
       <rect x={x} y={y} width={LW} height={h} fill={headerFill} stroke="#374151" strokeWidth={1} />
-      <text textAnchor="middle" fontSize={Math.round(10 * fsc * 10) / 10} fill="#3b1a08" fontWeight="bold"
+      <text textAnchor="middle" fontSize={fontSize} fill="#3b1a08" fontWeight="bold"
             transform={`rotate(-90,${cx},${cy})`}
             style={{ userSelect: "none", pointerEvents: "none" }}>
         {lines.map((line, i) => (

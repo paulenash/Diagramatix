@@ -10,6 +10,8 @@ export const DisplayModeCtx = createContext<DisplayMode>("normal");
 export const FontScaleCtx = createContext<number>(1);           // elements (base 12px)
 export const ConnectorFontScaleCtx = createContext<number>(1);  // connectors (base 10px)
 export const TitleFontSizeCtx = createContext<number>(14);      // title absolute px
+export const PoolFontSizeCtx = createContext<number>(12);       // pool header absolute px
+export const LaneFontSizeCtx = createContext<number>(12);       // lane header absolute px
 
 /** SVG filter component — render inside <svg> to define the sketchy filter */
 export function SketchyFilter() {

@@ -431,6 +431,8 @@ export function DiagramEditor({
     setFontSize,
     setConnectorFontSize,
     setTitleFontSize,
+    setPoolFontSize,
+    setLaneFontSize,
     setDatabase,
     elementMoveEnd,
     flipForkJoin,
@@ -1932,6 +1934,10 @@ export function DiagramEditor({
           onConnectorFontSizeChange={setConnectorFontSize}
           titleFontSize={data.titleFontSize}
           onTitleFontSizeChange={setTitleFontSize}
+          poolFontSize={data.poolFontSize}
+          onPoolFontSizeChange={setPoolFontSize}
+          laneFontSize={data.laneFontSize}
+          onLaneFontSizeChange={setLaneFontSize}
           onClose={() => setShowDiagramMaintenance(false)}
           onSaved={(config) => {
             setDiagramColorConfig(config);
