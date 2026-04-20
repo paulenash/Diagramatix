@@ -12,6 +12,17 @@ const SymbolColorCtx = createContext<SymbolColorConfig | undefined>(undefined);
 /** Set of lane IDs whose parent is also a lane (sublanes) */
 export const SublaneIdsCtx = createContext<Set<string>>(new Set());
 
+/** Linear interpolate between two #rrggbb colours. `frac=0` returns `hex`,
+ *  `frac=1` returns `toward`. Used to tint pool/lane bodies to a very light
+ *  shade of their header colour. */
+function lerpHex(hex: string, toward: string, frac: number): string {
+  const parse = (h: string) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+  const [r1, g1, b1] = parse(hex);
+  const [r2, g2, b2] = parse(toward);
+  const c = (a: number, b: number) => Math.round(a + (b - a) * frac).toString(16).padStart(2, "0");
+  return `#${c(r1, r2)}${c(g1, g2)}${c(b1, b2)}`;
+}
+
 export type ResizeHandle = "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w";
 
 interface Props {
@@ -1295,10 +1306,12 @@ function PoolShape({ el }: { el: DiagramElement }) {
   const mcx      = x + LW + (w - LW) / 2;
   const mly2     = y + h - 3;
   const mly1     = mly2 - mLineH;
+  const poolHeaderColour = resolveColor("pool", colors);
+  const poolBodyTint = lerpHex(poolHeaderColour, "#ffffff", 0.93);
   return (
     <g>
-      <rect x={x} y={y} width={w} height={h} fill="#f9fafb" stroke="#374151" strokeWidth={1.5} />
-      <rect x={x} y={y} width={LW} height={h} fill={resolveColor("pool", colors)} stroke="#374151" strokeWidth={1.5}
+      <rect x={x} y={y} width={w} height={h} fill={poolBodyTint} stroke="#374151" strokeWidth={1.5} />
+      <rect x={x} y={y} width={LW} height={h} fill={poolHeaderColour} stroke="#374151" strokeWidth={1.5}
         style={isWhiteBox ? { cursor: "pointer" } : undefined} />
       <text textAnchor="middle" fontSize={Math.round(11 * fsc * 10) / 10} fill="#3b1a08" fontWeight="bold"
             transform={`rotate(-90,${cx},${cy})`}
@@ -1330,20 +1343,14 @@ function LaneShape({ el, isSublane }: { el: DiagramElement; isSublane?: boolean 
   const lineH = 12;
   // Lighten fill based on nesting depth beyond direct sublane (depth 1)
   const baseFill = resolveColor(isSublane ? "sublane" : "lane", colors);
-  function lerpHex(hex: string, toward: string, frac: number): string {
-    const parse = (h: string) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
-    const [r1, g1, b1] = parse(hex);
-    const [r2, g2, b2] = parse(toward);
-    const c = (a: number, b: number) => Math.round(a + (b - a) * frac).toString(16).padStart(2, "0");
-    return `#${c(r1, r2)}${c(g1, g2)}${c(b1, b2)}`;
-  }
   // depth 0 = top-level lane, 1 = sublane (baseFill already), 2+ = sub-sublane (lighten)
   const lightenFrac = Math.min((laneDepth - 1) * 0.25, 0.8);
-  const fill = laneDepth > 1 ? lerpHex(baseFill, "#ffffff", lightenFrac) : baseFill;
+  const headerFill = laneDepth > 1 ? lerpHex(baseFill, "#ffffff", lightenFrac) : baseFill;
+  const bodyTint = lerpHex(headerFill, "#ffffff", 0.93);
   return (
     <g>
-      <rect x={x} y={y} width={w} height={h} fill="none" stroke="#374151" strokeWidth={1} />
-      <rect x={x} y={y} width={LW} height={h} fill={fill} stroke="#374151" strokeWidth={1} />
+      <rect x={x} y={y} width={w} height={h} fill={bodyTint} stroke="#374151" strokeWidth={1} />
+      <rect x={x} y={y} width={LW} height={h} fill={headerFill} stroke="#374151" strokeWidth={1} />
       <text textAnchor="middle" fontSize={Math.round(10 * fsc * 10) / 10} fill="#3b1a08" fontWeight="bold"
             transform={`rotate(-90,${cx},${cy})`}
             style={{ userSelect: "none", pointerEvents: "none" }}>
