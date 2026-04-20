@@ -753,6 +753,23 @@ export function layoutBpmnDiagram(
     }
   }
 
+  // Match black-box pool widths to the widest white-box pool so every pool's
+  // left and right edges line up. White-box pools can have grown during the
+  // `expandContainerToFitChildren` pass above if their lanes/sub-lanes pushed
+  // the contents wider than the initial column-based estimate.
+  const allPools = elements.filter(e => e.type === "pool");
+  const whiteBoxPoolEls = allPools.filter(
+    p => ((p.properties.poolType as string | undefined) ?? "white-box") === "white-box"
+  );
+  if (whiteBoxPoolEls.length > 0) {
+    const maxWbWidth = Math.max(...whiteBoxPoolEls.map(p => p.width));
+    for (const bbp of allPools) {
+      if ((bbp.properties.poolType as string | undefined) === "black-box") {
+        bbp.width = maxWbWidth;
+      }
+    }
+  }
+
   phase("containers expanded");
 
   // ── Create connectors ──
