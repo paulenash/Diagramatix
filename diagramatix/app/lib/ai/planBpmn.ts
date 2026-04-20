@@ -67,6 +67,7 @@ ${rules ? `USER RULES AND PREFERENCES (follow these strictly):\n${rules}\n\n` : 
   * Event subprocesses are small (about 4 task widths wide × 2 task heights tall) — the layout engine will size them automatically
   * NEVER create sequence connectors TO or FROM an Event Expanded Subprocess — they are triggered by events, not sequence flow.
 - Every process MUST have a Start Event and at least one End Event at the main Process Pool level (outside any subprocess). These represent the overall process entry and exit. If the user doesn't mention them explicitly, create them anyway.
+- The process-level Start Event MUST be assigned to the TOPMOST lane of its pool (the first lane in the pool's lane list). Even if the start event is logically performed by a role in a different lane, place it in the top lane so the process entry point reads top-down. The layout engine will enforce this — but emitting it correctly avoids confusing the AI plan view.
 - CRITICAL: Always place EVERY element mentioned in the prompt, EVEN IF it is not connected to anything. Unconnected elements still appear on the canvas.
 - Boundary events (edge-mounted on a task, subprocess, or expanded subprocess): add "boundaryHost": "<elementId>" to the event. Choose placement via "boundarySide":
   * Start events → "left" (default: middle of left edge)

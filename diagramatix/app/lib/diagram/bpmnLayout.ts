@@ -241,6 +241,19 @@ export function layoutBpmnDiagram(
     poolLanes.set(pool.id, poolLaneList);
   }
 
+  // R43: Process-level Start Events must be placed in the TOPMOST lane of
+  // their pool. Override any AI-set lane assignment so the process entry
+  // point always reads top-down. Boundary starts and event-subprocess
+  // internal starts are excluded — they belong with their host.
+  for (const el of flowElements) {
+    if (el.type !== "start-event") continue;
+    if (el.parentSubprocess || el.boundaryHost) continue;
+    if (!el.pool) continue;
+    const pLanes = poolLanes.get(el.pool);
+    if (!pLanes || pLanes.length === 0) continue;
+    el.lane = pLanes[0].id;
+  }
+
   // Assign elements to lanes/pools
   const laneElements = new Map<string, AiElement[]>(); // laneId → elements
   const unassigned: AiElement[] = [];
@@ -847,6 +860,64 @@ export function layoutBpmnDiagram(
     }
   }
 
+  // R44: Nested decision-gateway Y alignment. A decision gateway should sit
+  // at the same Y as its immediate sequence-flow predecessor so a branch
+  // continuing through a nested diamond doesn't zig-zag back to the lane
+  // centre. The paired merge gateway is aligned to the same Y for symmetry.
+  // Pairing heuristic: BFS every outgoing branch forward through the whole
+  // downstream graph (without stopping at inner merges) and collect the
+  // full set of merges each branch reaches; the paired merge is the
+  // smallest-column merge reachable by ALL branches — preferring one whose
+  // in-degree matches the decision's out-degree.
+  function findPairedMerge(decisionId: string): string | undefined {
+    const outConns = outgoing.get(decisionId) ?? [];
+    if (outConns.length < 2) return undefined;
+    const branchMerges: Set<string>[] = [];
+    for (const startConn of outConns) {
+      const visited = new Set<string>();
+      const merges = new Set<string>();
+      const queue: string[] = [startConn.targetId];
+      while (queue.length > 0) {
+        const cur = queue.shift()!;
+        if (visited.has(cur)) continue;
+        visited.add(cur);
+        const curEl = elMap.get(cur);
+        if (curEl && isMergeGateway(curEl)) merges.add(cur);
+        for (const c of outgoing.get(cur) ?? []) queue.push(c.targetId);
+      }
+      branchMerges.push(merges);
+    }
+    const common = [...branchMerges[0]].filter(m => branchMerges.every(s => s.has(m)));
+    if (common.length === 0) return undefined;
+    const byCol = (a: string, b: string) => (colMap.get(a) ?? 0) - (colMap.get(b) ?? 0);
+    const matching = common.filter(m => (incomingCount.get(m) ?? 0) === outConns.length);
+    if (matching.length > 0) return matching.sort(byCol)[0];
+    return common.sort(byCol)[0];
+  }
+
+  // Walk decision gateways in column order so upstream Y-adjustments are
+  // already applied when we read the predecessor's Y.
+  const decisionElsSorted = elements
+    .filter(e => isDecisionGateway(e))
+    .sort((a, b) => (colMap.get(a.id) ?? 0) - (colMap.get(b.id) ?? 0));
+  for (const dec of decisionElsSorted) {
+    const incs = incoming.get(dec.id) ?? [];
+    if (incs.length === 0) continue;
+    const pred = elMap.get(incs[0].sourceId);
+    if (!pred) continue;
+    if (pred.parentId !== dec.parentId) continue; // stay within same container
+    const predCentreY = pred.y + pred.height / 2;
+    dec.y = predCentreY - dec.height / 2;
+
+    const mergeId = findPairedMerge(dec.id);
+    if (mergeId) {
+      const merge = elMap.get(mergeId);
+      if (merge && merge.parentId === dec.parentId) {
+        merge.y = predCentreY - merge.height / 2;
+      }
+    }
+  }
+
   // Build the ordered lists for the wiring pass (R35/R36).
   //   Decision outgoings: sorted by target element vertical position — topmost
   //                       target exits at "top", bottommost at "bottom", any
@@ -1052,19 +1123,30 @@ export function layoutBpmnDiagram(
     let labelAnchor: "source" | "target" | undefined;
     if (c.label) {
       if (isDecisionGateway(src)) {
-        // R42: all outgoing sequence connectors from a decision gateway anchor
-        // their labels to the RIGHT of the source attachment point, close to
-        // where the line leaves the gateway. Top/bottom exits get a small
-        // extra vertical offset so the label doesn't sit on top of the
-        // gateway diamond edge.
+        // R42: outgoing sequence connector labels from a decision gateway
+        // anchor to the source attachment point. Per-side placement:
+        //   - top:    label sits ABOVE the gateway, RIGHT of the connector;
+        //             left edge of text +6px from the connector,
+        //             bottom of text 10px above the gateway top point.
+        //   - bottom: label sits BELOW the gateway, RIGHT of the connector;
+        //             left edge of text +6px from the connector,
+        //             top of text 10px below the gateway bottom point.
+        //   - right:  label sits BELOW the connector; left edge of text
+        //             +3px from the gateway right-hand connection point,
+        //             top of text 2px below the connector line.
+        // labelOffsetX shifts the label CENTRE, so left-edge alignment
+        // requires adding half the estimated text width (renderer formula:
+        // Math.max(30, len*6 + 12) at fontScale=1; line height = 14).
+        const estLabelW = Math.max(30, (c.label?.length ?? 0) * 6 + 12);
+        const lineH = 14;
         labelWidth = 60;
         labelAnchor = "source";
         switch (srcSide) {
-          case "top":    labelOffsetX = 8;               labelOffsetY = -22; break;
-          case "bottom": labelOffsetX = 8;               labelOffsetY = 10;  break;
-          case "right":  labelOffsetX = 8;               labelOffsetY = -6;  break;
-          case "left":   labelOffsetX = -labelWidth - 8; labelOffsetY = -6;  break;
-          default:       labelOffsetX = 8;               labelOffsetY = -20; break;
+          case "top":    labelOffsetX = 6 + estLabelW / 2; labelOffsetY = -10 - lineH; break;
+          case "bottom": labelOffsetX = 6 + estLabelW / 2; labelOffsetY = 10;          break;
+          case "right":  labelOffsetX = 3 + estLabelW / 2; labelOffsetY = 2;           break;
+          case "left":   labelOffsetX = -labelWidth - 8;   labelOffsetY = -6;          break;
+          default:       labelOffsetX = 8;                 labelOffsetY = -20;         break;
         }
       } else if (isMessage) {
         // Find the containing pool for each end, then centre the label in the gap.

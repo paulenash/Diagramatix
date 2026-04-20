@@ -2022,7 +2022,23 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       const isDecisionGateway = source.type === "gateway"
         && (gwType === "none" || gwType === "exclusive" || gwType === "inclusive");
       const isDecisionGatewayOutgoing = (connectorType === "sequence" || connectorType === "transition") && isDecisionGateway;
-      const isDecisionGatewayBottom = isDecisionGatewayOutgoing && sourceSide === "bottom";
+
+      // R42: per-side label placement for decision-gateway outgoing connectors.
+      // Mirrors bpmnLayout.ts. Label is empty at creation, so estimated width
+      // collapses to the renderer's 30px minimum.
+      const decisionLabelOffsets: { x: number; y: number } | null = isDecisionGatewayOutgoing
+        ? (() => {
+            const estLabelW = 30;
+            const lineH = 14;
+            switch (sourceSide) {
+              case "top":    return { x: 6 + estLabelW / 2, y: -10 - lineH };
+              case "bottom": return { x: 6 + estLabelW / 2, y: 10 };
+              case "right":  return { x: 3 + estLabelW / 2, y: 2 };
+              case "left":   return { x: -60 - 8,           y: -6 };
+              default:       return { x: 8,                 y: -20 };
+            }
+          })()
+        : null;
 
       const newConnector: Connector = {
         id: nanoid(),
@@ -2045,7 +2061,7 @@ function reducer(state: DiagramData, action: Action): DiagramData {
                     : isDecisionGatewayOutgoing ? ""
                     : connectorType === "sequence" ? ""
                     : undefined,
-        labelOffsetX: isFlow ? 0   : isTransition ? 0   : isMsgBpmn ? 20  : isDecisionGatewayBottom ? 10 : isDecisionGatewayOutgoing ? 5  : connectorType === "sequence" ? 0 : undefined,
+        labelOffsetX: isFlow ? 0   : isTransition ? 0   : isMsgBpmn ? 20  : decisionLabelOffsets ? decisionLabelOffsets.x : connectorType === "sequence" ? 0 : undefined,
         labelOffsetY: isFlow ? -30 : isTransition ? -30 : isMsgBpmn ? (() => {
           // Find the pool containing each element
           function findPool(el: DiagramElement): DiagramElement | undefined {
@@ -2082,7 +2098,7 @@ function reducer(state: DiagramData, action: Action): DiagramData {
             return labelY - anchorY - 7;
           }
           return 0;
-        })() : isDecisionGatewayBottom ? 10 : isDecisionGatewayOutgoing ? -20 : connectorType === "sequence" ? -20 : undefined,
+        })() : decisionLabelOffsets ? decisionLabelOffsets.y : connectorType === "sequence" ? -20 : undefined,
         labelWidth:   isFlow ? 80  : isTransition ? 80  : isMsgBpmn ? 80  : isDecisionGatewayOutgoing ? 60  : connectorType === "sequence" ? 80 : undefined,
         labelAnchor:  isDecisionGatewayOutgoing ? "source" : undefined,
       };

@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "go": "next build && next start"
+    "go": "next build && next start",
+    "kill": "npx kill-port 3000"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "0.88.0",
