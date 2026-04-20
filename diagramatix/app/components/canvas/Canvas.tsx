@@ -972,12 +972,19 @@ export function Canvas({
         //     be another (black-box) pool.
         //   - If the moving end is currently on a Task/Subprocess, the drop
         //     target must be another Task/Subprocess inside any white-box pool.
-        // In both cases, the target must not be the fixed end itself.
+        //   - Additionally, the arrowhead (target) end may land on a Start or
+        //     Intermediate event, and the source end may land on an Intermediate
+        //     or End event — both must sit in a white-box pool and not be
+        //     boundary-mounted.
+        // In all cases, the target must not be the fixed end itself.
+        const RECEIVE_EVENTS: Set<SymbolType> = new Set(["start-event", "intermediate-event"]);
+        const SEND_EVENTS:    Set<SymbolType> = new Set(["intermediate-event", "end-event"]);
         const fixedId   = endpoint === "source" ? conn!.targetId : conn!.sourceId;
         const fixedEl   = data.elements.find(e => e.id === fixedId);
         const movingEl  = data.elements.find(e => e.id === fromId);
         const movingIsPool    = movingEl?.type === "pool";
         const movingIsTaskSub = !!movingEl && MSG_TASKSUB_TYPES.has(movingEl.type);
+        const validEvents = endpoint === "target" ? RECEIVE_EVENTS : SEND_EVENTS;
         const targetEl  = findDropTarget(pos, fromId);
         let valid = false;
         if (targetEl && targetEl.id !== fixedId && targetEl.id !== fromId) {
@@ -985,6 +992,13 @@ export function Canvas({
             const ptype = (targetEl.properties.poolType as string | undefined) ?? "black-box";
             if (ptype === "black-box") valid = true;
           } else if (movingIsTaskSub && MSG_TASKSUB_TYPES.has(targetEl.type)) {
+            const tPoolId = getElementPoolId(targetEl, data.elements);
+            const tPool   = tPoolId ? data.elements.find(p => p.id === tPoolId) : null;
+            if (((tPool?.properties.poolType as string | undefined) ?? "black-box") === "white-box") {
+              valid = true;
+            }
+          }
+          if (!valid && validEvents.has(targetEl.type) && !targetEl.boundaryHostId) {
             const tPoolId = getElementPoolId(targetEl, data.elements);
             const tPool   = tPoolId ? data.elements.find(p => p.id === tPoolId) : null;
             if (((tPool?.properties.poolType as string | undefined) ?? "black-box") === "white-box") {
@@ -2536,15 +2550,26 @@ export function Canvas({
   const epDragFixedIsData = epDragFixedEl ? DATA_ELEMENT_TYPES.has(epDragFixedEl.type) : false;
 
   // For messageBPMN endpoint drag: the element the moving end is currently
-  // attached to. User rule: a pool endpoint can only move to another pool;
-  // a task/subprocess endpoint can only move to another task/subprocess
-  // inside a white-box pool.
+  // attached to. User rules:
+  //   - Pool endpoint moves to another pool.
+  //   - Task/Subprocess endpoint moves to another task/subprocess inside a
+  //     white-box pool.
+  //   - Arrowhead (target) endpoint may ALSO attach to a Start or Intermediate
+  //     event (receive-capable) inside a white-box pool.
+  //   - Source (start) endpoint may ALSO attach to an Intermediate or End
+  //     event (send-capable) inside a white-box pool.
   const MSG_TASKSUB_TYPES: Set<SymbolType> = new Set(["task", "subprocess", "subprocess-expanded"]);
+  const MSG_RECEIVE_EVENT_TYPES: Set<SymbolType> = new Set(["start-event", "intermediate-event"]);
+  const MSG_SEND_EVENT_TYPES: Set<SymbolType> = new Set(["intermediate-event", "end-event"]);
   const epDragMovingEl = epDragMovingId
     ? data.elements.find(e => e.id === epDragMovingId) ?? null
     : null;
   const epDragMovingIsPool = isMessageBpmnEndpointDrag && epDragMovingEl?.type === "pool";
   const epDragMovingIsTaskSub = isMessageBpmnEndpointDrag && epDragMovingEl ? MSG_TASKSUB_TYPES.has(epDragMovingEl.type) : false;
+  // Which event types are valid for the end being dragged.
+  const epDragMsgEventTypes: Set<SymbolType> | null = isMessageBpmnEndpointDrag && draggingEndpoint
+    ? (draggingEndpoint.endpoint === "target" ? MSG_RECEIVE_EVENT_TYPES : MSG_SEND_EVENT_TYPES)
+    : null;
 
   return (
     <div
@@ -3037,6 +3062,21 @@ export function Canvas({
                   if (((elPool?.properties.poolType as string | undefined) ?? "black-box") === "white-box") {
                     elIsMsgTarget = true;
                   }
+                }
+              }
+            }
+            // Event targets — orthogonal to the pool vs task/sub branches above.
+            // The end being dragged decides which event kinds are valid.
+            if (isMessageBpmnEndpointDrag && epDragMsgEventTypes
+                && epDragMsgEventTypes.has(el.type)
+                && !el.boundaryHostId
+                && el.id !== epDragMovingEl?.id
+                && el.id !== epDragFixedEl?.id) {
+              const elPoolId = getElementPoolId(el, data.elements);
+              if (elPoolId) {
+                const elPool = data.elements.find(p => p.id === elPoolId);
+                if (((elPool?.properties.poolType as string | undefined) ?? "black-box") === "white-box") {
+                  elIsMsgTarget = true;
                 }
               }
             } else if (isAssocBpmnEndpointDrag && el.id !== epDragMovingId) {

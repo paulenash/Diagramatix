@@ -7,6 +7,18 @@ import type { DiagramData, DiagramElement, Connector, Point } from "./types";
 import { getSymbolDefinition } from "./symbols/definitions";
 import { computeWaypoints } from "./routing";
 
+// Phase-trace writer: stderr + append to a known log file so the server's
+// layout progress is visible even when Next.js buffers stdout.
+function layoutTrace(line: string) {
+  const stamped = `${new Date().toISOString()} ${line}\n`;
+  try { process.stderr.write(stamped); } catch { /* ignore */ }
+  try {
+    // Dynamic require to keep this file Edge-runtime-safe in case it's ever imported there.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    require("fs").appendFileSync("C:\\Git\\Diagramatix\\diagramatix\\apply-layout.log", stamped);
+  } catch { /* ignore */ }
+}
+
 export interface AiElement {
   id: string;
   type: string; // "start-event" | "end-event" | "task" | "gateway" | "subprocess" | "subprocess-expanded" | "intermediate-event" | "pool" | "lane" | "data-object" | "data-store" | "text-annotation" | "group"
@@ -59,6 +71,14 @@ export function layoutBpmnDiagram(
 ): DiagramData {
   const elements: DiagramElement[] = [];
   const connectors: Connector[] = [];
+
+  // Phase timing — always writes to stderr and apply-layout.log so we can
+  // see where a layout hangs regardless of Next.js stdout buffering.
+  const _t0 = Date.now();
+  const phase = (name: string) => {
+    layoutTrace(`[layoutBpmnDiagram] ${name} @ ${Date.now() - _t0}ms`);
+  };
+  phase("start");
 
   // ── R26/R29/R30: Event Subprocess handling ──
   // - Auto-detect event subprocesses
@@ -128,6 +148,8 @@ export function layoutBpmnDiagram(
     }
   }
   aiElements = [...aiElements, ...injected];
+
+  phase("event-sub-injection done");
 
   // Separate pools from other elements
   const pools = aiElements.filter(e => e.type === "pool");
@@ -296,6 +318,7 @@ export function layoutBpmnDiagram(
     if (!colMap.has(el.id)) colMap.set(el.id, colMap.size);
   }
 
+  phase(`column map done (${colMap.size} elements, maxCol=${Math.max(0, ...colMap.values())})`);
   const maxCol = Math.max(0, ...colMap.values());
 
   // ── Pool width: content columns + 1 task width padding for user adjustment room ──
@@ -447,6 +470,8 @@ export function layoutBpmnDiagram(
     });
     curY += bbH + POOL_GAP;
   }
+
+  phase(`pool/lane placement done (${elements.length} elements placed)`);
 
   // ── Handle children of expanded subprocesses and edge-mounted boundary events ──
   // Find all expanded subprocesses that have declared children
@@ -648,6 +673,8 @@ export function layoutBpmnDiagram(
     }
   }
 
+  phase(`subprocess+boundary placement done (${elements.length} elements total)`);
+
   // ── R24: Grow pools and lanes to contain all their elements ──
   // After all placement (including enlarged expanded subprocesses and boundary events),
   // expand pools and lanes so every process element fits fully inside.
@@ -725,6 +752,8 @@ export function layoutBpmnDiagram(
       lane.width = pool.width - POOL_HEADER_W;
     }
   }
+
+  phase("containers expanded");
 
   // ── Create connectors ──
   const elMap = new Map(elements.map(e => [e.id, e]));
@@ -1040,11 +1069,20 @@ export function layoutBpmnDiagram(
     } as Connector);
   }
 
+  phase(`connectors built (${connectors.length})`);
+
   // Compute waypoints for all connectors
-  const computedConnectors = connectors.map(conn => {
+  const computedConnectors = connectors.map((conn, i) => {
+    const tConn = Date.now();
     const src = elMap.get(conn.sourceId);
     const tgt = elMap.get(conn.targetId);
     if (!src || !tgt) return conn;
+    const logSlow = () => {
+      const dur = Date.now() - tConn;
+      if (dur > 200) {
+        layoutTrace(`[layoutBpmnDiagram] slow waypoint ${i}/${connectors.length}: ${conn.type} ${conn.sourceId}→${conn.targetId} took ${dur}ms`);
+      }
+    };
     try {
       const srcOffset = conn.sourceOffsetAlong ?? 0.5;
       const tgtOffset = conn.targetOffsetAlong ?? 0.5;
@@ -1060,6 +1098,7 @@ export function layoutBpmnDiagram(
         const tgtY = tgtSide === "top" ? tgt.y : tgt.y + tgt.height;
         // Use the non-pool element's X for vertical alignment
         const alignX = src.type === "pool" ? tgtX : tgt.type === "pool" ? srcX : (srcX + tgtX) / 2;
+        logSlow();
         return {
           ...conn,
           waypoints: [
@@ -1075,11 +1114,14 @@ export function layoutBpmnDiagram(
 
       const result = computeWaypoints(src, tgt, elements,
         conn.sourceSide, conn.targetSide, conn.routingType, srcOffset, tgtOffset);
+      logSlow();
       return { ...conn, waypoints: result.waypoints,
         sourceInvisibleLeader: result.sourceInvisibleLeader,
         targetInvisibleLeader: result.targetInvisibleLeader };
-    } catch { return conn; }
+    } catch { logSlow(); return conn; }
   });
+
+  phase("waypoints computed — done");
 
   return {
     elements,
