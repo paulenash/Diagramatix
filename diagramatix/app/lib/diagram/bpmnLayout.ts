@@ -636,16 +636,18 @@ export function layoutBpmnDiagram(
       }
     }
     if (isEventSub) {
-      // Event subprocess: start event near left edge, end event near right edge, both vertically centred
+      // Event subprocess: Start event on the left, End event on the right,
+      // both vertically centred. R51: Start/End centres sit 1.5 × event
+      // width from their respective vertical boundaries (left for Start,
+      // right for End) so they aren't cramped against the edge.
       const cyCentre = spEl.height / 2;
       for (const ai of children) {
         const def = getSymbolDefinition(ai.type as DiagramElement["type"]);
         let cx: number;
         if (ai.type === "start-event") {
-          cx = 25; // near left inside boundary
+          cx = 1.5 * def.defaultWidth;
         } else if (ai.type === "end-event") {
-          cx = spEl.width - 25 - def.defaultWidth / 2 + def.defaultWidth / 2; // near right inside boundary
-          cx = spEl.width - 25;
+          cx = spEl.width - 1.5 * def.defaultWidth;
         } else {
           cx = spEl.width / 2; // middle for any other elements
         }
@@ -673,12 +675,14 @@ export function layoutBpmnDiagram(
         ? normalChildren.filter(ai => ai.type !== "start-event" && ai.type !== "end-event")
         : normalChildren;
 
-      // Place Start/End events in the top row: Start near left, End near right.
+      // Place Start/End events in the top row: Start on the left, End on
+      // the right. R51: centres sit 1.5 × event width from their
+      // respective vertical boundaries.
       for (const ai of topRowEvents) {
         const def = getSymbolDefinition(ai.type as DiagramElement["type"]);
         const cx = ai.type === "start-event"
-          ? EXPANDED_PAD_X + CHILD_COL_SPACING / 2
-          : spEl.width - EXPANDED_PAD_X - CHILD_COL_SPACING / 2;
+          ? 1.5 * def.defaultWidth
+          : spEl.width - 1.5 * def.defaultWidth;
         const cy = EXPANDED_PAD_Y + CHILD_ROW_SPACING / 2;
         elements.push({
           id: ai.id, type: ai.type as DiagramElement["type"],

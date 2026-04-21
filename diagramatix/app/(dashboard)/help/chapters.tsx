@@ -2592,6 +2592,16 @@ export const CHAPTERS: HelpChapter[] = [
                 a matching in-degree.
               </li>
               <li>
+                <strong>R51 — Internal Start/End horizontal inset.</strong>{" "}
+                Start and End events placed inside an Expanded Subprocess
+                (including Event Subprocesses and the top-row placement
+                used by R50) have their centres sit{" "}
+                <strong>1.5 × event width</strong> from their respective
+                vertical boundaries — Start from the left edge, End from
+                the right edge. Keeps them clear of the subprocess
+                border.
+              </li>
+              <li>
                 <strong>R50 — Boundary Start/End events on an outer sub
                 with embedded event subs.</strong>{" "}
                 Boundary Start events are placed on the LEFT edge;

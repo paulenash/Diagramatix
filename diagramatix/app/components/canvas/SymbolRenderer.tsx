@@ -1487,9 +1487,11 @@ export function SymbolRenderer({
   const [isEditingGatewayLabel, setIsEditingGatewayLabel] = useState(false);
   const [editGatewayLabelValue, setEditGatewayLabelValue] = useState("");
   const [labelHighlighted, setLabelHighlighted] = useState(false);
-  // Pool right-edge resize: visible grip only appears while the user is actively
-  // dragging it. Hit-zone stays invisible & click-catching; grip fades out on mouseup.
-  const [poolResizeActive, setPoolResizeActive] = useState(false);
+  // Pool edge resize: visible grip only appears while the user is actively
+  // dragging an edge. Hit-zones stay invisible & click-catching; grip fades
+  // out on mouseup. State tracks WHICH side is active so only that side's
+  // grip renders during a drag.
+  const [poolResizeActive, setPoolResizeActive] = useState<null | "e" | "w" | "n" | "s">(null);
   // Clear label highlight when element is deselected
   if (!selected && labelHighlighted) setLabelHighlighted(false);
   let dragStart: { mouseX: number; mouseY: number; elX: number; elY: number } | null = null;
@@ -2204,53 +2206,95 @@ export function SymbolRenderer({
         })
       }
 
-      {/* Pool right-edge resize handle. Hit zone (invisible) is always active,
-          so a click near the right edge initiates a drag; the visible grip +
-          ↔ glyph only render WHILE the drag is active, then disappear on
-          mouseup. Gives a clean visual with no always-on chrome. */}
+      {/* Pool edge resize handles. Hit zones (invisible, ~10px wide) straddle
+          each of the four edges and are ALWAYS active — a click near any
+          edge initiates a drag on that side. The visible grip + ↔/↕ glyph
+          only render while the drag is active, keeping the pool's chrome
+          clean when idle. */}
       {element.type === "pool" && onResizeDragStart && (() => {
         const HANDLE_W = 10;
-        const gripH = Math.min(40, element.height * 0.5);
-        const hx = element.x + element.width - HANDLE_W / 2;
-        const hy = element.y + element.height / 2 - gripH / 2;
-        const cx = element.x + element.width;
-        const cy = element.y + element.height / 2;
+        const horizontalGripLen = Math.min(40, element.height * 0.5); // E/W grips
+        const verticalGripLen   = Math.min(40, element.width  * 0.5); // N/S grips
+
+        type EdgeSpec = {
+          side: "e" | "w" | "n" | "s";
+          cursor: "ew-resize" | "ns-resize";
+          hit: { x: number; y: number; width: number; height: number };
+          grip: { x: number; y: number; width: number; height: number };
+          arrowPath: string; // double-headed arrow in the hit centre
+        };
+        const edges: EdgeSpec[] = [
+          // East (right)
+          {
+            side: "e", cursor: "ew-resize",
+            hit: { x: element.x + element.width - HANDLE_W, y: element.y, width: HANDLE_W * 2, height: element.height },
+            grip: { x: element.x + element.width - HANDLE_W / 2, y: element.y + element.height / 2 - horizontalGripLen / 2, width: HANDLE_W, height: horizontalGripLen },
+            arrowPath: (() => { const cx = element.x + element.width, cy = element.y + element.height / 2;
+              return `M ${cx - 4} ${cy} L ${cx - 1} ${cy - 3} L ${cx - 1} ${cy + 3} Z M ${cx + 4} ${cy} L ${cx + 1} ${cy - 3} L ${cx + 1} ${cy + 3} Z`; })(),
+          },
+          // West (left)
+          {
+            side: "w", cursor: "ew-resize",
+            hit: { x: element.x - HANDLE_W, y: element.y, width: HANDLE_W * 2, height: element.height },
+            grip: { x: element.x - HANDLE_W / 2, y: element.y + element.height / 2 - horizontalGripLen / 2, width: HANDLE_W, height: horizontalGripLen },
+            arrowPath: (() => { const cx = element.x, cy = element.y + element.height / 2;
+              return `M ${cx - 4} ${cy} L ${cx - 1} ${cy - 3} L ${cx - 1} ${cy + 3} Z M ${cx + 4} ${cy} L ${cx + 1} ${cy - 3} L ${cx + 1} ${cy + 3} Z`; })(),
+          },
+          // North (top)
+          {
+            side: "n", cursor: "ns-resize",
+            hit: { x: element.x, y: element.y - HANDLE_W, width: element.width, height: HANDLE_W * 2 },
+            grip: { x: element.x + element.width / 2 - verticalGripLen / 2, y: element.y - HANDLE_W / 2, width: verticalGripLen, height: HANDLE_W },
+            arrowPath: (() => { const cx = element.x + element.width / 2, cy = element.y;
+              return `M ${cx} ${cy - 4} L ${cx - 3} ${cy - 1} L ${cx + 3} ${cy - 1} Z M ${cx} ${cy + 4} L ${cx - 3} ${cy + 1} L ${cx + 3} ${cy + 1} Z`; })(),
+          },
+          // South (bottom)
+          {
+            side: "s", cursor: "ns-resize",
+            hit: { x: element.x, y: element.y + element.height - HANDLE_W, width: element.width, height: HANDLE_W * 2 },
+            grip: { x: element.x + element.width / 2 - verticalGripLen / 2, y: element.y + element.height - HANDLE_W / 2, width: verticalGripLen, height: HANDLE_W },
+            arrowPath: (() => { const cx = element.x + element.width / 2, cy = element.y + element.height;
+              return `M ${cx} ${cy - 4} L ${cx - 3} ${cy - 1} L ${cx + 3} ${cy - 1} Z M ${cx} ${cy + 4} L ${cx - 3} ${cy + 1} L ${cx + 3} ${cy + 1} Z`; })(),
+          },
+        ];
+
         return (
           <g data-interactive>
-            {/* Wide invisible hit zone straddling the right edge */}
-            <rect
-              x={element.x + element.width - HANDLE_W} y={element.y}
-              width={HANDLE_W * 2} height={element.height}
-              fill="transparent"
-              style={{ cursor: "ew-resize" }}
-              onMouseDown={(e) => {
-                e.stopPropagation();
-                setPoolResizeActive(true);
-                onResizeDragStart("e", e);
-                const onUp = () => {
-                  setPoolResizeActive(false);
-                  window.removeEventListener("mouseup", onUp);
-                };
-                window.addEventListener("mouseup", onUp);
-              }}
-            />
-            {poolResizeActive && (
-              <>
-                {/* Visible blue grip */}
+            {edges.map((edge) => (
+              <g key={edge.side}>
                 <rect
-                  x={hx} y={hy}
-                  width={HANDLE_W} height={gripH}
-                  fill="#2563eb" fillOpacity={0.75} stroke="white" strokeWidth={1} rx={2}
-                  style={{ cursor: "ew-resize", pointerEvents: "none" }}
+                  x={edge.hit.x} y={edge.hit.y}
+                  width={edge.hit.width} height={edge.hit.height}
+                  fill="transparent"
+                  style={{ cursor: edge.cursor }}
+                  onMouseDown={(e) => {
+                    e.stopPropagation();
+                    setPoolResizeActive(edge.side);
+                    onResizeDragStart(edge.side, e);
+                    const onUp = () => {
+                      setPoolResizeActive(null);
+                      window.removeEventListener("mouseup", onUp);
+                    };
+                    window.addEventListener("mouseup", onUp);
+                  }}
                 />
-                {/* ↔ glyph — two white triangles */}
-                <path
-                  d={`M ${cx - 4} ${cy} L ${cx - 1} ${cy - 3} L ${cx - 1} ${cy + 3} Z M ${cx + 4} ${cy} L ${cx + 1} ${cy - 3} L ${cx + 1} ${cy + 3} Z`}
-                  fill="white"
-                  style={{ pointerEvents: "none" }}
-                />
-              </>
-            )}
+                {poolResizeActive === edge.side && (
+                  <>
+                    <rect
+                      x={edge.grip.x} y={edge.grip.y}
+                      width={edge.grip.width} height={edge.grip.height}
+                      fill="#2563eb" fillOpacity={0.75} stroke="white" strokeWidth={1} rx={2}
+                      style={{ cursor: edge.cursor, pointerEvents: "none" }}
+                    />
+                    <path
+                      d={edge.arrowPath}
+                      fill="white"
+                      style={{ pointerEvents: "none" }}
+                    />
+                  </>
+                )}
+              </g>
+            ))}
           </g>
         );
       })()}
