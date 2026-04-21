@@ -925,6 +925,43 @@ export function layoutBpmnDiagram(
 
   phase("containers expanded");
 
+  // R52: Pools must never overlap. The expandContainerToFitChildren pass
+  // above can grow a white-box pool downward to accommodate its lanes and
+  // subprocess contents; if a bottom black-box pool was already placed at
+  // the pre-grown Y, the two now overlap. Re-stack every pool top-to-bottom
+  // with POOL_GAP between them and shift each pool's descendants (anything
+  // whose centre Y lies within the pool's current bounds) along with it.
+  {
+    const sortedPools = elements
+      .filter(e => e.type === "pool")
+      .sort((a, b) => a.y - b.y);
+    // Snapshot descendants BEFORE any shifting — once we start moving pools
+    // the spatial containment would no longer be accurate.
+    const poolDescendants = new Map<string, DiagramElement[]>();
+    for (const pool of sortedPools) {
+      const yTop = pool.y;
+      const yBot = pool.y + pool.height;
+      const descendants: DiagramElement[] = [];
+      for (const el of elements) {
+        if (el.type === "pool") continue;
+        const elMid = el.y + el.height / 2;
+        if (elMid >= yTop && elMid <= yBot) descendants.push(el);
+      }
+      poolDescendants.set(pool.id, descendants);
+    }
+    if (sortedPools.length > 0) {
+      let stackY = sortedPools[0].y;
+      for (const pool of sortedPools) {
+        const dy = stackY - pool.y;
+        if (dy !== 0) {
+          pool.y += dy;
+          for (const d of poolDescendants.get(pool.id)!) d.y += dy;
+        }
+        stackY = pool.y + pool.height + POOL_GAP;
+      }
+    }
+  }
+
   // ── Create connectors ──
   const elMap = new Map(elements.map(e => [e.id, e]));
 
