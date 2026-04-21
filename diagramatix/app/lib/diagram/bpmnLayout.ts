@@ -83,10 +83,22 @@ export function layoutBpmnDiagram(
   for (const ai of aiElements) {
     if (ai.type !== "subprocess-expanded") continue;
     const labelLower = (ai.label || "").toLowerCase();
+    // Fallback detection: treat as event sub if any direct child is a
+    // non-interrupting start event. AI sometimes forgets to set
+    // subprocessType="event" even when it emits the characteristic
+    // non-interrupting internal start event (which is only valid inside
+    // an event sub). Catching this avoids missed R48 connector-stripping.
+    const hasNonInterruptingStart = aiElements.some(child =>
+      child.parentSubprocess === ai.id &&
+      child.type === "start-event" &&
+      !child.boundaryHost &&
+      ((child.properties as Record<string, unknown> | undefined)?.interruptionType === "non-interrupting" ||
+       (child.properties as Record<string, unknown> | undefined)?.interrupting === false));
     const isEventSub = ai.subprocessType === "event" ||
       (ai.properties?.subprocessType === "event") ||
       labelLower.includes("event subprocess") ||
-      labelLower.includes("event expanded");
+      labelLower.includes("event expanded") ||
+      hasNonInterruptingStart;
     if (!isEventSub) continue;
     // Ensure subprocessType is set
     if (!ai.subprocessType) ai.subprocessType = "event";
@@ -539,6 +551,12 @@ export function layoutBpmnDiagram(
   const EVENT_SUB_H = taskDefForEvSub.defaultHeight * 2 + 40;
   const EVENT_SUB_GAP = 20;
 
+  // R50: set of outer expanded-subprocess ids that contain embedded event
+  // subs. When an outer sub is in this set, boundary Start/End events on
+  // that host are forced to the TOP edge, and internal Start/End events
+  // are placed in the top row of the grid.
+  const outerSpsWithEventSubs = new Set<string>();
+
   for (const spId of sortedSpIds) {
     const children = subprocessChildren.get(spId)!;
     const spEl = elements.find(e => e.id === spId);
@@ -554,8 +572,16 @@ export function layoutBpmnDiagram(
     const normalChildren = isEventSub ? children : children.filter(ai => !isChildEventSub(ai));
     const eventSubChildren = isEventSub ? [] : children.filter(ai => isChildEventSub(ai));
 
-    const rows = Math.max(1, Math.ceil(normalChildren.length / CHILD_COLS));
-    const cols = Math.min(CHILD_COLS, normalChildren.length);
+    // R50: when the outer has event subs, internal Start/End events are
+    // reserved for the top row; the rest fill the grid from row 1.
+    const hasEventSubs = eventSubChildren.length > 0;
+    const startEndCount = hasEventSubs
+      ? normalChildren.filter(ai => ai.type === "start-event" || ai.type === "end-event").length
+      : 0;
+    const gridChildCount = normalChildren.length - startEndCount;
+    const contentRows = (startEndCount > 0 ? 1 : 0) + Math.ceil(gridChildCount / CHILD_COLS);
+    const rows = Math.max(1, contentRows || 1);
+    const cols = Math.min(CHILD_COLS, Math.max(gridChildCount, startEndCount));
     // Event subprocess: 4 task widths × 2 task heights (small)
     // Normal subprocess: at least 5 tasks × 4 tasks (large), plus room
     // below the grid for any embedded event subs stacked vertically.
@@ -635,11 +661,44 @@ export function layoutBpmnDiagram(
         });
       }
     } else {
-      // Normal subprocess: grid layout for regular children
-      for (let i = 0; i < normalChildren.length; i++) {
-        const ai = normalChildren[i];
+      // Normal subprocess: grid layout for regular children.
+      // R50: if this outer has embedded event subs, reserve the TOP row for
+      // internal Start/End events and grid-place the rest starting row 1.
+      const hasEventSubs = eventSubChildren.length > 0;
+      if (hasEventSubs) outerSpsWithEventSubs.add(spId);
+      const topRowEvents = hasEventSubs
+        ? normalChildren.filter(ai => ai.type === "start-event" || ai.type === "end-event")
+        : [];
+      const gridChildren = hasEventSubs
+        ? normalChildren.filter(ai => ai.type !== "start-event" && ai.type !== "end-event")
+        : normalChildren;
+
+      // Place Start/End events in the top row: Start near left, End near right.
+      for (const ai of topRowEvents) {
+        const def = getSymbolDefinition(ai.type as DiagramElement["type"]);
+        const cx = ai.type === "start-event"
+          ? EXPANDED_PAD_X + CHILD_COL_SPACING / 2
+          : spEl.width - EXPANDED_PAD_X - CHILD_COL_SPACING / 2;
+        const cy = EXPANDED_PAD_Y + CHILD_ROW_SPACING / 2;
+        elements.push({
+          id: ai.id, type: ai.type as DiagramElement["type"],
+          x: spEl.x + cx - def.defaultWidth / 2,
+          y: spEl.y + cy - def.defaultHeight / 2,
+          width: def.defaultWidth, height: def.defaultHeight,
+          label: ai.label, properties: buildProps(ai), parentId: spEl.id,
+          ...(ai.taskType ? { taskType: ai.taskType as DiagramElement["taskType"] } : {}),
+          ...(ai.gatewayType ? { gatewayType: ai.gatewayType as DiagramElement["gatewayType"] } : {}),
+          ...(ai.eventType ? { eventType: ai.eventType as DiagramElement["eventType"] } : {}),
+        });
+      }
+
+      // Grid-place the rest, shifted down by one row when the top row is
+      // reserved for Start/End events.
+      const rowOffset = hasEventSubs ? 1 : 0;
+      for (let i = 0; i < gridChildren.length; i++) {
+        const ai = gridChildren[i];
         const col = i % CHILD_COLS;
-        const row = Math.floor(i / CHILD_COLS);
+        const row = Math.floor(i / CHILD_COLS) + rowOffset;
         const def = getSymbolDefinition(ai.type as DiagramElement["type"]);
         const cx = EXPANDED_PAD_X + col * CHILD_COL_SPACING + CHILD_COL_SPACING / 2;
         const cy = EXPANDED_PAD_Y + row * CHILD_ROW_SPACING + CHILD_ROW_SPACING / 2;
@@ -692,6 +751,13 @@ export function layoutBpmnDiagram(
         if (ev.type === "start-event") side = "left";
         else if (ev.type === "end-event") side = "right";
         else side = "top"; // intermediate events default to top
+      }
+      // R50: when the host is an outer expanded sub containing embedded
+      // event subs, force edge-mounted Start/End events to the TOP edge
+      // regardless of what the plan declared.
+      if (outerSpsWithEventSubs.has(hostId)
+          && (ev.type === "start-event" || ev.type === "end-event")) {
+        side = "top";
       }
       bySide[side].push(ev);
     }
@@ -1025,14 +1091,26 @@ export function layoutBpmnDiagram(
   const TASK_LIKE_TYPES = new Set(["task", "subprocess", "subprocess-expanded"]);
   const existingConnKeys = new Set(aiConnections.map(c => `${c.sourceId}->${c.targetId}`));
   const autoConns: AiConnection[] = [];
+  // Local helper — needed by both auto-connect (to exclude event subs from
+  // candidates) and the filter below. Must look at el.properties, which is
+  // already populated for every placed element.
+  const isEventSubElement = (id: string): boolean => {
+    const el = elements.find(e => e.id === id);
+    return el?.type === "subprocess-expanded" &&
+      (el.properties.subprocessType as string | undefined) === "event";
+  };
   for (const el of elements) {
     if (!el.boundaryHostId) continue;
     if (el.type !== "start-event" && el.type !== "end-event") continue;
     const host = elements.find(h => h.id === el.boundaryHostId);
     if (!host || host.type !== "subprocess-expanded") continue;
-    // Find children of the host that are task-like
+    // Find children of the host that are task-like, EXCLUDING event subs
+    // (R48: connectors to/from event subs are forbidden, so the auto-
+    // connect heuristic must not pick one as its nearest candidate).
     const candidates = elements.filter(c =>
-      c.parentId === host.id && TASK_LIKE_TYPES.has(c.type)
+      c.parentId === host.id &&
+      TASK_LIKE_TYPES.has(c.type) &&
+      !isEventSubElement(c.id)
     );
     if (candidates.length === 0) continue;
     // Pick the nearest by centre-to-centre distance
@@ -1054,15 +1132,11 @@ export function layoutBpmnDiagram(
   // R31/R48: Drop ANY connector (sequence OR message) that touches an Event
   // Expanded Subprocess. Event subs are triggered by events, not by any kind
   // of flow — the rule is broader than R31's original sequence-only scope.
-  const isEventSub = (id: string): boolean => {
-    const el = elements.find(e => e.id === id);
-    return el?.type === "subprocess-expanded" &&
-      (el.properties.subprocessType as string | undefined) === "event";
-  };
-  const filteredAi = aiConnections.filter(c =>
-    !(isEventSub(c.sourceId) || isEventSub(c.targetId))
+  // Apply the filter AFTER merging autoConns so auto-generated connectors
+  // can't bypass it.
+  const finalConnections = [...aiConnections, ...autoConns].filter(c =>
+    !(isEventSubElement(c.sourceId) || isEventSubElement(c.targetId))
   );
-  const finalConnections = [...filteredAi, ...autoConns];
 
   for (const c of finalConnections) {
     const src = elMap.get(c.sourceId);

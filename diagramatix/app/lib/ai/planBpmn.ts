@@ -58,14 +58,21 @@ ${rules ? `USER RULES AND PREFERENCES (follow these strictly):\n${rules}\n\n` : 
 - Tasks should have: taskType ("user", "service", "send", "receive", "manual", "none")
 - Gateways should have: gatewayType ("exclusive", "parallel", "inclusive")
 - Expanded subprocesses use type "subprocess-expanded". They CAN contain child elements: set their "parentSubprocess" property to the subprocess id instead of "lane"
-- If the prompt mentions an "Event Subprocess" or "Event Expanded Subprocess":
-  * Set properties.subprocessType = "event" on the subprocess-expanded element
+- EVENT SUBPROCESS DETECTION — an Event Expanded Subprocess is ANY subprocess that is TRIGGERED BY AN EVENT rather than by sequence flow. Recognise these triggers in the prompt (match case-insensitively and treat as event subs even when the user's label does NOT contain the words "event" or "subprocess"):
+  * Any mention of "event subprocess" / "event expanded subprocess" / "interrupt" / "non-interrupting" in relation to a subprocess
+  * Time-based triggers: "on timer", "after X minutes/hours/days", "periodically", "scheduled", "timeout", "deadline", "overdue", "SLA breach"
+  * Signal / message triggers: "on receiving X", "when X arrives", "on notification", "on update", "on change", "on alert"
+  * Exception triggers: "on error", "on failure", "if cancelled", "on escalation", "on abort"
+  * Parallel-handler language: "meanwhile", "in parallel, handle X", "whilst also listening for X", "concurrently"
+  A subprocess that handles "customer updates", "account changes", "policy updates", "incoming notifications", etc. is AN EVENT SUB — it fires when those things happen, not in the main sequence.
+- If you determine a subprocess is an Event Expanded Subprocess:
+  * Set subprocessType = "event" on the subprocess-expanded element (at top level, NOT nested under properties). Setting this is MANDATORY — downstream code strips illegal connectors using this flag; without it the diagram is incorrect.
   * An Event Subprocess MUST be placed INSIDE a containing Normal Expanded Subprocess (parentSubprocess = normal subprocess id). Create a wrapping Normal Expanded Subprocess if the user only mentioned the event subprocess.
   * Inside the Event Subprocess, add TWO child elements (not boundary events):
-    - A non-interrupting start event (parentSubprocess = event subprocess id, properties: { interrupting: false })
+    - A non-interrupting start event (parentSubprocess = event subprocess id, properties: { interruptionType: "non-interrupting" })
     - An end event (parentSubprocess = event subprocess id)
   * Event subprocesses are small (about 4 task widths wide × 2 task heights tall) — the layout engine will size them automatically
-  * NEVER create sequence connectors TO or FROM an Event Expanded Subprocess — they are triggered by events, not sequence flow.
+  * NEVER create ANY connector (sequence OR message) TO or FROM an Event Expanded Subprocess — they are triggered by events, not by flow of any kind.
 - Every process MUST have a Start Event and at least one End Event at the main Process Pool level (outside any subprocess). These represent the overall process entry and exit. If the user doesn't mention them explicitly, create them anyway.
 - The process-level Start Event MUST be assigned to the TOPMOST lane of its pool (the first lane in the pool's lane list). Even if the start event is logically performed by a role in a different lane, place it in the top lane so the process entry point reads top-down. The layout engine will enforce this — but emitting it correctly avoids confusing the AI plan view.
 - CRITICAL: Always place EVERY element mentioned in the prompt, EVEN IF it is not connected to anything. Unconnected elements still appear on the canvas.

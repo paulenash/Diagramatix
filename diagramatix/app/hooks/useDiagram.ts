@@ -2502,54 +2502,45 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         // that children straddling the marker stay inside the container.
         const isExpandedSp = el.type === "subprocess-expanded";
 
-        // Horizontal shift (dx > 0: push elements to the right of marker)
+        // Horizontal shift.
+        //   dx > 0: push content right of marker further right; containers
+        //           bisected by marker grow their RIGHT boundary.
+        //   dx < 0: push content left of marker further left; containers
+        //           bisected by marker grow their LEFT boundary (x shrinks,
+        //           width increases by |dx|).
         if (dx !== 0) {
           if (isPool || isLane || isSublane || isExpandedSp) {
-            // Extend right boundary if the marker vertical line intersects it
             if (markerX > el.x && markerX < el.x + el.width) {
-              return { ...el, width: el.width + dx };
+              if (dx > 0) return { ...el, width: el.width + dx };
+              return { ...el, x: el.x + dx, width: el.width - dx };
             }
-            // If the entire container is to the right, shift it
-            if (el.x >= markerX) {
-              return { ...el, x: el.x + dx };
-            }
+            if (dx > 0 && el.x >= markerX) return { ...el, x: el.x + dx };
+            if (dx < 0 && el.x + el.width <= markerX) return { ...el, x: el.x + dx };
             return el;
           }
-          // Normal element: shift if centre is to the right of marker
-          if (cx > markerX) {
-            return { ...el, x: el.x + dx };
-          }
+          if (dx > 0 && cx > markerX) return { ...el, x: el.x + dx };
+          if (dx < 0 && cx < markerX) return { ...el, x: el.x + dx };
           return el;
         }
 
-        // Vertical shift (dy > 0: push elements below marker down)
+        // Vertical shift.
+        //   dy > 0: push content below marker further down; containers
+        //           bisected by marker grow their BOTTOM boundary.
+        //   dy < 0: push content above marker further up; containers
+        //           bisected by marker grow their TOP boundary (y shrinks,
+        //           height increases by |dy|).
         if (dy !== 0) {
-          if (isPool) {
-            // If marker horizontal line intersects this pool, extend its bottom
+          if (isPool || isLane || isSublane || isExpandedSp) {
             if (markerY > el.y && markerY < el.y + el.height) {
-              return { ...el, height: el.height + dy };
+              if (dy > 0) return { ...el, height: el.height + dy };
+              return { ...el, y: el.y + dy, height: el.height - dy };
             }
-            // If pool is entirely below marker, shift it down
-            if (el.y >= markerY) {
-              return { ...el, y: el.y + dy };
-            }
+            if (dy > 0 && el.y >= markerY) return { ...el, y: el.y + dy };
+            if (dy < 0 && el.y + el.height <= markerY) return { ...el, y: el.y + dy };
             return el;
           }
-          if (isLane || isSublane || isExpandedSp) {
-            // If marker intersects this lane / expanded subprocess, extend its bottom
-            if (markerY > el.y && markerY < el.y + el.height) {
-              return { ...el, height: el.height + dy };
-            }
-            // If it is entirely below the marker, shift it down
-            if (el.y >= markerY) {
-              return { ...el, y: el.y + dy };
-            }
-            return el;
-          }
-          // Normal element: shift if centre is below marker
-          if (cy > markerY) {
-            return { ...el, y: el.y + dy };
-          }
+          if (dy > 0 && cy > markerY) return { ...el, y: el.y + dy };
+          if (dy < 0 && cy < markerY) return { ...el, y: el.y + dy };
           return el;
         }
 

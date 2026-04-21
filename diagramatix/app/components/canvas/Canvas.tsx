@@ -3719,16 +3719,19 @@ export function Canvas({
               e.stopPropagation();
               e.preventDefault();
               if (e.shiftKey && onInsertSpace) {
-                // Shift+drag: insert space
+                // Shift+drag: insert space. Positive drag grows right/bottom
+                // (pushes content right/down); negative drag grows left/top
+                // (pulls content left/up), so pools can expand in any of the
+                // four cardinal directions.
                 let lastWorld = clientToWorld(e.clientX, e.clientY);
                 function onMove(ev: MouseEvent) {
                   const curWorld = clientToWorld(ev.clientX, ev.clientY);
                   const ddx = curWorld.x - lastWorld.x;
                   const ddy = curWorld.y - lastWorld.y;
                   if (Math.abs(ddx) > Math.abs(ddy)) {
-                    if (ddx > 0) onInsertSpace!(mx, my, ddx, 0);
+                    if (ddx !== 0) onInsertSpace!(mx, my, ddx, 0);
                   } else {
-                    if (ddy > 0) onInsertSpace!(mx, my, 0, ddy);
+                    if (ddy !== 0) onInsertSpace!(mx, my, 0, ddy);
                   }
                   lastWorld = curWorld;
                 }
