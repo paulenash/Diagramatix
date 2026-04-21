@@ -48,6 +48,41 @@ export function PlanPanel({ diagramType, onApplyDiagram, onClose }: Props) {
   // state only on explicit "Apply JSON" (or blur with valid JSON).
   const [jsonDraft, setJsonDraft] = useState("");
   const [jsonFocused, setJsonFocused] = useState(false);
+
+  // Resizable sections — Saved Prompts + Tabs. The Description textarea
+  // takes whatever's left (flex-1). Dragging the horizontal handles between
+  // sections re-sizes them. Tabs area starts COLLAPSED so the description
+  // gets maximum room; the user expands it with the chevron or by dragging
+  // the handle above it.
+  const [savedPromptsH, setSavedPromptsH] = useState(96);
+  const [tabsH, setTabsH] = useState(280);
+  const [tabsExpanded, setTabsExpanded] = useState(false);
+
+  function startResize(
+    setter: React.Dispatch<React.SetStateAction<number>>,
+    sign: 1 | -1,
+    min: number,
+    max: number,
+  ) {
+    return (e: React.MouseEvent) => {
+      e.preventDefault();
+      const startY = e.clientY;
+      let startH = 0;
+      setter(prev => { startH = prev; return prev; });
+      function onMove(ev: MouseEvent) {
+        const delta = (ev.clientY - startY) * sign;
+        setter(Math.max(min, Math.min(max, startH + delta)));
+      }
+      function onUp() {
+        document.body.style.cursor = "";
+        window.removeEventListener("mousemove", onMove);
+        window.removeEventListener("mouseup", onUp);
+      }
+      document.body.style.cursor = "row-resize";
+      window.addEventListener("mousemove", onMove);
+      window.addEventListener("mouseup", onUp);
+    };
+  }
   const [jsonParseErr, setJsonParseErr] = useState<string | null>(null);
   useEffect(() => {
     if (!jsonFocused) setJsonDraft(asJson);
@@ -224,7 +259,8 @@ export function PlanPanel({ diagramType, onApplyDiagram, onClose }: Props) {
         return;
       }
       onApplyDiagram(json.diagramData);
-      setStatus(`Applied: ${json.elementCount} elements, ${json.connectionCount} connections`);
+      const poolCount = plan.elements.filter(e => e.type === "pool").length;
+      setStatus(`Applied: ${poolCount} pool${poolCount === 1 ? "" : "s"}, ${json.elementCount} elements, ${json.connectionCount} connections`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Network error");
       setStatus(null);
@@ -242,17 +278,17 @@ export function PlanPanel({ diagramType, onApplyDiagram, onClose }: Props) {
         <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-sm" title="Close">&times;</button>
       </div>
 
-      <div className="flex-1 px-3 py-2 flex flex-col gap-2 overflow-hidden">
+      <div className="flex-1 px-3 py-2 flex flex-col overflow-hidden">
         {diagramType !== "bpmn" && (
-          <p className="text-[11px] text-orange-700 bg-orange-50 border border-orange-200 rounded px-2 py-1">
+          <p className="text-[11px] text-orange-700 bg-orange-50 border border-orange-200 rounded px-2 py-1 mb-2 shrink-0">
             2-phase mode is currently BPMN-only.
           </p>
         )}
 
         {savedPrompts.length > 0 && (
-          <div className="shrink-0">
+          <div className="shrink-0 mb-1" style={{ height: savedPromptsH }}>
             <p className="text-[10px] text-gray-400 font-medium uppercase mb-1">Saved Prompts</p>
-            <div className="space-y-0.5 max-h-28 overflow-y-auto border border-gray-100 rounded">
+            <div className="space-y-0.5 overflow-y-auto border border-gray-100 rounded" style={{ height: `calc(100% - 16px)` }}>
               {savedPrompts.map(sp => (
                 <div key={sp.id} className="flex items-center gap-1 group px-1">
                   {confirmDeleteId === sp.id ? (
@@ -283,18 +319,25 @@ export function PlanPanel({ diagramType, onApplyDiagram, onClose }: Props) {
           </div>
         )}
 
-        <div className="shrink-0">
-          <label className="text-[10px] text-gray-500 font-medium mb-1 block">Describe the process</label>
+        {savedPrompts.length > 0 && (
+          <div
+            onMouseDown={startResize(setSavedPromptsH, 1, 40, 400)}
+            className="shrink-0 h-1 cursor-row-resize hover:bg-blue-300 bg-gray-100 mb-1 rounded"
+            title="Drag to resize Saved Prompts area"
+          />
+        )}
+
+        <div className="flex-1 flex flex-col min-h-0 mb-2">
+          <label className="text-[10px] text-gray-500 font-medium mb-1 block shrink-0">Describe the process</label>
           <textarea
             value={prompt}
             onChange={e => setPrompt(e.target.value)}
-            rows={3}
             placeholder="A customer places an order. The warehouse checks stock. If in stock, it ships the order. Otherwise it notifies the customer."
-            className="w-full px-2 py-1.5 text-[11px] border border-gray-300 rounded resize-y focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="flex-1 w-full px-2 py-1.5 text-[11px] border border-gray-300 rounded resize-none focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
         </div>
 
-        <div className="shrink-0 flex items-center gap-1.5">
+        <div className="shrink-0 flex items-center gap-1.5 mb-2">
           <button
             onClick={callPlan}
             disabled={!prompt.trim() || busy !== null}
@@ -328,7 +371,7 @@ export function PlanPanel({ diagramType, onApplyDiagram, onClose }: Props) {
         </div>
 
         {showSave && (
-          <div className="shrink-0 flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded px-2 py-1.5">
+          <div className="shrink-0 flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded px-2 py-1.5 mb-2">
             <input
               autoFocus
               value={saveName}
@@ -348,9 +391,9 @@ export function PlanPanel({ diagramType, onApplyDiagram, onClose }: Props) {
           </div>
         )}
 
-        {status && <p className="text-[10px] text-gray-500 shrink-0">{status}</p>}
+        {status && <p className="text-[10px] text-gray-500 shrink-0 mb-1">{status}</p>}
         {error && (
-          <div className="text-[11px] text-red-700 bg-red-50 border border-red-200 rounded px-2 py-1.5 shrink-0">
+          <div className="text-[11px] text-red-700 bg-red-50 border border-red-200 rounded px-2 py-1.5 shrink-0 mb-2">
             <p className="font-medium">{error}</p>
             {issues && issues.length > 0 && (
               <ul className="mt-1 list-disc list-inside space-y-0.5">
@@ -361,29 +404,50 @@ export function PlanPanel({ diagramType, onApplyDiagram, onClose }: Props) {
           </div>
         )}
 
-        {/* Tabs */}
-        <div className="shrink-0 flex border-b border-gray-200 text-[10px] -mb-px">
-          {([
-            { id: "pools",      label: "Pools / Lanes" },
-            { id: "elements",   label: "Elements" },
-            { id: "connectors", label: "Connectors" },
-            { id: "json",       label: "Raw JSON" },
-          ] as const).map(t => (
-            <button
-              key={t.id}
-              onClick={() => setActiveTab(t.id)}
-              className={`px-2 py-1 border-b-2 ${
-                activeTab === t.id
-                  ? "border-blue-500 text-blue-700 font-medium"
-                  : "border-transparent text-gray-500 hover:text-gray-700"
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
+        {/* Divider between Description and Tabs — only active while Tabs are expanded */}
+        {tabsExpanded && (
+          <div
+            onMouseDown={startResize(setTabsH, -1, 80, 800)}
+            className="shrink-0 h-1 cursor-row-resize hover:bg-blue-300 bg-gray-100 mb-1 rounded"
+            title="Drag to resize Pools / Lanes table"
+          />
+        )}
+
+        {/* Tabs header (always visible) with expand/collapse chevron */}
+        <div className="shrink-0 flex items-end border-b border-gray-200 text-[10px] -mb-px">
+          <div className="flex flex-1">
+            {([
+              { id: "pools",      label: "Pools / Lanes" },
+              { id: "elements",   label: "Elements" },
+              { id: "connectors", label: "Connectors" },
+              { id: "json",       label: "Raw JSON" },
+            ] as const).map(t => (
+              <button
+                key={t.id}
+                onClick={() => { setActiveTab(t.id); setTabsExpanded(true); }}
+                className={`px-2 py-1 border-b-2 ${
+                  activeTab === t.id && tabsExpanded
+                    ? "border-blue-500 text-blue-700 font-medium"
+                    : "border-transparent text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={() => setTabsExpanded(v => !v)}
+            className="px-2 py-1 text-gray-500 hover:text-gray-700"
+            title={tabsExpanded ? "Collapse table" : "Expand table"}
+          >
+            {tabsExpanded ? "▲" : "▼"}
+          </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto text-[11px]">
+        <div
+          className="overflow-y-auto text-[11px]"
+          style={{ height: tabsExpanded ? tabsH : 0 }}
+        >
           {activeTab === "pools" && (
             <PoolsLanesTree elements={plan.elements} onRename={(id, label) => updateElement(id, { label })} onDelete={deleteElement} onMove={moveElementRelativeTo} />
           )}
