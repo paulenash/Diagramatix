@@ -3544,6 +3544,16 @@ export function useDiagram(initialData: DiagramData) {
     dispatch({ type: "SET_DATA", payload: newData });
   }, []);
 
+  // Clear all elements and connectors but KEEP viewport, title, and font
+  // settings. Pushes history first so the user can Ctrl+Z to recover.
+  const clearDiagram = useCallback(() => {
+    pushHistory(snapshotData());
+    dispatch({
+      type: "SET_DATA",
+      payload: { ...dataRef.current, elements: [], connectors: [] },
+    });
+  }, []);
+
   const setViewport = useCallback((x: number, y: number, zoom: number) => {
     dispatch({ type: "SET_VIEWPORT", payload: { x, y, zoom } });
   }, []);
@@ -3695,6 +3705,7 @@ export function useDiagram(initialData: DiagramData) {
     applyTemplate,
     alignElements,
     setData,
+    clearDiagram,
     setViewport,
     correctAllConnectors,
     insertSpace,

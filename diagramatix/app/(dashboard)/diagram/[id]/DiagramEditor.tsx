@@ -444,6 +444,7 @@ export function DiagramEditor({
     applyTemplate,
     alignElements,
     setData,
+    clearDiagram,
     correctAllConnectors,
     insertSpace,
     addLane,
@@ -1555,6 +1556,24 @@ export function DiagramEditor({
           )}
         </div>
           </>
+        )}
+
+        {!readOnly && (
+          <button
+            onClick={() => {
+              const elCount = data.elements.length;
+              const conCount = data.connectors.length;
+              if (elCount === 0 && conCount === 0) return;
+              const ok = window.confirm(
+                `Clear diagram? This will remove ${elCount} element${elCount === 1 ? "" : "s"} and ${conCount} connector${conCount === 1 ? "" : "s"}. You can Ctrl+Z to undo.`
+              );
+              if (ok) clearDiagram();
+            }}
+            className="px-2 py-0.5 text-[11px] text-gray-700 border border-gray-300 rounded hover:bg-red-50 hover:border-red-300 hover:text-red-700"
+            title="Clear all elements and connectors"
+          >
+            Clear Diagram
+          </button>
         )}
 
         <a
