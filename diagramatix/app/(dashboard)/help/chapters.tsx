@@ -2543,6 +2543,14 @@ export const CHAPTERS: HelpChapter[] = [
             </p>
             <ul className="list-disc list-inside space-y-2 mt-2">
               <li>
+                <strong>R47 — Edge-mounted intermediate event exit point.</strong>{" "}
+                A connector from a boundary-mounted intermediate event
+                exits from the event&rsquo;s connection point{" "}
+                <em>furthest from the host edge the event is mounted upon</em>.
+                For example, an event mounted on the host&rsquo;s top
+                edge exits from the event&rsquo;s top connection point.
+              </li>
+              <li>
                 <strong>R42 — Decision-gateway outgoing label placement.</strong>{" "}
                 Labels on outgoing sequence connectors from a decision
                 gateway are anchored to the gateway&rsquo;s source
@@ -2582,6 +2590,17 @@ export const CHAPTERS: HelpChapter[] = [
                 the lane centre. Pairing is inferred from topology — the
                 merge reached by all of the decision&rsquo;s branches with
                 a matching in-degree.
+              </li>
+              <li>
+                <strong>R50 — Boundary Start/End events on an outer sub
+                with embedded event subs.</strong>{" "}
+                Boundary Start events are placed on the LEFT edge;
+                boundary End events on the RIGHT edge. Their Y is
+                aligned with the centre of the task or subprocess they
+                are connected to (explicit connector or R27/R28 auto-
+                connect target), not the middle of the host edge.
+                Internal (non-boundary) Start/End direct children of the
+                outer subprocess are placed in the top row of the grid.
               </li>
             </ul>
           </>

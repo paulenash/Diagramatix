@@ -24,6 +24,7 @@ import { Palette } from "@/app/components/canvas/Palette";
 import { PropertiesPanel } from "@/app/components/canvas/PropertiesPanel";
 import { captureTemplate, instantiateTemplate } from "@/app/lib/diagram/templates";
 import { ImpersonationBanner } from "@/app/components/ImpersonationBanner";
+import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 import { AiPanel } from "./AiPanel";
 import { PlanPanel } from "./PlanPanel";
 import { HistoryPanel } from "./HistoryPanel";
@@ -553,6 +554,7 @@ export function DiagramEditor({
   const [pendingPdfScale, setPendingPdfScale] = useState(100);
   const importJsonInputRef = useRef<HTMLInputElement>(null);
   const importXmlInputRef = useRef<HTMLInputElement>(null);
+  const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
 
   useEffect(() => {
     if (!projectId) return;
@@ -1561,13 +1563,8 @@ export function DiagramEditor({
         {!readOnly && (
           <button
             onClick={() => {
-              const elCount = data.elements.length;
-              const conCount = data.connectors.length;
-              if (elCount === 0 && conCount === 0) return;
-              const ok = window.confirm(
-                `Clear diagram? This will remove ${elCount} element${elCount === 1 ? "" : "s"} and ${conCount} connector${conCount === 1 ? "" : "s"}. You can Ctrl+Z to undo.`
-              );
-              if (ok) clearDiagram();
+              if (data.elements.length === 0 && data.connectors.length === 0) return;
+              setClearConfirmOpen(true);
             }}
             className="px-2 py-0.5 text-[11px] text-gray-700 border border-gray-300 rounded hover:bg-red-50 hover:border-red-300 hover:text-red-700"
             title="Clear all elements and connectors"
@@ -1779,6 +1776,20 @@ export function DiagramEditor({
           title={templateEditState ? "Update Template" : templateMode === "capturing-builtin" ? "Save Built-In Template" : "Save User Template"}
         />
       )}
+
+      {clearConfirmOpen && (() => {
+        const elCount = data.elements.length;
+        const conCount = data.connectors.length;
+        return (
+          <ConfirmDialog
+            title="Clear Diagram"
+            message={`This will remove ${elCount} element${elCount === 1 ? "" : "s"} and ${conCount} connector${conCount === 1 ? "" : "s"}. You can Ctrl+Z to undo.`}
+            confirmLabel="Clear"
+            onConfirm={() => { clearDiagram(); setClearConfirmOpen(false); }}
+            onCancel={() => setClearConfirmOpen(false)}
+          />
+        );
+      })()}
 
       {showSaveAs && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">

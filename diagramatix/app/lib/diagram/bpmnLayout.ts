@@ -752,12 +752,14 @@ export function layoutBpmnDiagram(
         else if (ev.type === "end-event") side = "right";
         else side = "top"; // intermediate events default to top
       }
-      // R50: when the host is an outer expanded sub containing embedded
-      // event subs, force edge-mounted Start/End events to the TOP edge
-      // regardless of what the plan declared.
-      if (outerSpsWithEventSubs.has(hostId)
-          && (ev.type === "start-event" || ev.type === "end-event")) {
-        side = "top";
+      // R50 (boundary): when the host is an outer expanded sub containing
+      // embedded event subs, force boundary Start events to the LEFT edge
+      // and boundary End events to the RIGHT edge (regardless of what
+      // the plan declared). Y will be re-aligned to the connected task's
+      // centre in a later post-pass.
+      if (outerSpsWithEventSubs.has(hostId)) {
+        if (ev.type === "start-event") side = "left";
+        else if (ev.type === "end-event") side = "right";
       }
       bySide[side].push(ev);
     }
@@ -786,7 +788,8 @@ export function layoutBpmnDiagram(
           x: ex, y: ey, width: W, height: H,
           label: ev.label,
           // R47: store boundarySide on the placed element so the wiring
-          // pass can anchor outgoing connectors to the outer-facing side.
+          // pass can exit outgoing connectors from the connection point
+          // furthest from the host edge the event is mounted on.
           properties: { ...buildProps(ev), boundarySide: side },
           boundaryHostId: host.id,
           ...(ev.taskType ? { taskType: ev.taskType as DiagramElement["taskType"] } : {}),
@@ -1129,6 +1132,33 @@ export function layoutBpmnDiagram(
       if (!existingConnKeys.has(key)) { autoConns.push({ sourceId: nearest.id, targetId: el.id, type: "sequence" }); existingConnKeys.add(key); }
     }
   }
+
+  // R50 (boundary Y-alignment): for boundary Start/End events on outer
+  // subs that contain embedded event subs, re-set the event's Y to the
+  // centre Y of the task/subprocess it connects to (explicit plan
+  // connector or R27/R28 auto-connect). Runs AFTER auto-connect so the
+  // connection target is known.
+  const allConnsForAlign = [...aiConnections, ...autoConns];
+  for (const el of elements) {
+    if (!el.boundaryHostId) continue;
+    if (el.type !== "start-event" && el.type !== "end-event") continue;
+    if (!outerSpsWithEventSubs.has(el.boundaryHostId)) continue;
+    // Find the connected task-like element (Start: outgoing target;
+    // End: incoming source). Skip event subs — they never connect.
+    let partnerId: string | undefined;
+    if (el.type === "start-event") {
+      const out = allConnsForAlign.find(c => c.sourceId === el.id);
+      partnerId = out?.targetId;
+    } else {
+      const inc = allConnsForAlign.find(c => c.targetId === el.id);
+      partnerId = inc?.sourceId;
+    }
+    if (!partnerId) continue;
+    const partner = elements.find(e => e.id === partnerId);
+    if (!partner || isEventSubElement(partner.id)) continue;
+    const partnerCY = partner.y + partner.height / 2;
+    el.y = partnerCY - el.height / 2;
+  }
   // R31/R48: Drop ANY connector (sequence OR message) that touches an Event
   // Expanded Subprocess. Event subs are triggered by events, not by any kind
   // of flow — the rule is broader than R31's original sequence-only scope.
@@ -1231,8 +1261,11 @@ export function layoutBpmnDiagram(
     }
 
     // R47: connectors from an edge-mounted intermediate event must exit
-    // from the event's outer-facing side (the side the event sits on the
-    // host boundary). Override whatever the generic rules chose.
+    // from the event's connection point FURTHEST FROM the host edge the
+    // event is mounted upon. That point sits on the event's own side that
+    // matches boundarySide (e.g. event mounted on host's top edge exits
+    // from the event's top point). Override whatever the generic rules
+    // chose.
     if (src.boundaryHostId && src.type === "intermediate-event") {
       const stored = (src.properties?.boundarySide as string | undefined);
       if (stored === "top" || stored === "bottom" || stored === "left" || stored === "right") {

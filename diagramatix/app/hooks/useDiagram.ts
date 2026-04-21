@@ -29,8 +29,8 @@ const BPMN_EVENT_TYPES = new Set(["start-event", "intermediate-event", "end-even
 const BOUNDARY_HOST_TYPES = new Set<SymbolType>(["task", "subprocess", "subprocess-expanded"]);
 const BOUNDARY_EVENT_TYPES = new Set<SymbolType>(["start-event", "intermediate-event", "end-event"]);
 const BOUNDARY_SNAP_THRESHOLD = 25; // world px
-const BOUNDARY_W = 27;              // 75% of standard 36
-const BOUNDARY_H = 27;
+const BOUNDARY_W = 36;              // same size as a standard event
+const BOUNDARY_H = 36;
 
 function nearestPointOnRectBoundary(
   rect: { x: number; y: number; width: number; height: number },
