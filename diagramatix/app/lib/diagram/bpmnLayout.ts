@@ -1126,6 +1126,93 @@ export function layoutBpmnDiagram(
     }
   }
 
+  // R57: pools must enclose every non-annotation, non-group element that
+  // belongs to them. R44/R55 can push a deeply-nested decision branch
+  // above or below the pool's current bounds (e.g. inner "yes" branch of
+  // an inner decision whose predecessor is itself the outer "yes" branch
+  // — lands two stack-rows above the pool centre). Grow the pool in
+  // whichever direction(s) the overflow occurs; annotations and groups
+  // are excluded from the bounds check since they float freely.
+  {
+    const FLOAT_TYPES = new Set(["text-annotation", "group"]);
+    const PAD = 20;
+    const pools = elements.filter(e => e.type === "pool");
+    for (const pool of pools) {
+      // Collect all descendants (via parentId chain + boundary events)
+      // EXCEPT annotations and groups.
+      const descendants: DiagramElement[] = [];
+      const visited = new Set<string>();
+      function collect(containerId: string) {
+        for (const e of elements) {
+          if (e.id === containerId || visited.has(e.id)) continue;
+          const belongs =
+            e.parentId === containerId ||
+            (e.boundaryHostId && visited.has(e.boundaryHostId));
+          if (!belongs) continue;
+          visited.add(e.id);
+          if (!FLOAT_TYPES.has(e.type)) descendants.push(e);
+          collect(e.id);
+        }
+      }
+      collect(pool.id);
+      if (descendants.length === 0) continue;
+
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (const d of descendants) {
+        minX = Math.min(minX, d.x);
+        minY = Math.min(minY, d.y);
+        maxX = Math.max(maxX, d.x + d.width);
+        maxY = Math.max(maxY, d.y + d.height);
+      }
+
+      const neededLeft = minX - PAD;
+      const neededTop = minY - PAD;
+      const neededRight = maxX + PAD;
+      const neededBottom = maxY + PAD;
+
+      // Grow LEFT
+      if (neededLeft < pool.x) {
+        const grow = pool.x - neededLeft;
+        pool.x -= grow;
+        pool.width += grow;
+      }
+      // Grow RIGHT
+      if (neededRight > pool.x + pool.width) {
+        pool.width = neededRight - pool.x;
+      }
+      // Grow TOP (and extend first lane upward so it covers the new top)
+      if (neededTop < pool.y) {
+        const grow = pool.y - neededTop;
+        pool.y -= grow;
+        pool.height += grow;
+        const poolLanes = elements.filter(e => e.type === "lane" && e.parentId === pool.id)
+          .sort((a, b) => a.y - b.y);
+        if (poolLanes.length > 0) {
+          poolLanes[0].y -= grow;
+          poolLanes[0].height += grow;
+        }
+      }
+      // Grow BOTTOM (and extend last lane downward)
+      if (neededBottom > pool.y + pool.height) {
+        const grow = neededBottom - (pool.y + pool.height);
+        pool.height += grow;
+        const poolLanes = elements.filter(e => e.type === "lane" && e.parentId === pool.id)
+          .sort((a, b) => a.y - b.y);
+        if (poolLanes.length > 0) {
+          poolLanes[poolLanes.length - 1].height += grow;
+        }
+      }
+      // Match lane widths to pool's new width
+      const poolLanes = elements.filter(e => e.type === "lane" && e.parentId === pool.id);
+      for (const lane of poolLanes) {
+        lane.x = pool.x + POOL_HEADER_W;
+        lane.width = pool.width - POOL_HEADER_W;
+      }
+    }
+    // R52 again — pool growth may have introduced overlaps between pools.
+    restackPoolsR52();
+  }
+
   // Build the ordered lists for the wiring pass (R35/R36).
   //   Decision outgoings: sorted by target element vertical position — topmost
   //                       target exits at "top", bottommost at "bottom", any
@@ -1548,9 +1635,7 @@ export function layoutBpmnDiagram(
 
   // R56: "AI Generated" annotation attached to the process-level Start Event.
   // Injected post-layout so it doesn't go through the column/lane placement.
-  // R57 compliance — the annotation must stay INSIDE its host pool. Prefer
-  // placing it above the Start Event within the pool; if there isn't room,
-  // fall back to placing it to the right of the Start Event (still inside).
+  // Annotations can float anywhere — no need to stay inside the pool.
   const finalConnectors: Connector[] = [...computedConnectors];
   if (opts?.promptLabel) {
     const startEl = elements.find(e =>
@@ -1559,37 +1644,20 @@ export function layoutBpmnDiagram(
     if (startEl) {
       const annotId = "_ai_gen_annotation";
       const annotW = 160, annotH = 44;
-      // Walk ancestors to find the enclosing pool — needed for bounds-clamp.
-      let pool: DiagramElement | undefined;
+      const startCx = startEl.x + startEl.width / 2;
+      // Walk ancestors to find the top of the enclosing pool — the
+      // annotation sits above it.
+      let topOfContainer = startEl.y;
       let cur = startEl as DiagramElement | undefined;
       while (cur?.parentId) {
         const parent = elements.find(p => p.id === cur!.parentId);
         if (!parent) break;
-        if (parent.type === "pool") { pool = parent; break; }
+        topOfContainer = parent.y;
+        if (parent.type === "pool") break;
         cur = parent;
       }
-      const startCx = startEl.x + startEl.width / 2;
-      const poolTop = pool ? pool.y : startEl.y;
-      const poolLeft = pool ? pool.x : startEl.x;
-      const poolRight = pool ? pool.x + pool.width : startEl.x + startEl.width;
-      const roomAbove = startEl.y - (poolTop + 4);
-      let annotX: number, annotY: number;
-      let srcSide: "bottom" | "left" = "bottom";
-      let tgtSide: "top" | "right" = "top";
-      if (roomAbove >= annotH + 12) {
-        // Place above the Start Event, centred horizontally on it
-        annotX = startCx - annotW / 2;
-        annotY = startEl.y - annotH - 12;
-      } else {
-        // Not enough headroom — place to the right, vertically centred on
-        // the Start Event
-        annotX = startEl.x + startEl.width + 24;
-        annotY = startEl.y + startEl.height / 2 - annotH / 2;
-        srcSide = "left";
-        tgtSide = "right";
-      }
-      // Clamp horizontally so the annotation stays within the pool
-      annotX = Math.max(poolLeft + 4, Math.min(poolRight - annotW - 4, annotX));
+      const annotX = startCx - annotW / 2;
+      const annotY = topOfContainer - annotH - 20;
       elements.push({
         id: annotId,
         type: "text-annotation",
@@ -1600,25 +1668,21 @@ export function layoutBpmnDiagram(
         label: `AI Generated\n${opts.promptLabel}`,
         properties: {},
       } as DiagramElement);
-      // Short direct association from the annotation to the start event.
-      const srcPt = srcSide === "bottom"
-        ? { x: annotX + annotW / 2, y: annotY + annotH }
-        : { x: annotX, y: annotY + annotH / 2 };
-      const tgtPt = tgtSide === "top"
-        ? { x: startCx, y: startEl.y }
-        : { x: startEl.x + startEl.width, y: startEl.y + startEl.height / 2 };
       finalConnectors.push({
         id: `conn-${annotId}-${startEl.id}`,
         sourceId: annotId,
         targetId: startEl.id,
-        sourceSide: srcSide,
-        targetSide: tgtSide,
+        sourceSide: "bottom",
+        targetSide: "top",
         type: "associationBPMN",
         directionType: "non-directed",
         routingType: "direct",
         sourceInvisibleLeader: false,
         targetInvisibleLeader: false,
-        waypoints: [srcPt, tgtPt],
+        waypoints: [
+          { x: annotX + annotW / 2, y: annotY + annotH },
+          { x: startCx,             y: startEl.y },
+        ],
         label: "",
       } as Connector);
     }
