@@ -446,6 +446,7 @@ export function DiagramEditor({
     alignElements,
     setData,
     clearDiagram,
+    clearDiagramExcept,
     correctAllConnectors,
     insertSpace,
     addLane,
@@ -554,7 +555,9 @@ export function DiagramEditor({
   const [pendingPdfScale, setPendingPdfScale] = useState(100);
   const importJsonInputRef = useRef<HTMLInputElement>(null);
   const importXmlInputRef = useRef<HTMLInputElement>(null);
-  const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
+  const [clearConfirmOpen, setClearConfirmOpen] = useState<null | "all" | "unselected">(null);
+  const [clearMenuOpen, setClearMenuOpen] = useState(false);
+  const clearMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!projectId) return;
@@ -647,6 +650,18 @@ export function DiagramEditor({
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, [fileMenuOpen, showPdfScalePopover]);
+
+  // Close Clear menu on outside click
+  useEffect(() => {
+    if (!clearMenuOpen) return;
+    function handleClick(e: MouseEvent) {
+      if (clearMenuRef.current && !clearMenuRef.current.contains(e.target as Node)) {
+        setClearMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [clearMenuOpen]);
 
   const effectiveColorConfig: SymbolColorConfig = displayMode === "hand-drawn"
     ? BW_SYMBOL_COLORS
@@ -1561,16 +1576,39 @@ export function DiagramEditor({
         )}
 
         {!readOnly && (
-          <button
-            onClick={() => {
-              if (data.elements.length === 0 && data.connectors.length === 0) return;
-              setClearConfirmOpen(true);
-            }}
-            className="px-2 py-0.5 text-[11px] text-gray-700 border border-gray-300 rounded hover:bg-red-50 hover:border-red-300 hover:text-red-700"
-            title="Clear all elements and connectors"
-          >
-            Clear Diagram
-          </button>
+          <div className="relative" ref={clearMenuRef}>
+            <button
+              onClick={() => {
+                if (data.elements.length === 0 && data.connectors.length === 0) return;
+                setClearMenuOpen(prev => !prev);
+              }}
+              className="px-2 py-0.5 text-[11px] text-gray-700 border border-gray-300 rounded hover:bg-red-50 hover:border-red-300 hover:text-red-700"
+              title="Clear diagram options"
+            >
+              Clear Diagram ▾
+            </button>
+            {clearMenuOpen && (
+              <div className="absolute right-0 top-full mt-1 w-56 bg-white border border-gray-200 rounded shadow-lg z-50">
+                <button
+                  onClick={() => { setClearMenuOpen(false); setClearConfirmOpen("all"); }}
+                  className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                >
+                  Clear Diagram
+                </button>
+                <button
+                  onClick={() => { setClearMenuOpen(false); setClearConfirmOpen("unselected"); }}
+                  disabled={selectedElementIds.size === 0}
+                  className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                  title={selectedElementIds.size === 0 ? "Select one or more elements first" : "Keep the selection (and connectors between selected elements); clear everything else"}
+                >
+                  Clear All but Selected
+                  {selectedElementIds.size > 0 && (
+                    <span className="text-gray-400 ml-1">({selectedElementIds.size})</span>
+                  )}
+                </button>
+              </div>
+            )}
+          </div>
         )}
 
         <a
@@ -1777,7 +1815,7 @@ export function DiagramEditor({
         />
       )}
 
-      {clearConfirmOpen && (() => {
+      {clearConfirmOpen === "all" && (() => {
         const elCount = data.elements.length;
         const conCount = data.connectors.length;
         return (
@@ -1785,8 +1823,43 @@ export function DiagramEditor({
             title="Clear Diagram"
             message={`This will remove ${elCount} element${elCount === 1 ? "" : "s"} and ${conCount} connector${conCount === 1 ? "" : "s"}. You can Ctrl+Z to undo.`}
             confirmLabel="Clear"
-            onConfirm={() => { clearDiagram(); setClearConfirmOpen(false); }}
-            onCancel={() => setClearConfirmOpen(false)}
+            onConfirm={() => { clearDiagram(); setClearConfirmOpen(null); }}
+            onCancel={() => setClearConfirmOpen(null)}
+          />
+        );
+      })()}
+
+      {clearConfirmOpen === "unselected" && (() => {
+        // Expand the selection the same way the reducer does so the
+        // confirmation counts match what will actually be kept.
+        const byId = new Map(data.elements.map(e => [e.id, e]));
+        const keep = new Set<string>(selectedElementIds);
+        for (const id of selectedElementIds) {
+          let cur = byId.get(id);
+          while (cur?.parentId) {
+            if (keep.has(cur.parentId)) break;
+            keep.add(cur.parentId);
+            cur = byId.get(cur.parentId);
+          }
+        }
+        for (const id of selectedElementIds) {
+          const el = byId.get(id);
+          if (el?.boundaryHostId) keep.add(el.boundaryHostId);
+        }
+        for (const el of data.elements) {
+          if (el.boundaryHostId && keep.has(el.boundaryHostId)) keep.add(el.id);
+        }
+        const removeEl = data.elements.length - keep.size;
+        const removeConn = data.connectors.filter(c =>
+          !(keep.has(c.sourceId) && keep.has(c.targetId))
+        ).length;
+        return (
+          <ConfirmDialog
+            title="Clear All but Selected"
+            message={`This will keep ${keep.size} element${keep.size === 1 ? "" : "s"} (selection plus their pools/lanes/hosts) and the connectors between them, and remove ${removeEl} other element${removeEl === 1 ? "" : "s"} plus ${removeConn} connector${removeConn === 1 ? "" : "s"}. You can Ctrl+Z to undo.`}
+            confirmLabel="Clear others"
+            onConfirm={() => { clearDiagramExcept(selectedElementIds); setClearConfirmOpen(null); }}
+            onCancel={() => setClearConfirmOpen(null)}
           />
         );
       })()}

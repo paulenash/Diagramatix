@@ -3612,6 +3612,46 @@ export function useDiagram(initialData: DiagramData) {
     dispatch({ type: "SET_DATA", payload: newData });
   }, []);
 
+  // Clear every element and connector EXCEPT those the user has selected.
+  // Expands the selection to include ancestors (parentId chain) so a
+  // selected task's lane/pool survive and the hierarchy stays valid; also
+  // pulls in any boundary events attached to kept hosts AND the host of
+  // any selected boundary event. Connectors survive only when BOTH ends
+  // are in the kept set (mutual connectors).
+  const clearDiagramExcept = useCallback((selectedIds: Set<string>) => {
+    if (selectedIds.size === 0) return;
+    const all = dataRef.current.elements;
+    const byId = new Map(all.map(e => [e.id, e]));
+    const keep = new Set<string>(selectedIds);
+    // Expand: ancestors via parentId
+    for (const id of selectedIds) {
+      let cur = byId.get(id);
+      while (cur?.parentId) {
+        if (keep.has(cur.parentId)) break;
+        keep.add(cur.parentId);
+        cur = byId.get(cur.parentId);
+      }
+    }
+    // Expand: host of any selected boundary event
+    for (const id of selectedIds) {
+      const el = byId.get(id);
+      if (el?.boundaryHostId) keep.add(el.boundaryHostId);
+    }
+    // Expand: boundary events attached to any kept host
+    for (const el of all) {
+      if (el.boundaryHostId && keep.has(el.boundaryHostId)) keep.add(el.id);
+    }
+    const elements = all.filter(e => keep.has(e.id));
+    const connectors = dataRef.current.connectors.filter(c =>
+      keep.has(c.sourceId) && keep.has(c.targetId)
+    );
+    pushHistory(snapshotData());
+    dispatch({
+      type: "SET_DATA",
+      payload: { ...dataRef.current, elements, connectors },
+    });
+  }, []);
+
   // Clear all elements and connectors but KEEP viewport, title, and font
   // settings. Pushes history first so the user can Ctrl+Z to recover.
   const clearDiagram = useCallback(() => {
@@ -3774,6 +3814,7 @@ export function useDiagram(initialData: DiagramData) {
     alignElements,
     setData,
     clearDiagram,
+    clearDiagramExcept,
     setViewport,
     correctAllConnectors,
     insertSpace,
