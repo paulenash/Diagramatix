@@ -33,7 +33,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const plan = (body as { plan?: unknown } | null)?.plan;
+  const plan = (body as { plan?: unknown; promptLabel?: unknown } | null)?.plan;
+  const promptLabelRaw = (body as { promptLabel?: unknown } | null)?.promptLabel;
+  const promptLabel = typeof promptLabelRaw === "string" && promptLabelRaw.trim().length > 0
+    ? promptLabelRaw.trim().slice(0, 100)
+    : undefined;
   if (plan == null) {
     return NextResponse.json({ error: "Missing 'plan' in request body" }, { status: 400 });
   }
@@ -58,7 +62,8 @@ export async function POST(req: Request) {
   const t0 = Date.now();
 
   try {
-    const diagramData = layoutBpmnDiagram(normalised.elements, normalised.connections);
+    const diagramData = layoutBpmnDiagram(normalised.elements, normalised.connections,
+      promptLabel ? { promptLabel } : undefined);
     trace(`[apply-layout] ok in ${Date.now() - t0}ms: ${diagramData.elements.length} rendered elements, ${diagramData.connectors.length} connectors`);
     return NextResponse.json({
       diagramData,

@@ -241,10 +241,18 @@ export function PlanPanel({ diagramType, onApplyDiagram, onClose }: Props) {
     setIssues(null);
     setStatus("Applying layout…");
     try {
+      // R56: tag the AI-generated diagram with an annotation on the Start
+      // Event. Label uses the saved prompt name when loaded, falling back
+      // to the first 100 chars of the prompt text.
+      const savedName = editingPromptId
+        ? savedPrompts.find(sp => sp.id === editingPromptId)?.name
+        : undefined;
+      const promptLabel = (savedName?.trim().length ? savedName.trim() : prompt.trim().slice(0, 100))
+        || undefined;
       const res = await fetch("/api/ai/bpmn/apply-layout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan }),
+        body: JSON.stringify({ plan, promptLabel }),
       });
       const json = await res.json();
       if (!res.ok) {

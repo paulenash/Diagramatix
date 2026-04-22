@@ -63,6 +63,7 @@ function buildProps(ai: AiElement): Record<string, unknown> {
 export function layoutBpmnDiagram(
   aiElements: AiElement[],
   aiConnections: AiConnection[],
+  opts?: { promptLabel?: string },
 ): DiagramData {
   const elements: DiagramElement[] = [];
   const connectors: Connector[] = [];
@@ -416,27 +417,45 @@ export function layoutBpmnDiagram(
     // Create lanes (if any)
     let laneY = poolStartY;
     if (pLanes.length === 0) {
-      // No lanes: place elements directly in pool (assigned to pool, no lane)
+      // No lanes: place elements directly in pool (assigned to pool, no lane).
+      // R45 (also applied in the lane path): when multiple elements share a
+      // column (e.g. decision-gateway branch targets), stack them vertically
+      // so they don't overlap at the pool centre. n ≤ 2 uses the symmetric
+      // split; n ≥ 3 stacks asymmetrically (idx 0 above, idx 1 level, idx 2+
+      // stepping downward) to mirror the decision-exit placement.
       const poolEls = [
         ...(laneElements.get("__pool_" + pool.id) ?? []),
         ...flowElements.filter(e => e.pool === pool.id && !e.lane && !e.parentSubprocess && !e.boundaryHost),
       ];
-      // Dedupe in case both paths added the same
       const seen = new Set<string>();
       const uniquePoolEls = poolEls.filter(e => { if (seen.has(e.id)) return false; seen.add(e.id); return true; });
+      const elsByCol = new Map<number, AiElement[]>();
       for (const el of uniquePoolEls) {
         const col = colMap.get(el.id) ?? 0;
-        const def = getSymbolDefinition(el.type as DiagramElement["type"]);
-        const elX = START_X + POOL_HEADER_W + LANE_PAD_X + col * COL_SPACING;
-        const elY = poolStartY + totalLaneH / 2 - def.defaultHeight / 2;
-        elements.push({
-          id: el.id, type: el.type as DiagramElement["type"],
-          x: elX, y: elY, width: def.defaultWidth, height: def.defaultHeight,
-          label: el.label, properties: buildProps(el), parentId: pool.id,
-          ...(el.taskType ? { taskType: el.taskType as DiagramElement["taskType"] } : {}),
-          ...(el.gatewayType ? { gatewayType: el.gatewayType as DiagramElement["gatewayType"] } : {}),
-          ...(el.eventType ? { eventType: el.eventType as DiagramElement["eventType"] } : {}),
-        });
+        const list = elsByCol.get(col) ?? [];
+        list.push(el);
+        elsByCol.set(col, list);
+      }
+      for (const [col, list] of elsByCol) {
+        const n = list.length;
+        for (let i = 0; i < n; i++) {
+          const el = list[i];
+          const def = getSymbolDefinition(el.type as DiagramElement["type"]);
+          const elX = START_X + POOL_HEADER_W + LANE_PAD_X + col * COL_SPACING;
+          const stackSpacing = def.defaultHeight + 30;
+          const stackOffset = n <= 2
+            ? (i - (n - 1) / 2) * stackSpacing
+            : (i - 1) * stackSpacing;
+          const elY = poolStartY + totalLaneH / 2 - def.defaultHeight / 2 + stackOffset;
+          elements.push({
+            id: el.id, type: el.type as DiagramElement["type"],
+            x: elX, y: elY, width: def.defaultWidth, height: def.defaultHeight,
+            label: el.label, properties: buildProps(el), parentId: pool.id,
+            ...(el.taskType ? { taskType: el.taskType as DiagramElement["taskType"] } : {}),
+            ...(el.gatewayType ? { gatewayType: el.gatewayType as DiagramElement["gatewayType"] } : {}),
+            ...(el.eventType ? { eventType: el.eventType as DiagramElement["eventType"] } : {}),
+          });
+        }
       }
     } else {
       for (let i = 0; i < pLanes.length; i++) {
@@ -1080,6 +1099,30 @@ export function layoutBpmnDiagram(
         merge.y = predCentreY - merge.height / 2;
       }
     }
+
+    // R55: re-stack this decision's immediate outgoing branch targets
+    // around the decision's (possibly-moved) Y so nested branches don't
+    // remain centred on the pool/lane. Initial placement stacked them
+    // around the container centre; here we snap them to match the
+    // decision's actual Y. Uses the same formula as R45 (n ≤ 2 symmetric,
+    // n ≥ 3 asymmetric). Only moves same-container siblings; branches in
+    // different lanes/containers stay put.
+    const outConns = outgoing.get(dec.id) ?? [];
+    if (outConns.length >= 2) {
+      const directBranches = outConns
+        .map(c => elMap.get(c.targetId))
+        .filter((x): x is DiagramElement => !!x && x.parentId === dec.parentId);
+      const n = directBranches.length;
+      const decCentreY = dec.y + dec.height / 2;
+      for (let i = 0; i < n; i++) {
+        const br = directBranches[i];
+        const stackSpacing = br.height + 30;
+        const offset = n <= 2
+          ? (i - (n - 1) / 2) * stackSpacing
+          : (i - 1) * stackSpacing;
+        br.y = decCentreY + offset - br.height / 2;
+      }
+    }
   }
 
   // Build the ordered lists for the wiring pass (R35/R36).
@@ -1502,9 +1545,67 @@ export function layoutBpmnDiagram(
 
   phase("waypoints computed — done");
 
+  // R56: "AI Generated" annotation attached to the process-level Start Event.
+  // Injected post-layout so it doesn't go through the column/lane placement.
+  // The annotation floats above the pool's top edge, centred on the start
+  // event's column, with a short direct association connector down to the
+  // start event.
+  const finalConnectors: Connector[] = [...computedConnectors];
+  if (opts?.promptLabel) {
+    const startEl = elements.find(e =>
+      e.type === "start-event" && !e.boundaryHostId
+      && !aiElements.find(a => a.id === e.id)?.parentSubprocess);
+    if (startEl) {
+      const annotId = "_ai_gen_annotation";
+      const annotW = 160, annotH = 44;
+      const startCx = startEl.x + startEl.width / 2;
+      // Prefer placing the annotation 20px above the start event's containing
+      // pool (if any); fall back to above the start event itself.
+      let topOfContainer = startEl.y;
+      let cur = startEl as DiagramElement | undefined;
+      while (cur?.parentId) {
+        const parent = elements.find(p => p.id === cur!.parentId);
+        if (!parent) break;
+        topOfContainer = parent.y;
+        if (parent.type === "pool") break;
+        cur = parent;
+      }
+      const annotX = startCx - annotW / 2;
+      const annotY = topOfContainer - annotH - 20;
+      elements.push({
+        id: annotId,
+        type: "text-annotation",
+        x: annotX,
+        y: annotY,
+        width: annotW,
+        height: annotH,
+        label: `AI Generated\n${opts.promptLabel}`,
+        properties: {},
+      } as DiagramElement);
+      // Direct association connector from annotation bottom → start event top.
+      finalConnectors.push({
+        id: `conn-${annotId}-${startEl.id}`,
+        sourceId: annotId,
+        targetId: startEl.id,
+        sourceSide: "bottom",
+        targetSide: "top",
+        type: "associationBPMN",
+        directionType: "non-directed",
+        routingType: "direct",
+        sourceInvisibleLeader: false,
+        targetInvisibleLeader: false,
+        waypoints: [
+          { x: annotX + annotW / 2, y: annotY + annotH },
+          { x: startCx,             y: startEl.y },
+        ],
+        label: "",
+      } as Connector);
+    }
+  }
+
   return {
     elements,
-    connectors: computedConnectors,
+    connectors: finalConnectors,
     viewport: { x: 0, y: 0, zoom: 0.6 },
     fontSize: 12,
     connectorFontSize: 10,
