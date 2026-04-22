@@ -121,6 +121,57 @@ function messageBpmnWaypoints(
  *     (bpmnLayout.ts AI output).
  * Edge indices are picked from the leader flags so either format works.
  */
+/**
+ * R54: preserve a connector's label world position when waypoints change
+ * programmatically (e.g. waypoint drag + obstacle-validation reroute,
+ * curvilinear control-point drag). The InteractionLabel renderer places
+ * the label at `anchor + (labelOffsetX, labelOffsetY)` where the anchor
+ * depends on labelAnchor + visible waypoints. If the anchor shifts during
+ * a routing change, the label visually jumps — which the user perceives
+ * as "resetting to its anchor point". We cancel that jump by shifting
+ * labelOffsetX/Y by the NEGATIVE anchor delta so the label stays put.
+ */
+function computeLabelAnchor(conn: Connector, waypoints: Point[]): Point | null {
+  if (waypoints.length < 2) return null;
+  const visStart = conn.sourceInvisibleLeader ? 1 : 0;
+  const visEnd = waypoints.length - 1 - (conn.targetInvisibleLeader ? 1 : 0);
+  if (visEnd < visStart) return null;
+  const visible = waypoints.slice(visStart, visEnd + 1);
+  if (visible.length === 0) return null;
+  if (conn.labelAnchor === "source") return { x: visible[0].x, y: visible[0].y };
+  if (visible.length === 4) {
+    // Cubic bezier midpoint at t = 0.5
+    const [p0, cp1, cp2, p3] = visible;
+    return {
+      x: 0.125 * p0.x + 0.375 * cp1.x + 0.375 * cp2.x + 0.125 * p3.x,
+      y: 0.125 * p0.y + 0.375 * cp1.y + 0.375 * cp2.y + 0.125 * p3.y,
+    };
+  }
+  const p0 = visible[0];
+  const pN = visible[visible.length - 1];
+  return { x: (p0.x + pN.x) / 2, y: (p0.y + pN.y) / 2 };
+}
+
+function preserveLabelWorldPos(
+  oldConn: Connector,
+  newWaypoints: Point[],
+): { labelOffsetX?: number; labelOffsetY?: number } {
+  if (oldConn.labelOffsetX == null && oldConn.labelOffsetY == null) return {};
+  const oldAnchor = computeLabelAnchor(oldConn, oldConn.waypoints);
+  const newAnchor = computeLabelAnchor(
+    { ...oldConn, waypoints: newWaypoints },
+    newWaypoints,
+  );
+  if (!oldAnchor || !newAnchor) return {};
+  const dx = oldAnchor.x - newAnchor.x;
+  const dy = oldAnchor.y - newAnchor.y;
+  if (Math.abs(dx) < 0.1 && Math.abs(dy) < 0.1) return {};
+  return {
+    labelOffsetX: (oldConn.labelOffsetX ?? 0) + dx,
+    labelOffsetY: (oldConn.labelOffsetY ?? 0) + dy,
+  };
+}
+
 function adjustMsgLabelOffset(
   conn: Connector,
   oldWaypoints: Point[],
@@ -2399,15 +2450,32 @@ function reducer(state: DiagramData, action: Action): DiagramData {
     }
 
     case "UPDATE_CONNECTOR_WAYPOINTS": {
-      const updatedConns = state.connectors.map((c) =>
-        c.id === action.payload.id ? { ...c, waypoints: consolidateWaypoints(action.payload.waypoints) } : c
-      );
+      const updatedConns = state.connectors.map((c) => {
+        if (c.id !== action.payload.id) return c;
+        const newWaypoints = consolidateWaypoints(action.payload.waypoints);
+        // R54: preserve label world position across the waypoint change
+        const labelAdj = preserveLabelWorldPos(c, newWaypoints);
+        return { ...c, waypoints: newWaypoints, ...labelAdj };
+      });
       // Skip obstacle validation for messageBPMN — they cross pools and don't interact with obstacles
       const waypointConn = updatedConns.find(c => c.id === action.payload.id);
       if (waypointConn?.type === "messageBPMN") {
         return { ...state, connectors: updatedConns };
       }
-      return { ...state, connectors: validateConnectorsAgainstObstacles(updatedConns, state.elements) };
+      // R54 continued: if the obstacle validator re-routes and shifts the
+      // anchor, preserve the label's world position there too. We re-apply
+      // preserveLabelWorldPos against the PRE-validation snapshot so the
+      // label ends up where the user left it, not where validator defaults
+      // would place it.
+      const preValidation = new Map(updatedConns.map(c => [c.id, c]));
+      const validated = validateConnectorsAgainstObstacles(updatedConns, state.elements);
+      const final = validated.map(c => {
+        const before = preValidation.get(c.id);
+        if (!before || before.waypoints === c.waypoints) return c;
+        const adj = preserveLabelWorldPos(before, c.waypoints);
+        return Object.keys(adj).length > 0 ? { ...c, ...adj } : c;
+      });
+      return { ...state, connectors: final };
     }
 
     case "UPDATE_CURVE_HANDLES": {

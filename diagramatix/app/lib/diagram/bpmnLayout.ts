@@ -1301,6 +1301,31 @@ export function layoutBpmnDiagram(
       }
     }
 
+    // R53: when source or target is an Event (start/end/intermediate), the
+    // connector must attach on the side of the event FACING the other end
+    // — so the line doesn't clip through the event's body. Skip boundary
+    // intermediate events (R47 already handled those) and gateways (their
+    // own rules R35/R36/R37/R45 dictate sides).
+    const EVENT_TYPES = new Set(["start-event", "end-event", "intermediate-event"]);
+    function sideFacing(el: DiagramElement, px: number, py: number): string {
+      const ecx = el.x + el.width / 2, ecy = el.y + el.height / 2;
+      const dx = px - ecx, dy = py - ecy;
+      const nx = Math.abs(dx) / (el.width / 2 || 1);
+      const ny = Math.abs(dy) / (el.height / 2 || 1);
+      if (nx >= ny) return dx >= 0 ? "right" : "left";
+      return dy >= 0 ? "bottom" : "top";
+    }
+    if (!isMessage) {
+      const _tgtCx = tgt.x + tgt.width / 2, _tgtCy = tgt.y + tgt.height / 2;
+      const _srcCx = src.x + src.width / 2, _srcCy = src.y + src.height / 2;
+      if (EVENT_TYPES.has(src.type) && !src.boundaryHostId) {
+        srcSide = sideFacing(src, _tgtCx, _tgtCy);
+      }
+      if (EVENT_TYPES.has(tgt.type) && !tgt.boundaryHostId) {
+        tgtSide = sideFacing(tgt, _srcCx, _srcCy);
+      }
+    }
+
     // R47: connectors from an edge-mounted intermediate event must exit
     // from the event's connection point FURTHEST FROM the host edge the
     // event is mounted upon. That point sits on the event's own side that
