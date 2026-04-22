@@ -950,12 +950,12 @@ export function layoutBpmnDiagram(
   // the pre-grown Y, the two now overlap. Re-stack every pool top-to-bottom
   // with POOL_GAP between them and shift each pool's descendants (anything
   // whose centre Y lies within the pool's current bounds) along with it.
-  {
+  // Extracted as a function so it can be re-run after R56 grows a pool
+  // upward to enclose its AI-Generated annotation.
+  function restackPoolsR52(): void {
     const sortedPools = elements
       .filter(e => e.type === "pool")
       .sort((a, b) => a.y - b.y);
-    // Snapshot descendants BEFORE any shifting — once we start moving pools
-    // the spatial containment would no longer be accurate.
     const poolDescendants = new Map<string, DiagramElement[]>();
     for (const pool of sortedPools) {
       const yTop = pool.y;
@@ -980,6 +980,7 @@ export function layoutBpmnDiagram(
       }
     }
   }
+  restackPoolsR52();
 
   // ── Create connectors ──
   const elMap = new Map(elements.map(e => [e.id, e]));
@@ -1547,9 +1548,9 @@ export function layoutBpmnDiagram(
 
   // R56: "AI Generated" annotation attached to the process-level Start Event.
   // Injected post-layout so it doesn't go through the column/lane placement.
-  // The annotation floats above the pool's top edge, centred on the start
-  // event's column, with a short direct association connector down to the
-  // start event.
+  // R57 compliance — the annotation must stay INSIDE its host pool. Prefer
+  // placing it above the Start Event within the pool; if there isn't room,
+  // fall back to placing it to the right of the Start Event (still inside).
   const finalConnectors: Connector[] = [...computedConnectors];
   if (opts?.promptLabel) {
     const startEl = elements.find(e =>
@@ -1558,20 +1559,37 @@ export function layoutBpmnDiagram(
     if (startEl) {
       const annotId = "_ai_gen_annotation";
       const annotW = 160, annotH = 44;
-      const startCx = startEl.x + startEl.width / 2;
-      // Prefer placing the annotation 20px above the start event's containing
-      // pool (if any); fall back to above the start event itself.
-      let topOfContainer = startEl.y;
+      // Walk ancestors to find the enclosing pool — needed for bounds-clamp.
+      let pool: DiagramElement | undefined;
       let cur = startEl as DiagramElement | undefined;
       while (cur?.parentId) {
         const parent = elements.find(p => p.id === cur!.parentId);
         if (!parent) break;
-        topOfContainer = parent.y;
-        if (parent.type === "pool") break;
+        if (parent.type === "pool") { pool = parent; break; }
         cur = parent;
       }
-      const annotX = startCx - annotW / 2;
-      const annotY = topOfContainer - annotH - 20;
+      const startCx = startEl.x + startEl.width / 2;
+      const poolTop = pool ? pool.y : startEl.y;
+      const poolLeft = pool ? pool.x : startEl.x;
+      const poolRight = pool ? pool.x + pool.width : startEl.x + startEl.width;
+      const roomAbove = startEl.y - (poolTop + 4);
+      let annotX: number, annotY: number;
+      let srcSide: "bottom" | "left" = "bottom";
+      let tgtSide: "top" | "right" = "top";
+      if (roomAbove >= annotH + 12) {
+        // Place above the Start Event, centred horizontally on it
+        annotX = startCx - annotW / 2;
+        annotY = startEl.y - annotH - 12;
+      } else {
+        // Not enough headroom — place to the right, vertically centred on
+        // the Start Event
+        annotX = startEl.x + startEl.width + 24;
+        annotY = startEl.y + startEl.height / 2 - annotH / 2;
+        srcSide = "left";
+        tgtSide = "right";
+      }
+      // Clamp horizontally so the annotation stays within the pool
+      annotX = Math.max(poolLeft + 4, Math.min(poolRight - annotW - 4, annotX));
       elements.push({
         id: annotId,
         type: "text-annotation",
@@ -1582,22 +1600,25 @@ export function layoutBpmnDiagram(
         label: `AI Generated\n${opts.promptLabel}`,
         properties: {},
       } as DiagramElement);
-      // Direct association connector from annotation bottom → start event top.
+      // Short direct association from the annotation to the start event.
+      const srcPt = srcSide === "bottom"
+        ? { x: annotX + annotW / 2, y: annotY + annotH }
+        : { x: annotX, y: annotY + annotH / 2 };
+      const tgtPt = tgtSide === "top"
+        ? { x: startCx, y: startEl.y }
+        : { x: startEl.x + startEl.width, y: startEl.y + startEl.height / 2 };
       finalConnectors.push({
         id: `conn-${annotId}-${startEl.id}`,
         sourceId: annotId,
         targetId: startEl.id,
-        sourceSide: "bottom",
-        targetSide: "top",
+        sourceSide: srcSide,
+        targetSide: tgtSide,
         type: "associationBPMN",
         directionType: "non-directed",
         routingType: "direct",
         sourceInvisibleLeader: false,
         targetInvisibleLeader: false,
-        waypoints: [
-          { x: annotX + annotW / 2, y: annotY + annotH },
-          { x: startCx,             y: startEl.y },
-        ],
+        waypoints: [srcPt, tgtPt],
         label: "",
       } as Connector);
     }
