@@ -313,23 +313,24 @@ export const CHAPTERS: HelpChapter[] = [
         body: (
           <>
             <p>
-              <strong>Click</strong> an element to select it. A blue selection
-              border appears with resize handles.
+              <strong>Click</strong> an element to select it (blue dashed
+              border). <strong>Shift+click</strong> additional elements to
+              add them to the selection.
             </p>
             <p className="mt-2">
-              <strong>Shift+click</strong> on additional elements to{" "}
-              <strong>add them to the selection</strong> without deselecting
-              what you already have.
+              <strong>Drag</strong> on empty canvas <strong>pans</strong> the
+              view. <strong>Shift+drag</strong> on empty canvas draws a{" "}
+              <strong>lasso rectangle</strong>; elements fully inside are
+              selected on release. Hold Shift through release to{" "}
+              <em>add</em> the lassoed elements to the existing selection
+              instead of replacing it.
             </p>
             <p className="mt-2">
-              <strong>Click and drag</strong> on empty canvas to draw a{" "}
-              <strong>selection rectangle</strong> (lasso) — all elements
-              fully inside it will be selected. Hold <strong>Shift</strong>{" "}
-              while releasing to <strong>add</strong> the lassoed elements to
-              your existing selection instead of replacing it.
+              Press <strong>Escape</strong> or click empty canvas to deselect.
             </p>
-            <p className="mt-2">
-              Press <strong>Escape</strong> to deselect everything.
+            <p className="mt-2 text-xs text-gray-600">
+              See <strong>Select &amp; Connect Protocol</strong> for the full
+              cursor and gesture reference.
             </p>
           </>
         ),
@@ -339,12 +340,14 @@ export const CHAPTERS: HelpChapter[] = [
         body: (
           <>
             <p>
-              <strong>Drag</strong> a selected element to move it. All
-              connected connectors automatically re-route.
+              <strong>Drag</strong> an element to move it. All connected
+              connectors automatically re-route.
             </p>
             <p className="mt-2">
-              Use the <strong>arrow keys</strong> to nudge selected elements
-              by 1 pixel at a time for precise positioning.
+              Use the <strong>arrow keys</strong> to nudge selected element(s)
+              by <strong>5&#8239;px</strong>, or{" "}
+              <strong>Shift&#8239;+&#8239;Arrow</strong> to nudge by{" "}
+              <strong>1&#8239;px</strong> for precise positioning.
             </p>
           </>
         ),
@@ -472,12 +475,36 @@ export const CHAPTERS: HelpChapter[] = [
         body: (
           <>
             <ol className="list-decimal list-inside space-y-1">
-              <li>Click the <strong>source</strong> element to select it.</li>
-              <li>Click on a <strong>target</strong> element — a connector is created between them.</li>
+              <li>
+                Click the <strong>source</strong> element to select it (blue
+                dashed border appears).
+              </li>
+              <li>
+                Click the <em>same</em> element again (no drag) — an orange
+                dashed ring appears: <strong>Connection-Creation mode</strong>.
+              </li>
+              <li>
+                Drag towards the target. A blue dashed preview line follows
+                the pointer; valid targets are outlined in green (sequence),
+                blue (message), or purple (association). Red outline means
+                the target is incompatible.
+              </li>
+              <li>
+                Release on a highlighted target to create the connector, or
+                press <strong>Esc</strong> to cancel.
+              </li>
             </ol>
             <p className="mt-2">
-              The connector type is chosen automatically based on the diagram
-              type (e.g. sequence flow in BPMN, transition in state machine).
+              Connector type is chosen automatically based on diagram type and
+              source/target pool membership (e.g. sequence within a pool,
+              message across pools). For a complete reference of cursors,
+              states, and modifiers see{" "}
+              <strong>Select &amp; Connect Protocol</strong>.
+            </p>
+            <p className="mt-2">
+              <strong>Shift&#8239;+&#8239;Ctrl&#8239;+&#8239;click</strong> on
+              a source element, then click on a target, forces a sequence
+              connector that bypasses normal validation (BPMN only).
             </p>
           </>
         ),
@@ -533,6 +560,221 @@ export const CHAPTERS: HelpChapter[] = [
   },
 
   /* ──────────────────────────────────────────────── 7 ── */
+  {
+    slug: "select-connect-protocol",
+    title: "Select & Connect Protocol",
+    sections: [
+      {
+        body: (
+          <p>
+            The canvas uses a three-state interaction model for every element:{" "}
+            <strong>Idle</strong> (nothing selected), <strong>Selected</strong>{" "}
+            (blue dashed border, resize handles visible), and{" "}
+            <strong>Connection&#8209;Creation</strong> (orange dashed ring on
+            the source, live preview line following the cursor). This section
+            is the canonical reference for every cursor and every mouse
+            gesture on the canvas.
+          </p>
+        ),
+      },
+      {
+        heading: "Cursors by context",
+        body: (
+          <div>
+            <table className="w-full text-[11px] border-collapse">
+              <thead>
+                <tr className="border-b border-gray-200">
+                  <th className="text-left py-1.5 pr-4 font-semibold">Pointer is over…</th>
+                  <th className="text-left py-1.5 font-semibold">Cursor</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                <tr><td className="py-1 pr-4">Selectable element (task, event, gateway, subprocess, annotation&hellip;)</td><td className="font-mono">move ⇔</td></tr>
+                <tr><td className="py-1 pr-4">The same element when it is already multi-selected</td><td className="font-mono">grab</td></tr>
+                <tr><td className="py-1 pr-4">Empty canvas or a non-selectable element</td><td className="font-mono">default</td></tr>
+                <tr><td className="py-1 pr-4">Pool edge (all four sides, 10&#8239;px hit-zone)</td><td className="font-mono">ew-resize / ns-resize</td></tr>
+                <tr><td className="py-1 pr-4">Lane boundary between adjacent lanes</td><td className="font-mono">ns-resize</td></tr>
+                <tr><td className="py-1 pr-4">Element resize handle (any of the 8 handles on a selected element)</td><td className="font-mono">directional resize</td></tr>
+                <tr><td className="py-1 pr-4">Connector endpoint handle (after the connector is selected)</td><td className="font-mono">pointer (amber during drag)</td></tr>
+                <tr><td className="py-1 pr-4">During element drag (move)</td><td className="font-mono">grabbing</td></tr>
+                <tr><td className="py-1 pr-4">During a connector-creation drag</td><td className="font-mono">crosshair</td></tr>
+              </tbody>
+            </table>
+          </div>
+        ),
+      },
+      {
+        heading: "Mouse actions on an element",
+        body: (
+          <ul className="list-disc list-inside space-y-1">
+            <li>
+              <strong>Click + release (no drag)</strong> — selects the element.
+              Blue dashed border appears. Previous selection is replaced unless
+              a modifier is held.
+            </li>
+            <li>
+              <strong>Click + hold + drag</strong> (&gt;&#8239;4&#8239;px) —
+              moves the element; all connected connectors re-route live.
+            </li>
+            <li>
+              <strong>Click an already-selected element again (no drag)</strong>{" "}
+              — enters <strong>Connection-Creation</strong> mode. An orange
+              dashed ring highlights the source.
+            </li>
+            <li>
+              <strong>Shift + click</strong> — toggles the element in or out of
+              the current selection (multi-select).
+            </li>
+            <li>
+              <strong>Shift + Ctrl + click</strong> — starts{" "}
+              <strong>force-connect</strong> (BPMN only). The next click on any
+              other element forces a sequence connector, bypassing normal
+              validation.
+            </li>
+            <li>
+              <strong>Double-click</strong> — edits the element&rsquo;s label.
+            </li>
+          </ul>
+        ),
+      },
+      {
+        heading: "Mouse actions on empty canvas",
+        body: (
+          <ul className="list-disc list-inside space-y-1">
+            <li>
+              <strong>Click + release</strong> — deselects everything; cancels
+              any pending connection-creation or force-connect.
+            </li>
+            <li>
+              <strong>Click + hold + drag</strong> — pans the canvas.
+            </li>
+            <li>
+              <strong>Shift + drag</strong> — draws a{" "}
+              <strong>lasso rectangle</strong>. Elements fully inside the
+              rectangle are selected on release. Hold Shift through release to
+              <em> add</em> the lassoed elements to the existing selection
+              instead of replacing it.
+            </li>
+            <li>
+              <strong>Ctrl + click</strong> — places (or re-places) the{" "}
+              <strong>space-insertion marker</strong> (BPMN only). Shift-drag
+              the marker to insert horizontal or vertical space.
+            </li>
+            <li>
+              <strong>Right-click</strong> — opens the{" "}
+              <strong>quick-add popup</strong> (BPMN only) to drop a new
+              element at that location.
+            </li>
+          </ul>
+        ),
+      },
+      {
+        heading: "Pool, lane, and subprocess boundaries",
+        body: (
+          <ul className="list-disc list-inside space-y-1">
+            <li>
+              Every pool has a 10&#8239;px invisible hit-zone straddling each
+              of its four edges. Hover shows the directional resize cursor;
+              drag resizes the pool on that edge. Lanes and lane widths
+              adjust proportionally.
+            </li>
+            <li>
+              Lane boundaries between adjacent lanes within the same pool are
+              draggable vertically to redistribute lane heights.
+            </li>
+            <li>
+              Expanded subprocesses behave like pools — all four edges are
+              draggable, lanes/sub-lanes and contained elements follow the
+              resize.
+            </li>
+          </ul>
+        ),
+      },
+      {
+        heading: "Connector endpoints (reattach)",
+        body: (
+          <ul className="list-disc list-inside space-y-1">
+            <li>
+              Click a connector&rsquo;s body to select it. Endpoint handles
+              (small amber circles) become draggable.
+            </li>
+            <li>
+              Click + hold + drag an endpoint to reattach it to a different
+              element. An amber dashed preview line shows the prospective
+              path; release on the new target to commit.
+            </li>
+            <li>
+              Press <strong>Esc</strong> during an endpoint drag to cancel and
+              snap back.
+            </li>
+          </ul>
+        ),
+      },
+      {
+        heading: "Connection-Creation mode",
+        body: (
+          <>
+            <ol className="list-decimal list-inside space-y-1">
+              <li>
+                Click an element to <strong>select</strong> it (blue dashed
+                border).
+              </li>
+              <li>
+                Click the <em>same</em> element again without dragging —{" "}
+                <strong>Connection-Creation</strong> starts. An orange dashed
+                ring appears around the source.
+              </li>
+              <li>
+                Drag towards the intended target. A blue dashed preview line
+                follows the cursor.
+              </li>
+              <li>
+                Potential targets are highlighted by outline colour while the
+                pointer is near them:
+                <ul className="list-disc list-inside ml-5 mt-1 space-y-0.5">
+                  <li><span className="text-green-600 font-medium">Green</span> — valid sequence-connector target</li>
+                  <li><span className="text-blue-500 font-medium">Blue</span> — valid message-connector target (cross-pool)</li>
+                  <li><span className="text-purple-500 font-medium">Purple</span> — valid association target (e.g. text annotation)</li>
+                  <li><span className="text-red-600 font-medium">Red</span> — target is incompatible with the connector type being drawn</li>
+                </ul>
+              </li>
+              <li>
+                Release on a highlighted target to create the connector.
+                Release on empty canvas or press <strong>Esc</strong> to
+                cancel.
+              </li>
+            </ol>
+          </>
+        ),
+      },
+      {
+        heading: "Keyboard while selected",
+        body: (
+          <ul className="list-disc list-inside space-y-1">
+            <li>
+              <strong>Arrow keys</strong> — nudge selected element(s) or
+              connector endpoint by <strong>5&#8239;px</strong>.
+            </li>
+            <li>
+              <strong>Shift + Arrow keys</strong> — nudge by{" "}
+              <strong>1&#8239;px</strong> for precise alignment.
+            </li>
+            <li>
+              <strong>Delete</strong> — delete the selected element(s) or
+              connector.
+            </li>
+            <li>
+              <strong>Esc</strong> — cancels whichever in-progress operation
+              takes priority: connection-creation → endpoint drag → label
+              edit → deselect.
+            </li>
+          </ul>
+        ),
+      },
+    ],
+  },
+
+  /* ──────────────────────────────────────────────── 8 ── */
   {
     slug: "auto-connect",
     title: "Auto-Connect",
@@ -982,8 +1224,9 @@ export const CHAPTERS: HelpChapter[] = [
                 <tr><td className="py-1.5 pr-4 font-mono text-xs">Ctrl+Shift+Z / Ctrl+Y</td><td>Redo</td></tr>
                 <tr><td className="py-1.5 pr-4 font-mono text-xs">Ctrl+S</td><td>Save now</td></tr>
                 <tr><td className="py-1.5 pr-4 font-mono text-xs">Delete</td><td>Delete selected element or connector</td></tr>
-                <tr><td className="py-1.5 pr-4 font-mono text-xs">Arrow keys</td><td>Nudge selected element(s) by 1 pixel</td></tr>
-                <tr><td className="py-1.5 pr-4 font-mono text-xs">Escape</td><td>Deselect / cancel connection mode / dismiss popup</td></tr>
+                <tr><td className="py-1.5 pr-4 font-mono text-xs">Arrow keys</td><td>Nudge selected element(s) or connector endpoint by 5 pixels</td></tr>
+                <tr><td className="py-1.5 pr-4 font-mono text-xs">Shift+Arrow keys</td><td>Nudge by 1 pixel (precise)</td></tr>
+                <tr><td className="py-1.5 pr-4 font-mono text-xs">Escape</td><td>Cancel connection creation / endpoint drag / label edit / deselect</td></tr>
                 <tr><td className="py-1.5 pr-4 font-mono text-xs">Enter</td><td>Commit label edit</td></tr>
                 <tr><td className="py-1.5 pr-4 font-mono text-xs">Shift+Enter</td><td>Line break in label</td></tr>
                 <tr><td className="py-1.5 pr-4 font-mono text-xs">Double-click</td><td>Edit element or connector label</td></tr>
