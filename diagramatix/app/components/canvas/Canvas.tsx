@@ -1779,11 +1779,29 @@ export function Canvas({
     // auto-connect paths. Look up the catalogue entry and call
     // onAddElement with the shape's natural dimensions, label, and
     // shapeKey in properties.
+    //
+    // Label generation: strip the layer prefix from the catalogue name
+    // ("Business Actor" → "Actor") and append a counter that increments
+    // across drops of the same base name ("Actor 1", "Actor 2", …).
     if (pendingDragSymbol === "archimate-shape" && pendingArchimateShapeKey) {
       const entry = findArchimateShapeByKey(pendingArchimateShapeKey);
-      const initial = entry
-        ? { properties: { shapeKey: entry.key }, width: entry.defaultWidth, height: entry.defaultHeight, label: entry.name }
-        : { properties: { shapeKey: pendingArchimateShapeKey } };
+      let initial: { properties: Record<string, unknown>; width?: number; height?: number; label?: string };
+      if (entry) {
+        const baseName = entry.name.replace(/^(Business|Application|Motivation|Strategy|Technology|Physical|Implementation|Composite)\s+/i, "");
+        const baseRe = new RegExp(`^${baseName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?:\\s+\\d+)?$`, "i");
+        const used = data.elements.filter(el =>
+          el.type === "archimate-shape" &&
+          typeof el.label === "string" && baseRe.test(el.label)
+        ).length;
+        initial = {
+          properties: { shapeKey: entry.key },
+          width: entry.defaultWidth,
+          height: entry.defaultHeight,
+          label: `${baseName} ${used + 1}`,
+        };
+      } else {
+        initial = { properties: { shapeKey: pendingArchimateShapeKey } };
+      }
       onAddElement("archimate-shape", worldPos, undefined, undefined, undefined, initial);
       return;
     }

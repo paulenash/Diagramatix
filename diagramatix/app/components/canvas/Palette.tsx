@@ -9,6 +9,7 @@ import {
 import { resolveColor, type SymbolColorConfig } from "@/app/lib/diagram/colors";
 import { loadArchimateCatalogue, type ArchimateCatalogue, type ArchimateShapeEntry } from "@/app/lib/archimate/catalogue";
 import { getThemeFor } from "@/app/lib/archimate/themes";
+import { ICON_DRAWERS } from "@/app/lib/archimate/icons";
 
 interface Props {
   diagramType: DiagramType;
@@ -297,14 +298,15 @@ function ArchimateShapePreview({ entry }: { entry: ArchimateShapeEntry }) {
   const fill = theme?.fill ?? entry.fill ?? "#f5f5f5";
   const stroke = theme?.stroke ?? entry.stroke ?? "#666";
   const iconColour = theme?.iconColour ?? stroke;
-  const w = 38, h = 22;
+  // Larger preview so the icon glyph is clearly identifiable
+  const w = 64, h = 38;
   let outline: React.ReactNode;
   switch (entry.shapeFamily) {
     case "ellipse":
       outline = <ellipse cx={w / 2} cy={h / 2} rx={w / 2 - 1} ry={h / 2 - 1} fill={fill} stroke={stroke} strokeWidth={1.2} />;
       break;
     case "rounded-rect":
-      outline = <rect x={1} y={1} width={w - 2} height={h - 2} rx={4} ry={4} fill={fill} stroke={stroke} strokeWidth={1.2} />;
+      outline = <rect x={1} y={1} width={w - 2} height={h - 2} rx={6} ry={6} fill={fill} stroke={stroke} strokeWidth={1.2} />;
       break;
     case "hexagon": {
       const pad = w * 0.15;
@@ -315,11 +317,12 @@ function ArchimateShapePreview({ entry }: { entry: ArchimateShapeEntry }) {
     default:
       outline = <rect x={1} y={1} width={w - 2} height={h - 2} fill={fill} stroke={stroke} strokeWidth={1.2} />;
   }
-  // Tiny icon dot in corner to hint at iconType
+  // Big, centred icon glyph so the user can recognise the shape at a glance
+  const drawIcon = entry.iconType ? ICON_DRAWERS[entry.iconType] : undefined;
   return (
     <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
       {outline}
-      {entry.iconType ? <circle cx={w - 5} cy={5} r={2} fill={iconColour} /> : null}
+      {drawIcon ? drawIcon({ cx: w / 2, cy: h / 2, size: Math.min(w, h) - 6, colour: iconColour }) : null}
     </svg>
   );
 }
@@ -361,7 +364,7 @@ function ArchimatePalette({
   }
 
   return (
-    <div className="border-r border-gray-200 bg-white flex flex-col shrink-0" style={{ width: 240 }}>
+    <div className="border-r border-gray-200 bg-white flex flex-col shrink-0" style={{ width: 220 }}>
       <div className="px-2 py-1.5 border-b border-gray-200 flex items-center justify-between">
         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
           ArchiMate
@@ -375,6 +378,9 @@ function ArchimatePalette({
         {catalogue === null ? (
           <p className="text-[11px] text-gray-400 p-2">Loading shapes…</p>
         ) : catalogue.categories.map(cat => {
+          // Only the "box" variant per element (icon-only variants are
+          // duplicates with no extra meaning in the palette).
+          const items = cat.shapes.filter(s => s.variant === "box");
           const open = !!openCategories[cat.id];
           return (
             <div key={cat.id} className="border-b border-gray-100">
@@ -382,25 +388,22 @@ function ArchimatePalette({
                 onClick={() => toggleCategory(cat.id)}
                 className="w-full flex items-center justify-between px-2 py-1.5 text-[11px] font-medium text-gray-700 hover:bg-gray-50"
               >
-                <span>{cat.name} <span className="text-gray-400 ml-1">({cat.shapes.length})</span></span>
+                <span>{cat.name} <span className="text-gray-400 ml-1">({items.length})</span></span>
                 <span className="text-gray-400">{open ? "\u25BE" : "\u25B8"}</span>
               </button>
               {open && (
-                <div className="pl-1 pr-1 pb-1 space-y-0.5">
-                  {cat.shapes.map(entry => (
+                <div className="px-1 pb-1 space-y-1">
+                  {items.map(entry => (
                     <div
                       key={entry.key}
                       draggable
                       onDragStart={() => onDragStart("archimate-shape", { shapeKey: entry.key })}
                       title={entry.description ?? entry.name}
-                      className="flex items-center gap-2 px-1 py-0.5 rounded select-none hover:bg-gray-50 cursor-grab active:cursor-grabbing"
+                      className="flex flex-col items-center gap-0.5 px-1 py-1 rounded select-none hover:bg-gray-50 cursor-grab active:cursor-grabbing"
                     >
-                      <div className="flex items-center justify-center w-10 shrink-0">
-                        <ArchimateShapePreview entry={entry} />
-                      </div>
-                      <span className="text-[10px] text-gray-700 leading-tight truncate flex-1">
+                      <ArchimateShapePreview entry={entry} />
+                      <span className="text-[10px] text-gray-700 leading-tight text-center w-full truncate">
                         {entry.name}
-                        <span className="text-gray-400 ml-1">({entry.variant})</span>
                       </span>
                     </div>
                   ))}
