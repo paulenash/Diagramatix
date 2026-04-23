@@ -1,16 +1,18 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import type { DiagramType, SymbolType } from "@/app/lib/diagram/types";
 import {
   ALL_SYMBOLS,
   PALETTE_BY_DIAGRAM_TYPE,
 } from "@/app/lib/diagram/symbols/definitions";
 import { resolveColor, type SymbolColorConfig } from "@/app/lib/diagram/colors";
+import { loadArchimateCatalogue, type ArchimateCatalogue, type ArchimateShapeEntry } from "@/app/lib/archimate/catalogue";
+import { getThemeFor } from "@/app/lib/archimate/themes";
 
 interface Props {
   diagramType: DiagramType;
-  onDragStart: (symbolType: SymbolType) => void;
+  onDragStart: (symbolType: SymbolType, extras?: { shapeKey?: string }) => void;
   disabledSymbols?: SymbolType[];
   colorConfig?: SymbolColorConfig;
 }
@@ -286,8 +288,138 @@ export function PaletteSymbolPreview({ type, colorConfig }: { type: SymbolType; 
   }
 }
 
+// ────────────────────────────────────────────────────────────────────
+// ArchiMate palette — category accordion fed by the shape catalogue
+// ────────────────────────────────────────────────────────────────────
+
+function ArchimateShapePreview({ entry }: { entry: ArchimateShapeEntry }) {
+  const theme = getThemeFor(entry.category);
+  const fill = theme?.fill ?? entry.fill ?? "#f5f5f5";
+  const stroke = theme?.stroke ?? entry.stroke ?? "#666";
+  const iconColour = theme?.iconColour ?? stroke;
+  const w = 38, h = 22;
+  let outline: React.ReactNode;
+  switch (entry.shapeFamily) {
+    case "ellipse":
+      outline = <ellipse cx={w / 2} cy={h / 2} rx={w / 2 - 1} ry={h / 2 - 1} fill={fill} stroke={stroke} strokeWidth={1.2} />;
+      break;
+    case "rounded-rect":
+      outline = <rect x={1} y={1} width={w - 2} height={h - 2} rx={4} ry={4} fill={fill} stroke={stroke} strokeWidth={1.2} />;
+      break;
+    case "hexagon": {
+      const pad = w * 0.15;
+      const pts = `${pad},1 ${w - pad},1 ${w - 1},${h / 2} ${w - pad},${h - 1} ${pad},${h - 1} 1,${h / 2}`;
+      outline = <polygon points={pts} fill={fill} stroke={stroke} strokeWidth={1.2} />;
+      break;
+    }
+    default:
+      outline = <rect x={1} y={1} width={w - 2} height={h - 2} fill={fill} stroke={stroke} strokeWidth={1.2} />;
+  }
+  // Tiny icon dot in corner to hint at iconType
+  return (
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
+      {outline}
+      {entry.iconType ? <circle cx={w - 5} cy={5} r={2} fill={iconColour} /> : null}
+    </svg>
+  );
+}
+
+function ArchimatePalette({
+  onDragStart, collapsed, setCollapsed,
+}: {
+  onDragStart: Props["onDragStart"];
+  collapsed: boolean;
+  setCollapsed: (v: boolean) => void;
+}) {
+  const [catalogue, setCatalogue] = useState<ArchimateCatalogue | null>(null);
+  const [openCategories, setOpenCategories] = useState<Record<string, boolean>>({ business: true });
+
+  useEffect(() => {
+    loadArchimateCatalogue().then(setCatalogue).catch((e: unknown) => {
+      console.error("Failed to load ArchiMate catalogue:", e);
+    });
+  }, []);
+
+  function toggleCategory(id: string) {
+    setOpenCategories(prev => ({ ...prev, [id]: !prev[id] }));
+  }
+
+  if (collapsed) {
+    return (
+      <div className="border-r border-gray-200 bg-white flex flex-col shrink-0" style={{ width: 52 }}>
+        <div className="px-1 py-1 border-b border-gray-200 flex items-center justify-center">
+          <button onClick={() => setCollapsed(false)} title="Expand shapes"
+            className="text-gray-400 hover:text-gray-600 text-xs">
+            {"\u25B6"}
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-0.5 text-center text-[10px] text-gray-400 py-2">
+          ArchiMate
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="border-r border-gray-200 bg-white flex flex-col shrink-0" style={{ width: 240 }}>
+      <div className="px-2 py-1.5 border-b border-gray-200 flex items-center justify-between">
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+          ArchiMate
+        </p>
+        <button onClick={() => setCollapsed(true)} title="Collapse shapes"
+          className="text-gray-400 hover:text-gray-600 text-xs">
+          {"\u25C0"}
+        </button>
+      </div>
+      <div className="flex-1 overflow-y-auto">
+        {catalogue === null ? (
+          <p className="text-[11px] text-gray-400 p-2">Loading shapes…</p>
+        ) : catalogue.categories.map(cat => {
+          const open = !!openCategories[cat.id];
+          return (
+            <div key={cat.id} className="border-b border-gray-100">
+              <button
+                onClick={() => toggleCategory(cat.id)}
+                className="w-full flex items-center justify-between px-2 py-1.5 text-[11px] font-medium text-gray-700 hover:bg-gray-50"
+              >
+                <span>{cat.name} <span className="text-gray-400 ml-1">({cat.shapes.length})</span></span>
+                <span className="text-gray-400">{open ? "\u25BE" : "\u25B8"}</span>
+              </button>
+              {open && (
+                <div className="pl-1 pr-1 pb-1 space-y-0.5">
+                  {cat.shapes.map(entry => (
+                    <div
+                      key={entry.key}
+                      draggable
+                      onDragStart={() => onDragStart("archimate-shape", { shapeKey: entry.key })}
+                      title={entry.description ?? entry.name}
+                      className="flex items-center gap-2 px-1 py-0.5 rounded select-none hover:bg-gray-50 cursor-grab active:cursor-grabbing"
+                    >
+                      <div className="flex items-center justify-center w-10 shrink-0">
+                        <ArchimateShapePreview entry={entry} />
+                      </div>
+                      <span className="text-[10px] text-gray-700 leading-tight truncate flex-1">
+                        {entry.name}
+                        <span className="text-gray-400 ml-1">({entry.variant})</span>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export function Palette({ diagramType, onDragStart, disabledSymbols = [], colorConfig }: Props) {
   const [collapsed, setCollapsed] = useState(false);
+  // ArchiMate gets its own catalogue-driven accordion palette
+  if (diagramType === "archimate") {
+    return <ArchimatePalette onDragStart={onDragStart} collapsed={collapsed} setCollapsed={setCollapsed} />;
+  }
   const paletteTypes = PALETTE_BY_DIAGRAM_TYPE[diagramType] ?? ["task"];
   const symbols = paletteTypes
     .map((t) => ALL_SYMBOLS.find((s) => s.type === t))

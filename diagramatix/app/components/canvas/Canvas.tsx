@@ -22,6 +22,7 @@ import { PaletteSymbolPreview } from "./Palette";
 import { CHEVRON_THEMES } from "@/app/lib/diagram/chevronThemes";
 import { DisplayModeCtx, FontScaleCtx, ConnectorFontScaleCtx, TitleFontSizeCtx, PoolFontSizeCtx, LaneFontSizeCtx, SketchyFilter } from "@/app/lib/diagram/displayMode";
 import { ConnectorRenderer } from "./ConnectorRenderer";
+import { findShapeByKey as findArchimateShapeByKey } from "@/app/lib/archimate/catalogue";
 
 const HEADER_H = 28;
 const MIN_BOUNDARY_W = 100;
@@ -139,7 +140,14 @@ function findConnectorNearPoint(connectors: Connector[], pos: Point, margin = 15
 interface Props {
   data: DiagramData;
   diagramType: DiagramType;
-  onAddElement: (type: SymbolType, position: Point, taskType?: BpmnTaskType, eventType?: EventType, id?: string) => void;
+  onAddElement: (
+    type: SymbolType,
+    position: Point,
+    taskType?: BpmnTaskType,
+    eventType?: EventType,
+    id?: string,
+    initial?: { properties?: Record<string, unknown>; width?: number; height?: number; label?: string },
+  ) => void;
   onMoveElement: (id: string, x: number, y: number, unconstrained?: boolean) => void;
   onResizeElement: (id: string, x: number, y: number, width: number, height: number) => void;
   onUpdateLabel: (id: string, label: string) => void;
@@ -171,6 +179,7 @@ interface Props {
   onMoveElements?: (ids: string[], dx: number, dy: number) => void;
   onElementsMoveEnd?: () => void;
   pendingDragSymbol: SymbolType | null;
+  pendingArchimateShapeKey?: string | null;
   defaultDirectionType: DirectionType;
   defaultRoutingType: RoutingType;
   onUpdateProperties?: (id: string, props: Record<string, unknown>) => void;
@@ -369,6 +378,7 @@ export function Canvas({
   onMoveElements,
   onElementsMoveEnd,
   pendingDragSymbol,
+  pendingArchimateShapeKey,
   defaultDirectionType,
   defaultRoutingType,
   onUpdateProperties,
@@ -1764,6 +1774,19 @@ export function Canvas({
     if (!pendingDragSymbol) return;
     const rect = svgRef.current!.getBoundingClientRect();
     const worldPos = svgToWorld(e.clientX - rect.left, e.clientY - rect.top);
+
+    // ArchiMate shape drop: short-circuit the BPMN/state-machine split +
+    // auto-connect paths. Look up the catalogue entry and call
+    // onAddElement with the shape's natural dimensions, label, and
+    // shapeKey in properties.
+    if (pendingDragSymbol === "archimate-shape" && pendingArchimateShapeKey) {
+      const entry = findArchimateShapeByKey(pendingArchimateShapeKey);
+      const initial = entry
+        ? { properties: { shapeKey: entry.key }, width: entry.defaultWidth, height: entry.defaultHeight, label: entry.name }
+        : { properties: { shapeKey: pendingArchimateShapeKey } };
+      onAddElement("archimate-shape", worldPos, undefined, undefined, undefined, initial);
+      return;
+    }
 
     // Check if dropped on a connector (split connector feature)
     const BPMN_SPLITTABLE = new Set(["gateway", "intermediate-event", "task", "subprocess"]);

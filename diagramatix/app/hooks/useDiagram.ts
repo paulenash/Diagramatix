@@ -223,7 +223,7 @@ function adjustMsgLabelOffset(
 
 type Action =
   | { type: "SET_DATA"; payload: DiagramData }
-  | { type: "ADD_ELEMENT"; payload: { symbolType: SymbolType; position: Point; taskType?: BpmnTaskType; eventType?: EventType; id?: string } }
+  | { type: "ADD_ELEMENT"; payload: { symbolType: SymbolType; position: Point; taskType?: BpmnTaskType; eventType?: EventType; id?: string; initial?: { properties?: Record<string, unknown>; width?: number; height?: number; label?: string } } }
   | { type: "MOVE_ELEMENT"; payload: { id: string; x: number; y: number; unconstrained?: boolean } }
   | { type: "RESIZE_ELEMENT"; payload: { id: string; x: number; y: number; width: number; height: number } }
   | { type: "UPDATE_LABEL"; payload: { id: string; label: string } }
@@ -860,24 +860,34 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       }
       // Pools: place header near the drop point instead of centring the full width
       const isPool = action.payload.symbolType === "pool";
+      const initial = action.payload.initial;
+      // Apply initial overrides (used by ArchiMate shapes dropped from the
+      // catalogue palette — the shape's natural dimensions and shapeKey
+      // come from the catalogue, not the generic symbol definition).
+      const effectiveW = initial?.width ?? def.defaultWidth;
+      const effectiveH = initial?.height ?? def.defaultHeight;
+      const effectiveLabel = initial?.label ?? label;
       const dropX = isPool
         ? action.payload.position.x - 18  // header is 36px wide, put its centre at drop
-        : action.payload.position.x - def.defaultWidth / 2;
-      const dropY = action.payload.position.y - def.defaultHeight / 2;
+        : action.payload.position.x - effectiveW / 2;
+      const dropY = action.payload.position.y - effectiveH / 2;
+
+      const baseProperties: Record<string, unknown> =
+        action.payload.symbolType === "pool" ? { poolType: "black-box" }
+        : action.payload.symbolType === "uml-class" ? { showAttributes: false, showOperations: false }
+        : action.payload.symbolType === "gateway" ? { labelOffsetX: -30, labelOffsetY: -54 }
+        : (action.payload.symbolType === "chevron" || action.payload.symbolType === "chevron-collapsed") ? { showDescription: true }
+        : {};
 
       let newEl: DiagramElement = {
         id: action.payload.id ?? nanoid(),
         type: action.payload.symbolType,
         x: dropX,
         y: dropY,
-        width: def.defaultWidth,
-        height: def.defaultHeight,
-        label,
-        properties: action.payload.symbolType === "pool" ? { poolType: "black-box" }
-          : action.payload.symbolType === "uml-class" ? { showAttributes: false, showOperations: false }
-          : action.payload.symbolType === "gateway" ? { labelOffsetX: -30, labelOffsetY: -54 }
-          : (action.payload.symbolType === "chevron" || action.payload.symbolType === "chevron-collapsed") ? { showDescription: true }
-          : {},
+        width: effectiveW,
+        height: effectiveH,
+        label: effectiveLabel,
+        properties: { ...baseProperties, ...(initial?.properties ?? {}) },
         taskType:  action.payload.taskType,
         eventType: action.payload.eventType,
       };
@@ -3349,9 +3359,16 @@ export function useDiagram(initialData: DiagramData) {
   // ────────────────────────────────────────────────────────────────────────────
 
   const addElement = useCallback(
-    (symbolType: SymbolType, position: Point, taskType?: BpmnTaskType, eventType?: EventType, id?: string) => {
+    (
+      symbolType: SymbolType,
+      position: Point,
+      taskType?: BpmnTaskType,
+      eventType?: EventType,
+      id?: string,
+      initial?: { properties?: Record<string, unknown>; width?: number; height?: number; label?: string },
+    ) => {
       pushHistory(snapshotData());
-      dispatch({ type: "ADD_ELEMENT", payload: { symbolType, position, taskType, eventType, id } });
+      dispatch({ type: "ADD_ELEMENT", payload: { symbolType, position, taskType, eventType, id, initial } });
     },
     []
   );

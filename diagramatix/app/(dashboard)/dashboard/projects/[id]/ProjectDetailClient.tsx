@@ -317,6 +317,7 @@ const DIAGRAM_TYPE_LABELS: Record<string, string> = {
   bpmn: "BPMN",
   domain: "Domain",
   "value-chain": "Value Chain",
+  archimate: "ArchiMate",
 };
 
 const DIAGRAM_TYPES: { value: DiagramType; label: string; description: string }[] = [
@@ -326,6 +327,7 @@ const DIAGRAM_TYPES: { value: DiagramType; label: string; description: string }[
   { value: "bpmn", label: "BPMN", description: "Full Business Process Model and Notation" },
   { value: "domain", label: "Domain", description: "UML class diagrams with classes, enumerations, and relationships" },
   { value: "value-chain", label: "Value Chain", description: "Process-based value chain diagrams with value chain containers" },
+  { value: "archimate", label: "ArchiMate", description: "Enterprise architecture using the ArchiMate 3.1 standard (Business, Motivation, Strategy, Application layers)" },
 ];
 
 export function ProjectDetailClient({ project, otherProjects, version, readOnly, viewingAsName, viewingAsEmail }: Props) {

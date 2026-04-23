@@ -511,6 +511,7 @@ export function DiagramEditor({
   const [selectedElementIds, setSelectedElementIds] = useState<Set<string>>(new Set());
   const [selectedConnectorId, setSelectedConnectorId] = useState<string | null>(null);
   const [pendingDragSymbol, setPendingDragSymbol] = useState<SymbolType | null>(null);
+  const [pendingArchimateShapeKey, setPendingArchimateShapeKey] = useState<string | null>(null);
   const [projectColorConfig, setProjectColorConfig] = useState<SymbolColorConfig | undefined>(undefined);
   const [diagramColorConfig, setDiagramColorConfig] = useState<SymbolColorConfig>(initialDiagramColorConfig ?? {});
   const [displayMode, setDisplayMode] = useState<DisplayMode>(initialDisplayMode ?? "normal");
@@ -1627,7 +1628,10 @@ export function DiagramEditor({
         {!readOnly && (
           <Palette
             diagramType={diagramType}
-            onDragStart={(type) => setPendingDragSymbol(type)}
+            onDragStart={(type, extras) => {
+              setPendingDragSymbol(type);
+              setPendingArchimateShapeKey(extras?.shapeKey ?? null);
+            }}
             disabledSymbols={disabledSymbols}
             colorConfig={effectiveColorConfig}
           />
@@ -1657,6 +1661,7 @@ export function DiagramEditor({
           onMoveElements={moveElements}
           onElementsMoveEnd={elementsMoveEnd}
           pendingDragSymbol={pendingDragSymbol}
+          pendingArchimateShapeKey={pendingArchimateShapeKey}
           defaultDirectionType={defaultDirectionType}
           defaultRoutingType={defaultRoutingType}
           onUpdateProperties={updateProperties}
