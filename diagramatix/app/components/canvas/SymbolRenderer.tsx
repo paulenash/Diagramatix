@@ -4,6 +4,7 @@ import { useState, createContext, useContext } from "react";
 import type { BpmnTaskType, GatewayType, EventType, DiagramElement, Point, Side, SymbolType } from "@/app/lib/diagram/types";
 import { type SymbolColorConfig, resolveColor } from "@/app/lib/diagram/colors";
 import { DisplayModeCtx, FontScaleCtx, PoolFontSizeCtx, LaneFontSizeCtx, sketchyFilter } from "@/app/lib/diagram/displayMode";
+import { ArchimateShape } from "./ArchimateShape";
 
 /** React context carrying the active project colour config.  Shape components
  *  read from it; when undefined, resolveColor falls back to defaults. */
@@ -1403,6 +1404,7 @@ function SymbolShape({ el }: { el: DiagramElement }) {
       case "uml-enumeration":       return <UmlEnumerationShape el={el} />;
       case "external-entity":     return <ExternalEntityShape el={el} />;
       case "process-system":      return <ProcessSystemShape el={el} />;
+      case "archimate-shape":     return <ArchimateShape el={el} />;
       default:                  return <TaskShape el={el} />;
     }
   })();

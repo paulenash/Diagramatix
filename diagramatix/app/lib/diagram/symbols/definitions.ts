@@ -254,6 +254,13 @@ export const ALL_SYMBOLS: SymbolDefinition[] = [
     defaultHeight: 84,
     description: "A UML enumeration in a domain diagram",
   },
+  {
+    type: "archimate-shape",
+    label: "ArchiMate Shape",
+    defaultWidth: 120,
+    defaultHeight: 60,
+    description: "Generic ArchiMate 3.1 shape — geometry, fill, and icon resolved from the catalogue by properties.shapeKey",
+  },
 ];
 
 export const PALETTE_BY_DIAGRAM_TYPE: Record<DiagramType, SymbolType[]> = {
@@ -277,6 +284,11 @@ export const PALETTE_BY_DIAGRAM_TYPE: Record<DiagramType, SymbolType[]> = {
   ],
   domain: ["uml-class", "uml-enumeration"],
   "value-chain": ["chevron", "chevron-collapsed", "process-group"],
+  // ArchiMate shapes are driven by the runtime catalogue (see
+  // app/lib/archimate/catalogue.ts). The palette renders category accordions
+  // reading that catalogue rather than this static list, so the registered
+  // symbol type is a single generic placeholder.
+  archimate: ["archimate-shape"],
 };
 
 /** Colour-picker palette — includes body colour entries and lane that aren't in the drag palette. */
@@ -303,6 +315,7 @@ export const COLOR_PALETTE_BY_DIAGRAM_TYPE: Record<DiagramType, SymbolType[]> = 
   ],
   domain: ["uml-class", "uml-enumeration"],
   "value-chain": ["chevron", "chevron-collapsed", "process-group"],
+  archimate: ["archimate-shape"],
 };
 
 export function getSymbolDefinition(type: SymbolType): SymbolDefinition {

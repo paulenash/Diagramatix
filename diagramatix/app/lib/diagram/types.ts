@@ -1,4 +1,4 @@
-export type DiagramType = "context" | "basic" | "process-context" | "state-machine" | "bpmn" | "domain" | "value-chain";
+export type DiagramType = "context" | "basic" | "process-context" | "state-machine" | "bpmn" | "domain" | "value-chain" | "archimate";
 
 export type SymbolType =
   | "task"
@@ -35,7 +35,8 @@ export type SymbolType =
   | "submachine"
   | "chevron"
   | "chevron-collapsed"
-  | "process-group";
+  | "process-group"
+  | "archimate-shape";
 
 export type BpmnTaskType =
   | "none"

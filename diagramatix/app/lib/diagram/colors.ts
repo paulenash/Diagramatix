@@ -46,6 +46,10 @@ export const DEFAULT_SYMBOL_COLORS: Record<SymbolType, string> = {
   // Domain Diagram
   "uml-class":           "#fed7aa",   // light orange
   "uml-enumeration":     "#bbf7d0",   // light green
+  // ArchiMate — actual fill comes from the catalogue + category theme
+  // at render time; this is only a fallback when rendering outside the
+  // canvas (e.g. a minimap thumbnail).
+  "archimate-shape":     "#ffffff",
 };
 
 /** Black & white colour scheme: fills → white, lines/strokes → black. */
@@ -90,6 +94,7 @@ export const BW_SYMBOL_COLORS: Record<SymbolType, string> = {
   "process-group":       "#ffffff",
   "uml-class":           "#ffffff",
   "uml-enumeration":     "#ffffff",
+  "archimate-shape":     "#ffffff",
 };
 
 /** Return the effective colour for a symbol type, preferring the project config over defaults. */
