@@ -314,7 +314,8 @@ const BPMN_CONTENT_TYPES = new Set<SymbolType>([
 function isContainerType(type: SymbolType): boolean {
   return type === "system-boundary" || type === "composite-state"
       || type === "pool" || type === "lane" || type === "subprocess-expanded"
-      || type === "process-group";
+      || type === "process-group"
+      || type === "archimate-shape";
 }
 
 const PROCESS_GROUP_CHILDREN = new Set<SymbolType>(["chevron", "chevron-collapsed", "process-group"]);
@@ -326,6 +327,7 @@ function containerAccepts(containerType: SymbolType, childType: SymbolType): boo
   if (containerType === "lane") return childType === "lane" || BPMN_CONTENT_TYPES.has(childType);
   if (containerType === "subprocess-expanded") return BPMN_CONTENT_TYPES.has(childType);
   if (containerType === "process-group") return PROCESS_GROUP_CHILDREN.has(childType);
+  if (containerType === "archimate-shape") return childType === "archimate-shape";
   return false;
 }
 
@@ -1180,6 +1182,9 @@ function reducer(state: DiagramData, action: Action): DiagramData {
               containerAccepts(b.type, e.type) &&
               b.id !== id &&
               !wouldCreateCycle(state.elements, id, b.id) &&
+              // ArchiMate shapes are only container-parents if the user
+              // has explicitly flipped the archimateIsContainer flag
+              (b.type !== "archimate-shape" || !!b.properties?.archimateIsContainer) &&
               cx >= b.x && cx <= b.x + b.width &&
               cy >= b.y && cy <= b.y + b.height
           );
@@ -1187,6 +1192,9 @@ function reducer(state: DiagramData, action: Action): DiagramData {
           const potentialParent =
             // subprocess-expanded: pick smallest (innermost)
             (potentialParents.filter(b => b.type === "subprocess-expanded")
+              .sort((a, b) => (a.width * a.height) - (b.width * b.height))[0]) ??
+            // archimate-shape: pick smallest (innermost)
+            (potentialParents.filter(b => b.type === "archimate-shape")
               .sort((a, b) => (a.width * a.height) - (b.width * b.height))[0]) ??
             potentialParents.find(b => b.type === "lane") ??
             potentialParents.find(b => b.type === "pool") ??

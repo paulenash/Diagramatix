@@ -43,12 +43,15 @@ export const ICON_DRAWERS: Record<string, IconDrawer> = {
   // half would sit inside the body). The right ellipse shows BOTH
   // halves — the right half as the outline cap, the left half as
   // an inner arc representing the back of the cylinder.
+  //
+  // Ellipses are wider / rounder (eccentricity halved) so the end
+  // caps read clearly as ovals rather than slivers.
   role: ({ cx, cy, size, colour }) => {
     const s = size;
-    const rx = s * 0.07;
+    const rx = s * 0.14;              // ← wider (eccentricity halved)
     const ry = s * 0.20;
-    const leftCx = cx - s * 0.15;   // → centres separated by s × 0.30
-    const rightCx = cx + s * 0.15;
+    const leftCx = cx - s * 0.18;     // centres separated slightly more so ellipses don't overlap
+    const rightCx = cx + s * 0.18;
     const topY = cy - ry;
     const bottomY = cy + ry;
     const sw = Math.max(1, s / 16);
@@ -94,22 +97,28 @@ export const ICON_DRAWERS: Record<string, IconDrawer> = {
       />
     );
   },
-  // Function — chunky upward chevron. Two chevron strokes separated
-  // vertically by a gap (~5 px at full icon size), closed off on the
-  // left and right with short vertical line segments. Produces a
-  // filled hollow arrow pointing up.
+  // Function — two upward-pointing chevrons stacked vertically, gap
+  // between them equals the role ellipse height (s × 0.4), with
+  // vertical lines joining the chevron ends on the left and right.
   function: ({ cx, cy, size, colour }) => {
     const s = size;
-    const gap = Math.max(3, s * 0.16);       // vertical offset between the two ^ strokes
-    const topOuter = cy - s * 0.28;          // outer peak (top)
-    const bottomY = cy + s * 0.18;           // outer bottom-edge Y
-    const leftX = cx - s * 0.32;             // outer-left X
-    const rightX = cx + s * 0.32;            // outer-right X
+    const halfW = s * 0.24;
+    const chevHeight = s * 0.10;
+    const ellipseHeight = s * 0.4;           // height of the Role ellipse
+    const topBase = cy - (ellipseHeight + chevHeight) / 2;
+    const topPeak = topBase - chevHeight;
+    const bottomBase = topBase + ellipseHeight;
+    const bottomPeak = bottomBase - chevHeight;
+    const leftX = cx - halfW;
+    const rightX = cx + halfW;
+    const sw = Math.max(1.5, s / 14);
     return (
-      <path
-        d={`M ${leftX} ${bottomY} L ${cx} ${topOuter} L ${rightX} ${bottomY} L ${rightX} ${bottomY - gap} L ${cx} ${topOuter + gap} L ${leftX} ${bottomY - gap} Z`}
-        fill={colour} stroke="none"
-      />
+      <g stroke={colour} strokeWidth={sw} fill="none" strokeLinejoin="round" strokeLinecap="round">
+        <polyline points={`${leftX},${topBase} ${cx},${topPeak} ${rightX},${topBase}`} />
+        <polyline points={`${leftX},${bottomBase} ${cx},${bottomPeak} ${rightX},${bottomBase}`} />
+        <line x1={leftX} y1={topBase} x2={leftX} y2={bottomBase} />
+        <line x1={rightX} y1={topBase} x2={rightX} y2={bottomBase} />
+      </g>
     );
   },
   // Service — stadium / pill shape with semicircle ends on the left
