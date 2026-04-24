@@ -354,15 +354,42 @@ function ArchimatePalette({
 }) {
   const [catalogue, setCatalogue] = useState<ArchimateCatalogue | null>(null);
   const [openCategories, setOpenCategories] = useState<Record<string, boolean>>({ business: true });
+  // User-adjustable category order. Persisted to localStorage so it sticks
+  // across reloads. Initialised from the catalogue's natural order on first
+  // load, with any newly-introduced categories appended at the end.
+  const [categoryOrder, setCategoryOrder] = useState<string[]>([]);
 
   useEffect(() => {
-    loadArchimateCatalogue().then(setCatalogue).catch((e: unknown) => {
+    loadArchimateCatalogue().then((cat) => {
+      setCatalogue(cat);
+      const natural = cat.categories.map(c => c.id);
+      let saved: string[] = [];
+      try {
+        const raw = localStorage.getItem("archimate-category-order");
+        if (raw) saved = JSON.parse(raw);
+      } catch {}
+      const validSaved = saved.filter(id => natural.includes(id));
+      const missing = natural.filter(id => !validSaved.includes(id));
+      setCategoryOrder([...validSaved, ...missing]);
+    }).catch((e: unknown) => {
       console.error("Failed to load ArchiMate catalogue:", e);
     });
   }, []);
 
   function toggleCategory(id: string) {
     setOpenCategories(prev => ({ ...prev, [id]: !prev[id] }));
+  }
+
+  function moveCategory(id: string, direction: -1 | 1) {
+    setCategoryOrder(prev => {
+      const idx = prev.indexOf(id);
+      const swap = idx + direction;
+      if (idx < 0 || swap < 0 || swap >= prev.length) return prev;
+      const next = prev.slice();
+      [next[idx], next[swap]] = [next[swap], next[idx]];
+      try { localStorage.setItem("archimate-category-order", JSON.stringify(next)); } catch {}
+      return next;
+    });
   }
 
   if (collapsed) {
@@ -395,7 +422,13 @@ function ArchimatePalette({
       <div className="flex-1 overflow-y-auto">
         {catalogue === null ? (
           <p className="text-[11px] text-gray-400 p-2">Loading shapes…</p>
-        ) : catalogue.categories.map(cat => {
+        ) : (() => {
+          const byId = new Map(catalogue.categories.map(c => [c.id, c]));
+          const orderedCategories = categoryOrder
+            .map(id => byId.get(id))
+            .filter((c): c is typeof catalogue.categories[number] => !!c);
+          return orderedCategories;
+        })().map((cat, catIdx, orderedArr) => {
           // One palette entry per distinct element name. When both a
           // "(box)" and an "icon" master exist for the same element, prefer
           // the box form. For Actor, Business Service, and Business Event
@@ -422,15 +455,33 @@ function ArchimatePalette({
             }
           }
           const open = !!openCategories[cat.id];
+          const canUp = catIdx > 0;
+          const canDown = catIdx < orderedArr.length - 1;
           return (
             <div key={cat.id} className="border-b border-gray-100">
-              <button
-                onClick={() => toggleCategory(cat.id)}
-                className="w-full flex items-center justify-between px-2 py-1.5 text-[11px] font-medium text-gray-700 hover:bg-gray-50"
-              >
-                <span>{cat.name} <span className="text-gray-400 ml-1">({items.length})</span></span>
-                <span className="text-gray-400">{open ? "\u25BE" : "\u25B8"}</span>
-              </button>
+              <div className="w-full flex items-center px-2 py-1.5 text-[11px] font-medium text-gray-700 hover:bg-gray-50">
+                <button
+                  onClick={() => toggleCategory(cat.id)}
+                  className="flex-1 flex items-center justify-between text-left"
+                >
+                  <span>{cat.name} <span className="text-gray-400 ml-1">({items.length})</span></span>
+                  <span className="text-gray-400">{open ? "\u25BE" : "\u25B8"}</span>
+                </button>
+                <div className="flex items-center gap-0.5 ml-1">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); moveCategory(cat.id, -1); }}
+                    disabled={!canUp}
+                    title="Move category up"
+                    className={`px-1 text-[10px] ${canUp ? "text-gray-500 hover:text-gray-800" : "text-gray-300 cursor-not-allowed"}`}
+                  >{"\u25B2"}</button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); moveCategory(cat.id, 1); }}
+                    disabled={!canDown}
+                    title="Move category down"
+                    className={`px-1 text-[10px] ${canDown ? "text-gray-500 hover:text-gray-800" : "text-gray-300 cursor-not-allowed"}`}
+                  >{"\u25BC"}</button>
+                </div>
+              </div>
               {open && (
                 <div className="px-1 pb-1 grid grid-cols-2 gap-1">
                   {items.map(item => (

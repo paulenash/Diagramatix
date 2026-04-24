@@ -71,16 +71,16 @@ export const ICON_DRAWERS: Record<string, IconDrawer> = {
       </g>
     );
   },
-  // Interface — lollipop. Circle diameter doubled from s × 0.26 to
-  // s × 0.52 (radius 0.26). Stem shortened so the lollipop still fits.
+  // Interface — lollipop. Stem length equals the circle diameter (2r).
   interface: ({ cx, cy, size, colour }) => {
     const s = size;
-    const r = s * 0.26;                  // ← was 0.13 (2× diameter)
+    const r = s * 0.26;
     const circleCx = cx + s * 0.08;      // centred slightly right of icon middle
+    const stemRight = circleCx - r;
     return (
       <g stroke={colour} strokeWidth={Math.max(1, s / 16)} fill="none">
         <circle cx={circleCx} cy={cy} r={r} />
-        <line x1={cx - s * 0.30} y1={cy} x2={circleCx - r} y2={cy} />
+        <line x1={stemRight - 2 * r} y1={cy} x2={stemRight} y2={cy} />
       </g>
     );
   },
@@ -129,7 +129,7 @@ export const ICON_DRAWERS: Record<string, IconDrawer> = {
   // and right (rx = height/2 gives true semicircles).
   service: ({ cx, cy, size, colour }) => {
     const s = size;
-    const h = s * 0.3;
+    const h = s * 0.45; // 50% taller than the original 0.3
     return (
       <rect
         x={cx - s * 0.3} y={cy - h / 2}
@@ -425,6 +425,63 @@ export const ICON_DRAWERS: Record<string, IconDrawer> = {
       <g stroke={colour} strokeWidth={Math.max(1, s / 16)} fill="none">
         <path d={`M ${cx} ${cy - s * 0.22} C ${cx + s * 0.2} ${cy - s * 0.22} ${cx + s * 0.18} ${cy} ${cx} ${cy + s * 0.22} C ${cx - s * 0.18} ${cy} ${cx - s * 0.2} ${cy - s * 0.22} ${cx} ${cy - s * 0.22} Z`} />
         <circle cx={cx} cy={cy - s * 0.08} r={s * 0.05} fill={colour} />
+      </g>
+    );
+  },
+  // Node — front face rectangle with an offset parallelogram lid on top
+  // and right side to read as a 3D cube.
+  node: ({ cx, cy, size, colour }) => {
+    const s = size;
+    const sw = Math.max(1, s / 16);
+    const w = s * 0.45;
+    const h = s * 0.32;
+    const off = s * 0.08;          // 3D offset depth
+    const left = cx - w / 2;
+    const bot = cy + h / 2 - off / 2;
+    const top = bot - h;
+    const right = left + w;
+    return (
+      <g stroke={colour} strokeWidth={sw} fill="none" strokeLinejoin="round">
+        <rect x={left} y={top} width={w} height={h} />
+        <path d={`M ${left} ${top} L ${left + off} ${top - off} L ${right + off} ${top - off} L ${right} ${top} Z`} />
+        <path d={`M ${right} ${top} L ${right + off} ${top - off} L ${right + off} ${bot - off} L ${right} ${bot} Z`} />
+      </g>
+    );
+  },
+  // Device — stylised monitor / hardware: trapezoid body with a short
+  // base line below.
+  device: ({ cx, cy, size, colour }) => {
+    const s = size;
+    const sw = Math.max(1, s / 16);
+    const topW = s * 0.34;
+    const botW = s * 0.48;
+    const h = s * 0.28;
+    const topY = cy - h / 2 - s * 0.02;
+    const botY = topY + h;
+    return (
+      <g stroke={colour} strokeWidth={sw} fill="none" strokeLinejoin="round">
+        <path
+          d={`M ${cx - topW / 2} ${topY} L ${cx + topW / 2} ${topY} L ${cx + botW / 2} ${botY} L ${cx - botW / 2} ${botY} Z`}
+        />
+        <line x1={cx - botW / 2 - s * 0.04} y1={botY + s * 0.08} x2={cx + botW / 2 + s * 0.04} y2={botY + s * 0.08} />
+      </g>
+    );
+  },
+  // Artifact — page-with-folded-corner glyph.
+  artifact: ({ cx, cy, size, colour }) => {
+    const s = size;
+    const sw = Math.max(1, s / 16);
+    const w = s * 0.38;
+    const h = s * 0.48;
+    const fold = s * 0.12;         // size of the folded corner
+    const left = cx - w / 2;
+    const right = left + w;
+    const top = cy - h / 2;
+    const bot = top + h;
+    return (
+      <g stroke={colour} strokeWidth={sw} fill="none" strokeLinejoin="round">
+        <path d={`M ${left} ${top} L ${right - fold} ${top} L ${right} ${top + fold} L ${right} ${bot} L ${left} ${bot} Z`} />
+        <path d={`M ${right - fold} ${top} L ${right - fold} ${top + fold} L ${right} ${top + fold}`} />
       </g>
     );
   },

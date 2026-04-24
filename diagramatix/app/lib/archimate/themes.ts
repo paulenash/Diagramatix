@@ -48,7 +48,7 @@ export const DEFAULT_ARCHIMATE_THEMES: ArchimateCategoryTheme[] = [
   { id: "application", name: "Application", fill: "#b5ffff", stroke: "#2a7a91", iconColour: "#0b4d5e" },
   { id: "composite",   name: "Composite",   fill: "#eeeeee", stroke: "#888888", iconColour: "#444444" },
   // Placeholders — fill in when those categories are added
-  { id: "technology",                name: "Technology",                fill: null, stroke: null, iconColour: null },
+  { id: "technology",                name: "Technology",                fill: "#c5e0b4", stroke: "#4f7a3a", iconColour: "#2d4a1f" },
   { id: "physical",                  name: "Physical",                  fill: null, stroke: null, iconColour: null },
   { id: "implementation-migration",  name: "Implementation & Migration", fill: null, stroke: null, iconColour: null },
 ];
