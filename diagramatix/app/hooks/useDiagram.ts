@@ -955,6 +955,18 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         console.log(`[ADD_ELEMENT] type=${newEl.type} isContainer=${isNewContainer} cx=${newCx.toFixed(0)} cy=${newCy.toFixed(0)} matchingContainers=${containers.length} parent=${container?.id ?? 'none'} (${container?.type ?? ''})`);
         if (container) {
           newEl = { ...newEl, parentId: container.id };
+          // Auto-promote archimate-shape parent to container so its label
+          // moves to the top and its fill lightens against the child.
+          if (container.type === "archimate-shape" && !container.properties?.archimateIsContainer) {
+            const elements = state.elements.map(e => e.id === container.id
+              ? { ...e, properties: { ...e.properties, archimateIsContainer: true } }
+              : e
+            );
+            if (newEl.type === "text-annotation") {
+              newEl = autoResizeTextAnnotation(newEl);
+            }
+            return { ...state, elements: [...elements, newEl] };
+          }
         }
       }
       // Text annotations start already tight around their default label
@@ -1182,9 +1194,6 @@ function reducer(state: DiagramData, action: Action): DiagramData {
               containerAccepts(b.type, e.type) &&
               b.id !== id &&
               !wouldCreateCycle(state.elements, id, b.id) &&
-              // ArchiMate shapes are only container-parents if the user
-              // has explicitly flipped the archimateIsContainer flag
-              (b.type !== "archimate-shape" || !!b.properties?.archimateIsContainer) &&
               cx >= b.x && cx <= b.x + b.width &&
               cy >= b.y && cy <= b.y + b.height
           );
@@ -1220,6 +1229,22 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         }
         return e;
       });
+
+      // Auto-promote archimate-shape to container when a child lands inside
+      {
+        const moved = elements.find(e => e.id === id);
+        if (moved?.parentId) {
+          const parent = elements.find(e => e.id === moved.parentId);
+          if (parent?.type === "archimate-shape" && !parent.properties?.archimateIsContainer) {
+            for (let i = 0; i < elements.length; i++) {
+              if (elements[i].id === parent.id) {
+                elements[i] = { ...parent, properties: { ...parent.properties, archimateIsContainer: true } };
+                break;
+              }
+            }
+          }
+        }
+      }
 
       // Chevron horizontal snap: when a chevron is moved near another chevron
       // with ≥75% vertical overlap, snap to aligned Y-centre with 10px overlap.
