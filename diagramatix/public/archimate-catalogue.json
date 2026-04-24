@@ -117,7 +117,7 @@
           "defaultHeight": 76,
           "fill": "#ffff66",
           "stroke": "#000000",
-          "shapeFamily": "rectangle",
+          "shapeFamily": "rounded-rect",
           "iconType": "service"
         },
         {
@@ -129,7 +129,7 @@
           "defaultWidth": 113,
           "defaultHeight": 57,
           "fill": "#ffff66",
-          "shapeFamily": "rectangle",
+          "shapeFamily": "rounded-rect",
           "iconType": "service"
         },
         {
@@ -142,7 +142,7 @@
           "defaultHeight": 76,
           "fill": "#ffff66",
           "stroke": "#000000",
-          "shapeFamily": "rectangle",
+          "shapeFamily": "rounded-rect",
           "iconType": "process"
         },
         {
@@ -167,7 +167,7 @@
           "defaultHeight": 76,
           "fill": "#ffff66",
           "stroke": "#000000",
-          "shapeFamily": "rectangle",
+          "shapeFamily": "rounded-rect",
           "iconType": "function"
         },
         {
@@ -192,7 +192,7 @@
           "defaultHeight": 76,
           "fill": "#ffff66",
           "stroke": "#000000",
-          "shapeFamily": "rectangle",
+          "shapeFamily": "rounded-rect",
           "iconType": "interaction"
         },
         {
@@ -217,7 +217,7 @@
           "defaultHeight": 76,
           "fill": "#ffff66",
           "stroke": "#000000",
-          "shapeFamily": "rectangle",
+          "shapeFamily": "rounded-rect",
           "iconType": "event"
         },
         {
@@ -229,7 +229,7 @@
           "defaultWidth": 113,
           "defaultHeight": 57,
           "fill": "#ffff66",
-          "shapeFamily": "rectangle",
+          "shapeFamily": "rounded-rect",
           "iconType": "event"
         },
         {
@@ -430,7 +430,7 @@
           "defaultWidth": 49,
           "defaultHeight": 49,
           "fill": "#ddd7e6",
-          "shapeFamily": "rectangle",
+          "shapeFamily": "rounded-rect",
           "iconType": "principle"
         },
         {
@@ -546,7 +546,7 @@
           "defaultHeight": 76,
           "fill": "#f9c499",
           "stroke": "#000000",
-          "shapeFamily": "rectangle",
+          "shapeFamily": "rounded-rect",
           "iconType": "capability"
         },
         {
@@ -558,7 +558,7 @@
           "defaultWidth": 45,
           "defaultHeight": 45,
           "fill": "#f9c499",
-          "shapeFamily": "rectangle",
+          "shapeFamily": "rounded-rect",
           "iconType": "capability"
         },
         {
@@ -571,7 +571,7 @@
           "defaultHeight": 76,
           "fill": "#f9c499",
           "stroke": "#000000",
-          "shapeFamily": "rectangle",
+          "shapeFamily": "rounded-rect",
           "iconType": "course-of-action"
         },
         {
@@ -596,7 +596,7 @@
           "defaultHeight": 76,
           "fill": "#f9c499",
           "stroke": "#000000",
-          "shapeFamily": "rectangle",
+          "shapeFamily": "rounded-rect",
           "iconType": "value"
         },
         {
@@ -703,7 +703,7 @@
           "defaultHeight": 76,
           "fill": "#8eccdb",
           "stroke": "#000000",
-          "shapeFamily": "rectangle",
+          "shapeFamily": "rounded-rect",
           "iconType": "service"
         },
         {
@@ -715,7 +715,7 @@
           "defaultWidth": 113,
           "defaultHeight": 57,
           "fill": "#8eccdb",
-          "shapeFamily": "rectangle",
+          "shapeFamily": "rounded-rect",
           "iconType": "service"
         },
         {
@@ -728,7 +728,7 @@
           "defaultHeight": 76,
           "fill": "#8eccdb",
           "stroke": "#000000",
-          "shapeFamily": "rectangle",
+          "shapeFamily": "rounded-rect",
           "iconType": "function"
         },
         {
@@ -765,7 +765,7 @@
           "defaultHeight": 76,
           "fill": "#8eccdb",
           "stroke": "#000000",
-          "shapeFamily": "rectangle",
+          "shapeFamily": "rounded-rect",
           "iconType": "interaction"
         },
         {
@@ -790,7 +790,7 @@
           "defaultHeight": 76,
           "fill": "#8eccdb",
           "stroke": "#000000",
-          "shapeFamily": "rectangle",
+          "shapeFamily": "rounded-rect",
           "iconType": "event"
         },
         {
@@ -802,7 +802,7 @@
           "defaultWidth": 113,
           "defaultHeight": 57,
           "fill": "#8eccdb",
-          "shapeFamily": "rectangle",
+          "shapeFamily": "rounded-rect",
           "iconType": "event"
         },
         {
@@ -893,7 +893,7 @@
           "defaultWidth": 113,
           "defaultHeight": 57,
           "fill": "#c5e0b4",
-          "shapeFamily": "rectangle",
+          "shapeFamily": "rounded-rect",
           "iconType": "function"
         },
         {
@@ -905,7 +905,7 @@
           "defaultWidth": 113,
           "defaultHeight": 57,
           "fill": "#c5e0b4",
-          "shapeFamily": "rectangle",
+          "shapeFamily": "rounded-rect",
           "iconType": "process"
         },
         {
@@ -917,7 +917,7 @@
           "defaultWidth": 113,
           "defaultHeight": 57,
           "fill": "#c5e0b4",
-          "shapeFamily": "rectangle",
+          "shapeFamily": "rounded-rect",
           "iconType": "interaction"
         },
         {
@@ -929,7 +929,7 @@
           "defaultWidth": 113,
           "defaultHeight": 57,
           "fill": "#c5e0b4",
-          "shapeFamily": "rectangle",
+          "shapeFamily": "rounded-rect",
           "iconType": "event"
         },
         {
@@ -941,7 +941,7 @@
           "defaultWidth": 113,
           "defaultHeight": 57,
           "fill": "#c5e0b4",
-          "shapeFamily": "rectangle",
+          "shapeFamily": "rounded-rect",
           "iconType": "service"
         },
         {

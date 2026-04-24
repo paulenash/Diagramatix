@@ -100,7 +100,7 @@ export function ArchimateShape({ el }: { el: DiagramElement }) {
   const depthMap = useContext(ArchimateDepthCtx);
   const depth = depthMap.get(el.id) ?? 0;
   if (depth > 0) {
-    fill = lightenHex(fill, Math.min(0.85, depth * 0.30));
+    fill = lightenHex(fill, Math.min(0.75, depth * 0.15));
   }
 
   const iconOnly = !!el.properties?.archimateIconOnly;
