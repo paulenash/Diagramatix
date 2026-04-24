@@ -48,10 +48,10 @@ export const ICON_DRAWERS: Record<string, IconDrawer> = {
   // caps read clearly as ovals rather than slivers.
   role: ({ cx, cy, size, colour }) => {
     const s = size;
-    const rx = s * 0.14;              // ← wider (eccentricity halved)
-    const ry = s * 0.20;
-    const leftCx = cx - s * 0.18;     // centres separated slightly more so ellipses don't overlap
-    const rightCx = cx + s * 0.18;
+    const rx = s * 0.14;              // ellipse width unchanged
+    const ry = s * 0.20;              // ellipse height unchanged
+    const leftCx = cx - s * 0.22;     // ← further apart (was 0.18) → longer top/bottom lines
+    const rightCx = cx + s * 0.22;
     const topY = cy - ry;
     const bottomY = cy + ry;
     const sw = Math.max(1, s / 16);
@@ -71,12 +71,16 @@ export const ICON_DRAWERS: Record<string, IconDrawer> = {
       </g>
     );
   },
+  // Interface — lollipop. Circle diameter doubled from s × 0.26 to
+  // s × 0.52 (radius 0.26). Stem shortened so the lollipop still fits.
   interface: ({ cx, cy, size, colour }) => {
     const s = size;
+    const r = s * 0.26;                  // ← was 0.13 (2× diameter)
+    const circleCx = cx + s * 0.08;      // centred slightly right of icon middle
     return (
       <g stroke={colour} strokeWidth={Math.max(1, s / 16)} fill="none">
-        <circle cx={cx + s * 0.18} cy={cy} r={s * 0.13} />
-        <line x1={cx - s * 0.3} y1={cy} x2={cx + s * 0.05} y2={cy} />
+        <circle cx={circleCx} cy={cy} r={r} />
+        <line x1={cx - s * 0.30} y1={cy} x2={circleCx - r} y2={cy} />
       </g>
     );
   },
@@ -97,21 +101,21 @@ export const ICON_DRAWERS: Record<string, IconDrawer> = {
       />
     );
   },
-  // Function — two upward-pointing chevrons stacked vertically, gap
-  // between them equals the role ellipse height (s × 0.4), with
-  // vertical lines joining the chevron ends on the left and right.
+  // Function — two upward-pointing chevrons stacked vertically,
+  // slightly wider than the old version and brought slightly closer
+  // together. Line thickness matches the Role icon.
   function: ({ cx, cy, size, colour }) => {
     const s = size;
-    const halfW = s * 0.24;
+    const halfW = s * 0.30;              // ← wider (was 0.24)
     const chevHeight = s * 0.10;
-    const ellipseHeight = s * 0.4;           // height of the Role ellipse
-    const topBase = cy - (ellipseHeight + chevHeight) / 2;
+    const gap = s * 0.30;                // ← closer (was 0.40)
+    const topBase = cy - (gap + chevHeight) / 2;
     const topPeak = topBase - chevHeight;
-    const bottomBase = topBase + ellipseHeight;
+    const bottomBase = topBase + gap;
     const bottomPeak = bottomBase - chevHeight;
     const leftX = cx - halfW;
     const rightX = cx + halfW;
-    const sw = Math.max(1.5, s / 14);
+    const sw = Math.max(1, s / 16);      // ← matches Role icon
     return (
       <g stroke={colour} strokeWidth={sw} fill="none" strokeLinejoin="round" strokeLinecap="round">
         <polyline points={`${leftX},${topBase} ${cx},${topPeak} ${rightX},${topBase}`} />
