@@ -164,7 +164,8 @@ interface Props {
     targetSide: Side,
     sourceOffsetAlong?: number,
     targetOffsetAlong?: number,
-    force?: boolean
+    force?: boolean,
+    initialLabel?: string,
   ) => void;
   onDeleteConnector: (id: string) => void;
   onUpdateConnectorEndpoint: (
@@ -4415,10 +4416,21 @@ export function Canvas({
         <ArchimateConnectorPicker
           x={pendingArchiConn.screenX + 6}
           y={pendingArchiConn.screenY + 6}
+          sourceName={(() => {
+            const el = data.elements.find(e => e.id === pendingArchiConn.sourceId);
+            const key = el?.properties?.shapeKey as string | undefined;
+            return key ? findArchimateShapeByKey(key)?.name : undefined;
+          })()}
+          targetName={(() => {
+            const el = data.elements.find(e => e.id === pendingArchiConn.targetId);
+            const key = el?.properties?.shapeKey as string | undefined;
+            return key ? findArchimateShapeByKey(key)?.name : undefined;
+          })()}
           onCancel={() => setPendingArchiConn(null)}
-          onSelect={(archiType: ArchimateConnectorType) => {
+          onSelect={(archiType: ArchimateConnectorType, extras?: { influenceSign?: "+" | "-" }) => {
             const p = pendingArchiConn;
             setPendingArchiConn(null);
+            const initialLabel = archiType === "archi-influence" && extras?.influenceSign ? extras.influenceSign : undefined;
             onAddConnector(
               p.sourceId,
               p.targetId,
@@ -4429,6 +4441,8 @@ export function Canvas({
               p.targetSide,
               p.sourceOffset,
               p.targetOffset,
+              false,            // force
+              initialLabel,
             );
           }}
         />

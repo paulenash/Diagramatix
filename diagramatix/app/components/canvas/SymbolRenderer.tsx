@@ -1428,7 +1428,10 @@ function getLabelPos(el: DiagramElement, archimateDepth: number = 0): { x: numbe
     const isActorIcon = iconOnly && typeof el.properties?.shapeKey === "string" &&
       (el.properties.shapeKey as string).includes("actor");
     if (isActorIcon) {
-      return { x: el.x + el.width / 2, y: el.y + el.height + 12, baseline: "hanging" };
+      // Tight gap so the label hugs the figure's feet — the box already
+      // hugs the figure (size = el.height), leaving only ~3px of slack
+      // between the feet and the box bottom.
+      return { x: el.x + el.width / 2, y: el.y + el.height + 2, baseline: "hanging" };
     }
     if (archimateDepth > 0) {
       return { x: el.x + el.width / 2, y: el.y + HEADER_H / 2, baseline: "middle" };
@@ -2084,13 +2087,26 @@ export function SymbolRenderer({
         element.type === 'uml-enumeration'
       ) && !(element.type === 'gateway' && (element.properties.gatewayRole as string | undefined) === 'merge') && (() => {
         const isChevron = element.type === 'chevron' || element.type === 'chevron-collapsed';
+        const isArchi = element.type === 'archimate-shape';
         const labelLines = element.label.split('\n');
         const fSize = fs(isActorOrTeam ? 11 : 12);
         const lineH = fSize * 1.3;
-        if (isChevron && labelLines.length > 1) {
-          const topY = labelInfo.y - ((labelLines.length - 1) * lineH) / 2;
+        if ((isChevron || isArchi) && labelLines.length > 1) {
+          // For ArchiMate the labelInfo anchor is either the centre of
+          // the box (leaf) or the header strip (container) or the figure
+          // baseline (icon-only Actor). Stack tspans relative to that
+          // anchor, respecting the baseline.
+          let topY: number;
+          if (isArchi && labelInfo.baseline === "hanging") {
+            // Anchor is the TOP of the first line (e.g. icon-only Actor)
+            topY = labelInfo.y;
+          } else {
+            // Centre the block on the anchor (default + chevron behaviour)
+            topY = labelInfo.y - ((labelLines.length - 1) * lineH) / 2;
+          }
           return (
             <text textAnchor="middle" fontSize={fSize} fill="#111827"
+              dominantBaseline={isArchi ? labelInfo.baseline : undefined}
               style={{ userSelect: "none", pointerEvents: "none" }}>
               {labelLines.map((line, i) => (
                 <tspan key={i} x={labelInfo.x} y={topY + i * lineH}>{line}</tspan>

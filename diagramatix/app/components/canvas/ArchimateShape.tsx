@@ -100,7 +100,7 @@ export function ArchimateShape({ el }: { el: DiagramElement }) {
   const depthMap = useContext(ArchimateDepthCtx);
   const depth = depthMap.get(el.id) ?? 0;
   if (depth > 0) {
-    fill = lightenHex(fill, Math.min(0.75, depth * 0.15));
+    fill = lightenHex(fill, Math.min(0.80, depth * 0.25));
   }
 
   const iconOnly = !!el.properties?.archimateIconOnly;
@@ -116,8 +116,11 @@ export function ArchimateShape({ el }: { el: DiagramElement }) {
     // category theme colour so the label stays readable.
     const cx = el.x + el.width / 2;
     const cy = el.y + el.height / 2;
-    const size = Math.min(el.width, el.height);
     const isActor = entry.iconType === "actor";
+    // Actor: scale figure to the box HEIGHT (not min) so the stick
+    // figure fills the box vertically and the label can hug the feet.
+    // Other icon-only shapes still use the smaller dimension.
+    const size = isActor ? el.height : Math.min(el.width, el.height);
     // Service & Event want a filled background shape in theme colour
     if (!isActor) {
       let bg: string;

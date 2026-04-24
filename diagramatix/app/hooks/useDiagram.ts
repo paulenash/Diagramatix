@@ -240,6 +240,7 @@ type Action =
       sourceOffsetAlong?: number;
       targetOffsetAlong?: number;
       force?: boolean;
+      initialLabel?: string;
     }}
   | { type: "DELETE_CONNECTOR"; payload: { id: string } }
   | { type: "UPDATE_CONNECTOR_ENDPOINT"; payload: {
@@ -1999,7 +2000,7 @@ function reducer(state: DiagramData, action: Action): DiagramData {
     }
 
     case "ADD_CONNECTOR": {
-      const { sourceId, targetId, connectorType, directionType, routingType, sourceSide, targetSide, sourceOffsetAlong, targetOffsetAlong, force } = action.payload;
+      const { sourceId, targetId, connectorType, directionType, routingType, sourceSide, targetSide, sourceOffsetAlong, targetOffsetAlong, force, initialLabel } = action.payload;
       const source = state.elements.find((el) => el.id === sourceId);
       const target = state.elements.find((el) => el.id === targetId);
       if (!source || !target) return state;
@@ -2148,7 +2149,8 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         sourceInvisibleLeader,
         targetInvisibleLeader,
         waypoints,
-        label:        isFlow       ? `flow ${flowCount + 1}`
+        label:        initialLabel !== undefined ? initialLabel
+                    : isFlow       ? `flow ${flowCount + 1}`
                     : isFromInitialState ? ""
                     : isTransition ? `transition ${transitionCount + 1}`
                     : isMsgBpmn   ? `message ${msgBpmnCount + 1}`
@@ -3528,12 +3530,13 @@ export function useDiagram(initialData: DiagramData) {
       targetSide: Side = "left",
       sourceOffsetAlong?: number,
       targetOffsetAlong?: number,
-      force?: boolean
+      force?: boolean,
+      initialLabel?: string,
     ) => {
       pushHistory(snapshotData());
       dispatch({
         type: "ADD_CONNECTOR",
-        payload: { sourceId, targetId, connectorType, directionType, routingType, sourceSide, targetSide, sourceOffsetAlong, targetOffsetAlong, force },
+        payload: { sourceId, targetId, connectorType, directionType, routingType, sourceSide, targetSide, sourceOffsetAlong, targetOffsetAlong, force, initialLabel },
       });
     },
     []

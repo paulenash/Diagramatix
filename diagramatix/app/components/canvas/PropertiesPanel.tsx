@@ -1393,10 +1393,11 @@ export function PropertiesPanel({
               className="w-full px-1.5 py-1 border border-gray-300 rounded text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-500 resize-y overflow-y-auto"
               rows={
                 element.type === "archimate-shape"
-                  // Dynamic: starts at 1 line, grows with each Shift+Enter
-                  // the user types (caps at 6 lines so the panel doesn't
-                  // stretch excessively).
-                  ? Math.max(1, Math.min(6, labelDraft.split("\n").length))
+                  // Starts at 3 lines, grows with each Shift+Enter the
+                  // user types (caps at 6 lines so the panel doesn't
+                  // stretch excessively). Enter commits, Shift+Enter
+                  // inserts a newline.
+                  ? Math.max(3, Math.min(6, labelDraft.split("\n").length))
                   : (element.type === "chevron" || element.type === "chevron-collapsed" ? 3 : 2)
               }
               value={labelDraft}

@@ -25,8 +25,8 @@
           "variant": "icon",
           "description": "A business actor is a business entity that is capable of performing behavior.",
           "category": "business",
-          "defaultWidth": 29,
-          "defaultHeight": 47,
+          "defaultWidth": 15,
+          "defaultHeight": 21,
           "fill": "#ffffff",
           "shapeFamily": "custom",
           "iconType": "actor"

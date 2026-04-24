@@ -75,11 +75,13 @@ function MarkerTriangleOpen({ id, color }: { id: string; color: string }) {
   );
 }
 function MarkerCircleFilled({ id, color }: { id: string; color: string }) {
-  // refX=1 anchors the circle's leading edge (nearest to target) at the
-  // connector start point, so the full disc sits OUTSIDE the element
-  // boundary rather than straddling it.
+  // orient="auto" (NOT auto-start-reverse) so the marker's local +x
+  // points along the path direction — i.e. TOWARD the target, which is
+  // away from the source element's interior. With refX=1 the circle's
+  // left edge sits exactly on the source boundary and the rest of the
+  // disc extends outward into free space.
   return (
-    <marker id={id} markerWidth={8} markerHeight={8} refX={1} refY={4} orient="auto-start-reverse" overflow="visible">
+    <marker id={id} markerWidth={8} markerHeight={8} refX={1} refY={4} orient="auto" overflow="visible">
       <circle cx={4} cy={4} r={3} fill={color} stroke={color} strokeWidth={1} />
     </marker>
   );

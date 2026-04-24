@@ -1,0 +1,79 @@
+{
+  "_comment": "Partial ArchiMate 3.2 relationship compatibility matrix. Edit freely. The 'allowed' set lists the relationships the spec endorses for that pair (or category-pair); the 'derived' set lists ones reachable via the derivation rules in §5.7 of the spec. The 'universal' list is added to every pair (Association is always permitted).",
+  "universal": ["archi-association"],
+  "selfTypeOnly": ["archi-specialisation"],
+  "categories": {
+    "active": [
+      "Business Actor", "Business Role", "Business Collaboration",
+      "Application Component", "Application Collaboration",
+      "Node", "Device", "System Software", "Technology Collaboration"
+    ],
+    "interface": [
+      "Business Interface", "Application Interface", "Technology Interface"
+    ],
+    "behaviour": [
+      "Business Process", "Business Function", "Business Interaction", "Business Event", "Business Service",
+      "Application Process", "Application Function", "Application Interaction", "Application Event", "Application Service",
+      "Technology Process", "Technology Function", "Technology Interaction", "Technology Event", "Technology Service"
+    ],
+    "passive": [
+      "Business Object", "Contract", "Representation", "Product",
+      "Data Object", "Artifact"
+    ],
+    "motivation": [
+      "Stakeholder", "Driver", "Assessment", "Goal", "Outcome",
+      "Principle", "Requirement", "Constraint", "Meaning", "Value"
+    ],
+    "strategy": [
+      "Resource", "Capability", "Course of Action", "Value Stream"
+    ]
+  },
+  "categoryRules": [
+    { "from": "active",     "to": "active",     "allowed": ["archi-composition", "archi-aggregation"] },
+    { "from": "active",     "to": "interface",  "allowed": ["archi-assignment", "archi-composition"] },
+    { "from": "active",     "to": "behaviour",  "allowed": ["archi-assignment"], "derived": ["archi-realisation"] },
+
+    { "from": "interface",  "to": "behaviour",  "allowed": ["archi-assignment"] },
+    { "from": "interface",  "to": "active",     "allowed": ["archi-serving"] },
+    { "from": "interface",  "to": "interface",  "allowed": ["archi-composition", "archi-aggregation"] },
+
+    { "from": "behaviour",  "to": "behaviour",  "allowed": ["archi-triggering", "archi-flow", "archi-composition", "archi-aggregation"], "derived": ["archi-realisation"] },
+    { "from": "behaviour",  "to": "active",     "allowed": ["archi-serving"] },
+    { "from": "behaviour",  "to": "interface",  "allowed": ["archi-serving"] },
+    { "from": "behaviour",  "to": "passive",    "allowed": ["archi-access"] },
+
+    { "from": "passive",    "to": "behaviour",  "allowed": ["archi-access"] },
+    { "from": "passive",    "to": "active",     "allowed": ["archi-realisation"] },
+    { "from": "passive",    "to": "passive",    "allowed": ["archi-composition", "archi-aggregation"] },
+
+    { "from": "motivation", "to": "motivation", "allowed": ["archi-influence", "archi-composition", "archi-aggregation"] },
+    { "from": "motivation", "to": "strategy",   "derived": ["archi-influence"] },
+    { "from": "motivation", "to": "behaviour",  "derived": ["archi-influence"] },
+    { "from": "motivation", "to": "active",     "derived": ["archi-influence"] },
+
+    { "from": "strategy",   "to": "strategy",   "allowed": ["archi-composition", "archi-aggregation", "archi-triggering", "archi-flow"], "derived": ["archi-realisation"] },
+    { "from": "strategy",   "to": "behaviour",  "allowed": ["archi-realisation"] },
+    { "from": "strategy",   "to": "active",     "allowed": ["archi-assignment"] }
+  ],
+  "overrides": {
+    "_comment": "Per-pair overrides. Use to add or override category-level rules for a specific element pair. Format: overrides[sourceName][targetName] = { allowed?: [...], derived?: [...] }",
+    "Business Actor": {
+      "Business Role":     { "allowed": ["archi-assignment"] },
+      "Business Service":  { "allowed": ["archi-serving"] }
+    },
+    "Application Component": {
+      "Application Service": { "allowed": ["archi-realisation"] }
+    },
+    "Node": {
+      "Technology Service": { "allowed": ["archi-realisation"] },
+      "Artifact":           { "allowed": ["archi-assignment", "archi-realisation"] }
+    },
+    "Artifact": {
+      "Application Component": { "allowed": ["archi-realisation"] },
+      "System Software":       { "allowed": ["archi-realisation"] }
+    },
+    "Capability": {
+      "Course of Action": { "allowed": ["archi-realisation"] }
+    }
+  }
+}
