@@ -139,9 +139,8 @@ export const ICON_DRAWERS: Record<string, IconDrawer> = {
       />
     );
   },
-  // Event — chevron-like shape with a V-notch on the left and a
-  // half-circle bulge on the right. Right end is rounded (not a
-  // triangular point).
+  // Event (ArchiMate 3.2) — pill with an inward-facing semi-circle
+  // scoop on the left and a half-circle bulge on the right.
   event: ({ cx, cy, size, colour }) => {
     const s = size;
     const top = cy - s * 0.18;
@@ -149,32 +148,50 @@ export const ICON_DRAWERS: Record<string, IconDrawer> = {
     const left = cx - s * 0.30;
     const right = cx + s * 0.30;
     const radius = (bot - top) / 2;
-    const notchTip = left + s * 0.12; // how far the V-notch reaches into the shape
     const archStart = right - radius;
     return (
       <path
-        d={`M ${left} ${top} L ${archStart} ${top} A ${radius} ${radius} 0 0 1 ${archStart} ${bot} L ${left} ${bot} L ${notchTip} ${cy} Z`}
+        d={`M ${left} ${top} L ${archStart} ${top} A ${radius} ${radius} 0 0 1 ${archStart} ${bot} L ${left} ${bot} A ${radius} ${radius} 0 0 0 ${left} ${top} Z`}
         fill="none" stroke={colour} strokeWidth={Math.max(1, s / 16)}
         strokeLinejoin="round"
       />
     );
   },
+  // Interaction — two half-discs separated by a small gap. Left one
+  // bulges LEFT (curve on left, flat edge on the right), right one
+  // bulges RIGHT (curve on right, flat edge on the left).
   interaction: ({ cx, cy, size, colour }) => {
     const s = size;
+    const sw = Math.max(1, s / 16);
+    const r = s * 0.18;
+    const gap = s * 0.06;
+    const leftX = cx - gap / 2;   // flat edge x for left half-disc
+    const rightX = cx + gap / 2;  // flat edge x for right half-disc
+    const topY = cy - r;
+    const botY = cy + r;
     return (
-      <g stroke={colour} strokeWidth={Math.max(1, s / 16)} fill="none">
-        <circle cx={cx - s * 0.09} cy={cy} r={s * 0.16} />
-        <circle cx={cx + s * 0.09} cy={cy} r={s * 0.16} />
+      <g stroke={colour} strokeWidth={sw} fill="none" strokeLinejoin="round">
+        <path d={`M ${leftX} ${topY} A ${r} ${r} 0 0 0 ${leftX} ${botY} Z`} />
+        <path d={`M ${rightX} ${topY} A ${r} ${r} 0 0 1 ${rightX} ${botY} Z`} />
       </g>
     );
   },
+  // Object — a short rectangle sitting on top of the main body.
+  // Both rectangles share the same width.
   object: ({ cx, cy, size, colour }) => {
     const s = size;
+    const sw = Math.max(1, s / 16);
+    const mainW = s * 0.44;
+    const mainH = s * 0.28;
+    const topH = s * 0.10;
+    const mainLeft = cx - mainW / 2;
+    const mainTop = cy - mainH / 2 + topH / 2; // nudge main down to leave room for top strip
+    const topTop = mainTop - topH;
     return (
-      <path
-        d={`M ${cx - s * 0.28} ${cy - s * 0.2} L ${cx + s * 0.28} ${cy - s * 0.2} L ${cx + s * 0.28} ${cy + s * 0.2} L ${cx - s * 0.28} ${cy + s * 0.2} Z`}
-        fill="none" stroke={colour} strokeWidth={Math.max(1, s / 16)}
-      />
+      <g stroke={colour} strokeWidth={sw} fill="none">
+        <rect x={mainLeft} y={topTop} width={mainW} height={topH} />
+        <rect x={mainLeft} y={mainTop} width={mainW} height={mainH} />
+      </g>
     );
   },
   data: ({ cx, cy, size, colour }) => {
@@ -196,30 +213,79 @@ export const ICON_DRAWERS: Record<string, IconDrawer> = {
       </g>
     );
   },
+  // Contract — short rectangles at the top AND bottom of a larger
+  // middle rectangle. All three rectangles share the same width.
   contract: ({ cx, cy, size, colour }) => {
     const s = size;
+    const sw = Math.max(1, s / 16);
+    const mainW = s * 0.44;
+    const mainH = s * 0.24;
+    const stripH = s * 0.08;
+    const gap = s * 0.02;
+    const mainLeft = cx - mainW / 2;
+    const mainTop = cy - mainH / 2;
+    const topStripTop = mainTop - gap - stripH;
+    const botStripTop = mainTop + mainH + gap;
     return (
-      <g stroke={colour} strokeWidth={Math.max(1, s / 16)} fill="none">
-        <path d={`M ${cx - s * 0.22} ${cy - s * 0.22} L ${cx + s * 0.12} ${cy - s * 0.22} L ${cx + s * 0.22} ${cy - s * 0.12} L ${cx + s * 0.22} ${cy + s * 0.22} L ${cx - s * 0.22} ${cy + s * 0.22} Z`} />
-        <line x1={cx - s * 0.14} y1={cy} x2={cx + s * 0.14} y2={cy} />
-        <line x1={cx - s * 0.14} y1={cy + s * 0.1} x2={cx + s * 0.14} y2={cy + s * 0.1} />
+      <g stroke={colour} strokeWidth={sw} fill="none">
+        <rect x={mainLeft} y={topStripTop} width={mainW} height={stripH} />
+        <rect x={mainLeft} y={mainTop} width={mainW} height={mainH} />
+        <rect x={mainLeft} y={botStripTop} width={mainW} height={stripH} />
       </g>
     );
   },
+  // Product — outer rectangle with a smaller inner rectangle in the
+  // top-left corner, half the outer's width.
   product: ({ cx, cy, size, colour }) => {
     const s = size;
+    const sw = Math.max(1, s / 16);
+    const outerW = s * 0.50;
+    const outerH = s * 0.36;
+    const outerLeft = cx - outerW / 2;
+    const outerTop = cy - outerH / 2;
+    const innerW = outerW / 2;
+    const innerH = outerH * 0.35;
     return (
-      <path
-        d={`M ${cx - s * 0.28} ${cy + s * 0.22} L ${cx - s * 0.28} ${cy - s * 0.1} L ${cx} ${cy - s * 0.22} L ${cx + s * 0.28} ${cy - s * 0.1} L ${cx + s * 0.28} ${cy + s * 0.22} Z`}
-        fill="none" stroke={colour} strokeWidth={Math.max(1, s / 16)}
-      />
+      <g stroke={colour} strokeWidth={sw} fill="none">
+        <rect x={outerLeft} y={outerTop} width={outerW} height={outerH} />
+        <rect x={outerLeft} y={outerTop} width={innerW} height={innerH} />
+      </g>
     );
   },
+  // Representation — same frame as Object (short top strip + main body),
+  // but the bottom edge of the main body is replaced by two semicircles:
+  // left bulges downward (below baseline), right bulges upward (above) —
+  // giving a wavy bottom.
   representation: ({ cx, cy, size, colour }) => {
     const s = size;
+    const sw = Math.max(1, s / 16);
+    const mainW = s * 0.44;
+    const mainH = s * 0.28;
+    const topW = s * 0.30;
+    const topH = s * 0.10;
+    const mainLeft = cx - mainW / 2;
+    const mainTop = cy - mainH / 2 + topH / 2;
+    const topLeft = cx - topW / 2;
+    const topTop = mainTop - topH;
+    const mainRight = mainLeft + mainW;
+    const mainBot = mainTop + mainH;
+    const halfW = mainW / 2;
+    const midX = mainLeft + halfW;
+    const radius = halfW / 2;
+    // Body: top-left → top-right → down right side → along wavy bottom
+    // (right semicircle bulges UP / sweep=0, then left semicircle
+    // bulges DOWN / sweep=1) → up left side.
+    const bodyPath =
+      `M ${mainLeft} ${mainTop} ` +
+      `L ${mainRight} ${mainTop} ` +
+      `L ${mainRight} ${mainBot} ` +
+      `A ${radius} ${radius} 0 0 0 ${midX} ${mainBot} ` +
+      `A ${radius} ${radius} 0 0 1 ${mainLeft} ${mainBot} ` +
+      `L ${mainLeft} ${mainTop} Z`;
     return (
-      <g stroke={colour} strokeWidth={Math.max(1, s / 16)} fill="none">
-        <path d={`M ${cx - s * 0.24} ${cy - s * 0.22} Q ${cx} ${cy - s * 0.28} ${cx + s * 0.24} ${cy - s * 0.22} L ${cx + s * 0.24} ${cy + s * 0.22} Q ${cx} ${cy + s * 0.28} ${cx - s * 0.24} ${cy + s * 0.22} Z`} />
+      <g stroke={colour} strokeWidth={sw} fill="none">
+        <rect x={topLeft} y={topTop} width={topW} height={topH} />
+        <path d={bodyPath} strokeLinejoin="round" />
       </g>
     );
   },

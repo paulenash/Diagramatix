@@ -3,6 +3,7 @@
 import React, { useRef, useState, useCallback, useEffect, useMemo } from "react";
 import { nanoid } from "nanoid";
 import type {
+  ArchimateConnectorType,
   BpmnTaskType,
   Connector,
   ConnectorType,
@@ -16,6 +17,7 @@ import type {
   Side,
   SymbolType,
 } from "@/app/lib/diagram/types";
+import { ArchimateConnectorPicker } from "./ArchimateConnectorPicker";
 import { SymbolRenderer, SublaneIdsCtx, ProcessGroupDepthCtx, LaneDepthCtx, DatabaseCtx, ArchimateDepthCtx, type ResizeHandle } from "./SymbolRenderer";
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
 import { PaletteSymbolPreview } from "./Palette";
@@ -428,6 +430,14 @@ export function Canvas({
     sourceSide: Side; targetSide: Side;
     sourceOffset?: number; targetOffset?: number;
     pos: Point;
+  } | null>(null);
+  // ArchiMate connector picker: stores the dropped-connector parameters
+  // and defers onAddConnector until the user selects a relationship type.
+  const [pendingArchiConn, setPendingArchiConn] = useState<{
+    sourceId: string; targetId: string;
+    sourceSide: Side; targetSide: Side;
+    sourceOffset?: number; targetOffset?: number;
+    screenX: number; screenY: number;
   } | null>(null);
   const [focusedEndpoint, setFocusedEndpoint] = useState<"source" | "target" | null>(null);
   const [msgMarkerFocused, setMsgMarkerFocused] = useState(false);
@@ -901,6 +911,23 @@ export function Canvas({
                 return;
               }
             }
+          } else if (diagramType === "archimate") {
+            // Defer to the picker — the user chooses the relationship type
+            // from a popup. Do NOT create the connector yet.
+            setPendingArchiConn({
+              sourceId: elementId,
+              targetId: targetEl.id,
+              sourceSide: seqSourceSide,
+              targetSide: seqTargetSide,
+              sourceOffset: seqSourceOffsetAlong,
+              targetOffset: seqTargetOffsetAlong,
+              screenX: ev.clientX,
+              screenY: ev.clientY,
+            });
+            setDraggingConnector(null);
+            window.removeEventListener("mousemove", onMouseMove);
+            window.removeEventListener("mouseup", onMouseUp);
+            return;
           } else {
             connType = "sequence"; connRouting = defaultRoutingType; connDirection = defaultDirectionType;
           }
@@ -4384,6 +4411,28 @@ export function Canvas({
           </div>
         );
       })()}
+      {pendingArchiConn && (
+        <ArchimateConnectorPicker
+          x={pendingArchiConn.screenX + 6}
+          y={pendingArchiConn.screenY + 6}
+          onCancel={() => setPendingArchiConn(null)}
+          onSelect={(archiType: ArchimateConnectorType) => {
+            const p = pendingArchiConn;
+            setPendingArchiConn(null);
+            onAddConnector(
+              p.sourceId,
+              p.targetId,
+              archiType,
+              "directed",
+              "rectilinear",
+              p.sourceSide,
+              p.targetSide,
+              p.sourceOffset,
+              p.targetOffset,
+            );
+          }}
+        />
+      )}
     </div>
   );
 }

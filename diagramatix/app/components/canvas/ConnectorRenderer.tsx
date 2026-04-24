@@ -4,6 +4,7 @@ import { useState, useContext } from "react";
 import type { Connector, Point, Side } from "@/app/lib/diagram/types";
 import { DisplayModeCtx, ConnectorFontScaleCtx, sketchyFilter } from "@/app/lib/diagram/displayMode";
 import { waypointsToSvgPath, waypointsToCurvePath, waypointsToRoundedPath } from "@/app/lib/diagram/routing";
+import { ArchimateConnectorRenderer, isArchimateConnectorType } from "./ArchimateConnectorRenderer";
 
 interface Props {
   connector: Connector;
@@ -485,6 +486,23 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
   const [draggingEndLabel, setDraggingEndLabel] = useState<string | null>(null);
   const waypoints = connector.waypoints;
   if (waypoints.length === 0) return null;
+
+  // ArchiMate relationships render through their own independent pipeline.
+  // Keeps BPMN / Domain visuals separate from archi-* visuals so each set
+  // can evolve without cross-contamination.
+  if (isArchimateConnectorType(connector.type)) {
+    return (
+      <ArchimateConnectorRenderer
+        connector={connector}
+        selected={selected}
+        onSelect={onSelect}
+        svgToWorld={svgToWorld}
+        onUpdateWaypoints={onUpdateWaypoints}
+        onWaypointsDragEnd={onWaypointsDragEnd}
+        onUpdateLabel={onUpdateLabel}
+      />
+    );
+  }
 
   const isMessage = connector.type === "message";
   const isAssocBPMN = connector.type === "associationBPMN";

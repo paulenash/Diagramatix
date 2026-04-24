@@ -60,7 +60,28 @@ export type RepeatType = "none" | "loop" | "mi-sequential" | "mi-parallel";
 
 export type FlowType = "none" | "catching" | "throwing";
 
-export type ConnectorType = "sequence" | "message" | "association" | "transition" | "associationBPMN" | "messageBPMN" | "flow" | "uml-association" | "uml-aggregation" | "uml-composition" | "uml-generalisation";
+export type ArchimateConnectorType =
+  // Structural
+  | "archi-composition"
+  | "archi-aggregation"
+  | "archi-assignment"
+  | "archi-realisation"
+  // Dependency
+  | "archi-serving"
+  | "archi-access"
+  | "archi-influence"
+  | "archi-association"
+  // Dynamic
+  | "archi-triggering"
+  | "archi-flow"
+  // Other
+  | "archi-specialisation";
+
+export type ConnectorType =
+  | "sequence" | "message" | "association" | "transition"
+  | "associationBPMN" | "messageBPMN" | "flow"
+  | "uml-association" | "uml-aggregation" | "uml-composition" | "uml-generalisation"
+  | ArchimateConnectorType;
 
 export type Side = "top" | "right" | "bottom" | "left";
 

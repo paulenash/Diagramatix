@@ -1433,24 +1433,6 @@ export function PropertiesPanel({
         )}
       </div>
 
-      {element.type === "archimate-shape" && !element.properties?.archimateIconOnly && (
-        <div className="flex items-center gap-1">
-          <label className="text-[10px] text-gray-500 whitespace-nowrap w-14 shrink-0">Container</label>
-          <input
-            type="checkbox"
-            checked={!!element.properties?.archimateIsContainer}
-            onChange={e => onUpdateProperties(element.id, {
-              ...element.properties,
-              archimateIsContainer: e.target.checked,
-            })}
-            className="accent-blue-600"
-          />
-          <span className="text-[10px] text-gray-500 ml-2">
-            When on, the label shows at the top so children fit below
-          </span>
-        </div>
-      )}
-
       {element.type === "text-annotation" && (
         <div className="flex items-center gap-1">
           <label className="text-[10px] text-gray-500 whitespace-nowrap w-14 shrink-0">Colour</label>

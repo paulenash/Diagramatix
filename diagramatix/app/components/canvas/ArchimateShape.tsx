@@ -128,15 +128,15 @@ export function ArchimateShape({ el }: { el: DiagramElement }) {
         const r = el.height / 2;
         bg = `M ${el.x + r} ${el.y} L ${el.x + el.width - r} ${el.y} A ${r} ${r} 0 0 1 ${el.x + el.width - r} ${el.y + el.height} L ${el.x + r} ${el.y + el.height} A ${r} ${r} 0 0 1 ${el.x + r} ${el.y} Z`;
       } else if (entry.iconType === "event") {
-        // Chevron + half-circle sized to the element bounds
+        // ArchiMate 3.2: inward semi-circle scoop on the left + bulge on
+        // the right. Both arcs use the element height as diameter.
         const top = el.y;
         const bot = el.y + el.height;
         const left = el.x;
         const right = el.x + el.width;
         const radius = el.height / 2;
-        const notchTip = left + el.width * 0.14;
         const archStart = right - radius;
-        bg = `M ${left} ${top} L ${archStart} ${top} A ${radius} ${radius} 0 0 1 ${archStart} ${bot} L ${left} ${bot} L ${notchTip} ${(top + bot) / 2} Z`;
+        bg = `M ${left} ${top} L ${archStart} ${top} A ${radius} ${radius} 0 0 1 ${archStart} ${bot} L ${left} ${bot} A ${radius} ${radius} 0 0 0 ${left} ${top} Z`;
       } else {
         bg = `M ${el.x} ${el.y} L ${el.x + el.width} ${el.y} L ${el.x + el.width} ${el.y + el.height} L ${el.x} ${el.y + el.height} Z`;
       }
