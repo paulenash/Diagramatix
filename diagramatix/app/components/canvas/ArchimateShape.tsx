@@ -22,6 +22,17 @@ import {
 import { getThemeFor, type ArchimateCategoryTheme } from "@/app/lib/archimate/themes";
 import { ICON_DRAWERS } from "@/app/lib/archimate/icons";
 
+const STROKE_WIDTH = 2.4;               // 2× the previous 1.2
+
+function lightenHex(hex: string, amount: number): string {
+  const m = /^#([0-9a-f]{6})$/i.exec(hex);
+  if (!m) return hex;
+  const n = parseInt(m[1], 16);
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  const mix = (c: number) => Math.round(c + (255 - c) * amount);
+  return `#${[mix(r), mix(g), mix(b)].map(v => v.toString(16).padStart(2, "0")).join("")}`;
+}
+
 // ────────────────────────────────────────────────────────────────────
 // Outline renderers per shape family
 // ────────────────────────────────────────────────────────────────────
@@ -75,22 +86,76 @@ export function ArchimateShape({ el }: { el: DiagramElement }) {
   const theme: ArchimateCategoryTheme | undefined = getThemeFor(entry.category);
   const elOverrideFill = el.properties?.fill as string | undefined;
   const elOverrideStroke = el.properties?.stroke as string | undefined;
-  const fill = elOverrideFill ?? theme?.fill ?? entry.fill ?? "#f5f5f5";
+  let fill = elOverrideFill ?? theme?.fill ?? entry.fill ?? "#f5f5f5";
   const stroke = elOverrideStroke ?? theme?.stroke ?? entry.stroke ?? "#666666";
   const iconColour = (el.properties?.iconColour as string | undefined) ?? theme?.iconColour ?? stroke;
 
-  const d = drawOutline(entry.shapeFamily, el.x, el.y, el.width, el.height);
+  // Container fill: a shade lighter than children so the children stand
+  // out against their parent. 35% toward white works for the layer
+  // colours we're using.
+  if (el.properties?.archimateIsContainer) {
+    fill = lightenHex(fill, 0.35);
+  }
 
-  // Icon overlay — ALWAYS top-right corner regardless of variant.
+  const iconOnly = !!el.properties?.archimateIconOnly;
+  const drawIcon = entry.iconType ? ICON_DRAWERS[entry.iconType] : undefined;
+
+  if (iconOnly && drawIcon) {
+    // Icon-only rendering: the icon IS the shape. Fill the element bounds
+    // with the glyph; no rectangular outline.
+    //   - Actor: the stick figure (label rendered below by SymbolRenderer)
+    //   - Service: the rounded-rect service icon (label rendered inside)
+    //   - Event: the chevron+half-circle (label rendered inside)
+    // For service and event we also draw a filled background shape in the
+    // category theme colour so the label stays readable.
+    const cx = el.x + el.width / 2;
+    const cy = el.y + el.height / 2;
+    const size = Math.min(el.width, el.height);
+    const isActor = entry.iconType === "actor";
+    // Service & Event want a filled background shape in theme colour
+    if (!isActor) {
+      let bg: string;
+      if (entry.iconType === "service") {
+        // Stadium / pill shape: rectangle with semicircle ends on the
+        // left and right. The corner radius equals half the height so
+        // the end caps are true semicircles.
+        const r = el.height / 2;
+        bg = `M ${el.x + r} ${el.y} L ${el.x + el.width - r} ${el.y} A ${r} ${r} 0 0 1 ${el.x + el.width - r} ${el.y + el.height} L ${el.x + r} ${el.y + el.height} A ${r} ${r} 0 0 1 ${el.x + r} ${el.y} Z`;
+      } else if (entry.iconType === "event") {
+        // Chevron + half-circle sized to the element bounds
+        const top = el.y;
+        const bot = el.y + el.height;
+        const left = el.x;
+        const right = el.x + el.width;
+        const radius = el.height / 2;
+        const notchTip = left + el.width * 0.14;
+        const archStart = right - radius;
+        bg = `M ${left} ${top} L ${archStart} ${top} A ${radius} ${radius} 0 0 1 ${archStart} ${bot} L ${left} ${bot} L ${notchTip} ${(top + bot) / 2} Z`;
+      } else {
+        bg = `M ${el.x} ${el.y} L ${el.x + el.width} ${el.y} L ${el.x + el.width} ${el.y + el.height} L ${el.x} ${el.y + el.height} Z`;
+      }
+      return (
+        <g>
+          <path d={bg} fill={fill} stroke={stroke} strokeWidth={STROKE_WIDTH} strokeLinejoin="round" />
+        </g>
+      );
+    }
+    // Actor icon-only: draw the stick figure large, no background
+    return (
+      <g>
+        {drawIcon({ cx, cy, size, colour: stroke })}
+      </g>
+    );
+  }
+
+  // Standard box rendering — outline + corner icon glyph
+  const d = drawOutline(entry.shapeFamily, el.x, el.y, el.width, el.height);
   const iconBoxSize = 18;
   const iconCx = el.x + el.width - iconBoxSize / 2 - 6;
   const iconCy = el.y + iconBoxSize / 2 + 6;
-
-  const drawIcon = entry.iconType ? ICON_DRAWERS[entry.iconType] : undefined;
-
   return (
     <g>
-      <path d={d} fill={fill} stroke={stroke} strokeWidth={1.2} />
+      <path d={d} fill={fill} stroke={stroke} strokeWidth={STROKE_WIDTH} />
       {drawIcon ? drawIcon({ cx: iconCx, cy: iconCy, size: iconBoxSize, colour: iconColour }) : null}
     </g>
   );

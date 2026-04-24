@@ -21,26 +21,41 @@ export type IconDrawer = (opts: {
 }) => React.ReactNode;
 
 export const ICON_DRAWERS: Record<string, IconDrawer> = {
-  // Actor — stick figure
+  // Actor — stick figure: hollow head; torso shortened by 20% at the
+  // leg-attach point (from cy + 0.22 to cy + 0.144)
   actor: ({ cx, cy, size, colour }) => {
     const s = size;
     const headR = s * 0.12;
+    const legAttach = cy + s * 0.144;
     return (
       <g stroke={colour} strokeWidth={Math.max(1, s / 16)} fill="none" strokeLinecap="round">
-        <circle cx={cx} cy={cy - s * 0.28} r={headR} fill={colour} />
-        <line x1={cx} y1={cy - s * 0.16} x2={cx} y2={cy + s * 0.22} />
+        <circle cx={cx} cy={cy - s * 0.28} r={headR} fill="none" />
+        <line x1={cx} y1={cy - s * 0.16} x2={cx} y2={legAttach} />
         <line x1={cx - s * 0.2} y1={cy - s * 0.04} x2={cx + s * 0.2} y2={cy - s * 0.04} />
-        <line x1={cx} y1={cy + s * 0.22} x2={cx - s * 0.18} y2={cy + s * 0.42} />
-        <line x1={cx} y1={cy + s * 0.22} x2={cx + s * 0.18} y2={cy + s * 0.42} />
+        <line x1={cx} y1={legAttach} x2={cx - s * 0.18} y2={cy + s * 0.42} />
+        <line x1={cx} y1={legAttach} x2={cx + s * 0.18} y2={cy + s * 0.42} />
       </g>
     );
   },
+  // Role — horizontal "log" (cylinder on its side): two vertical
+  // ellipses as end caps joined by top + bottom horizontal lines.
+  // Only the LEFT half of the left ellipse is visible (the right
+  // half would sit inside the body). The right ellipse shows BOTH
+  // halves — the right half as the outline cap, the left half as
+  // an inner arc representing the back of the cylinder.
   role: ({ cx, cy, size, colour }) => {
     const s = size;
+    const rx = s * 0.07;
+    const ry = s * 0.20;
+    const leftCx = cx - s * 0.15;   // → centres separated by s × 0.30
+    const rightCx = cx + s * 0.15;
+    const topY = cy - ry;
+    const bottomY = cy + ry;
+    const sw = Math.max(1, s / 16);
     return (
-      <g stroke={colour} strokeWidth={Math.max(1, s / 16)} fill="none">
-        <circle cx={cx} cy={cy + s * 0.05} r={s * 0.22} />
-        <path d={`M ${cx - s * 0.3} ${cy + s * 0.1} A ${s * 0.3} ${s * 0.3} 0 0 1 ${cx + s * 0.3} ${cy + s * 0.1}`} />
+      <g stroke={colour} strokeWidth={sw} fill="none">
+        <path d={`M ${leftCx} ${topY} L ${rightCx} ${topY} A ${rx} ${ry} 0 0 1 ${rightCx} ${bottomY} L ${leftCx} ${bottomY} A ${rx} ${ry} 0 0 1 ${leftCx} ${topY} Z`} />
+        <path d={`M ${rightCx} ${topY} A ${rx} ${ry} 0 0 0 ${rightCx} ${bottomY}`} />
       </g>
     );
   },
@@ -62,38 +77,75 @@ export const ICON_DRAWERS: Record<string, IconDrawer> = {
       </g>
     );
   },
+  // Process — outlined right-pointing block arrow. Thinner body,
+  // taller arrowhead, unfilled.
   process: ({ cx, cy, size, colour }) => {
     const s = size;
+    const body = s * 0.10;         // body half-height (was 0.14 — now thinner)
+    const head = s * 0.26;         // arrowhead half-height (was 0.22 — now taller)
+    const tailX = cx - s * 0.30;
+    const shoulderX = cx + s * 0.06;
+    const tipX = cx + s * 0.30;
     return (
       <path
-        d={`M ${cx - s * 0.3} ${cy - s * 0.2} L ${cx + s * 0.1} ${cy - s * 0.2} L ${cx + s * 0.3} ${cy} L ${cx + s * 0.1} ${cy + s * 0.2} L ${cx - s * 0.3} ${cy + s * 0.2} Z`}
+        d={`M ${tailX} ${cy - body} L ${shoulderX} ${cy - body} L ${shoulderX} ${cy - head} L ${tipX} ${cy} L ${shoulderX} ${cy + head} L ${shoulderX} ${cy + body} L ${tailX} ${cy + body} Z`}
         fill="none" stroke={colour} strokeWidth={Math.max(1, s / 16)}
+        strokeLinejoin="round"
       />
     );
   },
+  // Function — chunky upward chevron. Two chevron strokes separated
+  // vertically by a gap (~5 px at full icon size), closed off on the
+  // left and right with short vertical line segments. Produces a
+  // filled hollow arrow pointing up.
   function: ({ cx, cy, size, colour }) => {
     const s = size;
+    const gap = Math.max(3, s * 0.16);       // vertical offset between the two ^ strokes
+    const topOuter = cy - s * 0.28;          // outer peak (top)
+    const bottomY = cy + s * 0.18;           // outer bottom-edge Y
+    const leftX = cx - s * 0.32;             // outer-left X
+    const rightX = cx + s * 0.32;            // outer-right X
     return (
       <path
-        d={`M ${cx - s * 0.28} ${cy + s * 0.2} L ${cx + s * 0.28} ${cy + s * 0.2} L ${cx} ${cy - s * 0.22} Z`}
-        fill="none" stroke={colour} strokeWidth={Math.max(1, s / 16)}
+        d={`M ${leftX} ${bottomY} L ${cx} ${topOuter} L ${rightX} ${bottomY} L ${rightX} ${bottomY - gap} L ${cx} ${topOuter + gap} L ${leftX} ${bottomY - gap} Z`}
+        fill={colour} stroke="none"
       />
     );
   },
+  // Service — stadium / pill shape with semicircle ends on the left
+  // and right (rx = height/2 gives true semicircles).
   service: ({ cx, cy, size, colour }) => {
     const s = size;
+    const h = s * 0.3;
     return (
       <rect
-        x={cx - s * 0.3} y={cy - s * 0.15}
-        width={s * 0.6} height={s * 0.3}
-        rx={s * 0.15} ry={s * 0.15}
+        x={cx - s * 0.3} y={cy - h / 2}
+        width={s * 0.6} height={h}
+        rx={h / 2} ry={h / 2}
         fill="none" stroke={colour} strokeWidth={Math.max(1, s / 16)}
       />
     );
   },
-  event: ({ cx, cy, size, colour }) => (
-    <circle cx={cx} cy={cy} r={size * 0.22} fill="none" stroke={colour} strokeWidth={Math.max(1, size / 16)} />
-  ),
+  // Event — chevron-like shape with a V-notch on the left and a
+  // half-circle bulge on the right. Right end is rounded (not a
+  // triangular point).
+  event: ({ cx, cy, size, colour }) => {
+    const s = size;
+    const top = cy - s * 0.18;
+    const bot = cy + s * 0.18;
+    const left = cx - s * 0.30;
+    const right = cx + s * 0.30;
+    const radius = (bot - top) / 2;
+    const notchTip = left + s * 0.12; // how far the V-notch reaches into the shape
+    const archStart = right - radius;
+    return (
+      <path
+        d={`M ${left} ${top} L ${archStart} ${top} A ${radius} ${radius} 0 0 1 ${archStart} ${bot} L ${left} ${bot} L ${notchTip} ${cy} Z`}
+        fill="none" stroke={colour} strokeWidth={Math.max(1, s / 16)}
+        strokeLinejoin="round"
+      />
+    );
+  },
   interaction: ({ cx, cy, size, colour }) => {
     const s = size;
     return (

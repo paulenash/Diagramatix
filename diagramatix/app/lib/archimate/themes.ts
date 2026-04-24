@@ -42,7 +42,7 @@ export interface ArchimateCategoryTheme {
  */
 export const DEFAULT_ARCHIMATE_THEMES: ArchimateCategoryTheme[] = [
   // Filled in by us (phase 1 scope)
-  { id: "business",    name: "Business",    fill: "#fffab2", stroke: "#b49b00", iconColour: "#6b5b00" },
+  { id: "business",    name: "Business",    fill: "#ffff00", stroke: "#b49b00", iconColour: "#6b5b00" },
   { id: "motivation",  name: "Motivation",  fill: "#e5d9ff", stroke: "#7a5db3", iconColour: "#4b2e89" },
   { id: "strategy",    name: "Strategy",    fill: "#f5deaa", stroke: "#b38037", iconColour: "#6b4a0e" },
   { id: "application", name: "Application", fill: "#b5ffff", stroke: "#2a7a91", iconColour: "#0b4d5e" },

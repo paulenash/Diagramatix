@@ -180,6 +180,7 @@ interface Props {
   onElementsMoveEnd?: () => void;
   pendingDragSymbol: SymbolType | null;
   pendingArchimateShapeKey?: string | null;
+  pendingArchimateIconOnly?: boolean;
   defaultDirectionType: DirectionType;
   defaultRoutingType: RoutingType;
   onUpdateProperties?: (id: string, props: Record<string, unknown>) => void;
@@ -379,6 +380,7 @@ export function Canvas({
   onElementsMoveEnd,
   pendingDragSymbol,
   pendingArchimateShapeKey,
+  pendingArchimateIconOnly,
   defaultDirectionType,
   defaultRoutingType,
   onUpdateProperties,
@@ -1191,7 +1193,8 @@ export function Canvas({
       const freeResize = elType === "task" || elType === "subprocess"
         || elType === "subprocess-expanded" || elType === "state"
         || elType === "submachine" || elType === "composite-state"
-        || elType === "chevron" || elType === "chevron-collapsed" || elType === "process-group";
+        || elType === "chevron" || elType === "chevron-collapsed" || elType === "process-group"
+        || (elType === "archimate-shape" && !(el!.properties?.archimateIconOnly));
       if (!isContainer && !freeResize && ar > 0) {
         if (handle.includes("e") || handle.includes("w")) {
           // Width is primary — derive height to preserve aspect ratio
@@ -1785,6 +1788,7 @@ export function Canvas({
     // across drops of the same base name ("Actor 1", "Actor 2", …).
     if (pendingDragSymbol === "archimate-shape" && pendingArchimateShapeKey) {
       const entry = findArchimateShapeByKey(pendingArchimateShapeKey);
+      const iconOnly = !!pendingArchimateIconOnly;
       let initial: { properties: Record<string, unknown>; width?: number; height?: number; label?: string };
       if (entry) {
         const baseName = entry.name.replace(/^(Business|Application|Motivation|Strategy|Technology|Physical|Implementation|Composite)\s+/i, "");
@@ -1793,14 +1797,25 @@ export function Canvas({
           el.type === "archimate-shape" &&
           typeof el.label === "string" && baseRe.test(el.label)
         ).length;
+        // Default aspect matches the palette preview (64 × 38 ≈ 1.68:1).
+        // Icon-only variants use their own fixed aspect so the glyph
+        // renders at a sensible scale.
+        let w: number, h: number;
+        if (iconOnly) {
+          if (entry.iconType === "actor") { w = 48; h = 86; }       // portrait stick figure
+          else if (entry.iconType === "service") { w = 120; h = 60; } // rounded-rect
+          else { w = 120; h = 60; }                                   // event + fallbacks
+        } else {
+          w = 128; h = 76; // matches palette preview aspect
+        }
         initial = {
-          properties: { shapeKey: entry.key },
-          width: entry.defaultWidth,
-          height: entry.defaultHeight,
+          properties: { shapeKey: entry.key, archimateIconOnly: iconOnly },
+          width: w,
+          height: h,
           label: `${baseName} ${used + 1}`,
         };
       } else {
-        initial = { properties: { shapeKey: pendingArchimateShapeKey } };
+        initial = { properties: { shapeKey: pendingArchimateShapeKey, archimateIconOnly: iconOnly } };
       }
       onAddElement("archimate-shape", worldPos, undefined, undefined, undefined, initial);
       return;

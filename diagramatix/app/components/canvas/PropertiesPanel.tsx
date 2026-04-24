@@ -1385,12 +1385,20 @@ export function PropertiesPanel({
           element.type === "uml-class" || element.type === "uml-enumeration" ||
           element.type === "text-annotation" ||
           element.type === "chevron" || element.type === "chevron-collapsed" ||
+          element.type === "archimate-shape" ||
           element.type === "pool" || element.type === "lane") ? (
             <textarea
               key={element.id}
               data-properties-label="true"
               className="w-full px-1.5 py-1 border border-gray-300 rounded text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-500 resize-y overflow-y-auto"
-              rows={element.type === "chevron" || element.type === "chevron-collapsed" ? 3 : 2}
+              rows={
+                element.type === "archimate-shape"
+                  // Dynamic: starts at 1 line, grows with each Shift+Enter
+                  // the user types (caps at 6 lines so the panel doesn't
+                  // stretch excessively).
+                  ? Math.max(1, Math.min(6, labelDraft.split("\n").length))
+                  : (element.type === "chevron" || element.type === "chevron-collapsed" ? 3 : 2)
+              }
               value={labelDraft}
               onFocus={(e) => e.target.select()}
               onChange={(e) => {
@@ -1424,6 +1432,24 @@ export function PropertiesPanel({
           />
         )}
       </div>
+
+      {element.type === "archimate-shape" && !element.properties?.archimateIconOnly && (
+        <div className="flex items-center gap-1">
+          <label className="text-[10px] text-gray-500 whitespace-nowrap w-14 shrink-0">Container</label>
+          <input
+            type="checkbox"
+            checked={!!element.properties?.archimateIsContainer}
+            onChange={e => onUpdateProperties(element.id, {
+              ...element.properties,
+              archimateIsContainer: e.target.checked,
+            })}
+            className="accent-blue-600"
+          />
+          <span className="text-[10px] text-gray-500 ml-2">
+            When on, the label shows at the top so children fit below
+          </span>
+        </div>
+      )}
 
       {element.type === "text-annotation" && (
         <div className="flex items-center gap-1">

@@ -1415,6 +1415,23 @@ function getLabelPos(el: DiagramElement): { x: number; y: number; baseline: "han
   if (el.type === "actor" || el.type === "team" || el.type === "hourglass" || el.type === "system") {
     return { x: el.x + el.width / 2, y: el.y + el.height + 12, baseline: "hanging" };
   }
+  // ArchiMate shapes:
+  //   - Icon-only Actor → label BELOW the stick figure
+  //   - Containers (shape with child elements) → label at TOP
+  //   - Default → label centred inside
+  if (el.type === "archimate-shape") {
+    const iconOnly = !!el.properties?.archimateIconOnly;
+    const isActorIcon = iconOnly && typeof el.properties?.shapeKey === "string" &&
+      (el.properties.shapeKey as string).includes("actor");
+    const isContainer = !!el.properties?.archimateIsContainer;
+    if (isActorIcon) {
+      return { x: el.x + el.width / 2, y: el.y + el.height + 12, baseline: "hanging" };
+    }
+    if (isContainer) {
+      return { x: el.x + el.width / 2, y: el.y + HEADER_H / 2, baseline: "middle" };
+    }
+    // fall through to default centred
+  }
   if (el.type === "system-boundary" || el.type === "composite-state" || el.type === "group" || el.type === "process-group") {
     return { x: el.x + el.width / 2, y: el.y + HEADER_H / 2, baseline: "middle" };
   }

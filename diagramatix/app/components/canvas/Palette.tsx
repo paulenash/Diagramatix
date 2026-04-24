@@ -13,7 +13,7 @@ import { ICON_DRAWERS } from "@/app/lib/archimate/icons";
 
 interface Props {
   diagramType: DiagramType;
-  onDragStart: (symbolType: SymbolType, extras?: { shapeKey?: string }) => void;
+  onDragStart: (symbolType: SymbolType, extras?: { shapeKey?: string; iconOnly?: boolean }) => void;
   disabledSymbols?: SymbolType[];
   colorConfig?: SymbolColorConfig;
 }
@@ -293,13 +293,25 @@ export function PaletteSymbolPreview({ type, colorConfig }: { type: SymbolType; 
 // ArchiMate palette — category accordion fed by the shape catalogue
 // ────────────────────────────────────────────────────────────────────
 
-function ArchimateShapePreview({ entry }: { entry: ArchimateShapeEntry }) {
+function ArchimateShapePreview({ entry, iconOnly = false }: { entry: ArchimateShapeEntry; iconOnly?: boolean }) {
   const theme = getThemeFor(entry.category);
   const fill = theme?.fill ?? entry.fill ?? "#f5f5f5";
   const stroke = theme?.stroke ?? entry.stroke ?? "#666";
   const iconColour = theme?.iconColour ?? stroke;
   // Larger preview so the icon glyph is clearly identifiable
   const w = 64, h = 38;
+  const drawIcon = entry.iconType ? ICON_DRAWERS[entry.iconType] : undefined;
+
+  // Icon-only variant: render the icon glyph itself AS the shape (no box
+  // outline, bigger icon) so the user sees the compact iconic form.
+  if (iconOnly && drawIcon) {
+    return (
+      <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
+        {drawIcon({ cx: w / 2, cy: h / 2, size: Math.min(w, h) * 1.4, colour: iconColour })}
+      </svg>
+    );
+  }
+
   let outline: React.ReactNode;
   switch (entry.shapeFamily) {
     case "ellipse":
@@ -317,12 +329,18 @@ function ArchimateShapePreview({ entry }: { entry: ArchimateShapeEntry }) {
     default:
       outline = <rect x={1} y={1} width={w - 2} height={h - 2} fill={fill} stroke={stroke} strokeWidth={1.2} />;
   }
-  // Big, centred icon glyph so the user can recognise the shape at a glance
-  const drawIcon = entry.iconType ? ICON_DRAWERS[entry.iconType] : undefined;
+  // Box variant: outlined rectangle with the icon glyph in the top-right
+  // corner (matching the canvas rendering)
+  const cornerSize = 14;
   return (
     <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
       {outline}
-      {drawIcon ? drawIcon({ cx: w / 2, cy: h / 2, size: Math.min(w, h) - 6, colour: iconColour }) : null}
+      {drawIcon ? drawIcon({
+        cx: w - cornerSize / 2 - 4,
+        cy: cornerSize / 2 + 4,
+        size: cornerSize,
+        colour: iconColour,
+      }) : null}
     </svg>
   );
 }
@@ -378,9 +396,31 @@ function ArchimatePalette({
         {catalogue === null ? (
           <p className="text-[11px] text-gray-400 p-2">Loading shapes…</p>
         ) : catalogue.categories.map(cat => {
-          // Only the "box" variant per element (icon-only variants are
-          // duplicates with no extra meaning in the palette).
-          const items = cat.shapes.filter(s => s.variant === "box");
+          // One palette entry per distinct element name. When both a
+          // "(box)" and an "icon" master exist for the same element, prefer
+          // the box form. For Actor, Business Service, and Business Event
+          // we ALSO surface the icon-variant as a separate drag source so
+          // users can pick the compact icon-only shape.
+          const ICON_AS_SEPARATE = new Set<string>(["Business Actor", "Business Service", "Business Event"]);
+          const byName = new Map<string, { primary: ArchimateShapeEntry; iconCounterpart?: ArchimateShapeEntry }>();
+          for (const s of cat.shapes) {
+            const existing = byName.get(s.name);
+            if (!existing) {
+              byName.set(s.name, { primary: s });
+            } else if (existing.primary.variant === "icon" && s.variant === "box") {
+              byName.set(s.name, { primary: s, iconCounterpart: existing.primary });
+            } else if (existing.primary.variant === "box" && s.variant === "icon") {
+              byName.set(s.name, { primary: existing.primary, iconCounterpart: s });
+            }
+          }
+          type PaletteItem = { entry: ArchimateShapeEntry; iconOnly: boolean; label: string };
+          const items: PaletteItem[] = [];
+          for (const [name, pair] of byName) {
+            items.push({ entry: pair.primary, iconOnly: false, label: name });
+            if (pair.iconCounterpart && ICON_AS_SEPARATE.has(name)) {
+              items.push({ entry: pair.iconCounterpart, iconOnly: true, label: `${name} (icon)` });
+            }
+          }
           const open = !!openCategories[cat.id];
           return (
             <div key={cat.id} className="border-b border-gray-100">
@@ -392,18 +432,21 @@ function ArchimatePalette({
                 <span className="text-gray-400">{open ? "\u25BE" : "\u25B8"}</span>
               </button>
               {open && (
-                <div className="px-1 pb-1 space-y-1">
-                  {items.map(entry => (
+                <div className="px-1 pb-1 grid grid-cols-2 gap-1">
+                  {items.map(item => (
                     <div
-                      key={entry.key}
+                      key={`${item.entry.key}:${item.iconOnly ? "icon" : "box"}`}
                       draggable
-                      onDragStart={() => onDragStart("archimate-shape", { shapeKey: entry.key })}
-                      title={entry.description ?? entry.name}
+                      onDragStart={() => onDragStart("archimate-shape", {
+                        shapeKey: item.entry.key,
+                        iconOnly: item.iconOnly,
+                      })}
+                      title={item.entry.description ?? item.entry.name}
                       className="flex flex-col items-center gap-0.5 px-1 py-1 rounded select-none hover:bg-gray-50 cursor-grab active:cursor-grabbing"
                     >
-                      <ArchimateShapePreview entry={entry} />
+                      <ArchimateShapePreview entry={item.entry} iconOnly={item.iconOnly} />
                       <span className="text-[10px] text-gray-700 leading-tight text-center w-full truncate">
-                        {entry.name}
+                        {item.label}
                       </span>
                     </div>
                   ))}
