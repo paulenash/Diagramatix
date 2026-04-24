@@ -16,7 +16,7 @@ import type {
   Side,
   SymbolType,
 } from "@/app/lib/diagram/types";
-import { SymbolRenderer, SublaneIdsCtx, ProcessGroupDepthCtx, LaneDepthCtx, DatabaseCtx, type ResizeHandle } from "./SymbolRenderer";
+import { SymbolRenderer, SublaneIdsCtx, ProcessGroupDepthCtx, LaneDepthCtx, DatabaseCtx, ArchimateDepthCtx, type ResizeHandle } from "./SymbolRenderer";
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
 import { PaletteSymbolPreview } from "./Palette";
 import { CHEVRON_THEMES } from "@/app/lib/diagram/chevronThemes";
@@ -2313,6 +2313,34 @@ export function Canvas({
   })();
   const groupElements = data.elements.filter((el) => el.type === "group");
 
+  // ArchiMate descendant depth: for every archimate-shape, the max
+  // depth of its descendant chain (0 = leaf, 1 = parent of leaves,
+  // 2 = grandparent, …). Drives per-level fill lightening.
+  const archimateDepthMap = useMemo(() => {
+    const m = new Map<string, number>();
+    const children = new Map<string, string[]>();
+    for (const e of data.elements) {
+      if (e.parentId) {
+        if (!children.has(e.parentId)) children.set(e.parentId, []);
+        children.get(e.parentId)!.push(e.id);
+      }
+    }
+    function depth(id: string, visited: Set<string>): number {
+      if (m.has(id)) return m.get(id)!;
+      if (visited.has(id)) return 0;
+      visited.add(id);
+      const kids = children.get(id) ?? [];
+      if (kids.length === 0) { m.set(id, 0); return 0; }
+      let maxChildDepth = 0;
+      for (const kid of kids) maxChildDepth = Math.max(maxChildDepth, depth(kid, visited));
+      const d = maxChildDepth + 1;
+      m.set(id, d);
+      return d;
+    }
+    for (const e of data.elements) if (e.type === "archimate-shape") depth(e.id, new Set());
+    return m;
+  }, [data.elements]);
+
   // Compute process-group nesting depth: how many process-group ancestors each has
   const processGroupDepthMap = useMemo(() => {
     const DEPTH_TYPES = new Set(["process-group", "subprocess-expanded"]);
@@ -2644,6 +2672,7 @@ export function Canvas({
       <SublaneIdsCtx.Provider value={sublaneIds}>
       <ProcessGroupDepthCtx.Provider value={processGroupDepthMap}>
       <LaneDepthCtx.Provider value={laneDepthMap}>
+      <ArchimateDepthCtx.Provider value={archimateDepthMap}>
       <DatabaseCtx.Provider value={data.database}>
       <svg
         ref={svgRef}
@@ -3898,6 +3927,7 @@ export function Canvas({
         </g>
       </svg>
       </DatabaseCtx.Provider>
+      </ArchimateDepthCtx.Provider>
       </LaneDepthCtx.Provider>
       </ProcessGroupDepthCtx.Provider>
       </SublaneIdsCtx.Provider>

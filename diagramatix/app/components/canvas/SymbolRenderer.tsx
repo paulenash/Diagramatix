@@ -133,6 +133,10 @@ const ShowValueDisplayCtx = createContext(false);
 export const ProcessGroupDepthCtx = createContext<Map<string, number>>(new Map());
 export const LaneDepthCtx = createContext<Map<string, number>>(new Map());
 export const DatabaseCtx = createContext<string | undefined>(undefined);
+/** Map from archimate-shape id → descendant depth (0 = leaf, 1 = parent of
+ *  leaves, 2 = grandparent, …). Drives the per-level lightening of
+ *  container fills and the label-at-top position. Computed in Canvas.tsx. */
+export const ArchimateDepthCtx = createContext<Map<string, number>>(new Map());
 
 function ValueBadge({ el, show: showProp }: { el: DiagramElement; show?: boolean }) {
   const showCtx = useContext(ShowValueDisplayCtx);
@@ -1411,23 +1415,22 @@ function SymbolShape({ el }: { el: DiagramElement }) {
   return <g filter={sketchyFilter(mode)}>{shape}</g>;
 }
 
-function getLabelPos(el: DiagramElement): { x: number; y: number; baseline: "hanging" | "middle" | "auto" } {
+function getLabelPos(el: DiagramElement, archimateDepth: number = 0): { x: number; y: number; baseline: "hanging" | "middle" | "auto" } {
   if (el.type === "actor" || el.type === "team" || el.type === "hourglass" || el.type === "system") {
     return { x: el.x + el.width / 2, y: el.y + el.height + 12, baseline: "hanging" };
   }
   // ArchiMate shapes:
   //   - Icon-only Actor → label BELOW the stick figure
-  //   - Containers (shape with child elements) → label at TOP
+  //   - Has descendants (any depth > 0) → label at TOP
   //   - Default → label centred inside
   if (el.type === "archimate-shape") {
     const iconOnly = !!el.properties?.archimateIconOnly;
     const isActorIcon = iconOnly && typeof el.properties?.shapeKey === "string" &&
       (el.properties.shapeKey as string).includes("actor");
-    const isContainer = !!el.properties?.archimateIsContainer;
     if (isActorIcon) {
       return { x: el.x + el.width / 2, y: el.y + el.height + 12, baseline: "hanging" };
     }
-    if (isContainer) {
+    if (archimateDepth > 0) {
       return { x: el.x + el.width / 2, y: el.y + HEADER_H / 2, baseline: "middle" };
     }
     // fall through to default centred
@@ -1698,7 +1701,8 @@ export function SymbolRenderer({
     window.addEventListener("keydown", onKeyDown);
   }
 
-  const labelInfo = getLabelPos(element);
+  const archimateDepthMap = useContext(ArchimateDepthCtx);
+  const labelInfo = getLabelPos(element, archimateDepthMap.get(element.id) ?? 0);
   const isActorOrTeam = element.type === "actor" || element.type === "team" || element.type === "system";
   const isBoundary = element.type === "system-boundary";  // excluded from connection overlay
   const isPoolLane = element.type === "pool" || element.type === "lane";

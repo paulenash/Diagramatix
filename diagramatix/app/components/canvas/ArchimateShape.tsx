@@ -11,7 +11,7 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useContext } from "react";
 import type { DiagramElement } from "@/app/lib/diagram/types";
 import {
   loadArchimateCatalogue,
@@ -21,6 +21,7 @@ import {
 } from "@/app/lib/archimate/catalogue";
 import { getThemeFor, type ArchimateCategoryTheme } from "@/app/lib/archimate/themes";
 import { ICON_DRAWERS } from "@/app/lib/archimate/icons";
+import { ArchimateDepthCtx } from "./SymbolRenderer";
 
 const STROKE_WIDTH = 2.4;               // 2× the previous 1.2
 
@@ -90,11 +91,16 @@ export function ArchimateShape({ el }: { el: DiagramElement }) {
   const stroke = elOverrideStroke ?? theme?.stroke ?? entry.stroke ?? "#666666";
   const iconColour = (el.properties?.iconColour as string | undefined) ?? theme?.iconColour ?? stroke;
 
-  // Container fill: a shade lighter than children so the children stand
-  // out against their parent. 35% toward white works for the layer
-  // colours we're using.
-  if (el.properties?.archimateIsContainer) {
-    fill = lightenHex(fill, 0.35);
+  // Depth-based container fill: each level of nesting makes the parent
+  // ~30% lighter (capped at 85% toward white). A leaf (depth 0) keeps
+  // its original colour. As soon as a child is added, the element
+  // becomes depth 1 and lightens; adding a grandchild takes it to depth
+  // 2 (two steps lighter), etc. When the last child is removed, the
+  // depth reverts to 0 and the colour returns to the original.
+  const depthMap = useContext(ArchimateDepthCtx);
+  const depth = depthMap.get(el.id) ?? 0;
+  if (depth > 0) {
+    fill = lightenHex(fill, Math.min(0.85, depth * 0.30));
   }
 
   const iconOnly = !!el.properties?.archimateIconOnly;
