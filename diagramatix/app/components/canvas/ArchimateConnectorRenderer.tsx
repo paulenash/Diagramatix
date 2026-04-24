@@ -50,16 +50,19 @@ function MarkerArrowOpen({ id, color }: { id: string; color: string }) {
     </marker>
   );
 }
+// Diamond markers used as marker-END: refX=15 places the right tip at
+// the target boundary so the diamond sits just before the element with
+// its point touching the edge.
 function MarkerDiamondFilled({ id, color }: { id: string; color: string }) {
   return (
-    <marker id={id} markerWidth={16} markerHeight={10} refX={1} refY={5} orient="auto" overflow="visible">
+    <marker id={id} markerWidth={16} markerHeight={10} refX={15} refY={5} orient="auto" overflow="visible">
       <polygon points="1,5 8,1 15,5 8,9" fill={color} stroke={color} strokeWidth={1.2} strokeLinejoin="miter" />
     </marker>
   );
 }
 function MarkerDiamondOpen({ id, color }: { id: string; color: string }) {
   return (
-    <marker id={id} markerWidth={16} markerHeight={10} refX={1} refY={5} orient="auto" overflow="visible">
+    <marker id={id} markerWidth={16} markerHeight={10} refX={15} refY={5} orient="auto" overflow="visible">
       <polygon points="1,5 8,1 15,5 8,9" fill="white" stroke={color} strokeWidth={1.2} strokeLinejoin="miter" />
     </marker>
   );
@@ -72,8 +75,11 @@ function MarkerTriangleOpen({ id, color }: { id: string; color: string }) {
   );
 }
 function MarkerCircleFilled({ id, color }: { id: string; color: string }) {
+  // refX=1 anchors the circle's leading edge (nearest to target) at the
+  // connector start point, so the full disc sits OUTSIDE the element
+  // boundary rather than straddling it.
   return (
-    <marker id={id} markerWidth={8} markerHeight={8} refX={4} refY={4} orient="auto-start-reverse" overflow="visible">
+    <marker id={id} markerWidth={8} markerHeight={8} refX={1} refY={4} orient="auto-start-reverse" overflow="visible">
       <circle cx={4} cy={4} r={3} fill={color} stroke={color} strokeWidth={1} />
     </marker>
   );
@@ -82,11 +88,13 @@ function MarkerCircleFilled({ id, color }: { id: string; color: string }) {
 // ────────────────────────────────────────────────────────────────────
 // Style resolution per type. Dash patterns + markers + routing hints.
 // ────────────────────────────────────────────────────────────────────
+type MarkerKind = "arrow-filled" | "arrow-open" | "triangle-open" | "diamond-filled" | "diamond-open" | "circle-filled";
+
 interface Style {
   dash?: string;
   strokeColor: string;
-  startMarker: "diamond-filled" | "diamond-open" | "circle-filled" | null;
-  endMarker: "arrow-filled" | "arrow-open" | "triangle-open" | null;
+  startMarker: MarkerKind | null;
+  endMarker: MarkerKind | null;
   strokeWidth: number;
   label?: string; // small overlay label (e.g., "+" for influence) — future use
 }
@@ -95,11 +103,11 @@ function styleFor(type: ArchimateConnectorType, selected: boolean): Style {
   const color = selected ? "#2563eb" : "#333333";
   const base: Style = { strokeColor: color, startMarker: null, endMarker: null, strokeWidth: selected ? 1.8 : 1.4 };
   switch (type) {
-    // Structural
+    // Structural — diamond sits at the target (whole) end
     case "archi-composition":
-      return { ...base, startMarker: "diamond-filled", endMarker: null };
+      return { ...base, startMarker: null, endMarker: "diamond-filled" };
     case "archi-aggregation":
-      return { ...base, startMarker: "diamond-open", endMarker: null };
+      return { ...base, startMarker: null, endMarker: "diamond-open" };
     case "archi-assignment":
       return { ...base, startMarker: "circle-filled", endMarker: "arrow-filled" };
     case "archi-realisation":

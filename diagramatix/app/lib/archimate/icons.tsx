@@ -163,8 +163,8 @@ export const ICON_DRAWERS: Record<string, IconDrawer> = {
   interaction: ({ cx, cy, size, colour }) => {
     const s = size;
     const sw = Math.max(1, s / 16);
-    const r = s * 0.18;
-    const gap = s * 0.06;
+    const r = s * 0.27;
+    const gap = s * 0.06 + 1;
     const leftX = cx - gap / 2;   // flat edge x for left half-disc
     const rightX = cx + gap / 2;  // flat edge x for right half-disc
     const topY = cy - r;
@@ -181,9 +181,9 @@ export const ICON_DRAWERS: Record<string, IconDrawer> = {
   object: ({ cx, cy, size, colour }) => {
     const s = size;
     const sw = Math.max(1, s / 16);
-    const mainW = s * 0.44;
-    const mainH = s * 0.28;
-    const topH = s * 0.10;
+    const mainW = s * 0.55;
+    const mainH = s * 0.35;
+    const topH = s * 0.125;
     const mainLeft = cx - mainW / 2;
     const mainTop = cy - mainH / 2 + topH / 2; // nudge main down to leave room for top strip
     const topTop = mainTop - topH;
@@ -218,10 +218,10 @@ export const ICON_DRAWERS: Record<string, IconDrawer> = {
   contract: ({ cx, cy, size, colour }) => {
     const s = size;
     const sw = Math.max(1, s / 16);
-    const mainW = s * 0.44;
-    const mainH = s * 0.24;
-    const stripH = s * 0.08;
-    const gap = s * 0.02;
+    const mainW = s * 0.55;
+    const mainH = s * 0.30;
+    const stripH = s * 0.10;
+    const gap = s * 0.025;
     const mainLeft = cx - mainW / 2;
     const mainTop = cy - mainH / 2;
     const topStripTop = mainTop - gap - stripH;
@@ -239,8 +239,8 @@ export const ICON_DRAWERS: Record<string, IconDrawer> = {
   product: ({ cx, cy, size, colour }) => {
     const s = size;
     const sw = Math.max(1, s / 16);
-    const outerW = s * 0.50;
-    const outerH = s * 0.36;
+    const outerW = s * 0.625;
+    const outerH = s * 0.45;
     const outerLeft = cx - outerW / 2;
     const outerTop = cy - outerH / 2;
     const innerW = outerW / 2;
@@ -259,13 +259,11 @@ export const ICON_DRAWERS: Record<string, IconDrawer> = {
   representation: ({ cx, cy, size, colour }) => {
     const s = size;
     const sw = Math.max(1, s / 16);
-    const mainW = s * 0.44;
-    const mainH = s * 0.28;
-    const topW = s * 0.30;
-    const topH = s * 0.10;
+    const mainW = s * 0.55;
+    const mainH = s * 0.35;
+    const topH = s * 0.125;
     const mainLeft = cx - mainW / 2;
     const mainTop = cy - mainH / 2 + topH / 2;
-    const topLeft = cx - topW / 2;
     const topTop = mainTop - topH;
     const mainRight = mainLeft + mainW;
     const mainBot = mainTop + mainH;
@@ -284,7 +282,7 @@ export const ICON_DRAWERS: Record<string, IconDrawer> = {
       `L ${mainLeft} ${mainTop} Z`;
     return (
       <g stroke={colour} strokeWidth={sw} fill="none">
-        <rect x={topLeft} y={topTop} width={topW} height={topH} />
+        <rect x={mainLeft} y={topTop} width={mainW} height={topH} />
         <path d={bodyPath} strokeLinejoin="round" />
       </g>
     );

@@ -156,7 +156,7 @@ export function ArchimateShape({ el }: { el: DiagramElement }) {
 
   // Standard box rendering — outline + corner icon glyph
   const d = drawOutline(entry.shapeFamily, el.x, el.y, el.width, el.height);
-  const iconBoxSize = 18;
+  const iconBoxSize = 22.5;
   const iconCx = el.x + el.width - iconBoxSize / 2 - 6;
   const iconCy = el.y + iconBoxSize / 2 + 6;
   return (

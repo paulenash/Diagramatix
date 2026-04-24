@@ -111,7 +111,7 @@ export function ArchimateConnectorPicker({ x, y, onSelect, onCancel }: Props) {
                   <button
                     key={e.type}
                     type="button"
-                    className={`flex items-center gap-2 rounded px-2 py-1 text-left text-xs transition-colors ${
+                    className={`flex items-center gap-2 rounded px-2 py-1 text-left text-xs font-medium text-gray-900 transition-colors ${
                       isHover ? "bg-blue-50 ring-1 ring-blue-300" : "hover:bg-gray-50"
                     }`}
                     onMouseEnter={() => setHovered(e.type)}
