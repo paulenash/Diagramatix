@@ -1573,9 +1573,12 @@ export function Canvas({
       // Allow edge-mounted start events on the new element's parent expanded subprocess
       // but only if the new element is a valid target (task, subprocess, expanded subprocess)
       if (e.boundaryHostId) {
+        // Boundary-mounted start event → child element of its host. Allow
+        // any of the EDGE_START_TARGETS, including subprocess-expanded
+        // (assumed regular — user can delete the auto-connect if they
+        // later change the subtype to event/transaction).
         if (e.type === "start-event" && e.boundaryHostId === newExpandedScope
-            && newSymbolType && EDGE_START_TARGETS.has(newSymbolType)
-            && newSymbolType !== "subprocess-expanded") return true; // can't know subtype yet; allow non-expanded-sub
+            && newSymbolType && EDGE_START_TARGETS.has(newSymbolType)) return true;
         return false;
       }
       // BPMN: never auto-connect FROM an end event (end events have no outgoing)
@@ -1584,7 +1587,12 @@ export function Canvas({
       if (isBpmn && newIsStartEvent) return false;
       // BPMN: never auto-connect to/from event or transaction expanded subprocesses
       if (isBpmn && isEventOrTxnSub(e)) return false;
-      if (isBpmn && newSymbolType === "subprocess-expanded") return false; // can't know subtype yet; skip
+      // New element is a subprocess-expanded: subtype isn't known at drop
+      // time. Assume the default "regular" subtype and allow auto-connect
+      // from valid sources (start/intermediate events, tasks,
+      // subprocesses, gateways). The user can delete the connector if
+      // they later change the subtype to event/transaction.
+      // (The candidate's own validity is already covered by other rules.)
       // BPMN: never auto-connect from elements inside an Event Expanded Subprocess to outside (or vice versa)
       if (isBpmn) {
         const candParent = e.parentId ? data.elements.find(p => p.id === e.parentId) : null;
