@@ -1831,6 +1831,200 @@ export function Canvas({
     }
   }
 
+  /**
+   * Mirror of findAutoConnectSource for the OPPOSITE flow direction:
+   * find an existing element to be the TARGET of a sequence connector
+   * from the new (just-dropped) element. Used to support:
+   *   - Pass-through wiring when a new element is dropped between two
+   *     existing unconnected elements (left → new → right).
+   *   - Auto-connect FROM a new element TO an existing EP that sits to
+   *     its right (was missing from the source-only path).
+   *
+   * The candidate must be positioned RIGHT/BELOW (or diagonally
+   * RIGHT-of) the new element so the new element naturally flows into
+   * it. Boundary events and non-boundary start events are excluded as
+   * targets — sequence flows can't terminate there.
+   */
+  function findAutoConnectTarget(
+    newX: number, newY: number, newW: number, newH: number,
+    newSymbolType?: SymbolType
+  ): { target: DiagramElement; srcSide: Side; tgtSide: Side } | null {
+    const BPMN_AUTO_CONNECT = new Set<SymbolType>([
+      "task", "subprocess", "subprocess-expanded", "gateway",
+      "intermediate-event", "end-event",
+    ]);
+    const SM_AUTO_CONNECT = new Set<SymbolType>([
+      "state", "submachine", "final-state", "composite-state", "gateway", "fork-join",
+    ]);
+    const AUTO_CONNECT_TYPES = diagramType === "state-machine" ? SM_AUTO_CONNECT : BPMN_AUTO_CONNECT;
+
+    function expandedParentOf(el: DiagramElement): string | null {
+      let cur: DiagramElement | undefined = el.parentId
+        ? data.elements.find((e) => e.id === el.parentId)
+        : undefined;
+      while (cur) {
+        if (cur.type === "subprocess-expanded" || cur.type === "composite-state") return cur.id;
+        if (!cur.parentId) return null;
+        cur = data.elements.find((e) => e.id === cur!.parentId);
+      }
+      return null;
+    }
+
+    const CONTAINER_TYPES = new Set(["subprocess-expanded", "composite-state"]);
+    const newRight2 = newX + newW;
+    const newBottom2 = newY + newH;
+    let newExpandedScope: string | null = null;
+    for (const cand of data.elements) {
+      if (!CONTAINER_TYPES.has(cand.type)) continue;
+      if (newX >= cand.x && newRight2 <= cand.x + cand.width &&
+          newY >= cand.y && newBottom2 <= cand.y + cand.height) {
+        newExpandedScope = cand.id;
+        break;
+      }
+    }
+
+    let newPool: DiagramElement | null = null;
+    for (const cand of data.elements) {
+      if (cand.type !== "lane") continue;
+      if (newX >= cand.x && newRight2 <= cand.x + cand.width &&
+          newY >= cand.y && newBottom2 <= cand.y + cand.height) {
+        newPool = cand.parentId ? data.elements.find(e => e.id === cand.parentId) ?? null : null;
+        break;
+      }
+    }
+    if (!newPool) {
+      for (const cand of data.elements) {
+        if (cand.type !== "pool") continue;
+        if (newX >= cand.x && newRight2 <= cand.x + cand.width &&
+            newY >= cand.y && newBottom2 <= cand.y + cand.height) {
+          newPool = cand;
+          break;
+        }
+      }
+    }
+    const isWhiteBoxPool = (p: DiagramElement | null): boolean =>
+      !!p && p.type === "pool" &&
+      (((p.properties.poolType as string | undefined) ?? "black-box") === "white-box");
+    function containingPool(el: DiagramElement): DiagramElement | null {
+      let cur: DiagramElement | undefined = el;
+      for (let i = 0; i < 10 && cur; i++) {
+        if (cur.type === "pool") return cur;
+        if (!cur.parentId) return null;
+        cur = data.elements.find(e => e.id === cur!.parentId);
+      }
+      return null;
+    }
+
+    const isBpmn = diagramType === "bpmn";
+    const isStateMachine = diagramType === "state-machine";
+    const newIsEnd = newSymbolType === "end-event";
+    const newIsFinal = newSymbolType === "final-state";
+    const isEventOrTxnSub = (el: DiagramElement) =>
+      el.type === "subprocess-expanded" &&
+      ((el.properties.subprocessType as string | undefined) === "event" ||
+       (el.properties.subprocessType as string | undefined) === "transaction");
+
+    // BPMN: end events have no outgoing sequence — short-circuit.
+    if (isBpmn && newIsEnd) return null;
+    // State-machine: final states have no outgoing transitions — short-circuit.
+    if (isStateMachine && newIsFinal) return null;
+
+    const candidates = data.elements.filter((e) => {
+      if (!AUTO_CONNECT_TYPES.has(e.type)) return false;
+      // Boundary events as auto-connect targets aren't intuitive — exclude.
+      if (e.boundaryHostId) return false;
+      // BPMN: never connect to event/txn sub
+      if (isBpmn && isEventOrTxnSub(e)) return false;
+      // BPMN: candidate inside an event sub that isn't the new element's scope
+      if (isBpmn) {
+        const candParent = e.parentId ? data.elements.find(p => p.id === e.parentId) : null;
+        const candInEventSub = candParent?.type === "subprocess-expanded" &&
+          (candParent.properties.subprocessType as string | undefined) === "event";
+        if (candInEventSub && candParent.id !== newExpandedScope) return false;
+      }
+      // BPMN: cross white-box pool prohibited
+      if (isBpmn) {
+        const candPool = containingPool(e);
+        if (candPool && newPool && candPool.id !== newPool.id &&
+            isWhiteBoxPool(candPool) && isWhiteBoxPool(newPool)) {
+          return false;
+        }
+      }
+      // State-machine: never connect to initial state
+      if (isStateMachine && e.type === "initial-state") return false;
+      // Cannot target an EP/composite-state whose bounds contain the new element
+      // (would be the new element's own parent).
+      if ((e.type === "subprocess-expanded" || e.type === "composite-state") &&
+          newX >= e.x && newRight2 <= e.x + e.width &&
+          newY >= e.y && newBottom2 <= e.y + e.height) {
+        return false;
+      }
+      // Cannot target the new element's parent EP scope
+      if (e.id === newExpandedScope) return false;
+      // Both must share the same container scope (or both have none)
+      const candScope = expandedParentOf(e);
+      return candScope === newExpandedScope;
+    });
+
+    const newRight = newX + newW;
+    const newBottom = newY + newH;
+    const newCx = newX + newW / 2;
+    const newCy = newY + newH / 2;
+
+    type Match = { el: DiagramElement; srcSide: Side; tgtSide: Side; dist: number };
+    const matches: Match[] = [];
+    for (const el of candidates) {
+      const elLeft = el.x;
+      const elRight = el.x + el.width;
+      const elTop = el.y;
+      const elBottom = el.y + el.height;
+      const vOverlap = Math.min(elBottom, newBottom) - Math.max(elTop, newY);
+      const hOverlap = Math.min(elRight, newRight) - Math.max(elLeft, newX);
+
+      let srcSide: Side | null = null;
+      let tgtSide: Side | null = null;
+
+      if (newRight <= elLeft && vOverlap > 0) {
+        // Existing RIGHT of new with vOverlap → new.right → existing.left
+        srcSide = "right"; tgtSide = "left";
+      } else if (newRight <= elLeft) {
+        // Existing RIGHT of new diagonally
+        const elCy = elTop + el.height / 2;
+        tgtSide = newCy < elCy ? "top" : "bottom";
+        srcSide = "right";
+      } else if (hOverlap > 0 && newBottom <= elTop) {
+        // Existing BELOW new with hOverlap → new.bottom → existing.top
+        srcSide = "bottom"; tgtSide = "top";
+      } else if (hOverlap > 0 && elBottom <= newY) {
+        // Existing ABOVE new with hOverlap (uncommon) → new.top → existing.bottom
+        srcSide = "top"; tgtSide = "bottom";
+      } else if (
+        (el.type === "subprocess-expanded" || el.type === "composite-state") &&
+        (vOverlap > 0 || hOverlap > 0)
+      ) {
+        // Container target partially overlaps new — center direction fallback
+        const elCx = el.x + el.width / 2;
+        const elCy = elTop + el.height / 2;
+        if (vOverlap > 0 && newCx < elCx) {
+          srcSide = "right"; tgtSide = "left";
+        } else if (hOverlap > 0 && newCy < elCy) {
+          srcSide = "bottom"; tgtSide = "top";
+        }
+      }
+      if (!srcSide || !tgtSide) continue;
+
+      const newRectSyn = { ...el, x: newX, y: newY, width: newW, height: newH } as DiagramElement;
+      const from = sideMidpoint(newRectSyn, srcSide);
+      const to = sideMidpoint(el, tgtSide);
+      const dist = Math.hypot(to.x - from.x, to.y - from.y);
+      matches.push({ el, srcSide, tgtSide, dist });
+    }
+    if (matches.length === 0) return null;
+    matches.sort((a, b) => a.dist - b.dist);
+    const winner = matches[0];
+    return { target: winner.el, srcSide: winner.srcSide, tgtSide: winner.tgtSide };
+  }
+
   // Compute the (x,y) point on an element's side at offset 0.5 (middle).
   function sideMidpoint(el: DiagramElement, side: Side): Point {
     const cx = el.x + el.width / 2;
@@ -1843,22 +2037,24 @@ export function Canvas({
     }
   }
 
+  /**
+   * Run a flashing-line auto-connect animation, then dispatch ONE
+   * connector. Generalised to accept arbitrary source + target rects so
+   * the new (just-dropped) element can be either source OR target.
+   */
   function startAutoConnect(
-    sourceEl: DiagramElement, targetId: string,
-    targetX: number, targetY: number, targetW: number, targetH: number,
+    sourceId: string, sourceX: number, sourceY: number, sourceW: number, sourceH: number,
+    targetId: string, targetX: number, targetY: number, targetW: number, targetH: number,
     srcSide: Side, tgtSide: Side
   ) {
     autoConnectAbortRef.current = false;
-    const from = sideMidpoint(sourceEl, srcSide);
-    // Synthesize a target rect for midpoint calculation
-    const targetRect: DiagramElement = {
-      ...sourceEl, // structural fields don't matter for sideMidpoint
-      x: targetX, y: targetY, width: targetW, height: targetH,
-    } as DiagramElement;
+    const sourceRect = { x: sourceX, y: sourceY, width: sourceW, height: sourceH } as DiagramElement;
+    const targetRect = { x: targetX, y: targetY, width: targetW, height: targetH } as DiagramElement;
+    const from = sideMidpoint(sourceRect, srcSide);
     const to = sideMidpoint(targetRect, tgtSide);
     let cycle = 0;
     const TOTAL_CYCLES = 6; // 3 flashes = 3 on + 3 off
-    setAutoConnectFlash({ sourceId: sourceEl.id, targetId, from, to, visible: true });
+    setAutoConnectFlash({ sourceId, targetId, from, to, visible: true });
     const tick = () => {
       if (autoConnectAbortRef.current) { setAutoConnectFlash(null); return; }
       cycle++;
@@ -1867,7 +2063,7 @@ export function Canvas({
         if (!autoConnectAbortRef.current) {
           const autoConnType: ConnectorType = diagramType === "state-machine" ? "transition" : "sequence";
           onAddConnector(
-            sourceEl.id, targetId,
+            sourceId, targetId,
             autoConnType, defaultDirectionType, defaultRoutingType,
             srcSide, tgtSide, 0.5, 0.5
           );
@@ -2027,40 +2223,125 @@ export function Canvas({
       const def = getSymbolDefinition(symbolType);
       let newX = worldPos.x - def.defaultWidth / 2;
       let newY = worldPos.y - def.defaultHeight / 2;
-      const found = findAutoConnectSource(newX, newY, def.defaultWidth, def.defaultHeight, symbolType);
-      if (found) {
-        // Case A (right + vertical overlap): auto-align horizontally so the
-        // new element's centre y matches the source's centre y.
+      const srcFound = findAutoConnectSource(newX, newY, def.defaultWidth, def.defaultHeight, symbolType);
+      const tgtFound = findAutoConnectTarget(newX, newY, def.defaultWidth, def.defaultHeight, symbolType);
+
+      // Pass-through auto-connect: new element placed BETWEEN two
+      // existing unconnected elements → wire src→new AND new→tgt.
+      // Skip if there is already a sequence/transition connector
+      // between src and tgt (per user rule: don't override an existing
+      // direct relationship).
+      let dualEligible = !!srcFound && !!tgtFound;
+      if (dualEligible && srcFound && tgtFound) {
+        const existingDirect = data.connectors.some(c =>
+          c.sourceId === srcFound.source.id &&
+          c.targetId === tgtFound.target.id &&
+          (c.type === "sequence" || c.type === "transition")
+        );
+        if (existingDirect) dualEligible = false;
+        // Also: if src and tgt are the same element (shouldn't happen
+        // but defensive), skip.
+        if (srcFound.source.id === tgtFound.target.id) dualEligible = false;
+      }
+
+      if (dualEligible && srcFound && tgtFound) {
+        // Two-connector dual: align new.y to source's centre when the
+        // src→new leg is right→left so the layout reads cleanly.
         let alignedPos = worldPos;
-        let srcSide = found.srcSide;
-        let tgtSide = found.tgtSide;
-        if (srcSide === "right" && tgtSide === "left") {
-          const srcCy = found.source.y + found.source.height / 2;
+        let srcSide = srcFound.srcSide;
+        let srcTgtSide = srcFound.tgtSide;
+        let newSrcSide = tgtFound.srcSide;
+        let tgtSide = tgtFound.tgtSide;
+        if (srcSide === "right" && srcTgtSide === "left") {
+          const srcCy = srcFound.source.y + srcFound.source.height / 2;
           newY = srcCy - def.defaultHeight / 2;
           alignedPos = { x: worldPos.x, y: srcCy };
         }
-        // Override target side when the new element is a gateway: pick the
-        // diamond vertex that matches the source's vertical position.
-        //   source clearly above gateway → top vertex
-        //   source vertically overlaps    → left vertex
-        //   source clearly below gateway  → bottom vertex
+        // Gateway-as-new: pick diamond vertices for both sides.
         if (symbolType === "gateway") {
-          const src = found.source;
+          const src = srcFound.source;
+          const tgt = tgtFound.target;
+          const gwTop = newY;
+          const gwBottom = newY + def.defaultHeight;
+          // src→new
+          if (src.y + src.height <= gwTop) { srcSide = "bottom"; srcTgtSide = "top"; }
+          else if (src.y >= gwBottom)      { srcSide = "top";    srcTgtSide = "bottom"; }
+          else                              { srcSide = "right";  srcTgtSide = "left"; }
+          // new→tgt
+          if (tgt.y + tgt.height <= gwTop) { newSrcSide = "top";    tgtSide = "bottom"; }
+          else if (tgt.y >= gwBottom)      { newSrcSide = "bottom"; tgtSide = "top"; }
+          else                              { newSrcSide = "right"; tgtSide = "left"; }
+        }
+        const newId = nanoid();
+        onAddElement(symbolType, alignedPos, taskType, eventType, newId);
+        // Two connectors at once — skip the flash to avoid juggling two
+        // independent timers, and dispatch immediately.
+        const autoConnType: ConnectorType = diagramType === "state-machine" ? "transition" : "sequence";
+        onAddConnector(
+          srcFound.source.id, newId,
+          autoConnType, defaultDirectionType, defaultRoutingType,
+          srcSide, srcTgtSide, 0.5, 0.5
+        );
+        onAddConnector(
+          newId, tgtFound.target.id,
+          autoConnType, defaultDirectionType, defaultRoutingType,
+          newSrcSide, tgtSide, 0.5, 0.5
+        );
+        return;
+      }
+
+      if (srcFound) {
+        // Existing → new (the legacy path, with flash).
+        let alignedPos = worldPos;
+        let srcSide = srcFound.srcSide;
+        let tgtSide = srcFound.tgtSide;
+        if (srcSide === "right" && tgtSide === "left") {
+          const srcCy = srcFound.source.y + srcFound.source.height / 2;
+          newY = srcCy - def.defaultHeight / 2;
+          alignedPos = { x: worldPos.x, y: srcCy };
+        }
+        // Override target side when the new element is a gateway.
+        if (symbolType === "gateway") {
+          const src = srcFound.source;
           const srcTop = src.y;
           const srcBottom = src.y + src.height;
           const gwTop = newY;
           const gwBottom = newY + def.defaultHeight;
-          if (srcBottom <= gwTop) {
-            srcSide = "bottom"; tgtSide = "top";
-          } else if (srcTop >= gwBottom) {
-            srcSide = "top"; tgtSide = "bottom";
-          } else {
-            srcSide = "right"; tgtSide = "left";
-          }
+          if (srcBottom <= gwTop) { srcSide = "bottom"; tgtSide = "top"; }
+          else if (srcTop >= gwBottom) { srcSide = "top"; tgtSide = "bottom"; }
+          else { srcSide = "right"; tgtSide = "left"; }
         }
         const newId = nanoid();
         onAddElement(symbolType, alignedPos, taskType, eventType, newId);
-        startAutoConnect(found.source, newId, newX, newY, def.defaultWidth, def.defaultHeight, srcSide, tgtSide);
+        const src = srcFound.source;
+        startAutoConnect(
+          src.id, src.x, src.y, src.width, src.height,
+          newId, newX, newY, def.defaultWidth, def.defaultHeight,
+          srcSide, tgtSide,
+        );
+        return;
+      }
+
+      if (tgtFound) {
+        // New → existing (covers e.g. new task placed to the LEFT of an
+        // existing EP). Align new.y to target's centre when the
+        // new→tgt leg is right→left.
+        let alignedPos = worldPos;
+        const srcSide = tgtFound.srcSide;
+        const tgtSide = tgtFound.tgtSide;
+        if (srcSide === "right" && tgtSide === "left") {
+          const tgtCy = tgtFound.target.y + tgtFound.target.height / 2;
+          newY = tgtCy - def.defaultHeight / 2;
+          alignedPos = { x: worldPos.x, y: tgtCy };
+        }
+        const newId = nanoid();
+        onAddElement(symbolType, alignedPos, taskType, eventType, newId);
+        const tgt = tgtFound.target;
+        startAutoConnect(
+          newId, newX, newY, def.defaultWidth, def.defaultHeight,
+          tgt.id, tgt.x, tgt.y, tgt.width, tgt.height,
+          srcSide, tgtSide,
+        );
         return;
       }
     }
