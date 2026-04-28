@@ -843,7 +843,16 @@ export function Canvas({
           } else {
             seqSourceSide = outerSide ? oppositeSide(outerSide) : effectiveSide;
           }
-          let seqTargetSide: Side = targetOuterSide ? oppositeSide(targetOuterSide) : getClosestSide(pos, targetEl);
+          // Boundary START event as target → connection comes from OUTSIDE
+          // the host EP, so attach at the OUTER side.
+          // Boundary END event as target → connection comes from INSIDE the
+          // host EP, so attach at the INNER side.
+          let seqTargetSide: Side;
+          if (targetOuterSide) {
+            seqTargetSide = targetEl.type === "start-event" ? targetOuterSide : oppositeSide(targetOuterSide);
+          } else {
+            seqTargetSide = getClosestSide(pos, targetEl);
+          }
 
           // Source: nearest boundary point to initial click; Target: nearest to release point
           let seqSourceOffsetAlong: number | undefined;
@@ -997,16 +1006,24 @@ export function Canvas({
         onSelectConnector(null);
       } else if (!isMsgBPMN && innerTarget) {
         // Dropped on a child or boundary event inside an expanded subprocess.
-        // For a boundary event the connection point inside the EP is the
-        // INNER side — opposite the host edge it sits on. So a right-edge
-        // mounted end event accepts the connector at its LEFT side, and a
-        // left-edge mounted start event emits from its RIGHT side.
+        // Side selection for boundary events:
+        //   - Boundary START event as TARGET → OUTER (incoming flow comes
+        //     from outside the host EP).
+        //   - Boundary START event as SOURCE → INNER (emits into the EP).
+        //   - Boundary END event → INNER both ways (received from inside,
+        //     and end events don't emit).
         const targetOuterSide = getBoundaryEventOuterSide(innerTarget, data.elements);
         if (!targetOuterSide && (conn?.type === "flow" || conn?.type === "transition")) {
           const bound = pointToBoundaryOffset(pos, innerTarget);
           onUpdateConnectorEndpoint(connectorId, endpoint, innerTarget.id, bound.side, bound.offsetAlong);
         } else {
-          const newSide = targetOuterSide ? oppositeSide(targetOuterSide) : getClosestSide(pos, innerTarget);
+          let newSide: Side;
+          if (targetOuterSide) {
+            const isStartTarget = innerTarget.type === "start-event" && endpoint === "target";
+            newSide = isStartTarget ? targetOuterSide : oppositeSide(targetOuterSide);
+          } else {
+            newSide = getClosestSide(pos, innerTarget);
+          }
           onUpdateConnectorEndpoint(connectorId, endpoint, innerTarget.id, newSide, 0.5);
         }
         onSelectConnector(null);
@@ -1102,9 +1119,15 @@ export function Canvas({
               const bound = pointToBoundaryOffset(pos, targetEl);
               onUpdateConnectorEndpoint(connectorId, endpoint, targetEl.id, bound.side, bound.offsetAlong);
             } else {
-              // Boundary events: snap to the INNER side so the connector
-              // attaches inside the EP rather than at the outer mount.
-              const newSide = targetOuterSide ? oppositeSide(targetOuterSide) : getClosestSide(pos, targetEl);
+              // Boundary events: target-of-start = OUTER (from outside the
+              // EP); everything else (including target-of-end) = INNER.
+              let newSide: Side;
+              if (targetOuterSide) {
+                const isStartTarget = targetEl.type === "start-event" && endpoint === "target";
+                newSide = isStartTarget ? targetOuterSide : oppositeSide(targetOuterSide);
+              } else {
+                newSide = getClosestSide(pos, targetEl);
+              }
               onUpdateConnectorEndpoint(connectorId, endpoint, targetEl.id, newSide, 0.5);
             }
           }

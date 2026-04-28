@@ -2447,6 +2447,21 @@ function reducer(state: DiagramData, action: Action): DiagramData {
             }
           }
         }
+
+        // Rule: an edge-mounted End event can only be reached from INSIDE
+        // its host EP. Any source outside the host (or in a different EP)
+        // is rejected — the end event represents the EP completing, so
+        // outside elements have no business connecting to it.
+        if (target.boundaryHostId && target.type === "end-event") {
+          const hostId = target.boundaryHostId;
+          let cur: DiagramElement | undefined = source;
+          let inside = false;
+          for (let i = 0; i < 10 && cur; i++) {
+            if (cur.id === hostId || cur.parentId === hostId) { inside = true; break; }
+            cur = cur.parentId ? state.elements.find(e => e.id === cur!.parentId) : undefined;
+          }
+          if (!inside) return state;
+        }
       }
 
       } // end if (!force)
