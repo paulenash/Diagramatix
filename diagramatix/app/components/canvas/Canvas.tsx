@@ -996,13 +996,17 @@ export function Canvas({
         onUpdateConnectorEndpoint(connectorId, endpoint, currentEl.id, side, offsetAlong);
         onSelectConnector(null);
       } else if (!isMsgBPMN && innerTarget) {
-        // Dropped on a child or boundary event inside an expanded subprocess
+        // Dropped on a child or boundary event inside an expanded subprocess.
+        // For a boundary event the connection point inside the EP is the
+        // INNER side — opposite the host edge it sits on. So a right-edge
+        // mounted end event accepts the connector at its LEFT side, and a
+        // left-edge mounted start event emits from its RIGHT side.
         const targetOuterSide = getBoundaryEventOuterSide(innerTarget, data.elements);
         if (!targetOuterSide && (conn?.type === "flow" || conn?.type === "transition")) {
           const bound = pointToBoundaryOffset(pos, innerTarget);
           onUpdateConnectorEndpoint(connectorId, endpoint, innerTarget.id, bound.side, bound.offsetAlong);
         } else {
-          const newSide = targetOuterSide ?? getClosestSide(pos, innerTarget);
+          const newSide = targetOuterSide ? oppositeSide(targetOuterSide) : getClosestSide(pos, innerTarget);
           onUpdateConnectorEndpoint(connectorId, endpoint, innerTarget.id, newSide, 0.5);
         }
         onSelectConnector(null);
@@ -1083,7 +1087,10 @@ export function Canvas({
                 const bound = pointToBoundaryOffset(pos, targetEl);
                 onUpdateConnectorEndpoint(connectorId, endpoint, targetEl.id, bound.side, bound.offsetAlong);
               } else {
-                const newSide = targetOuterSide ?? getClosestSide(pos, targetEl);
+                // Boundary events: snap to the INNER side (opposite of
+                // the host edge they sit on) — that's the connection
+                // point inside the EP.
+                const newSide = targetOuterSide ? oppositeSide(targetOuterSide) : getClosestSide(pos, targetEl);
                 onUpdateConnectorEndpoint(connectorId, endpoint, targetEl.id, newSide, 0.5);
               }
             }
@@ -1095,7 +1102,9 @@ export function Canvas({
               const bound = pointToBoundaryOffset(pos, targetEl);
               onUpdateConnectorEndpoint(connectorId, endpoint, targetEl.id, bound.side, bound.offsetAlong);
             } else {
-              const newSide = targetOuterSide ?? getClosestSide(pos, targetEl);
+              // Boundary events: snap to the INNER side so the connector
+              // attaches inside the EP rather than at the outer mount.
+              const newSide = targetOuterSide ? oppositeSide(targetOuterSide) : getClosestSide(pos, targetEl);
               onUpdateConnectorEndpoint(connectorId, endpoint, targetEl.id, newSide, 0.5);
             }
           }
@@ -1642,6 +1651,13 @@ export function Canvas({
           srcSide = newCy < srcCy ? "top" : "bottom";
           tgtSide = "left";
         }
+        // Edge-mounted start events: emit from the inner side (opposite
+        // to the host edge they sit on), regardless of the new element's
+        // relative geometry.
+        if (src.type === "start-event" && src.boundaryHostId) {
+          const outer = getBoundaryEventOuterSide(src, data.elements);
+          if (outer) srcSide = oppositeSide(outer);
+        }
         return { source: src, srcSide, tgtSide };
       };
 
@@ -1742,6 +1758,16 @@ export function Canvas({
           srcSide = "top"; tgtSide = "bottom";
         }
         if (!srcSide || !tgtSide) continue;
+
+        // Edge-mounted start events emit their flow into the host: the
+        // visible connection point is the side OPPOSITE to the host edge
+        // they're mounted on. Override the geometry-derived srcSide so
+        // the connector always leaves through that "inner" side (e.g.
+        // right-hand point for a left-edge mount).
+        if (el.type === "start-event" && el.boundaryHostId) {
+          const outer = getBoundaryEventOuterSide(el, data.elements);
+          if (outer) srcSide = oppositeSide(outer);
+        }
 
         // Distance metric: sideMidpoint (source) → sideMidpoint (synthetic
         // target rect at the new element's position).
