@@ -512,6 +512,271 @@ function updatePoolTypes(elements: DiagramElement[]): DiagramElement[] {
   });
 }
 
+/**
+ * Pool sizing derived from its rotated label.
+ *
+ * The label is drawn rotated −90° along the left header strip, so:
+ *   - "minHeight" is bounded by the LONGEST line's pixel length plus
+ *     padding — this is what determines how tall the pool must be to
+ *     fit the rotated text without clipping.
+ *   - "headerWidth" is the strip's perpendicular extent — the stack of
+ *     lines fits across this dimension.
+ *
+ * Both grow with poolFontSize and shrink when the user breaks the label
+ * into more lines (each line gets shorter).
+ */
+function poolMetrics(label: string, fontSize: number): { minHeight: number; headerWidth: number } {
+  const lines = (label || "").split("\n");
+  const charPxWidth = fontSize * 0.6;
+  const lineH = fontSize * 1.18;
+  const longestLine = Math.max(1, ...lines.map(l => l.length));
+  const minHeight = Math.max(50, Math.ceil(longestLine * charPxWidth + 20));
+  // Default 36 fits ~2 lines at fontSize 12; widens once 4+ lines need to stack.
+  const stackedH = Math.ceil(lines.length * lineH + 8);
+  const headerWidth = Math.max(36, stackedH);
+  return { minHeight, headerWidth };
+}
+
+/** Read a pool's effective header width (stored property override, else 36). */
+function getPoolHeaderWidth(pool: DiagramElement): number {
+  const stored = pool.properties?.poolHeaderWidth;
+  return typeof stored === "number" && stored > 0 ? stored : 36;
+}
+
+/** Read a lane's effective header width (stored property override, else 36). */
+function getLaneHeaderWidth(lane: DiagramElement): number {
+  const stored = lane.properties?.laneHeaderWidth;
+  return typeof stored === "number" && stored > 0 ? stored : 36;
+}
+
+/** Same shape as poolMetrics but tuned for lane labels. */
+function laneMetrics(label: string, fontSize: number): { minHeight: number; headerWidth: number } {
+  const lines = (label || "").split("\n");
+  const charPxWidth = fontSize * 0.6;
+  const lineH = fontSize * 1.2;
+  const longestLine = Math.max(1, ...lines.map(l => l.length));
+  const minHeight = Math.max(40, Math.ceil(longestLine * charPxWidth + 16));
+  const stackedH = Math.ceil(lines.length * lineH + 8);
+  const headerWidth = Math.max(36, stackedH);
+  return { minHeight, headerWidth };
+}
+
+/**
+ * Apply auto-sizing to a lane (including sublanes):
+ *   - Grow the lane vertically if its label needs more height (never shrink).
+ *   - Propagate that growth to the parent (a lane or a pool) and any
+ *     siblings below.
+ *   - Sync header width across ALL lane siblings inside the same parent
+ *     so visual alignment is preserved; widen when the longest label
+ *     exceeds 36, shrink back to 36 when no sibling needs more.
+ *
+ * Returns the updated elements + connectors.
+ */
+function resizeLaneForLabel(
+  baseElements: DiagramElement[],
+  baseConnectors: Connector[],
+  laneId: string,
+  fontSize: number,
+): { elements: DiagramElement[]; connectors: Connector[] } {
+  const lane = baseElements.find(e => e.id === laneId && e.type === "lane");
+  if (!lane) return { elements: baseElements, connectors: baseConnectors };
+  const parent = baseElements.find(e => e.id === lane.parentId);
+  if (!parent) return { elements: baseElements, connectors: baseConnectors };
+
+  let elements = baseElements;
+  let connectors = baseConnectors;
+
+  // ── 1. Height: grow this lane if its label demands more vertical space. ──
+  const { minHeight: laneMin } = laneMetrics(lane.label, fontSize);
+  if (lane.height < laneMin) {
+    const growBy = laneMin - lane.height;
+    const siblings = elements
+      .filter(e => e.type === "lane" && e.parentId === lane.parentId)
+      .sort((a, b) => a.y - b.y);
+    const idx = siblings.findIndex(s => s.id === laneId);
+    const moveDownIds = new Set(siblings.slice(idx + 1).map(s => s.id));
+
+    // Collect descendants of THIS lane and of every sibling below — they
+    // need to shift down together so contents stay anchored.
+    const descendants = new Set<string>();
+    function collectDesc(rootId: string) {
+      for (const e of elements) {
+        if (e.parentId === rootId || e.boundaryHostId === rootId) {
+          descendants.add(e.id);
+          collectDesc(e.id);
+        }
+      }
+    }
+    collectDesc(lane.id);
+    for (const s of siblings.slice(idx + 1)) collectDesc(s.id);
+
+    elements = elements.map(e => {
+      if (e.id === lane.id) return { ...e, height: e.height + growBy };
+      if (moveDownIds.has(e.id)) return { ...e, y: e.y + growBy };
+      if (descendants.has(e.id)) return { ...e, y: e.y + growBy };
+      return e;
+    });
+
+    // Propagate height growth UPWARD: parent lane (if sublane) and the
+    // pool eventually contain more content.
+    let cur = elements.find(e => e.id === lane.parentId);
+    while (cur) {
+      if (cur.type === "pool" || cur.type === "lane") {
+        const grownId = cur.id;
+        elements = elements.map(e => e.id === grownId ? { ...e, height: e.height + growBy } : e);
+      }
+      cur = cur.parentId ? elements.find(e => e.id === cur!.parentId) : undefined;
+    }
+  }
+
+  // ── 2. Header width: sync the max across all sibling lanes of the
+  // same parent; shift each sibling's descendants by the per-lane delta.
+  const siblings = elements.filter(e => e.type === "lane" && e.parentId === lane.parentId);
+  if (siblings.length > 0) {
+    const maxNeeded = siblings.reduce((m, s) => {
+      const { headerWidth } = laneMetrics(s.label, fontSize);
+      return Math.max(m, headerWidth);
+    }, 36);
+
+    for (const sib of siblings) {
+      const oldW = getLaneHeaderWidth(sib);
+      if (oldW === maxNeeded) continue;
+      const deltaW = maxNeeded - oldW;
+      // Direct children of THIS sibling shift by deltaW (they sit at sib.x + oldW).
+      const sibDesc = new Set<string>();
+      function collectInto(rootId: string) {
+        for (const e of elements) {
+          if (e.parentId === rootId || e.boundaryHostId === rootId) {
+            sibDesc.add(e.id);
+            collectInto(e.id);
+          }
+        }
+      }
+      collectInto(sib.id);
+      elements = elements.map(e => {
+        if (e.id === sib.id) {
+          return { ...e, properties: { ...e.properties, laneHeaderWidth: maxNeeded } };
+        }
+        if (sibDesc.has(e.id)) return { ...e, x: e.x + deltaW };
+        return e;
+      });
+    }
+  }
+
+  // Recompute connectors touching anything we may have moved.
+  // (Conservative: recompute all that touch this lane or its descendants.)
+  const touched = new Set<string>([laneId]);
+  function collectAll(rootId: string) {
+    for (const e of elements) {
+      if (e.parentId === rootId || e.boundaryHostId === rootId) {
+        touched.add(e.id);
+        collectAll(e.id);
+      }
+    }
+  }
+  collectAll(lane.parentId!);
+  connectors = connectors.map(conn => {
+    if (!touched.has(conn.sourceId) && !touched.has(conn.targetId)) return conn;
+    return recomputeAllConnectors([conn], elements)[0] ?? conn;
+  });
+
+  return { elements, connectors };
+}
+
+/**
+ * Apply (minHeight, headerWidth) to a pool. Shrinks or grows the height,
+ * stores the dynamic header width on the pool, and — if the header width
+ * delta is non-zero — shifts every descendant horizontally so their
+ * relative position to the body is preserved.
+ *
+ * Returns the updated elements + connectors slices for the caller to
+ * merge back into state.
+ */
+function resizePoolForLabel(
+  baseElements: DiagramElement[],
+  baseConnectors: Connector[],
+  poolId: string,
+  minHeight: number,
+  headerWidth: number,
+): { elements: DiagramElement[]; connectors: Connector[] } {
+  const pool = baseElements.find(e => e.id === poolId);
+  if (!pool || pool.type !== "pool") return { elements: baseElements, connectors: baseConnectors };
+
+  const oldHeaderW = getPoolHeaderWidth(pool);
+  const deltaW = headerWidth - oldHeaderW;
+  const lanes = baseElements.filter(e => e.type === "lane" && e.parentId === poolId);
+  const hasLanes = lanes.length > 0;
+
+  // Build descendant set (lanes + their children + boundary events) for the shift.
+  const descendantIds = new Set<string>();
+  function collect(parentId: string) {
+    for (const e of baseElements) {
+      if (e.parentId === parentId || e.boundaryHostId === parentId) {
+        descendantIds.add(e.id);
+        collect(e.id);
+      }
+    }
+  }
+  collect(poolId);
+
+  // Step 1: pool height. Free pool: snap to minHeight (shrink or grow).
+  // Pool with lanes: ensure total lane span >= minHeight, growing the
+  // last lane only when needed; never shrink lanes (preserves user
+  // layout inside lanes).
+  let elements = baseElements;
+  if (!hasLanes) {
+    if (pool.height !== minHeight) {
+      elements = elements.map(e => e.id === poolId ? { ...e, height: minHeight } : e);
+    }
+  } else {
+    const totalLaneH = lanes.reduce((s, e) => s + e.height, 0);
+    if (totalLaneH < minHeight) {
+      const extra = minHeight - totalLaneH;
+      const perLane = Math.ceil(extra / lanes.length);
+      let offsetY = 0;
+      elements = elements.map(e => {
+        if (e.type === "lane" && e.parentId === poolId) {
+          const newE = { ...e, y: e.y + offsetY, height: e.height + perLane };
+          offsetY += perLane;
+          return newE;
+        }
+        if (e.id === poolId) return { ...e, height: totalLaneH + extra };
+        return e;
+      });
+    }
+  }
+
+  // Step 2: header width. Store on pool; shift descendants by deltaW so
+  // existing children stay anchored to the body, not the header.
+  if (deltaW !== 0) {
+    elements = elements.map(e => {
+      if (e.id === poolId) {
+        return { ...e, properties: { ...e.properties, poolHeaderWidth: headerWidth } };
+      }
+      if (descendantIds.has(e.id)) {
+        return { ...e, x: e.x + deltaW };
+      }
+      return e;
+    });
+  } else if (typeof pool.properties?.poolHeaderWidth !== "number") {
+    // Persist 36 the first time we touch this pool so subsequent
+    // shrinkages have a baseline to diff against.
+    elements = elements.map(e =>
+      e.id === poolId ? { ...e, properties: { ...e.properties, poolHeaderWidth: headerWidth } } : e
+    );
+  }
+
+  // Connectors attached to anything that moved need waypoint recompute.
+  const connectors = baseConnectors.map(conn => {
+    const srcMoved = descendantIds.has(conn.sourceId) || conn.sourceId === poolId;
+    const tgtMoved = descendantIds.has(conn.targetId) || conn.targetId === poolId;
+    if (!srcMoved && !tgtMoved) return conn;
+    return recomputeAllConnectors([conn], elements)[0] ?? conn;
+  });
+
+  return { elements, connectors };
+}
+
 function clampChildrenToLane(elements: DiagramElement[], lane: DiagramElement): DiagramElement[] {
   const LANE_LW = 36;
   const minX = lane.x + LANE_LW;
@@ -1738,43 +2003,21 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         });
         return { ...state, elements: resizedElements, connectors };
       }
-      // Auto-resize pool height to fit vertical label text + buffer
+      // Auto-resize pool height + header width to fit the (possibly
+      // multi-line) label at the current poolFontSize. Both grow AND
+      // shrink with the label.
       if (labelEl && labelEl.type === "pool") {
-        const label = action.payload.label;
-        const textH = label.length * 7 + 20; // ~7px per char + 10px buffer each side
-        const hasLanes = elements.some(e => e.type === "lane" && e.parentId === labelEl.id);
-        // Only auto-resize if the pool has no lanes (black-box or empty white-box)
-        if (!hasLanes) {
-          const minH = Math.max(50, textH);
-          if (labelEl.height < minH) {
-            const resized = elements.map(e =>
-              e.id === labelEl.id ? { ...e, height: minH } : e
-            );
-            return { ...state, elements: resized };
-          }
-        } else {
-          // With lanes: expand lanes if pool is too short for the label
-          const totalLaneH = elements
-            .filter(e => e.type === "lane" && e.parentId === labelEl.id)
-            .reduce((s, e) => s + e.height, 0);
-          if (totalLaneH < textH) {
-            const extra = textH - totalLaneH;
-            const lanes = elements.filter(e => e.type === "lane" && e.parentId === labelEl.id);
-            const perLane = Math.ceil(extra / lanes.length);
-            let offsetY = 0;
-            const resized = elements.map(e => {
-              if (e.type === "lane" && e.parentId === labelEl.id) {
-                const newH = e.height + perLane;
-                const newE = { ...e, y: e.y + offsetY, height: newH };
-                offsetY += perLane;
-                return newE;
-              }
-              if (e.id === labelEl.id) return { ...e, height: totalLaneH + extra };
-              return e;
-            });
-            return { ...state, elements: resized };
-          }
-        }
+        const fontSize = state.poolFontSize ?? 12;
+        const { minHeight, headerWidth } = poolMetrics(action.payload.label, fontSize);
+        const updated = resizePoolForLabel(elements, state.connectors, labelEl.id, minHeight, headerWidth);
+        return { ...state, ...updated };
+      }
+      // Lane / sublane label edited: grow lane height if needed and
+      // sync header widths across siblings.
+      if (labelEl && labelEl.type === "lane") {
+        const fontSize = state.laneFontSize ?? 12;
+        const updated = resizeLaneForLabel(elements, state.connectors, labelEl.id, fontSize);
+        return { ...state, ...updated };
       }
       return { ...state, elements };
     }
@@ -1926,6 +2169,17 @@ function reducer(state: DiagramData, action: Action): DiagramData {
                   : undefined;
               }
             }
+          }
+
+          // Re-sync header widths across surviving siblings — removing a
+          // wide-headered lane lets the others shrink back toward 36.
+          const survivingSibling = elements.find(e => e.type === "lane" && e.parentId === parent.id);
+          if (survivingSibling) {
+            const fontSize = state.laneFontSize ?? 12;
+            const synced = resizeLaneForLabel(elements, state.connectors, survivingSibling.id, fontSize);
+            elements = synced.elements;
+            // Connectors will be recomputed below by existing logic; the
+            // helper's connector recompute is a strict subset.
           }
         }
       }
@@ -2585,11 +2839,37 @@ function reducer(state: DiagramData, action: Action): DiagramData {
     case "SET_TITLE_FONT_SIZE":
       return { ...state, titleFontSize: action.payload };
 
-    case "SET_POOL_FONT_SIZE":
-      return { ...state, poolFontSize: action.payload };
+    case "SET_POOL_FONT_SIZE": {
+      // Recompute every pool's (minHeight, headerWidth) for the new
+      // font size so the rotated label still fits and the header
+      // width tracks the line stack.
+      let elements = state.elements;
+      let connectors = state.connectors;
+      const fontSize = action.payload;
+      for (const el of state.elements) {
+        if (el.type !== "pool") continue;
+        const { minHeight, headerWidth } = poolMetrics(el.label, fontSize);
+        const updated = resizePoolForLabel(elements, connectors, el.id, minHeight, headerWidth);
+        elements = updated.elements;
+        connectors = updated.connectors;
+      }
+      return { ...state, elements, connectors, poolFontSize: fontSize };
+    }
 
-    case "SET_LANE_FONT_SIZE":
-      return { ...state, laneFontSize: action.payload };
+    case "SET_LANE_FONT_SIZE": {
+      // Recompute every lane's auto-size (height growth + sibling
+      // header-width sync) at the new font size.
+      let elements = state.elements;
+      let connectors = state.connectors;
+      const fontSize = action.payload;
+      for (const el of state.elements) {
+        if (el.type !== "lane") continue;
+        const updated = resizeLaneForLabel(elements, connectors, el.id, fontSize);
+        elements = updated.elements;
+        connectors = updated.connectors;
+      }
+      return { ...state, elements, connectors, laneFontSize: fontSize };
+    }
 
     case "SET_DATABASE":
       return { ...state, database: action.payload || undefined };
@@ -2911,7 +3191,12 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         const elements = state.elements.map((e) =>
           e.id === poolId ? { ...e, height: poolH } : e
         );
-        return { ...state, elements: updatePoolTypes([...elements, lane1, lane2]) };
+        let next = { elements: updatePoolTypes([...elements, lane1, lane2]), connectors: state.connectors };
+        // Auto-size each new lane against its label.
+        const laneFs = state.laneFontSize ?? 12;
+        next = resizeLaneForLabel(next.elements, next.connectors, lane1.id, laneFs);
+        next = resizeLaneForLabel(next.elements, next.connectors, lane2.id, laneFs);
+        return { ...state, ...next };
       }
 
       // Additional lane: add at bottom, grow pool
@@ -2928,7 +3213,10 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       const elements = state.elements.map((e) =>
         e.id === poolId && neededH > e.height ? { ...e, height: neededH } : e
       );
-      return { ...state, elements: updatePoolTypes([...elements, newLane]) };
+      let next = { elements: updatePoolTypes([...elements, newLane]), connectors: state.connectors };
+      const laneFs = state.laneFontSize ?? 12;
+      next = resizeLaneForLabel(next.elements, next.connectors, newLane.id, laneFs);
+      return { ...state, ...next };
     }
 
     case "ADD_SUBLANE": {
@@ -2966,7 +3254,10 @@ function reducer(state: DiagramData, action: Action): DiagramData {
             return e;
           });
         }
-        return { ...state, elements };
+        let next = { elements, connectors: state.connectors };
+        const laneFs = state.laneFontSize ?? 12;
+        next = resizeLaneForLabel(next.elements, next.connectors, newSublane.id, laneFs);
+        return { ...state, ...next };
       } else {
         // First time: split parent lane into 2 sublanes
         const sublaneCount = state.elements.filter((e) => e.type === "lane").length;
@@ -2994,7 +3285,11 @@ function reducer(state: DiagramData, action: Action): DiagramData {
           if (e.parentId === laneId && e.type !== "lane") return { ...e, parentId: sublane1.id };
           return e;
         });
-        return { ...state, elements: [...elements, sublane1, sublane2] };
+        let next = { elements: [...elements, sublane1, sublane2], connectors: state.connectors };
+        const laneFs = state.laneFontSize ?? 12;
+        next = resizeLaneForLabel(next.elements, next.connectors, sublane1.id, laneFs);
+        next = resizeLaneForLabel(next.elements, next.connectors, sublane2.id, laneFs);
+        return { ...state, ...next };
       }
     }
 

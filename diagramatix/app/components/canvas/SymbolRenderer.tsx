@@ -1300,7 +1300,11 @@ function PoolShape({ el }: { el: DiagramElement }) {
   const colors = useContext(SymbolColorCtx);
   const poolFs = useContext(PoolFontSizeCtx);
   const { x, y, width: w, height: h } = el;
-  const LW = 36;
+  // Header strip width: dynamic per pool (widens when label has 4+ lines
+  // or large font). Stored on the element by the reducer after a label
+  // or font change; falls back to the legacy default of 36.
+  const storedLW = (el.properties?.poolHeaderWidth as number | undefined);
+  const LW = typeof storedLW === "number" && storedLW > 0 ? storedLW : 36;
   const cx = x + LW / 2 + 3;
   const cy = y + h / 2;
   const lines = el.label.split('\n');
@@ -1343,7 +1347,10 @@ function LaneShape({ el, isSublane }: { el: DiagramElement; isSublane?: boolean 
   const laneFs = useContext(LaneFontSizeCtx);
   const laneDepth = useContext(LaneDepthCtx).get(el.id) ?? 0;
   const { x, y, width: w, height: h } = el;
-  const LW = 36;
+  // Dynamic lane header width — set by the reducer when a sibling label
+  // grows tall enough to need >36px. Falls back to the legacy default.
+  const storedLW = el.properties?.laneHeaderWidth as number | undefined;
+  const LW = typeof storedLW === "number" && storedLW > 0 ? storedLW : 36;
   const cx = x + LW / 2 + 3;
   const cy = y + h / 2;
   const lines = el.label.split('\n');
@@ -1532,7 +1539,11 @@ export function SymbolRenderer({
       ((element.properties.poolType as string | undefined) ?? "black-box") === "white-box";
     const isLane = element.type === "lane";
     if (isWhiteBoxPool || isLane) {
-      const HEADER_LW = 36;
+      // Both pools and lanes can have dynamic header widths now.
+      const stored = element.type === "pool"
+        ? (element.properties?.poolHeaderWidth as number | undefined)
+        : (element.properties?.laneHeaderWidth as number | undefined);
+      const HEADER_LW = typeof stored === "number" && stored > 0 ? stored : 36;
       const worldPos = svgToWorld ? svgToWorld(e.clientX, e.clientY) : null;
       if (worldPos && worldPos.x > element.x + HEADER_LW) return; // body click — bubble
       e.stopPropagation();

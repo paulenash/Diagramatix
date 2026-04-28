@@ -2111,7 +2111,11 @@ export function Canvas({
 
     const isOldContainer = el.type === "system-boundary" || el.type === "composite-state" || el.type === "subprocess-expanded" || el.type === "group";
     if (el.type === "pool" || el.type === "lane") {
-      const lw = 36; // same header width for pools and lanes
+      // Both pool and lane support dynamic header widths.
+      const storedW = el.type === "pool"
+        ? (el.properties?.poolHeaderWidth as number | undefined)
+        : (el.properties?.laneHeaderWidth as number | undefined);
+      const lw = typeof storedW === "number" && storedW > 0 ? storedW : 36;
       setEditingLabel({
         elementId: el.id,
         x: (el.x + lw) * zoom + pan.x,
