@@ -1788,6 +1788,21 @@ export function Canvas({
         } else if (hOverlap > 0 && newBottom <= elTop) {
           // Below with horizontal overlap → top→bottom
           srcSide = "top"; tgtSide = "bottom";
+        } else if (
+          (el.type === "subprocess-expanded" || el.type === "composite-state") &&
+          (vOverlap > 0 || hOverlap > 0)
+        ) {
+          // Container source partially overlaps the new element — none of
+          // the strict edge-relations fired, but a connector still makes
+          // sense. Pick direction by center comparison so dropping a
+          // task NEAR (not strictly outside) an EP still wires up.
+          const elCx = el.x + el.width / 2;
+          const elCy = elTop + el.height / 2;
+          if (vOverlap > 0 && newCx > elCx) {
+            srcSide = "right"; tgtSide = "left";
+          } else if (hOverlap > 0 && newCy > elCy) {
+            srcSide = "bottom"; tgtSide = "top";
+          }
         }
         if (!srcSide || !tgtSide) continue;
 
