@@ -549,6 +549,37 @@ function getLaneHeaderWidth(lane: DiagramElement): number {
   return typeof stored === "number" && stored > 0 ? stored : 36;
 }
 
+/**
+ * Minimum height required for a pool / lane / sublane such that:
+ *   - its own rotated label fits along its vertical extent
+ *   - its children (lanes / sublanes) each fit their own minimum heights
+ *
+ * Used by RESIZE_ELEMENT to clamp user-driven resizes so labels can never
+ * be cropped past the container boundary.
+ */
+function minHeightForContainer(
+  el: DiagramElement,
+  elements: DiagramElement[],
+  poolFs: number,
+  laneFs: number,
+): number {
+  if (el.type === "pool") {
+    const own = poolMetrics(el.label, poolFs).minHeight;
+    const lanes = elements.filter(e => e.type === "lane" && e.parentId === el.id);
+    if (lanes.length === 0) return own;
+    const lanesH = lanes.reduce((s, l) => s + minHeightForContainer(l, elements, poolFs, laneFs), 0);
+    return Math.max(own, lanesH);
+  }
+  if (el.type === "lane") {
+    const own = laneMetrics(el.label, laneFs).minHeight;
+    const sublanes = elements.filter(e => e.type === "lane" && e.parentId === el.id);
+    if (sublanes.length === 0) return own;
+    const subH = sublanes.reduce((s, l) => s + minHeightForContainer(l, elements, poolFs, laneFs), 0);
+    return Math.max(own, subH);
+  }
+  return 40;
+}
+
 /** Same shape as poolMetrics but tuned for lane labels. */
 function laneMetrics(label: string, fontSize: number): { minHeight: number; headerWidth: number } {
   const lines = (label || "").split("\n");
@@ -618,12 +649,40 @@ function resizeLaneForLabel(
     });
 
     // Propagate height growth UPWARD: parent lane (if sublane) and the
-    // pool eventually contain more content.
+    // pool eventually contain more content. At each level, also shift
+    // the just-grown ancestor's later siblings down so they don't end
+    // up overlapped by the expanded ancestor.
     let cur = elements.find(e => e.id === lane.parentId);
     while (cur) {
       if (cur.type === "pool" || cur.type === "lane") {
         const grownId = cur.id;
-        elements = elements.map(e => e.id === grownId ? { ...e, height: e.height + growBy } : e);
+        // Shift later siblings (only relevant when cur has a parent —
+        // pools have no siblings to shift).
+        const shiftIds = new Set<string>();
+        if (cur.parentId) {
+          const ancestorSibs = elements
+            .filter(e => e.type === "lane" && e.parentId === cur!.parentId)
+            .sort((a, b) => a.y - b.y);
+          const ai = ancestorSibs.findIndex(s => s.id === grownId);
+          for (const sib of ancestorSibs.slice(ai + 1)) {
+            shiftIds.add(sib.id);
+            const stack = [sib.id];
+            while (stack.length) {
+              const cid = stack.pop()!;
+              for (const e of elements) {
+                if ((e.parentId === cid || e.boundaryHostId === cid) && !shiftIds.has(e.id)) {
+                  shiftIds.add(e.id);
+                  stack.push(e.id);
+                }
+              }
+            }
+          }
+        }
+        elements = elements.map(e => {
+          if (e.id === grownId) return { ...e, height: e.height + growBy };
+          if (shiftIds.has(e.id)) return { ...e, y: e.y + growBy };
+          return e;
+        });
       }
       cur = cur.parentId ? elements.find(e => e.id === cur!.parentId) : undefined;
     }
@@ -1879,8 +1938,16 @@ function reducer(state: DiagramData, action: Action): DiagramData {
     }
 
     case "RESIZE_ELEMENT": {
-      const { id, x: newX, y: newY, width: newW, height: newH } = action.payload;
+      const { id, x: newX, y: newY, width: newW, height: rawNewH } = action.payload;
       const target = state.elements.find((e) => e.id === id);
+      const poolFs = state.poolFontSize ?? 12;
+      const laneFs = state.laneFontSize ?? 12;
+      // Clamp the resize height so labels (own + descendants') can never
+      // be clipped past the container boundary.
+      const labelMinH = target && (target.type === "pool" || target.type === "lane")
+        ? minHeightForContainer(target, state.elements, poolFs, laneFs)
+        : 0;
+      const newH = Math.max(rawNewH, labelMinH);
 
       if (target?.type === "pool") {
         const POOL_LW = 30;
@@ -1888,10 +1955,17 @@ function reducer(state: DiagramData, action: Action): DiagramData {
           .filter((e) => e.type === "lane" && e.parentId === id)
           .sort((a, b) => a.y - b.y);
         const totalLaneH = sortedLanes.reduce((s, l) => s + l.height, 0) || 1;
+        // Per-lane minimum (each lane needs at least its own + its
+        // sublanes' label-driven minimum).
+        const laneMins = new Map<string, number>();
+        for (const lane of sortedLanes) {
+          laneMins.set(lane.id, minHeightForContainer(lane, state.elements, poolFs, laneFs));
+        }
         let stackY = newY;
         const laneUpdates = new Map<string, DiagramElement>();
         for (const lane of sortedLanes) {
-          const newLaneH = Math.max(40, Math.round(newH * (lane.height / totalLaneH)));
+          const proportional = Math.round(newH * (lane.height / totalLaneH));
+          const newLaneH = Math.max(40, laneMins.get(lane.id) ?? 40, proportional);
           const updated = { ...lane, x: newX + POOL_LW, y: stackY, width: newW - POOL_LW, height: newLaneH };
           laneUpdates.set(lane.id, updated);
           stackY += newLaneH;
@@ -1905,9 +1979,12 @@ function reducer(state: DiagramData, action: Action): DiagramData {
             .sort((a, b) => a.y - b.y);
           if (sublanes.length > 0) {
             const totalSubH = sublanes.reduce((s, l) => s + l.height, 0) || 1;
+            const subMins = new Map<string, number>();
+            for (const s of sublanes) subMins.set(s.id, minHeightForContainer(s, state.elements, poolFs, laneFs));
             let subStackY = updatedLane.y;
             for (const sub of sublanes) {
-              const newSubH = Math.max(40, Math.round(updatedLane.height * (sub.height / totalSubH)));
+              const proportional = Math.round(updatedLane.height * (sub.height / totalSubH));
+              const newSubH = Math.max(40, subMins.get(sub.id) ?? 40, proportional);
               const updatedSub = { ...sub, x: updatedLane.x + LANE_LW, y: subStackY, width: updatedLane.width - LANE_LW, height: newSubH };
               sublaneUpdates.set(sub.id, updatedSub);
               subStackY += newSubH;
@@ -2111,12 +2188,23 @@ function reducer(state: DiagramData, action: Action): DiagramData {
           //     each lane's descendants along by the same Δy so content travels
           //     with its lane.
           // Stops once we hit a non-lane ancestor (the pool terminates the chain).
+          // Container's own label-driven minimum — used to clamp the
+          // post-deletion height so a long pool/lane name never gets
+          // cropped just because a child lane was removed.
+          const poolFs = state.poolFontSize ?? 12;
+          const laneFs = state.laneFontSize ?? 12;
+          function ownLabelMin(c: DiagramElement): number {
+            if (c.type === "pool") return poolMetrics(c.label, poolFs).minHeight;
+            if (c.type === "lane") return laneMetrics(c.label, laneFs).minHeight;
+            return 40;
+          }
+
           let cursor: DiagramElement | undefined = parent;
           while (cursor) {
             const curId = cursor.id;
             const curBefore = elements.find(e => e.id === curId);
             if (!curBefore) break;
-            const newH = Math.max(40, curBefore.height - deletedH);
+            const newH = Math.max(40, ownLabelMin(curBefore), curBefore.height - deletedH);
             elements = elements.map(e => e.id === curId ? { ...e, height: newH } : e);
             const curAfter = elements.find(e => e.id === curId)!;
 
@@ -2149,7 +2237,17 @@ function reducer(state: DiagramData, action: Action): DiagramData {
           }
 
           // Second-last-lane rule: if only one lane remains in the parent and
-          // it is empty, delete it too so the pool returns to its laneless state.
+          // it is empty, delete it too so the pool returns to its laneless
+          // state.
+          //
+          // Parent is a Pool: shrink the pool by the deleted lane's height
+          // (the pool reverts to "laneless").
+          // Parent is a Lane (sublane scenario): keep the parent lane at its
+          // current height — it simply reverts to "lane without sublanes".
+          // The explicit-delete cascade above has already shrunk the parent
+          // by the user-deleted sublane's height; shrinking again here would
+          // double-count and leave the parent (and pool) too short, which
+          // would push the parent lane outside the pool boundary.
           const remainingLanes = elements.filter(e => e.type === "lane" && e.parentId === parent.id);
           if (remainingLanes.length === 1) {
             const lastLane = remainingLanes[0];
@@ -2157,17 +2255,23 @@ function reducer(state: DiagramData, action: Action): DiagramData {
             if (!lastHasChildren) {
               const lastH = lastLane.height;
               elements = elements.filter(e => e.id !== lastLane.id);
-              // Shrink the parent (and above, if parent is itself a lane) by the last lane's height too.
-              let cursor2: DiagramElement | undefined = elements.find(e => e.id === parent.id);
-              while (cursor2) {
-                const curId = cursor2.id;
-                const curBefore = elements.find(e => e.id === curId);
-                if (!curBefore) break;
-                elements = elements.map(e => e.id === curId ? { ...e, height: Math.max(40, curBefore.height - lastH) } : e);
-                cursor2 = cursor2.type === "lane" && cursor2.parentId
-                  ? elements.find(e => e.id === cursor2!.parentId)
-                  : undefined;
+              if (parent.type === "pool") {
+                // Pool case: shrink the pool by the last lane's height,
+                // but never below the pool's own label-driven minimum.
+                let cursor2: DiagramElement | undefined = elements.find(e => e.id === parent.id);
+                while (cursor2) {
+                  const curId = cursor2.id;
+                  const curBefore = elements.find(e => e.id === curId);
+                  if (!curBefore) break;
+                  const clampedH = Math.max(40, ownLabelMin(curBefore), curBefore.height - lastH);
+                  elements = elements.map(e => e.id === curId ? { ...e, height: clampedH } : e);
+                  cursor2 = cursor2.type === "lane" && cursor2.parentId
+                    ? elements.find(e => e.id === cursor2!.parentId)
+                    : undefined;
+                }
               }
+              // Lane parent: leave heights as-is. The parent lane keeps
+              // its current vertical extent and the pool stays the same.
             }
           }
 
