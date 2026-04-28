@@ -1623,6 +1623,15 @@ export function Canvas({
       // State-machine: never auto-connect initial → initial or final → final
       if (isStateMachine && newIsInitial && e.type === "initial-state") return false;
       if (isStateMachine && newIsFinal && e.type === "final-state") return false;
+      // Never auto-connect from an EP (or composite-state) to an element
+      // that ends up inside it. Bounds-containment is the authoritative
+      // test — covers direct parent and any transitive ancestor, even if
+      // newExpandedScope only points to the outermost match.
+      if ((e.type === "subprocess-expanded" || e.type === "composite-state") &&
+          newX >= e.x && newRight2 <= e.x + e.width &&
+          newY >= e.y && newBottom2 <= e.y + e.height) {
+        return false;
+      }
       // Both must share the same container scope (or both have none).
       if (e.id === newExpandedScope) return false;
       const candScope = expandedParentOf(e);
