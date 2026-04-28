@@ -2462,6 +2462,20 @@ function reducer(state: DiagramData, action: Action): DiagramData {
           }
           if (!inside) return state;
         }
+
+        // Rule (R43): an edge-mounted Start event represents an external
+        // trigger — it can only be reached from OUTSIDE its host EP. A
+        // source inside the same host (or a descendant of it) is rejected.
+        if (target.boundaryHostId && target.type === "start-event") {
+          const hostId = target.boundaryHostId;
+          let cur: DiagramElement | undefined = source;
+          let inside = false;
+          for (let i = 0; i < 10 && cur; i++) {
+            if (cur.id === hostId || cur.parentId === hostId) { inside = true; break; }
+            cur = cur.parentId ? state.elements.find(e => e.id === cur!.parentId) : undefined;
+          }
+          if (inside) return state;
+        }
       }
 
       } // end if (!force)

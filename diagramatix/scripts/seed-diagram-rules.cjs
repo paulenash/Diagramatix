@@ -32,6 +32,10 @@ R09: Every process must end with one or more End Events on the right side, withi
 R10: CRITICAL: Any decision point that creates a diverging flow MUST always have a corresponding downstream Merge Gateway to reconnect ALL branches before any subsequent task.
 R11: Use Exclusive Gateways for if/else decisions with condition labels on the outgoing flows.
 R12: Use Parallel Gateways for concurrent activities that must all complete before proceeding.
+R42: Sequence connectors leaving an edge-mounted Start Event MUST emit from its INNER side (the side facing into the host Expanded Subprocess). For the typical left-edge mount, this is the right-hand connection point.
+R43: Sequence connectors targeting an edge-mounted Start Event MUST attach at its OUTER side (the side facing AWAY from the host EP). Such connectors are only valid when the source element sits OUTSIDE the host EP — the boundary start represents an external trigger.
+R44: Sequence connectors targeting an edge-mounted End Event MUST attach at its INNER side AND originate from an element INSIDE the host EP. No element outside the EP may connect to a boundary end event.
+R45: An Expanded Subprocess MUST NEVER auto-connect to one of its own descendants. EP-to-child sequence connectors are disallowed regardless of the child's relative position inside the EP.
 
 ## Group 4: Naming & Labels
 R13: Task names should be action-oriented verb phrases (e.g. "Check Order", "Create Invoice", "Send Email").
@@ -61,7 +65,12 @@ R32: Every process must include a Start Event and at least one End Event at the 
 R33: A Gateway with one (or zero) incoming sequence connector and two or more outgoing sequence connectors must have gatewayType="none" and gatewayRole="decision" (unless an explicit marker such as parallel or inclusive was set).
 R34: A Gateway with two or more incoming sequence connectors and one (or zero) outgoing sequence connector must have gatewayType="none" and gatewayRole="merge" (unless an explicit marker was set).
 R35: Decision gateway wiring — the incoming sequence connector attaches to the left diamond point; outgoing connectors attach in AI order to top, then bottom, then right (for up to three outgoing branches).
-R36: Merge gateway wiring — the outgoing sequence connector attaches to the right diamond point; incoming connectors attach in AI order to top, then bottom, then left (for up to three incoming branches).`,
+R36: Merge gateway wiring — the outgoing sequence connector attaches to the right diamond point; incoming connectors attach in AI order to top, then bottom, then left (for up to three incoming branches).
+R37: Pool height must accommodate the longest line of the (possibly multi-line) pool name at the current pool font size, plus a small vertical padding. When the pool name is split across lines via Shift-Enter, the pool height shrinks to fit the now-shorter longest line.
+R38: Pool header strip width grows when the pool name spans more than ~2 lines (or uses a larger font), and shrinks back toward the 36px default when fewer lines are needed. Children inside the pool are shifted horizontally by the same delta so they stay anchored to the pool body.
+R39: Lane height must be at least the longest line of the lane label at the current lane font size, plus padding. Lanes never auto-shrink — they only grow to fit. Growth propagates up to the parent lane (for sublanes) and to the containing pool.
+R40: Lane and sublane header widths are synchronised across all sibling lanes within the same parent — every sibling adopts the maximum needed width so the lane stack stays visually aligned. The shared width shrinks back to the 36px default when no sibling needs more.
+R41: Resizing a Pool, Lane, or Sublane is clamped to a minimum height equal to the larger of (the container's own label-driven minimum) or (the sum of every nested lane/sublane's minimum). Labels can never be cropped past the container boundary by a manual resize.`,
 
   "state-machine": `## Group 1: States
 S01: Every state machine must have exactly one Initial State (filled circle) and at least one Final State (bull's eye).
@@ -159,10 +168,14 @@ P15: All other actor/team/system associations are non-directed (no arrows).`,
 
 async function seed() {
   for (const [category, text] of Object.entries(rules)) {
+    // UPSERT on id so re-running the seed propagates updated rule text
+    // to the existing default rows. The fixed id is `default-{category}`.
     await pool.query(
       `INSERT INTO "DiagramRules" (id, category, rules, "isDefault", "createdAt", "updatedAt")
        VALUES ($1, $2, $3, true, NOW(), NOW())
-       ON CONFLICT DO NOTHING`,
+       ON CONFLICT (id) DO UPDATE
+         SET rules = EXCLUDED.rules,
+             "updatedAt" = NOW()`,
       [`default-${category}`, category, text]
     );
     console.log(`Seeded: ${category} (${text.split("\n").filter(l => l.match(/^[A-Z]\d+:/)).length} rules)`);
