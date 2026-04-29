@@ -442,6 +442,15 @@ export function Canvas({
   } | null>(null);
   const [focusedEndpoint, setFocusedEndpoint] = useState<"source" | "target" | null>(null);
   const [msgMarkerFocused, setMsgMarkerFocused] = useState(false);
+  // Pool vertical-boundary alignment guide. Active during a left/right
+  // resize of a pool. Shows a dotted vertical line at the moving
+  // boundary's current X plus a marker at every other pool's same-side
+  // boundary (vertical centre), highlighted green on alignment.
+  const [poolBoundaryGuide, setPoolBoundaryGuide] = useState<{
+    side: "left" | "right";
+    currentX: number;
+    others: { id: string; x: number; midY: number }[];
+  } | null>(null);
   const [debugLabelOffsets, setDebugLabelOffsets] = useState<Map<string, Point>>(new Map());
   const setDebugLabelOffset = useCallback((id: string, offset: Point) => {
     setDebugLabelOffsets(prev => { const next = new Map(prev); next.set(id, offset); return next; });
@@ -1230,6 +1239,28 @@ export function Canvas({
     const startMouse = { x: e.clientX, y: e.clientY };
     const startBounds = { x: el.x, y: el.y, width: el.width, height: el.height };
 
+    // Pool vertical-boundary guide: detect left/right resize of a pool
+    // and snapshot every OTHER pool's same-side boundary so we can show
+    // alignment markers during the drag.
+    const isPoolBoundaryDrag = el.type === "pool" && (handle.includes("w") || handle.includes("e"));
+    const movingSide: "left" | "right" | null = isPoolBoundaryDrag
+      ? (handle.includes("w") ? "left" : "right")
+      : null;
+    if (movingSide) {
+      const others = data.elements
+        .filter(p => p.type === "pool" && p.id !== el.id)
+        .map(p => ({
+          id: p.id,
+          x: movingSide === "left" ? p.x : p.x + p.width,
+          midY: p.y + p.height / 2,
+        }));
+      setPoolBoundaryGuide({
+        side: movingSide,
+        currentX: movingSide === "left" ? el.x : el.x + el.width,
+        others,
+      });
+    }
+
     function onMouseMove(ev: MouseEvent) {
       const dx = (ev.clientX - startMouse.x) / zoom;
       const dy = (ev.clientY - startMouse.y) / zoom;
@@ -1325,12 +1356,19 @@ export function Canvas({
       }
 
       onResizeElement(elementId, x, y, width, height);
+
+      // Live-update the boundary guide's X as the user drags.
+      if (movingSide) {
+        const newX = movingSide === "left" ? x : x + width;
+        setPoolBoundaryGuide(prev => prev ? { ...prev, currentX: newX } : null);
+      }
     }
 
     function onMouseUp() {
       window.removeEventListener("mousemove", onMouseMove);
       window.removeEventListener("mouseup", onMouseUp);
       onResizeElementEnd?.(elementId);
+      if (movingSide) setPoolBoundaryGuide(null);
     }
 
     window.addEventListener("mousemove", onMouseMove);
@@ -4152,6 +4190,49 @@ export function Canvas({
                   points={`${autoConnectFlash.to.x},${autoConnectFlash.to.y} ${aLeftX},${aLeftY} ${aRightX},${aRightY}`}
                   fill="#10b981"
                 />
+              </g>
+            );
+          })()}
+
+          {/* Pool vertical-boundary alignment guide: dotted black line at the
+              moving boundary's current X, with a marker at every other pool's
+              same-side boundary (vertical centre). Markers turn green when the
+              moving boundary aligns with that pool's; the whole line flashes
+              green when ALL other pool boundaries align simultaneously. */}
+          {poolBoundaryGuide && (() => {
+            const SNAP_PX = 4;
+            const others = poolBoundaryGuide.others;
+            const aligned = others.map(o => Math.abs(o.x - poolBoundaryGuide.currentX) < SNAP_PX);
+            const allAligned = aligned.length > 0 && aligned.every(v => v);
+            if (others.length === 0) return null;
+            // Vertical extent: span all pool centres plus a generous margin
+            const minMidY = Math.min(...others.map(o => o.midY));
+            const maxMidY = Math.max(...others.map(o => o.midY));
+            const y1 = minMidY - 80;
+            const y2 = maxMidY + 80;
+            return (
+              <g pointerEvents="none">
+                <line
+                  x1={poolBoundaryGuide.currentX} x2={poolBoundaryGuide.currentX}
+                  y1={y1} y2={y2}
+                  stroke={allAligned ? "#10b981" : "#000000"}
+                  strokeWidth={allAligned ? 2 : 1}
+                  strokeDasharray="4 3"
+                  className={allAligned ? "animate-pulse" : undefined}
+                  opacity={allAligned ? 1 : 0.7}
+                />
+                {others.map((o, i) => (
+                  <circle
+                    key={o.id}
+                    cx={o.x}
+                    cy={o.midY}
+                    r={6}
+                    fill={aligned[i] ? "#10b981" : "#9ca3af"}
+                    fillOpacity={aligned[i] ? 0.9 : 0.4}
+                    stroke={aligned[i] ? "#047857" : "#4b5563"}
+                    strokeWidth={1.5}
+                  />
+                ))}
               </g>
             );
           })()}

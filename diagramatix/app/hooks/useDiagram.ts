@@ -2973,6 +2973,14 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       const updatedConns = state.connectors.map((c) => {
         if (c.id !== action.payload.id) return c;
         const newWaypoints = consolidateWaypoints(action.payload.waypoints);
+        // For messageBPMN: the label follows the connector horizontally
+        // (and vertically). Skip the world-position preservation so a
+        // user-initiated horizontal drag of the connector visibly moves
+        // the label with it, instead of pinning the label in place
+        // while the connector slides underneath.
+        if (c.type === "messageBPMN") {
+          return { ...c, waypoints: newWaypoints };
+        }
         // R54: preserve label world position across the waypoint change
         const labelAdj = preserveLabelWorldPos(c, newWaypoints);
         return { ...c, waypoints: newWaypoints, ...labelAdj };
@@ -3479,6 +3487,46 @@ function reducer(state: DiagramData, action: Action): DiagramData {
               connectors: next.connectors.map(conn => {
                 if (!shiftIds.has(conn.sourceId) && !shiftIds.has(conn.targetId)) return conn;
                 return recomputeAllConnectors([conn], next.elements)[0] ?? conn;
+              }),
+            };
+            // For messageBPMN labels: the label should track the BBP
+            // attachment Y. The connector midpoint shifted by avg of
+            // src/tgt pool shifts; if only the BBP-side pool shifted,
+            // the label drifts by half the shift relative to the BBP.
+            // Add the missing differential to labelOffsetY so the label
+            // visually moves by the SAME amount as the BBP boundary.
+            const findPoolIdOf = (elId: string): string | null => {
+              let cur = next.elements.find(e => e.id === elId);
+              for (let i = 0; i < 10 && cur; i++) {
+                if (cur.type === "pool") return cur.id;
+                if (!cur.parentId) return null;
+                cur = next.elements.find(e => e.id === cur!.parentId);
+              }
+              return null;
+            };
+            next = {
+              elements: next.elements,
+              connectors: next.connectors.map(conn => {
+                if (conn.type !== "messageBPMN") return conn;
+                const srcPoolId = findPoolIdOf(conn.sourceId);
+                const tgtPoolId = findPoolIdOf(conn.targetId);
+                const srcShifted = !!(srcPoolId && shiftIds.has(srcPoolId));
+                const tgtShifted = !!(tgtPoolId && shiftIds.has(tgtPoolId));
+                if (srcShifted === tgtShifted) return conn; // both or neither — no differential
+                const srcPool = srcPoolId ? next.elements.find(e => e.id === srcPoolId) : undefined;
+                const tgtPool = tgtPoolId ? next.elements.find(e => e.id === tgtPoolId) : undefined;
+                const srcIsBlackBox = !!srcPool && ((srcPool.properties.poolType as string | undefined) ?? "black-box") !== "white-box";
+                const tgtIsBlackBox = !!tgtPool && ((tgtPool.properties.poolType as string | undefined) ?? "black-box") !== "white-box";
+                let bbpShifted: boolean;
+                if (srcIsBlackBox && !tgtIsBlackBox) bbpShifted = srcShifted;
+                else if (tgtIsBlackBox && !srcIsBlackBox) bbpShifted = tgtShifted;
+                else if (srcIsBlackBox && tgtIsBlackBox) bbpShifted = srcShifted;
+                else return conn; // both white-box — no BBP anchor
+                const anchorShift = ((srcShifted ? growth : 0) + (tgtShifted ? growth : 0)) / 2;
+                const bbpShift = bbpShifted ? growth : 0;
+                const extra = bbpShift - anchorShift;
+                if (Math.abs(extra) < 0.5) return conn;
+                return { ...conn, labelOffsetY: (conn.labelOffsetY ?? 0) + extra };
               }),
             };
           }
