@@ -2452,9 +2452,170 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       if (el?.type === "lane" && el.parentId) {
         const parent = elements.find((e) => e.id === el.parentId);
         if (parent) {
-          // Direct sublane children of the deleted lane (from original
-          // state — line 2437's .map() unparented them to undefined, but
-          // we read the original parent linkage from state.elements).
+          // Helper: promote a lane's direct sublanes into a slot, recursively
+          // resize their descendants proportionally, re-home non-lane orphans
+          // to the closest promoted lane, and cascade x/width through the
+          // promoted hierarchy so each lane sits flush against its new
+          // parent's header width.
+          const promoteIntoSlot = (
+            elementsArr: DiagramElement[],
+            deletedLane: DiagramElement,
+            newParent: DiagramElement,
+            dSubs: DiagramElement[],
+            directOrphanIds: string[],
+          ): DiagramElement[] => {
+            if (dSubs.length === 0) return elementsArr;
+
+            const deletedY = deletedLane.y;
+            const deletedH = deletedLane.height;
+            const childrenTop = Math.min(...dSubs.map((c) => c.y));
+            const childrenBottom = Math.max(...dSubs.map((c) => c.y + c.height));
+            const childrenSpan = Math.max(1, childrenBottom - childrenTop);
+
+            const promotedScale = new Map<
+              string,
+              { oldY: number; oldH: number; newY: number; newH: number }
+            >();
+            for (const child of dSubs) {
+              const t = (child.y - childrenTop) / childrenSpan;
+              const b = (child.y + child.height - childrenTop) / childrenSpan;
+              promotedScale.set(child.id, {
+                oldY: child.y,
+                oldH: child.height,
+                newY: deletedY + t * deletedH,
+                newH: (b - t) * deletedH,
+              });
+            }
+
+            const cascadeResize = (
+              parentLid: string,
+              parentScale: { oldY: number; oldH: number; newY: number; newH: number },
+            ) => {
+              const sf = parentScale.newH / Math.max(1, parentScale.oldH);
+              for (const e of elementsArr) {
+                if (e.type === "lane" && e.parentId === parentLid && !promotedScale.has(e.id)) {
+                  const ns = {
+                    oldY: e.y,
+                    oldH: e.height,
+                    newY: parentScale.newY + (e.y - parentScale.oldY) * sf,
+                    newH: e.height * sf,
+                  };
+                  promotedScale.set(e.id, ns);
+                  cascadeResize(e.id, ns);
+                }
+              }
+            };
+            for (const child of dSubs) cascadeResize(child.id, promotedScale.get(child.id)!);
+
+            const directSublaneIdSet = new Set(dSubs.map((c) => c.id));
+            let result = elementsArr.map((e) => {
+              const sc = promotedScale.get(e.id);
+              if (!sc) return e;
+              return {
+                ...e,
+                y: sc.newY,
+                height: sc.newH,
+                parentId: directSublaneIdSet.has(e.id) ? newParent.id : e.parentId,
+              };
+            });
+
+            for (const oid of directOrphanIds) {
+              const orph = result.find((e) => e.id === oid);
+              if (!orph) continue;
+              const center = orph.y + orph.height / 2;
+              let best: { id: string; dist: number } | null = null;
+              for (const c of dSubs) {
+                const sc = promotedScale.get(c.id)!;
+                if (center >= sc.newY && center <= sc.newY + sc.newH) {
+                  best = { id: c.id, dist: 0 };
+                  break;
+                }
+                const d = Math.min(
+                  Math.abs(center - sc.newY),
+                  Math.abs(center - (sc.newY + sc.newH)),
+                );
+                if (!best || d < best.dist) best = { id: c.id, dist: d };
+              }
+              if (best) {
+                const bestId = best.id;
+                result = result.map((e) => (e.id === oid ? { ...e, parentId: bestId } : e));
+              }
+            }
+
+            // Cascade x/width through promoted hierarchy: each promoted lane
+            // (and its promoted descendants) sits at parent.x + headerWidth,
+            // with width = parent.width - headerWidth.
+            const queue: string[] = dSubs.map((c) => c.id);
+            const seen = new Set<string>();
+            while (queue.length) {
+              const lid = queue.shift()!;
+              if (seen.has(lid)) continue;
+              seen.add(lid);
+              const lane = result.find((e) => e.id === lid);
+              if (!lane) continue;
+              const par = result.find((e) => e.id === lane.parentId);
+              if (!par) continue;
+              const headerW = par.type === "pool" ? getPoolHeaderWidth(par) : getLaneHeaderWidth(par);
+              const newX = par.x + headerW;
+              const newW = par.width - headerW;
+              if (lane.x !== newX || lane.width !== newW) {
+                result = result.map((e) =>
+                  e.id === lid ? { ...e, x: newX, width: newW } : e,
+                );
+              }
+              for (const e of elementsArr) {
+                if (
+                  e.type === "lane" &&
+                  e.parentId === lid &&
+                  promotedScale.has(e.id) &&
+                  !seen.has(e.id)
+                ) {
+                  queue.push(e.id);
+                }
+              }
+            }
+
+            return result;
+          };
+
+          // Helper: while `parent` has exactly one lane child, dissolve it.
+          // If that lone lane has its own direct sublanes, promote them into
+          // the lone lane's slot (filling parent's body) and remove the lone
+          // lane. If it has no sublanes, flatten the lane into the parent.
+          // Loops up to 10 times to handle deep promote-then-dissolve chains.
+          const dissolveSingletons = (
+            elementsArr: DiagramElement[],
+            par: DiagramElement,
+          ): DiagramElement[] => {
+            let result = elementsArr;
+            for (let iter = 0; iter < 10; iter++) {
+              const remaining = result.filter(
+                (e) => e.type === "lane" && e.parentId === par.id,
+              );
+              if (remaining.length !== 1) return result;
+              const last = remaining[0];
+              const lastSubs = result
+                .filter((e) => e.type === "lane" && e.parentId === last.id)
+                .sort((a, b) => a.y - b.y);
+              const lastOrphans = result
+                .filter((e) => e.type !== "lane" && e.parentId === last.id)
+                .map((e) => e.id);
+              if (lastSubs.length > 0) {
+                result = promoteIntoSlot(result, last, par, lastSubs, lastOrphans);
+                result = result.filter((e) => e.id !== last.id);
+              } else {
+                result = result.map((e) =>
+                  e.parentId === last.id ? { ...e, parentId: par.id } : e,
+                );
+                result = result.filter((e) => e.id !== last.id);
+                return result;
+              }
+            }
+            return result;
+          };
+
+          // Direct sublane children of the deleted lane (read from original
+          // state — line 2437's .map() unparented them to undefined).
           const directSublanes = state.elements
             .filter((e) => e.type === "lane" && e.parentId === id)
             .sort((a, b) => a.y - b.y);
@@ -2463,97 +2624,18 @@ function reducer(state: DiagramData, action: Action): DiagramData {
             // ── PROMOTION PATH ──
             // The deleted lane has direct sublane children. Promote them
             // to be children of the deleted lane's parent. They fill the
-            // deleted lane's vertical slice (lanes already tile their
-            // parent, but proportionally remap to be resilient against
-            // rounding gaps). Grandchildren and deeper descendants are
-            // proportionally resized so they continue to tile their now-
-            // resized parent. Sibling lanes at the deleted lane's level
-            // are unaffected — they keep their original (y, height).
-            const deletedY = el.y;
-            const deletedH = el.height;
-            const childrenTop = Math.min(...directSublanes.map((c) => c.y));
-            const childrenBottom = Math.max(...directSublanes.map((c) => c.y + c.height));
-            const childrenSpan = Math.max(1, childrenBottom - childrenTop);
-
-            // promotedScale = id → { oldY, oldH, newY, newH } for the
-            // direct sublanes AND their descendants (so descendants can
-            // be cascade-resized).
-            const promotedScale = new Map<string, { oldY: number; oldH: number; newY: number; newH: number }>();
-            for (const child of directSublanes) {
-              const t = (child.y - childrenTop) / childrenSpan;
-              const b = (child.y + child.height - childrenTop) / childrenSpan;
-              const newY = deletedY + t * deletedH;
-              const newH = (b - t) * deletedH;
-              promotedScale.set(child.id, { oldY: child.y, oldH: child.height, newY, newH });
-            }
-
-            function cascadeResize(
-              parentId: string,
-              parentScale: { oldY: number; oldH: number; newY: number; newH: number },
-            ) {
-              const sf = parentScale.newH / Math.max(1, parentScale.oldH);
-              for (const e of state.elements) {
-                if (e.type === "lane" && e.parentId === parentId) {
-                  const offsetWithin = e.y - parentScale.oldY;
-                  const newY = parentScale.newY + offsetWithin * sf;
-                  const newH = e.height * sf;
-                  promotedScale.set(e.id, { oldY: e.y, oldH: e.height, newY, newH });
-                  cascadeResize(e.id, { oldY: e.y, oldH: e.height, newY, newH });
-                }
-              }
-            }
-            for (const child of directSublanes) {
-              const sc = promotedScale.get(child.id)!;
-              cascadeResize(child.id, sc);
-            }
-
-            // Apply resize + reparent direct sublanes to `parent`.
-            const directSublaneIdSet = new Set(directSublanes.map((c) => c.id));
-            elements = elements.map((e) => {
-              const sc = promotedScale.get(e.id);
-              if (!sc) return e;
-              return {
-                ...e,
-                y: sc.newY,
-                height: sc.newH,
-                parentId: directSublaneIdSet.has(e.id) ? parent.id : e.parentId,
-              };
-            });
-
-            // Re-home non-lane elements that lived DIRECTLY inside the
-            // deleted lane to the closest promoted lane by vertical center.
+            // deleted lane's vertical slice. Grandchildren and deeper
+            // descendants resize proportionally to their parent's new
+            // height. Sibling lanes at the deleted lane's level are
+            // unaffected — they keep their original (y, height).
             const directOrphans = state.elements
               .filter((e) => e.type !== "lane" && e.parentId === id)
               .map((e) => e.id);
-            for (const oid of directOrphans) {
-              const orph = elements.find((e) => e.id === oid);
-              if (!orph) continue;
-              const center = orph.y + orph.height / 2;
-              let best: { id: string; dist: number } | null = null;
-              for (const c of directSublanes) {
-                const sc = promotedScale.get(c.id)!;
-                if (center >= sc.newY && center <= sc.newY + sc.newH) {
-                  best = { id: c.id, dist: 0 };
-                  break;
-                }
-                const d = Math.min(Math.abs(center - sc.newY), Math.abs(center - (sc.newY + sc.newH)));
-                if (!best || d < best.dist) best = { id: c.id, dist: d };
-              }
-              if (best) {
-                const bestId = best.id;
-                elements = elements.map((e) =>
-                  e.id === oid ? { ...e, parentId: bestId } : e,
-                );
-              }
-            }
-
-            // Header width re-sync across the now-larger sibling set.
-            const fontSize = state.laneFontSize ?? 12;
-            const aSibling = elements.find((e) => e.type === "lane" && e.parentId === parent.id);
-            if (aSibling) {
-              const synced = resizeLaneForLabel(elements, state.connectors, aSibling.id, fontSize);
-              elements = synced.elements;
-            }
+            elements = promoteIntoSlot(elements, el, parent, directSublanes, directOrphans);
+            // After promotion, parent might have only one lane (e.g. the
+            // deleted lane was the only sibling AND had only one sublane).
+            // Recursively dissolve.
+            elements = dissolveSingletons(elements, parent);
           } else {
             // ── ABSORBER PATH (no direct sublanes) ──
             // The pool (and every ancestor) keeps its current height. A
@@ -2561,15 +2643,12 @@ function reducer(state: DiagramData, action: Action): DiagramData {
             // deleted lane grows to swallow the deleted lane's vertical
             // slice. Every element stays at its original (x, y) — only
             // its parentId is updated to the absorbing lane (or to the
-            // parent if there are no siblings). No connector recompute
-            // is needed because nothing physically moves.
+            // parent if there are no siblings).
             const deletedY = el.y;
             const deletedH = el.height;
             const deletedBottom = deletedY + deletedH;
             const deletedCenter = deletedY + deletedH / 2;
 
-            // Find the absorbing sibling: prefer the lane immediately
-            // below the deleted one, else the lane immediately above.
             const siblings = elements
               .filter((e) => e.type === "lane" && e.parentId === parent.id)
               .sort((a, b) => a.y - b.y);
@@ -2598,42 +2677,27 @@ function reducer(state: DiagramData, action: Action): DiagramData {
               );
             }
 
-            // Second-last-lane rule: if exactly one sibling lane remains
-            // after the absorb, auto-delete that one too. The auto-
-            // deleted lane's ENTIRE sublane tree cascades down with it.
-            const remainingAfterAbsorb = elements.filter(
-              (e) => e.type === "lane" && e.parentId === parent.id,
-            );
-            if (remainingAfterAbsorb.length === 1) {
-              const last = remainingAfterAbsorb[0];
-              const cascadeIds = new Set<string>([last.id]);
-              function collectSubsRecursive(parentId: string) {
-                for (const e of elements) {
-                  if (e.type === "lane" && e.parentId === parentId && !cascadeIds.has(e.id)) {
-                    cascadeIds.add(e.id);
-                    collectSubsRecursive(e.id);
-                  }
-                }
-              }
-              collectSubsRecursive(last.id);
-              elements = elements
-                .filter((e) => !cascadeIds.has(e.id))
-                .map((e) =>
-                  e.parentId !== undefined && cascadeIds.has(e.parentId)
-                    ? { ...e, parentId: parent.id }
-                    : e,
-                );
-            }
+            // Replaces the original "second-last cascade-delete" rule.
+            // Sublanes of the lone surviving lane are now PROMOTED rather
+            // than cascade-deleted (e.g. delete L1 of P{L1, L2 with SL3,
+            // SL4} → L2 absorbs → singleton dissolve promotes SL3, SL4 to
+            // be lanes of P, filling its body).
+            elements = dissolveSingletons(elements, parent);
+          }
 
-            // Header width re-sync across surviving siblings.
-            const survivingSibling = elements.find(
-              (e) => e.type === "lane" && e.parentId === parent.id,
+          // Header width re-sync across surviving siblings.
+          const survivingSibling = elements.find(
+            (e) => e.type === "lane" && e.parentId === parent.id,
+          );
+          if (survivingSibling) {
+            const fontSize = state.laneFontSize ?? 12;
+            const synced = resizeLaneForLabel(
+              elements,
+              state.connectors,
+              survivingSibling.id,
+              fontSize,
             );
-            if (survivingSibling) {
-              const fontSize = state.laneFontSize ?? 12;
-              const synced = resizeLaneForLabel(elements, state.connectors, survivingSibling.id, fontSize);
-              elements = synced.elements;
-            }
+            elements = synced.elements;
           }
         }
       }
