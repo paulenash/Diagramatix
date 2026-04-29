@@ -2146,6 +2146,32 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       if (el?.type === "pool" && state.elements.some((e) => e.parentId === id)) {
         return state;
       }
+
+      // Identify "orphans" up-front: non-lane elements that lived inside the
+      // deleted lane or any of its cascade sublanes. Capturing them BEFORE
+      // the filter strips their parentId lets us re-home them to the
+      // nearest surviving lane (or the pool if all lanes vanish) AFTER the
+      // lane-shrink + second-last-rule logic has run.
+      const orphanIds = new Set<string>();
+      if (el?.type === "lane") {
+        const allDeletedLaneIds = new Set<string>([id]);
+        function collectCascadeLanes(parentId: string) {
+          for (const e of state.elements) {
+            if (e.type === "lane" && e.parentId === parentId) {
+              allDeletedLaneIds.add(e.id);
+              collectCascadeLanes(e.id);
+            }
+          }
+        }
+        collectCascadeLanes(id);
+        for (const e of state.elements) {
+          if (e.type === "lane") continue; // sub-lane removal is handled separately
+          if (e.parentId && allDeletedLaneIds.has(e.parentId)) {
+            orphanIds.add(e.id);
+          }
+        }
+      }
+
       const deletingIsContainer = el ? isContainerType(el.type) : false;
       let elements = state.elements
         .filter((e) => e.id !== id)
@@ -2285,6 +2311,82 @@ function reducer(state: DiagramData, action: Action): DiagramData {
             // Connectors will be recomputed below by existing logic; the
             // helper's connector recompute is a strict subset.
           }
+
+          // ── Re-home orphans ──
+          // Children of the deleted lane (or its cascade sublanes) lost
+          // their parent during the cascade. Move them into the NEAREST
+          // surviving lane (by y-distance to the lane's vertical range);
+          // if no lanes remain in the pool, drop them onto the pool body.
+          // Connectors stay attached because they reference endpoints by
+          // id — the final recomputeAllConnectors below re-routes
+          // waypoints around the new positions.
+          if (orphanIds.size > 0) {
+            // Find the pool ancestor of the originally-deleted lane.
+            let poolId: string | undefined;
+            let curAnc: DiagramElement | undefined = state.elements.find(e => e.id === el.parentId);
+            for (let i = 0; curAnc && i < 10; i++) {
+              if (curAnc.type === "pool") { poolId = curAnc.id; break; }
+              if (!curAnc.parentId) break;
+              curAnc = state.elements.find(e => e.id === curAnc!.parentId);
+            }
+            const pool = poolId ? elements.find(e => e.id === poolId) : undefined;
+            if (pool) {
+              // Surviving lanes (any depth) inside the pool, post-shrink.
+              const survivingLanes: DiagramElement[] = [];
+              function collectSurvivingLanes(parentId: string) {
+                for (const e of elements) {
+                  if (e.type === "lane" && e.parentId === parentId) {
+                    survivingLanes.push(e);
+                    collectSurvivingLanes(e.id);
+                  }
+                }
+              }
+              collectSurvivingLanes(pool.id);
+
+              for (const orphanId of orphanIds) {
+                const orphan = elements.find(e => e.id === orphanId);
+                if (!orphan) continue;
+                const orphanCy = orphan.y + orphan.height / 2;
+
+                let newParent: DiagramElement | undefined;
+                if (survivingLanes.length === 0) {
+                  newParent = pool;
+                } else {
+                  // Pick the lane whose y range is closest to the orphan's
+                  // centre y. Inside-lane orphans get distance 0 — they
+                  // stay in the most natural place.
+                  let bestLane: DiagramElement | undefined;
+                  let bestDist = Infinity;
+                  for (const lane of survivingLanes) {
+                    const top = lane.y;
+                    const bot = lane.y + lane.height;
+                    const dist = orphanCy >= top && orphanCy <= bot ? 0
+                      : orphanCy < top ? top - orphanCy
+                      : orphanCy - bot;
+                    if (dist < bestDist) { bestDist = dist; bestLane = lane; }
+                  }
+                  newParent = bestLane;
+                }
+                if (!newParent) continue;
+
+                // Clamp the orphan into the new parent's content area —
+                // header strip on the left, with a small inset.
+                const headerW = newParent.type === "pool"
+                  ? getPoolHeaderWidth(newParent)
+                  : getLaneHeaderWidth(newParent);
+                const PAD = 4;
+                const minX = newParent.x + headerW + PAD;
+                const maxX = Math.max(minX, newParent.x + newParent.width - orphan.width - PAD);
+                const minY = newParent.y + PAD;
+                const maxY = Math.max(minY, newParent.y + newParent.height - orphan.height - PAD);
+                const newX = Math.max(minX, Math.min(orphan.x, maxX));
+                const newY = Math.max(minY, Math.min(orphan.y, maxY));
+                elements = elements.map(e =>
+                  e.id === orphanId ? { ...e, x: newX, y: newY, parentId: newParent!.id } : e
+                );
+              }
+            }
+          }
         }
       }
 
@@ -2335,6 +2437,12 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         (c) => c.sourceId !== id && c.targetId !== id
       );
       if (bridgeConnector) connectors = [...connectors, bridgeConnector];
+
+      // If any orphans were re-homed, their connectors need waypoint
+      // re-routing — endpoints didn't change, but element positions did.
+      if (orphanIds.size > 0) {
+        connectors = recomputeAllConnectors(connectors, elements);
+      }
 
       // Re-theme snapped group if a process was removed from it
       if (el && CHEVRON_SNAP_TYPES.has(el.type)) {
