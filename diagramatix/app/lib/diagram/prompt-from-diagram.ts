@@ -1,4 +1,19 @@
-import type { Connector, ConnectorType, DiagramElement, SymbolType } from "./types";
+import type { Connector, ConnectorType, DiagramElement, DiagramType, SymbolType } from "./types";
+
+/**
+ * Router: picks the per-diagram-type prompt generator. Falls back to the
+ * BPMN one for any type we haven't taught a structure to yet.
+ */
+export function buildPromptFromDiagram(
+  elements: DiagramElement[],
+  connectors: Connector[],
+  diagramType: DiagramType,
+): string {
+  if (diagramType === "context" || diagramType === "basic") {
+    return buildContextPrompt(elements, connectors);
+  }
+  return buildBpmnPrompt(elements, connectors);
+}
 
 const FLOW_ELEMENT_TYPES: Set<SymbolType> = new Set<SymbolType>([
   "task",
@@ -176,6 +191,46 @@ export function buildBpmnPrompt(elements: DiagramElement[], connectors: Connecto
   lines.push("");
 
   // ── 6. Connectors grouped by type ──
+  // Index boundary events by host so we can re-attribute connectors that
+  // visually leave (or arrive at) a boundary event but whose stored
+  // sourceId/targetId points at the host element instead.
+  const boundariesByHost = new Map<string, DiagramElement[]>();
+  for (const e of elements) {
+    if (!e.boundaryHostId) continue;
+    const arr = boundariesByHost.get(e.boundaryHostId) ?? [];
+    arr.push(e);
+    boundariesByHost.set(e.boundaryHostId, arr);
+  }
+  const effectiveEndpoint = (c: Connector, end: "source" | "target"): DiagramElement | undefined => {
+    const refId = end === "source" ? c.sourceId : c.targetId;
+    const ref = byId.get(refId);
+    if (!ref) return undefined;
+    const events = boundariesByHost.get(refId);
+    if (!events || events.length === 0) return ref;
+    const side = end === "source" ? c.sourceSide : c.targetSide;
+    const along = (end === "source" ? c.sourceOffsetAlong : c.targetOffsetAlong) ?? 0.5;
+    let ex: number, ey: number;
+    switch (side) {
+      case "top":    ex = ref.x + ref.width * along; ey = ref.y; break;
+      case "bottom": ex = ref.x + ref.width * along; ey = ref.y + ref.height; break;
+      case "left":   ex = ref.x;                     ey = ref.y + ref.height * along; break;
+      case "right":  ex = ref.x + ref.width;         ey = ref.y + ref.height * along; break;
+      default:       return ref;
+    }
+    let best: { ev: DiagramElement; dist: number } | null = null;
+    for (const ev of events) {
+      const cx = ev.x + ev.width / 2;
+      const cy = ev.y + ev.height / 2;
+      const d = Math.hypot(cx - ex, cy - ey);
+      if (!best || d < best.dist) best = { ev, dist: d };
+    }
+    // Threshold: half the event's diameter + a little slack. Boundary
+    // events are typically ~27px wide, so anything within ~18px of the
+    // exit/entry point is "on" the boundary event.
+    if (best && best.dist <= best.ev.width / 2 + 6) return best.ev;
+    return ref;
+  };
+
   lines.push("# 6. Connectors");
   lines.push("");
   if (connectors.length === 0) {
@@ -190,8 +245,8 @@ export function buildBpmnPrompt(elements: DiagramElement[], connectors: Connecto
     for (const [type, conns] of groups) {
       lines.push(`## ${type}`);
       for (const c of conns) {
-        const src = byId.get(c.sourceId);
-        const tgt = byId.get(c.targetId);
+        const src = effectiveEndpoint(c, "source");
+        const tgt = effectiveEndpoint(c, "target");
         const lbl = c.label?.trim();
         lines.push(
           `- "${labelOf(src)}" → "${labelOf(tgt)}"${lbl ? ` (label: "${lbl}")` : ""}`,
@@ -263,6 +318,111 @@ function cap(s: string): string {
     .split(/[-_]/)
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
     .join(" ");
+}
+
+/**
+ * Reverse-engineer a Context Diagram into a 4-section structured prompt:
+ *   1. Processes (process-system) and their names — usually one
+ *   2. Entities (external-entity) and their names
+ *   3. Layout — entities placed relative to each process
+ *   4. Flow connectors with directions and labels
+ */
+export function buildContextPrompt(
+  elements: DiagramElement[],
+  connectors: Connector[],
+): string {
+  const byId = new Map(elements.map((e) => [e.id, e]));
+  const labelOf = (e: DiagramElement | undefined): string =>
+    e ? (e.label?.trim() || `<unnamed ${e.type}>`) : "<missing>";
+
+  const processes = elements
+    .filter((e) => e.type === "process-system")
+    .sort((a, b) => a.x - b.x || a.y - b.y);
+  const entities = elements
+    .filter((e) => e.type === "external-entity")
+    .sort((a, b) => a.x - b.x || a.y - b.y);
+
+  const lines: string[] = [];
+
+  // ── 1. Processes ──
+  lines.push("# 1. Processes");
+  lines.push("");
+  if (processes.length === 0) {
+    lines.push("- (No central process — this diagram is missing the system being analysed.)");
+  } else {
+    for (const p of processes) lines.push(`- "${labelOf(p)}"`);
+  }
+  lines.push("");
+
+  // ── 2. Entities ──
+  lines.push("# 2. External Entities");
+  lines.push("");
+  if (entities.length === 0) {
+    lines.push("- (No external entities.)");
+  } else {
+    for (const e of entities) lines.push(`- "${labelOf(e)}"`);
+  }
+  lines.push("");
+
+  // ── 3. Layout (entity → process relative position) ──
+  lines.push("# 3. Layout (entities relative to processes)");
+  lines.push("");
+  if (processes.length === 0 || entities.length === 0) {
+    lines.push("- (Layout not described — needs at least one process and one entity.)");
+  } else {
+    for (const ent of entities) {
+      const rels: string[] = [];
+      for (const proc of processes) {
+        const dirs = relativeDirection(ent, proc);
+        rels.push(`${dirs} "${labelOf(proc)}"`);
+      }
+      lines.push(`- "${labelOf(ent)}" is ${rels.join("; and ")}.`);
+    }
+  }
+  lines.push("");
+
+  // ── 4. Flow connectors ──
+  lines.push("# 4. Flow Connectors");
+  lines.push("");
+  if (connectors.length === 0) {
+    lines.push("- No connectors.");
+  } else {
+    for (const c of connectors) {
+      const src = byId.get(c.sourceId);
+      const tgt = byId.get(c.targetId);
+      const arrow = arrowFor(c.directionType);
+      const lbl = c.label?.trim();
+      lines.push(
+        `- "${labelOf(src)}" ${arrow} "${labelOf(tgt)}"${lbl ? ` (label: "${lbl}")` : ""}`,
+      );
+    }
+  }
+
+  return lines.join("\n").trimEnd();
+}
+
+function relativeDirection(a: DiagramElement, b: DiagramElement): string {
+  const dirs: string[] = [];
+  if (a.x + a.width <= b.x) dirs.push("left of");
+  else if (b.x + b.width <= a.x) dirs.push("right of");
+  if (a.y + a.height <= b.y) dirs.push("above");
+  else if (b.y + b.height <= a.y) dirs.push("below");
+  if (dirs.length === 0) return "overlapping";
+  return dirs.join(" and ");
+}
+
+function arrowFor(d: string | undefined): string {
+  switch (d) {
+    case "directed":
+      return "→";
+    case "open-directed":
+      return "⇢";
+    case "both":
+      return "↔";
+    case "non-directed":
+    default:
+      return "—";
+  }
 }
 
 function friendlyConnectorType(t: ConnectorType): string {

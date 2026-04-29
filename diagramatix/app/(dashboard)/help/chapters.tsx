@@ -675,12 +675,18 @@ export const CHAPTERS: HelpChapter[] = [
             <li>
               Every pool has a 10&#8239;px invisible hit-zone straddling each
               of its four edges. Hover shows the directional resize cursor;
-              drag resizes the pool on that edge. Lanes and lane widths
-              adjust proportionally.
+              drag resizes the pool on that edge. The vertical delta is
+              absorbed by the single lane sharing the dragged edge — other
+              sibling lanes keep their height. Inside that absorbing lane
+              every descendant sublane (and sub-sublane, recursively)
+              proportionally rescales so each level continues to tile its
+              parent.
             </li>
             <li>
               Lane boundaries between adjacent lanes within the same pool are
-              draggable vertically to redistribute lane heights.
+              draggable vertically to redistribute lane heights. Sublanes
+              inside the resized lanes proportionally rescale all the way
+              down.
             </li>
             <li>
               Expanded subprocesses behave like pools — all four edges are
@@ -688,6 +694,49 @@ export const CHAPTERS: HelpChapter[] = [
               resize.
             </li>
           </ul>
+        ),
+      },
+      {
+        heading: "Lane &amp; sublane deletion",
+        body: (
+          <>
+            <p>
+              When you delete a Lane or Sublane the canvas applies one of
+              two strategies depending on whether the deleted container has
+              its own sublane children:
+            </p>
+            <ul className="list-disc list-inside space-y-1 mt-1">
+              <li>
+                <strong>No sublane children — &ldquo;adjacent absorbs&rdquo;:</strong>{" "}
+                the immediately-below sibling (or above, if there is no below)
+                grows to swallow the deleted lane&rsquo;s vertical slot.
+                Every flow element keeps its (x, y) and is reparented to the
+                absorbing sibling. The pool&rsquo;s overall height is
+                unchanged, so existing connectors don&rsquo;t move.
+              </li>
+              <li>
+                <strong>Has sublane children — &ldquo;promotion&rdquo;:</strong>{" "}
+                the deleted container&rsquo;s direct sublane children are
+                <em>promoted</em> to be children of the deleted
+                container&rsquo;s parent. They proportionally fill the
+                deleted slot and their headers re-align flush against the
+                new parent&rsquo;s header strip (pool header for
+                promoted-to-pool, lane header for promoted-to-lane). Deeper
+                grandchildren proportionally rescale to continue tiling each
+                promoted parent. Sibling lanes at the deleted
+                container&rsquo;s level are untouched.
+              </li>
+            </ul>
+            <p className="mt-2">
+              <strong>Singleton dissolve:</strong> if a delete (or any
+              cascade) leaves the pool with only one Lane, that lone Lane
+              is automatically dissolved too. If it has its own direct
+              sublanes those promote to the pool with their headers
+              re-aligned (per the promotion rule); otherwise the pool
+              reverts to a flat (no-lane) pool. The dissolve loops until
+              the pool has either 0 or 2+ direct lanes.
+            </p>
+          </>
         ),
       },
       {
@@ -1513,8 +1562,34 @@ export const CHAPTERS: HelpChapter[] = [
         body: (
           <p>
             Click the <strong>trash icon</strong> next to a template in
-            the dropdown. The template is permanently removed.
+            the dropdown. A confirmation dialog appears showing the
+            template&rsquo;s name; click <strong>Delete</strong> to remove
+            it permanently or <strong>Cancel</strong> to keep it.
           </p>
+        ),
+      },
+      {
+        heading: "Bulk export / import",
+        body: (
+          <>
+            <p>
+              From the diagram editor, <strong>File ▾ → Export ▶ → All
+              Templates</strong> downloads every BPMN template (User and
+              Built-In) as a single <code>.diag_tems</code> file. This is
+              the safest way to share a template library between users or
+              keep an offline backup.
+            </p>
+            <p className="mt-2">
+              <strong>File ▾ → Import ▶ → Templates</strong> restores from
+              a <code>.diag_tems</code> file. You choose whether to merge
+              into your <strong>User</strong> list or (admin only) the
+              <strong>Built-In</strong> list. Duplicates are detected by
+              <em>(name, diagram type)</em> and skipped — a Diagramatix
+              dialog reports how many were imported and lists any skipped
+              names. The Templates dropdown refreshes immediately; no
+              page reload needed.
+            </p>
+          </>
         ),
       },
       {
@@ -2774,6 +2849,32 @@ export const CHAPTERS: HelpChapter[] = [
             <span className="text-red-600 font-medium">red</span> rules
             (under Layout groups) are implemented in the layout engine code.
           </p>
+        ),
+      },
+      {
+        heading: "Create Prompt from Diagram (BPMN, admin only)",
+        body: (
+          <>
+            <p>
+              Admins see a purple <strong>Create Prompt from Diagram</strong>{" "}
+              button in the BPMN AI panel. It reverse-engineers the current
+              canvas into a structured 6-section text prompt that can be
+              reused or fed back to the generator:
+            </p>
+            <ol className="list-decimal list-inside space-y-1 mt-1">
+              <li>Pools, Lanes, and Sublanes (recursive tree)</li>
+              <li>Pool properties — Black-box / White-box, System flag, multiplicity</li>
+              <li>Pool layout (relative positions of every pool pair)</li>
+              <li>Lane contents in left-to-right flow order, with element type and label</li>
+              <li>Edge-mounted (boundary) events and their hosts</li>
+              <li>Connectors grouped by type — Sequence Flows, Message Flows, Associations, &hellip; with <em>Source &rarr; Target</em> and connector label if any. When a connector&rsquo;s exit/entry point sits on a mounted boundary event, the source/target is attributed to the event rather than the host element.</li>
+            </ol>
+            <p className="mt-2">
+              The generated text drops into the prompt textarea so you can
+              edit, save (via the regular Save button), or send straight to
+              the generator with <strong>Plan</strong>.
+            </p>
+          </>
         ),
       },
       {

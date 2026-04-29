@@ -1926,9 +1926,6 @@ export function DiagramEditor({
         {showAiPanel && (
           <AiPanel
             diagramType={diagramType}
-            isAdmin={isAdmin}
-            currentElements={data.elements}
-            currentConnectors={data.connectors}
             onApplyDiagram={(aiData: DiagramData) => {
               // Replace: set entire diagram data
               setData({
@@ -1948,6 +1945,9 @@ export function DiagramEditor({
         {showPlanPanel && (
           <PlanPanel
             diagramType={diagramType}
+            isAdmin={isAdmin}
+            currentElements={data.elements}
+            currentConnectors={data.connectors}
             onApplyDiagram={(aiData: DiagramData) => {
               setData({
                 ...data,

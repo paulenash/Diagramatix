@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { DiagramData, DiagramElement, Connector } from "@/app/lib/diagram/types";
-import { buildBpmnPrompt } from "@/app/lib/diagram/prompt-from-diagram";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 declare global {
@@ -16,20 +15,9 @@ interface Props {
   onApplyDiagram: (data: DiagramData) => void;
   onAddToDiagram: (elements: DiagramElement[], connectors: Connector[]) => void;
   onClose: () => void;
-  isAdmin?: boolean;
-  currentElements?: DiagramElement[];
-  currentConnectors?: Connector[];
 }
 
-export function AiPanel({
-  diagramType,
-  onApplyDiagram,
-  onAddToDiagram,
-  onClose,
-  isAdmin = false,
-  currentElements,
-  currentConnectors,
-}: Props) {
+export function AiPanel({ diagramType, onApplyDiagram, onAddToDiagram, onClose }: Props) {
   const [prompt, setPrompt] = useState("");
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -305,26 +293,6 @@ export function AiPanel({
             Add to diagram
           </label>
         </div>
-
-        {isAdmin && diagramType === "bpmn" && (
-          <button
-            onClick={() => {
-              const els = currentElements ?? [];
-              const conns = currentConnectors ?? [];
-              const generated = buildBpmnPrompt(els, conns);
-              setPrompt(generated);
-              setEditingPromptId(null);
-              setSaveName("");
-              setShowSave(false);
-              setError(null);
-              setStatus("Created prompt from current diagram. Edit and save if you'd like.");
-            }}
-            className="px-3 py-1.5 text-xs text-purple-700 bg-purple-50 border border-purple-300 rounded hover:bg-purple-100"
-            title="Admin only \u2014 reverse-engineer the current diagram into a structured prompt"
-          >
-            Create Prompt from Diagram
-          </button>
-        )}
 
         <div className="flex gap-1.5">
           <button onClick={handleGenerate} disabled={generating || !prompt.trim()}

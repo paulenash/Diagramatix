@@ -11,7 +11,9 @@
  *   - Raw JSON (commit-on-blur / explicit Apply to avoid stale overwrites)
  */
 import { useState, useCallback, useEffect, useRef } from "react";
-import type { DiagramData } from "@/app/lib/diagram/types";
+import type { Connector, DiagramData, DiagramElement } from "@/app/lib/diagram/types";
+import { buildPromptFromDiagram } from "@/app/lib/diagram/prompt-from-diagram";
+import type { DiagramType } from "@/app/lib/diagram/types";
 import { usePlanState, type Plan } from "./ai-plan/usePlanState";
 import { PoolsLanesTree } from "./ai-plan/PoolsLanesTree";
 import { ElementsByContainerView } from "./ai-plan/ElementsByContainerView";
@@ -21,13 +23,23 @@ interface Props {
   diagramType: string;
   onApplyDiagram: (data: DiagramData) => void;
   onClose: () => void;
+  isAdmin?: boolean;
+  currentElements?: DiagramElement[];
+  currentConnectors?: Connector[];
 }
 
 interface SavedPrompt { id: string; name: string; text: string; }
 
 type Tab = "pools" | "elements" | "connectors" | "json";
 
-export function PlanPanel({ diagramType, onApplyDiagram, onClose }: Props) {
+export function PlanPanel({
+  diagramType,
+  onApplyDiagram,
+  onClose,
+  isAdmin = false,
+  currentElements,
+  currentConnectors,
+}: Props) {
   const [prompt, setPrompt] = useState("");
   const { plan, setPlan, updateElement, deleteElement, updateConnection, deleteConnection, moveElementRelativeTo, asJson } = usePlanState();
   const [activeTab, setActiveTab] = useState<Tab>("pools");
@@ -344,6 +356,31 @@ export function PlanPanel({ diagramType, onApplyDiagram, onClose }: Props) {
             className="flex-1 w-full px-2 py-1.5 text-[11px] border border-gray-300 rounded resize-none focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
         </div>
+
+        {isAdmin && (
+          <div className="shrink-0 mb-2">
+            <button
+              onClick={() => {
+                const generated = buildPromptFromDiagram(
+                  currentElements ?? [],
+                  currentConnectors ?? [],
+                  diagramType as DiagramType,
+                );
+                setPrompt(generated);
+                setEditingPromptId(null);
+                setSaveName("");
+                setShowSave(false);
+                setError(null);
+                setStatus("Created prompt from current diagram. Edit and save if you'd like.");
+              }}
+              disabled={busy !== null}
+              className="w-full px-2 py-1 text-[11px] font-medium text-purple-700 bg-purple-50 border border-purple-300 rounded hover:bg-purple-100 disabled:opacity-50"
+              title="Admin only — reverse-engineer the current diagram into a structured prompt"
+            >
+              Create Prompt from Diagram
+            </button>
+          </div>
+        )}
 
         <div className="shrink-0 flex items-center gap-1.5 mb-2">
           <button
