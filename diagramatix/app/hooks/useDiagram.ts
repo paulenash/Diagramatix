@@ -660,6 +660,89 @@ function getPoolHeaderWidth(pool: DiagramElement): number {
   return typeof stored === "number" && stored > 0 ? stored : 36;
 }
 
+/**
+ * 100px-rule shift: if the named pool grew so that its new bottom now
+ * sits within 100px of any pool below, shove ALL pools below (and their
+ * descendants) down by `growth` to preserve the visual gap. Recomputes
+ * connectors for anything that moved, and adjusts messageBPMN label
+ * offsets so labels track their Black-Box Pool attachment Y.
+ *
+ * Returns updated { elements, connectors }; safe to call when growth is
+ * 0 or no pools are too close (returns the inputs unchanged).
+ */
+function applyPoolBelowShift(
+  elements: DiagramElement[],
+  connectors: Connector[],
+  poolId: string,
+  oldPoolBottom: number,
+  growth: number,
+): { elements: DiagramElement[]; connectors: Connector[] } {
+  if (growth <= 0) return { elements, connectors };
+  const finalPool = elements.find(e => e.id === poolId);
+  if (!finalPool) return { elements, connectors };
+  const newPoolBottom = finalPool.y + finalPool.height;
+  const poolsBelow = elements.filter(e =>
+    e.type === "pool" && e.id !== poolId && e.y >= oldPoolBottom
+  );
+  const tooClose = poolsBelow.some(p => p.y - newPoolBottom < 100);
+  if (!tooClose) return { elements, connectors };
+
+  const shiftIds = new Set<string>();
+  for (const p of poolsBelow) {
+    shiftIds.add(p.id);
+    const stack = [p.id];
+    while (stack.length) {
+      const cid = stack.pop()!;
+      for (const e of elements) {
+        if ((e.parentId === cid || e.boundaryHostId === cid) && !shiftIds.has(e.id)) {
+          shiftIds.add(e.id);
+          stack.push(e.id);
+        }
+      }
+    }
+  }
+  const shiftedElements = elements.map(e =>
+    shiftIds.has(e.id) ? { ...e, y: e.y + growth } : e
+  );
+  let updatedConnectors = connectors.map(conn => {
+    if (!shiftIds.has(conn.sourceId) && !shiftIds.has(conn.targetId)) return conn;
+    return recomputeAllConnectors([conn], shiftedElements)[0] ?? conn;
+  });
+  // messageBPMN label tracking — BBP attachment Y dictates label Y.
+  const findPoolIdOf = (elId: string): string | null => {
+    let cur = shiftedElements.find(e => e.id === elId);
+    for (let i = 0; i < 10 && cur; i++) {
+      if (cur.type === "pool") return cur.id;
+      if (!cur.parentId) return null;
+      cur = shiftedElements.find(e => e.id === cur!.parentId);
+    }
+    return null;
+  };
+  updatedConnectors = updatedConnectors.map(conn => {
+    if (conn.type !== "messageBPMN") return conn;
+    const srcPoolId = findPoolIdOf(conn.sourceId);
+    const tgtPoolId = findPoolIdOf(conn.targetId);
+    const srcShifted = !!(srcPoolId && shiftIds.has(srcPoolId));
+    const tgtShifted = !!(tgtPoolId && shiftIds.has(tgtPoolId));
+    if (srcShifted === tgtShifted) return conn;
+    const srcPool = srcPoolId ? shiftedElements.find(e => e.id === srcPoolId) : undefined;
+    const tgtPool = tgtPoolId ? shiftedElements.find(e => e.id === tgtPoolId) : undefined;
+    const srcIsBlackBox = !!srcPool && ((srcPool.properties.poolType as string | undefined) ?? "black-box") !== "white-box";
+    const tgtIsBlackBox = !!tgtPool && ((tgtPool.properties.poolType as string | undefined) ?? "black-box") !== "white-box";
+    let bbpShifted: boolean;
+    if (srcIsBlackBox && !tgtIsBlackBox) bbpShifted = srcShifted;
+    else if (tgtIsBlackBox && !srcIsBlackBox) bbpShifted = tgtShifted;
+    else if (srcIsBlackBox && tgtIsBlackBox) bbpShifted = srcShifted;
+    else return conn;
+    const anchorShift = ((srcShifted ? growth : 0) + (tgtShifted ? growth : 0)) / 2;
+    const bbpShift = bbpShifted ? growth : 0;
+    const extra = bbpShift - anchorShift;
+    if (Math.abs(extra) < 0.5) return conn;
+    return { ...conn, labelOffsetY: (conn.labelOffsetY ?? 0) + extra };
+  });
+  return { elements: shiftedElements, connectors: updatedConnectors };
+}
+
 /** Read a lane's effective header width (stored property override, else 36). */
 function getLaneHeaderWidth(lane: DiagramElement): number {
   const stored = lane.properties?.laneHeaderWidth;
@@ -3525,89 +3608,14 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       }
 
       // Pool-below shift rule: if the lane addition grew the pool such
-      // that its new bottom lands within 100px of any pool that sits
-      // below it, shove ALL pools below (and their descendants) down by
-      // the same growth amount so the visual gap is preserved.
-      const finalPool = next.elements.find(e => e.id === poolId);
-      if (finalPool) {
-        const growth = finalPool.height - oldPoolHeight;
-        if (growth > 0) {
-          const newPoolBottom = finalPool.y + finalPool.height;
-          const poolsBelow = next.elements.filter(e =>
-            e.type === "pool" && e.id !== poolId && e.y >= oldPoolBottom
-          );
-          const tooClose = poolsBelow.some(p => p.y - newPoolBottom < 100);
-          if (tooClose) {
-            const shiftIds = new Set<string>();
-            for (const p of poolsBelow) {
-              shiftIds.add(p.id);
-              const stack = [p.id];
-              while (stack.length) {
-                const cid = stack.pop()!;
-                for (const e of next.elements) {
-                  if ((e.parentId === cid || e.boundaryHostId === cid) && !shiftIds.has(e.id)) {
-                    shiftIds.add(e.id);
-                    stack.push(e.id);
-                  }
-                }
-              }
-            }
-            next = {
-              elements: next.elements.map(e =>
-                shiftIds.has(e.id) ? { ...e, y: e.y + growth } : e
-              ),
-              connectors: next.connectors,
-            };
-            // Recompute connectors that touched anything we just shifted
-            // — their absolute waypoints need to follow.
-            next = {
-              elements: next.elements,
-              connectors: next.connectors.map(conn => {
-                if (!shiftIds.has(conn.sourceId) && !shiftIds.has(conn.targetId)) return conn;
-                return recomputeAllConnectors([conn], next.elements)[0] ?? conn;
-              }),
-            };
-            // For messageBPMN labels: the label should track the BBP
-            // attachment Y. The connector midpoint shifted by avg of
-            // src/tgt pool shifts; if only the BBP-side pool shifted,
-            // the label drifts by half the shift relative to the BBP.
-            // Add the missing differential to labelOffsetY so the label
-            // visually moves by the SAME amount as the BBP boundary.
-            const findPoolIdOf = (elId: string): string | null => {
-              let cur = next.elements.find(e => e.id === elId);
-              for (let i = 0; i < 10 && cur; i++) {
-                if (cur.type === "pool") return cur.id;
-                if (!cur.parentId) return null;
-                cur = next.elements.find(e => e.id === cur!.parentId);
-              }
-              return null;
-            };
-            next = {
-              elements: next.elements,
-              connectors: next.connectors.map(conn => {
-                if (conn.type !== "messageBPMN") return conn;
-                const srcPoolId = findPoolIdOf(conn.sourceId);
-                const tgtPoolId = findPoolIdOf(conn.targetId);
-                const srcShifted = !!(srcPoolId && shiftIds.has(srcPoolId));
-                const tgtShifted = !!(tgtPoolId && shiftIds.has(tgtPoolId));
-                if (srcShifted === tgtShifted) return conn; // both or neither — no differential
-                const srcPool = srcPoolId ? next.elements.find(e => e.id === srcPoolId) : undefined;
-                const tgtPool = tgtPoolId ? next.elements.find(e => e.id === tgtPoolId) : undefined;
-                const srcIsBlackBox = !!srcPool && ((srcPool.properties.poolType as string | undefined) ?? "black-box") !== "white-box";
-                const tgtIsBlackBox = !!tgtPool && ((tgtPool.properties.poolType as string | undefined) ?? "black-box") !== "white-box";
-                let bbpShifted: boolean;
-                if (srcIsBlackBox && !tgtIsBlackBox) bbpShifted = srcShifted;
-                else if (tgtIsBlackBox && !srcIsBlackBox) bbpShifted = tgtShifted;
-                else if (srcIsBlackBox && tgtIsBlackBox) bbpShifted = srcShifted;
-                else return conn; // both white-box — no BBP anchor
-                const anchorShift = ((srcShifted ? growth : 0) + (tgtShifted ? growth : 0)) / 2;
-                const bbpShift = bbpShifted ? growth : 0;
-                const extra = bbpShift - anchorShift;
-                if (Math.abs(extra) < 0.5) return conn;
-                return { ...conn, labelOffsetY: (conn.labelOffsetY ?? 0) + extra };
-              }),
-            };
-          }
+      // that its new bottom lands within 100px of any pool below it,
+      // shove ALL pools below (and their descendants) down by the same
+      // growth so the visual gap is preserved.
+      {
+        const finalPool = next.elements.find(e => e.id === poolId);
+        if (finalPool) {
+          const growth = finalPool.height - oldPoolHeight;
+          next = applyPoolBelowShift(next.elements, next.connectors, poolId, oldPoolBottom, growth);
         }
       }
 
@@ -3619,6 +3627,21 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       const parentLane = state.elements.find((e) => e.id === laneId && e.type === "lane");
       if (!parentLane) return state;
       const LANE_LW = 36;
+
+      // Walk up to find the containing pool — needed for the 100px
+      // pool-below-shift rule below if this addition grows the pool.
+      let topPool: DiagramElement | undefined;
+      {
+        let cur: DiagramElement | undefined = parentLane;
+        for (let i = 0; cur && i < 10; i++) {
+          if (cur.type === "pool") { topPool = cur; break; }
+          if (!cur.parentId) break;
+          cur = state.elements.find(e => e.id === cur!.parentId);
+        }
+      }
+      const oldPoolHeight = topPool?.height ?? 0;
+      const oldPoolBottom = topPool ? topPool.y + topPool.height : 0;
+
       const existingSublanes = state.elements.filter((e) => e.type === "lane" && e.parentId === laneId);
       if (existingSublanes.length > 0) {
         // Add one more sublane at the bottom
@@ -3652,6 +3675,15 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         let next = { elements, connectors: state.connectors };
         const laneFs = state.laneFontSize ?? 12;
         next = resizeLaneForLabel(next.elements, next.connectors, newSublane.id, laneFs);
+        // 100px pool-below-shift: a sublane add can grow the containing
+        // pool too. Reuse the same rule that ADD_LANE applies.
+        if (topPool) {
+          const finalPool = next.elements.find(e => e.id === topPool!.id);
+          if (finalPool) {
+            const growth = finalPool.height - oldPoolHeight;
+            next = applyPoolBelowShift(next.elements, next.connectors, topPool.id, oldPoolBottom, growth);
+          }
+        }
         return { ...state, ...next };
       } else {
         // First time: split parent lane into 2 sublanes
@@ -3684,6 +3716,16 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         const laneFs = state.laneFontSize ?? 12;
         next = resizeLaneForLabel(next.elements, next.connectors, sublane1.id, laneFs);
         next = resizeLaneForLabel(next.elements, next.connectors, sublane2.id, laneFs);
+        // resizeLaneForLabel can grow the parent lane (and the pool)
+        // when a sublane label needs more height than the half-split
+        // gave it — apply the 100px shift if so.
+        if (topPool) {
+          const finalPool = next.elements.find(e => e.id === topPool!.id);
+          if (finalPool) {
+            const growth = finalPool.height - oldPoolHeight;
+            next = applyPoolBelowShift(next.elements, next.connectors, topPool.id, oldPoolBottom, growth);
+          }
+        }
         return { ...state, ...next };
       }
     }
