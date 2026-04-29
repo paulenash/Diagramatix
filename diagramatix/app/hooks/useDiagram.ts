@@ -780,6 +780,61 @@ function minHeightForContainer(
   return 40;
 }
 
+/**
+ * Recursively proportionally re-stack a parent lane's sublanes to fit its
+ * (already-updated) y/height/x/width. Used when a pool or lane boundary is
+ * dragged so deeper levels (sub-sublanes etc.) also resize to fill their
+ * parent. Uses dynamic header widths and respects each descendant's
+ * label-driven minimum height.
+ *
+ * Returns updated elements (immutable). The caller is expected to have
+ * already applied the new (x, y, width, height) to `parentLane` itself in
+ * `elementsArr`.
+ */
+function rescaleSublanesRecursive(
+  elementsArr: DiagramElement[],
+  parentLane: DiagramElement,
+  poolFs: number,
+  laneFs: number,
+): DiagramElement[] {
+  const subs = elementsArr
+    .filter((e) => e.type === "lane" && e.parentId === parentLane.id)
+    .sort((a, b) => a.y - b.y);
+  if (subs.length === 0) return elementsArr;
+
+  const LANE_LW = getLaneHeaderWidth(parentLane);
+  const totalSubH = subs.reduce((s, l) => s + l.height, 0) || 1;
+  const subMins = new Map<string, number>();
+  for (const s of subs) subMins.set(s.id, minHeightForContainer(s, elementsArr, poolFs, laneFs));
+
+  let result = elementsArr;
+  let stackY = parentLane.y;
+  for (let i = 0; i < subs.length; i++) {
+    const sub = subs[i];
+    const proportional = Math.round(parentLane.height * (sub.height / totalSubH));
+    const minH = subMins.get(sub.id) ?? 40;
+    let newSubH = Math.max(40, minH, proportional);
+    // Last sublane: snap to fill remaining space so the stack always
+    // covers the parent exactly (avoids rounding gaps).
+    if (i === subs.length - 1) {
+      newSubH = Math.max(minH, parentLane.y + parentLane.height - stackY);
+    }
+    const newSubX = parentLane.x + LANE_LW;
+    const newSubW = parentLane.width - LANE_LW;
+    const updatedSub: DiagramElement = {
+      ...sub,
+      x: newSubX,
+      y: stackY,
+      width: newSubW,
+      height: newSubH,
+    };
+    result = result.map((e) => (e.id === sub.id ? updatedSub : e));
+    result = rescaleSublanesRecursive(result, updatedSub, poolFs, laneFs);
+    stackY += newSubH;
+  }
+  return result;
+}
+
 /** Same shape as poolMetrics but tuned for lane labels. */
 function laneMetrics(label: string, fontSize: number): { minHeight: number; headerWidth: number } {
   const lines = (label || "").split("\n");
@@ -2229,40 +2284,25 @@ function reducer(state: DiagramData, action: Action): DiagramData {
             stackY += newLaneH;
           }
         }
-        // Also proportionally resize sub-lanes within each lane
-        const sublaneUpdates = new Map<string, DiagramElement>();
-        for (const [laneId, updatedLane] of laneUpdates) {
-          // Lane header strip can also be widened by multi-line lane
-          // labels, so use the dynamic value instead of a hardcoded 36.
-          const LANE_LW = getLaneHeaderWidth(updatedLane);
-          const sublanes = state.elements
-            .filter((e) => e.type === "lane" && e.parentId === laneId)
-            .sort((a, b) => a.y - b.y);
-          if (sublanes.length > 0) {
-            const totalSubH = sublanes.reduce((s, l) => s + l.height, 0) || 1;
-            const subMins = new Map<string, number>();
-            for (const s of sublanes) subMins.set(s.id, minHeightForContainer(s, state.elements, poolFs, laneFs));
-            let subStackY = updatedLane.y;
-            for (const sub of sublanes) {
-              const proportional = Math.round(updatedLane.height * (sub.height / totalSubH));
-              const newSubH = Math.max(40, subMins.get(sub.id) ?? 40, proportional);
-              const updatedSub = { ...sub, x: updatedLane.x + LANE_LW, y: subStackY, width: updatedLane.width - LANE_LW, height: newSubH };
-              sublaneUpdates.set(sub.id, updatedSub);
-              subStackY += newSubH;
-            }
-          }
-        }
+        // Apply pool + lane updates first, then recurse into deeper
+        // sub-sublane levels via rescaleSublanesRecursive so a single
+        // pool-boundary drag propagates all the way to the leaves of a
+        // P-L-SL-SSL hierarchy.
         let elements = state.elements.map((e) =>
           e.id === id ? { ...e, x: newX, y: newY, width: newW, height: newH }
           : laneUpdates.has(e.id) ? laneUpdates.get(e.id)!
-          : sublaneUpdates.has(e.id) ? sublaneUpdates.get(e.id)!
           : e
         );
         for (const updatedLane of laneUpdates.values()) {
+          elements = rescaleSublanesRecursive(elements, updatedLane, poolFs, laneFs);
+        }
+        for (const updatedLane of laneUpdates.values()) {
           elements = clampChildrenToLane(elements, updatedLane);
         }
-        for (const updatedSub of sublaneUpdates.values()) {
-          elements = clampChildrenToLane(elements, updatedSub);
+        for (const e of elements) {
+          if (e.type === "lane" && laneUpdates.has(e.parentId ?? "")) {
+            elements = clampChildrenToLane(elements, e);
+          }
         }
         const connectors = recomputeAllConnectors(state.connectors, elements);
         return { ...state, elements, connectors };
