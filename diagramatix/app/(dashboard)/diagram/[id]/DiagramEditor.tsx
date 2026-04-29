@@ -553,10 +553,17 @@ export function DiagramEditor({
   // File menu state (Export, Import, PDF scale popover)
   const [fileMenuOpen, setFileMenuOpen] = useState(false);
   const fileMenuRef = useRef<HTMLDivElement>(null);
+  // Which submenu (Export ▶ / Import ▶) is currently expanded.
+  const [fileSubmenu, setFileSubmenu] = useState<"export" | "import" | null>(null);
   const [showPdfScalePopover, setShowPdfScalePopover] = useState(false);
   const [pendingPdfScale, setPendingPdfScale] = useState(100);
   const importJsonInputRef = useRef<HTMLInputElement>(null);
   const importXmlInputRef = useRef<HTMLInputElement>(null);
+  const importTemplatesInputRef = useRef<HTMLInputElement>(null);
+  // Admin-only: prompt the admin to pick the destination list when
+  // exporting or importing templates. Non-admins skip the prompt.
+  const [templateExportPrompt, setTemplateExportPrompt] = useState(false);
+  const [templateImportFile, setTemplateImportFile] = useState<File | null>(null);
   const [clearConfirmOpen, setClearConfirmOpen] = useState<null | "all" | "unselected">(null);
   const [clearMenuOpen, setClearMenuOpen] = useState(false);
   const clearMenuRef = useRef<HTMLDivElement>(null);
@@ -646,6 +653,7 @@ export function DiagramEditor({
     function handleClick(e: MouseEvent) {
       if (fileMenuRef.current && !fileMenuRef.current.contains(e.target as Node)) {
         setFileMenuOpen(false);
+        setFileSubmenu(null);
         setShowPdfScalePopover(false);
       }
     }
@@ -891,6 +899,65 @@ export function DiagramEditor({
 
     // Always download the matching XSD alongside (best-effort, no-op on failure)
     await downloadMatchingXsd(SCHEMA_VERSION);
+  }
+
+  // Export every template of the given scope as a `.diag_tems` JSON file.
+  async function handleExportTemplates(scope: "user" | "builtin") {
+    try {
+      const resp = await fetch(`/api/templates/export?type=${scope}`);
+      if (!resp.ok) {
+        const txt = await resp.text();
+        alert(`Template export failed: ${txt || resp.statusText}`);
+        return;
+      }
+      // Use the server-supplied filename if present.
+      const cd = resp.headers.get("Content-Disposition") ?? "";
+      const m = cd.match(/filename="([^"]+)"/);
+      const fallback = `diagramatix-templates-${scope}-${new Date().toISOString().slice(0, 10)}.diag_tems`;
+      const filename = m?.[1] ?? fallback;
+      const blob = await resp.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (err) {
+      alert(`Template export failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  // Import templates from a `.diag_tems` file into the chosen list.
+  async function handleImportTemplatesFile(file: File, dest: "user" | "builtin") {
+    try {
+      const text = await file.text();
+      let payload: unknown;
+      try { payload = JSON.parse(text); }
+      catch { alert("Import failed: file isn't valid JSON"); return; }
+      // Forward the parsed payload — the server validates shape and skips
+      // duplicates by (name + diagramType).
+      const resp = await fetch(`/api/templates/import?type=${dest}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!resp.ok) {
+        const txt = await resp.text();
+        alert(`Template import failed: ${txt || resp.statusText}`);
+        return;
+      }
+      const summary = await resp.json() as { created: number; skipped: number; skippedNames: string[] };
+      const lines: string[] = [];
+      lines.push(`Imported ${summary.created} template${summary.created === 1 ? "" : "s"} into the ${dest === "builtin" ? "Built-In" : "User"} list.`);
+      if (summary.skipped > 0) {
+        lines.push(`Skipped ${summary.skipped} duplicate${summary.skipped === 1 ? "" : "s"}: ${summary.skippedNames.slice(0, 8).join(", ")}${summary.skippedNames.length > 8 ? ", …" : ""}`);
+      }
+      alert(lines.join("\n"));
+    } catch (err) {
+      alert(`Template import failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
   }
 
   function handleSaveAsTemplate() {
@@ -1418,159 +1485,234 @@ export function DiagramEditor({
             e.target.value = "";
           }}
         />
+        <input
+          ref={importTemplatesInputRef}
+          type="file"
+          accept=".diag_tems,application/json"
+          className="hidden"
+          onChange={e => {
+            const f = e.target.files?.[0];
+            e.target.value = "";
+            if (!f) return;
+            // Admin: prompt for destination list (User vs Built-In).
+            // Non-admin: import directly into User templates.
+            if (isAdmin) {
+              setTemplateImportFile(f);
+            } else {
+              handleImportTemplatesFile(f, "user");
+            }
+          }}
+        />
 
         <div className="relative" ref={fileMenuRef}>
           <button
             onClick={() => {
               setFileMenuOpen((prev) => !prev);
+              setFileSubmenu(null);
               setShowPdfScalePopover(false);
             }}
             className="px-2 py-0.5 text-[11px] text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
           >
-            Import/Export ▾
+            File ▾
           </button>
           {fileMenuOpen && (
             <div className="absolute right-0 top-full mt-1 w-44 bg-white border border-gray-200 rounded shadow-lg z-50">
-              {/* 1. Export PDF (with adjacent PDF Scale popover) */}
-              <div className="relative">
-                <button
-                  onClick={() => {
-                    // Open the scale popover instead of exporting immediately
-                    setPendingPdfScale(pdfScale);
-                    setShowPdfScalePopover(true);
-                  }}
-                  className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
-                >
-                  Export PDF
-                </button>
-                {showPdfScalePopover && (
-                  <div
-                    className="absolute right-full top-0 mr-1 w-36 bg-white border border-gray-300 rounded shadow-lg p-2 z-50"
-                    onMouseDown={(e) => e.stopPropagation()}
-                  >
-                    <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1">PDF Scale</div>
-                    {[100, 75, 50, 25].map((val) => (
-                      <label key={val} className="flex items-center gap-2 py-0.5 text-xs text-gray-700 cursor-pointer">
-                        <input
-                          type="radio"
-                          name="pdfScalePending"
-                          checked={pendingPdfScale === val}
-                          onChange={() => setPendingPdfScale(val)}
-                          className="accent-blue-600"
-                        />
-                        {val}%
-                      </label>
-                    ))}
-                    <div className="flex justify-end gap-1 mt-2">
-                      <button
-                        onClick={() => setShowPdfScalePopover(false)}
-                        className="px-2 py-0.5 text-[10px] text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={() => {
-                          setPdfScale(pendingPdfScale);
-                          setShowPdfScalePopover(false);
-                          setFileMenuOpen(false);
-                          handleExportPdf();
-                        }}
-                        className="px-2 py-0.5 text-[10px] text-white bg-blue-600 rounded hover:bg-blue-700"
-                      >
-                        Confirm
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-              {/* 2. Export Visio (BPMN only) */}
-              {diagramType === "bpmn" && (
-                <button
-                  onClick={() => {
-                    setFileMenuOpen(false);
-                    // V2 server-side export (stable baseline).
-                    const a = document.createElement("a");
-                    a.href = `/api/export/visio-v2?diagramId=${diagramId}`;
-                    a.rel = "noopener";
-                    a.click();
-                  }}
-                  className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
-                >
-                  Export Visio
-                </button>
-              )}
-              {/* 3. Export SVG */}
-              <button
-                onClick={() => { handleExport(); setFileMenuOpen(false); }}
-                className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
-              >
-                Export SVG
-              </button>
-              {/* 4. Export JSON */}
-              <button
-                onClick={() => { handleExportJson(); setFileMenuOpen(false); }}
-                className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
-                title="Download diagram as a single-diagram JSON file"
-              >
-                Export JSON
-              </button>
-              {/* 5. Export XML */}
-              <button
-                onClick={() => { handleExportXml(); setFileMenuOpen(false); }}
-                className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
-                title="Download diagram XML and the matching XSD schema"
-              >
-                Export XML
-              </button>
-              <div className="border-t border-gray-100" />
               {/* Save As — clone current diagram into the same project under a new name */}
               <button
                 onClick={() => {
                   setFileMenuOpen(false);
+                  setFileSubmenu(null);
                   setSaveAsName(`${diagramName} (copy)`);
                   setShowSaveAs(true);
                 }}
+                onMouseEnter={() => setFileSubmenu(null)}
                 className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
                 title="Save a copy of this diagram in the same project under a new name"
               >
                 Save As&hellip;
               </button>
               <div className="border-t border-gray-100" />
-              {/* Imports */}
-              <button
-                onClick={() => { setFileMenuOpen(false); importJsonInputRef.current?.click(); }}
-                className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
-                title="Replace the current diagram contents with the first diagram in a JSON file"
+
+              {/* Export ▶ — opens a submenu with all export formats */}
+              <div
+                className="relative"
+                onMouseEnter={() => setFileSubmenu("export")}
               >
-                Import JSON
-              </button>
-              <button
-                onClick={() => { setFileMenuOpen(false); importXmlInputRef.current?.click(); }}
-                className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
-                title="Replace the current diagram contents with the first diagram in an XML file"
+                <button
+                  onClick={() => setFileSubmenu(fileSubmenu === "export" ? null : "export")}
+                  className="w-full flex items-center justify-between px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                >
+                  <span>Export</span>
+                  <span className="text-gray-400">▶</span>
+                </button>
+                {fileSubmenu === "export" && (
+                  <div className="absolute right-full top-0 mr-1 w-44 bg-white border border-gray-200 rounded shadow-lg z-50">
+                    {/* PDF — opens scale popover */}
+                    <div className="relative">
+                      <button
+                        onClick={() => {
+                          setPendingPdfScale(pdfScale);
+                          setShowPdfScalePopover(true);
+                        }}
+                        className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                      >
+                        PDF
+                      </button>
+                      {showPdfScalePopover && (
+                        <div
+                          className="absolute right-full top-0 mr-1 w-36 bg-white border border-gray-300 rounded shadow-lg p-2 z-50"
+                          onMouseDown={(e) => e.stopPropagation()}
+                        >
+                          <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1">PDF Scale</div>
+                          {[100, 75, 50, 25].map((val) => (
+                            <label key={val} className="flex items-center gap-2 py-0.5 text-xs text-gray-700 cursor-pointer">
+                              <input
+                                type="radio"
+                                name="pdfScalePending"
+                                checked={pendingPdfScale === val}
+                                onChange={() => setPendingPdfScale(val)}
+                                className="accent-blue-600"
+                              />
+                              {val}%
+                            </label>
+                          ))}
+                          <div className="flex justify-end gap-1 mt-2">
+                            <button
+                              onClick={() => setShowPdfScalePopover(false)}
+                              className="px-2 py-0.5 text-[10px] text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              onClick={() => {
+                                setPdfScale(pendingPdfScale);
+                                setShowPdfScalePopover(false);
+                                setFileMenuOpen(false);
+                                setFileSubmenu(null);
+                                handleExportPdf();
+                              }}
+                              className="px-2 py-0.5 text-[10px] text-white bg-blue-600 rounded hover:bg-blue-700"
+                            >
+                              Confirm
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    {/* Visio (BPMN only) */}
+                    {diagramType === "bpmn" && (
+                      <button
+                        onClick={() => {
+                          setFileMenuOpen(false);
+                          setFileSubmenu(null);
+                          const a = document.createElement("a");
+                          a.href = `/api/export/visio-v2?diagramId=${diagramId}`;
+                          a.rel = "noopener";
+                          a.click();
+                        }}
+                        className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                      >
+                        Visio
+                      </button>
+                    )}
+                    {/* SVG */}
+                    <button
+                      onClick={() => { handleExport(); setFileMenuOpen(false); setFileSubmenu(null); }}
+                      className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                    >
+                      SVG
+                    </button>
+                    {/* JSON */}
+                    <button
+                      onClick={() => { handleExportJson(); setFileMenuOpen(false); setFileSubmenu(null); }}
+                      className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                      title="Download diagram as a single-diagram JSON file"
+                    >
+                      JSON
+                    </button>
+                    {/* XML */}
+                    <button
+                      onClick={() => { handleExportXml(); setFileMenuOpen(false); setFileSubmenu(null); }}
+                      className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                      title="Download diagram XML and the matching XSD schema"
+                    >
+                      XML
+                    </button>
+                    {/* Visio (V3) — admin only */}
+                    {diagramType === "bpmn" && isAdmin && (
+                      <button
+                        onClick={() => {
+                          setFileMenuOpen(false);
+                          setFileSubmenu(null);
+                          const a = document.createElement("a");
+                          a.href = `/api/export/visio-v3?diagramId=${diagramId}`;
+                          a.rel = "noopener";
+                          a.click();
+                        }}
+                        className="w-full text-left px-3 py-2 text-xs text-orange-600 hover:bg-orange-50"
+                      >
+                        Visio (V3) — Admin
+                      </button>
+                    )}
+                    {/* Templates — non-admin exports User templates directly;
+                        admin opens a User-vs-Built-In picker. */}
+                    <button
+                      onClick={() => {
+                        if (isAdmin) {
+                          setTemplateExportPrompt(true);
+                        } else {
+                          handleExportTemplates("user");
+                          setFileMenuOpen(false);
+                          setFileSubmenu(null);
+                        }
+                      }}
+                      className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                      title="Export your templates as a .diag_tems file"
+                    >
+                      Templates
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Import ▶ — submenu with import sources */}
+              <div
+                className="relative"
+                onMouseEnter={() => setFileSubmenu("import")}
               >
-                Import XML
-              </button>
-              {/* Last: Export Visio (V3) — admin only */}
-              {diagramType === "bpmn" && isAdmin && (
-                <>
-                  <div className="border-t border-gray-100" />
-                  <button
-                    onClick={() => {
-                      setFileMenuOpen(false);
-                      // V3 server-side export — admin-only experimental fork of V2,
-                      // free to evolve without affecting V2.
-                      const a = document.createElement("a");
-                      a.href = `/api/export/visio-v3?diagramId=${diagramId}`;
-                      a.rel = "noopener";
-                      a.click();
-                    }}
-                    className="w-full text-left px-3 py-2 text-xs text-orange-600 hover:bg-orange-50"
-                  >
-                    Export Visio (V3) — admin
-                  </button>
-                </>
-              )}
+                <button
+                  onClick={() => setFileSubmenu(fileSubmenu === "import" ? null : "import")}
+                  className="w-full flex items-center justify-between px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                >
+                  <span>Import</span>
+                  <span className="text-gray-400">▶</span>
+                </button>
+                {fileSubmenu === "import" && (
+                  <div className="absolute right-full top-0 mr-1 w-44 bg-white border border-gray-200 rounded shadow-lg z-50">
+                    <button
+                      onClick={() => { setFileMenuOpen(false); setFileSubmenu(null); importJsonInputRef.current?.click(); }}
+                      className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                      title="Replace the current diagram contents with the first diagram in a JSON file"
+                    >
+                      JSON
+                    </button>
+                    <button
+                      onClick={() => { setFileMenuOpen(false); setFileSubmenu(null); importXmlInputRef.current?.click(); }}
+                      className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                      title="Replace the current diagram contents with the first diagram in an XML file"
+                    >
+                      XML
+                    </button>
+                    <button
+                      onClick={() => { setFileMenuOpen(false); setFileSubmenu(null); importTemplatesInputRef.current?.click(); }}
+                      className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                      title="Import templates from a .diag_tems file"
+                    >
+                      Templates
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -1910,6 +2052,93 @@ export function DiagramEditor({
                 className="px-3 py-1.5 text-sm text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {saveAsBusy ? "Saving\u2026" : "Save As"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Admin: pick the source list to EXPORT (User vs Built-In). */}
+      {templateExportPrompt && isAdmin && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-sm">
+            <div className="px-5 pt-4 pb-2">
+              <h2 className="text-base font-semibold text-gray-900">Export Templates</h2>
+              <p className="mt-1 text-sm text-gray-600">
+                Pick which template list to export as a <code>.diag_tems</code> file.
+              </p>
+            </div>
+            <div className="px-5 pb-4 pt-2 flex gap-2 justify-end">
+              <button
+                onClick={() => setTemplateExportPrompt(false)}
+                className="px-3 py-1.5 text-sm text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  setTemplateExportPrompt(false);
+                  setFileMenuOpen(false);
+                  setFileSubmenu(null);
+                  handleExportTemplates("user");
+                }}
+                className="px-3 py-1.5 text-sm text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
+              >
+                User templates
+              </button>
+              <button
+                onClick={() => {
+                  setTemplateExportPrompt(false);
+                  setFileMenuOpen(false);
+                  setFileSubmenu(null);
+                  handleExportTemplates("builtin");
+                }}
+                className="px-3 py-1.5 text-sm text-white bg-blue-600 rounded hover:bg-blue-700"
+              >
+                Built-In templates
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Admin: pick the destination list to IMPORT into. */}
+      {templateImportFile && isAdmin && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-sm">
+            <div className="px-5 pt-4 pb-2">
+              <h2 className="text-base font-semibold text-gray-900">Import Templates</h2>
+              <p className="mt-1 text-sm text-gray-600">
+                Importing <span className="font-mono">{templateImportFile.name}</span>.
+                Pick the destination list. Duplicates (by name) are skipped.
+              </p>
+            </div>
+            <div className="px-5 pb-4 pt-2 flex gap-2 justify-end">
+              <button
+                onClick={() => setTemplateImportFile(null)}
+                className="px-3 py-1.5 text-sm text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  const f = templateImportFile;
+                  setTemplateImportFile(null);
+                  if (f) await handleImportTemplatesFile(f, "user");
+                }}
+                className="px-3 py-1.5 text-sm text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
+              >
+                User templates
+              </button>
+              <button
+                onClick={async () => {
+                  const f = templateImportFile;
+                  setTemplateImportFile(null);
+                  if (f) await handleImportTemplatesFile(f, "builtin");
+                }}
+                className="px-3 py-1.5 text-sm text-white bg-blue-600 rounded hover:bg-blue-700"
+              >
+                Built-In templates
               </button>
             </div>
           </div>
