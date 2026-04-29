@@ -537,6 +537,123 @@ function poolMetrics(label: string, fontSize: number): { minHeight: number; head
   return { minHeight, headerWidth };
 }
 
+/**
+ * Compute messageBPMN label offsets per the BBP-anchored placement rules.
+ *
+ *   - Y: place the label 50px FROM the Black-Box Pool boundary INTO the
+ *     gap between the BBP and the other end's pool (whether the other
+ *     pool is white-box or another black-box).
+ *   - X: prefer the RIGHT of the connector with a small gap; fall back
+ *     to the LEFT if a sibling label on the same BBP would overlap.
+ *
+ * If neither end is a BBP (e.g. white-box → white-box), falls back to
+ * the legacy "gap centre" placement so existing behaviour is preserved.
+ */
+function computeMsgBpmnLabelOffsets(
+  source: DiagramElement,
+  target: DiagramElement,
+  sourceSide: Side,
+  waypoints: Point[],
+  allElements: DiagramElement[],
+  allConnectors: Connector[],
+): { offsetX: number; offsetY: number } {
+  function findPool(el: DiagramElement): DiagramElement | undefined {
+    if (el.type === "pool") return el;
+    let cur = el;
+    for (let i = 0; i < 10; i++) {
+      if (!cur.parentId) break;
+      const parent = allElements.find(e => e.id === cur.parentId);
+      if (!parent) break;
+      if (parent.type === "pool") return parent;
+      cur = parent;
+    }
+    return allElements.find(e => e.type === "pool"
+      && el.x >= e.x && el.x + el.width <= e.x + e.width
+      && el.y >= e.y && el.y + el.height <= e.y + e.height);
+  }
+  const srcPool = findPool(source);
+  const tgtPool = findPool(target);
+  const goingDown = sourceSide === "bottom";
+  if (waypoints.length < 4 || !srcPool || !tgtPool) {
+    return { offsetX: 20, offsetY: 0 };
+  }
+  const srcPoolEdgeY = goingDown ? srcPool.y + srcPool.height : srcPool.y;
+  const tgtPoolEdgeY = goingDown ? tgtPool.y : tgtPool.y + tgtPool.height;
+  const srcIsBlackBox = ((srcPool.properties.poolType as string | undefined) ?? "black-box") !== "white-box";
+  const tgtIsBlackBox = ((tgtPool.properties.poolType as string | undefined) ?? "black-box") !== "white-box";
+
+  // Anchor (Y) — midpoint between source-edge and target-edge waypoints
+  // (matches ConnectorRenderer's messageBPMN anchor with invisible leaders).
+  const anchorY = (waypoints[1].y + waypoints[waypoints.length - 2].y) / 2;
+  const anchorX = (waypoints[1].x + waypoints[waypoints.length - 2].x) / 2;
+
+  // Pick the BBP end. If neither pool is BBP, retain legacy gap-centre.
+  let bbpPool: DiagramElement | null = null;
+  let bbpEdgeY = 0;
+  let otherEdgeY = 0;
+  if (srcIsBlackBox && !tgtIsBlackBox) {
+    bbpPool = srcPool; bbpEdgeY = srcPoolEdgeY; otherEdgeY = tgtPoolEdgeY;
+  } else if (tgtIsBlackBox && !srcIsBlackBox) {
+    bbpPool = tgtPool; bbpEdgeY = tgtPoolEdgeY; otherEdgeY = srcPoolEdgeY;
+  } else if (srcIsBlackBox && tgtIsBlackBox) {
+    // BBP↔BBP — anchor to source pool edge so the label sits 50 below/above it
+    bbpPool = srcPool; bbpEdgeY = srcPoolEdgeY; otherEdgeY = tgtPoolEdgeY;
+  }
+  if (!bbpPool) {
+    // Both white-box: legacy gap-centre placement
+    const labelY = (srcPoolEdgeY + tgtPoolEdgeY) / 2;
+    return { offsetX: 20, offsetY: labelY - anchorY - 7 };
+  }
+
+  // Direction: +1 if BBP edge is above the other (label drops 50 below
+  // the BBP edge); -1 if BBP edge is below the other (label sits 50 above).
+  const direction = otherEdgeY >= bbpEdgeY ? 1 : -1;
+  const labelCentreY = bbpEdgeY + 50 * direction;
+  const offsetY = labelCentreY - anchorY - 7; // -7 = half line-height for top-Y conversion
+
+  // X: choose right (offset +45) by default; flip to left (-45) if a
+  // sibling label on the same BBP would overlap. Label width assumed 80,
+  // so 45 puts the visible left edge ~5px right of the connector.
+  const LABEL_W = 80;
+  const RIGHT_OFFSET = 45;
+  const LEFT_OFFSET = -45;
+  const Y_BAND = 24;
+  const existingLabels = allConnectors
+    .filter(c =>
+      c.type === "messageBPMN" &&
+      typeof c.label === "string" && c.label.trim().length > 0 &&
+      (c.sourceId === bbpPool!.id || c.targetId === bbpPool!.id) &&
+      c.waypoints.length >= 4
+    )
+    .map(c => {
+      const cAnchorX = (c.waypoints[1].x + c.waypoints[c.waypoints.length - 2].x) / 2;
+      const cAnchorY = (c.waypoints[1].y + c.waypoints[c.waypoints.length - 2].y) / 2;
+      const cx = cAnchorX + (c.labelOffsetX ?? 0);
+      const cy = cAnchorY + (c.labelOffsetY ?? 0) + 7; // shift back to label centre Y
+      return { cx, cy, w: c.labelWidth ?? LABEL_W };
+    });
+
+  function rangeOverlaps(testCentreX: number): boolean {
+    for (const l of existingLabels) {
+      if (Math.abs(l.cy - labelCentreY) > Y_BAND) continue;
+      const aL = testCentreX - LABEL_W / 2;
+      const aR = testCentreX + LABEL_W / 2;
+      const bL = l.cx - l.w / 2;
+      const bR = l.cx + l.w / 2;
+      if (!(aR < bL || bR < aL)) return true;
+    }
+    return false;
+  }
+
+  const rightCentreX = anchorX + RIGHT_OFFSET;
+  const leftCentreX = anchorX + LEFT_OFFSET;
+  let offsetX = RIGHT_OFFSET;
+  if (rangeOverlaps(rightCentreX) && !rangeOverlaps(leftCentreX)) {
+    offsetX = LEFT_OFFSET;
+  }
+  return { offsetX, offsetY };
+}
+
 /** Read a pool's effective header width (stored property override, else 36). */
 function getPoolHeaderWidth(pool: DiagramElement): number {
   const stored = pool.properties?.poolHeaderWidth;
@@ -2258,8 +2375,24 @@ function reducer(state: DiagramData, action: Action): DiagramData {
             );
           }
 
-          // Re-sync header widths across surviving siblings — removing a
-          // wide-headered lane lets the others shrink back toward 36.
+          // Second-last-lane rule: if exactly one sibling lane remains
+          // after the absorb, auto-delete that one too — the parent
+          // (pool or lane) reverts to its lane-less state. Every child
+          // of the auto-deleted lane (including the just-reparented
+          // orphans) is reparented to the parent. Heights are NOT
+          // changed; the parent keeps its current size and the elements
+          // stay at their original (x, y).
+          const remainingAfterAbsorb = elements.filter(e => e.type === "lane" && e.parentId === parent.id);
+          if (remainingAfterAbsorb.length === 1) {
+            const last = remainingAfterAbsorb[0];
+            elements = elements
+              .filter(e => e.id !== last.id)
+              .map(e => e.parentId === last.id ? { ...e, parentId: parent.id } : e);
+          }
+
+          // Re-sync header widths across any still-surviving siblings —
+          // removing a wide-headered lane lets the others shrink back
+          // toward 36. (No-op if the second-last rule cleared everything.)
           const survivingSibling = elements.find(e => e.type === "lane" && e.parentId === parent.id);
           if (survivingSibling) {
             const fontSize = state.laneFontSize ?? 12;
@@ -2529,44 +2662,14 @@ function reducer(state: DiagramData, action: Action): DiagramData {
                     : isDecisionGatewayOutgoing ? ""
                     : connectorType === "sequence" ? ""
                     : undefined,
-        labelOffsetX: isFlow ? 0   : isTransition ? 0   : isMsgBpmn ? 20  : decisionLabelOffsets ? decisionLabelOffsets.x : connectorType === "sequence" ? 0 : undefined,
-        labelOffsetY: isFlow ? -30 : isTransition ? -30 : isMsgBpmn ? (() => {
-          // Find the pool containing each element
-          function findPool(el: DiagramElement): DiagramElement | undefined {
-            if (el.type === "pool") return el;
-            // Walk up parentId chain to find pool
-            let cur = el;
-            for (let i = 0; i < 10; i++) {
-              if (!cur.parentId) break;
-              const parent = state.elements.find(e => e.id === cur.parentId);
-              if (!parent) break;
-              if (parent.type === "pool") return parent;
-              cur = parent;
-            }
-            // Fallback: find pool by containment
-            return state.elements.find(e => e.type === "pool"
-              && el.x >= e.x && el.x + el.width <= e.x + e.width
-              && el.y >= e.y && el.y + el.height <= e.y + e.height);
-          }
-          const srcPool = findPool(source);
-          const tgtPool = findPool(target);
-          if (srcPool && tgtPool) {
-            const goingDown = sourceSide === "bottom";
-            const srcPoolEdgeY = goingDown ? srcPool.y + srcPool.height : srcPool.y;
-            const tgtPoolEdgeY = goingDown ? tgtPool.y : tgtPool.y + tgtPool.height;
-            const srcIsBlackBox = (srcPool.properties.poolType as string | undefined) !== "white-box";
-            const tgtIsBlackBox = (tgtPool.properties.poolType as string | undefined) !== "white-box";
-            let labelY: number;
-            if (srcIsBlackBox && tgtIsBlackBox) {
-              labelY = srcPoolEdgeY + (goingDown ? 15 : -15);
-            } else {
-              labelY = (srcPoolEdgeY + tgtPoolEdgeY) / 2;
-            }
-            const anchorY = (waypoints[1].y + waypoints[waypoints.length - 2].y) / 2;
-            return labelY - anchorY - 7;
-          }
-          return 0;
-        })() : decisionLabelOffsets ? decisionLabelOffsets.y : connectorType === "sequence" ? -20 : undefined,
+        labelOffsetX: isFlow ? 0   : isTransition ? 0
+                    : isMsgBpmn ? computeMsgBpmnLabelOffsets(source, target, sourceSide, waypoints, state.elements, state.connectors).offsetX
+                    : decisionLabelOffsets ? decisionLabelOffsets.x
+                    : connectorType === "sequence" ? 0 : undefined,
+        labelOffsetY: isFlow ? -30 : isTransition ? -30
+                    : isMsgBpmn ? computeMsgBpmnLabelOffsets(source, target, sourceSide, waypoints, state.elements, state.connectors).offsetY
+                    : decisionLabelOffsets ? decisionLabelOffsets.y
+                    : connectorType === "sequence" ? -20 : undefined,
         labelWidth:   isFlow ? 80  : isTransition ? 80  : isMsgBpmn ? 80  : isDecisionGatewayOutgoing ? 60  : connectorType === "sequence" ? 80 : undefined,
         labelAnchor:  isDecisionGatewayOutgoing ? "source" : undefined,
       };
@@ -3281,6 +3384,8 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       const { poolId } = action.payload;
       const pool = state.elements.find((e) => e.id === poolId && e.type === "pool");
       if (!pool) return state;
+      const oldPoolHeight = pool.height;
+      const oldPoolBottom = pool.y + oldPoolHeight;
       const POOL_LABEL_W = 36;
       const LANE_HEADER_H = 28;
       const MIN_LANE_H = 80;
@@ -3288,7 +3393,9 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         .filter((e) => e.type === "lane" && e.parentId === poolId)
         .sort((a, b) => a.y - b.y);
       const laneCount = state.elements.filter((e) => e.type === "lane").length;
+      const laneFs = state.laneFontSize ?? 12;
 
+      let next: { elements: DiagramElement[]; connectors: Connector[] };
       if (existingLanes.length === 0) {
         // First lane: split pool into two lanes
         const topH = Math.max(MIN_LANE_H, Math.floor(pool.height / 2));
@@ -3309,31 +3416,75 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         const elements = state.elements.map((e) =>
           e.id === poolId ? { ...e, height: poolH } : e
         );
-        let next = { elements: updatePoolTypes([...elements, lane1, lane2]), connectors: state.connectors };
-        // Auto-size each new lane against its label.
-        const laneFs = state.laneFontSize ?? 12;
+        next = { elements: updatePoolTypes([...elements, lane1, lane2]), connectors: state.connectors };
         next = resizeLaneForLabel(next.elements, next.connectors, lane1.id, laneFs);
         next = resizeLaneForLabel(next.elements, next.connectors, lane2.id, laneFs);
-        return { ...state, ...next };
+      } else {
+        // Additional lane: add at bottom, grow pool
+        const lastLane = existingLanes[existingLanes.length - 1];
+        const laneY = lastLane.y + lastLane.height;
+        const newLaneH = Math.max(LANE_HEADER_H, MIN_LANE_H);
+        const newLane: DiagramElement = {
+          id: nanoid(), type: "lane",
+          x: pool.x + POOL_LABEL_W, y: laneY,
+          width: pool.width - POOL_LABEL_W, height: newLaneH,
+          label: `Lane ${laneCount + 1}`, properties: {}, parentId: poolId,
+        };
+        const neededH = (laneY + newLaneH) - pool.y;
+        const elements = state.elements.map((e) =>
+          e.id === poolId && neededH > e.height ? { ...e, height: neededH } : e
+        );
+        next = { elements: updatePoolTypes([...elements, newLane]), connectors: state.connectors };
+        next = resizeLaneForLabel(next.elements, next.connectors, newLane.id, laneFs);
       }
 
-      // Additional lane: add at bottom, grow pool
-      const lastLane = existingLanes[existingLanes.length - 1];
-      const laneY = lastLane.y + lastLane.height;
-      const newLaneH = Math.max(LANE_HEADER_H, MIN_LANE_H);
-      const newLane: DiagramElement = {
-        id: nanoid(), type: "lane",
-        x: pool.x + POOL_LABEL_W, y: laneY,
-        width: pool.width - POOL_LABEL_W, height: newLaneH,
-        label: `Lane ${laneCount + 1}`, properties: {}, parentId: poolId,
-      };
-      const neededH = (laneY + newLaneH) - pool.y;
-      const elements = state.elements.map((e) =>
-        e.id === poolId && neededH > e.height ? { ...e, height: neededH } : e
-      );
-      let next = { elements: updatePoolTypes([...elements, newLane]), connectors: state.connectors };
-      const laneFs = state.laneFontSize ?? 12;
-      next = resizeLaneForLabel(next.elements, next.connectors, newLane.id, laneFs);
+      // Pool-below shift rule: if the lane addition grew the pool such
+      // that its new bottom lands within 100px of any pool that sits
+      // below it, shove ALL pools below (and their descendants) down by
+      // the same growth amount so the visual gap is preserved.
+      const finalPool = next.elements.find(e => e.id === poolId);
+      if (finalPool) {
+        const growth = finalPool.height - oldPoolHeight;
+        if (growth > 0) {
+          const newPoolBottom = finalPool.y + finalPool.height;
+          const poolsBelow = next.elements.filter(e =>
+            e.type === "pool" && e.id !== poolId && e.y >= oldPoolBottom
+          );
+          const tooClose = poolsBelow.some(p => p.y - newPoolBottom < 100);
+          if (tooClose) {
+            const shiftIds = new Set<string>();
+            for (const p of poolsBelow) {
+              shiftIds.add(p.id);
+              const stack = [p.id];
+              while (stack.length) {
+                const cid = stack.pop()!;
+                for (const e of next.elements) {
+                  if ((e.parentId === cid || e.boundaryHostId === cid) && !shiftIds.has(e.id)) {
+                    shiftIds.add(e.id);
+                    stack.push(e.id);
+                  }
+                }
+              }
+            }
+            next = {
+              elements: next.elements.map(e =>
+                shiftIds.has(e.id) ? { ...e, y: e.y + growth } : e
+              ),
+              connectors: next.connectors,
+            };
+            // Recompute connectors that touched anything we just shifted
+            // — their absolute waypoints need to follow.
+            next = {
+              elements: next.elements,
+              connectors: next.connectors.map(conn => {
+                if (!shiftIds.has(conn.sourceId) && !shiftIds.has(conn.targetId)) return conn;
+                return recomputeAllConnectors([conn], next.elements)[0] ?? conn;
+              }),
+            };
+          }
+        }
+      }
+
       return { ...state, ...next };
     }
 

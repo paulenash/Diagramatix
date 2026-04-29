@@ -2171,24 +2171,19 @@ export function PropertiesPanel({
           </button>
         )
       ) : element.type === "lane" ? (
-        laneHasContent ? (
-          <div>
-            <p className="text-xs text-orange-600 mb-1">Remove all elements from this lane first</p>
-            <button
-              disabled
-              className="w-full px-3 py-1.5 text-xs bg-gray-50 text-gray-400 border border-gray-200 rounded cursor-not-allowed"
-            >
-              Delete lane
-            </button>
-          </div>
-        ) : (
-          <button
-            onClick={() => onDeleteElement(element.id)}
-            className="w-full px-3 py-1.5 text-xs bg-red-50 text-red-600 border border-red-200 rounded hover:bg-red-100"
-          >
-            Delete lane
-          </button>
-        )
+        // Non-empty lanes can be deleted: the adjacent sibling lane
+        // absorbs the freed vertical slice, every element keeps its
+        // (x, y) and connectors stay attached. No need to evacuate the
+        // lane first.
+        <button
+          onClick={() => onDeleteElement(element.id)}
+          className="w-full px-3 py-1.5 text-xs bg-red-50 text-red-600 border border-red-200 rounded hover:bg-red-100"
+          title={laneHasContent
+            ? "Elements stay where they are; the adjacent lane absorbs this lane's space"
+            : "Delete this empty lane"}
+        >
+          Delete lane
+        </button>
       ) : (
         <button
           onClick={() => onDeleteElement(element.id)}

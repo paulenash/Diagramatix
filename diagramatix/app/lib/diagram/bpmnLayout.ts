@@ -1520,7 +1520,10 @@ export function layoutBpmnDiagram(
           default:       labelOffsetX = 8;                 labelOffsetY = -20;         break;
         }
       } else if (isMessage) {
-        // Find the containing pool for each end, then centre the label in the gap.
+        // BBP-anchored placement: label sits 50px from the Black-Box Pool
+        // boundary (into the gap), right of the connector by default.
+        // If a sibling label on the same BBP would overlap, flip to the
+        // left. Falls back to gap-centre when neither pool is BBP.
         function containingPool(el: DiagramElement): DiagramElement | undefined {
           if (el.type === "pool") return el;
           let cur: DiagramElement | undefined = el;
@@ -1536,20 +1539,64 @@ export function layoutBpmnDiagram(
         const srcPool = containingPool(src);
         const tgtPool = containingPool(tgt);
         labelWidth = 80;
-        labelOffsetX = 20;
         if (srcPool && tgtPool) {
           const goingDown = srcSide === "bottom";
           const srcPoolEdgeY = goingDown ? srcPool.y + srcPool.height : srcPool.y;
           const tgtPoolEdgeY = goingDown ? tgtPool.y : tgtPool.y + tgtPool.height;
-          const gapCentreY = (srcPoolEdgeY + tgtPoolEdgeY) / 2;
-          // The connector's visible midpoint is between srcEdge and tgtEdge
-          // (computed later). Approximate its Y here using the pool edges for
-          // pool endpoints, or element edges otherwise.
           const srcY = src.type === "pool" ? srcPoolEdgeY : (srcSide === "bottom" ? src.y + src.height : src.y);
           const tgtY = tgt.type === "pool" ? tgtPoolEdgeY : (srcSide === "bottom" ? tgt.y : tgt.y + tgt.height);
           const midY = (srcY + tgtY) / 2;
-          labelOffsetY = gapCentreY - midY - 7;
+          // Approx anchor X (vertical messageBPMN means src and tgt edges share x)
+          const midX = src.x + src.width / 2;
+          const srcIsBlackBox = ((srcPool.properties.poolType as string | undefined) ?? "black-box") !== "white-box";
+          const tgtIsBlackBox = ((tgtPool.properties.poolType as string | undefined) ?? "black-box") !== "white-box";
+          let bbpId: string | null = null;
+          let bbpEdgeY = 0;
+          let otherEdgeY = 0;
+          if (srcIsBlackBox && !tgtIsBlackBox) { bbpId = srcPool.id; bbpEdgeY = srcPoolEdgeY; otherEdgeY = tgtPoolEdgeY; }
+          else if (tgtIsBlackBox && !srcIsBlackBox) { bbpId = tgtPool.id; bbpEdgeY = tgtPoolEdgeY; otherEdgeY = srcPoolEdgeY; }
+          else if (srcIsBlackBox && tgtIsBlackBox) { bbpId = srcPool.id; bbpEdgeY = srcPoolEdgeY; otherEdgeY = tgtPoolEdgeY; }
+          if (bbpId) {
+            const direction = otherEdgeY >= bbpEdgeY ? 1 : -1;
+            const labelCentreY = bbpEdgeY + 50 * direction;
+            labelOffsetY = labelCentreY - midY - 7;
+            const RIGHT = 45;
+            const LEFT = -45;
+            const Y_BAND = 24;
+            const placedOnBbp = connectors.filter(pc =>
+              pc.type === "messageBPMN" &&
+              typeof pc.label === "string" && pc.label.trim().length > 0 &&
+              (pc.sourceId === bbpId || pc.targetId === bbpId) &&
+              pc.waypoints.length >= 4
+            ).map(pc => {
+              const cAnchorX = (pc.waypoints[1].x + pc.waypoints[pc.waypoints.length - 2].x) / 2;
+              const cAnchorY = (pc.waypoints[1].y + pc.waypoints[pc.waypoints.length - 2].y) / 2;
+              return {
+                cx: cAnchorX + (pc.labelOffsetX ?? 0),
+                cy: cAnchorY + (pc.labelOffsetY ?? 0) + 7,
+                w: pc.labelWidth ?? 80,
+              };
+            });
+            const overlapsAt = (testCx: number) => {
+              for (const l of placedOnBbp) {
+                if (Math.abs(l.cy - labelCentreY) > Y_BAND) continue;
+                const aL = testCx - 80 / 2, aR = testCx + 80 / 2;
+                const bL = l.cx - l.w / 2, bR = l.cx + l.w / 2;
+                if (!(aR < bL || bR < aL)) return true;
+              }
+              return false;
+            };
+            const rightCx = midX + RIGHT;
+            const leftCx = midX + LEFT;
+            labelOffsetX = (overlapsAt(rightCx) && !overlapsAt(leftCx)) ? LEFT : RIGHT;
+          } else {
+            // Both white-box — legacy gap-centre placement
+            const gapCentreY = (srcPoolEdgeY + tgtPoolEdgeY) / 2;
+            labelOffsetY = gapCentreY - midY - 7;
+            labelOffsetX = 20;
+          }
         } else {
+          labelOffsetX = 20;
           labelOffsetY = 0;
         }
       } else {
