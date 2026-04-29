@@ -25,6 +25,7 @@ import { PropertiesPanel } from "@/app/components/canvas/PropertiesPanel";
 import { captureTemplate, instantiateTemplate } from "@/app/lib/diagram/templates";
 import { ImpersonationBanner } from "@/app/components/ImpersonationBanner";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
+import { InfoDialog } from "@/app/components/InfoDialog";
 import { AiPanel } from "./AiPanel";
 import { PlanPanel } from "./PlanPanel";
 import { HistoryPanel } from "./HistoryPanel";
@@ -535,6 +536,12 @@ export function DiagramEditor({
   const [builtInTemplates, setBuiltInTemplates] = useState<{ id: string; name: string }[]>([]);
   const [templateMode, setTemplateMode] = useState<"idle" | "capturing" | "capturing-builtin" | "editing">("idle");
   const [deletingTemplateIds, setDeletingTemplateIds] = useState<Set<string>>(new Set());
+  const [templateImportInfo, setTemplateImportInfo] = useState<
+    { title: string; lines: string[] } | null
+  >(null);
+  const [templateDeleteConfirm, setTemplateDeleteConfirm] = useState<
+    { id: string; name: string; isBuiltIn: boolean } | null
+  >(null);
   const [templateDropdownOpen, setTemplateDropdownOpen] = useState(false);
   // builtInDropdownOpen removed — merged into single Templates dropdown
   const [showTemplateNameModal, setShowTemplateNameModal] = useState(false);
@@ -935,7 +942,10 @@ export function DiagramEditor({
       const text = await file.text();
       let payload: unknown;
       try { payload = JSON.parse(text); }
-      catch { alert("Import failed: file isn't valid JSON"); return; }
+      catch {
+        setTemplateImportInfo({ title: "Template Import Failed", lines: ["The selected file is not valid JSON."] });
+        return;
+      }
       // Forward the parsed payload — the server validates shape and skips
       // duplicates by (name + diagramType).
       const resp = await fetch(`/api/templates/import?type=${dest}`, {
@@ -945,18 +955,43 @@ export function DiagramEditor({
       });
       if (!resp.ok) {
         const txt = await resp.text();
-        alert(`Template import failed: ${txt || resp.statusText}`);
+        setTemplateImportInfo({
+          title: "Template Import Failed",
+          lines: [txt || resp.statusText],
+        });
         return;
       }
-      const summary = await resp.json() as { created: number; skipped: number; skippedNames: string[] };
+      const summary = await resp.json() as { created: number; skipped: number; skippedNames: string[]; createdNames?: string[] };
+      // Refresh the in-memory list so newly imported templates show up
+      // without a page reload.
+      try {
+        const which = dest === "builtin" ? "builtin" : "user";
+        const refresh = await fetch(`/api/templates?type=${which}`);
+        if (refresh.ok) {
+          const list = await refresh.json() as { id: string; name: string; diagramType: string }[];
+          const bpmnOnly = list.filter((t) => t.diagramType === "bpmn").map(t => ({ id: t.id, name: t.name }));
+          if (dest === "builtin") setBuiltInTemplates(bpmnOnly);
+          else setUserTemplates(bpmnOnly);
+        }
+      } catch { /* non-fatal — modal still shows results */ }
+      const destLabel = dest === "builtin" ? "Built-In" : "User";
       const lines: string[] = [];
-      lines.push(`Imported ${summary.created} template${summary.created === 1 ? "" : "s"} into the ${dest === "builtin" ? "Built-In" : "User"} list.`);
+      lines.push(
+        `Imported ${summary.created} template${summary.created === 1 ? "" : "s"} into the ${destLabel} list.`,
+      );
       if (summary.skipped > 0) {
-        lines.push(`Skipped ${summary.skipped} duplicate${summary.skipped === 1 ? "" : "s"}: ${summary.skippedNames.slice(0, 8).join(", ")}${summary.skippedNames.length > 8 ? ", …" : ""}`);
+        const head = summary.skippedNames.slice(0, 8).join(", ");
+        const tail = summary.skippedNames.length > 8 ? ", …" : "";
+        lines.push(
+          `Skipped ${summary.skipped} duplicate${summary.skipped === 1 ? "" : "s"}: ${head}${tail}`,
+        );
       }
-      alert(lines.join("\n"));
+      setTemplateImportInfo({ title: "Template Import Complete", lines });
     } catch (err) {
-      alert(`Template import failed: ${err instanceof Error ? err.message : String(err)}`);
+      setTemplateImportInfo({
+        title: "Template Import Failed",
+        lines: [err instanceof Error ? err.message : String(err)],
+      });
     }
   }
 
@@ -1316,7 +1351,7 @@ export function DiagramEditor({
                                 className="px-1.5 py-1.5 text-gray-400 hover:text-blue-500" title="Edit">
                                 <svg width={11} height={11} viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"><path d="M7 2l3 3-7 7H0V9z" /></svg>
                               </button>
-                              <button onClick={(e) => { e.stopPropagation(); handleDeleteTemplate(t.id, true); }}
+                              <button onClick={(e) => { e.stopPropagation(); setTemplateDeleteConfirm({ id: t.id, name: t.name, isBuiltIn: true }); }}
                                 className="px-1.5 py-1.5 text-gray-400 hover:text-red-500" title="Delete">
                                 <svg width={11} height={11} viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round"><path d="M2 3h8M4.5 3V2h3v1M3 3v7a1 1 0 001 1h4a1 1 0 001-1V3" /></svg>
                               </button>
@@ -1350,7 +1385,7 @@ export function DiagramEditor({
                                 className="px-1.5 py-1.5 text-gray-400 hover:text-blue-500" title="Edit">
                                 <svg width={11} height={11} viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"><path d="M7 2l3 3-7 7H0V9z" /></svg>
                               </button>
-                              <button onClick={(e) => { e.stopPropagation(); handleDeleteTemplate(t.id); }}
+                              <button onClick={(e) => { e.stopPropagation(); setTemplateDeleteConfirm({ id: t.id, name: t.name, isBuiltIn: false }); }}
                                 className="px-1.5 py-1.5 text-gray-400 hover:text-red-500" title="Delete">
                                 <svg width={11} height={11} viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round"><path d="M2 3h8M4.5 3V2h3v1M3 3v7a1 1 0 001 1h4a1 1 0 001-1V3" /></svg>
                               </button>
@@ -1962,6 +1997,28 @@ export function DiagramEditor({
           onClose={() => { setShowTemplateNameModal(false); setPendingTemplateData(null); setTemplateMode("idle"); }}
           initialName={templateEditState?.templateName}
           title={templateEditState ? "Update Template" : templateMode === "capturing-builtin" ? "Save Built-In Template" : "Save User Template"}
+        />
+      )}
+
+      {templateImportInfo && (
+        <InfoDialog
+          title={templateImportInfo.title}
+          lines={templateImportInfo.lines}
+          onClose={() => setTemplateImportInfo(null)}
+        />
+      )}
+
+      {templateDeleteConfirm && (
+        <ConfirmDialog
+          title="Delete Template"
+          message={`Are you sure you want to delete the template "${templateDeleteConfirm.name}"? This action cannot be undone.`}
+          confirmLabel="Delete"
+          onConfirm={() => {
+            const { id, isBuiltIn } = templateDeleteConfirm;
+            setTemplateDeleteConfirm(null);
+            void handleDeleteTemplate(id, isBuiltIn);
+          }}
+          onCancel={() => setTemplateDeleteConfirm(null)}
         />
       )}
 
