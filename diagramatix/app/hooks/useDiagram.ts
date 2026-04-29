@@ -2180,18 +2180,24 @@ function reducer(state: DiagramData, action: Action): DiagramData {
           deletingIsContainer && e.parentId === id ? { ...e, parentId: undefined } : e
         );
 
-      // If deleting a lane: shrink each ancestor container by the deleted
-      // height and re-stack the surviving siblings at their ORIGINAL heights
-      // (content moves with them). This replaces the earlier reflow-to-fill
-      // behaviour that silently scaled siblings proportionally — users now
-      // see the pool shrink to match the new lane count.
+      // ── Lane deletion: "adjacent absorbs" model ──
+      // The pool (and every ancestor) keeps its current height. A sibling
+      // lane immediately below (else immediately above) the deleted lane
+      // grows to swallow the deleted lane's vertical slice. Every element
+      // stays at its original (x, y) — only its parentId is updated to
+      // the absorbing lane (or to the parent if there are no siblings).
+      // No connector recompute is needed because nothing physically
+      // moves; only ownership changes.
       if (el?.type === "lane" && el.parentId) {
         const parent = elements.find((e) => e.id === el.parentId);
         if (parent) {
-          const headerW = 36; // same for pools and lanes
+          const deletedY = el.y;
           const deletedH = el.height;
+          const deletedBottom = deletedY + deletedH;
+          const deletedCenter = deletedY + deletedH / 2;
 
-          // First, remove any sub-lanes of the deleted lane (cascades content removal).
+          // Cascade-delete sublanes of the deleted lane (their children are
+          // already in `orphanIds` from the up-front capture).
           const sublanesToDelete = new Set<string>();
           function collectSublanes(parentId: string) {
             for (const e of elements) {
@@ -2208,97 +2214,48 @@ function reducer(state: DiagramData, action: Action): DiagramData {
               .map((e) => sublanesToDelete.has(e.parentId ?? "") ? { ...e, parentId: undefined } : e);
           }
 
-          // Walk up the container chain (immediate parent → grandparent → …):
-          //   - shrink the container by deletedH
-          //   - re-stack its direct lane children at their own heights, moving
-          //     each lane's descendants along by the same Δy so content travels
-          //     with its lane.
-          // Stops once we hit a non-lane ancestor (the pool terminates the chain).
-          // Container's own label-driven minimum — used to clamp the
-          // post-deletion height so a long pool/lane name never gets
-          // cropped just because a child lane was removed.
-          const poolFs = state.poolFontSize ?? 12;
-          const laneFs = state.laneFontSize ?? 12;
-          function ownLabelMin(c: DiagramElement): number {
-            if (c.type === "pool") return poolMetrics(c.label, poolFs).minHeight;
-            if (c.type === "lane") return laneMetrics(c.label, laneFs).minHeight;
-            return 40;
+          // Find the absorbing sibling: prefer the lane immediately below
+          // the deleted one, else the lane immediately above. Siblings are
+          // direct lane children of `parent` (post-cascade).
+          const siblings = elements
+            .filter(e => e.type === "lane" && e.parentId === parent.id)
+            .sort((a, b) => a.y - b.y);
+          const lower = siblings.find(s => s.y >= deletedCenter);
+          let absorber: DiagramElement | undefined = lower;
+          if (!absorber) {
+            // No sibling below — pick the topmost sibling above (sorted by
+            // y desc, the highest-y of the upper group is the closest).
+            const upperSorted = siblings
+              .filter(s => s.y < deletedCenter)
+              .sort((a, b) => (b.y + b.height) - (a.y + a.height));
+            absorber = upperSorted[0];
           }
 
-          let cursor: DiagramElement | undefined = parent;
-          while (cursor) {
-            const curId = cursor.id;
-            const curBefore = elements.find(e => e.id === curId);
-            if (!curBefore) break;
-            const newH = Math.max(40, ownLabelMin(curBefore), curBefore.height - deletedH);
-            elements = elements.map(e => e.id === curId ? { ...e, height: newH } : e);
-            const curAfter = elements.find(e => e.id === curId)!;
-
-            const childLanes = elements
-              .filter(e => e.type === "lane" && e.parentId === curId)
-              .sort((a, b) => a.y - b.y);
-            let stackY = curAfter.y;
-            for (const lane of childLanes) {
-              const deltaY = stackY - lane.y;
-              const laneNewX = curAfter.x + headerW;
-              const laneNewW = curAfter.width - headerW;
-              if (deltaY !== 0) {
-                const descIds = getAllDescendantIds(elements, lane.id);
-                elements = elements.map(e => {
-                  if (e.id === lane.id) return { ...e, y: lane.y + deltaY, x: laneNewX, width: laneNewW };
-                  if (descIds.has(e.id)) return { ...e, y: e.y + deltaY };
-                  return e;
-                });
-              } else {
-                elements = elements.map(e => e.id === lane.id ? { ...e, x: laneNewX, width: laneNewW } : e);
-              }
-              stackY += lane.height;
-            }
-
-            // Ascend only through lane→lane. Pools (and any other container type)
-            // terminate the cascade — the pool has just shrunk to fit.
-            cursor = cursor.type === "lane" && cursor.parentId
-              ? elements.find(e => e.id === cursor!.parentId)
-              : undefined;
-          }
-
-          // Second-last-lane rule: if only one lane remains in the parent and
-          // it is empty, delete it too so the pool returns to its laneless
-          // state.
-          //
-          // Parent is a Pool: shrink the pool by the deleted lane's height
-          // (the pool reverts to "laneless").
-          // Parent is a Lane (sublane scenario): keep the parent lane at its
-          // current height — it simply reverts to "lane without sublanes".
-          // The explicit-delete cascade above has already shrunk the parent
-          // by the user-deleted sublane's height; shrinking again here would
-          // double-count and leave the parent (and pool) too short, which
-          // would push the parent lane outside the pool boundary.
-          const remainingLanes = elements.filter(e => e.type === "lane" && e.parentId === parent.id);
-          if (remainingLanes.length === 1) {
-            const lastLane = remainingLanes[0];
-            const lastHasChildren = elements.some(e => e.parentId === lastLane.id);
-            if (!lastHasChildren) {
-              const lastH = lastLane.height;
-              elements = elements.filter(e => e.id !== lastLane.id);
-              if (parent.type === "pool") {
-                // Pool case: shrink the pool by the last lane's height,
-                // but never below the pool's own label-driven minimum.
-                let cursor2: DiagramElement | undefined = elements.find(e => e.id === parent.id);
-                while (cursor2) {
-                  const curId = cursor2.id;
-                  const curBefore = elements.find(e => e.id === curId);
-                  if (!curBefore) break;
-                  const clampedH = Math.max(40, ownLabelMin(curBefore), curBefore.height - lastH);
-                  elements = elements.map(e => e.id === curId ? { ...e, height: clampedH } : e);
-                  cursor2 = cursor2.type === "lane" && cursor2.parentId
-                    ? elements.find(e => e.id === cursor2!.parentId)
-                    : undefined;
-                }
-              }
-              // Lane parent: leave heights as-is. The parent lane keeps
-              // its current vertical extent and the pool stays the same.
-            }
+          if (absorber) {
+            // Extend the absorber to cover the deleted area: its top
+            // becomes min(its top, deletedTop), its bottom becomes
+            // max(its bottom, deletedBottom). Total new height equals
+            // old height + deletedH.
+            const newY = Math.min(absorber.y, deletedY);
+            const newBottom = Math.max(absorber.y + absorber.height, deletedBottom);
+            const newH = newBottom - newY;
+            elements = elements.map(e =>
+              e.id === absorber!.id ? { ...e, y: newY, height: newH } : e
+            );
+            // Reparent every orphan to the absorber. Position UNCHANGED
+            // (absorber now spatially covers the orphan's old location).
+            elements = elements.map(e =>
+              orphanIds.has(e.id) ? { ...e, parentId: absorber!.id } : e
+            );
+          } else {
+            // No siblings to absorb the gap (e.g. the deleted lane was
+            // the only lane in its parent). Reparent orphans directly to
+            // the parent (pool or grandparent lane). Parent height stays
+            // the same — the pool body just has empty space where the
+            // lane used to be.
+            elements = elements.map(e =>
+              orphanIds.has(e.id) ? { ...e, parentId: parent.id } : e
+            );
           }
 
           // Re-sync header widths across surviving siblings — removing a
@@ -2308,84 +2265,6 @@ function reducer(state: DiagramData, action: Action): DiagramData {
             const fontSize = state.laneFontSize ?? 12;
             const synced = resizeLaneForLabel(elements, state.connectors, survivingSibling.id, fontSize);
             elements = synced.elements;
-            // Connectors will be recomputed below by existing logic; the
-            // helper's connector recompute is a strict subset.
-          }
-
-          // ── Re-home orphans ──
-          // Children of the deleted lane (or its cascade sublanes) lost
-          // their parent during the cascade. Move them into the NEAREST
-          // surviving lane (by y-distance to the lane's vertical range);
-          // if no lanes remain in the pool, drop them onto the pool body.
-          // Connectors stay attached because they reference endpoints by
-          // id — the final recomputeAllConnectors below re-routes
-          // waypoints around the new positions.
-          if (orphanIds.size > 0) {
-            // Find the pool ancestor of the originally-deleted lane.
-            let poolId: string | undefined;
-            let curAnc: DiagramElement | undefined = state.elements.find(e => e.id === el.parentId);
-            for (let i = 0; curAnc && i < 10; i++) {
-              if (curAnc.type === "pool") { poolId = curAnc.id; break; }
-              if (!curAnc.parentId) break;
-              curAnc = state.elements.find(e => e.id === curAnc!.parentId);
-            }
-            const pool = poolId ? elements.find(e => e.id === poolId) : undefined;
-            if (pool) {
-              // Surviving lanes (any depth) inside the pool, post-shrink.
-              const survivingLanes: DiagramElement[] = [];
-              function collectSurvivingLanes(parentId: string) {
-                for (const e of elements) {
-                  if (e.type === "lane" && e.parentId === parentId) {
-                    survivingLanes.push(e);
-                    collectSurvivingLanes(e.id);
-                  }
-                }
-              }
-              collectSurvivingLanes(pool.id);
-
-              for (const orphanId of orphanIds) {
-                const orphan = elements.find(e => e.id === orphanId);
-                if (!orphan) continue;
-                const orphanCy = orphan.y + orphan.height / 2;
-
-                let newParent: DiagramElement | undefined;
-                if (survivingLanes.length === 0) {
-                  newParent = pool;
-                } else {
-                  // Pick the lane whose y range is closest to the orphan's
-                  // centre y. Inside-lane orphans get distance 0 — they
-                  // stay in the most natural place.
-                  let bestLane: DiagramElement | undefined;
-                  let bestDist = Infinity;
-                  for (const lane of survivingLanes) {
-                    const top = lane.y;
-                    const bot = lane.y + lane.height;
-                    const dist = orphanCy >= top && orphanCy <= bot ? 0
-                      : orphanCy < top ? top - orphanCy
-                      : orphanCy - bot;
-                    if (dist < bestDist) { bestDist = dist; bestLane = lane; }
-                  }
-                  newParent = bestLane;
-                }
-                if (!newParent) continue;
-
-                // Clamp the orphan into the new parent's content area —
-                // header strip on the left, with a small inset.
-                const headerW = newParent.type === "pool"
-                  ? getPoolHeaderWidth(newParent)
-                  : getLaneHeaderWidth(newParent);
-                const PAD = 4;
-                const minX = newParent.x + headerW + PAD;
-                const maxX = Math.max(minX, newParent.x + newParent.width - orphan.width - PAD);
-                const minY = newParent.y + PAD;
-                const maxY = Math.max(minY, newParent.y + newParent.height - orphan.height - PAD);
-                const newX = Math.max(minX, Math.min(orphan.x, maxX));
-                const newY = Math.max(minY, Math.min(orphan.y, maxY));
-                elements = elements.map(e =>
-                  e.id === orphanId ? { ...e, x: newX, y: newY, parentId: newParent!.id } : e
-                );
-              }
-            }
           }
         }
       }
@@ -2437,12 +2316,10 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         (c) => c.sourceId !== id && c.targetId !== id
       );
       if (bridgeConnector) connectors = [...connectors, bridgeConnector];
-
-      // If any orphans were re-homed, their connectors need waypoint
-      // re-routing — endpoints didn't change, but element positions did.
-      if (orphanIds.size > 0) {
-        connectors = recomputeAllConnectors(connectors, elements);
-      }
+      // Lane deletion does NOT move any element under the new
+      // "adjacent absorbs" model — the absorbing sibling extends its
+      // bounds while every element keeps its (x, y). So connector
+      // waypoints stay valid; no recompute necessary.
 
       // Re-theme snapped group if a process was removed from it
       if (el && CHEVRON_SNAP_TYPES.has(el.type)) {
