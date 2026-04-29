@@ -2067,7 +2067,10 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       const newH = Math.max(rawNewH, labelMinH);
 
       if (target?.type === "pool") {
-        const POOL_LW = 30;
+        // Use the pool's DYNAMIC header width (the rotated label strip
+        // on the left), not a hardcoded 30. Default is 36 but multi-line
+        // pool names widen it via `properties.poolHeaderWidth`.
+        const POOL_LW = getPoolHeaderWidth(target);
         const sortedLanes = state.elements
           .filter((e) => e.type === "lane" && e.parentId === id)
           .sort((a, b) => a.y - b.y);
@@ -2090,7 +2093,9 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         // Also proportionally resize sub-lanes within each lane
         const sublaneUpdates = new Map<string, DiagramElement>();
         for (const [laneId, updatedLane] of laneUpdates) {
-          const LANE_LW = 36;
+          // Lane header strip can also be widened by multi-line lane
+          // labels, so use the dynamic value instead of a hardcoded 36.
+          const LANE_LW = getLaneHeaderWidth(updatedLane);
           const sublanes = state.elements
             .filter((e) => e.type === "lane" && e.parentId === laneId)
             .sort((a, b) => a.y - b.y);
