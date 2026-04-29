@@ -2174,16 +2174,26 @@ export function PropertiesPanel({
         // Non-empty lanes can be deleted: the adjacent sibling lane
         // absorbs the freed vertical slice, every element keeps its
         // (x, y) and connectors stay attached. No need to evacuate the
-        // lane first.
-        <button
-          onClick={() => onDeleteElement(element.id)}
-          className="w-full px-3 py-1.5 text-xs bg-red-50 text-red-600 border border-red-200 rounded hover:bg-red-100"
-          title={laneHasContent
-            ? "Elements stay where they are; the adjacent lane absorbs this lane's space"
-            : "Delete this empty lane"}
-        >
-          Delete lane
-        </button>
+        // lane first. Sub-lanes (a lane whose parent is itself a lane)
+        // get the "Delete Sublane" label so the user knows the scope.
+        (() => {
+          const parent = element.parentId
+            ? allElements?.find(e => e.id === element.parentId)
+            : undefined;
+          const isSublane = parent?.type === "lane";
+          const verb = isSublane ? "Delete sublane" : "Delete lane";
+          return (
+            <button
+              onClick={() => onDeleteElement(element.id)}
+              className="w-full px-3 py-1.5 text-xs bg-red-50 text-red-600 border border-red-200 rounded hover:bg-red-100"
+              title={laneHasContent
+                ? "Elements stay where they are; the adjacent " + (isSublane ? "sublane" : "lane") + " absorbs this " + (isSublane ? "sublane" : "lane") + "'s space"
+                : "Delete this empty " + (isSublane ? "sublane" : "lane")}
+            >
+              {verb}
+            </button>
+          );
+        })()
       ) : (
         <button
           onClick={() => onDeleteElement(element.id)}

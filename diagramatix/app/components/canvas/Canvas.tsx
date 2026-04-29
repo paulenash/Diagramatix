@@ -449,7 +449,7 @@ export function Canvas({
   const [poolBoundaryGuide, setPoolBoundaryGuide] = useState<{
     side: "left" | "right";
     currentX: number;
-    others: { id: string; x: number; midY: number }[];
+    others: { id: string; x: number; midY: number; isMoving: boolean }[];
   } | null>(null);
   const [debugLabelOffsets, setDebugLabelOffsets] = useState<Map<string, Point>>(new Map());
   const setDebugLabelOffset = useCallback((id: string, offset: Point) => {
@@ -1247,12 +1247,16 @@ export function Canvas({
       ? (handle.includes("w") ? "left" : "right")
       : null;
     if (movingSide) {
+      // Include EVERY pool — the moving one is included so the guide
+      // line spans the full set of pools on the canvas (and gets a
+      // marker on its own boundary too).
       const others = data.elements
-        .filter(p => p.type === "pool" && p.id !== el.id)
+        .filter(p => p.type === "pool")
         .map(p => ({
           id: p.id,
           x: movingSide === "left" ? p.x : p.x + p.width,
           midY: p.y + p.height / 2,
+          isMoving: p.id === el.id,
         }));
       setPoolBoundaryGuide({
         side: movingSide,
@@ -4194,44 +4198,66 @@ export function Canvas({
             );
           })()}
 
-          {/* Pool vertical-boundary alignment guide: dotted black line at the
-              moving boundary's current X, with a marker at every other pool's
-              same-side boundary (vertical centre). Markers turn green when the
-              moving boundary aligns with that pool's; the whole line flashes
-              green when ALL other pool boundaries align simultaneously. */}
+          {/* Pool vertical-boundary alignment guide: dotted vertical line
+              at the moving boundary's current X, spanning every pool on
+              the canvas (including the one being resized). A marker sits
+              at each pool's same-side boundary (vertical centre); the
+              moving pool's own marker is always green (it IS the line),
+              and other markers turn green when their X matches within
+              4px. The whole line flashes green when EVERY pool aligns. */}
           {poolBoundaryGuide && (() => {
             const SNAP_PX = 4;
             const others = poolBoundaryGuide.others;
-            const aligned = others.map(o => Math.abs(o.x - poolBoundaryGuide.currentX) < SNAP_PX);
-            const allAligned = aligned.length > 0 && aligned.every(v => v);
             if (others.length === 0) return null;
-            // Vertical extent: span all pool centres plus a generous margin
+            // The moving pool's marker is always considered "aligned"
+            // since the line passes through it by definition.
+            const aligned = others.map(o =>
+              o.isMoving || Math.abs(o.x - poolBoundaryGuide.currentX) < SNAP_PX
+            );
+            // "All aligned" means every OTHER pool also aligned.
+            const allAligned =
+              others.filter(o => !o.isMoving).length > 0 &&
+              aligned.every(v => v);
             const minMidY = Math.min(...others.map(o => o.midY));
             const maxMidY = Math.max(...others.map(o => o.midY));
-            const y1 = minMidY - 80;
-            const y2 = maxMidY + 80;
+            const y1 = minMidY - 100;
+            const y2 = maxMidY + 100;
             return (
               <g pointerEvents="none">
+                {/* White halo behind the dotted line so it stays visible
+                    over dark / busy backgrounds. */}
+                <line
+                  x1={poolBoundaryGuide.currentX} x2={poolBoundaryGuide.currentX}
+                  y1={y1} y2={y2}
+                  stroke="#ffffff"
+                  strokeWidth={5}
+                  strokeOpacity={0.7}
+                />
                 <line
                   x1={poolBoundaryGuide.currentX} x2={poolBoundaryGuide.currentX}
                   y1={y1} y2={y2}
                   stroke={allAligned ? "#10b981" : "#000000"}
-                  strokeWidth={allAligned ? 2 : 1}
-                  strokeDasharray="4 3"
+                  strokeWidth={allAligned ? 3 : 2}
+                  strokeDasharray="6 4"
                   className={allAligned ? "animate-pulse" : undefined}
-                  opacity={allAligned ? 1 : 0.7}
+                  opacity={1}
                 />
                 {others.map((o, i) => (
-                  <circle
-                    key={o.id}
-                    cx={o.x}
-                    cy={o.midY}
-                    r={6}
-                    fill={aligned[i] ? "#10b981" : "#9ca3af"}
-                    fillOpacity={aligned[i] ? 0.9 : 0.4}
-                    stroke={aligned[i] ? "#047857" : "#4b5563"}
-                    strokeWidth={1.5}
-                  />
+                  <g key={o.id}>
+                    {/* White halo around the marker for contrast */}
+                    <circle
+                      cx={o.x} cy={o.midY} r={10}
+                      fill="#ffffff" fillOpacity={0.85}
+                      stroke="none"
+                    />
+                    <circle
+                      cx={o.x} cy={o.midY} r={8}
+                      fill={aligned[i] ? "#10b981" : "#1f2937"}
+                      fillOpacity={aligned[i] ? 1 : 0.6}
+                      stroke={aligned[i] ? "#047857" : "#000000"}
+                      strokeWidth={2}
+                    />
+                  </g>
                 ))}
               </g>
             );

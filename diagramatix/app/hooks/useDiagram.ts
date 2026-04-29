@@ -2081,14 +2081,70 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         for (const lane of sortedLanes) {
           laneMins.set(lane.id, minHeightForContainer(lane, state.elements, poolFs, laneFs));
         }
-        let stackY = newY;
+        // Detect WHICH boundary moved to avoid pro-rata distribution
+        // across all lanes when the user only dragged one horizontal
+        // edge (top OR bottom). A pure horizontal-edge drag (e/w) shows
+        // no top/bottom delta — only x/width updates.
+        const deltaTopY    = newY - target.y;
+        const deltaBottomY = (newY + newH) - (target.y + target.height);
+        const topMoved    = Math.abs(deltaTopY) > 0.5;
+        const bottomMoved = Math.abs(deltaBottomY) > 0.5;
         const laneUpdates = new Map<string, DiagramElement>();
-        for (const lane of sortedLanes) {
-          const proportional = Math.round(newH * (lane.height / totalLaneH));
-          const newLaneH = Math.max(40, laneMins.get(lane.id) ?? 40, proportional);
-          const updated = { ...lane, x: newX + POOL_LW, y: stackY, width: newW - POOL_LW, height: newLaneH };
-          laneUpdates.set(lane.id, updated);
-          stackY += newLaneH;
+        if (sortedLanes.length === 0) {
+          // No lanes — nothing to update beyond the pool itself.
+        } else if (topMoved && !bottomMoved) {
+          // Top edge dragged: ONLY the topmost lane absorbs the delta.
+          // Other lanes keep their height; just shift x/width to follow
+          // the pool body and re-stack y so the chain stays tight.
+          const firstLaneId = sortedLanes[0].id;
+          let stackY = newY;
+          for (const lane of sortedLanes) {
+            const min = laneMins.get(lane.id) ?? 40;
+            const newLaneH = lane.id === firstLaneId
+              ? Math.max(40, min, lane.height - deltaTopY)
+              : lane.height;
+            laneUpdates.set(lane.id, {
+              ...lane, x: newX + POOL_LW, y: stackY,
+              width: newW - POOL_LW, height: newLaneH,
+            });
+            stackY += newLaneH;
+          }
+        } else if (bottomMoved && !topMoved) {
+          // Bottom edge dragged: ONLY the bottommost lane absorbs.
+          const lastLaneId = sortedLanes[sortedLanes.length - 1].id;
+          let stackY = newY;
+          for (const lane of sortedLanes) {
+            const min = laneMins.get(lane.id) ?? 40;
+            const newLaneH = lane.id === lastLaneId
+              ? Math.max(40, min, lane.height + deltaBottomY)
+              : lane.height;
+            laneUpdates.set(lane.id, {
+              ...lane, x: newX + POOL_LW, y: stackY,
+              width: newW - POOL_LW, height: newLaneH,
+            });
+            stackY += newLaneH;
+          }
+        } else if (!topMoved && !bottomMoved) {
+          // Pure horizontal resize (e/w). Lanes' x and width update;
+          // y/height stay exactly as they are.
+          for (const lane of sortedLanes) {
+            laneUpdates.set(lane.id, {
+              ...lane, x: newX + POOL_LW, width: newW - POOL_LW,
+            });
+          }
+        } else {
+          // Both edges moved (e.g. programmatic resize) — fall back to
+          // proportional distribution as before.
+          let stackY = newY;
+          for (const lane of sortedLanes) {
+            const proportional = Math.round(newH * (lane.height / totalLaneH));
+            const newLaneH = Math.max(40, laneMins.get(lane.id) ?? 40, proportional);
+            laneUpdates.set(lane.id, {
+              ...lane, x: newX + POOL_LW, y: stackY,
+              width: newW - POOL_LW, height: newLaneH,
+            });
+            stackY += newLaneH;
+          }
         }
         // Also proportionally resize sub-lanes within each lane
         const sublaneUpdates = new Map<string, DiagramElement>();
@@ -2382,17 +2438,34 @@ function reducer(state: DiagramData, action: Action): DiagramData {
 
           // Second-last-lane rule: if exactly one sibling lane remains
           // after the absorb, auto-delete that one too — the parent
-          // (pool or lane) reverts to its lane-less state. Every child
-          // of the auto-deleted lane (including the just-reparented
-          // orphans) is reparented to the parent. Heights are NOT
-          // changed; the parent keeps its current size and the elements
-          // stay at their original (x, y).
+          // (pool or lane) reverts to its lane-less state. The auto-
+          // deleted lane's ENTIRE sublane tree cascades down with it
+          // (otherwise the sublanes survive as orphan lanes parented to
+          // the pool, which the renderer can't lay out correctly).
+          // Non-lane elements inside any cascade-deleted lane (the
+          // tasks/events at the bottom of the tree) reparent to the
+          // surviving parent. Heights are NOT changed; the parent keeps
+          // its current size and elements stay at their original (x, y).
           const remainingAfterAbsorb = elements.filter(e => e.type === "lane" && e.parentId === parent.id);
           if (remainingAfterAbsorb.length === 1) {
             const last = remainingAfterAbsorb[0];
+            const cascadeIds = new Set<string>([last.id]);
+            function collectSubsRecursive(parentId: string) {
+              for (const e of elements) {
+                if (e.type === "lane" && e.parentId === parentId && !cascadeIds.has(e.id)) {
+                  cascadeIds.add(e.id);
+                  collectSubsRecursive(e.id);
+                }
+              }
+            }
+            collectSubsRecursive(last.id);
             elements = elements
-              .filter(e => e.id !== last.id)
-              .map(e => e.parentId === last.id ? { ...e, parentId: parent.id } : e);
+              .filter(e => !cascadeIds.has(e.id))
+              .map(e =>
+                e.parentId !== undefined && cascadeIds.has(e.parentId)
+                  ? { ...e, parentId: parent.id }
+                  : e
+              );
           }
 
           // Re-sync header widths across any still-surviving siblings —
