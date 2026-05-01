@@ -290,19 +290,24 @@ export async function exportVisioV3(
   let nextId = 100;
 
   // Helper: generate sub-shapes with F='Inh' for BOTH width AND height scaling
-  // MasterShapes 6 (outer rect), 7 (border group containing 8,9)
-  function makeRectSubShapes(baseId: number, w: number, h: number): string {
+  // MasterShapes 6 (outer rect — the visible body), 7 (border group containing
+  // 8,9). MasterShape 6 paints the body fill: it inherits FillStyle='7' from
+  // the master, which falls through to the document theme (white). We MUST
+  // inject an explicit FillForegnd at the instance level so the body picks
+  // up our Diagramatix colour instead of the theme default.
+  function makeRectSubShapes(baseId: number, w: number, h: number, bodyFillCells: string = ""): string {
     const hw = w / 2;
     const hh = h / 2;
     const wi = w - 0.05; // inner border slightly smaller
     const hi = h - 0.05;
     return `<Shapes>` +
-      // MasterShape 6: outer rect
+      // MasterShape 6: outer rect (body)
       `<Shape ID='${baseId}' Type='Shape' MasterShape='6'>` +
       `<Cell N='PinX' V='${hw}' F='Inh'/><Cell N='PinY' V='${hh}' F='Inh'/>` +
       `<Cell N='Width' V='${w}' F='Inh'/><Cell N='Height' V='${h}' F='Inh'/>` +
       `<Cell N='LocPinX' V='${hw}' F='Inh'/><Cell N='LocPinY' V='${hh}' F='Inh'/>` +
       `<Cell N='LayerMember' V='0'/>` +
+      bodyFillCells +
       `<Section N='Geometry' IX='0'>` +
       `<Row T='LineTo' IX='2'><Cell N='X' V='${w}' F='Inh'/></Row>` +
       `<Row T='LineTo' IX='3'><Cell N='X' V='${w}' F='Inh'/><Cell N='Y' V='${h}' F='Inh'/></Row>` +
@@ -544,8 +549,14 @@ export async function exportVisioV3(
         // Fallback: no sub-shapes, just position
         subShapes = "";
       } else {
-        // Task, Subprocess: rectangular sub-shapes
-        subShapes = makeRectSubShapes(shapeId + 1, w, h);
+        // Task, Subprocess: rectangular sub-shapes. The body sub-shape
+        // (MasterShape 6) needs an explicit FillForegnd at instance level —
+        // its master cell falls through to FillStyle 7 (theme white).
+        const bodyFill = isColor && colorMap[el.type]
+          ? `<Cell N='FillForegnd' V='${colorMap[el.type]}' F='RGB(${parseInt(colorMap[el.type].slice(1,3),16)},${parseInt(colorMap[el.type].slice(3,5),16)},${parseInt(colorMap[el.type].slice(5,7),16)})'/>` +
+            `<Cell N='FillPattern' V='1' F='RGB(0,0,0)*0+1'/>`
+          : "";
+        subShapes = makeRectSubShapes(shapeId + 1, w, h, bodyFill);
       }
     }
 
