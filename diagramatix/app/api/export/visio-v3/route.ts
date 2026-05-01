@@ -62,6 +62,15 @@ export async function GET(request: Request) {
     const result = await exportVisioV3(data, diagram.name, stencilBuf.buffer, templateBuf.buffer, displayMode, effectiveColors);
     console.log("[visio-v3] Output size:", result.length, "bytes");
 
+    // DEBUG: write a copy of the export to /tmp so we can inspect what
+    // actually shipped without needing to round-trip through the browser.
+    try {
+      fs.writeFileSync("C:/temp/last-visio-v3-export.vsdx", Buffer.from(result));
+      console.log("[visio-v3] Debug copy written to C:/temp/last-visio-v3-export.vsdx");
+    } catch (e) {
+      console.log("[visio-v3] Could not write debug copy:", (e as Error).message);
+    }
+
     return new NextResponse(result as any, {
       headers: {
         "Content-Type": "application/vnd.ms-visio.drawing",
