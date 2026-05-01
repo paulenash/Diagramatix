@@ -212,7 +212,7 @@ export async function exportVisioV3(
     const g = parseInt(colour.slice(3, 5), 16);
     const b = parseInt(colour.slice(5, 7), 16);
     const cell = `<Cell N='FillForegnd' V='${colour}' F='RGB(${r},${g},${b})'/>`;
-    return content
+    let updated = content
       .replace(/<Cell N='FillForegnd' V='1' F='GUARD\([^']+\)'\/>/g, cell)
       .replace(
         /<Cell N='FillForegnd' V='#ffffff' F='THEMEGUARD\(RGB\(255,255,255\)\)'\/>/g,
@@ -222,6 +222,28 @@ export async function exportVisioV3(
         /<Cell N='FillPattern' V='1' F='GUARD\(1\)'\/>/g,
         `<Cell N='FillPattern' V='1' F='RGB(0,0,0)*0+1'/>`,
       );
+
+    // Some templates (Task = master2.xml, Subprocess = master11.xml) have
+    // MasterShape 6 with `FillStyle='7'` and NO FillForegnd cell of its own,
+    // so the body inherits theme white at render time. Inject an explicit
+    // FillForegnd + solid FillPattern into Shape ID='6' if absent.
+    const shape6 = updated.match(/<Shape ID='6'[^>]*>/);
+    if (shape6) {
+      const shapeStart = shape6.index!;
+      const shapeOpenEnd = shapeStart + shape6[0].length;
+      // Bound the search to the next `<Shape ID=` (or end of string) so we
+      // don't see FillForegnd from a later sub-shape.
+      const nextShape = updated.indexOf("<Shape ID=", shapeOpenEnd);
+      const bodyEnd = nextShape === -1 ? updated.length : nextShape;
+      const bodyText = updated.slice(shapeOpenEnd, bodyEnd);
+      if (!/<Cell N='FillForegnd'/.test(bodyText)) {
+        const cells =
+          `<Cell N='FillForegnd' V='${colour}' F='RGB(${r},${g},${b})'/>` +
+          `<Cell N='FillPattern' V='1' F='RGB(0,0,0)*0+1'/>`;
+        updated = updated.slice(0, shapeOpenEnd) + cells + updated.slice(shapeOpenEnd);
+      }
+    }
+    return updated;
   }
 
   /** Create a per-instance master copy of `sourceMasterId` with `colour` baked
@@ -345,6 +367,16 @@ export async function exportVisioV3(
       `</Shapes></Shape>` +
       `</Shapes>`;
   }
+
+  /** Element types that should get a Diagramatix body fill (excludes
+   *  pool/lane which has its own colour path, and stroke-only types like
+   *  text-annotation and group). */
+  const BODY_FILL_TYPES = new Set([
+    "task", "subprocess", "subprocess-expanded",
+    "gateway",
+    "start-event", "intermediate-event", "end-event",
+    "data-object", "data-store",
+  ]);
 
   for (const el of data.elements) {
     const mapping = getElementMappingV3(el);
@@ -549,26 +581,21 @@ export async function exportVisioV3(
         // Fallback: no sub-shapes, just position
         subShapes = "";
       } else {
-        // Task, Subprocess: rectangular sub-shapes. The body sub-shape
-        // (MasterShape 6) needs an explicit FillForegnd at instance level —
-        // its master cell falls through to FillStyle 7 (theme white).
-        const bodyFill = isColor && colorMap[el.type]
-          ? `<Cell N='FillForegnd' V='${colorMap[el.type]}' F='RGB(${parseInt(colorMap[el.type].slice(1,3),16)},${parseInt(colorMap[el.type].slice(3,5),16)},${parseInt(colorMap[el.type].slice(5,7),16)})'/>` +
-            `<Cell N='FillPattern' V='1' F='RGB(0,0,0)*0+1'/>`
-          : "";
-        subShapes = makeRectSubShapes(shapeId + 1, w, h, bodyFill);
+        // Task, Subprocess: rectangular sub-shapes. Colour is now applied
+        // in the per-instance master via `bakeColourIntoMaster` injecting
+        // FillForegnd into MasterShape 6, so no instance-level body fill
+        // is needed (it would overdraw the master's task-type marker).
+        subShapes = makeRectSubShapes(shapeId + 1, w, h);
       }
     }
 
-    // Per-instance master copy with colour baked in. Currently scoped to
-    // Task only so we can validate the approach works before generalising
-    // to every BPMN element type.
+    // Per-instance master copy with colour baked in for any body-fill type.
+    // The bake step targets MasterShape 6 (the visible body) directly, so the
+    // master renders coloured and the master's marker sub-shapes (task type
+    // icon, gateway diamond, event trigger) render normally on top.
     let effectiveMasterId = mapping.masterId;
-    if (el.type === "task" && isColor) {
-      const taskColour = colorMap[el.type];
-      if (taskColour) {
-        effectiveMasterId = await createInstanceMaster(mapping.masterId, taskColour);
-      }
+    if (BODY_FILL_TYPES.has(el.type) && isColor && colorMap[el.type]) {
+      effectiveMasterId = await createInstanceMaster(mapping.masterId, colorMap[el.type]);
     }
 
     shapes.push(
