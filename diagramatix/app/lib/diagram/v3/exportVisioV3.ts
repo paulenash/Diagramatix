@@ -9,6 +9,14 @@ import type { DiagramData } from "../types";
 import { getElementMappingV3, getConnectorMappingV3 } from "./visioMasterMapV3";
 import { DEFAULT_SYMBOL_COLORS } from "../colors";
 import type { SymbolColorConfig } from "../colors";
+import { randomUUID } from "node:crypto";
+
+/** Visio-style GUID `{XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}`. Used so per-
+ *  instance master copies don't share BaseID/UniqueID with anything in the
+ *  user's locally-installed Microsoft stencil cache. */
+function freshGuid(): string {
+  return `{${randomUUID().toUpperCase()}}`;
+}
 
 const VISIO_NS = "http://schemas.microsoft.com/office/visio/2012/main";
 const REL_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
@@ -192,6 +200,88 @@ export async function exportVisioV3(
     if (!hex || !isColor) return "";
     return `<Cell N='FillForegnd' V='${hex}' F='${hexToVisioRgb(hex)}'/>` +
       `<Cell N='FillPattern' V='1' F='GUARD(1)'/>`;
+  }
+
+  /** Bake `colour` into every body FillForegnd cell of a master XML, mirroring
+   *  `scripts/buildVisioStencilV3.cjs`. Replaces white-with-formula-lock cells
+   *  (`V='1' F='GUARD(...)'` and `V='#ffffff' F='THEMEGUARD(RGB(255,255,255))'`)
+   *  with non-GUARDed RGB values. `V='0' F='GUARD(0)'` (intentional black
+   *  marker strokes) is left alone. */
+  function bakeColourIntoMaster(content: string, colour: string): string {
+    const r = parseInt(colour.slice(1, 3), 16);
+    const g = parseInt(colour.slice(3, 5), 16);
+    const b = parseInt(colour.slice(5, 7), 16);
+    const cell = `<Cell N='FillForegnd' V='${colour}' F='RGB(${r},${g},${b})'/>`;
+    return content
+      .replace(/<Cell N='FillForegnd' V='1' F='GUARD\([^']+\)'\/>/g, cell)
+      .replace(
+        /<Cell N='FillForegnd' V='#ffffff' F='THEMEGUARD\(RGB\(255,255,255\)\)'\/>/g,
+        `<Cell N='FillForegnd' V='${colour}' F='THEMEGUARD(RGB(${r},${g},${b}))'/>`,
+      )
+      .replace(
+        /<Cell N='FillPattern' V='1' F='GUARD\(1\)'\/>/g,
+        `<Cell N='FillPattern' V='1' F='RGB(0,0,0)*0+1'/>`,
+      );
+  }
+
+  /** Create a per-instance master copy of `sourceMasterId` with `colour` baked
+   *  in and a fresh BaseID/UniqueID. Updates `mastersXml`, `mastersRels`,
+   *  `contentTypes` (the local mutable strings, then re-writes them to the
+   *  zip — same pattern Pool/Lane uses on line 422). Returns the new
+   *  master ID, or `sourceMasterId` if the source can't be found.
+   *
+   *  This bypasses Visio's tendency to silently substitute a master with the
+   *  user's locally-installed Microsoft BPMN_M version (which would discard
+   *  our colour edits). */
+  let nextInstanceMasterId = 1000;
+  async function createInstanceMaster(
+    sourceMasterId: number,
+    colour: string,
+  ): Promise<number> {
+    const blockRe = new RegExp(`<Master\\s+ID='${sourceMasterId}'[\\s\\S]*?</Master>`);
+    const blockMatch = mastersXml.match(blockRe);
+    if (!blockMatch) return sourceMasterId;
+    const sourceBlock = blockMatch[0];
+
+    const relMatch = sourceBlock.match(/<Rel\s+r:id='(rId\d+)'/);
+    if (!relMatch) return sourceMasterId;
+    const fileMatch = mastersRels.match(
+      new RegExp(`Id=["']${relMatch[1]}["'][^>]*Target=["']([^"']+)["']`),
+    );
+    if (!fileMatch) return sourceMasterId;
+    const sourceFile = fileMatch[1];
+
+    let masterContent = await zip.file(`visio/masters/${sourceFile}`)?.async("string");
+    if (!masterContent) return sourceMasterId;
+
+    masterContent = bakeColourIntoMaster(masterContent, colour);
+
+    const newId = nextInstanceMasterId++;
+    const newRId = `rId${newId}`;
+    const newFileName = `master${newId}.xml`;
+
+    const newBlock = sourceBlock
+      .replace(/ID='\d+'/, `ID='${newId}'`)
+      .replace(/UniqueID='\{[^}]+\}'/, `UniqueID='${freshGuid()}'`)
+      .replace(/BaseID='\{[^}]+\}'/, `BaseID='${freshGuid()}'`)
+      .replace(/<Rel\s+r:id='rId\d+'/, `<Rel r:id='${newRId}'`);
+
+    mastersXml = mastersXml.replace("</Masters>", newBlock + "</Masters>");
+    mastersRels = mastersRels.replace(
+      "</Relationships>",
+      `<Relationship Id="${newRId}" Type="http://schemas.microsoft.com/visio/2010/relationships/master" Target="${newFileName}"/></Relationships>`,
+    );
+    contentTypes = contentTypes.replace(
+      "</Types>",
+      `<Override PartName="/visio/masters/${newFileName}" ContentType="application/vnd.ms-visio.master+xml"/></Types>`,
+    );
+
+    zip.file(`visio/masters/${newFileName}`, masterContent);
+    zip.file("visio/masters/masters.xml", mastersXml);
+    zip.file("visio/masters/_rels/masters.xml.rels", mastersRels);
+    zip.file("[Content_Types].xml", contentTypes);
+
+    return newId;
   }
 
   const shapes: string[] = [];
@@ -459,8 +549,19 @@ export async function exportVisioV3(
       }
     }
 
+    // Per-instance master copy with colour baked in. Currently scoped to
+    // Task only so we can validate the approach works before generalising
+    // to every BPMN element type.
+    let effectiveMasterId = mapping.masterId;
+    if (el.type === "task" && isColor) {
+      const taskColour = colorMap[el.type];
+      if (taskColour) {
+        effectiveMasterId = await createInstanceMaster(mapping.masterId, taskColour);
+      }
+    }
+
     shapes.push(
-      `<Shape ID='${shapeId}' NameU='${esc(el.label || el.type)}' Type='Group' Master='${mapping.masterId}'>` +
+      `<Shape ID='${shapeId}' NameU='${esc(el.label || el.type)}' Type='Group' Master='${effectiveMasterId}'>` +
       `<Cell N='PinX' V='${cx}'/>` +
       `<Cell N='PinY' V='${cy}'/>` +
       fillCells(el.type) +

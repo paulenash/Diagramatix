@@ -18,7 +18,18 @@
  */
 const fs = require("fs");
 const path = require("path");
+const crypto = require("crypto");
 const JSZip = require("jszip");
+
+/**
+ * Generate a fresh GUID in Visio's `{XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}`
+ * format. We rewrite every master's `BaseID` and `UniqueID` so Visio can't
+ * silently substitute one of our masters with the user's locally-installed
+ * Microsoft BPMN_M stencil version (which would discard our colour edits).
+ */
+function freshGuid() {
+  return `{${crypto.randomUUID().toUpperCase()}}`;
+}
 
 const PUBLIC_DIR = path.join(__dirname, "..", "public");
 const STENCIL_PATH = path.join(PUBLIC_DIR, "bpmn-stencil-v3.vssx");
@@ -192,6 +203,26 @@ async function colourMaster(zip, file, elType, label) {
   console.log(`  ${label} (${file}): coloured → ${colour}  (${rewriteCount} cells rewritten)`);
 }
 
+/** Rewrite every `<Master>` block's `BaseID` and `UniqueID` GUIDs to fresh
+ *  values. This stops Visio from silently substituting our edited master
+ *  with a locally-installed Microsoft BPMN_M master that has the same GUIDs. */
+async function regenerateMasterGuids(zip) {
+  let mastersXml = await zip.file("visio/masters/masters.xml").async("string");
+  let count = 0;
+  mastersXml = mastersXml.replace(
+    /<Master ([^>]*)>/g,
+    (full, attrs) => {
+      let next = attrs;
+      next = next.replace(/UniqueID='\{[^}]+\}'/, () => `UniqueID='${freshGuid()}'`);
+      next = next.replace(/BaseID='\{[^}]+\}'/, () => `BaseID='${freshGuid()}'`);
+      if (next !== attrs) count++;
+      return `<Master ${next}>`;
+    },
+  );
+  zip.file("visio/masters/masters.xml", mastersXml);
+  return count;
+}
+
 async function processFile(filePath, masterMap, label) {
   console.log(`\n${label}: ${path.basename(filePath)}`);
   const buf = fs.readFileSync(filePath);
@@ -205,6 +236,8 @@ async function processFile(filePath, masterMap, label) {
     }
     await colourMaster(zip, file, elType, `Master ID=${id} (${elType})`);
   }
+  const guidCount = await regenerateMasterGuids(zip);
+  console.log(`  Regenerated GUIDs on ${guidCount} masters`);
   const out = await zip.generateAsync({
     type: "nodebuffer",
     compression: "DEFLATE",
