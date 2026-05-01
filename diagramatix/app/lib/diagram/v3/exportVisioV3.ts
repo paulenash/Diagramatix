@@ -602,11 +602,12 @@ export async function exportVisioV3(
         // Fallback: no sub-shapes, just position
         subShapes = "";
       } else {
-        // Task, Subprocess: rectangular sub-shapes for Visio resize. Body
-        // fill comes from the per-instance master's Shape 6 (with FillStyle
-        // changed to 3 + injected FillForegnd) so we don't pass body fill
-        // here — that was overdrawing the task-type marker.
-        subShapes = makeRectSubShapes(shapeId + 1, w, h);
+        // Task, Subprocess: NO instance sub-shapes — they would override the
+        // master's MasterShape 6 cells at instance level (including the
+        // FillForegnd we just injected into the per-instance master). Body
+        // colour and resize behaviour now come entirely from the per-instance
+        // master, mirroring Pool/Lane's working pattern.
+        subShapes = "";
       }
     }
     // Non-resizable types (events, gateway, data object/store) and
