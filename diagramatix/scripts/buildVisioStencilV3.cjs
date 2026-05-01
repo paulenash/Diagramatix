@@ -154,31 +154,42 @@ async function colourMaster(zip, file, elType, label) {
     return;
   }
 
-  // 1. Rewrite root Shape ID='5' FillForegnd.
-  const root = findShapeBlock(original, 5);
-  if (!root) {
-    console.log(`  ${label}: no root Shape ID='5', skipping`);
-    return;
-  }
   let updated = original;
-  const rootBlockOriginal = updated.slice(root.start, root.end);
-  let rootBlockNew = setFillForegnd(rootBlockOriginal, colour);
-  rootBlockNew = ensureSolidFillPattern(rootBlockNew);
-  updated = updated.slice(0, root.start) + rootBlockNew + updated.slice(root.end);
+  let rewriteCount = 0;
 
-  // 2. For Task/Subprocess templates, also overwrite the explicit
-  //    THEMEGUARD(RGB(255,255,255)) cells in Shape IDs 8 and 9 — those are
-  //    the visible body squares and would otherwise paint white over the
-  //    inherited colour.
-  if (elType === "task" || elType === "subprocess") {
-    updated = updated.replace(
-      /<Cell N='FillForegnd' V='#ffffff' F='THEMEGUARD\(RGB\(255,255,255\)\)'\/>/g,
-      `<Cell N='FillForegnd' V='${colour}' F='THEMEGUARD(${rgbFormula(colour)})'/>`,
-    );
+  // 1. Rewrite root Shape ID='5' FillForegnd (cleans up the `GUARD(IF(...))`
+  //    chain on the root group so instance-level overrides can flow down).
+  const root = findShapeBlock(updated, 5);
+  if (root) {
+    const rootBlockOriginal = updated.slice(root.start, root.end);
+    let rootBlockNew = setFillForegnd(rootBlockOriginal, colour);
+    rootBlockNew = ensureSolidFillPattern(rootBlockNew);
+    if (rootBlockNew !== rootBlockOriginal) rewriteCount++;
+    updated = updated.slice(0, root.start) + rootBlockNew + updated.slice(root.end);
   }
+
+  // 2. Body sub-shapes with `V='1' F='GUARD(IF(...))'` or `V='1' F='GUARD(1)'`
+  //    paint white-with-formula-lock over the inherited root colour. Replace
+  //    those cells with our colour. `V='0' F='GUARD(0)'` cells are inner
+  //    marker/icon strokes and stay as-is.
+  const colourCell = `<Cell N='FillForegnd' V='${colour}' F='${rgbFormula(colour)}'/>`;
+  const whiteGuardRe = /<Cell N='FillForegnd' V='1' F='GUARD\([^']+\)'\/>/g;
+  updated = updated.replace(whiteGuardRe, () => {
+    rewriteCount++;
+    return colourCell;
+  });
+
+  // 3. THEMEGUARD(RGB(255,255,255)) explicit-white cells (Task/Subprocess
+  //    body squares; some BPMN_M masters too) get the same treatment.
+  const themeGuardWhiteRe =
+    /<Cell N='FillForegnd' V='#ffffff' F='THEMEGUARD\(RGB\(255,255,255\)\)'\/>/g;
+  updated = updated.replace(themeGuardWhiteRe, () => {
+    rewriteCount++;
+    return `<Cell N='FillForegnd' V='${colour}' F='THEMEGUARD(${rgbFormula(colour)})'/>`;
+  });
 
   zip.file(`visio/masters/${file}`, updated);
-  console.log(`  ${label} (${file}): coloured → ${colour}`);
+  console.log(`  ${label} (${file}): coloured → ${colour}  (${rewriteCount} cells rewritten)`);
 }
 
 async function processFile(filePath, masterMap, label) {
