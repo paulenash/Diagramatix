@@ -212,12 +212,40 @@ export async function exportVisioV3(
     const g = parseInt(colour.slice(3, 5), 16);
     const b = parseInt(colour.slice(5, 7), 16);
     const cell = `<Cell N='FillForegnd' V='${colour}' F='RGB(${r},${g},${b})'/>`;
-    return content
+    let updated = content
       .replace(/<Cell N='FillForegnd' V='1' F='GUARD\([^']+\)'\/>/g, cell)
       .replace(
         /<Cell N='FillForegnd' V='#ffffff' F='THEMEGUARD\(RGB\(255,255,255\)\)'\/>/g,
         `<Cell N='FillForegnd' V='${colour}' F='THEMEGUARD(RGB(${r},${g},${b}))'/>`,
       );
+
+    // Some template masters (Task, Subprocess) have MasterShape 6 with
+    // `FillStyle='7'` which makes Visio inherit themed white at render time.
+    // Pool/Lane's coloured shape uses `FillStyle='3'` (no inherited fill).
+    // Mirror that: change FillStyle='7' → '3' AND inject a FillForegnd cell
+    // so the body actually paints our colour.
+    const shape6 = updated.match(/<Shape ID='6'[^>]*>/);
+    if (shape6) {
+      const shapeStart = shape6.index!;
+      const shapeOpenEnd = shapeStart + shape6[0].length;
+      const nextShape = updated.indexOf("<Shape ID=", shapeOpenEnd);
+      const bodyEnd = nextShape === -1 ? updated.length : nextShape;
+      const bodyText = updated.slice(shapeOpenEnd, bodyEnd);
+
+      const newOpen = shape6[0].replace(/FillStyle='\d+'/, "FillStyle='3'");
+
+      const cellsToInject = /<Cell N='FillForegnd'/.test(bodyText)
+        ? ""
+        : `<Cell N='FillForegnd' V='${colour}' F='RGB(${r},${g},${b})'/>` +
+          `<Cell N='FillPattern' V='1' F='RGB(0,0,0)*0+1'/>`;
+
+      updated =
+        updated.slice(0, shapeStart) +
+        newOpen +
+        cellsToInject +
+        updated.slice(shapeOpenEnd);
+    }
+    return updated;
   }
 
   /** Create a per-instance master copy of `sourceMasterId` with `colour` baked
@@ -574,20 +602,16 @@ export async function exportVisioV3(
         // Fallback: no sub-shapes, just position
         subShapes = "";
       } else {
-        // Task, Subprocess: rectangular sub-shapes. Inject body fill on
-        // MasterShape 6 (the visible body rectangle) so colour shows.
-        const bodyFill = isColor && colorMap[el.type]
-          ? `<Cell N='FillForegnd' V='${colorMap[el.type]}' F='RGB(${parseInt(colorMap[el.type].slice(1,3),16)},${parseInt(colorMap[el.type].slice(3,5),16)},${parseInt(colorMap[el.type].slice(5,7),16)})'/>` +
-            `<Cell N='FillPattern' V='1' F='RGB(0,0,0)*0+1'/>`
-          : "";
-        subShapes = makeRectSubShapes(shapeId + 1, w, h, bodyFill);
+        // Task, Subprocess: rectangular sub-shapes for Visio resize. Body
+        // fill comes from the per-instance master's Shape 6 (with FillStyle
+        // changed to 3 + injected FillForegnd) so we don't pass body fill
+        // here — that was overdrawing the task-type marker.
+        subShapes = makeRectSubShapes(shapeId + 1, w, h);
       }
-    } else if (isColor && BODY_FILL_TYPES.has(el.type) && colorMap[el.type]) {
-      // Non-resizable types (events, gateway, data object/store): minimal
-      // body-fill sub-shape with no geometry override (so master's geometry
-      // and markers are preserved).
-      subShapes = makeBodyFillSubshape(shapeId + 1, colorMap[el.type]);
     }
+    // Non-resizable types (events, gateway, data object/store) and
+    // resizable Task/Subprocess all get body colour from their per-instance
+    // master, so no instance-level body-fill sub-shape is needed.
 
     // Per-instance master copy with colour baked in for any body-fill type.
     let effectiveMasterId = mapping.masterId;
