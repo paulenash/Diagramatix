@@ -130,38 +130,18 @@ export async function exportVisioV3(
   let nextRId = 50;
   let nextFileNum = 50;
 
-  // Map BPMN_M master newIds to element types for colour injection
-  const masterColorMap: Record<number, string> = {
-    104: "gateway", 105: "intermediate-event", 106: "end-event", 107: "start-event",
-    110: "text-annotation", 111: "", 112: "", // connectors: no fill
-    115: "data-object", 116: "data-store", 117: "group",
-  };
-
   for (const entry of mastersToAdd) {
     const info = bpmnMasterBlocks[entry.origId];
-    if (!info) { console.log(`[v2] BPMN_M master ${entry.origId} not found`); continue; }
+    if (!info) { console.log(`[v3] BPMN_M master ${entry.origId} not found`); continue; }
 
-    // Copy master content file with a new filename
+    // Copy master content file with a new filename. Master fills are
+    // PRE-COLOURED at build time by `scripts/buildVisioStencilV3.cjs`,
+    // so the master XML is used verbatim — no per-export fill injection.
+    // Project / diagram colour overrides and BW mode are applied per
+    // shape instance via `fillCells()` further below.
     const newFileName = `master${nextFileNum++}.xml`;
-    let masterContent = await bpmnM.file("visio/masters/" + info.file)?.async("string");
-    if (!masterContent) { console.log(`[v2] Master file ${info.file} not found`); continue; }
-
-    // Inject fill colour into root shape (ID='5').
-    // If root already has FillForegnd, replace it. Otherwise inject one.
-    // Sub-shapes referencing Sheet.5!FillForegnd will inherit the colour.
-    const elType = masterColorMap[entry.newId];
-    if (isColor && elType) {
-      const hex = colorMap[elType];
-      if (hex) {
-        const fillCell = `<Cell N='FillForegnd' V='${hex}' F='${hexToVisioRgb(hex)}'/>`;
-        // Find root shape's first cell area (after <Shape ID='5'...>)
-        const rootShapeMatch = masterContent.match(/<Shape ID='5'[^>]*>/);
-        if (rootShapeMatch) {
-          const insertPos = rootShapeMatch.index! + rootShapeMatch[0].length;
-          masterContent = masterContent.substring(0, insertPos) + fillCell + masterContent.substring(insertPos);
-        }
-      }
-    }
+    const masterContent = await bpmnM.file("visio/masters/" + info.file)?.async("string");
+    if (!masterContent) { console.log(`[v3] Master file ${info.file} not found`); continue; }
 
     zip.file("visio/masters/" + newFileName, masterContent);
 
@@ -194,36 +174,8 @@ export async function exportVisioV3(
   // not our added BPMN_M masters. Visio will use masters.xml instead.
   zip.remove("visio/pages/_rels/page1.xml.rels");
 
-  // Inject fill colours into template masters (Task=9, Subprocess=33).
-  // Dynamically find master files via rels, then replace white fills.
-  if (isColor) {
-    const tRels = await base.file("visio/masters/_rels/masters.xml.rels")!.async("string");
-    const tMasters = await base.file("visio/masters/masters.xml")!.async("string");
-    const templateMasterColors: Array<{ id: number; elType: string }> = [
-      { id: 9, elType: "task" },
-      { id: 33, elType: "subprocess" },
-    ];
-    for (const { id, elType } of templateMasterColors) {
-      const hex = colorMap[elType];
-      if (!hex) continue;
-      const mBlock = tMasters.match(new RegExp(`<Master\\s+ID='${id}'[\\s\\S]*?</Master>`));
-      if (!mBlock) continue;
-      const mRel = mBlock[0].match(/<Rel\s+r:id='(rId\d+)'/);
-      if (!mRel) continue;
-      const mFile = tRels.match(new RegExp(`Id=["']${mRel[1]}["'][^>]*Target=["']([^"']*)["']`));
-      if (!mFile) continue;
-      const existing = await zip.file("visio/masters/" + mFile[1])?.async("string");
-      if (!existing) continue;
-      // Inject FillForegnd into root shape (ID='5')
-      const fillCell = `<Cell N='FillForegnd' V='${hex}' F='${hexToVisioRgb(hex)}'/>`;
-      const rootMatch = existing.match(/<Shape ID='5'[^>]*>/);
-      if (rootMatch) {
-        const pos = rootMatch.index! + rootMatch[0].length;
-        const modified = existing.substring(0, pos) + fillCell + existing.substring(pos);
-        zip.file("visio/masters/" + mFile[1], modified);
-      }
-    }
-  }
+  // Template masters (Task=9, Subprocess=33) are PRE-COLOURED at build
+  // time by `scripts/buildVisioStencilV3.cjs`. No per-export injection.
 
   // ── Step 3: Build shapes ──
   // Font sizes from diagram settings (px → Visio inches: px / 96 * 72 / 72 = px / 96)
