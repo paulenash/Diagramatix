@@ -563,7 +563,10 @@ export async function exportVisioV3(
     const minBody = Math.min(instanceW, instanceH);
     const outerD = minBody * 0.556;
     const innerD = minBody * 0.439;
-    const pentD = minBody * 0.293;
+    // Pentagon: 1/3 of the previous size — sits comfortably inside the
+    // inner ring with breathing room. Diagramatix canvas marker has
+    // pentagon at s*0.5 = ~29% of body; 1/3 of that = ~10% of body.
+    const pentD = minBody * 0.098;
 
     // Shape 8 — container, body-centred. Width/Height = Sheet.5!Width*0.556
     // so it's square (assuming square gateway, which Diagramatix's are).
@@ -595,18 +598,72 @@ export async function exportVisioV3(
     content = rewriteShape9Rings(content, outerD, innerFrac);
 
     // Shape 10 — pentagon, inside the inner circle. Re-pin to the
-    // centre of Shape 8 (= centre of Shape 9), size = pentD.
+    // centre of Shape 8 (= centre of Shape 9), size = pentD. The
+    // pentagon's geometric vertices fan out from a centroid at
+    // (0.5W, 0.44H) of its bounding box (point-up pentagon: top vertex
+    // at Y=H, two side vertices at Y=0.6H, two bottom vertices at Y=0).
+    // Setting LocPinY = 0.44 × Height makes the pin land on the
+    // centroid, so PinY at Shape 8's centre puts the pentagon's visual
+    // centre at Shape 8's centre.
     content = overrideShapeDirectCells(content, 10, {
       Width: { v: pentD, f: `Sheet.8!Width*${(pentD / outerD).toFixed(6)}` },
       Height: { v: pentD, f: "Width" },
       PinX: { v: outerD / 2, f: "Sheet.8!Width*0.5" },
       PinY: { v: outerD / 2, f: "Sheet.8!Height*0.5" },
       LocPinX: { v: pentD / 2, f: "Width*0.5" },
-      LocPinY: { v: pentD / 2, f: "Height*0.5" },
+      LocPinY: { v: pentD * 0.44, f: "Height*0.44" },
     });
 
     content = setEventMarkerLineWeight(content);
     return content;
+  }
+
+  /** Make the parallel-gateway cross arms 25% longer while keeping the
+   *  arm thickness the same. Approach: scale Shape 13 W and H by 1.25
+   *  (so arms reach 25% further to the new bounding-box edges) and
+   *  rewrite the Geometry section to use thinner thickness fractions
+   *  (0.4375 / 0.5625 instead of 0.422 / 0.578) so the absolute arm
+   *  width is preserved across the larger box. */
+  function lengthenParallelArms(content: string, instanceW: number): string {
+    const NEW_FRAC = 0.441 * 1.25; // = 0.55125
+    const newW = instanceW * NEW_FRAC;
+    const halfW = newW / 2;
+    content = overrideShapeDirectCells(content, 13, {
+      Width: { v: newW, f: `Sheet.5!Width*${NEW_FRAC.toFixed(6)}` },
+      Height: { v: newW, f: "Width" },
+      LocPinX: { v: halfW, f: "Width*0.5" },
+      LocPinY: { v: halfW, f: "Height*0.5" },
+    });
+    // Rewrite Shape 13's Geometry section. Cross outline as a closed
+    // 12-vertex path: vertical arm extends from Y=0 to Y=H,
+    // horizontal arm from X=0 to X=W, both with thickness fraction
+    // 0.125 (= 0.5 - 0.4375 each side of centre).
+    const lo = 0.4375; // left/inner thickness fraction
+    const hi = 0.5625; // right/outer thickness fraction
+    const W = newW;
+    const newGeom =
+      `<Section N='Geometry' IX='0'>` +
+      `<Cell N='NoFill' V='0'/><Cell N='NoLine' V='0'/>` +
+      `<Cell N='NoShow' V='1' F='NOT(Sheet.5!Actions.Parallel.Checked)'/>` +
+      `<Cell N='NoSnap' V='0'/><Cell N='NoQuickDrag' V='0' F='No Formula'/>` +
+      `<Row T='MoveTo' IX='1'><Cell N='X' V='${W * lo}' F='Width*${lo}'/><Cell N='Y' V='${W * lo}' F='Height*${lo}'/></Row>` +
+      `<Row T='LineTo' IX='2'><Cell N='X' V='${W * lo}' F='Width*${lo}'/><Cell N='Y' V='0' F='Height*0'/></Row>` +
+      `<Row T='LineTo' IX='3'><Cell N='X' V='${W * hi}' F='Width*${hi}'/><Cell N='Y' V='0' F='Height*0'/></Row>` +
+      `<Row T='LineTo' IX='4'><Cell N='X' V='${W * hi}' F='Width*${hi}'/><Cell N='Y' V='${W * lo}' F='Height*${lo}'/></Row>` +
+      `<Row T='LineTo' IX='5'><Cell N='X' V='${W}' F='Width*1'/><Cell N='Y' V='${W * lo}' F='Height*${lo}'/></Row>` +
+      `<Row T='LineTo' IX='6'><Cell N='X' V='${W}' F='Width*1'/><Cell N='Y' V='${W * hi}' F='Height*${hi}'/></Row>` +
+      `<Row T='LineTo' IX='7'><Cell N='X' V='${W * hi}' F='Width*${hi}'/><Cell N='Y' V='${W * hi}' F='Height*${hi}'/></Row>` +
+      `<Row T='LineTo' IX='8'><Cell N='X' V='${W * hi}' F='Width*${hi}'/><Cell N='Y' V='${W}' F='Height*1'/></Row>` +
+      `<Row T='LineTo' IX='9'><Cell N='X' V='${W * lo}' F='Width*${lo}'/><Cell N='Y' V='${W}' F='Height*1'/></Row>` +
+      `<Row T='LineTo' IX='10'><Cell N='X' V='${W * lo}' F='Width*${lo}'/><Cell N='Y' V='${W * hi}' F='Height*${hi}'/></Row>` +
+      `<Row T='LineTo' IX='11'><Cell N='X' V='0' F='Width*0'/><Cell N='Y' V='${W * hi}' F='Height*${hi}'/></Row>` +
+      `<Row T='LineTo' IX='12'><Cell N='X' V='0' F='Width*0'/><Cell N='Y' V='${W * lo}' F='Height*${lo}'/></Row>` +
+      `<Row T='LineTo' IX='13'><Cell N='X' V='${W * lo}' F='Width*${lo}'/><Cell N='Y' V='${W * lo}' F='Height*${lo}'/></Row>` +
+      `</Section>`;
+    return content.replace(
+      /(<Shape ID='13'[\s\S]*?)<Section N='Geometry' IX='0'>[\s\S]*?<\/Section>/,
+      `$1${newGeom}`,
+    );
   }
 
   /** Replace Shape 9's two Ellipse geometry sections with clean
@@ -1178,12 +1235,14 @@ export async function exportVisioV3(
       if (gwType === "inclusive") {
         masterContent = drawInclusiveAsThickRing(masterContent);
       }
-      // Parallel: the master's Shape 13 (cross marker) is wider than
-      // tall (W frac 0.441 vs H frac 0.5625), so the horizontal arm
-      // ends up shorter than the vertical arm. Force it square so the
-      // two cross arms have the same length.
+      // Parallel: 25% longer cross arms, same arm thickness. Replace
+      // Shape 13 with a square sized at body × 0.5513 (= 0.441 × 1.25)
+      // and rewrite its Geometry section so the arm thickness fraction
+      // shrinks by 1/1.25 = 0.8 — that keeps the absolute thickness the
+      // same as the natural template while extending the arms to the
+      // new (larger) bounding box edges.
       if (gwType === "parallel") {
-        masterContent = forceShapeSquare(masterContent, 13);
+        masterContent = lengthenParallelArms(masterContent, instanceW);
       }
     }
 

@@ -1458,6 +1458,7 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         action.payload.symbolType === "pool" ? { poolType: "black-box" }
         : action.payload.symbolType === "uml-class" ? { showAttributes: false, showOperations: false }
         : action.payload.symbolType === "gateway" ? { labelOffsetX: -30, labelOffsetY: -54 }
+        : action.payload.symbolType === "data-store" ? { labelOffsetX: 0, labelOffsetY: 7 }
         : (action.payload.symbolType === "chevron" || action.payload.symbolType === "chevron-collapsed") ? { showDescription: true }
         : {};
 
