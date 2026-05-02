@@ -400,6 +400,50 @@ export async function exportVisioV3(
     );
   }
 
+  /** Lay out the Subprocess bottom-row markers along the body's bottom
+   *  centre by rewriting each visible marker shape's cached PinX V to
+   *  match the master's `BpmnIconPosition` formula evaluation. Order
+   *  (matching the master's per-shape position formulas):
+   *
+   *    Loop (1) → Compensation (2) → Collapsed (3) → AdHoc (4)
+   *
+   *  Master-derived constants:
+   *    PinX = (W - IconW*N)/2 - IconW/2 + IconW*Position
+   *         = W/2 + IconW*(Position - (N+1)/2)
+   *  IconW ≈ 0.18in (User.BpmnIconWidth in master 33). Each marker's
+   *  IconWidth varies slightly (0.18 vs 0.19) but using a single value
+   *  matches the visual layout closely enough; the formula recalculation
+   *  on Visio's first interaction will refine. */
+  function layoutSubprocessMarkers(
+    content: string,
+    instanceW: number,
+    opts: {
+      loopShapeId: number | null;
+      hasCollapsed: boolean;
+      hasAdHoc: boolean;
+    },
+  ): string {
+    const ICON_W = 0.18;
+    const center = instanceW / 2;
+    const ordered: number[] = [];
+    if (opts.loopShapeId !== null) ordered.push(opts.loopShapeId);
+    if (opts.hasCollapsed) ordered.push(11);
+    if (opts.hasAdHoc) ordered.push(10);
+    const N = ordered.length;
+    if (N === 0) return content;
+    let out = content;
+    for (let i = 0; i < ordered.length; i++) {
+      const shapeId = ordered[i];
+      const position = i + 1;
+      const pinX = center + ICON_W * (position - (N + 1) / 2);
+      const re = new RegExp(
+        `(<Shape ID='${shapeId}'[^>]*>[\\s\\S]*?<Cell N='PinX' V=')[\\d.]+(')`,
+      );
+      out = out.replace(re, `$1${pinX}$2`);
+    }
+    return out;
+  }
+
   /** Apply the `3MM → 4.58MM` (X, +6px) and `3MM → 3.26MM` (Y, +1px)
    *  marker-icon nudge inside the `<Shape ID='${shapeId}'>...</Shape>`
    *  block only. Walks Shape opens/closes to find the correct matching
@@ -455,6 +499,7 @@ export async function exportVisioV3(
     instanceH?: number,
     elType?: string,
     elProps?: Record<string, unknown>,
+    repeatType?: string,
   ): Promise<number> {
     const blockRe = new RegExp(`<Master\\s+ID='${sourceMasterId}'[\\s\\S]*?</Master>`);
     const blockMatch = mastersXml.match(blockRe);
@@ -563,18 +608,15 @@ export async function exportVisioV3(
       }
     }
 
-    // Subprocess + marker (Shapes 11, 12, 13 in master 33). The master's
-    // collapsed marker sizes via `BpmnIconHeight*IF(IsInstance,1,2)`,
-    // which paints at 2× (8MM, template size) on first frame — too big
-    // for typical BPMN. Replace the IF with 1.5× to get a 6MM marker
-    // (half as wide as 2× × 1.5 = 0.75 of natural cached V), and pin it
-    // to the bottom-centre of the body via `Sheet.5!Height-4MM`.
-    //
-    // For Expanded Subprocess (`subprocess-expanded`), additionally
-    // override NoShow on Shapes 12 and 13 so the marker hides
-    // entirely — an expanded subprocess shows its internal flow, no +.
-    if (sourceMasterId === 33 && instanceH !== undefined) {
-      // Step 1: force the IF multipliers in the master template formulas.
+    // Subprocess bottom-row markers (master 33). Lay out whichever are
+    // active (Loop / Compensation / Collapsed / AdHoc) along the body's
+    // bottom centre, sized correctly, and with cached PinX values
+    // matching the BPMN_M positioning formulas — otherwise multiple
+    // active markers overlap at body centre on first paint until Visio
+    // recalcs.
+    if (sourceMasterId === 33 && instanceH !== undefined && instanceW !== undefined) {
+      // Force IF(IsInstance,1,2) → 1.5 so Shape 11/12/13 size to 6MM
+      // (50% bigger than the IsInstance=1 branch, matching standard BPMN).
       masterContent = masterContent.replace(
         /IF\(Sheet\.5!User\.IsInstance,1,2\)/g,
         "1.5",
@@ -583,22 +625,35 @@ export async function exportVisioV3(
         /IF\(Sheet\.5!User\.IsInstance,0,0\.1\)/g,
         "0",
       );
-      // Step 2: re-pin Shape 11 to the body's bottom-centre. Shape 11's
-      // PinX was already centred horizontally by the body-chain rescale.
-      // Override PinY to `4MM*DropOnPageScale` — Visio shape coords are
-      // Y-up, so Y=4MM places the marker centre 4MM from the bottom edge,
-      // which gives a 1MM gap below a 6MM-tall marker.
-      const pinYNew = 0.15748031496062992; // 4MM in inches
+      // Re-pin Shape 11 to `3.5MM*DropOnPageScale` from the body bottom
+      // (Visio shape coords are Y-up). 3.5MM keeps the 6MM-tall marker
+      // sitting just above the bottom edge — 0.5MM gap.
+      const pinYNew = 0.13779527559055118; // 3.5MM in inches
       masterContent = masterContent.replace(
         /(<Shape ID='11'[^>]*>[\s\S]*?<Cell N='PinY' V=')[\d.]+(' U='MM' F=')[^']+(')/,
-        `$1${pinYNew}$2GUARD(4MM*Sheet.5!DropOnPageScale)$3`,
+        `$1${pinYNew}$2GUARD(3.5MM*Sheet.5!DropOnPageScale)$3`,
       );
-      // Step 3: scale dimension cells in shapes 11, 12, 13 by 0.75 (= 1.5×
-      // template / 2× natural). Shape 11's PinX/PinY are skipped (set
-      // above / handled by Layer 1).
+      // Scale Shape 11/12/13 cached V's to match the 1.5× formula above.
       masterContent = scaleMarkerShape(masterContent, 11, 0.75, ["PinX", "PinY"]);
       masterContent = scaleMarkerShape(masterContent, 12, 0.75);
       masterContent = scaleMarkerShape(masterContent, 13, 0.75);
+      // Compute which markers are active and rewrite their PinX cached
+      // V's to match where the master's `BpmnIconPosition` formulas
+      // would place them with this combination active. Without this,
+      // multiple active markers all paint at body centre on first frame
+      // (overlapping) until Visio recalcs.
+      const hasAdHoc = elProps?.adHoc === true;
+      const hasCollapsed = elType === "subprocess";
+      const loopShapeId =
+        repeatType === "loop" ? 16
+        : repeatType === "mi-sequential" ? 27
+        : repeatType === "mi-parallel" ? 15
+        : null;
+      masterContent = layoutSubprocessMarkers(
+        masterContent,
+        instanceW,
+        { loopShapeId, hasCollapsed, hasAdHoc },
+      );
       if (elType === "subprocess-expanded") {
         masterContent = hideCollapsedMarker(masterContent);
       }
@@ -1099,6 +1154,7 @@ export async function exportVisioV3(
         h,
         el.type,
         el.properties as Record<string, unknown> | undefined,
+        el.repeatType,
       );
     }
 
