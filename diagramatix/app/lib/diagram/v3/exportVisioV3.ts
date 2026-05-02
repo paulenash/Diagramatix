@@ -254,6 +254,80 @@ export async function exportVisioV3(
     );
   }
 
+  /** For each `<Shape ID='N'>` whose own Width formula references
+   *  `Sheet.[57]!Width` (i.e. it was just rescaled), scale the cached V
+   *  on its `LocPinX` cell by `wRatio` so the shape's pin lands on the
+   *  centre of its new Width. Same for Height/LocPinY. Markers and other
+   *  shapes whose Width/Height aren't tied to the body chain are
+   *  skipped — their cached LocPin values remain correct.
+   *
+   *  Walks Shape openings and identifies the "direct body" of each shape
+   *  (cells before the first nested `<Shape ID='` or the shape's
+   *  `</Shape>`). Direct cells are the ones whose F we inspect. */
+  function scaleLocalLocPin(
+    content: string,
+    wRatio: number,
+    hRatio: number,
+  ): string {
+    const openRe = /<Shape ID='(\d+)'[^>]*>/g;
+    let result = "";
+    let lastIdx = 0;
+    let m: RegExpExecArray | null;
+    while ((m = openRe.exec(content)) !== null) {
+      const openEnd = m.index + m[0].length;
+      // Append everything up to and including the opening tag verbatim.
+      result += content.slice(lastIdx, openEnd);
+      // Direct body extends from openEnd to the next Shape opening or the
+      // shape's own </Shape>, whichever comes first.
+      const nextOpen = content.indexOf("<Shape ID='", openEnd);
+      const nextClose = content.indexOf("</Shape>", openEnd);
+      let bodyEnd: number;
+      if (nextClose === -1) {
+        result += content.slice(openEnd);
+        lastIdx = content.length;
+        break;
+      }
+      if (nextOpen !== -1 && nextOpen < nextClose) {
+        bodyEnd = nextOpen;
+      } else {
+        bodyEnd = nextClose;
+      }
+      let directBody = content.slice(openEnd, bodyEnd);
+      // Inspect own Width/Height F for body-chain references.
+      const widthF = directBody.match(
+        /<Cell N='Width' V='[\d.]+'[^>]*F='([^']+)'/,
+      )?.[1];
+      const heightF = directBody.match(
+        /<Cell N='Height' V='[\d.]+'[^>]*F='([^']+)'/,
+      )?.[1];
+      const widthScaled = !!widthF && /Sheet\.[57]!Width/.test(widthF);
+      const heightScaled = !!heightF && /Sheet\.[57]!Height/.test(heightF);
+      if (widthScaled) {
+        directBody = directBody.replace(
+          /<Cell N='LocPinX' V='([\d.]+)'([^>]*F='Width\*[\d.]+')\s*\/>/g,
+          (_w, vStr, rest) => {
+            const v = parseFloat(vStr);
+            return `<Cell N='LocPinX' V='${v * wRatio}'${rest}/>`;
+          },
+        );
+      }
+      if (heightScaled) {
+        directBody = directBody.replace(
+          /<Cell N='LocPinY' V='([\d.]+)'([^>]*F='Height\*[\d.]+')\s*\/>/g,
+          (_w, vStr, rest) => {
+            const v = parseFloat(vStr);
+            return `<Cell N='LocPinY' V='${v * hRatio}'${rest}/>`;
+          },
+        );
+      }
+      result += directBody;
+      lastIdx = bodyEnd;
+      openRe.lastIndex = bodyEnd;
+    }
+    result += content.slice(lastIdx);
+    return result;
+  }
+
   /** Apply the `3MM → 4.58MM` (X, +6px) and `3MM → 3.26MM` (Y, +1px)
    *  marker-icon nudge inside the `<Shape ID='${shapeId}'>...</Shape>`
    *  block only. Walks Shape opens/closes to find the correct matching
@@ -384,6 +458,14 @@ export async function exportVisioV3(
                 return `<Cell N='${cellName}' V='${newV}'${rest}/>`;
               },
             );
+            // Per-shape pass: scale LocPinX/LocPinY (formulas like
+            // `Width*0.5` / `Height*0.5`) for shapes whose Width/Height
+            // were just rescaled. Without this, sub-shapes draw with their
+            // pin point off-centre relative to their (now larger) Width —
+            // visible bodies appear shifted off the selection rectangle.
+            // Marker shapes whose Width is constant (`GUARD(10PT)…`) are
+            // skipped by checking the Width F for a Sheet.[57]!Width ref.
+            masterContent = scaleLocalLocPin(masterContent, wRatio, hRatio);
             // Root Shape 5's own Width/Height/LocPin cells don't reference
             // Sheet.5! (they ARE Sheet.5), so handle them explicitly.
             masterContent = masterContent.replace(
