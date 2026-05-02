@@ -256,14 +256,16 @@ export async function exportVisioV3(
 
   /** For each `<Shape ID='N'>` whose own Width formula references
    *  `Sheet.[57]!Width` (i.e. it was just rescaled), scale the cached V
-   *  on its `LocPinX` cell by `wRatio` so the shape's pin lands on the
-   *  centre of its new Width. Same for Height/LocPinY. Markers and other
-   *  shapes whose Width/Height aren't tied to the body chain are
-   *  skipped — their cached LocPin values remain correct.
+   *  on every cell whose formula references the shape's local `Width` or
+   *  `Height` (e.g. `Width*0.5`, `Width*1`, `Height*0.66`). Covers
+   *  LocPinX/LocPinY *and* the X/Y cached V's inside Geometry-section
+   *  Rows, which Visio uses for first paint of the body outline. Marker
+   *  shapes and other sub-shapes whose Width/Height aren't tied to the
+   *  body chain are skipped — their cached values remain correct.
    *
    *  Walks Shape openings and identifies the "direct body" of each shape
-   *  (cells before the first nested `<Shape ID='` or the shape's
-   *  `</Shape>`). Direct cells are the ones whose F we inspect. */
+   *  (cells/sections before the first nested `<Shape ID='` or the
+   *  shape's own `</Shape>`). */
   function scaleLocalLocPin(
     content: string,
     wRatio: number,
@@ -275,10 +277,7 @@ export async function exportVisioV3(
     let m: RegExpExecArray | null;
     while ((m = openRe.exec(content)) !== null) {
       const openEnd = m.index + m[0].length;
-      // Append everything up to and including the opening tag verbatim.
       result += content.slice(lastIdx, openEnd);
-      // Direct body extends from openEnd to the next Shape opening or the
-      // shape's own </Shape>, whichever comes first.
       const nextOpen = content.indexOf("<Shape ID='", openEnd);
       const nextClose = content.indexOf("</Shape>", openEnd);
       let bodyEnd: number;
@@ -293,7 +292,6 @@ export async function exportVisioV3(
         bodyEnd = nextClose;
       }
       let directBody = content.slice(openEnd, bodyEnd);
-      // Inspect own Width/Height F for body-chain references.
       const widthF = directBody.match(
         /<Cell N='Width' V='[\d.]+'[^>]*F='([^']+)'/,
       )?.[1];
@@ -302,21 +300,16 @@ export async function exportVisioV3(
       )?.[1];
       const widthScaled = !!widthF && /Sheet\.[57]!Width/.test(widthF);
       const heightScaled = !!heightF && /Sheet\.[57]!Height/.test(heightF);
-      if (widthScaled) {
+      if (widthScaled || heightScaled) {
         directBody = directBody.replace(
-          /<Cell N='LocPinX' V='([\d.]+)'([^>]*F='Width\*[\d.]+')\s*\/>/g,
-          (_w, vStr, rest) => {
+          /<Cell N='([A-Za-z0-9]+)' V='([\d.]+)'([^>]*F='(Width|Height)\*[^']*')\s*\/>/g,
+          (whole, cellName, vStr, rest, dim) => {
+            if (dim === "Width" && !widthScaled) return whole;
+            if (dim === "Height" && !heightScaled) return whole;
             const v = parseFloat(vStr);
-            return `<Cell N='LocPinX' V='${v * wRatio}'${rest}/>`;
-          },
-        );
-      }
-      if (heightScaled) {
-        directBody = directBody.replace(
-          /<Cell N='LocPinY' V='([\d.]+)'([^>]*F='Height\*[\d.]+')\s*\/>/g,
-          (_w, vStr, rest) => {
-            const v = parseFloat(vStr);
-            return `<Cell N='LocPinY' V='${v * hRatio}'${rest}/>`;
+            if (!isFinite(v) || v === 0) return whole;
+            const ratio = dim === "Width" ? wRatio : hRatio;
+            return `<Cell N='${cellName}' V='${v * ratio}'${rest}/>`;
           },
         );
       }
