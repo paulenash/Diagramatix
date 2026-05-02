@@ -81,22 +81,32 @@ export function getElementMappingV3(el: DiagramElement): MasterMapping | null {
       return { masterId: MASTER.GATEWAY, properties: gwProps };
     }
 
-    case "start-event":
+    case "start-event": {
+      const ni = (el.properties as Record<string, unknown> | undefined)
+        ?.interruptionType === "non-interrupting";
       return {
         masterId: MASTER.START_EVENT,
         properties: {
-          BpmnEventType: "Start",
+          BpmnEventType: ni ? "Start (Non-Interrupting)" : "Start",
           BpmnTriggerOrResult: EVENT_TYPE_MAP[el.eventType ?? "none"] ?? "None",
           BpmnName: el.label ?? "",
         },
       };
+    }
 
     case "intermediate-event": {
       const isThrowing = el.flowType === "throwing" || el.taskType === "send";
+      const ni = (el.properties as Record<string, unknown> | undefined)
+        ?.interruptionType === "non-interrupting";
+      const bpmnType = isThrowing
+        ? "Intermediate (Throwing)"
+        : ni
+        ? "Intermediate (Non-Interrupting)"
+        : "Intermediate";
       return {
         masterId: MASTER.INTERMEDIATE_EVENT,
         properties: {
-          BpmnEventType: isThrowing ? "Intermediate (Throwing)" : "Intermediate",
+          BpmnEventType: bpmnType,
           BpmnTriggerOrResult: EVENT_TYPE_MAP[el.eventType ?? "none"] ?? "None",
           BpmnName: el.label ?? "",
         },
@@ -114,17 +124,27 @@ export function getElementMappingV3(el: DiagramElement): MasterMapping | null {
       };
 
     case "subprocess":
+    case "subprocess-expanded": {
+      const SUB_TYPE_TO_BOUNDARY: Record<string, string> = {
+        normal: "Default",
+        call: "Call",
+        event: "Event",
+        transaction: "Transaction",
+      };
+      const subType = (el.properties as Record<string, unknown> | undefined)
+        ?.subprocessType as string | undefined;
+      const boundary = SUB_TYPE_TO_BOUNDARY[subType ?? "normal"] ?? "Default";
       return {
-        masterId: MASTER.COLLAPSED_SUBPROCESS,
+        masterId: el.type === "subprocess"
+          ? MASTER.COLLAPSED_SUBPROCESS
+          : MASTER.EXPANDED_SUBPROCESS,
         properties: {
-          BpmnBoundaryType: (el.properties as any)?.subprocessType === "call" ? "Call" : "Default",
+          BpmnBoundaryType: boundary,
           BpmnLoopType: el.repeatType === "loop" ? "Standard" : "None",
           BpmnName: el.label ?? "",
         },
       };
-
-    case "subprocess-expanded":
-      return { masterId: MASTER.EXPANDED_SUBPROCESS, properties: {} };
+    }
 
     case "pool":
       return { masterId: MASTER.POOL_LANE, properties: { BpmnName: el.label ?? "Pool" } };

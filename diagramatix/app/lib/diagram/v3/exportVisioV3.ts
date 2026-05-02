@@ -997,6 +997,36 @@ export async function exportVisioV3(
       }
     }
 
+    // Non-interrupting events (master 105 = Intermediate, 107 = Start).
+    // The body outline shapes (6, 7 for both, plus 9 for Intermediate)
+    // have `LinePattern` formulas like:
+    //   GUARD(IF(OR(StartNonInterrupting.Checked,IntermediateNonInterrupting.Checked),2,1))
+    // → cached V=1 (solid) on first paint until Visio recalcs. Force the
+    // cached V to 2 (dashed) directly so first paint matches.
+    if (
+      (sourceMasterId === 105 || sourceMasterId === 107) &&
+      elProps?.interruptionType === "non-interrupting"
+    ) {
+      masterContent = masterContent.replace(
+        /(<Cell N='LinePattern' V=')1('[^>]*F='[^']*Actions\.(?:Start|Intermediate)NonInterrupting[^']*'\/>)/g,
+        `$12$2`,
+      );
+    }
+
+    // Event Subprocess (master 33, subprocessType="event"). Body shape 6's
+    // LinePattern gates on `(BoundaryEvent.Checked AND CollapsedSubProcess.Checked)`,
+    // so the dashed border only fires for COLLAPSED event subprocesses by
+    // default. Drop the CollapsedSubProcess clause so Expanded Event
+    // Subprocess (BPMN convention) also draws with a dashed outline.
+    // Cached V also forced to 3 (= dashed line pattern) so first paint
+    // matches.
+    if (sourceMasterId === 33 && elProps?.subprocessType === "event") {
+      masterContent = masterContent.replace(
+        /(<Shape ID='6'[^>]*>[\s\S]*?<Cell N='LinePattern' V=')\d('[^>]*F=')[^']+(')/,
+        `$13$2GUARD(IF(Sheet.5!Actions.BoundaryEvent.Checked,3,1))$3`,
+      );
+    }
+
     // Data Object Collection marker (master 57 = mapping.masterId 115).
     // Shape 7 in the master is gated on `Prop.BpmnCollection` — flipping
     // this Prop's V to '1' unhides the collection bars at the bottom.
@@ -1213,10 +1243,22 @@ export async function exportVisioV3(
     ) {
       const trig = EVENT_TRIGGER_ACTION[el.eventType ?? "none"] ?? "NoTriggerResult";
       const noTrig = trig === "NoTriggerResult" ? "1" : "0";
+      const isNonInterrupting =
+        (el.type === "start-event" || el.type === "intermediate-event") &&
+        (el.properties as Record<string, unknown> | undefined)
+          ?.interruptionType === "non-interrupting";
+      const niAction = isNonInterrupting
+        ? el.type === "start-event"
+          ? "StartNonInterrupting"
+          : "IntermediateNonInterrupting"
+        : null;
       actionsSection = `<Section N='Actions'>` +
         `<Row N='NoTriggerResult'><Cell N='Checked' V='${noTrig}' F='Inh'/></Row>` +
         (trig !== "NoTriggerResult"
           ? `<Row N='${trig}'><Cell N='Checked' V='1' F='Inh'/></Row>`
+          : "") +
+        (niAction
+          ? `<Row N='${niAction}'><Cell N='Checked' V='1' F='Inh'/></Row>`
           : "") +
         `</Section>`;
       if (trig !== "NoTriggerResult") triggerActions.push(trig);
@@ -1261,17 +1303,27 @@ export async function exportVisioV3(
       // a Loop / MI variant from `repeatType`, plus the AdHoc tilde from
       // `properties.adHoc`. The master's PinX formula uses
       // `BpmnNumIconsVisible` to space them out across the bottom centre.
+      // Plus a boundary action (BoundaryEvent / BoundaryCall) when the
+      // user has set `subprocessType` to "event" / "call" — which switches
+      // the body outline to the appropriate dashed / double border.
       const SUBPROCESS_REPEAT_ACTION: Record<string, string> = {
         "loop":          "StandardLoop",
         "mi-sequential": "SequentialLoop",
         "mi-parallel":   "ParallelLoop",
       };
+      const SUBPROCESS_BOUNDARY_ACTION: Record<string, string> = {
+        "call":  "BoundaryCall",
+        "event": "BoundaryEvent",
+      };
+      const props = el.properties as Record<string, unknown> | undefined;
       const acts: string[] = [];
       const repeatAct = SUBPROCESS_REPEAT_ACTION[el.repeatType ?? "none"];
       if (repeatAct) acts.push(repeatAct);
-      if ((el.properties as Record<string, unknown> | undefined)?.adHoc === true) {
-        acts.push("AdHoc");
-      }
+      if (props?.adHoc === true) acts.push("AdHoc");
+      const boundaryAct = SUBPROCESS_BOUNDARY_ACTION[
+        props?.subprocessType as string ?? "normal"
+      ];
+      if (boundaryAct) acts.push(boundaryAct);
       if (acts.length > 0) {
         actionsSection = `<Section N='Actions'>` +
           acts.map((a) => `<Row N='${a}'><Cell N='Checked' V='1' F='Inh'/></Row>`).join("") +
