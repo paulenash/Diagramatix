@@ -585,12 +585,13 @@ export async function exportVisioV3(
       );
       // Step 2: re-pin Shape 11 to the body's bottom-centre. Shape 11's
       // PinX was already centred horizontally by the body-chain rescale.
-      // Override its PinY to `Height - 4MM*DropOnPageScale` (= 1MM gap
-      // from bottom edge with a 6MM-tall marker). Cached V matches.
-      const pinYNew = instanceH - 0.15748031496062992; // 4MM in inches
+      // Override PinY to `4MM*DropOnPageScale` — Visio shape coords are
+      // Y-up, so Y=4MM places the marker centre 4MM from the bottom edge,
+      // which gives a 1MM gap below a 6MM-tall marker.
+      const pinYNew = 0.15748031496062992; // 4MM in inches
       masterContent = masterContent.replace(
         /(<Shape ID='11'[^>]*>[\s\S]*?<Cell N='PinY' V=')[\d.]+(' U='MM' F=')[^']+(')/,
-        `$1${pinYNew}$2GUARD(Sheet.5!Height-4MM*Sheet.5!DropOnPageScale)$3`,
+        `$1${pinYNew}$2GUARD(4MM*Sheet.5!DropOnPageScale)$3`,
       );
       // Step 3: scale dimension cells in shapes 11, 12, 13 by 0.75 (= 1.5×
       // template / 2× natural). Shape 11's PinX/PinY are skipped (set
@@ -786,7 +787,7 @@ export async function exportVisioV3(
       "business-rule":  "BusinessRule",
     };
     let actionsSection = "";
-    let triggerAction: string | null = null;
+    const triggerActions: string[] = [];
     if (
       el.type === "start-event" ||
       el.type === "intermediate-event" ||
@@ -800,7 +801,7 @@ export async function exportVisioV3(
           ? `<Row N='${trig}'><Cell N='Checked' V='1' F='Inh'/></Row>`
           : "") +
         `</Section>`;
-      if (trig !== "NoTriggerResult") triggerAction = trig;
+      if (trig !== "NoTriggerResult") triggerActions.push(trig);
     } else if (el.type === "task") {
       const act = TASK_TYPE_ACTION[el.taskType ?? "none"] ?? "NoTaskType";
       const noAct = act === "NoTaskType" ? "1" : "0";
@@ -810,7 +811,7 @@ export async function exportVisioV3(
           ? `<Row N='${act}'><Cell N='Checked' V='1' F='Inh'/></Row>`
           : "") +
         `</Section>`;
-      if (act !== "NoTaskType") triggerAction = act;
+      if (act !== "NoTaskType") triggerActions.push(act);
     } else if (el.type === "gateway") {
       const GATEWAY_TYPE_ACTION: Record<string, string> = {
         "exclusive":   "ExclusiveDataWithMarker",
@@ -823,7 +824,29 @@ export async function exportVisioV3(
       actionsSection = `<Section N='Actions'>` +
         `<Row N='${act}'><Cell N='Checked' V='1' F='Inh'/></Row>` +
         `</Section>`;
-      triggerAction = act;
+      triggerActions.push(act);
+    } else if (el.type === "subprocess" || el.type === "subprocess-expanded") {
+      // Subprocesses can carry multiple bottom-row markers simultaneously:
+      // a Loop / MI variant from `repeatType`, plus the AdHoc tilde from
+      // `properties.adHoc`. The master's PinX formula uses
+      // `BpmnNumIconsVisible` to space them out across the bottom centre.
+      const SUBPROCESS_REPEAT_ACTION: Record<string, string> = {
+        "loop":          "StandardLoop",
+        "mi-sequential": "SequentialLoop",
+        "mi-parallel":   "ParallelLoop",
+      };
+      const acts: string[] = [];
+      const repeatAct = SUBPROCESS_REPEAT_ACTION[el.repeatType ?? "none"];
+      if (repeatAct) acts.push(repeatAct);
+      if ((el.properties as Record<string, unknown> | undefined)?.adHoc === true) {
+        acts.push("AdHoc");
+      }
+      if (acts.length > 0) {
+        actionsSection = `<Section N='Actions'>` +
+          acts.map((a) => `<Row N='${a}'><Cell N='Checked' V='1' F='Inh'/></Row>`).join("") +
+          `</Section>`;
+        triggerActions.push(...acts);
+      }
     }
 
     // Each marker is one or more (shapeId, geomIxs) overrides — Geometry IX
@@ -861,10 +884,17 @@ export async function exportVisioV3(
         { shapeId: 9,  geomIxs: [0, 1] },
         { shapeId: 10, geomIxs: [0] },
       ],
+      // Subprocess bottom-row markers (BPMN_M Subprocess master 33).
+      // Multiple markers can show simultaneously; the master's PinX
+      // formula uses `BpmnNumIconsVisible` to lay them out side-by-side.
+      "AdHoc":          [{ shapeId: 10, geomIxs: [0] }],
+      "StandardLoop":   [{ shapeId: 17, geomIxs: [0] }],
+      "SequentialLoop": [{ shapeId: 27, geomIxs: [0] }],
+      "ParallelLoop":   [{ shapeId: 15, geomIxs: [0] }],
     };
-    const triggerMarkers: MarkerSpec[] = triggerAction
-      ? (TRIGGER_MARKER_MAP[triggerAction] ?? [])
-      : [];
+    const triggerMarkers: MarkerSpec[] = triggerActions.flatMap(
+      (a) => TRIGGER_MARKER_MAP[a] ?? [],
+    );
 
     const isPool = mapping.masterId === 19;
     const textEl = el.label ? `<Text>${esc(el.label)}</Text>` : "";
