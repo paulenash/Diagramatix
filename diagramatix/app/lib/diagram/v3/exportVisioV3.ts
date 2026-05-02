@@ -418,17 +418,66 @@ export async function exportVisioV3(
     const w = el.width / 96;
     const h = el.height / 96;
 
-    // Property overrides — use F='No Formula' to prevent master's INDEX()
-    // formula from overriding the value we set here.
+    // Property overrides — match Visio's re-saved baseline: F='Inh' so the
+    // master's formula chain stays intact, with our V= acting as the cached
+    // value. Combined with the Actions section below, this is what lets
+    // Visio render the trigger marker on events.
     let propSection = "";
     const propEntries = Object.entries(mapping.properties);
     if (propEntries.length > 0) {
       propSection = `<Section N='Property'>` +
         propEntries.map(([name, value]) =>
-          `<Row N='${name}'><Cell N='Value' V='${esc(String(value))}' U='STR' F='No Formula'/></Row>`
+          `<Row N='${name}'><Cell N='Value' V='${esc(String(value))}' U='STR' F='Inh'/></Row>`
         ).join("") +
         `</Section>`;
     }
+
+    // Actions section — for events, this is what activates the trigger
+    // marker. Confirmed by diffing a Visio re-saved reference file.
+    const EVENT_TRIGGER_ACTION: Record<string, string> = {
+      "none": "NoTriggerResult",
+      "message": "Message",
+      "timer": "Timer",
+      "error": "Error",
+      "signal": "Signal",
+      "terminate": "Terminate",
+      "conditional": "Conditional",
+      "escalation": "Escalation",
+      "cancel": "Cancel",
+      "compensation": "Compensation",
+      "link": "Link",
+    };
+    let actionsSection = "";
+    let triggerAction: string | null = null;
+    if (
+      el.type === "start-event" ||
+      el.type === "intermediate-event" ||
+      el.type === "end-event"
+    ) {
+      const trig = EVENT_TRIGGER_ACTION[el.eventType ?? "none"] ?? "NoTriggerResult";
+      const noTrig = trig === "NoTriggerResult" ? "1" : "0";
+      actionsSection = `<Section N='Actions'>` +
+        `<Row N='NoTriggerResult'><Cell N='Checked' V='${noTrig}' F='Inh'/></Row>` +
+        (trig !== "NoTriggerResult"
+          ? `<Row N='${trig}'><Cell N='Checked' V='1' F='Inh'/></Row>`
+          : "") +
+        `</Section>`;
+      if (trig !== "NoTriggerResult") triggerAction = trig;
+    }
+
+    // Each BPMN event trigger has a fixed MasterShape ID inside the BPMN_M
+    // event masters (IDs 5-17 in master5/4/3). Visio's diff against a
+    // re-saved file showed the trigger marker is force-shown by emitting
+    // Geometry sub-sections with `NoShow='0' F='Inh'` on the corresponding
+    // stub sub-shape (e.g. MasterShape='10' for Message).
+    const EVENT_TRIGGER_MASTERSHAPE: Record<string, number> = {
+      "Message": 10,
+      // Other triggers (Timer, Error, Signal, ...) would map to different
+      // MasterShape IDs — extend after testing each.
+    };
+    const triggerMasterShape = triggerAction
+      ? EVENT_TRIGGER_MASTERSHAPE[triggerAction] ?? null
+      : null;
 
     const isPool = mapping.masterId === 19;
     const textEl = el.label ? `<Text>${esc(el.label)}</Text>` : "";
@@ -626,9 +675,69 @@ export async function exportVisioV3(
       effectiveMasterId = await createInstanceMaster(mapping.masterId, colorMap[el.type]);
     }
 
-    // (Stub sub-shape registrations were tried but suppressed Gateway
-    // rendering and didn't restore markers. The Visio reference file's
-    // stubs are cached-on-save state, not functionally required.)
+    // Stub sub-shape registrations for non-resizable body-fill types
+    // (events, gateway, data object/store). Mirrors what Visio writes when
+    // it re-saves a fixed reference file. For events specifically: the
+    // stub for the trigger MasterShape (e.g. MasterShape='10' for Message)
+    // ALSO carries three `<Section N='Geometry'>` blocks with
+    // `<Cell N='NoShow' V='0' F='Inh'/>` — that's the switch that makes the
+    // marker geometry visible at instance level.
+    if (subShapes === "" && BODY_FILL_TYPES.has(el.type) && !isResizable) {
+      const masterFileEntry = await zip
+        .file(`visio/masters/master${effectiveMasterId}.xml`)
+        ?.async("string");
+      if (masterFileEntry) {
+        const root = masterFileEntry.match(/<Shape ID='5'[^>]*>/);
+        if (root) {
+          const rootOpenEnd = root.index! + root[0].length;
+          let rDepth = 0;
+          const rRe = /<\/?Shape[^>]*>/g;
+          rRe.lastIndex = root.index!;
+          let rm, rootEnd = masterFileEntry.length;
+          while ((rm = rRe.exec(masterFileEntry))) {
+            if (rm[0].startsWith("</Shape")) {
+              rDepth--;
+              if (rDepth === 0) { rootEnd = rm.index; break; }
+            } else rDepth++;
+          }
+          const inner = masterFileEntry.slice(rootOpenEnd, rootEnd);
+          const childShapesStart = inner.indexOf("<Shapes>");
+          if (childShapesStart !== -1) {
+            const stubIds: number[] = [];
+            let depth = 0;
+            const re = /<Shapes>|<\/Shapes>|<Shape ID='(\d+)'[^>]*>|<\/Shape>/g;
+            re.lastIndex = childShapesStart;
+            let m;
+            while ((m = re.exec(inner))) {
+              if (m[0] === "<Shapes>") depth++;
+              else if (m[0] === "</Shapes>") {
+                depth--;
+                if (depth === 0) break;
+              } else if (m[0].startsWith("<Shape ID=") && depth === 1) {
+                stubIds.push(parseInt(m[1], 10));
+              }
+            }
+            if (stubIds.length > 0) {
+              const stubs = stubIds
+                .map((msId, i) => {
+                  const isMarker = msId === triggerMasterShape;
+                  const noShowCells = isMarker
+                    ? `<Section N='Geometry' IX='0'><Cell N='NoShow' V='0' F='Inh'/></Section>` +
+                      `<Section N='Geometry' IX='1'><Cell N='NoShow' V='0' F='Inh'/></Section>` +
+                      `<Section N='Geometry' IX='2'><Cell N='NoShow' V='0' F='Inh'/></Section>`
+                    : "";
+                  return `<Shape ID='${shapeId + 1 + i}' Type='Shape' MasterShape='${msId}'>` +
+                    `<Cell N='LayerMember' V=''/>` +
+                    noShowCells +
+                    `</Shape>`;
+                })
+                .join("");
+              subShapes = `<Shapes>${stubs}</Shapes>`;
+            }
+          }
+        }
+      }
+    }
 
     // Text positioning cells with F='Inh' AND cached V values sized to the
     // actual label so the first render isn't truncated to the master's tiny
@@ -671,15 +780,20 @@ export async function exportVisioV3(
       ? `<Text><cp IX='0'/>${esc(el.label)}</Text>`
       : "";
 
+    const escLabel = esc(el.label || el.type);
     shapes.push(
-      `<Shape ID='${shapeId}' NameU='${esc(el.label || el.type)}' Type='Group' Master='${effectiveMasterId}'>` +
+      `<Shape ID='${shapeId}' NameU='${escLabel}'` +
+      ` IsCustomNameU='1' Name='${escLabel}' IsCustomName='1'` +
+      ` Type='Group' Master='${effectiveMasterId}'>` +
       `<Cell N='PinX' V='${cx}'/>` +
       `<Cell N='PinY' V='${cy}'/>` +
+      `<Cell N='LayerMember' V=''/>` +
       fillCells(el.type) +
       sizeCells +
       txtInhCells +
       userSection +
       propSection +
+      actionsSection +
       elCharSection +
       textElWithCp +
       subShapes +
