@@ -211,41 +211,47 @@ export async function exportVisioV3(
     const r = parseInt(colour.slice(1, 3), 16);
     const g = parseInt(colour.slice(3, 5), 16);
     const b = parseInt(colour.slice(5, 7), 16);
-    const cell = `<Cell N='FillForegnd' V='${colour}' F='RGB(${r},${g},${b})'/>`;
-    let updated = content
-      .replace(/<Cell N='FillForegnd' V='1' F='GUARD\([^']+\)'\/>/g, cell)
+    // Only touch Shape ID='6' (the visible body). Earlier we replaced
+    // `V='1' F='GUARD(...)'` cells globally, which painted over the master's
+    // marker sub-shapes (task-type icons, event triggers) — those use the
+    // same cell pattern legitimately to drive conditional visibility.
+    const shape6 = content.match(/<Shape ID='6'[^>]*>/);
+    if (!shape6) return content;
+    const shapeStart = shape6.index!;
+    const shapeOpenEnd = shapeStart + shape6[0].length;
+    const nextShape = content.indexOf("<Shape ID=", shapeOpenEnd);
+    const bodyEnd = nextShape === -1 ? content.length : nextShape;
+    const bodyTextOriginal = content.slice(shapeOpenEnd, bodyEnd);
+
+    // Drop any FillStyle on the opening tag — Pool/Lane's coloured shape
+    // uses FillStyle='3' (no theme inheritance), template masters use '7'
+    // (themed white). Force '3' so our cell-level FillForegnd wins.
+    const newOpen = shape6[0].replace(/FillStyle='\d+'/, "FillStyle='3'");
+
+    // Inside Shape 6's block, replace any V='1' GUARD or white THEMEGUARD
+    // cells with our colour, AND inject FillForegnd + FillPattern if Shape 6
+    // has none.
+    const colourCell = `<Cell N='FillForegnd' V='${colour}' F='RGB(${r},${g},${b})'/>`;
+    let bodyTextNew = bodyTextOriginal
+      .replace(/<Cell N='FillForegnd' V='1' F='GUARD\([^']+\)'\/>/g, colourCell)
       .replace(
         /<Cell N='FillForegnd' V='#ffffff' F='THEMEGUARD\(RGB\(255,255,255\)\)'\/>/g,
         `<Cell N='FillForegnd' V='${colour}' F='THEMEGUARD(RGB(${r},${g},${b}))'/>`,
       );
 
-    // Some template masters (Task, Subprocess) have MasterShape 6 with
-    // `FillStyle='7'` which makes Visio inherit themed white at render time.
-    // Pool/Lane's coloured shape uses `FillStyle='3'` (no inherited fill).
-    // Mirror that: change FillStyle='7' → '3' AND inject a FillForegnd cell
-    // so the body actually paints our colour.
-    const shape6 = updated.match(/<Shape ID='6'[^>]*>/);
-    if (shape6) {
-      const shapeStart = shape6.index!;
-      const shapeOpenEnd = shapeStart + shape6[0].length;
-      const nextShape = updated.indexOf("<Shape ID=", shapeOpenEnd);
-      const bodyEnd = nextShape === -1 ? updated.length : nextShape;
-      const bodyText = updated.slice(shapeOpenEnd, bodyEnd);
-
-      const newOpen = shape6[0].replace(/FillStyle='\d+'/, "FillStyle='3'");
-
-      const cellsToInject = /<Cell N='FillForegnd'/.test(bodyText)
-        ? ""
-        : `<Cell N='FillForegnd' V='${colour}' F='RGB(${r},${g},${b})'/>` +
-          `<Cell N='FillPattern' V='1' F='RGB(0,0,0)*0+1'/>`;
-
-      updated =
-        updated.slice(0, shapeStart) +
-        newOpen +
-        cellsToInject +
-        updated.slice(shapeOpenEnd);
+    if (!/<Cell N='FillForegnd'/.test(bodyTextNew)) {
+      bodyTextNew =
+        `<Cell N='FillForegnd' V='${colour}' F='RGB(${r},${g},${b})'/>` +
+        `<Cell N='FillPattern' V='1' F='RGB(0,0,0)*0+1'/>` +
+        bodyTextNew;
     }
-    return updated;
+
+    return (
+      content.slice(0, shapeStart) +
+      newOpen +
+      bodyTextNew +
+      content.slice(bodyEnd)
+    );
   }
 
   /** Create a per-instance master copy of `sourceMasterId` with `colour` baked
@@ -620,16 +626,58 @@ export async function exportVisioV3(
       effectiveMasterId = await createInstanceMaster(mapping.masterId, colorMap[el.type]);
     }
 
+    // Text positioning cells with F='Inh' AND cached V values sized to the
+    // actual label so the first render isn't truncated to the master's tiny
+    // natural-size cache. Visio uses cached V on first paint before
+    // evaluating F='Inh', so a too-small V wraps long labels prematurely.
+    // The Control.Row_1 section is the source the master's `TxtPinY` formula
+    // references — without it the inheritance chain has no anchor.
+    let txtInhCells = "";
+    if (!isResizable && BODY_FILL_TYPES.has(el.type)) {
+      const lines = (el.label ?? "").split("\n");
+      const longestLine = Math.max(1, ...lines.map((l) => l.length));
+      // ~0.075 in per char at 12pt + small horizontal padding; cap to a
+      // generous upper bound so very long labels don't blow up the page.
+      const charWidth = 0.08;
+      const horizPad = 0.08;
+      const lineH = 0.18;
+      const txtW = Math.max(0.4, longestLine * charWidth + horizPad);
+      const txtH = Math.max(0.21, lines.length * lineH);
+      const txtLocX = txtW / 2;
+      const txtLocY = txtH / 2;
+      const txtPinY = -txtLocY; // label sits below the body's local Y=0
+      txtInhCells =
+        `<Cell N='TxtPinY' V='${txtPinY}' F='Inh'/>` +
+        `<Cell N='TxtWidth' V='${txtW}' F='Inh'/>` +
+        `<Cell N='TxtHeight' V='${txtH}' F='Inh'/>` +
+        `<Cell N='TxtLocPinX' V='${txtLocX}' F='Inh'/>` +
+        `<Cell N='TxtLocPinY' V='${txtLocY}' F='Inh'/>` +
+        `<Section N='Control'>` +
+          `<Row N='Row_1'>` +
+            `<Cell N='Y' V='${txtPinY}' F='Inh'/>` +
+            `<Cell N='YDyn' V='${txtPinY}' F='Inh'/>` +
+            `<Cell N='YCon' V='2' F='Inh'/>` +
+          `</Row>` +
+        `</Section>`;
+    }
+
+    // <cp IX='0'/> in Text links to Character section row 0 — required for
+    // the master's character formatting (font size etc) to apply.
+    const textElWithCp = el.label
+      ? `<Text><cp IX='0'/>${esc(el.label)}</Text>`
+      : "";
+
     shapes.push(
       `<Shape ID='${shapeId}' NameU='${esc(el.label || el.type)}' Type='Group' Master='${effectiveMasterId}'>` +
       `<Cell N='PinX' V='${cx}'/>` +
       `<Cell N='PinY' V='${cy}'/>` +
       fillCells(el.type) +
       sizeCells +
+      txtInhCells +
       userSection +
       propSection +
       elCharSection +
-      textEl +
+      textElWithCp +
       subShapes +
       `</Shape>`
     );
