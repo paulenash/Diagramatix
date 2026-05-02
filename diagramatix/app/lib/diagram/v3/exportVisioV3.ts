@@ -346,6 +346,54 @@ export async function exportVisioV3(
     return result;
   }
 
+  /** Halve the cached V of every PinX/PinY/Width/Height/LocPinX/LocPinY
+   *  cell *and* every cell with `F='Width*X'`/`F='Height*Y'` (Geometry
+   *  rows) inside the `<Shape ID='${shapeId}'>` block. Used for the
+   *  Subprocess + marker (Shapes 11, 12, 13 in master 33) which paints
+   *  at 2× scale via the template's `IF(IsInstance,1,2)` formula —
+   *  after we replace those IFs with `1`, the cached V's still need to
+   *  be halved to keep the first-paint at the correct size. */
+  function halveSubprocessMarkerShape(content: string, shapeId: number): string {
+    const openRe = new RegExp(`<Shape ID='${shapeId}'[^>]*>`);
+    const openMatch = content.match(openRe);
+    if (!openMatch || openMatch.index === undefined) return content;
+    const start = openMatch.index;
+    let pos = start + openMatch[0].length;
+    let depth = 1;
+    while (depth > 0 && pos < content.length) {
+      const nextOpen = content.indexOf("<Shape ", pos);
+      const nextClose = content.indexOf("</Shape>", pos);
+      if (nextClose === -1) return content;
+      if (nextOpen !== -1 && nextOpen < nextClose) {
+        depth++;
+        pos = nextOpen + "<Shape ".length;
+      } else {
+        depth--;
+        pos = nextClose + "</Shape>".length;
+      }
+    }
+    const block = content.slice(start, pos);
+    let halved = block.replace(
+      /<Cell N='(PinX|PinY|Width|Height|LocPinX|LocPinY|X|Y)' V='([\d.]+)'([^>]*)\/>/g,
+      (_w, cellName, vStr, rest) => {
+        const v = parseFloat(vStr);
+        if (!isFinite(v) || v === 0) return _w;
+        return `<Cell N='${cellName}' V='${v / 2}'${rest}/>`;
+      },
+    );
+    return content.slice(0, start) + halved + content.slice(pos);
+  }
+
+  /** Override the NoShow cells in Shapes 12 and 13 of the Subprocess
+   *  master so the + marker is always hidden. Used for Expanded
+   *  Subprocess where the marker doesn't apply. */
+  function hideCollapsedMarker(content: string): string {
+    return content.replace(
+      /(<Shape ID='1[23]'[^>]*>[\s\S]*?)<Cell N='NoShow' V='[01]' F='NOT\(Sheet\.5!Actions\.Collapsed\.Checked\)'\/>/g,
+      `$1<Cell N='NoShow' V='1' F='1'/>`,
+    );
+  }
+
   /** Apply the `3MM → 4.58MM` (X, +6px) and `3MM → 3.26MM` (Y, +1px)
    *  marker-icon nudge inside the `<Shape ID='${shapeId}'>...</Shape>`
    *  block only. Walks Shape opens/closes to find the correct matching
@@ -399,6 +447,7 @@ export async function exportVisioV3(
     colour: string,
     instanceW?: number,
     instanceH?: number,
+    elType?: string,
   ): Promise<number> {
     const blockRe = new RegExp(`<Master\\s+ID='${sourceMasterId}'[\\s\\S]*?</Master>`);
     const blockMatch = mastersXml.match(blockRe);
@@ -504,6 +553,33 @@ export async function exportVisioV3(
             );
           }
         }
+      }
+    }
+
+    // Subprocess + marker (Shapes 11, 12, 13 in master 33). The master's
+    // collapsed marker is sized via `BpmnIconHeight*IF(IsInstance,1,2)`,
+    // which paints at 2× (template size) on first frame. Force the IF
+    // multipliers to the 1× branch and halve the cached V's to match —
+    // so the marker is half as wide and half as tall, matching what
+    // Visio's own collapsed Subprocess looks like.
+    //
+    // For Expanded Subprocess (`subprocess-expanded`), additionally
+    // override NoShow on Shapes 12 and 13 so the marker hides
+    // entirely — an expanded subprocess shows its internal flow, no +.
+    if (sourceMasterId === 33) {
+      masterContent = masterContent.replace(
+        /IF\(Sheet\.5!User\.IsInstance,1,2\)/g,
+        "1",
+      );
+      masterContent = masterContent.replace(
+        /IF\(Sheet\.5!User\.IsInstance,0,0\.1\)/g,
+        "0",
+      );
+      for (const shapeId of [11, 12, 13]) {
+        masterContent = halveSubprocessMarkerShape(masterContent, shapeId);
+      }
+      if (elType === "subprocess-expanded") {
+        masterContent = hideCollapsedMarker(masterContent);
       }
     }
 
@@ -961,6 +1037,7 @@ export async function exportVisioV3(
         colorMap[el.type],
         w,
         h,
+        el.type,
       );
     }
 
