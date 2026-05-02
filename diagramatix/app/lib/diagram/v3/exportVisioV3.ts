@@ -390,6 +390,58 @@ export async function exportVisioV3(
     return content.slice(0, start) + scaled + content.slice(pos);
   }
 
+  /** Like `scaleMarkerShape` but with separate scale factors for the
+   *  width-direction cells (X / PinX / LocPinX / Width) and the
+   *  height-direction cells (Y / PinY / LocPinY / Height). Used when a
+   *  shape's width and height come from different parents (e.g. event-
+   *  based gateway pentagon at `Sheet.8!Width` × `Sheet.8!Height`, where
+   *  Sheet.8 itself was rescaled by both Layer-1 and a shrink factor). */
+  function scaleMarkerShapeXY(
+    content: string,
+    shapeId: number,
+    wScale: number,
+    hScale: number,
+  ): string {
+    const openRe = new RegExp(`<Shape ID='${shapeId}'[^>]*>`);
+    const openMatch = content.match(openRe);
+    if (!openMatch || openMatch.index === undefined) return content;
+    const start = openMatch.index;
+    let pos = start + openMatch[0].length;
+    let depth = 1;
+    while (depth > 0 && pos < content.length) {
+      const nextOpen = content.indexOf("<Shape ", pos);
+      const nextClose = content.indexOf("</Shape>", pos);
+      if (nextClose === -1) return content;
+      if (nextOpen !== -1 && nextOpen < nextClose) {
+        depth++;
+        pos = nextOpen + "<Shape ".length;
+      } else {
+        depth--;
+        pos = nextClose + "</Shape>".length;
+      }
+    }
+    const block = content.slice(start, pos);
+    const W_CELLS = new Set(["PinX", "LocPinX", "Width", "X"]);
+    const H_CELLS = new Set(["PinY", "LocPinY", "Height", "Y"]);
+    const scaled = block.replace(
+      /<Cell N='(PinX|PinY|Width|Height|LocPinX|LocPinY|X|Y|A|B|C|D)' V='([\d.]+)'([^>]*)\/>/g,
+      (_w, cellName, vStr, rest) => {
+        const v = parseFloat(vStr);
+        if (!isFinite(v) || v === 0) return _w;
+        // EllipticalArcTo / NURBSTo cells: A/C are X-axis, B/D are Y-axis.
+        const dim = W_CELLS.has(cellName) || cellName === "A" || cellName === "C"
+          ? "W"
+          : H_CELLS.has(cellName) || cellName === "B" || cellName === "D"
+          ? "H"
+          : null;
+        if (!dim) return _w;
+        const factor = dim === "W" ? wScale : hScale;
+        return `<Cell N='${cellName}' V='${v * factor}'${rest}/>`;
+      },
+    );
+    return content.slice(0, start) + scaled + content.slice(pos);
+  }
+
   /** Override Txt* cells in Shape 5 to pin the label near the top of
    *  the body. Visio shape coords are Y-up, so "near top" = high Y.
    *  Approach: 6MM-tall text block whose top edge sits at the body's
@@ -420,6 +472,79 @@ export async function exportVisioV3(
       `$10$20$3`,
     );
     return content;
+  }
+
+  /** Shrink the event-based-gateway marker (master 50, Shapes 8/9/10)
+   *  so the pentagon fits inside the diamond. The template renders it
+   *  at 46–58% of the body W/H — the wide vertical fraction makes the
+   *  marker corners poke past the diamond's slanted edges. Shrinking
+   *  Shape 8 by `SHRINK` (which Layer 1 has already pre-scaled to
+   *  instance dims) and matching Shape 9/10 cached V's keeps the
+   *  marker centred in the diamond and well inside its bounds. */
+  function shrinkEventBasedMarker(
+    content: string,
+    wRatio: number,
+    hRatio: number,
+  ): string {
+    const SHRINK = 0.6;
+    // Shape 8 was already scaled to instance dims by Layer 1, so apply
+    // SHRINK to its cached V's. Skip PinX/PinY — those still pin to
+    // body centre.
+    content = scaleMarkerShape(content, 8, SHRINK, ["PinX", "PinY"]);
+    // Shapes 9 and 10 reference Sheet.8 which Layer 1 doesn't catch
+    // (regex is `Sheet.[57]!`), so their cached V's are still at
+    // template natural. Apply both wRatio (Layer 1 equivalent) and
+    // SHRINK to bring them onto the new Shape 8.
+    content = scaleMarkerShapeXY(content, 9, wRatio * SHRINK, hRatio * SHRINK);
+    content = scaleMarkerShapeXY(content, 10, wRatio * SHRINK, hRatio * SHRINK);
+    return content;
+  }
+
+  /** Make the Inclusive gateway marker (master 50, Shape 11) render as
+   *  a thick unfilled circle instead of a filled oval. The template
+   *  paints both Geom 0 (outer ellipse) and Geom 1 (inner ellipse)
+   *  with FillForegnd=0, which on a coloured body stacks two filled
+   *  ellipses and looks solid. Fix:
+   *   - Geom 0: NoFill='1' so only the stroke shows.
+   *   - Geom 1: NoShow forced (always hidden).
+   *   - Shape 11 LineWeight: bumped to 3PT so the stroke reads as
+   *     a thick ring at typical gateway sizes. */
+  function drawInclusiveAsThickRing(content: string): string {
+    const openRe = /<Shape ID='11'[^>]*>/;
+    const openMatch = content.match(openRe);
+    if (!openMatch || openMatch.index === undefined) return content;
+    const start = openMatch.index;
+    let pos = start + openMatch[0].length;
+    let depth = 1;
+    while (depth > 0 && pos < content.length) {
+      const nextOpen = content.indexOf("<Shape ", pos);
+      const nextClose = content.indexOf("</Shape>", pos);
+      if (nextClose === -1) return content;
+      if (nextOpen !== -1 && nextOpen < nextClose) {
+        depth++;
+        pos = nextOpen + "<Shape ".length;
+      } else {
+        depth--;
+        pos = nextClose + "</Shape>".length;
+      }
+    }
+    let block = content.slice(start, pos);
+    // Geom 0 NoFill=1 (stroke only).
+    block = block.replace(
+      /(<Section N='Geometry' IX='0'>[\s\S]*?)<Cell N='NoFill' V='[01]'\/>/,
+      `$1<Cell N='NoFill' V='1'/>`,
+    );
+    // Geom 1: force NoShow=1.
+    block = block.replace(
+      /(<Section N='Geometry' IX='1'>[\s\S]*?)<Cell N='NoShow' V='[01]'(?: F='[^']+')?\/>/,
+      `$1<Cell N='NoShow' V='1' F='1'/>`,
+    );
+    // Thick line for the ring.
+    block = block.replace(
+      /<Cell N='LineWeight' V='[\d.]+'[^>]*\/>/,
+      `<Cell N='LineWeight' V='0.04166666666666667' U='PT' F='GUARD(3PT)'/>`,
+    );
+    return content.slice(0, start) + block + content.slice(pos);
   }
 
   /** Override the NoShow cells in Shapes 12 and 13 of the Subprocess
@@ -707,6 +832,23 @@ export async function exportVisioV3(
         /(<Row N='BpmnCollection'>[\s\S]*?<Cell N='Value' V=')0(' U='BOOL'\/>)/,
         "$11$2",
       );
+    }
+
+    // Gateway marker tweaks (master 50 = mapping.masterId 104).
+    if (sourceMasterId === 104 && instanceW !== undefined && instanceH !== undefined) {
+      const gwType = elProps?.gatewayType ?? "exclusive";
+      // Master 50's Shape 5 natural Width=1in, Height=0.75in.
+      const wRatio = instanceW / 1;
+      const hRatio = instanceH / 0.75;
+      // Event-based: shrink the pentagon so it fits inside the diamond.
+      if (gwType === "event-based") {
+        masterContent = shrinkEventBasedMarker(masterContent, wRatio, hRatio);
+      }
+      // Inclusive: render as a thick unfilled ring instead of two
+      // stacked filled ellipses.
+      if (gwType === "inclusive") {
+        masterContent = drawInclusiveAsThickRing(masterContent);
+      }
     }
 
     const newId = nextInstanceMasterId++;
@@ -1204,13 +1346,21 @@ export async function exportVisioV3(
     // the instance selection rectangle.
     let effectiveMasterId = mapping.masterId;
     if (BODY_FILL_TYPES.has(el.type) && isColor && colorMap[el.type]) {
+      // Merge the top-level `el.gatewayType` into elProps so the per-
+      // instance master logic can read it from a single object. Diagramatix
+      // sets both `el.gatewayType` and `el.properties.gatewayType`; we
+      // prefer whichever is set (bpmnLayout writes properties).
+      const mergedProps = {
+        ...(el.properties as Record<string, unknown> | undefined),
+        gatewayType: (el.properties as any)?.gatewayType ?? el.gatewayType,
+      };
       effectiveMasterId = await createInstanceMaster(
         mapping.masterId,
         colorMap[el.type],
         w,
         h,
         el.type,
-        el.properties as Record<string, unknown> | undefined,
+        mergedProps,
         el.repeatType,
       );
     }
@@ -1350,7 +1500,8 @@ export async function exportVisioV3(
 
     // <cp IX='0'/> in Text links to Character section row 0 — required for
     // the master's character formatting (font size etc) to apply.
-    const textElWithCp = el.label
+    // Merge gateways have no label by convention — skip the Text element.
+    const textElWithCp = el.label && !isMergeGateway
       ? `<Text><cp IX='0'/>${esc(el.label)}</Text>`
       : "";
 
