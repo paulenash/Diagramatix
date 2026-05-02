@@ -276,6 +276,7 @@ export async function exportVisioV3(
     let lastIdx = 0;
     let m: RegExpExecArray | null;
     while ((m = openRe.exec(content)) !== null) {
+      const shapeId = m[1];
       const openEnd = m.index + m[0].length;
       result += content.slice(lastIdx, openEnd);
       const nextOpen = content.indexOf("<Shape ID='", openEnd);
@@ -292,23 +293,47 @@ export async function exportVisioV3(
         bodyEnd = nextClose;
       }
       let directBody = content.slice(openEnd, bodyEnd);
+      // Shape 5 (the master root) is always rescaled — createInstanceMaster
+      // explicitly rewrites its Width/Height/LocPin to instance dims. So
+      // its Geometry rows (used by single-shape masters like Data Store /
+      // Data Object that draw the body directly on the root) need scaling
+      // too. For sub-shapes 6+, decide by inspecting their own Width/Height
+      // formulas for body-chain refs.
+      const isRoot = shapeId === "5";
       const widthF = directBody.match(
         /<Cell N='Width' V='[\d.]+'[^>]*F='([^']+)'/,
       )?.[1];
       const heightF = directBody.match(
         /<Cell N='Height' V='[\d.]+'[^>]*F='([^']+)'/,
       )?.[1];
-      const widthScaled = !!widthF && /Sheet\.[57]!Width/.test(widthF);
-      const heightScaled = !!heightF && /Sheet\.[57]!Height/.test(heightF);
+      const widthScaled =
+        isRoot || (!!widthF && /Sheet\.[57]!Width/.test(widthF));
+      const heightScaled =
+        isRoot || (!!heightF && /Sheet\.[57]!Height/.test(heightF));
       if (widthScaled || heightScaled) {
         directBody = directBody.replace(
-          /<Cell N='([A-Za-z0-9]+)' V='([\d.]+)'([^>]*F='(Width|Height)\*[^']*')\s*\/>/g,
-          (whole, cellName, vStr, rest, dim) => {
-            if (dim === "Width" && !widthScaled) return whole;
-            if (dim === "Height" && !heightScaled) return whole;
+          /<Cell N='([A-Za-z0-9]+)' V='([\d.]+)'([^>]*F='([^']+)')\s*\/>/g,
+          (whole, cellName, vStr, rest, fStr) => {
+            // Decide which dimension this cell scales with by inspecting
+            // the formula. Matches:
+            //   F='Width*X'         → wRatio
+            //   F='Height*Y'        → hRatio
+            //   F='GeometryN.XM'    → wRatio (Visio close-path refs)
+            //   F='GeometryN.YM'    → hRatio
+            // Cells with `Sheet.X!` refs are already handled by the earlier
+            // pass; they're safe to skip here because Width|Height after a
+            // `!` doesn't match the patterns below.
+            let dim: "W" | "H" | null = null;
+            if (/^Width\*/.test(fStr)) dim = "W";
+            else if (/^Height\*/.test(fStr)) dim = "H";
+            else if (/^Geometry\d+\.X\d+/.test(fStr)) dim = "W";
+            else if (/^Geometry\d+\.Y\d+/.test(fStr)) dim = "H";
+            if (!dim) return whole;
+            if (dim === "W" && !widthScaled) return whole;
+            if (dim === "H" && !heightScaled) return whole;
             const v = parseFloat(vStr);
             if (!isFinite(v) || v === 0) return whole;
-            const ratio = dim === "Width" ? wRatio : hRatio;
+            const ratio = dim === "W" ? wRatio : hRatio;
             return `<Cell N='${cellName}' V='${v * ratio}'${rest}/>`;
           },
         );
@@ -680,6 +705,19 @@ export async function exportVisioV3(
           : "") +
         `</Section>`;
       if (act !== "NoTaskType") triggerAction = act;
+    } else if (el.type === "gateway") {
+      const GATEWAY_TYPE_ACTION: Record<string, string> = {
+        "exclusive":   "ExclusiveDataWithMarker",
+        "inclusive":   "Inclusive",
+        "parallel":    "Parallel",
+        "event-based": "ExclusiveEvent",
+      };
+      const act = GATEWAY_TYPE_ACTION[el.gatewayType ?? "exclusive"]
+        ?? "ExclusiveDataWithMarker";
+      actionsSection = `<Section N='Actions'>` +
+        `<Row N='${act}'><Cell N='Checked' V='1' F='Inh'/></Row>` +
+        `</Section>`;
+      triggerAction = act;
     }
 
     // Each marker is one or more (shapeId, geomIxs) overrides — Geometry IX
@@ -707,6 +745,16 @@ export async function exportVisioV3(
       "BusinessRule": [{ shapeId: 26, geomIxs: [0, 1, 2, 3] }],
       // Error, Cancel, Conditional are drawn by geometry sections on the
       // master's root Shape 5 (no dedicated marker sub-shape). TBD.
+      // Gateway markers (BPMN_M Gateway master 50, mapping.masterId=104).
+      // Action names match the gateway master's Actions section
+      // (ExclusiveDataWithMarker/Inclusive/Parallel/ExclusiveEvent).
+      "ExclusiveDataWithMarker": [{ shapeId: 7,  geomIxs: [0] }],
+      "Inclusive":               [{ shapeId: 11, geomIxs: [0] }],
+      "Parallel":                [{ shapeId: 13, geomIxs: [0] }],
+      "ExclusiveEvent":          [
+        { shapeId: 9,  geomIxs: [0, 1] },
+        { shapeId: 10, geomIxs: [0] },
+      ],
     };
     const triggerMarkers: MarkerSpec[] = triggerAction
       ? (TRIGGER_MARKER_MAP[triggerAction] ?? [])
