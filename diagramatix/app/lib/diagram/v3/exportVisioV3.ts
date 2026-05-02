@@ -484,6 +484,20 @@ export async function exportVisioV3(
     return scaleMarkerShapeXY(content, shapeId, 1, hScale, ["PinX", "PinY"]);
   }
 
+  /** Shift a collapsed Subprocess's label up 5px from the master's
+   *  default centre-anchored position. Override `TxtPinY`'s cached V
+   *  and formula so first paint and Visio recalc agree on the new
+   *  position (`Sheet.5!Height*0.5 + 1.32MM`). 1.32MM = 5/96 inch
+   *  matches Diagramatix's 96-DPI canvas. */
+  function shiftSubprocessLabelUp(content: string, instanceH: number): string {
+    const FIVE_PX_IN = 0.0520833333333333; // 5 / 96 inches
+    const newV = instanceH / 2 + FIVE_PX_IN;
+    return content.replace(
+      /(<Shape ID='5'[^>]*>[\s\S]*?<Cell N='TxtPinY' V=')[\d.]+('[^>]*F=')[^']+(')/,
+      `$1${newV}$2Sheet.5!Height*0.5+1.32MM$3`,
+    );
+  }
+
   /** Override Txt* cells in Shape 5 to pin the label near the top of
    *  the body. Visio shape coords are Y-up, so "near top" = high Y.
    *  Approach: 6MM-tall text block whose top edge sits at the body's
@@ -546,7 +560,44 @@ export async function exportVisioV3(
     content = forceShapeSquare(content, 8);
     content = forceShapeSquare(content, 9);
     content = forceShapeSquare(content, 10);
+    // Render as 2 thin concentric circles + a thin pentagon: Shape 9's
+    // Geom 0 and Geom 1 default to NoFill=0 (filled), which paints two
+    // stacked filled ellipses on a coloured body — looks solid. Set
+    // both to NoFill=1 so only the strokes show. Shape 10 (pentagon)
+    // is already NoFill=1 in the template.
+    content = unfillEventBasedRings(content);
     return content;
+  }
+
+  /** For master 50 Shape 9 (event-based gateway concentric circles),
+   *  set Geom 0 and Geom 1 NoFill='1' so they paint as thin outlines
+   *  rather than filled ellipses. */
+  function unfillEventBasedRings(content: string): string {
+    const openRe = /<Shape ID='9'[^>]*>/;
+    const openMatch = content.match(openRe);
+    if (!openMatch || openMatch.index === undefined) return content;
+    const start = openMatch.index;
+    let pos = start + openMatch[0].length;
+    let depth = 1;
+    while (depth > 0 && pos < content.length) {
+      const nextOpen = content.indexOf("<Shape ", pos);
+      const nextClose = content.indexOf("</Shape>", pos);
+      if (nextClose === -1) return content;
+      if (nextOpen !== -1 && nextOpen < nextClose) {
+        depth++;
+        pos = nextOpen + "<Shape ".length;
+      } else {
+        depth--;
+        pos = nextClose + "</Shape>".length;
+      }
+    }
+    let block = content.slice(start, pos);
+    // Set NoFill='1' on both Geometry sections (IX=0 outer, IX=1 inner).
+    block = block.replace(
+      /(<Section N='Geometry' IX='[01]'>)<Cell N='NoFill' V='[01]'\/>/g,
+      `$1<Cell N='NoFill' V='1'/>`,
+    );
+    return content.slice(0, start) + block + content.slice(pos);
   }
 
   /** Make the Inclusive gateway marker (master 50, Shape 11) render as
@@ -871,28 +922,46 @@ export async function exportVisioV3(
     // active markers overlap at body centre on first paint until Visio
     // recalcs.
     if (sourceMasterId === 33 && instanceH !== undefined && instanceW !== undefined) {
-      // Force IF(IsInstance,1,2) → 1.5 so Shape 11/12/13 size to 6MM
-      // (50% bigger than the IsInstance=1 branch, matching standard BPMN).
+      // Force IF(IsInstance,1,2) → 0.85 so Shape 11/12/13 size to 3.4MM,
+      // matching the height of the MI Sequential / MI Parallel markers
+      // (which use `BpmnIconHeight*0.85` directly — see Shape 15/27).
       masterContent = masterContent.replace(
         /IF\(Sheet\.5!User\.IsInstance,1,2\)/g,
-        "1.5",
+        "0.85",
       );
       masterContent = masterContent.replace(
         /IF\(Sheet\.5!User\.IsInstance,0,0\.1\)/g,
         "0",
       );
-      // Re-pin Shape 11 to `3.5MM*DropOnPageScale` from the body bottom
-      // (Visio shape coords are Y-up). 3.5MM keeps the 6MM-tall marker
-      // sitting just above the bottom edge — 0.5MM gap.
-      const pinYNew = 0.13779527559055118; // 3.5MM in inches
+      // Re-pin Shape 11's vertical position to match the MI markers —
+      // they sit at `BpmnIconPinY` (= 3MM from body bottom in Y-up
+      // coords). Using the same anchor keeps the + aligned with Loop
+      // and AdHoc on the bottom row.
+      const pinYNew = 0.1181102362204724; // 3MM in inches
       masterContent = masterContent.replace(
         /(<Shape ID='11'[^>]*>[\s\S]*?<Cell N='PinY' V=')[\d.]+(' U='MM' F=')[^']+(')/,
-        `$1${pinYNew}$2GUARD(3.5MM*Sheet.5!DropOnPageScale)$3`,
+        `$1${pinYNew}$2GUARD(Sheet.5!User.BpmnIconPinY)$3`,
       );
-      // Scale Shape 11/12/13 cached V's to match the 1.5× formula above.
-      masterContent = scaleMarkerShape(masterContent, 11, 0.75, ["PinX", "PinY"]);
-      masterContent = scaleMarkerShape(masterContent, 12, 0.75);
-      masterContent = scaleMarkerShape(masterContent, 13, 0.75);
+      // Scale Shape 11/12/13 cached V's to match the 0.85× formula
+      // above (template natural is 2× → factor 0.85/2 = 0.425).
+      masterContent = scaleMarkerShape(masterContent, 11, 0.425, ["PinX", "PinY"]);
+      masterContent = scaleMarkerShape(masterContent, 12, 0.425);
+      masterContent = scaleMarkerShape(masterContent, 13, 0.425);
+      // MI Sequential / MI Parallel markers — halve their Width so the
+      // 3 lines fit in half the horizontal span (= lines slightly
+      // closer together AND each line shorter).
+      masterContent = scaleMarkerShapeXY(masterContent, 15, 0.5, 1, ["PinX", "PinY"]);
+      masterContent = scaleMarkerShapeXY(masterContent, 27, 0.5, 1, ["PinX", "PinY"]);
+      // Also halve the Width formula multiplier (0.74 → 0.37) so Visio
+      // recalc agrees with the cached V's.
+      masterContent = masterContent.replace(
+        /(<Shape ID='15'[^>]*>[\s\S]*?<Cell N='Width' V='[\d.]+'[^>]*F=')GUARD\(Sheet\.5!User\.BpmnIconHeight\)\*0\.74(')/,
+        `$1GUARD(Sheet.5!User.BpmnIconHeight)*0.37$2`,
+      );
+      masterContent = masterContent.replace(
+        /(<Shape ID='27'[^>]*>[\s\S]*?<Cell N='Width' V='[\d.]+'[^>]*F=')GUARD\(Sheet\.5!User\.BpmnIconHeight\)\*0\.74(')/,
+        `$1GUARD(Sheet.5!User.BpmnIconHeight)*0.37$2`,
+      );
       // Compute which markers are active and rewrite their PinX cached
       // V's to match where the master's `BpmnIconPosition` formulas
       // would place them with this combination active. Without this,
@@ -920,6 +989,11 @@ export async function exportVisioV3(
           masterContent,
           instanceH,
         );
+      } else {
+        // Collapsed Subprocess: shift the centre-anchored label up 5px
+        // (= 5/96" ≈ 1.32MM) so it doesn't crowd the bottom-row markers.
+        // Visio shape coords are Y-up — "up" on screen = higher Y.
+        masterContent = shiftSubprocessLabelUp(masterContent, instanceH);
       }
     }
 

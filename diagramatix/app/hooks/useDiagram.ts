@@ -1092,7 +1092,7 @@ function resizePoolForLabel(
 }
 
 function clampChildrenToLane(elements: DiagramElement[], lane: DiagramElement): DiagramElement[] {
-  const LANE_LW = 36;
+  const LANE_LW = getLaneHeaderWidth(lane);
   const minX = lane.x + LANE_LW;
   const minY = lane.y;
   const maxX = lane.x + lane.width;
@@ -3742,6 +3742,10 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         .sort((a, b) => a.y - b.y);
       const laneCount = state.elements.filter((e) => e.type === "lane").length;
       const laneFs = state.laneFontSize ?? 12;
+      // Use the pool's actual header width — if the user (or auto-grow)
+      // has widened it past the default 36, child lanes must start at
+      // the wider boundary or their headers overlap the pool header.
+      const POOL_LABEL_W_DYN = getPoolHeaderWidth(pool);
 
       let next: { elements: DiagramElement[]; connectors: Connector[] };
       if (existingLanes.length === 0) {
@@ -3751,14 +3755,14 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         const poolH = topH + botH;
         const lane1: DiagramElement = {
           id: nanoid(), type: "lane",
-          x: pool.x + POOL_LABEL_W, y: pool.y,
-          width: pool.width - POOL_LABEL_W, height: topH,
+          x: pool.x + POOL_LABEL_W_DYN, y: pool.y,
+          width: pool.width - POOL_LABEL_W_DYN, height: topH,
           label: `Lane ${laneCount + 1}`, properties: {}, parentId: poolId,
         };
         const lane2: DiagramElement = {
           id: nanoid(), type: "lane",
-          x: pool.x + POOL_LABEL_W, y: pool.y + topH,
-          width: pool.width - POOL_LABEL_W, height: botH,
+          x: pool.x + POOL_LABEL_W_DYN, y: pool.y + topH,
+          width: pool.width - POOL_LABEL_W_DYN, height: botH,
           label: `Lane ${laneCount + 2}`, properties: {}, parentId: poolId,
         };
         const elements = state.elements.map((e) =>
@@ -3774,8 +3778,8 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         const newLaneH = Math.max(LANE_HEADER_H, MIN_LANE_H);
         const newLane: DiagramElement = {
           id: nanoid(), type: "lane",
-          x: pool.x + POOL_LABEL_W, y: laneY,
-          width: pool.width - POOL_LABEL_W, height: newLaneH,
+          x: pool.x + POOL_LABEL_W_DYN, y: laneY,
+          width: pool.width - POOL_LABEL_W_DYN, height: newLaneH,
           label: `Lane ${laneCount + 1}`, properties: {}, parentId: poolId,
         };
         const neededH = (laneY + newLaneH) - pool.y;
@@ -3805,7 +3809,10 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       const { laneId } = action.payload;
       const parentLane = state.elements.find((e) => e.id === laneId && e.type === "lane");
       if (!parentLane) return state;
-      const LANE_LW = 36;
+      // Use the parent lane's actual header width — if it's auto-grown
+      // past the default 36, sublanes must start at the wider boundary
+      // or their headers overlap the parent lane header.
+      const LANE_LW = getLaneHeaderWidth(parentLane);
 
       // Walk up to find the containing pool — needed for the 100px
       // pool-below-shift rule below if this addition grows the pool.
@@ -4015,8 +4022,9 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       }
 
       // Proportionally resize sub-lanes within the resized lanes (recurse into deeper nesting)
-      const LANE_LW = 36;
       function resizeSublanes(elements: DiagramElement[], laneId: string, newLaneY: number, newLaneH: number, newLaneX: number, newLaneW: number): DiagramElement[] {
+        const parent = elements.find((e) => e.id === laneId);
+        const LANE_LW = parent ? getLaneHeaderWidth(parent) : 36;
         const subs = elements.filter((e) => e.type === "lane" && e.parentId === laneId).sort((a, b) => a.y - b.y);
         if (subs.length === 0) return elements;
         const totalSubH = subs.reduce((s, l) => s + l.height, 0) || 1;
