@@ -215,55 +215,54 @@ export async function exportVisioV3(
     const r = parseInt(colour.slice(1, 3), 16);
     const g = parseInt(colour.slice(3, 5), 16);
     const b = parseInt(colour.slice(5, 7), 16);
-    // For most masters Shape 6 is the body fill. End and Intermediate
-    // events are special: Shape 6 paints the OUTER ring (black for End,
-    // theme white for Intermediate), and Shape 9 — `FillStyle='7'` theme-
-    // white inner ellipse — overlays Shape 6 to create the visible body
-    // interior. Colour Shape 9 for both so the outer ring keeps its
-    // shape and the inner body picks up the user's colour.
-    const targetShapeId =
-      elType === "end-event" || elType === "intermediate-event" ? "9" : "6";
-    const targetOpenRe = new RegExp(`<Shape ID='${targetShapeId}'[^>]*>`);
-    const targetOpen = content.match(targetOpenRe);
-    if (!targetOpen) return content;
-    const shapeStart = targetOpen.index!;
-    const shapeOpenEnd = shapeStart + targetOpen[0].length;
-    const nextShape = content.indexOf("<Shape ID=", shapeOpenEnd);
-    const bodyEnd = nextShape === -1 ? content.length : nextShape;
-    const bodyTextOriginal = content.slice(shapeOpenEnd, bodyEnd);
-
-    // Drop any FillStyle on the opening tag — Pool/Lane's coloured shape
-    // uses FillStyle='3' (no theme inheritance), template masters use '7'
-    // (themed white). Force '3' so our cell-level FillForegnd wins.
-    const newOpen = targetOpen[0].replace(/FillStyle='\d+'/, "FillStyle='3'");
-
-    // Inside Shape 6's block, replace any FillForegnd cell with our colour.
-    // We're already scoped to Shape 6's block, so this is safe — no marker
-    // sub-shape FillForegnd cells get touched. Catches three common
-    // patterns the BPMN_M masters use:
-    //   `V='1' F='GUARD(...)'`     — Task / Subprocess body
-    //   `V='#ffffff' F='THEMEGUARD(...)'` — Pool / Lane body
-    //   `V='0' F='GUARD(IF(User.EventTypeMode=5,0,...))'` — End Event body
-    //     (without this, end events stayed black instead of red).
+    // Decide which shape(s) get coloured:
+    //   end-event           → Shape 9 only (Shape 6 is the BLACK ring,
+    //                         keep it black; Shape 9 is the inner body)
+    //   intermediate-event  → Shape 6 AND Shape 9 — Shape 6 fills the
+    //                         outer ring area, Shape 9 the inner. Both
+    //                         coloured so the area between the rings
+    //                         AND inside the inner ring are coloured.
+    //   everything else     → Shape 6 only
+    const targetShapeIds: string[] =
+      elType === "end-event" ? ["9"]
+      : elType === "intermediate-event" ? ["6", "9"]
+      : ["6"];
     const colourCell = `<Cell N='FillForegnd' V='${colour}' F='RGB(${r},${g},${b})'/>`;
-    let bodyTextNew = bodyTextOriginal.replace(
-      /<Cell N='FillForegnd' V='[^']*' F='[^']*'\/>/g,
-      colourCell,
-    );
+    for (const targetShapeId of targetShapeIds) {
+      const targetOpenRe = new RegExp(`<Shape ID='${targetShapeId}'[^>]*>`);
+      const targetOpen = content.match(targetOpenRe);
+      if (!targetOpen) continue;
+      const shapeStart = targetOpen.index!;
+      const shapeOpenEnd = shapeStart + targetOpen[0].length;
+      const nextShape = content.indexOf("<Shape ID=", shapeOpenEnd);
+      const bodyEnd = nextShape === -1 ? content.length : nextShape;
+      const bodyTextOriginal = content.slice(shapeOpenEnd, bodyEnd);
 
-    if (!/<Cell N='FillForegnd'/.test(bodyTextNew)) {
-      bodyTextNew =
-        `<Cell N='FillForegnd' V='${colour}' F='RGB(${r},${g},${b})'/>` +
-        `<Cell N='FillPattern' V='1' F='RGB(0,0,0)*0+1'/>` +
-        bodyTextNew;
+      // Drop any FillStyle on the opening tag — Pool/Lane's coloured shape
+      // uses FillStyle='3' (no theme inheritance), template masters use '7'
+      // (themed white). Force '3' so our cell-level FillForegnd wins.
+      const newOpen = targetOpen[0].replace(/FillStyle='\d+'/, "FillStyle='3'");
+
+      // Replace any FillForegnd cell with our colour.
+      let bodyTextNew = bodyTextOriginal.replace(
+        /<Cell N='FillForegnd' V='[^']*' F='[^']*'\/>/g,
+        colourCell,
+      );
+
+      if (!/<Cell N='FillForegnd'/.test(bodyTextNew)) {
+        bodyTextNew =
+          `<Cell N='FillForegnd' V='${colour}' F='RGB(${r},${g},${b})'/>` +
+          `<Cell N='FillPattern' V='1' F='RGB(0,0,0)*0+1'/>` +
+          bodyTextNew;
+      }
+
+      content =
+        content.slice(0, shapeStart) +
+        newOpen +
+        bodyTextNew +
+        content.slice(bodyEnd);
     }
-
-    return (
-      content.slice(0, shapeStart) +
-      newOpen +
-      bodyTextNew +
-      content.slice(bodyEnd)
-    );
+    return content;
   }
 
   /** For each `<Shape ID='N'>` whose own Width formula references
@@ -566,13 +565,11 @@ export async function exportVisioV3(
     const innerD = minBody * 0.439;
     const pentD = minBody * 0.293;
 
-    // Shape 8 — container, square, body-centred. Override Width and
-    // Height formulas to MIN(W,H)*0.556 so square holds for any
-    // instance aspect; cached V matches.
-    const minSideF = "GUARD(IF(Sheet.5!Width<Sheet.5!Height,Sheet.5!Width,Sheet.5!Height))";
+    // Shape 8 — container, body-centred. Width/Height = Sheet.5!Width*0.556
+    // so it's square (assuming square gateway, which Diagramatix's are).
     content = overrideShapeDirectCells(content, 8, {
-      Width: { v: outerD, f: `${minSideF}*0.556` },
-      Height: { v: outerD, f: "Width" },
+      Width: { v: outerD, f: "Sheet.5!Width*0.556" },
+      Height: { v: outerD, f: "Sheet.5!Width*0.556" },
       LocPinX: { v: outerD / 2, f: "Width*0.5" },
       LocPinY: { v: outerD / 2, f: "Height*0.5" },
       PinX: { v: instanceW / 2, f: "Sheet.5!Width*0.5" },
