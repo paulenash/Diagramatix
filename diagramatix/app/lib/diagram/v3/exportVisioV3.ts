@@ -215,12 +215,14 @@ export async function exportVisioV3(
     const r = parseInt(colour.slice(1, 3), 16);
     const g = parseInt(colour.slice(3, 5), 16);
     const b = parseInt(colour.slice(5, 7), 16);
-    // For most masters Shape 6 is the body fill. End events are special:
-    // Shape 6 is the THICK BLACK OUTER RING (FillForegnd evaluates to 0
-    // when EventTypeMode=5), and Shape 7 is the inner body fill. Colour
-    // Shape 7 instead so the outer ring stays black and the body picks
-    // up the user's red.
-    const targetShapeId = elType === "end-event" ? "7" : "6";
+    // For most masters Shape 6 is the body fill. End and Intermediate
+    // events are special: Shape 6 paints the OUTER ring (black for End,
+    // theme white for Intermediate), and Shape 9 — `FillStyle='7'` theme-
+    // white inner ellipse — overlays Shape 6 to create the visible body
+    // interior. Colour Shape 9 for both so the outer ring keeps its
+    // shape and the inner body picks up the user's colour.
+    const targetShapeId =
+      elType === "end-event" || elType === "intermediate-event" ? "9" : "6";
     const targetOpenRe = new RegExp(`<Shape ID='${targetShapeId}'[^>]*>`);
     const targetOpen = content.match(targetOpenRe);
     if (!targetOpen) return content;
@@ -549,33 +551,159 @@ export async function exportVisioV3(
    *  marker centred in the diamond and well inside its bounds. */
   function shrinkEventBasedMarker(
     content: string,
-    wRatio: number,
-    hRatio: number,
+    instanceW: number,
+    instanceH: number,
   ): string {
-    const SHRINK = 0.6;
-    // Shape 8 was already scaled to instance dims by Layer 1, so apply
-    // SHRINK to its cached V's. Skip PinX/PinY — those still pin to
-    // body centre.
-    content = scaleMarkerShape(content, 8, SHRINK, ["PinX", "PinY"]);
-    // Shapes 9 and 10 reference Sheet.8 which Layer 1 doesn't catch
-    // (regex is `Sheet.[57]!`), so their cached V's are still at
-    // template natural. Apply both wRatio (Layer 1 equivalent) and
-    // SHRINK to bring them onto the new Shape 8.
-    content = scaleMarkerShapeXY(content, 9, wRatio * SHRINK, hRatio * SHRINK);
-    content = scaleMarkerShapeXY(content, 10, wRatio * SHRINK, hRatio * SHRINK);
-    // Force the marker container and its children to be square so the
-    // outer/inner ellipses render as circles and the pentagon is
-    // regular. Template fractions differ in W vs H (0.46 vs 0.58 for
-    // Shape 8) which produces an elliptical / squashed pentagon look.
-    content = forceShapeSquare(content, 8);
-    content = forceShapeSquare(content, 9);
-    content = forceShapeSquare(content, 10);
-    // Render as 2 thin concentric circles + a thin pentagon: Shape 9's
-    // Geom 0 and Geom 1 default to NoFill=0 (filled), which paints two
-    // stacked filled ellipses on a coloured body — looks solid. Set
-    // both to NoFill=1 so only the strokes show. Shape 10 (pentagon)
-    // is already NoFill=1 in the template.
-    content = unfillEventBasedRings(content);
+    // Match Diagramatix canvas marker design (SymbolRenderer.tsx
+    // event-based): outer circle radius = s*0.95, inner = s*0.75,
+    // pentagon = s*0.5 with s=11.7 in a typical 40px gateway. As
+    // fractions of body: outer diam ≈ 0.556, inner ≈ 0.439, pentagon
+    // ≈ 0.293. We override Shape 8 (container) to a square at outer
+    // diameter, then Shape 9's cached V's (rings) and Shape 10's
+    // cached V's (pentagon) so first paint matches Visio's recalc.
+    const minBody = Math.min(instanceW, instanceH);
+    const outerD = minBody * 0.556;
+    const innerD = minBody * 0.439;
+    const pentD = minBody * 0.293;
+
+    // Shape 8 — container, square, body-centred. Override Width and
+    // Height formulas to MIN(W,H)*0.556 so square holds for any
+    // instance aspect; cached V matches.
+    const minSideF = "GUARD(IF(Sheet.5!Width<Sheet.5!Height,Sheet.5!Width,Sheet.5!Height))";
+    content = overrideShapeDirectCells(content, 8, {
+      Width: { v: outerD, f: `${minSideF}*0.556` },
+      Height: { v: outerD, f: "Width" },
+      LocPinX: { v: outerD / 2, f: "Width*0.5" },
+      LocPinY: { v: outerD / 2, f: "Height*0.5" },
+      PinX: { v: instanceW / 2, f: "Sheet.5!Width*0.5" },
+      PinY: { v: instanceH / 2, f: "Sheet.5!Height*0.5" },
+    });
+
+    // Shape 9 — full-size circle + smaller circle. The two ellipse
+    // geometries fill the same bounding box; the Geom 1 ellipse is
+    // sized smaller via its A and D fractions of the local Width/
+    // Height. Override Shape 9's box to outer size, set Geom 1 ellipse
+    // to innerD/outerD ratio of itself, set NoFill=1 + 1px LineWeight.
+    const innerFrac = innerD / outerD;
+    content = overrideShapeDirectCells(content, 9, {
+      Width: { v: outerD, f: "Sheet.8!Width*1" },
+      Height: { v: outerD, f: "Sheet.8!Height*1" },
+      PinX: { v: outerD / 2, f: "Sheet.8!Width*0.5" },
+      PinY: { v: outerD / 2, f: "Sheet.8!Height*0.5" },
+      LocPinX: { v: outerD / 2, f: "Width*0.5" },
+      LocPinY: { v: outerD / 2, f: "Height*0.5" },
+    });
+    // Replace Shape 9's two Geometry sections with clean concentric
+    // ellipses (outer fills shape, inner is innerFrac smaller).
+    content = rewriteShape9Rings(content, outerD, innerFrac);
+
+    // Shape 10 — pentagon, inside the inner circle. Re-pin to the
+    // centre of Shape 8 (= centre of Shape 9), size = pentD.
+    content = overrideShapeDirectCells(content, 10, {
+      Width: { v: pentD, f: `Sheet.8!Width*${(pentD / outerD).toFixed(6)}` },
+      Height: { v: pentD, f: "Width" },
+      PinX: { v: outerD / 2, f: "Sheet.8!Width*0.5" },
+      PinY: { v: outerD / 2, f: "Sheet.8!Height*0.5" },
+      LocPinX: { v: pentD / 2, f: "Width*0.5" },
+      LocPinY: { v: pentD / 2, f: "Height*0.5" },
+    });
+
+    content = setEventMarkerLineWeight(content);
+    return content;
+  }
+
+  /** Replace Shape 9's two Ellipse geometry sections with clean
+   *  concentric circles. Outer ellipse fills Shape 9; inner ellipse
+   *  is `innerFrac` smaller (centred). Both NoFill=1 (stroke only). */
+  function rewriteShape9Rings(
+    content: string,
+    outerD: number,
+    innerFrac: number,
+  ): string {
+    const halfO = outerD / 2;
+    const innerR = (outerD * innerFrac) / 2;
+    const outerSec =
+      `<Section N='Geometry' IX='0'>` +
+      `<Cell N='NoFill' V='1'/><Cell N='NoLine' V='0'/>` +
+      `<Cell N='NoShow' V='1' F='NOT(Sheet.5!Actions.ExclusiveEvent.Checked)'/>` +
+      `<Cell N='NoSnap' V='0'/><Cell N='NoQuickDrag' V='0' F='No Formula'/>` +
+      `<Row T='Ellipse' IX='1'>` +
+      `<Cell N='X' V='${halfO}' F='Width*0.5'/>` +
+      `<Cell N='Y' V='${halfO}' F='Height*0.5'/>` +
+      `<Cell N='A' V='${outerD}' F='Width*1'/>` +
+      `<Cell N='B' V='${halfO}' F='Height*0.5'/>` +
+      `<Cell N='C' V='${halfO}' F='Width*0.5'/>` +
+      `<Cell N='D' V='${outerD}' F='Height*1'/>` +
+      `</Row></Section>`;
+    const innerSec =
+      `<Section N='Geometry' IX='1'>` +
+      `<Cell N='NoFill' V='1'/><Cell N='NoLine' V='0'/>` +
+      `<Cell N='NoShow' V='1' F='Geometry1.NoShow'/>` +
+      `<Cell N='NoSnap' V='0'/><Cell N='NoQuickDrag' V='0' F='No Formula'/>` +
+      `<Row T='Ellipse' IX='1'>` +
+      `<Cell N='X' V='${halfO}' F='Width*0.5'/>` +
+      `<Cell N='Y' V='${halfO}' F='Height*0.5'/>` +
+      `<Cell N='A' V='${halfO + innerR}' F='Width*${(0.5 + innerFrac / 2).toFixed(6)}'/>` +
+      `<Cell N='B' V='${halfO}' F='Height*0.5'/>` +
+      `<Cell N='C' V='${halfO}' F='Width*0.5'/>` +
+      `<Cell N='D' V='${halfO + innerR}' F='Height*${(0.5 + innerFrac / 2).toFixed(6)}'/>` +
+      `</Row></Section>`;
+    return content.replace(
+      /(<Shape ID='9'[^>]*>[\s\S]*?)<Section N='Geometry' IX='0'>[\s\S]*?<\/Section><Section N='Geometry' IX='1'>[\s\S]*?<\/Section>/,
+      `$1${outerSec}${innerSec}`,
+    );
+  }
+
+  /** Override the cached V (and optionally formula) of specific cells
+   *  in a shape's DIRECT body — the cells that appear before the first
+   *  nested `<Shape ID='`. Lets us rewrite a shape's Width/Height/
+   *  PinX/PinY without inadvertently touching nested children's cells
+   *  (which `scaleMarkerShape` does because it operates on the full
+   *  shape block). */
+  function overrideShapeDirectCells(
+    content: string,
+    shapeId: number,
+    overrides: Record<string, { v: number; f?: string }>,
+  ): string {
+    const openRe = new RegExp(`<Shape ID='${shapeId}'[^>]*>`);
+    const openMatch = content.match(openRe);
+    if (!openMatch || openMatch.index === undefined) return content;
+    const start = openMatch.index;
+    const openEnd = start + openMatch[0].length;
+    const nextOpen = content.indexOf("<Shape ID='", openEnd);
+    const nextClose = content.indexOf("</Shape>", openEnd);
+    let bodyEnd: number;
+    if (nextClose === -1) return content;
+    if (nextOpen !== -1 && nextOpen < nextClose) bodyEnd = nextOpen;
+    else bodyEnd = nextClose;
+    let directBody = content.slice(openEnd, bodyEnd);
+    for (const [cellName, { v, f }] of Object.entries(overrides)) {
+      const re = new RegExp(
+        `(<Cell N='${cellName}' V=')[\\d.]+('[^>]*?)(?:F='[^']+')?(/>)`,
+      );
+      const replacement = f
+        ? `$1${v}$2F='${f}'$3`
+        : `$1${v}$2$3`;
+      directBody = directBody.replace(re, replacement);
+    }
+    return content.slice(0, openEnd) + directBody + content.slice(bodyEnd);
+  }
+
+  /** Set LineWeight on Shapes 9 and 10 of the gateway master (event-
+   *  based marker rings + pentagon) to 1px (= 0.75PT) so the marker
+   *  draws with thin strokes matching the Diagramatix canvas style.
+   *  V = 1/96 inch = 0.01041666… */
+  function setEventMarkerLineWeight(content: string): string {
+    const ONE_PX_IN = 0.010416666666666666; // 1 / 96 inches
+    for (const shapeId of [9, 10]) {
+      const re = new RegExp(
+        `(<Shape ID='${shapeId}'[^>]*>[\\s\\S]*?<Cell N='LineWeight' V=')[\\d.]+('[^>]*F=')[^']+(')`,
+      );
+      content = content.replace(
+        re,
+        `$1${ONE_PX_IN}$2GUARD(0.75PT)$3`,
+      );
+    }
     return content;
   }
 
@@ -1041,16 +1169,24 @@ export async function exportVisioV3(
     if (sourceMasterId === 104 && instanceW !== undefined && instanceH !== undefined) {
       const gwType = elProps?.gatewayType ?? "exclusive";
       // Master 50's Shape 5 natural Width=1in, Height=0.75in.
-      const wRatio = instanceW / 1;
-      const hRatio = instanceH / 0.75;
-      // Event-based: shrink the pentagon so it fits inside the diamond.
+      // (kept for any callers that still need a ratio; helpers below
+      // now take the instance dimensions directly.)
+      // Event-based: clean rewrite of the marker — outer + inner
+      // circles + pentagon — matching Diagramatix canvas proportions.
       if (gwType === "event-based") {
-        masterContent = shrinkEventBasedMarker(masterContent, wRatio, hRatio);
+        masterContent = shrinkEventBasedMarker(masterContent, instanceW, instanceH);
       }
       // Inclusive: render as a thick unfilled ring instead of two
       // stacked filled ellipses.
       if (gwType === "inclusive") {
         masterContent = drawInclusiveAsThickRing(masterContent);
+      }
+      // Parallel: the master's Shape 13 (cross marker) is wider than
+      // tall (W frac 0.441 vs H frac 0.5625), so the horizontal arm
+      // ends up shorter than the vertical arm. Force it square so the
+      // two cross arms have the same length.
+      if (gwType === "parallel") {
+        masterContent = forceShapeSquare(masterContent, 13);
       }
     }
 
