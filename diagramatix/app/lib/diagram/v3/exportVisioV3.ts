@@ -254,6 +254,44 @@ export async function exportVisioV3(
     );
   }
 
+  /** Apply the `3MM → 4.58MM` (X, +6px) and `3MM → 3.26MM` (Y, +1px)
+   *  marker-icon nudge inside the `<Shape ID='${shapeId}'>...</Shape>`
+   *  block only. Walks Shape opens/closes to find the correct matching
+   *  close (Shape elements can nest, so a non-greedy regex would
+   *  mis-match). Other Shape blocks in the same master are left
+   *  untouched. */
+  function nudgeMarkerShapeBlock(content: string, shapeId: number): string {
+    const openRe = new RegExp(`<Shape ID='${shapeId}'[^>]*>`);
+    const openMatch = content.match(openRe);
+    if (!openMatch || openMatch.index === undefined) return content;
+    const start = openMatch.index;
+    let pos = start + openMatch[0].length;
+    let depth = 1;
+    while (depth > 0 && pos < content.length) {
+      const nextOpen = content.indexOf("<Shape ", pos);
+      const nextClose = content.indexOf("</Shape>", pos);
+      if (nextClose === -1) return content;
+      if (nextOpen !== -1 && nextOpen < nextClose) {
+        depth++;
+        pos = nextOpen + "<Shape ".length;
+      } else {
+        depth--;
+        pos = nextClose + "</Shape>".length;
+      }
+    }
+    const block = content.slice(start, pos);
+    const nudged = block
+      .replace(
+        /GUARD\(3MM\*Sheet\.5!DropOnPageScale\)/g,
+        "GUARD(4.58MM*Sheet.5!DropOnPageScale)",
+      )
+      .replace(
+        /GUARD\(Sheet\.5!Height-3MM\*Sheet\.5!DropOnPageScale\)/g,
+        "GUARD(Sheet.5!Height-3.26MM*Sheet.5!DropOnPageScale)",
+      );
+    return content.slice(0, start) + nudged + content.slice(pos);
+  }
+
   /** Create a per-instance master copy of `sourceMasterId` with `colour` baked
    *  in and a fresh BaseID/UniqueID. Updates `mastersXml`, `mastersRels`,
    *  `contentTypes` (the local mutable strings, then re-writes them to the
@@ -267,6 +305,8 @@ export async function exportVisioV3(
   async function createInstanceMaster(
     sourceMasterId: number,
     colour: string,
+    instanceW?: number,
+    instanceH?: number,
   ): Promise<number> {
     const blockRe = new RegExp(`<Master\\s+ID='${sourceMasterId}'[\\s\\S]*?</Master>`);
     const blockMatch = mastersXml.match(blockRe);
@@ -285,6 +325,87 @@ export async function exportVisioV3(
     if (!masterContent) return sourceMasterId;
 
     masterContent = bakeColourIntoMaster(masterContent, colour);
+
+    // Task task-type markers (User/Service/Send/Receive/Manual/Script/
+    // BusinessRule) need to sit 6px to the right and ~1px below the
+    // master's natural `3MM` icon-anchor position so they line up inside
+    // the (corrected) visible body of the resized Task. Apply the nudge
+    // by replacing `3MM` with `4.58MM` for X (3MM + 6px ≈ 1.59mm) and
+    // `3MM` with `3.26MM` for Y (3MM + 1px) inside the marker shape
+    // blocks only — the same `3MM` constant is reused by other task
+    // sub-shapes for body-relative positioning, so a global replace would
+    // break body alignment.
+    if (sourceMasterId === 9) {
+      const taskMarkerShapeIds = [18, 19, 20, 21, 22, 23, 25, 26];
+      for (const msId of taskMarkerShapeIds) {
+        masterContent = nudgeMarkerShapeBlock(masterContent, msId);
+      }
+    }
+
+    // Resize the per-instance master to match the actual instance
+    // dimensions. Visio uses cached `V=` on first paint, before evaluating
+    // formulas — so master sub-shapes with `F='Sheet.5!Width*1'` paint at
+    // the natural-size cached V even if the instance Width is different.
+    //
+    // Approach: rewrite cached V on every cell whose formula references the
+    // body-chain sheets (`Sheet.5!Width|Height` or `Sheet.7!Width|Height`)
+    // by scaling V proportionally to the resize ratio. This catches:
+    //  - Shape 6/7 body cells (`Sheet.5!Width*1` / `*0.5`)
+    //  - Shape 8 outline cells (`Sheet.7!Width*1` — Sheet.7 inherits 5)
+    //  - Shape 9 inset body cells (`Sheet.7!Width-0.05*DropOnPageScale`)
+    //  - Sub-shapes using non-trivial factors (e.g. DataObject Shape 7
+    //    with `Sheet.5!Width*0.125` for the folded corner)
+    // Marker shapes whose formulas use `Sheet.5!DropOnPageScale` or
+    // `Sheet.5!User.BpmnIconHeight` are NOT matched (regex requires
+    // `Width|Height` directly after `!`), so their offsets remain intact.
+    if (instanceW !== undefined && instanceH !== undefined) {
+      const root5 = masterContent.match(
+        /<Shape ID='5'[^>]*>([\s\S]*?)<\/Shape>/,
+      );
+      if (root5) {
+        const naturalW = root5[1].match(/<Cell N='Width' V='([\d.]+)'/)?.[1];
+        const naturalH = root5[1].match(/<Cell N='Height' V='([\d.]+)'/)?.[1];
+        if (naturalW && naturalH) {
+          const nW = parseFloat(naturalW);
+          const nH = parseFloat(naturalH);
+          if (Math.abs(nW - instanceW) > 1e-9 || Math.abs(nH - instanceH) > 1e-9) {
+            const W = instanceW.toString();
+            const H = instanceH.toString();
+            const HW = (instanceW / 2).toString();
+            const HH = (instanceH / 2).toString();
+            const wRatio = instanceW / nW;
+            const hRatio = instanceH / nH;
+            masterContent = masterContent.replace(
+              /<Cell N='(\w+)' V='([\d.]+)'([^>]*F='[^']*Sheet\.[57]!(Width|Height)[^']*')\s*\/>/g,
+              (whole, cellName, vStr, rest, dim) => {
+                const v = parseFloat(vStr);
+                if (!isFinite(v) || v === 0) return whole;
+                const newV = dim === "Width" ? v * wRatio : v * hRatio;
+                return `<Cell N='${cellName}' V='${newV}'${rest}/>`;
+              },
+            );
+            // Root Shape 5's own Width/Height/LocPin cells don't reference
+            // Sheet.5! (they ARE Sheet.5), so handle them explicitly.
+            masterContent = masterContent.replace(
+              /(<Shape ID='5'[^>]*>[\s\S]*?<Cell N='Width' V=')[\d.]+('[^>]*\/>)/,
+              `$1${W}$2`,
+            );
+            masterContent = masterContent.replace(
+              /(<Shape ID='5'[^>]*>[\s\S]*?<Cell N='Height' V=')[\d.]+('[^>]*\/>)/,
+              `$1${H}$2`,
+            );
+            masterContent = masterContent.replace(
+              /(<Shape ID='5'[^>]*>[\s\S]*?<Cell N='LocPinX' V=')[\d.]+('[^>]*\/>)/,
+              `$1${HW}$2`,
+            );
+            masterContent = masterContent.replace(
+              /(<Shape ID='5'[^>]*>[\s\S]*?<Cell N='LocPinY' V=')[\d.]+('[^>]*\/>)/,
+              `$1${HH}$2`,
+            );
+          }
+        }
+      }
+    }
 
     const newId = nextInstanceMasterId++;
     const newRId = `rId${newId}`;
@@ -432,8 +553,9 @@ export async function exportVisioV3(
         `</Section>`;
     }
 
-    // Actions section — for events, this is what activates the trigger
-    // marker. Confirmed by diffing a Visio re-saved reference file.
+    // Actions section — Visio's master uses `Actions.<Name>.Checked` to
+    // drive marker visibility. Setting it explicitly at instance level is
+    // what activates each marker (verified for Message Start Event).
     const EVENT_TRIGGER_ACTION: Record<string, string> = {
       "none": "NoTriggerResult",
       "message": "Message",
@@ -446,6 +568,16 @@ export async function exportVisioV3(
       "cancel": "Cancel",
       "compensation": "Compensation",
       "link": "Link",
+    };
+    const TASK_TYPE_ACTION: Record<string, string> = {
+      "none":           "NoTaskType",
+      "user":           "User",
+      "service":        "Service",
+      "send":           "Send",
+      "receive":        "Receive",
+      "manual":         "Manual",
+      "script":         "Script",
+      "business-rule":  "BusinessRule",
     };
     let actionsSection = "";
     let triggerAction: string | null = null;
@@ -463,21 +595,47 @@ export async function exportVisioV3(
           : "") +
         `</Section>`;
       if (trig !== "NoTriggerResult") triggerAction = trig;
+    } else if (el.type === "task") {
+      const act = TASK_TYPE_ACTION[el.taskType ?? "none"] ?? "NoTaskType";
+      const noAct = act === "NoTaskType" ? "1" : "0";
+      actionsSection = `<Section N='Actions'>` +
+        `<Row N='NoTaskType'><Cell N='Checked' V='${noAct}' F='Inh'/></Row>` +
+        (act !== "NoTaskType"
+          ? `<Row N='${act}'><Cell N='Checked' V='1' F='Inh'/></Row>`
+          : "") +
+        `</Section>`;
+      if (act !== "NoTaskType") triggerAction = act;
     }
 
-    // Each BPMN event trigger has a fixed MasterShape ID inside the BPMN_M
-    // event masters (IDs 5-17 in master5/4/3). Visio's diff against a
-    // re-saved file showed the trigger marker is force-shown by emitting
-    // Geometry sub-sections with `NoShow='0' F='Inh'` on the corresponding
-    // stub sub-shape (e.g. MasterShape='10' for Message).
-    const EVENT_TRIGGER_MASTERSHAPE: Record<string, number> = {
-      "Message": 10,
-      // Other triggers (Timer, Error, Signal, ...) would map to different
-      // MasterShape IDs — extend after testing each.
+    // Each marker is one or more (shapeId, geomIxs) overrides — Geometry IX
+    // values whose NoShow we force to '0'. Discovered by scanning the
+    // master's `Actions.<Name>.Checked` references per sub-shape.
+    type MarkerSpec = { shapeId: number; geomIxs: number[] };
+    const TRIGGER_MARKER_MAP: Record<string, MarkerSpec[]> = {
+      // Event triggers (BPMN_M Start/Intermediate/End Event masters)
+      "Message":      [{ shapeId: 10, geomIxs: [0, 1, 2] }],
+      "Link":         [{ shapeId: 11, geomIxs: [0] }],
+      "Timer":        [{ shapeId: 12, geomIxs: [0,1,2,3,4,5,6,7,8,9,10,11,12,13] }],
+      "Signal":       [{ shapeId: 13, geomIxs: [0] }],
+      "Compensation": [{ shapeId: 15, geomIxs: [0, 1] }],
+      "Escalation":   [{ shapeId: 16, geomIxs: [0] }],
+      "Terminate":    [{ shapeId: 8,  geomIxs: [0] }],
+      // Task type markers (Task template master). User and Script share
+      // Shape 18 — User uses IX=0/1, Script uses IX=2.
+      "User":         [{ shapeId: 18, geomIxs: [0, 1] }],
+      "Script":       [{ shapeId: 18, geomIxs: [2] }],
+      "Service":      [{ shapeId: 19, geomIxs: [0, 1, 2, 3, 4] }],
+      // Send is two leaf shapes (21, 22) inside group Shape 20.
+      "Send":         [{ shapeId: 21, geomIxs: [0] }, { shapeId: 22, geomIxs: [0] }],
+      "Receive":      [{ shapeId: 23, geomIxs: [0, 1] }],
+      "Manual":       [{ shapeId: 25, geomIxs: [0, 1] }],
+      "BusinessRule": [{ shapeId: 26, geomIxs: [0, 1, 2, 3] }],
+      // Error, Cancel, Conditional are drawn by geometry sections on the
+      // master's root Shape 5 (no dedicated marker sub-shape). TBD.
     };
-    const triggerMasterShape = triggerAction
-      ? EVENT_TRIGGER_MASTERSHAPE[triggerAction] ?? null
-      : null;
+    const triggerMarkers: MarkerSpec[] = triggerAction
+      ? (TRIGGER_MARKER_MAP[triggerAction] ?? [])
+      : [];
 
     const isPool = mapping.masterId === 19;
     const textEl = el.label ? `<Text>${esc(el.label)}</Text>` : "";
@@ -670,25 +828,37 @@ export async function exportVisioV3(
     // master, so no instance-level body-fill sub-shape is needed.
 
     // Per-instance master copy with colour baked in for any body-fill type.
+    // Pass the instance's actual dimensions so the master's cached natural-
+    // size values are rewritten — that aligns the visible body geometry with
+    // the instance selection rectangle.
     let effectiveMasterId = mapping.masterId;
     if (BODY_FILL_TYPES.has(el.type) && isColor && colorMap[el.type]) {
-      effectiveMasterId = await createInstanceMaster(mapping.masterId, colorMap[el.type]);
+      effectiveMasterId = await createInstanceMaster(
+        mapping.masterId,
+        colorMap[el.type],
+        w,
+        h,
+      );
     }
 
-    // Stub sub-shape registrations for non-resizable body-fill types
-    // (events, gateway, data object/store). Mirrors what Visio writes when
-    // it re-saves a fixed reference file. For events specifically: the
-    // stub for the trigger MasterShape (e.g. MasterShape='10' for Message)
-    // ALSO carries three `<Section N='Geometry'>` blocks with
-    // `<Cell N='NoShow' V='0' F='Inh'/>` — that's the switch that makes the
-    // marker geometry visible at instance level.
-    if (subShapes === "" && BODY_FILL_TYPES.has(el.type) && !isResizable) {
+    // Stub sub-shape registrations for non-resizable body-fill types AND
+    // resizable types that need markers (Tasks). Mirrors what Visio writes
+    // when it re-saves a fixed reference file. The stubs preserve the
+    // master's nested-group structure (Type='Group' for groups with nested
+    // <Shapes> for their children, Type='Shape' for leaves).
+    //
+    // Special case: for events, the stub corresponding to the trigger
+    // marker MasterShape carries Geometry sub-sections with `NoShow='0'
+    // F='Inh'` to force the marker visible.
+    if (BODY_FILL_TYPES.has(el.type) && subShapes === "") {
       const masterFileEntry = await zip
         .file(`visio/masters/master${effectiveMasterId}.xml`)
         ?.async("string");
       if (masterFileEntry) {
         const root = masterFileEntry.match(/<Shape ID='5'[^>]*>/);
         if (root) {
+          // Walk the master, building a tree of {id, type, children}
+          interface StubNode { id: number; type: string; children: StubNode[]; }
           const rootOpenEnd = root.index! + root[0].length;
           let rDepth = 0;
           const rRe = /<\/?Shape[^>]*>/g;
@@ -703,36 +873,66 @@ export async function exportVisioV3(
           const inner = masterFileEntry.slice(rootOpenEnd, rootEnd);
           const childShapesStart = inner.indexOf("<Shapes>");
           if (childShapesStart !== -1) {
-            const stubIds: number[] = [];
-            let depth = 0;
-            const re = /<Shapes>|<\/Shapes>|<Shape ID='(\d+)'[^>]*>|<\/Shape>/g;
-            re.lastIndex = childShapesStart;
+            // Recursive parse: walk Shapes/Shape tags with depth tracking,
+            // building up a tree of direct children (and their grandchildren
+            // for nested groups).
+            const rootNode: StubNode = { id: 5, type: "Group", children: [] };
+            const tagRe = /<Shape ID='(\d+)'[^>]*Type='([^']+)'[^>]*>|<Shapes>|<\/Shapes>|<\/Shape>/g;
+            tagRe.lastIndex = childShapesStart + "<Shapes>".length;
+            const stack: StubNode[] = [rootNode];
+            let pendingGroup: StubNode | null = null;
             let m;
-            while ((m = re.exec(inner))) {
-              if (m[0] === "<Shapes>") depth++;
-              else if (m[0] === "</Shapes>") {
-                depth--;
-                if (depth === 0) break;
-              } else if (m[0].startsWith("<Shape ID=") && depth === 1) {
-                stubIds.push(parseInt(m[1], 10));
+            while ((m = tagRe.exec(inner))) {
+              if (m[0] === "<Shapes>") {
+                if (pendingGroup) { stack.push(pendingGroup); pendingGroup = null; }
+              } else if (m[0] === "</Shapes>") {
+                if (stack.length > 1) stack.pop();
+                else break;
+              } else if (m[0].startsWith("<Shape ID=") && stack.length > 0) {
+                const node: StubNode = { id: parseInt(m[1], 10), type: m[2], children: [] };
+                stack[stack.length - 1].children.push(node);
+                pendingGroup = node.type === "Group" ? node : null;
+              } else if (m[0] === "</Shape>") {
+                pendingGroup = null;
               }
             }
-            if (stubIds.length > 0) {
-              const stubs = stubIds
-                .map((msId, i) => {
-                  const isMarker = msId === triggerMasterShape;
-                  const noShowCells = isMarker
-                    ? `<Section N='Geometry' IX='0'><Cell N='NoShow' V='0' F='Inh'/></Section>` +
-                      `<Section N='Geometry' IX='1'><Cell N='NoShow' V='0' F='Inh'/></Section>` +
-                      `<Section N='Geometry' IX='2'><Cell N='NoShow' V='0' F='Inh'/></Section>`
-                    : "";
-                  return `<Shape ID='${shapeId + 1 + i}' Type='Shape' MasterShape='${msId}'>` +
-                    `<Cell N='LayerMember' V=''/>` +
-                    noShowCells +
-                    `</Shape>`;
-                })
-                .join("");
-              subShapes = `<Shapes>${stubs}</Shapes>`;
+
+            // Emit stubs from the tree, assigning unique instance IDs. The
+            // ID for a Group must be allocated BEFORE recursing into its
+            // children so the counter advance from the recursion doesn't
+            // collide back onto the Group's own ID.
+            let stubIdCounter = shapeId;
+            function emitStub(node: StubNode): string {
+              const myId = ++stubIdCounter;
+              // Find any marker spec(s) matching this MasterShape. For
+              // markers split across multiple shapes (Send), each spec hits
+              // its own shape independently.
+              const matchingSpecs = triggerMarkers.filter((s) => s.shapeId === node.id);
+              let extra = "";
+              for (const spec of matchingSpecs) {
+                for (const ix of spec.geomIxs) {
+                  extra += `<Section N='Geometry' IX='${ix}'><Cell N='NoShow' V='0' F='Inh'/></Section>`;
+                }
+              }
+              if (node.type === "Group" && node.children.length > 0) {
+                const childStubs = node.children.map(emitStub).join("");
+                return (
+                  `<Shape ID='${myId}' Type='Group' MasterShape='${node.id}'>` +
+                  `<Cell N='LayerMember' V=''/>` +
+                  extra +
+                  `<Shapes>${childStubs}</Shapes>` +
+                  `</Shape>`
+                );
+              }
+              return (
+                `<Shape ID='${myId}' Type='Shape' MasterShape='${node.id}'>` +
+                `<Cell N='LayerMember' V=''/>` +
+                extra +
+                `</Shape>`
+              );
+            }
+            if (rootNode.children.length > 0) {
+              subShapes = `<Shapes>${rootNode.children.map(emitStub).join("")}</Shapes>`;
             }
           }
         }
