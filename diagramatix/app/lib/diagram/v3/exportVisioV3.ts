@@ -207,18 +207,25 @@ export async function exportVisioV3(
    *  (`V='1' F='GUARD(...)'` and `V='#ffffff' F='THEMEGUARD(RGB(255,255,255))'`)
    *  with non-GUARDed RGB values. `V='0' F='GUARD(0)'` (intentional black
    *  marker strokes) is left alone. */
-  function bakeColourIntoMaster(content: string, colour: string): string {
+  function bakeColourIntoMaster(
+    content: string,
+    colour: string,
+    elType?: string,
+  ): string {
     const r = parseInt(colour.slice(1, 3), 16);
     const g = parseInt(colour.slice(3, 5), 16);
     const b = parseInt(colour.slice(5, 7), 16);
-    // Only touch Shape ID='6' (the visible body). Earlier we replaced
-    // `V='1' F='GUARD(...)'` cells globally, which painted over the master's
-    // marker sub-shapes (task-type icons, event triggers) — those use the
-    // same cell pattern legitimately to drive conditional visibility.
-    const shape6 = content.match(/<Shape ID='6'[^>]*>/);
-    if (!shape6) return content;
-    const shapeStart = shape6.index!;
-    const shapeOpenEnd = shapeStart + shape6[0].length;
+    // For most masters Shape 6 is the body fill. End events are special:
+    // Shape 6 is the THICK BLACK OUTER RING (FillForegnd evaluates to 0
+    // when EventTypeMode=5), and Shape 7 is the inner body fill. Colour
+    // Shape 7 instead so the outer ring stays black and the body picks
+    // up the user's red.
+    const targetShapeId = elType === "end-event" ? "7" : "6";
+    const targetOpenRe = new RegExp(`<Shape ID='${targetShapeId}'[^>]*>`);
+    const targetOpen = content.match(targetOpenRe);
+    if (!targetOpen) return content;
+    const shapeStart = targetOpen.index!;
+    const shapeOpenEnd = shapeStart + targetOpen[0].length;
     const nextShape = content.indexOf("<Shape ID=", shapeOpenEnd);
     const bodyEnd = nextShape === -1 ? content.length : nextShape;
     const bodyTextOriginal = content.slice(shapeOpenEnd, bodyEnd);
@@ -226,18 +233,21 @@ export async function exportVisioV3(
     // Drop any FillStyle on the opening tag — Pool/Lane's coloured shape
     // uses FillStyle='3' (no theme inheritance), template masters use '7'
     // (themed white). Force '3' so our cell-level FillForegnd wins.
-    const newOpen = shape6[0].replace(/FillStyle='\d+'/, "FillStyle='3'");
+    const newOpen = targetOpen[0].replace(/FillStyle='\d+'/, "FillStyle='3'");
 
-    // Inside Shape 6's block, replace any V='1' GUARD or white THEMEGUARD
-    // cells with our colour, AND inject FillForegnd + FillPattern if Shape 6
-    // has none.
+    // Inside Shape 6's block, replace any FillForegnd cell with our colour.
+    // We're already scoped to Shape 6's block, so this is safe — no marker
+    // sub-shape FillForegnd cells get touched. Catches three common
+    // patterns the BPMN_M masters use:
+    //   `V='1' F='GUARD(...)'`     — Task / Subprocess body
+    //   `V='#ffffff' F='THEMEGUARD(...)'` — Pool / Lane body
+    //   `V='0' F='GUARD(IF(User.EventTypeMode=5,0,...))'` — End Event body
+    //     (without this, end events stayed black instead of red).
     const colourCell = `<Cell N='FillForegnd' V='${colour}' F='RGB(${r},${g},${b})'/>`;
-    let bodyTextNew = bodyTextOriginal
-      .replace(/<Cell N='FillForegnd' V='1' F='GUARD\([^']+\)'\/>/g, colourCell)
-      .replace(
-        /<Cell N='FillForegnd' V='#ffffff' F='THEMEGUARD\(RGB\(255,255,255\)\)'\/>/g,
-        `<Cell N='FillForegnd' V='${colour}' F='THEMEGUARD(RGB(${r},${g},${b}))'/>`,
-      );
+    let bodyTextNew = bodyTextOriginal.replace(
+      /<Cell N='FillForegnd' V='[^']*' F='[^']*'\/>/g,
+      colourCell,
+    );
 
     if (!/<Cell N='FillForegnd'/.test(bodyTextNew)) {
       bodyTextNew =
@@ -824,7 +834,7 @@ export async function exportVisioV3(
     let masterContent = await zip.file(`visio/masters/${sourceFile}`)?.async("string");
     if (!masterContent) return sourceMasterId;
 
-    masterContent = bakeColourIntoMaster(masterContent, colour);
+    masterContent = bakeColourIntoMaster(masterContent, colour, elType);
 
     // Task task-type markers (User/Service/Send/Receive/Manual/Script/
     // BusinessRule) need to sit 6px to the right and ~1px below the
@@ -922,46 +932,28 @@ export async function exportVisioV3(
     // active markers overlap at body centre on first paint until Visio
     // recalcs.
     if (sourceMasterId === 33 && instanceH !== undefined && instanceW !== undefined) {
-      // Force IF(IsInstance,1,2) → 0.85 so Shape 11/12/13 size to 3.4MM,
-      // matching the height of the MI Sequential / MI Parallel markers
-      // (which use `BpmnIconHeight*0.85` directly — see Shape 15/27).
+      // Force IF(IsInstance,1,2) → 1.5 so Shape 11/12/13 size to 6MM
+      // (50% bigger than 1× = the size that worked best in testing).
       masterContent = masterContent.replace(
         /IF\(Sheet\.5!User\.IsInstance,1,2\)/g,
-        "0.85",
+        "1.5",
       );
       masterContent = masterContent.replace(
         /IF\(Sheet\.5!User\.IsInstance,0,0\.1\)/g,
         "0",
       );
-      // Re-pin Shape 11's vertical position to match the MI markers —
-      // they sit at `BpmnIconPinY` (= 3MM from body bottom in Y-up
-      // coords). Using the same anchor keeps the + aligned with Loop
-      // and AdHoc on the bottom row.
-      const pinYNew = 0.1181102362204724; // 3MM in inches
+      // Re-pin Shape 11 PinY to `3.5MM*DropOnPageScale` so the 6MM-tall
+      // marker sits just above the body bottom (0.5MM gap).
+      const pinYNew = 0.13779527559055118; // 3.5MM in inches
       masterContent = masterContent.replace(
         /(<Shape ID='11'[^>]*>[\s\S]*?<Cell N='PinY' V=')[\d.]+(' U='MM' F=')[^']+(')/,
-        `$1${pinYNew}$2GUARD(Sheet.5!User.BpmnIconPinY)$3`,
+        `$1${pinYNew}$2GUARD(3.5MM*Sheet.5!DropOnPageScale)$3`,
       );
-      // Scale Shape 11/12/13 cached V's to match the 0.85× formula
-      // above (template natural is 2× → factor 0.85/2 = 0.425).
-      masterContent = scaleMarkerShape(masterContent, 11, 0.425, ["PinX", "PinY"]);
-      masterContent = scaleMarkerShape(masterContent, 12, 0.425);
-      masterContent = scaleMarkerShape(masterContent, 13, 0.425);
-      // MI Sequential / MI Parallel markers — halve their Width so the
-      // 3 lines fit in half the horizontal span (= lines slightly
-      // closer together AND each line shorter).
-      masterContent = scaleMarkerShapeXY(masterContent, 15, 0.5, 1, ["PinX", "PinY"]);
-      masterContent = scaleMarkerShapeXY(masterContent, 27, 0.5, 1, ["PinX", "PinY"]);
-      // Also halve the Width formula multiplier (0.74 → 0.37) so Visio
-      // recalc agrees with the cached V's.
-      masterContent = masterContent.replace(
-        /(<Shape ID='15'[^>]*>[\s\S]*?<Cell N='Width' V='[\d.]+'[^>]*F=')GUARD\(Sheet\.5!User\.BpmnIconHeight\)\*0\.74(')/,
-        `$1GUARD(Sheet.5!User.BpmnIconHeight)*0.37$2`,
-      );
-      masterContent = masterContent.replace(
-        /(<Shape ID='27'[^>]*>[\s\S]*?<Cell N='Width' V='[\d.]+'[^>]*F=')GUARD\(Sheet\.5!User\.BpmnIconHeight\)\*0\.74(')/,
-        `$1GUARD(Sheet.5!User.BpmnIconHeight)*0.37$2`,
-      );
+      // Scale Shape 11/12/13 cached V's to match the 1.5× formula
+      // (template natural is 2× → factor 1.5/2 = 0.75).
+      masterContent = scaleMarkerShape(masterContent, 11, 0.75, ["PinX", "PinY"]);
+      masterContent = scaleMarkerShape(masterContent, 12, 0.75);
+      masterContent = scaleMarkerShape(masterContent, 13, 0.75);
       // Compute which markers are active and rewrite their PinX cached
       // V's to match where the master's `BpmnIconPosition` formulas
       // would place them with this combination active. Without this,
