@@ -39,9 +39,12 @@ const TASK_TYPE_MAP: Record<string, string> = {
   "send": "Send", "receive": "Receive", "manual": "Manual", "business-rule": "Business Rule",
 };
 
-// Gateway type mapping — use "with Marker" for external text
+// Gateway type mapping. `marker: true` flips Visio's BpmnExclusiveType
+// label to "Exclusive Gateway (with Marker)" so the X is shown; without
+// marker it's just "Exclusive Gateway" (plain diamond, no X). Diagramatix's
+// `none` is the plain diamond — so marker stays false there.
 const GATEWAY_TYPE_MAP: Record<string, { type: string; exclusive?: string; marker?: boolean }> = {
-  "none": { type: "Exclusive", exclusive: "Data", marker: true },
+  "none": { type: "Exclusive", exclusive: "Data" },
   "exclusive": { type: "Exclusive", exclusive: "Data", marker: true },
   "inclusive": { type: "Inclusive" },
   "parallel": { type: "Parallel" },

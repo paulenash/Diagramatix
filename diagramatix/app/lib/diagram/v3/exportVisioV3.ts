@@ -390,6 +390,38 @@ export async function exportVisioV3(
     return content.slice(0, start) + scaled + content.slice(pos);
   }
 
+  /** Override Txt* cells in Shape 5 to pin the label near the top of
+   *  the body. Visio shape coords are Y-up, so "near top" = high Y.
+   *  Approach: 6MM-tall text block whose top edge sits at the body's
+   *  top edge, with the text block's pin anchored at that top edge
+   *  (LocPinY=TxtHeight) and VerticalAlign=0 (text top within block). */
+  function positionExpandedSubprocessLabel(
+    content: string,
+    instanceH: number,
+  ): string {
+    const TXT_H = 0.23622047244094488; // 6MM in inches
+    const txtPinY = instanceH; // top of body
+    // TxtPinY: pin point sits at top of body; TxtLocPinY = TxtHeight so
+    // the block's top edge is at the pin (block extends down into body).
+    content = content.replace(
+      /(<Shape ID='5'[^>]*>[\s\S]*?<Cell N='TxtPinY' V=')[\d.]+('[^>]*F=')[^']+(')/,
+      `$1${txtPinY}$2Sheet.5!Height$3`,
+    );
+    content = content.replace(
+      /(<Shape ID='5'[^>]*>[\s\S]*?<Cell N='TxtHeight' V=')[\d.]+('[^>]*F=')[^']+(')/,
+      `$1${TXT_H}$26MM*Sheet.5!DropOnPageScale$3`,
+    );
+    content = content.replace(
+      /(<Shape ID='5'[^>]*>[\s\S]*?<Cell N='TxtLocPinY' V=')[\d.]+('[^>]*F=')[^']+(')/,
+      `$1${TXT_H}$2TxtHeight$3`,
+    );
+    content = content.replace(
+      /(<Shape ID='5'[^>]*>[\s\S]*?<Cell N='VerticalAlign' V=')[\d.]+('[^>]*F=')[^']+(')/,
+      `$10$20$3`,
+    );
+    return content;
+  }
+
   /** Override the NoShow cells in Shapes 12 and 13 of the Subprocess
    *  master so the + marker is always hidden. Used for Expanded
    *  Subprocess where the marker doesn't apply. */
@@ -656,6 +688,14 @@ export async function exportVisioV3(
       );
       if (elType === "subprocess-expanded") {
         masterContent = hideCollapsedMarker(masterContent);
+        // Pin the label just below the top boundary instead of centred.
+        // Use a 6MM-tall text block anchored at the top of the body, with
+        // the text top-aligned within the block. Cached V's compute from
+        // the instance height so first paint matches the formula.
+        masterContent = positionExpandedSubprocessLabel(
+          masterContent,
+          instanceH,
+        );
       }
     }
 
@@ -868,18 +908,31 @@ export async function exportVisioV3(
         `</Section>`;
       if (act !== "NoTaskType") triggerActions.push(act);
     } else if (el.type === "gateway") {
-      const GATEWAY_TYPE_ACTION: Record<string, string> = {
-        "exclusive":   "ExclusiveDataWithMarker",
-        "inclusive":   "Inclusive",
-        "parallel":    "Parallel",
-        "event-based": "ExclusiveEvent",
-      };
-      const act = GATEWAY_TYPE_ACTION[el.gatewayType ?? "exclusive"]
-        ?? "ExclusiveDataWithMarker";
-      actionsSection = `<Section N='Actions'>` +
-        `<Row N='${act}'><Cell N='Checked' V='1' F='Inh'/></Row>` +
-        `</Section>`;
-      triggerActions.push(act);
+      const role = (el.properties as Record<string, unknown> | undefined)
+        ?.gatewayRole ?? "decision";
+      if (role !== "merge") {
+        // Decision gateway: emit the action that matches gatewayType.
+        // Diagramatix's `none` means "plain diamond, no inner marker" —
+        // use `ExclusiveData` (Exclusive Gateway, no X) rather than
+        // `ExclusiveDataWithMarker` (Exclusive Gateway with X).
+        const GATEWAY_TYPE_ACTION: Record<string, string> = {
+          "none":        "ExclusiveData",
+          "exclusive":   "ExclusiveDataWithMarker",
+          "inclusive":   "Inclusive",
+          "parallel":    "Parallel",
+          "event-based": "ExclusiveEvent",
+        };
+        const act = GATEWAY_TYPE_ACTION[el.gatewayType ?? "none"]
+          ?? "ExclusiveData";
+        actionsSection = `<Section N='Actions'>` +
+          `<Row N='${act}'><Cell N='Checked' V='1' F='Inh'/></Row>` +
+          `</Section>`;
+        triggerActions.push(act);
+      }
+      // Merge gateways: no Actions section emitted → no inner marker
+      // (the master's marker NoShow formulas all evaluate visible-only
+      // when their Action.Checked = 1, so leaving them all unchecked
+      // keeps the diamond clean).
     } else if (el.type === "subprocess" || el.type === "subprocess-expanded") {
       // Subprocesses can carry multiple bottom-row markers simultaneously:
       // a Loop / MI variant from `repeatType`, plus the AdHoc tilde from
@@ -952,7 +1005,11 @@ export async function exportVisioV3(
     );
 
     const isPool = mapping.masterId === 19;
-    const textEl = el.label ? `<Text>${esc(el.label)}</Text>` : "";
+    const isMergeGateway = el.type === "gateway" &&
+      ((el.properties as Record<string, unknown> | undefined)
+        ?.gatewayRole === "merge");
+    const textEl = el.label && !isMergeGateway
+      ? `<Text>${esc(el.label)}</Text>` : "";
 
     // For Tasks, Subprocesses, Pools: set Width/Height + sub-shapes with F='Inh'
     // so the visual matches the Diagramatix dimensions.
