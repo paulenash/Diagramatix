@@ -401,6 +401,7 @@ export async function exportVisioV3(
     shapeId: number,
     wScale: number,
     hScale: number,
+    skipCells: string[] = [],
   ): string {
     const openRe = new RegExp(`<Shape ID='${shapeId}'[^>]*>`);
     const openMatch = content.match(openRe);
@@ -420,12 +421,14 @@ export async function exportVisioV3(
         pos = nextClose + "</Shape>".length;
       }
     }
+    const skipSet = new Set(skipCells);
     const block = content.slice(start, pos);
     const W_CELLS = new Set(["PinX", "LocPinX", "Width", "X"]);
     const H_CELLS = new Set(["PinY", "LocPinY", "Height", "Y"]);
     const scaled = block.replace(
       /<Cell N='(PinX|PinY|Width|Height|LocPinX|LocPinY|X|Y|A|B|C|D)' V='([\d.]+)'([^>]*)\/>/g,
       (_w, cellName, vStr, rest) => {
+        if (skipSet.has(cellName)) return _w;
         const v = parseFloat(vStr);
         if (!isFinite(v) || v === 0) return _w;
         // EllipticalArcTo / NURBSTo cells: A/C are X-axis, B/D are Y-axis.
@@ -440,6 +443,45 @@ export async function exportVisioV3(
       },
     );
     return content.slice(0, start) + scaled + content.slice(pos);
+  }
+
+  /** Force the absolute Height of a shape to equal its absolute Width by
+   *  reading the post-Layer-1 cached V's and scaling all H-direction
+   *  cells (Height, LocPinY, Y, B, D) by W/H. PinY is skipped — we keep
+   *  the shape's vertical centre wherever Layer 1 placed it.
+   *
+   *  Used to make gateway Inclusive marker (Shape 11) and event-based
+   *  marker (Shapes 8, 9, 10) circular instead of elliptical when the
+   *  template's W and H fractions differ. */
+  function forceShapeSquare(content: string, shapeId: number): string {
+    const openRe = new RegExp(`<Shape ID='${shapeId}'[^>]*>`);
+    const openMatch = content.match(openRe);
+    if (!openMatch || openMatch.index === undefined) return content;
+    const start = openMatch.index;
+    let pos = start + openMatch[0].length;
+    let depth = 1;
+    while (depth > 0 && pos < content.length) {
+      const nextOpen = content.indexOf("<Shape ", pos);
+      const nextClose = content.indexOf("</Shape>", pos);
+      if (nextClose === -1) return content;
+      if (nextOpen !== -1 && nextOpen < nextClose) {
+        depth++;
+        pos = nextOpen + "<Shape ".length;
+      } else {
+        depth--;
+        pos = nextClose + "</Shape>".length;
+      }
+    }
+    const block = content.slice(start, pos);
+    const wMatch = block.match(/<Cell N='Width' V='([\d.]+)'/);
+    const hMatch = block.match(/<Cell N='Height' V='([\d.]+)'/);
+    if (!wMatch || !hMatch) return content;
+    const cachedW = parseFloat(wMatch[1]);
+    const cachedH = parseFloat(hMatch[1]);
+    if (!isFinite(cachedW) || !isFinite(cachedH) || cachedH === 0) return content;
+    if (Math.abs(cachedW - cachedH) < 1e-9) return content;
+    const hScale = cachedW / cachedH;
+    return scaleMarkerShapeXY(content, shapeId, 1, hScale, ["PinX", "PinY"]);
   }
 
   /** Override Txt* cells in Shape 5 to pin the label near the top of
@@ -497,6 +539,13 @@ export async function exportVisioV3(
     // SHRINK to bring them onto the new Shape 8.
     content = scaleMarkerShapeXY(content, 9, wRatio * SHRINK, hRatio * SHRINK);
     content = scaleMarkerShapeXY(content, 10, wRatio * SHRINK, hRatio * SHRINK);
+    // Force the marker container and its children to be square so the
+    // outer/inner ellipses render as circles and the pentagon is
+    // regular. Template fractions differ in W vs H (0.46 vs 0.58 for
+    // Shape 8) which produces an elliptical / squashed pentagon look.
+    content = forceShapeSquare(content, 8);
+    content = forceShapeSquare(content, 9);
+    content = forceShapeSquare(content, 10);
     return content;
   }
 
@@ -544,7 +593,57 @@ export async function exportVisioV3(
       /<Cell N='LineWeight' V='[\d.]+'[^>]*\/>/,
       `<Cell N='LineWeight' V='0.04166666666666667' U='PT' F='GUARD(3PT)'/>`,
     );
-    return content.slice(0, start) + block + content.slice(pos);
+    // Force absolute square: BPMN_M's Inclusive marker is taller than
+    // wide (Shape 11 W frac 0.479 vs H frac 0.596). Equalising H to W
+    // turns the ellipse into a circle.
+    const result = content.slice(0, start) + block + content.slice(pos);
+    return forceShapeSquare(result, 11);
+  }
+
+  /** Spread Data Store master's three top "depth" rings (Geometry IX 1,
+   *  2, 3) by 2× the template's natural gap. Template positions the
+   *  rings at Y fractions 0.893 (top, IX=1), 0.835 (middle, IX=3),
+   *  0.777 (bottom, IX=2) — gaps of 0.058. Doubling shifts IX=3 to
+   *  0.777 and IX=2 to 0.661 (pinning the topmost ring at 0.893).
+   *  We rewrite both the formula (so Visio recalc agrees) and the
+   *  cached V (so first paint matches). */
+  function widenDataStoreRingSpacing(content: string, instanceH: number): string {
+    const updates: Array<{
+      ix: number;
+      newY: number;
+      newB: number;
+      newYFraction: number;
+      newBFraction: number;
+    }> = [
+      { ix: 1, newYFraction: 0.893, newBFraction: 0.786,
+        newY: 0.893 * instanceH, newB: 0.786 * instanceH },
+      { ix: 3, newYFraction: 0.777, newBFraction: 0.670,
+        newY: 0.777 * instanceH, newB: 0.670 * instanceH },
+      { ix: 2, newYFraction: 0.661, newBFraction: 0.554,
+        newY: 0.661 * instanceH, newB: 0.554 * instanceH },
+    ];
+    for (const u of updates) {
+      // Replace MoveTo Y, EllipticalArcTo Y, and B (the second ellipse
+      // axis endpoint that sets arc curvature) inside the IX section.
+      const sectRe = new RegExp(
+        `(<Section N='Geometry' IX='${u.ix}'>[\\s\\S]*?<\\/Section>)`,
+      );
+      const sectMatch = content.match(sectRe);
+      if (!sectMatch) continue;
+      let sect = sectMatch[1];
+      // Y cells in MoveTo and EllipticalArcTo rows
+      sect = sect.replace(
+        /(<Cell N='Y' V=')[\d.]+('[^>]*F=')Height\*[\d.]+(')/g,
+        `$1${u.newY}$2Height*${u.newYFraction}$3`,
+      );
+      // B cells in EllipticalArcTo
+      sect = sect.replace(
+        /(<Cell N='B' V=')[\d.]+('[^>]*F=')Height\*[\d.]+(')/g,
+        `$1${u.newB}$2Height*${u.newBFraction}$3`,
+      );
+      content = content.replace(sectRe, sect);
+    }
+    return content;
   }
 
   /** Override the NoShow cells in Shapes 12 and 13 of the Subprocess
@@ -832,6 +931,14 @@ export async function exportVisioV3(
         /(<Row N='BpmnCollection'>[\s\S]*?<Cell N='Value' V=')0(' U='BOOL'\/>)/,
         "$11$2",
       );
+    }
+
+    // Data Store ring spacing. Master 58 has 3 horizontal arcs at the top
+    // of the cylinder at Y fractions 0.893 / 0.835 / 0.777 (gap = 0.058
+    // each). Doubling the gap to 0.116 spreads the rings out so they read
+    // as a stacked cylinder rather than a single thick band.
+    if (sourceMasterId === 116 && instanceH !== undefined) {
+      masterContent = widenDataStoreRingSpacing(masterContent, instanceH);
     }
 
     // Gateway marker tweaks (master 50 = mapping.masterId 104).
@@ -1139,8 +1246,13 @@ export async function exportVisioV3(
       // formula uses `BpmnNumIconsVisible` to lay them out side-by-side.
       "AdHoc":          [{ shapeId: 10, geomIxs: [0] }],
       "StandardLoop":   [{ shapeId: 17, geomIxs: [0] }],
-      "SequentialLoop": [{ shapeId: 27, geomIxs: [0] }],
-      "ParallelLoop":   [{ shapeId: 15, geomIxs: [0] }],
+      // MI markers draw three parallel lines via three Geometry sections
+      // each — Geom 0 has the explicit `Actions.X.Checked` NoShow, while
+      // Geom 1 and 2 chain via `GeometryN.NoShow` references. On first
+      // paint Visio uses cached V, so each Geom needs its own NoShow=0
+      // override or we only see one line.
+      "SequentialLoop": [{ shapeId: 27, geomIxs: [0, 1, 2] }],
+      "ParallelLoop":   [{ shapeId: 15, geomIxs: [0, 1, 2] }],
     };
     const triggerMarkers: MarkerSpec[] = triggerActions.flatMap(
       (a) => TRIGGER_MARKER_MAP[a] ?? [],
