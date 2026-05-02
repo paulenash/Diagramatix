@@ -626,6 +626,50 @@ export async function exportVisioV3(
       effectiveMasterId = await createInstanceMaster(mapping.masterId, colorMap[el.type]);
     }
 
+    // Stub sub-shape registrations: one `<Shape ID='X' Type='Shape'
+    // MasterShape='Y'><Cell N='LayerMember' V=''/></Shape>` per top-level
+    // master sub-shape. Visio's reference output (after re-saving) emits
+    // these for every MasterShape — without them, the master's marker
+    // sub-shapes (task-type icons, event triggers) don't render at instance
+    // level. Only emitted for non-resizable body-fill types that don't
+    // already have explicit instance sub-shapes from `makeRectSubShapes`.
+    if (subShapes === "" && BODY_FILL_TYPES.has(el.type) && !isResizable) {
+      const masterFileEntry = await zip
+        .file(`visio/masters/master${effectiveMasterId}.xml`)
+        ?.async("string");
+      if (masterFileEntry) {
+        // Find top-level sub-shapes — children of Shape ID='5'. Walk to first
+        // `<Shapes>` (children of root) then enumerate Shape ID's at depth 1.
+        const rootChildrenStart = masterFileEntry.indexOf("<Shapes>");
+        if (rootChildrenStart !== -1) {
+          const stubIds: number[] = [];
+          let depth = 0;
+          const re = /<\/?Shape[ s]?[^>]*>|<Shapes>|<\/Shapes>/g;
+          re.lastIndex = rootChildrenStart;
+          let m;
+          while ((m = re.exec(masterFileEntry))) {
+            if (m[0] === "<Shapes>") depth++;
+            else if (m[0] === "</Shapes>") {
+              depth--;
+              if (depth === 0) break;
+            } else if (m[0].startsWith("<Shape ID=") && depth === 1) {
+              const idMatch = m[0].match(/<Shape ID='(\d+)'/);
+              if (idMatch) stubIds.push(parseInt(idMatch[1], 10));
+            }
+          }
+          if (stubIds.length > 0) {
+            const stubs = stubIds
+              .map(
+                (msId, i) =>
+                  `<Shape ID='${shapeId + 1 + i}' Type='Shape' MasterShape='${msId}'><Cell N='LayerMember' V=''/></Shape>`,
+              )
+              .join("");
+            subShapes = `<Shapes>${stubs}</Shapes>`;
+          }
+        }
+      }
+    }
+
     // Text positioning cells with F='Inh' AND cached V values sized to the
     // actual label so the first render isn't truncated to the master's tiny
     // natural-size cache. Visio uses cached V on first paint before
