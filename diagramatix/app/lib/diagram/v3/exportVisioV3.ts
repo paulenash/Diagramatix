@@ -346,14 +346,18 @@ export async function exportVisioV3(
     return result;
   }
 
-  /** Halve the cached V of every PinX/PinY/Width/Height/LocPinX/LocPinY
-   *  cell *and* every cell with `F='Width*X'`/`F='Height*Y'` (Geometry
-   *  rows) inside the `<Shape ID='${shapeId}'>` block. Used for the
-   *  Subprocess + marker (Shapes 11, 12, 13 in master 33) which paints
-   *  at 2× scale via the template's `IF(IsInstance,1,2)` formula —
-   *  after we replace those IFs with `1`, the cached V's still need to
-   *  be halved to keep the first-paint at the correct size. */
-  function halveSubprocessMarkerShape(content: string, shapeId: number): string {
+  /** Scale the cached V of dimension cells inside `<Shape ID='${shapeId}'>`
+   *  by `scale`. Used to resize the Subprocess + marker (Shapes 11, 12,
+   *  13 in master 33). `skipCells` lists cell names to leave untouched
+   *  (e.g. Shape 11's PinX comes from the body-chain Sheet.5!Width
+   *  rescale earlier; Shape 11's PinY is positioned explicitly to sit
+   *  at the body bottom). */
+  function scaleMarkerShape(
+    content: string,
+    shapeId: number,
+    scale: number,
+    skipCells: string[] = [],
+  ): string {
     const openRe = new RegExp(`<Shape ID='${shapeId}'[^>]*>`);
     const openMatch = content.match(openRe);
     if (!openMatch || openMatch.index === undefined) return content;
@@ -372,16 +376,18 @@ export async function exportVisioV3(
         pos = nextClose + "</Shape>".length;
       }
     }
+    const skipSet = new Set(skipCells);
     const block = content.slice(start, pos);
-    let halved = block.replace(
+    const scaled = block.replace(
       /<Cell N='(PinX|PinY|Width|Height|LocPinX|LocPinY|X|Y)' V='([\d.]+)'([^>]*)\/>/g,
       (_w, cellName, vStr, rest) => {
+        if (skipSet.has(cellName)) return _w;
         const v = parseFloat(vStr);
         if (!isFinite(v) || v === 0) return _w;
-        return `<Cell N='${cellName}' V='${v / 2}'${rest}/>`;
+        return `<Cell N='${cellName}' V='${v * scale}'${rest}/>`;
       },
     );
-    return content.slice(0, start) + halved + content.slice(pos);
+    return content.slice(0, start) + scaled + content.slice(pos);
   }
 
   /** Override the NoShow cells in Shapes 12 and 13 of the Subprocess
@@ -448,6 +454,7 @@ export async function exportVisioV3(
     instanceW?: number,
     instanceH?: number,
     elType?: string,
+    elProps?: Record<string, unknown>,
   ): Promise<number> {
     const blockRe = new RegExp(`<Master\\s+ID='${sourceMasterId}'[\\s\\S]*?</Master>`);
     const blockMatch = mastersXml.match(blockRe);
@@ -557,30 +564,53 @@ export async function exportVisioV3(
     }
 
     // Subprocess + marker (Shapes 11, 12, 13 in master 33). The master's
-    // collapsed marker is sized via `BpmnIconHeight*IF(IsInstance,1,2)`,
-    // which paints at 2× (template size) on first frame. Force the IF
-    // multipliers to the 1× branch and halve the cached V's to match —
-    // so the marker is half as wide and half as tall, matching what
-    // Visio's own collapsed Subprocess looks like.
+    // collapsed marker sizes via `BpmnIconHeight*IF(IsInstance,1,2)`,
+    // which paints at 2× (8MM, template size) on first frame — too big
+    // for typical BPMN. Replace the IF with 1.5× to get a 6MM marker
+    // (half as wide as 2× × 1.5 = 0.75 of natural cached V), and pin it
+    // to the bottom-centre of the body via `Sheet.5!Height-4MM`.
     //
     // For Expanded Subprocess (`subprocess-expanded`), additionally
     // override NoShow on Shapes 12 and 13 so the marker hides
     // entirely — an expanded subprocess shows its internal flow, no +.
-    if (sourceMasterId === 33) {
+    if (sourceMasterId === 33 && instanceH !== undefined) {
+      // Step 1: force the IF multipliers in the master template formulas.
       masterContent = masterContent.replace(
         /IF\(Sheet\.5!User\.IsInstance,1,2\)/g,
-        "1",
+        "1.5",
       );
       masterContent = masterContent.replace(
         /IF\(Sheet\.5!User\.IsInstance,0,0\.1\)/g,
         "0",
       );
-      for (const shapeId of [11, 12, 13]) {
-        masterContent = halveSubprocessMarkerShape(masterContent, shapeId);
-      }
+      // Step 2: re-pin Shape 11 to the body's bottom-centre. Shape 11's
+      // PinX was already centred horizontally by the body-chain rescale.
+      // Override its PinY to `Height - 4MM*DropOnPageScale` (= 1MM gap
+      // from bottom edge with a 6MM-tall marker). Cached V matches.
+      const pinYNew = instanceH - 0.15748031496062992; // 4MM in inches
+      masterContent = masterContent.replace(
+        /(<Shape ID='11'[^>]*>[\s\S]*?<Cell N='PinY' V=')[\d.]+(' U='MM' F=')[^']+(')/,
+        `$1${pinYNew}$2GUARD(Sheet.5!Height-4MM*Sheet.5!DropOnPageScale)$3`,
+      );
+      // Step 3: scale dimension cells in shapes 11, 12, 13 by 0.75 (= 1.5×
+      // template / 2× natural). Shape 11's PinX/PinY are skipped (set
+      // above / handled by Layer 1).
+      masterContent = scaleMarkerShape(masterContent, 11, 0.75, ["PinX", "PinY"]);
+      masterContent = scaleMarkerShape(masterContent, 12, 0.75);
+      masterContent = scaleMarkerShape(masterContent, 13, 0.75);
       if (elType === "subprocess-expanded") {
         masterContent = hideCollapsedMarker(masterContent);
       }
+    }
+
+    // Data Object Collection marker (master 57 = mapping.masterId 115).
+    // Shape 7 in the master is gated on `Prop.BpmnCollection` — flipping
+    // this Prop's V to '1' unhides the collection bars at the bottom.
+    if (sourceMasterId === 115 && elProps?.multiplicity === "collection") {
+      masterContent = masterContent.replace(
+        /(<Row N='BpmnCollection'>[\s\S]*?<Cell N='Value' V=')0(' U='BOOL'\/>)/,
+        "$11$2",
+      );
     }
 
     const newId = nextInstanceMasterId++;
@@ -1038,6 +1068,7 @@ export async function exportVisioV3(
         w,
         h,
         el.type,
+        el.properties as Record<string, unknown> | undefined,
       );
     }
 
