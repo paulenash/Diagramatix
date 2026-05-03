@@ -1585,24 +1585,24 @@ export function PropertiesPanel({
             </>
           )}
 
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Multiplicity</label>
-            <div className="flex flex-wrap gap-1">
-              {(["single", "collection"] as const).map((v) => (
-                <button
-                  key={v}
-                  onClick={() => onUpdateProperties(element.id, { multiplicity: v })}
-                  className={`px-2 py-1 text-xs rounded border ${
-                    ((element.properties.multiplicity as string | undefined) ?? "single") === v
-                      ? "bg-blue-600 text-white border-blue-600"
-                      : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                  }`}
-                >
-                  {v === "single" ? "Single" : "Collection"}
-                </button>
-              ))}
+          {(element.type === "data-object" ||
+            (element.type === "pool" &&
+              ((element.properties.poolType as string | undefined) ?? "black-box") === "black-box")) && (
+            <div className="flex items-center gap-2">
+              <input
+                id={`mult-collection-${element.id}`}
+                type="checkbox"
+                className="h-3.5 w-3.5"
+                checked={(element.properties.multiplicity as string | undefined) === "collection"}
+                onChange={(e) => onUpdateProperties(element.id, {
+                  multiplicity: e.target.checked ? "collection" : undefined,
+                })}
+              />
+              <label htmlFor={`mult-collection-${element.id}`} className="text-xs font-medium text-gray-700">
+                Collection
+              </label>
             </div>
-          </div>
+          )}
         </>
       )}
 

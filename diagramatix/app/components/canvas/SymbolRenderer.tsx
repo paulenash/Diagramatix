@@ -466,7 +466,7 @@ function DataObjectShape({ el }: { el: DiagramElement }) {
     `${ax},${ry + rectH}`,
   ].join(" ");
 
-  const lineH   = Math.round(h * 0.14);
+  const lineH   = Math.round(h * 0.168); // 20% longer than the previous 0.14
   const lineGap = 3;
   const cx  = x + w / 2;
   const ly2 = y + h - 3;
@@ -1002,20 +1002,25 @@ function BpmnTaskMarker({ taskType, x, y }: { taskType: BpmnTaskType; x: number;
         </g>
       );
     case "manual":
-      // Visio Manual Task marker (BPMN_M Task master, Shape 25). Path
-      // converted from the Visio master geometry's MoveTo/LineTo/
-      // EllipticalArcTo rows; arcs approximated as quadratic beziers
-      // using Visio's A/B control points. Drawn in a 14×10 box offset
-      // by (0, 2) so it sits centred in the 14×14 marker space.
+      // Stylised hand: palm + 4 fingers (taller in the middle) + thumb on
+      // the right, then rotated 90° clockwise so the hand points right —
+      // common BPMN Manual Task convention.
       return (
-        <g transform={`translate(${x},${y})`}>
-          <path
-            d="M11.72,12.00 L7.41,12.00 L1.37,12.00 Q0.40,11.63 0.00,10.75 L0.00,2.94 Q1.20,2.55 2.05,2.00 L3.31,2.00 L7.62,2.00 Q8.27,2.25 8.54,2.84 Q8.27,3.43 7.62,3.68 L3.31,3.68 Q3.34,3.92 3.41,4.11 L7.17,4.11 Q7.29,4.09 7.41,4.08 L13.08,4.08 Q13.73,4.33 14.00,4.92 Q13.73,5.51 13.08,5.76 L7.41,5.76 Q7.29,5.75 7.17,5.73 L7.17,6.19 Q7.29,6.17 7.41,6.16 L12.74,6.16 Q13.39,6.41 13.66,7.00 Q13.39,7.59 12.74,7.84 L7.41,7.84 Q7.29,7.83 7.17,7.81 L7.17,8.27 Q7.29,8.25 7.41,8.24 L12.06,8.24 Q12.71,8.49 12.98,9.08 Q12.71,9.67 12.06,9.92 L7.41,9.92 Q7.29,9.91 7.17,9.89 L7.17,10.35 Q7.29,10.33 7.41,10.32 L11.72,10.32 Q12.37,10.57 12.63,11.16 Q12.37,11.75 11.72,12.00 Z"
-            fill="white"
-            stroke="#374151"
-            strokeWidth={1}
-            strokeLinejoin="round"
-          />
+        <g
+          fill="white"
+          stroke="#374151"
+          strokeLinejoin="round"
+          transform={`rotate(90 ${x + 7} ${y + 7})`}
+        >
+          {/* palm */}
+          <rect x={x + 1.5} y={y + 7.5} width={9}   height={5}   rx={1.2} strokeWidth={1.2} />
+          {/* thumb (right side, becomes bottom after rotation) */}
+          <rect x={x + 10}  y={y + 5.5} width={1.6} height={4}   rx={0.8} strokeWidth={1} />
+          {/* 4 fingers (left → right: pinky, ring, middle, index) */}
+          <rect x={x + 1.8} y={y + 3}   width={1.6} height={5}   rx={0.8} strokeWidth={1} />
+          <rect x={x + 3.8} y={y + 1.5} width={1.6} height={6.5} rx={0.8} strokeWidth={1} />
+          <rect x={x + 5.8} y={y + 1.5} width={1.6} height={6.5} rx={0.8} strokeWidth={1} />
+          <rect x={x + 7.8} y={y + 3}   width={1.6} height={5}   rx={0.8} strokeWidth={1} />
         </g>
       );
     case "business-rule":
