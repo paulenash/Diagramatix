@@ -69,6 +69,20 @@ const FIXED_ICON_SIZES: Partial<Record<SymbolType, { w: number; h: number }>> = 
   "data-store":         { w: 50, h: 40 },
 };
 
+// Fallback sizes when the imported width/height is missing or unparseable
+// (e.g. the cell was outside our head slice, or Visio used a formula-only
+// cell with no cached V). Used only as a sanity floor.
+const FALLBACK_SIZES: Partial<Record<SymbolType, { w: number; h: number }>> = {
+  "task":               { w: 102, h: 65 },
+  "subprocess":         { w: 108, h: 72 },
+  "subprocess-expanded":{ w: 180, h: 108 },
+  "pool":               { w: 600, h: 200 },
+  "lane":               { w: 600, h: 80 },
+  "sublane":            { w: 600, h: 60 },
+  "group":              { w: 240, h: 160 },
+  "text-annotation":    { w: 100, h: 60 },
+};
+
 function nano(): string {
   return Math.random().toString(36).slice(2, 10);
 }
@@ -132,10 +146,16 @@ const ELEMENT_NAMEU_MAP: Record<string, ElementSeed | null> = {
 
   // Pool / Lane
   "Pool / Lane": { type: "pool" },
-  "Pool with 2 Lanes": { type: "pool", poolType: "white-box" },
-  "Black-Box Pool": { type: "pool", poolType: "black-box" },
-  "Additional Lane": { type: "lane" },
-  "Lane": { type: "lane" },
+  "Pool":                { type: "pool" },
+  "Pool with 2 Lanes":   { type: "pool", poolType: "white-box" },
+  "Pool with 3 Lanes":   { type: "pool", poolType: "white-box" },
+  "Pool with 4 Lanes":   { type: "pool", poolType: "white-box" },
+  "Black-Box Pool":      { type: "pool", poolType: "black-box" },
+  "Vertical Pool":       { type: "pool" },
+  "Horizontal Pool":     { type: "pool" },
+  "Swimlane":            { type: "lane" },
+  "Additional Lane":     { type: "lane" },
+  "Lane":                { type: "lane" },
 
   // Data
   "Data Object": { type: "data-object" },
@@ -159,13 +179,20 @@ const ELEMENT_NAMEU_MAP: Record<string, ElementSeed | null> = {
 };
 
 const CONNECTOR_NAMEU_MAP: Record<string, ConnectorBase | null> = {
-  "Sequence Flow": "sequence",
-  "Default Sequence Flow": "sequence",
-  "Conditional Sequence Flow": "sequence",
-  "Message Flow": "messageBPMN",
-  "Association": "associationBPMN",
-  "Directed Association": "associationBPMN",
-  "Data Association": "associationBPMN",
+  "Sequence Flow":              "sequence",
+  "Default Sequence Flow":      "sequence",
+  "Conditional Sequence Flow":  "sequence",
+  "BPMN Sequence Flow":         "sequence",
+  "Message Flow":               "messageBPMN",
+  "BPMN Message Flow":          "messageBPMN",
+  "Initiating Message Flow":    "messageBPMN",
+  "Non-Initiating Message Flow":"messageBPMN",
+  "Association":                "associationBPMN",
+  "BPMN Association":           "associationBPMN",
+  "Directed Association":       "associationBPMN",
+  "Data Association":           "associationBPMN",
+  "Data Input Association":     "associationBPMN",
+  "Data Output Association":    "associationBPMN",
 };
 
 /* ─── Bpmn property overrides ─────────────────────────────────────────── */
@@ -296,7 +323,9 @@ interface WalkedShape {
   shapeId: string;
   block: string;            // full Shape XML, including any nested <Shapes>
   parentShapeId: string | null;
-  /** PinX in page-absolute Visio inches (Y-up). */
+  /** PinX in page-absolute Visio inches (Y-up). Computed in a second
+   *  pass via `readCellNum` on the FULL block (not a head slice), so
+   *  cells buried deep in the shape XML still resolve. */
   pageX: number;
   /** PinY in page-absolute Visio inches (Y-up). */
   pageY: number;
@@ -304,91 +333,95 @@ interface WalkedShape {
   height: number;
 }
 
-/** Read PinX/PinY/Width/Height cells from the *head* of a Shape — the
- *  cells/sections that appear before any nested `<Shapes>` block. Stops
- *  at the first `<Shapes>`, `</Shape>`, or next `<Shape ID=` so we don't
- *  pick up a child's PinX as if it were the outer's. */
-function readShapeHeadCells(headXml: string): {
-  pinX: number;
-  pinY: number;
-  width: number;
-  height: number;
-} {
-  const stops = ["<Shapes>", "</Shape>", "<Shape "];
-  let cut = headXml.length;
-  for (const s of stops) {
-    const i = headXml.indexOf(s);
-    if (i >= 0 && i < cut) cut = i;
-  }
-  const head = headXml.slice(0, cut);
-  return {
-    pinX: parseFloat(head.match(/<Cell\s+N='PinX'\s+V='([^']*)'/)?.[1] ?? "0"),
-    pinY: parseFloat(head.match(/<Cell\s+N='PinY'\s+V='([^']*)'/)?.[1] ?? "0"),
-    width: parseFloat(head.match(/<Cell\s+N='Width'\s+V='([^']*)'/)?.[1] ?? "0"),
-    height: parseFloat(head.match(/<Cell\s+N='Height'\s+V='([^']*)'/)?.[1] ?? "0"),
-  };
-}
-
 function walkAllShapes(pageXml: string): WalkedShape[] {
   const m = pageXml.match(/<Shapes>([\s\S]*?)<\/Shapes>(?=\s*(?:<Connects>|<\/PageContents>))/);
   if (!m) return [];
   const inner = m[1];
-  const out: WalkedShape[] = [];
 
-  type Frame = {
-    shapeId: string;
-    blockStart: number;
-    pageX: number;
-    pageY: number;
-    width: number;
-    height: number;
-  };
+  // First pass: just structure — shape IDs, parent relationships, block ranges.
+  type RawNode = { shapeId: string; block: string; parentShapeId: string | null };
+  const nodes: RawNode[] = [];
+  type Frame = { shapeId: string; blockStart: number };
   const stack: Frame[] = [];
-
   const tagRe = /<(\/?)Shape(\s|>)/g;
   let t;
   while ((t = tagRe.exec(inner)) !== null) {
     if (t[1] === "/") {
-      // Closing tag → pop frame, emit record covering the full block.
       const frame = stack.pop();
-      if (!frame) continue; // unbalanced; skip
+      if (!frame) continue;
       const blockEnd = inner.indexOf(">", t.index) + 1;
-      out.push({
+      nodes.push({
         shapeId: frame.shapeId,
         block: inner.slice(frame.blockStart, blockEnd),
         parentShapeId: stack.length > 0 ? stack[stack.length - 1].shapeId : null,
-        pageX: frame.pageX,
-        pageY: frame.pageY,
-        width: frame.width,
-        height: frame.height,
       });
       continue;
     }
-    // Opening tag: read shape's local PinX/PinY/W/H from cells before
-    // any nested <Shapes>, then transform local→page using parent frame.
     const tagEnd = inner.indexOf(">", t.index) + 1;
     const openTag = inner.slice(t.index, tagEnd);
     const shapeId = openTag.match(/ID='(\d+)'/)?.[1] ?? "?";
-    // Slice an upper bound for the head — short slice for speed.
-    const headSlice = inner.slice(tagEnd, Math.min(inner.length, tagEnd + 6000));
-    const { pinX, pinY, width, height } = readShapeHeadCells(headSlice);
-    let pageX = pinX;
-    let pageY = pinY;
-    if (stack.length > 0) {
-      const parent = stack[stack.length - 1];
-      pageX = (parent.pageX - parent.width / 2) + pinX;
-      pageY = (parent.pageY - parent.height / 2) + pinY;
-    }
-    stack.push({
-      shapeId,
-      blockStart: t.index,
-      pageX,
-      pageY,
-      width,
-      height,
+    stack.push({ shapeId, blockStart: t.index });
+  }
+
+  // Second pass: read PinX/PinY/W/H from each shape's FULL block (the
+  // first occurrence of each cell is always the outer shape's, since
+  // outer cells precede nested <Shapes>).
+  type Geom = { localPinX: number; localPinY: number; width: number; height: number };
+  const geomById = new Map<string, Geom>();
+  const nodeById = new Map<string, RawNode>();
+  for (const n of nodes) {
+    nodeById.set(n.shapeId, n);
+    geomById.set(n.shapeId, {
+      localPinX: readCellNum(n.block, "PinX") ?? 0,
+      localPinY: readCellNum(n.block, "PinY") ?? 0,
+      width: readCellNum(n.block, "Width") ?? 0,
+      height: readCellNum(n.block, "Height") ?? 0,
     });
   }
-  return out;
+
+  // Third pass: compute pageX/pageY per shape by walking parent chain
+  // (memoised so the cost is O(N), not O(N·depth)).
+  const pageCache = new Map<string, { pageX: number; pageY: number }>();
+  function pageCoords(shapeId: string): { pageX: number; pageY: number } {
+    const cached = pageCache.get(shapeId);
+    if (cached) return cached;
+    const g = geomById.get(shapeId);
+    const n = nodeById.get(shapeId);
+    if (!g || !n) {
+      const v = { pageX: 0, pageY: 0 };
+      pageCache.set(shapeId, v);
+      return v;
+    }
+    if (!n.parentShapeId) {
+      const v = { pageX: g.localPinX, pageY: g.localPinY };
+      pageCache.set(shapeId, v);
+      return v;
+    }
+    const parentG = geomById.get(n.parentShapeId);
+    const parentPage = pageCoords(n.parentShapeId);
+    const offX = parentG ? parentG.width / 2 : 0;
+    const offY = parentG ? parentG.height / 2 : 0;
+    const v = {
+      pageX: parentPage.pageX - offX + g.localPinX,
+      pageY: parentPage.pageY - offY + g.localPinY,
+    };
+    pageCache.set(shapeId, v);
+    return v;
+  }
+
+  return nodes.map((n) => {
+    const g = geomById.get(n.shapeId)!;
+    const p = pageCoords(n.shapeId);
+    return {
+      shapeId: n.shapeId,
+      block: n.block,
+      parentShapeId: n.parentShapeId,
+      pageX: p.pageX,
+      pageY: p.pageY,
+      width: g.width,
+      height: g.height,
+    };
+  });
 }
 
 function isConnectorMaster(nameU: string): ConnectorBase | null {
@@ -594,8 +627,19 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
     // gateways, data-objects and data-stores don't import as oversized
     // 1in Visio masters. Centre (pinX, pinY) is preserved.
     const fixed = FIXED_ICON_SIZES[r.seed.type];
-    const widthPx = fixed ? fixed.w : w * PX_PER_INCH;
-    const heightPx = fixed ? fixed.h : h * PX_PER_INCH;
+    let widthPx = fixed ? fixed.w : w * PX_PER_INCH;
+    let heightPx = fixed ? fixed.h : h * PX_PER_INCH;
+    // Sanity floor: if a resizable shape's imported W/H came out as 0 or
+    // implausibly small (e.g. cells outside the head slice, or a master
+    // with formula-only cached values that didn't survive parsing), drop
+    // back to a sensible default so the shape actually renders on canvas.
+    if (!fixed) {
+      const fallback = FALLBACK_SIZES[r.seed.type];
+      if (fallback) {
+        if (widthPx < 5) widthPx = fallback.w;
+        if (heightPx < 5) heightPx = fallback.h;
+      }
+    }
     const centreXPx = pinX * PX_PER_INCH;
     const centreYPx = (pageH - pinY) * PX_PER_INCH;
     const xPx = centreXPx - widthPx / 2;
@@ -685,27 +729,28 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
       continue;
     }
 
-    let beginX = readCellNum(r.block, "BeginX") ?? 0;
-    let beginY = readCellNum(r.block, "BeginY") ?? 0;
-    let endX = readCellNum(r.block, "EndX") ?? 0;
-    let endY = readCellNum(r.block, "EndY") ?? 0;
-    // Begin/End cells live in the connector's parent frame (same frame
-    // as its PinX). For a nested connector inside a Pool/Group, lift
-    // them to page-absolute Visio coords so canvas conversion is correct.
-    if (r.parentShapeId) {
-      const p = rawByShapeId.get(r.parentShapeId);
-      if (p) {
-        const offX = p.pageX - p.width / 2;
-        const offY = p.pageY - p.height / 2;
-        beginX += offX; endX += offX;
-        beginY += offY; endY += offY;
-      }
-    }
+    // Compute Begin/End in PAGE-ABSOLUTE Visio coords. The walker already
+    // gives us r.pageX/pageY (the connector's centre in page coords). Begin
+    // and End cells are in the connector's parent frame (same frame as the
+    // PinX cell), so the offset between them and pageX is exactly the
+    // parent-origin shift — works for top-level (offset=0) and any depth
+    // of nesting.
+    const cellPinX = readCellNum(r.block, "PinX") ?? 0;
+    const cellPinY = readCellNum(r.block, "PinY") ?? 0;
+    const cellLocPinX = readCellNum(r.block, "LocPinX") ?? 0;
+    const cellLocPinY = readCellNum(r.block, "LocPinY") ?? 0;
+    const offX = r.pageX - cellPinX;
+    const offY = r.pageY - cellPinY;
+    const beginX = (readCellNum(r.block, "BeginX") ?? 0) + offX;
+    const beginY = (readCellNum(r.block, "BeginY") ?? 0) + offY;
+    const endX = (readCellNum(r.block, "EndX") ?? 0) + offX;
+    const endY = (readCellNum(r.block, "EndY") ?? 0) + offY;
+    // Local origin (bottom-left of the connector's bounding box) in page
+    // coords. Geometry MoveTo/LineTo rows are LOCAL-frame coords measured
+    // from this origin (Visio Y-up).
+    const localOrigX = r.pageX - cellLocPinX;
+    const localOrigY = r.pageY - cellLocPinY;
 
-    // Geometry IX='0' carries the connector path. MoveTo IX='1' marks
-    // Begin (typically (0,0)); subsequent LineTo rows are offsets relative
-    // to BeginX/BeginY in inches (Visio Y-up, so canvas Y is computed via
-    // pageH - (BeginY + ry)).
     const geom = r.block.match(/<Section\s+N='Geometry'\s+IX='0'>([\s\S]*?)<\/Section>/)?.[1] ?? "";
     const rawWPs: Point[] = [];
     const rowRe = /<Row\s+T='(MoveTo|LineTo)'\s+IX='(\d+)'>([\s\S]*?)<\/Row>/g;
@@ -715,11 +760,11 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
       const rx = parseFloat(readCellV(inner, "X") ?? "0");
       const ry = parseFloat(readCellV(inner, "Y") ?? "0");
       rawWPs.push({
-        x: (beginX + rx) * PX_PER_INCH,
-        y: (pageH - (beginY + ry)) * PX_PER_INCH,
+        x: (localOrigX + rx) * PX_PER_INCH,
+        y: (pageH - (localOrigY + ry)) * PX_PER_INCH,
       });
     }
-    // No geometry section (some master-defined connectors): synthesize Begin.
+    // No geometry section: synthesize Begin so we have at least one waypoint.
     if (rawWPs.length === 0) {
       rawWPs.push({
         x: beginX * PX_PER_INCH,
