@@ -707,15 +707,14 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
     const wp = walkedById.get(parentId);
     if (!wp) continue;
 
-    // Skip wrappers we've explicitly chosen to ignore (CFF Container,
-    // Swimlane List, Phase List, Separator, Message). Promoting one of
-    // these would create a phantom pool in the wrong spot — the Visio
-    // container framework often spans the whole page or has padding
-    // overhang that doesn't match the visual pool boundary.
+    // Note: we DON'T skip on the explicit-ignore list (CFF Container,
+    // Swimlane List etc.) because in cross-functional flowchart files
+    // those *are* the pool's structural shape. Position is computed
+    // from lane bounds below, not from the wrapper's reported
+    // dimensions, so container padding/overhang can't displace the pool.
     const wrapperMasterId = wp.block.match(/Master='(\d+)'/)?.[1];
     const wrapperMaster = wrapperMasterId ? masters.get(wrapperMasterId) : undefined;
     const wrapperNameU = normaliseNameU(wrapperMaster?.nameU ?? "");
-    if (wrapperNameU && ELEMENT_NAMEU_MAP[wrapperNameU] === null) continue;
 
     // Compute the synthesised pool's bounds from its lane children,
     // not from the wrapper's own dimensions. Visio container shapes
@@ -853,33 +852,54 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
   // Connectors: page-level <Connects><Connect FromSheet=… ToSheet=… /></Connects>
   // gives source/target. FromCell='BeginX' → source; FromCell='EndX' → target.
   const connectsBlock = pageXml.match(/<Connects>([\s\S]*?)<\/Connects>/)?.[1] ?? "";
-  const connectRows: { connId: string; cell: string; toSheet: string }[] = [];
-  const connectRe =
-    /<Connect\s+FromSheet='(\d+)'\s+FromCell='(\w+)'[^>]*ToSheet='(\d+)'/g;
-  let cm;
-  while ((cm = connectRe.exec(connectsBlock)) !== null) {
-    connectRows.push({ connId: cm[1], cell: cm[2], toSheet: cm[3] });
-  }
-
+  // Collect connector glue from page-level <Connect> rows. Visio writes
+  // attributes in a fixed order but be defensive — match either FromCell
+  // before/after ToSheet, and accept both single and double quotes.
   const connSourceTarget = new Map<string, { source?: string; target?: string }>();
-  for (const row of connectRows) {
-    const entry = connSourceTarget.get(row.connId) ?? {};
-    if (row.cell === "BeginX") entry.source = row.toSheet;
-    else if (row.cell === "EndX") entry.target = row.toSheet;
-    connSourceTarget.set(row.connId, entry);
+  const connectAttrRe = /<Connect\s+([^>]+?)\/?>/g;
+  let cm;
+  while ((cm = connectAttrRe.exec(connectsBlock)) !== null) {
+    const attrs = cm[1];
+    const fromSheet = attrs.match(/FromSheet=["'](\d+)["']/)?.[1];
+    const fromCell  = attrs.match(/FromCell=["'](\w+)["']/)?.[1];
+    const toSheet   = attrs.match(/ToSheet=["'](\d+)["']/)?.[1];
+    if (!fromSheet || !fromCell || !toSheet) continue;
+    const entry = connSourceTarget.get(fromSheet) ?? {};
+    if (fromCell === "BeginX") entry.source = toSheet;
+    else if (fromCell === "EndX") entry.target = toSheet;
+    connSourceTarget.set(fromSheet, entry);
   }
 
   const connectors: Connector[] = [];
   for (const r of raw) {
     if (!r.connectorBase) continue;
 
-    const ends = connSourceTarget.get(r.shapeId);
+    let ends = connSourceTarget.get(r.shapeId);
+    // Fallback: if the page-level <Connect> rows didn't resolve source
+    // or target, parse the connector's BegTrigger/EndTrigger formulas.
+    // V3 export emits `F='_XFTRIGGER(Sheet.${shapeId}!EventXFMod)'` on
+    // both cells; native Visio uses similar formulas when shapes are
+    // glued. Either way, the embedded `Sheet.N` reveals the linked shape.
+    if (!ends?.source || !ends?.target) {
+      const begCell = r.block.match(/<Cell\s+N='BegTrigger'[^>]*F='[^']*Sheet\.(\d+)/);
+      const endCell = r.block.match(/<Cell\s+N='EndTrigger'[^>]*F='[^']*Sheet\.(\d+)/);
+      const next = { ...(ends ?? {}) };
+      if (!next.source && begCell) next.source = begCell[1];
+      if (!next.target && endCell) next.target = endCell[1];
+      ends = next;
+    }
     const sourceShape = ends?.source;
     const targetShape = ends?.target;
     const sourceId = sourceShape ? shapeIdToElId.get(sourceShape) : undefined;
     const targetId = targetShape ? shapeIdToElId.get(targetShape) : undefined;
     if (!sourceId || !targetId) {
-      warnings.push(`Skipped connector ${r.shapeId} — source or target unresolved.`);
+      const why = !sourceShape && !targetShape
+        ? "no Connect row and no glue formula"
+        : !sourceShape ? "no source glue"
+        : !targetShape ? "no target glue"
+        : !sourceId ? `source shape ${sourceShape} not in element list`
+        : `target shape ${targetShape} not in element list`;
+      warnings.push(`Skipped connector ${r.shapeId} (${r.nameU}) — ${why}.`);
       continue;
     }
 
