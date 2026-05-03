@@ -1259,6 +1259,87 @@ export async function exportVisioV3(
       );
     }
 
+    // Data Object Input/Output role marker (master 115).
+    // Master 115 has no native BpmnDataInput/BpmnDataOutput Prop, so inject a
+    // 7-point arrow polygon as a new sub-shape (Shape 8) into Shape 5's
+    // children group. Filled #374151 for "output", white with #374151 stroke
+    // for "input". Matches the canvas glyph in `DataObjectShape`:
+    //   arrowW = w * 0.28, arrowH = h * 0.18
+    //   triW   = arrowW * 0.7, rectW = arrowW * 0.35, rectH = arrowH * 0.35
+    //   anchored 3px from the body's left edge, 4px below its top
+    if (
+      sourceMasterId === 115 &&
+      instanceW !== undefined &&
+      instanceH !== undefined &&
+      (elProps?.role === "input" || elProps?.role === "output")
+    ) {
+      const role = elProps.role as "input" | "output";
+      const arrowW = instanceW * 0.28;
+      const arrowH = instanceH * 0.18;
+      const rectW  = arrowW * 0.35;
+      const triW   = arrowW * 0.7;
+      const markerW = rectW + triW;            // total horizontal extent
+      const markerH = arrowH;
+      // Master local coords are Y-up; canvas position "3px from left, 4px
+      // from top" → master x=3/96 from left, y=H-4/96 at the marker's top.
+      const inset = 3 / 96;
+      const topInset = 4 / 96;
+      const pinX = inset + markerW / 2;
+      const pinY = instanceH - topInset - markerH / 2;
+      // Polygon points in marker-local coords (Y-up, origin at bottom-left
+      // of the marker bounding box).
+      const xL = 0;
+      const xM = rectW;
+      const xR = markerW;
+      const yShaftHi = (markerH + arrowH * 0.35) / 2; // shaft top (Y-up)
+      const yShaftLo = (markerH - arrowH * 0.35) / 2; // shaft bottom
+      const yHeadHi  = markerH;                       // arrowhead top
+      const yHeadLo  = 0;                             // arrowhead bottom
+      const yTip     = markerH / 2;                   // arrowhead tip
+      const isFilled = role === "output";
+      const fillColor = "#374151";
+      const fillF     = hexToVisioRgb(fillColor);
+      const noFill    = isFilled ? "0" : "1";
+      const noLine    = isFilled ? "1" : "0";
+      const lineColor = isFilled ? "#000000" : fillColor;
+      const lineColorF = isFilled ? "GUARD(0)" : `${fillF}`;
+      const lineWeight = isFilled ? "0" : "0.0166"; // ~1.2pt for the input outline
+      const roleMarkerShape =
+        `<Shape ID='8' Type='Shape' LineStyle='3' FillStyle='3' TextStyle='3'>` +
+        `<Cell N='PinX' V='${pinX}'/>` +
+        `<Cell N='PinY' V='${pinY}'/>` +
+        `<Cell N='Width' V='${markerW}'/>` +
+        `<Cell N='Height' V='${markerH}'/>` +
+        `<Cell N='LocPinX' V='${markerW / 2}'/>` +
+        `<Cell N='LocPinY' V='${markerH / 2}'/>` +
+        `<Cell N='Angle' V='0'/>` +
+        `<Cell N='LineWeight' V='${lineWeight}' U='PT'/>` +
+        `<Cell N='LineColor' V='${lineColor}' F='${lineColorF}'/>` +
+        `<Cell N='LinePattern' V='1' F='GUARD(1)'/>` +
+        `<Cell N='FillForegnd' V='${isFilled ? fillColor : "#ffffff"}' F='${isFilled ? fillF : "GUARD(THEMEGUARD(THEME(\"BackgroundColor\")+1))"}'/>` +
+        `<Cell N='FillPattern' V='1' F='GUARD(1)'/>` +
+        `<Section N='Geometry' IX='0'>` +
+        `<Cell N='NoFill' V='${noFill}'/>` +
+        `<Cell N='NoLine' V='${noLine}'/>` +
+        `<Cell N='NoShow' V='0'/>` +
+        `<Cell N='NoSnap' V='0'/>` +
+        `<Cell N='NoQuickDrag' V='0'/>` +
+        `<Row T='MoveTo'  IX='1'><Cell N='X' V='${xL}'/><Cell N='Y' V='${yShaftHi}'/></Row>` +
+        `<Row T='LineTo'  IX='2'><Cell N='X' V='${xM}'/><Cell N='Y' V='${yShaftHi}'/></Row>` +
+        `<Row T='LineTo'  IX='3'><Cell N='X' V='${xM}'/><Cell N='Y' V='${yHeadHi}'/></Row>` +
+        `<Row T='LineTo'  IX='4'><Cell N='X' V='${xR}'/><Cell N='Y' V='${yTip}'/></Row>` +
+        `<Row T='LineTo'  IX='5'><Cell N='X' V='${xM}'/><Cell N='Y' V='${yHeadLo}'/></Row>` +
+        `<Row T='LineTo'  IX='6'><Cell N='X' V='${xM}'/><Cell N='Y' V='${yShaftLo}'/></Row>` +
+        `<Row T='LineTo'  IX='7'><Cell N='X' V='${xL}'/><Cell N='Y' V='${yShaftLo}'/></Row>` +
+        `<Row T='LineTo'  IX='8'><Cell N='X' V='${xL}'/><Cell N='Y' V='${yShaftHi}'/></Row>` +
+        `</Section>` +
+        `</Shape>`;
+      masterContent = masterContent.replace(
+        /<\/Shapes><\/Shape><\/Shapes><\/MasterContents>/,
+        `${roleMarkerShape}</Shapes></Shape></Shapes></MasterContents>`,
+      );
+    }
+
     // Data Store ring spacing. Master 58 has 3 horizontal arcs at the top
     // of the cylinder at Y fractions 0.893 / 0.835 / 0.777 (gap = 0.058
     // each). Doubling the gap to 0.116 spreads the rings out so they read
