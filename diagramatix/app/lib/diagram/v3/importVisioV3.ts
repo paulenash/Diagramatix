@@ -54,8 +54,30 @@ type ConnectorBase = "sequence" | "messageBPMN" | "associationBPMN";
 
 const PX_PER_INCH = 96;
 
+// Diagramatix uses fixed-size icons for these types — the canvas doesn't
+// support arbitrary sizes, and Visio's master defaults (typically 1in
+// circles for events) come out 2-3× too large on import. Always force
+// these to Diagramatix defaults; preserve PinX/PinY so the centre stays
+// put. Resizable types (task, subprocess, pool, lane, group, text-
+// annotation) keep their imported dimensions.
+const FIXED_ICON_SIZES: Partial<Record<SymbolType, { w: number; h: number }>> = {
+  "start-event":        { w: 36, h: 36 },
+  "end-event":          { w: 36, h: 36 },
+  "intermediate-event": { w: 36, h: 36 },
+  "gateway":            { w: 40, h: 40 },
+  "data-object":        { w: 36, h: 46 },
+  "data-store":         { w: 50, h: 40 },
+};
+
 function nano(): string {
   return Math.random().toString(36).slice(2, 10);
+}
+
+/** V3 export creates per-instance master clones whose NameU has a numeric
+ *  suffix appended (e.g. "Pool / Lane.200"). Strip it so lookup hits the
+ *  canonical entry. */
+function normaliseNameU(nameU: string): string {
+  return nameU.replace(/\.\d+$/, "");
 }
 
 /* ─── NameU → element/connector base mapping ──────────────────────────── */
@@ -405,7 +427,7 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
     const masterIdM = block.match(/Master='(\d+)'/);
     const masterId = masterIdM?.[1] ?? null;
     const masterInfo = masterId ? masters.get(masterId) : undefined;
-    const nameU = masterInfo?.nameU ?? "";
+    const nameU = normaliseNameU(masterInfo?.nameU ?? "");
     const props = readPropValues(block);
     const bpmnId = props.BpmnId;
 
@@ -454,10 +476,16 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
     const w = readCellNum(r.block, "Width") ?? 1;
     const h = readCellNum(r.block, "Height") ?? 1;
 
-    const widthPx = w * PX_PER_INCH;
-    const heightPx = h * PX_PER_INCH;
-    const xPx = (pinX - w / 2) * PX_PER_INCH;
-    const yPx = (pageH - pinY - h / 2) * PX_PER_INCH;
+    // Force Diagramatix default sizes for fixed-icon types so events,
+    // gateways, data-objects and data-stores don't import as oversized
+    // 1in Visio masters. Centre (pinX, pinY) is preserved.
+    const fixed = FIXED_ICON_SIZES[r.seed.type];
+    const widthPx = fixed ? fixed.w : w * PX_PER_INCH;
+    const heightPx = fixed ? fixed.h : h * PX_PER_INCH;
+    const centreXPx = pinX * PX_PER_INCH;
+    const centreYPx = (pageH - pinY) * PX_PER_INCH;
+    const xPx = centreXPx - widthPx / 2;
+    const yPx = centreYPx - heightPx / 2;
 
     const label = readText(r.block);
     const properties: Record<string, unknown> = {};
@@ -533,37 +561,45 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
     const endX = readCellNum(r.block, "EndX") ?? 0;
     const endY = readCellNum(r.block, "EndY") ?? 0;
 
-    // Geometry IX='0' MoveTo (always 0,0) + LineTo rows with relative offsets
-    // from BeginX/BeginY (Y inverted on export, so we re-invert here).
+    // Geometry IX='0' carries the connector path. MoveTo IX='1' marks
+    // Begin (typically (0,0)); subsequent LineTo rows are offsets relative
+    // to BeginX/BeginY in inches (Visio Y-up, so canvas Y is computed via
+    // pageH - (BeginY + ry)).
     const geom = r.block.match(/<Section\s+N='Geometry'\s+IX='0'>([\s\S]*?)<\/Section>/)?.[1] ?? "";
-    const waypoints: Point[] = [];
-    waypoints.push({
-      x: beginX * PX_PER_INCH,
-      y: (pageH - beginY) * PX_PER_INCH,
-    });
+    const rawWPs: Point[] = [];
     const rowRe = /<Row\s+T='(MoveTo|LineTo)'\s+IX='(\d+)'>([\s\S]*?)<\/Row>/g;
     let rr;
-    let lastWasOnlyEnd = true;
     while ((rr = rowRe.exec(geom)) !== null) {
-      const t = rr[1];
       const inner = rr[3];
-      if (t === "MoveTo") continue; // always (0,0); represents Begin
       const rx = parseFloat(readCellV(inner, "X") ?? "0");
       const ry = parseFloat(readCellV(inner, "Y") ?? "0");
-      // LineTo coords are relative to BeginX/BeginY in inches; Y inverted.
-      const wpX = (beginX + rx) * PX_PER_INCH;
-      const wpY = (pageH - (beginY - ry)) * PX_PER_INCH;
-      waypoints.push({ x: wpX, y: wpY });
-      lastWasOnlyEnd = false;
+      rawWPs.push({
+        x: (beginX + rx) * PX_PER_INCH,
+        y: (pageH - (beginY + ry)) * PX_PER_INCH,
+      });
     }
-    // Ensure final waypoint is (endX, endY) even if Geometry rows were sparse.
-    const lastWP = waypoints[waypoints.length - 1];
+    // No geometry section (some master-defined connectors): synthesize Begin.
+    if (rawWPs.length === 0) {
+      rawWPs.push({
+        x: beginX * PX_PER_INCH,
+        y: (pageH - beginY) * PX_PER_INCH,
+      });
+    }
+    // Append End if the last raw waypoint isn't already there.
     const finalX = endX * PX_PER_INCH;
     const finalY = (pageH - endY) * PX_PER_INCH;
-    if (Math.abs(lastWP.x - finalX) > 0.5 || Math.abs(lastWP.y - finalY) > 0.5) {
-      waypoints.push({ x: finalX, y: finalY });
+    const tail = rawWPs[rawWPs.length - 1];
+    if (Math.abs(tail.x - finalX) > 0.5 || Math.abs(tail.y - finalY) > 0.5) {
+      rawWPs.push({ x: finalX, y: finalY });
     }
-    void lastWasOnlyEnd;
+    // Dedupe near-duplicate consecutive waypoints (within 0.5 px).
+    const waypoints: Point[] = [];
+    for (const wp of rawWPs) {
+      const last = waypoints[waypoints.length - 1];
+      if (!last || Math.abs(last.x - wp.x) > 0.5 || Math.abs(last.y - wp.y) > 0.5) {
+        waypoints.push(wp);
+      }
+    }
 
     const connId = r.bpmnId && r.bpmnId.length > 0 ? r.bpmnId : nano();
     const label = readText(r.block);
