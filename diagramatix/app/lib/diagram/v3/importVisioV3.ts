@@ -706,17 +706,45 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
     if (laneChildren.length < 2) continue;
     const wp = walkedById.get(parentId);
     if (!wp) continue;
+
+    // Skip wrappers we've explicitly chosen to ignore (CFF Container,
+    // Swimlane List, Phase List, Separator, Message). Promoting one of
+    // these would create a phantom pool in the wrong spot — the Visio
+    // container framework often spans the whole page or has padding
+    // overhang that doesn't match the visual pool boundary.
+    const wrapperMasterId = wp.block.match(/Master='(\d+)'/)?.[1];
+    const wrapperMaster = wrapperMasterId ? masters.get(wrapperMasterId) : undefined;
+    const wrapperNameU = normaliseNameU(wrapperMaster?.nameU ?? "");
+    if (wrapperNameU && ELEMENT_NAMEU_MAP[wrapperNameU] === null) continue;
+
+    // Compute the synthesised pool's bounds from its lane children,
+    // not from the wrapper's own dimensions. Visio container shapes
+    // often include padding / overhang / member-overlap that makes
+    // their reported W/H much larger than the visible pool — using the
+    // lanes' bounding box snaps the pool exactly around them.
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (const lane of laneChildren) {
+      minX = Math.min(minX, lane.pageX - lane.width / 2);
+      maxX = Math.max(maxX, lane.pageX + lane.width / 2);
+      minY = Math.min(minY, lane.pageY - lane.height / 2);
+      maxY = Math.max(maxY, lane.pageY + lane.height / 2);
+    }
+    const poolPageX = (minX + maxX) / 2;
+    const poolPageY = (minY + maxY) / 2;
+    const poolW     = maxX - minX;
+    const poolH     = maxY - minY;
+
     const props = readPropValues(wp.block);
     const synthesised: RawShape = {
       shapeId: parentId,
       parentShapeId: wp.parentShapeId,
-      masterId: null,
-      nameU: "(implicit pool)",
+      masterId: wrapperMasterId ?? null,
+      nameU: wrapperNameU || "(implicit pool)",
       block: wp.block,
-      pageX: wp.pageX,
-      pageY: wp.pageY,
-      width: wp.width,
-      height: wp.height,
+      pageX: poolPageX,
+      pageY: poolPageY,
+      width: poolW,
+      height: poolH,
       seed: { type: "pool" },
       connectorBase: null,
       bpmnId: props.BpmnId,
@@ -726,9 +754,7 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
     rawByShapeId.set(parentId, synthesised);
     // Synthesised pool steals one warning entry off the skip list since
     // it's no longer "skipped".
-    const tag = walkedById.get(parentId)?.block.match(/<Master\s+ID='(\d+)'/)?.[1]
-      ? `master ${walkedById.get(parentId)!.block.match(/<Master\s+ID='(\d+)'/)![1]} (no NameU)`
-      : "(no master)";
+    const tag = wrapperNameU || (wrapperMasterId ? `master ${wrapperMasterId} (no NameU)` : "(no master)");
     const cur = skippedByTag.get(tag) ?? 0;
     if (cur > 0) skippedByTag.set(tag, cur - 1);
     if (skippedByTag.get(tag) === 0) skippedByTag.delete(tag);
