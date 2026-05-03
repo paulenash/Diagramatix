@@ -188,7 +188,10 @@ const ELEMENT_NAMEU_MAP: Record<string, ElementSeed | null> = {
 
   // Misc
   "Text Annotation": { type: "text-annotation" },
-  "Group": { type: "group" },
+  "Annotation":      { type: "text-annotation" },
+  "Group":           { type: "group" },
+  "Merge":           { type: "gateway", gatewayType: "exclusive" },
+  "Diagram Title":   { type: "text-annotation" },
 
   // Explicitly ignored (decorative shapes from BPMN_M)
   "Message": null,
@@ -800,13 +803,20 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
     raw.push(synthesised);
     rawByShapeId.set(parentId, synthesised);
     implicitPoolCount++;
-    // Update master breakdown — a previously-skipped wrapper just became a pool.
-    const breakdownKey = `${wrapperMasterId ?? "-"}|${wrapperNameU}`;
-    const bd = masterBreakdown.get(breakdownKey);
-    if (bd) {
-      bd.classifiedAs = "element → pool (implicit)";
-      // count stays the same; we're reclassifying, not adding
-    }
+    // Add a SEPARATE breakdown row for the synthesised pool (instead of
+    // reclassifying the existing "(no master)" row, which would falsely
+    // mark every same-master shape as a pool — they share one row).
+    masterBreakdown.set(`__synth_pool_${parentId}`, {
+      masterId: wrapperMasterId ?? "-",
+      nameU: wrapperNameU || "(implicit pool wrapper)",
+      count: 1,
+      classifiedAs: "element → pool (implicit)",
+    });
+    // Decrement the original skipped row by 1 since this shape is no longer skipped.
+    const origKey = `${wrapperMasterId ?? "-"}|${wrapperNameU}`;
+    const orig = masterBreakdown.get(origKey);
+    if (orig && orig.count > 0) orig.count--;
+    if (orig && orig.count === 0) masterBreakdown.delete(origKey);
     // Synthesised pool steals one warning entry off the skip list since
     // it's no longer "skipped".
     const tag = wrapperNameU || (wrapperMasterId ? `master ${wrapperMasterId} (no NameU)` : "(no master)");
@@ -912,6 +922,9 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
   // attributes in a fixed order but be defensive — match either FromCell
   // before/after ToSheet, and accept both single and double quotes.
   const connSourceTarget = new Map<string, { source?: string; target?: string }>();
+  // Reverse map for glue-target Black-Box pool detection: shape ID → set
+  // of connector shape IDs that glue to it.
+  const glueTargets = new Set<string>();
   const connectAttrRe = /<Connect\s+([^>]+?)\/?>/g;
   let cm;
   while ((cm = connectAttrRe.exec(connectsBlock)) !== null) {
@@ -924,6 +937,80 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
     if (fromCell === "BeginX") entry.source = toSheet;
     else if (fromCell === "EndX") entry.target = toSheet;
     connSourceTarget.set(fromSheet, entry);
+    glueTargets.add(toSheet);
+  }
+  // Also collect glue targets from BegTrigger/EndTrigger formulas for any
+  // connector whose Connect rows we couldn't read.
+  for (const r of raw) {
+    if (!r.connectorBase) continue;
+    const beg = r.block.match(/<Cell\s+N='BegTrigger'[^>]*F='[^']*Sheet\.(\d+)/)?.[1];
+    const end = r.block.match(/<Cell\s+N='EndTrigger'[^>]*F='[^']*Sheet\.(\d+)/)?.[1];
+    if (beg) glueTargets.add(beg);
+    if (end) glueTargets.add(end);
+  }
+
+  // Glue-target promotion for Black-Box Pools: an unclassified shape that
+  // is referenced by a connector's Begin/End AND has a non-empty text
+  // label is almost always a labelled pool (no master attribute, common
+  // in hand-built Visio BPMN files). Synthesise it as a Pool so the
+  // connectors don't end up dangling.
+  const blackBoxPoolsCreated: string[] = [];
+  for (const targetShapeId of glueTargets) {
+    if (rawByShapeId.has(targetShapeId)) continue;     // already classified
+    const wp = walkedById.get(targetShapeId);
+    if (!wp) continue;
+    const text = readText(wp.block);
+    const props = readPropValues(wp.block);
+    const label = text || props.BpmnName || "";
+    if (!label) continue;                              // no label → skip
+    // Use read W/H if plausible; else fall back to a Black-Box Pool default.
+    const widthIn = wp.width > 0.5 ? wp.width : 200 / PX_PER_INCH;     // ≥48px ish
+    const heightIn = wp.height > 0.3 ? wp.height : 60 / PX_PER_INCH;
+    const synthBox: RawShape = {
+      shapeId: targetShapeId,
+      parentShapeId: wp.parentShapeId,
+      masterId: null,
+      nameU: "(black-box pool)",
+      block: wp.block,
+      pageX: wp.pageX,
+      pageY: wp.pageY,
+      width: widthIn,
+      height: heightIn,
+      seed: { type: "pool", poolType: "black-box" },
+      connectorBase: null,
+      bpmnId: props.BpmnId,
+      props,
+    };
+    raw.push(synthBox);
+    rawByShapeId.set(targetShapeId, synthBox);
+    blackBoxPoolsCreated.push(targetShapeId);
+    // Add to elements directly (we've already left the element-build loop).
+    const elId = props.BpmnId && props.BpmnId.length > 0 ? props.BpmnId : nano();
+    shapeIdToElId.set(targetShapeId, elId);
+    const widthPx = widthIn * PX_PER_INCH;
+    const heightPx = heightIn * PX_PER_INCH;
+    elements.push({
+      id: elId,
+      type: "pool",
+      x: wp.pageX * PX_PER_INCH - widthPx / 2,
+      y: (pageH - wp.pageY) * PX_PER_INCH - heightPx / 2,
+      width: widthPx,
+      height: heightPx,
+      label,
+      properties: { poolType: "black-box" },
+    });
+    // Update breakdown: add a separate row for the synthesised pool.
+    masterBreakdown.set(`__synth_blackbox_${targetShapeId}`, {
+      masterId: "-",
+      nameU: `"${label.slice(0, 30)}"`,
+      count: 1,
+      classifiedAs: "element → pool (black-box, glue-target)",
+    });
+    // Decrement the "(no master)" skipped row.
+    const origKey = `-|`;
+    const orig = masterBreakdown.get(origKey);
+    if (orig && orig.count > 0) orig.count--;
+    if (orig && orig.count === 0) masterBreakdown.delete(origKey);
   }
 
   const connectors: Connector[] = [];
@@ -1018,6 +1105,27 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
       if (!last || Math.abs(last.x - wp.x) > 0.5 || Math.abs(last.y - wp.y) > 0.5) {
         waypoints.push(wp);
       }
+    }
+
+    // Snap the first/last waypoints to the source/target shape centres.
+    // Reason: events, gateways, data-objects and data-stores have their
+    // imported W/H overridden to Diagramatix defaults (a Visio gateway
+    // is 1"×0.75" = 96×72px → forced to 40×40); the cached BeginX/EndX
+    // points at Visio's larger bounds, which is now OUTSIDE the smaller
+    // diamond so the connector visually disconnects on first paint.
+    // Snapping endpoints to centres lets the canvas's edge-clipping
+    // routing draw a clean attachment.
+    const sourceEl = elements.find((e) => e.id === sourceId);
+    const targetEl = elements.find((e) => e.id === targetId);
+    if (sourceEl && targetEl && waypoints.length >= 2) {
+      waypoints[0] = {
+        x: sourceEl.x + sourceEl.width / 2,
+        y: sourceEl.y + sourceEl.height / 2,
+      };
+      waypoints[waypoints.length - 1] = {
+        x: targetEl.x + targetEl.width / 2,
+        y: targetEl.y + targetEl.height / 2,
+      };
     }
 
     const connId = r.bpmnId && r.bpmnId.length > 0 ? r.bpmnId : nano();

@@ -2260,10 +2260,19 @@ export function DiagramEditor({
       {/* Visio import status — shows the per-master breakdown, stats, and
           full warnings list from the most recent Import → Visio. Always
           shown after an import (clean or noisy) so the user can verify
-          what came through and what didn't. */}
+          what came through and what didn't. Stays open until the user
+          explicitly clicks Close or Open Diagram (z-[60] beats the
+          unsaved-changes dialog and other z-50 overlays; backdrop click
+          is swallowed). */}
       {visioImportStatus && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[85vh] flex flex-col">
+        <div
+          className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60]"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div
+            className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[85vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="px-5 pt-4 pb-2 border-b border-gray-200">
               <h2 className="text-base font-semibold text-gray-900">Visio Import — Results</h2>
               <p className="mt-1 text-xs text-gray-600">
