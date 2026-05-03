@@ -244,6 +244,22 @@ function readCellNum(block: string, name: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+/** Scope the block to its OUTER shape only (cells/sections before any
+ *  nested `<Shapes>` or `<Shape ID=`). Prevents `readCellNum` from
+ *  falling through to deeply-nested marker sub-shapes when the outer
+ *  shape's cell has only a formula and no cached `V=` value. */
+function outerHead(block: string): string {
+  let cut = block.length;
+  const m1 = block.indexOf("<Shapes>");
+  const m2 = block.search(/<Shape\s+ID=/);
+  // m2 of -1 means no match; the open tag itself is `<Shape ID=...`,
+  // so the first occurrence will be at index 0 — skip it.
+  const innerStart = m2 > 0 ? m2 : -1;
+  if (m1 >= 0 && m1 < cut) cut = m1;
+  if (innerStart >= 0 && innerStart < cut) cut = innerStart;
+  return block.slice(0, cut);
+}
+
 function readPropValues(block: string): Record<string, string> {
   const result: Record<string, string> = {};
   // Property section: <Section N='Property'> ... <Row N='BpmnX'><Cell N='Value' V='...' .../>
@@ -371,11 +387,15 @@ function walkAllShapes(pageXml: string): WalkedShape[] {
   const nodeById = new Map<string, RawNode>();
   for (const n of nodes) {
     nodeById.set(n.shapeId, n);
+    // Scope cell reads to the outer head — otherwise a Subprocess whose
+    // outer Width is formula-only (no cached V=) would inherit a tiny
+    // marker sub-shape's Width and render as a pencil-thin sliver.
+    const head = outerHead(n.block);
     geomById.set(n.shapeId, {
-      localPinX: readCellNum(n.block, "PinX") ?? 0,
-      localPinY: readCellNum(n.block, "PinY") ?? 0,
-      width: readCellNum(n.block, "Width") ?? 0,
-      height: readCellNum(n.block, "Height") ?? 0,
+      localPinX: readCellNum(head, "PinX") ?? 0,
+      localPinY: readCellNum(head, "PinY") ?? 0,
+      width: readCellNum(head, "Width") ?? 0,
+      height: readCellNum(head, "Height") ?? 0,
     });
   }
 
@@ -666,6 +686,54 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
     if (isLane) r.seed.type = "lane";
   }
 
+  // Implicit-pool detection: a wrapper shape that's NOT classified but
+  // directly contains 2+ classified Lane children is almost certainly a
+  // Pool — Visio cross-functional flowchart files often use a generic
+  // container or unrecognised master for the pool wrapper, with named
+  // Lane shapes nested inside.
+  const walkedById = new Map<string, WalkedShape>();
+  for (const w of walked) walkedById.set(w.shapeId, w);
+  const childrenByParent = new Map<string, RawShape[]>();
+  for (const r of raw) {
+    if (!r.parentShapeId) continue;
+    const list = childrenByParent.get(r.parentShapeId) ?? [];
+    list.push(r);
+    childrenByParent.set(r.parentShapeId, list);
+  }
+  for (const [parentId, children] of childrenByParent) {
+    if (rawByShapeId.has(parentId)) continue;          // parent already classified
+    const laneChildren = children.filter((c) => c.seed?.type === "lane");
+    if (laneChildren.length < 2) continue;
+    const wp = walkedById.get(parentId);
+    if (!wp) continue;
+    const props = readPropValues(wp.block);
+    const synthesised: RawShape = {
+      shapeId: parentId,
+      parentShapeId: wp.parentShapeId,
+      masterId: null,
+      nameU: "(implicit pool)",
+      block: wp.block,
+      pageX: wp.pageX,
+      pageY: wp.pageY,
+      width: wp.width,
+      height: wp.height,
+      seed: { type: "pool" },
+      connectorBase: null,
+      bpmnId: props.BpmnId,
+      props,
+    };
+    raw.push(synthesised);
+    rawByShapeId.set(parentId, synthesised);
+    // Synthesised pool steals one warning entry off the skip list since
+    // it's no longer "skipped".
+    const tag = walkedById.get(parentId)?.block.match(/<Master\s+ID='(\d+)'/)?.[1]
+      ? `master ${walkedById.get(parentId)!.block.match(/<Master\s+ID='(\d+)'/)![1]} (no NameU)`
+      : "(no master)";
+    const cur = skippedByTag.get(tag) ?? 0;
+    if (cur > 0) skippedByTag.set(tag, cur - 1);
+    if (skippedByTag.get(tag) === 0) skippedByTag.delete(tag);
+  }
+
   // Build element list.
   const shapeIdToElId = new Map<string, string>();
   const elements: DiagramElement[] = [];
@@ -692,8 +760,12 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
     if (!fixed) {
       const fallback = FALLBACK_SIZES[r.seed.type];
       if (fallback) {
-        if (widthPx < 5) widthPx = fallback.w;
-        if (heightPx < 5) heightPx = fallback.h;
+        // 20 px floor: BPMN shapes below this size are almost certainly a
+        // sub-decoration with an artificially small W/H, not a real
+        // user-sized element. Drop in the canonical default so the shape
+        // actually renders.
+        if (widthPx < 20) widthPx = fallback.w;
+        if (heightPx < 20) heightPx = fallback.h;
       }
     }
     const centreXPx = pinX * PX_PER_INCH;
@@ -791,16 +863,17 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
     // PinX cell), so the offset between them and pageX is exactly the
     // parent-origin shift — works for top-level (offset=0) and any depth
     // of nesting.
-    const cellPinX = readCellNum(r.block, "PinX") ?? 0;
-    const cellPinY = readCellNum(r.block, "PinY") ?? 0;
-    const cellLocPinX = readCellNum(r.block, "LocPinX") ?? 0;
-    const cellLocPinY = readCellNum(r.block, "LocPinY") ?? 0;
+    const head = outerHead(r.block);
+    const cellPinX = readCellNum(head, "PinX") ?? 0;
+    const cellPinY = readCellNum(head, "PinY") ?? 0;
+    const cellLocPinX = readCellNum(head, "LocPinX") ?? 0;
+    const cellLocPinY = readCellNum(head, "LocPinY") ?? 0;
     const offX = r.pageX - cellPinX;
     const offY = r.pageY - cellPinY;
-    const beginX = (readCellNum(r.block, "BeginX") ?? 0) + offX;
-    const beginY = (readCellNum(r.block, "BeginY") ?? 0) + offY;
-    const endX = (readCellNum(r.block, "EndX") ?? 0) + offX;
-    const endY = (readCellNum(r.block, "EndY") ?? 0) + offY;
+    const beginX = (readCellNum(head, "BeginX") ?? 0) + offX;
+    const beginY = (readCellNum(head, "BeginY") ?? 0) + offY;
+    const endX = (readCellNum(head, "EndX") ?? 0) + offX;
+    const endY = (readCellNum(head, "EndY") ?? 0) + offY;
     // Local origin (bottom-left of the connector's bounding box) in page
     // coords. Geometry MoveTo/LineTo rows are LOCAL-frame coords measured
     // from this origin (Visio Y-up).
