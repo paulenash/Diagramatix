@@ -8,17 +8,15 @@ import { exportVisioV3 } from "@/app/lib/diagram/v3/exportVisioV3";
 import { DEFAULT_SYMBOL_COLORS, BW_SYMBOL_COLORS } from "@/app/lib/diagram/colors";
 import type { SymbolColorConfig } from "@/app/lib/diagram/colors";
 import { getCurrentOrgId, OrgContextError } from "@/app/lib/auth/orgContext";
-import { isSuperuser } from "@/app/lib/superuser";
 
 /**
  * GET /api/export/visio-v3?diagramId=<id>
- * V3 Visio export — independent fork of V2, free to evolve.
- * Admin-only while under active development.
+ * V3 Visio export — now the default Visio export wired to the user-facing
+ * "Export → Visio" button. V2 endpoint stays in place as a rollback path.
  */
 export async function GET(request: Request) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!isSuperuser(session)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { searchParams } = new URL(request.url);
   const diagramId = searchParams.get("diagramId");

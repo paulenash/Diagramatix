@@ -1641,7 +1641,7 @@ export function DiagramEditor({
                           setFileMenuOpen(false);
                           setFileSubmenu(null);
                           const a = document.createElement("a");
-                          a.href = `/api/export/visio-v2?diagramId=${diagramId}`;
+                          a.href = `/api/export/visio-v3?diagramId=${diagramId}`;
                           a.rel = "noopener";
                           a.click();
                         }}
@@ -1673,22 +1673,6 @@ export function DiagramEditor({
                     >
                       XML
                     </button>
-                    {/* Visio (V3) — admin only */}
-                    {diagramType === "bpmn" && isAdmin && (
-                      <button
-                        onClick={() => {
-                          setFileMenuOpen(false);
-                          setFileSubmenu(null);
-                          const a = document.createElement("a");
-                          a.href = `/api/export/visio-v3?diagramId=${diagramId}`;
-                          a.rel = "noopener";
-                          a.click();
-                        }}
-                        className="w-full text-left px-3 py-2 text-xs text-orange-600 hover:bg-orange-50"
-                      >
-                        Visio (V3) — Admin
-                      </button>
-                    )}
                     {/* Templates — non-admin exports User templates directly;
                         admin opens a User-vs-Built-In picker. */}
                     <button
