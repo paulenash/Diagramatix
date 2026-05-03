@@ -418,13 +418,66 @@ function walkAllShapes(pageXml: string): WalkedShape[] {
 }
 
 function isConnectorMaster(nameU: string): ConnectorBase | null {
-  return CONNECTOR_NAMEU_MAP[nameU] ?? null;
+  const exact = CONNECTOR_NAMEU_MAP[nameU];
+  if (exact !== undefined) return exact;
+  // Fuzzy fallback: many third-party / localised / custom-stencil
+  // connectors carry the canonical type as a substring inside a
+  // longer NameU. Order matters — check the more specific terms first.
+  const n = nameU.toLowerCase();
+  if (n.includes("message flow") || n.includes("message connection")) return "messageBPMN";
+  if (n.includes("association")) return "associationBPMN";
+  if (n.includes("sequence flow") || n.includes("sequence-flow")) return "sequence";
+  return null;
+}
+
+/** Last-ditch element classification by substring — for files using
+ *  custom or localised stencils whose NameUs aren't in the exact-match
+ *  table. Order matters: more specific terms before generic ones. */
+function fuzzyClassifyElement(nameU: string): ElementSeed | null {
+  const n = nameU.toLowerCase();
+  // Pools and lanes — Visio cross-functional flowchart files often use
+  // names like "Functional Band", "Swimlane" etc. for what we treat as
+  // a Pool's lane stripe.
+  if (n.includes("black-box") || n.includes("black box")) return { type: "pool", poolType: "black-box" };
+  if (n.includes("pool")) return { type: "pool" };
+  if (n.includes("swimlane") || n.includes("functional band")) return { type: "lane" };
+  if (n.includes("lane")) return { type: "lane" };
+  // Subprocesses (check before "process" so "Sub-Process" wins).
+  if (n.includes("expanded sub")) return { type: "subprocess-expanded" };
+  if (n.includes("collapsed sub") || n.includes("sub-process") || n.includes("subprocess")) return { type: "subprocess" };
+  // Gateways
+  if (n.includes("exclusive gateway")) return { type: "gateway", gatewayType: "exclusive" };
+  if (n.includes("inclusive")) return { type: "gateway", gatewayType: "inclusive" };
+  if (n.includes("parallel gateway")) return { type: "gateway", gatewayType: "parallel" };
+  if (n.includes("event gateway") || n.includes("event-based")) return { type: "gateway", gatewayType: "event-based" };
+  if (n.includes("gateway")) return { type: "gateway" };
+  // Events
+  if (n.includes("start event") || n.endsWith(" start") || n === "start") return { type: "start-event" };
+  if (n.includes("end event") || n.endsWith(" end")) return { type: "end-event" };
+  if (n.includes("intermediate")) return { type: "intermediate-event" };
+  // Tasks
+  if (n.includes("user task")) return { type: "task", taskType: "user" };
+  if (n.includes("service task")) return { type: "task", taskType: "service" };
+  if (n.includes("script task")) return { type: "task", taskType: "script" };
+  if (n.includes("send task")) return { type: "task", taskType: "send" };
+  if (n.includes("receive task")) return { type: "task", taskType: "receive" };
+  if (n.includes("manual task")) return { type: "task", taskType: "manual" };
+  if (n.includes("business rule task")) return { type: "task", taskType: "business-rule" };
+  if (n.includes("task") || n.includes("activity")) return { type: "task" };
+  // Data
+  if (n.includes("data store") || n.includes("datastore")) return { type: "data-store" };
+  if (n.includes("data object") || n.includes("dataobject")) return { type: "data-object" };
+  // Misc
+  if (n.includes("text annotation") || n.includes("annotation")) return { type: "text-annotation" };
+  if (n.includes("group")) return { type: "group" };
+  return null;
 }
 
 function classifyElement(nameU: string, props: Record<string, string>): ElementSeed | null {
-  const base = ELEMENT_NAMEU_MAP[nameU];
-  if (base === null) return null;        // explicitly ignored
-  if (base === undefined) return null;   // unknown
+  let base = ELEMENT_NAMEU_MAP[nameU];
+  if (base === undefined && nameU) base = fuzzyClassifyElement(nameU);
+  if (base === null) return null;        // explicitly ignored (CFF Container etc.)
+  if (base === undefined) return null;   // unknown — even fuzzy match returned nothing
   const seed: ElementSeed = { ...base };
 
   // Bpmn property overrides
@@ -508,6 +561,10 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
   void pageW; // not currently used; available for future centring logic.
 
   const walked = walkAllShapes(pageXml);
+  // Track skipped masters so we can emit a single summary warning at the
+  // end (pasting 200 per-shape warnings into a chat is unhelpful).
+  const skippedByTag = new Map<string, number>();
+  const perShapeWarnings: string[] = [];
 
   // First pass: classify every walked shape (any depth). Track parent
   // shape IDs from nesting AND Pool Member sections — both feed into the
@@ -545,16 +602,22 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
     if (!connectorBase && !seed) {
       const labelHint = readText(block).slice(0, 40);
       const labelSuffix = labelHint ? ` (text: "${labelHint}")` : "";
-      if (nameU) {
-        warnings.push(
-          `Skipped shape ${w.shapeId} — unrecognised master "${nameU}" (master ID ${masterId})${labelSuffix}.`,
-        );
-      } else if (masterId) {
-        warnings.push(
-          `Skipped shape ${w.shapeId} — master ${masterId} has no NameU${labelSuffix}.`,
-        );
-      } else {
-        warnings.push(`Skipped shape ${w.shapeId} — no Master attribute${labelSuffix}.`);
+      const tag = nameU || (masterId ? `master ${masterId} (no NameU)` : "(no master)");
+      skippedByTag.set(tag, (skippedByTag.get(tag) ?? 0) + 1);
+      // Detailed per-shape warning (capped to avoid flooding) — useful when
+      // the summary alone doesn't pinpoint the issue.
+      if (perShapeWarnings.length < 20) {
+        if (nameU) {
+          perShapeWarnings.push(
+            `Skipped shape ${w.shapeId} — unrecognised master "${nameU}" (master ID ${masterId})${labelSuffix}.`,
+          );
+        } else if (masterId) {
+          perShapeWarnings.push(
+            `Skipped shape ${w.shapeId} — master ${masterId} has no NameU${labelSuffix}.`,
+          );
+        } else {
+          perShapeWarnings.push(`Skipped shape ${w.shapeId} — no Master attribute${labelSuffix}.`);
+        }
       }
       continue;
     }
@@ -817,6 +880,21 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
         wp.y += offY;
       }
     }
+  }
+
+  // Skipped-shape summary: lead with one aggregated warning that lists
+  // each unrecognised master NameU and the count of shapes that used it,
+  // followed by up to 20 individual per-shape entries for context.
+  if (skippedByTag.size > 0) {
+    const sorted = [...skippedByTag].sort((a, b) => b[1] - a[1]);
+    const summary = sorted
+      .map(([tag, count]) => `${count}× "${tag}"`)
+      .join(", ");
+    warnings.push(
+      `Skipped ${[...skippedByTag.values()].reduce((a, b) => a + b, 0)} shape(s) ` +
+      `with unrecognised masters: ${summary}.`,
+    );
+    warnings.push(...perShapeWarnings);
   }
 
   return {
