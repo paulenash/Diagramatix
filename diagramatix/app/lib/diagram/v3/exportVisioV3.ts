@@ -563,9 +563,10 @@ export async function exportVisioV3(
     const minBody = Math.min(instanceW, instanceH);
     const outerD = minBody * 0.556;
     const innerD = minBody * 0.439;
-    // Pentagon: ~1/3 of the inner-ring diameter — sits comfortably
-    // inside the inner ring with breathing room.
-    const pentD = innerD / 3; // = body * 0.146
+    // Pentagon: ~1/2 of the inner-ring diameter (= 1/3 × 1.5, 50%
+    // bigger than the prior 1/3 sizing). Sits comfortably inside the
+    // inner ring with a small visual margin.
+    const pentD = innerD / 2; // = body * 0.220
 
     // Shape 8 — container, body-centred. Width/Height = Sheet.5!Width*0.556
     // so it's square (assuming square gateway, which Diagramatix's are).
