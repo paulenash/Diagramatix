@@ -282,35 +282,111 @@ async function loadMasterIndex(zip: JSZip): Promise<Map<string, MasterInfo>> {
 }
 
 /* ─── Page-level shape walker ─────────────────────────────────────────── */
-// Returns top-level <Shape> blocks (i.e. immediate children of <Shapes>),
-// skipping nested children of Group shapes. Visio's shape XML can nest
-// deeply for in-master sub-shapes, but for import we only care about the
-// page-level instances.
+// Native Visio BPMN files routinely nest content inside Pool/Lane/Group
+// shapes (Tasks live inside a Lane's <Shapes>, Lanes inside a Pool's
+// <Shapes>, etc.). The walker recurses through every depth and emits one
+// record per Shape, with its PinX/PinY translated from parent-local to
+// page-absolute Visio coordinates.
+//
+// Why the transform: Visio sub-shape PinX/PinY are measured in the
+// parent group's local frame (origin at the parent's bottom-left,
+// Y-up). Page-absolute = parent.pageBottomLeft + child.localPin.
 
-function extractTopLevelShapes(pageXml: string): string[] {
+interface WalkedShape {
+  shapeId: string;
+  block: string;            // full Shape XML, including any nested <Shapes>
+  parentShapeId: string | null;
+  /** PinX in page-absolute Visio inches (Y-up). */
+  pageX: number;
+  /** PinY in page-absolute Visio inches (Y-up). */
+  pageY: number;
+  width: number;
+  height: number;
+}
+
+/** Read PinX/PinY/Width/Height cells from the *head* of a Shape — the
+ *  cells/sections that appear before any nested `<Shapes>` block. Stops
+ *  at the first `<Shapes>`, `</Shape>`, or next `<Shape ID=` so we don't
+ *  pick up a child's PinX as if it were the outer's. */
+function readShapeHeadCells(headXml: string): {
+  pinX: number;
+  pinY: number;
+  width: number;
+  height: number;
+} {
+  const stops = ["<Shapes>", "</Shape>", "<Shape "];
+  let cut = headXml.length;
+  for (const s of stops) {
+    const i = headXml.indexOf(s);
+    if (i >= 0 && i < cut) cut = i;
+  }
+  const head = headXml.slice(0, cut);
+  return {
+    pinX: parseFloat(head.match(/<Cell\s+N='PinX'\s+V='([^']*)'/)?.[1] ?? "0"),
+    pinY: parseFloat(head.match(/<Cell\s+N='PinY'\s+V='([^']*)'/)?.[1] ?? "0"),
+    width: parseFloat(head.match(/<Cell\s+N='Width'\s+V='([^']*)'/)?.[1] ?? "0"),
+    height: parseFloat(head.match(/<Cell\s+N='Height'\s+V='([^']*)'/)?.[1] ?? "0"),
+  };
+}
+
+function walkAllShapes(pageXml: string): WalkedShape[] {
   const m = pageXml.match(/<Shapes>([\s\S]*?)<\/Shapes>(?=\s*(?:<Connects>|<\/PageContents>))/);
   if (!m) return [];
   const inner = m[1];
-  const out: string[] = [];
-  let depth = 0;
-  let start = -1;
-  // Walk tag-by-tag tracking open/close depth.
+  const out: WalkedShape[] = [];
+
+  type Frame = {
+    shapeId: string;
+    blockStart: number;
+    pageX: number;
+    pageY: number;
+    width: number;
+    height: number;
+  };
+  const stack: Frame[] = [];
+
   const tagRe = /<(\/?)Shape(\s|>)/g;
   let t;
   while ((t = tagRe.exec(inner)) !== null) {
-    const closing = t[1] === "/";
-    if (!closing) {
-      if (depth === 0) start = t.index;
-      depth++;
-    } else {
-      depth--;
-      if (depth === 0 && start >= 0) {
-        // include up through "</Shape>"
-        const endIdx = inner.indexOf(">", t.index) + 1;
-        out.push(inner.slice(start, endIdx));
-        start = -1;
-      }
+    if (t[1] === "/") {
+      // Closing tag → pop frame, emit record covering the full block.
+      const frame = stack.pop();
+      if (!frame) continue; // unbalanced; skip
+      const blockEnd = inner.indexOf(">", t.index) + 1;
+      out.push({
+        shapeId: frame.shapeId,
+        block: inner.slice(frame.blockStart, blockEnd),
+        parentShapeId: stack.length > 0 ? stack[stack.length - 1].shapeId : null,
+        pageX: frame.pageX,
+        pageY: frame.pageY,
+        width: frame.width,
+        height: frame.height,
+      });
+      continue;
     }
+    // Opening tag: read shape's local PinX/PinY/W/H from cells before
+    // any nested <Shapes>, then transform local→page using parent frame.
+    const tagEnd = inner.indexOf(">", t.index) + 1;
+    const openTag = inner.slice(t.index, tagEnd);
+    const shapeId = openTag.match(/ID='(\d+)'/)?.[1] ?? "?";
+    // Slice an upper bound for the head — short slice for speed.
+    const headSlice = inner.slice(tagEnd, Math.min(inner.length, tagEnd + 6000));
+    const { pinX, pinY, width, height } = readShapeHeadCells(headSlice);
+    let pageX = pinX;
+    let pageY = pinY;
+    if (stack.length > 0) {
+      const parent = stack[stack.length - 1];
+      pageX = (parent.pageX - parent.width / 2) + pinX;
+      pageY = (parent.pageY - parent.height / 2) + pinY;
+    }
+    stack.push({
+      shapeId,
+      blockStart: t.index,
+      pageX,
+      pageY,
+      width,
+      height,
+    });
   }
   return out;
 }
@@ -405,27 +481,21 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
   const pageH = readCellNum(pagePropsBlock, "PageHeight") ?? 8.27;
   void pageW; // not currently used; available for future centring logic.
 
-  const shapeBlocks = extractTopLevelShapes(pageXml);
+  const walked = walkAllShapes(pageXml);
 
-  // Diagnostic: count ALL <Shape> openings on the page (including nested).
-  // If the file nests its content inside a Pool/Group, only the outer
-  // wrapper shows up at top level — the rest goes uncounted by our walker.
-  const totalShapeCount = (pageXml.match(/<Shape\s+ID='/g) ?? []).length;
-  const nestedShapeCount = totalShapeCount - shapeBlocks.length;
-  if (nestedShapeCount > 0) {
-    warnings.push(
-      `Page has ${nestedShapeCount} nested shape${nestedShapeCount === 1 ? "" : "s"} ` +
-      `(${shapeBlocks.length} top-level). Nested shapes are not currently extracted — ` +
-      `if the diagram nests content inside a Pool/Group, those shapes will be missing.`,
-    );
-  }
-
-  // First pass: classify all shapes; collect Pool→Lane Member maps.
+  // First pass: classify every walked shape (any depth). Track parent
+  // shape IDs from nesting AND Pool Member sections — both feed into the
+  // Pool→Lane parentage resolution below.
   type RawShape = {
     shapeId: string;
+    parentShapeId: string | null;
     masterId: string | null;
     nameU: string;
     block: string;
+    pageX: number;     // page-absolute Visio inches (Y-up)
+    pageY: number;
+    width: number;
+    height: number;
     seed: ElementSeed | null;
     connectorBase: ConnectorBase | null;
     bpmnId?: string;
@@ -434,10 +504,8 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
   const raw: RawShape[] = [];
   const poolMembers = new Map<string, string[]>(); // poolShapeId → lane shape IDs
 
-  for (const block of shapeBlocks) {
-    const shapeIdM = block.match(/^<Shape\s+ID='(\d+)'/);
-    if (!shapeIdM) continue;
-    const shapeId = shapeIdM[1];
+  for (const w of walked) {
+    const block = w.block;
     const masterIdM = block.match(/Master='(\d+)'/);
     const masterId = masterIdM?.[1] ?? null;
     const masterInfo = masterId ? masters.get(masterId) : undefined;
@@ -453,34 +521,60 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
       const labelSuffix = labelHint ? ` (text: "${labelHint}")` : "";
       if (nameU) {
         warnings.push(
-          `Skipped shape ${shapeId} — unrecognised master "${nameU}" (master ID ${masterId})${labelSuffix}.`,
+          `Skipped shape ${w.shapeId} — unrecognised master "${nameU}" (master ID ${masterId})${labelSuffix}.`,
         );
       } else if (masterId) {
         warnings.push(
-          `Skipped shape ${shapeId} — master ${masterId} has no NameU${labelSuffix}.`,
+          `Skipped shape ${w.shapeId} — master ${masterId} has no NameU${labelSuffix}.`,
         );
       } else {
-        warnings.push(`Skipped shape ${shapeId} — no Master attribute${labelSuffix}.`);
+        warnings.push(`Skipped shape ${w.shapeId} — no Master attribute${labelSuffix}.`);
       }
       continue;
     }
 
-    raw.push({ shapeId, masterId, nameU, block, seed, connectorBase, bpmnId, props });
+    raw.push({
+      shapeId: w.shapeId,
+      parentShapeId: w.parentShapeId,
+      masterId,
+      nameU,
+      block,
+      pageX: w.pageX,
+      pageY: w.pageY,
+      width: w.width,
+      height: w.height,
+      seed,
+      connectorBase,
+      bpmnId,
+      props,
+    });
 
     if (seed?.type === "pool") {
       const memberIds = readMemberIDs(block);
-      if (memberIds.length > 0) poolMembers.set(shapeId, memberIds);
+      if (memberIds.length > 0) poolMembers.set(w.shapeId, memberIds);
     }
   }
 
-  // Disambiguate "Pool / Lane" master: if the shape is referenced by a
-  // Pool's Member section, it's a Lane; otherwise it's a Pool.
+  // Disambiguate "Pool / Lane" master. A shape is a *Lane* if EITHER:
+  //   a) It's referenced by another Pool's Member section (V3 round-trip:
+  //      lanes are top-level siblings linked via Member rows), OR
+  //   b) Its direct parent in the page shape tree is also a Pool/Lane
+  //      (native Visio: lanes are nested inside the Pool's <Shapes>).
   const laneShapeIds = new Set<string>();
   for (const ids of poolMembers.values()) for (const id of ids) laneShapeIds.add(id);
+  // Build a quick lookup: shapeId → RawShape (for parent classification).
+  const rawByShapeId = new Map<string, RawShape>();
+  for (const r of raw) rawByShapeId.set(r.shapeId, r);
   for (const r of raw) {
-    if (r.seed?.type === "pool" && r.nameU === "Pool / Lane" && laneShapeIds.has(r.shapeId)) {
-      r.seed.type = "lane";
+    if (r.seed?.type !== "pool" || r.nameU !== "Pool / Lane") continue;
+    let isLane = laneShapeIds.has(r.shapeId);
+    if (!isLane && r.parentShapeId) {
+      const parent = rawByShapeId.get(r.parentShapeId);
+      if (parent?.seed?.type === "pool" || parent?.seed?.type === "lane") {
+        isLane = true;
+      }
     }
+    if (isLane) r.seed.type = "lane";
   }
 
   // Build element list.
@@ -491,10 +585,10 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
     const elId = r.bpmnId && r.bpmnId.length > 0 ? r.bpmnId : nano();
     shapeIdToElId.set(r.shapeId, elId);
 
-    const pinX = readCellNum(r.block, "PinX") ?? 0;
-    const pinY = readCellNum(r.block, "PinY") ?? 0;
-    const w = readCellNum(r.block, "Width") ?? 1;
-    const h = readCellNum(r.block, "Height") ?? 1;
+    const pinX = r.pageX;        // page-absolute (after parent transform)
+    const pinY = r.pageY;
+    const w = r.width;
+    const h = r.height;
 
     // Force Diagramatix default sizes for fixed-icon types so events,
     // gateways, data-objects and data-stores don't import as oversized
@@ -534,7 +628,7 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
     elements.push(el);
   }
 
-  // Pool→Lane parentage.
+  // Pool→Lane parentage from Pool Member sections (V3 round-trip).
   for (const [poolShapeId, laneShapeIds] of poolMembers) {
     const poolElId = shapeIdToElId.get(poolShapeId);
     if (!poolElId) continue;
@@ -542,8 +636,20 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
       const laneElId = shapeIdToElId.get(laneShapeId);
       if (!laneElId) continue;
       const lane = elements.find((e) => e.id === laneElId);
-      if (lane) lane.parentId = poolElId;
+      if (lane && !lane.parentId) lane.parentId = poolElId;
     }
+  }
+  // Pool→Lane parentage from page nesting (native Visio): if a Lane was
+  // nested inside a Pool in the source XML, set parentId from that.
+  for (const r of raw) {
+    if (r.seed?.type !== "lane" || !r.parentShapeId) continue;
+    const parent = rawByShapeId.get(r.parentShapeId);
+    if (parent?.seed?.type !== "pool") continue;
+    const laneElId = shapeIdToElId.get(r.shapeId);
+    const poolElId = shapeIdToElId.get(parent.shapeId);
+    if (!laneElId || !poolElId) continue;
+    const lane = elements.find((e) => e.id === laneElId);
+    if (lane && !lane.parentId) lane.parentId = poolElId;
   }
 
   // Connectors: page-level <Connects><Connect FromSheet=… ToSheet=… /></Connects>
@@ -579,10 +685,22 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
       continue;
     }
 
-    const beginX = readCellNum(r.block, "BeginX") ?? 0;
-    const beginY = readCellNum(r.block, "BeginY") ?? 0;
-    const endX = readCellNum(r.block, "EndX") ?? 0;
-    const endY = readCellNum(r.block, "EndY") ?? 0;
+    let beginX = readCellNum(r.block, "BeginX") ?? 0;
+    let beginY = readCellNum(r.block, "BeginY") ?? 0;
+    let endX = readCellNum(r.block, "EndX") ?? 0;
+    let endY = readCellNum(r.block, "EndY") ?? 0;
+    // Begin/End cells live in the connector's parent frame (same frame
+    // as its PinX). For a nested connector inside a Pool/Group, lift
+    // them to page-absolute Visio coords so canvas conversion is correct.
+    if (r.parentShapeId) {
+      const p = rawByShapeId.get(r.parentShapeId);
+      if (p) {
+        const offX = p.pageX - p.width / 2;
+        const offY = p.pageY - p.height / 2;
+        beginX += offX; endX += offX;
+        beginY += offY; endY += offY;
+      }
+    }
 
     // Geometry IX='0' carries the connector path. MoveTo IX='1' marks
     // Begin (typically (0,0)); subsequent LineTo rows are offsets relative
