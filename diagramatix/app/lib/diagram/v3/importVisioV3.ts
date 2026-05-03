@@ -407,6 +407,19 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
 
   const shapeBlocks = extractTopLevelShapes(pageXml);
 
+  // Diagnostic: count ALL <Shape> openings on the page (including nested).
+  // If the file nests its content inside a Pool/Group, only the outer
+  // wrapper shows up at top level — the rest goes uncounted by our walker.
+  const totalShapeCount = (pageXml.match(/<Shape\s+ID='/g) ?? []).length;
+  const nestedShapeCount = totalShapeCount - shapeBlocks.length;
+  if (nestedShapeCount > 0) {
+    warnings.push(
+      `Page has ${nestedShapeCount} nested shape${nestedShapeCount === 1 ? "" : "s"} ` +
+      `(${shapeBlocks.length} top-level). Nested shapes are not currently extracted — ` +
+      `if the diagram nests content inside a Pool/Group, those shapes will be missing.`,
+    );
+  }
+
   // First pass: classify all shapes; collect Pool→Lane Member maps.
   type RawShape = {
     shapeId: string;
@@ -416,6 +429,7 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
     seed: ElementSeed | null;
     connectorBase: ConnectorBase | null;
     bpmnId?: string;
+    props: Record<string, string>;
   };
   const raw: RawShape[] = [];
   const poolMembers = new Map<string, string[]>(); // poolShapeId → lane shape IDs
@@ -435,17 +449,23 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
     const seed = connectorBase ? null : classifyElement(nameU, props);
 
     if (!connectorBase && !seed) {
+      const labelHint = readText(block).slice(0, 40);
+      const labelSuffix = labelHint ? ` (text: "${labelHint}")` : "";
       if (nameU) {
-        warnings.push(`Skipped shape ${shapeId} — unrecognised master "${nameU}".`);
+        warnings.push(
+          `Skipped shape ${shapeId} — unrecognised master "${nameU}" (master ID ${masterId})${labelSuffix}.`,
+        );
       } else if (masterId) {
-        warnings.push(`Skipped shape ${shapeId} — master ${masterId} has no NameU.`);
+        warnings.push(
+          `Skipped shape ${shapeId} — master ${masterId} has no NameU${labelSuffix}.`,
+        );
       } else {
-        warnings.push(`Skipped shape ${shapeId} — no Master attribute.`);
+        warnings.push(`Skipped shape ${shapeId} — no Master attribute${labelSuffix}.`);
       }
       continue;
     }
 
-    raw.push({ shapeId, masterId, nameU, block, seed, connectorBase, bpmnId });
+    raw.push({ shapeId, masterId, nameU, block, seed, connectorBase, bpmnId, props });
 
     if (seed?.type === "pool") {
       const memberIds = readMemberIDs(block);
@@ -487,7 +507,10 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
     const xPx = centreXPx - widthPx / 2;
     const yPx = centreYPx - heightPx / 2;
 
-    const label = readText(r.block);
+    // Page-level <Text> wins; otherwise fall back to the BpmnName Property
+    // (Pools and Lanes carry their label only on the per-instance master,
+    // not the page shape, so for those types BpmnName is the only source).
+    const label = readText(r.block) || r.props.BpmnName || "";
     const properties: Record<string, unknown> = {};
     if (r.seed.subprocessType) properties.subprocessType = r.seed.subprocessType;
     if (r.seed.poolType) properties.poolType = r.seed.poolType;
