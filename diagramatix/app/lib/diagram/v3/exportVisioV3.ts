@@ -2295,6 +2295,12 @@ export async function exportVisioV3(
       `<Cell N='BegTrigger' V='2' F='_XFTRIGGER(Sheet.${srcShapeId}!EventXFMod)'/>` +
       `<Cell N='EndTrigger' V='2' F='_XFTRIGGER(Sheet.${tgtShapeId}!EventXFMod)'/>` +
       `<Cell N='ConFixedCode' V='6'/>` +
+      // Round-trip metadata: stash the Diagramatix connector ID so re-import
+      // can recover the original ID (mirrors the BpmnId added to elements
+      // via getElementMappingV3).
+      `<Section N='Property'>` +
+        `<Row N='BpmnId'><Cell N='Value' V='${esc(conn.id)}' U='STR'/></Row>` +
+      `</Section>` +
       txtCells +
       `<Section N='Geometry' IX='0'>` +
       `<Cell N='NoFill' V='1'/><Cell N='NoLine' V='0'/><Cell N='NoShow' V='0'/><Cell N='NoSnap' V='0'/>` +

@@ -567,6 +567,7 @@ export function DiagramEditor({
   const importJsonInputRef = useRef<HTMLInputElement>(null);
   const importXmlInputRef = useRef<HTMLInputElement>(null);
   const importTemplatesInputRef = useRef<HTMLInputElement>(null);
+  const importVisioInputRef = useRef<HTMLInputElement>(null);
   // Admin-only: prompt the admin to pick the destination list when
   // exporting or importing templates. Non-admins skip the prompt.
   const [templateExportPrompt, setTemplateExportPrompt] = useState(false);
@@ -937,6 +938,35 @@ export function DiagramEditor({
   }
 
   // Import templates from a `.diag_tems` file into the chosen list.
+  async function handleImportVisioFile(file: File) {
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      if (projectId) form.append("projectId", projectId);
+      const resp = await fetch("/api/import/visio-v3", { method: "POST", body: form });
+      if (!resp.ok) {
+        const txt = await resp.text();
+        alert(`Visio import failed: ${txt || resp.statusText}`);
+        return;
+      }
+      const result = await resp.json() as {
+        diagram: { id: string };
+        warnings: string[];
+      };
+      if (result.warnings.length > 0) {
+        // Brief, scannable summary; full list also surfaced for diagnosis.
+        alert(
+          `Imported with ${result.warnings.length} warning${result.warnings.length === 1 ? "" : "s"}:\n\n` +
+          result.warnings.slice(0, 8).join("\n") +
+          (result.warnings.length > 8 ? `\n…(+${result.warnings.length - 8} more)` : ""),
+        );
+      }
+      router.push(`/diagram/${result.diagram.id}`);
+    } catch (err) {
+      alert(`Visio import failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
   async function handleImportTemplatesFile(file: File, dest: "user" | "builtin") {
     try {
       const text = await file.text();
@@ -1538,6 +1568,17 @@ export function DiagramEditor({
             }
           }}
         />
+        <input
+          ref={importVisioInputRef}
+          type="file"
+          accept=".vsdx"
+          className="hidden"
+          onChange={e => {
+            const f = e.target.files?.[0];
+            e.target.value = "";
+            if (f) handleImportVisioFile(f);
+          }}
+        />
 
         <div className="relative" ref={fileMenuRef}>
           <button
@@ -1650,6 +1691,19 @@ export function DiagramEditor({
                         Visio
                       </button>
                     )}
+                    {/* Visio Stencil download (BPMN only) — install in Visio
+                        to author BPMN diagrams natively that import cleanly. */}
+                    {diagramType === "bpmn" && (
+                      <a
+                        href="/BPMN%20Diagramatix%20v1.0.vssx"
+                        download
+                        onClick={() => { setFileMenuOpen(false); setFileSubmenu(null); }}
+                        className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                        title="Download the BPMN Diagramatix stencil (.vssx) to use in Visio"
+                      >
+                        Visio Stencil
+                      </a>
+                    )}
                     {/* SVG */}
                     <button
                       onClick={() => { handleExport(); setFileMenuOpen(false); setFileSubmenu(null); }}
@@ -1728,6 +1782,13 @@ export function DiagramEditor({
                       title="Import templates from a .diag_tems file"
                     >
                       Templates
+                    </button>
+                    <button
+                      onClick={() => { setFileMenuOpen(false); setFileSubmenu(null); importVisioInputRef.current?.click(); }}
+                      className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                      title="Import a Visio BPMN .vsdx file as a new diagram"
+                    >
+                      Visio
                     </button>
                   </div>
                 )}

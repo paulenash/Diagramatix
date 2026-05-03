@@ -59,6 +59,28 @@ const EVENT_TYPE_MAP: Record<string, string> = {
 };
 
 export function getElementMappingV3(el: DiagramElement): MasterMapping | null {
+  const mapping = getElementMappingV3Inner(el);
+  if (!mapping) return null;
+  // Round-trip metadata: stash the Diagramatix element ID into BpmnId so
+  // re-import can recover the original ID. Visio treats unknown Bpmn props
+  // as opaque strings and silently round-trips them.
+  mapping.properties.BpmnId = el.id;
+  const elPropsRec = el.properties as Record<string, unknown> | undefined;
+  const role = elPropsRec?.role as string | undefined;
+  const mult = elPropsRec?.multiplicity as string | undefined;
+  if (el.type === "data-object" && (role === "input" || role === "output")) {
+    mapping.properties.BpmnRole = role;
+  }
+  if (
+    (el.type === "data-object" || el.type === "pool") &&
+    mult === "collection"
+  ) {
+    mapping.properties.BpmnMultiplicity = "collection";
+  }
+  return mapping;
+}
+
+function getElementMappingV3Inner(el: DiagramElement): MasterMapping | null {
   switch (el.type) {
     case "task":
       return {
