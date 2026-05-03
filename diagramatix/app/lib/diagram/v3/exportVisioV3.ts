@@ -563,10 +563,9 @@ export async function exportVisioV3(
     const minBody = Math.min(instanceW, instanceH);
     const outerD = minBody * 0.556;
     const innerD = minBody * 0.439;
-    // Pentagon: 1/3 of the previous size — sits comfortably inside the
-    // inner ring with breathing room. Diagramatix canvas marker has
-    // pentagon at s*0.5 = ~29% of body; 1/3 of that = ~10% of body.
-    const pentD = minBody * 0.098;
+    // Pentagon: ~1/3 of the inner-ring diameter — sits comfortably
+    // inside the inner ring with breathing room.
+    const pentD = innerD / 3; // = body * 0.146
 
     // Shape 8 — container, body-centred. Width/Height = Sheet.5!Width*0.556
     // so it's square (assuming square gateway, which Diagramatix's are).
@@ -1169,6 +1168,37 @@ export async function exportVisioV3(
         // Visio shape coords are Y-up — "up" on screen = higher Y.
         masterContent = shiftSubprocessLabelUp(masterContent, instanceH);
       }
+    }
+
+    // End event ring thickness — narrow it to 75% of the natural
+    // template's thickness. The black "ring" is the visible margin
+    // between Shape 6 (full-body black disc) and Shape 9 (the inner
+    // theme-coloured overlay). Original ring = body × (1-0.8)/2 = 0.1
+    // body on each side. Shrinking to 0.075 each side = ring × 0.75.
+    // Achieved by enlarging Shape 9 from `Sheet.5!Width*0.8` to
+    // `Sheet.5!Width*0.85` (and same for Height). Only applies to End
+    // event (master 106) — Intermediate (master 105) keeps its 0.8
+    // inner ring for the classic double-ring look.
+    if (sourceMasterId === 106 && instanceW !== undefined && instanceH !== undefined) {
+      const newW = instanceW * 0.85;
+      const newH = instanceH * 0.85;
+      masterContent = masterContent.replace(
+        /(<Shape ID='9'[^>]*>[\s\S]*?<Cell N='Width' V=')[\d.]+('[^>]*F=')[^']+(')/,
+        `$1${newW}$2Sheet.5!Width*0.85$3`,
+      );
+      masterContent = masterContent.replace(
+        /(<Shape ID='9'[^>]*>[\s\S]*?<Cell N='Height' V=')[\d.]+('[^>]*F=')[^']+(')/,
+        `$1${newH}$2Sheet.5!Height*0.85$3`,
+      );
+      // LocPin halves of the new size.
+      masterContent = masterContent.replace(
+        /(<Shape ID='9'[^>]*>[\s\S]*?<Cell N='LocPinX' V=')[\d.]+(')/,
+        `$1${newW / 2}$2`,
+      );
+      masterContent = masterContent.replace(
+        /(<Shape ID='9'[^>]*>[\s\S]*?<Cell N='LocPinY' V=')[\d.]+(')/,
+        `$1${newH / 2}$2`,
+      );
     }
 
     // Non-interrupting events (master 105 = Intermediate, 107 = Start).
