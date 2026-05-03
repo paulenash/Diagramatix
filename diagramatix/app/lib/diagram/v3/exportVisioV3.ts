@@ -1318,6 +1318,20 @@ export async function exportVisioV3(
   const elIdToShapeId = new Map<string, number>();
   let nextId = 100;
 
+  // Pre-pass: assign shape IDs to every element BEFORE emission so that
+  // when a Pool emits, it can list its child Lane IDs in a Visio
+  // `<Section N='Member'>` block. Without that pre-pass, Pools (which
+  // typically come before their Lanes in the iteration order) wouldn't
+  // know the Lane IDs yet.
+  for (const el of data.elements) {
+    const m = getElementMappingV3(el);
+    if (!m) continue;
+    elIdToShapeId.set(el.id, nextId);
+    nextId += 100;
+  }
+  // Reset nextId so the actual emission loop reuses the same allocations.
+  nextId = 100;
+
   // Helper: generate sub-shapes with F='Inh' for BOTH width AND height scaling
   // MasterShapes 6 (outer rect — the visible body), 7 (border group containing
   // 8,9). MasterShape 6 paints the body fill: it inherits FillStyle='7' from
@@ -1695,6 +1709,16 @@ export async function exportVisioV3(
             `N='Height' V='${h}' U='MM' F='${h}*25.4MM'/>`
           );
 
+          // Pool header strip width — Visio template uses 12MM, but
+          // Diagramatix's `POOL_HEADER_W` is 36px = 9.525MM. Mismatch
+          // means Lane.x (set at Pool.x + 36px) sits INSIDE the wider
+          // template header, producing the visible overlap. Override
+          // the Pool master's header thickness to match Diagramatix.
+          poolMasterXml = poolMasterXml
+            .split("12MM*DropOnPageScale").join("9.525MM*DropOnPageScale")
+            .split("0.4724409448818898").join("0.375")
+            .split("0.2362204724409449").join("0.1875");
+
           // Replace "Function" text in <Text> elements and property values only
           poolMasterXml = poolMasterXml.replace(
             /<Text>Function\s*<\/Text>/g,
@@ -1771,6 +1795,36 @@ export async function exportVisioV3(
           const poolUserSection = `<Section N='User'>` +
             `<Row N='visHeadingText'><Cell N='Value' V='${esc(poolLabel)}' U='STR' F='Inh'/></Row>` +
             `</Section>`;
+          // Member section (Visio Container framework): list the shape
+          // IDs of every Lane whose `parentId === el.id` so Visio treats
+          // them as members of this Pool's container. Result: moving the
+          // Pool moves the Lanes; Lane boundary drags resize neighbours.
+          // Only emitted on Pools (not Lanes).
+          let memberSection = "";
+          if (el.type === "pool") {
+            const childLaneIds: number[] = [];
+            for (const child of data.elements) {
+              if (child.type === "lane" && child.parentId === el.id) {
+                const cid = elIdToShapeId.get(child.id);
+                if (cid !== undefined) childLaneIds.push(cid);
+              }
+            }
+            if (childLaneIds.length > 0) {
+              memberSection =
+                `<Section N='Member'>` +
+                childLaneIds
+                  .map(
+                    (cid, i) =>
+                      `<Row IX='${i + 1}'>` +
+                      `<Cell N='ID' V='${cid}'/>` +
+                      `<Cell N='ContainerProperties' V='2'/>` +
+                      `<Cell N='MemberFlags' V='0'/>` +
+                      `</Row>`,
+                  )
+                  .join("") +
+                `</Section>`;
+            }
+          }
           shapes.push(
             `<Shape ID='${shapeId}' NameU='${esc(poolLabel)}' Type='Group' Master='${poolInstanceId}'>` +
             `<Cell N='PinX' V='${cx}'/>` +
@@ -1782,6 +1836,7 @@ export async function exportVisioV3(
             poolUserSection +
             propSection +
             elCharSection +
+            memberSection +
             `</Shape>`
           );
           continue; // skip the normal shape.push below
