@@ -28,9 +28,30 @@ import type {
   Point,
 } from "../types";
 
+export interface MasterStat {
+  masterId: string;
+  nameU: string;
+  count: number;          // total shape instances on the page using this master
+  classifiedAs: string;   // "task" / "pool" / "skipped" / "(connector) sequence" / etc.
+}
+
+export interface ImportStats {
+  totalShapesOnPage: number;
+  elementsCreated: number;
+  connectorsCreated: number;
+  shapesSkipped: number;
+  connectorsSkipped: number;
+  implicitPools: number;
+  /** Per-master breakdown — sorted by count desc. The single most useful
+   *  signal when debugging: "which Visio master is in your file and what
+   *  did we do with it?". */
+  masters: MasterStat[];
+}
+
 export interface ImportResult {
   data: DiagramData;
   warnings: string[];
+  stats: ImportStats;
 }
 
 interface MasterInfo {
@@ -541,11 +562,16 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
   const masters = await loadMasterIndex(zip);
 
   // Find page1.xml — the first page listed in pages.xml.
+  const emptyStats: ImportStats = {
+    totalShapesOnPage: 0, elementsCreated: 0, connectorsCreated: 0,
+    shapesSkipped: 0, connectorsSkipped: 0, implicitPools: 0, masters: [],
+  };
   const pagesXml = await zip.file("visio/pages/pages.xml")?.async("string");
   if (!pagesXml) {
     return {
       data: { elements: [], connectors: [], viewport: { x: 0, y: 0, zoom: 1 } },
       warnings: ["No pages.xml in .vsdx — nothing to import."],
+      stats: emptyStats,
     };
   }
   // Count pages first to warn on multi-page.
@@ -569,6 +595,7 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
     return {
       data: { elements: [], connectors: [], viewport: { x: 0, y: 0, zoom: 1 } },
       warnings: [...warnings, `Page file ${firstPageFile} not found.`],
+      stats: emptyStats,
     };
   }
 
@@ -585,6 +612,18 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
   // end (pasting 200 per-shape warnings into a chat is unhelpful).
   const skippedByTag = new Map<string, number>();
   const perShapeWarnings: string[] = [];
+  // Per-master breakdown for the post-import status modal.
+  // Key = "${masterId || '-'}|${nameU || ''}" so masters with the same
+  // ID-but-no-NameU and masters with no master at all stay distinct.
+  type MasterBreakdown = { masterId: string; nameU: string; count: number; classifiedAs: string };
+  const masterBreakdown = new Map<string, MasterBreakdown>();
+  function recordMaster(masterId: string | null, nameU: string, classifiedAs: string) {
+    const id = masterId ?? "-";
+    const key = `${id}|${nameU}`;
+    const existing = masterBreakdown.get(key);
+    if (existing) existing.count++;
+    else masterBreakdown.set(key, { masterId: id, nameU, count: 1, classifiedAs });
+  }
 
   // First pass: classify every walked shape (any depth). Track parent
   // shape IDs from nesting AND Pool Member sections — both feed into the
@@ -620,6 +659,7 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
     const seed = connectorBase ? null : classifyElement(nameU, props);
 
     if (!connectorBase && !seed) {
+      recordMaster(masterId, nameU, "skipped");
       const labelHint = readText(block).slice(0, 40);
       const labelSuffix = labelHint ? ` (text: "${labelHint}")` : "";
       const tag = nameU || (masterId ? `master ${masterId} (no NameU)` : "(no master)");
@@ -657,6 +697,13 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
       bpmnId,
       props,
     });
+    recordMaster(
+      masterId,
+      nameU,
+      connectorBase
+        ? `connector → ${connectorBase}`
+        : `element → ${seed!.type}`,
+    );
 
     if (seed?.type === "pool") {
       const memberIds = readMemberIDs(block);
@@ -691,6 +738,7 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
   // Pool — Visio cross-functional flowchart files often use a generic
   // container or unrecognised master for the pool wrapper, with named
   // Lane shapes nested inside.
+  let implicitPoolCount = 0;
   const walkedById = new Map<string, WalkedShape>();
   for (const w of walked) walkedById.set(w.shapeId, w);
   const childrenByParent = new Map<string, RawShape[]>();
@@ -751,6 +799,14 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
     };
     raw.push(synthesised);
     rawByShapeId.set(parentId, synthesised);
+    implicitPoolCount++;
+    // Update master breakdown — a previously-skipped wrapper just became a pool.
+    const breakdownKey = `${wrapperMasterId ?? "-"}|${wrapperNameU}`;
+    const bd = masterBreakdown.get(breakdownKey);
+    if (bd) {
+      bd.classifiedAs = "element → pool (implicit)";
+      // count stays the same; we're reclassifying, not adding
+    }
     // Synthesised pool steals one warning entry off the skip list since
     // it's no longer "skipped".
     const tag = wrapperNameU || (wrapperMasterId ? `master ${wrapperMasterId} (no NameU)` : "(no master)");
@@ -871,6 +927,7 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
   }
 
   const connectors: Connector[] = [];
+  let connectorsSkipped = 0;
   for (const r of raw) {
     if (!r.connectorBase) continue;
 
@@ -900,6 +957,7 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
         : !sourceId ? `source shape ${sourceShape} not in element list`
         : `target shape ${targetShape} not in element list`;
       warnings.push(`Skipped connector ${r.shapeId} (${r.nameU}) — ${why}.`);
+      connectorsSkipped++;
       continue;
     }
 
@@ -1016,6 +1074,14 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
     warnings.push(...perShapeWarnings);
   }
 
+  // Build the final stats payload — sorted by occurrence count desc.
+  const totalShapes = walked.length;
+  const elementsCreated = elements.length;
+  const connectorsCreated = connectors.length;
+  const shapesSkipped = [...skippedByTag.values()].reduce((a, b) => a + b, 0);
+  const sortedMasters: MasterStat[] = [...masterBreakdown.values()]
+    .sort((a, b) => b.count - a.count);
+
   return {
     data: {
       elements,
@@ -1023,5 +1089,14 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
       viewport: { x: 0, y: 0, zoom: 1 },
     },
     warnings,
+    stats: {
+      totalShapesOnPage: totalShapes,
+      elementsCreated,
+      connectorsCreated,
+      shapesSkipped,
+      connectorsSkipped,
+      implicitPools: implicitPoolCount,
+      masters: sortedMasters,
+    },
   };
 }

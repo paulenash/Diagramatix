@@ -30,6 +30,20 @@ import { AiPanel } from "./AiPanel";
 import { PlanPanel } from "./PlanPanel";
 import { HistoryPanel } from "./HistoryPanel";
 
+interface VisioImportResult {
+  diagram: { id: string };
+  warnings: string[];
+  stats: {
+    totalShapesOnPage: number;
+    elementsCreated: number;
+    connectorsCreated: number;
+    shapesSkipped: number;
+    connectorsSkipped: number;
+    implicitPools: number;
+    masters: { masterId: string; nameU: string; count: number; classifiedAs: string }[];
+  };
+}
+
 interface Props {
   diagramId: string;
   diagramName: string;
@@ -572,6 +586,7 @@ export function DiagramEditor({
   // exporting or importing templates. Non-admins skip the prompt.
   const [templateExportPrompt, setTemplateExportPrompt] = useState(false);
   const [templateImportFile, setTemplateImportFile] = useState<File | null>(null);
+  const [visioImportStatus, setVisioImportStatus] = useState<VisioImportResult | null>(null);
   const [clearConfirmOpen, setClearConfirmOpen] = useState<null | "all" | "unselected">(null);
   const [clearMenuOpen, setClearMenuOpen] = useState(false);
   const clearMenuRef = useRef<HTMLDivElement>(null);
@@ -949,19 +964,11 @@ export function DiagramEditor({
         alert(`Visio import failed: ${txt || resp.statusText}`);
         return;
       }
-      const result = await resp.json() as {
-        diagram: { id: string };
-        warnings: string[];
-      };
-      if (result.warnings.length > 0) {
-        // Brief, scannable summary; full list also surfaced for diagnosis.
-        alert(
-          `Imported with ${result.warnings.length} warning${result.warnings.length === 1 ? "" : "s"}:\n\n` +
-          result.warnings.slice(0, 8).join("\n") +
-          (result.warnings.length > 8 ? `\n…(+${result.warnings.length - 8} more)` : ""),
-        );
-      }
-      router.push(`/diagram/${result.diagram.id}`);
+      const result = await resp.json() as VisioImportResult;
+      // Always show the status modal — even on a clean import — so the
+      // user can see the per-master breakdown and decide whether to open
+      // the new diagram or try a different source file.
+      setVisioImportStatus(result);
     } catch (err) {
       alert(`Visio import failed: ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -2244,6 +2251,116 @@ export function DiagramEditor({
                 className="px-3 py-1.5 text-sm text-white bg-blue-600 rounded hover:bg-blue-700"
               >
                 Built-In templates
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Visio import status — shows the per-master breakdown, stats, and
+          full warnings list from the most recent Import → Visio. Always
+          shown after an import (clean or noisy) so the user can verify
+          what came through and what didn't. */}
+      {visioImportStatus && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[85vh] flex flex-col">
+            <div className="px-5 pt-4 pb-2 border-b border-gray-200">
+              <h2 className="text-base font-semibold text-gray-900">Visio Import — Results</h2>
+              <p className="mt-1 text-xs text-gray-600">
+                Page totals, per-master breakdown, and any warnings from this import.
+                Open the new diagram to see the result on canvas, or close to retry with a different file.
+              </p>
+            </div>
+            <div className="px-5 py-3 border-b border-gray-200">
+              <div className="grid grid-cols-3 gap-3 text-xs text-gray-700">
+                <div><span className="font-semibold">Total shapes on page:</span> {visioImportStatus.stats.totalShapesOnPage}</div>
+                <div><span className="font-semibold">Elements created:</span> {visioImportStatus.stats.elementsCreated}</div>
+                <div><span className="font-semibold">Connectors created:</span> {visioImportStatus.stats.connectorsCreated}</div>
+                <div><span className="font-semibold">Shapes skipped:</span> {visioImportStatus.stats.shapesSkipped}</div>
+                <div><span className="font-semibold">Connectors skipped:</span> {visioImportStatus.stats.connectorsSkipped}</div>
+                <div><span className="font-semibold">Implicit pools:</span> {visioImportStatus.stats.implicitPools}</div>
+              </div>
+            </div>
+            <div className="overflow-y-auto px-5 py-3 flex-1 min-h-0">
+              <div className="mb-4">
+                <h3 className="text-xs font-semibold text-gray-800 mb-1">Master breakdown</h3>
+                <div className="border border-gray-200 rounded text-[11px]">
+                  <table className="w-full">
+                    <thead className="bg-gray-50 text-gray-700">
+                      <tr>
+                        <th className="text-left px-2 py-1 font-semibold">Master ID</th>
+                        <th className="text-left px-2 py-1 font-semibold">NameU</th>
+                        <th className="text-right px-2 py-1 font-semibold">Count</th>
+                        <th className="text-left px-2 py-1 font-semibold">Outcome</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {visioImportStatus.stats.masters.length === 0 && (
+                        <tr><td colSpan={4} className="px-2 py-2 text-gray-500">(no masters used)</td></tr>
+                      )}
+                      {visioImportStatus.stats.masters.map((m, i) => (
+                        <tr key={i} className={
+                          m.classifiedAs === "skipped" ? "bg-red-50" :
+                          m.classifiedAs.includes("implicit") ? "bg-yellow-50" : ""
+                        }>
+                          <td className="px-2 py-1 font-mono">{m.masterId}</td>
+                          <td className="px-2 py-1">{m.nameU || <span className="text-gray-400 italic">(empty)</span>}</td>
+                          <td className="px-2 py-1 text-right">{m.count}</td>
+                          <td className="px-2 py-1">{m.classifiedAs}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              {visioImportStatus.warnings.length > 0 && (
+                <div>
+                  <h3 className="text-xs font-semibold text-gray-800 mb-1">
+                    Warnings ({visioImportStatus.warnings.length})
+                  </h3>
+                  <pre className="text-[11px] font-mono whitespace-pre-wrap bg-gray-50 border border-gray-200 rounded p-2 text-gray-700">
+{visioImportStatus.warnings.join("\n")}
+                  </pre>
+                </div>
+              )}
+            </div>
+            <div className="px-5 py-3 flex gap-2 justify-end border-t border-gray-200">
+              <button
+                onClick={() => {
+                  navigator.clipboard?.writeText(
+                    [
+                      `Total: ${visioImportStatus.stats.totalShapesOnPage} shapes, ${visioImportStatus.stats.elementsCreated} elements, ${visioImportStatus.stats.connectorsCreated} connectors`,
+                      `Skipped: ${visioImportStatus.stats.shapesSkipped} shapes, ${visioImportStatus.stats.connectorsSkipped} connectors. Implicit pools: ${visioImportStatus.stats.implicitPools}`,
+                      "",
+                      "Master breakdown:",
+                      ...visioImportStatus.stats.masters.map(
+                        (m) => `  ${m.masterId.padStart(4)}  ${m.count.toString().padStart(3)}×  ${m.classifiedAs.padEnd(28)}  ${m.nameU || "(empty)"}`,
+                      ),
+                      "",
+                      `Warnings (${visioImportStatus.warnings.length}):`,
+                      ...visioImportStatus.warnings,
+                    ].join("\n"),
+                  );
+                }}
+                className="px-3 py-1.5 text-xs text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
+              >
+                Copy to clipboard
+              </button>
+              <button
+                onClick={() => setVisioImportStatus(null)}
+                className="px-3 py-1.5 text-xs text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
+              >
+                Close
+              </button>
+              <button
+                onClick={() => {
+                  const id = visioImportStatus.diagram.id;
+                  setVisioImportStatus(null);
+                  router.push(`/diagram/${id}`);
+                }}
+                className="px-3 py-1.5 text-xs text-white bg-blue-600 rounded hover:bg-blue-700"
+              >
+                Open Diagram
               </button>
             </div>
           </div>

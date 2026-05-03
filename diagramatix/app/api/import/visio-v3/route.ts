@@ -112,7 +112,7 @@ export async function POST(request: Request) {
   });
 
   return NextResponse.json(
-    { diagram, warnings: parsed.warnings },
+    { diagram, warnings: parsed.warnings, stats: parsed.stats },
     { status: 201 },
   );
 }
