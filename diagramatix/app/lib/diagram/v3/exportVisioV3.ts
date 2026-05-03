@@ -596,14 +596,9 @@ export async function exportVisioV3(
     // ellipses (outer fills shape, inner is innerFrac smaller).
     content = rewriteShape9Rings(content, outerD, innerFrac);
 
-    // Shape 10 — pentagon, inside the inner circle. Re-pin to the
-    // centre of Shape 8 (= centre of Shape 9), size = pentD. The
-    // pentagon's geometric vertices fan out from a centroid at
-    // (0.5W, 0.44H) of its bounding box (point-up pentagon: top vertex
-    // at Y=H, two side vertices at Y=0.6H, two bottom vertices at Y=0).
-    // Setting LocPinY = 0.44 × Height makes the pin land on the
-    // centroid, so PinY at Shape 8's centre puts the pentagon's visual
-    // centre at Shape 8's centre.
+    // Shape 10 — pentagon. Re-pin to centre of Shape 8, set size to
+    // pentD, anchor at the pentagon's centroid (0.5W, 0.44H of its
+    // bounding box) so the visual centre lands on Shape 8's centre.
     content = overrideShapeDirectCells(content, 10, {
       Width: { v: pentD, f: `Sheet.8!Width*${(pentD / outerD).toFixed(6)}` },
       Height: { v: pentD, f: "Width" },
@@ -612,9 +607,53 @@ export async function exportVisioV3(
       LocPinX: { v: pentD / 2, f: "Width*0.5" },
       LocPinY: { v: pentD * 0.44, f: "Height*0.44" },
     });
+    // Replace Shape 10's Geometry section with one whose cached V's are
+    // computed from the NEW pentD. Without this, Visio paints the
+    // pentagon at the natural-template cached values (~0.27 × 0.24 in
+    // template coords) on first frame, dwarfing the resized container.
+    content = rewriteShape10Pentagon(content, pentD);
 
     content = setEventMarkerLineWeight(content);
     return content;
+  }
+
+  /** Replace Shape 10's pentagon Geometry section with cached V values
+   *  computed from the new `pentD` size. The natural-template cached
+   *  V's are at the master's natural Width/Height (~0.27 × 0.24 in
+   *  template coords), and Visio uses cached V on first paint — so
+   *  without this rewrite the pentagon paints at template size on
+   *  first frame regardless of the resized Shape 10. */
+  function rewriteShape10Pentagon(content: string, pentD: number): string {
+    const W = pentD;
+    // Pentagon point-up with vertices: top (0.5W, H), two side
+    // vertices (W*0.18, 0.6H) and (W*0.82, 0.6H), two bottom vertices
+    // (0.18W, 0) and (0.82W, 0). Drawn as 5-vertex closed polygon.
+    // Master uses different ordering; stick with master's order so
+    // formulas like `Geometry1.X1` keep referencing the right cell.
+    //
+    // Master order:
+    //   1: MoveTo (0,            0.6H)        — left mid
+    //   2: LineTo (0.5W,         H)           — top
+    //   3: LineTo (W,            0.6H)        — right mid
+    //   4: LineTo (0.82W,        0)           — bottom right
+    //   5: LineTo (0.18W,        0)           — bottom left
+    //   6: LineTo (Geometry1.X1, Geometry1.Y1) — close back to start
+    const newGeom =
+      `<Section N='Geometry' IX='0'>` +
+      `<Cell N='NoFill' V='1'/><Cell N='NoLine' V='0'/>` +
+      `<Cell N='NoShow' V='1' F='NOT(Sheet.5!Actions.ExclusiveEvent.Checked)'/>` +
+      `<Cell N='NoSnap' V='0'/><Cell N='NoQuickDrag' V='0' F='No Formula'/>` +
+      `<Row T='MoveTo' IX='1'><Cell N='X' V='0' F='Width*0'/><Cell N='Y' V='${W * 0.6}' F='Height*0.6'/></Row>` +
+      `<Row T='LineTo' IX='2'><Cell N='X' V='${W * 0.5}' F='Width*0.5'/><Cell N='Y' V='${W}' F='Height*1'/></Row>` +
+      `<Row T='LineTo' IX='3'><Cell N='X' V='${W}' F='Width*1'/><Cell N='Y' V='${W * 0.6}' F='Height*0.6'/></Row>` +
+      `<Row T='LineTo' IX='4'><Cell N='X' V='${W * 0.82}' F='Width*0.82'/><Cell N='Y' V='0' F='Height*0'/></Row>` +
+      `<Row T='LineTo' IX='5'><Cell N='X' V='${W * 0.18}' F='Width*0.18'/><Cell N='Y' V='0' F='Height*0'/></Row>` +
+      `<Row T='LineTo' IX='6'><Cell N='X' V='0' F='Geometry1.X1'/><Cell N='Y' V='${W * 0.6}' F='Geometry1.Y1'/></Row>` +
+      `</Section>`;
+    return content.replace(
+      /(<Shape ID='10'[\s\S]*?)<Section N='Geometry' IX='0'>[\s\S]*?<\/Section>/,
+      `$1${newGeom}`,
+    );
   }
 
   /** Make the parallel-gateway cross arms 25% longer while keeping the
@@ -1168,37 +1207,6 @@ export async function exportVisioV3(
         // Visio shape coords are Y-up — "up" on screen = higher Y.
         masterContent = shiftSubprocessLabelUp(masterContent, instanceH);
       }
-    }
-
-    // End event ring thickness — narrow it to 75% of the natural
-    // template's thickness. The black "ring" is the visible margin
-    // between Shape 6 (full-body black disc) and Shape 9 (the inner
-    // theme-coloured overlay). Original ring = body × (1-0.8)/2 = 0.1
-    // body on each side. Shrinking to 0.075 each side = ring × 0.75.
-    // Achieved by enlarging Shape 9 from `Sheet.5!Width*0.8` to
-    // `Sheet.5!Width*0.85` (and same for Height). Only applies to End
-    // event (master 106) — Intermediate (master 105) keeps its 0.8
-    // inner ring for the classic double-ring look.
-    if (sourceMasterId === 106 && instanceW !== undefined && instanceH !== undefined) {
-      const newW = instanceW * 0.85;
-      const newH = instanceH * 0.85;
-      masterContent = masterContent.replace(
-        /(<Shape ID='9'[^>]*>[\s\S]*?<Cell N='Width' V=')[\d.]+('[^>]*F=')[^']+(')/,
-        `$1${newW}$2Sheet.5!Width*0.85$3`,
-      );
-      masterContent = masterContent.replace(
-        /(<Shape ID='9'[^>]*>[\s\S]*?<Cell N='Height' V=')[\d.]+('[^>]*F=')[^']+(')/,
-        `$1${newH}$2Sheet.5!Height*0.85$3`,
-      );
-      // LocPin halves of the new size.
-      masterContent = masterContent.replace(
-        /(<Shape ID='9'[^>]*>[\s\S]*?<Cell N='LocPinX' V=')[\d.]+(')/,
-        `$1${newW / 2}$2`,
-      );
-      masterContent = masterContent.replace(
-        /(<Shape ID='9'[^>]*>[\s\S]*?<Cell N='LocPinY' V=')[\d.]+(')/,
-        `$1${newH / 2}$2`,
-      );
     }
 
     // Non-interrupting events (master 105 = Intermediate, 107 = Start).
