@@ -379,39 +379,32 @@ function walkAllShapes(pageXml: string): WalkedShape[] {
     });
   }
 
-  // Third pass: compute pageX/pageY per shape by walking parent chain
-  // (memoised so the cost is O(N), not O(N·depth)).
+  // Third pass: compute pageX/pageY iteratively in topological order.
+  // The walker emits in post-order (children before parents), so reversing
+  // gives parents-first — every shape sees its parent's pageX/pageY already
+  // computed. Iterative form avoids stack overflow on deep nesting.
+  void nodeById; // not currently used; retained in case future passes want it
   const pageCache = new Map<string, { pageX: number; pageY: number }>();
-  function pageCoords(shapeId: string): { pageX: number; pageY: number } {
-    const cached = pageCache.get(shapeId);
-    if (cached) return cached;
-    const g = geomById.get(shapeId);
-    const n = nodeById.get(shapeId);
-    if (!g || !n) {
-      const v = { pageX: 0, pageY: 0 };
-      pageCache.set(shapeId, v);
-      return v;
-    }
+  for (let i = nodes.length - 1; i >= 0; i--) {
+    const n = nodes[i];
+    const g = geomById.get(n.shapeId)!;
     if (!n.parentShapeId) {
-      const v = { pageX: g.localPinX, pageY: g.localPinY };
-      pageCache.set(shapeId, v);
-      return v;
+      pageCache.set(n.shapeId, { pageX: g.localPinX, pageY: g.localPinY });
+      continue;
     }
     const parentG = geomById.get(n.parentShapeId);
-    const parentPage = pageCoords(n.parentShapeId);
+    const parentPage = pageCache.get(n.parentShapeId) ?? { pageX: 0, pageY: 0 };
     const offX = parentG ? parentG.width / 2 : 0;
     const offY = parentG ? parentG.height / 2 : 0;
-    const v = {
+    pageCache.set(n.shapeId, {
       pageX: parentPage.pageX - offX + g.localPinX,
       pageY: parentPage.pageY - offY + g.localPinY,
-    };
-    pageCache.set(shapeId, v);
-    return v;
+    });
   }
 
   return nodes.map((n) => {
     const g = geomById.get(n.shapeId)!;
-    const p = pageCoords(n.shapeId);
+    const p = pageCache.get(n.shapeId) ?? { pageX: 0, pageY: 0 };
     return {
       shapeId: n.shapeId,
       block: n.block,
