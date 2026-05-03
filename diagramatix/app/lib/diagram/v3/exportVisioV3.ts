@@ -170,7 +170,6 @@ export async function exportVisioV3(
     contentTypes = contentTypes.replace("</Types>",
       `<Override PartName="/visio/masters/${newFileName}" ContentType="application/vnd.ms-visio.master+xml"/></Types>`);
 
-    console.log(`[v2] Added master: ${entry.name} (${entry.origId} → ${entry.newId}) → ${newFileName}`);
   }
 
   // Write updated masters index and rels
@@ -1241,12 +1240,22 @@ export async function exportVisioV3(
     }
 
     // Data Object Collection marker (master 57 = mapping.masterId 115).
-    // Shape 7 in the master is gated on `Prop.BpmnCollection` — flipping
-    // this Prop's V to '1' unhides the collection bars at the bottom.
+    // Shape 7's three Geometry sections each carry a NoShow cell whose
+    // formula is `NOT(Sheet.5!Prop.BpmnCollection)` (or chains off
+    // Geometry1.NoShow). Flipping the BpmnCollection Prop's cached V to
+    // '1' makes the formula evaluate to NoShow=0, BUT Visio paints the
+    // first frame from cached V — so the three NoShow cached V's need
+    // to be flipped from '1' to '0' as well or the bars stay hidden
+    // until Visio recalcs. Scope the NoShow flip to Shape 7's block to
+    // avoid touching other shapes' NoShow cells.
     if (sourceMasterId === 115 && elProps?.multiplicity === "collection") {
       masterContent = masterContent.replace(
         /(<Row N='BpmnCollection'>[\s\S]*?<Cell N='Value' V=')0(' U='BOOL'\/>)/,
         "$11$2",
+      );
+      masterContent = masterContent.replace(
+        /<Shape ID='7'[\s\S]*?<\/Shape>/,
+        (block) => block.replace(/<Cell N='NoShow' V='1'/g, "<Cell N='NoShow' V='0'"),
       );
     }
 
@@ -1764,7 +1773,59 @@ export async function exportVisioV3(
             `${charSectionForHeader}<Text>$1</Text></Shape></Shapes></Shape>`
           );
 
-          console.log(`[v2] Pool per-instance master: w=${w}, h=${h}, name=${poolLabel}`);
+          // Black-Box Pool collection marker: 3 short vertical lines at the
+          // bottom-centre of the body region (excluding the left header
+          // strip), matching the canvas glyph. Pool master 19 has no
+          // BpmnCollection Prop — inject three line shapes (IDs 9/10/11)
+          // into Shape 5's Shapes group instead.
+          const poolPropsRec = el.properties as Record<string, unknown> | undefined;
+          const poolType = (poolPropsRec?.poolType as string | undefined) ?? "black-box";
+          const poolIsCollection =
+            el.type === "pool"
+            && poolType === "black-box"
+            && (poolPropsRec?.multiplicity as string | undefined) === "collection";
+          if (poolIsCollection) {
+            const HEADER_W = 0.375;        // matches the 9.525MM header substitution above
+            const lineH    = 0.197;        // ≈ 5mm, ≈ 18px on canvas
+            const halfH    = lineH / 2;
+            const lineGap  = 0.0625;       // ≈ 1.6mm gap between adjacent line centres
+            const bodyMidX = HEADER_W + (w - HEADER_W) / 2;
+            const midY     = 0.06 + halfH; // 0.06 in above bottom, then up half a line
+            const buildLine = (id: number, pinX: number) =>
+              `<Shape ID='${id}' Type='Shape' LineStyle='3' FillStyle='3' TextStyle='3'>` +
+              `<Cell N='PinX' V='${pinX}'/>` +
+              `<Cell N='PinY' V='${midY}'/>` +
+              `<Cell N='Width' V='0'/>` +
+              `<Cell N='Height' V='${lineH}'/>` +
+              `<Cell N='LocPinX' V='0'/>` +
+              `<Cell N='LocPinY' V='${halfH}'/>` +
+              `<Cell N='Angle' V='0'/>` +
+              `<Cell N='LineWeight' V='0.0138' U='PT' F='GUARD(1PT)'/>` +
+              `<Cell N='LineColor' V='0' F='GUARD(0)'/>` +
+              `<Cell N='LinePattern' V='1' F='GUARD(1)'/>` +
+              `<Cell N='FillForegnd' V='0' F='GUARD(0)'/>` +
+              `<Cell N='FillPattern' V='0' F='GUARD(0)'/>` +
+              `<Section N='Geometry' IX='0'>` +
+              `<Cell N='NoFill' V='1'/>` +
+              `<Cell N='NoLine' V='0'/>` +
+              `<Cell N='NoShow' V='0'/>` +
+              `<Cell N='NoSnap' V='0'/>` +
+              `<Cell N='NoQuickDrag' V='0'/>` +
+              `<Row T='MoveTo' IX='1'><Cell N='X' V='0'/><Cell N='Y' V='0'/></Row>` +
+              `<Row T='LineTo' IX='2'><Cell N='X' V='0'/><Cell N='Y' V='${lineH}'/></Row>` +
+              `</Section>` +
+              `</Shape>`;
+            const collectionLines =
+              buildLine(9,  bodyMidX - lineGap) +
+              buildLine(10, bodyMidX) +
+              buildLine(11, bodyMidX + lineGap);
+            // Inject just before the closing `</Shapes></Shape></Shapes></MasterContents>`.
+            // The first `</Shapes>` closes Shape 5's child shapes group.
+            poolMasterXml = poolMasterXml.replace(
+              /<\/Shapes><\/Shape><\/Shapes><\/MasterContents>/,
+              `${collectionLines}</Shapes></Shape></Shapes></MasterContents>`,
+            );
+          }
 
           // Write as new master file
           const poolInstanceId = 200 + shapeId;
