@@ -654,6 +654,32 @@ function computeMsgBpmnLabelOffsets(
   return { offsetX, offsetY };
 }
 
+/**
+ * Shift a set of root lanes plus EVERY descendant (sublanes, sub-sublanes,
+ * tasks/events/etc. living inside them) down by `deltaY`. Used when an
+ * insert grows a pool — pushing only the top-level lane while leaving its
+ * sublanes behind would visually disconnect the lane from its contents.
+ */
+function shiftLaneSubtreesDown(
+  elements: DiagramElement[],
+  rootLaneIds: Set<string>,
+  deltaY: number,
+): DiagramElement[] {
+  if (rootLaneIds.size === 0 || deltaY === 0) return elements;
+  const all = new Set<string>(rootLaneIds);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const e of elements) {
+      if (e.parentId && all.has(e.parentId) && !all.has(e.id)) {
+        all.add(e.id);
+        changed = true;
+      }
+    }
+  }
+  return elements.map((e) => (all.has(e.id) ? { ...e, y: e.y + deltaY } : e));
+}
+
 /** Read a pool's effective header width (stored property override, else 36). */
 function getPoolHeaderWidth(pool: DiagramElement): number {
   const stored = pool.properties?.poolHeaderWidth;
@@ -1500,11 +1526,14 @@ function reducer(state: DiagramData, action: Action): DiagramData {
               width: targetPool.width - POOL_LW, height: NEW_LANE_H,
               label: `Lane ${totalLaneCount + 1}`, properties: {}, parentId: targetPool.id,
             };
-            const elements = state.elements.map((e) => {
-              if (e.id === targetPool.id) return { ...e, height: e.height + NEW_LANE_H };
-              if (e.type === "lane" && e.parentId === targetPool.id) return { ...e, y: e.y + NEW_LANE_H };
-              return e;
-            });
+            const movedRoots = new Set<string>();
+            for (const e of state.elements) {
+              if (e.type === "lane" && e.parentId === targetPool.id) movedRoots.add(e.id);
+            }
+            const grown = state.elements.map((e) =>
+              e.id === targetPool.id ? { ...e, height: e.height + NEW_LANE_H } : e,
+            );
+            const elements = shiftLaneSubtreesDown(grown, movedRoots, NEW_LANE_H);
             let next = { elements: updatePoolTypes([...elements, newLane]), connectors: state.connectors };
             next = resizeLaneForLabel(next.elements, next.connectors, newLane.id, laneFs);
             next = applyPoolBelowShift(next.elements, next.connectors, targetPool.id, oldPoolBottom, NEW_LANE_H);
@@ -1540,13 +1569,14 @@ function reducer(state: DiagramData, action: Action): DiagramData {
                 width: targetPool.width - POOL_LW, height: NEW_LANE_H,
                 label: `Lane ${totalLaneCount + 1}`, properties: {}, parentId: targetPool.id,
               };
-              const elements = state.elements.map((e) => {
-                if (e.id === targetPool.id) return { ...e, height: e.height + NEW_LANE_H };
-                if (e.type === "lane" && e.parentId === targetPool.id && e.y >= sep) {
-                  return { ...e, y: e.y + NEW_LANE_H };
-                }
-                return e;
-              });
+              const movedRoots = new Set<string>();
+              for (const e of state.elements) {
+                if (e.type === "lane" && e.parentId === targetPool.id && e.y >= sep) movedRoots.add(e.id);
+              }
+              const grown = state.elements.map((e) =>
+                e.id === targetPool.id ? { ...e, height: e.height + NEW_LANE_H } : e,
+              );
+              const elements = shiftLaneSubtreesDown(grown, movedRoots, NEW_LANE_H);
               let next = { elements: updatePoolTypes([...elements, newLane]), connectors: state.connectors };
               next = resizeLaneForLabel(next.elements, next.connectors, newLane.id, laneFs);
               next = applyPoolBelowShift(next.elements, next.connectors, targetPool.id, oldPoolBottom, NEW_LANE_H);
@@ -1568,8 +1598,11 @@ function reducer(state: DiagramData, action: Action): DiagramData {
             const LANE_EDGE = 10;
 
             // Helper: insert a sublane inside `cursorLane` at `insertY`,
-            // pushing existing sublanes whose y >= insertY down by
-            // NEW_SUBLANE_H, and growing the lane + pool by the same amount.
+            // pushing existing sublanes whose y >= insertY (and their
+            // sub-sublane subtrees) down by NEW_SUBLANE_H. Also grow
+            // the lane + pool by NEW_SUBLANE_H, and push every top-level
+            // lane below `cursorLane` (with its descendants) down by
+            // the same amount so visual hierarchy stays intact.
             const insertSublaneAt = (
               insertY: number,
               labelN: number,
@@ -1580,17 +1613,23 @@ function reducer(state: DiagramData, action: Action): DiagramData {
                 width: cursorLane.width - LANE_LW, height: NEW_SUBLANE_H,
                 label: `Sublane ${labelN}`, properties: {}, parentId: cursorLane.id,
               };
-              const updated = state.elements.map((e) => {
-                if (e.id === cursorLane.id) return { ...e, height: e.height + NEW_SUBLANE_H };
+              const movedSubRoots = new Set<string>();
+              const movedTopRoots = new Set<string>();
+              for (const e of state.elements) {
                 if (e.type === "lane" && e.parentId === cursorLane.id && e.y >= insertY) {
-                  return { ...e, y: e.y + NEW_SUBLANE_H };
+                  movedSubRoots.add(e.id);
                 }
-                if (e.id === targetPool.id) return { ...e, height: e.height + NEW_SUBLANE_H };
                 if (e.type === "lane" && e.parentId === targetPool.id && e.y > cursorLane.y) {
-                  return { ...e, y: e.y + NEW_SUBLANE_H };
+                  movedTopRoots.add(e.id);
                 }
+              }
+              const grown = state.elements.map((e) => {
+                if (e.id === cursorLane.id) return { ...e, height: e.height + NEW_SUBLANE_H };
+                if (e.id === targetPool.id) return { ...e, height: e.height + NEW_SUBLANE_H };
                 return e;
               });
+              let updated = shiftLaneSubtreesDown(grown, movedSubRoots, NEW_SUBLANE_H);
+              updated = shiftLaneSubtreesDown(updated, movedTopRoots, NEW_SUBLANE_H);
               let next = { elements: [...updated, newSub], connectors: state.connectors };
               next = resizeLaneForLabel(next.elements, next.connectors, newSub.id, laneFs);
               const finalPool = next.elements.find((e) => e.id === targetPool.id);
@@ -1603,7 +1642,10 @@ function reducer(state: DiagramData, action: Action): DiagramData {
             };
 
             // Helper: insert a new LANE in the pool at `insertY`, push
-            // every lane whose y >= insertY down by NEW_LANE_H.
+            // every lane whose y >= insertY (and ALL its descendants —
+            // sublanes, sub-sublanes, and any non-lane children) down
+            // by NEW_LANE_H. Without descendant-aware shift, the moved
+            // lane visually disconnects from its sublanes/contents.
             const insertLaneAt = (insertY: number, labelN: number) => {
               const newLane: DiagramElement = {
                 id: nanoid(), type: "lane",
@@ -1611,13 +1653,16 @@ function reducer(state: DiagramData, action: Action): DiagramData {
                 width: targetPool.width - POOL_LW, height: NEW_LANE_H,
                 label: `Lane ${labelN}`, properties: {}, parentId: targetPool.id,
               };
-              const updated = state.elements.map((e) => {
-                if (e.id === targetPool.id) return { ...e, height: e.height + NEW_LANE_H };
+              const movedRoots = new Set<string>();
+              for (const e of state.elements) {
                 if (e.type === "lane" && e.parentId === targetPool.id && e.y >= insertY) {
-                  return { ...e, y: e.y + NEW_LANE_H };
+                  movedRoots.add(e.id);
                 }
-                return e;
-              });
+              }
+              const grown = state.elements.map((e) =>
+                e.id === targetPool.id ? { ...e, height: e.height + NEW_LANE_H } : e,
+              );
+              const updated = shiftLaneSubtreesDown(grown, movedRoots, NEW_LANE_H);
               let next = { elements: [...updated, newLane], connectors: state.connectors };
               next = resizeLaneForLabel(next.elements, next.connectors, newLane.id, laneFs);
               next = applyPoolBelowShift(next.elements, next.connectors, targetPool.id, oldPoolBottom, NEW_LANE_H);
