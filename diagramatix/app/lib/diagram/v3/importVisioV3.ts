@@ -165,18 +165,27 @@ const ELEMENT_NAMEU_MAP: Record<string, ElementSeed | null> = {
   "Expanded Sub-process": { type: "subprocess-expanded" },
   "Call Collapsed Sub-process": { type: "subprocess", subprocessType: "call" },
 
-  // Pool / Lane
-  "Pool / Lane": { type: "pool" },
-  "Pool":                { type: "pool" },
-  "Pool with 2 Lanes":   { type: "pool", poolType: "white-box" },
-  "Pool with 3 Lanes":   { type: "pool", poolType: "white-box" },
-  "Pool with 4 Lanes":   { type: "pool", poolType: "white-box" },
-  "Black-Box Pool":      { type: "pool", poolType: "black-box" },
-  "Vertical Pool":       { type: "pool" },
-  "Horizontal Pool":     { type: "pool" },
-  "Swimlane":            { type: "lane" },
-  "Additional Lane":     { type: "lane" },
-  "Lane":                { type: "lane" },
+  // Pool / Lane.
+  // CFF Container and Swimlane List are Microsoft's Visio Cross-Functional
+  // Flowchart pool wrappers — they ARE the BPMN pool. Disambiguation below
+  // re-classifies any nested instance to a Lane.
+  "Pool / Lane":           { type: "pool" },
+  "Pool":                  { type: "pool" },
+  "Pool with 2 Lanes":     { type: "pool", poolType: "white-box" },
+  "Pool with 3 Lanes":     { type: "pool", poolType: "white-box" },
+  "Pool with 4 Lanes":     { type: "pool", poolType: "white-box" },
+  "Pool + 2 Lanes":        { type: "pool", poolType: "white-box" },
+  "Pool + 3 Lanes":        { type: "pool", poolType: "white-box" },
+  "Pool + 4 Lanes":        { type: "pool", poolType: "white-box" },
+  "Black-Box Pool":        { type: "pool", poolType: "black-box" },
+  "System Pool":           { type: "pool", poolType: "black-box" },
+  "Vertical Pool":         { type: "pool" },
+  "Horizontal Pool":       { type: "pool" },
+  "CFF Container":         { type: "pool" },
+  "Swimlane List":         { type: "pool" },
+  "Swimlane":              { type: "lane" },
+  "Additional Lane":       { type: "lane" },
+  "Lane":                  { type: "lane" },
 
   // Data
   "Data Object": { type: "data-object" },
@@ -193,10 +202,10 @@ const ELEMENT_NAMEU_MAP: Record<string, ElementSeed | null> = {
   "Merge":           { type: "gateway", gatewayType: "exclusive" },
   "Diagram Title":   { type: "text-annotation" },
 
-  // Explicitly ignored (decorative shapes from BPMN_M)
+  // Explicitly ignored (decorative shapes from BPMN_M / CFF stencil).
+  // CFF Container and Swimlane List were previously here but are now
+  // mapped to pool above — they ARE the pool wrapper in CFF files.
   "Message": null,
-  "CFF Container": null,
-  "Swimlane List": null,
   "Phase List": null,
   "Separator": null,
   "Separator (vertical)": null,
@@ -724,8 +733,14 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
   // Build a quick lookup: shapeId → RawShape (for parent classification).
   const rawByShapeId = new Map<string, RawShape>();
   for (const r of raw) rawByShapeId.set(r.shapeId, r);
+  // Names where this disambiguation applies — masters that double as both
+  // pool AND lane in different contexts (CFF Container can be the outer
+  // pool OR a nested lane band; Swimlane is the same).
+  const POOL_OR_LANE_NAMES = new Set([
+    "Pool / Lane", "CFF Container", "Swimlane List", "Swimlane",
+  ]);
   for (const r of raw) {
-    if (r.seed?.type !== "pool" || r.nameU !== "Pool / Lane") continue;
+    if (r.seed?.type !== "pool" || !POOL_OR_LANE_NAMES.has(r.nameU)) continue;
     let isLane = laneShapeIds.has(r.shapeId);
     if (!isLane && r.parentShapeId) {
       const parent = rawByShapeId.get(r.parentShapeId);
@@ -823,6 +838,76 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
     const cur = skippedByTag.get(tag) ?? 0;
     if (cur > 0) skippedByTag.set(tag, cur - 1);
     if (skippedByTag.get(tag) === 0) skippedByTag.delete(tag);
+  }
+
+  // Visual-heuristic pool detection: any walked shape that ISN'T classified
+  // yet AND has the visual hallmarks of a pool — wider than tall, large,
+  // and either text-bearing or with a vertical-text header — gets promoted
+  // to a Pool. This catches Microsoft CFF instances (`CFF Container.NN`)
+  // whose master NameU isn't in the exact map after suffix-strip, plus
+  // hand-drawn pool boxes with no master attribute at all.
+  const heuristicSkipNames = new Set([
+    "Phase List", "Separator", "Separator (vertical)", "Diagram Title",
+    "Message",
+  ]);
+  for (const w of walked) {
+    if (rawByShapeId.has(w.shapeId)) continue;          // already classified
+    // Re-resolve NameU for this skipped shape so we can avoid promoting
+    // explicit-ignore decorations.
+    const wMasterId = w.block.match(/Master='(\d+)'/)?.[1];
+    const wMasterInfo = wMasterId ? masters.get(wMasterId) : undefined;
+    const wNameU = normaliseNameU(wMasterInfo?.nameU ?? "");
+    if (heuristicSkipNames.has(wNameU)) continue;
+    if (wNameU.startsWith("Theme Colors")) continue;
+    if (wNameU.startsWith("Document")) continue;
+
+    const W = w.width;
+    const H = w.height;
+    if (!(W > 0 && H > 0)) continue;
+    if (W <= H) continue;                               // not landscape
+    if (W < 2.0) continue;                              // < ~192 px wide
+    if (W * H < 4.0) continue;                          // < 4 sq.in area
+    const text = readText(w.block);
+    const txtAngle = readCellNum(w.block, "TxtAngle") ?? 0;
+    const hasVerticalText = Math.abs(Math.sin(txtAngle)) > 0.7;
+    if (!text && !hasVerticalText) continue;
+
+    // Synthesise as a Pool. Use the walker's own page-absolute coords
+    // (these wrappers don't necessarily have lane children to bound from).
+    const props = readPropValues(w.block);
+    const synthesised: RawShape = {
+      shapeId: w.shapeId,
+      parentShapeId: w.parentShapeId,
+      masterId: wMasterId ?? null,
+      nameU: wNameU || "(visual-heuristic pool)",
+      block: w.block,
+      pageX: w.pageX,
+      pageY: w.pageY,
+      width: W,
+      height: H,
+      seed: { type: "pool" },
+      connectorBase: null,
+      bpmnId: props.BpmnId,
+      props,
+    };
+    raw.push(synthesised);
+    rawByShapeId.set(w.shapeId, synthesised);
+    implicitPoolCount++;
+    masterBreakdown.set(`__synth_heur_${w.shapeId}`, {
+      masterId: wMasterId ?? "-",
+      nameU: wNameU || `"${(text || "").slice(0, 30)}"`,
+      count: 1,
+      classifiedAs: "element → pool (heuristic)",
+    });
+    // Decrement the corresponding skip row.
+    const skipKey = `${wMasterId ?? "-"}|${wNameU}`;
+    const skipBd = masterBreakdown.get(skipKey);
+    if (skipBd && skipBd.count > 0) skipBd.count--;
+    if (skipBd && skipBd.count === 0) masterBreakdown.delete(skipKey);
+    const skipTag = wNameU || (wMasterId ? `master ${wMasterId} (no NameU)` : "(no master)");
+    const skipN = skippedByTag.get(skipTag) ?? 0;
+    if (skipN > 0) skippedByTag.set(skipTag, skipN - 1);
+    if (skippedByTag.get(skipTag) === 0) skippedByTag.delete(skipTag);
   }
 
   // Build element list.
