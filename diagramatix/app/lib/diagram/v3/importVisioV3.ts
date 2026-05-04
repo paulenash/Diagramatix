@@ -450,6 +450,13 @@ function walkAllShapes(pageXml: string): WalkedShape[] {
     }
     const tagEnd = inner.indexOf(">", t.index) + 1;
     const openTag = inner.slice(t.index, tagEnd);
+    // Self-closing `<Shape Del='1' ID='X'/>` markers (Visio writes these
+    // for deleted/internal shapes — typically with the sentinel
+    // ID='4294967295'). They have NO content and NO matching </Shape>;
+    // pushing a frame for them would corrupt the stack — every later
+    // </Shape> would pop the wrong frame, and 16 unrelated real shapes
+    // would lose their close-tag pairing. Skip them entirely.
+    if (openTag.endsWith("/>")) continue;
     const shapeId = openTag.match(/ID='(\d+)'/)?.[1] ?? "?";
     const nodeIndex = nextIndex++;
     nodes[nodeIndex] = {
@@ -709,7 +716,12 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
     const masterIdM = block.match(/Master='(\d+)'/);
     const masterId = masterIdM?.[1] ?? null;
     const masterInfo = masterId ? masters.get(masterId) : undefined;
-    const nameU = normaliseNameU(masterInfo?.nameU ?? "");
+    // NameU resolution order: master's NameU (if shape has Master attr), else
+    // the shape's OWN NameU on its open tag. The latter catches CFF Container
+    // variants like shape 55 ("Online Modules") that have NameU='CFF Container.44'
+    // in the open tag but no Master='...' attribute (only MasterShape='6').
+    const inlineNameU = block.match(/<Shape\s+ID='\d+'[^>]*\sNameU='([^']*)'/)?.[1] ?? "";
+    const nameU = normaliseNameU(masterInfo?.nameU || inlineNameU);
     const props = readPropValues(block);
     const bpmnId = props.BpmnId;
 
@@ -1224,13 +1236,17 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
     const sourceId = sourceShape ? shapeIdToElId.get(sourceShape) : undefined;
     const targetId = targetShape ? shapeIdToElId.get(targetShape) : undefined;
     if (!sourceId || !targetId) {
+      const sFmt = sourceShape ? `src=shape ${sourceShape}` : "src=(no glue)";
+      const tFmt = targetShape ? `tgt=shape ${targetShape}` : "tgt=(no glue)";
       const why = !sourceShape && !targetShape
         ? "no Connect row and no glue formula"
         : !sourceShape ? "no source glue"
         : !targetShape ? "no target glue"
         : !sourceId ? `source shape ${sourceShape} not in element list`
         : `target shape ${targetShape} not in element list`;
-      warnings.push(`Skipped connector ${r.shapeId} (${r.nameU}) — ${why}.`);
+      warnings.push(
+        `Skipped connector ${r.shapeId} (${r.nameU}) [${sFmt}, ${tFmt}] — ${why}.`,
+      );
       connectorsSkipped++;
       continue;
     }
