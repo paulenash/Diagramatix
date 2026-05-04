@@ -108,10 +108,11 @@ function nano(): string {
   return Math.random().toString(36).slice(2, 10);
 }
 
-/** Project an external point onto the nearest edge of a rectangle (in
- *  canvas coords, all in px). Used to snap connector endpoints to the
- *  shape's boundary instead of its centre. If the external point is
- *  inside the rect, return the rect's centre as a graceful fallback. */
+/** Snap a connector endpoint to the MIDPOINT of the rectangle's closest
+ *  edge — based on which side of the shape's centre the external point
+ *  sits. Always lands ON the boundary (never inside), so connectors
+ *  visually attach to the pool/element edge regardless of whether the
+ *  source/target waypoints landed inside or outside. */
 function clipToRectEdge(
   rect: { x: number; y: number; width: number; height: number },
   external: { x: number; y: number },
@@ -120,15 +121,19 @@ function clipToRectEdge(
   const cy = rect.y + rect.height / 2;
   const dx = external.x - cx;
   const dy = external.y - cy;
-  if (dx === 0 && dy === 0) return { x: cx, y: cy };
-  // Parametric line from centre toward external; clip at first edge hit.
-  const halfW = rect.width / 2;
-  const halfH = rect.height / 2;
-  // t such that |t*dx| <= halfW and |t*dy| <= halfH; we want the smallest t.
-  const tx = dx !== 0 ? halfW / Math.abs(dx) : Infinity;
-  const ty = dy !== 0 ? halfH / Math.abs(dy) : Infinity;
-  const t = Math.min(tx, ty, 1);   // cap at 1 → don't extend beyond the external point
-  return { x: cx + dx * t, y: cy + dy * t };
+  if (dx === 0 && dy === 0) return { x: cx, y: rect.y };       // degenerate
+  // Decide which edge faces `external` most directly using normalised
+  // distance (so wide pools don't always pick top/bottom).
+  const xDom = Math.abs(dx) / Math.max(1, rect.width)
+             > Math.abs(dy) / Math.max(1, rect.height);
+  if (xDom) {
+    return dx > 0
+      ? { x: rect.x + rect.width, y: cy }                     // right edge
+      : { x: rect.x,              y: cy };                    // left edge
+  }
+  return dy > 0
+    ? { x: cx, y: rect.y + rect.height }                       // bottom edge
+    : { x: cx, y: rect.y };                                    // top edge
 }
 
 /** V3 export creates per-instance master clones whose NameU has a numeric
@@ -910,7 +915,7 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
   // hand-drawn pool boxes with no master attribute at all.
   const heuristicSkipNames = new Set([
     "Phase List", "Separator", "Separator (vertical)", "Diagram Title",
-    "Message",
+    "Message", "Phase",
   ]);
   for (const w of walked) {
     if (rawByShapeId.has(w.shapeId)) continue;          // already classified
@@ -922,6 +927,21 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
     if (heuristicSkipNames.has(wNameU)) continue;
     if (wNameU.startsWith("Theme Colors")) continue;
     if (wNameU.startsWith("Document")) continue;
+    // If any ancestor's NameU is "Phase List", this shape is a Phase band
+    // — those are vertical decorations within a swimlane, not pools.
+    let phaseAncestor = false;
+    {
+      let cur: string | null = w.parentShapeId;
+      while (cur) {
+        const pw = walkedById.get(cur);
+        if (!pw) break;
+        const pmId = pw.block.match(/Master='(\d+)'/)?.[1];
+        const pNameU = normaliseNameU(masters.get(pmId ?? "")?.nameU ?? "");
+        if (pNameU === "Phase List" || pNameU === "Phase") { phaseAncestor = true; break; }
+        cur = pw.parentShapeId ?? null;
+      }
+    }
+    if (phaseAncestor) continue;
 
     const W = w.width;
     const H = w.height;
@@ -1037,6 +1057,15 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
     // Visio's "System Pool" master signals a system participant in BPMN —
     // surface that as the canvas's `isSystem` flag (Black-Box variant).
     if (r.nameU === "System Pool") properties.isSystem = true;
+    // Widen the pool header strip for multi-line labels. Pool labels are
+    // rendered rotated 90° in the left header — each `\n` becomes a
+    // parallel column, so a 3-line label needs ~3× the default 36px.
+    if (r.seed.type === "pool" && label) {
+      const lineCount = label.split(/\r?\n/).length;
+      if (lineCount > 1) {
+        properties.poolHeaderWidth = Math.max(36, lineCount * 30 + 16);
+      }
+    }
 
     const el: DiagramElement = {
       id: elId,
@@ -1343,6 +1372,12 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
       targetInvisibleLeader: false,
       waypoints,
       label: label || undefined,
+      // Anchor labels at the connector midpoint with no offset, so they
+      // sit in the gap between source/target shapes (matches the AI
+      // generator's convention for cleanly-readable message labels).
+      labelAnchor: "midpoint",
+      labelOffsetX: 0,
+      labelOffsetY: 0,
     };
     connectors.push(connector);
   }
@@ -1370,6 +1405,96 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
     for (const e of elements) {
       if (e.parentId && droppedPoolIds.has(e.parentId)) e.parentId = undefined;
     }
+  }
+
+  // Align lanes to their parent pool's body left edge. Visio CFF lanes
+  // can land slightly offset from the pool body (often ~10 px gap or
+  // overlap with the pool header). Snap each lane.x to pool.x +
+  // headerWidth so the lane's left edge sits flush against the right
+  // side of the pool's header strip — matching BPMN convention.
+  for (const lane of elements) {
+    if (lane.type !== "lane" || !lane.parentId) continue;
+    const pool = elements.find((e) => e.id === lane.parentId);
+    if (!pool || pool.type !== "pool") continue;
+    const headerW = (pool.properties.poolHeaderWidth as number | undefined) ?? 36;
+    const desiredX = pool.x + headerW;
+    const desiredW = pool.width - headerW;
+    if (Math.abs(lane.x - desiredX) > 0.5) lane.x = desiredX;
+    if (Math.abs(lane.width - desiredW) > 0.5) lane.width = Math.max(lane.width, desiredW);
+  }
+
+  // Aggregate duplicate pools: when two or more pools share the same
+  // (case-insensitive) label AND their bounding boxes overlap by ≥ 25 %
+  // of the smaller pool, treat them as the SAME pool. This handles the
+  // Microsoft CFF "layered template" structure where one logical pool
+  // shows up as two visually-stacked shapes (e.g. an outer black-box +
+  // an inner title band, both labelled "iMIS"). Keep the LARGEST pool;
+  // redirect every connector that referenced any duplicate to the kept
+  // one; drop the duplicates.
+  function rectsOverlapFraction(
+    a: { x: number; y: number; width: number; height: number },
+    b: { x: number; y: number; width: number; height: number },
+  ): number {
+    const ix = Math.max(0, Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x));
+    const iy = Math.max(0, Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y));
+    const inter = ix * iy;
+    if (inter === 0) return 0;
+    const aArea = a.width * a.height;
+    const bArea = b.width * b.height;
+    return inter / Math.min(aArea, bArea);
+  }
+  const poolsByLabel = new Map<string, DiagramElement[]>();
+  for (const e of elements) {
+    if (e.type !== "pool") continue;
+    const key = e.label.trim().toLowerCase();
+    if (!key) continue;
+    const list = poolsByLabel.get(key) ?? [];
+    list.push(e);
+    poolsByLabel.set(key, list);
+  }
+  const mergedAwayIds = new Map<string, string>();    // dropped poolId → kept poolId
+  for (const [, list] of poolsByLabel) {
+    if (list.length < 2) continue;
+    // Pick the keeper as the LARGEST by area (most visually meaningful).
+    list.sort((a, b) => (b.width * b.height) - (a.width * a.height));
+    const keeper = list[0];
+    for (let i = 1; i < list.length; i++) {
+      const other = list[i];
+      const overlap = rectsOverlapFraction(keeper, other);
+      if (overlap < 0.25) continue;                   // not the same pool — leave alone
+      mergedAwayIds.set(other.id, keeper.id);
+    }
+  }
+  if (mergedAwayIds.size > 0) {
+    // Redirect connectors.
+    for (const c of connectors) {
+      const newSrc = mergedAwayIds.get(c.sourceId);
+      const newTgt = mergedAwayIds.get(c.targetId);
+      if (newSrc) c.sourceId = newSrc;
+      if (newTgt) c.targetId = newTgt;
+    }
+    // Drop the absorbed pools.
+    for (let i = elements.length - 1; i >= 0; i--) {
+      if (mergedAwayIds.has(elements[i].id)) elements.splice(i, 1);
+    }
+    // Clear any lane.parentId pointing at an absorbed pool — point at the keeper.
+    for (const e of elements) {
+      if (e.parentId && mergedAwayIds.has(e.parentId)) e.parentId = mergedAwayIds.get(e.parentId);
+    }
+  }
+
+  // Re-snap connector endpoints to source/target edge midpoints AFTER
+  // the pool merge (otherwise endpoints still pointed at the absorbed
+  // pool's edges). Also drop any zero-length / degenerate connectors
+  // that ended up collapsed onto a single point.
+  for (const c of connectors) {
+    const srcEl = elements.find((e) => e.id === c.sourceId);
+    const tgtEl = elements.find((e) => e.id === c.targetId);
+    if (!srcEl || !tgtEl || c.waypoints.length < 2) continue;
+    const srcCentre = { x: srcEl.x + srcEl.width / 2, y: srcEl.y + srcEl.height / 2 };
+    const tgtCentre = { x: tgtEl.x + tgtEl.width / 2, y: tgtEl.y + tgtEl.height / 2 };
+    c.waypoints[0] = clipToRectEdge(srcEl, tgtCentre);
+    c.waypoints[c.waypoints.length - 1] = clipToRectEdge(tgtEl, srcCentre);
   }
 
   // Normalise so the upper-left of the diagram sits near (0, 0) on the canvas.
