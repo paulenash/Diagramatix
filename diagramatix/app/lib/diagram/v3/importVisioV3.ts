@@ -108,6 +108,29 @@ function nano(): string {
   return Math.random().toString(36).slice(2, 10);
 }
 
+/** Project an external point onto the nearest edge of a rectangle (in
+ *  canvas coords, all in px). Used to snap connector endpoints to the
+ *  shape's boundary instead of its centre. If the external point is
+ *  inside the rect, return the rect's centre as a graceful fallback. */
+function clipToRectEdge(
+  rect: { x: number; y: number; width: number; height: number },
+  external: { x: number; y: number },
+): { x: number; y: number } {
+  const cx = rect.x + rect.width / 2;
+  const cy = rect.y + rect.height / 2;
+  const dx = external.x - cx;
+  const dy = external.y - cy;
+  if (dx === 0 && dy === 0) return { x: cx, y: cy };
+  // Parametric line from centre toward external; clip at first edge hit.
+  const halfW = rect.width / 2;
+  const halfH = rect.height / 2;
+  // t such that |t*dx| <= halfW and |t*dy| <= halfH; we want the smallest t.
+  const tx = dx !== 0 ? halfW / Math.abs(dx) : Infinity;
+  const ty = dy !== 0 ? halfH / Math.abs(dy) : Infinity;
+  const t = Math.min(tx, ty, 1);   // cap at 1 → don't extend beyond the external point
+  return { x: cx + dx * t, y: cy + dy * t };
+}
+
 /** V3 export creates per-instance master clones whose NameU has a numeric
  *  suffix appended (e.g. "Pool / Lane.200"). Strip it so lookup hits the
  *  canonical entry. */
@@ -315,12 +338,13 @@ function readMemberIDs(block: string): string[] {
 }
 
 function readText(block: string): string {
-  // Strip the leading `<cp IX='0'/>` (V3's character-property hint) plus any
-  // additional `<cp .../>` markers Visio sprinkles in mid-text.
+  // Strip Visio's inline formatting markers — `<cp/>` (character props),
+  // `<pp/>` (paragraph props), `<tp/>` (tab props), `<fld/>` (field code).
+  // Without this, "<pp IX='0'/>Online Modules (OM)" surfaces verbatim.
   const m = block.match(/<Text>([\s\S]*?)<\/Text>/);
   if (!m) return "";
   return m[1]
-    .replace(/<cp\s+IX='\d+'\s*\/>/g, "")
+    .replace(/<(?:cp|pp|tp|fld)\b[^/>]*\/?>/g, "")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"')
@@ -867,14 +891,28 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
     if (W <= H) continue;                               // not landscape
     if (W < 2.0) continue;                              // < ~192 px wide
     if (W * H < 4.0) continue;                          // < 4 sq.in area
-    const text = readText(w.block);
-    const txtAngle = readCellNum(w.block, "TxtAngle") ?? 0;
-    const hasVerticalText = Math.abs(Math.sin(txtAngle)) > 0.7;
-    if (!text && !hasVerticalText) continue;
+    // Require an actual text label — vertical-text-only signals (an
+    // unnamed wrapper with rotated empty text frame) produce phantom pools.
+    // Also fall back to the BpmnName Property if <Text> is empty.
+    const props0 = readPropValues(w.block);
+    const text = readText(w.block) || props0.BpmnName || "";
+    if (!text.trim()) continue;
+    // Dedupe: don't promote if any ancestor in the page tree is already
+    // classified as a pool — that would create the "Online Modules (IOM)
+    // appears twice" symptom (outer wrapper + inner title sub-shape both
+    // pass the heuristic).
+    let hasPoolAncestor = false;
+    let curParent = w.parentShapeId;
+    while (curParent) {
+      const pRaw = rawByShapeId.get(curParent);
+      if (pRaw?.seed?.type === "pool") { hasPoolAncestor = true; break; }
+      curParent = walkedById.get(curParent)?.parentShapeId ?? null;
+    }
+    if (hasPoolAncestor) continue;
 
     // Synthesise as a Pool. Use the walker's own page-absolute coords
     // (these wrappers don't necessarily have lane children to bound from).
-    const props = readPropValues(w.block);
+    const props = props0;
     const synthesised: RawShape = {
       shapeId: w.shapeId,
       parentShapeId: w.parentShapeId,
@@ -958,6 +996,9 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
     if (r.seed.poolType) properties.poolType = r.seed.poolType;
     if (r.seed.role) properties.role = r.seed.role;
     if (r.seed.multiplicity) properties.multiplicity = r.seed.multiplicity;
+    // Visio's "System Pool" master signals a system participant in BPMN —
+    // surface that as the canvas's `isSystem` flag (Black-Box variant).
+    if (r.nameU === "System Pool") properties.isSystem = true;
 
     const el: DiagramElement = {
       id: elId,
@@ -998,6 +1039,21 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
     if (!laneElId || !poolElId) continue;
     const lane = elements.find((e) => e.id === laneElId);
     if (lane && !lane.parentId) lane.parentId = poolElId;
+  }
+
+  // Auto-detect poolType: any pool that has a Lane child becomes white-box;
+  // any pool with NO lane children becomes black-box. This runs AFTER all
+  // parentage has been resolved so lane-counts are accurate.
+  const laneCountByPool = new Map<string, number>();
+  for (const e of elements) {
+    if (e.type === "lane" && e.parentId) {
+      laneCountByPool.set(e.parentId, (laneCountByPool.get(e.parentId) ?? 0) + 1);
+    }
+  }
+  for (const e of elements) {
+    if (e.type !== "pool") continue;
+    if (e.properties.poolType !== undefined) continue;   // explicit (System Pool / Pool + N Lanes / Black-Box etc.)
+    e.properties.poolType = (laneCountByPool.get(e.id) ?? 0) > 0 ? "white-box" : "black-box";
   }
 
   // Connectors: page-level <Connects><Connect FromSheet=… ToSheet=… /></Connects>
@@ -1192,25 +1248,21 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
       }
     }
 
-    // Snap the first/last waypoints to the source/target shape centres.
-    // Reason: events, gateways, data-objects and data-stores have their
-    // imported W/H overridden to Diagramatix defaults (a Visio gateway
-    // is 1"×0.75" = 96×72px → forced to 40×40); the cached BeginX/EndX
-    // points at Visio's larger bounds, which is now OUTSIDE the smaller
-    // diamond so the connector visually disconnects on first paint.
-    // Snapping endpoints to centres lets the canvas's edge-clipping
-    // routing draw a clean attachment.
+    // Snap the first/last waypoints to the nearest EDGE of source/target
+    // shape (not the centre — large pools would have message connectors
+    // visibly piercing into the middle). Compute the intersection of the
+    // line from shape-centre toward the next/prev waypoint with the
+    // shape's bounding rectangle.
     const sourceEl = elements.find((e) => e.id === sourceId);
     const targetEl = elements.find((e) => e.id === targetId);
-    if (sourceEl && targetEl && waypoints.length >= 2) {
-      waypoints[0] = {
-        x: sourceEl.x + sourceEl.width / 2,
-        y: sourceEl.y + sourceEl.height / 2,
-      };
-      waypoints[waypoints.length - 1] = {
-        x: targetEl.x + targetEl.width / 2,
-        y: targetEl.y + targetEl.height / 2,
-      };
+    if (sourceEl && waypoints.length >= 2) {
+      waypoints[0] = clipToRectEdge(sourceEl, waypoints[1]);
+    }
+    if (targetEl && waypoints.length >= 2) {
+      waypoints[waypoints.length - 1] = clipToRectEdge(
+        targetEl,
+        waypoints[waypoints.length - 2],
+      );
     }
 
     const connId = r.bpmnId && r.bpmnId.length > 0 ? r.bpmnId : nano();
@@ -1231,6 +1283,31 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
       label: label || undefined,
     };
     connectors.push(connector);
+  }
+
+  // Drop any heuristic-promoted pool whose final label is empty (after
+  // <pp/> stripping, BpmnName fallback etc.) — these are almost always
+  // a wrapper container we shouldn't have classified.  Also drop any
+  // connector that referenced one of these pruned pools.
+  const droppedPoolIds = new Set<string>();
+  for (let i = elements.length - 1; i >= 0; i--) {
+    const e = elements[i];
+    if (e.type !== "pool") continue;
+    if (e.label && e.label.trim()) continue;
+    droppedPoolIds.add(e.id);
+    elements.splice(i, 1);
+  }
+  if (droppedPoolIds.size > 0) {
+    for (let i = connectors.length - 1; i >= 0; i--) {
+      const c = connectors[i];
+      if (droppedPoolIds.has(c.sourceId) || droppedPoolIds.has(c.targetId)) {
+        connectors.splice(i, 1);
+      }
+    }
+    // Clear any lane.parentId that referenced a dropped pool.
+    for (const e of elements) {
+      if (e.parentId && droppedPoolIds.has(e.parentId)) e.parentId = undefined;
+    }
   }
 
   // Normalise so the upper-left of the diagram sits near (0, 0) on the canvas.
