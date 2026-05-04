@@ -426,6 +426,13 @@ export function Canvas({
   const [draggingConnector, setDraggingConnector] = useState<DraggingConnector | null>(null);
   const [draggingEndpoint, setDraggingEndpoint] = useState<DraggingEndpoint | null>(null);
   const [pendingDrop, setPendingDrop] = useState<PendingDrop | null>(null);
+  // Live preview for "drag Pool/Lane over existing Pool" — shows where a
+  // new lane will be inserted on release. `kind` controls the colour:
+  //   "boundary" → bright green (above-all, between, below-all)
+  //   "split"    → light green (split a lane into 2 sublanes)
+  const [poolDropPreview, setPoolDropPreview] = useState<{
+    x1: number; y1: number; x2: number; y2: number; kind: "boundary" | "split";
+  } | null>(null);
   const [connectorChoice, setConnectorChoice] = useState<{
     sourceId: string; targetId: string;
     sourceSide: Side; targetSide: Side;
@@ -3118,8 +3125,79 @@ export function Canvas({
         onMouseDownCapture={() => svgRef.current?.focus({ preventScroll: true })}
         onMouseDown={handleBackgroundMouseDown}
         onWheel={handleWheel}
-        onDrop={handleDrop}
-        onDragOver={(e) => e.preventDefault()}
+        onDrop={(e) => { setPoolDropPreview(null); handleDrop(e); }}
+        onDragOver={(e) => {
+          e.preventDefault();
+          // Pool/Lane drop preview: only when dragging the "pool" symbol
+          // over an existing pool. Computes the insertion line based on
+          // cursor Y exactly as the reducer's drop logic will.
+          if (pendingDragSymbol !== "pool") {
+            if (poolDropPreview) setPoolDropPreview(null);
+            return;
+          }
+          const rect = svgRef.current!.getBoundingClientRect();
+          const wp = svgToWorld(e.clientX - rect.left, e.clientY - rect.top);
+          const target = data.elements.find(
+            (el) =>
+              el.type === "pool" &&
+              wp.x >= el.x && wp.x <= el.x + el.width &&
+              wp.y >= el.y && wp.y <= el.y + el.height,
+          );
+          if (!target) {
+            if (poolDropPreview) setPoolDropPreview(null);
+            return;
+          }
+          const lanes = data.elements
+            .filter((el) => el.type === "lane" && el.parentId === target.id)
+            .sort((a, b) => a.y - b.y);
+          if (lanes.length === 0) {
+            // Will split pool into 2 lanes — no overlay needed.
+            if (poolDropPreview) setPoolDropPreview(null);
+            return;
+          }
+          const TOP_BOTTOM = 20;
+          const SEP = 15;
+          const dy = wp.y - target.y;
+          const poolBot = target.y + target.height;
+          let preview: typeof poolDropPreview = null;
+          if (dy <= TOP_BOTTOM) {
+            preview = { x1: target.x, y1: target.y, x2: target.x + target.width, y2: target.y, kind: "boundary" };
+          } else if (poolBot - wp.y <= TOP_BOTTOM) {
+            preview = { x1: target.x, y1: poolBot, x2: target.x + target.width, y2: poolBot, kind: "boundary" };
+          } else {
+            // Check separators
+            let onSep = false;
+            for (let i = 0; i < lanes.length - 1; i++) {
+              const sep = lanes[i].y + lanes[i].height;
+              if (Math.abs(wp.y - sep) <= SEP) {
+                preview = { x1: target.x, y1: sep, x2: target.x + target.width, y2: sep, kind: "boundary" };
+                onSep = true;
+                break;
+              }
+            }
+            if (!onSep) {
+              const lane = lanes.find((ln) => wp.y >= ln.y + ln.height / 3 && wp.y <= ln.y + (ln.height * 2) / 3);
+              if (lane) {
+                const midY = lane.y + lane.height / 2;
+                preview = { x1: lane.x, y1: midY, x2: lane.x + lane.width, y2: midY, kind: "split" };
+              } else {
+                // Fall-back: bottom of cursor's lane.
+                const cursorLane = lanes.find((ln) => wp.y >= ln.y && wp.y <= ln.y + ln.height);
+                if (cursorLane) {
+                  const insertY = cursorLane.y + cursorLane.height;
+                  preview = { x1: target.x, y1: insertY, x2: target.x + target.width, y2: insertY, kind: "boundary" };
+                }
+              }
+            }
+          }
+          // Only update if changed to avoid render thrash.
+          const same = preview && poolDropPreview &&
+            preview.x1 === poolDropPreview.x1 && preview.y1 === poolDropPreview.y1 &&
+            preview.x2 === poolDropPreview.x2 && preview.y2 === poolDropPreview.y2 &&
+            preview.kind === poolDropPreview.kind;
+          if (!same) setPoolDropPreview(preview);
+        }}
+        onDragLeave={() => { if (poolDropPreview) setPoolDropPreview(null); }}
         onKeyDown={handleKeyDown}
         onContextMenu={(e) => {
           if (readOnly || (diagramType !== "bpmn" && diagramType !== "state-machine" && diagramType !== "value-chain")) return;
@@ -4424,6 +4502,23 @@ export function Canvas({
                 offsets={debugLabelOffsets} setOffset={setDebugLabelOffset} />
             ));
           })()}
+
+          {/* Pool/Lane drop preview — shown while dragging the Pool/Lane
+              palette symbol over an existing pool. Bright green for an
+              insertion at a boundary; lighter green for a split-into-
+              sublanes preview at a lane's middle. */}
+          {poolDropPreview && (
+            <line
+              x1={poolDropPreview.x1}
+              y1={poolDropPreview.y1}
+              x2={poolDropPreview.x2}
+              y2={poolDropPreview.y2}
+              stroke={poolDropPreview.kind === "split" ? "#86efac" : "#22c55e"}
+              strokeWidth={4 / zoom}
+              strokeLinecap="round"
+              pointerEvents="none"
+            />
+          )}
 
         </g>
       </svg>

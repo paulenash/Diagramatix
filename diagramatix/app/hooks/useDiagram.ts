@@ -1363,6 +1363,200 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       return action.payload;
 
     case "ADD_ELEMENT": {
+      // ── Pool/Lane drop intercept ─────────────────────────────────────
+      // The "Pool/Lane" palette symbol has THREE behaviours:
+      //   1) Drop into empty space  → create a new Pool. If other pools
+      //      already exist on the diagram, match the nearest pool's x +
+      //      width; else use 80% of the catalogue default width.
+      //   2) Drop on an existing Pool that has NO Lanes → behave as
+      //      "+ Add Lane" (split the pool into 2 lanes).
+      //   3) Drop on an existing Pool with ≥1 Lane → insert a new lane
+      //      based on cursor position:
+      //         · within 20px of pool top      → above all lanes
+      //         · within 20px of pool bottom   → below all lanes
+      //         · within 15px of a lane separator → between adjacent lanes
+      //         · within the middle third of a lane → split into 2 sublanes
+      //         · else                          → below the lane the cursor sits in
+      // In every "add lane" case the pool grows downwards and any pools
+      // below get pushed by the same growth amount.
+      if (action.payload.symbolType === "pool") {
+        const dropPos = action.payload.position;
+        const targetPool = state.elements.find(
+          (e) =>
+            e.type === "pool" &&
+            dropPos.x >= e.x && dropPos.x <= e.x + e.width &&
+            dropPos.y >= e.y && dropPos.y <= e.y + e.height,
+        );
+        if (targetPool) {
+          const oldPoolHeight = targetPool.height;
+          const oldPoolBottom = targetPool.y + oldPoolHeight;
+          const POOL_LW = getPoolHeaderWidth(targetPool);
+          const lanes = state.elements
+            .filter((e) => e.type === "lane" && e.parentId === targetPool.id)
+            .sort((a, b) => a.y - b.y);
+          const laneFs = state.laneFontSize ?? 12;
+          const totalLaneCount = state.elements.filter((e) => e.type === "lane").length;
+          const NEW_LANE_H = 80;
+          const TOP_BOTTOM_THRESHOLD = 20;
+          const SEPARATOR_THRESHOLD = 15;
+
+          // Case A: pool with no lanes — same as ADD_LANE first-lane path
+          // (split the pool into 2 lanes).
+          if (lanes.length === 0) {
+            const MIN_LANE_H = 80;
+            const topH = Math.max(MIN_LANE_H, Math.floor(targetPool.height / 2));
+            const botH = Math.max(MIN_LANE_H, targetPool.height - topH);
+            const poolH = topH + botH;
+            const lane1: DiagramElement = {
+              id: nanoid(), type: "lane",
+              x: targetPool.x + POOL_LW, y: targetPool.y,
+              width: targetPool.width - POOL_LW, height: topH,
+              label: `Lane ${totalLaneCount + 1}`, properties: {}, parentId: targetPool.id,
+            };
+            const lane2: DiagramElement = {
+              id: nanoid(), type: "lane",
+              x: targetPool.x + POOL_LW, y: targetPool.y + topH,
+              width: targetPool.width - POOL_LW, height: botH,
+              label: `Lane ${totalLaneCount + 2}`, properties: {}, parentId: targetPool.id,
+            };
+            const updated = state.elements.map((e) =>
+              e.id === targetPool.id ? { ...e, height: poolH } : e,
+            );
+            let next = { elements: updatePoolTypes([...updated, lane1, lane2]), connectors: state.connectors };
+            next = resizeLaneForLabel(next.elements, next.connectors, lane1.id, laneFs);
+            next = resizeLaneForLabel(next.elements, next.connectors, lane2.id, laneFs);
+            const finalPool = next.elements.find(e => e.id === targetPool.id);
+            if (finalPool) {
+              const growth = finalPool.height - oldPoolHeight;
+              next = applyPoolBelowShift(next.elements, next.connectors, targetPool.id, oldPoolBottom, growth);
+            }
+            return { ...state, ...next };
+          }
+
+          // Case B: pool with lanes — figure out where to insert.
+          const dy = dropPos.y - targetPool.y;
+          const poolBot = targetPool.y + targetPool.height;
+          // B1: near top boundary → insert ABOVE all lanes
+          if (dy <= TOP_BOTTOM_THRESHOLD) {
+            const newLane: DiagramElement = {
+              id: nanoid(), type: "lane",
+              x: targetPool.x + POOL_LW, y: targetPool.y,
+              width: targetPool.width - POOL_LW, height: NEW_LANE_H,
+              label: `Lane ${totalLaneCount + 1}`, properties: {}, parentId: targetPool.id,
+            };
+            const elements = state.elements.map((e) => {
+              if (e.id === targetPool.id) return { ...e, height: e.height + NEW_LANE_H };
+              if (e.type === "lane" && e.parentId === targetPool.id) return { ...e, y: e.y + NEW_LANE_H };
+              return e;
+            });
+            let next = { elements: updatePoolTypes([...elements, newLane]), connectors: state.connectors };
+            next = resizeLaneForLabel(next.elements, next.connectors, newLane.id, laneFs);
+            next = applyPoolBelowShift(next.elements, next.connectors, targetPool.id, oldPoolBottom, NEW_LANE_H);
+            return { ...state, ...next };
+          }
+          // B2: near bottom boundary → insert BELOW all lanes
+          if (poolBot - dropPos.y <= TOP_BOTTOM_THRESHOLD) {
+            const lastLane = lanes[lanes.length - 1];
+            const newLaneY = lastLane.y + lastLane.height;
+            const newLane: DiagramElement = {
+              id: nanoid(), type: "lane",
+              x: targetPool.x + POOL_LW, y: newLaneY,
+              width: targetPool.width - POOL_LW, height: NEW_LANE_H,
+              label: `Lane ${totalLaneCount + 1}`, properties: {}, parentId: targetPool.id,
+            };
+            const elements = state.elements.map((e) =>
+              e.id === targetPool.id ? { ...e, height: e.height + NEW_LANE_H } : e,
+            );
+            let next = { elements: updatePoolTypes([...elements, newLane]), connectors: state.connectors };
+            next = resizeLaneForLabel(next.elements, next.connectors, newLane.id, laneFs);
+            next = applyPoolBelowShift(next.elements, next.connectors, targetPool.id, oldPoolBottom, NEW_LANE_H);
+            return { ...state, ...next };
+          }
+          // B3: near a lane separator → insert BETWEEN
+          for (let i = 0; i < lanes.length - 1; i++) {
+            const sep = lanes[i].y + lanes[i].height;     // y of separator between lanes[i] and lanes[i+1]
+            if (Math.abs(dropPos.y - sep) <= SEPARATOR_THRESHOLD) {
+              const newLane: DiagramElement = {
+                id: nanoid(), type: "lane",
+                x: targetPool.x + POOL_LW, y: sep,
+                width: targetPool.width - POOL_LW, height: NEW_LANE_H,
+                label: `Lane ${totalLaneCount + 1}`, properties: {}, parentId: targetPool.id,
+              };
+              const elements = state.elements.map((e) => {
+                if (e.id === targetPool.id) return { ...e, height: e.height + NEW_LANE_H };
+                if (e.type === "lane" && e.parentId === targetPool.id && e.y >= sep) {
+                  return { ...e, y: e.y + NEW_LANE_H };
+                }
+                return e;
+              });
+              let next = { elements: updatePoolTypes([...elements, newLane]), connectors: state.connectors };
+              next = resizeLaneForLabel(next.elements, next.connectors, newLane.id, laneFs);
+              next = applyPoolBelowShift(next.elements, next.connectors, targetPool.id, oldPoolBottom, NEW_LANE_H);
+              return { ...state, ...next };
+            }
+          }
+          // B4: middle third of a lane → split into 2 sublanes
+          const insideLane = lanes.find(
+            (ln) => dropPos.y >= ln.y + ln.height / 3 && dropPos.y <= ln.y + (ln.height * 2) / 3,
+          );
+          if (insideLane) {
+            const LANE_LW = getLaneHeaderWidth(insideLane);
+            const existingSublanes = state.elements.filter(
+              (e) => e.type === "lane" && e.parentId === insideLane.id,
+            );
+            if (existingSublanes.length === 0) {
+              // Split into 2 sublanes — same as ADD_SUBLANE first-time path.
+              const halfH = Math.max(40, Math.round(insideLane.height / 2));
+              const sub1: DiagramElement = {
+                id: nanoid(), type: "lane",
+                x: insideLane.x + LANE_LW, y: insideLane.y,
+                width: insideLane.width - LANE_LW, height: halfH,
+                label: `Sublane ${totalLaneCount + 1}`, properties: {}, parentId: insideLane.id,
+              };
+              const sub2: DiagramElement = {
+                id: nanoid(), type: "lane",
+                x: insideLane.x + LANE_LW, y: insideLane.y + halfH,
+                width: insideLane.width - LANE_LW, height: insideLane.height - halfH,
+                label: `Sublane ${totalLaneCount + 2}`, properties: {}, parentId: insideLane.id,
+              };
+              const elements = state.elements.map((e) => {
+                if (e.parentId === insideLane.id) return { ...e, parentId: sub1.id };
+                return e;
+              });
+              return {
+                ...state,
+                elements: updatePoolTypes([...elements, sub1, sub2]),
+              };
+            }
+          }
+          // Fallback B5: append below the lane the cursor sits in.
+          const cursorLane = lanes.find(
+            (ln) => dropPos.y >= ln.y && dropPos.y <= ln.y + ln.height,
+          );
+          if (cursorLane) {
+            const insertY = cursorLane.y + cursorLane.height;
+            const newLane: DiagramElement = {
+              id: nanoid(), type: "lane",
+              x: targetPool.x + POOL_LW, y: insertY,
+              width: targetPool.width - POOL_LW, height: NEW_LANE_H,
+              label: `Lane ${totalLaneCount + 1}`, properties: {}, parentId: targetPool.id,
+            };
+            const elements = state.elements.map((e) => {
+              if (e.id === targetPool.id) return { ...e, height: e.height + NEW_LANE_H };
+              if (e.type === "lane" && e.parentId === targetPool.id && e.y >= insertY) {
+                return { ...e, y: e.y + NEW_LANE_H };
+              }
+              return e;
+            });
+            let next = { elements: updatePoolTypes([...elements, newLane]), connectors: state.connectors };
+            next = resizeLaneForLabel(next.elements, next.connectors, newLane.id, laneFs);
+            next = applyPoolBelowShift(next.elements, next.connectors, targetPool.id, oldPoolBottom, NEW_LANE_H);
+            return { ...state, ...next };
+          }
+          // No matching insertion zone — fall through to standard pool drop.
+        }
+      }
+
       const def = getSymbolDefinition(action.payload.symbolType);
       let label = def.label;
       if (action.payload.symbolType === "task") {
@@ -1446,11 +1640,36 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       // Apply initial overrides (used by ArchiMate shapes dropped from the
       // catalogue palette — the shape's natural dimensions and shapeKey
       // come from the catalogue, not the generic symbol definition).
-      const effectiveW = initial?.width ?? def.defaultWidth;
+      let baseW = initial?.width ?? def.defaultWidth;
+      let baseX_override: number | null = null;
+      if (isPool && !initial?.width) {
+        // First-pool / matching rule: if no other pools exist on the
+        // diagram, shrink the catalogue width by 20%; if pools exist,
+        // copy the NEAREST pool's x and width so the new pool aligns
+        // vertically beneath/above the existing column of pools.
+        const otherPools = state.elements.filter((e) => e.type === "pool");
+        if (otherPools.length === 0) {
+          baseW = Math.round(def.defaultWidth * 0.8);
+        } else {
+          const dropCx = action.payload.position.x;
+          const dropCy = action.payload.position.y;
+          const nearest = otherPools.reduce((best, p) => {
+            const pCx = p.x + p.width / 2;
+            const pCy = p.y + p.height / 2;
+            const d = Math.hypot(pCx - dropCx, pCy - dropCy);
+            return !best || d < best.d ? { p, d } : best;
+          }, null as null | { p: DiagramElement; d: number });
+          if (nearest) {
+            baseW = nearest.p.width;
+            baseX_override = nearest.p.x;
+          }
+        }
+      }
+      const effectiveW = baseW;
       const effectiveH = initial?.height ?? def.defaultHeight;
       const effectiveLabel = initial?.label ?? label;
       const dropX = isPool
-        ? action.payload.position.x - 18  // header is 36px wide, put its centre at drop
+        ? (baseX_override ?? action.payload.position.x - 18)  // align with nearest pool, else header at drop
         : action.payload.position.x - effectiveW / 2;
       const dropY = action.payload.position.y - effectiveH / 2;
 

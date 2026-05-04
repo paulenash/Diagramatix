@@ -158,10 +158,10 @@ export const ALL_SYMBOLS: SymbolDefinition[] = [
   },
   {
     type: "pool",
-    label: "Pool",
+    label: "Pool/Lane",
     defaultWidth: 1000,
-    defaultHeight: 50,
-    description: "A BPMN pool (swimlane container)",
+    defaultHeight: 75,
+    description: "A BPMN pool (drag onto an existing pool to add a lane)",
   },
   {
     type: "lane",
