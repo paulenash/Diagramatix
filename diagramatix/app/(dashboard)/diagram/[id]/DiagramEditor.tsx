@@ -2292,30 +2292,33 @@ export function DiagramEditor({
             </div>
             <div className="overflow-y-auto px-5 py-3 flex-1 min-h-0">
               <div className="mb-4">
-                <h3 className="text-xs font-semibold text-gray-800 mb-1">Master breakdown</h3>
-                <div className="border border-gray-200 rounded text-[11px]">
+                <h3 className="text-sm font-semibold text-gray-900 mb-2">Master breakdown</h3>
+                <div className="border border-gray-300 rounded text-[13px] text-gray-900">
                   <table className="w-full">
-                    <thead className="bg-gray-50 text-gray-700">
+                    <thead className="bg-gray-100 text-gray-900 border-b border-gray-300">
                       <tr>
-                        <th className="text-left px-2 py-1 font-semibold">Master ID</th>
-                        <th className="text-left px-2 py-1 font-semibold">NameU</th>
-                        <th className="text-right px-2 py-1 font-semibold">Count</th>
-                        <th className="text-left px-2 py-1 font-semibold">Outcome</th>
+                        <th className="text-left px-3 py-2 font-semibold">Master ID</th>
+                        <th className="text-left px-3 py-2 font-semibold">NameU</th>
+                        <th className="text-right px-3 py-2 font-semibold">Count</th>
+                        <th className="text-left px-3 py-2 font-semibold">Outcome</th>
                       </tr>
                     </thead>
                     <tbody>
                       {visioImportStatus.stats.masters.length === 0 && (
-                        <tr><td colSpan={4} className="px-2 py-2 text-gray-500">(no masters used)</td></tr>
+                        <tr><td colSpan={4} className="px-3 py-2 text-gray-700">(no masters used)</td></tr>
                       )}
                       {visioImportStatus.stats.masters.map((m, i) => (
                         <tr key={i} className={
-                          m.classifiedAs === "skipped" ? "bg-red-50" :
-                          m.classifiedAs.includes("implicit") ? "bg-yellow-50" : ""
+                          "border-t border-gray-200 " + (
+                            m.classifiedAs === "skipped" ? "bg-red-100" :
+                            m.classifiedAs.includes("implicit") || m.classifiedAs.includes("heuristic") || m.classifiedAs.includes("black-box") ? "bg-yellow-100" :
+                            i % 2 === 0 ? "bg-white" : "bg-gray-50"
+                          )
                         }>
-                          <td className="px-2 py-1 font-mono">{m.masterId}</td>
-                          <td className="px-2 py-1">{m.nameU || <span className="text-gray-400 italic">(empty)</span>}</td>
-                          <td className="px-2 py-1 text-right">{m.count}</td>
-                          <td className="px-2 py-1">{m.classifiedAs}</td>
+                          <td className="px-3 py-1.5 font-mono">{m.masterId}</td>
+                          <td className="px-3 py-1.5">{m.nameU || <span className="text-gray-500 italic">(empty)</span>}</td>
+                          <td className="px-3 py-1.5 text-right">{m.count}</td>
+                          <td className="px-3 py-1.5">{m.classifiedAs}</td>
                         </tr>
                       ))}
                     </tbody>

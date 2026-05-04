@@ -338,19 +338,26 @@ function readMemberIDs(block: string): string[] {
 }
 
 function readText(block: string): string {
-  // Strip Visio's inline formatting markers — `<cp/>` (character props),
-  // `<pp/>` (paragraph props), `<tp/>` (tab props), `<fld/>` (field code).
-  // Without this, "<pp IX='0'/>Online Modules (OM)" surfaces verbatim.
-  const m = block.match(/<Text>([\s\S]*?)<\/Text>/);
-  if (!m) return "";
-  return m[1]
-    .replace(/<(?:cp|pp|tp|fld)\b[^/>]*\/?>/g, "")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&apos;/g, "'")
-    .replace(/&amp;/g, "&")
-    .trim();
+  // Walk every <Text>...</Text> block and return the first NON-EMPTY one
+  // (after stripping Visio's inline formatting — `<cp/>` character props,
+  // `<pp/>` paragraph props, `<tp/>` tab props, `<fld/>` field code).
+  // Many Visio masters (Pool + 2 Lanes, CFF Container variants) put the
+  // label on a NESTED sub-shape's <Text> while leaving the outer empty —
+  // taking the first match unconditionally would lose the actual label.
+  const re = /<Text>([\s\S]*?)<\/Text>/g;
+  let m;
+  while ((m = re.exec(block)) !== null) {
+    const stripped = m[1]
+      .replace(/<(?:cp|pp|tp|fld)\b[^/>]*\/?>/g, "")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&quot;/g, '"')
+      .replace(/&apos;/g, "'")
+      .replace(/&amp;/g, "&")
+      .trim();
+    if (stripped) return stripped;
+  }
+  return "";
 }
 
 /* ─── Master index ────────────────────────────────────────────────────── */
@@ -411,11 +418,22 @@ function walkAllShapes(pageXml: string): WalkedShape[] {
   if (!m) return [];
   const inner = m[1];
 
-  // First pass: just structure — shape IDs, parent relationships, block ranges.
-  type RawNode = { shapeId: string; block: string; parentShapeId: string | null };
+  // First pass: build the tree by ARRAY INDEX, not shape ID. Visio routinely
+  // writes the sentinel ID `4294967295` (2^32-1, "no/duplicate ID") on many
+  // sub-shapes; if we keyed parent lookups by shape ID those duplicates
+  // would all collide on one map entry, and any nested shape descended
+  // from one of them would inherit the wrong parent's dimensions →
+  // wildly off-page pageX/pageY.
+  type RawNode = {
+    nodeIndex: number;
+    shapeId: string;
+    block: string;
+    parentNodeIndex: number;       // -1 for top-level
+  };
   const nodes: RawNode[] = [];
-  type Frame = { shapeId: string; blockStart: number };
+  type Frame = { nodeIndex: number; blockStart: number };
   const stack: Frame[] = [];
+  let nextIndex = 0;
   const tagRe = /<(\/?)Shape(\s|>)/g;
   let t;
   while ((t = tagRe.exec(inner)) !== null) {
@@ -423,75 +441,73 @@ function walkAllShapes(pageXml: string): WalkedShape[] {
       const frame = stack.pop();
       if (!frame) continue;
       const blockEnd = inner.indexOf(">", t.index) + 1;
-      nodes.push({
-        shapeId: frame.shapeId,
-        block: inner.slice(frame.blockStart, blockEnd),
-        parentShapeId: stack.length > 0 ? stack[stack.length - 1].shapeId : null,
-      });
+      // Slot already pre-allocated at OPEN time (so nodeIndex is stable);
+      // fill in block & parentNodeIndex now.
+      const node = nodes[frame.nodeIndex];
+      node.block = inner.slice(frame.blockStart, blockEnd);
+      node.parentNodeIndex = stack.length > 0 ? stack[stack.length - 1].nodeIndex : -1;
       continue;
     }
     const tagEnd = inner.indexOf(">", t.index) + 1;
     const openTag = inner.slice(t.index, tagEnd);
     const shapeId = openTag.match(/ID='(\d+)'/)?.[1] ?? "?";
-    stack.push({ shapeId, blockStart: t.index });
+    const nodeIndex = nextIndex++;
+    nodes[nodeIndex] = {
+      nodeIndex,
+      shapeId,
+      block: "",                  // filled in at close
+      parentNodeIndex: -1,
+    };
+    stack.push({ nodeIndex, blockStart: t.index });
   }
 
-  // Second pass: read PinX/PinY/W/H from each shape's FULL block (the
-  // first occurrence of each cell is always the outer shape's, since
-  // outer cells precede nested <Shapes>).
+  // Second pass: read PinX/PinY/W/H from each shape's outer head (cells
+  // before the first nested <Shapes>). Indexed by nodeIndex so duplicate
+  // shape IDs don't collide.
   type Geom = { localPinX: number; localPinY: number; width: number; height: number };
-  const geomById = new Map<string, Geom>();
-  const nodeById = new Map<string, RawNode>();
+  const geom: Geom[] = new Array(nodes.length);
   for (const n of nodes) {
-    nodeById.set(n.shapeId, n);
-    // Scope cell reads to the outer head — otherwise a Subprocess whose
-    // outer Width is formula-only (no cached V=) would inherit a tiny
-    // marker sub-shape's Width and render as a pencil-thin sliver.
     const head = outerHead(n.block);
-    geomById.set(n.shapeId, {
+    geom[n.nodeIndex] = {
       localPinX: readCellNum(head, "PinX") ?? 0,
       localPinY: readCellNum(head, "PinY") ?? 0,
       width: readCellNum(head, "Width") ?? 0,
       height: readCellNum(head, "Height") ?? 0,
-    });
+    };
   }
 
-  // Third pass: compute pageX/pageY iteratively in topological order.
-  // The walker emits in post-order (children before parents), so reversing
-  // gives parents-first — every shape sees its parent's pageX/pageY already
-  // computed. Iterative form avoids stack overflow on deep nesting.
-  void nodeById; // not currently used; retained in case future passes want it
-  const pageCache = new Map<string, { pageX: number; pageY: number }>();
-  for (let i = nodes.length - 1; i >= 0; i--) {
+  // Third pass: compute pageX/pageY in pre-order (parents-first). The
+  // walker assigns nodeIndex monotonically at OPEN time, so iterating
+  // 0..N-1 always sees a parent before its children.
+  const pageX: number[] = new Array(nodes.length);
+  const pageY: number[] = new Array(nodes.length);
+  for (let i = 0; i < nodes.length; i++) {
     const n = nodes[i];
-    const g = geomById.get(n.shapeId)!;
-    if (!n.parentShapeId) {
-      pageCache.set(n.shapeId, { pageX: g.localPinX, pageY: g.localPinY });
+    const g = geom[i];
+    if (n.parentNodeIndex < 0) {
+      pageX[i] = g.localPinX;
+      pageY[i] = g.localPinY;
       continue;
     }
-    const parentG = geomById.get(n.parentShapeId);
-    const parentPage = pageCache.get(n.parentShapeId) ?? { pageX: 0, pageY: 0 };
-    const offX = parentG ? parentG.width / 2 : 0;
-    const offY = parentG ? parentG.height / 2 : 0;
-    pageCache.set(n.shapeId, {
-      pageX: parentPage.pageX - offX + g.localPinX,
-      pageY: parentPage.pageY - offY + g.localPinY,
-    });
+    const parentG = geom[n.parentNodeIndex];
+    const parentX = pageX[n.parentNodeIndex] ?? 0;
+    const parentY = pageY[n.parentNodeIndex] ?? 0;
+    pageX[i] = parentX - parentG.width / 2 + g.localPinX;
+    pageY[i] = parentY - parentG.height / 2 + g.localPinY;
   }
 
-  return nodes.map((n) => {
-    const g = geomById.get(n.shapeId)!;
-    const p = pageCache.get(n.shapeId) ?? { pageX: 0, pageY: 0 };
-    return {
-      shapeId: n.shapeId,
-      block: n.block,
-      parentShapeId: n.parentShapeId,
-      pageX: p.pageX,
-      pageY: p.pageY,
-      width: g.width,
-      height: g.height,
-    };
-  });
+  // Build a parent-shape-ID for each node by chasing parentNodeIndex →
+  // nodes[parentNodeIndex].shapeId. This gives the right shape ID even
+  // when duplicate IDs exist elsewhere in the tree.
+  return nodes.map((n, i) => ({
+    shapeId: n.shapeId,
+    block: n.block,
+    parentShapeId: n.parentNodeIndex >= 0 ? nodes[n.parentNodeIndex].shapeId : null,
+    pageX: pageX[i],
+    pageY: pageY[i],
+    width: geom[i].width,
+    height: geom[i].height,
+  }));
 }
 
 function isConnectorMaster(nameU: string): ConnectorBase | null {
@@ -582,9 +598,15 @@ function classifyElement(nameU: string, props: Record<string, string>): ElementS
     seed.multiplicity = "collection";
   }
   if (seed.type === "subprocess" || seed.type === "subprocess-expanded") {
+    // BpmnBoundaryType is the authoritative source. The master name only
+    // sets the *initial* default (e.g. dragging "Call Collapsed Sub-process"
+    // seeds subprocessType="call"), but the user may have explicitly set
+    // the property to "Default" afterwards — in which case it's actually
+    // a normal subprocess. Re-derive from the property whenever it's set.
     if (props.BpmnBoundaryType === "Call") seed.subprocessType = "call";
     else if (props.BpmnBoundaryType === "Event") seed.subprocessType = "event";
     else if (props.BpmnBoundaryType === "Transaction") seed.subprocessType = "transaction";
+    else if (props.BpmnBoundaryType === "Default") delete seed.subprocessType;
   }
   return seed;
 }
@@ -757,11 +779,15 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
   // Build a quick lookup: shapeId → RawShape (for parent classification).
   const rawByShapeId = new Map<string, RawShape>();
   for (const r of raw) rawByShapeId.set(r.shapeId, r);
-  // Names where this disambiguation applies — masters that double as both
-  // pool AND lane in different contexts (CFF Container can be the outer
-  // pool OR a nested lane band; Swimlane is the same).
+  // Names where this disambiguation applies — only masters that genuinely
+  // double as pool-vs-lane in different contexts. CFF Container and
+  // Swimlane List are deliberately NOT here: in real-world Visio CFF
+  // files each *named* CFF Container.NN is a sibling pool, and an outer
+  // top-level CFF Container is just a transparent wrapper. Flipping nested
+  // CFF Containers to lanes would silently turn every pool into a lane
+  // whenever a wrapper is heuristically promoted.
   const POOL_OR_LANE_NAMES = new Set([
-    "Pool / Lane", "CFF Container", "Swimlane List", "Swimlane",
+    "Pool / Lane", "Swimlane",
   ]);
   for (const r of raw) {
     if (r.seed?.type !== "pool" || !POOL_OR_LANE_NAMES.has(r.nameU)) continue;
@@ -1041,19 +1067,39 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
     if (lane && !lane.parentId) lane.parentId = poolElId;
   }
 
-  // Auto-detect poolType: any pool that has a Lane child becomes white-box;
-  // any pool with NO lane children becomes black-box. This runs AFTER all
-  // parentage has been resolved so lane-counts are accurate.
+  // Auto-detect poolType. A pool is *white-box* if either (a) it has at
+  // least one Lane child via parentId, or (b) its bounding box on canvas
+  // geometrically contains another classified non-pool element. Otherwise
+  // *black-box*. This catches TPB-Client-Services-style pools that hold
+  // tasks/events directly without an explicit Lane band, which the
+  // lane-count check alone would mis-classify as black-box.
   const laneCountByPool = new Map<string, number>();
   for (const e of elements) {
     if (e.type === "lane" && e.parentId) {
       laneCountByPool.set(e.parentId, (laneCountByPool.get(e.parentId) ?? 0) + 1);
     }
   }
+  function geometricallyContainsAny(pool: DiagramElement): boolean {
+    const px1 = pool.x;
+    const py1 = pool.y;
+    const px2 = pool.x + pool.width;
+    const py2 = pool.y + pool.height;
+    for (const e of elements) {
+      if (e === pool) continue;
+      if (e.type === "pool") continue;          // pools-in-pools handled by parentage
+      const ex = e.x + e.width / 2;
+      const ey = e.y + e.height / 2;
+      if (ex >= px1 && ex <= px2 && ey >= py1 && ey <= py2) return true;
+    }
+    return false;
+  }
   for (const e of elements) {
     if (e.type !== "pool") continue;
     if (e.properties.poolType !== undefined) continue;   // explicit (System Pool / Pool + N Lanes / Black-Box etc.)
-    e.properties.poolType = (laneCountByPool.get(e.id) ?? 0) > 0 ? "white-box" : "black-box";
+    const hasLanes = (laneCountByPool.get(e.id) ?? 0) > 0;
+    e.properties.poolType = (hasLanes || geometricallyContainsAny(e))
+      ? "white-box"
+      : "black-box";
   }
 
   // Connectors: page-level <Connects><Connect FromSheet=… ToSheet=… /></Connects>
