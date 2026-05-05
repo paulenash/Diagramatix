@@ -1443,6 +1443,34 @@ function applyEPBoundaryChange(
   const newEpEl = updatedEls.find((e) => e.id === epId)!;
   updatedEls = resnapEPBoundaryEvents(updatedEls, newEpEl, oldRect);
 
+  // 5b. Explicitly grow each EP ancestor (lane / sublane / pool) by the
+  //     EP's grow on each axis so their boundaries track the EP exactly.
+  //     Without this, ensureContainersEncloseChildren would only grow
+  //     the ancestor by the PAD-fit minimum — which for a lane with
+  //     interior slack falls SHORT of the matching sibling-lane bulk
+  //     shift, leaving a gap between the ancestor lane's new bottom and
+  //     the next lane below. User spec: "All lane or pool boundaries in
+  //     the pool that the EP is part of must also move up or down with
+  //     the EP top and bottom boundary moves."
+  if (epAncestors.size > 0 && (growTop !== 0 || growBottom !== 0 || growLeft !== 0 || growRight !== 0)) {
+    updatedEls = updatedEls.map((e) => {
+      if (!epAncestors.has(e.id)) return e;
+      let nx = e.x;
+      let ny = e.y;
+      let nw = e.width;
+      let nh = e.height;
+      // Outward grows (positive deltas) push the boundary OUT; inward
+      // shrinks (negative) pull it IN. Treating both symmetrically lets
+      // a manual EP top-handle drag DOWN (shrink) also pull the lane
+      // tops down with it.
+      if (growTop !== 0)    { ny -= growTop;  nh += growTop; }
+      if (growLeft !== 0)   { nx -= growLeft; nw += growLeft; }
+      if (growBottom !== 0) { nh += growBottom; }
+      if (growRight !== 0)  { nw += growRight; }
+      return { ...e, x: nx, y: ny, width: nw, height: nh };
+    });
+  }
+
   // 6. Capture the enclosing pool's PRE-bubble rect so we can compute
   //    cascade deltas after enclose + buffer have grown it.
   let enclosingPoolBefore: DiagramElement | null = null;
@@ -1714,28 +1742,33 @@ function ensureContainersEncloseChildren(
       ? allKids
       : allKids.filter((c) => c.type === "lane" || c.type === "sublane" || c.type === "subprocess-expanded");
     if (kids.length === 0) continue;
-    const childBottom = Math.max(...kids.map((c) => c.y + c.height));
-    if (childBottom + PAD > live.y + live.height) {
-      live.height = childBottom + PAD - live.y;
+    // PAD=0 for lane/sublane children — they fill their pool/lane by
+    // convention (no gap between last lane bottom and pool bottom).
+    // PAD=8 for EP / task / etc. children that don't fill.
+    const padFor = (c: DiagramElement) =>
+      (c.type === "lane" || c.type === "sublane") ? 0 : PAD;
+    const childMaxBottom = Math.max(...kids.map((c) => c.y + c.height + padFor(c)));
+    if (childMaxBottom > live.y + live.height) {
+      live.height = childMaxBottom - live.y;
     }
-    const childRight = Math.max(...kids.map((c) => c.x + c.width));
-    if (childRight + PAD > live.x + live.width) {
-      live.width = childRight + PAD - live.x;
+    const childMaxRight = Math.max(...kids.map((c) => c.x + c.width + padFor(c)));
+    if (childMaxRight > live.x + live.width) {
+      live.width = childMaxRight - live.x;
     }
     // Grow UP / LEFT when a child sticks past the top / left edge.
     // Without these, an EP whose top is dragged up past the lane top
     // would leave the EP overlapping the lane (the lane / pool tops
     // never followed). Adjust live.y / live.x and grow live.height /
     // live.width by the same amount so the bottom / right stay put.
-    const childTop = Math.min(...kids.map((c) => c.y));
-    if (childTop - PAD < live.y) {
-      const newTopY = childTop - PAD;
+    const childMinTop = Math.min(...kids.map((c) => c.y - padFor(c)));
+    if (childMinTop < live.y) {
+      const newTopY = childMinTop;
       live.height += live.y - newTopY;
       live.y = newTopY;
     }
-    const childLeft = Math.min(...kids.map((c) => c.x));
-    if (childLeft - PAD < live.x) {
-      const newLeftX = childLeft - PAD;
+    const childMinLeft = Math.min(...kids.map((c) => c.x - padFor(c)));
+    if (childMinLeft < live.x) {
+      const newLeftX = childMinLeft;
       live.width += live.x - newLeftX;
       live.x = newLeftX;
     }
