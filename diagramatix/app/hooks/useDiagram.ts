@@ -732,35 +732,193 @@ function shiftSubtreesByX(
 }
 
 /**
+ * Mirror of `applyPoolBelowShift` along the X axis. When a pool grew
+ * wider on the right (because an EP inside it grew right), shove ALL
+ * pools whose left edge sits at-or-after the named pool's OLD right
+ * edge to the right by `growth`, along with every descendant. Used by
+ * the LEFT- and RIGHT-edge EP boundary growth.
+ */
+function applyPoolRightShift(
+  elements: DiagramElement[],
+  connectors: Connector[],
+  poolId: string,
+  oldPoolRight: number,
+  growth: number,
+): { elements: DiagramElement[]; connectors: Connector[] } {
+  if (growth <= 0) return { elements, connectors };
+  const finalPool = elements.find((e) => e.id === poolId);
+  if (!finalPool) return { elements, connectors };
+  const newPoolRight = finalPool.x + finalPool.width;
+  const poolsRight = elements.filter(
+    (e) => e.type === "pool" && e.id !== poolId && e.x >= oldPoolRight,
+  );
+  const tooClose = poolsRight.some((p) => p.x - newPoolRight < 100);
+  if (!tooClose) return { elements, connectors };
+
+  const shiftIds = new Set<string>();
+  for (const p of poolsRight) {
+    shiftIds.add(p.id);
+    const stack = [p.id];
+    while (stack.length) {
+      const cid = stack.pop()!;
+      for (const e of elements) {
+        if ((e.parentId === cid || e.boundaryHostId === cid) && !shiftIds.has(e.id)) {
+          shiftIds.add(e.id);
+          stack.push(e.id);
+        }
+      }
+    }
+  }
+  const shiftedElements = elements.map((e) =>
+    shiftIds.has(e.id) ? { ...e, x: e.x + growth } : e,
+  );
+  // Shift connectors whose source AND target both moved (their waypoints
+  // need translating). For half-moved connectors, leave waypoints alone
+  // — a recompute pass downstream will validate.
+  const updatedConnectors = connectors.map((conn) => {
+    const srcMoved = shiftIds.has(conn.sourceId);
+    const tgtMoved = shiftIds.has(conn.targetId);
+    if (srcMoved && tgtMoved) {
+      return {
+        ...conn,
+        waypoints: conn.waypoints.map((wp) => ({ x: wp.x + growth, y: wp.y })),
+      };
+    }
+    return conn;
+  });
+  return { elements: shiftedElements, connectors: updatedConnectors };
+}
+
+/**
+ * "Past line" element shift used by EP boundary growth: shift every
+ * element whose relevant edge sits at-or-past `line` along `axis`, by
+ * `delta`. Carries descendants and boundary events along (parentId +
+ * boundaryHostId BFS). Skips any id in `excludeIds` (typically the new
+ * element being placed and the EP itself).
+ */
+function shiftElementsPastLine(
+  elements: DiagramElement[],
+  axis: "x" | "y",
+  line: number,
+  delta: number,
+  excludeIds: Set<string>,
+): DiagramElement[] {
+  if (delta === 0) return elements;
+  // Roots: any element whose far-side coord (left for x-axis, top for y-axis)
+  // is at-or-past the line, NOT in excludeIds.
+  const roots = new Set<string>();
+  for (const e of elements) {
+    if (excludeIds.has(e.id)) continue;
+    const edge = axis === "x" ? e.x : e.y;
+    if (edge >= line) roots.add(e.id);
+  }
+  // Expand via parentId + boundaryHostId.
+  const all = new Set<string>(roots);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const e of elements) {
+      if (excludeIds.has(e.id) || all.has(e.id)) continue;
+      if (
+        (e.parentId && all.has(e.parentId)) ||
+        (e.boundaryHostId && all.has(e.boundaryHostId))
+      ) {
+        all.add(e.id);
+        changed = true;
+      }
+    }
+  }
+  return elements.map((e) => {
+    if (!all.has(e.id)) return e;
+    return axis === "x" ? { ...e, x: e.x + delta } : { ...e, y: e.y + delta };
+  });
+}
+
+/** Shift any connector waypoint whose coord is at-or-past `line` along
+ *  `axis` by `delta`. Used in tandem with `shiftElementsPastLine` so
+ *  free-floating connector segments don't get left behind. */
+function shiftConnectorWaypointsPastLine(
+  connectors: Connector[],
+  axis: "x" | "y",
+  line: number,
+  delta: number,
+): Connector[] {
+  if (delta === 0) return connectors;
+  return connectors.map((conn) => ({
+    ...conn,
+    waypoints: conn.waypoints.map((wp) => {
+      const v = axis === "x" ? wp.x : wp.y;
+      if (v < line) return wp;
+      return axis === "x" ? { x: wp.x + delta, y: wp.y } : { x: wp.x, y: wp.y + delta };
+    }),
+  }));
+}
+
+/** After an EP is resized, walk every boundary event whose
+ *  `boundaryHostId` is the EP and re-snap it to the new bounds while
+ *  preserving its (side, frac) along the edge — so events on the LEFT
+ *  edge stay on the LEFT, events on the RIGHT edge slide right with
+ *  the edge, etc. */
+function resnapEPBoundaryEvents(
+  elements: DiagramElement[],
+  ep: DiagramElement,
+  oldEpRect: { x: number; y: number; width: number; height: number },
+): DiagramElement[] {
+  return elements.map((e) => {
+    if (e.boundaryHostId !== ep.id) return e;
+    const cx = e.x + e.width / 2;
+    const cy = e.y + e.height / 2;
+    const { side, frac } = boundaryEdgeOf({ x: cx, y: cy }, oldEpRect);
+    const f = Math.max(0, Math.min(1, frac));
+    let ncx: number, ncy: number;
+    switch (side) {
+      case "top":    ncx = ep.x + f * ep.width;  ncy = ep.y;                 break;
+      case "bottom": ncx = ep.x + f * ep.width;  ncy = ep.y + ep.height;     break;
+      case "left":   ncx = ep.x;                 ncy = ep.y + f * ep.height; break;
+      default:       ncx = ep.x + ep.width;      ncy = ep.y + f * ep.height; break;
+    }
+    return { ...e, x: ncx - e.width / 2, y: ncy - e.height / 2 };
+  });
+}
+
+/**
  * Detect whether `newEl`'s drop position is near OR on a boundary of an
  * Expanded Subprocess `epId`, and if so, grow the EP in that direction
- * (by 2× the new element's dimension on the affected axis), shift any
- * existing children clear, and return the placement coordinates for the
- * new element. Returns `null` if the drop is comfortably interior — the
- * caller's existing flow + `ensureContainersEncloseChildren` handles
- * those cases.
+ * (by 2× the new element's dimension on the affected axis), shift
+ * existing elements / connectors / boundary events according to the
+ * spec, and return placement coordinates for the new element. Returns
+ * `null` if the drop is comfortably interior.
  *
- * Growth rules (per user spec):
- *   - LEFT edge:   keep ep.x fixed, grow width by 2*newW; shift every
- *                   EP descendant right by newW + PAD; place newEl at
- *                   ep.x + PAD.
- *   - TOP edge:    keep ep.y fixed, grow height by 2*newH; shift every
- *                   EP descendant down by newH + PAD; place newEl at
- *                   ep.y + PAD.
- *   - RIGHT edge:  grow width by 2*newW (no shift); place newEl at
- *                   ep.x + ep.width' - newW - PAD.
- *   - BOTTOM edge: grow height by 2*newH (no shift); place newEl at
- *                   ep.y + ep.height' - newH - PAD.
- *
- * Tie-break for corner drops: smallest perpendicular distance wins;
- * fully-symmetric ties go LEFT > TOP > RIGHT > BOTTOM.
+ * Per-edge behaviour (user spec):
+ *  - RIGHT  → grow width by 2*newW; place newEl at the user's drop
+ *              position; nothing else moves; pool's right edge grows
+ *              and a pool-right-shift cascades to pools further right.
+ *  - BOTTOM → grow height by 2*newH; place newEl at user's drop
+ *              position; shift every element BELOW the EP's old bottom
+ *              down by 2*newH (with descendants + boundary events +
+ *              connector waypoints); pool grows; pool-below-shift.
+ *  - LEFT   → keep ep.x fixed, grow width by 2*newW; place newEl at
+ *              ep.x + PAD; shift everything past (newEl.right) right
+ *              by 2*newW (inside AND outside the EP); EP's right-edge
+ *              boundary events re-snap with the new edge; LEFT-edge
+ *              events stay; pool right-grows; pool-right-shift.
+ *  - TOP    → keep ep.y fixed, grow height by 2*newH; place newEl at
+ *              ep.y + PAD; shift everything past (newEl.bottom) down
+ *              by 2*newH; EP's bottom-edge events re-snap; TOP events
+ *              stay; pool bottom-grows; pool-below-shift.
  */
 function expandEPForBoundaryEntry(
   elements: DiagramElement[],
+  connectors: Connector[],
   epId: string,
   newEl: { id?: string; x: number; y: number; width: number; height: number },
   threshold: number = 30,
-): { elements: DiagramElement[]; placedX: number; placedY: number } | null {
+): {
+  elements: DiagramElement[];
+  connectors: Connector[];
+  placedX: number;
+  placedY: number;
+} | null {
   const ep = elements.find((e) => e.id === epId);
   if (!ep || ep.type !== "subprocess-expanded") return null;
 
@@ -780,8 +938,6 @@ function expandEPForBoundaryEntry(
   const straddleTop    = newEl.y < ep.y && newEl.y + newEl.height > ep.y;
   const straddleBottom = newEl.y < ep.y + ep.height && newEl.y + newEl.height > ep.y + ep.height;
 
-  // Pick the affected edge: closest by perpendicular distance, but only
-  // if either distance ≤ threshold or there's a straddle on that edge.
   type Edge = "left" | "top" | "right" | "bottom";
   const candidates: { edge: Edge; dist: number; straddle: boolean }[] = ([
     { edge: "left"   as Edge, dist: distLeft,   straddle: straddleLeft   },
@@ -791,68 +947,95 @@ function expandEPForBoundaryEntry(
   ]).filter((c) => c.dist <= threshold || c.straddle);
   if (candidates.length === 0) return null;
 
-  // Sort by distance ascending; ties keep insertion order (LEFT > TOP > RIGHT > BOTTOM).
   candidates.sort((a, b) => a.dist - b.dist);
   const winner = candidates[0].edge;
 
-  // Compute growth + collect EP descendants for shifting. If `newEl.id`
-  // is supplied (MOVE_ELEMENT case where the moving shape is already in
-  // `elements` with parentId pointing at the EP), exclude it from the
-  // descendant set so it isn't double-shifted alongside the placement
-  // we're about to assign.
-  const epDescendants = new Set<string>();
-  {
-    const stack = [ep.id];
-    while (stack.length) {
-      const cur = stack.pop()!;
-      for (const e of elements) {
-        if (e.id === ep.id) continue;
-        if (newEl.id && e.id === newEl.id) continue;
-        if ((e.parentId === cur || e.boundaryHostId === cur) && !epDescendants.has(e.id)) {
-          epDescendants.add(e.id);
-          stack.push(e.id);
-        }
-      }
-    }
-  }
+  // Snapshot the OLD EP rect so EP-attached boundary events can be
+  // re-snapped against the NEW rect afterwards (preserving side+frac).
+  const oldEpRect = { x: ep.x, y: ep.y, width: ep.width, height: ep.height };
 
-  let updated = elements.slice();
+  // exclude set: the new element itself (when MOVE_ELEMENT passes id)
+  // and the EP itself (its position cell stays put even when its width
+  // or height grows).
+  const exclude = new Set<string>([ep.id]);
+  if (newEl.id) exclude.add(newEl.id);
+
+  let updatedEls = elements.slice();
+  let updatedConns = connectors.slice();
   let placedX = newEl.x;
   let placedY = newEl.y;
 
-  if (winner === "left") {
+  if (winner === "right") {
+    // Grow EP rightward; place at user's drop position (clamped inside).
     const growth = 2 * newEl.width;
-    updated = updated.map((e) =>
-      e.id === ep.id ? { ...e, width: e.width + growth } : e,
+    const newWidth = ep.width + growth;
+    updatedEls = updatedEls.map((e) =>
+      e.id === ep.id ? { ...e, width: newWidth } : e,
     );
-    updated = shiftSubtreesByX(updated, epDescendants, newEl.width + PAD);
+    placedX = Math.max(ep.x + PAD, Math.min(newEl.x, ep.x + newWidth - newEl.width - PAD));
+    placedY = Math.max(ep.y + PAD, Math.min(newEl.y, ep.y + ep.height - newEl.height - PAD));
+    // Re-snap EP boundary events on the new bounds.
+    const newEpRect = { x: ep.x, y: ep.y, width: newWidth, height: ep.height };
+    const newEpEl = { ...ep, ...newEpRect };
+    updatedEls = resnapEPBoundaryEvents(updatedEls, newEpEl, oldEpRect);
+  }
+  else if (winner === "bottom") {
+    // Grow EP downward; place at user's drop position; shift everything
+    // BELOW the EP's old bottom downward by `growth`.
+    const growth = 2 * newEl.height;
+    const newHeight = ep.height + growth;
+    updatedEls = updatedEls.map((e) =>
+      e.id === ep.id ? { ...e, height: newHeight } : e,
+    );
+    placedX = Math.max(ep.x + PAD, Math.min(newEl.x, ep.x + ep.width - newEl.width - PAD));
+    placedY = Math.max(ep.y + PAD, Math.min(newEl.y, ep.y + newHeight - newEl.height - PAD));
+    // Shift everything past the OLD bottom.
+    const oldBottom = ep.y + ep.height;
+    updatedEls = shiftElementsPastLine(updatedEls, "y", oldBottom, growth, exclude);
+    updatedConns = shiftConnectorWaypointsPastLine(updatedConns, "y", oldBottom, growth);
+    const newEpRect = { x: ep.x, y: ep.y, width: ep.width, height: newHeight };
+    const newEpEl = { ...ep, ...newEpRect };
+    updatedEls = resnapEPBoundaryEvents(updatedEls, newEpEl, oldEpRect);
+  }
+  else if (winner === "left") {
+    // Keep EP's left edge fixed; grow rightward; place new element at
+    // ep.x + PAD; shift everything past the new element's right edge by
+    // `growth` (= 2*newW) — both inside AND outside the EP.
+    const growth = 2 * newEl.width;
+    const newWidth = ep.width + growth;
+    updatedEls = updatedEls.map((e) =>
+      e.id === ep.id ? { ...e, width: newWidth } : e,
+    );
     placedX = ep.x + PAD;
     placedY = Math.max(ep.y + PAD, Math.min(newEl.y, ep.y + ep.height - newEl.height - PAD));
-  } else if (winner === "right") {
-    const growth = 2 * newEl.width;
-    updated = updated.map((e) =>
-      e.id === ep.id ? { ...e, width: e.width + growth } : e,
-    );
-    placedX = ep.x + ep.width + growth - newEl.width - PAD;
-    placedY = Math.max(ep.y + PAD, Math.min(newEl.y, ep.y + ep.height - newEl.height - PAD));
-  } else if (winner === "top") {
+    // Shift line is just past the new element's right edge.
+    const shiftLine = placedX + newEl.width;
+    updatedEls = shiftElementsPastLine(updatedEls, "x", shiftLine, growth, exclude);
+    updatedConns = shiftConnectorWaypointsPastLine(updatedConns, "x", shiftLine, growth);
+    const newEpRect = { x: ep.x, y: ep.y, width: newWidth, height: ep.height };
+    const newEpEl = { ...ep, ...newEpRect };
+    updatedEls = resnapEPBoundaryEvents(updatedEls, newEpEl, oldEpRect);
+  }
+  else { // top
+    // Keep EP's top edge fixed; grow downward; place new element at
+    // ep.y + PAD; shift everything past the new element's bottom edge
+    // by `growth` (= 2*newH) — both inside AND outside the EP.
     const growth = 2 * newEl.height;
-    updated = updated.map((e) =>
-      e.id === ep.id ? { ...e, height: e.height + growth } : e,
+    const newHeight = ep.height + growth;
+    updatedEls = updatedEls.map((e) =>
+      e.id === ep.id ? { ...e, height: newHeight } : e,
     );
-    updated = shiftLaneSubtreesDown(updated, epDescendants, newEl.height + PAD);
     placedX = Math.max(ep.x + PAD, Math.min(newEl.x, ep.x + ep.width - newEl.width - PAD));
     placedY = ep.y + PAD;
-  } else { // bottom
-    const growth = 2 * newEl.height;
-    updated = updated.map((e) =>
-      e.id === ep.id ? { ...e, height: e.height + growth } : e,
-    );
-    placedX = Math.max(ep.x + PAD, Math.min(newEl.x, ep.x + ep.width - newEl.width - PAD));
-    placedY = ep.y + ep.height + growth - newEl.height - PAD;
+    const shiftLine = placedY + newEl.height;
+    updatedEls = shiftElementsPastLine(updatedEls, "y", shiftLine, growth, exclude);
+    updatedConns = shiftConnectorWaypointsPastLine(updatedConns, "y", shiftLine, growth);
+    const newEpRect = { x: ep.x, y: ep.y, width: ep.width, height: newHeight };
+    const newEpEl = { ...ep, ...newEpRect };
+    updatedEls = resnapEPBoundaryEvents(updatedEls, newEpEl, oldEpRect);
   }
 
-  return { elements: updated, placedX, placedY };
+  return { elements: updatedEls, connectors: updatedConns, placedX, placedY };
 }
 
 /** Read a pool's effective header width (stored property override, else 36). */
@@ -2189,6 +2372,12 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       // existing EP descendant clear so the new element fits at the
       // original edge. For RIGHT/BOTTOM edges, just grow outward.
       let workingElements = state.elements;
+      let workingConnectors = state.connectors;
+      // Capture the enclosing pool's pre-EP-grow rect so we can cascade
+      // pool-below-shift (vertical growth) / pool-right-shift (horizontal
+      // growth) once ensureContainersEncloseChildren has bubbled the
+      // EP's growth up to the pool.
+      let enclosingPoolBefore: DiagramElement | null = null;
       if (
         newEl.parentId &&
         !newEl.boundaryHostId &&
@@ -2196,9 +2385,16 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       ) {
         const parent = workingElements.find((e) => e.id === newEl.parentId);
         if (parent?.type === "subprocess-expanded") {
-          const grown = expandEPForBoundaryEntry(workingElements, parent.id, newEl);
+          // Walk up the parent chain to find the enclosing pool.
+          let cur: DiagramElement | undefined = parent;
+          while (cur) {
+            if (cur.type === "pool") { enclosingPoolBefore = { ...cur }; break; }
+            cur = workingElements.find((e) => e.id === cur!.parentId);
+          }
+          const grown = expandEPForBoundaryEntry(workingElements, workingConnectors, parent.id, newEl);
           if (grown) {
             workingElements = grown.elements;
+            workingConnectors = grown.connectors;
             newEl = { ...newEl, x: grown.placedX, y: grown.placedY };
           }
         }
@@ -2209,8 +2405,27 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       // inside a tight subprocess-expanded leaves it overlapping the
       // boundary; the helper grows the subprocess (and bubbles up to
       // grow the enclosing lane / pool too).
-      const elementsWithNew = ensureContainersEncloseChildren([...workingElements, newEl]);
-      return { ...state, elements: elementsWithNew };
+      let elementsWithNew = ensureContainersEncloseChildren([...workingElements, newEl]);
+
+      // Cascade pool-below-shift / pool-right-shift if the enclosing pool
+      // grew due to EP boundary growth.
+      if (enclosingPoolBefore) {
+        const newPool = elementsWithNew.find((e) => e.id === enclosingPoolBefore!.id);
+        if (newPool) {
+          const dY = (newPool.y + newPool.height) - (enclosingPoolBefore.y + enclosingPoolBefore.height);
+          const dX = (newPool.x + newPool.width) - (enclosingPoolBefore.x + enclosingPoolBefore.width);
+          if (dY > 0) {
+            const r = applyPoolBelowShift(elementsWithNew, workingConnectors, enclosingPoolBefore.id, enclosingPoolBefore.y + enclosingPoolBefore.height, dY);
+            elementsWithNew = r.elements; workingConnectors = r.connectors;
+          }
+          if (dX > 0) {
+            const r = applyPoolRightShift(elementsWithNew, workingConnectors, enclosingPoolBefore.id, enclosingPoolBefore.x + enclosingPoolBefore.width, dX);
+            elementsWithNew = r.elements; workingConnectors = r.connectors;
+          }
+        }
+      }
+
+      return { ...state, elements: elementsWithNew, connectors: workingConnectors };
     }
 
     case "MOVE_ELEMENT": {
@@ -2613,6 +2828,7 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       // the moved element. Excluding the moved id from the shift set
       // prevents double-shifting it alongside the placement we then
       // assign.
+      let enclosingPoolBefore: DiagramElement | null = null;
       {
         const moved = elements.find((e) => e.id === id);
         if (
@@ -2622,7 +2838,15 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         ) {
           const parent = elements.find((e) => e.id === moved.parentId);
           if (parent?.type === "subprocess-expanded") {
-            const grown = expandEPForBoundaryEntry(elements, parent.id, {
+            // Capture enclosing pool BEFORE the EP grows so we can cascade
+            // pool-below-shift / pool-right-shift to neighbouring pools
+            // after ensureContainersEncloseChildren bubbles the growth up.
+            let cur: DiagramElement | undefined = parent;
+            while (cur) {
+              if (cur.type === "pool") { enclosingPoolBefore = { ...cur }; break; }
+              cur = elements.find((e) => e.id === cur!.parentId);
+            }
+            const grown = expandEPForBoundaryEntry(elements, connectors, parent.id, {
               id: moved.id,
               x: moved.x,
               y: moved.y,
@@ -2633,12 +2857,31 @@ function reducer(state: DiagramData, action: Action): DiagramData {
               elements = grown.elements.map((e) =>
                 e.id === id ? { ...e, x: grown.placedX, y: grown.placedY } : e,
               );
+              connectors = grown.connectors;
             }
           }
         }
       }
       // Bubble any EP / lane / pool growth up through the container chain.
       elements = ensureContainersEncloseChildren(elements);
+
+      // Cascade pool-below-shift / pool-right-shift if the enclosing pool
+      // grew due to EP boundary growth.
+      if (enclosingPoolBefore) {
+        const newPool = elements.find((e) => e.id === enclosingPoolBefore!.id);
+        if (newPool) {
+          const dY = (newPool.y + newPool.height) - (enclosingPoolBefore.y + enclosingPoolBefore.height);
+          const dX = (newPool.x + newPool.width) - (enclosingPoolBefore.x + enclosingPoolBefore.width);
+          if (dY > 0) {
+            const r = applyPoolBelowShift(elements, connectors, enclosingPoolBefore.id, enclosingPoolBefore.y + enclosingPoolBefore.height, dY);
+            elements = r.elements; connectors = r.connectors;
+          }
+          if (dX > 0) {
+            const r = applyPoolRightShift(elements, connectors, enclosingPoolBefore.id, enclosingPoolBefore.x + enclosingPoolBefore.width, dX);
+            elements = r.elements; connectors = r.connectors;
+          }
+        }
+      }
 
       return { ...state, elements: updatePoolTypes(elements), connectors };
     }
