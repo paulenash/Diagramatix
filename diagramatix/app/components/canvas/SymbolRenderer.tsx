@@ -2267,12 +2267,14 @@ export function SymbolRenderer({
         })
       }
 
-      {/* Pool edge resize handles. Hit zones (invisible, ~10px wide) straddle
-          each of the four edges and are ALWAYS active — a click near any
-          edge initiates a drag on that side. The visible grip + ↔/↕ glyph
-          only render while the drag is active, keeping the pool's chrome
-          clean when idle. */}
-      {element.type === "pool" && onResizeDragStart && (() => {
+      {/* Pool / Subprocess-Expanded edge resize handles. Hit zones
+          (invisible, ~10px wide) straddle each of the four edges and are
+          ALWAYS active — a click near any edge initiates a drag on that
+          side. The visible grip + ↔/↕ glyph only render while the drag
+          is active. EPs reuse the same pool mechanic per user spec
+          ("Pools have to move their boundaries to Expanded Subprocesses"),
+          giving consistent edge-hover-resize UX across both. */}
+      {(element.type === "pool" || element.type === "subprocess-expanded") && onResizeDragStart && (() => {
         const HANDLE_W = 10;
         const horizontalGripLen = Math.min(40, element.height * 0.5); // E/W grips
         const verticalGripLen   = Math.min(40, element.width  * 0.5); // N/S grips
