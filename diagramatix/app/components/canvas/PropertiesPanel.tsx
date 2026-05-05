@@ -1462,15 +1462,12 @@ export function PropertiesPanel({
       {element.type === "pool" && (() => {
         const poolType = (element.properties.poolType as string | undefined) ?? "black-box";
         // Message connectors whose source OR target is this pool (directly).
-        // Used to gate both the Add Lane button and the black-box→white-box
-        // pool-type change confirm.
+        // Gates the black-box → white-box pool-type change confirm
+        // (formerly also gated the now-removed "+ Add Lane" button).
         const poolMessageConns = (allConnectors ?? []).filter(
           c => c.type === "messageBPMN" && (c.sourceId === element.id || c.targetId === element.id),
         );
         const hasMessageConns = poolMessageConns.length > 0;
-        // Add Lane is allowed for white-box pools OR for black-box pools that
-        // have no message connectors yet (pool is still "empty" / unclassified).
-        const canAddLane = poolType === "white-box" || !hasMessageConns;
         return (
           <>
             <div className="flex items-center gap-1">
@@ -1504,25 +1501,15 @@ export function PropertiesPanel({
                 System (IT application / database)
               </label>
             )}
-            {onAddLane && canAddLane && (
-              <button onClick={() => onAddLane(element.id)}
-                className="w-full px-2 py-0.5 text-[10px] bg-blue-50 text-blue-700 border border-blue-200 rounded hover:bg-blue-100"
-                title={poolType === "black-box"
-                  ? "Adding a lane will convert this pool to White-box"
-                  : "Add a new lane to this pool"}>
-                + Add Lane
-              </button>
-            )}
+            {/* + Add Lane removed — drop the Pool/Lane palette symbol
+                onto an existing pool to add lanes (with green/blue/purple
+                drop preview). */}
           </>
         );
       })()}
 
-      {element.type === "lane" && onAddSublane && (
-        <button onClick={() => onAddSublane(element.id)}
-          className="w-full px-2 py-0.5 text-[10px] bg-blue-50 text-blue-700 border border-blue-200 rounded hover:bg-blue-100">
-          + Add Sublane
-        </button>
-      )}
+      {/* + Add Sublane removed — drop the Pool/Lane palette symbol on
+          the middle ⅓ of a lane to split into sublanes. */}
 
       {element.type === "lane" && onReorderLane && (() => {
         const siblings = (allElements ?? [])

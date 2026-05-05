@@ -2886,9 +2886,59 @@ function reducer(state: DiagramData, action: Action): DiagramData {
     case "DELETE_ELEMENT": {
       const { id } = action.payload;
       const el = state.elements.find((e) => e.id === id);
-      // Prevent deleting a pool that still has lanes or elements inside
-      if (el?.type === "pool" && state.elements.some((e) => e.parentId === id)) {
-        return state;
+
+      // Quick-delete for Pool / Lane / Sublane / Sub-sublane: when a
+      // container is selected, cascade-delete the WHOLE container
+      // subtree (Pool → Lane → Sublane → …) but leave non-container
+      // children (tasks, events, gateways, data, annotations) intact at
+      // their original positions, with their parentId cleared so they
+      // sit on the canvas without an owner. Pool-level deletion was
+      // previously blocked when the pool had children — now it's
+      // allowed via this cascade path.
+      if (el?.type === "pool" || el?.type === "lane") {
+        // Walk every descendant lane (including sub-sublanes etc.).
+        const containerIds = new Set<string>([id]);
+        const walk = (parentId: string) => {
+          for (const e of state.elements) {
+            if (e.type === "lane" && e.parentId === parentId && !containerIds.has(e.id)) {
+              containerIds.add(e.id);
+              walk(e.id);
+            }
+          }
+        };
+        walk(id);
+
+        // For a Lane with sibling lanes, prefer the existing absorb-into-
+        // sibling model — it preserves the visual layout. Quick-delete
+        // cascade fires only when (a) deleting a Pool, OR (b) deleting a
+        // Lane whose parent has no other lane siblings (so absorption
+        // would have nothing to absorb into).
+        const isPool = el.type === "pool";
+        let useCascade = isPool;
+        if (!isPool && el.parentId) {
+          const siblingLanes = state.elements.filter(
+            (e) => e.type === "lane" && e.parentId === el.parentId && e.id !== id,
+          );
+          if (siblingLanes.length === 0) useCascade = true;
+        }
+
+        if (useCascade) {
+          const elements = state.elements
+            .filter((e) => !containerIds.has(e.id))
+            .filter((e) => !e.boundaryHostId || !containerIds.has(e.boundaryHostId))
+            .map((e) =>
+              e.parentId && containerIds.has(e.parentId)
+                ? { ...e, parentId: undefined }
+                : e,
+            );
+          // Drop any connector whose endpoints referenced one of the
+          // deleted containers (rare — connectors usually go between
+          // tasks/events that survive).
+          const connectors = state.connectors.filter(
+            (c) => !containerIds.has(c.sourceId) && !containerIds.has(c.targetId),
+          );
+          return { ...state, elements, connectors };
+        }
       }
 
       // Identify "orphans" up-front: non-lane elements that lived inside the
