@@ -430,6 +430,22 @@ export function Canvas({
   // new lane will be inserted on release. `kind` controls the colour:
   //   "boundary" → bright green (above-all, between, below-all)
   //   "split"    → light green (split a lane into 2 sublanes)
+  // Auto-connect on/off toggle. When enabled (default), dropping an
+  // element near an existing one triggers BPMN/state-machine auto-
+  // connect; when disabled, drops just place the shape with no
+  // automatic connector. Persisted in localStorage so the choice
+  // survives reloads.
+  const [autoConnectEnabled, setAutoConnectEnabled] = useState<boolean>(() => {
+    if (typeof window === "undefined") return true;
+    const v = window.localStorage.getItem("diagramatix.autoConnect");
+    return v === null ? true : v === "1";
+  });
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("diagramatix.autoConnect", autoConnectEnabled ? "1" : "0");
+    }
+  }, [autoConnectEnabled]);
+
   // Drop-preview line:
   //   "lane"        → bright green  — any LANE insert
   //   "sublane"     → bright blue   — sublane insert (top/bottom/between
@@ -2229,6 +2245,13 @@ export function Canvas({
     symbolType: SymbolType, worldPos: Point,
     taskType?: BpmnTaskType, eventType?: EventType
   ) {
+    // Toggle override: when auto-connect is disabled in the bottom-right
+    // canvas toggle, skip the auto-connect detection entirely and just
+    // place the shape at the drop point.
+    if (!autoConnectEnabled) {
+      onAddElement(symbolType, worldPos, taskType, eventType);
+      return;
+    }
     const BPMN_AUTO_CONNECT_TYPES = new Set<SymbolType>([
       "task", "subprocess", "subprocess-expanded", "gateway",
       "start-event", "intermediate-event", "end-event",
@@ -4999,7 +5022,10 @@ export function Canvas({
         }
 
         return (
-          <div className="absolute bottom-2 right-2 flex items-center gap-1.5 bg-white/90 border border-gray-200 rounded-full px-2 py-1 shadow-sm backdrop-blur-sm z-30 select-none">
+          <div
+            className="absolute bottom-2 flex items-center gap-1.5 bg-white/90 border border-gray-200 rounded-full px-2 py-1 shadow-sm backdrop-blur-sm z-30 select-none"
+            style={{ right: "calc(0.5rem + 156px + 6px)" }}
+          >
             <button
               onClick={() => applyZoomPct(displayPct - 10)}
               className="text-gray-500 hover:text-gray-800 text-xs font-bold w-5 h-5 flex items-center justify-center"
@@ -5033,6 +5059,41 @@ export function Canvas({
           </div>
         );
       })()}
+
+      {/* Auto-connect on/off toggle — sits flush to the right of the
+          canvas, just to the right of the zoom control (the zoom pill is
+          shifted left to make room). Persists across reloads via
+          localStorage. */}
+      <button
+        onClick={() => setAutoConnectEnabled((v) => !v)}
+        className={`absolute bottom-2 right-2 flex items-center gap-1 rounded-full px-2 py-1 shadow-sm backdrop-blur-sm z-30 select-none border text-[11px] font-medium transition-colors ${
+          autoConnectEnabled
+            ? "bg-blue-600 text-white border-blue-600 hover:bg-blue-700"
+            : "bg-white/90 text-gray-600 border-gray-300 hover:bg-gray-50"
+        }`}
+        title={
+          autoConnectEnabled
+            ? "Auto-connect ON — clicking shapes near each other auto-creates a connector. Click to disable."
+            : "Auto-connect OFF — dropped shapes are placed without auto-connectors. Click to enable."
+        }
+      >
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 16 16"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          aria-hidden="true"
+        >
+          <circle cx="3" cy="8" r="2" />
+          <circle cx="13" cy="8" r="2" />
+          <line x1="5" y1="8" x2="11" y2="8" />
+        </svg>
+        Auto-connect: {autoConnectEnabled ? "ON" : "OFF"}
+      </button>
+
       {pendingArchiConn && (
         <ArchimateConnectorPicker
           x={pendingArchiConn.screenX + 6}
