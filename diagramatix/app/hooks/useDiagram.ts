@@ -687,18 +687,22 @@ function getPoolHeaderWidth(pool: DiagramElement): number {
 }
 
 /**
- * Defensive: walk every Pool / Lane / Sublane and ensure its bounding box
- * fully encloses all direct child Lanes / Sublanes. If a child has slipped
- * past the parent's bottom (a lane drop, a label widen, etc.), grow the
- * parent's height to enclose it. Run AFTER any operation that adds or
- * resizes lanes/sublanes so the visual hierarchy stays consistent.
- *
+ * Defensive: walk every container (Pool, Lane, Sublane, subprocess-
+ * expanded) and ensure its bounding box fully encloses every direct child.
+ * Adds an 8-px padding so children aren't flush against the boundary.
  * Bottom-up (deepest descendants first) so a sublane's growth bubbles up
- * to its lane, which then bubbles up to its pool.
+ * to its lane → pool, and a subprocess-expanded's growth bubbles up to
+ * its enclosing lane / pool.
+ *
+ * For pool/lane parents, only LANE-typed children are considered when
+ * computing minimum height — adding a free-floating Task inside a Pool
+ * shouldn't widen the Pool. But for subprocess-expanded parents, ALL
+ * children count (its job IS to wrap whatever sits inside it).
  */
 function ensureContainersEncloseChildren(
   elements: DiagramElement[],
 ): DiagramElement[] {
+  const PAD = 8;
   const childrenByParent = new Map<string, DiagramElement[]>();
   for (const e of elements) {
     if (!e.parentId) continue;
@@ -718,24 +722,27 @@ function ensureContainersEncloseChildren(
     return d;
   };
   const sorted = [...elements].sort((a, b) => depthOf(b.id) - depthOf(a.id));
-  // Mutate a working copy keyed by id.
   const byId = new Map<string, DiagramElement>();
   for (const e of elements) byId.set(e.id, { ...e });
   for (const e of sorted) {
-    if (e.type !== "pool" && e.type !== "lane") continue;
+    if (e.type !== "pool" && e.type !== "lane" && e.type !== "subprocess-expanded") continue;
     const live = byId.get(e.id);
     if (!live) continue;
-    const kids = (childrenByParent.get(e.id) ?? [])
-      .map((c) => byId.get(c.id) ?? c)
-      .filter((c) => c.type === "lane");
+    const allKids = (childrenByParent.get(e.id) ?? []).map((c) => byId.get(c.id) ?? c);
+    // Pool/Lane: ONLY structural children (lanes / sub-lanes) bound the
+    // height. Subprocess-expanded children DO count too — a subprocess
+    // bigger than its parent lane should grow the lane.
+    const kids = e.type === "subprocess-expanded"
+      ? allKids
+      : allKids.filter((c) => c.type === "lane" || c.type === "subprocess-expanded");
     if (kids.length === 0) continue;
     const childBottom = Math.max(...kids.map((c) => c.y + c.height));
-    if (childBottom > live.y + live.height) {
-      live.height = childBottom - live.y;
+    if (childBottom + PAD > live.y + live.height) {
+      live.height = childBottom + PAD - live.y;
     }
     const childRight = Math.max(...kids.map((c) => c.x + c.width));
-    if (childRight > live.x + live.width) {
-      live.width = childRight - live.x;
+    if (childRight + PAD > live.x + live.width) {
+      live.width = childRight + PAD - live.x;
     }
   }
   return elements.map((e) => byId.get(e.id) ?? e);
@@ -1959,7 +1966,10 @@ function reducer(state: DiagramData, action: Action): DiagramData {
 
       // Check if newly dropped element is inside a container
       // For containers dropped inside other containers, use centre-point containment
-      // (they may not fit fully inside). For regular elements, use full bounds.
+      // (they may not fit fully inside). For regular elements, use full bounds —
+      // EXCEPT for subprocess-expanded: drop a Task whose centre is inside the
+      // subprocess and we adopt it even if it pokes past the current bounds.
+      // ensureContainersEncloseChildren below grows the subprocess to enclose it.
       if (!newEl.boundaryHostId) {
         const newCx = newEl.x + newEl.width / 2;
         const newCy = newEl.y + newEl.height / 2;
@@ -1968,7 +1978,7 @@ function reducer(state: DiagramData, action: Action): DiagramData {
           (b) =>
             isContainerType(b.type) &&
             containerAccepts(b.type, newEl.type) &&
-            (isNewContainer
+            (isNewContainer || b.type === "subprocess-expanded"
               ? (newCx >= b.x && newCx <= b.x + b.width && newCy >= b.y && newCy <= b.y + b.height)
               : (newEl.x >= b.x && newEl.x + newEl.width <= b.x + b.width &&
                  newEl.y >= b.y && newEl.y + newEl.height <= b.y + b.height))
@@ -1996,7 +2006,13 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       if (newEl.type === "text-annotation") {
         newEl = autoResizeTextAnnotation(newEl);
       }
-      return { ...state, elements: [...state.elements, newEl] };
+      // Auto-grow any container the new element landed inside (Pool /
+      // Lane / subprocess-expanded). Without this, dropping a Task
+      // inside a tight subprocess-expanded leaves it overlapping the
+      // boundary; the helper grows the subprocess (and bubbles up to
+      // grow the enclosing lane / pool too).
+      const elementsWithNew = ensureContainersEncloseChildren([...state.elements, newEl]);
+      return { ...state, elements: elementsWithNew };
     }
 
     case "MOVE_ELEMENT": {
@@ -2792,6 +2808,12 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       });
       // Validate ALL connectors against ALL elements
       connectors = validateConnectorsAgainstObstacles(connectors, finalElements);
+      // Auto-grow ancestors when a contained element grew. Specifically:
+      // dragging a subprocess-expanded's bottom handle should make the
+      // enclosing lane / pool grow to fit (down AND right). The
+      // bottom-up walk in ensureContainersEncloseChildren handles
+      // arbitrary nesting (subprocess-in-lane-in-pool).
+      finalElements = ensureContainersEncloseChildren(finalElements);
       return { ...state, elements: finalElements, connectors };
     }
 
