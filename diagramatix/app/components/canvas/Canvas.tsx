@@ -620,6 +620,18 @@ export function Canvas({
 
   const [draggingElementId, setDraggingElementId] = useState<string | null>(null);
 
+  // Safety net: clear draggingElementId on any window-level mouseup. The
+  // per-element onMoveEnd handler clears it on normal drops, but if the
+  // drag ends outside the SVG (mouseup fires on a different DOM target,
+  // a focus change interrupts the drag, etc.) the orange containment
+  // indicator can otherwise stay visible. This effect guarantees the
+  // indicator is always dismissed at the end of any drag.
+  useEffect(() => {
+    function onWindowMouseUp() { setDraggingElementId(null); }
+    window.addEventListener("mouseup", onWindowMouseUp);
+    return () => window.removeEventListener("mouseup", onWindowMouseUp);
+  }, []);
+
   // Lasso selection state
   const [lassoRect, setLassoRect] = useState<{ startX: number; startY: number; endX: number; endY: number } | null>(null);
 
