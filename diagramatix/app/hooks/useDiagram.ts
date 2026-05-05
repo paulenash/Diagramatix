@@ -1448,9 +1448,35 @@ function applyEPBoundaryChange(
     updatedEls = r.elements; updatedConns = r.connectors;
   }
 
-  // 5. Re-snap EP boundary events to the new edges (preserving side+frac).
+  // 5. Re-snap EP boundary events on the moving edges only. Events on
+  //    sides that didn't move (even if those sides got longer because
+  //    an adjacent edge moved) keep their absolute position per user
+  //    spec — "only edge-mounted events on the moving boundary should
+  //    move". A boundary event on the TOP edge does NOT slide when the
+  //    user drags the RIGHT edge, even though the top is now wider.
   const newEpEl = updatedEls.find((e) => e.id === epId)!;
-  updatedEls = resnapEPBoundaryEvents(updatedEls, newEpEl, oldRect);
+  const movingSides = new Set<"top" | "bottom" | "left" | "right">();
+  if (growTop !== 0)    movingSides.add("top");
+  if (growBottom !== 0) movingSides.add("bottom");
+  if (growLeft !== 0)   movingSides.add("left");
+  if (growRight !== 0)  movingSides.add("right");
+  updatedEls = resnapEPBoundaryEvents(updatedEls, newEpEl, oldRect, movingSides);
+
+  // Capture the enclosing pool's PRE-change rect from the INPUT
+  // `elements` array — must be the rect BEFORE step 5b's explicit
+  // ancestor grow, otherwise the cascade deltas (computed against
+  // this rect at step 9) miss the explicit grow and only see the
+  // additional ensure/buffer growth, leaving sibling pools
+  // un-shifted in lockstep.
+  let enclosingPoolBefore: DiagramElement | null = null;
+  {
+    let walk: DiagramElement | undefined = elements.find((e) => e.id === ep0.parentId);
+    while (walk) {
+      if (walk.type === "pool") { enclosingPoolBefore = { ...walk }; break; }
+      if (!walk.parentId) break;
+      walk = elements.find((e) => e.id === walk!.parentId);
+    }
+  }
 
   // 5b. Explicitly grow each EP ancestor (lane / sublane / pool) by the
   //     EP's grow on each axis so their boundaries track the EP exactly.
@@ -1484,15 +1510,8 @@ function applyEPBoundaryChange(
     });
   }
 
-  // 6. Capture the enclosing pool's PRE-bubble rect so we can compute
-  //    cascade deltas after enclose + buffer have grown it.
-  let enclosingPoolBefore: DiagramElement | null = null;
-  let walk: DiagramElement | undefined = updatedEls.find((e) => e.id === ep0.parentId);
-  while (walk) {
-    if (walk.type === "pool") { enclosingPoolBefore = { ...walk }; break; }
-    if (!walk.parentId) break;
-    walk = updatedEls.find((e) => e.id === walk!.parentId);
-  }
+  // (enclosingPoolBefore captured earlier, before step 5b, so cascade
+  //  deltas reflect the FULL pool growth including the explicit grow.)
 
   // 7. Bubble the EP's growth up through Lane / Sublane / Pool.
   updatedEls = ensureContainersEncloseChildren(updatedEls);
@@ -1566,19 +1585,25 @@ function applyEPBoundaryChange(
 
 /** After an EP is resized, walk every boundary event whose
  *  `boundaryHostId` is the EP and re-snap it to the new bounds while
- *  preserving its (side, frac) along the edge — so events on the LEFT
- *  edge stay on the LEFT, events on the RIGHT edge slide right with
- *  the edge, etc. */
+ *  preserving its (side, frac) along the edge — but ONLY for events
+ *  on the moving sides (per user spec: "only edge-mounted events on
+ *  the moving boundary should move"). Events on the two sides
+ *  adjacent to the moving edge (which lengthen as a side-effect)
+ *  retain their absolute position; the next re-snap will derive a
+ *  fresh frac from their current centre. */
 function resnapEPBoundaryEvents(
   elements: DiagramElement[],
   ep: DiagramElement,
   oldEpRect: { x: number; y: number; width: number; height: number },
+  movingSides: Set<"top" | "bottom" | "left" | "right">,
 ): DiagramElement[] {
+  if (movingSides.size === 0) return elements;
   return elements.map((e) => {
     if (e.boundaryHostId !== ep.id) return e;
     const cx = e.x + e.width / 2;
     const cy = e.y + e.height / 2;
     const { side, frac } = boundaryEdgeOf({ x: cx, y: cy }, oldEpRect);
+    if (!movingSides.has(side)) return e;
     const f = Math.max(0, Math.min(1, frac));
     let ncx: number, ncy: number;
     switch (side) {
