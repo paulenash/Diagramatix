@@ -338,7 +338,15 @@ function getAllDescendantIds(elements: DiagramElement[], containerId: string): S
   while (queue.length) {
     const id = queue.shift()!;
     for (const e of elements) {
-      if (e.parentId === id && !result.has(e.id)) { result.add(e.id); queue.push(e.id); }
+      // Walk BOTH the parent-child edge AND the boundary-host edge so a
+      // boundary event whose host is inside this container is treated
+      // as a descendant. Without the boundaryHostId branch, dragging a
+      // Lane / Pool that contains a Task with a boundary error event
+      // would leave the boundary event behind.
+      if ((e.parentId === id || e.boundaryHostId === id) && !result.has(e.id)) {
+        result.add(e.id);
+        queue.push(e.id);
+      }
     }
   }
   return result;
@@ -659,6 +667,12 @@ function computeMsgBpmnLabelOffsets(
  * tasks/events/etc. living inside them) down by `deltaY`. Used when an
  * insert grows a pool — pushing only the top-level lane while leaving its
  * sublanes behind would visually disconnect the lane from its contents.
+ *
+ * Walks BOTH the parent-child edge AND the boundary-host edge so any
+ * boundary event whose host is inside the shifting subtree follows it —
+ * boundary events have parentId=host.parentId, so a host-only `parentId`
+ * walk would miss boundary events of hosts whose parentId chain doesn't
+ * directly include a moved root.
  */
 function shiftLaneSubtreesDown(
   elements: DiagramElement[],
@@ -671,13 +685,174 @@ function shiftLaneSubtreesDown(
   while (changed) {
     changed = false;
     for (const e of elements) {
-      if (e.parentId && all.has(e.parentId) && !all.has(e.id)) {
+      if (
+        !all.has(e.id) &&
+        (
+          (e.parentId && all.has(e.parentId)) ||
+          (e.boundaryHostId && all.has(e.boundaryHostId))
+        )
+      ) {
         all.add(e.id);
         changed = true;
       }
     }
   }
   return elements.map((e) => (all.has(e.id) ? { ...e, y: e.y + deltaY } : e));
+}
+
+/**
+ * Mirror of `shiftLaneSubtreesDown` along the X axis. Used by the EP
+ * boundary-aware growth for left-edge drops, which keep the EP's left
+ * edge fixed and slide every existing EP child rightward.
+ */
+function shiftSubtreesByX(
+  elements: DiagramElement[],
+  rootIds: Set<string>,
+  deltaX: number,
+): DiagramElement[] {
+  if (rootIds.size === 0 || deltaX === 0) return elements;
+  const all = new Set<string>(rootIds);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const e of elements) {
+      if (
+        !all.has(e.id) &&
+        (
+          (e.parentId && all.has(e.parentId)) ||
+          (e.boundaryHostId && all.has(e.boundaryHostId))
+        )
+      ) {
+        all.add(e.id);
+        changed = true;
+      }
+    }
+  }
+  return elements.map((e) => (all.has(e.id) ? { ...e, x: e.x + deltaX } : e));
+}
+
+/**
+ * Detect whether `newEl`'s drop position is near OR on a boundary of an
+ * Expanded Subprocess `epId`, and if so, grow the EP in that direction
+ * (by 2× the new element's dimension on the affected axis), shift any
+ * existing children clear, and return the placement coordinates for the
+ * new element. Returns `null` if the drop is comfortably interior — the
+ * caller's existing flow + `ensureContainersEncloseChildren` handles
+ * those cases.
+ *
+ * Growth rules (per user spec):
+ *   - LEFT edge:   keep ep.x fixed, grow width by 2*newW; shift every
+ *                   EP descendant right by newW + PAD; place newEl at
+ *                   ep.x + PAD.
+ *   - TOP edge:    keep ep.y fixed, grow height by 2*newH; shift every
+ *                   EP descendant down by newH + PAD; place newEl at
+ *                   ep.y + PAD.
+ *   - RIGHT edge:  grow width by 2*newW (no shift); place newEl at
+ *                   ep.x + ep.width' - newW - PAD.
+ *   - BOTTOM edge: grow height by 2*newH (no shift); place newEl at
+ *                   ep.y + ep.height' - newH - PAD.
+ *
+ * Tie-break for corner drops: smallest perpendicular distance wins;
+ * fully-symmetric ties go LEFT > TOP > RIGHT > BOTTOM.
+ */
+function expandEPForBoundaryEntry(
+  elements: DiagramElement[],
+  epId: string,
+  newEl: { id?: string; x: number; y: number; width: number; height: number },
+  threshold: number = 30,
+): { elements: DiagramElement[]; placedX: number; placedY: number } | null {
+  const ep = elements.find((e) => e.id === epId);
+  if (!ep || ep.type !== "subprocess-expanded") return null;
+
+  const PAD = 16;
+  const cx = newEl.x + newEl.width / 2;
+  const cy = newEl.y + newEl.height / 2;
+
+  // Perpendicular distance from newEl's centre to each EP edge.
+  const distLeft   = Math.abs(cx - ep.x);
+  const distRight  = Math.abs(ep.x + ep.width - cx);
+  const distTop    = Math.abs(cy - ep.y);
+  const distBottom = Math.abs(ep.y + ep.height - cy);
+
+  // Straddle: newEl's bounding box crosses the edge line.
+  const straddleLeft   = newEl.x < ep.x && newEl.x + newEl.width > ep.x;
+  const straddleRight  = newEl.x < ep.x + ep.width && newEl.x + newEl.width > ep.x + ep.width;
+  const straddleTop    = newEl.y < ep.y && newEl.y + newEl.height > ep.y;
+  const straddleBottom = newEl.y < ep.y + ep.height && newEl.y + newEl.height > ep.y + ep.height;
+
+  // Pick the affected edge: closest by perpendicular distance, but only
+  // if either distance ≤ threshold or there's a straddle on that edge.
+  type Edge = "left" | "top" | "right" | "bottom";
+  const candidates: { edge: Edge; dist: number; straddle: boolean }[] = ([
+    { edge: "left"   as Edge, dist: distLeft,   straddle: straddleLeft   },
+    { edge: "top"    as Edge, dist: distTop,    straddle: straddleTop    },
+    { edge: "right"  as Edge, dist: distRight,  straddle: straddleRight  },
+    { edge: "bottom" as Edge, dist: distBottom, straddle: straddleBottom },
+  ]).filter((c) => c.dist <= threshold || c.straddle);
+  if (candidates.length === 0) return null;
+
+  // Sort by distance ascending; ties keep insertion order (LEFT > TOP > RIGHT > BOTTOM).
+  candidates.sort((a, b) => a.dist - b.dist);
+  const winner = candidates[0].edge;
+
+  // Compute growth + collect EP descendants for shifting. If `newEl.id`
+  // is supplied (MOVE_ELEMENT case where the moving shape is already in
+  // `elements` with parentId pointing at the EP), exclude it from the
+  // descendant set so it isn't double-shifted alongside the placement
+  // we're about to assign.
+  const epDescendants = new Set<string>();
+  {
+    const stack = [ep.id];
+    while (stack.length) {
+      const cur = stack.pop()!;
+      for (const e of elements) {
+        if (e.id === ep.id) continue;
+        if (newEl.id && e.id === newEl.id) continue;
+        if ((e.parentId === cur || e.boundaryHostId === cur) && !epDescendants.has(e.id)) {
+          epDescendants.add(e.id);
+          stack.push(e.id);
+        }
+      }
+    }
+  }
+
+  let updated = elements.slice();
+  let placedX = newEl.x;
+  let placedY = newEl.y;
+
+  if (winner === "left") {
+    const growth = 2 * newEl.width;
+    updated = updated.map((e) =>
+      e.id === ep.id ? { ...e, width: e.width + growth } : e,
+    );
+    updated = shiftSubtreesByX(updated, epDescendants, newEl.width + PAD);
+    placedX = ep.x + PAD;
+    placedY = Math.max(ep.y + PAD, Math.min(newEl.y, ep.y + ep.height - newEl.height - PAD));
+  } else if (winner === "right") {
+    const growth = 2 * newEl.width;
+    updated = updated.map((e) =>
+      e.id === ep.id ? { ...e, width: e.width + growth } : e,
+    );
+    placedX = ep.x + ep.width + growth - newEl.width - PAD;
+    placedY = Math.max(ep.y + PAD, Math.min(newEl.y, ep.y + ep.height - newEl.height - PAD));
+  } else if (winner === "top") {
+    const growth = 2 * newEl.height;
+    updated = updated.map((e) =>
+      e.id === ep.id ? { ...e, height: e.height + growth } : e,
+    );
+    updated = shiftLaneSubtreesDown(updated, epDescendants, newEl.height + PAD);
+    placedX = Math.max(ep.x + PAD, Math.min(newEl.x, ep.x + ep.width - newEl.width - PAD));
+    placedY = ep.y + PAD;
+  } else { // bottom
+    const growth = 2 * newEl.height;
+    updated = updated.map((e) =>
+      e.id === ep.id ? { ...e, height: e.height + growth } : e,
+    );
+    placedX = Math.max(ep.x + PAD, Math.min(newEl.x, ep.x + ep.width - newEl.width - PAD));
+    placedY = ep.y + ep.height + growth - newEl.height - PAD;
+  }
+
+  return { elements: updated, placedX, placedY };
 }
 
 /** Read a pool's effective header width (stored property override, else 36). */
@@ -2006,12 +2181,35 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       if (newEl.type === "text-annotation") {
         newEl = autoResizeTextAnnotation(newEl);
       }
+
+      // EP boundary-aware growth: if the new element's parent is an
+      // Expanded Subprocess AND the drop position is near (or straddling)
+      // one of the EP's edges, grow the EP by 2× the new element's
+      // dimension on that axis. For LEFT/TOP edges, also shift every
+      // existing EP descendant clear so the new element fits at the
+      // original edge. For RIGHT/BOTTOM edges, just grow outward.
+      let workingElements = state.elements;
+      if (
+        newEl.parentId &&
+        !newEl.boundaryHostId &&
+        !BOUNDARY_EVENT_TYPES.has(newEl.type)
+      ) {
+        const parent = workingElements.find((e) => e.id === newEl.parentId);
+        if (parent?.type === "subprocess-expanded") {
+          const grown = expandEPForBoundaryEntry(workingElements, parent.id, newEl);
+          if (grown) {
+            workingElements = grown.elements;
+            newEl = { ...newEl, x: grown.placedX, y: grown.placedY };
+          }
+        }
+      }
+
       // Auto-grow any container the new element landed inside (Pool /
       // Lane / subprocess-expanded). Without this, dropping a Task
       // inside a tight subprocess-expanded leaves it overlapping the
       // boundary; the helper grows the subprocess (and bubbles up to
       // grow the enclosing lane / pool too).
-      const elementsWithNew = ensureContainersEncloseChildren([...state.elements, newEl]);
+      const elementsWithNew = ensureContainersEncloseChildren([...workingElements, newEl]);
       return { ...state, elements: elementsWithNew };
     }
 
@@ -2408,6 +2606,39 @@ function reducer(state: DiagramData, action: Action): DiagramData {
           }
         }
       }
+
+      // EP boundary-aware growth on move-into. If the moved element was
+      // re-parented to a subprocess-expanded AND its NEW position is near
+      // (or straddling) one of the EP's edges, grow the EP and reposition
+      // the moved element. Excluding the moved id from the shift set
+      // prevents double-shifting it alongside the placement we then
+      // assign.
+      {
+        const moved = elements.find((e) => e.id === id);
+        if (
+          moved?.parentId &&
+          !moved.boundaryHostId &&
+          !BOUNDARY_EVENT_TYPES.has(moved.type)
+        ) {
+          const parent = elements.find((e) => e.id === moved.parentId);
+          if (parent?.type === "subprocess-expanded") {
+            const grown = expandEPForBoundaryEntry(elements, parent.id, {
+              id: moved.id,
+              x: moved.x,
+              y: moved.y,
+              width: moved.width,
+              height: moved.height,
+            });
+            if (grown) {
+              elements = grown.elements.map((e) =>
+                e.id === id ? { ...e, x: grown.placedX, y: grown.placedY } : e,
+              );
+            }
+          }
+        }
+      }
+      // Bubble any EP / lane / pool growth up through the container chain.
+      elements = ensureContainersEncloseChildren(elements);
 
       return { ...state, elements: updatePoolTypes(elements), connectors };
     }
