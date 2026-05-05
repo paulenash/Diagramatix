@@ -834,6 +834,240 @@ function shiftElementsPastLine(
   });
 }
 
+/**
+ * Span-aware variant of `shiftElementsPastLine`: only shift roots whose
+ * perpendicular projection overlaps `[spanMin, spanMax]`. Used by EP
+ * boundary growth to ensure the bulk shift only touches elements
+ * actually in the path of the moving boundary (issue 5: never elements
+ * well away from the moving boundary). Span check applies to ROOTS
+ * only — descendants/boundary events of a moving root come along
+ * regardless of their span.
+ */
+function shiftElementsPastLineWithinSpan(
+  elements: DiagramElement[],
+  shiftAxis: "x" | "y",
+  line: number,
+  delta: number,
+  spanMin: number,
+  spanMax: number,
+  excludeIds: Set<string>,
+): DiagramElement[] {
+  if (delta === 0) return elements;
+  const roots = new Set<string>();
+  for (const e of elements) {
+    if (excludeIds.has(e.id)) continue;
+    const edge = shiftAxis === "x" ? e.x : e.y;
+    if (edge < line) continue;
+    const perpMin = shiftAxis === "x" ? e.y : e.x;
+    const perpMax = shiftAxis === "x" ? e.y + e.height : e.x + e.width;
+    if (perpMax <= spanMin || perpMin >= spanMax) continue;
+    roots.add(e.id);
+  }
+  const all = new Set<string>(roots);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const e of elements) {
+      if (excludeIds.has(e.id) || all.has(e.id)) continue;
+      if (
+        (e.parentId && all.has(e.parentId)) ||
+        (e.boundaryHostId && all.has(e.boundaryHostId))
+      ) {
+        all.add(e.id);
+        changed = true;
+      }
+    }
+  }
+  return elements.map((e) => {
+    if (!all.has(e.id)) return e;
+    return shiftAxis === "x" ? { ...e, x: e.x + delta } : { ...e, y: e.y + delta };
+  });
+}
+
+/** Span-aware variant of `shiftElementsBeforeLine`. */
+function shiftElementsBeforeLineWithinSpan(
+  elements: DiagramElement[],
+  shiftAxis: "x" | "y",
+  line: number,
+  delta: number,
+  spanMin: number,
+  spanMax: number,
+  excludeIds: Set<string>,
+): DiagramElement[] {
+  if (delta === 0) return elements;
+  const roots = new Set<string>();
+  for (const e of elements) {
+    if (excludeIds.has(e.id)) continue;
+    const farEdge = shiftAxis === "x" ? e.x + e.width : e.y + e.height;
+    if (farEdge > line) continue;
+    const perpMin = shiftAxis === "x" ? e.y : e.x;
+    const perpMax = shiftAxis === "x" ? e.y + e.height : e.x + e.width;
+    if (perpMax <= spanMin || perpMin >= spanMax) continue;
+    roots.add(e.id);
+  }
+  const all = new Set<string>(roots);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const e of elements) {
+      if (excludeIds.has(e.id) || all.has(e.id)) continue;
+      if (
+        (e.parentId && all.has(e.parentId)) ||
+        (e.boundaryHostId && all.has(e.boundaryHostId))
+      ) {
+        all.add(e.id);
+        changed = true;
+      }
+    }
+  }
+  return elements.map((e) => {
+    if (!all.has(e.id)) return e;
+    return shiftAxis === "x" ? { ...e, x: e.x + delta } : { ...e, y: e.y + delta };
+  });
+}
+
+/** Span-aware variant of `shiftConnectorWaypointsPastLine`: only shifts
+ *  waypoints whose perpendicular coord is within `[spanMin, spanMax]`. */
+function shiftConnectorWaypointsPastLineWithinSpan(
+  connectors: Connector[],
+  shiftAxis: "x" | "y",
+  line: number,
+  delta: number,
+  spanMin: number,
+  spanMax: number,
+): Connector[] {
+  if (delta === 0) return connectors;
+  return connectors.map((conn) => ({
+    ...conn,
+    waypoints: conn.waypoints.map((wp) => {
+      const v = shiftAxis === "x" ? wp.x : wp.y;
+      if (v < line) return wp;
+      const perp = shiftAxis === "x" ? wp.y : wp.x;
+      if (perp <= spanMin || perp >= spanMax) return wp;
+      return shiftAxis === "x" ? { x: wp.x + delta, y: wp.y } : { x: wp.x, y: wp.y + delta };
+    }),
+  }));
+}
+
+/**
+ * When a Subprocess-Expanded is MOVED (translated, not resized), push
+ * any outside element whose closest boundary is within `proximity` px
+ * of the EP's leading edge in the direction of the move (issue 4).
+ * "Leading edge" = the EP edge facing the move direction (bottom for
+ * dy > 0, top for dy < 0, etc.). Span check on the perpendicular axis
+ * keeps us from pushing elements far off to the side (issue 5).
+ *
+ * Excludes the EP itself, all EP descendants, and any boundary events
+ * of the EP / its descendants (these all move with the EP already).
+ */
+function pushOutsideElementsForEPMove(
+  elements: DiagramElement[],
+  connectors: Connector[],
+  epId: string,
+  newEpRect: { x: number; y: number; width: number; height: number },
+  dx: number,
+  dy: number,
+  proximity: number = 30,
+): { elements: DiagramElement[]; connectors: Connector[] } {
+  if (dx === 0 && dy === 0) return { elements, connectors };
+  const epDescIds = getAllDescendantIds(elements, epId);
+  const skipIds = new Set<string>([epId, ...epDescIds]);
+  // Also skip boundary events of EP descendants — they ride with their host.
+  for (const e of elements) {
+    if (e.boundaryHostId && skipIds.has(e.boundaryHostId)) skipIds.add(e.id);
+  }
+  const epLeft = newEpRect.x;
+  const epRight = newEpRect.x + newEpRect.width;
+  const epTop = newEpRect.y;
+  const epBottom = newEpRect.y + newEpRect.height;
+  const pushIds = new Set<string>();
+  for (const e of elements) {
+    if (skipIds.has(e.id)) continue;
+    // Skip pools/lanes — they're container ancestors of/around the EP,
+    // not "outside elements" in the user's sense.
+    if (e.type === "pool" || e.type === "lane" || e.type === "sublane") continue;
+    let inProximity = false;
+    if (dy > 0) {
+      const horizOverlap = e.x + e.width > epLeft && e.x < epRight;
+      const dist = e.y - epBottom;
+      if (horizOverlap && dist <= proximity && dist >= -e.height) inProximity = true;
+    }
+    if (!inProximity && dy < 0) {
+      const horizOverlap = e.x + e.width > epLeft && e.x < epRight;
+      const dist = epTop - (e.y + e.height);
+      if (horizOverlap && dist <= proximity && dist >= -e.height) inProximity = true;
+    }
+    if (!inProximity && dx > 0) {
+      const vertOverlap = e.y + e.height > epTop && e.y < epBottom;
+      const dist = e.x - epRight;
+      if (vertOverlap && dist <= proximity && dist >= -e.width) inProximity = true;
+    }
+    if (!inProximity && dx < 0) {
+      const vertOverlap = e.y + e.height > epTop && e.y < epBottom;
+      const dist = epLeft - (e.x + e.width);
+      if (vertOverlap && dist <= proximity && dist >= -e.width) inProximity = true;
+    }
+    if (inProximity) pushIds.add(e.id);
+  }
+  if (pushIds.size === 0) return { elements, connectors };
+  // Carry descendants + boundary events of pushed roots along.
+  const all = new Set<string>(pushIds);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const e of elements) {
+      if (skipIds.has(e.id) || all.has(e.id)) continue;
+      if (
+        (e.parentId && all.has(e.parentId)) ||
+        (e.boundaryHostId && all.has(e.boundaryHostId))
+      ) {
+        all.add(e.id);
+        changed = true;
+      }
+    }
+  }
+  const newElements = elements.map((e) =>
+    all.has(e.id) ? { ...e, x: e.x + dx, y: e.y + dy } : e,
+  );
+  const newConnectors = connectors.map((conn) => {
+    const srcIn = all.has(conn.sourceId);
+    const tgtIn = all.has(conn.targetId);
+    if (srcIn && tgtIn) {
+      return {
+        ...conn,
+        waypoints: conn.waypoints.map((wp) => ({ x: wp.x + dx, y: wp.y + dy })),
+      };
+    }
+    if (srcIn || tgtIn) {
+      return recomputeAllConnectors([conn], newElements)[0] ?? conn;
+    }
+    return conn;
+  });
+  return { elements: newElements, connectors: newConnectors };
+}
+
+/** Span-aware variant of `shiftConnectorWaypointsBeforeLine`. */
+function shiftConnectorWaypointsBeforeLineWithinSpan(
+  connectors: Connector[],
+  shiftAxis: "x" | "y",
+  line: number,
+  delta: number,
+  spanMin: number,
+  spanMax: number,
+): Connector[] {
+  if (delta === 0) return connectors;
+  return connectors.map((conn) => ({
+    ...conn,
+    waypoints: conn.waypoints.map((wp) => {
+      const v = shiftAxis === "x" ? wp.x : wp.y;
+      if (v > line) return wp;
+      const perp = shiftAxis === "x" ? wp.y : wp.x;
+      if (perp <= spanMin || perp >= spanMax) return wp;
+      return shiftAxis === "x" ? { x: wp.x + delta, y: wp.y } : { x: wp.x, y: wp.y + delta };
+    }),
+  }));
+}
+
 /** Shift any connector waypoint whose coord is at-or-past `line` along
  *  `axis` by `delta`. Used in tandem with `shiftElementsPastLine` so
  *  free-floating connector segments don't get left behind. */
@@ -915,14 +1149,12 @@ function shiftConnectorWaypointsBeforeLine(
 }
 
 /**
- * After EP boundary growth has cascaded up through ensureContainersEncloseChildren
- * to widen / heighten the enclosing pool, ensure there's at least
- * ½ × default-Task buffer between the deepest EP edge and the pool's
- * boundary on the axes that grew (user rule for cascade events).
- *
- *  - bufW / bufH = the desired minimum gap (51 px / 33 px = ½ × 102 / 65).
- *  - applyW / applyH = whether to enforce the buffer on that axis (the
- *    caller passes true only for axes that actually grew).
+ * Whenever EP-related geometry changes (drop, move-in, resize), ensure
+ * there's at least ½ × default-Task buffer between the deepest EP edge
+ * (within this pool) and the pool's boundary on each axis. If the
+ * current gap is already >= the buffer, the pool is left alone (no
+ * shrink). This is what triggers the pool to follow when an EP edge
+ * gets to within 33 px / 51 px of the pool boundary (user issue 3).
  *
  * Width buffer: pool + ALL lane / sublane descendants widen so lane
  * boundaries stay flush with the wider pool. Height buffer: pool plus
@@ -935,10 +1167,7 @@ function ensurePoolBufferFromEPs(
   poolId: string,
   bufW: number,
   bufH: number,
-  applyW: boolean,
-  applyH: boolean,
 ): DiagramElement[] {
-  if (!applyW && !applyH) return elements;
   const pool = elements.find((e) => e.id === poolId);
   if (!pool || pool.type !== "pool") return elements;
   const descIds = getAllDescendantIds(elements, poolId);
@@ -956,8 +1185,8 @@ function ensurePoolBufferFromEPs(
   if (!hasEP) return elements;
   const currentRightGap = pool.x + pool.width - maxEpRight;
   const currentBottomGap = pool.y + pool.height - maxEpBottom;
-  const dW = applyW && currentRightGap < bufW ? bufW - currentRightGap : 0;
-  const dH = applyH && currentBottomGap < bufH ? bufH - currentBottomGap : 0;
+  const dW = currentRightGap < bufW ? bufW - currentRightGap : 0;
+  const dH = currentBottomGap < bufH ? bufH - currentBottomGap : 0;
   if (dW <= 0 && dH <= 0) return elements;
 
   const widenIds = new Set<string>([poolId]);
@@ -1110,11 +1339,17 @@ function expandEPForBoundaryEntry(
   const distTop    = Math.abs(cy - ep.y);
   const distBottom = Math.abs(ep.y + ep.height - cy);
 
-  // Straddle: newEl's bounding box crosses the edge line.
-  const straddleLeft   = newEl.x < ep.x && newEl.x + newEl.width > ep.x;
-  const straddleRight  = newEl.x < ep.x + ep.width && newEl.x + newEl.width > ep.x + ep.width;
-  const straddleTop    = newEl.y < ep.y && newEl.y + newEl.height > ep.y;
-  const straddleBottom = newEl.y < ep.y + ep.height && newEl.y + newEl.height > ep.y + ep.height;
+  // Straddle: newEl's bounding box crosses the edge line AND the
+  // perpendicular projection overlaps the EP — without the
+  // perpendicular-overlap guard, an element far to the right whose
+  // y-range happens to cross the EP top would be treated as straddling
+  // TOP, and we'd grow the EP for an element nowhere near it.
+  const xOverlap = newEl.x < ep.x + ep.width && newEl.x + newEl.width > ep.x;
+  const yOverlap = newEl.y < ep.y + ep.height && newEl.y + newEl.height > ep.y;
+  const straddleLeft   = yOverlap && newEl.x < ep.x && newEl.x + newEl.width > ep.x;
+  const straddleRight  = yOverlap && newEl.x < ep.x + ep.width && newEl.x + newEl.width > ep.x + ep.width;
+  const straddleTop    = xOverlap && newEl.y < ep.y && newEl.y + newEl.height > ep.y;
+  const straddleBottom = xOverlap && newEl.y < ep.y + ep.height && newEl.y + newEl.height > ep.y + ep.height;
 
   type Edge = "left" | "top" | "right" | "bottom";
   const candidates: { edge: Edge; dist: number; straddle: boolean }[] = ([
@@ -1171,7 +1406,10 @@ function expandEPForBoundaryEntry(
 
   // Helper: bulk-shift a set of internal elements + their connectors by
   // (dx, dy). Connectors that have BOTH endpoints in the set translate
-  // uniformly; partial connectors are recomputed downstream.
+  // uniformly; PARTIAL connectors (one end in the set, one outside the
+  // EP) are recomputed so their route follows the new layout — without
+  // this, an outside-to-inside association is left behind when its
+  // inside endpoint moves (issue 1).
   const shiftInternal = (dx: number, dy: number) => {
     if (dx === 0 && dy === 0) return;
     updatedEls = updatedEls.map((e) =>
@@ -1185,6 +1423,9 @@ function expandEPForBoundaryEntry(
           ...conn,
           waypoints: conn.waypoints.map((wp) => ({ x: wp.x + dx, y: wp.y + dy })),
         };
+      }
+      if (srcIn || tgtIn) {
+        return recomputeAllConnectors([conn], updatedEls)[0] ?? conn;
       }
       return conn;
     });
@@ -1209,9 +1450,10 @@ function expandEPForBoundaryEntry(
   }
   else if (winner === "bottom") {
     // Place at user's drop position; grow only as needed to leave bufH
-    // buffer on the bottom; shift everything past the OLD bottom down by
-    // the growth (this is OUTSIDE-the-EP movement only — internal
-    // elements stay put because BOTTOM growth doesn't crowd them).
+    // buffer on the bottom. Shift OUTSIDE elements past the OLD bottom
+    // down by `growth` ONLY if their x-projection overlaps the EP's
+    // x-span — issue 5: never shift elements well away from the
+    // moving boundary.
     placedX = Math.max(ep.x + bufW, Math.min(newEl.x, ep.x + ep.width - newEl.width - bufW));
     placedY = Math.max(ep.y + bufH, newEl.y);
     const newBottomEdge = Math.max(ep.y + ep.height, placedY + newEl.height + bufH);
@@ -1222,8 +1464,8 @@ function expandEPForBoundaryEntry(
         e.id === ep.id ? { ...e, height: newHeight } : e,
       );
       const oldBottom = ep.y + ep.height;
-      updatedEls = shiftElementsPastLine(updatedEls, "y", oldBottom, growth, exclude);
-      updatedConns = shiftConnectorWaypointsPastLine(updatedConns, "y", oldBottom, growth);
+      updatedEls = shiftElementsPastLineWithinSpan(updatedEls, "y", oldBottom, growth, ep.x, ep.x + ep.width, exclude);
+      updatedConns = shiftConnectorWaypointsPastLineWithinSpan(updatedConns, "y", oldBottom, growth, ep.x, ep.x + ep.width);
     }
     const newEpRect = { x: ep.x, y: ep.y, width: ep.width, height: newHeight };
     const newEpEl = { ...ep, ...newEpRect };
@@ -1232,10 +1474,9 @@ function expandEPForBoundaryEntry(
   else if (winner === "left") {
     // Keep EP's left edge fixed; place new element at ep.x + bufW; grow
     // EP rightward by 1.5*newW. Shift ALL existing internal elements
-    // right by `growth` so they stay clear of the new element (user
-    // rule: "everything in the EP must move", not just past-line). Then
-    // shift external elements past the EP's old right by the same
-    // growth so the outside-stays-outside invariant holds.
+    // right by `growth` (issue 6: "everything in the EP must move",
+    // not just past-line). Shift OUTSIDE elements past the EP's old
+    // right ONLY if their y-projection overlaps the EP's y-span.
     placedX = ep.x + bufW;
     placedY = Math.max(ep.y + bufH, Math.min(newEl.y, ep.y + ep.height - newEl.height - bufH));
     const growth = newEl.width + bufW; // 1.5 * newW
@@ -1245,8 +1486,8 @@ function expandEPForBoundaryEntry(
     );
     shiftInternal(growth, 0);
     const oldRight = ep.x + ep.width;
-    updatedEls = shiftElementsPastLine(updatedEls, "x", oldRight, growth, exclude);
-    updatedConns = shiftConnectorWaypointsPastLine(updatedConns, "x", oldRight, growth);
+    updatedEls = shiftElementsPastLineWithinSpan(updatedEls, "x", oldRight, growth, ep.y, ep.y + ep.height, exclude);
+    updatedConns = shiftConnectorWaypointsPastLineWithinSpan(updatedConns, "x", oldRight, growth, ep.y, ep.y + ep.height);
     const newEpRect = { x: ep.x, y: ep.y, width: newWidth, height: ep.height };
     const newEpEl = { ...ep, ...newEpRect };
     updatedEls = resnapEPBoundaryEvents(updatedEls, newEpEl, oldEpRect);
@@ -1254,10 +1495,8 @@ function expandEPForBoundaryEntry(
   else { // top
     // Keep EP's top edge fixed; place new element at ep.y + bufH; grow
     // EP downward by 1.5*newH. Shift ALL existing internal elements
-    // down by `growth` (user spec issue 6: "everything in the EP must
-    // move down, not just items strictly below it"). Also shift
-    // external elements past the EP's old bottom down by `growth` so
-    // the outside-stays-outside invariant holds.
+    // down by `growth`. Shift OUTSIDE elements past the EP's old
+    // bottom ONLY if their x-projection overlaps the EP's x-span.
     placedX = Math.max(ep.x + bufW, Math.min(newEl.x, ep.x + ep.width - newEl.width - bufW));
     placedY = ep.y + bufH;
     const growth = newEl.height + bufH; // 1.5 * newH
@@ -1267,18 +1506,18 @@ function expandEPForBoundaryEntry(
     );
     shiftInternal(0, growth);
     const oldBottom = ep.y + ep.height;
-    updatedEls = shiftElementsPastLine(updatedEls, "y", oldBottom, growth, exclude);
-    updatedConns = shiftConnectorWaypointsPastLine(updatedConns, "y", oldBottom, growth);
+    updatedEls = shiftElementsPastLineWithinSpan(updatedEls, "y", oldBottom, growth, ep.x, ep.x + ep.width, exclude);
+    updatedConns = shiftConnectorWaypointsPastLineWithinSpan(updatedConns, "y", oldBottom, growth, ep.x, ep.x + ep.width);
     const newEpRect = { x: ep.x, y: ep.y, width: ep.width, height: newHeight };
     const newEpEl = { ...ep, ...newEpRect };
     updatedEls = resnapEPBoundaryEvents(updatedEls, newEpEl, oldEpRect);
   }
 
-  // Recompute every connector attached to the EP itself OR an EP-direct
-  // boundary event. The EP rect changed (issue 1: connectors anchored to
+  // Recompute every connector attached to the EP itself, an EP-direct
+  // boundary event, OR any EP descendant whose route now needs
+  // refreshing. The EP rect changed (issue 1: connectors anchored to
   // the EP's own edges need their endpoints re-derived), and re-snapped
-  // boundary events have new (side, frac) attachment points (issue 2:
-  // bulk waypoint shift only translates, doesn't re-derive endpoints).
+  // boundary events have new (side, frac) attachment points.
   const epRecomputeIds = new Set<string>([ep.id, ...epDirectBoundaryIds]);
   updatedConns = updatedConns.map((conn) => {
     if (epRecomputeIds.has(conn.sourceId) || epRecomputeIds.has(conn.targetId)) {
@@ -2599,12 +2838,24 @@ function reducer(state: DiagramData, action: Action): DiagramData {
             if (b.type === "subprocess-expanded") {
               if (centreInside) return true;
               if (isEventLike) return false;
-              const straddle =
+              // True straddle: bounds cross an EP edge AND the element's
+              // perpendicular projection overlaps the EP. Without the
+              // perpendicular-overlap guard, an element placed FAR to the
+              // right of the EP whose y-range (incidentally) crosses
+              // the EP top edge would be treated as straddling — and
+              // expandEPForBoundaryEntry would grow the EP for an
+              // element nowhere near it.
+              const xOverlap = newEl.x < b.x + b.width && newEl.x + newEl.width > b.x;
+              const yOverlap = newEl.y < b.y + b.height && newEl.y + newEl.height > b.y;
+              const straddleLR = yOverlap && (
                 (newEl.x < b.x && newEl.x + newEl.width > b.x) ||
-                (newEl.x < b.x + b.width && newEl.x + newEl.width > b.x + b.width) ||
+                (newEl.x < b.x + b.width && newEl.x + newEl.width > b.x + b.width)
+              );
+              const straddleTB = xOverlap && (
                 (newEl.y < b.y && newEl.y + newEl.height > b.y) ||
-                (newEl.y < b.y + b.height && newEl.y + newEl.height > b.y + b.height);
-              return straddle;
+                (newEl.y < b.y + b.height && newEl.y + newEl.height > b.y + b.height)
+              );
+              return straddleLR || straddleTB;
             }
             if (isNewContainer) return centreInside;
             return (
@@ -2684,13 +2935,12 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       // buffer rule before computing the cascade deltas so neighbours
       // shift by the buffered amount.
       if (enclosingPoolBefore) {
-        let newPool = elementsWithNew.find((e) => e.id === enclosingPoolBefore!.id);
-        if (newPool) {
-          const grewY0 = (newPool.y + newPool.height) > (enclosingPoolBefore.y + enclosingPoolBefore.height);
-          const grewX0 = (newPool.x + newPool.width) !== (enclosingPoolBefore.x + enclosingPoolBefore.width);
-          elementsWithNew = ensurePoolBufferFromEPs(elementsWithNew, enclosingPoolBefore.id, POOL_BUF_W, POOL_BUF_H, grewX0, grewY0);
-          newPool = elementsWithNew.find((e) => e.id === enclosingPoolBefore!.id);
-        }
+        // Always enforce the EP→pool buffer (issue 3): pool follows
+        // when EP gets to within ½-default-Task of the pool boundary,
+        // not just when ensureContainersEncloseChildren already grew
+        // the pool.
+        elementsWithNew = ensurePoolBufferFromEPs(elementsWithNew, enclosingPoolBefore.id, POOL_BUF_W, POOL_BUF_H);
+        const newPool = elementsWithNew.find((e) => e.id === enclosingPoolBefore!.id);
         if (newPool) {
           const dY = (newPool.y + newPool.height) - (enclosingPoolBefore.y + enclosingPoolBefore.height);
           const dX = (newPool.x + newPool.width) - (enclosingPoolBefore.x + enclosingPoolBefore.width);
@@ -3109,6 +3359,19 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       // cascade exactly once on drag end. During the drag the lane / pool
       // is allowed to look temporarily under-sized; ensureContainersEncloseChildren
       // still bubbles other shape resizes upward where appropriate.
+      //
+      // When the moved element is itself a subprocess-expanded (manual
+      // EP translation), push any outside element whose closest boundary
+      // is within 30 px of the EP's leading edge along the direction of
+      // the move (issue 4). Span-checked on the perpendicular axis so
+      // elements far off to the side aren't disturbed (issue 5).
+      if (el.type === "subprocess-expanded" && (dx !== 0 || dy !== 0)) {
+        const newEpRect = { x: effectiveX, y: effectiveY, width: el.width, height: el.height };
+        const pushed = pushOutsideElementsForEPMove(elements, connectors, id, newEpRect, dx, dy);
+        elements = pushed.elements;
+        connectors = pushed.connectors;
+      }
+
       elements = ensureContainersEncloseChildren(elements);
 
       return { ...state, elements: updatePoolTypes(elements), connectors };
@@ -3547,21 +3810,25 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         }
         const epExclude = new Set<string>([id, ...epDescendants, ...epAncestors]);
 
+        // Span-aware shifts (issue 5): only push elements whose
+        // perpendicular projection actually overlaps the moving boundary.
+        // South handle moving down → only elements within the EP's
+        // x-range get pushed (not pools/elements far to the side); etc.
         if (dBottom > 0) {
-          finalElements = shiftElementsPastLine(finalElements, "y", oldEpBottom, dBottom, epExclude);
-          connectors = shiftConnectorWaypointsPastLine(connectors, "y", oldEpBottom, dBottom);
+          finalElements = shiftElementsPastLineWithinSpan(finalElements, "y", oldEpBottom, dBottom, oldEpLeft, oldEpRight, epExclude);
+          connectors = shiftConnectorWaypointsPastLineWithinSpan(connectors, "y", oldEpBottom, dBottom, oldEpLeft, oldEpRight);
         }
         if (dRight > 0) {
-          finalElements = shiftElementsPastLine(finalElements, "x", oldEpRight, dRight, epExclude);
-          connectors = shiftConnectorWaypointsPastLine(connectors, "x", oldEpRight, dRight);
+          finalElements = shiftElementsPastLineWithinSpan(finalElements, "x", oldEpRight, dRight, oldEpTop, oldEpBottom, epExclude);
+          connectors = shiftConnectorWaypointsPastLineWithinSpan(connectors, "x", oldEpRight, dRight, oldEpTop, oldEpBottom);
         }
         if (dTop < 0) {
-          finalElements = shiftElementsBeforeLine(finalElements, "y", oldEpTop, dTop, epExclude);
-          connectors = shiftConnectorWaypointsBeforeLine(connectors, "y", oldEpTop, dTop);
+          finalElements = shiftElementsBeforeLineWithinSpan(finalElements, "y", oldEpTop, dTop, oldEpLeft, oldEpRight, epExclude);
+          connectors = shiftConnectorWaypointsBeforeLineWithinSpan(connectors, "y", oldEpTop, dTop, oldEpLeft, oldEpRight);
         }
         if (dLeft < 0) {
-          finalElements = shiftElementsBeforeLine(finalElements, "x", oldEpLeft, dLeft, epExclude);
-          connectors = shiftConnectorWaypointsBeforeLine(connectors, "x", oldEpLeft, dLeft);
+          finalElements = shiftElementsBeforeLineWithinSpan(finalElements, "x", oldEpLeft, dLeft, oldEpTop, oldEpBottom, epExclude);
+          connectors = shiftConnectorWaypointsBeforeLineWithinSpan(connectors, "x", oldEpLeft, dLeft, oldEpTop, oldEpBottom);
         }
       }
 
@@ -3576,13 +3843,9 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       // when an EP resize grew the enclosing pool. Apply the user's
       // ½-default-Task buffer rule before computing the cascade deltas.
       if (enclosingPoolBefore) {
-        let newPool = finalElements.find((e) => e.id === enclosingPoolBefore!.id);
-        if (newPool) {
-          const grewY0 = (newPool.y + newPool.height) > (enclosingPoolBefore.y + enclosingPoolBefore.height);
-          const grewX0 = (newPool.x + newPool.width) !== (enclosingPoolBefore.x + enclosingPoolBefore.width);
-          finalElements = ensurePoolBufferFromEPs(finalElements, enclosingPoolBefore.id, POOL_BUF_W, POOL_BUF_H, grewX0, grewY0);
-          newPool = finalElements.find((e) => e.id === enclosingPoolBefore!.id);
-        }
+        // Always enforce the EP→pool buffer (issue 3).
+        finalElements = ensurePoolBufferFromEPs(finalElements, enclosingPoolBefore.id, POOL_BUF_W, POOL_BUF_H);
+        const newPool = finalElements.find((e) => e.id === enclosingPoolBefore!.id);
         if (newPool) {
           const dY = (newPool.y + newPool.height) - (enclosingPoolBefore.y + enclosingPoolBefore.height);
           const dX = (newPool.x + newPool.width) - (enclosingPoolBefore.x + enclosingPoolBefore.width);
@@ -4926,13 +5189,9 @@ function reducer(state: DiagramData, action: Action): DiagramData {
           // Bubble + cascade.
           elements = ensureContainersEncloseChildren(elements);
           if (enclosingPoolBefore) {
-            let newPool = elements.find(e => e.id === enclosingPoolBefore!.id);
-            if (newPool) {
-              const grewY0 = (newPool.y + newPool.height) > (enclosingPoolBefore.y + enclosingPoolBefore.height);
-              const grewX0 = (newPool.x + newPool.width) !== (enclosingPoolBefore.x + enclosingPoolBefore.width);
-              elements = ensurePoolBufferFromEPs(elements, enclosingPoolBefore.id, POOL_BUF_W, POOL_BUF_H, grewX0, grewY0);
-              newPool = elements.find(e => e.id === enclosingPoolBefore!.id);
-            }
+            // Always enforce the EP→pool buffer (issue 3).
+            elements = ensurePoolBufferFromEPs(elements, enclosingPoolBefore.id, POOL_BUF_W, POOL_BUF_H);
+            const newPool = elements.find(e => e.id === enclosingPoolBefore!.id);
             if (newPool) {
               const dY = (newPool.y + newPool.height) - (enclosingPoolBefore.y + enclosingPoolBefore.height);
               const dX = (newPool.x + newPool.width) - (enclosingPoolBefore.x + enclosingPoolBefore.width);
