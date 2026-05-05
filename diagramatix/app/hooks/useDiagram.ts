@@ -854,6 +854,111 @@ function shiftConnectorWaypointsPastLine(
   }));
 }
 
+/**
+ * Mirror of `shiftElementsPastLine` for shifting elements that sit
+ * BEFORE the line (their far edge ≤ line) by a (negative) delta. Used
+ * by EP resize on the NORTH / WEST handles: when the EP top moves up,
+ * everything fully above the EP's old top must shift up to stay outside.
+ */
+function shiftElementsBeforeLine(
+  elements: DiagramElement[],
+  axis: "x" | "y",
+  line: number,
+  delta: number,
+  excludeIds: Set<string>,
+): DiagramElement[] {
+  if (delta === 0) return elements;
+  const roots = new Set<string>();
+  for (const e of elements) {
+    if (excludeIds.has(e.id)) continue;
+    const farEdge = axis === "x" ? e.x + e.width : e.y + e.height;
+    if (farEdge <= line) roots.add(e.id);
+  }
+  const all = new Set<string>(roots);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const e of elements) {
+      if (excludeIds.has(e.id) || all.has(e.id)) continue;
+      if (
+        (e.parentId && all.has(e.parentId)) ||
+        (e.boundaryHostId && all.has(e.boundaryHostId))
+      ) {
+        all.add(e.id);
+        changed = true;
+      }
+    }
+  }
+  return elements.map((e) => {
+    if (!all.has(e.id)) return e;
+    return axis === "x" ? { ...e, x: e.x + delta } : { ...e, y: e.y + delta };
+  });
+}
+
+/** Mirror of `shiftConnectorWaypointsPastLine` for shifting waypoints
+ *  whose coord is BEFORE the line by a (negative) delta. */
+function shiftConnectorWaypointsBeforeLine(
+  connectors: Connector[],
+  axis: "x" | "y",
+  line: number,
+  delta: number,
+): Connector[] {
+  if (delta === 0) return connectors;
+  return connectors.map((conn) => ({
+    ...conn,
+    waypoints: conn.waypoints.map((wp) => {
+      const v = axis === "x" ? wp.x : wp.y;
+      if (v > line) return wp;
+      return axis === "x" ? { x: wp.x + delta, y: wp.y } : { x: wp.x, y: wp.y + delta };
+    }),
+  }));
+}
+
+/**
+ * After an EP grows right inside a pool, widen any OTHER pool whose
+ * right edge was aligned with the enclosing pool's old right edge.
+ * Stacked-pool diagrams typically maintain a flush right edge across
+ * all pools; without this, growing one pool leaves the others narrower
+ * and the right edges become uneven. Walks the pool's structural
+ * children (lanes / sublanes) and grows their width too so the lane
+ * boundaries stay flush with the wider pool.
+ */
+function widenPoolsAlignedToRight(
+  elements: DiagramElement[],
+  excludePoolId: string,
+  alignedRightEdge: number,
+  growth: number,
+): DiagramElement[] {
+  if (growth <= 0) return elements;
+  const TOLERANCE = 1;
+  const alignedPoolIds = new Set<string>();
+  for (const e of elements) {
+    if (e.type !== "pool" || e.id === excludePoolId) continue;
+    if (Math.abs((e.x + e.width) - alignedRightEdge) <= TOLERANCE) {
+      alignedPoolIds.add(e.id);
+    }
+  }
+  if (alignedPoolIds.size === 0) return elements;
+  // Collect all structural descendants (pools + their lanes / sublanes /
+  // sub-sublanes) that should grow with the pool's width.
+  const grow = new Set<string>(alignedPoolIds);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const e of elements) {
+      if (grow.has(e.id)) continue;
+      if (e.parentId && grow.has(e.parentId)
+          && (e.type === "lane" || e.type === "sublane")) {
+        grow.add(e.id);
+        changed = true;
+      }
+    }
+  }
+  return elements.map((e) =>
+    grow.has(e.id) ? { ...e, width: e.width + growth } : e,
+  );
+}
+
 /** After an EP is resized, walk every boundary event whose
  *  `boundaryHostId` is the EP and re-snap it to the new bounds while
  *  preserving its (side, frac) along the edge — so events on the LEFT
@@ -3282,12 +3387,86 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       });
       // Validate ALL connectors against ALL elements
       connectors = validateConnectorsAgainstObstacles(connectors, finalElements);
+
+      // EP resize: maintain the invariant that everything outside the OLD
+      // EP must remain outside the NEW EP. Shift any element / lane /
+      // sublane / pool descendant past (or before) the EP's grown edge by
+      // the EP's growth on that axis. Also bubble the growth up to the
+      // enclosing pool and cascade pool-below/-right shifts to neighbours.
+      // Excludes the EP itself, its descendants, and its ancestors (which
+      // grow via ensureContainersEncloseChildren rather than shift).
+      let enclosingPoolBefore: DiagramElement | null = null;
+      if (target?.type === "subprocess-expanded") {
+        const oldEpRight = target.x + target.width;
+        const oldEpBottom = target.y + target.height;
+        const oldEpLeft = target.x;
+        const oldEpTop = target.y;
+        const dRight  = (newX + newW) - oldEpRight;   // > 0 when EP grew right
+        const dBottom = (newY + newH) - oldEpBottom;  // > 0 when EP grew down
+        const dLeft   = newX - oldEpLeft;             // < 0 when EP grew left
+        const dTop    = newY - oldEpTop;              // < 0 when EP grew up
+
+        // Build EP exclude set: EP id + all descendants + all ancestors.
+        const epDescendants = getAllDescendantIds(state.elements, id);
+        const epAncestors = new Set<string>();
+        {
+          let cur = state.elements.find((e) => e.id === target.parentId);
+          while (cur) {
+            epAncestors.add(cur.id);
+            if (cur.type === "pool") { enclosingPoolBefore = { ...cur }; }
+            if (!cur.parentId) break;
+            cur = state.elements.find((e) => e.id === cur!.parentId);
+          }
+        }
+        const epExclude = new Set<string>([id, ...epDescendants, ...epAncestors]);
+
+        if (dBottom > 0) {
+          finalElements = shiftElementsPastLine(finalElements, "y", oldEpBottom, dBottom, epExclude);
+          connectors = shiftConnectorWaypointsPastLine(connectors, "y", oldEpBottom, dBottom);
+        }
+        if (dRight > 0) {
+          finalElements = shiftElementsPastLine(finalElements, "x", oldEpRight, dRight, epExclude);
+          connectors = shiftConnectorWaypointsPastLine(connectors, "x", oldEpRight, dRight);
+        }
+        if (dTop < 0) {
+          finalElements = shiftElementsBeforeLine(finalElements, "y", oldEpTop, dTop, epExclude);
+          connectors = shiftConnectorWaypointsBeforeLine(connectors, "y", oldEpTop, dTop);
+        }
+        if (dLeft < 0) {
+          finalElements = shiftElementsBeforeLine(finalElements, "x", oldEpLeft, dLeft, epExclude);
+          connectors = shiftConnectorWaypointsBeforeLine(connectors, "x", oldEpLeft, dLeft);
+        }
+      }
+
       // Auto-grow ancestors when a contained element grew. Specifically:
       // dragging a subprocess-expanded's bottom handle should make the
       // enclosing lane / pool grow to fit (down AND right). The
       // bottom-up walk in ensureContainersEncloseChildren handles
       // arbitrary nesting (subprocess-in-lane-in-pool).
       finalElements = ensureContainersEncloseChildren(finalElements);
+
+      // Cascade pool-below-shift / pool-right-shift to neighbouring pools
+      // when an EP resize grew the enclosing pool. Also widen any other
+      // pool whose right edge was flush with the enclosing pool's old
+      // right edge, so stacked-pool diagrams keep their right edges
+      // aligned.
+      if (enclosingPoolBefore) {
+        const newPool = finalElements.find((e) => e.id === enclosingPoolBefore!.id);
+        if (newPool) {
+          const dY = (newPool.y + newPool.height) - (enclosingPoolBefore.y + enclosingPoolBefore.height);
+          const dX = (newPool.x + newPool.width) - (enclosingPoolBefore.x + enclosingPoolBefore.width);
+          if (dY > 0) {
+            const r = applyPoolBelowShift(finalElements, connectors, enclosingPoolBefore.id, enclosingPoolBefore.y + enclosingPoolBefore.height, dY);
+            finalElements = r.elements; connectors = r.connectors;
+          }
+          if (dX > 0) {
+            const r = applyPoolRightShift(finalElements, connectors, enclosingPoolBefore.id, enclosingPoolBefore.x + enclosingPoolBefore.width, dX);
+            finalElements = r.elements; connectors = r.connectors;
+            finalElements = widenPoolsAlignedToRight(finalElements, enclosingPoolBefore.id, enclosingPoolBefore.x + enclosingPoolBefore.width, dX);
+          }
+        }
+      }
+
       return { ...state, elements: finalElements, connectors };
     }
 
