@@ -1490,6 +1490,19 @@ function applyEPBoundaryChange(
   //     boundary can move out when the EP grows, but never moves in
   //     when the EP shrinks. Lane / sublane ancestors still track the
   //     EP in both directions so the lane chain stays flush.
+  //
+  //     For EP-typed ancestors (an outer EP enclosing this EP), capture
+  //     their pre-grow rect so we can re-snap THEIR boundary events and
+  //     recompute connectors anchored to them — without this, an outer
+  //     EP's boundary events stay glued to the OLD edges when only the
+  //     inner EP moved.
+  const epAncestorOldRects = new Map<string, { x: number; y: number; width: number; height: number }>();
+  for (const ancId of epAncestors) {
+    const anc = updatedEls.find((e) => e.id === ancId);
+    if (anc?.type === "subprocess-expanded") {
+      epAncestorOldRects.set(ancId, { x: anc.x, y: anc.y, width: anc.width, height: anc.height });
+    }
+  }
   if (epAncestors.size > 0 && (growTop !== 0 || growBottom !== 0 || growLeft !== 0 || growRight !== 0)) {
     updatedEls = updatedEls.map((e) => {
       if (!epAncestors.has(e.id)) return e;
@@ -1508,6 +1521,17 @@ function applyEPBoundaryChange(
       if (gR !== 0) { nw += gR; }
       return { ...e, x: nx, y: ny, width: nw, height: nh };
     });
+  }
+
+  // 5c. Re-snap boundary events on each EP-typed ancestor that grew.
+  //     Same movingSides as the inner EP because the ancestor grew by
+  //     identical deltas (no clamp). Without this pass, an outer EP's
+  //     edge-mounted events stay at their pre-grow positions while the
+  //     edge slid.
+  for (const [ancId, ancOldRect] of epAncestorOldRects) {
+    const ancNew = updatedEls.find((e) => e.id === ancId);
+    if (!ancNew) continue;
+    updatedEls = resnapEPBoundaryEvents(updatedEls, ancNew, ancOldRect, movingSides);
   }
 
   // (enclosingPoolBefore captured earlier, before step 5b, so cascade
@@ -1552,12 +1576,18 @@ function applyEPBoundaryChange(
   }
 
   // 10. Recompute connectors anchored to the EP, its boundary events,
-  //     OR the enclosing pool (whose edges may have moved when it grew /
-  //     was buffered). Without including the pool, a messageBPMN with
-  //     src=this-pool would keep its old waypoints even after its
-  //     attachment edge slid.
+  //     the enclosing pool, OR any EP-typed ancestor that grew along
+  //     with the inner EP (plus those ancestors' boundary events).
+  //     Without the ancestor sweep, an outer EP's anchored connectors
+  //     stay at the OLD edges when only the inner EP moved.
   const recomputeIds = new Set<string>([epId, ...epDirectBoundaryIds]);
   if (enclosingPoolBefore) recomputeIds.add(enclosingPoolBefore.id);
+  for (const ancId of epAncestorOldRects.keys()) {
+    recomputeIds.add(ancId);
+    for (const e of updatedEls) {
+      if (e.boundaryHostId === ancId) recomputeIds.add(e.id);
+    }
+  }
   updatedConns = updatedConns.map((conn) => {
     if (recomputeIds.has(conn.sourceId) || recomputeIds.has(conn.targetId)) {
       return recomputeAllConnectors([conn], updatedEls)[0] ?? conn;

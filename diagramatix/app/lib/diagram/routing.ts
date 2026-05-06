@@ -472,6 +472,21 @@ export function computeWaypoints(
     "start-event", "intermediate-event", "end-event",
     "data-object", "data-store",
   ]);
+  // Walk the ancestor chain so an EP that contains the source/target at
+  // ANY depth (not only as a direct parent) is excluded from obstacles.
+  // User rule: an EP is an obstacle for a sequence connector unless the
+  // connector terminates on one of its descendants.
+  function ancestorsOf(elementId: string): Set<string> {
+    const result = new Set<string>();
+    let cur = allElements.find((e) => e.id === elementId);
+    while (cur?.parentId) {
+      result.add(cur.parentId);
+      cur = allElements.find((e) => e.id === cur!.parentId);
+    }
+    return result;
+  }
+  const srcAncestors = ancestorsOf(source.id);
+  const tgtAncestors = ancestorsOf(target.id);
   const obstacles = allElements
     .filter((el) => {
       if (el.id === source.id || el.id === target.id) return false;
@@ -480,14 +495,16 @@ export function computeWaypoints(
       // Edge-mounted (boundary) events on ANY host are excluded so connectors
       // can route to them without their host shape blocking the path.
       if (el.boundaryHostId) return false;
-      // Don't treat the target's parent subprocess-expanded as an obstacle
-      if (target.parentId && el.id === target.parentId && el.type === "subprocess-expanded") return false;
-      // Don't treat the source's parent subprocess-expanded as an obstacle
-      if (source.parentId && el.id === source.parentId && el.type === "subprocess-expanded") return false;
       // Don't treat pools or lanes as obstacles (connectors route within them)
       if (el.type === "pool" || el.type === "lane") return false;
       // Only the BPMN flow-node types listed above are obstacles for sequence flow.
       if (!SEQ_OBSTACLE_TYPES.has(el.type)) return false;
+      // EPs that contain source OR target (at any depth) are not obstacles —
+      // sequence flow must be allowed to enter the EP to reach the
+      // descendant endpoint. EPs that DON'T contain either endpoint stay
+      // as obstacles, so a sequence connector between two outside elements
+      // routes around the EP instead of through it.
+      if (el.type === "subprocess-expanded" && (srcAncestors.has(el.id) || tgtAncestors.has(el.id))) return false;
       return true;
     })
     .map(getBounds);
@@ -923,17 +940,34 @@ export function recomputeAllConnectors(
         }
         // Check if preserved interior routing passes through any obstacle.
         // Same set as the main routing pass: only BPMN flow-node types are
-        // obstacles for sequence flow, and edge-mounted events are excluded.
+        // obstacles for sequence flow, edge-mounted events are excluded,
+        // and EPs containing source or target at any depth are excluded.
         const SEQ_OBS = new Set<string>([
           "task", "subprocess", "subprocess-expanded",
           "start-event", "intermediate-event", "end-event",
           "data-object", "data-store",
         ]);
+        function ancestorsOfPreserve(elementId: string): Set<string> {
+          const result = new Set<string>();
+          let cur = elements.find((e) => e.id === elementId);
+          while (cur?.parentId) {
+            result.add(cur.parentId);
+            cur = elements.find((e) => e.id === cur!.parentId);
+          }
+          return result;
+        }
+        const preserveSrcAncestors = ancestorsOfPreserve(source.id);
+        const preserveTgtAncestors = ancestorsOfPreserve(target.id);
         const obstacles = elements
-          .filter(el => el.id !== source.id && el.id !== target.id
-            && el.type !== "pool" && el.type !== "lane"
-            && !el.boundaryHostId
-            && SEQ_OBS.has(el.type))
+          .filter(el => {
+            if (el.id === source.id || el.id === target.id) return false;
+            if (el.type === "pool" || el.type === "lane") return false;
+            if (el.boundaryHostId) return false;
+            if (!SEQ_OBS.has(el.type)) return false;
+            if (el.type === "subprocess-expanded"
+                && (preserveSrcAncestors.has(el.id) || preserveTgtAncestors.has(el.id))) return false;
+            return true;
+          })
           .map(getBounds);
         // Validate every segment is strictly axis-aligned. If the rectify pass
         // failed to make the result orthogonal (e.g. because the user-customised
