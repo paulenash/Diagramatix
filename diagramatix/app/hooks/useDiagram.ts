@@ -3452,6 +3452,15 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         }
       }
 
+      // Skip parent re-detection during MOVE_ELEMENT when the current
+      // parent is a subprocess-expanded — keeping the moved element
+      // anchored to its containing EP through the entire drag (user
+      // spec: "an element moving inside an EP should not cause sibling
+      // EP or any of their contents to be affected"). Final parent
+      // re-detection happens at MOVE_END if needed.
+      const currentParent = state.elements.find(p => p.id === el.parentId);
+      const lockParentToEP = currentParent?.type === "subprocess-expanded";
+
       let elements = state.elements.map((e) => {
         if (e.id === id) {
           if (snapResult) {
@@ -3463,33 +3472,35 @@ function reducer(state: DiagramData, action: Action): DiagramData {
             };
           }
           let parentId = e.parentId;
-          const cx = effectiveX + e.width / 2;
-          const cy = effectiveY + e.height / 2;
-          const potentialParents = state.elements.filter(
-            (b) =>
-              isContainerType(b.type) &&
-              containerAccepts(b.type, e.type) &&
-              b.id !== id &&
-              !wouldCreateCycle(state.elements, id, b.id) &&
-              cx >= b.x && cx <= b.x + b.width &&
-              cy >= b.y && cy <= b.y + b.height
-          );
-          // Prefer innermost (smallest) container by type priority
-          const potentialParent =
-            // subprocess-expanded: pick smallest (innermost)
-            (potentialParents.filter(b => b.type === "subprocess-expanded")
-              .sort((a, b) => (a.width * a.height) - (b.width * b.height))[0]) ??
-            // archimate-shape: pick smallest (innermost)
-            (potentialParents.filter(b => b.type === "archimate-shape")
-              .sort((a, b) => (a.width * a.height) - (b.width * b.height))[0]) ??
-            potentialParents.find(b => b.type === "lane") ??
-            potentialParents.find(b => b.type === "pool") ??
-            // process-groups: pick smallest (innermost)
-            (potentialParents.filter(b => b.type === "process-group")
-              .sort((a, b) => (a.width * a.height) - (b.width * b.height))[0]) ??
-            potentialParents[0];
-          if (potentialParent !== undefined || state.elements.some(b => isContainerType(b.type) && containerAccepts(b.type, e.type))) {
-            parentId = potentialParent?.id;
+          if (!lockParentToEP) {
+            const cx = effectiveX + e.width / 2;
+            const cy = effectiveY + e.height / 2;
+            const potentialParents = state.elements.filter(
+              (b) =>
+                isContainerType(b.type) &&
+                containerAccepts(b.type, e.type) &&
+                b.id !== id &&
+                !wouldCreateCycle(state.elements, id, b.id) &&
+                cx >= b.x && cx <= b.x + b.width &&
+                cy >= b.y && cy <= b.y + b.height
+            );
+            // Prefer innermost (smallest) container by type priority
+            const potentialParent =
+              // subprocess-expanded: pick smallest (innermost)
+              (potentialParents.filter(b => b.type === "subprocess-expanded")
+                .sort((a, b) => (a.width * a.height) - (b.width * b.height))[0]) ??
+              // archimate-shape: pick smallest (innermost)
+              (potentialParents.filter(b => b.type === "archimate-shape")
+                .sort((a, b) => (a.width * a.height) - (b.width * b.height))[0]) ??
+              potentialParents.find(b => b.type === "lane") ??
+              potentialParents.find(b => b.type === "pool") ??
+              // process-groups: pick smallest (innermost)
+              (potentialParents.filter(b => b.type === "process-group")
+                .sort((a, b) => (a.width * a.height) - (b.width * b.height))[0]) ??
+              potentialParents[0];
+            if (potentialParent !== undefined || state.elements.some(b => isContainerType(b.type) && containerAccepts(b.type, e.type))) {
+              parentId = potentialParent?.id;
+            }
           }
           return { ...e, x: effectiveX, y: effectiveY, parentId };
         }
@@ -3666,7 +3677,50 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         connectors = pushed.connectors;
       }
 
-      elements = ensureContainersEncloseChildren(elements);
+      // When the moved element's parent is a subprocess-expanded, the EP
+      // may need to grow to keep the element enclosed. Route the grow
+      // through applyEPBoundaryChange so the cascade — boundary events
+      // re-snap to the moving edges, connectors anchored to the EP
+      // recompute, ancestor lanes / pool follow, and pools above /
+      // below shift in lockstep — fires consistently. Without this,
+      // ensureContainersEncloseChildren would silently grow the EP but
+      // leave its boundary events / connector attachment points stuck
+      // at the OLD edges (user issue 1).
+      const movedNow = elements.find((e) => e.id === id);
+      const epParent = movedNow?.parentId
+        ? elements.find((e) => e.id === movedNow.parentId && e.type === "subprocess-expanded")
+        : null;
+      let epGrown = false;
+      if (epParent && movedNow) {
+        const PAD = 8;
+        const oldRect = { x: epParent.x, y: epParent.y, width: epParent.width, height: epParent.height };
+        const reqLeft   = movedNow.x - PAD;
+        const reqTop    = movedNow.y - PAD;
+        const reqRight  = movedNow.x + movedNow.width + PAD;
+        const reqBottom = movedNow.y + movedNow.height + PAD;
+        const newLeft   = Math.min(oldRect.x, reqLeft);
+        const newTop    = Math.min(oldRect.y, reqTop);
+        const newRight  = Math.max(oldRect.x + oldRect.width, reqRight);
+        const newBottom = Math.max(oldRect.y + oldRect.height, reqBottom);
+        const newRect = { x: newLeft, y: newTop, width: newRight - newLeft, height: newBottom - newTop };
+        const changed =
+          Math.abs(newRect.x - oldRect.x) > 0.5 ||
+          Math.abs(newRect.y - oldRect.y) > 0.5 ||
+          Math.abs(newRect.width - oldRect.width) > 0.5 ||
+          Math.abs(newRect.height - oldRect.height) > 0.5;
+        if (changed) {
+          const r = applyEPBoundaryChange(elements, connectors, epParent.id, oldRect, newRect, id);
+          elements = r.elements;
+          connectors = r.connectors;
+          epGrown = true;
+        }
+      }
+
+      // applyEPBoundaryChange already runs ensure-enclose internally;
+      // skip the redundant call when it fired so we don't double-bubble.
+      if (!epGrown) {
+        elements = ensureContainersEncloseChildren(elements);
+      }
 
       return { ...state, elements: updatePoolTypes(elements), connectors };
     }
