@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useContext } from "react";
+import { useState, useContext, useRef } from "react";
 import type { Connector, Point, Side } from "@/app/lib/diagram/types";
 import { DisplayModeCtx, ConnectorFontScaleCtx, sketchyFilter } from "@/app/lib/diagram/displayMode";
 import { waypointsToSvgPath, waypointsToCurvePath, waypointsToRoundedPath } from "@/app/lib/diagram/routing";
@@ -484,6 +484,10 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
   const displayMode = useContext(DisplayModeCtx);
   const connFontScale = useContext(ConnectorFontScaleCtx);
   const [draggingEndLabel, setDraggingEndLabel] = useState<string | null>(null);
+  // Manual double-click detection — onDoubleClick on SVG paths inside
+  // transformed groups can be flaky across browsers, so we time the
+  // gap between two clicks ourselves.
+  const lastClickRef = useRef<number>(0);
   const waypoints = connector.waypoints;
   if (waypoints.length === 0) return null;
 
@@ -655,16 +659,14 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
     window.addEventListener("mouseup", onUp);
   }
 
-  // Double-click to insert a new waypoint at the click point. The new
-  // waypoint is collinear with the segment it splits, so the connector
-  // looks unchanged — but the visible-waypoint count grows by 1, which
-  // promotes a previously-edge segment into an interior one and makes
-  // the new segment draggable. The user can then grab it and reshape.
-  function handleConnectorDoubleClick(e: React.MouseEvent) {
-    if (connector.routingType !== "rectilinear") return;
-    if (!svgToWorld || !onUpdateWaypoints) return;
-    const click = svgToWorld(e.clientX, e.clientY);
-    // Find the segment whose projection of `click` is closest.
+  // Insert a new waypoint at the click point. Inserts THREE collinear
+  // points spaced ~30 px apart so a draggable interior segment exists
+  // immediately AND is wide enough to grab. The path looks unchanged
+  // until the user drags the new middle segment — handleSegmentMouseDown's
+  // bridging-corner logic handles the orthogonal bend.
+  function insertWaypointAt(click: Point) {
+    if (connector.routingType !== "rectilinear") return false;
+    if (!onUpdateWaypoints) return false;
     let bestSegIdx = -1;
     let bestDist = Infinity;
     let bestProjection: Point | null = null;
@@ -675,25 +677,70 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
       const d = Math.hypot(click.x - proj.x, click.y - proj.y);
       if (d < bestDist) { bestDist = d; bestSegIdx = i; bestProjection = proj; }
     }
-    if (bestSegIdx < 0 || bestProjection == null || bestDist > 12) return;
-    // Skip if the projected point is essentially on top of an existing
-    // waypoint (would create a zero-length segment).
-    const NEAR = 6;
+    if (bestSegIdx < 0 || bestProjection == null || bestDist > 20) return false;
     const p1 = visibleWaypoints[bestSegIdx];
     const p2 = visibleWaypoints[bestSegIdx + 1];
-    if (Math.hypot(bestProjection.x - p1.x, bestProjection.y - p1.y) < NEAR) return;
-    if (Math.hypot(bestProjection.x - p2.x, bestProjection.y - p2.y) < NEAR) return;
-    // Insert the new waypoint into the FULL waypoints array at the
-    // position right after the segment's start. visStart accounts for
-    // the optional source invisible leader.
+    const isHoriz = Math.abs(p1.y - p2.y) < 1;
+    // Pick three collinear points centred on the projection, spaced
+    // 30 px apart along the segment direction. The middle of the three
+    // becomes a draggable interior segment per draggableSegments rules.
+    const SPAN = 30;
+    let q1: Point, q2: Point, q3: Point;
+    if (isHoriz) {
+      const dir = p2.x >= p1.x ? 1 : -1;
+      q1 = { x: bestProjection.x - dir * SPAN, y: p1.y };
+      q2 = { x: bestProjection.x,             y: p1.y };
+      q3 = { x: bestProjection.x + dir * SPAN, y: p1.y };
+    } else {
+      const dir = p2.y >= p1.y ? 1 : -1;
+      q1 = { x: p1.x, y: bestProjection.y - dir * SPAN };
+      q2 = { x: p1.x, y: bestProjection.y };
+      q3 = { x: p1.x, y: bestProjection.y + dir * SPAN };
+    }
+    // Clamp so the inserted points stay strictly between p1 and p2.
+    function clampBetween(q: Point): Point {
+      if (isHoriz) {
+        const lo = Math.min(p1.x, p2.x) + 4;
+        const hi = Math.max(p1.x, p2.x) - 4;
+        return { x: Math.max(lo, Math.min(hi, q.x)), y: p1.y };
+      } else {
+        const lo = Math.min(p1.y, p2.y) + 4;
+        const hi = Math.max(p1.y, p2.y) - 4;
+        return { x: p1.x, y: Math.max(lo, Math.min(hi, q.y)) };
+      }
+    }
+    q1 = clampBetween(q1);
+    q2 = clampBetween(q2);
+    q3 = clampBetween(q3);
+    // Skip if the segment is too short for a useful split.
+    const segLen = isHoriz ? Math.abs(p2.x - p1.x) : Math.abs(p2.y - p1.y);
+    if (segLen < 30) return false;
     const fullIdx = visStart + bestSegIdx + 1;
     const newWaypoints = [
       ...connector.waypoints.slice(0, fullIdx),
-      { x: bestProjection.x, y: bestProjection.y },
+      q1, q2, q3,
       ...connector.waypoints.slice(fullIdx),
     ];
     onUpdateWaypoints(connector.id, newWaypoints);
+    return true;
+  }
+
+  // Combined click + double-click handler. First click selects the
+  // connector; a second click within 350 ms inserts a waypoint at the
+  // click position. Manual timing is more reliable than React's
+  // onDoubleClick on SVG paths inside transformed groups (which can
+  // miss the second click when an intervening re-render swaps the
+  // event target).
+  function handleConnectorClick(e: React.MouseEvent) {
     e.stopPropagation();
+    const now = Date.now();
+    const isDouble = now - lastClickRef.current < 350;
+    lastClickRef.current = isDouble ? 0 : now;
+    if (isDouble && svgToWorld) {
+      const inserted = insertWaypointAt(svgToWorld(e.clientX, e.clientY));
+      if (inserted) return;
+    }
+    onSelect();
   }
 
   return (
@@ -763,8 +810,7 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
         strokeWidth={12}
         style={{ cursor: "pointer" }}
         mask={isAssocBPMN && (sourceBounds || targetBounds) ? `url(#assoc-hit-mask-${connector.id})` : undefined}
-        onClick={(e) => { e.stopPropagation(); onSelect(); }}
-        onDoubleClick={handleConnectorDoubleClick}
+        onClick={handleConnectorClick}
       />
 
       {/* Filtered connector line (hand-drawn wobble) — skip messageBPMN */}

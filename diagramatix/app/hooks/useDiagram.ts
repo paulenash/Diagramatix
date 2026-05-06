@@ -1506,6 +1506,13 @@ function applyEPBoundaryChange(
   if (epAncestors.size > 0 && (growTop !== 0 || growBottom !== 0 || growLeft !== 0 || growRight !== 0)) {
     updatedEls = updatedEls.map((e) => {
       if (!epAncestors.has(e.id)) return e;
+      // EP-typed ancestors are NOT explicitly grown here. They follow
+      // proximity-based — outer EP's boundary only moves when the inner
+      // EP gets within 5 px (handled by ensureContainersEncloseChildren
+      // with PAD=5 for EP-in-EP, see step 7). Without this skip, every
+      // inner-EP move dragged the outer EP boundary along by the full
+      // delta even if the inner was nowhere near it.
+      if (e.type === "subprocess-expanded") return e;
       const isPool = e.type === "pool";
       const gT = isPool ? Math.max(0, growTop)    : growTop;
       const gB = isPool ? Math.max(0, growBottom) : growBottom;
@@ -1523,22 +1530,33 @@ function applyEPBoundaryChange(
     });
   }
 
-  // 5c. Re-snap boundary events on each EP-typed ancestor that grew.
-  //     Same movingSides as the inner EP because the ancestor grew by
-  //     identical deltas (no clamp). Without this pass, an outer EP's
-  //     edge-mounted events stay at their pre-grow positions while the
-  //     edge slid.
-  for (const [ancId, ancOldRect] of epAncestorOldRects) {
-    const ancNew = updatedEls.find((e) => e.id === ancId);
-    if (!ancNew) continue;
-    updatedEls = resnapEPBoundaryEvents(updatedEls, ancNew, ancOldRect, movingSides);
-  }
-
   // (enclosingPoolBefore captured earlier, before step 5b, so cascade
   //  deltas reflect the FULL pool growth including the explicit grow.)
 
-  // 7. Bubble the EP's growth up through Lane / Sublane / Pool.
+  // 7. Bubble the EP's growth up through Lane / Sublane / Pool. With
+  //    PAD=5 for EP-in-EP, an outer EP only grows when the inner EP
+  //    gets within 5 px of its edge — proximity-gated cascade.
   updatedEls = ensureContainersEncloseChildren(updatedEls);
+
+  // 7b. Re-snap boundary events on every EP-typed ancestor whose rect
+  //     actually changed during ensure-enclose. Outer EPs only grow
+  //     when the inner gets close (PAD=5), so most of the time this
+  //     loop is a no-op. When they DO grow, their edge-mounted events
+  //     slide along the moving edge, just like the inner EP's.
+  for (const [ancId, ancOldRect] of epAncestorOldRects) {
+    const ancNew = updatedEls.find((e) => e.id === ancId);
+    if (!ancNew) continue;
+    if (ancNew.x === ancOldRect.x && ancNew.y === ancOldRect.y &&
+        ancNew.width === ancOldRect.width && ancNew.height === ancOldRect.height) continue;
+    // Determine which sides of the ANCESTOR moved (independent of the
+    // inner EP's movingSides — outer EP might only grow on one side).
+    const ancMovingSides = new Set<"top" | "bottom" | "left" | "right">();
+    if (ancNew.y !== ancOldRect.y) ancMovingSides.add("top");
+    if (ancNew.x !== ancOldRect.x) ancMovingSides.add("left");
+    if (ancNew.y + ancNew.height !== ancOldRect.y + ancOldRect.height) ancMovingSides.add("bottom");
+    if (ancNew.x + ancNew.width !== ancOldRect.x + ancOldRect.width) ancMovingSides.add("right");
+    updatedEls = resnapEPBoundaryEvents(updatedEls, ancNew, ancOldRect, ancMovingSides);
+  }
 
   // 8. Enforce the EP→pool buffer (now four-sided).
   if (enclosingPoolBefore) {
@@ -1576,13 +1594,18 @@ function applyEPBoundaryChange(
   }
 
   // 10. Recompute connectors anchored to the EP, its boundary events,
-  //     the enclosing pool, OR any EP-typed ancestor that grew along
-  //     with the inner EP (plus those ancestors' boundary events).
-  //     Without the ancestor sweep, an outer EP's anchored connectors
-  //     stay at the OLD edges when only the inner EP moved.
+  //     the enclosing pool, OR any EP-typed ancestor that ACTUALLY grew
+  //     during ensure-enclose (proximity-gated cascade — most outer EPs
+  //     don't change at all when an inner EP moves). Skipping ancestors
+  //     that didn't move means an outer EP's anchored connectors stay
+  //     untouched when the inner EP is well inside the outer.
   const recomputeIds = new Set<string>([epId, ...epDirectBoundaryIds]);
   if (enclosingPoolBefore) recomputeIds.add(enclosingPoolBefore.id);
-  for (const ancId of epAncestorOldRects.keys()) {
+  for (const [ancId, ancOldRect] of epAncestorOldRects) {
+    const ancNew = updatedEls.find((e) => e.id === ancId);
+    if (!ancNew) continue;
+    if (ancNew.x === ancOldRect.x && ancNew.y === ancOldRect.y &&
+        ancNew.width === ancOldRect.width && ancNew.height === ancOldRect.height) continue;
     recomputeIds.add(ancId);
     for (const e of updatedEls) {
       if (e.boundaryHostId === ancId) recomputeIds.add(e.id);
@@ -1830,9 +1853,16 @@ function ensureContainersEncloseChildren(
     if (kids.length === 0) continue;
     // PAD=0 for lane/sublane children — they fill their pool/lane by
     // convention (no gap between last lane bottom and pool bottom).
-    // PAD=8 for EP / task / etc. children that don't fill.
-    const padFor = (c: DiagramElement) =>
-      (c.type === "lane" || c.type === "sublane") ? 0 : PAD;
+    // PAD=5 for an EP-inside-EP relationship (user rule: outer EP only
+    // follows the inner EP's boundary when the inner edge is within
+    // 5 px of the outer edge — same proximity model as a task moved
+    // within an EP). PAD=8 for everything else (tasks / events / EP
+    // inside a non-EP container).
+    const padFor = (c: DiagramElement) => {
+      if (c.type === "lane" || c.type === "sublane") return 0;
+      if (c.type === "subprocess-expanded" && e.type === "subprocess-expanded") return 5;
+      return PAD;
+    };
     const childMaxBottom = Math.max(...kids.map((c) => c.y + c.height + padFor(c)));
     if (childMaxBottom > live.y + live.height) {
       live.height = childMaxBottom - live.y;
@@ -3722,7 +3752,12 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         : null;
       let epGrown = false;
       if (epParent && movedNow) {
-        const PAD = 8;
+        // PAD=5 when an inner EP is moving inside an outer EP (user
+        // rule: parent EP only follows the inner EP's boundary when the
+        // inner edge is within 5 px). PAD=8 when a non-EP element
+        // (task / event / etc.) is moving — preserves the existing
+        // task-in-EP proximity behaviour.
+        const PAD = movedNow.type === "subprocess-expanded" ? 5 : 8;
         const oldRect = { x: epParent.x, y: epParent.y, width: epParent.width, height: epParent.height };
         const reqLeft   = movedNow.x - PAD;
         const reqTop    = movedNow.y - PAD;
