@@ -655,6 +655,47 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
     window.addEventListener("mouseup", onUp);
   }
 
+  // Double-click to insert a new waypoint at the click point. The new
+  // waypoint is collinear with the segment it splits, so the connector
+  // looks unchanged — but the visible-waypoint count grows by 1, which
+  // promotes a previously-edge segment into an interior one and makes
+  // the new segment draggable. The user can then grab it and reshape.
+  function handleConnectorDoubleClick(e: React.MouseEvent) {
+    if (connector.routingType !== "rectilinear") return;
+    if (!svgToWorld || !onUpdateWaypoints) return;
+    const click = svgToWorld(e.clientX, e.clientY);
+    // Find the segment whose projection of `click` is closest.
+    let bestSegIdx = -1;
+    let bestDist = Infinity;
+    let bestProjection: Point | null = null;
+    for (let i = 0; i < visibleWaypoints.length - 1; i++) {
+      const p1 = visibleWaypoints[i];
+      const p2 = visibleWaypoints[i + 1];
+      const proj = closestPointOnSegment(p1, p2, click);
+      const d = Math.hypot(click.x - proj.x, click.y - proj.y);
+      if (d < bestDist) { bestDist = d; bestSegIdx = i; bestProjection = proj; }
+    }
+    if (bestSegIdx < 0 || bestProjection == null || bestDist > 12) return;
+    // Skip if the projected point is essentially on top of an existing
+    // waypoint (would create a zero-length segment).
+    const NEAR = 6;
+    const p1 = visibleWaypoints[bestSegIdx];
+    const p2 = visibleWaypoints[bestSegIdx + 1];
+    if (Math.hypot(bestProjection.x - p1.x, bestProjection.y - p1.y) < NEAR) return;
+    if (Math.hypot(bestProjection.x - p2.x, bestProjection.y - p2.y) < NEAR) return;
+    // Insert the new waypoint into the FULL waypoints array at the
+    // position right after the segment's start. visStart accounts for
+    // the optional source invisible leader.
+    const fullIdx = visStart + bestSegIdx + 1;
+    const newWaypoints = [
+      ...connector.waypoints.slice(0, fullIdx),
+      { x: bestProjection.x, y: bestProjection.y },
+      ...connector.waypoints.slice(fullIdx),
+    ];
+    onUpdateWaypoints(connector.id, newWaypoints);
+    e.stopPropagation();
+  }
+
   return (
     <>
       {isMessageBPMN ? (
@@ -723,6 +764,7 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
         style={{ cursor: "pointer" }}
         mask={isAssocBPMN && (sourceBounds || targetBounds) ? `url(#assoc-hit-mask-${connector.id})` : undefined}
         onClick={(e) => { e.stopPropagation(); onSelect(); }}
+        onDoubleClick={handleConnectorDoubleClick}
       />
 
       {/* Filtered connector line (hand-drawn wobble) — skip messageBPMN */}
