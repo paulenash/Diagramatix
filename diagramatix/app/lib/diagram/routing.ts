@@ -130,7 +130,13 @@ function pathHitsObstacles(path: Point[], obstacles: Bounds[]): boolean {
 function buildOrthogonalPath(
   start: Point,
   end: Point,
-  obstacles: Bounds[]
+  obstacles: Bounds[],
+  // Containment: when both endpoints sit inside an EP (or any other
+  // bounded region we want to keep the route inside), pass that rect
+  // here. The around-obstacle candidates are clamped so the path stays
+  // within the box. Without this, an internal obstacle between two
+  // EP children would push the route OUTSIDE the EP boundary.
+  containment?: Bounds,
 ): Point[] {
   const mid1: Point = { x: end.x, y: start.y };
   const mid2: Point = { x: start.x, y: end.y };
@@ -145,10 +151,25 @@ function buildOrthogonalPath(
   const MARGIN = 20;
 
   // Use ALL obstacles to compute safe routing bounds
-  const bottomY = Math.max(start.y, end.y, ...obstacles.map(o => o.y + o.height)) + MARGIN;
-  const topY = Math.min(start.y, end.y, ...obstacles.map(o => o.y)) - MARGIN;
-  const rightX = Math.max(start.x, end.x, ...obstacles.map(o => o.x + o.width)) + MARGIN;
-  const leftX = Math.min(start.x, end.x, ...obstacles.map(o => o.x)) - MARGIN;
+  let bottomY = Math.max(start.y, end.y, ...obstacles.map(o => o.y + o.height)) + MARGIN;
+  let topY = Math.min(start.y, end.y, ...obstacles.map(o => o.y)) - MARGIN;
+  let rightX = Math.max(start.x, end.x, ...obstacles.map(o => o.x + o.width)) + MARGIN;
+  let leftX = Math.min(start.x, end.x, ...obstacles.map(o => o.x)) - MARGIN;
+
+  // Clamp to containment box: keep the routing safely inside the
+  // enclosing EP (with a small inset so the route doesn't sit on the
+  // EP edge).
+  if (containment) {
+    const INSET = 4;
+    const cTop    = containment.y + INSET;
+    const cBottom = containment.y + containment.height - INSET;
+    const cLeft   = containment.x + INSET;
+    const cRight  = containment.x + containment.width - INSET;
+    bottomY = Math.min(bottomY, cBottom);
+    topY    = Math.max(topY, cTop);
+    rightX  = Math.min(rightX, cRight);
+    leftX   = Math.max(leftX, cLeft);
+  }
 
   const candidates: { path: Point[]; len: number }[] = [
     { path: [start, { x: start.x, y: bottomY }, { x: end.x, y: bottomY }, end], len: 0 },
@@ -171,10 +192,15 @@ function buildOrthogonalPath(
     if (!pathHitsObstacles(c.path, obstacles)) return c.path;
   }
 
-  // Last resort: route far enough outside all obstacles
-  const farY = topY - MARGIN;
-  const farPath = [start, { x: start.x, y: farY }, { x: end.x, y: farY }, end];
-  if (!pathHitsObstacles(farPath, obstacles)) return farPath;
+  // Last resort: route far enough outside all obstacles. When containment
+  // is set, prefer the shortest containment-clamped candidate over going
+  // outside the EP — accept that it may clip an internal obstacle rather
+  // than break out of the EP boundary.
+  if (!containment) {
+    const farY = topY - MARGIN;
+    const farPath = [start, { x: start.x, y: farY }, { x: end.x, y: farY }, end];
+    if (!pathHitsObstacles(farPath, obstacles)) return farPath;
+  }
 
   return candidates[0].path;
 }
@@ -487,6 +513,25 @@ export function computeWaypoints(
   }
   const srcAncestors = ancestorsOf(source.id);
   const tgtAncestors = ancestorsOf(target.id);
+  // Innermost EP that contains BOTH endpoints — used as the route's
+  // containment box so internal-obstacle avoidance never pushes the
+  // path outside the EP boundary (user rule). If neither endpoint is
+  // inside any common EP, no containment is applied.
+  let containmentBounds: Bounds | undefined = undefined;
+  {
+    const commonEPs: DiagramElement[] = [];
+    for (const ancId of srcAncestors) {
+      if (!tgtAncestors.has(ancId)) continue;
+      const anc = allElements.find((e) => e.id === ancId);
+      if (anc?.type === "subprocess-expanded") commonEPs.push(anc);
+    }
+    if (commonEPs.length > 0) {
+      const innermost = commonEPs.reduce((a, b) =>
+        a.width * a.height <= b.width * b.height ? a : b,
+      );
+      containmentBounds = getBounds(innermost);
+    }
+  }
   const obstacles = allElements
     .filter((el) => {
       if (el.id === source.id || el.id === target.id) return false;
@@ -579,7 +624,7 @@ export function computeWaypoints(
         ? [exitPt, approachPt]
         : [exitPt, { x: midX, y: exitPt.y }, { x: midX, y: approachPt.y }, approachPt];
     } else {
-      midPath = buildOrthogonalPath(exitPt, approachPt, obstacles);
+      midPath = buildOrthogonalPath(exitPt, approachPt, obstacles, containmentBounds);
     }
   } else if (
     exitOutward && approachOutward &&
@@ -595,7 +640,7 @@ export function computeWaypoints(
         ? [exitPt, approachPt]
         : [exitPt, { x: exitPt.x, y: midY }, { x: approachPt.x, y: midY }, approachPt];
     } else {
-      midPath = buildOrthogonalPath(exitPt, approachPt, obstacles);
+      midPath = buildOrthogonalPath(exitPt, approachPt, obstacles, containmentBounds);
     }
   } else {
     // Perpendicular sides (e.g., right→top, bottom→left, etc.)
@@ -626,7 +671,7 @@ export function computeWaypoints(
       midPath = [lCorner2];
     } else {
       // Fall back to stub-based routing (guarantees perpendicularity, may have more corners)
-      midPath = buildOrthogonalPath(exitPt, approachPt, obstacles);
+      midPath = buildOrthogonalPath(exitPt, approachPt, obstacles, containmentBounds);
     }
   }
 
