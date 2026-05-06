@@ -147,14 +147,29 @@ function buildOrthogonalPath(
   if (!pathHitsObstacles(pathA, obstacles)) return pathA;
   if (!pathHitsObstacles(pathB, obstacles)) return pathB;
 
-  // Both L-shaped paths blocked — route around ALL obstacles
-  const MARGIN = 20;
-
-  // Use ALL obstacles to compute safe routing bounds
-  let bottomY = Math.max(start.y, end.y, ...obstacles.map(o => o.y + o.height)) + MARGIN;
-  let topY = Math.min(start.y, end.y, ...obstacles.map(o => o.y)) - MARGIN;
-  let rightX = Math.max(start.x, end.x, ...obstacles.map(o => o.x + o.width)) + MARGIN;
-  let leftX = Math.min(start.x, end.x, ...obstacles.map(o => o.x)) - MARGIN;
+  // Both L-shaped paths blocked — route around the obstacles, hugging
+  // them (10 px clearance) instead of swinging far out. Each detour
+  // direction only considers obstacles whose perpendicular projection
+  // overlaps the start↔end span on the OTHER axis — so a far-away
+  // obstacle off to the side doesn't push the detour wider than needed.
+  const MARGIN = 10;
+  const xMin = Math.min(start.x, end.x);
+  const xMax = Math.max(start.x, end.x);
+  const yMin = Math.min(start.y, end.y);
+  const yMax = Math.max(start.y, end.y);
+  // Obstacles whose x-range overlaps the start-end x-range affect a
+  // SOUTH/NORTH detour (vertical clearance); y-range overlap affects
+  // EAST/WEST detours.
+  const obsX = obstacles.filter(o => o.x < xMax && o.x + o.width > xMin);
+  const obsY = obstacles.filter(o => o.y < yMax && o.y + o.height > yMin);
+  let bottomY = yMax;
+  if (obsX.length > 0) bottomY = Math.max(bottomY, ...obsX.map(o => o.y + o.height)) + MARGIN;
+  let topY = yMin;
+  if (obsX.length > 0) topY = Math.min(topY, ...obsX.map(o => o.y)) - MARGIN;
+  let rightX = xMax;
+  if (obsY.length > 0) rightX = Math.max(rightX, ...obsY.map(o => o.x + o.width)) + MARGIN;
+  let leftX = xMin;
+  if (obsY.length > 0) leftX = Math.min(leftX, ...obsY.map(o => o.x)) - MARGIN;
 
   // Clamp to containment box: keep the routing safely inside the
   // enclosing EP (with a small inset so the route doesn't sit on the

@@ -1859,14 +1859,13 @@ function ensureContainersEncloseChildren(
     if (kids.length === 0) continue;
     // PAD=0 for lane/sublane children — they fill their pool/lane by
     // convention (no gap between last lane bottom and pool bottom).
-    // PAD=5 for an EP-inside-EP relationship (user rule: outer EP only
+    // PAD=10 for an EP-inside-EP relationship (user rule: outer EP only
     // follows the inner EP's boundary when the inner edge is within
-    // 5 px of the outer edge — same proximity model as a task moved
-    // within an EP). PAD=8 for everything else (tasks / events / EP
-    // inside a non-EP container).
+    // 10 px of the outer edge, then the outer cascade kicks in).
+    // PAD=8 for everything else (tasks / events / EP in a non-EP container).
     const padFor = (c: DiagramElement) => {
       if (c.type === "lane" || c.type === "sublane") return 0;
-      if (c.type === "subprocess-expanded" && e.type === "subprocess-expanded") return 5;
+      if (c.type === "subprocess-expanded" && e.type === "subprocess-expanded") return 10;
       return PAD;
     };
     const childMaxBottom = Math.max(...kids.map((c) => c.y + c.height + padFor(c)));
@@ -3758,12 +3757,12 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         : null;
       let epGrown = false;
       if (epParent && movedNow) {
-        // PAD=5 when an inner EP is moving inside an outer EP (user
+        // PAD=10 when an inner EP is moving inside an outer EP (user
         // rule: parent EP only follows the inner EP's boundary when the
-        // inner edge is within 5 px). PAD=8 when a non-EP element
+        // inner edge is within 10 px). PAD=8 when a non-EP element
         // (task / event / etc.) is moving — preserves the existing
         // task-in-EP proximity behaviour.
-        const PAD = movedNow.type === "subprocess-expanded" ? 5 : 8;
+        const PAD = movedNow.type === "subprocess-expanded" ? 10 : 8;
         const oldRect = { x: epParent.x, y: epParent.y, width: epParent.width, height: epParent.height };
         const reqLeft   = movedNow.x - PAD;
         const reqTop    = movedNow.y - PAD;

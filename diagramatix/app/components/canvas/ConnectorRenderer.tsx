@@ -1,6 +1,15 @@
 "use client";
 
-import { useState, useContext, useRef } from "react";
+import { useState, useContext } from "react";
+
+// Module-level double-click tracking. Must NOT be a per-component ref:
+// Canvas renders the SELECTED connector and the UNSELECTED connectors
+// in two different JSX branches, so a click that toggles selection
+// causes the connector's React instance to re-mount on a new branch.
+// useRef would lose the previous click time across that re-mount and
+// the double-click would never register.
+let lastConnectorClickId: string | null = null;
+let lastConnectorClickTime = 0;
 import type { Connector, Point, Side } from "@/app/lib/diagram/types";
 import { DisplayModeCtx, ConnectorFontScaleCtx, sketchyFilter } from "@/app/lib/diagram/displayMode";
 import { waypointsToSvgPath, waypointsToCurvePath, waypointsToRoundedPath } from "@/app/lib/diagram/routing";
@@ -484,10 +493,6 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
   const displayMode = useContext(DisplayModeCtx);
   const connFontScale = useContext(ConnectorFontScaleCtx);
   const [draggingEndLabel, setDraggingEndLabel] = useState<string | null>(null);
-  // Manual double-click detection — onDoubleClick on SVG paths inside
-  // transformed groups can be flaky across browsers, so we time the
-  // gap between two clicks ourselves.
-  const lastClickRef = useRef<number>(0);
   const waypoints = connector.waypoints;
   if (waypoints.length === 0) return null;
 
@@ -666,7 +671,10 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
   // vertical) follows the click position relative to the segment so the
   // bend appears on the side the user clicked.
   function insertWaypointAt(click: Point) {
-    if (connector.routingType !== "rectilinear") return false;
+    // Accept any non-curvilinear routing — including older connectors
+    // that may have routingType undefined. Only curvilinear has its
+    // own dedicated handle-drag model.
+    if (connector.routingType === "curvilinear") return false;
     if (!onUpdateWaypoints) return false;
     let bestSegIdx = -1;
     let bestDist = Infinity;
@@ -686,9 +694,9 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
     // at each end; otherwise the inserted waypoints would land too
     // close to existing ones and `consolidateWaypoints` would drop them.
     const segLen = isHoriz ? Math.abs(p2.x - p1.x) : Math.abs(p2.y - p1.y);
-    const HALF_W = 15;       // half-width of the U along the segment direction
-    const JOG_H  = 20;       // perpendicular height of the U
-    const END_MIN = 12;      // distance from each segment endpoint to U-corner
+    const HALF_W = 10;       // half-width of the U along the segment direction
+    const JOG_H  = 15;       // perpendicular height of the U
+    const END_MIN = 4;       // distance from each segment endpoint to U-corner
     if (segLen < 2 * HALF_W + 2 * END_MIN) return false;
     let q1: Point, q2: Point, q3: Point, q4: Point;
     if (isHoriz) {
@@ -725,16 +733,21 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
   }
 
   // Combined click + double-click handler. First click selects the
-  // connector; a second click within 350 ms inserts a waypoint at the
-  // click position. Manual timing is more reliable than React's
-  // onDoubleClick on SVG paths inside transformed groups (which can
-  // miss the second click when an intervening re-render swaps the
-  // event target).
+  // connector; a second click within 400 ms on the SAME connector
+  // inserts a U-jog at the click position. Module-level state survives
+  // the React instance re-mount when selection toggles which JSX
+  // branch the connector lives in.
   function handleConnectorClick(e: React.MouseEvent) {
     e.stopPropagation();
     const now = Date.now();
-    const isDouble = now - lastClickRef.current < 350;
-    lastClickRef.current = isDouble ? 0 : now;
+    const isDouble = lastConnectorClickId === connector.id && now - lastConnectorClickTime < 400;
+    if (isDouble) {
+      lastConnectorClickId = null;
+      lastConnectorClickTime = 0;
+    } else {
+      lastConnectorClickId = connector.id;
+      lastConnectorClickTime = now;
+    }
     if (isDouble && svgToWorld) {
       const inserted = insertWaypointAt(svgToWorld(e.clientX, e.clientY));
       if (inserted) return;
