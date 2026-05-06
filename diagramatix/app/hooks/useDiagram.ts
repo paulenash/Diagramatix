@@ -1503,15 +1503,21 @@ function applyEPBoundaryChange(
       epAncestorOldRects.set(ancId, { x: anc.x, y: anc.y, width: anc.width, height: anc.height });
     }
   }
-  if (epAncestors.size > 0 && (growTop !== 0 || growBottom !== 0 || growLeft !== 0 || growRight !== 0)) {
+  // When the moved EP's direct parent is also an EP (nested EP case),
+  // skip explicit ancestor grow entirely. Lane / pool / outer-EP all
+  // follow via proximity-gated `ensureContainersEncloseChildren` (PAD=5
+  // for EP-in-EP; PAD=8 for outer-EP-in-lane). Without this gate the
+  // lane / pool would grow by the inner EP's full delta even though
+  // the outer EP didn't move — making the lane jut out beyond the
+  // outer EP visually.
+  const movedEpDirectParent = elements.find((e) => e.id === ep0.parentId);
+  const epIsInsideEP = movedEpDirectParent?.type === "subprocess-expanded";
+  if (!epIsInsideEP && epAncestors.size > 0 && (growTop !== 0 || growBottom !== 0 || growLeft !== 0 || growRight !== 0)) {
     updatedEls = updatedEls.map((e) => {
       if (!epAncestors.has(e.id)) return e;
-      // EP-typed ancestors are NOT explicitly grown here. They follow
-      // proximity-based — outer EP's boundary only moves when the inner
-      // EP gets within 5 px (handled by ensureContainersEncloseChildren
-      // with PAD=5 for EP-in-EP, see step 7). Without this skip, every
-      // inner-EP move dragged the outer EP boundary along by the full
-      // delta even if the inner was nowhere near it.
+      // EP-typed ancestors stay proximity-gated even for outermost-EP
+      // moves — the user only wants the OUTER EP boundary to follow
+      // when the inner EP gets within 5 px.
       if (e.type === "subprocess-expanded") return e;
       const isPool = e.type === "pool";
       const gT = isPool ? Math.max(0, growTop)    : growTop;
@@ -5247,25 +5253,15 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         const labelAdj = preserveLabelWorldPos(c, newWaypoints);
         return { ...c, waypoints: newWaypoints, ...labelAdj };
       });
-      // Skip obstacle validation for messageBPMN — they cross pools and don't interact with obstacles
-      const waypointConn = updatedConns.find(c => c.id === action.payload.id);
-      if (waypointConn?.type === "messageBPMN") {
-        return { ...state, connectors: updatedConns };
-      }
-      // R54 continued: if the obstacle validator re-routes and shifts the
-      // anchor, preserve the label's world position there too. We re-apply
-      // preserveLabelWorldPos against the PRE-validation snapshot so the
-      // label ends up where the user left it, not where validator defaults
-      // would place it.
-      const preValidation = new Map(updatedConns.map(c => [c.id, c]));
-      const validated = validateConnectorsAgainstObstacles(updatedConns, state.elements);
-      const final = validated.map(c => {
-        const before = preValidation.get(c.id);
-        if (!before || before.waypoints === c.waypoints) return c;
-        const adj = preserveLabelWorldPos(before, c.waypoints);
-        return Object.keys(adj).length > 0 ? { ...c, ...adj } : c;
-      });
-      return { ...state, connectors: final };
+      // Skip obstacle validation entirely. UPDATE_CONNECTOR_WAYPOINTS is
+      // only fired by user-initiated waypoint changes (segment drag,
+      // double-click insert). Running the validator here would
+      // recompute the route around any obstacle the user's path
+      // crosses — instantly reverting an intentional re-route through
+      // an EP, double-click U-jog, or any other manual reshape.
+      // Element-move flows still validate via their own
+      // `validateConnectorsAgainstObstacles` calls.
+      return { ...state, connectors: updatedConns };
     }
 
     case "UPDATE_CURVE_HANDLES": {
@@ -5513,30 +5509,69 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       const initialEl = state.elements.find(e => e.id === id);
       if (!initialEl) return state;
 
+      // Step 0: Final parent re-detection. During the drag (MOVE_ELEMENT)
+      // we lock parentId to the moved element's containing EP so sibling
+      // EPs don't get disturbed. At drop, re-evaluate where the element
+      // landed — if its centre is now inside a different container
+      // (typically a NESTED EP that the user dragged into), update its
+      // parentId so the EP-grow path below picks the right container.
+      let elements = state.elements;
+      let connectors = state.connectors;
+      if (
+        !initialEl.boundaryHostId &&
+        !BOUNDARY_EVENT_TYPES.has(initialEl.type)
+      ) {
+        const cx = initialEl.x + initialEl.width / 2;
+        const cy = initialEl.y + initialEl.height / 2;
+        const candidates = elements.filter(b =>
+          isContainerType(b.type) &&
+          containerAccepts(b.type, initialEl.type) &&
+          b.id !== id &&
+          !wouldCreateCycle(elements, id, b.id) &&
+          cx >= b.x && cx <= b.x + b.width &&
+          cy >= b.y && cy <= b.y + b.height,
+        );
+        // Prefer innermost (smallest) EP, then archimate-shape, then lane,
+        // then pool — same priority as MOVE_ELEMENT's auto-detection.
+        const newParent =
+          candidates.filter(b => b.type === "subprocess-expanded")
+            .sort((a, b) => (a.width * a.height) - (b.width * b.height))[0] ??
+          candidates.filter(b => b.type === "archimate-shape")
+            .sort((a, b) => (a.width * a.height) - (b.width * b.height))[0] ??
+          candidates.find(b => b.type === "lane") ??
+          candidates.find(b => b.type === "pool") ??
+          candidates.filter(b => b.type === "process-group")
+            .sort((a, b) => (a.width * a.height) - (b.width * b.height))[0] ??
+          candidates[0];
+        const newParentId = newParent?.id;
+        if (newParentId !== initialEl.parentId) {
+          elements = elements.map(e => e.id === id ? { ...e, parentId: newParentId } : e);
+        }
+      }
+
       // Step 1 (issue 8): EP boundary-aware growth fires once at drag
       // release, not on every MOVE_ELEMENT tick. If the moved element
       // ended up parented to a subprocess-expanded near (or straddling)
       // an EP edge, grow the EP, place the moved element, and cascade
       // to the enclosing pool / neighbouring pools.
-      let elements = state.elements;
-      let connectors = state.connectors;
+      const elPostReparent = elements.find(e => e.id === id);
       if (
-        initialEl.parentId &&
-        !initialEl.boundaryHostId &&
-        !BOUNDARY_EVENT_TYPES.has(initialEl.type)
+        elPostReparent?.parentId &&
+        !elPostReparent.boundaryHostId &&
+        !BOUNDARY_EVENT_TYPES.has(elPostReparent.type)
       ) {
-        const parent = elements.find(e => e.id === initialEl.parentId);
+        const parent = elements.find(e => e.id === elPostReparent.parentId);
         if (parent?.type === "subprocess-expanded") {
           // expandEPForBoundaryEntry → applyEPBoundaryChange handles the
           // EP grow, ancestor grow, pool buffer, pool cascade, AND
           // messageBPMN label tracking internally. No separate cascade
           // is needed here.
           const grown = expandEPForBoundaryEntry(elements, connectors, parent.id, {
-            id: initialEl.id,
-            x: initialEl.x,
-            y: initialEl.y,
-            width: initialEl.width,
-            height: initialEl.height,
+            id: elPostReparent.id,
+            x: elPostReparent.x,
+            y: elPostReparent.y,
+            width: elPostReparent.width,
+            height: elPostReparent.height,
           });
           if (grown) {
             elements = grown.elements.map(e =>

@@ -659,11 +659,12 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
     window.addEventListener("mouseup", onUp);
   }
 
-  // Insert a new waypoint at the click point. Inserts THREE collinear
-  // points spaced ~30 px apart so a draggable interior segment exists
-  // immediately AND is wide enough to grab. The path looks unchanged
-  // until the user drags the new middle segment — handleSegmentMouseDown's
-  // bridging-corner logic handles the orthogonal bend.
+  // Insert a small, visible U-shaped jog at the click point. Four new
+  // waypoints break the segment into five orthogonal pieces; the bottom
+  // (or side) of the U becomes immediately draggable for re-routing.
+  // The jog direction (above/below for horizontal, left/right for
+  // vertical) follows the click position relative to the segment so the
+  // bend appears on the side the user clicked.
   function insertWaypointAt(click: Point) {
     if (connector.routingType !== "rectilinear") return false;
     if (!onUpdateWaypoints) return false;
@@ -681,44 +682,42 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
     const p1 = visibleWaypoints[bestSegIdx];
     const p2 = visibleWaypoints[bestSegIdx + 1];
     const isHoriz = Math.abs(p1.y - p2.y) < 1;
-    // Pick three collinear points centred on the projection, spaced
-    // 30 px apart along the segment direction. The middle of the three
-    // becomes a draggable interior segment per draggableSegments rules.
-    const SPAN = 30;
-    let q1: Point, q2: Point, q3: Point;
-    if (isHoriz) {
-      const dir = p2.x >= p1.x ? 1 : -1;
-      q1 = { x: bestProjection.x - dir * SPAN, y: p1.y };
-      q2 = { x: bestProjection.x,             y: p1.y };
-      q3 = { x: bestProjection.x + dir * SPAN, y: p1.y };
-    } else {
-      const dir = p2.y >= p1.y ? 1 : -1;
-      q1 = { x: p1.x, y: bestProjection.y - dir * SPAN };
-      q2 = { x: p1.x, y: bestProjection.y };
-      q3 = { x: p1.x, y: bestProjection.y + dir * SPAN };
-    }
-    // Clamp so the inserted points stay strictly between p1 and p2.
-    function clampBetween(q: Point): Point {
-      if (isHoriz) {
-        const lo = Math.min(p1.x, p2.x) + 4;
-        const hi = Math.max(p1.x, p2.x) - 4;
-        return { x: Math.max(lo, Math.min(hi, q.x)), y: p1.y };
-      } else {
-        const lo = Math.min(p1.y, p2.y) + 4;
-        const hi = Math.max(p1.y, p2.y) - 4;
-        return { x: p1.x, y: Math.max(lo, Math.min(hi, q.y)) };
-      }
-    }
-    q1 = clampBetween(q1);
-    q2 = clampBetween(q2);
-    q3 = clampBetween(q3);
-    // Skip if the segment is too short for a useful split.
+    // The segment must be long enough for the U-jog to fit with margin
+    // at each end; otherwise the inserted waypoints would land too
+    // close to existing ones and `consolidateWaypoints` would drop them.
     const segLen = isHoriz ? Math.abs(p2.x - p1.x) : Math.abs(p2.y - p1.y);
-    if (segLen < 30) return false;
+    const HALF_W = 15;       // half-width of the U along the segment direction
+    const JOG_H  = 20;       // perpendicular height of the U
+    const END_MIN = 12;      // distance from each segment endpoint to U-corner
+    if (segLen < 2 * HALF_W + 2 * END_MIN) return false;
+    let q1: Point, q2: Point, q3: Point, q4: Point;
+    if (isHoriz) {
+      // Direction from click to perpendicular: above the segment → up,
+      // else → down. Click is within 20 px of segment by construction.
+      const jogDir = click.y < p1.y ? -1 : 1;
+      // Centre the U on the projection, but clamp so corners stay
+      // END_MIN px from segment endpoints.
+      const lo = Math.min(p1.x, p2.x) + END_MIN + HALF_W;
+      const hi = Math.max(p1.x, p2.x) - END_MIN - HALF_W;
+      const cx = Math.max(lo, Math.min(hi, bestProjection.x));
+      q1 = { x: cx - HALF_W, y: p1.y };
+      q2 = { x: cx - HALF_W, y: p1.y + jogDir * JOG_H };
+      q3 = { x: cx + HALF_W, y: p1.y + jogDir * JOG_H };
+      q4 = { x: cx + HALF_W, y: p1.y };
+    } else {
+      const jogDir = click.x < p1.x ? -1 : 1;
+      const lo = Math.min(p1.y, p2.y) + END_MIN + HALF_W;
+      const hi = Math.max(p1.y, p2.y) - END_MIN - HALF_W;
+      const cy = Math.max(lo, Math.min(hi, bestProjection.y));
+      q1 = { x: p1.x,                     y: cy - HALF_W };
+      q2 = { x: p1.x + jogDir * JOG_H,    y: cy - HALF_W };
+      q3 = { x: p1.x + jogDir * JOG_H,    y: cy + HALF_W };
+      q4 = { x: p1.x,                     y: cy + HALF_W };
+    }
     const fullIdx = visStart + bestSegIdx + 1;
     const newWaypoints = [
       ...connector.waypoints.slice(0, fullIdx),
-      q1, q2, q3,
+      q1, q2, q3, q4,
       ...connector.waypoints.slice(fullIdx),
     ];
     onUpdateWaypoints(connector.id, newWaypoints);
