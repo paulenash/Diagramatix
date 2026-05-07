@@ -464,6 +464,7 @@ export function DiagramEditor({
     clearDiagramExcept,
     correctAllConnectors,
     insertSpace,
+    removeSpace,
     addLane,
     addSublane,
     reorderLane,
@@ -1924,6 +1925,7 @@ export function DiagramEditor({
           showValueDisplay={showValueDisplay}
           showBottleneck={showBottleneck}
           onInsertSpace={(diagramType === "bpmn" || diagramType === "state-machine") ? insertSpace : undefined}
+          onRemoveSpace={(diagramType === "bpmn" || diagramType === "state-machine") ? removeSpace : undefined}
           onAddSelfTransition={diagramType === "state-machine" ? addSelfTransition : undefined}
         />
 

@@ -284,6 +284,7 @@ type Action =
   | { type: "SET_DATABASE"; payload: string }
   | { type: "CORRECT_ALL_CONNECTORS" }
   | { type: "INSERT_SPACE"; payload: { markerX: number; markerY: number; dx: number; dy: number } }
+  | { type: "REMOVE_SPACE"; payload: { zone: { x: number; y: number; width: number; height: number } } }
   | { type: "SET_VIEWPORT"; payload: { x: number; y: number; zoom: number } }
   | { type: "MOVE_END"; payload: { id: string } }
   | { type: "SPLIT_CONNECTOR"; payload: {
@@ -5477,6 +5478,12 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       //   • If the host grows down (dy>0, marker line cuts host vertically)
       //     → only boundary events on the BOTTOM edge shift down
       //   • Otherwise → the event stays where it is
+      //
+      // EP exception (user rule): when the insertion line cuts through
+      // a `subprocess-expanded`, that EP's edge-mounted events keep
+      // their absolute position regardless of which edge they're on.
+      // The EP itself still grows in width/height (first pass), but
+      // its events stay glued to the page.
       const oldElementMap = new Map(state.elements.map(e => [e.id, e]));
       const newElementMap = new Map(elements.map(e => [e.id, e]));
       const finalElements = elements.map(el => {
@@ -5484,6 +5491,13 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         const oldHost = oldElementMap.get(el.boundaryHostId);
         const newHost = newElementMap.get(el.boundaryHostId);
         if (!oldHost || !newHost) return el;
+        if (oldHost.type === "subprocess-expanded") {
+          const cutsHorizontally = dy !== 0
+            && markerY > oldHost.y && markerY < oldHost.y + oldHost.height;
+          const cutsVertically = dx !== 0
+            && markerX > oldHost.x && markerX < oldHost.x + oldHost.width;
+          if (cutsHorizontally || cutsVertically) return el;
+        }
 
         // Identify which side of the OLD host the event is mounted on
         const evCx = el.x + el.width / 2;
@@ -5528,6 +5542,173 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       });
 
       return { ...state, elements: updatePoolTypes(finalElements), connectors: validateConnectorsAgainstObstacles(connectors, finalElements) };
+    }
+
+    case "REMOVE_SPACE": {
+      const { zone } = action.payload;
+      const zR = zone.x + zone.width;
+      const zB = zone.y + zone.height;
+      const MIN_W = 40, MIN_H = 40;     // floor for shrunk containers
+      const EP_CLAMP = 10;              // EP-clamp clearance for shifted externals
+
+      // EP exemption set: every EP element + every descendant of an EP +
+      // every boundary event whose host is in that set. These are
+      // EXEMPT from delete and from container-shrink. They DO get
+      // shifted (an EP entirely right of the zone moves left with the
+      // rest).
+      const epRoots = state.elements.filter((e) => e.type === "subprocess-expanded");
+      const epExempt = new Set<string>();
+      for (const ep of epRoots) {
+        epExempt.add(ep.id);
+        for (const id of getAllDescendantIds(state.elements, ep.id)) epExempt.add(id);
+      }
+      for (const e of state.elements) {
+        if (e.boundaryHostId && epExempt.has(e.boundaryHostId)) epExempt.add(e.id);
+      }
+
+      // EP rects (for the post-shift clamp pass).
+      const epRects = epRoots.map((ep) => ({
+        id: ep.id,
+        x: ep.x, y: ep.y, width: ep.width, height: ep.height,
+      }));
+
+      const fullyInside = (e: { x: number; y: number; width: number; height: number }) =>
+        e.x >= zone.x && e.x + e.width <= zR &&
+        e.y >= zone.y && e.y + e.height <= zB;
+      const partialOverlap = (e: { x: number; y: number; width: number; height: number }) =>
+        e.x < zR && e.x + e.width > zone.x &&
+        e.y < zB && e.y + e.height > zone.y;
+
+      // Delete fully-inside elements (skip EP-exempt). Track the deleted
+      // set to also remove connectors attached to them.
+      const deleteIds = new Set<string>();
+      for (const e of state.elements) {
+        if (epExempt.has(e.id)) continue;
+        if (fullyInside(e)) deleteIds.add(e.id);
+      }
+
+      const STRUCTURAL = new Set<string>(["pool", "lane", "sublane"]);
+
+      const shiftedElements = state.elements
+        .filter((e) => !deleteIds.has(e.id))
+        .map((e) => {
+          // EP-exempt elements (EP + descendants + their boundary events):
+          // shift only — never shrink, never delete.
+          if (epExempt.has(e.id)) {
+            const ePast = e.x >= zR;
+            const ebPast = e.y >= zB;
+            if (!ePast && !ebPast) return e;
+            return { ...e, x: ePast ? e.x - zone.width : e.x, y: ebPast ? e.y - zone.height : e.y };
+          }
+          // Boundary events follow their host. They'll be re-placed in
+          // a second pass once host rects are known.
+          if (e.boundaryHostId) return e;
+          // Containers (pool / lane / sublane) that straddle the zone
+          // shrink rather than shift past it.
+          const isStructural = STRUCTURAL.has(e.type);
+          if (isStructural) {
+            let nx = e.x, ny = e.y, nw = e.width, nh = e.height;
+            const straddleX = e.x < zone.x && e.x + e.width > zR;
+            const straddleY = e.y < zone.y && e.y + e.height > zB;
+            if (straddleX) { nw = Math.max(MIN_W, nw - zone.width); }
+            else if (e.x >= zR) { nx -= zone.width; }
+            if (straddleY) { nh = Math.max(MIN_H, nh - zone.height); }
+            else if (e.y >= zB) { ny -= zone.height; }
+            return { ...e, x: nx, y: ny, width: nw, height: nh };
+          }
+          // Non-structural, non-EP elements: partial overlap → leave
+          // alone; otherwise shift inward.
+          if (partialOverlap(e)) return e;
+          let nx = e.x, ny = e.y;
+          if (e.x >= zR) nx -= zone.width;
+          if (e.y >= zB) ny -= zone.height;
+          if (nx === e.x && ny === e.y) return e;
+          return { ...e, x: nx, y: ny };
+        });
+
+      // EP clamp: if a shifted external element's new position would
+      // land inside an EP it didn't sit inside before, push it 10 px
+      // outside the EP's nearest edge.
+      const wasInside = (eOld: typeof state.elements[number], ep: typeof epRects[number]) => {
+        const cx = eOld.x + eOld.width / 2;
+        const cy = eOld.y + eOld.height / 2;
+        return cx > ep.x && cx < ep.x + ep.width && cy > ep.y && cy < ep.y + ep.height;
+      };
+      const oldById = new Map(state.elements.map((e) => [e.id, e]));
+      const clampedElements = shiftedElements.map((e) => {
+        if (epExempt.has(e.id) || e.boundaryHostId) return e;
+        const eOld = oldById.get(e.id);
+        if (!eOld) return e;
+        const cx = e.x + e.width / 2;
+        const cy = e.y + e.height / 2;
+        for (const ep of epRects) {
+          const newInside = cx > ep.x && cx < ep.x + ep.width && cy > ep.y && cy < ep.y + ep.height;
+          if (!newInside) continue;
+          if (wasInside(eOld, ep)) continue; // already inside before — leave alone
+          // Push outside via the nearest edge with 10 px clearance.
+          const distLeft = cx - ep.x;
+          const distRight = ep.x + ep.width - cx;
+          const distTop = cy - ep.y;
+          const distBottom = ep.y + ep.height - cy;
+          const minD = Math.min(distLeft, distRight, distTop, distBottom);
+          let nx = e.x, ny = e.y;
+          if (minD === distLeft)        nx = ep.x - e.width - EP_CLAMP;
+          else if (minD === distRight)  nx = ep.x + ep.width + EP_CLAMP;
+          else if (minD === distTop)    ny = ep.y - e.height - EP_CLAMP;
+          else                          ny = ep.y + ep.height + EP_CLAMP;
+          return { ...e, x: nx, y: ny };
+        }
+        return e;
+      });
+
+      // Re-place boundary events: anchor follows host's NEW edge so an
+      // event mounted on the right edge of a host that just shifted
+      // left rides along.
+      const oldHostMap = new Map(state.elements.map((e) => [e.id, e]));
+      const newHostMap = new Map(clampedElements.map((e) => [e.id, e]));
+      const finalElements = clampedElements.map((el) => {
+        if (!el.boundaryHostId) return el;
+        const oldHost = oldHostMap.get(el.boundaryHostId);
+        const newHost = newHostMap.get(el.boundaryHostId);
+        if (!oldHost || !newHost) return el;
+        const dx = newHost.x - oldHost.x;
+        const dy = newHost.y - oldHost.y;
+        const dW = newHost.width - oldHost.width;
+        const dH = newHost.height - oldHost.height;
+        if (dx === 0 && dy === 0 && dW === 0 && dH === 0) return el;
+        // Determine which side of OLD host the event is on, mirroring
+        // INSERT_SPACE's logic.
+        const evCx = el.x + el.width / 2;
+        const evCy = el.y + el.height / 2;
+        const distTop    = Math.abs(evCy - oldHost.y);
+        const distBottom = Math.abs(evCy - (oldHost.y + oldHost.height));
+        const distLeft   = Math.abs(evCx - oldHost.x);
+        const distRight  = Math.abs(evCx - (oldHost.x + oldHost.width));
+        const minD = Math.min(distTop, distBottom, distLeft, distRight);
+        const onTop = minD === distTop;
+        const onBottom = !onTop && minD === distBottom;
+        const onLeft = !onTop && !onBottom && minD === distLeft;
+        const onRight = !onTop && !onBottom && !onLeft;
+        let evDx = dx;
+        let evDy = dy;
+        if (onRight) evDx += dW;
+        if (onBottom) evDy += dH;
+        // (onTop / onLeft: edge unchanged because host's x/y already moved.)
+        if (evDx === 0 && evDy === 0) return el;
+        return { ...el, x: el.x + evDx, y: el.y + evDy };
+      });
+
+      // Drop connectors whose endpoints were deleted; recompute the rest.
+      const survivingConnectors = state.connectors.filter((c) =>
+        !deleteIds.has(c.sourceId) && !deleteIds.has(c.targetId),
+      );
+      const recomputed = recomputeAllConnectors(survivingConnectors, finalElements);
+      const enclosed = ensureContainersEncloseChildren(finalElements);
+      return {
+        ...state,
+        elements: updatePoolTypes(enclosed),
+        connectors: validateConnectorsAgainstObstacles(recomputed, enclosed),
+      };
     }
 
     case "CORRECT_ALL_CONNECTORS": {
@@ -6694,6 +6875,11 @@ export function useDiagram(initialData: DiagramData) {
     dispatch({ type: "INSERT_SPACE", payload: { markerX, markerY, dx, dy } });
   }, []);
 
+  const removeSpace = useCallback((zone: { x: number; y: number; width: number; height: number }) => {
+    pushHistory(snapshotData());
+    dispatch({ type: "REMOVE_SPACE", payload: { zone } });
+  }, []);
+
   const addLane = useCallback((poolId: string) => {
     pushHistory(snapshotData());
     dispatch({ type: "ADD_LANE", payload: { poolId } });
@@ -6837,6 +7023,7 @@ export function useDiagram(initialData: DiagramData) {
     setViewport,
     correctAllConnectors,
     insertSpace,
+    removeSpace,
     addLane,
     addSublane,
     moveLaneBoundary,

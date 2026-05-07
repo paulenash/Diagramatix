@@ -25,6 +25,7 @@ import { CHEVRON_THEMES } from "@/app/lib/diagram/chevronThemes";
 import { DisplayModeCtx, FontScaleCtx, ConnectorFontScaleCtx, TitleFontSizeCtx, PoolFontSizeCtx, LaneFontSizeCtx, SketchyFilter } from "@/app/lib/diagram/displayMode";
 import { ConnectorRenderer } from "./ConnectorRenderer";
 import { findShapeByKey as findArchimateShapeByKey } from "@/app/lib/archimate/catalogue";
+import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 
 const HEADER_H = 28;
 const MIN_BOUNDARY_W = 100;
@@ -218,6 +219,7 @@ interface Props {
   showValueDisplay?: boolean;
   showBottleneck?: boolean;
   onInsertSpace?: (markerX: number, markerY: number, dx: number, dy: number) => void;
+  onRemoveSpace?: (zone: { x: number; y: number; width: number; height: number }) => void;
   onAddSelfTransition?: (elementId: string, side: Side, srcOffset: number, tgtOffset: number, bulge: number) => void;
 }
 
@@ -418,6 +420,7 @@ export function Canvas({
   showValueDisplay,
   showBottleneck,
   onInsertSpace,
+  onRemoveSpace,
   onAddSelfTransition,
 }: Props) {
   const displayMode = displayModeProp ?? "normal";
@@ -639,9 +642,12 @@ export function Canvas({
   // Lasso selection state
   const [lassoRect, setLassoRect] = useState<{ startX: number; startY: number; endX: number; endY: number } | null>(null);
 
-  // Space insertion marker state (BPMN only)
+  // Space insertion / removal marker state (BPMN + state-machine).
+  // Two markers active = REMOVE mode (red); one marker = INSERT mode (green).
   const [spaceMarker, setSpaceMarker] = useState<Point | null>(null);
   const [spaceMarkerPlacing, setSpaceMarkerPlacing] = useState(false);
+  const [secondSpaceMarker, setSecondSpaceMarker] = useState<Point | null>(null);
+  const [removalConfirm, setRemovalConfirm] = useState<{ zone: { x: number; y: number; width: number; height: number }; deleteCount: number } | null>(null);
   // (Shift key is checked directly via event.shiftKey for lasso selection)
 
   // Expose viewport center to parent via ref
@@ -1443,22 +1449,30 @@ export function Canvas({
       return;
     }
 
-    // Ctrl+click on background: place/move space insertion marker (BPMN only)
+    // Ctrl+click on background: state machine
+    //   • idle (no marker)         → place 1st green marker (INSERT mode)
+    //   • INSERT mode (1 marker)   → place 2nd marker → REMOVE mode (red)
+    //   • REMOVE mode (2 markers)  → reposition the 2nd marker to the click
+    //                                 (drag updates it in real time)
     if (e.ctrlKey && onInsertSpace) {
       const worldPt = clientToWorld(e.clientX, e.clientY);
-      setSpaceMarker(worldPt);
-      setSpaceMarkerPlacing(true);
-      // Allow immediate drag to reposition
-      const startCX = e.clientX;
-      const startCY = e.clientY;
+      const placingSecond = spaceMarker !== null;
+      if (placingSecond) {
+        setSecondSpaceMarker(worldPt);
+      } else {
+        setSpaceMarker(worldPt);
+        setSpaceMarkerPlacing(true);
+      }
+      // Allow immediate drag to reposition the just-placed marker.
       function onMove(ev: MouseEvent) {
         const wp = clientToWorld(ev.clientX, ev.clientY);
-        setSpaceMarker(wp);
+        if (placingSecond) setSecondSpaceMarker(wp);
+        else setSpaceMarker(wp);
       }
       function onUp() {
         window.removeEventListener("mousemove", onMove);
         window.removeEventListener("mouseup", onUp);
-        setSpaceMarkerPlacing(false);
+        if (!placingSecond) setSpaceMarkerPlacing(false);
       }
       window.addEventListener("mousemove", onMove);
       window.addEventListener("mouseup", onUp);
@@ -2728,10 +2742,59 @@ export function Canvas({
       }
       if (selectedConnectorId) onDeleteConnector(selectedConnectorId);
     }
-    // Escape cancels space marker
-    if (e.key === "Escape" && spaceMarker) {
-      setSpaceMarker(null);
-      setSpaceMarkerPlacing(false);
+    // Escape ladder for space markers:
+    //   • REMOVE mode (2 markers) → drop the 2nd marker, return to INSERT.
+    //   • INSERT mode (1 marker)  → drop the 1st marker, return to idle.
+    if (e.key === "Escape") {
+      if (removalConfirm) {
+        setRemovalConfirm(null);
+        return;
+      }
+      if (secondSpaceMarker) {
+        setSecondSpaceMarker(null);
+        return;
+      }
+      if (spaceMarker) {
+        setSpaceMarker(null);
+        setSpaceMarkerPlacing(false);
+      }
+    }
+    // Enter in REMOVE mode: open the confirmation dialog with the
+    // computed deletion count.
+    if (e.key === "Enter" && spaceMarker && secondSpaceMarker && !removalConfirm) {
+      e.preventDefault();
+      const zx = Math.min(spaceMarker.x, secondSpaceMarker.x);
+      const zy = Math.min(spaceMarker.y, secondSpaceMarker.y);
+      const zw = Math.abs(secondSpaceMarker.x - spaceMarker.x);
+      const zh = Math.abs(secondSpaceMarker.y - spaceMarker.y);
+      // Count fully-inside non-EP, non-EP-descendant elements that
+      // would be deleted (mirrors the reducer's classifier).
+      const epExempt = new Set<string>();
+      for (const ep of data.elements) {
+        if (ep.type !== "subprocess-expanded") continue;
+        epExempt.add(ep.id);
+        const stack = [ep.id];
+        while (stack.length) {
+          const cur = stack.pop()!;
+          for (const c of data.elements) {
+            if ((c.parentId === cur || c.boundaryHostId === cur) && !epExempt.has(c.id)) {
+              epExempt.add(c.id);
+              stack.push(c.id);
+            }
+          }
+        }
+      }
+      let deleteCount = 0;
+      for (const el of data.elements) {
+        if (epExempt.has(el.id)) continue;
+        if (el.boundaryHostId) continue;
+        if (el.type === "pool" || el.type === "lane") continue;
+        if (
+          el.x >= zx && el.x + el.width <= zx + zw &&
+          el.y >= zy && el.y + el.height <= zy + zh
+        ) deleteCount++;
+      }
+      setRemovalConfirm({ zone: { x: zx, y: zy, width: zw, height: zh }, deleteCount });
     }
   }
 
@@ -4461,74 +4524,99 @@ export function Canvas({
             );
           })()}
 
-          {/* Space insertion marker */}
+          {/* Space insertion / removal markers.
+              One marker = INSERT mode (green); two markers = REMOVE mode
+              (red, with light-red strips highlighting the zone that
+              will be collapsed). Either marker can be click-dragged
+              to reposition; in INSERT mode shift-dragging the marker
+              fires onInsertSpace. */}
           {spaceMarker && (() => {
-            const mx = spaceMarker.x;
-            const my = spaceMarker.y;
+            const inRemove = secondSpaceMarker !== null;
             const extent = 100000;
-            const hitSize = 20 / zoom; // generous hit area in screen pixels
+            const hitSize = 20 / zoom;
+            const stroke = inRemove ? "#ef4444" : "#16a34a";
+            const fill = inRemove ? "#ef4444" : "#22c55e";
+            const lineColor = inRemove ? "rgba(239,68,68,0.45)" : "rgba(34,197,94,0.25)";
 
-            function handleMarkerMouseDown(e: React.MouseEvent) {
-              e.stopPropagation();
-              e.preventDefault();
-              if (e.shiftKey && onInsertSpace) {
-                // Shift+drag: insert space. Positive drag grows right/bottom
-                // (pushes content right/down); negative drag grows left/top
-                // (pulls content left/up), so pools can expand in any of the
-                // four cardinal directions.
-                let lastWorld = clientToWorld(e.clientX, e.clientY);
-                function onMove(ev: MouseEvent) {
-                  const curWorld = clientToWorld(ev.clientX, ev.clientY);
-                  const ddx = curWorld.x - lastWorld.x;
-                  const ddy = curWorld.y - lastWorld.y;
-                  if (Math.abs(ddx) > Math.abs(ddy)) {
-                    if (ddx !== 0) onInsertSpace!(mx, my, ddx, 0);
-                  } else {
-                    if (ddy !== 0) onInsertSpace!(mx, my, 0, ddy);
+            function makeMarkerHandler(setMarker: (p: Point | null) => void, mx: number, my: number) {
+              return function (e: React.MouseEvent) {
+                e.stopPropagation();
+                e.preventDefault();
+                if (!inRemove && e.shiftKey && onInsertSpace) {
+                  // Shift+drag in INSERT mode: dispatch space insertion.
+                  let lastWorld = clientToWorld(e.clientX, e.clientY);
+                  function onMove(ev: MouseEvent) {
+                    const curWorld = clientToWorld(ev.clientX, ev.clientY);
+                    const ddx = curWorld.x - lastWorld.x;
+                    const ddy = curWorld.y - lastWorld.y;
+                    if (Math.abs(ddx) > Math.abs(ddy)) {
+                      if (ddx !== 0) onInsertSpace!(mx, my, ddx, 0);
+                    } else {
+                      if (ddy !== 0) onInsertSpace!(mx, my, 0, ddy);
+                    }
+                    lastWorld = curWorld;
                   }
-                  lastWorld = curWorld;
+                  function onUp() {
+                    window.removeEventListener("mousemove", onMove);
+                    window.removeEventListener("mouseup", onUp);
+                  }
+                  window.addEventListener("mousemove", onMove);
+                  window.addEventListener("mouseup", onUp);
+                } else {
+                  // Normal drag: reposition this marker.
+                  function onMove(ev: MouseEvent) { setMarker(clientToWorld(ev.clientX, ev.clientY)); }
+                  function onUp() {
+                    window.removeEventListener("mousemove", onMove);
+                    window.removeEventListener("mouseup", onUp);
+                  }
+                  window.addEventListener("mousemove", onMove);
+                  window.addEventListener("mouseup", onUp);
                 }
-                function onUp() {
-                  window.removeEventListener("mousemove", onMove);
-                  window.removeEventListener("mouseup", onUp);
-                }
-                window.addEventListener("mousemove", onMove);
-                window.addEventListener("mouseup", onUp);
-              } else {
-                // Normal drag: reposition marker
-                function onMove(ev: MouseEvent) {
-                  setSpaceMarker(clientToWorld(ev.clientX, ev.clientY));
-                }
-                function onUp() {
-                  window.removeEventListener("mousemove", onMove);
-                  window.removeEventListener("mouseup", onUp);
-                }
-                window.addEventListener("mousemove", onMove);
-                window.addEventListener("mouseup", onUp);
-              }
+              };
             }
 
-            return (
+            const renderMarker = (mx: number, my: number, setter: (p: Point | null) => void) => (
               <g>
-                {/* Crosshair lines — non-interactive */}
                 <line x1={mx} y1={my - extent} x2={mx} y2={my + extent}
-                  stroke="rgba(34,197,94,0.25)" strokeWidth={2 / zoom}
+                  stroke={lineColor} strokeWidth={2 / zoom}
                   style={{ pointerEvents: "none" }} />
                 <line x1={mx - extent} y1={my} x2={mx + extent} y2={my}
-                  stroke="rgba(34,197,94,0.25)" strokeWidth={2 / zoom}
+                  stroke={lineColor} strokeWidth={2 / zoom}
                   style={{ pointerEvents: "none" }} />
-                {/* Large invisible hit area */}
                 <rect
                   x={mx - hitSize / 2} y={my - hitSize / 2}
                   width={hitSize} height={hitSize}
                   fill="transparent" stroke="none"
                   style={{ cursor: "move", pointerEvents: "all" }}
-                  onMouseDown={handleMarkerMouseDown}
+                  onMouseDown={makeMarkerHandler(setter, mx, my)}
                 />
-                {/* Visible green circle */}
                 <circle cx={mx} cy={my} r={6 / zoom}
-                  fill="#22c55e" stroke="#16a34a" strokeWidth={2 / zoom}
+                  fill={fill} stroke={stroke} strokeWidth={2 / zoom}
                   style={{ pointerEvents: "none" }} />
+              </g>
+            );
+
+            return (
+              <g>
+                {/* Light-red zone strips behind markers when in REMOVE mode */}
+                {inRemove && secondSpaceMarker && (() => {
+                  const x1 = Math.min(spaceMarker.x, secondSpaceMarker.x);
+                  const x2 = Math.max(spaceMarker.x, secondSpaceMarker.x);
+                  const y1 = Math.min(spaceMarker.y, secondSpaceMarker.y);
+                  const y2 = Math.max(spaceMarker.y, secondSpaceMarker.y);
+                  return (
+                    <g style={{ pointerEvents: "none" }}>
+                      {/* Horizontal strip — full width */}
+                      <rect x={-extent} y={y1} width={extent * 2} height={y2 - y1}
+                        fill="#ef4444" fillOpacity={0.18} />
+                      {/* Vertical strip — full height */}
+                      <rect x={x1} y={-extent} width={x2 - x1} height={extent * 2}
+                        fill="#ef4444" fillOpacity={0.18} />
+                    </g>
+                  );
+                })()}
+                {renderMarker(spaceMarker.x, spaceMarker.y, setSpaceMarker)}
+                {secondSpaceMarker && renderMarker(secondSpaceMarker.x, secondSpaceMarker.y, setSecondSpaceMarker)}
               </g>
             );
           })()}
@@ -5143,6 +5231,24 @@ export function Canvas({
               initialLabel,
             );
           }}
+        />
+      )}
+
+      {removalConfirm && (
+        <ConfirmDialog
+          title="Remove space?"
+          message={`${removalConfirm.deleteCount} element${removalConfirm.deleteCount === 1 ? "" : "s"} fully inside the highlighted area will be deleted. Pool / lane boundaries that straddle the area will shrink to close the gap. This cannot be undone.`}
+          confirmLabel="Remove"
+          cancelLabel="Cancel"
+          destructive
+          onConfirm={() => {
+            const z = removalConfirm.zone;
+            setRemovalConfirm(null);
+            setSpaceMarker(null);
+            setSecondSpaceMarker(null);
+            if (onRemoveSpace) onRemoveSpace(z);
+          }}
+          onCancel={() => setRemovalConfirm(null)}
         />
       )}
     </div>
