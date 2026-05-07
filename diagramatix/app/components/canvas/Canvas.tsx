@@ -2828,6 +2828,20 @@ export function Canvas({
         if (inside) toDelete.push(ref);
         else if (overlap) ignored.push(ref);
       }
+      // eslint-disable-next-line no-console
+      console.log("[REMOVE_SPACE classifier] " + JSON.stringify({
+        zone: { x: zx, y: zy, width: zw, height: zh },
+        markers: { a: spaceMarker, b: secondSpaceMarker },
+        toDelete: toDelete.map((r) => ({ id: r.id, type: r.type, label: r.label })),
+        ignored: ignored.map((r) => ({ id: r.id, type: r.type, label: r.label })),
+        affected: affected.map((r) => ({ id: r.id, type: r.type, label: r.label })),
+        elements: data.elements.map((el) => ({
+          id: el.id, type: el.type, x: el.x, y: el.y, w: el.width, h: el.height,
+          parentId: el.parentId, boundaryHostId: el.boundaryHostId,
+          inside: fullyInside(el), overlap: partialOverlap(el),
+          isEpExempt: epExempt.has(el.id), isEpRoot: epRoots.has(el.id),
+        })),
+      }, null, 2));
       setRemovalConfirm({ zone: { x: zx, y: zy, width: zw, height: zh }, toDelete, ignored, affected });
     }
   }
