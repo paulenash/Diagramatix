@@ -5580,48 +5580,104 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         e.y < zB && e.y + e.height > zone.y;
 
       // Delete fully-inside elements (skip EP-exempt). Track the deleted
-      // set to also remove connectors attached to them.
+      // set to also remove connectors attached to them. Also delete
+      // boundary events whose host was deleted (host gone → event has
+      // nothing to snap to).
       const deleteIds = new Set<string>();
       for (const e of state.elements) {
         if (epExempt.has(e.id)) continue;
         if (fullyInside(e)) deleteIds.add(e.id);
       }
+      for (const e of state.elements) {
+        if (e.boundaryHostId && deleteIds.has(e.boundaryHostId)) deleteIds.add(e.id);
+      }
 
       const STRUCTURAL = new Set<string>(["pool", "lane", "sublane"]);
+
+      // Choose which side moves on each axis (user rule: prefer leaving
+      // the heavier-populated side undisturbed). Count non-structural,
+      // non-boundary, non-EP-descendant elements strictly outside the
+      // zone on each side. EP roots are counted (they shift as a unit);
+      // their descendants are excluded so a deeply-nested EP doesn't
+      // outweigh a single sibling task.
+      let aboveCount = 0, belowCount = 0, leftCount = 0, rightCount = 0;
+      for (const e of state.elements) {
+        if (e.boundaryHostId) continue;
+        if (STRUCTURAL.has(e.type)) continue;
+        if (e.parentId) continue;             // descendants ride with their parent
+        if (deleteIds.has(e.id)) continue;
+        if (partialOverlap(e)) continue;
+        const eR = e.x + e.width;
+        const eB = e.y + e.height;
+        if (eB <= zone.y) aboveCount++;
+        else if (e.y >= zB) belowCount++;
+        if (eR <= zone.x) leftCount++;
+        else if (e.x >= zR) rightCount++;
+      }
+      // `aboveMoves`: shift elements that sit ABOVE the zone DOWN by
+      // zone.height. Otherwise shift elements BELOW the zone UP. Tie
+      // (or no items on either side) defaults to "below moves up" —
+      // the conventional behaviour.
+      const aboveMoves = aboveCount > 0 && aboveCount < belowCount;
+      const belowMoves = !aboveMoves;        // covers below-only and tie
+      const leftMoves = leftCount > 0 && leftCount < rightCount;
+      const rightMoves = !leftMoves;
 
       const shiftedElements = state.elements
         .filter((e) => !deleteIds.has(e.id))
         .map((e) => {
           // EP-exempt elements (EP + descendants + their boundary events):
-          // shift only — never shrink, never delete.
+          // shift only — never shrink, never delete. Direction-aware.
           if (epExempt.has(e.id)) {
-            const ePast = e.x >= zR;
-            const ebPast = e.y >= zB;
-            if (!ePast && !ebPast) return e;
-            return { ...e, x: ePast ? e.x - zone.width : e.x, y: ebPast ? e.y - zone.height : e.y };
+            let nx = e.x, ny = e.y;
+            if (e.x >= zR) { if (rightMoves) nx -= zone.width; }
+            else if (e.x + e.width <= zone.x) { if (leftMoves) nx += zone.width; }
+            if (e.y >= zB) { if (belowMoves) ny -= zone.height; }
+            else if (e.y + e.height <= zone.y) { if (aboveMoves) ny += zone.height; }
+            if (nx === e.x && ny === e.y) return e;
+            return { ...e, x: nx, y: ny };
           }
           // Boundary events follow their host. They'll be re-placed in
           // a second pass once host rects are known.
           if (e.boundaryHostId) return e;
           // Containers (pool / lane / sublane) that straddle the zone
-          // shrink rather than shift past it.
+          // shrink on the moving side rather than shift past it.
           const isStructural = STRUCTURAL.has(e.type);
           if (isStructural) {
             let nx = e.x, ny = e.y, nw = e.width, nh = e.height;
-            const straddleX = e.x < zone.x && e.x + e.width > zR;
-            const straddleY = e.y < zone.y && e.y + e.height > zB;
-            if (straddleX) { nw = Math.max(MIN_W, nw - zone.width); }
-            else if (e.x >= zR) { nx -= zone.width; }
-            if (straddleY) { nh = Math.max(MIN_H, nh - zone.height); }
-            else if (e.y >= zB) { ny -= zone.height; }
+            const eR = e.x + e.width;
+            const eB = e.y + e.height;
+            const straddleX = e.x < zone.x && eR > zR;
+            const straddleY = e.y < zone.y && eB > zB;
+            if (straddleX) {
+              nw = Math.max(MIN_W, nw - zone.width);
+              if (leftMoves) nx += zone.width;     // left edge moves right; right edge stays
+              // rightMoves: right edge moves left; left edge stays — width already shrunk
+            } else if (e.x >= zR && rightMoves) {
+              nx -= zone.width;
+            } else if (eR <= zone.x && leftMoves) {
+              nx += zone.width;
+            }
+            if (straddleY) {
+              nh = Math.max(MIN_H, nh - zone.height);
+              if (aboveMoves) ny += zone.height;   // top moves down; bottom stays
+              // belowMoves: bottom moves up; top stays — height already shrunk
+            } else if (e.y >= zB && belowMoves) {
+              ny -= zone.height;
+            } else if (eB <= zone.y && aboveMoves) {
+              ny += zone.height;
+            }
             return { ...e, x: nx, y: ny, width: nw, height: nh };
           }
           // Non-structural, non-EP elements: partial overlap → leave
-          // alone; otherwise shift inward.
+          // alone; otherwise shift on each axis according to the
+          // direction choice.
           if (partialOverlap(e)) return e;
           let nx = e.x, ny = e.y;
-          if (e.x >= zR) nx -= zone.width;
-          if (e.y >= zB) ny -= zone.height;
+          if (e.x >= zR && rightMoves) nx -= zone.width;
+          else if (e.x + e.width <= zone.x && leftMoves) nx += zone.width;
+          if (e.y >= zB && belowMoves) ny -= zone.height;
+          else if (e.y + e.height <= zone.y && aboveMoves) ny += zone.height;
           if (nx === e.x && ny === e.y) return e;
           return { ...e, x: nx, y: ny };
         });
