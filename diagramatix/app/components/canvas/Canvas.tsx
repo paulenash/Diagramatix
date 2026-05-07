@@ -25,7 +25,7 @@ import { CHEVRON_THEMES } from "@/app/lib/diagram/chevronThemes";
 import { DisplayModeCtx, FontScaleCtx, ConnectorFontScaleCtx, TitleFontSizeCtx, PoolFontSizeCtx, LaneFontSizeCtx, SketchyFilter } from "@/app/lib/diagram/displayMode";
 import { ConnectorRenderer } from "./ConnectorRenderer";
 import { findShapeByKey as findArchimateShapeByKey } from "@/app/lib/archimate/catalogue";
-import { ConfirmDialog } from "@/app/components/ConfirmDialog";
+import { RemoveSpaceDialog, type RsRef, type RsSelection } from "@/app/components/RemoveSpaceDialog";
 
 const HEADER_H = 28;
 const MIN_BOUNDARY_W = 100;
@@ -219,7 +219,14 @@ interface Props {
   showValueDisplay?: boolean;
   showBottleneck?: boolean;
   onInsertSpace?: (markerX: number, markerY: number, dx: number, dy: number) => void;
-  onRemoveSpace?: (zone: { x: number; y: number; width: number; height: number }) => void;
+  onRemoveSpace?: (
+    zone: { x: number; y: number; width: number; height: number },
+    overrides?: {
+      preserveIds?: string[];
+      extraDeleteIds?: string[];
+      leaveAloneIds?: string[];
+    },
+  ) => void;
   onAddSelfTransition?: (elementId: string, side: Side, srcOffset: number, tgtOffset: number, bulge: number) => void;
 }
 
@@ -647,7 +654,12 @@ export function Canvas({
   const [spaceMarker, setSpaceMarker] = useState<Point | null>(null);
   const [spaceMarkerPlacing, setSpaceMarkerPlacing] = useState(false);
   const [secondSpaceMarker, setSecondSpaceMarker] = useState<Point | null>(null);
-  const [removalConfirm, setRemovalConfirm] = useState<{ zone: { x: number; y: number; width: number; height: number }; deleteCount: number } | null>(null);
+  const [removalConfirm, setRemovalConfirm] = useState<{
+    zone: { x: number; y: number; width: number; height: number };
+    toDelete: RsRef[];
+    ignored: RsRef[];
+    affected: RsRef[];
+  } | null>(null);
   // (Shift key is checked directly via event.shiftKey for lasso selection)
 
   // Expose viewport center to parent via ref
@@ -2760,19 +2772,21 @@ export function Canvas({
       }
     }
     // Enter in REMOVE mode: open the confirmation dialog with the
-    // computed deletion count.
+    // categorised element lists.
     if (e.key === "Enter" && spaceMarker && secondSpaceMarker && !removalConfirm) {
       e.preventDefault();
       const zx = Math.min(spaceMarker.x, secondSpaceMarker.x);
       const zy = Math.min(spaceMarker.y, secondSpaceMarker.y);
       const zw = Math.abs(secondSpaceMarker.x - spaceMarker.x);
       const zh = Math.abs(secondSpaceMarker.y - spaceMarker.y);
-      // Count fully-inside non-EP, non-EP-descendant elements that
-      // would be deleted (mirrors the reducer's classifier).
+      const zR = zx + zw, zB = zy + zh;
+      // Mirror the reducer's EP-exempt classifier.
       const epExempt = new Set<string>();
+      const epRoots = new Set<string>();
       for (const ep of data.elements) {
         if (ep.type !== "subprocess-expanded") continue;
         epExempt.add(ep.id);
+        epRoots.add(ep.id);
         const stack = [ep.id];
         while (stack.length) {
           const cur = stack.pop()!;
@@ -2784,17 +2798,37 @@ export function Canvas({
           }
         }
       }
-      let deleteCount = 0;
+      const STRUCTURAL = new Set<string>(["pool", "lane", "sublane"]);
+      const fullyInside = (el: { x: number; y: number; width: number; height: number }) =>
+        el.x >= zx && el.x + el.width <= zR &&
+        el.y >= zy && el.y + el.height <= zB;
+      const partialOverlap = (el: { x: number; y: number; width: number; height: number }) =>
+        el.x < zR && el.x + el.width > zx &&
+        el.y < zB && el.y + el.height > zy;
+      const toDelete: RsRef[] = [];
+      const ignored: RsRef[] = [];
+      const affected: RsRef[] = [];
       for (const el of data.elements) {
-        if (epExempt.has(el.id)) continue;
-        if (el.boundaryHostId) continue;
-        if (el.type === "pool" || el.type === "lane") continue;
-        if (
-          el.x >= zx && el.x + el.width <= zx + zw &&
-          el.y >= zy && el.y + el.height <= zy + zh
-        ) deleteCount++;
+        if (el.boundaryHostId) continue;            // boundary events ride with their host
+        // EP-internal descendants ride with the EP root — don't list them individually.
+        if (epExempt.has(el.id) && !epRoots.has(el.id)) continue;
+        const ref: RsRef = { id: el.id, label: el.label || "", type: el.type };
+        const inside = fullyInside(el);
+        const overlap = !inside && partialOverlap(el);
+        if (epRoots.has(el.id)) {
+          // EPs are exempt from delete; if they touch the zone, they're affected.
+          if (inside || overlap) affected.push(ref);
+          continue;
+        }
+        if (STRUCTURAL.has(el.type)) {
+          // Structural containers: shrink/shift in the affected list.
+          if (inside || overlap) affected.push(ref);
+          continue;
+        }
+        if (inside) toDelete.push(ref);
+        else if (overlap) ignored.push(ref);
       }
-      setRemovalConfirm({ zone: { x: zx, y: zy, width: zw, height: zh }, deleteCount });
+      setRemovalConfirm({ zone: { x: zx, y: zy, width: zw, height: zh }, toDelete, ignored, affected });
     }
   }
 
@@ -5235,18 +5269,24 @@ export function Canvas({
       )}
 
       {removalConfirm && (
-        <ConfirmDialog
-          title="Remove space?"
-          message={`${removalConfirm.deleteCount} element${removalConfirm.deleteCount === 1 ? "" : "s"} fully inside the highlighted area will be deleted. Pool / lane boundaries that straddle the area will shrink to close the gap. This cannot be undone.`}
-          confirmLabel="Remove"
-          cancelLabel="Cancel"
-          destructive
-          onConfirm={() => {
+        <RemoveSpaceDialog
+          zoneWidth={removalConfirm.zone.width}
+          zoneHeight={removalConfirm.zone.height}
+          toDelete={removalConfirm.toDelete}
+          ignored={removalConfirm.ignored}
+          affected={removalConfirm.affected}
+          onConfirm={(sel: RsSelection) => {
             const z = removalConfirm.zone;
             setRemovalConfirm(null);
             setSpaceMarker(null);
             setSecondSpaceMarker(null);
-            if (onRemoveSpace) onRemoveSpace(z);
+            if (onRemoveSpace) {
+              onRemoveSpace(z, {
+                preserveIds: Array.from(sel.preserve),
+                extraDeleteIds: Array.from(sel.delete),
+                leaveAloneIds: Array.from(sel.leaveAlone),
+              });
+            }
           }}
           onCancel={() => setRemovalConfirm(null)}
         />

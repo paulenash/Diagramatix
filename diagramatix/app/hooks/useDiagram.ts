@@ -284,7 +284,7 @@ type Action =
   | { type: "SET_DATABASE"; payload: string }
   | { type: "CORRECT_ALL_CONNECTORS" }
   | { type: "INSERT_SPACE"; payload: { markerX: number; markerY: number; dx: number; dy: number } }
-  | { type: "REMOVE_SPACE"; payload: { zone: { x: number; y: number; width: number; height: number } } }
+  | { type: "REMOVE_SPACE"; payload: { zone: { x: number; y: number; width: number; height: number }; preserveIds?: string[]; extraDeleteIds?: string[]; leaveAloneIds?: string[] } }
   | { type: "SET_VIEWPORT"; payload: { x: number; y: number; zoom: number } }
   | { type: "MOVE_END"; payload: { id: string } }
   | { type: "SPLIT_CONNECTOR"; payload: {
@@ -5546,6 +5546,9 @@ function reducer(state: DiagramData, action: Action): DiagramData {
 
     case "REMOVE_SPACE": {
       const { zone } = action.payload;
+      const preserveIds = new Set<string>(action.payload.preserveIds || []);
+      const extraDeleteIds = new Set<string>(action.payload.extraDeleteIds || []);
+      const leaveAloneIds = new Set<string>(action.payload.leaveAloneIds || []);
       const zR = zone.x + zone.width;
       const zB = zone.y + zone.height;
       const MIN_W = 40, MIN_H = 40;     // floor for shrunk containers
@@ -5566,6 +5569,21 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         if (e.boundaryHostId && epExempt.has(e.boundaryHostId)) epExempt.add(e.id);
       }
 
+      // Stay-put set: ids the user explicitly chose to preserve or
+      // leave-alone, expanded to include descendants and boundary events
+      // anchored on those ids. These elements skip both delete and the
+      // shrink / shift pass — they keep their original coords / size.
+      const stayPutIds = new Set<string>();
+      const expand = (id: string) => {
+        stayPutIds.add(id);
+        for (const d of getAllDescendantIds(state.elements, id)) stayPutIds.add(d);
+      };
+      for (const id of preserveIds) expand(id);
+      for (const id of leaveAloneIds) expand(id);
+      for (const e of state.elements) {
+        if (e.boundaryHostId && stayPutIds.has(e.boundaryHostId)) stayPutIds.add(e.id);
+      }
+
       // EP rects (for the post-shift clamp pass).
       const epRects = epRoots.map((ep) => ({
         id: ep.id,
@@ -5579,14 +5597,20 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         e.x < zR && e.x + e.width > zone.x &&
         e.y < zB && e.y + e.height > zone.y;
 
-      // Delete fully-inside elements (skip EP-exempt). Track the deleted
-      // set to also remove connectors attached to them. Also delete
-      // boundary events whose host was deleted (host gone → event has
-      // nothing to snap to).
+      // Delete fully-inside elements (skip EP-exempt and user-preserved).
+      // Track the deleted set so connectors attached to them, and
+      // boundary events whose host was deleted, also drop.
       const deleteIds = new Set<string>();
       for (const e of state.elements) {
         if (epExempt.has(e.id)) continue;
+        if (preserveIds.has(e.id)) continue;
         if (fullyInside(e)) deleteIds.add(e.id);
+      }
+      // User-explicit deletes (e.g. partial-overlap items they unchecked
+      // from the "ignored" group). Skip EP-exempt for safety.
+      for (const id of extraDeleteIds) {
+        if (epExempt.has(id)) continue;
+        deleteIds.add(id);
       }
       for (const e of state.elements) {
         if (e.boundaryHostId && deleteIds.has(e.boundaryHostId)) deleteIds.add(e.id);
@@ -5606,6 +5630,7 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         if (STRUCTURAL.has(e.type)) continue;
         if (e.parentId) continue;             // descendants ride with their parent
         if (deleteIds.has(e.id)) continue;
+        if (stayPutIds.has(e.id)) continue;   // user opted these out — don't bias the direction
         if (partialOverlap(e)) continue;
         const eR = e.x + e.width;
         const eB = e.y + e.height;
@@ -5626,6 +5651,9 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       const shiftedElements = state.elements
         .filter((e) => !deleteIds.has(e.id))
         .map((e) => {
+          // User-opted-out (preserve / leave-alone + their descendants +
+          // their boundary events): keep at original coords and size.
+          if (stayPutIds.has(e.id)) return e;
           // EP-exempt elements (EP + descendants + their boundary events):
           // shift only — never shrink, never delete. Direction-aware.
           if (epExempt.has(e.id)) {
@@ -6931,9 +6959,20 @@ export function useDiagram(initialData: DiagramData) {
     dispatch({ type: "INSERT_SPACE", payload: { markerX, markerY, dx, dy } });
   }, []);
 
-  const removeSpace = useCallback((zone: { x: number; y: number; width: number; height: number }) => {
+  const removeSpace = useCallback((
+    zone: { x: number; y: number; width: number; height: number },
+    overrides?: { preserveIds?: string[]; extraDeleteIds?: string[]; leaveAloneIds?: string[] },
+  ) => {
     pushHistory(snapshotData());
-    dispatch({ type: "REMOVE_SPACE", payload: { zone } });
+    dispatch({
+      type: "REMOVE_SPACE",
+      payload: {
+        zone,
+        preserveIds: overrides?.preserveIds,
+        extraDeleteIds: overrides?.extraDeleteIds,
+        leaveAloneIds: overrides?.leaveAloneIds,
+      },
+    });
   }, []);
 
   const addLane = useCallback((poolId: string) => {
