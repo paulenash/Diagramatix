@@ -93,12 +93,16 @@ function computeUseCaseSize(label: string, currentW: number): { w: number; h: nu
 }
 
 const INTERMEDIATE_EVENT_TYPE_OPTIONS: { value: EventType; label: string }[] = [
-  { value: "none",        label: "None" },
-  { value: "message",     label: "Message" },
-  { value: "timer",       label: "Timer" },
-  { value: "error",       label: "Error" },
-  { value: "signal",      label: "Signal" },
-  { value: "conditional", label: "Conditional" },
+  { value: "none",         label: "None" },
+  { value: "message",      label: "Message" },
+  { value: "timer",        label: "Timer" },
+  { value: "error",        label: "Error" },
+  { value: "signal",       label: "Signal" },
+  { value: "conditional",  label: "Conditional" },
+  { value: "escalation",   label: "Escalation" },
+  { value: "cancel",       label: "Cancel" },
+  { value: "compensation", label: "Compensation" },
+  { value: "link",         label: "Link" },
 ];
 
 const TASK_TYPE_OPTIONS: { value: BpmnTaskType; label: string }[] = [

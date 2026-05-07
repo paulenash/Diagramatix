@@ -814,7 +814,15 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
         );
       })()}
 
-      {/* Invisible wider hit area — follows curve for curvilinear */}
+      {/* Invisible wider hit area — follows curve for curvilinear.
+           onMouseDown stopPropagation prevents Canvas's background
+           mousedown handler from running. That handler installs a
+           window-level mouseup listener that clears the selection on
+           every click — which would re-mount the connector between
+           clicks (selected ↔ unselected JSX branch) and leave click 2
+           landing on a freshly-mounted instance whose handler had no
+           record of click 1. Stopping the bubble keeps the instance
+           stable across both clicks so double-click registers. */}
       <path
         d={hitD}
         fill="none"
@@ -822,6 +830,7 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
         strokeWidth={12}
         style={{ cursor: "pointer" }}
         mask={isAssocBPMN && (sourceBounds || targetBounds) ? `url(#assoc-hit-mask-${connector.id})` : undefined}
+        onMouseDown={(e) => e.stopPropagation()}
         onClick={handleConnectorClick}
       />
 

@@ -990,7 +990,22 @@ function pushOutsideElementsForEPMove(
   if (dx === 0 && dy === 0) return { elements, connectors };
   const epDescIds = getAllDescendantIds(elements, epId);
   const skipIds = new Set<string>([epId, ...epDescIds]);
-  // Also skip boundary events of EP descendants — they ride with their host.
+  // Also skip ANCESTORS — pushing the moving EP's container chain
+  // (typically an outer EP / lane / pool) would visually drag the
+  // entire enclosing container along with the inner EP. Without this
+  // the outer EP gets caught in the proximity loop's "straddle" range
+  // (its top is far above the inner EP's bottom but `dist >= -e.height`
+  // returns true since the outer EP fully encloses the inner) and
+  // ends up pushed by `(dx, dy)` — making the inner EP appear locked
+  // to its parent.
+  let ancestor = elements.find((e) => e.id === epId);
+  while (ancestor?.parentId) {
+    skipIds.add(ancestor.parentId);
+    ancestor = elements.find((e) => e.id === ancestor!.parentId);
+  }
+  // Also skip boundary events of EP descendants AND ancestors — they
+  // ride with their host (descendants move with the EP; ancestors
+  // shouldn't move at all).
   for (const e of elements) {
     if (e.boundaryHostId && skipIds.has(e.boundaryHostId)) skipIds.add(e.id);
   }
@@ -1397,7 +1412,9 @@ function applyEPBoundaryChange(
   // 3. Build exclude set: EP, descendants (including nested boundary
   //    events), all ancestors (lane/pool — they grow via enclose/buffer
   //    rather than shift), EP's own boundary events (they re-snap),
-  //    and the caller's excludeId.
+  //    boundary events on EVERY ancestor (otherwise an outer EP's
+  //    edge-mounted intermediate event would slide off as the inner
+  //    EP grows), and the caller's excludeId.
   const epDescendants = getAllDescendantIds(updatedEls, epId);
   const epAncestors = new Set<string>();
   let cur: DiagramElement | undefined = updatedEls.find((e) => e.id === ep0.parentId);
@@ -1409,13 +1426,38 @@ function applyEPBoundaryChange(
   const epDirectBoundaryIds = new Set(
     updatedEls.filter((e) => e.boundaryHostId === epId).map((e) => e.id),
   );
+  const ancestorBoundaryIds = new Set<string>();
+  for (const e of updatedEls) {
+    if (e.boundaryHostId && epAncestors.has(e.boundaryHostId)) {
+      ancestorBoundaryIds.add(e.id);
+    }
+  }
   const exclude = new Set<string>([
     epId,
     ...epDescendants,
     ...epAncestors,
     ...epDirectBoundaryIds,
+    ...ancestorBoundaryIds,
   ]);
   if (excludeId) exclude.add(excludeId);
+
+  // When the moved EP is INSIDE another EP, restrict the bulk shift to
+  // elements that live inside the immediate parent EP. Anything OUTSIDE
+  // the parent EP — including pools below, sibling EPs in the same
+  // lane, edge-mounted events on the parent EP — must stay put unless
+  // the outer EP itself grows (which is proximity-gated and triggers
+  // its own cascade in the post-ensure pool-cascade step). Without
+  // this restriction, a small inner-EP boundary nudge dragged
+  // unrelated elements all over the diagram.
+  const movedEpParent = updatedEls.find((e) => e.id === ep0.parentId);
+  if (movedEpParent?.type === "subprocess-expanded") {
+    const parentEPDescendantIds = getAllDescendantIds(updatedEls, movedEpParent.id);
+    for (const e of updatedEls) {
+      if (e.id === movedEpParent.id) continue;
+      if (parentEPDescendantIds.has(e.id)) continue;
+      exclude.add(e.id);
+    }
+  }
 
   // 4. External span-aware shifts on each edge that grew outward.
   //    Span = the EP's perpendicular extent on the OLD rect.
