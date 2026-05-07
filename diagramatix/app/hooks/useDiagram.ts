@@ -5590,12 +5590,22 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         x: ep.x, y: ep.y, width: ep.width, height: ep.height,
       }));
 
-      const fullyInside = (e: { x: number; y: number; width: number; height: number }) =>
-        e.x >= zone.x && e.x + e.width <= zR &&
-        e.y >= zone.y && e.y + e.height <= zB;
-      const partialOverlap = (e: { x: number; y: number; width: number; height: number }) =>
-        e.x < zR && e.x + e.width > zone.x &&
-        e.y < zB && e.y + e.height > zone.y;
+      // Zone is the visual cross of two strips: vertical slice [x, x+w]
+      // (full height) and horizontal slice [y, y+h] (full width). When
+      // the markers share an axis, that strip collapses to zero extent
+      // and the zone is a single strip on the other axis.
+      const vActive = zone.width > 0;
+      const hActive = zone.height > 0;
+      const fullyInside = (e: { x: number; y: number; width: number; height: number }) => {
+        const inV = vActive && e.x >= zone.x && e.x + e.width <= zR;
+        const inH = hActive && e.y >= zone.y && e.y + e.height <= zB;
+        return inV || inH;
+      };
+      const partialOverlap = (e: { x: number; y: number; width: number; height: number }) => {
+        const ovV = vActive && e.x < zR && e.x + e.width > zone.x;
+        const ovH = hActive && e.y < zB && e.y + e.height > zone.y;
+        return ovV || ovH;
+      };
 
       // Delete fully-inside elements (skip EP-exempt and user-preserved).
       // Track the deleted set so connectors attached to them, and

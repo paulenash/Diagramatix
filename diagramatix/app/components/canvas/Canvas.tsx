@@ -2799,12 +2799,24 @@ export function Canvas({
         }
       }
       const STRUCTURAL = new Set<string>(["pool", "lane", "sublane"]);
-      const fullyInside = (el: { x: number; y: number; width: number; height: number }) =>
-        el.x >= zx && el.x + el.width <= zR &&
-        el.y >= zy && el.y + el.height <= zB;
-      const partialOverlap = (el: { x: number; y: number; width: number; height: number }) =>
-        el.x < zR && el.x + el.width > zx &&
-        el.y < zB && el.y + el.height > zy;
+      // The deletion zone is the visual cross formed by the two strips:
+      // a vertical slice [zx, zR] (full height) and a horizontal slice
+      // [zy, zB] (full width). When the markers share an axis, that
+      // strip collapses to zero extent and the zone becomes a single
+      // strip. "Fully inside" → fits in either strip; "overlap" →
+      // touches either strip.
+      const vActive = zw > 0;
+      const hActive = zh > 0;
+      const fullyInside = (el: { x: number; y: number; width: number; height: number }) => {
+        const inV = vActive && el.x >= zx && el.x + el.width <= zR;
+        const inH = hActive && el.y >= zy && el.y + el.height <= zB;
+        return inV || inH;
+      };
+      const partialOverlap = (el: { x: number; y: number; width: number; height: number }) => {
+        const ovV = vActive && el.x < zR && el.x + el.width > zx;
+        const ovH = hActive && el.y < zB && el.y + el.height > zy;
+        return ovV || ovH;
+      };
       const toDelete: RsRef[] = [];
       const ignored: RsRef[] = [];
       const affected: RsRef[] = [];
@@ -2828,20 +2840,6 @@ export function Canvas({
         if (inside) toDelete.push(ref);
         else if (overlap) ignored.push(ref);
       }
-      // eslint-disable-next-line no-console
-      console.log("[REMOVE_SPACE classifier] " + JSON.stringify({
-        zone: { x: zx, y: zy, width: zw, height: zh },
-        markers: { a: spaceMarker, b: secondSpaceMarker },
-        toDelete: toDelete.map((r) => ({ id: r.id, type: r.type, label: r.label })),
-        ignored: ignored.map((r) => ({ id: r.id, type: r.type, label: r.label })),
-        affected: affected.map((r) => ({ id: r.id, type: r.type, label: r.label })),
-        elements: data.elements.map((el) => ({
-          id: el.id, type: el.type, x: el.x, y: el.y, w: el.width, h: el.height,
-          parentId: el.parentId, boundaryHostId: el.boundaryHostId,
-          inside: fullyInside(el), overlap: partialOverlap(el),
-          isEpExempt: epExempt.has(el.id), isEpRoot: epRoots.has(el.id),
-        })),
-      }, null, 2));
       setRemovalConfirm({ zone: { x: zx, y: zy, width: zw, height: zh }, toDelete, ignored, affected });
     }
   }
