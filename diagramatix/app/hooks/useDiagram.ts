@@ -1384,14 +1384,12 @@ function applyEPBoundaryChange(
   const ep0 = elements.find((e) => e.id === epId);
   if (!ep0 || ep0.type !== "subprocess-expanded") return { elements, connectors };
 
-  // Snapshot original waypoints per messageBPMN connector so we can
-  // adjust labelOffsetY at the end via `adjustMsgLabelOffset` — this
-  // is what keeps message labels glued to their attachment points
-  // when a pool moves under them (user spec).
-  const origWaypointsById = new Map<string, Point[]>();
-  for (const c of connectors) {
-    if (c.type === "messageBPMN") origWaypointsById.set(c.id, c.waypoints);
-  }
+  // EP boundaries no longer interact with sublane / lane / pool
+  // boundaries (user spec). The EP rect changes; elements WITHIN the
+  // EP's immediate scope container (innermost sublane / lane / pool /
+  // outer-EP ancestor) get pushed when an EP edge grows outward; the
+  // scope container itself stays at its old size; ancestors above the
+  // scope are untouched; pools below / aligned pools no longer cascade.
 
   // 1. Apply newRect to the EP element.
   let updatedEls = elements.map((e) =>
@@ -1399,104 +1397,91 @@ function applyEPBoundaryChange(
   );
   let updatedConns = connectors.slice();
 
-  // 2. Per-edge deltas. Outward growth = positive `growXxx`; inward
-  //    shrink ≤ 0 (no external shift on that side).
+  // 2. Per-edge deltas. Outward growth = positive `growXxx`.
   const oldRight  = oldRect.x + oldRect.width;
   const oldBottom = oldRect.y + oldRect.height;
   const newRight  = newRect.x + newRect.width;
   const newBottom = newRect.y + newRect.height;
-  const growRight  = newRight  - oldRight;   // > 0 = right edge moved outward
-  const growBottom = newBottom - oldBottom;  // > 0 = bottom edge moved outward
-  const growLeft   = oldRect.x - newRect.x;  // > 0 = left edge moved outward (newRect.x < oldRect.x)
-  const growTop    = oldRect.y - newRect.y;  // > 0 = top edge moved outward (newRect.y < oldRect.y)
+  const growRight  = newRight  - oldRight;
+  const growBottom = newBottom - oldBottom;
+  const growLeft   = oldRect.x - newRect.x;
+  const growTop    = oldRect.y - newRect.y;
 
-  // 3. Build exclude set: EP, descendants (including nested boundary
-  //    events), all ancestors (lane/pool — they grow via enclose/buffer
-  //    rather than shift), EP's own boundary events (they re-snap),
-  //    boundary events on EVERY ancestor (otherwise an outer EP's
-  //    edge-mounted intermediate event would slide off as the inner
-  //    EP grows), and the caller's excludeId.
+  // 3. Determine the scope container — innermost {pool / lane / sublane /
+  //    outer EP} ancestor of the moved EP. Element shifts are confined
+  //    to descendants of this container; the container itself does NOT
+  //    grow. (Sublanes are stored as type "lane" with parent="lane", so
+  //    "lane" covers both top-level lanes and sublanes.)
+  const scopeContainer: DiagramElement | null = (() => {
+    let cur: DiagramElement | undefined = updatedEls.find((e) => e.id === ep0.parentId);
+    while (cur) {
+      if (cur.type === "pool" || cur.type === "lane" || cur.type === "subprocess-expanded") return cur;
+      if (!cur.parentId) return null;
+      cur = updatedEls.find((e) => e.id === cur!.parentId);
+    }
+    return null;
+  })();
+
+  // 4. Build the exclude set: the moved EP, its descendants, the scope
+  //    container itself, and every element that is NOT a descendant of
+  //    the scope container (so we never push siblings of the scope —
+  //    other lanes, other pools, other EPs, etc.). Without a scope
+  //    container we don't push anything at all.
   const epDescendants = getAllDescendantIds(updatedEls, epId);
-  const epAncestors = new Set<string>();
-  let cur: DiagramElement | undefined = updatedEls.find((e) => e.id === ep0.parentId);
-  while (cur) {
-    epAncestors.add(cur.id);
-    if (!cur.parentId) break;
-    cur = updatedEls.find((e) => e.id === cur!.parentId);
-  }
-  const epDirectBoundaryIds = new Set(
-    updatedEls.filter((e) => e.boundaryHostId === epId).map((e) => e.id),
-  );
-  const ancestorBoundaryIds = new Set<string>();
-  for (const e of updatedEls) {
-    if (e.boundaryHostId && epAncestors.has(e.boundaryHostId)) {
-      ancestorBoundaryIds.add(e.id);
-    }
-  }
-  const exclude = new Set<string>([
-    epId,
-    ...epDescendants,
-    ...epAncestors,
-    ...epDirectBoundaryIds,
-    ...ancestorBoundaryIds,
-  ]);
+  const exclude = new Set<string>([epId, ...epDescendants]);
   if (excludeId) exclude.add(excludeId);
-
-  // When the moved EP is INSIDE another EP, restrict the bulk shift to
-  // elements that live inside the immediate parent EP. Anything OUTSIDE
-  // the parent EP — including pools below, sibling EPs in the same
-  // lane, edge-mounted events on the parent EP — must stay put unless
-  // the outer EP itself grows (which is proximity-gated and triggers
-  // its own cascade in the post-ensure pool-cascade step). Without
-  // this restriction, a small inner-EP boundary nudge dragged
-  // unrelated elements all over the diagram.
-  const movedEpParent = updatedEls.find((e) => e.id === ep0.parentId);
-  if (movedEpParent?.type === "subprocess-expanded") {
-    const parentEPDescendantIds = getAllDescendantIds(updatedEls, movedEpParent.id);
+  if (scopeContainer) {
+    exclude.add(scopeContainer.id);
+    const scopeDescendants = getAllDescendantIds(updatedEls, scopeContainer.id);
     for (const e of updatedEls) {
-      if (e.id === movedEpParent.id) continue;
-      if (parentEPDescendantIds.has(e.id)) continue;
-      exclude.add(e.id);
+      if (e.id === scopeContainer.id) continue;
+      if (!scopeDescendants.has(e.id)) exclude.add(e.id);
+    }
+  } else {
+    for (const e of updatedEls) exclude.add(e.id);
+  }
+
+  // 5. External shifts on each edge that grew outward, scoped to the
+  //    scope container's perpendicular extent.
+  if (scopeContainer) {
+    const scXMin = scopeContainer.x;
+    const scXMax = scopeContainer.x + scopeContainer.width;
+    const scYMin = scopeContainer.y;
+    const scYMax = scopeContainer.y + scopeContainer.height;
+    if (growBottom > 0) {
+      const r = shiftElementsPastLineWithinSpan(
+        updatedEls, updatedConns, "y", oldBottom, growBottom,
+        scXMin, scXMax, exclude,
+      );
+      updatedEls = r.elements; updatedConns = r.connectors;
+    }
+    if (growRight > 0) {
+      const r = shiftElementsPastLineWithinSpan(
+        updatedEls, updatedConns, "x", oldRight, growRight,
+        scYMin, scYMax, exclude,
+      );
+      updatedEls = r.elements; updatedConns = r.connectors;
+    }
+    if (growTop > 0) {
+      const r = shiftElementsBeforeLineWithinSpan(
+        updatedEls, updatedConns, "y", oldRect.y, -growTop,
+        scXMin, scXMax, exclude,
+      );
+      updatedEls = r.elements; updatedConns = r.connectors;
+    }
+    if (growLeft > 0) {
+      const r = shiftElementsBeforeLineWithinSpan(
+        updatedEls, updatedConns, "x", oldRect.x, -growLeft,
+        scYMin, scYMax, exclude,
+      );
+      updatedEls = r.elements; updatedConns = r.connectors;
     }
   }
 
-  // 4. External span-aware shifts on each edge that grew outward.
-  //    Span = the EP's perpendicular extent on the OLD rect.
-  if (growBottom > 0) {
-    const r = shiftElementsPastLineWithinSpan(
-      updatedEls, updatedConns, "y", oldBottom, growBottom,
-      oldRect.x, oldRect.x + oldRect.width, exclude,
-    );
-    updatedEls = r.elements; updatedConns = r.connectors;
-  }
-  if (growRight > 0) {
-    const r = shiftElementsPastLineWithinSpan(
-      updatedEls, updatedConns, "x", oldRight, growRight,
-      oldRect.y, oldRect.y + oldRect.height, exclude,
-    );
-    updatedEls = r.elements; updatedConns = r.connectors;
-  }
-  if (growTop > 0) {
-    const r = shiftElementsBeforeLineWithinSpan(
-      updatedEls, updatedConns, "y", oldRect.y, -growTop,
-      oldRect.x, oldRect.x + oldRect.width, exclude,
-    );
-    updatedEls = r.elements; updatedConns = r.connectors;
-  }
-  if (growLeft > 0) {
-    const r = shiftElementsBeforeLineWithinSpan(
-      updatedEls, updatedConns, "x", oldRect.x, -growLeft,
-      oldRect.y, oldRect.y + oldRect.height, exclude,
-    );
-    updatedEls = r.elements; updatedConns = r.connectors;
-  }
-
-  // 5. Re-snap EP boundary events on the moving edges only. Events on
-  //    sides that didn't move (even if those sides got longer because
-  //    an adjacent edge moved) keep their absolute position per user
-  //    spec — "only edge-mounted events on the moving boundary should
-  //    move". A boundary event on the TOP edge does NOT slide when the
-  //    user drags the RIGHT edge, even though the top is now wider.
+  // 6. Re-snap EP boundary events on the moving sides. Sides that
+  //    didn't move keep their absolute position (perpendicular-side
+  //    events stay anchored to the unmoved opposite edge — see
+  //    resnapEPBoundaryEvents).
   const newEpEl = updatedEls.find((e) => e.id === epId)!;
   const movingSides = new Set<"top" | "bottom" | "left" | "right">();
   if (growTop !== 0)    movingSides.add("top");
@@ -1505,211 +1490,26 @@ function applyEPBoundaryChange(
   if (growRight !== 0)  movingSides.add("right");
   updatedEls = resnapEPBoundaryEvents(updatedEls, newEpEl, oldRect, movingSides);
 
-  // Capture the enclosing pool's PRE-change rect from the INPUT
-  // `elements` array — must be the rect BEFORE step 5b's explicit
-  // ancestor grow, otherwise the cascade deltas (computed against
-  // this rect at step 9) miss the explicit grow and only see the
-  // additional ensure/buffer growth, leaving sibling pools
-  // un-shifted in lockstep.
-  let enclosingPoolBefore: DiagramElement | null = null;
-  {
-    let walk: DiagramElement | undefined = elements.find((e) => e.id === ep0.parentId);
-    while (walk) {
-      if (walk.type === "pool") { enclosingPoolBefore = { ...walk }; break; }
-      if (!walk.parentId) break;
-      walk = elements.find((e) => e.id === walk!.parentId);
-    }
-  }
-
-  // 5b. Explicitly grow each EP ancestor (lane / sublane / pool) by the
-  //     EP's grow on each axis so their boundaries track the EP exactly.
-  //     Without this, ensureContainersEncloseChildren would only grow
-  //     the ancestor by the PAD-fit minimum — which for a lane with
-  //     interior slack falls SHORT of the matching sibling-lane bulk
-  //     shift, leaving a gap between the ancestor lane's new bottom and
-  //     the next lane below.
-  //
-  //     POOL ancestors clamp to outward-only (user rule): a pool's
-  //     boundary can move out when the EP grows, but never moves in
-  //     when the EP shrinks. Lane / sublane ancestors still track the
-  //     EP in both directions so the lane chain stays flush.
-  //
-  //     For EP-typed ancestors (an outer EP enclosing this EP), capture
-  //     their pre-grow rect so we can re-snap THEIR boundary events and
-  //     recompute connectors anchored to them — without this, an outer
-  //     EP's boundary events stay glued to the OLD edges when only the
-  //     inner EP moved.
-  const epAncestorOldRects = new Map<string, { x: number; y: number; width: number; height: number }>();
-  for (const ancId of epAncestors) {
-    const anc = updatedEls.find((e) => e.id === ancId);
-    if (anc?.type === "subprocess-expanded") {
-      epAncestorOldRects.set(ancId, { x: anc.x, y: anc.y, width: anc.width, height: anc.height });
-    }
-  }
-  // When the moved EP's direct parent is also an EP (nested EP case),
-  // skip explicit ancestor grow entirely. Lane / pool / outer-EP all
-  // follow via proximity-gated `ensureContainersEncloseChildren` (PAD=5
-  // for EP-in-EP; PAD=8 for outer-EP-in-lane). Without this gate the
-  // lane / pool would grow by the inner EP's full delta even though
-  // the outer EP didn't move — making the lane jut out beyond the
-  // outer EP visually.
-  const movedEpDirectParent = elements.find((e) => e.id === ep0.parentId);
-  const epIsInsideEP = movedEpDirectParent?.type === "subprocess-expanded";
-  if (!epIsInsideEP && epAncestors.size > 0 && (growTop !== 0 || growBottom !== 0 || growLeft !== 0 || growRight !== 0)) {
-    updatedEls = updatedEls.map((e) => {
-      if (!epAncestors.has(e.id)) return e;
-      // EP-typed ancestors stay proximity-gated even for outermost-EP
-      // moves — the user only wants the OUTER EP boundary to follow
-      // when the inner EP gets within 5 px.
-      if (e.type === "subprocess-expanded") return e;
-      const isPool = e.type === "pool";
-      const gT = isPool ? Math.max(0, growTop)    : growTop;
-      const gB = isPool ? Math.max(0, growBottom) : growBottom;
-      const gL = isPool ? Math.max(0, growLeft)   : growLeft;
-      const gR = isPool ? Math.max(0, growRight)  : growRight;
-      let nx = e.x;
-      let ny = e.y;
-      let nw = e.width;
-      let nh = e.height;
-      if (gT !== 0) { ny -= gT; nh += gT; }
-      if (gL !== 0) { nx -= gL; nw += gL; }
-      if (gB !== 0) { nh += gB; }
-      if (gR !== 0) { nw += gR; }
-      return { ...e, x: nx, y: ny, width: nw, height: nh };
-    });
-  }
-
-  // (enclosingPoolBefore captured earlier, before step 5b, so cascade
-  //  deltas reflect the FULL pool growth including the explicit grow.)
-
-  // 7. Bubble the EP's growth up through Lane / Sublane / Pool. With
-  //    PAD=5 for EP-in-EP, an outer EP only grows when the inner EP
-  //    gets within 5 px of its edge — proximity-gated cascade.
-  updatedEls = ensureContainersEncloseChildren(updatedEls);
-
-  // 7-bis. Issue 5 — re-snap the moved EP's boundary events AGAIN
-  //        using the POST-enclose rect. When the user drags a boundary
-  //        inward past an internal child, ensureContainersEncloseChildren
-  //        grows the EP back so the boundary stops at the obstacle. The
-  //        first resnap above used the user-INPUT newRect; without this
-  //        second pass the events stay at the user-input edge and get
-  //        visually disconnected from the (clamped) post-enclose edge.
-  const postEncloseEp = updatedEls.find((e) => e.id === epId);
-  if (postEncloseEp) {
-    const finalMoving = new Set<"top" | "bottom" | "left" | "right">();
-    if (postEncloseEp.y !== newRect.y) finalMoving.add("top");
-    if (postEncloseEp.x !== newRect.x) finalMoving.add("left");
-    if (postEncloseEp.y + postEncloseEp.height !== newRect.y + newRect.height) finalMoving.add("bottom");
-    if (postEncloseEp.x + postEncloseEp.width !== newRect.x + newRect.width) finalMoving.add("right");
-    if (finalMoving.size > 0) {
-      updatedEls = resnapEPBoundaryEvents(updatedEls, postEncloseEp, newRect, finalMoving);
-    }
-  }
-
-  // 7b. Re-snap boundary events on every EP-typed ancestor whose rect
-  //     actually changed during ensure-enclose. Outer EPs only grow
-  //     when the inner gets close (PAD=5), so most of the time this
-  //     loop is a no-op. When they DO grow, their edge-mounted events
-  //     slide along the moving edge, just like the inner EP's.
-  for (const [ancId, ancOldRect] of epAncestorOldRects) {
-    const ancNew = updatedEls.find((e) => e.id === ancId);
-    if (!ancNew) continue;
-    if (ancNew.x === ancOldRect.x && ancNew.y === ancOldRect.y &&
-        ancNew.width === ancOldRect.width && ancNew.height === ancOldRect.height) continue;
-    // Determine which sides of the ANCESTOR moved (independent of the
-    // inner EP's movingSides — outer EP might only grow on one side).
-    const ancMovingSides = new Set<"top" | "bottom" | "left" | "right">();
-    if (ancNew.y !== ancOldRect.y) ancMovingSides.add("top");
-    if (ancNew.x !== ancOldRect.x) ancMovingSides.add("left");
-    if (ancNew.y + ancNew.height !== ancOldRect.y + ancOldRect.height) ancMovingSides.add("bottom");
-    if (ancNew.x + ancNew.width !== ancOldRect.x + ancOldRect.width) ancMovingSides.add("right");
-    updatedEls = resnapEPBoundaryEvents(updatedEls, ancNew, ancOldRect, ancMovingSides);
-  }
-
-  // 8. Enforce the EP→pool buffer (now four-sided).
-  if (enclosingPoolBefore) {
-    updatedEls = ensurePoolBufferFromEPs(updatedEls, enclosingPoolBefore.id, POOL_BUF_W, POOL_BUF_H);
-  }
-
-  // 9. Cascade to neighbouring pools.
-  if (enclosingPoolBefore) {
-    const newPool = updatedEls.find((e) => e.id === enclosingPoolBefore!.id);
-    if (newPool) {
-      const dY_below = (newPool.y + newPool.height) - (enclosingPoolBefore.y + enclosingPoolBefore.height);
-      const dY_above = enclosingPoolBefore.y - newPool.y;
-      const dX_right = (newPool.x + newPool.width) - (enclosingPoolBefore.x + enclosingPoolBefore.width);
-      const dX_left  = enclosingPoolBefore.x - newPool.x;
-      if (dY_below > 0) {
-        const r = applyPoolBelowShift(updatedEls, updatedConns, enclosingPoolBefore.id,
-          enclosingPoolBefore.y + enclosingPoolBefore.height, dY_below);
-        updatedEls = r.elements; updatedConns = r.connectors;
-      }
-      if (dY_above > 0) {
-        const r = applyPoolAboveShift(updatedEls, updatedConns, enclosingPoolBefore.id,
-          enclosingPoolBefore.y, dY_above);
-        updatedEls = r.elements; updatedConns = r.connectors;
-      }
-      // Horizontal lockstep across pools (cascade-only). Compose dLeft
-      // and dRight into the helper's signed pair so other pools widen
-      // / shift on whichever side(s) the resized pool moved.
-      const dLeft  = -dX_left;   // dX_left > 0 means pool moved left → other pools shift x by -dX_left
-      const dRight =  dX_right;  // dX_right > 0 means pool's right moved right → other pools widen by dX_right
-      if (dLeft !== 0 || dRight !== 0) {
-        const r = applyPoolBoundaryShift(updatedEls, updatedConns, enclosingPoolBefore.id, dLeft, dRight);
-        updatedEls = r.elements; updatedConns = r.connectors;
-        // Issues 5 + 6: sibling lanes within the moved pool didn't follow
-        // the L/R change (only the EP's ancestor lane was grown by step
-        // 5b). Snap every direct-child lane (and their sublanes) to the
-        // pool's new L/R so the lane stack stays flush. Also snap the
-        // OTHER pools that just got cascaded so their lanes follow too.
-        updatedEls = syncLanesToPool(updatedEls, enclosingPoolBefore.id);
-        for (const p of updatedEls) {
-          if (p.type === "pool" && p.id !== enclosingPoolBefore.id) {
-            updatedEls = syncLanesToPool(updatedEls, p.id);
-          }
-        }
-      }
-    }
-  }
-
-  // 10. Recompute connectors anchored to the EP, its boundary events,
-  //     the enclosing pool, OR any EP-typed ancestor that ACTUALLY grew
-  //     during ensure-enclose (proximity-gated cascade — most outer EPs
-  //     don't change at all when an inner EP moves). Skipping ancestors
-  //     that didn't move means an outer EP's anchored connectors stay
-  //     untouched when the inner EP is well inside the outer.
+  // 7. Recompute connectors anchored to the EP, its boundary events,
+  //    or any element that was just shifted. Cheap pass: recompute any
+  //    connector whose source or target id is in the EP's anchor set
+  //    or in the shifted set.
+  const epDirectBoundaryIds = new Set(
+    updatedEls.filter((e) => e.boundaryHostId === epId).map((e) => e.id),
+  );
   const recomputeIds = new Set<string>([epId, ...epDirectBoundaryIds]);
-  if (enclosingPoolBefore) recomputeIds.add(enclosingPoolBefore.id);
-  for (const [ancId, ancOldRect] of epAncestorOldRects) {
-    const ancNew = updatedEls.find((e) => e.id === ancId);
-    if (!ancNew) continue;
-    if (ancNew.x === ancOldRect.x && ancNew.y === ancOldRect.y &&
-        ancNew.width === ancOldRect.width && ancNew.height === ancOldRect.height) continue;
-    recomputeIds.add(ancId);
-    for (const e of updatedEls) {
-      if (e.boundaryHostId === ancId) recomputeIds.add(e.id);
-    }
+  // Anything whose position changed compared to the input `elements`.
+  const oldById = new Map(elements.map((e) => [e.id, e]));
+  for (const e of updatedEls) {
+    const old = oldById.get(e.id);
+    if (!old) continue;
+    if (old.x !== e.x || old.y !== e.y) recomputeIds.add(e.id);
   }
   updatedConns = updatedConns.map((conn) => {
     if (recomputeIds.has(conn.sourceId) || recomputeIds.has(conn.targetId)) {
       return recomputeAllConnectors([conn], updatedEls)[0] ?? conn;
     }
     return conn;
-  });
-
-  // 11. Track messageBPMN labels with their attachment points on every
-  //     pool that moved (user spec: "move message labels with their
-  //     attachment points on any moving pool"). The helper preserves the
-  //     signed distance from the label centre to the nearest endpoint,
-  //     so a label glued to one pool's edge follows that edge even when
-  //     only ONE end of the messageBPMN moved (asymmetric case where
-  //     midpoint shifts by half the attachment delta).
-  updatedConns = updatedConns.map((conn) => {
-    if (conn.type !== "messageBPMN") return conn;
-    const orig = origWaypointsById.get(conn.id);
-    if (!orig) return conn;
-    const adj = adjustMsgLabelOffset(conn, orig, conn.waypoints);
-    return Object.keys(adj).length > 0 ? { ...conn, ...adj } : conn;
   });
 
   return { elements: updatedEls, connectors: updatedConns };
@@ -1944,14 +1744,13 @@ function ensureContainersEncloseChildren(
     if (!live) continue;
     const allKids = (childrenByParent.get(e.id) ?? []).map((c) => byId.get(c.id) ?? c);
     // Pool/Lane/Sublane: ONLY structural children (lanes / sub-lanes /
-    // sub-sublanes) bound the height. Subprocess-expanded children DO
-    // count too — a subprocess bigger than its parent lane should grow
-    // the lane (and ultimately the pool, fixing issue 4 where the
-    // pool's bottom was failing to follow a deeper EP grow because the
-    // intervening sub-lane wasn't being walked).
+    // sub-sublanes) bound the size. Subprocess-expanded children no
+    // longer grow their parent lane / pool (user spec: EPs cross
+    // lane / sublane boundaries without interacting). For EP parents,
+    // every child still counts so an EP encloses its own contents.
     const kids = e.type === "subprocess-expanded"
       ? allKids
-      : allKids.filter((c) => c.type === "lane" || c.type === "sublane" || c.type === "subprocess-expanded");
+      : allKids.filter((c) => c.type === "lane" || c.type === "sublane");
     if (kids.length === 0) continue;
     // PAD=0 for lane/sublane children — they fill their pool/lane by
     // convention (no gap between last lane bottom and pool bottom).
@@ -3924,17 +3723,11 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       // is allowed to look temporarily under-sized; ensureContainersEncloseChildren
       // still bubbles other shape resizes upward where appropriate.
       //
-      // When the moved element is itself a subprocess-expanded (manual
-      // EP translation), push any outside element whose closest boundary
-      // is within 30 px of the EP's leading edge along the direction of
-      // the move (issue 4). Span-checked on the perpendicular axis so
-      // elements far off to the side aren't disturbed (issue 5).
-      if (el.type === "subprocess-expanded" && (dx !== 0 || dy !== 0)) {
-        const newEpRect = { x: effectiveX, y: effectiveY, width: el.width, height: el.height };
-        const pushed = pushOutsideElementsForEPMove(elements, connectors, id, newEpRect, dx, dy);
-        elements = pushed.elements;
-        connectors = pushed.connectors;
-      }
+      // EPs translate freely now (user spec: "EPs must be able to cross
+      // Lane and sublane boundaries without interacting with them, just
+      // like all other elements"). The previous push-outside cascade is
+      // intentionally disabled — moving an EP no longer disturbs any
+      // surrounding element or container.
 
       // When the moved element's parent is a subprocess-expanded, the EP
       // may need to grow to keep the element enclosed. Route the grow
