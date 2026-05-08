@@ -2033,7 +2033,11 @@ export function PropertiesPanel({
 
       {isEventElement && diagramType === "bpmn" && onSetEventBoundary && (() => {
         const isMounted = !!element.boundaryHostId;
-        const SNAP_THRESHOLD = 25; // mirror reducer constant
+        // Tighter snap threshold for the Properties-panel re-mount than
+        // the 25 px used during drag (user spec: 15 px). This makes
+        // re-checking the box only succeed when the event is already
+        // visually next to a host edge — far-away events stay free.
+        const SNAP_THRESHOLD = 15;
         const HOST_TYPES = new Set(["task", "subprocess", "subprocess-expanded"]);
         // Find nearest valid host within snap range — used when the
         // user re-checks the box on a free-floating event.

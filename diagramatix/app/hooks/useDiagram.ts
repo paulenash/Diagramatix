@@ -4365,11 +4365,36 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       if (!evt) return state;
       if (!BOUNDARY_EVENT_TYPES.has(evt.type)) return state;
       if (hostId === null) {
-        // Detach: clear boundaryHostId; leave the event at its current
-        // position so the user can drag it elsewhere. parentId is left
-        // intact (still belongs to the same lane / pool / EP container).
+        // Detach: clear boundaryHostId AND nudge the event 10 px outward
+        // from the boundary it was sitting on (the side closest to the
+        // event's centre on the previous host's rect). Without the
+        // nudge the event stays exactly on the host edge — visually
+        // overlapping the host's stroke and hard for the user to grab
+        // before dragging it elsewhere. parentId is left intact (the
+        // event still belongs to the same lane / pool / EP container).
+        const oldHost = evt.boundaryHostId
+          ? state.elements.find((e) => e.id === evt.boundaryHostId)
+          : null;
+        let nudgeDx = 0;
+        let nudgeDy = 0;
+        if (oldHost) {
+          const NUDGE = 10;
+          const ecx = evt.x + evt.width / 2;
+          const ecy = evt.y + evt.height / 2;
+          const distLeft   = Math.abs(ecx - oldHost.x);
+          const distRight  = Math.abs(ecx - (oldHost.x + oldHost.width));
+          const distTop    = Math.abs(ecy - oldHost.y);
+          const distBottom = Math.abs(ecy - (oldHost.y + oldHost.height));
+          const min = Math.min(distLeft, distRight, distTop, distBottom);
+          if (min === distLeft)        nudgeDx = -NUDGE;
+          else if (min === distRight)  nudgeDx =  NUDGE;
+          else if (min === distTop)    nudgeDy = -NUDGE;
+          else                         nudgeDy =  NUDGE;
+        }
         const elements = state.elements.map((e) =>
-          e.id === id ? { ...e, boundaryHostId: undefined } : e,
+          e.id === id
+            ? { ...e, x: e.x + nudgeDx, y: e.y + nudgeDy, boundaryHostId: undefined }
+            : e,
         );
         const connectors = state.connectors.map((conn) => {
           if (conn.sourceId !== id && conn.targetId !== id) return conn;

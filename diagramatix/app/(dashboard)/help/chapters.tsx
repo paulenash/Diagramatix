@@ -2034,17 +2034,27 @@ export const CHAPTERS: HelpChapter[] = [
             <ul className="list-disc list-inside space-y-1 mt-2">
               <li>
                 <strong>Uncheck</strong> the box to detach the event
-                from its host. The event stays at its current position
-                but no longer follows the host&rsquo;s edge — drag it
-                anywhere on the diagram.
+                from its host. The event is automatically nudged
+                <strong> 10 px outward</strong> from the side it was
+                mounted on so you can grab it cleanly, then drag it
+                anywhere on the diagram. <code>boundaryHostId</code>{" "}
+                is cleared; the event no longer follows the host edge.
               </li>
               <li>
-                <strong>Re-check</strong> the box (or drag the event
-                back onto a host edge) to re-mount it. Re-check only
-                works when the event is already within 25 px of a
-                valid host; otherwise drag it onto an edge to mount.
+                <strong>Re-check</strong> the box to re-mount the event
+                on the nearest host. Re-check only succeeds when the
+                event&rsquo;s centre is within <strong>15 px</strong>
+                {" "}of a valid host&rsquo;s boundary; otherwise the
+                box bounces back unchecked. Drag the event onto an
+                edge instead to mount from any distance.
               </li>
             </ul>
+            <p className="mt-2 text-xs text-gray-500">
+              Note: the 25 px snap that mounts events automatically
+              when you <em>drop</em> them from the palette or drag a
+              free event near a host is unchanged. The 15 px is just
+              the tighter rule for the Properties checkbox.
+            </p>
           </>
         ),
       },
