@@ -29,7 +29,7 @@ export const CHAPTERS: HelpChapter[] = [
               domain models and more.
             </p>
             <p className="mt-2 text-xs text-gray-500">
-              This guide covers version <strong>1.8</strong>.
+              This guide covers version <strong>1.9</strong>.
             </p>
             <p className="mt-2">
               After signing in you land on the <strong>Dashboard</strong> —
@@ -840,6 +840,40 @@ export const CHAPTERS: HelpChapter[] = [
         ),
       },
       {
+        heading: "Three-state toggle",
+        body: (
+          <>
+            <p>
+              The pill in the bottom-right corner of the canvas cycles
+              through three modes on each click:
+            </p>
+            <ul className="list-disc list-inside space-y-1 mt-2">
+              <li>
+                <strong className="text-blue-700">ON</strong> — both sides
+                are auto-connected. The nearest left / above neighbour is
+                wired INTO the new element, and any candidate to the right
+                is wired FROM the new element.
+              </li>
+              <li>
+                <strong className="text-amber-700">TO ONLY</strong> — only
+                an incoming connector is created (existing → new). No
+                outgoing connector from the new element. Useful when you
+                want to extend a flow without picking a downstream target.
+              </li>
+              <li>
+                <strong className="text-gray-700">OFF</strong> — no auto-
+                connectors at all. Dropped shapes are placed as-is.
+                Gateway-merge (group connect via double-click) still runs.
+              </li>
+            </ul>
+            <p className="mt-2">
+              The selected mode is saved in your browser and survives
+              page reloads.
+            </p>
+          </>
+        ),
+      },
+      {
         heading: "How it works",
         body: (
           <>
@@ -917,18 +951,22 @@ export const CHAPTERS: HelpChapter[] = [
         body: (
           <ul className="list-disc list-inside space-y-1">
             <li>
-              Never auto-connect <strong>TO</strong> a Start Event
-              (exception: boundary-mounted start events can receive
-              from outside their host subprocess).
+              Never auto-connect <strong>TO</strong> a Start Event.
             </li>
             <li>
               Never auto-connect <strong>FROM</strong> an End Event.
             </li>
             <li>
-              Never auto-connect <strong>between elements in different
-              white-box pools</strong> — sequence flows don&rsquo;t cross
-              pool boundaries in BPMN; cross-pool links must be message
-              connectors (dragged manually).
+              Never auto-connect <strong>to or from any
+              edge-mounted (boundary) event</strong>. Boundary events
+              are always wired manually by the user.
+            </li>
+            <li>
+              Never auto-connect <strong>across pool boundaries</strong>{" "}
+              — regardless of pool subtype. Anything outside the new
+              element&rsquo;s pool (including elements that sit in NO
+              pool) is rejected. Cross-pool links must be message
+              connectors, dragged manually.
             </li>
             <li>
               No sequence connectors <strong>to or from</strong> an
@@ -947,6 +985,34 @@ export const CHAPTERS: HelpChapter[] = [
               only valid targets are highlighted.
             </li>
           </ul>
+        ),
+      },
+      {
+        heading: "Boundary-event attachment side",
+        body: (
+          <p>
+            When a sequence connector touches a boundary event mounted
+            on an Expanded Subprocess edge, Diagramatix picks the
+            event&rsquo;s OUTSIDE face if the other endpoint sits
+            outside the host EP, and the INSIDE face if the other
+            endpoint sits inside. The two perpendicular sides of the
+            event (which lie ON the EP boundary) are never used. This
+            keeps internal vs external flows visually unambiguous and
+            survives any later EP resize.
+          </p>
+        ),
+      },
+      {
+        heading: "Self-avoidance",
+        body: (
+          <p>
+            Newly created and rerouted sequence connectors are
+            validated against the source and target body — if the
+            initial side pick would route the path through the
+            element interior (most visible on Gateways and EPs), the
+            sides are recomputed off the source-to-target delta vector
+            so the path exits and approaches cleanly.
+          </p>
         ),
       },
       {
@@ -1137,15 +1203,52 @@ export const CHAPTERS: HelpChapter[] = [
         body: (
           <>
             <p>
-              An expanded subprocess acts as a container. Drag elements from
-              the palette directly into the expanded subprocess to add child
-              elements.
+              An expanded subprocess (EP) acts as a container. Drag
+              elements from the palette directly into the expanded
+              subprocess to add child elements.
             </p>
             <p className="mt-2">
-              Elements dropped inside an expanded subprocess are automatically
-              <strong> scaled to 75%</strong> of their normal size to fit
-              the subprocess context.
+              Elements dropped inside an expanded subprocess are
+              automatically <strong>scaled to 75%</strong> of their
+              normal size to fit the subprocess context.
             </p>
+          </>
+        ),
+      },
+      {
+        heading: "EP isolation from lanes / pools",
+        body: (
+          <>
+            <p>
+              EPs are visually inside a lane or pool but they do NOT
+              interact with the lane or pool boundary:
+            </p>
+            <ul className="list-disc list-inside space-y-1 mt-2">
+              <li>
+                <strong>Free crossing.</strong> An EP can be dragged
+                across any lane / sublane divider without affecting
+                the divider, the lane, the pool, or any neighbouring
+                pool. Just like every other element on the canvas.
+              </li>
+              <li>
+                <strong>Resize is scoped.</strong> When you drag an EP
+                edge handle (or move a child inside the EP that forces
+                it to grow), the EP grows / shrinks but its parent
+                lane and pool stay at their current size. Tasks and
+                events INSIDE the same lane (or sublane, or pool with
+                no lanes) are pushed aside to make room; siblings
+                outside that scope are untouched.
+              </li>
+              <li>
+                <strong>Boundary events follow the EP.</strong> Edge-
+                mounted events on the EP&rsquo;s top / bottom / left /
+                right sides re-anchor to the moving edge as you
+                resize. Events on a perpendicular side keep their
+                absolute position on the unchanged opposite edge until
+                the moving edge catches up to them, at which point
+                they snap to the new corner.
+              </li>
+            </ul>
           </>
         ),
       },
@@ -1156,6 +1259,19 @@ export const CHAPTERS: HelpChapter[] = [
             Drag an <strong>intermediate event</strong> onto the edge of a
             task or subprocess to create a boundary event. Boundary events
             snap to the nearest edge and move with their host element.
+            Auto-connect never picks a boundary event as either source
+            or target — wire them manually.
+          </p>
+        ),
+      },
+      {
+        heading: "EPs in lane-pools render above lane backgrounds",
+        body: (
+          <p>
+            Pool, lane, and sublane backgrounds paint first; flow
+            elements (including EPs) paint on top. An EP placed in a
+            lane is fully visible and selectable — clicking the EP
+            body always selects the EP, never the lane behind it.
           </p>
         ),
       },
@@ -1611,31 +1727,35 @@ export const CHAPTERS: HelpChapter[] = [
   /* ──────────────────────────────────────────────── 15 ── */
   {
     slug: "inserting-space",
-    title: "Inserting Space",
+    title: "Inserting & Removing Space",
     sections: [
       {
         body: (
           <p>
             When a diagram gets crowded you can push elements apart by
-            inserting horizontal or vertical space. This is available in
-            <strong>BPMN</strong> and <strong>State Machine</strong> diagrams.
+            inserting horizontal or vertical space. When it has too much
+            empty area you can collapse a region by removing space.
+            Both modes use the same Ctrl+click marker workflow on{" "}
+            <strong>BPMN</strong> and <strong>State Machine</strong>{" "}
+            diagrams.
           </p>
         ),
       },
       {
-        heading: "How to insert space",
+        heading: "Insert mode (one marker, green)",
         body: (
           <ol className="list-decimal list-inside space-y-2">
             <li>
               <strong>Ctrl+click</strong> on an empty area of the canvas.
-              A space-insertion marker (crosshair line) appears at that
-              position.
+              A green space-insertion marker (crosshair line) appears at
+              that position.
             </li>
             <li>
-              <strong>Shift+drag</strong> the marker <strong>horizontally</strong>{" "}
-              to push all elements to the right of the marker further
-              rightward, or <strong>vertically</strong> to push all elements
-              below the marker further downward.
+              <strong>Shift+drag</strong> the marker{" "}
+              <strong>horizontally</strong> to push everything past the
+              marker rightward, or <strong>vertically</strong> to push
+              everything past it downward. Drag in the opposite
+              direction to push the other way.
             </li>
             <li>
               Release the mouse button. The space is inserted and all
@@ -1648,7 +1768,94 @@ export const CHAPTERS: HelpChapter[] = [
         imageCaption: "Ctrl+click to place the marker, then Shift+drag to insert space.",
       },
       {
-        heading: "What gets moved",
+        heading: "Remove mode (two markers, red)",
+        body: (
+          <>
+            <ol className="list-decimal list-inside space-y-2">
+              <li>
+                With one marker already placed, <strong>Ctrl+click</strong>{" "}
+                a second time. Both markers and their guide lines turn
+                red, and the cross-shaped strip between them is shaded
+                light red — that is the deletion zone.
+              </li>
+              <li>
+                Click and drag either marker to refine the zone. The
+                shaded strip updates live.
+              </li>
+              <li>
+                Press <strong>Enter</strong>. A confirmation dialog
+                lists every element the operation would touch, grouped
+                into three categories with checkboxes:
+                <ul className="list-disc list-inside ml-4 mt-1">
+                  <li>
+                    <em>Fully inside</em> — could be deleted (default
+                    UNCHECKED — preserved unless you tick).
+                  </li>
+                  <li>
+                    <em>Partially inside, ignored</em> — default
+                    CHECKED (left alone). Untick to delete.
+                  </li>
+                  <li>
+                    <em>Partially inside, will be affected</em> —
+                    pools, lanes, sublanes, EPs that straddle the
+                    zone. Default CHECKED (will shrink / shift). Untick
+                    to leave intact.
+                  </li>
+                </ul>
+              </li>
+              <li>
+                Click <strong>Remove</strong>. The zone collapses,
+                ticked elements are deleted, and surviving elements
+                shift inward. <strong>Cancel</strong> closes the
+                dialog and keeps the markers.
+              </li>
+            </ol>
+            <p className="mt-2 text-xs text-gray-500">
+              When the two markers share an axis the zone collapses to
+              a single horizontal or vertical strip — the perpendicular
+              strip is zero-extent and contributes nothing.
+            </p>
+          </>
+        ),
+      },
+      {
+        heading: "Direction-aware shift",
+        body: (
+          <p>
+            On removal, Diagramatix counts elements outside the zone
+            on each axis and shifts whichever side has{" "}
+            <em>fewer</em> elements — leaving the heavier side
+            undisturbed. So if there are 8 tasks above and 2 below,
+            the 2 below shift up to close the gap rather than the 8
+            above shifting down. Pool / lane containers that straddle
+            the zone shrink instead of shifting.
+          </p>
+        ),
+      },
+      {
+        heading: "Escape ladder",
+        body: (
+          <>
+            <p>Press Escape progressively to cancel:</p>
+            <ul className="list-disc list-inside space-y-1 mt-2">
+              <li>
+                <strong>From the dialog</strong>: closes the dialog,
+                markers stay.
+              </li>
+              <li>
+                <strong>From REMOVE mode</strong>: drops the second
+                marker, returns to INSERT mode.
+              </li>
+              <li>
+                <strong>From INSERT mode</strong>: drops the first
+                marker, returns to idle.
+              </li>
+            </ul>
+          </>
+        ),
+      },
+      {
+        heading: "What gets moved on insert",
         body: (
           <ul className="list-disc list-inside space-y-1">
             <li>
@@ -1661,8 +1868,9 @@ export const CHAPTERS: HelpChapter[] = [
               than shifted, so they grow to accommodate the new space.
             </li>
             <li>
-              Boundary events stay attached to their host element&apos;s edge
-              and are re-anchored automatically.
+              Boundary events on an EP that the insertion line cuts
+              through stay at their original absolute position — they
+              do NOT slide with the new EP edge.
             </li>
           </ul>
         ),
@@ -1670,13 +1878,11 @@ export const CHAPTERS: HelpChapter[] = [
       {
         heading: "Tips",
         body: (
-          <>
-            <p>
-              Drag the marker (without Shift) to reposition it before
-              inserting space. Press <strong>Escape</strong> to cancel the
-              marker entirely.
-            </p>
-          </>
+          <p>
+            Drag a marker (without Shift) to reposition it before
+            inserting or confirming a removal. Press{" "}
+            <strong>Escape</strong> at any point to step back.
+          </p>
         ),
       },
     ],
@@ -1813,6 +2019,33 @@ export const CHAPTERS: HelpChapter[] = [
               boundary events.
             </li>
           </ul>
+        ),
+      },
+      {
+        heading: "Detaching from the boundary",
+        body: (
+          <>
+            <p>
+              The Properties panel shows an <strong>Edge-mounted</strong>{" "}
+              checkbox for any BPMN event. It is automatically checked
+              when an event is placed on the edge of a Task, Subprocess,
+              or Expanded Subprocess.
+            </p>
+            <ul className="list-disc list-inside space-y-1 mt-2">
+              <li>
+                <strong>Uncheck</strong> the box to detach the event
+                from its host. The event stays at its current position
+                but no longer follows the host&rsquo;s edge — drag it
+                anywhere on the diagram.
+              </li>
+              <li>
+                <strong>Re-check</strong> the box (or drag the event
+                back onto a host edge) to re-mount it. Re-check only
+                works when the event is already within 25 px of a
+                valid host; otherwise drag it onto an edge to mount.
+              </li>
+            </ul>
+          </>
         ),
       },
       {

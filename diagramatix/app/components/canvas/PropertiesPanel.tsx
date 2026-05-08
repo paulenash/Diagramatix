@@ -23,6 +23,7 @@ interface Props {
   diagramType?: DiagramType;
   onUpdateLabel: (id: string, label: string) => void;
   onUpdateProperties: (id: string, props: Record<string, unknown>) => void;
+  onSetEventBoundary?: (id: string, hostId: string | null) => void;
   onDeleteElement: (id: string) => void;
   onDeleteConnector: (id: string) => void;
   onUpdateConnectorDirection: (id: string, directionType: DirectionType) => void;
@@ -557,6 +558,7 @@ export function PropertiesPanel({
   diagramType,
   onUpdateLabel,
   onUpdateProperties,
+  onSetEventBoundary,
   onDeleteElement,
   onDeleteConnector,
   onUpdateConnectorDirection,
@@ -2028,6 +2030,58 @@ export function PropertiesPanel({
           </select>
         </div>
       )}
+
+      {isEventElement && diagramType === "bpmn" && onSetEventBoundary && (() => {
+        const isMounted = !!element.boundaryHostId;
+        const SNAP_THRESHOLD = 25; // mirror reducer constant
+        const HOST_TYPES = new Set(["task", "subprocess", "subprocess-expanded"]);
+        // Find nearest valid host within snap range — used when the
+        // user re-checks the box on a free-floating event.
+        function nearestHostId(): string | null {
+          if (!allElements || !element) return null;
+          const cx = element.x + element.width / 2;
+          const cy = element.y + element.height / 2;
+          let bestId: string | null = null;
+          let bestDist = SNAP_THRESHOLD;
+          for (const h of allElements) {
+            if (!HOST_TYPES.has(h.type)) continue;
+            // closest point on the host's bounding rect
+            const px = Math.max(h.x, Math.min(h.x + h.width, cx));
+            const py = Math.max(h.y, Math.min(h.y + h.height, cy));
+            const d = Math.hypot(px - cx, py - cy);
+            if (d < bestDist) { bestDist = d; bestId = h.id; }
+          }
+          return bestId;
+        }
+        return (
+          <div>
+            <label className="flex items-center gap-2 text-xs text-gray-700 cursor-pointer" title="When checked, the event is mounted to the boundary of a Task / Subprocess / EP. Uncheck to detach and move it elsewhere on the diagram.">
+              <input
+                type="checkbox"
+                className="h-3.5 w-3.5"
+                checked={isMounted}
+                onChange={(e) => {
+                  if (e.target.checked) {
+                    const hid = nearestHostId();
+                    if (hid) onSetEventBoundary(element.id, hid);
+                    // No nearby host → no-op; the controlled checkbox
+                    // will revert on the next render.
+                  } else {
+                    onSetEventBoundary(element.id, null);
+                  }
+                }}
+              />
+              <span>Edge-mounted</span>
+            </label>
+            {!isMounted && (
+              <p className="text-[10px] text-gray-500 mt-0.5">
+                Drag the event onto the edge of a Task, Subprocess, or
+                Expanded Subprocess to mount it (auto-checks the box).
+              </p>
+            )}
+          </div>
+        );
+      })()}
 
 
       {/* Outgoing connectors list (debug mode only) */}

@@ -429,6 +429,7 @@ export function DiagramEditor({
     updateLabel,
     updateProperties,
     updatePropertiesBatch,
+    setEventBoundary,
     deleteElement,
     addConnector,
     deleteConnector,
@@ -1937,6 +1938,7 @@ export function DiagramEditor({
             multiSelectionCount={selectedElementIds.size}
             onUpdateLabel={updateLabel}
             onUpdateProperties={updateProperties}
+            onSetEventBoundary={setEventBoundary}
             onUpdateConnectorDirection={updateConnectorDirection}
             onUpdateConnectorType={updateConnectorType}
             onReverseConnector={reverseConnector}

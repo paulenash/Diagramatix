@@ -228,6 +228,7 @@ type Action =
   | { type: "RESIZE_ELEMENT"; payload: { id: string; x: number; y: number; width: number; height: number } }
   | { type: "UPDATE_LABEL"; payload: { id: string; label: string } }
   | { type: "UPDATE_PROPERTIES"; payload: { id: string; properties: Record<string, unknown> } }
+  | { type: "SET_EVENT_BOUNDARY"; payload: { id: string; hostId: string | null } }
   | { type: "DELETE_ELEMENT"; payload: { id: string } }
   | { type: "ADD_CONNECTOR"; payload: {
       sourceId: string;
@@ -1439,6 +1440,18 @@ function applyEPBoundaryChange(
     }
   } else {
     for (const e of updatedEls) exclude.add(e.id);
+  }
+  // Any boundary event whose host is in exclude must also be excluded —
+  // its host isn't moving, so the event must not move either. Without
+  // this, a child move that grows an inner EP would push the OUTER EP's
+  // edge-mounted events sideways even though the outer EP boundary
+  // itself stays put (the outer EP is the scope container — excluded
+  // from shifts — but its boundary events otherwise land "past the
+  // line" and are picked up as roots).
+  for (const e of updatedEls) {
+    if (e.boundaryHostId && exclude.has(e.boundaryHostId)) {
+      exclude.add(e.id);
+    }
   }
 
   // 5. External shifts on each edge that grew outward, scoped to the
@@ -4346,6 +4359,42 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       return { ...state, elements };
     }
 
+    case "SET_EVENT_BOUNDARY": {
+      const { id, hostId } = action.payload;
+      const evt = state.elements.find((e) => e.id === id);
+      if (!evt) return state;
+      if (!BOUNDARY_EVENT_TYPES.has(evt.type)) return state;
+      if (hostId === null) {
+        // Detach: clear boundaryHostId; leave the event at its current
+        // position so the user can drag it elsewhere. parentId is left
+        // intact (still belongs to the same lane / pool / EP container).
+        const elements = state.elements.map((e) =>
+          e.id === id ? { ...e, boundaryHostId: undefined } : e,
+        );
+        const connectors = state.connectors.map((conn) => {
+          if (conn.sourceId !== id && conn.targetId !== id) return conn;
+          return recomputeAllConnectors([conn], elements)[0] ?? conn;
+        });
+        return { ...state, elements, connectors };
+      }
+      // Re-mount: snap the event's centre to the nearest point on the
+      // host's boundary (host must be a valid boundary host type).
+      const host = state.elements.find((e) => e.id === hostId);
+      if (!host || !BOUNDARY_HOST_TYPES.has(host.type)) return state;
+      const centre = { x: evt.x + evt.width / 2, y: evt.y + evt.height / 2 };
+      const pt = nearestPointOnRectBoundary(host, centre);
+      const elements = state.elements.map((e) =>
+        e.id === id
+          ? { ...e, x: pt.x - evt.width / 2, y: pt.y - evt.height / 2, boundaryHostId: hostId, parentId: host.parentId }
+          : e,
+      );
+      const connectors = state.connectors.map((conn) => {
+        if (conn.sourceId !== id && conn.targetId !== id) return conn;
+        return recomputeAllConnectors([conn], elements)[0] ?? conn;
+      });
+      return { ...state, elements, connectors };
+    }
+
     case "DELETE_ELEMENT": {
       const { id } = action.payload;
       const el = state.elements.find((e) => e.id === id);
@@ -6722,6 +6771,14 @@ export function useDiagram(initialData: DiagramData) {
     []
   );
 
+  const setEventBoundary = useCallback(
+    (id: string, hostId: string | null) => {
+      pushHistory(snapshotData());
+      dispatch({ type: "SET_EVENT_BOUNDARY", payload: { id, hostId } });
+    },
+    []
+  );
+
   const updatePropertiesBatch = useCallback(
     (updates: Array<{ id: string; properties: Record<string, unknown> }>) => {
       pushHistory(snapshotData());
@@ -7062,6 +7119,7 @@ export function useDiagram(initialData: DiagramData) {
     updateLabel,
     updateProperties,
     updatePropertiesBatch,
+    setEventBoundary,
     deleteElement,
     addConnector,
     deleteConnector,

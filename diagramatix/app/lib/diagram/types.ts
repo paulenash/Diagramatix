@@ -292,5 +292,47 @@ export interface TemplateData {
  *          a lane shrinks the pool height; right-edge resize grip appears
  *          only during an active drag. Click model: white-box pool header
  *          and lane header are the only selection hit zones (bodies bubble).
+ * v1.9:    Additive XSD catch-up — DiagramType "archimate", SymbolType
+ *          "archimate-shape", ConnectorType "archi-*" (11 ArchiMate
+ *          relationships); DiagramData attributes "poolFontSize",
+ *          "laneFontSize", "database". No breaking changes.
+ *          Behaviour changes (no schema impact, documented for
+ *          completeness):
+ *            - Auto-connect 3-state toggle: on / to-only / off.
+ *              Persisted in localStorage as "diagramatix.autoConnect".
+ *              "to-only" suppresses the new→existing leg; "off" disables
+ *              auto-connect entirely (gateway-merge group connect still
+ *              runs).
+ *            - Auto-connect rejects ANY cross-pool candidate (regardless
+ *              of pool subtype) and ANY edge-mounted boundary event as
+ *              source or target.
+ *            - Insert / Remove Space: Ctrl+click drops a green INSERT
+ *              marker; a second Ctrl+click switches to two-marker
+ *              REMOVE mode (red strips). Enter opens a confirmation
+ *              dialog with three checkbox sections (fully-inside /
+ *              partial-ignored / partial-affected). Direction-aware
+ *              shift on removal — the lighter side moves.
+ *            - EP isolation: EPs cross lane / sublane / pool
+ *              boundaries freely on move; EP resize pushes only
+ *              elements within the EP's innermost lane / sublane /
+ *              pool / outer-EP scope and never grows ancestor
+ *              containers; render order paints EPs above lane / pool
+ *              backgrounds so they're visible and selectable.
+ *            - Sublanes are first-class parents. Drag-drop into a
+ *              sublane region sets element.parentId to the sublane;
+ *              the Properties panel surfaces the new parent.
+ *            - Lane / sublane divider drag REDISTRIBUTES height
+ *              between the two adjacent lanes (above grows, below
+ *              shrinks) — the parent lane / pool keeps its size,
+ *              preserving "sublanes fill their lane, lanes fill
+ *              their pool".
+ *            - Connector self-avoidance: newly created and rerouted
+ *              sequence connectors validate against source / target
+ *              body interior and pick a safe side pair if the path
+ *              would clip through.
+ *            - Boundary-event side picking: connectors to / from an
+ *              edge-mounted event use the OUTER face when the other
+ *              endpoint sits outside the host EP, the INNER face
+ *              when inside; never the perpendicular sides.
  */
-export const SCHEMA_VERSION = "1.8";
+export const SCHEMA_VERSION = "1.9";
