@@ -444,21 +444,24 @@ export function Canvas({
   // new lane will be inserted on release. `kind` controls the colour:
   //   "boundary" → bright green (above-all, between, below-all)
   //   "split"    → light green (split a lane into 2 sublanes)
-  // Auto-connect on/off toggle. When enabled (default), dropping an
-  // element near an existing one triggers BPMN/state-machine auto-
-  // connect; when disabled, drops just place the shape with no
-  // automatic connector. Persisted in localStorage so the choice
-  // survives reloads.
-  const [autoConnectEnabled, setAutoConnectEnabled] = useState<boolean>(() => {
-    if (typeof window === "undefined") return true;
+  // Auto-connect 3-state toggle. Modes:
+  //   "on"      — full auto-connect: pick a FROM source AND a TO target.
+  //   "to-only" — only auto-connect TO the new element; never source FROM.
+  //   "off"     — no auto-connect (gateway-merge group connect still runs).
+  // Persisted in localStorage so the choice survives reloads. Reads the
+  // legacy "0" / "1" values from the binary toggle for backwards compat.
+  const [autoConnectMode, setAutoConnectMode] = useState<"on" | "to-only" | "off">(() => {
+    if (typeof window === "undefined") return "on";
     const v = window.localStorage.getItem("diagramatix.autoConnect");
-    return v === null ? true : v === "1";
+    if (v === "off" || v === "0") return "off";
+    if (v === "to-only") return "to-only";
+    return "on";
   });
   useEffect(() => {
     if (typeof window !== "undefined") {
-      window.localStorage.setItem("diagramatix.autoConnect", autoConnectEnabled ? "1" : "0");
+      window.localStorage.setItem("diagramatix.autoConnect", autoConnectMode);
     }
-  }, [autoConnectEnabled]);
+  }, [autoConnectMode]);
 
   // Drop-preview line:
   //   "lane"        → bright green  — any LANE insert
@@ -1712,22 +1715,11 @@ export function Canvas({
       ((el.properties.subprocessType as string | undefined) === "event" ||
        (el.properties.subprocessType as string | undefined) === "transaction");
 
-    // Valid targets for edge-mounted start events: only task, subprocess, subprocess-expanded (not events)
-    const EDGE_START_TARGETS = new Set<SymbolType>(["task", "subprocess", "subprocess-expanded"]);
-
     const candidates = data.elements.filter((e) => {
       if (!AUTO_CONNECT_TYPES.has(e.type)) return false;
-      // Allow edge-mounted start events on the new element's parent expanded subprocess
-      // but only if the new element is a valid target (task, subprocess, expanded subprocess)
-      if (e.boundaryHostId) {
-        // Boundary-mounted start event → child element of its host. Allow
-        // any of the EDGE_START_TARGETS, including subprocess-expanded
-        // (assumed regular — user can delete the auto-connect if they
-        // later change the subtype to event/transaction).
-        if (e.type === "start-event" && e.boundaryHostId === newExpandedScope
-            && newSymbolType && EDGE_START_TARGETS.has(newSymbolType)) return true;
-        return false;
-      }
+      // Per spec: never auto-connect from/to ANY edge-mounted (boundary)
+      // event — they are always manually wired by the user.
+      if (e.boundaryHostId) return false;
       // BPMN: never auto-connect FROM an end event (end events have no outgoing)
       if (isBpmn && e.type === "end-event") return false;
       // BPMN: never auto-connect TO a start event
@@ -2287,10 +2279,10 @@ export function Canvas({
     symbolType: SymbolType, worldPos: Point,
     taskType?: BpmnTaskType, eventType?: EventType
   ) {
-    // Toggle override: when auto-connect is disabled in the bottom-right
-    // canvas toggle, skip the auto-connect detection entirely and just
-    // place the shape at the drop point.
-    if (!autoConnectEnabled) {
+    // Toggle override: when auto-connect is OFF, skip auto-connect entirely
+    // (gateway-merge group connect at handleGatewayDoubleClick remains
+    // unaffected — it never consulted this toggle).
+    if (autoConnectMode === "off") {
       onAddElement(symbolType, worldPos, taskType, eventType);
       return;
     }
@@ -2345,8 +2337,14 @@ export function Canvas({
       const def = getSymbolDefinition(symbolType);
       let newX = worldPos.x - def.defaultWidth / 2;
       let newY = worldPos.y - def.defaultHeight / 2;
+      // Mode semantics:
+      //   "on"      — both directions: existing→new (src) AND new→existing (tgt).
+      //   "to-only" — only auto-connect TO the new element; skip the new→existing leg.
+      //   "off"     — handled above (early return).
       const srcFound = findAutoConnectSource(newX, newY, def.defaultWidth, def.defaultHeight, symbolType);
-      const tgtFound = findAutoConnectTarget(newX, newY, def.defaultWidth, def.defaultHeight, symbolType);
+      const tgtFound = autoConnectMode === "to-only"
+        ? null
+        : findAutoConnectTarget(newX, newY, def.defaultWidth, def.defaultHeight, symbolType);
 
       // Pass-through auto-connect: new element placed BETWEEN two
       // existing unconnected elements → wire src→new AND new→tgt.
@@ -5210,21 +5208,23 @@ export function Canvas({
         );
       })()}
 
-      {/* Auto-connect on/off toggle — sits flush to the right of the
-          canvas, just to the right of the zoom control (the zoom pill is
-          shifted left to make room). Persists across reloads via
-          localStorage. */}
+      {/* Auto-connect 3-state cyclic toggle (off → to-only → on → off).
+          Persists across reloads via localStorage. */}
       <button
-        onClick={() => setAutoConnectEnabled((v) => !v)}
+        onClick={() => setAutoConnectMode((m) => m === "off" ? "to-only" : m === "to-only" ? "on" : "off")}
         className={`absolute bottom-2 right-2 flex items-center gap-1 rounded-full px-2 py-1 shadow-sm backdrop-blur-sm z-30 select-none border text-[11px] font-medium transition-colors ${
-          autoConnectEnabled
+          autoConnectMode === "on"
             ? "bg-blue-600 text-white border-blue-600 hover:bg-blue-700"
-            : "bg-white/90 text-gray-600 border-gray-300 hover:bg-gray-50"
+            : autoConnectMode === "to-only"
+              ? "bg-amber-500 text-white border-amber-500 hover:bg-amber-600"
+              : "bg-white/90 text-gray-600 border-gray-300 hover:bg-gray-50"
         }`}
         title={
-          autoConnectEnabled
-            ? "Auto-connect ON — clicking shapes near each other auto-creates a connector. Click to disable."
-            : "Auto-connect OFF — dropped shapes are placed without auto-connectors. Click to enable."
+          autoConnectMode === "on"
+            ? "Auto-connect ON — both incoming and outgoing connectors are auto-created. Click to switch to TO ONLY."
+            : autoConnectMode === "to-only"
+              ? "Auto-connect TO ONLY — only incoming connectors (existing → new) are auto-created. Click to switch to OFF."
+              : "Auto-connect OFF — dropped shapes are placed without auto-connectors (gateway-merge group connect still runs). Click to switch to TO ONLY."
         }
       >
         <svg
@@ -5241,7 +5241,7 @@ export function Canvas({
           <circle cx="13" cy="8" r="2" />
           <line x1="5" y1="8" x2="11" y2="8" />
         </svg>
-        Auto-connect: {autoConnectEnabled ? "ON" : "OFF"}
+        Auto-connect: {autoConnectMode === "on" ? "ON" : autoConnectMode === "to-only" ? "TO ONLY" : "OFF"}
       </button>
 
       {pendingArchiConn && (

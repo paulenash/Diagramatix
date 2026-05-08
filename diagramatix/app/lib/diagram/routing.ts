@@ -98,6 +98,101 @@ function getOffsetAlong(el: DiagramElement, side: Side, pt: Point): number {
   return clamp((pt.y - el.y) / el.height);
 }
 
+/**
+ * Returns the side of the host EP that a boundary event is mounted on (= its
+ * outer face), or null when the element isn't a boundary event or its host
+ * can't be located.
+ */
+export function getBoundaryEventOuterSide(
+  el: DiagramElement,
+  allElements: DiagramElement[],
+): Side | null {
+  if (!el.boundaryHostId) return null;
+  const host = allElements.find((h) => h.id === el.boundaryHostId);
+  if (!host) return null;
+  const ecx = el.x + el.width / 2;
+  const ecy = el.y + el.height / 2;
+  const distTop    = Math.abs(ecy - host.y);
+  const distBottom = Math.abs(ecy - (host.y + host.height));
+  const distLeft   = Math.abs(ecx - host.x);
+  const distRight  = Math.abs(ecx - (host.x + host.width));
+  const min = Math.min(distTop, distBottom, distLeft, distRight);
+  if (min === distTop)    return "top";
+  if (min === distBottom) return "bottom";
+  if (min === distLeft)   return "left";
+  return "right";
+}
+
+/** Opposite side helper — used to flip outer→inner for boundary events. */
+export function oppositeSide(s: Side): Side {
+  if (s === "top")    return "bottom";
+  if (s === "bottom") return "top";
+  if (s === "left")   return "right";
+  return "left";
+}
+
+/**
+ * Pick the correct attachment side on a boundary (edge-mounted) event for a
+ * connector whose other endpoint is `other`. Returns the OUTER face when
+ * `other` lies outside the host EP; the INNER (opposite) face when it lies
+ * inside. Never returns one of the two perpendicular sides that sit ON the
+ * EP boundary itself. Returns null when the element isn't a boundary event.
+ */
+export function pickBoundaryEventSide(
+  evt: DiagramElement,
+  other: DiagramElement,
+  allElements: DiagramElement[],
+): Side | null {
+  const outer = getBoundaryEventOuterSide(evt, allElements);
+  if (!outer) return null;
+  const host = allElements.find((h) => h.id === evt.boundaryHostId);
+  if (!host) return outer;
+  const ocx = other.x + other.width / 2;
+  const ocy = other.y + other.height / 2;
+  const otherInsideHost =
+    ocx > host.x && ocx < host.x + host.width &&
+    ocy > host.y && ocy < host.y + host.height;
+  return otherInsideHost ? oppositeSide(outer) : outer;
+}
+
+/**
+ * Pick a symmetric pair of sides for a NEW or rerouted sequence connector
+ * such that the source's exit faces the target's centre and vice versa.
+ * The asymmetric `getClosestSideOfElement` picks each side from the OTHER
+ * endpoint's centre but doesn't guarantee the path won't double back through
+ * the source/target body — this helper does, by choosing both sides off the
+ * same delta vector. Falls through to `pickBoundaryEventSide` for boundary
+ * events on either end.
+ */
+export function safeSidePair(
+  source: DiagramElement,
+  target: DiagramElement,
+  allElements: DiagramElement[],
+): { src: Side; tgt: Side } {
+  const sCx = source.x + source.width / 2;
+  const sCy = source.y + source.height / 2;
+  const tCx = target.x + target.width / 2;
+  const tCy = target.y + target.height / 2;
+  const dx = tCx - sCx;
+  const dy = tCy - sCy;
+  const horizontalDominant = Math.abs(dx) >= Math.abs(dy);
+  let src: Side;
+  let tgt: Side;
+  if (horizontalDominant) {
+    src = dx > 0 ? "right" : "left";
+    tgt = dx > 0 ? "left"  : "right";
+  } else {
+    src = dy > 0 ? "bottom" : "top";
+    tgt = dy > 0 ? "top"    : "bottom";
+  }
+  // Boundary events override — outer/inner face per host containment.
+  const srcOverride = pickBoundaryEventSide(source, target, allElements);
+  if (srcOverride) src = srcOverride;
+  const tgtOverride = pickBoundaryEventSide(target, source, allElements);
+  if (tgtOverride) tgt = tgtOverride;
+  return { src, tgt };
+}
+
 // Check if an axis-aligned segment (horizontal or vertical) intersects an obstacle bounds
 function segmentHitsObstacle(p1: Point, p2: Point, obs: Bounds, margin = 4): boolean {
   const left = obs.x - margin, right = obs.x + obs.width + margin;
@@ -1069,12 +1164,11 @@ export function recomputeAllConnectors(
                  && (tgtN.dy !== 0 ? appDy * (-tgtN.dy) > 0 : true);
 
       if (!exitOk || !appOk) {
-        // Recalculate optimal sides based on current element positions
-        const srcCx = source.x + source.width / 2, srcCy = source.y + source.height / 2;
-        const tgtCx = target.x + target.width / 2, tgtCy = target.y + target.height / 2;
-        const dx = tgtCx - srcCx, dy = tgtCy - srcCy;
-        const newSrcSide: Side = Math.abs(dx) >= Math.abs(dy) ? (dx > 0 ? "right" : "left") : (dy > 0 ? "bottom" : "top");
-        const newTgtSide: Side = Math.abs(dx) >= Math.abs(dy) ? (dx > 0 ? "left" : "right") : (dy > 0 ? "top" : "bottom");
+        // Recalculate optimal sides — `safeSidePair` picks both sides off
+        // the same delta vector so the path can't double back through the
+        // source / target body, and overrides with `pickBoundaryEventSide`
+        // for boundary-event endpoints (issues 2 + 8).
+        const { src: newSrcSide, tgt: newTgtSide } = safeSidePair(source, target, elements);
         const result2 = computeWaypoints(
           source, target, elements,
           newSrcSide, newTgtSide, conn.routingType, 0.5, 0.5,
@@ -1112,12 +1206,9 @@ export function recomputeAllConnectors(
       if (waypointInsideObs) break;
     }
     if (waypointInsideObs) {
-      // Recalculate with optimal facing sides
-      const srcCx = source.x + source.width / 2, srcCy = source.y + source.height / 2;
-      const tgtCx = target.x + target.width / 2, tgtCy = target.y + target.height / 2;
-      const ddx = tgtCx - srcCx, ddy = tgtCy - srcCy;
-      const reSrcSide: Side = Math.abs(ddx) >= Math.abs(ddy) ? (ddx > 0 ? "right" : "left") : (ddy > 0 ? "bottom" : "top");
-      const reTgtSide: Side = Math.abs(ddx) >= Math.abs(ddy) ? (ddx > 0 ? "left" : "right") : (ddy > 0 ? "top" : "bottom");
+      // Recalculate with optimal facing sides — boundary-event-aware and
+      // self-avoidant via `safeSidePair`.
+      const { src: reSrcSide, tgt: reTgtSide } = safeSidePair(source, target, elements);
       const result3 = computeWaypoints(source, target, elements, reSrcSide, reTgtSide, conn.routingType, 0.5, 0.5);
       return { ...conn, waypoints: result3.waypoints,
         sourceInvisibleLeader: result3.sourceInvisibleLeader,

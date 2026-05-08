@@ -19,7 +19,7 @@ import type {
   Side,
   SymbolType,
 } from "@/app/lib/diagram/types";
-import { computeWaypoints, recomputeAllConnectors, consolidateWaypoints, rectifyWaypoints, constrainControlPoint } from "@/app/lib/diagram/routing";
+import { computeWaypoints, recomputeAllConnectors, consolidateWaypoints, rectifyWaypoints, constrainControlPoint, safeSidePair } from "@/app/lib/diagram/routing";
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
 import { CHEVRON_THEMES } from "@/app/lib/diagram/chevronThemes";
 
@@ -1587,6 +1587,25 @@ function applyEPBoundaryChange(
   //    gets within 5 px of its edge — proximity-gated cascade.
   updatedEls = ensureContainersEncloseChildren(updatedEls);
 
+  // 7-bis. Issue 5 — re-snap the moved EP's boundary events AGAIN
+  //        using the POST-enclose rect. When the user drags a boundary
+  //        inward past an internal child, ensureContainersEncloseChildren
+  //        grows the EP back so the boundary stops at the obstacle. The
+  //        first resnap above used the user-INPUT newRect; without this
+  //        second pass the events stay at the user-input edge and get
+  //        visually disconnected from the (clamped) post-enclose edge.
+  const postEncloseEp = updatedEls.find((e) => e.id === epId);
+  if (postEncloseEp) {
+    const finalMoving = new Set<"top" | "bottom" | "left" | "right">();
+    if (postEncloseEp.y !== newRect.y) finalMoving.add("top");
+    if (postEncloseEp.x !== newRect.x) finalMoving.add("left");
+    if (postEncloseEp.y + postEncloseEp.height !== newRect.y + newRect.height) finalMoving.add("bottom");
+    if (postEncloseEp.x + postEncloseEp.width !== newRect.x + newRect.width) finalMoving.add("right");
+    if (finalMoving.size > 0) {
+      updatedEls = resnapEPBoundaryEvents(updatedEls, postEncloseEp, newRect, finalMoving);
+    }
+  }
+
   // 7b. Re-snap boundary events on every EP-typed ancestor whose rect
   //     actually changed during ensure-enclose. Outer EPs only grow
   //     when the inner gets close (PAD=5), so most of the time this
@@ -1705,16 +1724,39 @@ function resnapEPBoundaryEvents(
     const cx = e.x + e.width / 2;
     const cy = e.y + e.height / 2;
     const { side, frac } = boundaryEdgeOf({ x: cx, y: cy }, oldEpRect);
-    if (!movingSides.has(side)) return e;
-    const f = Math.max(0, Math.min(1, frac));
-    let ncx: number, ncy: number;
-    switch (side) {
-      case "top":    ncx = ep.x + f * ep.width;  ncy = ep.y;                 break;
-      case "bottom": ncx = ep.x + f * ep.width;  ncy = ep.y + ep.height;     break;
-      case "left":   ncx = ep.x;                 ncy = ep.y + f * ep.height; break;
-      default:       ncx = ep.x + ep.width;      ncy = ep.y + f * ep.height; break;
+    if (movingSides.has(side)) {
+      // Event is on a side that just moved — re-snap by fraction so it
+      // stays at the same proportional position along the new edge.
+      const f = Math.max(0, Math.min(1, frac));
+      let ncx: number, ncy: number;
+      switch (side) {
+        case "top":    ncx = ep.x + f * ep.width;  ncy = ep.y;                 break;
+        case "bottom": ncx = ep.x + f * ep.width;  ncy = ep.y + ep.height;     break;
+        case "left":   ncx = ep.x;                 ncy = ep.y + f * ep.height; break;
+        default:       ncx = ep.x + ep.width;      ncy = ep.y + f * ep.height; break;
+      }
+      return { ...e, x: ncx - e.width / 2, y: ncy - e.height / 2 };
     }
-    return { ...e, x: ncx - e.width / 2, y: ncy - e.height / 2 };
+    // Event is on a perpendicular (non-moving) side. Issue 6: keep the
+    // event's absolute coordinate along that edge fixed (anchored to
+    // the OPPOSITE, non-moving boundary) instead of preserving its
+    // fractional position. Issue 7: clamp the absolute coordinate to
+    // the new edge length — when the moving boundary catches up to the
+    // event's centre, the event clamps to the new corner and from then
+    // on travels with the moving boundary.
+    if (side === "top" || side === "bottom") {
+      const newY = side === "top" ? ep.y : ep.y + ep.height;
+      const minX = ep.x;
+      const maxX = ep.x + ep.width;
+      const clampedCx = Math.max(minX, Math.min(maxX, cx));
+      return { ...e, x: clampedCx - e.width / 2, y: newY - e.height / 2 };
+    }
+    // left or right
+    const newX = side === "left" ? ep.x : ep.x + ep.width;
+    const minY = ep.y;
+    const maxY = ep.y + ep.height;
+    const clampedCy = Math.max(minY, Math.min(maxY, cy));
+    return { ...e, x: newX - e.width / 2, y: clampedCy - e.height / 2 };
   });
 }
 
@@ -2569,6 +2611,17 @@ function connectorHitsAnyElement(conn: Connector, elements: DiagramElement[]): b
           return true;
         }
       }
+      // Issue 8: also flag any visible SEGMENT that crosses the strict
+      // interior of the source / target body. The entry/exit waypoints
+      // sit on the boundary so they're admitted via margin = -1, but a
+      // segment that doubles back through the body (caused by a wrong
+      // sourceSide / targetSide) IS a strict-interior crossing and gets
+      // flagged. Most visible on gateways and EPs where a poor side pick
+      // can route the path back through the diamond / rectangle body.
+      const visible = wp.slice(vs, ve + 1);
+      for (let i = 0; i < visible.length - 1; i++) {
+        if (segmentHitsRect(visible[i], visible[i + 1], b, -1)) return true;
+      }
     } else {
       // Exclude boundary events on source/target
       if (obs.boundaryHostId === conn.sourceId || obs.boundaryHostId === conn.targetId) continue;
@@ -2617,12 +2670,11 @@ function validateConnectorsAgainstObstacles(connectors: Connector[], elements: D
       const c1 = { ...conn, waypoints: r1.waypoints, sourceInvisibleLeader: r1.sourceInvisibleLeader, targetInvisibleLeader: r1.targetInvisibleLeader,
         ...endLabelResets };
       if (!connectorHitsAnyElement(c1, elements)) return c1;
-      // Try with recalculated optimal sides
-      const srcCx = source.x + source.width / 2, srcCy = source.y + source.height / 2;
-      const tgtCx = target.x + target.width / 2, tgtCy = target.y + target.height / 2;
-      const ddx = tgtCx - srcCx, ddy = tgtCy - srcCy;
-      const newSrcSide: Side = Math.abs(ddx) >= Math.abs(ddy) ? (ddx > 0 ? "right" : "left") : (ddy > 0 ? "bottom" : "top");
-      const newTgtSide: Side = Math.abs(ddx) >= Math.abs(ddy) ? (ddx > 0 ? "left" : "right") : (ddy > 0 ? "top" : "bottom");
+      // Try with recalculated optimal sides — `safeSidePair` picks both
+      // sides off the same delta vector (avoiding self-clip through the
+      // source / target body) and overrides with `pickBoundaryEventSide`
+      // for boundary-event endpoints (issues 2 + 8).
+      const { src: newSrcSide, tgt: newTgtSide } = safeSidePair(source, target, elements);
       const r2 = computeWaypoints(source, target, elements, newSrcSide, newTgtSide, conn.routingType, 0.5, 0.5);
       return { ...conn, waypoints: r2.waypoints, sourceInvisibleLeader: r2.sourceInvisibleLeader, targetInvisibleLeader: r2.targetInvisibleLeader,
         sourceSide: newSrcSide, targetSide: newTgtSide, sourceOffsetAlong: 0.5, targetOffsetAlong: 0.5,
@@ -5051,7 +5103,13 @@ function reducer(state: DiagramData, action: Action): DiagramData {
           })
         : updatedElements;
 
-      return { ...state, elements: finalElements, connectors: allConnectors };
+      // Validate the new connector against obstacles so newly created
+      // sequence flows can't leave the source / target body or clip
+      // through other elements (issue 8 expanded — applies to every new
+      // connector path: auto-connect, manual draw, group-connect).
+      // messageBPMN / associationBPMN are skipped inside the helper.
+      const validated = validateConnectorsAgainstObstacles(allConnectors, finalElements);
+      return { ...state, elements: finalElements, connectors: validated };
     }
 
     case "DELETE_CONNECTOR": {
