@@ -2035,10 +2035,11 @@ export const CHAPTERS: HelpChapter[] = [
               <li>
                 <strong>Uncheck</strong> the box to detach the event
                 from its host. The event is automatically nudged
-                <strong> 10 px outward</strong> from the side it was
-                mounted on so you can grab it cleanly, then drag it
-                anywhere on the diagram. <code>boundaryHostId</code>{" "}
-                is cleared; the event no longer follows the host edge.
+                <strong> 30 px outward</strong> from the side it was
+                mounted on — far enough to clear the 25 px auto-snap
+                threshold so the next drag won&rsquo;t re-mount it.
+                <code> boundaryHostId</code> is cleared; the event no
+                longer follows the host edge.
               </li>
               <li>
                 <strong>Re-check</strong> the box to re-mount the event

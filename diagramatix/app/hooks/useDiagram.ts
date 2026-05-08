@@ -4365,12 +4365,11 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       if (!evt) return state;
       if (!BOUNDARY_EVENT_TYPES.has(evt.type)) return state;
       if (hostId === null) {
-        // Detach: clear boundaryHostId AND nudge the event 10 px outward
+        // Detach: clear boundaryHostId AND nudge the event 30 px outward
         // from the boundary it was sitting on (the side closest to the
-        // event's centre on the previous host's rect). Without the
-        // nudge the event stays exactly on the host edge — visually
-        // overlapping the host's stroke and hard for the user to grab
-        // before dragging it elsewhere. parentId is left intact (the
+        // event's centre on the previous host's rect). 30 px > the
+        // 25 px MOVE_ELEMENT auto-snap threshold, so the next drag
+        // won't immediately re-mount. parentId is left intact (the
         // event still belongs to the same lane / pool / EP container).
         const oldHost = evt.boundaryHostId
           ? state.elements.find((e) => e.id === evt.boundaryHostId)
@@ -4378,7 +4377,7 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         let nudgeDx = 0;
         let nudgeDy = 0;
         if (oldHost) {
-          const NUDGE = 10;
+          const NUDGE = 30;
           const ecx = evt.x + evt.width / 2;
           const ecy = evt.y + evt.height / 2;
           const distLeft   = Math.abs(ecx - oldHost.x);
