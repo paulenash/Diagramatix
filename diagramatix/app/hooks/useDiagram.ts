@@ -6319,90 +6319,74 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       const below = state.elements.find((e) => e.id === belowLaneId);
       if (!above || !below) return state;
 
-      // Issue 2 — "behave like a pool boundary and push those elements":
-      // grow the above lane by Δ; below lane shifts down by Δ unchanged
-      // in size; push every element past the OLD divider line within the
-      // parent's x-span (so the pool / outer lane grows from the bottom);
-      // ensureContainersEncloseChildren bubbles the pool growth; pools
-      // below cascade via applyPoolBelowShift.
-      //
-      // Negative Δ (drag up) is symmetric: shrinks the above lane (clamped
-      // at MIN_H), pulls everything below upward (uses negative delta in
-      // the same helper). Pools below are NOT pulled up — they only
-      // cascade outward when a pool grows.
+      // Redistribute height between the two adjacent lanes / sublanes:
+      // above grows by clampedDy, below shrinks by the same amount and
+      // its top edge moves to follow. The enclosing parent (pool or
+      // outer lane) keeps its size — sublanes always fill their lane,
+      // lanes always fill their pool. No external push, no pool cascade.
+      const maxGrow   = below.height - MIN_H;
       const maxShrink = above.height - MIN_H;
-      const clampedDy = Math.max(-maxShrink, dy);
+      const clampedDy = Math.max(-maxShrink, Math.min(maxGrow, dy));
       if (clampedDy === 0) return state;
 
-      const oldDividerY = above.y + above.height;
-      const parent = above.parentId ? state.elements.find((e) => e.id === above.parentId) : undefined;
-      if (!parent) return state;
-      const spanXMin = parent.x;
-      const spanXMax = parent.x + parent.width;
+      const newAboveH = above.height + clampedDy;
+      const newBelowH = below.height - clampedDy;
+      const newBelowY = below.y + clampedDy;
 
-      // 1. Grow above lane.
-      let elements = state.elements.map((e) =>
-        e.id === aboveLaneId ? { ...e, height: e.height + clampedDy } : e,
-      );
-      let connectors = state.connectors;
+      let elements = state.elements.map((e) => {
+        if (e.id === aboveLaneId) return { ...e, height: newAboveH };
+        if (e.id === belowLaneId) return { ...e, y: newBelowY, height: newBelowH };
+        return e;
+      });
 
-      // 2. Push everything past the OLD divider line within the parent's
-      //    x-span. Exclude the above lane and its descendants (they
-      //    belong to above lane and ride with their parent).
-      const exclude = new Set<string>([aboveLaneId]);
-      for (const id of getAllDescendantIds(elements, aboveLaneId)) exclude.add(id);
-      const pushed = shiftElementsPastLineWithinSpan(
-        elements, connectors, "y", oldDividerY, clampedDy,
-        spanXMin, spanXMax, exclude,
-      );
-      elements = pushed.elements;
-      connectors = pushed.connectors;
-
-      // 3. Explicitly adjust the parent chain (parent lane / sublane up
-      //    to the enclosing pool) by clampedDy. ensureContainersEncloseChildren
-      //    only GROWS containers (never shrinks), so the chain wouldn't
-      //    follow on UP drags without this — leaving a gap below the
-      //    bottom lane (issue 1).
-      const enclosingPool = (() => {
-        let cur: DiagramElement | undefined = parent;
-        for (let i = 0; i < 10 && cur; i++) {
-          if (cur.type === "pool") return cur;
-          if (!cur.parentId) return null;
-          cur = elements.find((e) => e.id === cur!.parentId);
-        }
-        return null;
-      })();
-      {
-        let cur: DiagramElement | undefined = parent;
-        for (let i = 0; i < 10 && cur; i++) {
-          const id = cur.id;
-          elements = elements.map((e) => e.id === id ? { ...e, height: e.height + clampedDy } : e);
-          if (cur.type === "pool") break;
-          if (!cur.parentId) break;
-          cur = elements.find((e) => e.id === cur!.parentId);
-        }
-      }
-      const oldPoolBottom = enclosingPool ? enclosingPool.y + enclosingPool.height : null;
-      // Sanity net — picks up any over-shrink that would clip a sibling.
-      elements = ensureContainersEncloseChildren(elements);
-
-      // 4. Pool-below cascade: when the enclosing pool's bottom moved
-      //    down, push neighbour pools below by the same delta (same
-      //    proximity rule as applyEPBoundaryChange).
-      if (enclosingPool && oldPoolBottom !== null) {
-        const newPool = elements.find((e) => e.id === enclosingPool.id);
-        if (newPool) {
-          const dY_below = (newPool.y + newPool.height) - oldPoolBottom;
-          if (dY_below > 0) {
-            const r = applyPoolBelowShift(elements, connectors, enclosingPool.id, oldPoolBottom, dY_below);
-            elements = r.elements; connectors = r.connectors;
+      // Proportionally rescale sub-lanes within each affected lane so
+      // the sublane stack continues to fill the parent lane's new
+      // height. Recurses through arbitrary nesting depth.
+      function rescaleSubs(els: DiagramElement[], laneId: string, laneY: number, laneH: number, laneX: number, laneW: number): DiagramElement[] {
+        const lane = els.find((e) => e.id === laneId);
+        const LANE_LW = lane ? getLaneHeaderWidth(lane) : 36;
+        const subs = els.filter((e) => e.type === "lane" && e.parentId === laneId).sort((a, b) => a.y - b.y);
+        if (subs.length === 0) return els;
+        const totalSubH = subs.reduce((s, l) => s + l.height, 0) || 1;
+        let stackY = laneY;
+        let result = els;
+        for (let i = 0; i < subs.length; i++) {
+          const sub = subs[i];
+          let newSubH = Math.max(28, Math.round(laneH * (sub.height / totalSubH)));
+          if (i === subs.length - 1) {
+            newSubH = Math.max(28, laneY + laneH - stackY);
           }
+          const newSubX = laneX + LANE_LW;
+          const newSubW = laneW - LANE_LW;
+          const updatedSub: DiagramElement = { ...sub, x: newSubX, y: stackY, width: newSubW, height: newSubH };
+          result = result.map((e) => (e.id === sub.id ? updatedSub : e));
+          result = rescaleSubs(result, sub.id, stackY, newSubH, newSubX, newSubW);
+          stackY += newSubH;
+        }
+        return result;
+      }
+      elements = rescaleSubs(elements, aboveLaneId, above.y, newAboveH, above.x, above.width);
+      elements = rescaleSubs(elements, belowLaneId, newBelowY, newBelowH, below.x, below.width);
+
+      // Recompute any connector whose source / target moved during the
+      // redistribute (sublane shifts can drag boundary events / tasks
+      // anchored to them).
+      let connectors = state.connectors;
+      const movedIds = new Set<string>();
+      const oldById = new Map(state.elements.map((e) => [e.id, e]));
+      for (const e of elements) {
+        const old = oldById.get(e.id);
+        if (!old) continue;
+        if (old.x !== e.x || old.y !== e.y || old.width !== e.width || old.height !== e.height) {
+          movedIds.add(e.id);
         }
       }
-
-      // 5. Recompute / validate connectors against the new layout.
-      connectors = recomputeAllConnectors(connectors, elements);
-      connectors = validateConnectorsAgainstObstacles(connectors, elements);
+      connectors = connectors.map((conn) => {
+        if (movedIds.has(conn.sourceId) || movedIds.has(conn.targetId)) {
+          return recomputeAllConnectors([conn], elements)[0] ?? conn;
+        }
+        return conn;
+      });
 
       return { ...state, elements, connectors };
     }
