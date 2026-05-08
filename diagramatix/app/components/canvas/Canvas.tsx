@@ -1665,15 +1665,28 @@ export function Canvas({
       }
     }
 
-    // Infer the pool the new element would land in (spatial containment):
-    // prefer the deepest lane hit, otherwise a pool directly.
+    // Infer the pool the new element would land in (spatial containment).
+    // Pick the deepest spatial-fit lane (innermost wins) and walk up its
+    // parent chain to find the actual pool — without the walk, a sublane
+    // hit set newPool to its parent LANE (not a pool), which broke the
+    // cross-pool guard for nested lane structures (issue 3).
     let newPool: DiagramElement | null = null;
+    let deepestLane: DiagramElement | null = null;
     for (const cand of data.elements) {
       if (cand.type !== "lane") continue;
       if (newX >= cand.x && newRight2 <= cand.x + cand.width &&
           newY >= cand.y && newBottom2 <= cand.y + cand.height) {
-        newPool = cand.parentId ? data.elements.find(e => e.id === cand.parentId) ?? null : null;
-        break;
+        if (!deepestLane || (cand.width * cand.height) < (deepestLane.width * deepestLane.height)) {
+          deepestLane = cand;
+        }
+      }
+    }
+    if (deepestLane) {
+      let cur: DiagramElement | undefined = deepestLane;
+      for (let i = 0; i < 10 && cur; i++) {
+        if (cur.type === "pool") { newPool = cur; break; }
+        if (!cur.parentId) break;
+        cur = data.elements.find((e) => e.id === cur!.parentId);
       }
     }
     if (!newPool) {
@@ -1686,9 +1699,6 @@ export function Canvas({
         }
       }
     }
-    const isWhiteBoxPool = (p: DiagramElement | null): boolean =>
-      !!p && p.type === "pool" &&
-      (((p.properties.poolType as string | undefined) ?? "black-box") === "white-box");
     function containingPool(el: DiagramElement): DiagramElement | null {
       let cur: DiagramElement | undefined = el;
       for (let i = 0; i < 10 && cur; i++) {
@@ -1740,12 +1750,14 @@ export function Canvas({
         if (candInEventSub && candParent.id !== newExpandedScope) return false;
       }
       // BPMN: sequence flows never auto-connect across pool boundaries.
-      // Any two elements in different pools — regardless of pool subtype —
-      // can only be wired by a manual messageBPMN flow, never by auto-
-      // connect (issue 6).
+      // Reject when the candidate's containing pool differs from the new
+      // element's containing pool — INCLUDING null-vs-pool mismatches
+      // (anything outside all pools can't auto-connect to anything inside
+      // a pool, and vice versa). Manual messageBPMN flows are the only
+      // BPMN-legal cross-pool link (issues 6 + 3).
       if (isBpmn) {
         const candPool = containingPool(e);
-        if (candPool && newPool && candPool.id !== newPool.id) {
+        if ((candPool?.id ?? null) !== (newPool?.id ?? null)) {
           return false;
         }
       }
@@ -1989,13 +2001,25 @@ export function Canvas({
       }
     }
 
+    // Pick the deepest spatial-fit lane and walk up to its enclosing pool
+    // (issue 3 — sublane parent-chain wasn't always reaching a pool).
     let newPool: DiagramElement | null = null;
+    let deepestLane: DiagramElement | null = null;
     for (const cand of data.elements) {
       if (cand.type !== "lane") continue;
       if (newX >= cand.x && newRight2 <= cand.x + cand.width &&
           newY >= cand.y && newBottom2 <= cand.y + cand.height) {
-        newPool = cand.parentId ? data.elements.find(e => e.id === cand.parentId) ?? null : null;
-        break;
+        if (!deepestLane || (cand.width * cand.height) < (deepestLane.width * deepestLane.height)) {
+          deepestLane = cand;
+        }
+      }
+    }
+    if (deepestLane) {
+      let cur: DiagramElement | undefined = deepestLane;
+      for (let i = 0; i < 10 && cur; i++) {
+        if (cur.type === "pool") { newPool = cur; break; }
+        if (!cur.parentId) break;
+        cur = data.elements.find((e) => e.id === cur!.parentId);
       }
     }
     if (!newPool) {
@@ -2008,9 +2032,6 @@ export function Canvas({
         }
       }
     }
-    const isWhiteBoxPool = (p: DiagramElement | null): boolean =>
-      !!p && p.type === "pool" &&
-      (((p.properties.poolType as string | undefined) ?? "black-box") === "white-box");
     function containingPool(el: DiagramElement): DiagramElement | null {
       let cur: DiagramElement | undefined = el;
       for (let i = 0; i < 10 && cur; i++) {
@@ -2048,12 +2069,15 @@ export function Canvas({
           (candParent.properties.subprocessType as string | undefined) === "event";
         if (candInEventSub && candParent.id !== newExpandedScope) return false;
       }
-      // BPMN: sequence flows never auto-connect across pool boundaries
-      // (issue 6) — any two elements in different pools can only be wired
-      // manually via messageBPMN.
+      // BPMN: sequence flows never auto-connect across pool boundaries.
+      // Reject when the candidate's containing pool differs from the new
+      // element's containing pool — INCLUDING null-vs-pool mismatches
+      // (anything outside all pools can't auto-connect to anything inside
+      // a pool, and vice versa). Manual messageBPMN flows are the only
+      // BPMN-legal cross-pool link (issues 6 + 3).
       if (isBpmn) {
         const candPool = containingPool(e);
-        if (candPool && newPool && candPool.id !== newPool.id) {
+        if ((candPool?.id ?? null) !== (newPool?.id ?? null)) {
           return false;
         }
       }
@@ -4614,23 +4638,30 @@ export function Canvas({
                   className={allAligned ? "animate-pulse" : undefined}
                   opacity={1}
                 />
-                {others.map((o, i) => (
-                  <g key={o.id}>
-                    {/* White halo around the marker for contrast */}
-                    <circle
-                      cx={o.x} cy={o.midY} r={10}
-                      fill="#ffffff" fillOpacity={0.85}
-                      stroke="none"
-                    />
-                    <circle
-                      cx={o.x} cy={o.midY} r={8}
-                      fill={aligned[i] ? "#10b981" : "#1f2937"}
-                      fillOpacity={aligned[i] ? 1 : 0.6}
-                      stroke={aligned[i] ? "#047857" : "#000000"}
-                      strokeWidth={2}
-                    />
-                  </g>
-                ))}
+                {others.map((o, i) => {
+                  // Issue 2: the moving pool's marker tracks the live drag X
+                  // (currentX) instead of the snapshot value. Other pools'
+                  // markers stay anchored to their stored boundary X so the
+                  // alignment cue is meaningful.
+                  const cx = o.isMoving ? poolBoundaryGuide.currentX : o.x;
+                  return (
+                    <g key={o.id}>
+                      {/* White halo around the marker for contrast */}
+                      <circle
+                        cx={cx} cy={o.midY} r={10}
+                        fill="#ffffff" fillOpacity={0.85}
+                        stroke="none"
+                      />
+                      <circle
+                        cx={cx} cy={o.midY} r={8}
+                        fill={aligned[i] ? "#10b981" : "#1f2937"}
+                        fillOpacity={aligned[i] ? 1 : 0.6}
+                        stroke={aligned[i] ? "#047857" : "#000000"}
+                        strokeWidth={2}
+                      />
+                    </g>
+                  );
+                })}
               </g>
             );
           })()}

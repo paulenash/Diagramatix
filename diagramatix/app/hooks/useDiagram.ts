@@ -1657,6 +1657,17 @@ function applyEPBoundaryChange(
       if (dLeft !== 0 || dRight !== 0) {
         const r = applyPoolBoundaryShift(updatedEls, updatedConns, enclosingPoolBefore.id, dLeft, dRight);
         updatedEls = r.elements; updatedConns = r.connectors;
+        // Issues 5 + 6: sibling lanes within the moved pool didn't follow
+        // the L/R change (only the EP's ancestor lane was grown by step
+        // 5b). Snap every direct-child lane (and their sublanes) to the
+        // pool's new L/R so the lane stack stays flush. Also snap the
+        // OTHER pools that just got cascaded so their lanes follow too.
+        updatedEls = syncLanesToPool(updatedEls, enclosingPoolBefore.id);
+        for (const p of updatedEls) {
+          if (p.type === "pool" && p.id !== enclosingPoolBefore.id) {
+            updatedEls = syncLanesToPool(updatedEls, p.id);
+          }
+        }
       }
     }
   }
@@ -1980,6 +1991,47 @@ function ensureContainersEncloseChildren(
     }
   }
   return elements.map((e) => byId.get(e.id) ?? e);
+}
+
+/**
+ * Snap every direct-child lane of a pool to match the pool's current
+ * L/R bounds (lane.x = pool.x + POOL_LW, lane.width = pool.width - POOL_LW)
+ * and recurse into the lane's sublanes via `rescaleSublanesRecursive`.
+ *
+ * Used after the EP-grow / MOVE_ELEMENT cascade widens a pool: without
+ * this, only the EP's ancestor lane gets resized — sibling lanes keep
+ * their old width so the pool ends up wider than its lanes (visible gap
+ * on the right when an EP pushes the pool right; lane-header floats off
+ * the pool header on the left when an EP pushes the pool left). Issues
+ * 5 + 6.
+ */
+function syncLanesToPool(
+  elements: DiagramElement[],
+  poolId: string,
+): DiagramElement[] {
+  const pool = elements.find((e) => e.id === poolId);
+  if (!pool || pool.type !== "pool") return elements;
+  // Recursively re-fit each child lane / sublane to its parent's L/R
+  // bounds while preserving heights and y positions. Each container's
+  // children share the parent's interior x / width minus the container
+  // header strip.
+  function syncChildren(parent: DiagramElement, els: DiagramElement[]): DiagramElement[] {
+    const headerW = parent.type === "pool"
+      ? getPoolHeaderWidth(parent)
+      : getLaneHeaderWidth(parent);
+    const childX = parent.x + headerW;
+    const childW = Math.max(40, parent.width - headerW);
+    let result = els;
+    const kids = els.filter((e) => e.type === "lane" && e.parentId === parent.id);
+    for (const kid of kids) {
+      if (kid.x === childX && kid.width === childW) continue;
+      const updated: DiagramElement = { ...kid, x: childX, width: childW };
+      result = result.map((e) => (e.id === kid.id ? updated : e));
+      result = syncChildren(updated, result);
+    }
+    return result;
+  }
+  return syncChildren(pool, elements);
 }
 
 /**
@@ -3948,6 +4000,29 @@ function reducer(state: DiagramData, action: Action): DiagramData {
           if (dY > 0) {
             const r = applyPoolBelowShift(elements, connectors, oldEl.id, oldEl.y + oldEl.height, dY);
             elements = r.elements; connectors = r.connectors;
+          }
+        }
+        // Issues 5 + 6: cascade pool L/R growth to OTHER aligned pools
+        // and snap every pool's child lanes to the new L/R bounds. When
+        // ensureContainersEncloseChildren widens a pool because an EP /
+        // task got pushed to its right (or extends past the left), only
+        // that pool's outer rect grew — sibling lanes inside still had
+        // the old width, and other pools didn't follow.
+        for (const oldEl of elementsBefore) {
+          if (oldEl.type !== "pool") continue;
+          const newPool = elements.find((e) => e.id === oldEl.id);
+          if (!newPool) continue;
+          const dX_left  = oldEl.x - newPool.x;                                 // > 0 when left edge moved out
+          const dX_right = (newPool.x + newPool.width) - (oldEl.x + oldEl.width); // > 0 when right edge moved out
+          if (dX_left !== 0 || dX_right !== 0) {
+            const r = applyPoolBoundaryShift(elements, connectors, oldEl.id, -dX_left, dX_right);
+            elements = r.elements; connectors = r.connectors;
+          }
+        }
+        // Snap every pool's child lanes to the pool's current L/R.
+        for (const el of elements) {
+          if (el.type === "pool") {
+            elements = syncLanesToPool(elements, el.id);
           }
         }
         connectors = recomputeAllConnectors(connectors, elements);
@@ -6490,8 +6565,11 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       elements = pushed.elements;
       connectors = pushed.connectors;
 
-      // 3. Bubble structural growth up — parent lane / sublane / pool
-      //    grow to enclose the shifted children.
+      // 3. Explicitly adjust the parent chain (parent lane / sublane up
+      //    to the enclosing pool) by clampedDy. ensureContainersEncloseChildren
+      //    only GROWS containers (never shrinks), so the chain wouldn't
+      //    follow on UP drags without this — leaving a gap below the
+      //    bottom lane (issue 1).
       const enclosingPool = (() => {
         let cur: DiagramElement | undefined = parent;
         for (let i = 0; i < 10 && cur; i++) {
@@ -6501,7 +6579,18 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         }
         return null;
       })();
+      {
+        let cur: DiagramElement | undefined = parent;
+        for (let i = 0; i < 10 && cur; i++) {
+          const id = cur.id;
+          elements = elements.map((e) => e.id === id ? { ...e, height: e.height + clampedDy } : e);
+          if (cur.type === "pool") break;
+          if (!cur.parentId) break;
+          cur = elements.find((e) => e.id === cur!.parentId);
+        }
+      }
       const oldPoolBottom = enclosingPool ? enclosingPool.y + enclosingPool.height : null;
+      // Sanity net — picks up any over-shrink that would clip a sibling.
       elements = ensureContainersEncloseChildren(elements);
 
       // 4. Pool-below cascade: when the enclosing pool's bottom moved
