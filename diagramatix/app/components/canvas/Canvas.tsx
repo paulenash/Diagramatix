@@ -1739,14 +1739,13 @@ export function Canvas({
           (candParent.properties.subprocessType as string | undefined) === "event";
         if (candInEventSub && candParent.id !== newExpandedScope) return false;
       }
-      // BPMN: sequence flows cannot cross white-box pool boundaries.
-      // If the candidate and the new element both sit inside pools that are
-      // different and both are white-box, skip — message flows (dragged
-      // manually) are the only BPMN-legal cross-pool link.
+      // BPMN: sequence flows never auto-connect across pool boundaries.
+      // Any two elements in different pools — regardless of pool subtype —
+      // can only be wired by a manual messageBPMN flow, never by auto-
+      // connect (issue 6).
       if (isBpmn) {
         const candPool = containingPool(e);
-        if (candPool && newPool && candPool.id !== newPool.id &&
-            isWhiteBoxPool(candPool) && isWhiteBoxPool(newPool)) {
+        if (candPool && newPool && candPool.id !== newPool.id) {
           return false;
         }
       }
@@ -2049,11 +2048,12 @@ export function Canvas({
           (candParent.properties.subprocessType as string | undefined) === "event";
         if (candInEventSub && candParent.id !== newExpandedScope) return false;
       }
-      // BPMN: cross white-box pool prohibited
+      // BPMN: sequence flows never auto-connect across pool boundaries
+      // (issue 6) — any two elements in different pools can only be wired
+      // manually via messageBPMN.
       if (isBpmn) {
         const candPool = containingPool(e);
-        if (candPool && newPool && candPool.id !== newPool.id &&
-            isWhiteBoxPool(candPool) && isWhiteBoxPool(newPool)) {
+        if (candPool && newPool && candPool.id !== newPool.id) {
           return false;
         }
       }
@@ -2888,9 +2888,13 @@ export function Canvas({
     return map;
   }, [data.elements]);
 
+  // EPs are split out of `otherContainers` so they can render AFTER lanes
+  // (issue 5: EPs in lane-pools were being obscured by the lane background).
+  // EPs paint between the sublane drag rects and the regular connectors —
+  // above lane fills, below child tasks / boundary events.
   const otherContainersUnsorted = data.elements.filter(
     (el) => el.type === "system-boundary" || el.type === "composite-state"
-         || el.type === "subprocess-expanded" || el.type === "process-group"
+         || el.type === "process-group"
   );
   // Sort containers by nesting depth so parents render before (behind) children
   const otherContainers = (() => {
@@ -2907,6 +2911,24 @@ export function Canvas({
     }
     for (const el of otherContainersUnsorted) getDepth(el, new Set());
     return [...otherContainersUnsorted].sort((a, b) => (depthMap.get(a.id) ?? 0) - (depthMap.get(b.id) ?? 0));
+  })();
+  // EPs sorted by nesting depth (parent EP behind nested EP) so a child EP
+  // paints over its enclosing EP when stacked.
+  const expandedSubprocesses = (() => {
+    const eps = data.elements.filter((el) => el.type === "subprocess-expanded");
+    const depthMap = new Map<string, number>();
+    const epSet = new Set(eps.map((e) => e.id));
+    function getDepth(el: DiagramElement, visited: Set<string>): number {
+      if (depthMap.has(el.id)) return depthMap.get(el.id)!;
+      if (!el.parentId || visited.has(el.id)) { depthMap.set(el.id, 0); return 0; }
+      visited.add(el.id);
+      const parent = epSet.has(el.parentId) ? eps.find((p) => p.id === el.parentId) : undefined;
+      const d = parent ? getDepth(parent, visited) + 1 : 0;
+      depthMap.set(el.id, d);
+      return d;
+    }
+    for (const el of eps) getDepth(el, new Set());
+    return [...eps].sort((a, b) => (depthMap.get(a.id) ?? 0) - (depthMap.get(b.id) ?? 0));
   })();
   const groupElements = data.elements.filter((el) => el.type === "group");
 
@@ -3699,6 +3721,82 @@ export function Canvas({
                 />
               );
             });
+          })}
+
+          {/* Expanded Subprocesses — rendered AFTER lanes / sublanes so EPs
+              sit above the lane background (issue 5). Depth-sorted so a
+              nested EP paints over its parent EP. */}
+          {expandedSubprocesses.map((el) => {
+            const isEventSubprocess = el.type === "subprocess-expanded" &&
+              (el.properties.subprocessType as string | undefined) === "event";
+            const isSubExpDropTarget = isDraggingConnector && !draggingSourceIsData &&
+              !isEventSubprocess &&
+              !draggingFromEventSubprocess &&
+              !draggingFromInsideEventSubprocess &&
+              el.id !== draggingConnector!.fromId &&
+              el.id !== (draggingSourceEl?.parentId ?? "") &&
+              !draggingFromEdgeMountedStartEvent &&
+              !draggingFromEdgeMountedIntermediateReceiveEvent;
+            const isSubExpAssocTarget = isDraggingConnector && draggingSourceIsData &&
+              el.id !== draggingConnector!.fromId;
+            const draggingEl = draggingElementId ? data.elements.find(e => e.id === draggingElementId) : null;
+            const isElementDragTarget = draggingEl != null &&
+              (draggingEl.x + draggingEl.width / 2) >= el.x &&
+              (draggingEl.x + draggingEl.width / 2) <= el.x + el.width &&
+              (draggingEl.y + draggingEl.height / 2) >= el.y &&
+              (draggingEl.y + draggingEl.height / 2) <= el.y + el.height;
+            return (
+              <SymbolRenderer
+                key={el.id}
+                element={el}
+                selected={selectedElementIds.has(el.id)}
+                isDropTarget={isSubExpDropTarget}
+                isDisallowedTarget={false}
+                isAssocBpmnTarget={isSubExpAssocTarget}
+                isElementDragTarget={isElementDragTarget}
+                onSelect={(e) => {
+                  if (handleForceConnectSelect(el.id, e)) return;
+                  if (pendingConnSourceId && (pendingConnSourceId !== el.id)) {
+                    onAddConnector(
+                      pendingConnSourceId, el.id,
+                      "sequence", defaultDirectionType, defaultRoutingType,
+                      "right", "left", 0.5, 0.5,
+                    );
+                    setPendingConnSourceId(null);
+                    return;
+                  }
+                  if (e?.shiftKey) {
+                    onSetSelectedElements((prev) => { const next = new Set(prev); if (next.has(el.id)) next.delete(el.id); else next.add(el.id); return next; });
+                  } else if (!selectedElementIds.has(el.id)) {
+                    onSetSelectedElements(new Set([el.id]));
+                  }
+                  onSelectConnector(null);
+                }}
+                onMove={(x, y, uc) => { setDraggingElementId(el.id); onMoveElement(el.id, x, y, uc); }}
+                onDoubleClick={() => {
+                  if (tryGroupConnectToGateway(el)) return;
+                  startEditingLabel(el);
+                }}
+                onConnectionPointDragStart={(side, worldPos) => {
+                  handleConnectionPointDragStart(el.id, side, worldPos);
+                }}
+                showConnectionPoints={selectedElementIds.size <= 1 && diagramType !== "value-chain" && (selectedElementIds.has(el.id) || isDraggingConnector || isDraggingEndpoint)}
+                onResizeDragStart={(handle, e) => handleResizeDragStart(el.id, handle, e)}
+                svgToWorld={clientToWorld}
+                onUpdateProperties={onUpdateProperties}
+                onUpdateLabel={onUpdateLabel}
+                onMoveEnd={() => { setDraggingElementId(null); onElementMoveEnd?.(el.id); }}
+                multiSelected={selectedElementIds.size > 1 && selectedElementIds.has(el.id)}
+                onGroupMove={onMoveElements ? (dx, dy) => onMoveElements([...selectedElementIds], dx / zoom, dy / zoom) : undefined}
+                onGroupMoveEnd={onElementsMoveEnd}
+                colorConfig={colorConfig}
+                debugMode={debugMode}
+                onEnterConnectionMode={diagramType !== "value-chain" ? () => setPendingConnSourceId(el.id) : undefined}
+                onCancelConnectionMode={() => setPendingConnSourceId(null)}
+                inConnectionMode={pendingConnSourceId === el.id}
+                showValueDisplay={showValueDisplay}
+              />
+            );
           })}
 
           {/* Regular connectors — rendered behind elements (skip selected, rendered on top later) */}

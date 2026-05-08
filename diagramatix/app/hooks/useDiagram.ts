@@ -1983,6 +1983,49 @@ function ensureContainersEncloseChildren(
 }
 
 /**
+ * After `ensureContainersEncloseChildren` grows lanes / sublanes to
+ * accommodate new child content, push siblings BELOW each grown lane
+ * down by the grow delta so a deeper lane doesn't overlap its
+ * neighbours / parent (issue 2 auto-grow path). Pool-below cascade
+ * handled at the call site since it depends on which pool ancestor
+ * also grew.
+ *
+ * Only fires for BOTTOM growth (lane.y + lane.height moved DOWN).
+ * Top / left / right growth are handled by ensureContainersEncloseChildren
+ * itself; lateral pushes between siblings are not a user-facing concern
+ * because lane stacks are vertical.
+ */
+function pushPastLaneGrowth(
+  elementsBefore: DiagramElement[],
+  elementsAfter: DiagramElement[],
+  connectors: Connector[],
+): { elements: DiagramElement[]; connectors: Connector[] } {
+  let elements = elementsAfter;
+  let conns = connectors;
+  const beforeById = new Map(elementsBefore.map((e) => [e.id, e]));
+  const lanes = elementsAfter.filter((e) => e.type === "lane");
+  for (const lane of lanes) {
+    const oldLane = beforeById.get(lane.id);
+    if (!oldLane) continue;
+    const oldBottom = oldLane.y + oldLane.height;
+    const newBottom = lane.y + lane.height;
+    const delta = newBottom - oldBottom;
+    if (delta <= 0) continue;
+    const parent = lane.parentId ? elements.find((e) => e.id === lane.parentId) : null;
+    if (!parent) continue;
+    const exclude = new Set<string>([lane.id]);
+    for (const id of getAllDescendantIds(elements, lane.id)) exclude.add(id);
+    const r = shiftElementsPastLineWithinSpan(
+      elements, conns, "y", oldBottom, delta,
+      parent.x, parent.x + parent.width, exclude,
+    );
+    elements = r.elements;
+    conns = r.connectors;
+  }
+  return { elements, connectors: conns };
+}
+
+/**
  * 100px-rule shift: if the named pool grew so that its new bottom now
  * sits within 100px of any pool below, shove ALL pools below (and their
  * descendants) down by `growth` to preserve the visual gap. Recomputes
@@ -3644,7 +3687,9 @@ function reducer(state: DiagramData, action: Action): DiagramData {
                 cx >= b.x && cx <= b.x + b.width &&
                 cy >= b.y && cy <= b.y + b.height
             );
-            // Prefer innermost (smallest) container by type priority
+            // Prefer innermost (smallest) container by type priority.
+            // For lanes, also pick smallest so a sublane wins over its
+            // parent lane (issue 1).
             const potentialParent =
               // subprocess-expanded: pick smallest (innermost)
               (potentialParents.filter(b => b.type === "subprocess-expanded")
@@ -3652,7 +3697,9 @@ function reducer(state: DiagramData, action: Action): DiagramData {
               // archimate-shape: pick smallest (innermost)
               (potentialParents.filter(b => b.type === "archimate-shape")
                 .sort((a, b) => (a.width * a.height) - (b.width * b.height))[0]) ??
-              potentialParents.find(b => b.type === "lane") ??
+              // lane / sublane: pick smallest (innermost) — sublane wins
+              (potentialParents.filter(b => b.type === "lane")
+                .sort((a, b) => (a.width * a.height) - (b.width * b.height))[0]) ??
               potentialParents.find(b => b.type === "pool") ??
               // process-groups: pick smallest (innermost)
               (potentialParents.filter(b => b.type === "process-group")
@@ -3884,7 +3931,26 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       // applyEPBoundaryChange already runs ensure-enclose internally;
       // skip the redundant call when it fired so we don't double-bubble.
       if (!epGrown) {
+        // Issue 2 auto-grow path: capture the pre-enclose snapshot so we
+        // can push siblings below each grown lane / sublane.
+        const elementsBefore = elements;
         elements = ensureContainersEncloseChildren(elements);
+        const pushed = pushPastLaneGrowth(elementsBefore, elements, connectors);
+        elements = pushed.elements;
+        connectors = pushed.connectors;
+        // Cascade pool-below if any pool's bottom moved down because of
+        // the lane growth chain.
+        for (const oldEl of elementsBefore) {
+          if (oldEl.type !== "pool") continue;
+          const newPool = elements.find((e) => e.id === oldEl.id);
+          if (!newPool) continue;
+          const dY = (newPool.y + newPool.height) - (oldEl.y + oldEl.height);
+          if (dY > 0) {
+            const r = applyPoolBelowShift(elements, connectors, oldEl.id, oldEl.y + oldEl.height, dY);
+            elements = r.elements; connectors = r.connectors;
+          }
+        }
+        connectors = recomputeAllConnectors(connectors, elements);
       }
 
       return { ...state, elements: updatePoolTypes(elements), connectors };
@@ -5905,14 +5971,16 @@ function reducer(state: DiagramData, action: Action): DiagramData {
           cx >= b.x && cx <= b.x + b.width &&
           cy >= b.y && cy <= b.y + b.height,
         );
-        // Prefer innermost (smallest) EP, then archimate-shape, then lane,
+        // Prefer innermost (smallest) EP, then archimate-shape, then the
+        // smallest lane (so a sublane wins over its parent lane — issue 1),
         // then pool — same priority as MOVE_ELEMENT's auto-detection.
         const newParent =
           candidates.filter(b => b.type === "subprocess-expanded")
             .sort((a, b) => (a.width * a.height) - (b.width * b.height))[0] ??
           candidates.filter(b => b.type === "archimate-shape")
             .sort((a, b) => (a.width * a.height) - (b.width * b.height))[0] ??
-          candidates.find(b => b.type === "lane") ??
+          candidates.filter(b => b.type === "lane")
+            .sort((a, b) => (a.width * a.height) - (b.width * b.height))[0] ??
           candidates.find(b => b.type === "pool") ??
           candidates.filter(b => b.type === "process-group")
             .sort((a, b) => (a.width * a.height) - (b.width * b.height))[0] ??
@@ -6383,52 +6451,78 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       const below = state.elements.find((e) => e.id === belowLaneId);
       if (!above || !below) return state;
 
-      // Clamp so neither lane goes below MIN_H
-      const maxGrow = below.height - MIN_H;   // above can grow at most this much
-      const maxShrink = above.height - MIN_H;  // above can shrink at most this much
-      const clampedDy = Math.max(-maxShrink, Math.min(maxGrow, dy));
+      // Issue 2 — "behave like a pool boundary and push those elements":
+      // grow the above lane by Δ; below lane shifts down by Δ unchanged
+      // in size; push every element past the OLD divider line within the
+      // parent's x-span (so the pool / outer lane grows from the bottom);
+      // ensureContainersEncloseChildren bubbles the pool growth; pools
+      // below cascade via applyPoolBelowShift.
+      //
+      // Negative Δ (drag up) is symmetric: shrinks the above lane (clamped
+      // at MIN_H), pulls everything below upward (uses negative delta in
+      // the same helper). Pools below are NOT pulled up — they only
+      // cascade outward when a pool grows.
+      const maxShrink = above.height - MIN_H;
+      const clampedDy = Math.max(-maxShrink, dy);
       if (clampedDy === 0) return state;
 
-      const newAboveH = above.height + clampedDy;
-      const newBelowH = below.height - clampedDy;
-      const newBelowY = below.y + clampedDy;
+      const oldDividerY = above.y + above.height;
+      const parent = above.parentId ? state.elements.find((e) => e.id === above.parentId) : undefined;
+      if (!parent) return state;
+      const spanXMin = parent.x;
+      const spanXMax = parent.x + parent.width;
 
-      // Ensure lanes stay within parent bounds
-      const parent = above.parentId ? state.elements.find(e => e.id === above.parentId) : undefined;
-      if (parent) {
-        const parentBottom = parent.y + parent.height;
-        if (newBelowY + newBelowH > parentBottom + 1) return state;
-        if (above.y < parent.y - 1) return state;
-      }
+      // 1. Grow above lane.
+      let elements = state.elements.map((e) =>
+        e.id === aboveLaneId ? { ...e, height: e.height + clampedDy } : e,
+      );
+      let connectors = state.connectors;
 
-      // Proportionally resize sub-lanes within the resized lanes (recurse into deeper nesting)
-      function resizeSublanes(elements: DiagramElement[], laneId: string, newLaneY: number, newLaneH: number, newLaneX: number, newLaneW: number): DiagramElement[] {
-        const parent = elements.find((e) => e.id === laneId);
-        const LANE_LW = parent ? getLaneHeaderWidth(parent) : 36;
-        const subs = elements.filter((e) => e.type === "lane" && e.parentId === laneId).sort((a, b) => a.y - b.y);
-        if (subs.length === 0) return elements;
-        const totalSubH = subs.reduce((s, l) => s + l.height, 0) || 1;
-        let stackY = newLaneY;
-        for (const sub of subs) {
-          const newSubH = Math.max(28, Math.round(newLaneH * (sub.height / totalSubH)));
-          const newSubX = newLaneX + LANE_LW;
-          const newSubW = newLaneW - LANE_LW;
-          const updatedSub = { ...sub, x: newSubX, y: stackY, width: newSubW, height: newSubH };
-          elements = elements.map((e) => e.id === sub.id ? updatedSub : e);
-          // Recurse — resize this sublane's own children
-          elements = resizeSublanes(elements, sub.id, stackY, newSubH, newSubX, newSubW);
-          stackY += newSubH;
+      // 2. Push everything past the OLD divider line within the parent's
+      //    x-span. Exclude the above lane and its descendants (they
+      //    belong to above lane and ride with their parent).
+      const exclude = new Set<string>([aboveLaneId]);
+      for (const id of getAllDescendantIds(elements, aboveLaneId)) exclude.add(id);
+      const pushed = shiftElementsPastLineWithinSpan(
+        elements, connectors, "y", oldDividerY, clampedDy,
+        spanXMin, spanXMax, exclude,
+      );
+      elements = pushed.elements;
+      connectors = pushed.connectors;
+
+      // 3. Bubble structural growth up — parent lane / sublane / pool
+      //    grow to enclose the shifted children.
+      const enclosingPool = (() => {
+        let cur: DiagramElement | undefined = parent;
+        for (let i = 0; i < 10 && cur; i++) {
+          if (cur.type === "pool") return cur;
+          if (!cur.parentId) return null;
+          cur = elements.find((e) => e.id === cur!.parentId);
         }
-        return elements;
+        return null;
+      })();
+      const oldPoolBottom = enclosingPool ? enclosingPool.y + enclosingPool.height : null;
+      elements = ensureContainersEncloseChildren(elements);
+
+      // 4. Pool-below cascade: when the enclosing pool's bottom moved
+      //    down, push neighbour pools below by the same delta (same
+      //    proximity rule as applyEPBoundaryChange).
+      if (enclosingPool && oldPoolBottom !== null) {
+        const newPool = elements.find((e) => e.id === enclosingPool.id);
+        if (newPool) {
+          const dY_below = (newPool.y + newPool.height) - oldPoolBottom;
+          if (dY_below > 0) {
+            const r = applyPoolBelowShift(elements, connectors, enclosingPool.id, oldPoolBottom, dY_below);
+            elements = r.elements; connectors = r.connectors;
+          }
+        }
       }
-      let elements = state.elements.map((e) => {
-        if (e.id === aboveLaneId) return { ...e, height: newAboveH };
-        if (e.id === belowLaneId) return { ...e, y: newBelowY, height: newBelowH };
-        return e;
-      });
-      elements = resizeSublanes(elements, aboveLaneId, above.y, newAboveH, above.x, above.width);
-      elements = resizeSublanes(elements, belowLaneId, newBelowY, newBelowH, below.x, below.width);
-      return { ...state, elements };
+
+      // 5. Recompute / validate connectors against the new layout.
+      connectors = recomputeAllConnectors(connectors, elements);
+      connectors = validateConnectorsAgainstObstacles(connectors, elements);
+
+      return { ...state, elements, connectors };
     }
 
     case "APPLY_TEMPLATE":
