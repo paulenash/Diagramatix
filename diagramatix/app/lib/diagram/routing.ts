@@ -664,6 +664,21 @@ export function computeWaypoints(
     })
     .map(getBounds);
 
+  // Detour-only obstacle list: includes source / target gateways so a
+  // path between exitPt and approachPt cannot cross the gateway body
+  // (e.g., a connector aimed at the gateway's BOTTOM vertex from a
+  // source ABOVE the gateway must route AROUND, not vertically through
+  // the diamond). NOT used for L-shape `pathHitsObstacles` checks —
+  // those have endpoints on the gateway boundary and would be flagged
+  // by margin=4. Used only for the final `buildOrthogonalPath` fallback
+  // which routes the MIDDLE of the path between exitPt / approachPt.
+  const obstaclesForDetour = (() => {
+    const arr = obstacles.slice();
+    if (source.type === "gateway") arr.push(getBounds(source));
+    if (target.type === "gateway") arr.push(getBounds(target));
+    return arr;
+  })();
+
   // Check if exit/approach stubs land inside an obstacle — if so, pick better sides
   function pointInsideAnyObstacle(pt: Point, obs: Bounds[]): boolean {
     return obs.some(o => pt.x > o.x && pt.x < o.x + o.width && pt.y > o.y && pt.y < o.y + o.height);
@@ -734,7 +749,7 @@ export function computeWaypoints(
         ? [exitPt, approachPt]
         : [exitPt, { x: midX, y: exitPt.y }, { x: midX, y: approachPt.y }, approachPt];
     } else {
-      midPath = buildOrthogonalPath(exitPt, approachPt, obstacles, containmentBounds);
+      midPath = buildOrthogonalPath(exitPt, approachPt, obstaclesForDetour, containmentBounds);
     }
   } else if (
     exitOutward && approachOutward &&
@@ -750,7 +765,7 @@ export function computeWaypoints(
         ? [exitPt, approachPt]
         : [exitPt, { x: exitPt.x, y: midY }, { x: approachPt.x, y: midY }, approachPt];
     } else {
-      midPath = buildOrthogonalPath(exitPt, approachPt, obstacles, containmentBounds);
+      midPath = buildOrthogonalPath(exitPt, approachPt, obstaclesForDetour, containmentBounds);
     }
   } else {
     // Perpendicular sides (e.g., right→top, bottom→left, etc.)
@@ -780,8 +795,12 @@ export function computeWaypoints(
     } else if (a2Perp && !pathHitsObstacles([effectiveSrcEdge, lCorner2, effectiveTgtEdge], obstacles)) {
       midPath = [lCorner2];
     } else {
-      // Fall back to stub-based routing (guarantees perpendicularity, may have more corners)
-      midPath = buildOrthogonalPath(exitPt, approachPt, obstacles, containmentBounds);
+      // Fall back to stub-based routing (guarantees perpendicularity, may have more corners).
+      // Use obstaclesForDetour so the path can't slice through the
+      // source / target gateway body when the natural straight middle
+      // would (e.g., source ABOVE gateway, target = gateway BOTTOM
+      // vertex — the detour routes the path AROUND the gateway).
+      midPath = buildOrthogonalPath(exitPt, approachPt, obstaclesForDetour, containmentBounds);
     }
   }
 
