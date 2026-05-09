@@ -57,6 +57,12 @@ export interface ImportResult {
 interface MasterInfo {
   nameU: string;
   fileName: string;
+  /** Width/Height from the master's root Shape 5 (in inches). Used as a
+   *  fallback when an instance shape has no Width/Height of its own —
+   *  Visio inherits the dimensions from the master at render time, but
+   *  the importer reads only instance cells unless we resolve up. */
+  masterWidth?: number;
+  masterHeight?: number;
 }
 
 interface ElementSeed {
@@ -390,6 +396,38 @@ async function loadMasterIndex(zip: JSZip): Promise<Map<string, MasterInfo>> {
     }
     masters.set(id, { nameU, fileName });
   }
+
+  // Second pass: open each master's XML file and read its root Shape 5
+  // outer-head Width/Height. Container masters (Black-Box Pool, CFF
+  // Container, Pool / Lane) define their natural dimensions at the master
+  // level — the page-level instance frequently has only PinX/PinY and
+  // inherits W/H. Without this, Black-Box Pool drops at the canvas-default
+  // fallback size instead of its master-defined ~15.75 × 1.06 inches.
+  for (const [id, info] of masters) {
+    if (!info.fileName) continue;
+    const masterXml = await zip.file(`visio/masters/${info.fileName}`)?.async("string");
+    if (!masterXml) continue;
+    const shape5Open = masterXml.match(/<Shape\s+ID='5'[^>]*>/);
+    if (!shape5Open) continue;
+    // Outer head of the master's Shape 5: cells before any nested <Shapes>
+    // or <Shape ID=…>. Reuse the same logic as outerHead() for instances.
+    const shape5Start = shape5Open.index! + shape5Open[0].length;
+    const inner = masterXml.slice(shape5Start);
+    const cut = (() => {
+      let c = inner.length;
+      const m1 = inner.indexOf("<Shapes>");
+      const m2 = inner.search(/<Shape\s+ID=/);
+      if (m1 >= 0 && m1 < c) c = m1;
+      if (m2 >= 0 && m2 < c) c = m2;
+      return c;
+    })();
+    const head5 = inner.slice(0, cut);
+    const masterWidth = readCellNum(head5, "Width") ?? undefined;
+    const masterHeight = readCellNum(head5, "Height") ?? undefined;
+    if (masterWidth || masterHeight) {
+      masters.set(id, { ...info, masterWidth, masterHeight });
+    }
+  }
   return masters;
 }
 
@@ -418,7 +456,7 @@ interface WalkedShape {
   height: number;
 }
 
-function walkAllShapes(pageXml: string): WalkedShape[] {
+function walkAllShapes(pageXml: string, masters: Map<string, MasterInfo>): WalkedShape[] {
   const m = pageXml.match(/<Shapes>([\s\S]*?)<\/Shapes>(?=\s*(?:<Connects>|<\/PageContents>))/);
   if (!m) return [];
   const inner = m[1];
@@ -476,19 +514,18 @@ function walkAllShapes(pageXml: string): WalkedShape[] {
   // Second pass: read PinX/PinY/W/H from each shape's outer head (cells
   // before the first nested <Shapes>). Indexed by nodeIndex so duplicate
   // shape IDs don't collide.
-  // Pools that wrap their body geometry in a sub-shape (e.g. Black-Box
-  // Pool's CFF Container child carries the actual Width/Height while the
-  // outer Group has only PinX/PinY) get caught by the fall-through to the
-  // first nested <Shape>'s W/H.
+  // Pools that wrap their body geometry in a sub-shape OR rely entirely
+  // on master inheritance (e.g. Black-Box Pool whose page-level Shape
+  // carries only PinX/PinY) get caught by:
+  //   1. fall-through to the FIRST nested <Shape>'s W/H, then
+  //   2. fall-through to the master file's Shape 5 W/H (read into
+  //      MasterInfo.masterWidth / masterHeight at index-load time).
   type Geom = { localPinX: number; localPinY: number; width: number; height: number };
   const geom: Geom[] = new Array(nodes.length);
   for (const n of nodes) {
     const head = outerHead(n.block);
     let width = readCellNum(head, "Width") ?? 0;
     let height = readCellNum(head, "Height") ?? 0;
-    // Fall-back: if the outer head doesn't carry W/H, peek at the FIRST
-    // nested <Shape>'s outer head. For Black-Box Pool / CFF Container the
-    // dimensions live on the inner body shape (MasterShape='6').
     if (width <= 0 || height <= 0) {
       const innerOpenIdx = n.block.search(/<Shape\s+ID=/g);
       // First match at index 0 IS the wrapper itself — find the SECOND.
@@ -501,6 +538,17 @@ function walkAllShapes(pageXml: string): WalkedShape[] {
         if (width <= 0) width = readCellNum(innerHead, "Width") ?? 0;
         if (height <= 0) height = readCellNum(innerHead, "Height") ?? 0;
       }
+    }
+    if (width <= 0 || height <= 0) {
+      // Last fallback: master's own Shape 5 Width/Height. Visio inherits
+      // these to instances at render time when the instance has none of
+      // its own (typical for Black-Box Pool: instance carries only
+      // PinX/PinY, all sizing inherited).
+      const masterIdM = n.block.match(/Master='(\d+)'/);
+      const masterId = masterIdM?.[1];
+      const info = masterId ? masters.get(masterId) : undefined;
+      if (info?.masterWidth && width <= 0) width = info.masterWidth;
+      if (info?.masterHeight && height <= 0) height = info.masterHeight;
     }
     geom[n.nodeIndex] = {
       localPinX: readCellNum(head, "PinX") ?? 0,
@@ -699,7 +747,7 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
   const pageH = readCellNum(pagePropsBlock, "PageHeight") ?? 8.27;
   void pageW; // not currently used; available for future centring logic.
 
-  const walked = walkAllShapes(pageXml);
+  const walked = walkAllShapes(pageXml, masters);
   // Track skipped masters so we can emit a single summary warning at the
   // end (pasting 200 per-shape warnings into a chat is unhelpful).
   const skippedByTag = new Map<string, number>();
@@ -751,6 +799,23 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
     const nameU = normaliseNameU(masterInfo?.nameU || inlineNameU);
     const props = readPropValues(block);
     const bpmnId = props.BpmnId;
+
+    // Skip sub-shapes (those that reference a parent master's shape via
+    // `MasterShape='N'` and have no `Master='X'` of their own). Without
+    // this guard, the body sub-shape of a Black-Box Pool — `Shape ID='299'
+    // NameU='CFF Container.44' MasterShape='6'` — gets fuzzy-matched as
+    // its own pool element, and the same goes for the Swimlane List
+    // sub-shape. The result is phantom-pool inflation: 2 Black-Box Pools
+    // multiply into 6 pool elements (2 real + 2 CFF Container body
+    // duplicates + 2 Swimlane List body duplicates), and lanes end up
+    // parented to the wrong (innermost) phantom pool which is why the
+    // user sees "lanes linked together / not separately selectable."
+    const hasMasterShapeAttr = /MasterShape='\d+'/.test(block.slice(0, block.indexOf(">") + 1));
+    if (!masterId && hasMasterShapeAttr) {
+      // Don't even record this in the master breakdown — these are
+      // structural decorations of an already-classified parent.
+      continue;
+    }
 
     const connectorBase = isConnectorMaster(nameU);
     const seed = connectorBase ? null : classifyElement(nameU, props);
@@ -1128,6 +1193,78 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
     if (!laneElId || !poolElId) continue;
     const lane = elements.find((e) => e.id === laneElId);
     if (lane && !lane.parentId) lane.parentId = poolElId;
+  }
+
+  // Deduplicate overlapping pools. BPMN_M's Pool/Lane structure puts a
+  // CFF Container, a Swimlane List, AND multiple Lanes as TOP-LEVEL
+  // siblings (no nesting). Both CFF Container and Swimlane List map to
+  // "pool" in ELEMENT_NAMEU_MAP because in some files they each ARE the
+  // pool. In a CFF-style file with both, the user sees one logical pool
+  // — but the importer creates two (e.g. Company CFF Container with
+  // label, plus an unlabelled Swimlane List that fully overlaps it). The
+  // unlabelled wrapper has no semantic role on the canvas and just makes
+  // the lane parentage ambiguous. Drop pools that have an empty label
+  // AND fully (or near-fully) overlap a labelled pool of similar size.
+  {
+    const pools = elements.filter((e) => e.type === "pool");
+    const dropPoolIds = new Set<string>();
+    for (const a of pools) {
+      if (dropPoolIds.has(a.id)) continue;
+      if (a.label && a.label.trim().length > 0) continue; // labelled — keep
+      const ax1 = a.x, ay1 = a.y, ax2 = a.x + a.width, ay2 = a.y + a.height;
+      const aArea = a.width * a.height;
+      if (aArea <= 0) continue;
+      for (const b of pools) {
+        if (b.id === a.id) continue;
+        if (!b.label || b.label.trim().length === 0) continue; // need labelled twin
+        if (dropPoolIds.has(b.id)) continue;
+        const bx1 = b.x, by1 = b.y, bx2 = b.x + b.width, by2 = b.y + b.height;
+        const ix = Math.max(0, Math.min(ax2, bx2) - Math.max(ax1, bx1));
+        const iy = Math.max(0, Math.min(ay2, by2) - Math.max(ay1, by1));
+        const inter = ix * iy;
+        // Drop A if ≥80% of A's area is inside the labelled B — handles
+        // the off-screen Swimlane List case (LocPinX missing in source,
+        // imported bbox shifts left, but >80% still overlaps the Company
+        // pool that's positioned correctly).
+        if (inter / aArea >= 0.8) {
+          dropPoolIds.add(a.id);
+          break;
+        }
+      }
+    }
+    if (dropPoolIds.size > 0) {
+      // Remap shapeIdToElId entries that pointed to a dropped pool to
+      // null so downstream connector lookups don't keep stale refs.
+      for (const [shapeId, elId] of shapeIdToElId.entries()) {
+        if (dropPoolIds.has(elId)) shapeIdToElId.delete(shapeId);
+      }
+      for (let i = elements.length - 1; i >= 0; i--) {
+        if (dropPoolIds.has(elements[i].id)) elements.splice(i, 1);
+      }
+    }
+  }
+
+  // Pool→Lane parentage by GEOMETRIC CONTAINMENT — final fallback for
+  // BPMN_M-style pools where the page XML places the CFF Container and
+  // Lane shapes as TOP-LEVEL siblings (no nesting and no Member section).
+  // Each lane gets parented to whichever pool's bounding rectangle
+  // contains its centre. Without this, lanes have no parentId and
+  // Diagramatix's lane-stack rendering doesn't kick in — the user sees
+  // "3 lanes linked together / not separately selectable" because
+  // they're orphan elements in page space.
+  const poolElements = elements.filter((e) => e.type === "pool");
+  for (const lane of elements) {
+    if (lane.type !== "lane" || lane.parentId) continue;
+    const cx = lane.x + lane.width / 2;
+    const cy = lane.y + lane.height / 2;
+    let bestPool: DiagramElement | null = null;
+    let bestArea = Infinity;
+    for (const p of poolElements) {
+      if (cx < p.x || cx > p.x + p.width || cy < p.y || cy > p.y + p.height) continue;
+      const area = p.width * p.height;
+      if (area < bestArea) { bestArea = area; bestPool = p; }
+    }
+    if (bestPool) lane.parentId = bestPool.id;
   }
 
   // Auto-detect poolType. A pool is *white-box* if either (a) it has at
