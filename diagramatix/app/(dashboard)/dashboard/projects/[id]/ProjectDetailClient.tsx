@@ -1475,7 +1475,7 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
                       {visioImportInProgress ? "Importing Visio…" : "Import Visio"}
                     </button>
                     <a
-                      href="/BPMN%20Diagramatix%20v1.0.vssx"
+                      href="/BPMN%20Diagramatix%20Shapes%20v1.2.vssx"
                       download
                       onClick={() => setShowFileMenu(false)}
                       className="block w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100"
