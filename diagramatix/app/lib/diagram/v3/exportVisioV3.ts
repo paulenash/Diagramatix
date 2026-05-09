@@ -1711,6 +1711,32 @@ export async function exportVisioV3(
       (a) => TRIGGER_MARKER_MAP[a] ?? [],
     );
 
+    // Root-level marker geometries — drawn on the master ROOT (Shape 5)
+    // rather than on a dedicated marker sub-shape. These need a Geometry
+    // IX NoShow override on the INSTANCE shape itself (not as a sub-shape
+    // stub). Common to start / intermediate / end event masters in the
+    // BPMN_M template:
+    //   IX=0 → Error    (visible when Actions.Error.Checked AND any of
+    //                    Actions.Start/Intermediate/End is also checked)
+    //   IX=1 → Cancel   (visible when Actions.Cancel.Checked AND Action.
+    //                    Intermediate or End is also checked)
+    //   IX=2 → Conditional
+    // The instance overrides Actions.<Trigger>.Checked via the trigger
+    // row above; the master's existing AND-clause re-evaluates correctly,
+    // but Visio uses the cached V (=1, NoShow) on first paint. Forcing
+    // V=0 here is what actually makes the marker visible.
+    const ROOT_MARKER_IX_MAP: Record<string, number> = {
+      "Error":       0,
+      "Cancel":      1,
+      "Conditional": 2,
+    };
+    const rootMarkerIxs: number[] = triggerActions
+      .map((a) => ROOT_MARKER_IX_MAP[a])
+      .filter((ix): ix is number => ix !== undefined);
+    const rootMarkerSections = rootMarkerIxs
+      .map((ix) => `<Section N='Geometry' IX='${ix}'><Cell N='NoShow' V='0' F='Inh'/></Section>`)
+      .join("");
+
     const isPool = mapping.masterId === 19;
     const isMergeGateway = el.type === "gateway" &&
       ((el.properties as Record<string, unknown> | undefined)
@@ -2178,6 +2204,7 @@ export async function exportVisioV3(
       propSection +
       actionsSection +
       elCharSection +
+      rootMarkerSections +
       textElWithCp +
       subShapes +
       `</Shape>`
