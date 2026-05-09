@@ -1683,26 +1683,51 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
     }
 
     // Read the original Visio label position (TxtPinX/TxtPinY, page-absolute
-    // after the connector-frame transform) and convert to a Diagramatix
-    // labelOffsetX/Y relative to the visual midpoint (or source endpoint
-    // for "source"-anchored labels — but the importer always uses
-    // "midpoint" anchor).
+    // after the connector-frame transform). The Diagramatix labelOffset is
+    // relative to the VISIBLE midpoint of the connector path (not the
+    // centre-leader endpoints), so we defer the actual offset computation
+    // until after `finalWaypoints` is built — that way it doesn't matter
+    // whether the connector got the messageBPMN 4-point reshuffle or the
+    // [srcCentre, ...edges, tgtCentre] pass for sequence/association.
     const txtPinXLocal = readCellNum(head, "TxtPinX");
     const txtPinYLocal = readCellNum(head, "TxtPinY");
-    let labelOffsetX = 0;
-    let labelOffsetY = 0;
-    if (label && txtPinXLocal != null && txtPinYLocal != null && waypoints.length >= 2) {
-      // TxtPin is in the connector's local frame (same frame as the
-      // Geometry MoveTo/LineTo rows: origin at bottom-left of the
-      // connector's bounding box, Y up).
-      const labelPageX = (localOrigX + txtPinXLocal) * PX_PER_INCH;
-      const labelPageY = (pageH - (localOrigY + txtPinYLocal)) * PX_PER_INCH;
-      const visStart = 0;
-      const visEnd = waypoints.length - 1;
-      const midX = (waypoints[visStart].x + waypoints[visEnd].x) / 2;
-      const midY = (waypoints[visStart].y + waypoints[visEnd].y) / 2;
-      labelOffsetX = labelPageX - midX;
-      labelOffsetY = labelPageY - midY;
+    const labelPagePos = (txtPinXLocal != null && txtPinYLocal != null)
+      ? {
+          x: (localOrigX + txtPinXLocal) * PX_PER_INCH,
+          y: (pageH - (localOrigY + txtPinYLocal)) * PX_PER_INCH,
+        }
+      : null;
+    // Read TxtWidth too so we can replicate Visio's word-wrap when the
+    // text overflows its label box. Diagramatix's connector renderer
+    // only splits on '\n' — it doesn't auto-wrap by labelWidth like
+    // Visio does — so we PRE-WRAP the label here. e.g. Visio's
+    // "Get Emails Details" with TxtWidth=0.615 inch (≈59 px) wraps to
+    // "Get Emails / Details"; we insert the '\n' so Diagramatix
+    // renders the same two lines.
+    const txtWidthLocal = readCellNum(head, "TxtWidth");
+    let wrappedLabel = label;
+    if (label && txtWidthLocal != null && txtWidthLocal > 0) {
+      const txtWidthPx = txtWidthLocal * PX_PER_INCH;
+      // Match the renderer's char-width heuristic (10pt × 0.6 ≈ 6 px/char).
+      // Subtract a small padding so we wrap at the SAME visible width
+      // Visio rendered, not slightly past it.
+      const FONT_PX = 10;
+      const AVG_CHAR_W = FONT_PX * 0.6;
+      const charsPerLine = Math.max(1, Math.floor((txtWidthPx - 4) / AVG_CHAR_W));
+      const wrap = (segment: string): string => {
+        const words = segment.split(" ");
+        const out: string[] = [];
+        let current = "";
+        for (const word of words) {
+          if (!current) current = word;
+          else if (current.length + 1 + word.length <= charsPerLine) current += " " + word;
+          else { out.push(current); current = word; }
+        }
+        if (current) out.push(current);
+        return out.join("\n");
+      };
+      // Preserve any pre-existing line breaks the user typed in Visio.
+      wrappedLabel = label.split(/\r?\n/).map(wrap).join("\n");
     }
 
     // Diagramatix's native convention (verified by diffing a manually-
@@ -1771,6 +1796,24 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
       targetInvisibleLeader = true;
     }
 
+    // Now that finalWaypoints is settled, compute labelOffsetX/Y relative
+    // to the connector's VISIBLE midpoint — the same anchor the renderer
+    // uses ([ConnectorRenderer.tsx:323-326](../components/canvas/ConnectorRenderer.tsx)).
+    let labelOffsetX = 0;
+    let labelOffsetY = 0;
+    if (labelPagePos && finalWaypoints.length >= 2) {
+      const visStart = sourceInvisibleLeader ? 1 : 0;
+      const visEnd = finalWaypoints.length - 1 - (targetInvisibleLeader ? 1 : 0);
+      if (visEnd >= visStart) {
+        const p0 = finalWaypoints[visStart];
+        const pN = finalWaypoints[visEnd];
+        const midX = (p0.x + pN.x) / 2;
+        const midY = (p0.y + pN.y) / 2;
+        labelOffsetX = labelPagePos.x - midX;
+        labelOffsetY = labelPagePos.y - midY;
+      }
+    }
+
     const connector: Connector = {
       id: connId,
       sourceId,
@@ -1783,7 +1826,7 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
       sourceInvisibleLeader,
       targetInvisibleLeader,
       waypoints: finalWaypoints,
-      label: label || undefined,
+      label: wrappedLabel || undefined,
       labelAnchor: "midpoint",
       labelOffsetX,
       labelOffsetY,
