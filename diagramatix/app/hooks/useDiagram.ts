@@ -1503,6 +1503,26 @@ function applyEPBoundaryChange(
   if (growRight !== 0)  movingSides.add("right");
   updatedEls = resnapEPBoundaryEvents(updatedEls, newEpEl, oldRect, movingSides);
 
+  // 6b. Defensive final clamp — guarantees every EP boundary event
+  //     sits exactly on the FINAL EP rect's perimeter. The (side,
+  //     frac) re-snap above handles the common case, but events
+  //     mounted at a corner, slightly inside the bounds, or otherwise
+  //     ambiguous to boundaryEdgeOf could be left a few pixels off
+  //     after a fast top-edge upward push. nearestPointOnRectBoundary
+  //     on the final rect closes that gap and is idempotent for events
+  //     already correctly positioned.
+  const epFinal = updatedEls.find((e) => e.id === epId);
+  if (epFinal) {
+    updatedEls = updatedEls.map((e) => {
+      if (e.boundaryHostId !== epId) return e;
+      const cx = e.x + e.width / 2;
+      const cy = e.y + e.height / 2;
+      const pt = nearestPointOnRectBoundary(epFinal, { x: cx, y: cy });
+      if (Math.abs(pt.x - cx) < 0.5 && Math.abs(pt.y - cy) < 0.5) return e;
+      return { ...e, x: pt.x - e.width / 2, y: pt.y - e.height / 2 };
+    });
+  }
+
   // 7. Recompute connectors anchored to the EP, its boundary events,
   //    or any element that was just shifted. Cheap pass: recompute any
   //    connector whose source or target id is in the EP's anchor set
@@ -2523,11 +2543,21 @@ function connectorHitsAnyElement(conn: Connector, elements: DiagramElement[]): b
       // sit on the boundary so they're admitted via margin = -1, but a
       // segment that doubles back through the body (caused by a wrong
       // sourceSide / targetSide) IS a strict-interior crossing and gets
-      // flagged. Most visible on gateways and EPs where a poor side pick
-      // can route the path back through the diamond / rectangle body.
-      const visible = wp.slice(vs, ve + 1);
-      for (let i = 0; i < visible.length - 1; i++) {
-        if (segmentHitsRect(visible[i], visible[i + 1], b, -1)) return true;
+      // flagged. Most visible on EPs where a poor side pick can route
+      // the path back through the rectangle body.
+      //
+      // Gateways are skipped here: their bounding rect inscribes a
+      // rhombus, so the rect interior includes large empty (transparent)
+      // corner regions. A nudged endpoint on the rhombus naturally
+      // produces a perpendicular exit segment that grazes the bounding-
+      // rect interior even though it never crosses the diamond body —
+      // flagging it would force `validateConnectorsAgainstObstacles` to
+      // reset the offset to 0.5, undoing every endpoint nudge.
+      if (obs.type !== "gateway") {
+        const visible = wp.slice(vs, ve + 1);
+        for (let i = 0; i < visible.length - 1; i++) {
+          if (segmentHitsRect(visible[i], visible[i + 1], b, -1)) return true;
+        }
       }
     } else {
       // Exclude boundary events on source/target
