@@ -1274,6 +1274,60 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
     if (bestPool) lane.parentId = bestPool.id;
   }
 
+  // LANE NORMALISATION — make every imported pool/lane structure look
+  // exactly like a Diagramatix-native pool with manually-added lanes.
+  // Diff source: a manual Pool + 3 lanes saved from the canvas had:
+  //   pool.properties.poolHeaderWidth = 36           (always)
+  //   pool.properties.poolType = "white-box"         (when has lanes)
+  //   lane.properties.laneHeaderWidth = 37           (always)
+  //   lane.x = pool.x + 36                           (snap to pool body)
+  //   lane.width = pool.width - 36
+  //   lane[i].y = pool.y + sum(lane[0..i-1].height)  (exact stacking, no gaps)
+  //   sum(lane.height) = pool.height                 (last lane absorbs the residue)
+  // Without this normalisation, Visio's raw geometry leaves lane.x off by
+  // ~10 px, sub-pixel Y-stacking gaps, and missing properties — the
+  // post-import MOVE_ELEMENT cascade reads these as inconsistent and
+  // collapses the top + bottom lanes (only middle survives), exactly the
+  // user-reported symptom.
+  const POOL_HEADER_W = 36;
+  const LANE_HEADER_W = 37;
+  for (const pool of elements) {
+    if (pool.type !== "pool") continue;
+    const poolLanes = elements
+      .filter((e) => e.type === "lane" && e.parentId === pool.id)
+      .sort((a, b) => a.y - b.y);
+    if (poolLanes.length === 0) continue;
+    // Always set poolHeaderWidth (the one the manual flow always sets).
+    pool.properties = pool.properties ?? {};
+    if (pool.properties.poolHeaderWidth === undefined) {
+      pool.properties.poolHeaderWidth = POOL_HEADER_W;
+    }
+    pool.properties.poolType = pool.properties.poolType ?? "white-box";
+    // Snap lane geometry & stack contiguously. Preserve relative heights:
+    // total lane height should equal pool height exactly. Distribute any
+    // rounding residue to the LAST lane.
+    const totalLaneH = poolLanes.reduce((s, e) => s + e.height, 0);
+    const heightScale = totalLaneH > 0 ? pool.height / totalLaneH : 1;
+    let runningY = pool.y;
+    for (let i = 0; i < poolLanes.length; i++) {
+      const lane = poolLanes[i];
+      const isLast = i === poolLanes.length - 1;
+      // Scale heights to fill the pool exactly; the last lane absorbs
+      // any sub-pixel residue.
+      const scaledH = lane.height * heightScale;
+      const newH = isLast ? pool.y + pool.height - runningY : Math.round(scaledH);
+      lane.x = pool.x + POOL_HEADER_W;
+      lane.width = pool.width - POOL_HEADER_W;
+      lane.y = runningY;
+      lane.height = newH;
+      lane.properties = lane.properties ?? {};
+      if (lane.properties.laneHeaderWidth === undefined) {
+        lane.properties.laneHeaderWidth = LANE_HEADER_W;
+      }
+      runningY += newH;
+    }
+  }
+
   // Auto-detect poolType. A pool is *white-box* if either (a) it has at
   // least one Lane child via parentId, or (b) its bounding box on canvas
   // geometrically contains another classified non-pool element. Otherwise
