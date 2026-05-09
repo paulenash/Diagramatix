@@ -1213,20 +1213,27 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
       if (a.label && a.label.trim().length > 0) continue; // labelled — keep
       const ax1 = a.x, ay1 = a.y, ax2 = a.x + a.width, ay2 = a.y + a.height;
       const aArea = a.width * a.height;
+      const acx = a.x + a.width / 2;
+      const acy = a.y + a.height / 2;
       if (aArea <= 0) continue;
       for (const b of pools) {
         if (b.id === a.id) continue;
         if (!b.label || b.label.trim().length === 0) continue; // need labelled twin
         if (dropPoolIds.has(b.id)) continue;
         const bx1 = b.x, by1 = b.y, bx2 = b.x + b.width, by2 = b.y + b.height;
+        // Drop A if EITHER:
+        //   (i)  ≥80% of A's bbox area is inside B (deep overlap), OR
+        //   (ii) A's CENTRE is inside B AND their heights match within 30%
+        //        (handles the off-screen Swimlane List case where missing
+        //        LocPinX shifts the bbox left but the centre still lands
+        //        inside the Company pool — e.g. Shape 210 Swimlane List
+        //        vs Shape 207 CFF Container "Company" in BPMN_M files).
         const ix = Math.max(0, Math.min(ax2, bx2) - Math.max(ax1, bx1));
         const iy = Math.max(0, Math.min(ay2, by2) - Math.max(ay1, by1));
-        const inter = ix * iy;
-        // Drop A if ≥80% of A's area is inside the labelled B — handles
-        // the off-screen Swimlane List case (LocPinX missing in source,
-        // imported bbox shifts left, but >80% still overlaps the Company
-        // pool that's positioned correctly).
-        if (inter / aArea >= 0.8) {
+        const overlapFrac = (ix * iy) / aArea;
+        const centreInside = acx >= bx1 && acx <= bx2 && acy >= by1 && acy <= by2;
+        const similarHeight = b.height > 0 && Math.abs(a.height - b.height) / b.height < 0.3;
+        if (overlapFrac >= 0.8 || (centreInside && similarHeight)) {
           dropPoolIds.add(a.id);
           break;
         }
@@ -1346,6 +1353,20 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
     if (rawByShapeId.has(targetShapeId)) continue;     // already classified
     const wp = walkedById.get(targetShapeId);
     if (!wp) continue;
+    // Skip sub-shapes that reference a parent master via MasterShape — these
+    // are decorations of an already-classified parent (e.g. Shape 299
+    // `NameU='CFF Container.44'` `MasterShape='6'` inside the real Customer
+    // Black-Box Pool). They carry the parent's BpmnName as a property
+    // (e.g. "Customer"), so the label test passes and the importer would
+    // synthesise a phantom black-box pool at the wrong (sub-shape) page
+    // position. Same shape that we already skip in the classification
+    // loop above — extend the skip here so the glue-target fallback
+    // doesn't quietly resurrect it.
+    const headForSub = outerHead(wp.block);
+    const hasMasterAttr = /\sMaster='\d+'/.test(wp.block.slice(0, wp.block.indexOf(">") + 1));
+    const hasMasterShape = /MasterShape='\d+'/.test(wp.block.slice(0, wp.block.indexOf(">") + 1));
+    if (!hasMasterAttr && hasMasterShape) continue;
+    void headForSub;
     const text = readText(wp.block);
     const props = readPropValues(wp.block);
     const label = text || props.BpmnName || "";
@@ -1595,17 +1616,57 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
     // leader flags FALSE, so the drag handle never appears and the user
     // can't move the attachment point. Rewrite to canonical 4-point
     // format: [srcCentre, srcEdge, tgtEdge, tgtCentre].
+    //
+    // Important: pull srcEdge/tgtEdge X from the RAW Visio waypoints, NOT
+    // from the clipped midpoint that `clipToRectEdge` produces. clipToRect-
+    // Edge collapses every endpoint to its rectangle's edge midpoint, so
+    // 3 different message connectors all targeting the same pool's top
+    // edge would attach at identical (cx, top) — visually all three
+    // overlap at the pool's centre-top. Visio messages preserve a
+    // per-connector shared X (vertical line); we want to keep that.
     let finalWaypoints: Point[] = waypoints;
     let sourceInvisibleLeader = false;
     let targetInvisibleLeader = false;
-    if (r.connectorBase === "messageBPMN" && sourceEl && targetEl && waypoints.length >= 2) {
-      const srcEdge = waypoints[0];
-      const tgtEdge = waypoints[waypoints.length - 1];
+    if (r.connectorBase === "messageBPMN" && sourceEl && targetEl && rawWPs.length >= 1) {
+      // Shared vertical X from the raw connector geometry: average of the
+      // first and last raw waypoint x coords (Visio messages are vertical,
+      // so these match anyway — averaging is just defensive against
+      // diagonal noise).
+      const rawSrcX = rawWPs[0].x;
+      const rawTgtX = rawWPs[rawWPs.length - 1].x;
+      const sharedX = (rawSrcX + rawTgtX) / 2;
+      // Determine which sides face the OTHER shape so we know top vs bot.
+      // Source is "above" target (in screen coords) if sourceY < targetY;
+      // then srcSide=bottom, tgtSide=top. Otherwise reversed.
+      const srcAbove = sourceEl.y + sourceEl.height / 2 < targetEl.y + targetEl.height / 2;
+      const srcEdgeY = srcAbove ? sourceEl.y + sourceEl.height : sourceEl.y;
+      const tgtEdgeY = srcAbove ? targetEl.y : targetEl.y + targetEl.height;
+      // Clamp the shared X to BOTH shapes' x-extents so the vertical line
+      // actually lands inside both endpoints (Visio occasionally writes
+      // BeginX slightly outside the source bbox; rejecting that prevents
+      // the drag-handle from appearing outside the shape).
+      const minX = Math.max(sourceEl.x, targetEl.x);
+      const maxX = Math.min(sourceEl.x + sourceEl.width, targetEl.x + targetEl.width);
+      const x = Math.max(minX, Math.min(maxX, sharedX));
+      const srcEdge = { x, y: srcEdgeY };
+      const tgtEdge = { x, y: tgtEdgeY };
       const srcCentre = { x: sourceEl.x + sourceEl.width / 2, y: sourceEl.y + sourceEl.height / 2 };
       const tgtCentre = { x: targetEl.x + targetEl.width / 2, y: targetEl.y + targetEl.height / 2 };
       finalWaypoints = [srcCentre, srcEdge, tgtEdge, tgtCentre];
       sourceInvisibleLeader = true;
       targetInvisibleLeader = true;
+      // Recompute side+offset from the actual edge points we just picked,
+      // so sourceOffsetAlong / targetOffsetAlong line up with the visible
+      // attachment (the earlier sideAndOffset call used the clipped
+      // midpoint and would now be inconsistent).
+      resolvedSourceSide = srcAbove ? "bottom" : "top";
+      resolvedTargetSide = srcAbove ? "top" : "bottom";
+      resolvedSourceOffset = sourceEl.width > 0
+        ? Math.max(0.02, Math.min(0.98, (x - sourceEl.x) / sourceEl.width))
+        : 0.5;
+      resolvedTargetOffset = targetEl.width > 0
+        ? Math.max(0.02, Math.min(0.98, (x - targetEl.x) / targetEl.width))
+        : 0.5;
     }
 
     const connector: Connector = {
