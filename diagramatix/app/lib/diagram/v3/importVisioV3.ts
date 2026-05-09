@@ -1094,11 +1094,27 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
   }
 
   // Build element list.
+  // Visio's BPMN_M template defaults BpmnId='0' on lane and other masters
+  // when the user hasn't assigned one. Treating "0" as a real ID makes
+  // every lane collide on the same Diagramatix element.id, which silently
+  // breaks `find(e => e.id === ...)` lookups: move-cascade picks the
+  // first lane found, the other two appear orphaned and get clobbered
+  // (root cause of the "top + bottom lanes vanish" symptom).
+  const isPlaceholderBpmnId = (s: string | undefined): boolean =>
+    !s || s.length === 0 || s === "0" || /^0+$/.test(s);
+  const usedIds = new Set<string>();
+  const mintId = (raw: string | undefined): string => {
+    let id = isPlaceholderBpmnId(raw) ? nano() : raw!;
+    while (usedIds.has(id)) id = nano();   // collision-proof against duplicates anywhere
+    usedIds.add(id);
+    return id;
+  };
+
   const shapeIdToElId = new Map<string, string>();
   const elements: DiagramElement[] = [];
   for (const r of raw) {
     if (!r.seed) continue;
-    const elId = r.bpmnId && r.bpmnId.length > 0 ? r.bpmnId : nano();
+    const elId = mintId(r.bpmnId);
     shapeIdToElId.set(r.shapeId, elId);
 
     const pinX = r.pageX;        // page-absolute (after parent transform)
@@ -1447,7 +1463,7 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
     rawByShapeId.set(targetShapeId, synthBox);
     blackBoxPoolsCreated.push(targetShapeId);
     // Add to elements directly (we've already left the element-build loop).
-    const elId = props.BpmnId && props.BpmnId.length > 0 ? props.BpmnId : nano();
+    const elId = mintId(props.BpmnId);
     shapeIdToElId.set(targetShapeId, elId);
     const widthPx = widthIn * PX_PER_INCH;
     const heightPx = heightIn * PX_PER_INCH;
@@ -1590,7 +1606,7 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
       );
     }
 
-    const connId = r.bpmnId && r.bpmnId.length > 0 ? r.bpmnId : nano();
+    const connId = mintId(r.bpmnId);
     const label = readText(r.block);
 
     // Determine sourceSide / targetSide / sourceOffsetAlong from the actual
