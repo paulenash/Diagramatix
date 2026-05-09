@@ -365,6 +365,11 @@ function readText(block: string): string {
       .replace(/&quot;/g, '"')
       .replace(/&apos;/g, "'")
       .replace(/&amp;/g, "&")
+      // Normalise Windows / classic-Mac line endings to plain "\n" — Visio
+      // writes "\r\n" inside multi-line labels (e.g. "Data Entry\r\nTeam"),
+      // but Diagramatix's lane / task renderer expects "\n" only. The
+      // mismatch is harmless visually but makes JSON diffs noisy.
+      .replace(/\r\n?/g, "\n")
       .trim();
     if (stripped) return stripped;
   }
@@ -1512,8 +1517,29 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
     }
     const sourceShape = ends?.source;
     const targetShape = ends?.target;
-    const sourceId = sourceShape ? shapeIdToElId.get(sourceShape) : undefined;
-    const targetId = targetShape ? shapeIdToElId.get(targetShape) : undefined;
+    // Walk UP the page-tree until we hit a classified ancestor. A
+    // connector's <Connect> row often glues to a SUB-shape inside a
+    // pool (e.g. Visio writes `ToSheet='299' ToCell='Connections.X2'`
+    // for an Email message glued to the Customer pool — shape 299 is
+    // the CFF Container.44 body sub-shape of pool 298, which the
+    // MasterShape-skip removes from the element list). Without this
+    // walk-up the connector silently drops, which is exactly the
+    // missing "Email" message in the user's import.
+    function resolveGlueId(shapeId: string | undefined): string | undefined {
+      if (!shapeId) return undefined;
+      let cur: string | null = shapeId;
+      const seen = new Set<string>();
+      while (cur && !seen.has(cur)) {
+        seen.add(cur);
+        const elId = shapeIdToElId.get(cur);
+        if (elId) return elId;
+        const w = walkedById.get(cur);
+        cur = w?.parentShapeId ?? null;
+      }
+      return undefined;
+    }
+    const sourceId = resolveGlueId(sourceShape);
+    const targetId = resolveGlueId(targetShape);
     if (!sourceId || !targetId) {
       const sFmt = sourceShape ? `src=shape ${sourceShape}` : "src=(no glue)";
       const tFmt = targetShape ? `tgt=shape ${targetShape}` : "tgt=(no glue)";
@@ -1679,21 +1705,16 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
       labelOffsetY = labelPageY - midY;
     }
 
-    // For messageBPMN connectors, Diagramatix's drag-handle UI requires
-    // exactly 4 waypoints with both invisibleLeader flags TRUE
-    // (Canvas.tsx:4410 — `selectedConnector.waypoints.length === 4`).
-    // Imported messages carry raw Visio waypoints (2-N points) with both
-    // leader flags FALSE, so the drag handle never appears and the user
-    // can't move the attachment point. Rewrite to canonical 4-point
-    // format: [srcCentre, srcEdge, tgtEdge, tgtCentre].
-    //
-    // Important: pull srcEdge/tgtEdge X from the RAW Visio waypoints, NOT
-    // from the clipped midpoint that `clipToRectEdge` produces. clipToRect-
-    // Edge collapses every endpoint to its rectangle's edge midpoint, so
-    // 3 different message connectors all targeting the same pool's top
-    // edge would attach at identical (cx, top) — visually all three
-    // overlap at the pool's centre-top. Visio messages preserve a
-    // per-connector shared X (vertical line); we want to keep that.
+    // Diagramatix's native convention (verified by diffing a manually-
+    // corrected diagram) is leaders=TRUE for EVERY connector type with
+    // the source-centre and target-centre as waypoints[0] and [N-1].
+    // The "visible" portion of the connector is waypoints[1..N-2]; the
+    // first and last segments are invisible leaders that let label
+    // anchoring + endpoint-drag UIs find the shape centres without
+    // calling out to the elements array. Applying this to imported
+    // sequence / association / messageBPMN connectors uniformly closes
+    // a class of bugs (drag-handle missing, second-clip-pass clobbering
+    // edge attachments, label offset relative to wrong anchor).
     let finalWaypoints: Point[] = waypoints;
     let sourceInvisibleLeader = false;
     let targetInvisibleLeader = false;
@@ -1737,6 +1758,17 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
       resolvedTargetOffset = targetEl.width > 0
         ? Math.max(0.02, Math.min(0.98, (x - targetEl.x) / targetEl.width))
         : 0.5;
+    } else if (sourceEl && targetEl && waypoints.length >= 2) {
+      // Sequence / association connectors: prepend src centre and append
+      // tgt centre, set leaders=true. waypoints[0] (post-clip) and
+      // waypoints[N-1] (post-clip) become the visible-edge points at
+      // positions 1 and N-2 in the new array — matching the Diagramatix-
+      // native format the user's manually-corrected diagram uses.
+      const srcCentre = { x: sourceEl.x + sourceEl.width / 2, y: sourceEl.y + sourceEl.height / 2 };
+      const tgtCentre = { x: targetEl.x + targetEl.width / 2, y: targetEl.y + targetEl.height / 2 };
+      finalWaypoints = [srcCentre, ...waypoints, tgtCentre];
+      sourceInvisibleLeader = true;
+      targetInvisibleLeader = true;
     }
 
     const connector: Connector = {
@@ -1862,18 +1894,36 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
     }
   }
 
-  // Re-snap connector endpoints to source/target edge midpoints AFTER
-  // the pool merge (otherwise endpoints still pointed at the absorbed
-  // pool's edges). Also drop any zero-length / degenerate connectors
-  // that ended up collapsed onto a single point.
-  for (const c of connectors) {
-    const srcEl = elements.find((e) => e.id === c.sourceId);
-    const tgtEl = elements.find((e) => e.id === c.targetId);
-    if (!srcEl || !tgtEl || c.waypoints.length < 2) continue;
-    const srcCentre = { x: srcEl.x + srcEl.width / 2, y: srcEl.y + srcEl.height / 2 };
-    const tgtCentre = { x: tgtEl.x + tgtEl.width / 2, y: tgtEl.y + tgtEl.height / 2 };
-    c.waypoints[0] = clipToRectEdge(srcEl, tgtCentre);
-    c.waypoints[c.waypoints.length - 1] = clipToRectEdge(tgtEl, srcCentre);
+  // Re-snap connector endpoints AFTER the pool merge — but ONLY for
+  // connectors whose source or target was actually remapped (otherwise
+  // we'd clobber the per-connector edge clipping the import loop just
+  // computed, which the user-reported "U-shaped gateway connector
+  // attaches to right/left edges instead of bottom" bug traced back to).
+  // Connectors using the new [srcCentre, ...visible..., tgtCentre]
+  // leader format need waypoints[0] and waypoints[N-1] preserved as
+  // shape centres; only the visible-edge points (waypoints[1] and
+  // [N-2]) are recomputed.
+  if (mergedAwayIds.size > 0) {
+    for (const c of connectors) {
+      const srcRemapped = !!mergedAwayIds.has(c.sourceId);
+      const tgtRemapped = !!mergedAwayIds.has(c.targetId);
+      if (!srcRemapped && !tgtRemapped) continue;
+      const srcEl = elements.find((e) => e.id === c.sourceId);
+      const tgtEl = elements.find((e) => e.id === c.targetId);
+      if (!srcEl || !tgtEl || c.waypoints.length < 2) continue;
+      const srcCentre = { x: srcEl.x + srcEl.width / 2, y: srcEl.y + srcEl.height / 2 };
+      const tgtCentre = { x: tgtEl.x + tgtEl.width / 2, y: tgtEl.y + tgtEl.height / 2 };
+      const visStart = c.sourceInvisibleLeader ? 1 : 0;
+      const visEnd = c.waypoints.length - 1 - (c.targetInvisibleLeader ? 1 : 0);
+      if (srcRemapped) {
+        if (c.sourceInvisibleLeader) c.waypoints[0] = srcCentre;
+        c.waypoints[visStart] = clipToRectEdge(srcEl, c.waypoints[Math.min(visStart + 1, visEnd)]);
+      }
+      if (tgtRemapped) {
+        if (c.targetInvisibleLeader) c.waypoints[c.waypoints.length - 1] = tgtCentre;
+        c.waypoints[visEnd] = clipToRectEdge(tgtEl, c.waypoints[Math.max(visEnd - 1, visStart)]);
+      }
+    }
   }
 
   // Normalise so the upper-left of the diagram sits near (0, 0) on the canvas.
