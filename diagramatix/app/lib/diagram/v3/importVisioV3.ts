@@ -476,15 +476,37 @@ function walkAllShapes(pageXml: string): WalkedShape[] {
   // Second pass: read PinX/PinY/W/H from each shape's outer head (cells
   // before the first nested <Shapes>). Indexed by nodeIndex so duplicate
   // shape IDs don't collide.
+  // Pools that wrap their body geometry in a sub-shape (e.g. Black-Box
+  // Pool's CFF Container child carries the actual Width/Height while the
+  // outer Group has only PinX/PinY) get caught by the fall-through to the
+  // first nested <Shape>'s W/H.
   type Geom = { localPinX: number; localPinY: number; width: number; height: number };
   const geom: Geom[] = new Array(nodes.length);
   for (const n of nodes) {
     const head = outerHead(n.block);
+    let width = readCellNum(head, "Width") ?? 0;
+    let height = readCellNum(head, "Height") ?? 0;
+    // Fall-back: if the outer head doesn't carry W/H, peek at the FIRST
+    // nested <Shape>'s outer head. For Black-Box Pool / CFF Container the
+    // dimensions live on the inner body shape (MasterShape='6').
+    if (width <= 0 || height <= 0) {
+      const innerOpenIdx = n.block.search(/<Shape\s+ID=/g);
+      // First match at index 0 IS the wrapper itself — find the SECOND.
+      const secondOpenIdx = innerOpenIdx >= 0
+        ? n.block.indexOf("<Shape ID=", innerOpenIdx + 1)
+        : -1;
+      if (secondOpenIdx > 0) {
+        const innerBlock = n.block.slice(secondOpenIdx);
+        const innerHead = outerHead(innerBlock);
+        if (width <= 0) width = readCellNum(innerHead, "Width") ?? 0;
+        if (height <= 0) height = readCellNum(innerHead, "Height") ?? 0;
+      }
+    }
     geom[n.nodeIndex] = {
       localPinX: readCellNum(head, "PinX") ?? 0,
       localPinY: readCellNum(head, "PinY") ?? 0,
-      width: readCellNum(head, "Width") ?? 0,
-      height: readCellNum(head, "Height") ?? 0,
+      width,
+      height,
     };
   }
 
@@ -1359,25 +1381,114 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
     const connId = r.bpmnId && r.bpmnId.length > 0 ? r.bpmnId : nano();
     const label = readText(r.block);
 
+    // Determine sourceSide / targetSide / sourceOffsetAlong from the actual
+    // begin/end positions relative to the source/target shapes. The default
+    // hardcode of right/left is wrong for vertical message flows between
+    // pools (which need top/bottom) and for any connector whose visible
+    // endpoint sits on a non-right edge.
+    let resolvedSourceSide: "top" | "right" | "bottom" | "left" = "right";
+    let resolvedTargetSide: "top" | "right" | "bottom" | "left" = "left";
+    let resolvedSourceOffset: number | undefined;
+    let resolvedTargetOffset: number | undefined;
+    function sideAndOffset(rect: { x: number; y: number; width: number; height: number }, p: Point) {
+      // Pick the closest edge to p (in pixel space).
+      const dLeft = Math.abs(p.x - rect.x);
+      const dRight = Math.abs(p.x - (rect.x + rect.width));
+      const dTop = Math.abs(p.y - rect.y);
+      const dBot = Math.abs(p.y - (rect.y + rect.height));
+      const min = Math.min(dLeft, dRight, dTop, dBot);
+      let side: "top" | "right" | "bottom" | "left";
+      let offset: number;
+      if (min === dTop && rect.height > 0) {
+        side = "top";
+        offset = (p.x - rect.x) / rect.width;
+      } else if (min === dBot && rect.height > 0) {
+        side = "bottom";
+        offset = (p.x - rect.x) / rect.width;
+      } else if (min === dLeft && rect.width > 0) {
+        side = "left";
+        offset = (p.y - rect.y) / rect.height;
+      } else {
+        side = "right";
+        offset = (p.y - rect.y) / Math.max(1, rect.height);
+      }
+      // Clamp to the same range Diagramatix uses internally so subsequent
+      // nudges don't immediately re-clamp the imported value.
+      offset = Math.max(0.02, Math.min(0.98, offset));
+      return { side, offset };
+    }
+    if (sourceEl && waypoints.length >= 1) {
+      const so = sideAndOffset(sourceEl, waypoints[0]);
+      resolvedSourceSide = so.side;
+      resolvedSourceOffset = so.offset;
+    }
+    if (targetEl && waypoints.length >= 1) {
+      const to = sideAndOffset(targetEl, waypoints[waypoints.length - 1]);
+      resolvedTargetSide = to.side;
+      resolvedTargetOffset = to.offset;
+    }
+
+    // Read the original Visio label position (TxtPinX/TxtPinY, page-absolute
+    // after the connector-frame transform) and convert to a Diagramatix
+    // labelOffsetX/Y relative to the visual midpoint (or source endpoint
+    // for "source"-anchored labels — but the importer always uses
+    // "midpoint" anchor).
+    const txtPinXLocal = readCellNum(head, "TxtPinX");
+    const txtPinYLocal = readCellNum(head, "TxtPinY");
+    let labelOffsetX = 0;
+    let labelOffsetY = 0;
+    if (label && txtPinXLocal != null && txtPinYLocal != null && waypoints.length >= 2) {
+      // TxtPin is in the connector's local frame (same frame as the
+      // Geometry MoveTo/LineTo rows: origin at bottom-left of the
+      // connector's bounding box, Y up).
+      const labelPageX = (localOrigX + txtPinXLocal) * PX_PER_INCH;
+      const labelPageY = (pageH - (localOrigY + txtPinYLocal)) * PX_PER_INCH;
+      const visStart = 0;
+      const visEnd = waypoints.length - 1;
+      const midX = (waypoints[visStart].x + waypoints[visEnd].x) / 2;
+      const midY = (waypoints[visStart].y + waypoints[visEnd].y) / 2;
+      labelOffsetX = labelPageX - midX;
+      labelOffsetY = labelPageY - midY;
+    }
+
+    // For messageBPMN connectors, Diagramatix's drag-handle UI requires
+    // exactly 4 waypoints with both invisibleLeader flags TRUE
+    // (Canvas.tsx:4410 — `selectedConnector.waypoints.length === 4`).
+    // Imported messages carry raw Visio waypoints (2-N points) with both
+    // leader flags FALSE, so the drag handle never appears and the user
+    // can't move the attachment point. Rewrite to canonical 4-point
+    // format: [srcCentre, srcEdge, tgtEdge, tgtCentre].
+    let finalWaypoints: Point[] = waypoints;
+    let sourceInvisibleLeader = false;
+    let targetInvisibleLeader = false;
+    if (r.connectorBase === "messageBPMN" && sourceEl && targetEl && waypoints.length >= 2) {
+      const srcEdge = waypoints[0];
+      const tgtEdge = waypoints[waypoints.length - 1];
+      const srcCentre = { x: sourceEl.x + sourceEl.width / 2, y: sourceEl.y + sourceEl.height / 2 };
+      const tgtCentre = { x: targetEl.x + targetEl.width / 2, y: targetEl.y + targetEl.height / 2 };
+      finalWaypoints = [srcCentre, srcEdge, tgtEdge, tgtCentre];
+      sourceInvisibleLeader = true;
+      targetInvisibleLeader = true;
+    }
+
     const connector: Connector = {
       id: connId,
       sourceId,
       targetId,
-      sourceSide: "right",   // best-effort; canvas can re-route after import
-      targetSide: "left",
+      sourceSide: resolvedSourceSide,
+      targetSide: resolvedTargetSide,
       type: r.connectorBase,
       directionType: "directed",
       routingType: "rectilinear",
-      sourceInvisibleLeader: false,
-      targetInvisibleLeader: false,
-      waypoints,
+      sourceInvisibleLeader,
+      targetInvisibleLeader,
+      waypoints: finalWaypoints,
       label: label || undefined,
-      // Anchor labels at the connector midpoint with no offset, so they
-      // sit in the gap between source/target shapes (matches the AI
-      // generator's convention for cleanly-readable message labels).
       labelAnchor: "midpoint",
-      labelOffsetX: 0,
-      labelOffsetY: 0,
+      labelOffsetX,
+      labelOffsetY,
+      sourceOffsetAlong: resolvedSourceOffset,
+      targetOffsetAlong: resolvedTargetOffset,
     };
     connectors.push(connector);
   }
