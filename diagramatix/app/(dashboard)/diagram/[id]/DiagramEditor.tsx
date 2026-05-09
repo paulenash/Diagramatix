@@ -1704,7 +1704,7 @@ export function DiagramEditor({
                         to author BPMN diagrams natively that import cleanly. */}
                     {diagramType === "bpmn" && (
                       <a
-                        href="/BPMN%20Diagramatix%20Shapes%20v1.2.vssx"
+                        href="/BPMN%20Diagramatix%20Shapes%20v1.3.vssx"
                         download
                         onClick={() => { setFileMenuOpen(false); setFileSubmenu(null); }}
                         className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
