@@ -3823,6 +3823,30 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         // can push siblings below each grown lane / sublane.
         const elementsBefore = elements;
         elements = ensureContainersEncloseChildren(elements);
+        // EP-rect-diff resnap — when ensureContainersEncloseChildren
+        // silently grows an EP because an internal child sticks past
+        // its bounds (most visibly TOP edge upward, since EP children
+        // are excluded from non-EP parents but still count for the EP
+        // itself), the EP's own boundary events would otherwise be
+        // left at the OLD edges. Compare every EP's pre/post rect and
+        // re-snap its boundary events on every side that actually
+        // moved. Symmetric with the explicit applyEPBoundaryChange
+        // path that already does this when its `changed` guard fires.
+        for (const before of elementsBefore) {
+          if (before.type !== "subprocess-expanded") continue;
+          const after = elements.find((e) => e.id === before.id);
+          if (!after) continue;
+          if (before.x === after.x && before.y === after.y &&
+              before.width === after.width && before.height === after.height) continue;
+          const ms = new Set<"top" | "bottom" | "left" | "right">();
+          if (after.y !== before.y) ms.add("top");
+          if (after.x !== before.x) ms.add("left");
+          if (after.y + after.height !== before.y + before.height) ms.add("bottom");
+          if (after.x + after.width !== before.x + before.width) ms.add("right");
+          if (ms.size > 0) {
+            elements = resnapEPBoundaryEvents(elements, after, before, ms);
+          }
+        }
         const pushed = pushPastLaneGrowth(elementsBefore, elements, connectors);
         elements = pushed.elements;
         connectors = pushed.connectors;
@@ -5329,7 +5353,14 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       const { connectorId, endpoint, dx, dy } = action.payload;
       const connectors = state.connectors.map((conn) => {
         if (conn.id !== connectorId) return conn;
-        function nudgeOffset(side: Side, offset: number, elId: string): number {
+        // Returns the new (side, offset) for the endpoint. For gateways,
+        // when the nudge brings the offset into a vertex zone (≤0.05
+        // from 0, 0.5, or 1) the endpoint is normalised to the
+        // canonical cardinal side at offset 0.5 — this re-routes the
+        // connector to enter / exit the rhombus along the cardinal
+        // axis (straight in/out), instead of the diagonal-edge normal
+        // that would otherwise apply.
+        function nudgeOffset(side: Side, offset: number, elId: string): { side: Side; offset: number } {
           const clamp = (v: number) => Math.max(0.02, Math.min(0.98, v));
           const el = state.elements.find(e => e.id === elId);
           if (el?.type === "gateway") {
@@ -5347,16 +5378,45 @@ function reducer(state: DiagramData, action: Action): DiagramData {
               case "bottom": delta = -dx; break;
               case "left":   delta = -dy; break;
             }
-            return clamp(offset + delta * 0.02);
+            const newOffset = clamp(offset + delta * 0.02);
+            // Vertex normalisation. Each (side, end-offset) pair maps to
+            // one of the four cardinal vertices, expressed canonically as
+            // (cardinalSide, 0.5) so future re-routes use the cardinal
+            // axis-aligned normal from gatewayEdgeNormal.
+            //   side="top":    offset≈0 → LEFT vertex,  ≈0.5 → TOP,    ≈1 → RIGHT
+            //   side="right":  offset≈0 → TOP vertex,   ≈0.5 → RIGHT,  ≈1 → BOTTOM
+            //   side="bottom": offset≈0 → RIGHT vertex, ≈0.5 → BOTTOM, ≈1 → LEFT
+            //   side="left":   offset≈0 → BOTTOM vertex,≈0.5 → LEFT,   ≈1 → TOP
+            const TOL = 0.05;
+            let vertex: Side | null = null;
+            if (Math.abs(newOffset - 0.5) <= TOL) {
+              vertex = side; // already on the cardinal vertex
+            } else if (newOffset <= TOL) {
+              vertex = side === "top" ? "left"
+                     : side === "right" ? "top"
+                     : side === "bottom" ? "right"
+                     : "bottom"; // side === "left"
+            } else if (newOffset >= 1 - TOL) {
+              vertex = side === "top" ? "right"
+                     : side === "right" ? "bottom"
+                     : side === "bottom" ? "left"
+                     : "top"; // side === "left"
+            }
+            return vertex ? { side: vertex, offset: 0.5 } : { side, offset: newOffset };
           }
-          if (side === "top" || side === "bottom") return clamp(offset + dx * 0.02);
-          return clamp(offset + dy * 0.02);
+          if (side === "top" || side === "bottom") return { side, offset: clamp(offset + dx * 0.02) };
+          return { side, offset: clamp(offset + dy * 0.02) };
         }
+        const r = nudgeOffset(
+          endpoint === "source" ? conn.sourceSide : conn.targetSide,
+          (endpoint === "source" ? conn.sourceOffsetAlong : conn.targetOffsetAlong) ?? 0.5,
+          endpoint === "source" ? conn.sourceId : conn.targetId,
+        );
         const updated = endpoint === "source"
-          ? { ...conn, sourceOffsetAlong: nudgeOffset(conn.sourceSide, conn.sourceOffsetAlong ?? 0.5, conn.sourceId),
+          ? { ...conn, sourceSide: r.side, sourceOffsetAlong: r.offset,
               sourceRoleOffset: undefined, sourceMultOffset: undefined,
               sourceConstraintOffset: undefined, sourceUniqueOffset: undefined }
-          : { ...conn, targetOffsetAlong: nudgeOffset(conn.targetSide, conn.targetOffsetAlong ?? 0.5, conn.targetId),
+          : { ...conn, targetSide: r.side, targetOffsetAlong: r.offset,
               targetRoleOffset: undefined, targetMultOffset: undefined,
               targetConstraintOffset: undefined, targetUniqueOffset: undefined };
         const source = state.elements.find((el) => el.id === updated.sourceId);
