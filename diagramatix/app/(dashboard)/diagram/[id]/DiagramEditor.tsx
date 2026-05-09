@@ -1938,7 +1938,13 @@ export function DiagramEditor({
             multiSelectionCount={selectedElementIds.size}
             onUpdateLabel={updateLabel}
             onUpdateProperties={updateProperties}
-            onSetEventBoundary={setEventBoundary}
+            onSetEventBoundary={(id, hostId) => {
+              setEventBoundary(id, hostId);
+              // After detaching, clear the selection so the next click
+              // on the (now-nudged) event isn't read as a connection-
+              // creation gesture on a still-selected element.
+              if (hostId === null) setSelectedElementIds(new Set());
+            }}
             onUpdateConnectorDirection={updateConnectorDirection}
             onUpdateConnectorType={updateConnectorType}
             onReverseConnector={reverseConnector}
