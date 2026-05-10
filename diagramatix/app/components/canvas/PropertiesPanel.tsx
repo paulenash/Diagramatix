@@ -779,10 +779,34 @@ export function PropertiesPanel({
             (srcEl.type !== tgtEl.type); // one is class, other is enumeration
           const isUmlConn = connector.type === "uml-association" || connector.type === "uml-aggregation" ||
             connector.type === "uml-composition" || connector.type === "uml-generalisation";
+          // Process-context generalisation: only available between actor-type
+          // participants (actor / team / system). When this case applies,
+          // suppress the full 4-option UML dropdown below and show a
+          // tailored Association/Generalisation choice instead — the
+          // 4-option dropdown's Aggregation/Composition entries are
+          // class-relationship semantics that don't apply to actors.
+          const PC_ACTOR_TYPES = new Set(["actor", "team", "system"]);
+          const isPCActorConn = diagramType === "process-context"
+            && !!srcEl && !!tgtEl
+            && PC_ACTOR_TYPES.has(srcEl.type)
+            && PC_ACTOR_TYPES.has(tgtEl.type)
+            && (connector.type === "association" || connector.type === "uml-generalisation");
           return (
             <>
+              {/* Process-context actor-to-actor: Association ↔ Generalisation toggle */}
+              {isPCActorConn && (
+                <div className="flex items-center gap-1">
+                  <span className="text-[10px] font-medium text-gray-500 w-20 shrink-0">Type:</span>
+                  <select value={connector.type}
+                    onChange={e => onUpdateConnectorType?.(connector.id, e.target.value as ConnectorType)}
+                    className="text-[10px] border border-gray-300 rounded px-1 py-0 bg-white text-gray-700 cursor-pointer font-medium flex-1 min-w-0">
+                    <option value="association">Association</option>
+                    <option value="uml-generalisation">Generalisation</option>
+                  </select>
+                </div>
+              )}
               {/* Relationship, Name, Reading Direction, Navigability — compact group */}
-              {isUmlConn && (() => {
+              {isUmlConn && !isPCActorConn && (() => {
                 const relOpts = [
                   { value: "uml-association" as ConnectorType, label: "Association" },
                   { value: "uml-aggregation" as ConnectorType, label: "Aggregation" },
