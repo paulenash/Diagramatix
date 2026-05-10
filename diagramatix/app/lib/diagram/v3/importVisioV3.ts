@@ -938,9 +938,18 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
     const iy1 = inner.pageY - inner.height / 2;
     const ix2 = inner.pageX + inner.width / 2;
     const iy2 = inner.pageY + inner.height / 2;
+    // Require the inner shape's area to be MEANINGFULLY smaller — at
+    // least 5%. Without this, Visio's per-instance floating-point
+    // precision noise (e.g. one shape's width 8.556061351706299 vs
+    // another's 8.556061351706301 — a 2×10⁻¹⁵ delta from the same
+    // master scaling formula) makes a strict `<` comparison wrongly
+    // declare two visually-identical shapes "one contains the other"
+    // and silently flip the inner one to a lane.
+    const innerArea = inner.width * inner.height;
+    const outerArea = outer.width * outer.height;
+    if (innerArea >= outerArea * 0.95) return false;
     return ix1 >= ox1 - margin && iy1 >= oy1 - margin
-      && ix2 <= ox2 + margin && iy2 <= oy2 + margin
-      && (inner.width * inner.height) < (outer.width * outer.height);
+      && ix2 <= ox2 + margin && iy2 <= oy2 + margin;
   }
   // Candidate outer containers for the geometric containment check —
   // ANY classified pool counts. A common BPMN_M case has the outer pool
