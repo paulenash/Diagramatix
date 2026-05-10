@@ -250,6 +250,11 @@ const CONNECTOR_NAMEU_MAP: Record<string, ConnectorBase | null> = {
   "Default Sequence Flow":      "sequence",
   "Conditional Sequence Flow":  "sequence",
   "BPMN Sequence Flow":         "sequence",
+  // Visio's built-in toolbar connector. Common in BPMN diagrams drawn
+  // without using the stencil's Sequence Flow master — every line drawn
+  // with the line tool from the toolbar gets master "Dynamic Connector".
+  // Treat them as sequence flows so they import.
+  "Dynamic Connector":          "sequence",
   "Message Flow":               "messageBPMN",
   "BPMN Message Flow":          "messageBPMN",
   "Initiating Message Flow":    "messageBPMN",
@@ -607,6 +612,10 @@ function isConnectorMaster(nameU: string): ConnectorBase | null {
   if (n.includes("message flow") || n.includes("message connection")) return "messageBPMN";
   if (n.includes("association")) return "associationBPMN";
   if (n.includes("sequence flow") || n.includes("sequence-flow")) return "sequence";
+  // Visio's generic toolbar connector — treat as sequence flow so
+  // BPMN diagrams drawn without using a stencil's Sequence Flow
+  // master still wire up correctly.
+  if (n.includes("dynamic connector")) return "sequence";
   return null;
 }
 
@@ -801,7 +810,20 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
     // variants like shape 55 ("Online Modules") that have NameU='CFF Container.44'
     // in the open tag but no Master='...' attribute (only MasterShape='6').
     const inlineNameU = block.match(/<Shape\s+ID='\d+'[^>]*\sNameU='([^']*)'/)?.[1] ?? "";
-    const nameU = normaliseNameU(masterInfo?.nameU || inlineNameU);
+    // When the user has explicitly renamed a shape (Visio sets
+    // `IsCustomNameU='1'` on the shape's opening tag), trust the inline
+    // NameU over the master's name. Common Visio pattern: drop the
+    // toolbar's Dynamic Connector, then rename it "Sequence Flow" — the
+    // shape opens as `Master='36' NameU='Sequence Flow' IsCustomNameU='1'`.
+    // Without this preference the importer reads the master's name
+    // ("Dynamic Connector"), misses the connector classification, and
+    // skips the shape.
+    const isCustomInline = /<Shape\s+ID='\d+'[^>]*\sIsCustomNameU='1'/.test(block.slice(0, block.indexOf(">") + 1));
+    const nameU = normaliseNameU(
+      isCustomInline && inlineNameU
+        ? inlineNameU
+        : masterInfo?.nameU || inlineNameU,
+    );
     const props = readPropValues(block);
     const bpmnId = props.BpmnId;
 
@@ -898,6 +920,28 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
   const POOL_OR_LANE_NAMES = new Set([
     "Pool / Lane", "Swimlane",
   ]);
+  // Geometric containment check for sibling-layout BPMN_M files: when
+  // the page XML places the outer CFF Container, the Swimlane List, and
+  // the Pool/Lane shapes (one for the pool header, one per lane) all
+  // as TOP-LEVEL siblings — which Visio's standard BPMN_M template does
+  // by default — the page-tree-parent check above never fires. Detect
+  // it here: a Pool/Lane shape whose bbox is fully inside ANOTHER
+  // Pool/Lane shape's bbox (with some margin for sub-pixel rounding)
+  // is a lane within that outer pool.
+  function bboxContains(outer: RawShape, inner: RawShape, margin = 0.05): boolean {
+    const ox1 = outer.pageX - outer.width / 2;
+    const oy1 = outer.pageY - outer.height / 2;
+    const ox2 = outer.pageX + outer.width / 2;
+    const oy2 = outer.pageY + outer.height / 2;
+    const ix1 = inner.pageX - inner.width / 2;
+    const iy1 = inner.pageY - inner.height / 2;
+    const ix2 = inner.pageX + inner.width / 2;
+    const iy2 = inner.pageY + inner.height / 2;
+    return ix1 >= ox1 - margin && iy1 >= oy1 - margin
+      && ix2 <= ox2 + margin && iy2 <= oy2 + margin
+      && (inner.width * inner.height) < (outer.width * outer.height);
+  }
+  const poolLaneRaws = raw.filter((r) => r.seed?.type === "pool" && POOL_OR_LANE_NAMES.has(r.nameU));
   for (const r of raw) {
     if (r.seed?.type !== "pool" || !POOL_OR_LANE_NAMES.has(r.nameU)) continue;
     let isLane = laneShapeIds.has(r.shapeId);
@@ -905,6 +949,14 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
       const parent = rawByShapeId.get(r.parentShapeId);
       if (parent?.seed?.type === "pool" || parent?.seed?.type === "lane") {
         isLane = true;
+      }
+    }
+    // Sibling-layout fallback: if any other Pool/Lane shape contains us,
+    // we're a lane inside it.
+    if (!isLane) {
+      for (const other of poolLaneRaws) {
+        if (other === r) continue;
+        if (bboxContains(other, r)) { isLane = true; break; }
       }
     }
     if (isLane) r.seed.type = "lane";
@@ -1293,6 +1345,29 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
       if (area < bestArea) { bestArea = area; bestPool = p; }
     }
     if (bestPool) lane.parentId = bestPool.id;
+  }
+
+  // Element→lane/pool parentage by GEOMETRIC CONTAINMENT. Without this,
+  // imported tasks/events/gateways/etc. are top-level elements with no
+  // parentId — they don't move when the user drags the pool, breaking
+  // the natural "pool encloses its contents" affordance. Find the
+  // SMALLEST containing classified container (lane preferred over pool)
+  // for each non-container element.
+  const CONTAINER_TYPES = new Set(["pool", "lane", "sublane", "subprocess-expanded", "group"]);
+  const containerElements = elements.filter((e) => CONTAINER_TYPES.has(e.type));
+  for (const el of elements) {
+    if (CONTAINER_TYPES.has(el.type)) continue;          // containers parented above
+    if (el.parentId) continue;                           // already set (e.g. by member section)
+    const cx = el.x + el.width / 2;
+    const cy = el.y + el.height / 2;
+    let bestContainer: DiagramElement | null = null;
+    let bestArea = Infinity;
+    for (const c of containerElements) {
+      if (cx < c.x || cx > c.x + c.width || cy < c.y || cy > c.y + c.height) continue;
+      const area = c.width * c.height;
+      if (area < bestArea) { bestArea = area; bestContainer = c; }
+    }
+    if (bestContainer) el.parentId = bestContainer.id;
   }
 
   // LANE NORMALISATION — make every imported pool/lane structure look
