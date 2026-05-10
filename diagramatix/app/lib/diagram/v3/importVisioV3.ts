@@ -354,6 +354,50 @@ function readMemberIDs(block: string): string[] {
   return ids;
 }
 
+/** Read a `User.<rowName>` cell's V= value from the OUTER head of a shape
+ *  block. BPMN_M / CFF (Cross-Functional Flowchart) files use specific
+ *  User-section rows as authoritative structural metadata:
+ *
+ *   `User.msvShapeCategories` — semicolon-separated tags. Contains
+ *      "CFF Container" on outer pool wrappers and "Lane"/"Swimlane" on
+ *      lane shapes. This is THE reliable Pool-vs-Lane signal — it's set
+ *      by Visio's CFF machinery, not by guesswork on master names.
+ *   `User.numLanes` — present on CFF Container outer pools; integer ≥ 1
+ *      when the container holds at least one lane.
+ *   `User.visHeadingText` — the lane's display label (rotated 90° in the
+ *      sidebar of a horizontal pool). Often inherited from the lane's
+ *      heading sub-shape's text.
+ *
+ *  Returns null when the row exists but Visio writes only an Inh formula
+ *  with no cached V — caller should fall back to a Property cell.
+ */
+function readUserCellValue(block: string, rowName: string): string | null {
+  const head = outerHead(block);
+  const userSec = head.match(/<Section\s+N='User'>([\s\S]*?)<\/Section>/);
+  if (!userSec) return null;
+  const re = new RegExp(`<Row\\s+N='${rowName}'>\\s*<Cell\\s+N='Value'\\s+V='([^']*)'`);
+  const m = userSec[1].match(re);
+  return m?.[1] ?? null;
+}
+
+/** Find Sheet.N references in a shape block. BPMN_M lanes carry formulas
+ *  like `Sheet.5!User.visCFFStyle` that point at their owning pool's
+ *  master sheet — the N is the parent pool's shape ID. Returns each
+ *  referenced sheet ID once, in order of first appearance. The shape's
+ *  own sheet ID is filtered out by the caller.
+ */
+function readSheetRefs(block: string): string[] {
+  const head = outerHead(block);
+  const re = /Sheet\.(\d+)!/g;
+  const seen = new Set<string>();
+  const out: string[] = [];
+  let m;
+  while ((m = re.exec(head)) !== null) {
+    if (!seen.has(m[1])) { seen.add(m[1]); out.push(m[1]); }
+  }
+  return out;
+}
+
 function readText(block: string): string {
   // Walk every <Text>...</Text> block and return the first NON-EMPTY one
   // (after stripping Visio's inline formatting — `<cp/>` character props,
@@ -911,6 +955,63 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
   // Build a quick lookup: shapeId → RawShape (for parent classification).
   const rawByShapeId = new Map<string, RawShape>();
   for (const r of raw) rawByShapeId.set(r.shapeId, r);
+
+  // ── BPMN_M structural metadata pass — RUNS BEFORE geometric heuristics.
+  //
+  // Visio's BPMN_M / CFF (Cross-Functional Flowchart) template stamps
+  // every pool/lane with deliberate structural tags that are far more
+  // reliable than name-based or bbox-based guessing:
+  //
+  //   • A shape's `User.msvShapeCategories` cell carries semicolon-
+  //     separated structural roles. Lanes have "Swimlane;Lane" (with
+  //     an optional ";DoNotContain"). The outer pool wrapper is a CFF
+  //     Container, identified by its master rather than this cell.
+  //   • A CFF Container with a `User.numLanes` value ≥ 1 IS a pool —
+  //     the cell counts the lane children directly.
+  //   • Each lane carries `Sheet.N!`-prefixed formula references
+  //     pointing at its owning pool's sheet. e.g. a lane's
+  //     `User.visCFFStyle` row reads `Sheet.5!User.visCFFStyle` →
+  //     N=5 → the lane's parent pool is the shape with ID 5.
+  //
+  // Using these signals fixes a class of bugs the geometric heuristics
+  // produced repeatedly: floating-point noise flipping pools to lanes
+  // (the Customer pool case), single-lane pools getting absorbed into
+  // a labelled twin (the Salesforce / Applicant case), and lanes mis-
+  // parented to off-screen Swimlane List wrappers (the Bank case).
+  // Geometric fall-backs further down the file still run for non-CFF
+  // files (hand-built Visio without BPMN_M) but defer to this pass
+  // when its signals fire.
+  const bpmnMPoolByShapeId = new Map<string, RawShape>();   // pool shapeId → RawShape
+  const bpmnMLaneToPoolId = new Map<string, string>();      // lane shapeId → pool shapeId
+  for (const r of raw) {
+    if (r.seed?.type !== "pool") continue;
+    const numLanes = readUserCellValue(r.block, "numLanes");
+    const cats = readUserCellValue(r.block, "msvShapeCategories") ?? "";
+    // CFF Container with numLanes ≥ 1 OR explicit "CFF Container"
+    // category tag is a Pool wrapper.
+    const isCffContainer = cats.includes("CFF Container") ||
+      (numLanes !== null && parseInt(numLanes, 10) >= 1);
+    if (isCffContainer) bpmnMPoolByShapeId.set(r.shapeId, r);
+  }
+  for (const r of raw) {
+    if (r.seed?.type !== "pool") continue;
+    const cats = readUserCellValue(r.block, "msvShapeCategories") ?? "";
+    if (!cats.includes("Lane") && !cats.includes("Swimlane")) continue;
+    // Authoritative LANE tag. Find its parent pool from Sheet.N refs.
+    const sheetRefs = readSheetRefs(r.block);
+    let parentPoolShapeId: string | null = null;
+    for (const sid of sheetRefs) {
+      if (sid === r.shapeId) continue;          // self-ref
+      if (bpmnMPoolByShapeId.has(sid)) { parentPoolShapeId = sid; break; }
+    }
+    // Flip the lane's classification and remember the parentage so the
+    // post-element-build pass can wire parentId without geometric guessing.
+    if (r.seed) r.seed.type = "lane";
+    if (parentPoolShapeId) bpmnMLaneToPoolId.set(r.shapeId, parentPoolShapeId);
+  }
+  // Promote BPMN_M lanes' parentage to the existing laneShapeIds set the
+  // member-section-based pass already populates — same downstream effect.
+  for (const laneId of bpmnMLaneToPoolId.keys()) laneShapeIds.add(laneId);
   // Names where this disambiguation applies — only masters that genuinely
   // double as pool-vs-lane in different contexts. CFF Container and
   // Swimlane List are deliberately NOT here: in real-world Visio CFF
@@ -1261,6 +1362,16 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
     elements.push(el);
   }
 
+  // Pool→Lane parentage from BPMN_M `Sheet.N!` references (most reliable).
+  // Set BEFORE the member-section / page-tree / geometric passes — when
+  // the structural metadata fires, the heuristics never need to.
+  for (const [laneShapeId, poolShapeId] of bpmnMLaneToPoolId) {
+    const laneElId = shapeIdToElId.get(laneShapeId);
+    const poolElId = shapeIdToElId.get(poolShapeId);
+    if (!laneElId || !poolElId) continue;
+    const lane = elements.find((e) => e.id === laneElId);
+    if (lane && !lane.parentId) lane.parentId = poolElId;
+  }
   // Pool→Lane parentage from Pool Member sections (V3 round-trip).
   for (const [poolShapeId, laneShapeIds] of poolMembers) {
     const poolElId = shapeIdToElId.get(poolShapeId);
@@ -1630,8 +1741,42 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
       }
       return undefined;
     }
-    const sourceId = resolveGlueId(sourceShape);
-    const targetId = resolveGlueId(targetShape);
+    let sourceId = resolveGlueId(sourceShape);
+    let targetId = resolveGlueId(targetShape);
+    // Geometric fallback for Message Flow / association connectors with a
+    // FREE END (one end glued, the other floating in space). BPMN message
+    // flows from an "external participant" pool routinely originate at a
+    // literal coordinate inside the pool's bbox without being glued to it
+    // — the user-visible symptom is "no message connectors imported"
+    // because the connector-build path skips when source OR target can't
+    // be resolved. Recover by reading the unglued end's BeginX/Y or
+    // EndX/Y from the connector's outer head and finding the smallest
+    // pool whose bbox contains that point.
+    if (r.connectorBase && (!sourceId || !targetId)) {
+      const head0 = outerHead(r.block);
+      const begX = readCellNum(head0, "BeginX");
+      const begY = readCellNum(head0, "BeginY");
+      const endX = readCellNum(head0, "EndX");
+      const endY = readCellNum(head0, "EndY");
+      const findPoolAt = (xIn: number | null, yIn: number | null): string | undefined => {
+        if (xIn == null || yIn == null) return undefined;
+        let bestId: string | undefined;
+        let bestArea = Infinity;
+        for (const r2 of raw) {
+          if (r2.seed?.type !== "pool") continue;
+          const x1 = r2.pageX - r2.width / 2;
+          const x2 = r2.pageX + r2.width / 2;
+          const y1 = r2.pageY - r2.height / 2;
+          const y2 = r2.pageY + r2.height / 2;
+          if (xIn < x1 || xIn > x2 || yIn < y1 || yIn > y2) continue;
+          const area = r2.width * r2.height;
+          if (area < bestArea) { bestArea = area; bestId = shapeIdToElId.get(r2.shapeId); }
+        }
+        return bestId;
+      };
+      if (!sourceId) sourceId = findPoolAt(begX, begY);
+      if (!targetId) targetId = findPoolAt(endX, endY);
+    }
     if (!sourceId || !targetId) {
       const sFmt = sourceShape ? `src=shape ${sourceShape}` : "src=(no glue)";
       const tFmt = targetShape ? `tgt=shape ${targetShape}` : "tgt=(no glue)";
