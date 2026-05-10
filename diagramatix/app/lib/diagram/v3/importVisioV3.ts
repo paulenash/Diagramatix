@@ -27,6 +27,7 @@ import type {
   FlowType,
   Point,
 } from "../types";
+import { recomputeAllConnectors } from "../routing";
 
 export interface MasterStat {
   masterId: string;
@@ -941,7 +942,14 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
       && ix2 <= ox2 + margin && iy2 <= oy2 + margin
       && (inner.width * inner.height) < (outer.width * outer.height);
   }
-  const poolLaneRaws = raw.filter((r) => r.seed?.type === "pool" && POOL_OR_LANE_NAMES.has(r.nameU));
+  // Candidate outer containers for the geometric containment check —
+  // ANY classified pool counts. A common BPMN_M case has the outer pool
+  // come in as a CFF Container (master 20) named "Bank", with the lane
+  // rows authored as Pool/Lane (master 19) shapes living inside the
+  // CFF Container's bbox; restricting the candidate set to Pool/Lane
+  // names alone misses the CFF Container parent and leaves Processing
+  // Centre / Help Desk classified as sibling pools instead of lanes.
+  const allPoolRaws = raw.filter((r) => r.seed?.type === "pool");
   for (const r of raw) {
     if (r.seed?.type !== "pool" || !POOL_OR_LANE_NAMES.has(r.nameU)) continue;
     let isLane = laneShapeIds.has(r.shapeId);
@@ -951,10 +959,10 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
         isLane = true;
       }
     }
-    // Sibling-layout fallback: if any other Pool/Lane shape contains us,
+    // Sibling-layout fallback: if any other classified pool contains us,
     // we're a lane inside it.
     if (!isLane) {
-      for (const other of poolLaneRaws) {
+      for (const other of allPoolRaws) {
         if (other === r) continue;
         if (bboxContains(other, r)) { isLane = true; break; }
       }
@@ -2061,6 +2069,24 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
         wp.y += offY;
       }
     }
+  }
+
+  // Final pass: recompute every connector's waypoints from scratch using
+  // the same routing helper that fires on MOVE_ELEMENT. The user-visible
+  // symptom this fixes — "sequence connectors initially mis-routed,
+  // moving any element fixes them" — is the imported raw Visio waypoints
+  // not matching Diagramatix's expected routing rules. The MOVE cascade
+  // already calls `recomputeAllConnectors`, which is why nudging an
+  // element repairs them. Running the same call once at import-time
+  // produces the correct routing immediately, before the user sees
+  // anything broken. The function is pure (only depends on element
+  // positions and connector source/target/sides), so it works the same
+  // whether invoked from the reducer or the import API route.
+  const recomputedConnectors = recomputeAllConnectors(connectors, elements);
+  // Replace in-place to keep all the post-import logic that captured
+  // `connectors` references operating on the same array.
+  for (let i = 0; i < connectors.length; i++) {
+    connectors[i] = recomputedConnectors[i] ?? connectors[i];
   }
 
   // Skipped-shape summary: lead with one aggregated warning that lists
