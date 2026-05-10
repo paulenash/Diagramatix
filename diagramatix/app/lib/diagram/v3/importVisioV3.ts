@@ -1372,6 +1372,46 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
     const lane = elements.find((e) => e.id === laneElId);
     if (lane && !lane.parentId) lane.parentId = poolElId;
   }
+
+  // BPMN_M pool element-ID set — these are authoritative pools tagged with
+  // `User.numLanes` ≥ 1 (or a "CFF Container" category). They must survive
+  // every subsequent "drop unlabelled pool" prune, because BPMN_M's
+  // single-lane convention puts the human-readable label on the LANE's
+  // visHeadingText, not on the outer container — so the pool is genuinely
+  // unlabelled at the page-shape level despite being a real pool.
+  // Without this guard, Salesforce/Applicant-style single-lane pools get
+  // dropped at line ~2089 and their lanes lose their parentId, rendering
+  // as undraggable orphans on the canvas.
+  const bpmnMPoolElIds = new Set<string>();
+  for (const poolShapeId of bpmnMPoolByShapeId.keys()) {
+    const elId = shapeIdToElId.get(poolShapeId);
+    if (elId) bpmnMPoolElIds.add(elId);
+  }
+  // Promote child-lane visHeadingText to the parent pool when the pool is
+  // unlabelled. Single-lane BPMN_M pools (Salesforce, Applicant…) have
+  // their label only on the lane; copying it to the pool gives the canvas
+  // a meaningful pool header and matches how BPMN typically displays a
+  // pool-with-one-lane (pool named, lane unnamed). We only promote when
+  // there's exactly one lane child AND the pool is currently unlabelled.
+  for (const [poolShapeId, raw] of bpmnMPoolByShapeId) {
+    const poolElId = shapeIdToElId.get(poolShapeId);
+    if (!poolElId) continue;
+    const pool = elements.find((e) => e.id === poolElId);
+    if (!pool || (pool.label && pool.label.trim())) continue;
+    const laneChildren = elements.filter((e) => e.type === "lane" && e.parentId === poolElId);
+    if (laneChildren.length === 1) {
+      const lane = laneChildren[0];
+      if (lane.label && lane.label.trim()) {
+        pool.label = lane.label;
+        lane.label = "";    // pool header now carries the name; lane body stays blank
+      }
+    } else {
+      // Multi-lane pool without its own label: fall back to the pool's
+      // own visHeadingText (sometimes BPMN_M does set it).
+      const heading = readUserCellValue(raw.block, "visHeadingText");
+      if (heading) pool.label = heading;
+    }
+  }
   // Pool→Lane parentage from Pool Member sections (V3 round-trip).
   for (const [poolShapeId, laneShapeIds] of poolMembers) {
     const poolElId = shapeIdToElId.get(poolShapeId);
@@ -1412,6 +1452,7 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
     for (const a of pools) {
       if (dropPoolIds.has(a.id)) continue;
       if (a.label && a.label.trim().length > 0) continue; // labelled — keep
+      if (bpmnMPoolElIds.has(a.id)) continue;             // authoritative BPMN_M pool — keep
       const ax1 = a.x, ay1 = a.y, ax2 = a.x + a.width, ay2 = a.y + a.height;
       const aArea = a.width * a.height;
       const acx = a.x + a.width / 2;
@@ -1758,19 +1799,40 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
       const begY = readCellNum(head0, "BeginY");
       const endX = readCellNum(head0, "EndX");
       const endY = readCellNum(head0, "EndY");
+      // EPS tolerance for the inch-coord bbox test. Visio's per-instance
+      // floating-point noise (same formulas, slightly different rounding —
+      // e.g. End Y 9.763779437684608 vs pool y1 9.76377943768461) can put
+      // a point that's VISUALLY on the pool edge a few attoseconds outside
+      // the strict bbox, silently dropping the connector. 1e-9 inches is
+      // ~25 picometres — well below any real authoring precision.
+      const EPS = 1e-9;
+      // Restrict the candidate set to "real" pools — pools whose Diagramatix
+      // element still has a non-empty label OR whose shape ID is in the
+      // BPMN_M-authoritative map. Without this filter, free-end message
+      // connectors can latch onto a ghost off-screen Swimlane-List wrapper
+      // (LocPin-shifted unlabelled pool that gets dropped later by the
+      // unlabelled-pool prune) — the prune then drops the connector along
+      // with the ghost, silently losing the message arrow.
+      const labelById = new Map<string, string>();
+      for (const e of elements) if (e.type === "pool") labelById.set(e.id, e.label ?? "");
       const findPoolAt = (xIn: number | null, yIn: number | null): string | undefined => {
         if (xIn == null || yIn == null) return undefined;
         let bestId: string | undefined;
         let bestArea = Infinity;
         for (const r2 of raw) {
           if (r2.seed?.type !== "pool") continue;
+          const elId = shapeIdToElId.get(r2.shapeId);
+          if (!elId) continue;
+          const isAuthoritative = bpmnMPoolByShapeId.has(r2.shapeId);
+          const lbl = labelById.get(elId) ?? "";
+          if (!isAuthoritative && !lbl.trim()) continue;   // skip ghost wrappers
           const x1 = r2.pageX - r2.width / 2;
           const x2 = r2.pageX + r2.width / 2;
           const y1 = r2.pageY - r2.height / 2;
           const y2 = r2.pageY + r2.height / 2;
-          if (xIn < x1 || xIn > x2 || yIn < y1 || yIn > y2) continue;
+          if (xIn < x1 - EPS || xIn > x2 + EPS || yIn < y1 - EPS || yIn > y2 + EPS) continue;
           const area = r2.width * r2.height;
-          if (area < bestArea) { bestArea = area; bestId = shapeIdToElId.get(r2.shapeId); }
+          if (area < bestArea) { bestArea = area; bestId = elId; }
         }
         return bestId;
       };
@@ -2077,11 +2139,17 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
   // <pp/> stripping, BpmnName fallback etc.) — these are almost always
   // a wrapper container we shouldn't have classified.  Also drop any
   // connector that referenced one of these pruned pools.
+  // EXCEPTION: BPMN_M pools (authoritative `User.numLanes` ≥ 1 metadata)
+  // are kept even when unlabelled — see the label-promotion pass above
+  // for context. Without this guard, off-screen-LocPin Swimlane-List
+  // ghost wrappers AND real single-lane pools both look "unlabelled" at
+  // this point, and dropping the latter orphans their lanes.
   const droppedPoolIds = new Set<string>();
   for (let i = elements.length - 1; i >= 0; i--) {
     const e = elements[i];
     if (e.type !== "pool") continue;
     if (e.label && e.label.trim()) continue;
+    if (bpmnMPoolElIds.has(e.id)) continue;            // authoritative — keep
     droppedPoolIds.add(e.id);
     elements.splice(i, 1);
   }
