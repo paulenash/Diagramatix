@@ -1391,8 +1391,17 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
   // unlabelled. Single-lane BPMN_M pools (Salesforce, Applicant…) have
   // their label only on the lane; copying it to the pool gives the canvas
   // a meaningful pool header and matches how BPMN typically displays a
-  // pool-with-one-lane (pool named, lane unnamed). We only promote when
-  // there's exactly one lane child AND the pool is currently unlabelled.
+  // pool-with-one-lane (pool named, no lane band). For the single-lane
+  // case we also DELETE the lane element entirely — visually identical
+  // to a no-lane pool, and it lets the post-import poolType detection
+  // (line ~1593) classify the pool as `black-box` (default for empty
+  // pools), which the canvas's message-misalignment check
+  // ([Canvas.tsx:3127](../../components/canvas/Canvas.tsx)) requires:
+  // messageBPMN connectors must touch black-box pools or flow elements,
+  // not white-box pools. Without the delete, the leftover unlabelled
+  // lane keeps the pool as white-box and every incoming/outgoing message
+  // arrow renders red until the user manually deletes the lane.
+  const lanesToDelete = new Set<string>();
   for (const [poolShapeId, raw] of bpmnMPoolByShapeId) {
     const poolElId = shapeIdToElId.get(poolShapeId);
     if (!poolElId) continue;
@@ -1401,15 +1410,24 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
     const laneChildren = elements.filter((e) => e.type === "lane" && e.parentId === poolElId);
     if (laneChildren.length === 1) {
       const lane = laneChildren[0];
-      if (lane.label && lane.label.trim()) {
-        pool.label = lane.label;
-        lane.label = "";    // pool header now carries the name; lane body stays blank
-      }
+      if (lane.label && lane.label.trim()) pool.label = lane.label;
+      // Re-parent any descendants from lane → pool before we delete it.
+      for (const e of elements) if (e.parentId === lane.id) e.parentId = poolElId;
+      lanesToDelete.add(lane.id);
     } else {
       // Multi-lane pool without its own label: fall back to the pool's
       // own visHeadingText (sometimes BPMN_M does set it).
       const heading = readUserCellValue(raw.block, "visHeadingText");
       if (heading) pool.label = heading;
+    }
+  }
+  if (lanesToDelete.size > 0) {
+    for (let i = elements.length - 1; i >= 0; i--) {
+      if (lanesToDelete.has(elements[i].id)) elements.splice(i, 1);
+    }
+    // Drop the shapeIdToElId pointer too — keeps connector glue consistent.
+    for (const [sId, elId] of shapeIdToElId.entries()) {
+      if (lanesToDelete.has(elId)) shapeIdToElId.delete(sId);
     }
   }
   // Pool→Lane parentage from Pool Member sections (V3 round-trip).
