@@ -76,6 +76,7 @@ interface ElementSeed {
   role?: string;
   multiplicity?: string;
   subprocessType?: string;
+  repeatType?: "loop" | "mi-sequential" | "mi-parallel";
 }
 
 type ConnectorBase = "sequence" | "messageBPMN" | "associationBPMN";
@@ -336,11 +337,20 @@ function outerHead(block: string): string {
 function readPropValues(block: string): Record<string, string> {
   const result: Record<string, string> = {};
   // Property section: <Section N='Property'> ... <Row N='BpmnX'><Cell N='Value' V='...' .../>
+  // CRITICAL: row-bounded extraction. Visio rows often carry ONLY a
+  // `<Cell N='Invisible'>` (no Value) — e.g. `BpmnTaskType` on a
+  // Sub-Process. A cross-row lazy `[\s\S]*?` would silently consume the
+  // NEXT row's Value cell, e.g. wrongly assigning BpmnIsCollapsed='1' to
+  // BpmnTaskType. Match each `<Row>…</Row>` first, then pull the Value
+  // cell from inside it.
   const propSec = block.match(/<Section N='Property'>([\s\S]*?)<\/Section>/);
   if (!propSec) return result;
-  const rowRe = /<Row\s+N='(\w+)'>[\s\S]*?<Cell\s+N='Value'\s+V='([^']*)'/g;
+  const rowRe = /<Row\s+N='(\w+)'>([\s\S]*?)<\/Row>/g;
   let m;
-  while ((m = rowRe.exec(propSec[1])) !== null) result[m[1]] = m[2];
+  while ((m = rowRe.exec(propSec[1])) !== null) {
+    const v = m[2].match(/<Cell\s+N='Value'\s+V='([^']*)'/);
+    if (v) result[m[1]] = v[1];
+  }
   return result;
 }
 
@@ -713,6 +723,32 @@ function classifyElement(nameU: string, props: Record<string, string>): ElementS
   if (base === null) return null;        // explicitly ignored (CFF Container etc.)
   if (base === undefined) return null;   // unknown — even fuzzy match returned nothing
   const seed: ElementSeed = { ...base };
+
+  // BpmnActivityType property override — promote a Task master to a
+  // Sub-Process when the BPMN property says so. Visio's BPMN_M template
+  // uses ONE physical "Task" master for both Tasks AND Sub-Processes,
+  // distinguishing them only via `BpmnActivityType` + `BpmnIsCollapsed`
+  // (and adding a marker icon to the bottom edge for loops / MI). Without
+  // this promotion every Sub-Process with a marker imports as a plain
+  // Task — the user-reported "P07.01 Check and re-Check Application" case.
+  if (seed.type === "task" && props.BpmnActivityType === "Sub-Process") {
+    seed.type = props.BpmnIsCollapsed === "1" ? "subprocess" : "subprocess-expanded";
+  }
+
+  // BpmnLoopType → Diagramatix repeatType. Visio's BPMN_M template stores
+  // the loop / multi-instance variant as a separate property; the marker
+  // icon is rendered from it. Mapping table mirrors the export side's
+  // SUBPROCESS_REPEAT_ACTION ([exportVisioV3.ts:1636](./exportVisioV3.ts)).
+  const LOOP_TYPE_MAP: Record<string, "loop" | "mi-sequential" | "mi-parallel"> = {
+    "Standard": "loop",
+    "SequentialMultiInstance": "mi-sequential",
+    "ParallelMultiInstance": "mi-parallel",
+    "Sequential": "mi-sequential",
+    "Parallel": "mi-parallel",
+  };
+  if (props.BpmnLoopType && LOOP_TYPE_MAP[props.BpmnLoopType]) {
+    seed.repeatType = LOOP_TYPE_MAP[props.BpmnLoopType];
+  }
 
   // Bpmn property overrides
   if (props.BpmnTaskType && BPMN_TASK_TYPE[props.BpmnTaskType]) {
@@ -1359,6 +1395,7 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
     if (r.seed.gatewayType) el.gatewayType = r.seed.gatewayType;
     if (r.seed.eventType) el.eventType = r.seed.eventType;
     if (r.seed.flowType) el.flowType = r.seed.flowType;
+    if (r.seed.repeatType) el.repeatType = r.seed.repeatType;
     elements.push(el);
   }
 
@@ -1422,12 +1459,31 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
     }
   }
   if (lanesToDelete.size > 0) {
+    // REPOINT (don't delete) shapeIdToElId entries for the deleted lanes.
+    // BPMN_M message connectors are often glued to the lane shape, not the
+    // pool wrapper — when we delete the lane element, the lane's shape ID
+    // is still referenced in <Connects> rows and Begin/EndTrigger formulas.
+    // Repointing the map so the lane shape ID resolves to the parent pool's
+    // element ID keeps every glued message arrow intact; without this,
+    // single-lane-pool messages silently vanish (the connector loop's
+    // resolveGlueId walks the page tree, but BPMN_M lanes are TOP-LEVEL
+    // siblings of their pool — there's no parent-shape walk-up to follow).
+    const laneElToPoolEl = new Map<string, string>();
+    for (const [laneShapeId, poolShapeId] of bpmnMLaneToPoolId) {
+      const laneElId = shapeIdToElId.get(laneShapeId);
+      const poolElId = shapeIdToElId.get(poolShapeId);
+      if (laneElId && poolElId && lanesToDelete.has(laneElId)) {
+        laneElToPoolEl.set(laneElId, poolElId);
+      }
+    }
     for (let i = elements.length - 1; i >= 0; i--) {
       if (lanesToDelete.has(elements[i].id)) elements.splice(i, 1);
     }
-    // Drop the shapeIdToElId pointer too — keeps connector glue consistent.
     for (const [sId, elId] of shapeIdToElId.entries()) {
-      if (lanesToDelete.has(elId)) shapeIdToElId.delete(sId);
+      if (!lanesToDelete.has(elId)) continue;
+      const poolElId = laneElToPoolEl.get(elId);
+      if (poolElId) shapeIdToElId.set(sId, poolElId);   // redirect to parent pool
+      else shapeIdToElId.delete(sId);
     }
   }
   // Pool→Lane parentage from Pool Member sections (V3 round-trip).
