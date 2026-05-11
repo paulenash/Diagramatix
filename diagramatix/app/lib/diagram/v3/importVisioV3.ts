@@ -1596,21 +1596,77 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
   // the natural "pool encloses its contents" affordance. Find the
   // SMALLEST containing classified container (lane preferred over pool)
   // for each non-container element.
+  //
+  // NESTED CONTAINERS: subprocess-expanded shapes can also be nested
+  // inside other subprocess-expanded shapes (and inside lanes/pools). We
+  // include them in the parentage loop — but exclude pools/lanes from
+  // being parented this way (they're handled by the pool/lane passes
+  // above and shouldn't ever sit "inside" something via geometry alone).
+  // For a subprocess-expanded to be a child, the parent must be STRICTLY
+  // larger; otherwise a shape can't be both the candidate and the parent.
   const CONTAINER_TYPES = new Set(["pool", "lane", "sublane", "subprocess-expanded", "group"]);
   const containerElements = elements.filter((e) => CONTAINER_TYPES.has(e.type));
   for (const el of elements) {
-    if (CONTAINER_TYPES.has(el.type)) continue;          // containers parented above
+    // Pools and lanes are parented by earlier dedicated passes — never
+    // reassign them here. Other container types (subprocess-expanded,
+    // group, sublane) ARE eligible for geometric nesting.
+    if (el.type === "pool" || el.type === "lane") continue;
     if (el.parentId) continue;                           // already set (e.g. by member section)
     const cx = el.x + el.width / 2;
     const cy = el.y + el.height / 2;
+    const elArea = el.width * el.height;
     let bestContainer: DiagramElement | null = null;
     let bestArea = Infinity;
     for (const c of containerElements) {
+      if (c.id === el.id) continue;                      // can't parent to self
       if (cx < c.x || cx > c.x + c.width || cy < c.y || cy > c.y + c.height) continue;
       const area = c.width * c.height;
+      if (area <= elArea) continue;                      // container must be strictly larger
       if (area < bestArea) { bestArea = area; bestContainer = c; }
     }
     if (bestContainer) el.parentId = bestContainer.id;
+  }
+
+  // EDGE-MOUNTED EVENT DETECTION — BPMN events (start/intermediate/end)
+  // positioned visually on a subprocess-expanded's boundary in Visio are
+  // not "glued" there in the .vsdx file; they're just placed near the
+  // edge. Diagramatix's boundary-event model uses `boundaryHostId` on
+  // the event to render it sitting on the host's edge. Detect this by
+  // looking for events whose CENTRE is within EDGE_TOL of one of the
+  // four edges of a subprocess-expanded (or subprocess) element, with
+  // the centre on the OPPOSITE axis inside the host's range. The first
+  // host within tolerance wins.
+  const BPMN_EVENT_TYPES = new Set(["start-event", "intermediate-event", "end-event"]);
+  const EDGE_TOL = 24;   // px — half of the default 36px event icon plus a few px slack
+  const boundaryCandidates = elements.filter(
+    (e) => e.type === "subprocess-expanded" || e.type === "subprocess",
+  );
+  for (const ev of elements) {
+    if (!BPMN_EVENT_TYPES.has(ev.type)) continue;
+    if (ev.boundaryHostId) continue;
+    const cx = ev.x + ev.width / 2;
+    const cy = ev.y + ev.height / 2;
+    let bestHost: DiagramElement | null = null;
+    let bestDist = Infinity;
+    for (const host of boundaryCandidates) {
+      if (host.id === ev.id) continue;
+      const left = host.x, right = host.x + host.width;
+      const top = host.y,  bottom = host.y + host.height;
+      const dL = Math.abs(cx - left),  inYL = cy >= top - EDGE_TOL && cy <= bottom + EDGE_TOL;
+      const dR = Math.abs(cx - right), inYR = inYL;
+      const dT = Math.abs(cy - top),   inXT = cx >= left - EDGE_TOL && cx <= right + EDGE_TOL;
+      const dB = Math.abs(cy - bottom),inXB = inXT;
+      // Closest edge distance, only if the event sits on that edge's span.
+      const candidates = [
+        inYL ? dL : Infinity,
+        inYR ? dR : Infinity,
+        inXT ? dT : Infinity,
+        inXB ? dB : Infinity,
+      ];
+      const d = Math.min(...candidates);
+      if (d <= EDGE_TOL && d < bestDist) { bestDist = d; bestHost = host; }
+    }
+    if (bestHost) ev.boundaryHostId = bestHost.id;
   }
 
   // LANE NORMALISATION — make every imported pool/lane structure look
@@ -1642,6 +1698,38 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
       pool.properties.poolHeaderWidth = POOL_HEADER_W;
     }
     pool.properties.poolType = pool.properties.poolType ?? "white-box";
+    // REPAIR pass — detect lanes whose height came from the WRONG source.
+    // The walker falls back to a nested sub-shape's height when the outer
+    // shape has no Height cell (typical for BPMN_M Pool/Lane master 2 used
+    // for the topmost lane). The nested sub-shape is the heading band
+    // (~0.5 inch / 50 px tall), NOT the lane body. Symptom: the top lane
+    // ends up disproportionately narrow after proportional scaling. Fix:
+    // any lane whose height is suspiciously small relative to the pool
+    // gets recomputed as the residue (pool height minus other lanes).
+    // Threshold: < 60 px AND less than 1/3 of avg sibling height OR less
+    // than 1/4 of pool height.
+    if (poolLanes.length >= 2) {
+      const totalRaw = poolLanes.reduce((s, e) => s + e.height, 0);
+      const avg = totalRaw / poolLanes.length;
+      const SUSPICIOUS_PX = 60;
+      const brokenIdxs: number[] = [];
+      for (let i = 0; i < poolLanes.length; i++) {
+        const h = poolLanes[i].height;
+        if (h < SUSPICIOUS_PX && (h < avg / 3 || h < pool.height / 4)) {
+          brokenIdxs.push(i);
+        }
+      }
+      // Only repair if SOME lanes have sensible heights — otherwise we
+      // have nothing to subtract from.
+      if (brokenIdxs.length > 0 && brokenIdxs.length < poolLanes.length) {
+        const goodTotal = poolLanes
+          .filter((_, i) => !brokenIdxs.includes(i))
+          .reduce((s, e) => s + e.height, 0);
+        const residue = Math.max(0, pool.height - goodTotal);
+        const perBroken = residue / brokenIdxs.length;
+        for (const i of brokenIdxs) poolLanes[i].height = perBroken;
+      }
+    }
     // Snap lane geometry & stack contiguously. Preserve relative heights:
     // total lane height should equal pool height exactly. Distribute any
     // rounding residue to the LAST lane.
