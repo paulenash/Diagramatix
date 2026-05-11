@@ -77,6 +77,7 @@ interface ElementSeed {
   multiplicity?: string;
   subprocessType?: string;
   repeatType?: "loop" | "mi-sequential" | "mi-parallel";
+  interruptionType?: "interrupting" | "non-interrupting";
 }
 
 type ConnectorBase = "sequence" | "messageBPMN" | "associationBPMN";
@@ -763,6 +764,17 @@ function classifyElement(nameU: string, props: Record<string, string>): ElementS
   if (props.BpmnEventType?.includes("Throwing")) seed.flowType = "throwing";
   else if (props.BpmnEventType?.includes("Catching")) seed.flowType = "catching";
 
+  // Visio's BpmnEventType carries the interruption mode in parentheses —
+  // e.g. "Start (Non-Interrupting)" or "Intermediate (Non-Interrupting)".
+  // Diagramatix represents this as `properties.interruptionType` (default
+  // "interrupting"). Applies to start-event and intermediate-event only.
+  if (
+    (seed.type === "start-event" || seed.type === "intermediate-event") &&
+    props.BpmnEventType?.includes("Non-Interrupting")
+  ) {
+    seed.interruptionType = "non-interrupting";
+  }
+
   if (seed.type === "data-object" && props.BpmnRole) {
     if (props.BpmnRole === "input" || props.BpmnRole === "output") {
       seed.role = props.BpmnRole;
@@ -1368,6 +1380,7 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
     if (r.seed.poolType) properties.poolType = r.seed.poolType;
     if (r.seed.role) properties.role = r.seed.role;
     if (r.seed.multiplicity) properties.multiplicity = r.seed.multiplicity;
+    if (r.seed.interruptionType) properties.interruptionType = r.seed.interruptionType;
     // Visio's "System Pool" master signals a system participant in BPMN —
     // surface that as the canvas's `isSystem` flag (Black-Box variant).
     if (r.nameU === "System Pool") properties.isSystem = true;
@@ -1667,6 +1680,22 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
       if (d <= EDGE_TOL && d < bestDist) { bestDist = d; bestHost = host; }
     }
     if (bestHost) ev.boundaryHostId = bestHost.id;
+  }
+
+  // Re-parent each boundary-mounted event from its HOST to the HOST'S parent.
+  // Reason: a boundary event straddles the host's edge — half its bbox sits
+  // OUTSIDE the host. If the event's parentId points at the host, then
+  // `ensureContainersEncloseChildren` in the reducer sees the event as a
+  // child overhanging the host's edge and grows the host's bbox on every
+  // child move (the user-reported "EP grows upwards" symptom). By moving
+  // the event to the HOST'S parent (typically the containing lane), the
+  // host's grow-to-fit logic no longer counts the event, and the lane
+  // contains it via geometry. boundaryHostId still drives the visual mount.
+  for (const ev of elements) {
+    if (!ev.boundaryHostId) continue;
+    const host = elements.find((e) => e.id === ev.boundaryHostId);
+    if (!host) continue;
+    ev.parentId = host.parentId;     // may be undefined for top-level hosts — fine
   }
 
   // LANE NORMALISATION — make every imported pool/lane structure look
