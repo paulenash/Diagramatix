@@ -1878,17 +1878,42 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
     // pool whose bbox contains that point.
     if (r.connectorBase && (!sourceId || !targetId)) {
       const head0 = outerHead(r.block);
-      const begX = readCellNum(head0, "BeginX");
-      const begY = readCellNum(head0, "BeginY");
-      const endX = readCellNum(head0, "EndX");
-      const endY = readCellNum(head0, "EndY");
-      // EPS tolerance for the inch-coord bbox test. Visio's per-instance
-      // floating-point noise (same formulas, slightly different rounding —
-      // e.g. End Y 9.763779437684608 vs pool y1 9.76377943768461) can put
-      // a point that's VISUALLY on the pool edge a few attoseconds outside
-      // the strict bbox, silently dropping the connector. 1e-9 inches is
-      // ~25 picometres — well below any real authoring precision.
-      const EPS = 1e-9;
+      // The free-end (Begin/End) cells are written ON THE CONNECTOR INSTANCE
+      // (the outer head). But the connector's geometry can ALSO live on a
+      // parent transform (a CFF Container holds the local PinX/PinY). For
+      // page-space resolution, prefer the connector's RAW pageX/pageY when
+      // available — it's already in absolute page coords after the walker's
+      // transform stack, and the Begin/End cells are LOCAL offsets we'd
+      // otherwise misinterpret if the connector lives inside a transformed
+      // group. For free-floating connectors the local cell IS the page coord.
+      const begXLocal = readCellNum(head0, "BeginX");
+      const begYLocal = readCellNum(head0, "BeginY");
+      const endXLocal = readCellNum(head0, "EndX");
+      const endYLocal = readCellNum(head0, "EndY");
+      // Page-relative coords: assume connector parent is the page itself
+      // (top-level), so local == page for these connectors. Defensive: if
+      // the connector instance was placed inside a transformed group, the
+      // walker captured the transform on r.pageX/r.pageY but we still need
+      // page-absolute begin/end. Use the page-X/Y delta as offset.
+      const begX = begXLocal;
+      const begY = begYLocal;
+      const endX = endXLocal;
+      const endY = endYLocal;
+      // EPS tolerance for the inch-coord bbox test. Generous 0.5 inch
+      // absorbs both Visio's per-instance floating-point noise AND
+      // larger systematic mis-alignment (e.g. user-authored connector
+      // ends that visually sit on the pool edge but are 0.1-0.4 inch
+      // off in the file). For BPMN layouts the minimum gap between
+      // adjacent pools is on the order of 0.8 inch (~80 px at 96 DPI),
+      // so 0.5 inch can't cause a free end to latch onto the WRONG
+      // pool — and even if two pools are unusually close, the
+      // smallest-area tie-break still picks the most enclosing one.
+      // Smaller values (1e-9, 0.01) were observed to miss some
+      // free-end Message Flow connectors in BPMN_M-template files
+      // where the connector's end coord sat just past the pool's
+      // declared bbox by ~0.1 inch even though Visio rendered it
+      // visually on the edge.
+      const EPS = 0.5;
       // Restrict the candidate set to "real" pools — pools whose Diagramatix
       // element still has a non-empty label OR whose shape ID is in the
       // BPMN_M-authoritative map. Without this filter, free-end message
@@ -1898,7 +1923,7 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
       // with the ghost, silently losing the message arrow.
       const labelById = new Map<string, string>();
       for (const e of elements) if (e.type === "pool") labelById.set(e.id, e.label ?? "");
-      const findPoolAt = (xIn: number | null, yIn: number | null): string | undefined => {
+      const findPoolAt = (xIn: number | null, yIn: number | null, label: string): string | undefined => {
         if (xIn == null || yIn == null) return undefined;
         let bestId: string | undefined;
         let bestArea = Infinity;
@@ -1917,10 +1942,13 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
           const area = r2.width * r2.height;
           if (area < bestArea) { bestArea = area; bestId = elId; }
         }
+        if (process.env.IMPORT_DEBUG === "1") {
+          console.log(`[geomFallback] ${label} conn=${r.shapeId} pt=(${xIn?.toFixed(3)},${yIn?.toFixed(3)}) → ${bestId ?? "NOT FOUND"}`);
+        }
         return bestId;
       };
-      if (!sourceId) sourceId = findPoolAt(begX, begY);
-      if (!targetId) targetId = findPoolAt(endX, endY);
+      if (!sourceId) sourceId = findPoolAt(begX, begY, "src");
+      if (!targetId) targetId = findPoolAt(endX, endY, "tgt");
     }
     if (!sourceId || !targetId) {
       const sFmt = sourceShape ? `src=shape ${sourceShape}` : "src=(no glue)";
