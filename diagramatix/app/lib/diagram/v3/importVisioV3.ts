@@ -2029,19 +2029,40 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
       // (LocPin-shifted unlabelled pool that gets dropped later by the
       // unlabelled-pool prune) — the prune then drops the connector along
       // with the ghost, silently losing the message arrow.
+      //
+      // Connector-type-aware candidate set:
+      //   • messageBPMN / associationBPMN free end → pools only (these
+      //     connectors typically attach at pool boundaries in BPMN).
+      //   • sequence free end → pools AND subprocess-expanded / subprocess
+      //     (sequence flows live inside a process and routinely attach to
+      //     a subprocess's edge without being formally glued in Visio —
+      //     concrete case: Customer Enquiry sequence 314, begin at
+      //     (6.6457, 5.858) = exactly on GP's right edge but no glue row,
+      //     so without subprocess candidates the begin fell through to
+      //     the enclosing Telstra pool and the connector appeared to
+      //     emerge from the pool instead of GP).
+      // Smallest-area tiebreak picks the most-specific container: GP
+      // wins over Telstra when both bboxes contain the point.
       const labelById = new Map<string, string>();
       for (const e of elements) if (e.type === "pool") labelById.set(e.id, e.label ?? "");
-      const findPoolAt = (xIn: number | null, yIn: number | null): string | undefined => {
+      const isSequence = r.connectorBase === "sequence";
+      const findContainerAt = (xIn: number | null, yIn: number | null): string | undefined => {
         if (xIn == null || yIn == null) return undefined;
         let bestId: string | undefined;
         let bestArea = Infinity;
         for (const r2 of raw) {
-          if (r2.seed?.type !== "pool") continue;
+          const t = r2.seed?.type;
+          if (!t) continue;
+          const isPool = t === "pool";
+          const isSubprocess = t === "subprocess-expanded" || t === "subprocess";
+          if (!isPool && !(isSequence && isSubprocess)) continue;
           const elId = shapeIdToElId.get(r2.shapeId);
           if (!elId) continue;
-          const isAuthoritative = bpmnMPoolByShapeId.has(r2.shapeId);
-          const lbl = labelById.get(elId) ?? "";
-          if (!isAuthoritative && !lbl.trim()) continue;   // skip ghost wrappers
+          if (isPool) {
+            const isAuthoritative = bpmnMPoolByShapeId.has(r2.shapeId);
+            const lbl = labelById.get(elId) ?? "";
+            if (!isAuthoritative && !lbl.trim()) continue;   // skip ghost wrappers
+          }
           const x1 = r2.pageX - r2.width / 2;
           const x2 = r2.pageX + r2.width / 2;
           const y1 = r2.pageY - r2.height / 2;
@@ -2052,8 +2073,25 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
         }
         return bestId;
       };
-      if (!sourceId) sourceId = findPoolAt(begX, begY);
-      if (!targetId) targetId = findPoolAt(endX, endY);
+      if (!sourceId) sourceId = findContainerAt(begX, begY);
+      if (!targetId) targetId = findContainerAt(endX, endY);
+    }
+    // Skip degenerate self-loops with zero geometric length. Visio
+    // occasionally leaves behind a sequence-flow shape with Begin == End
+    // and no glue — typically the residue of a deleted connector. The
+    // geometric fallback above resolves both endpoints to whatever
+    // shape's bbox contains that single point, producing a meaningless
+    // "X → X" arrow. Drop them silently.
+    if (sourceId && sourceId === targetId) {
+      const headSelfLoop = outerHead(r.block);
+      const bx = readCellNum(headSelfLoop, "BeginX");
+      const by = readCellNum(headSelfLoop, "BeginY");
+      const ex = readCellNum(headSelfLoop, "EndX");
+      const ey = readCellNum(headSelfLoop, "EndY");
+      if (bx != null && by != null && ex != null && ey != null
+          && Math.abs(bx - ex) < 1e-6 && Math.abs(by - ey) < 1e-6) {
+        continue;
+      }
     }
     if (!sourceId || !targetId) {
       const sFmt = sourceShape ? `src=shape ${sourceShape}` : "src=(no glue)";
