@@ -1824,13 +1824,22 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
     // or target, parse the connector's BegTrigger/EndTrigger formulas.
     // V3 export emits `F='_XFTRIGGER(Sheet.${shapeId}!EventXFMod)'` on
     // both cells; native Visio uses similar formulas when shapes are
-    // glued. Either way, the embedded `Sheet.N` reveals the linked shape.
+    // glued. The embedded `Sheet.N` either reveals the linked shape OR
+    // is a SELF-REFERENCE to the connector's own sheet — Visio writes a
+    // self-ref as a placeholder when the endpoint is NOT actually glued
+    // (free-floating). Filter self-references out, otherwise a free end
+    // gets a bogus targetId pointing at the connector itself, which then
+    // fails the element lookup ("target shape N not in element list") and
+    // the connector is silently skipped instead of falling through to the
+    // geometric fallback. Concrete case: `Application Process.vsdx`
+    // shape 107 EndTrigger = `Sheet.107!…` (self-ref), shape 1039
+    // BegTrigger = `Sheet.1039!…` (self-ref) — both correctly free-end.
     if (!ends?.source || !ends?.target) {
       const begCell = r.block.match(/<Cell\s+N='BegTrigger'[^>]*F='[^']*Sheet\.(\d+)/);
       const endCell = r.block.match(/<Cell\s+N='EndTrigger'[^>]*F='[^']*Sheet\.(\d+)/);
       const next = { ...(ends ?? {}) };
-      if (!next.source && begCell) next.source = begCell[1];
-      if (!next.target && endCell) next.target = endCell[1];
+      if (!next.source && begCell && begCell[1] !== r.shapeId) next.source = begCell[1];
+      if (!next.target && endCell && endCell[1] !== r.shapeId) next.target = endCell[1];
       ends = next;
     }
     const sourceShape = ends?.source;
