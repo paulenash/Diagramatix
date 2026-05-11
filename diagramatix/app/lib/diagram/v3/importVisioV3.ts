@@ -937,8 +937,26 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
       continue;
     }
 
-    const connectorBase = isConnectorMaster(nameU);
-    const seed = connectorBase ? null : classifyElement(nameU, props);
+    let connectorBase = isConnectorMaster(nameU);
+    let seed = connectorBase ? null : classifyElement(nameU, props);
+
+    // FALLBACK to master NameU when the inline NameU was used (via
+    // IsCustomNameU='1') but didn't classify. V3 round-trip writes the
+    // shape's NameU as the user-visible LABEL (e.g. "General Process",
+    // "Email Arrives") and marks IsCustomNameU='1' — the master still
+    // carries the right BPMN type (Sub-Process, Start Event…). Without
+    // this fallback, every shape from a V3-exported .vsdx skips because
+    // its label isn't a recognised BPMN type name. The fallback only
+    // fires when the inline route was actually taken AND it failed, so
+    // the legitimate user-rename case (e.g. "Dynamic Connector" master →
+    // user-renamed to "Sequence Flow") still wins.
+    if (!connectorBase && !seed && isCustomInline && masterInfo?.nameU) {
+      const masterNameU = normaliseNameU(masterInfo.nameU);
+      if (masterNameU && masterNameU !== nameU) {
+        connectorBase = isConnectorMaster(masterNameU);
+        seed = connectorBase ? null : classifyElement(masterNameU, props);
+      }
+    }
 
     if (!connectorBase && !seed) {
       recordMaster(masterId, nameU, "skipped");
