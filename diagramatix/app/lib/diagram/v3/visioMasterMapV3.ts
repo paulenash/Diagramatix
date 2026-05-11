@@ -1,37 +1,19 @@
 /**
  * V3 Visio Export — Maps Diagramatix BPMN elements to master IDs.
- * Uses template masters where available, BPMN_M masters (added with IDs 100+) for the rest.
- * Independent fork of the V2 mapping — modify freely.
+ *
+ * Master IDs are NOT hard-coded any more: they come from a `StencilProfile`
+ * passed in by the caller. This lets the same mapping logic produce
+ * exports for either the BPMN_M-flavoured template (Microsoft's standard
+ * stencil layout) or the Diagramatix v1.4 stencil flavour — same shape
+ * properties, just different master ID targets.
  */
 import type { DiagramElement, Connector } from "../types";
+import type { StencilProfile } from "./stencilProfile";
 
 interface MasterMapping {
   masterId: number;
   properties: Record<string, string>;
 }
-
-// Template masters (original) + BPMN_M masters (added with IDs 100+)
-// Note: Template "Start Event" (8) and "End Event" (15) are Phase markers,
-// NOT BPMN events. Use BPMN_M Start Event (7→107) and End Event (6→106) instead.
-const MASTER = {
-  // From template
-  TASK: 9,
-  COLLAPSED_SUBPROCESS: 33,
-  POOL_LANE: 19,
-  MESSAGE_FLOW: 24,
-  // From BPMN_M (added to template with new IDs)
-  START_EVENT: 107,
-  END_EVENT: 106,
-  GATEWAY: 104,
-  INTERMEDIATE_EVENT: 105,
-  SEQUENCE_FLOW: 111,
-  ASSOCIATION: 112,
-  DATA_OBJECT: 115,
-  DATA_STORE: 116,
-  TEXT_ANNOTATION: 110,
-  GROUP: 117,
-  EXPANDED_SUBPROCESS: 33,
-} as const;
 
 // Task type mapping
 const TASK_TYPE_MAP: Record<string, string> = {
@@ -58,8 +40,8 @@ const EVENT_TYPE_MAP: Record<string, string> = {
   "escalation": "Escalation", "cancel": "Cancel", "compensation": "Compensation", "link": "Link",
 };
 
-export function getElementMappingV3(el: DiagramElement): MasterMapping | null {
-  const mapping = getElementMappingV3Inner(el);
+export function getElementMappingV3(el: DiagramElement, profile: StencilProfile): MasterMapping | null {
+  const mapping = getElementMappingV3Inner(el, profile);
   if (!mapping) return null;
   // Round-trip metadata: stash the Diagramatix element ID into BpmnId so
   // re-import can recover the original ID. Visio treats unknown Bpmn props
@@ -80,11 +62,12 @@ export function getElementMappingV3(el: DiagramElement): MasterMapping | null {
   return mapping;
 }
 
-function getElementMappingV3Inner(el: DiagramElement): MasterMapping | null {
+function getElementMappingV3Inner(el: DiagramElement, profile: StencilProfile): MasterMapping | null {
+  const m = profile.masterIds;
   switch (el.type) {
     case "task":
       return {
-        masterId: MASTER.TASK,
+        masterId: m.task,
         properties: {
           BpmnActivityType: "Task",
           BpmnTaskType: TASK_TYPE_MAP[el.taskType ?? "none"] ?? "None",
@@ -100,14 +83,14 @@ function getElementMappingV3Inner(el: DiagramElement): MasterMapping | null {
       };
       if (gwInfo.exclusive) gwProps.BpmnExclusiveType = gwInfo.exclusive;
       if (gwInfo.marker) gwProps.BpmnMarkerVisible = "1";  // BOOL: 1=true
-      return { masterId: MASTER.GATEWAY, properties: gwProps };
+      return { masterId: m.gateway, properties: gwProps };
     }
 
     case "start-event": {
       const ni = (el.properties as Record<string, unknown> | undefined)
         ?.interruptionType === "non-interrupting";
       return {
-        masterId: MASTER.START_EVENT,
+        masterId: m.startEvent,
         properties: {
           BpmnEventType: ni ? "Start (Non-Interrupting)" : "Start",
           BpmnTriggerOrResult: EVENT_TYPE_MAP[el.eventType ?? "none"] ?? "None",
@@ -126,7 +109,7 @@ function getElementMappingV3Inner(el: DiagramElement): MasterMapping | null {
         ? "Intermediate (Non-Interrupting)"
         : "Intermediate";
       return {
-        masterId: MASTER.INTERMEDIATE_EVENT,
+        masterId: m.intermediateEvent,
         properties: {
           BpmnEventType: bpmnType,
           BpmnTriggerOrResult: EVENT_TYPE_MAP[el.eventType ?? "none"] ?? "None",
@@ -137,7 +120,7 @@ function getElementMappingV3Inner(el: DiagramElement): MasterMapping | null {
 
     case "end-event":
       return {
-        masterId: MASTER.END_EVENT,
+        masterId: m.endEvent,
         properties: {
           BpmnEventType: "End",
           BpmnTriggerOrResult: EVENT_TYPE_MAP[el.eventType ?? "none"] ?? "None",
@@ -157,9 +140,7 @@ function getElementMappingV3Inner(el: DiagramElement): MasterMapping | null {
         ?.subprocessType as string | undefined;
       const boundary = SUB_TYPE_TO_BOUNDARY[subType ?? "normal"] ?? "Default";
       return {
-        masterId: el.type === "subprocess"
-          ? MASTER.COLLAPSED_SUBPROCESS
-          : MASTER.EXPANDED_SUBPROCESS,
+        masterId: el.type === "subprocess" ? m.collapsedSubprocess : m.expandedSubprocess,
         properties: {
           BpmnActivityType: "Sub-Process",
           BpmnBoundaryType: boundary,
@@ -171,37 +152,38 @@ function getElementMappingV3Inner(el: DiagramElement): MasterMapping | null {
     }
 
     case "pool":
-      return { masterId: MASTER.POOL_LANE, properties: { BpmnName: el.label ?? "Pool" } };
+      return { masterId: m.poolLane, properties: { BpmnName: el.label ?? "Pool" } };
 
     case "lane":
-      return { masterId: MASTER.POOL_LANE, properties: { BpmnName: el.label ?? "Lane" } };
+      return { masterId: m.poolLane, properties: { BpmnName: el.label ?? "Lane" } };
 
     case "data-object":
-      return { masterId: MASTER.DATA_OBJECT, properties: {} };
+      return { masterId: m.dataObject, properties: {} };
 
     case "data-store":
-      return { masterId: MASTER.DATA_STORE, properties: {} };
+      return { masterId: m.dataStore, properties: {} };
 
     case "text-annotation":
-      return { masterId: MASTER.TEXT_ANNOTATION, properties: {} };
+      return { masterId: m.textAnnotation, properties: {} };
 
     case "group":
-      return { masterId: MASTER.GROUP, properties: {} };
+      return { masterId: m.group, properties: {} };
 
     default:
       return null;
   }
 }
 
-export function getConnectorMappingV3(conn: Connector): MasterMapping {
+export function getConnectorMappingV3(conn: Connector, profile: StencilProfile): MasterMapping {
+  const m = profile.masterIds;
   switch (conn.type) {
     case "sequence":
-      return { masterId: MASTER.SEQUENCE_FLOW, properties: {} };
+      return { masterId: m.sequenceFlow, properties: {} };
     case "messageBPMN":
-      return { masterId: MASTER.MESSAGE_FLOW, properties: {} };
+      return { masterId: m.messageFlow, properties: {} };
     case "associationBPMN":
-      return { masterId: MASTER.ASSOCIATION, properties: {} };
+      return { masterId: m.association, properties: {} };
     default:
-      return { masterId: MASTER.SEQUENCE_FLOW, properties: {} };
+      return { masterId: m.sequenceFlow, properties: {} };
   }
 }

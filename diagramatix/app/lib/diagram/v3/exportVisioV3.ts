@@ -7,6 +7,8 @@
 import JSZip from "jszip";
 import type { DiagramData } from "../types";
 import { getElementMappingV3, getConnectorMappingV3 } from "./visioMasterMapV3";
+import { DEFAULT_PROFILE } from "./stencilProfile";
+import type { StencilProfile } from "./stencilProfile";
 import { DEFAULT_SYMBOL_COLORS } from "../colors";
 import type { SymbolColorConfig } from "../colors";
 import { randomUUID } from "node:crypto";
@@ -58,7 +60,8 @@ export async function exportVisioV3(
   stencilBuffer: ArrayBuffer,
   templateBuffer: ArrayBuffer,
   displayMode: string = "normal",
-  colorConfig?: SymbolColorConfig
+  colorConfig?: SymbolColorConfig,
+  profile: StencilProfile = DEFAULT_PROFILE,
 ): Promise<Uint8Array> {
   const base = await JSZip.loadAsync(templateBuffer);
   const bpmnM = await JSZip.loadAsync(stencilBuffer);
@@ -119,21 +122,13 @@ export async function exportVisioV3(
   let mastersRels = await base.file("visio/masters/_rels/masters.xml.rels")!.async("string");
   let contentTypes = await base.file("[Content_Types].xml")!.async("string");
 
-  // Masters to add from BPMN_M (original ID → new ID in our file)
-  // Note: Template "Start Event" (8) and "End Event" (15) are Phase markers,
-  // not BPMN events. We import the real BPMN events from BPMN_M.
-  const mastersToAdd: Array<{ origId: number; newId: number; name: string }> = [
-    { origId: 4,  newId: 104, name: "Gateway" },
-    { origId: 5,  newId: 105, name: "Intermediate Event" },
-    { origId: 6,  newId: 106, name: "End Event" },
-    { origId: 7,  newId: 107, name: "Start Event" },
-    { origId: 10, newId: 110, name: "Text Annotation" },
-    { origId: 11, newId: 111, name: "Sequence Flow" },
-    { origId: 12, newId: 112, name: "Association" },
-    { origId: 15, newId: 115, name: "Data Object" },
-    { origId: 16, newId: 116, name: "Data Store" },
-    { origId: 17, newId: 117, name: "Group" },
-  ];
+  // Masters to add from the auxiliary stencil (original ID → new ID in
+  // our file). Comes from the active profile.
+  //
+  // Note for BPMN_M: Template "Start Event" (8) and "End Event" (15) are
+  // Phase markers, not BPMN events. We import the real BPMN events from
+  // the BPMN_M stencil.
+  const mastersToAdd = profile.mastersToAdd;
 
   let nextRId = 50;
   let nextFileNum = 50;
@@ -1414,7 +1409,7 @@ export async function exportVisioV3(
   // typically come before their Lanes in the iteration order) wouldn't
   // know the Lane IDs yet.
   for (const el of data.elements) {
-    const m = getElementMappingV3(el);
+    const m = getElementMappingV3(el, profile);
     if (!m) continue;
     elIdToShapeId.set(el.id, nextId);
     nextId += 100;
@@ -1509,7 +1504,7 @@ export async function exportVisioV3(
   ]);
 
   for (const el of data.elements) {
-    const mapping = getElementMappingV3(el);
+    const mapping = getElementMappingV3(el, profile);
     if (!mapping) continue;
 
     const shapeId = nextId;
@@ -2213,7 +2208,7 @@ export async function exportVisioV3(
 
   // ── Step 4: Connectors ──
   for (const conn of data.connectors) {
-    const mapping = getConnectorMappingV3(conn);
+    const mapping = getConnectorMappingV3(conn, profile);
     const shapeId = nextId;
     nextId += 100;
 
