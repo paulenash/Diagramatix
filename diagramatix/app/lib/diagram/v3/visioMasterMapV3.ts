@@ -161,8 +161,10 @@ function getElementMappingV3Inner(el: DiagramElement): MasterMapping | null {
           ? MASTER.COLLAPSED_SUBPROCESS
           : MASTER.EXPANDED_SUBPROCESS,
         properties: {
+          BpmnActivityType: "Sub-Process",
           BpmnBoundaryType: boundary,
           BpmnLoopType: el.repeatType === "loop" ? "Standard" : "None",
+          BpmnIsCollapsed: el.type === "subprocess" ? "1" : "0",
           BpmnName: el.label ?? "",
         },
       };

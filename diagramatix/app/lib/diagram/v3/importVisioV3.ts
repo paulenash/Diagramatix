@@ -735,6 +735,18 @@ function classifyElement(nameU: string, props: Record<string, string>): ElementS
   if (seed.type === "task" && props.BpmnActivityType === "Sub-Process") {
     seed.type = props.BpmnIsCollapsed === "1" ? "subprocess" : "subprocess-expanded";
   }
+  // V3 round-trip: the export uses the same template master (33,
+  // "Collapsed Sub-Process") for BOTH collapsed and expanded SPs — so
+  // every subprocess initially classifies as "subprocess" (collapsed)
+  // via the master NameU. The BpmnIsCollapsed property is the
+  // authoritative discriminator; flip to subprocess-expanded when it's
+  // explicitly "0". (Empty/missing keeps whatever the master indicated.)
+  if (
+    (seed.type === "subprocess" || seed.type === "subprocess-expanded") &&
+    props.BpmnIsCollapsed != null && props.BpmnIsCollapsed !== ""
+  ) {
+    seed.type = props.BpmnIsCollapsed === "1" ? "subprocess" : "subprocess-expanded";
+  }
 
   // BpmnLoopType → Diagramatix repeatType. Visio's BPMN_M template stores
   // the loop / multi-instance variant as a separate property; the marker
