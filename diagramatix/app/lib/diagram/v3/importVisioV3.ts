@@ -1899,21 +1899,12 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
       const begY = begYLocal;
       const endX = endXLocal;
       const endY = endYLocal;
-      // EPS tolerance for the inch-coord bbox test. Generous 0.5 inch
-      // absorbs both Visio's per-instance floating-point noise AND
-      // larger systematic mis-alignment (e.g. user-authored connector
-      // ends that visually sit on the pool edge but are 0.1-0.4 inch
-      // off in the file). For BPMN layouts the minimum gap between
-      // adjacent pools is on the order of 0.8 inch (~80 px at 96 DPI),
-      // so 0.5 inch can't cause a free end to latch onto the WRONG
-      // pool — and even if two pools are unusually close, the
-      // smallest-area tie-break still picks the most enclosing one.
-      // Smaller values (1e-9, 0.01) were observed to miss some
-      // free-end Message Flow connectors in BPMN_M-template files
-      // where the connector's end coord sat just past the pool's
-      // declared bbox by ~0.1 inch even though Visio rendered it
-      // visually on the edge.
-      const EPS = 0.5;
+      // EPS tolerance for the inch-coord bbox test. 0.05 inch ≈ 5 px
+      // at 96 DPI — absorbs float noise and the small visual gap that
+      // sometimes exists between a Visio connector end and the pool
+      // edge it "lit up" against without actually gluing. Larger
+      // values risk a free end latching onto a neighbouring pool.
+      const EPS = 0.05;
       // Restrict the candidate set to "real" pools — pools whose Diagramatix
       // element still has a non-empty label OR whose shape ID is in the
       // BPMN_M-authoritative map. Without this filter, free-end message
@@ -1923,7 +1914,7 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
       // with the ghost, silently losing the message arrow.
       const labelById = new Map<string, string>();
       for (const e of elements) if (e.type === "pool") labelById.set(e.id, e.label ?? "");
-      const findPoolAt = (xIn: number | null, yIn: number | null, label: string): string | undefined => {
+      const findPoolAt = (xIn: number | null, yIn: number | null): string | undefined => {
         if (xIn == null || yIn == null) return undefined;
         let bestId: string | undefined;
         let bestArea = Infinity;
@@ -1942,13 +1933,10 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
           const area = r2.width * r2.height;
           if (area < bestArea) { bestArea = area; bestId = elId; }
         }
-        if (process.env.IMPORT_DEBUG === "1") {
-          console.log(`[geomFallback] ${label} conn=${r.shapeId} pt=(${xIn?.toFixed(3)},${yIn?.toFixed(3)}) → ${bestId ?? "NOT FOUND"}`);
-        }
         return bestId;
       };
-      if (!sourceId) sourceId = findPoolAt(begX, begY, "src");
-      if (!targetId) targetId = findPoolAt(endX, endY, "tgt");
+      if (!sourceId) sourceId = findPoolAt(begX, begY);
+      if (!targetId) targetId = findPoolAt(endX, endY);
     }
     if (!sourceId || !targetId) {
       const sFmt = sourceShape ? `src=shape ${sourceShape}` : "src=(no glue)";
