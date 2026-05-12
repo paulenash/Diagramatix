@@ -1321,7 +1321,17 @@ function PoolShape({ el }: { el: DiagramElement }) {
         style={isWhiteBox ? { cursor: "pointer" } : undefined} />
       <text textAnchor="middle" fontSize={fontSize} fill="#3b1a08" fontWeight="bold"
             transform={`rotate(-90,${cx},${cy})`}
-            style={{ userSelect: "none", pointerEvents: "none" }}>
+            textRendering="geometricPrecision"
+            style={{
+              userSelect: "none",
+              pointerEvents: "none",
+              fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
+              // Force the browser onto its high-quality SVG text path —
+              // without this, rotated text frequently grabs the cheap
+              // "optimizeSpeed" rasteriser and looks visibly fuzzy.
+              WebkitFontSmoothing: "antialiased",
+              MozOsxFontSmoothing: "grayscale",
+            }}>
         {lines.map((line, i) => (
           <tspan key={i} x={cx} y={cy + (i - (lines.length - 1) / 2) * lineH}>{line}</tspan>
         ))}
@@ -1363,7 +1373,14 @@ function LaneShape({ el, isSublane }: { el: DiagramElement; isSublane?: boolean 
       <rect x={x} y={y} width={LW} height={h} fill={headerFill} stroke="#374151" strokeWidth={1} />
       <text textAnchor="middle" fontSize={fontSize} fill="#3b1a08" fontWeight="bold"
             transform={`rotate(-90,${cx},${cy})`}
-            style={{ userSelect: "none", pointerEvents: "none" }}>
+            textRendering="geometricPrecision"
+            style={{
+              userSelect: "none",
+              pointerEvents: "none",
+              fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
+              WebkitFontSmoothing: "antialiased",
+              MozOsxFontSmoothing: "grayscale",
+            }}>
         {lines.map((line, i) => (
           <tspan key={i} x={cx} y={cy + (i - (lines.length - 1) / 2) * lineH}>{line}</tspan>
         ))}

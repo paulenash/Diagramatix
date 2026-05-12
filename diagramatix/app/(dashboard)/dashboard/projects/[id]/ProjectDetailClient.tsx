@@ -384,6 +384,9 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
   // Renamed: this menu now also handles imports, so it's a generic File menu.
   const [showFileMenu, setShowFileMenu] = useState(false);
   const fileMenuRef = useRef<HTMLDivElement>(null);
+  // "Project ▾" dropdown: groups Project Configuration + Scan together.
+  const [showProjectMenu, setShowProjectMenu] = useState(false);
+  const projectMenuRef = useRef<HTMLDivElement>(null);
 
   // Scan Diagrams for Errors — three checks per diagram:
   //   1. sequence / association connectors on a Pool or Lane
@@ -409,6 +412,14 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
     laneId: string;
     laneName: string;
   }
+  interface ScanHangingMessage {
+    connectorId: string;
+    sourceName: string;
+    sourceType: string;
+    targetName: string;
+    targetType: string;
+    reason: string;
+  }
   interface ScanDiagram {
     diagramId: string;
     diagramName: string;
@@ -416,12 +427,14 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
     badConnectors: ScanConnectorIssue[];
     duplicateNames: ScanDuplicateName[];
     singleLanePools: ScanSingleLanePool[];
+    hangingMessages: ScanHangingMessage[];
   }
   interface ScanResult {
     diagrams: ScanDiagram[];
     totalBadConnectors: number;
     totalDuplicateGroups: number;
     totalSingleLanePools: number;
+    totalHangingMessages: number;
   }
   const [scanBusy, setScanBusy] = useState(false);
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
@@ -440,7 +453,9 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
       } else {
         const data = await res.json();
         setScanResult(data);
-        setScanExpanded(new Set());
+        // Auto-expand every diagram so the user immediately sees the
+        // issues without having to click the ▶ on each row.
+        setScanExpanded(new Set(data.diagrams.map((x: { diagramId: string }) => x.diagramId)));
       }
     } catch (err) {
       setScanError(err instanceof Error ? err.message : "Network error");
@@ -584,6 +599,15 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
     if (showFileMenu) document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, [showFileMenu]);
+
+  // Close Project menu on click outside
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (projectMenuRef.current && !projectMenuRef.current.contains(e.target as Node)) setShowProjectMenu(false);
+    }
+    if (showProjectMenu) document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [showProjectMenu]);
 
   // Get ordered diagrams in a specific folder
   function getOrderedDiagramsInFolder(folderId: string): DiagramSummary[] {
@@ -1689,12 +1713,35 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
           )}
           {version ? <span className="text-[10px] text-gray-400">v{SCHEMA_VERSION}.{version}</span> : null}
           {!readOnly && (
-            <button
-              onClick={() => setShowMaintenance(true)}
-              className="px-3 py-1 text-xs font-medium text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50"
-            >
-              Project Config
-            </button>
+            <div className="relative" ref={projectMenuRef}>
+              <button
+                onClick={() => setShowProjectMenu((v) => !v)}
+                className="px-3 py-1 text-xs font-medium text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50"
+              >
+                Project ▾
+              </button>
+              {showProjectMenu && (
+                <div className="absolute left-0 top-full mt-1 w-56 bg-white border border-gray-200 rounded shadow-lg z-50 py-1">
+                  <button
+                    className="block w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100"
+                    onClick={() => { setShowProjectMenu(false); setShowMaintenance(true); }}
+                  >
+                    Configuration
+                  </button>
+                  <button
+                    className="block w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+                    disabled={scanBusy}
+                    onClick={() => {
+                      setShowProjectMenu(false);
+                      handleScanPoolConnectors();
+                    }}
+                    title="Scan every diagram in this project for sequence/association connectors on a Pool/Lane, duplicate Pool/Lane names, Pools with a single Lane, and hanging messages (red on canvas)."
+                  >
+                    {scanBusy ? "Scanning…" : "Scan Diagrams for Errors"}
+                  </button>
+                </div>
+              )}
+            </div>
           )}
           {!readOnly && (
             <>
@@ -1815,18 +1862,6 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
                     >
                       Export Visio Stencil
                     </a>
-                    <div className="border-t border-gray-100" />
-                    <button
-                      className="block w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100 disabled:opacity-50"
-                      disabled={scanBusy}
-                      onClick={() => {
-                        setShowFileMenu(false);
-                        handleScanPoolConnectors();
-                      }}
-                      title="Scan every diagram in this project for: sequence/association connectors on a Pool or Lane; duplicate Pool/Lane names; Pools with exactly one Lane"
-                    >
-                      {scanBusy ? "Scanning…" : "Scan Diagrams for Errors"}
-                    </button>
                   </div>
                 )}
               </div>
@@ -2309,32 +2344,38 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
               <p className="mb-3 text-sm text-red-600 bg-red-50 px-3 py-2 rounded">{scanError}</p>
             )}
             {scanResult && (() => {
-              const total = scanResult.totalBadConnectors + scanResult.totalDuplicateGroups + scanResult.totalSingleLanePools;
+              const total =
+                scanResult.totalBadConnectors +
+                scanResult.totalDuplicateGroups +
+                scanResult.totalSingleLanePools +
+                scanResult.totalHangingMessages;
               if (total === 0) {
                 return (
                   <p className="text-sm text-gray-600">No errors found across this project&apos;s diagrams.</p>
                 );
               }
+              const summaryParts: string[] = [];
+              if (scanResult.totalBadConnectors > 0)
+                summaryParts.push(`${scanResult.totalBadConnectors} sequence/association on Pool/Lane`);
+              if (scanResult.totalDuplicateGroups > 0)
+                summaryParts.push(`${scanResult.totalDuplicateGroups} duplicate Pool/Lane name${scanResult.totalDuplicateGroups === 1 ? "" : "s"}`);
+              if (scanResult.totalSingleLanePools > 0)
+                summaryParts.push(`${scanResult.totalSingleLanePools} Pool${scanResult.totalSingleLanePools === 1 ? "" : "s"} with a single Lane`);
+              if (scanResult.totalHangingMessages > 0)
+                summaryParts.push(`${scanResult.totalHangingMessages} hanging message${scanResult.totalHangingMessages === 1 ? "" : "s"}`);
               return (
                 <>
                   <p className="text-xs text-gray-600 mb-3">
-                    Found {scanResult.totalBadConnectors > 0 && (
-                      <><strong>{scanResult.totalBadConnectors}</strong> sequence/association connector{scanResult.totalBadConnectors === 1 ? "" : "s"} on a Pool/Lane</>
-                    )}
-                    {scanResult.totalBadConnectors > 0 && (scanResult.totalDuplicateGroups > 0 || scanResult.totalSingleLanePools > 0) && ", "}
-                    {scanResult.totalDuplicateGroups > 0 && (
-                      <><strong>{scanResult.totalDuplicateGroups}</strong> duplicate Pool/Lane name{scanResult.totalDuplicateGroups === 1 ? "" : "s"}</>
-                    )}
-                    {scanResult.totalDuplicateGroups > 0 && scanResult.totalSingleLanePools > 0 && ", "}
-                    {scanResult.totalSingleLanePools > 0 && (
-                      <><strong>{scanResult.totalSingleLanePools}</strong> Pool{scanResult.totalSingleLanePools === 1 ? "" : "s"} with a single Lane</>
-                    )}
-                    {" "}across <strong>{scanResult.diagrams.length}</strong> diagram{scanResult.diagrams.length === 1 ? "" : "s"}. Click a diagram name to open it.
+                    Found <strong>{summaryParts.join(", ")}</strong> across <strong>{scanResult.diagrams.length}</strong> diagram{scanResult.diagrams.length === 1 ? "" : "s"}. Click a diagram name to open it.
                   </p>
                   <div className="border border-gray-200 rounded max-h-[60vh] overflow-y-auto">
                     {scanResult.diagrams.map((d) => {
                       const open = scanExpanded.has(d.diagramId);
-                      const issueCount = d.badConnectors.length + d.duplicateNames.length + d.singleLanePools.length;
+                      const issueCount =
+                        d.badConnectors.length +
+                        d.duplicateNames.length +
+                        d.singleLanePools.length +
+                        d.hangingMessages.length;
                       return (
                         <div key={d.diagramId} className="border-b border-gray-100 last:border-b-0">
                           <div className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50">
@@ -2406,6 +2447,21 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
                                         <span className="text-red-600 font-medium">{sl.poolName || "(unnamed pool)"}</span>
                                         <span className="text-gray-400">contains lane</span>
                                         <span className="text-gray-700">{sl.laneName || "(unnamed lane)"}</span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+                              {d.hangingMessages.length > 0 && (
+                                <div>
+                                  <p className="text-[10px] uppercase tracking-wide text-gray-400 mb-0.5">Hanging messages (red on canvas)</p>
+                                  <ul className="text-[11px] text-gray-700 space-y-0.5">
+                                    {d.hangingMessages.map((hm) => (
+                                      <li key={hm.connectorId} className="flex items-center gap-2 flex-wrap">
+                                        <span className="text-red-600 font-medium">{hm.sourceName} <span className="text-gray-400">[{hm.sourceType}]</span></span>
+                                        <span className="text-gray-400">→</span>
+                                        <span className="text-red-600 font-medium">{hm.targetName} <span className="text-gray-400">[{hm.targetType}]</span></span>
+                                        <span className="text-gray-500 text-[10px] italic">({hm.reason})</span>
                                       </li>
                                     ))}
                                   </ul>

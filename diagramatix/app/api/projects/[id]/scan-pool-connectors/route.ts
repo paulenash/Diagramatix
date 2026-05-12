@@ -29,6 +29,15 @@ interface SingleLanePoolIssue {
   laneName: string;
 }
 
+interface HangingMessageIssue {
+  connectorId: string;
+  sourceName: string;
+  sourceType: string;
+  targetName: string;
+  targetType: string;
+  reason: string;
+}
+
 interface DiagramIssue {
   diagramId: string;
   diagramName: string;
@@ -36,6 +45,7 @@ interface DiagramIssue {
   badConnectors: ConnectorIssue[];
   duplicateNames: DuplicateNameIssue[];
   singleLanePools: SingleLanePoolIssue[];
+  hangingMessages: HangingMessageIssue[];
 }
 
 /**
@@ -96,11 +106,16 @@ export async function GET(_req: Request, { params }: Params) {
   let totalBadConnectors = 0;
   let totalDuplicateGroups = 0;
   let totalSingleLanePools = 0;
+  let totalHangingMessages = 0;
 
   for (const d of diagrams) {
     const data = (d.data as Record<string, unknown> | null) ?? null;
     if (!data) continue;
-    type ElementLite = { id: string; type: string; label?: string; parentId?: string };
+    type ElementLite = {
+      id: string; type: string; label?: string; parentId?: string;
+      x?: number; y?: number; width?: number; height?: number;
+      properties?: { poolType?: string };
+    };
     const elements = (data.elements as ElementLite[] | undefined) ?? [];
     const connectors = (data.connectors as Array<{ id: string; type?: string; sourceId: string; targetId: string }> | undefined) ?? [];
 
@@ -184,7 +199,51 @@ export async function GET(_req: Request, { params }: Params) {
       });
     }
 
-    if (connectorIssues.length === 0 && duplicateNames.length === 0 && singleLanePools.length === 0) continue;
+    // ── Hanging Messages (messageBPMN connectors rendered red on canvas) ──
+    // Canvas.tsx flags a messageBPMN connector as "misaligned" (and renders
+    // it red) when either endpoint is a WHITE-BOX pool OR the source and
+    // target shapes have no x-axis overlap. Replicate both rules here so
+    // the project-wide scan surfaces every red message arrow.
+    const hangingMessages: HangingMessageIssue[] = [];
+    for (const c of connectors) {
+      if ((c.type ?? "") !== "messageBPMN") continue;
+      const src = byId.get(c.sourceId);
+      const tgt = byId.get(c.targetId);
+      if (!src || !tgt) continue;
+      const srcIsWhitePool =
+        src.type === "pool" && (src.properties?.poolType ?? "") === "white-box";
+      const tgtIsWhitePool =
+        tgt.type === "pool" && (tgt.properties?.poolType ?? "") === "white-box";
+      let reason = "";
+      if (srcIsWhitePool || tgtIsWhitePool) {
+        reason = "message touches white-box pool";
+      } else if (
+        typeof src.x === "number" && typeof src.width === "number" &&
+        typeof tgt.x === "number" && typeof tgt.width === "number"
+      ) {
+        const overlapMax = Math.min(src.x + src.width, tgt.x + tgt.width);
+        const overlapMin = Math.max(src.x, tgt.x);
+        if (overlapMax <= overlapMin) {
+          reason = "no x-axis overlap between source and target";
+        }
+      }
+      if (!reason) continue;
+      hangingMessages.push({
+        connectorId: c.id,
+        sourceName: src.label ?? src.type,
+        sourceType: src.type,
+        targetName: tgt.label ?? tgt.type,
+        targetType: tgt.type,
+        reason,
+      });
+    }
+
+    if (
+      connectorIssues.length === 0 &&
+      duplicateNames.length === 0 &&
+      singleLanePools.length === 0 &&
+      hangingMessages.length === 0
+    ) continue;
     result.push({
       diagramId: d.id,
       diagramName: d.name,
@@ -192,10 +251,12 @@ export async function GET(_req: Request, { params }: Params) {
       badConnectors: connectorIssues,
       duplicateNames,
       singleLanePools,
+      hangingMessages,
     });
     totalBadConnectors += connectorIssues.length;
     totalDuplicateGroups += duplicateNames.length;
     totalSingleLanePools += singleLanePools.length;
+    totalHangingMessages += hangingMessages.length;
   }
 
   return NextResponse.json({
@@ -203,6 +264,7 @@ export async function GET(_req: Request, { params }: Params) {
     totalBadConnectors,
     totalDuplicateGroups,
     totalSingleLanePools,
+    totalHangingMessages,
     // Legacy field name kept for compatibility with the existing UI.
     totalBad: totalBadConnectors,
   });
