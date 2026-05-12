@@ -79,17 +79,18 @@ export function getDefaultSize(type: AutosizeType): { w: number; h: number } {
     : { w: SUBPROCESS_DEFAULT_W, h: SUBPROCESS_DEFAULT_H };
 }
 
-/** Horizontal width reserved on the FIRST line of a task with a marker.
- *  When the text block is large enough that line 1 vertically overlaps the
- *  marker zone, line 1 is wrapped at a narrower width so its glyphs sit to
- *  the right of the marker icon plus an additional marker-width gap (per
- *  the spec: "leave just enough room for the marker and a marker width
- *  extra").
+/** Small visual breathing space between the marker icon's right edge and
+ *  the first character of text on line 1 (when narrowing kicks in). */
+export const TASK_MARKER_LINE1_GAP = 2;
+
+/** Horizontal width reserved on the FIRST line of a task with a marker
+ *  (only when the text block grows tall enough to vertically intersect the
+ *  marker — for 1- and 2-line labels at default size, no reserve applies).
  *
  *  Reserved area on the left of line 1 (relative to PAD-aligned text-box
- *  left): marker_x_offset (4) + marker_w (14) + extra_gap (14) - PAD (5)
- *  = 27. So firstLineWidth = innerW - 27. */
-export const TASK_MARKER_LINE1_RESERVE = TASK_MARKER_X + MARKER_SIZE + MARKER_SIZE - PAD; // 27
+ *  left): marker_x (4) + marker_w (14) + gap (2) − PAD (5) = 15. So
+ *  firstLineWidth = innerW − 15, and text on line 1 starts at x + 20. */
+export const TASK_MARKER_LINE1_RESERVE = TASK_MARKER_X + MARKER_SIZE + TASK_MARKER_LINE1_GAP - PAD;
 
 /** Vertical "chrome" reserved by the renderer for icons/markers within a
  *  task or sub-process. Subtracted from element height to give usable

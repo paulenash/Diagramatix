@@ -2477,9 +2477,12 @@ export function SymbolRenderer({
         const TASK_MARKER_X = 4;            // BpmnTaskMarker render offset
         const TASK_MARKER_Y = 4;
         const MARKER_SIZE = 14;
-        // Reserved horizontal space on line 1 for the marker icon plus a
-        // marker-width "extra" gap (so line 1 doesn't crowd the marker).
-        const TASK_MARKER_LINE1_RESERVE = TASK_MARKER_X + MARKER_SIZE + MARKER_SIZE - PAD; // 27
+        // Small visual gap between marker right edge and line-1 text. Keeps
+        // the marker clearly distinguishable without wasting horizontal room.
+        const TASK_MARKER_LINE1_GAP = 2;
+        // Reserved horizontal space on line 1 = marker offset + marker width
+        // + small gap − PAD. Text on line 1 starts at x + 20.
+        const TASK_MARKER_LINE1_RESERVE = TASK_MARKER_X + MARKER_SIZE + TASK_MARKER_LINE1_GAP - PAD;
         // Subprocess collapsed marker bottom geometry — text must never
         // intrude into this reserve.
         const SUBPROCESS_BOTTOM_RESERVE = 19;
@@ -2534,7 +2537,7 @@ export function SymbolRenderer({
         // narrowing is absolute to the marker position, not the user's
         // drag offset). Other lines centre on labelCenterX as usual.
         const firstLineCenterX = firstLineWidth != null
-          ? el.x + (TASK_MARKER_X + MARKER_SIZE + MARKER_SIZE + (el.width - PAD)) / 2
+          ? el.x + (TASK_MARKER_X + MARKER_SIZE + TASK_MARKER_LINE1_GAP + (el.width - PAD)) / 2
           : labelCenterX;
         const minY    = el.y + PAD;
         const maxBotY = el.y + el.height - PAD - (isSubprocessCollapsed || hasRepeatMarker ? SUBPROCESS_BOTTOM_RESERVE - PAD : 0);
