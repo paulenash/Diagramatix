@@ -334,5 +334,68 @@ export interface TemplateData {
  *              edge-mounted event use the OUTER face when the other
  *              endpoint sits outside the host EP, the INNER face
  *              when inside; never the perpendicular sides.
+ * v1.10:   Round-trip fix release — the XML exporter / importer now
+ *          actually emits and parses the v1.9 fields that the XSD
+ *          declared but the serialiser dropped:
+ *            - <dgx:data> attributes: poolFontSize, laneFontSize,
+ *              database.
+ *            - <dgx:connector> attribute: bottleneck (sequence
+ *              connector "stage" marker — already in types.ts and
+ *              ddlGenerate.ts but silently lost on XML round-trip
+ *              before this release).
+ *          No new data fields and no XSD shape change — purely a
+ *          serialisation completeness bump so round-trip is faithful.
+ *          Behaviour changes since v1.9 (no schema impact, documented
+ *          for completeness):
+ *            - Task / Sub-Process Name terminology + autosize:
+ *              in-element label renamed "Name" (was "Label") for
+ *              task / subprocess / subprocess-expanded in the
+ *              Properties Panel and help docs. Live text-driven
+ *              autosize for task and collapsed sub-process — the
+ *              element scales aspect-locked to its type's default
+ *              size as the user types; default size is the floor.
+ *              Task-type marker reserves horizontal space on line 1
+ *              only when the centred text block crosses the marker
+ *              zone; the marker no longer reserves vertical space.
+ *              Sub-Process bottom marker always reserved.
+ *            - Pool / Lane edits never auto-shrink. Manual size and
+ *              the user's chosen header strip width are preserved
+ *              across label edits; only grow when the new label
+ *              demands more room.
+ *            - Pool labels auto-wrap on import to fit pool height
+ *              (replicates Visio's visual wrap). poolHeaderWidth
+ *              widens proportionally to the line count.
+ *            - Visio Bulk Import: multi-page selection, optional
+ *              new-project creation, dashboard System-menu entry,
+ *              per-project folder placement. Importer now stamps
+ *              originalFolderId / originalFolderName onto archived
+ *              diagrams so the Deleted Diagrams view groups by
+ *              user → project → folder.
+ *            - Visio import — sequence and association connectors
+ *              never resolve to a Pool / Lane endpoint (neither
+ *              via resolveGlueId nor via the geometric fallback);
+ *              widened EPS for sequence / association free ends so
+ *              "very near a Task" snaps to that Task instead of
+ *              falling through to the surrounding Pool.
+ *            - Right-click on a Task / Gateway / Sub-Process / EP /
+ *              Data Object / Event surfaces a type-picker menu
+ *              instead of the canvas shape palette.
+ *            - Project ▾ menu: Configuration / Scan Diagrams for
+ *              Issues. Scan checks: sequence/association on
+ *              Pool/Lane, duplicate Pool/Lane names (whitespace-
+ *              insensitive), single-lane Pools, hanging messages
+ *              (red on canvas) split into Errors vs Warnings, with
+ *              per-type "ignore" filter persisted in sessionStorage
+ *              for the Scan-Fix-Rescan cycle.
+ *            - Deleted Diagrams view rewritten: user → project →
+ *              folder hierarchy with per-level Delete All; Restore
+ *              and permanent Delete on one row per diagram; all
+ *              destructive actions go through ConfirmDialog.
+ *            - Project delete cascade-archive option (`?cascade=
+ *              archive`) — server archives every diagram before
+ *              dropping the project row.
+ *            - Nav-tree per-project sort: Manual (drag-and-drop),
+ *              Name asc/desc, Modified asc/desc. Stored in
+ *              localStorage per project.
  */
-export const SCHEMA_VERSION = "1.9";
+export const SCHEMA_VERSION = "1.10";

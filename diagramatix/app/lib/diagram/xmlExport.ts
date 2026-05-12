@@ -62,7 +62,10 @@ export function pointXml(
 }
 
 export function diagramDataXml(dd: DiagramData, ind: string): string {
-  let x = `${ind}<dgx:data${attr("fontSize", dd.fontSize)}${attr("connectorFontSize", dd.connectorFontSize)}${attr("titleFontSize", dd.titleFontSize)}>\n`;
+  // v1.10 round-trip fix: poolFontSize, laneFontSize and database were
+  // declared on DiagramData (and in the XSD) in v1.9 but never written
+  // out. Emit them now so XML round-trip preserves them.
+  let x = `${ind}<dgx:data${attr("fontSize", dd.fontSize)}${attr("connectorFontSize", dd.connectorFontSize)}${attr("titleFontSize", dd.titleFontSize)}${attr("poolFontSize", dd.poolFontSize)}${attr("laneFontSize", dd.laneFontSize)}${attr("database", dd.database)}>\n`;
 
   // Elements
   x += `${ind}  <dgx:elements>\n`;
@@ -135,7 +138,10 @@ export function connectorXml(c: any, ind: string): string {
   x += `${attr("sourceInvisibleLeader", c.sourceInvisibleLeader || undefined)}${attr("targetInvisibleLeader", c.targetInvisibleLeader || undefined)}`;
   x += `${attr("labelOffsetX", c.labelOffsetX)}${attr("labelOffsetY", c.labelOffsetY)}${attr("labelWidth", c.labelWidth)}`;
   x += `${attr("sourceOffsetAlong", c.sourceOffsetAlong)}${attr("targetOffsetAlong", c.targetOffsetAlong)}`;
-  x += `${attr("labelAnchor", c.labelAnchor)}${attr("arrowAtSource", c.arrowAtSource || undefined)}>\n`;
+  // v1.10 round-trip fix: bottleneck (sequence connector "stage" marker)
+  // is in types.ts and in ddlGenerate.ts but was previously dropped on
+  // XML export. Emit it as an optional boolean attribute.
+  x += `${attr("labelAnchor", c.labelAnchor)}${attr("arrowAtSource", c.arrowAtSource || undefined)}${attr("bottleneck", c.bottleneck || undefined)}>\n`;
 
   if (c.waypoints && c.waypoints.length > 0) {
     x += `${ind}  <dgx:waypoints>\n`;
@@ -342,9 +348,15 @@ export function parseDiagramatixXml(xmlText: string): any {
     const fontSize = num(dataEl.getAttribute("fontSize"));
     const connectorFontSize = num(dataEl.getAttribute("connectorFontSize"));
     const titleFontSize = num(dataEl.getAttribute("titleFontSize"));
+    const poolFontSize = num(dataEl.getAttribute("poolFontSize"));
+    const laneFontSize = num(dataEl.getAttribute("laneFontSize"));
+    const database = dataEl.getAttribute("database");
     if (fontSize !== undefined) data.fontSize = fontSize;
     if (connectorFontSize !== undefined) data.connectorFontSize = connectorFontSize;
     if (titleFontSize !== undefined) data.titleFontSize = titleFontSize;
+    if (poolFontSize !== undefined) data.poolFontSize = poolFontSize;
+    if (laneFontSize !== undefined) data.laneFontSize = laneFontSize;
+    if (database != null && database !== "") data.database = database;
 
     // Elements
     const elementsEl = getChild(dataEl, "elements");
@@ -462,7 +474,7 @@ export function parseDiagramatixXml(xmlText: string): any {
       const v = num(cEl.getAttribute(a));
       if (v !== undefined) c[a] = v;
     }
-    const boolAttrs = ["sourceInvisibleLeader", "targetInvisibleLeader", "arrowAtSource"];
+    const boolAttrs = ["sourceInvisibleLeader", "targetInvisibleLeader", "arrowAtSource", "bottleneck"];
     for (const a of boolAttrs) {
       const v = bool(cEl.getAttribute(a));
       if (v !== undefined) c[a] = v;

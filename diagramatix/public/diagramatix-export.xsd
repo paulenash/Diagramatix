@@ -12,6 +12,18 @@
 
   The xs:schema version attribute carries the schemaVersion.
   The appVersion is recorded as an annotation below and injected at runtime via /api/schema.
+
+  v1.10 — round-trip serialisation completeness bump.
+    No schema shape change. The v1.9 fields below were declared in this
+    XSD but the XML serialiser previously dropped them; they are now
+    emitted and parsed faithfully:
+      <dgx:data>      attributes "poolFontSize", "laneFontSize", "database"
+      <dgx:connector> attribute  "bottleneck"
+    See SCHEMA_VERSION history in app/lib/diagram/types.ts for the
+    behavioural changes shipped in this release (Task/Sub-Process Name
+    + autosize, Pool/Lane grow-only, Visio bulk import, scan for issues,
+    Deleted Diagrams hierarchy, etc.) — none of which alter the data
+    shape, so the XSD is unchanged below.
 -->
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
            xmlns:dgx="http://diagramatix.com/export/1.0"
