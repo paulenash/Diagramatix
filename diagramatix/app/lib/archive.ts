@@ -40,6 +40,32 @@ export async function getArchiveProject(): Promise<{ id: string; adminId: string
   return { id: created.id, adminId: admin.id };
 }
 
+interface ArchiveFolderInfo { id: string | null; name: string | null }
+
+/** Look up a diagram's containing folder from its project's folderTree.
+ *  Returns { id: null, name: null } if the diagram sits at the project
+ *  root, the project has no folderTree, or the project doesn't exist. */
+async function lookupOriginalFolder(
+  projectId: string | null,
+  diagramId: string,
+): Promise<ArchiveFolderInfo> {
+  if (!projectId) return { id: null, name: null };
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: { folderTree: true },
+  });
+  if (!project?.folderTree) return { id: null, name: null };
+  // Prisma 7 JSON: cast through unknown to a structured shape.
+  const tree = project.folderTree as unknown as {
+    folders?: { id: string; name: string }[];
+    diagramFolderMap?: Record<string, string>;
+  };
+  const folderId = tree.diagramFolderMap?.[diagramId];
+  if (!folderId || folderId === "root") return { id: null, name: null };
+  const folder = tree.folders?.find((f) => f.id === folderId);
+  return { id: folderId, name: folder?.name ?? null };
+}
+
 /** Archive a diagram instead of deleting it */
 export async function archiveDiagram(
   diagramId: string,
@@ -56,6 +82,10 @@ export async function archiveDiagram(
   });
   if (!diagram) throw new Error("Diagram not found");
 
+  // Look up the diagram's folder inside its source project so the
+  // archived-diagrams UI can group by user → project → folder.
+  const folderInfo = await lookupOriginalFolder(originalProjectId, diagramId);
+
   // Inject archive metadata into the data JSON
   const data = (diagram.data as Record<string, unknown>) ?? {};
   data._archive = {
@@ -65,6 +95,8 @@ export async function archiveDiagram(
     _archivedFromUserEmail: originalUserEmail,
     _archivedFromProjectId: originalProjectId,
     _archivedFromProjectName: originalProjectName,
+    _archivedFromFolderId: folderInfo.id,
+    _archivedFromFolderName: folderInfo.name,
   };
 
   // Move diagram to archive project under admin's userId via raw SQL

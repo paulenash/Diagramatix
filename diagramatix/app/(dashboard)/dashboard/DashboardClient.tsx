@@ -761,6 +761,28 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
     });
   }
 
+  /** "Delete project AND every diagram in it." Diagrams move to the
+   *  system archive (recoverable from /dashboard/deleted-diagrams) and
+   *  the project itself is then deleted. Server cascades both via
+   *  `DELETE /api/projects/[id]?cascade=archive`. */
+  function handleDeleteProjectCascade(id: string, e: React.MouseEvent) {
+    e.stopPropagation();
+    const proj = projects.find(p => p.id === id);
+    const count = proj?._count?.diagrams ?? 0;
+    setConfirmDialog({
+      title: "Delete Project and All Diagrams",
+      message: `Are you sure you want to delete "${proj?.name ?? "this project"}" AND all ${count} diagram${count === 1 ? "" : "s"} inside it? Diagrams will be moved to the archive (recoverable from Deleted Diagrams).`,
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        const res = await fetch(`/api/projects/${id}?cascade=archive`, { method: "DELETE" });
+        if (!res.ok) return;
+        setProjects((prev) => prev.filter((p) => p.id !== id));
+        if (selectedProjectId === id) setSelectedProjectId(null);
+        // Diagrams went to the archive — they don't reappear in Unorganised.
+      },
+    });
+  }
+
   async function handleCreateDiagram() {
     if (!newName.trim()) { setError("Please enter a name"); return; }
     setCreating(true);
@@ -1104,9 +1126,16 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                         <button
                           onClick={(e) => handleDeleteProject(p.id, e)}
                           className="text-gray-400 hover:text-red-500 text-[10px] px-0.5"
-                          title="Delete project"
+                          title="Delete project (move diagrams to Unorganised)"
                         >
                           {"\u2715"}
+                        </button>
+                        <button
+                          onClick={(e) => handleDeleteProjectCascade(p.id, e)}
+                          className="text-gray-400 hover:text-red-600 text-[10px] px-0.5 font-semibold"
+                          title="Delete project AND all its diagrams (diagrams archived)"
+                        >
+                          {"\u2716+"}
                         </button>
                       </div>
                     )}

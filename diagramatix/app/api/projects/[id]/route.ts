@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { getEffectiveUserId, isImpersonating } from "@/app/lib/superuser";
+import { archiveDiagram } from "@/app/lib/archive";
 import {
   getCurrentOrgId,
   requireRole,
@@ -126,7 +127,7 @@ export async function PUT(req: Request, { params }: Params) {
   }
 }
 
-export async function DELETE(_req: Request, { params }: Params) {
+export async function DELETE(req: Request, { params }: Params) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -152,6 +153,29 @@ export async function DELETE(_req: Request, { params }: Params) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
+  // ?cascade=archive → move every diagram in this project into the system
+  // archive (recoverable from /dashboard/deleted-diagrams) BEFORE deleting
+  // the project row. Default behaviour (no query param) leaves diagrams
+  // orphaned, preserving the existing "move to Unorganised" semantics.
+  const { searchParams } = new URL(req.url);
+  const cascade = searchParams.get("cascade");
+  let archived = 0;
+  if (cascade === "archive") {
+    const userEmail = session.user.email ?? "";
+    const diagrams = await prisma.diagram.findMany({
+      where: { projectId: id, orgId },
+      select: { id: true },
+    });
+    for (const d of diagrams) {
+      try {
+        await archiveDiagram(d.id, session.user.id, userEmail, id, existing.name);
+        archived++;
+      } catch {
+        // If a single diagram fails to archive, skip it and continue.
+      }
+    }
+  }
+
   await prisma.project.delete({ where: { id } });
-  return NextResponse.json({ success: true });
+  return NextResponse.json({ success: true, archived });
 }

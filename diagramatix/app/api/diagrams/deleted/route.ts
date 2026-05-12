@@ -40,11 +40,45 @@ export async function GET() {
         originalUserEmail: meta._archivedFromUserEmail ?? null,
         originalProjectName: meta._archivedFromProjectName ?? null,
         originalProjectId: meta._archivedFromProjectId ?? null,
+        originalFolderName: meta._archivedFromFolderName ?? null,
+        originalFolderId: meta._archivedFromFolderId ?? null,
       };
     })
     .filter((d) => d.originalUserId === userId);
 
   return NextResponse.json(result);
+}
+
+/** DELETE /api/diagrams/deleted — permanently remove archived diagrams.
+ *  Body: `{ ids: string[] }`. Each id must reference a diagram whose
+ *  `_archive._archivedFromUserId` matches the effective caller (the
+ *  same scoping rule POST uses for restore). Other diagrams in the list
+ *  are silently skipped. Returns `{ deleted: number, skipped: string[] }`. */
+export async function DELETE(req: Request) {
+  const session = await auth();
+  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  let userId = session.user.id;
+  try { userId = getEffectiveUserId(session, await cookies()); } catch { /* ignore */ }
+
+  let body: { ids?: unknown };
+  try { body = await req.json(); } catch { return NextResponse.json({ error: "Invalid body" }, { status: 400 }); }
+  const ids = Array.isArray(body.ids) ? body.ids.filter((x): x is string => typeof x === "string") : [];
+  if (ids.length === 0) return NextResponse.json({ error: "ids required" }, { status: 400 });
+
+  // Load each diagram, verify it's archived to the caller's user, then delete.
+  const skipped: string[] = [];
+  let deleted = 0;
+  for (const id of ids) {
+    const diagram = await prisma.diagram.findUnique({ where: { id } });
+    if (!diagram) { skipped.push(id); continue; }
+    const data = (diagram.data as Record<string, unknown>) ?? {};
+    const meta = (data._archive as Record<string, unknown>) ?? {};
+    if (meta._archivedFromUserId !== userId) { skipped.push(id); continue; }
+    await prisma.diagram.delete({ where: { id } });
+    deleted++;
+  }
+  return NextResponse.json({ deleted, skipped });
 }
 
 /** POST /api/diagrams/deleted — restore a user's deleted diagram */
