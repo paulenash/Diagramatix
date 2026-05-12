@@ -1089,13 +1089,18 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
 
   // Bulk move — reassigns folder for every selected diagram. Works
   // purely on the project's folderTree (no API call per diagram needed;
-  // updateTree debounce-saves the whole tree).
+  // updateTree debounce-saves the whole tree). For the project root,
+  // mirror the single-move convention by DELETING the map entry rather
+  // than assigning `"root"` — absent ⇒ root in `getOrderedDiagramsInFolder`.
   function handleBulkMoveToFolder(targetFolderId: string) {
     const ids = Array.from(selectedDiagramIds);
     setShowBulkMoveDialog(false);
     updateTree(t => {
       const map = { ...t.diagramFolderMap };
-      for (const id of ids) map[id] = targetFolderId;
+      for (const id of ids) {
+        if (targetFolderId === ROOT_ID) delete map[id];
+        else map[id] = targetFolderId;
+      }
       return { ...t, diagramFolderMap: map };
     });
     clearDiagramSelection();
@@ -1338,7 +1343,27 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
           onDrop={(e) => {
             e.preventDefault();
             e.currentTarget.classList.remove("bg-blue-50");
-            if (dragDiagramId) { moveDiagramToFolder(dragDiagramId, folderId); setDragDiagramId(null); }
+            if (dragDiagramId) {
+              // Group-aware drop: if the dragged diagram is part of the
+              // current multi-selection (size > 1), move EVERY selected
+              // diagram to the target folder in one batch. Otherwise the
+              // drag is a regular single-diagram move.
+              if (selectedDiagramIds.size > 1 && selectedDiagramIds.has(dragDiagramId)) {
+                const ids = Array.from(selectedDiagramIds);
+                updateTree(t => {
+                  const map = { ...t.diagramFolderMap };
+                  for (const id of ids) {
+                    if (folderId === ROOT_ID) delete map[id];
+                    else map[id] = folderId;
+                  }
+                  return { ...t, diagramFolderMap: map };
+                });
+                clearDiagramSelection();
+              } else {
+                moveDiagramToFolder(dragDiagramId, folderId);
+              }
+              setDragDiagramId(null);
+            }
           }}
         >
           {hasChildren ? (
