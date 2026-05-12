@@ -64,6 +64,13 @@ interface MasterInfo {
    *  the importer reads only instance cells unless we resolve up. */
   masterWidth?: number;
   masterHeight?: number;
+  /** First non-empty `<Text>` block from the master's content. Used as
+   *  a last-resort fallback for the element label when the instance
+   *  shape has no Text and no BpmnName property — covers the "user
+   *  dropped a shape from the stencil and didn't rename it" pattern
+   *  (concrete: v5.1 Exclusive Gateway master defaults to "Decision?").
+   *  Empty string when the master has no default text. */
+  defaultText?: string;
 }
 
 interface ElementSeed {
@@ -496,8 +503,14 @@ async function loadMasterIndex(zip: JSZip): Promise<Map<string, MasterInfo>> {
     const head5 = inner.slice(0, cut);
     const masterWidth = readCellNum(head5, "Width") ?? undefined;
     const masterHeight = readCellNum(head5, "Height") ?? undefined;
-    if (masterWidth || masterHeight) {
-      masters.set(id, { ...info, masterWidth, masterHeight });
+    // Master's default text — the first non-empty `<Text>` block in the
+    // master file (covers both the root Shape 5 and any nested
+    // sub-shape carrying the visible label). `readText` does the same
+    // stripping the instance walker uses, so the result is comparable
+    // to what a user would see in Visio.
+    const defaultText = readText(masterXml);
+    if (masterWidth || masterHeight || defaultText) {
+      masters.set(id, { ...info, masterWidth, masterHeight, defaultText });
     }
   }
   return masters;
@@ -724,7 +737,12 @@ function fuzzyClassifyElement(nameU: string): ElementSeed | null {
   if (n.includes("inclusive")) return { type: "gateway", gatewayType: "inclusive" };
   if (n.includes("parallel gateway")) return { type: "gateway", gatewayType: "parallel" };
   if (n.includes("event gateway") || n.includes("event-based")) return { type: "gateway", gatewayType: "event-based" };
-  if (n === "merge" || n.endsWith(" merge")) return { type: "gateway" };       // v5.1 plain Merge gateway
+  // v5.1's "Merge" master is the plain diamond (no X marker). Map it
+  // explicitly to gatewayType "none" so the BPMN_M property-override
+  // pass below (which reads BpmnGatewayType="Exclusive" from the Merge
+  // master and would otherwise turn it into a gateway-with-X) doesn't
+  // upgrade it.
+  if (n === "merge" || n.endsWith(" merge")) return { type: "gateway", gatewayType: "none" };
   if (n.includes("gateway")) return { type: "gateway" };
   // Trigger-typed Start / Intermediate events — v5.1 names like
   // "Start with Timer", "Receive Message Start", "Send Message End Event"
@@ -812,8 +830,30 @@ function classifyElement(nameU: string, props: Record<string, string>): ElementS
   if (props.BpmnTaskType && BPMN_TASK_TYPE[props.BpmnTaskType]) {
     seed.taskType = BPMN_TASK_TYPE[props.BpmnTaskType];
   }
-  if (props.BpmnGatewayType && BPMN_GATEWAY_TYPE[props.BpmnGatewayType]) {
+  // BpmnGatewayType property is only used when the fuzzy classifier
+  // didn't already pin down a gatewayType from the master NameU. This
+  // matters because Diagramatix-style stencils (v1.x, v5.1) often have
+  // SEPARATE masters for "Exclusive Gateway" (with X) vs "Merge" (plain
+  // diamond) while both set `BpmnGatewayType="Exclusive"` on the master.
+  // The master NameU carries the visual signal; the property carries the
+  // BPMN semantic — they disagree for plain merge gateways, and the
+  // visual must win or every "Merge" would render with the X marker.
+  //
+  // BpmnMarkerVisible only applies on the property-driven path (BPMN_M
+  // files using a single generic "Gateway" master where the property is
+  // the only way to distinguish exclusive-with-X vs plain). Stencil-
+  // specific masters draw their X / lack of X from master geometry, so
+  // their `BpmnMarkerVisible="0"` value on the master is misleading
+  // metadata and must not be allowed to downgrade the fuzzy-derived
+  // gatewayType (concrete v5.1 case: "Exclusive Gateway" master has
+  // BpmnMarkerVisible="0" but ALWAYS draws the X via geometry).
+  const fuzzyPickedGatewayType = seed.type === "gateway" && !!seed.gatewayType;
+  if (!fuzzyPickedGatewayType
+      && props.BpmnGatewayType && BPMN_GATEWAY_TYPE[props.BpmnGatewayType]) {
     seed.gatewayType = BPMN_GATEWAY_TYPE[props.BpmnGatewayType];
+    if (seed.gatewayType === "exclusive" && props.BpmnMarkerVisible === "0") {
+      seed.gatewayType = "none";
+    }
   }
   if (props.BpmnTriggerOrResult && BPMN_EVENT_TRIGGER[props.BpmnTriggerOrResult]) {
     seed.eventType = BPMN_EVENT_TRIGGER[props.BpmnTriggerOrResult];
@@ -1452,10 +1492,15 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
     const xPx = centreXPx - widthPx / 2;
     const yPx = centreYPx - heightPx / 2;
 
-    // Page-level <Text> wins; otherwise fall back to the BpmnName Property
-    // (Pools and Lanes carry their label only on the per-instance master,
-    // not the page shape, so for those types BpmnName is the only source).
-    const label = readText(r.block) || r.props.BpmnName || "";
+    // Page-level <Text> wins; otherwise fall back to the BpmnName
+    // Property (Pools and Lanes carry their label only on the per-
+    // instance master, not the page shape, so for those types BpmnName
+    // is the only source). FINAL fallback: the master's own default
+    // text — covers "user dropped a shape from the stencil and never
+    // renamed it" (e.g. v5.1 Exclusive Gateway defaults to "Decision?").
+    const elMasterId = r.block.match(/Master='(\d+)'/)?.[1];
+    const elMasterInfo = elMasterId ? masters.get(elMasterId) : undefined;
+    const label = readText(r.block) || r.props.BpmnName || elMasterInfo?.defaultText || "";
     const properties: Record<string, unknown> = {};
     if (r.seed.subprocessType) properties.subprocessType = r.seed.subprocessType;
     if (r.seed.poolType) properties.poolType = r.seed.poolType;
