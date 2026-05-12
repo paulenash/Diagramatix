@@ -385,9 +385,11 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
   const [showFileMenu, setShowFileMenu] = useState(false);
   const fileMenuRef = useRef<HTMLDivElement>(null);
 
-  // Scan results — every diagram in the project that has at least one
-  // sequence or association connector terminating on a Pool / Lane.
-  interface ScanIssue {
+  // Scan Diagrams for Errors — three checks per diagram:
+  //   1. sequence / association connectors on a Pool or Lane
+  //   2. pools or lanes with duplicate (case-insensitive) labels
+  //   3. pools with exactly one child lane
+  interface ScanConnectorIssue {
     connectorId: string;
     type: string;
     sourceName: string;
@@ -397,14 +399,32 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
     sourceIsContainer: boolean;
     targetIsContainer: boolean;
   }
+  interface ScanDuplicateName {
+    name: string;
+    elements: { id: string; type: string }[];
+  }
+  interface ScanSingleLanePool {
+    poolId: string;
+    poolName: string;
+    laneId: string;
+    laneName: string;
+  }
   interface ScanDiagram {
     diagramId: string;
     diagramName: string;
     diagramType: string;
-    badConnectors: ScanIssue[];
+    badConnectors: ScanConnectorIssue[];
+    duplicateNames: ScanDuplicateName[];
+    singleLanePools: ScanSingleLanePool[];
+  }
+  interface ScanResult {
+    diagrams: ScanDiagram[];
+    totalBadConnectors: number;
+    totalDuplicateGroups: number;
+    totalSingleLanePools: number;
   }
   const [scanBusy, setScanBusy] = useState(false);
-  const [scanResult, setScanResult] = useState<{ diagrams: ScanDiagram[]; totalBad: number } | null>(null);
+  const [scanResult, setScanResult] = useState<ScanResult | null>(null);
   const [scanError, setScanError] = useState("");
   const [scanExpanded, setScanExpanded] = useState<Set<string>>(new Set());
 
@@ -1803,9 +1823,9 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
                         setShowFileMenu(false);
                         handleScanPoolConnectors();
                       }}
-                      title="Scan every diagram in this project for sequence or association connectors whose source or target is a Pool or Lane"
+                      title="Scan every diagram in this project for: sequence/association connectors on a Pool or Lane; duplicate Pool/Lane names; Pools with exactly one Lane"
                     >
-                      {scanBusy ? "Scanning…" : "Scan: sequence/association on Pool"}
+                      {scanBusy ? "Scanning…" : "Scan Diagrams for Errors"}
                     </button>
                   </div>
                 )}
@@ -2267,14 +2287,17 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
           opening the file picker. After name validation, the file input
           referenced by `importVisioInputRef` is clicked; the rest of the
           import flow runs inside `handleImportVisioFile`. */}
-      {/* Scan results — sequence / association connectors terminating on
-          a Pool or Lane. Clickable diagram rows navigate to the editor. */}
+      {/* Scan Diagrams for Errors — three checks per diagram:
+            1. sequence / association connectors on a Pool or Lane
+            2. duplicate Pool/Lane names
+            3. Pools with exactly one Lane
+          Clickable diagram rows open the editor in a new tab. */}
       {(scanResult || scanError) && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-2xl">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-lg font-semibold text-gray-900">
-                Sequence / Association on Pool or Lane
+                Scan Diagrams for Errors
               </h2>
               <button
                 onClick={() => { setScanResult(null); setScanError(""); }}
@@ -2285,69 +2308,118 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
             {scanError && (
               <p className="mb-3 text-sm text-red-600 bg-red-50 px-3 py-2 rounded">{scanError}</p>
             )}
-            {scanResult && (
-              <>
-                {scanResult.totalBad === 0 ? (
-                  <p className="text-sm text-gray-600">
-                    No sequence or association connectors attach to a Pool or Lane in this project.
+            {scanResult && (() => {
+              const total = scanResult.totalBadConnectors + scanResult.totalDuplicateGroups + scanResult.totalSingleLanePools;
+              if (total === 0) {
+                return (
+                  <p className="text-sm text-gray-600">No errors found across this project&apos;s diagrams.</p>
+                );
+              }
+              return (
+                <>
+                  <p className="text-xs text-gray-600 mb-3">
+                    Found {scanResult.totalBadConnectors > 0 && (
+                      <><strong>{scanResult.totalBadConnectors}</strong> sequence/association connector{scanResult.totalBadConnectors === 1 ? "" : "s"} on a Pool/Lane</>
+                    )}
+                    {scanResult.totalBadConnectors > 0 && (scanResult.totalDuplicateGroups > 0 || scanResult.totalSingleLanePools > 0) && ", "}
+                    {scanResult.totalDuplicateGroups > 0 && (
+                      <><strong>{scanResult.totalDuplicateGroups}</strong> duplicate Pool/Lane name{scanResult.totalDuplicateGroups === 1 ? "" : "s"}</>
+                    )}
+                    {scanResult.totalDuplicateGroups > 0 && scanResult.totalSingleLanePools > 0 && ", "}
+                    {scanResult.totalSingleLanePools > 0 && (
+                      <><strong>{scanResult.totalSingleLanePools}</strong> Pool{scanResult.totalSingleLanePools === 1 ? "" : "s"} with a single Lane</>
+                    )}
+                    {" "}across <strong>{scanResult.diagrams.length}</strong> diagram{scanResult.diagrams.length === 1 ? "" : "s"}. Click a diagram name to open it.
                   </p>
-                ) : (
-                  <>
-                    <p className="text-xs text-gray-600 mb-3">
-                      Found <strong>{scanResult.totalBad}</strong> bad connector{scanResult.totalBad === 1 ? "" : "s"} across <strong>{scanResult.diagrams.length}</strong> diagram{scanResult.diagrams.length === 1 ? "" : "s"}. Click a diagram name to open it.
-                    </p>
-                    <div className="border border-gray-200 rounded max-h-[60vh] overflow-y-auto">
-                      {scanResult.diagrams.map((d) => {
-                        const open = scanExpanded.has(d.diagramId);
-                        return (
-                          <div key={d.diagramId} className="border-b border-gray-100 last:border-b-0">
-                            <div className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50">
-                              <button
-                                onClick={() => {
-                                  setScanExpanded((prev) => {
-                                    const next = new Set(prev);
-                                    if (next.has(d.diagramId)) next.delete(d.diagramId);
-                                    else next.add(d.diagramId);
-                                    return next;
-                                  });
-                                }}
-                                className="text-gray-500 hover:text-gray-700 text-xs w-4"
-                              >{open ? "▼" : "▶"}</button>
-                              <a
-                                href={`/diagram/${d.diagramId}`}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="text-sm text-blue-600 hover:underline flex-1 truncate"
-                                title={d.diagramName}
-                              >{d.diagramName}</a>
-                              <span className="text-[10px] text-gray-500">
-                                {d.badConnectors.length} bad
-                              </span>
-                            </div>
-                            {open && (
-                              <ul className="text-[11px] text-gray-700 pl-9 pr-3 pb-2 space-y-0.5">
-                                {d.badConnectors.map((c) => (
-                                  <li key={c.connectorId} className="flex items-center gap-2">
-                                    <span className="px-1.5 py-0.5 bg-gray-100 rounded text-[10px] text-gray-600">{c.type}</span>
-                                    <span className={c.sourceIsContainer ? "text-red-600 font-medium" : ""}>
-                                      {c.sourceName} <span className="text-gray-400">[{c.sourceType}]</span>
-                                    </span>
-                                    <span className="text-gray-400">→</span>
-                                    <span className={c.targetIsContainer ? "text-red-600 font-medium" : ""}>
-                                      {c.targetName} <span className="text-gray-400">[{c.targetType}]</span>
-                                    </span>
-                                  </li>
-                                ))}
-                              </ul>
-                            )}
+                  <div className="border border-gray-200 rounded max-h-[60vh] overflow-y-auto">
+                    {scanResult.diagrams.map((d) => {
+                      const open = scanExpanded.has(d.diagramId);
+                      const issueCount = d.badConnectors.length + d.duplicateNames.length + d.singleLanePools.length;
+                      return (
+                        <div key={d.diagramId} className="border-b border-gray-100 last:border-b-0">
+                          <div className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50">
+                            <button
+                              onClick={() => {
+                                setScanExpanded((prev) => {
+                                  const next = new Set(prev);
+                                  if (next.has(d.diagramId)) next.delete(d.diagramId);
+                                  else next.add(d.diagramId);
+                                  return next;
+                                });
+                              }}
+                              className="text-gray-500 hover:text-gray-700 text-xs w-4"
+                            >{open ? "▼" : "▶"}</button>
+                            <a
+                              href={`/diagram/${d.diagramId}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-sm text-blue-600 hover:underline flex-1 truncate"
+                              title={d.diagramName}
+                            >{d.diagramName}</a>
+                            <span className="text-[10px] text-gray-500">
+                              {issueCount} issue{issueCount === 1 ? "" : "s"}
+                            </span>
                           </div>
-                        );
-                      })}
-                    </div>
-                  </>
-                )}
-              </>
-            )}
+                          {open && (
+                            <div className="pl-9 pr-3 pb-2 space-y-2">
+                              {d.badConnectors.length > 0 && (
+                                <div>
+                                  <p className="text-[10px] uppercase tracking-wide text-gray-400 mb-0.5">Connectors on Pool/Lane</p>
+                                  <ul className="text-[11px] text-gray-700 space-y-0.5">
+                                    {d.badConnectors.map((c) => (
+                                      <li key={c.connectorId} className="flex items-center gap-2">
+                                        <span className="px-1.5 py-0.5 bg-gray-100 rounded text-[10px] text-gray-600">{c.type}</span>
+                                        <span className={c.sourceIsContainer ? "text-red-600 font-medium" : ""}>
+                                          {c.sourceName} <span className="text-gray-400">[{c.sourceType}]</span>
+                                        </span>
+                                        <span className="text-gray-400">→</span>
+                                        <span className={c.targetIsContainer ? "text-red-600 font-medium" : ""}>
+                                          {c.targetName} <span className="text-gray-400">[{c.targetType}]</span>
+                                        </span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+                              {d.duplicateNames.length > 0 && (
+                                <div>
+                                  <p className="text-[10px] uppercase tracking-wide text-gray-400 mb-0.5">Duplicate Pool/Lane names</p>
+                                  <ul className="text-[11px] text-gray-700 space-y-0.5">
+                                    {d.duplicateNames.map((dn, i) => (
+                                      <li key={i} className="flex items-center gap-2">
+                                        <span className="text-red-600 font-medium">&ldquo;{dn.name}&rdquo;</span>
+                                        <span className="text-gray-500">×{dn.elements.length}</span>
+                                        <span className="text-gray-400 text-[10px]">
+                                          ({dn.elements.map((x) => x.type).join(", ")})
+                                        </span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+                              {d.singleLanePools.length > 0 && (
+                                <div>
+                                  <p className="text-[10px] uppercase tracking-wide text-gray-400 mb-0.5">Pools with a single Lane</p>
+                                  <ul className="text-[11px] text-gray-700 space-y-0.5">
+                                    {d.singleLanePools.map((sl) => (
+                                      <li key={sl.poolId} className="flex items-center gap-2">
+                                        <span className="text-red-600 font-medium">{sl.poolName || "(unnamed pool)"}</span>
+                                        <span className="text-gray-400">contains lane</span>
+                                        <span className="text-gray-700">{sl.laneName || "(unnamed lane)"}</span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              );
+            })()}
             <div className="flex gap-3 justify-end mt-4">
               <button
                 onClick={() => { setScanResult(null); setScanError(""); }}
