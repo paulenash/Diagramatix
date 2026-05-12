@@ -71,6 +71,15 @@ interface MasterInfo {
    *  (concrete: v5.1 Exclusive Gateway master defaults to "Decision?").
    *  Empty string when the master has no default text. */
   defaultText?: string;
+  /** Master's BPMN-property values (the `<Section N='Property'>` rows).
+   *  Used as a fallback for property reads when an instance shape
+   *  doesn't override the property locally — concrete v5.1 case: the
+   *  Exclusive Gateway master sets `BpmnMarkerVisible="0"` to mean
+   *  "default to plain diamond, no X marker"; instance shapes inherit
+   *  this and don't carry their own copy. Without this fallback the
+   *  classifier sees `props.BpmnMarkerVisible === undefined` and can't
+   *  honour the master's intent. */
+  bpmnProps?: Record<string, string>;
 }
 
 interface ElementSeed {
@@ -509,8 +518,12 @@ async function loadMasterIndex(zip: JSZip): Promise<Map<string, MasterInfo>> {
     // stripping the instance walker uses, so the result is comparable
     // to what a user would see in Visio.
     const defaultText = readText(masterXml);
-    if (masterWidth || masterHeight || defaultText) {
-      masters.set(id, { ...info, masterWidth, masterHeight, defaultText });
+    // Master's BPMN-property values — feed forward to classifier as a
+    // fallback when the instance shape doesn't override the property.
+    // Reuse the same row-bounded reader that processes instance blocks.
+    const bpmnProps = readPropValues(masterXml);
+    if (masterWidth || masterHeight || defaultText || Object.keys(bpmnProps).length > 0) {
+      masters.set(id, { ...info, masterWidth, masterHeight, defaultText, bpmnProps });
     }
   }
   return masters;
@@ -830,30 +843,34 @@ function classifyElement(nameU: string, props: Record<string, string>): ElementS
   if (props.BpmnTaskType && BPMN_TASK_TYPE[props.BpmnTaskType]) {
     seed.taskType = BPMN_TASK_TYPE[props.BpmnTaskType];
   }
-  // BpmnGatewayType property is only used when the fuzzy classifier
-  // didn't already pin down a gatewayType from the master NameU. This
-  // matters because Diagramatix-style stencils (v1.x, v5.1) often have
-  // SEPARATE masters for "Exclusive Gateway" (with X) vs "Merge" (plain
-  // diamond) while both set `BpmnGatewayType="Exclusive"` on the master.
-  // The master NameU carries the visual signal; the property carries the
-  // BPMN semantic — they disagree for plain merge gateways, and the
-  // visual must win or every "Merge" would render with the X marker.
+  // Gateway classification — two-step:
   //
-  // BpmnMarkerVisible only applies on the property-driven path (BPMN_M
-  // files using a single generic "Gateway" master where the property is
-  // the only way to distinguish exclusive-with-X vs plain). Stencil-
-  // specific masters draw their X / lack of X from master geometry, so
-  // their `BpmnMarkerVisible="0"` value on the master is misleading
-  // metadata and must not be allowed to downgrade the fuzzy-derived
-  // gatewayType (concrete v5.1 case: "Exclusive Gateway" master has
-  // BpmnMarkerVisible="0" but ALWAYS draws the X via geometry).
+  //   1. BpmnGatewayType property override fires only when the fuzzy
+  //      classifier didn't already pin down a gatewayType from the
+  //      master NameU. Diagramatix-style stencils (v1.x, v5.1) often
+  //      have SEPARATE masters for "Exclusive Gateway" vs "Merge" while
+  //      both set `BpmnGatewayType="Exclusive"` on the master; the
+  //      master NameU carries the visual signal and must win or every
+  //      "Merge" would render with the X marker.
+  //
+  //   2. BpmnMarkerVisible="0" universally downgrades an "exclusive"
+  //      gatewayType to "none" (plain diamond), regardless of how
+  //      gatewayType was set. v5.1's "Exclusive Gateway" master is a
+  //      universal gateway master whose marker sub-shape is gated by
+  //      `NOT(Sheet.5!Actions.ExclusiveDataWithMarker.Checked)` — the
+  //      master defaults to plain diamond and `BpmnMarkerVisible="0"`
+  //      reflects this. Because the master's bpmnProps are merged into
+  //      `props` at the call site, this check sees the master's "0"
+  //      even when the instance doesn't override.
   const fuzzyPickedGatewayType = seed.type === "gateway" && !!seed.gatewayType;
   if (!fuzzyPickedGatewayType
       && props.BpmnGatewayType && BPMN_GATEWAY_TYPE[props.BpmnGatewayType]) {
     seed.gatewayType = BPMN_GATEWAY_TYPE[props.BpmnGatewayType];
-    if (seed.gatewayType === "exclusive" && props.BpmnMarkerVisible === "0") {
-      seed.gatewayType = "none";
-    }
+  }
+  if (seed.type === "gateway"
+      && seed.gatewayType === "exclusive"
+      && props.BpmnMarkerVisible === "0") {
+    seed.gatewayType = "none";
   }
   if (props.BpmnTriggerOrResult && BPMN_EVENT_TRIGGER[props.BpmnTriggerOrResult]) {
     seed.eventType = BPMN_EVENT_TRIGGER[props.BpmnTriggerOrResult];
@@ -1014,7 +1031,17 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
         ? inlineNameU
         : masterInfo?.nameU || inlineNameU,
     );
-    const props = readPropValues(block);
+    const instanceProps = readPropValues(block);
+    // Merge master defaults with instance overrides — instance wins.
+    // This makes inherited BPMN properties (e.g. v5.1 Exclusive Gateway
+    // master's `BpmnMarkerVisible="0"` which the instance doesn't carry)
+    // visible to the classifier on a property read. Without this, the
+    // classifier sees only instance-level properties and can't honour
+    // master-level defaults.
+    const props: Record<string, string> = {
+      ...(masterInfo?.bpmnProps ?? {}),
+      ...instanceProps,
+    };
     const bpmnId = props.BpmnId;
 
     // Skip sub-shapes (those that reference a parent master's shape via
