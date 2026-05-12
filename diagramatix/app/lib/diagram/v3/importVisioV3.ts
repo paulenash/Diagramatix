@@ -726,7 +726,11 @@ function isConnectorMaster(nameU: string): ConnectorBase | null {
   // longer NameU. Order matters — check the more specific terms first.
   const n = nameU.toLowerCase();
   if (n.includes("message flow") || n.includes("message connection")) return "messageBPMN";
-  if (n.includes("association")) return "associationBPMN";
+  // "Association" must match at the START of the NameU only — using
+  // includes() catches "Data Object with Associations" (the BPMN_M data-
+  // object master) and mis-classifies it as an association connector,
+  // which silently drops every Data Object on import.
+  if (/^associations?(\b|[.\d_-])/.test(n)) return "associationBPMN";
   if (n.includes("sequence flow") || n.includes("sequence-flow")) return "sequence";
   // Visio's generic toolbar connector — treat as sequence flow so
   // BPMN diagrams drawn without using a stencil's Sequence Flow
@@ -1884,6 +1888,56 @@ export async function importVisioV3(
       if (area < bestArea) { bestArea = area; bestPool = p; }
     }
     if (bestPool) lane.parentId = bestPool.id;
+  }
+
+  // Generic single-lane absorption — parallel to the BPMN_M-specific
+  // pass earlier in the function. Any pool whose label is empty or a
+  // placeholder ("Title", "Pool", "Black-Box Pool"…) and that has a
+  // single child lane carrying a real (non-placeholder) label has the
+  // lane's name promoted up to the pool and the empty lane removed.
+  // Connectors that targeted the lane get remapped to the pool.
+  //
+  // The BPMN_M pass only fires for pools tagged with CFF Container
+  // category / numLanes ≥ 1 metadata. Cross-functional flowchart files
+  // from older Visio templates often place a CFF Container instance
+  // whose `User.msvShapeCategories` cell is empty on the page-level
+  // shape (the cell is only set on the master) — those pools fall
+  // through the BPMN_M check and never get the promotion, leaving the
+  // user with a "Title" pool wrapping a correctly-named lane.
+  {
+    const lanesToAbsorb = new Set<string>();
+    const laneToPool = new Map<string, string>();
+    for (const pool of elements) {
+      if (pool.type !== "pool") continue;
+      if (!isPoolLabelGeneric(pool.label)) continue;
+      const laneChildren = elements.filter(
+        (e) => e.type === "lane" && e.parentId === pool.id,
+      );
+      if (laneChildren.length !== 1) continue;
+      const lane = laneChildren[0];
+      if (!lane.label || !lane.label.trim()) continue;
+      if (isPoolLabelGeneric(lane.label)) continue;
+      pool.label = lane.label;
+      lanesToAbsorb.add(lane.id);
+      laneToPool.set(lane.id, pool.id);
+    }
+    if (lanesToAbsorb.size > 0) {
+      for (const e of elements) {
+        if (!e.parentId) continue;
+        const newParent = laneToPool.get(e.parentId);
+        if (newParent) e.parentId = newParent;
+      }
+      for (let i = elements.length - 1; i >= 0; i--) {
+        if (lanesToAbsorb.has(elements[i].id)) elements.splice(i, 1);
+      }
+      // Repoint shapeIdToElId so glued connectors that pointed at the
+      // absorbed lane resolve to the pool instead.
+      for (const [shapeId, elId] of shapeIdToElId.entries()) {
+        if (!lanesToAbsorb.has(elId)) continue;
+        const poolId = laneToPool.get(elId);
+        if (poolId) shapeIdToElId.set(shapeId, poolId);
+      }
+    }
   }
 
   // Element→lane/pool parentage by GEOMETRIC CONTAINMENT. Without this,
