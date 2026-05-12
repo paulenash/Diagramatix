@@ -396,15 +396,20 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
   // as the editor's modal so we can show the same diagnostic info here.
   const [visioImportStatus, setVisioImportStatus] = useState<VisioImportResult | null>(null);
   const [visioImportInProgress, setVisioImportInProgress] = useState(false);
-  // "New Diagram → Import from Visio" pre-step: dialog that collects a
-  // diagram name (unique within this project) and a target folder name
-  // (default "Imported BPMN Diagrams", created on demand if missing).
-  // After the user confirms, we open the file picker; the chosen name
-  // and folder are read back inside `handleImportVisioFile`.
+  // Visio Bulk Import: the user picks a .vsdx file, then the dialog
+  // opens showing every page in the file. They tick which pages to
+  // import, choose a target project (current or new), and a folder
+  // for the imported diagrams. The selected pages are imported as
+  // separate diagrams via POST /api/import/visio-v3/bulk.
   const [showImportVisioDialog, setShowImportVisioDialog] = useState(false);
-  const [importVisioName, setImportVisioName] = useState("");
+  const [importVisioFile, setImportVisioFile] = useState<File | null>(null);
+  const [importVisioPages, setImportVisioPages] = useState<{ index: number; name: string }[]>([]);
+  const [importVisioSelected, setImportVisioSelected] = useState<Set<number>>(new Set());
+  const [importVisioTarget, setImportVisioTarget] = useState<"current" | "new">("current");
+  const [importVisioNewProjectName, setImportVisioNewProjectName] = useState("");
   const [importVisioFolderName, setImportVisioFolderName] = useState("Imported BPMN Diagrams");
   const [importVisioError, setImportVisioError] = useState("");
+  const [importVisioBusy, setImportVisioBusy] = useState(false);
 
   // ── Multi-select for bulk diagram move / delete ────────────────────
   // Standard desktop selection model:
@@ -740,77 +745,123 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
   }
 
   // ── Import (Visio .vsdx) ──────────────────────────────────────────────
-  // The flow is split in two: the user first names the new diagram and
-  // picks a target folder (NewVisioImportDialog) — see
-  // `handleImportVisioConfirm` below — then the file picker opens.
-  // `handleImportVisioFile` receives the chosen file, reads the name /
-  // folder from component state, places the new diagram in the folder
-  // (creating the folder if it doesn't exist), and surfaces the import
-  // status modal which carries an "Open Diagram" button to navigate
-  // straight into the newly-imported diagram.
+  // Bulk flow: user picks the .vsdx file, the browser parses pages.xml
+  // (dynamic JSZip import) and opens the dialog showing every page. The
+  // user ticks the pages they want, picks a target project (current or
+  // new) and a folder. The selection is sent to /api/import/visio-v3/bulk
+  // which creates one diagram per selected page.
   async function handleImportVisioFile(file: File) {
-    const newName = importVisioName.trim();
-    const folderName = importVisioFolderName.trim();
-    if (!newName) { alert("Diagram name is required"); return; }
-    setVisioImportInProgress(true);
+    setImportVisioError("");
     try {
-      const form = new FormData();
-      form.append("file", file);
-      form.append("projectId", project.id);
-      form.append("name", newName);
-      const resp = await fetch("/api/import/visio-v3", { method: "POST", body: form });
-      if (!resp.ok) {
-        const txt = await resp.text();
-        alert(`Visio import failed: ${txt || resp.statusText}`);
+      // Dynamic JSZip — keeps it out of the main bundle.
+      const { listVisioPages } = await import("@/app/lib/diagram/v3/visioPages");
+      const buf = await file.arrayBuffer();
+      const pages = await listVisioPages(buf);
+      if (pages.length === 0) {
+        alert("No usable pages found in this .vsdx file.");
         return;
       }
-      const result = await resp.json() as VisioImportResult;
-      // Reflect the new diagram in the project's diagram list immediately.
-      setDiagrams((prev) => [
-        { id: result.diagram.id, name: newName, type: "bpmn", createdAt: new Date(), updatedAt: new Date() },
-        ...prev,
-      ]);
-      // Place the new diagram in the chosen folder. If a folder of that
-      // name doesn't exist yet, create one at the project root and use
-      // its id. Empty folderName ⇒ leave at root.
-      if (folderName) {
-        updateTree(t => {
-          const existing = t.folders.find(f => f.name === folderName);
-          if (existing) {
-            return {
-              ...t,
-              diagramFolderMap: { ...t.diagramFolderMap, [result.diagram.id]: existing.id },
-            };
-          }
-          // Create a new root-level folder.
-          const newFolderId = `folder-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-          return {
-            ...t,
-            folders: [...t.folders, { id: newFolderId, name: folderName, parentId: null }],
-            diagramFolderMap: { ...t.diagramFolderMap, [result.diagram.id]: newFolderId },
-          };
-        });
-      }
-      setVisioImportStatus(result);
+      setImportVisioFile(file);
+      setImportVisioPages(pages.map((p) => ({ index: p.index, name: p.name })));
+      setImportVisioSelected(new Set(pages.map((p) => p.index)));
+      setImportVisioTarget("current");
+      const stem = file.name.replace(/\.vsdx$/i, "");
+      setImportVisioNewProjectName(stem || "Imported Visio Diagrams");
+      setImportVisioFolderName("Imported BPMN Diagrams");
+      setShowImportVisioDialog(true);
     } catch (err) {
-      alert(`Visio import failed: ${err instanceof Error ? err.message : String(err)}`);
-    } finally {
-      setVisioImportInProgress(false);
+      alert(`Failed to read .vsdx: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 
-  // Confirm step from the New Visio Import dialog: validate name
-  // uniqueness within this project, dismiss the dialog, and trigger the
-  // file picker. The chosen name / folder remain in state to be read by
-  // `handleImportVisioFile` once the user selects a .vsdx file.
-  function handleImportVisioConfirm() {
-    const name = importVisioName.trim();
-    if (!name) { setImportVisioError("Name is required"); return; }
-    const clash = diagrams.find(d => d.name.toLowerCase() === name.toLowerCase());
-    if (clash) { setImportVisioError(`A diagram named "${name}" already exists in this project`); return; }
+  // Submit step from the bulk-import dialog: POST the file + selections
+  // to /api/import/visio-v3/bulk. On success, either navigate to the
+  // newly-created project or refresh the current project's diagrams.
+  async function handleImportVisioConfirm() {
+    if (!importVisioFile) { setImportVisioError("No file selected"); return; }
+    if (importVisioSelected.size === 0) { setImportVisioError("Select at least one page"); return; }
+    if (importVisioTarget === "new" && !importVisioNewProjectName.trim()) {
+      setImportVisioError("New project name is required");
+      return;
+    }
+    setImportVisioBusy(true);
     setImportVisioError("");
-    setShowImportVisioDialog(false);
-    importVisioInputRef.current?.click();
+    setVisioImportInProgress(true);
+    try {
+      const indices = Array.from(importVisioSelected).sort((a, b) => a - b).join(",");
+      const form = new FormData();
+      form.append("file", importVisioFile);
+      form.append("pageIndices", indices);
+      form.append("folderName", importVisioFolderName.trim());
+      if (importVisioTarget === "new") {
+        form.append("newProjectName", importVisioNewProjectName.trim());
+      } else {
+        form.append("projectId", project.id);
+      }
+      const resp = await fetch("/api/import/visio-v3/bulk", { method: "POST", body: form });
+      if (!resp.ok) {
+        const txt = await resp.text();
+        setImportVisioError(`Import failed: ${txt || resp.statusText}`);
+        return;
+      }
+      type BulkResult = {
+        project?: { id: string; name: string };
+        folderId?: string | null;
+        diagrams: Array<{ diagram: { id: string; name: string }; pageIndex: number; pageName: string; warnings: string[]; stats: VisioImportResult["stats"] }>;
+        errors: Array<{ pageIndex: number; pageName: string; message: string }>;
+      };
+      const result = (await resp.json()) as BulkResult;
+      setShowImportVisioDialog(false);
+      if (result.project) {
+        // New project was created — navigate to it.
+        router.push(`/dashboard/projects/${result.project.id}`);
+        return;
+      }
+      // Imported into the current project — splice the new diagrams into
+      // the local list and update the folder tree.
+      const now = new Date();
+      setDiagrams((prev) => [
+        ...result.diagrams.map((d) => ({ id: d.diagram.id, name: d.diagram.name, type: "bpmn", createdAt: now, updatedAt: now })),
+        ...prev,
+      ]);
+      const folderName = importVisioFolderName.trim();
+      if (folderName) {
+        updateTree((t) => {
+          let folders = t.folders;
+          let folderId = folders.find((f) => f.parentId === null && f.name === folderName)?.id ?? null;
+          if (!folderId) {
+            folderId = `folder-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+            folders = [...folders, { id: folderId, name: folderName, parentId: null }];
+          }
+          const newMap = { ...t.diagramFolderMap };
+          for (const d of result.diagrams) newMap[d.diagram.id] = folderId;
+          return { ...t, folders, diagramFolderMap: newMap };
+        });
+      }
+      // Surface a single aggregated status modal so the user sees per-page
+      // results (warnings + any failures). Reuse the existing single-page
+      // status modal by feeding the FIRST imported diagram's stats; show
+      // a summary list of all imported pages in the warnings array.
+      if (result.diagrams.length > 0) {
+        const summary: VisioImportResult = {
+          diagram: result.diagrams[0].diagram,
+          warnings: [
+            ...result.diagrams.flatMap((d) => d.warnings.map((w) => `[${d.pageName}] ${w}`)),
+            ...result.errors.map((e) => `[${e.pageName}] FAILED: ${e.message}`),
+            `Imported ${result.diagrams.length} diagram${result.diagrams.length === 1 ? "" : "s"} from ${importVisioFile.name}.`,
+          ],
+          stats: result.diagrams[0].stats,
+        };
+        setVisioImportStatus(summary);
+      } else if (result.errors.length > 0) {
+        alert(`All ${result.errors.length} pages failed to import:\n` + result.errors.map((e) => `[${e.pageName}] ${e.message}`).join("\n"));
+      }
+    } catch (err) {
+      setImportVisioError(`Visio import failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setImportVisioBusy(false);
+      setVisioImportInProgress(false);
+    }
   }
 
   // ── Import (JSON / XML) ───────────────────────────────────────────────
@@ -1681,19 +1732,13 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
                       disabled={visioImportInProgress}
                       onClick={() => {
                         setShowFileMenu(false);
-                        // Default name = next available "Visio BPMN Diagram Import N".
-                        const re = /^Visio BPMN Diagram Import (\d+)$/;
-                        let maxN = 0;
-                        for (const d of diagrams) {
-                          const m = d.name.match(re);
-                          if (m) maxN = Math.max(maxN, parseInt(m[1], 10));
-                        }
-                        setImportVisioName(`Visio BPMN Diagram Import ${maxN + 1}`);
-                        setImportVisioFolderName("Imported BPMN Diagrams");
+                        // Bulk flow: trigger the file picker; once a file
+                        // is chosen, handleImportVisioFile parses pages
+                        // and opens the bulk-import dialog.
                         setImportVisioError("");
-                        setShowImportVisioDialog(true);
+                        importVisioInputRef.current?.click();
                       }}
-                      title="Create a new BPMN diagram in this project from a Visio .vsdx file"
+                      title="Import one or more pages from a Visio .vsdx file as separate diagrams"
                     >
                       {visioImportInProgress ? "Importing Visio…" : "Import Visio"}
                     </button>
@@ -2166,27 +2211,96 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
           opening the file picker. After name validation, the file input
           referenced by `importVisioInputRef` is clicked; the rest of the
           import flow runs inside `handleImportVisioFile`. */}
-      {showImportVisioDialog && (
+      {showImportVisioDialog && importVisioFile && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Import Visio Diagram</h2>
+          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg">
+            <h2 className="text-lg font-semibold text-gray-900 mb-2">Import Visio Diagrams</h2>
+            <p className="text-xs text-gray-600 mb-4 truncate">
+              <span className="font-mono">{importVisioFile.name}</span> · {importVisioPages.length} page{importVisioPages.length === 1 ? "" : "s"}
+            </p>
 
             {importVisioError && (
               <p className="mb-3 text-sm text-red-600 bg-red-50 px-3 py-2 rounded">{importVisioError}</p>
             )}
 
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Diagram name</label>
-              <input
-                autoFocus
-                type="text"
-                value={importVisioName}
-                onChange={(e) => setImportVisioName(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleImportVisioConfirm()}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="My imported diagram"
-              />
-              <p className="mt-1.5 text-xs text-gray-500">Must be unique within this project.</p>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-sm font-medium text-gray-700">Select pages to import</label>
+                <div className="flex gap-2 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setImportVisioSelected(new Set(importVisioPages.map((p) => p.index)))}
+                    className="text-blue-600 hover:underline"
+                  >Select all</button>
+                  <button
+                    type="button"
+                    onClick={() => setImportVisioSelected(new Set())}
+                    className="text-blue-600 hover:underline"
+                  >Clear</button>
+                </div>
+              </div>
+              <div className="max-h-[40vh] overflow-y-auto border border-gray-300 rounded">
+                {importVisioPages.map((p) => {
+                  const checked = importVisioSelected.has(p.index);
+                  return (
+                    <label
+                      key={p.index}
+                      className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-800 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={(e) => {
+                          setImportVisioSelected((prev) => {
+                            const next = new Set(prev);
+                            if (e.target.checked) next.add(p.index);
+                            else next.delete(p.index);
+                            return next;
+                          });
+                        }}
+                        className="h-3.5 w-3.5"
+                      />
+                      <span className="text-gray-400 text-xs tabular-nums w-6">{p.index + 1}.</span>
+                      <span className="truncate">{p.name}</span>
+                    </label>
+                  );
+                })}
+              </div>
+              <p className="mt-1.5 text-xs text-gray-500">{importVisioSelected.size} of {importVisioPages.length} selected.</p>
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Target</label>
+              <div className="flex flex-col gap-1.5">
+                <label className="flex items-center gap-2 text-sm text-gray-800">
+                  <input
+                    type="radio"
+                    name="visio-import-target"
+                    checked={importVisioTarget === "current"}
+                    onChange={() => setImportVisioTarget("current")}
+                    className="h-3.5 w-3.5"
+                  />
+                  <span>Add to current project: <span className="font-medium">{project.name}</span></span>
+                </label>
+                <label className="flex items-center gap-2 text-sm text-gray-800">
+                  <input
+                    type="radio"
+                    name="visio-import-target"
+                    checked={importVisioTarget === "new"}
+                    onChange={() => setImportVisioTarget("new")}
+                    className="h-3.5 w-3.5"
+                  />
+                  <span>Create new project:</span>
+                  <input
+                    type="text"
+                    value={importVisioNewProjectName}
+                    onChange={(e) => setImportVisioNewProjectName(e.target.value)}
+                    onFocus={() => setImportVisioTarget("new")}
+                    className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="New project name"
+                  />
+                </label>
+              </div>
             </div>
 
             <div className="mb-4">
@@ -2195,7 +2309,6 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
                 type="text"
                 value={importVisioFolderName}
                 onChange={(e) => setImportVisioFolderName(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleImportVisioConfirm()}
                 list="import-visio-folder-options"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Imported BPMN Diagrams"
@@ -2205,21 +2318,27 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
                   .filter(f => f.parentId === null)
                   .map(f => <option key={f.id} value={f.name} />)}
               </datalist>
-              <p className="mt-1.5 text-xs text-gray-500">Created at the project root if it doesn&apos;t exist. Leave blank to keep the diagram at the project root.</p>
+              <p className="mt-1.5 text-xs text-gray-500">Created if it doesn&apos;t exist. Leave blank to place diagrams at the project root.</p>
             </div>
 
             <div className="flex gap-3 justify-end">
               <button
-                onClick={() => { setShowImportVisioDialog(false); setImportVisioError(""); }}
-                className="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50"
+                onClick={() => {
+                  setShowImportVisioDialog(false);
+                  setImportVisioFile(null);
+                  setImportVisioError("");
+                }}
+                disabled={importVisioBusy}
+                className="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 onClick={handleImportVisioConfirm}
-                className="px-4 py-2 text-sm text-white bg-blue-600 rounded-md hover:bg-blue-700"
+                disabled={importVisioBusy || importVisioSelected.size === 0}
+                className="px-4 py-2 text-sm text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
               >
-                Choose .vsdx file…
+                {importVisioBusy ? "Importing…" : `Import ${importVisioSelected.size} page${importVisioSelected.size === 1 ? "" : "s"}`}
               </button>
             </div>
           </div>

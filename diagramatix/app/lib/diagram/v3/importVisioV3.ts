@@ -29,6 +29,7 @@ import type {
 } from "../types";
 import { recomputeAllConnectors } from "../routing";
 import { autoSizeForType, type AutosizeType } from "../textMetrics";
+import { listVisioPages } from "./visioPages";
 
 export interface MasterStat {
   masterId: string;
@@ -943,13 +944,15 @@ function classifyElement(nameU: string, props: Record<string, string>): ElementS
 
 /* ─── Top-level parse ────────────────────────────────────────────────── */
 
-export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> {
+export async function importVisioV3(
+  buffer: ArrayBuffer,
+  pageIndex: number = 0,
+): Promise<ImportResult> {
   const warnings: string[] = [];
   const zip = await JSZip.loadAsync(buffer);
 
   const masters = await loadMasterIndex(zip);
 
-  // Find page1.xml — the first page listed in pages.xml.
   const emptyStats: ImportStats = {
     totalShapesOnPage: 0, elementsCreated: 0, connectorsCreated: 0,
     shapesSkipped: 0, connectorsSkipped: 0, implicitPools: 0, masters: [],
@@ -962,38 +965,50 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
       stats: emptyStats,
     };
   }
-  // Count pages first to warn on multi-page.
-  const pageCount = (pagesXml.match(/<Page\s+ID='/g) ?? []).length;
-  if (pageCount > 1) {
-    warnings.push(
-      `File has ${pageCount} pages; importing the first page only.`,
-    );
+  // Resolve the requested page index → physical file via the shared
+  // page-enumeration helper. For pageIndex=0 (default), this matches the
+  // legacy first-page behaviour.
+  const pages = await listVisioPages(buffer);
+  if (pages.length === 0) {
+    return {
+      data: { elements: [], connectors: [], viewport: { x: 0, y: 0, zoom: 1 } },
+      warnings: ["No usable pages in pages.xml — nothing to import."],
+      stats: emptyStats,
+    };
   }
-  const firstPageRel = pagesXml.match(/<Page\s+ID='\d+'[\s\S]*?<Rel\s+r:id='(rId\d+)'/);
-  const pagesRelsXml =
-    (await zip.file("visio/pages/_rels/pages.xml.rels")?.async("string")) ?? "";
-  const firstPageFile = firstPageRel
-    ? pagesRelsXml.match(
-        new RegExp(`Id=["']${firstPageRel[1]}["'][^>]*Target=["']([^"']+)["']`),
-      )?.[1] ?? "page1.xml"
-    : "page1.xml";
+  if (pageIndex < 0 || pageIndex >= pages.length) {
+    return {
+      data: { elements: [], connectors: [], viewport: { x: 0, y: 0, zoom: 1 } },
+      warnings: [`Page index ${pageIndex} out of range (file has ${pages.length} pages).`],
+      stats: emptyStats,
+    };
+  }
+  const targetPage = pages[pageIndex];
+  const pageFile = targetPage.fileName;
 
-  const pageXml = await zip.file(`visio/pages/${firstPageFile}`)?.async("string");
+  const pageXml = await zip.file(`visio/pages/${pageFile}`)?.async("string");
   if (!pageXml) {
     return {
       data: { elements: [], connectors: [], viewport: { x: 0, y: 0, zoom: 1 } },
-      warnings: [...warnings, `Page file ${firstPageFile} not found.`],
+      warnings: [...warnings, `Page file ${pageFile} not found.`],
       stats: emptyStats,
     };
   }
 
-  // Page dimensions: pages.xml carries <PageSheet> with PageWidth/PageHeight.
-  const pagePropsBlock = pagesXml.match(
-    /<Page\s+ID='\d+'[\s\S]*?<\/Page>/,
-  )?.[0] ?? "";
+  // Page dimensions: pull from the N-th non-background <Page> block in
+  // pages.xml. listVisioPages applies the same background filter, so
+  // pageIndex maps 1:1 to the corresponding block.
+  const allPageBlocks = pagesXml.match(/<Page\b[^>]*>[\s\S]*?<\/Page>/g) ?? [];
+  let visibleIdx = 0;
+  let pagePropsBlock = "";
+  for (const block of allPageBlocks) {
+    if (/\bBackground=["']1["']/.test(block)) continue;
+    if (visibleIdx === pageIndex) { pagePropsBlock = block; break; }
+    visibleIdx++;
+  }
   const pageW = readCellNum(pagePropsBlock, "PageWidth") ?? 11.69;
   const pageH = readCellNum(pagePropsBlock, "PageHeight") ?? 8.27;
-  void pageW; // not currently used; available for future centring logic.
+  void pageW; void targetPage; // pageW available for future centring; targetPage carries metadata for caller logging.
 
   const walked = walkAllShapes(pageXml, masters);
   // Track skipped masters so we can emit a single summary warning at the
