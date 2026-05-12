@@ -2738,20 +2738,11 @@ function reducer(state: DiagramData, action: Action): DiagramData {
     console.log(`[TRACE reducer] action=${action.type}`);
   }
   switch (action.type) {
-    case "SET_DATA": {
-      // Normalise task/subprocess sizes on load — they revert to the type's
-      // default size for their label, regardless of saved width/height.
-      // Idempotent: re-loading a normalised diagram is a no-op.
-      const normalisedElements = action.payload.elements.map((e) => {
-        if (e.type !== "task" && e.type !== "subprocess") return e;
-        const sz = autoSizeForElement(e);
-        if (sz.w === e.width && sz.h === e.height) return e;
-        const dx = (sz.w - e.width) / 2;
-        const dy = (sz.h - e.height) / 2;
-        return { ...e, x: e.x - dx, y: e.y - dy, width: sz.w, height: sz.h };
-      });
-      return { ...action.payload, elements: normalisedElements };
-    }
+    case "SET_DATA":
+      // Saved width/height is preserved verbatim — imported diagrams keep
+      // their Visio dimensions; in-app edits go through UPDATE_LABEL which
+      // applies autosize at that point.
+      return action.payload;
 
     case "ADD_ELEMENT": {
       // ── Pool/Lane drop intercept ─────────────────────────────────────

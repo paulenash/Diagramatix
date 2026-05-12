@@ -28,7 +28,7 @@ import type {
   Point,
 } from "../types";
 import { recomputeAllConnectors } from "../routing";
-import { autoSizeForType, type AutosizeType } from "../textMetrics";
+import { wrapText as wrapTextShared } from "../textMetrics";
 import { listVisioPages } from "./visioPages";
 
 export interface MasterStat {
@@ -1664,20 +1664,21 @@ export async function importVisioV3(
     if (r.seed.eventType) el.eventType = r.seed.eventType;
     if (r.seed.flowType) el.flowType = r.seed.flowType;
     if (r.seed.repeatType) el.repeatType = r.seed.repeatType;
-    // Task / Sub-Process: replace imported dims with the autosize-driven
-    // dims for the label, regardless of what the Visio file declared.
-    // Keeps the rule "revert to Diagramatix default initial size — no
-    // matter how they were created" consistent at the source rather than
-    // relying solely on the SET_DATA migration in useDiagram.
-    if (el.type === "task" || el.type === "subprocess") {
-      const hasTaskMarker = el.type === "task" && !!el.taskType && el.taskType !== "none";
-      const sz = autoSizeForType(el.type as AutosizeType, el.label || "", 12, hasTaskMarker);
-      const dx = (sz.w - el.width) / 2;
-      const dy = (sz.h - el.height) / 2;
-      el.x -= dx;
-      el.y -= dy;
-      el.width = sz.w;
-      el.height = sz.h;
+    // Task / Sub-Process: preserve the imported dimensions verbatim.
+    // Only grow MINIMALLY if the imported size genuinely can't fit the
+    // wrapped label — keep width, expand height just enough. Assumes the
+    // Visio author chose deliberate sizes that should be honoured.
+    if ((el.type === "task" || el.type === "subprocess") && el.label) {
+      const PAD = 5;
+      const lineH = 14;
+      const innerW = Math.max(20, el.width - 2 * PAD);
+      const lines = wrapTextShared(el.label, innerW, 12);
+      const needsH = lines.length * lineH + 2 * PAD;
+      if (needsH > el.height) {
+        const dy = (needsH - el.height) / 2;
+        el.y -= dy;
+        el.height = needsH;
+      }
     }
     elements.push(el);
   }
@@ -1721,12 +1722,24 @@ export async function importVisioV3(
   // not white-box pools. Without the delete, the leftover unlabelled
   // lane keeps the pool as white-box and every incoming/outgoing message
   // arrow renders red until the user manually deletes the lane.
+  // Generic placeholder strings that Visio masters drop into pools when
+  // the user hasn't typed a real name. Treat them as "unlabelled" so the
+  // lane-name promotion below kicks in.
+  const POOL_PLACEHOLDER_LABELS = new Set([
+    "title", "pool", "black-box pool", "black box pool",
+    "pool / lane", "pool/lane", "lane", "swimlane",
+  ]);
+  const isPoolLabelGeneric = (label: string | undefined | null) => {
+    const t = (label ?? "").trim();
+    if (!t) return true;
+    return POOL_PLACEHOLDER_LABELS.has(t.toLowerCase());
+  };
   const lanesToDelete = new Set<string>();
   for (const [poolShapeId, raw] of bpmnMPoolByShapeId) {
     const poolElId = shapeIdToElId.get(poolShapeId);
     if (!poolElId) continue;
     const pool = elements.find((e) => e.id === poolElId);
-    if (!pool || (pool.label && pool.label.trim())) continue;
+    if (!pool || !isPoolLabelGeneric(pool.label)) continue;
     const laneChildren = elements.filter((e) => e.type === "lane" && e.parentId === poolElId);
     if (laneChildren.length === 1) {
       const lane = laneChildren[0];
@@ -2690,6 +2703,63 @@ export async function importVisioV3(
     connectors.push(connector);
   }
 
+  // Black-box Pool with inner lane(s): the Visio author dropped a
+  // Black-Box Pool master, and one or more lanes ended up parented to it
+  // (either via geometric containment or master-shape inheritance). A
+  // black-box pool is rendered as a solid rectangle with no visible lane
+  // structure, so the lanes are visual artifacts. Remap any connector
+  // whose endpoint touches a child lane → the pool boundary, re-parent
+  // any non-lane descendants of those lanes to the pool, then remove the
+  // lanes. If the pool itself carries only a generic placeholder label
+  // ("Title", "Pool"…) and a single child lane carries the real name,
+  // promote the lane's name up first.
+  {
+    const lanesToRemove = new Set<string>();
+    const laneToParentPool = new Map<string, string>();
+    for (const pool of elements) {
+      if (pool.type !== "pool") continue;
+      if (pool.properties.poolType !== "black-box") continue;
+      const laneChildren = elements.filter(
+        (e) => e.type === "lane" && e.parentId === pool.id,
+      );
+      if (laneChildren.length === 0) continue;
+      if (isPoolLabelGeneric(pool.label) && laneChildren.length === 1) {
+        const lane = laneChildren[0];
+        if (lane.label && lane.label.trim()) pool.label = lane.label;
+      }
+      for (const lane of laneChildren) {
+        lanesToRemove.add(lane.id);
+        laneToParentPool.set(lane.id, pool.id);
+      }
+    }
+    if (lanesToRemove.size > 0) {
+      for (const c of connectors) {
+        const newSrc = laneToParentPool.get(c.sourceId);
+        const newTgt = laneToParentPool.get(c.targetId);
+        if (newSrc) c.sourceId = newSrc;
+        if (newTgt) c.targetId = newTgt;
+      }
+      // Re-parent any descendants of the removed lanes up to the pool.
+      for (const e of elements) {
+        if (!e.parentId) continue;
+        const newParent = laneToParentPool.get(e.parentId);
+        if (newParent) e.parentId = newParent;
+      }
+      // Remove the lanes themselves.
+      for (let i = elements.length - 1; i >= 0; i--) {
+        if (lanesToRemove.has(elements[i].id)) elements.splice(i, 1);
+      }
+      // Repoint shapeIdToElId entries that pointed at a removed lane
+      // to the absorbing pool, so any later glue-target lookup still
+      // resolves correctly.
+      for (const [shapeId, elId] of shapeIdToElId.entries()) {
+        if (!lanesToRemove.has(elId)) continue;
+        const poolId = laneToParentPool.get(elId);
+        if (poolId) shapeIdToElId.set(shapeId, poolId);
+      }
+    }
+  }
+
   // Drop any heuristic-promoted pool whose final label is empty (after
   // <pp/> stripping, BpmnName fallback etc.) — these are almost always
   // a wrapper container we shouldn't have classified.  Also drop any
@@ -2879,6 +2949,21 @@ export async function importVisioV3(
       `with unrecognised masters: ${summary}.`,
     );
     warnings.push(...perShapeWarnings);
+  }
+
+  // Element type breakdown for diagnostics — surfaces, for each imported
+  // page, how many of each element type ended up in the diagram. Helpful
+  // when investigating "no data-objects came across" style reports.
+  {
+    const byType = new Map<string, number>();
+    for (const e of elements) byType.set(e.type, (byType.get(e.type) ?? 0) + 1);
+    if (byType.size > 0) {
+      const summary = [...byType.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .map(([t, n]) => `${n}× ${t}`)
+        .join(", ");
+      warnings.push(`Element types imported: ${summary}.`);
+    }
   }
 
   // Build the final stats payload — sorted by occurrence count desc.
