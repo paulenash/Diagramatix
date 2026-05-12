@@ -129,13 +129,22 @@ export async function GET(_req: Request, { params }: Params) {
       });
     }
 
-    // ── Duplicate pool/lane names (case-insensitive) ──
+    // ── Duplicate pool/lane names (case-insensitive, whitespace-insensitive) ──
+    // Two pools that look identical to the user can have stored labels
+    // that differ only in whitespace — most commonly because the importer
+    // auto-wraps long pool labels at different line widths depending on
+    // each pool's height, so "Registered Practitioner" in one pool ends
+    // up as "Registered\nPractitioner" in another. Collapse every run of
+    // whitespace (spaces, tabs, newlines, CR) to a single space before
+    // bucketing so visually-identical names match.
+    const normaliseName = (s: string) =>
+      s.replace(/\s+/g, " ").trim().toLowerCase();
     const nameBuckets = new Map<string, { id: string; type: string }[]>();
     for (const e of elements) {
       if (!CONTAINER_TYPES.has(e.type)) continue;
-      const raw = (e.label ?? "").trim();
-      if (!raw) continue;
-      const key = raw.toLowerCase();
+      const raw = e.label ?? "";
+      const key = normaliseName(raw);
+      if (!key) continue;
       const list = nameBuckets.get(key) ?? [];
       list.push({ id: e.id, type: e.type });
       nameBuckets.set(key, list);
@@ -143,9 +152,13 @@ export async function GET(_req: Request, { params }: Params) {
     const duplicateNames: DuplicateNameIssue[] = [];
     for (const [, list] of nameBuckets) {
       if (list.length < 2) continue;
-      // Re-look up the original label for display from the first element.
+      // Display the first element's actual label (with whitespace
+      // collapsed for readability) so the user sees the name they typed.
       const sampleLabel = elements.find((e) => e.id === list[0].id)?.label ?? "";
-      duplicateNames.push({ name: sampleLabel.trim(), elements: list });
+      duplicateNames.push({
+        name: sampleLabel.replace(/\s+/g, " ").trim(),
+        elements: list,
+      });
     }
 
     // ── Pools with exactly one child lane ──
