@@ -90,6 +90,12 @@ interface MasterInfo {
    *  Y-axis pointing UP (Visio convention). */
   txtPinX?: number;
   txtPinY?: number;
+  /** Master's `TxtWidth` cell. The width of the text block in inches.
+   *  Used to derive the renderer's `labelWidth` so multi-line labels
+   *  wrap the same way they do in Visio. v5.1 gateway masters set this
+   *  to 0.8333 in (80 px) so labels like "Investigate Further?" wrap
+   *  to two lines. */
+  txtWidth?: number;
 }
 
 interface ElementSeed {
@@ -535,12 +541,15 @@ async function loadMasterIndex(zip: JSZip): Promise<Map<string, MasterInfo>> {
     // Master's TxtPinX / TxtPinY — default label position relative to
     // the shape (Visio local coords, inches, Y-up). Instances inherit
     // these unless the user explicitly repositioned the label.
+    // TxtWidth — default text-block width in inches; drives label wrap.
     const txtPinX = readCellNum(head5, "TxtPinX") ?? undefined;
     const txtPinY = readCellNum(head5, "TxtPinY") ?? undefined;
+    const txtWidth = readCellNum(head5, "TxtWidth") ?? undefined;
     if (masterWidth || masterHeight || defaultText
         || Object.keys(bpmnProps).length > 0
-        || txtPinX !== undefined || txtPinY !== undefined) {
-      masters.set(id, { ...info, masterWidth, masterHeight, defaultText, bpmnProps, txtPinX, txtPinY });
+        || txtPinX !== undefined || txtPinY !== undefined
+        || txtWidth !== undefined) {
+      masters.set(id, { ...info, masterWidth, masterHeight, defaultText, bpmnProps, txtPinX, txtPinY, txtWidth });
     }
   }
   return masters;
@@ -1576,8 +1585,19 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
       const head0 = outerHead(r.block);
       const tpxInst = readCellNum(head0, "TxtPinX");
       const tpyInst = readCellNum(head0, "TxtPinY");
+      const twInst = readCellNum(head0, "TxtWidth");
       const txtPinX = tpxInst ?? elMasterInfo?.txtPinX;
       const txtPinY = tpyInst ?? elMasterInfo?.txtPinY;
+      const txtWidth = twInst ?? elMasterInfo?.txtWidth;
+      // Text-block width → labelWidth (px). Drives the renderer's
+      // word-wrap so multi-line labels reflow exactly as in Visio.
+      // Concrete v5.1 case: Exclusive Gateway master has
+      // `TxtWidth=0.8333"` (80 px); "Investigate Further?" wraps to
+      // "Investigate" + "Further?" at that width.
+      if (txtWidth !== undefined && txtWidth > 0) {
+        const labelWidth = Math.round(txtWidth * PX_PER_INCH);
+        if (labelWidth !== 80) properties.labelWidth = labelWidth;   // skip if renderer's default
+      }
       if (txtPinX !== undefined && txtPinY !== undefined) {
         // Convert Visio shape-local (bottom-left origin, Y-up) →
         // Diagramatix labelOffset (centred X offset, Y-down distance
