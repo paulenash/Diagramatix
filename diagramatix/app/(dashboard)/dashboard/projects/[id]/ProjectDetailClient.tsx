@@ -1725,10 +1725,43 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
       </header>
 
       <div className="flex flex-1 overflow-hidden">
-        {/* Left: Resizable folder tree */}
-        <div className="border-r border-gray-200 bg-white overflow-y-auto p-2 flex-shrink-0 group relative"
+        {/* Left: Resizable folder tree. Bulk action panel is pinned to
+            the BOTTOM of the sidebar when 1+ diagrams are multi-selected
+            in the tree — so the Move/Delete actions are always visible
+            without leaving the sidebar where the user is selecting. */}
+        <div className="border-r border-gray-200 bg-white flex-shrink-0 group relative flex flex-col"
           style={{ width: navWidth }}>
-          {renderFolder(ROOT_ID, 0)}
+          <div className="overflow-y-auto p-2 flex-1">
+            {renderFolder(ROOT_ID, 0)}
+          </div>
+          {selectedDiagramIds.size > 0 && (
+            <div className="border-t border-blue-200 bg-blue-50 px-2 py-2 text-[11px] flex flex-col gap-1.5">
+              <div className="font-medium text-blue-900">
+                {selectedDiagramIds.size} diagram{selectedDiagramIds.size === 1 ? "" : "s"} selected
+              </div>
+              <div className="flex gap-1.5 flex-wrap">
+                <button
+                  onClick={() => setShowBulkMoveDialog(true)}
+                  className="flex-1 px-2 py-1 text-[11px] text-white bg-blue-600 rounded hover:bg-blue-700 whitespace-nowrap"
+                >
+                  Move to folder…
+                </button>
+                <button
+                  onClick={() => setShowBulkDeleteConfirm(true)}
+                  className="flex-1 px-2 py-1 text-[11px] text-white bg-red-600 rounded hover:bg-red-700 whitespace-nowrap"
+                >
+                  Delete {selectedDiagramIds.size}…
+                </button>
+              </div>
+              <button
+                onClick={clearDiagramSelection}
+                className="text-[10px] text-blue-700 hover:text-blue-900 underline self-start"
+                title="Press Escape to clear"
+              >
+                Clear selection
+              </button>
+            </div>
+          )}
         </div>
         {/* Resize handle */}
         <div

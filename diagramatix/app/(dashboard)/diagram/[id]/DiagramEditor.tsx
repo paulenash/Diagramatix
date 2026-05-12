@@ -594,6 +594,13 @@ export function DiagramEditor({
   const [templateExportPrompt, setTemplateExportPrompt] = useState(false);
   const [templateImportFile, setTemplateImportFile] = useState<File | null>(null);
   const [visioImportStatus, setVisioImportStatus] = useState<VisioImportResult | null>(null);
+  // Pending Visio import awaiting the user's overwrite-vs-create decision.
+  // Set when the chosen .vsdx file's basename matches the current
+  // diagram's name; cleared by the ConfirmDialog's Cancel / OK handlers
+  // (which kick off `runVisioImport` with the chosen mode).
+  const [pendingVisioImport, setPendingVisioImport] = useState<
+    { file: File; baseName: string } | null
+  >(null);
   const [clearConfirmOpen, setClearConfirmOpen] = useState<null | "all" | "unselected">(null);
   const [clearMenuOpen, setClearMenuOpen] = useState(false);
   const clearMenuRef = useRef<HTMLDivElement>(null);
@@ -961,29 +968,27 @@ export function DiagramEditor({
 
   // Import a Visio (.vsdx) file from the in-editor menu.
   //
-  // If the .vsdx file's basename matches the current diagram's name, the
-  // user is prompted to overwrite. On confirm, the import API runs in
-  // overwrite mode (UPDATE the current diagram's data, no new diagram
-  // created) and we push the parsed data straight into the reducer via
-  // setData so the canvas reflects the import without a page reload.
-  //
-  // Otherwise the import follows the standard create path. The API
-  // automatically appends a `dd-mm-yy hh:mm` timestamp suffix when the
-  // requested name collides with another diagram in the same project.
+  // Two phases:
+  //   1. handleImportVisioFile — entry point from the file input. If the
+  //      .vsdx basename matches the current diagram's name, opens the
+  //      overwrite-confirm dialog (Diagramatix's native ConfirmDialog,
+  //      NOT window.confirm) and stashes the file for the dialog's
+  //      onConfirm / onCancel handlers. Otherwise proceeds directly to
+  //      the create path.
+  //   2. runVisioImport — does the actual API call once the user has
+  //      made a decision (or there was no name conflict). Called with
+  //      `overwrite=true` from the dialog's OK handler, `false` from
+  //      its Cancel handler or directly when no prompt is needed.
   async function handleImportVisioFile(file: File) {
     const baseName = file.name.replace(/\.vsdx$/i, "").trim() || "Imported Visio Diagram";
-    const namesMatch = baseName === diagramName;
-    let overwrite = false;
-    if (namesMatch) {
-      // Native confirm() — quickest path and consistent with browser idioms.
-      // Can be upgraded to a styled dialog later if desired.
-      overwrite = window.confirm(
-        `A Visio file named "${baseName}" matches the current diagram. ` +
-        `Overwrite the current diagram with the imported content?\n\n` +
-        `Click OK to overwrite, or Cancel to create a new diagram instead ` +
-        `(a timestamp will be appended to the name to avoid the conflict).`,
-      );
+    if (baseName === diagramName) {
+      setPendingVisioImport({ file, baseName });
+      return;
     }
+    await runVisioImport(file, baseName, false);
+  }
+
+  async function runVisioImport(file: File, baseName: string, overwrite: boolean) {
     try {
       const form = new FormData();
       form.append("file", file);
@@ -1001,12 +1006,10 @@ export function DiagramEditor({
         // Replace the in-memory reducer state with the imported parse
         // result. The auto-save's lastSaved ref still holds the OLD JSON
         // string, so it'll consider the diagram "unsaved" briefly until
-        // the next user action — that's a harmless visual nuance; the
-        // server already has the imported data committed.
+        // the next user action — harmless visual nuance; the server has
+        // the imported data committed.
         setData(result.diagram.data);
       }
-      // Always show the status modal — even on a clean import — so the
-      // user can see the per-master breakdown.
       setVisioImportStatus(result);
     } catch (err) {
       alert(`Visio import failed: ${err instanceof Error ? err.message : String(err)}`);
@@ -2311,6 +2314,37 @@ export function DiagramEditor({
           explicitly clicks Close or Open Diagram (z-[60] beats the
           unsaved-changes dialog and other z-50 overlays; backdrop click
           is swallowed). */}
+      {/* Overwrite-or-create confirm — shown when the chosen .vsdx
+          file's basename matches the current diagram's name.
+          OK ⇒ overwrite this diagram. Cancel ⇒ create a new diagram
+          (the API will append a dd-mm-yy hh:mm timestamp to the name
+          if a same-named diagram already exists in the project). */}
+      {pendingVisioImport && (
+        <ConfirmDialog
+          title={`Overwrite "${pendingVisioImport.baseName}"?`}
+          message={
+            `The Visio file's name matches this diagram. Overwrite the current ` +
+            `diagram with the imported content?\n\n` +
+            `Cancel will instead create a new diagram with the same name; if a ` +
+            `same-named diagram already exists in this project, a dd-mm-yy hh:mm ` +
+            `timestamp will be appended automatically to keep both visible.`
+          }
+          confirmLabel="Overwrite"
+          cancelLabel="Create new"
+          destructive={false}
+          onConfirm={async () => {
+            const p = pendingVisioImport;
+            setPendingVisioImport(null);
+            await runVisioImport(p.file, p.baseName, true);
+          }}
+          onCancel={async () => {
+            const p = pendingVisioImport;
+            setPendingVisioImport(null);
+            await runVisioImport(p.file, p.baseName, false);
+          }}
+        />
+      )}
+
       {visioImportStatus && (
         <div
           className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60]"
