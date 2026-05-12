@@ -445,6 +445,29 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
   const [scanExpanded, setScanExpanded] = useState<Set<string>>(new Set());
   const [scanErrorsOpen, setScanErrorsOpen] = useState(true);
   const [scanWarningsOpen, setScanWarningsOpen] = useState(true);
+  // Issue-type filter — ticked types are HIDDEN from the result list.
+  // Lets the user park known/accepted issues so the next rescan focuses
+  // on what's still actionable. Persists across rescans during the
+  // session via the same sessionStorage entry as the rest of the scan
+  // state.
+  type ErrorType =
+    | "pool-lane-connector"
+    | "duplicate-name"
+    | "single-lane-pool"
+    | "hanging-error";
+  type WarningType = "hanging-warning";
+  const [ignoredErrorTypes, setIgnoredErrorTypes] = useState<Set<ErrorType>>(new Set());
+  const [ignoredWarningTypes, setIgnoredWarningTypes] = useState<Set<WarningType>>(new Set());
+  const [scanIgnoresOpen, setScanIgnoresOpen] = useState(false);
+  const ERROR_TYPE_LABELS: Record<ErrorType, string> = {
+    "pool-lane-connector": "Sequence/Association on Pool or Lane",
+    "duplicate-name":      "Duplicate Pool/Lane names",
+    "single-lane-pool":    "Pools with a single Lane",
+    "hanging-error":       "Hanging messages (no x-axis overlap)",
+  };
+  const WARNING_TYPE_LABELS: Record<WarningType, string> = {
+    "hanging-warning": "Messages touching a white-box pool",
+  };
   /** Per-project sessionStorage key. Saving the scan result + expand
    *  state survives in-app navigation to a diagram and back so the user
    *  doesn't have to re-run the scan after fixing one diagram. */
@@ -464,12 +487,20 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
         expanded?: string[];
         errorsOpen?: boolean;
         warningsOpen?: boolean;
+        ignoredErrors?: string[];
+        ignoredWarnings?: string[];
+        ignoresOpen?: boolean;
       };
       if (parsed.result) {
         setScanResult(parsed.result);
         setScanExpanded(new Set(parsed.expanded ?? []));
         if (typeof parsed.errorsOpen === "boolean") setScanErrorsOpen(parsed.errorsOpen);
         if (typeof parsed.warningsOpen === "boolean") setScanWarningsOpen(parsed.warningsOpen);
+        if (Array.isArray(parsed.ignoredErrors))
+          setIgnoredErrorTypes(new Set(parsed.ignoredErrors as ErrorType[]));
+        if (Array.isArray(parsed.ignoredWarnings))
+          setIgnoredWarningTypes(new Set(parsed.ignoredWarnings as WarningType[]));
+        if (typeof parsed.ignoresOpen === "boolean") setScanIgnoresOpen(parsed.ignoresOpen);
       }
     } catch { /* ignore — corrupt entry; next scan overwrites */ }
     // Only on mount.
@@ -491,10 +522,13 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
           expanded: Array.from(scanExpanded),
           errorsOpen: scanErrorsOpen,
           warningsOpen: scanWarningsOpen,
+          ignoredErrors: Array.from(ignoredErrorTypes),
+          ignoredWarnings: Array.from(ignoredWarningTypes),
+          ignoresOpen: scanIgnoresOpen,
         }),
       );
     } catch { /* quota — ignore */ }
-  }, [scanResult, scanExpanded, scanErrorsOpen, scanWarningsOpen, scanStorageKey]);
+  }, [scanResult, scanExpanded, scanErrorsOpen, scanWarningsOpen, ignoredErrorTypes, ignoredWarningTypes, scanIgnoresOpen, scanStorageKey]);
 
   async function handleScanPoolConnectors() {
     setScanBusy(true);
@@ -627,6 +661,34 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
   const [navWidth, setNavWidth] = useState(208);
   const resizingRef = useRef(false);
 
+  // Diagram sort order within each folder in the nav tree. Persists per
+  // project in localStorage. "manual" preserves the user's drag-and-drop
+  // order stored in folderTree.diagramOrder; other modes override it.
+  type DiagramSort =
+    | "manual"
+    | "name-asc"
+    | "name-desc"
+    | "modified-desc"
+    | "modified-asc";
+  const [diagramSort, setDiagramSort] = useState<DiagramSort>("manual");
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = window.localStorage.getItem(`diagram-sort-${project.id}`);
+      if (raw === "manual" || raw === "name-asc" || raw === "name-desc"
+          || raw === "modified-asc" || raw === "modified-desc") {
+        setDiagramSort(raw);
+      }
+    } catch { /* ignore */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(`diagram-sort-${project.id}`, diagramSort);
+    } catch { /* ignore */ }
+  }, [diagramSort, project.id]);
+
   // Initialize folder tree from DB prop, with one-time migration from localStorage
   useEffect(() => {
     const dbTree = parseFolderTree(project.folderTree);
@@ -673,15 +735,37 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
     return () => document.removeEventListener("mousedown", handleClick);
   }, [showProjectMenu]);
 
-  // Get ordered diagrams in a specific folder
+  // Get ordered diagrams in a specific folder. Sort modes:
+  //   manual         — folderTree.diagramOrder[folderId] (drag-and-drop)
+  //   name-asc       — A→Z by diagram name
+  //   name-desc      — Z→A by diagram name
+  //   modified-desc  — newest first by updatedAt
+  //   modified-asc   — oldest first by updatedAt
   function getOrderedDiagramsInFolder(folderId: string): DiagramSummary[] {
     const direct = diagrams.filter(d => (folderTree.diagramFolderMap[d.id] ?? ROOT_ID) === folderId);
-    const order = folderTree.diagramOrder?.[folderId];
-    if (!order) return direct;
-    return direct.sort((a, b) => {
-      const ai = order.indexOf(a.id);
-      const bi = order.indexOf(b.id);
-      return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+    if (diagramSort === "manual") {
+      const order = folderTree.diagramOrder?.[folderId];
+      if (!order) return direct;
+      return direct.slice().sort((a, b) => {
+        const ai = order.indexOf(a.id);
+        const bi = order.indexOf(b.id);
+        return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+      });
+    }
+    const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+    return direct.slice().sort((a, b) => {
+      switch (diagramSort) {
+        case "name-asc":
+          return collator.compare(a.name, b.name);
+        case "name-desc":
+          return collator.compare(b.name, a.name);
+        case "modified-desc":
+          return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+        case "modified-asc":
+          return new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
+        default:
+          return 0;
+      }
     });
   }
 
@@ -1968,6 +2052,30 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
             without leaving the sidebar where the user is selecting. */}
         <div className="border-r border-gray-200 bg-white flex-shrink-0 group relative flex flex-col"
           style={{ width: navWidth }}>
+          {/* Sort selector for the diagram list within each folder.
+              "Manual" honours the user's drag-and-drop ordering; the
+              other modes override it. Persists per-project in
+              localStorage so it sticks across reloads. */}
+          <div className="border-b border-gray-100 px-2 py-1.5 flex items-center gap-1.5 text-[10px] text-gray-600">
+            <label htmlFor="diagram-sort" className="text-gray-500 shrink-0">Sort:</label>
+            <select
+              id="diagram-sort"
+              value={diagramSort}
+              onChange={(e) => setDiagramSort(e.target.value as DiagramSort)}
+              className="flex-1 min-w-0 text-[10px] border border-gray-300 rounded px-1 py-0.5 bg-white text-gray-700"
+              title={
+                diagramSort === "manual"
+                  ? "Manual order: drag diagrams in the tree to reorder"
+                  : "Sort overrides the drag-and-drop order. Choose Manual to restore it."
+              }
+            >
+              <option value="manual">Manual (drag &amp; drop)</option>
+              <option value="name-asc">Name ↑ (A–Z)</option>
+              <option value="name-desc">Name ↓ (Z–A)</option>
+              <option value="modified-desc">Modified ↓ (newest first)</option>
+              <option value="modified-asc">Modified ↑ (oldest first)</option>
+            </select>
+          </div>
           <div className="overflow-y-auto p-2 flex-1">
             {renderFolder(ROOT_ID, 0)}
           </div>
@@ -2434,20 +2542,92 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
             {scanError && (
               <p className="mb-3 text-sm text-red-600 bg-red-50 px-3 py-2 rounded">{scanError}</p>
             )}
+            {/* Ignore-types control. Selecting a type hides every instance
+                of it from the result list AND from the next rescan's
+                display. The selections persist across rescans within the
+                Scan-Fix-Rescan cycle (sessionStorage), so the user can
+                progressively park accepted issues. */}
+            {scanResult && (
+              <div className="mb-3 border border-gray-200 rounded">
+                <button
+                  onClick={() => setScanIgnoresOpen((v) => !v)}
+                  className="w-full flex items-center gap-2 px-3 py-1.5 bg-gray-50 hover:bg-gray-100 text-left rounded-t"
+                >
+                  <span className="text-gray-500 text-xs">{scanIgnoresOpen ? "▼" : "▶"}</span>
+                  <span className="text-xs font-medium text-gray-700">Ignore issue types</span>
+                  {(ignoredErrorTypes.size + ignoredWarningTypes.size) > 0 && (
+                    <span className="text-[10px] text-gray-500">
+                      {ignoredErrorTypes.size + ignoredWarningTypes.size} type{(ignoredErrorTypes.size + ignoredWarningTypes.size) === 1 ? "" : "s"} hidden
+                    </span>
+                  )}
+                </button>
+                {scanIgnoresOpen && (
+                  <div className="px-3 py-2 grid grid-cols-2 gap-x-4 gap-y-1">
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wide text-red-700 mb-1">Error types</p>
+                      {(Object.keys(ERROR_TYPE_LABELS) as ErrorType[]).map((t) => (
+                        <label key={t} className="flex items-center gap-1.5 text-[11px] text-gray-700 py-0.5">
+                          <input
+                            type="checkbox"
+                            checked={ignoredErrorTypes.has(t)}
+                            onChange={(e) => {
+                              setIgnoredErrorTypes((prev) => {
+                                const next = new Set(prev);
+                                if (e.target.checked) next.add(t);
+                                else next.delete(t);
+                                return next;
+                              });
+                            }}
+                            className="h-3 w-3"
+                          />
+                          <span>{ERROR_TYPE_LABELS[t]}</span>
+                        </label>
+                      ))}
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wide text-amber-700 mb-1">Warning types</p>
+                      {(Object.keys(WARNING_TYPE_LABELS) as WarningType[]).map((t) => (
+                        <label key={t} className="flex items-center gap-1.5 text-[11px] text-gray-700 py-0.5">
+                          <input
+                            type="checkbox"
+                            checked={ignoredWarningTypes.has(t)}
+                            onChange={(e) => {
+                              setIgnoredWarningTypes((prev) => {
+                                const next = new Set(prev);
+                                if (e.target.checked) next.add(t);
+                                else next.delete(t);
+                                return next;
+                              });
+                            }}
+                            className="h-3 w-3"
+                          />
+                          <span>{WARNING_TYPE_LABELS[t]}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
             {scanResult && (() => {
-              // Split each diagram's hanging messages into error vs warning
-              // buckets, then build the per-severity diagram lists. A
-              // diagram appears in Errors iff it has any error-grade
-              // issue, in Warnings iff it has any warning-grade issue —
-              // diagrams with both appear in both sections.
+              // Apply the ignored-types filter before splitting into
+              // error / warning buckets so counts and diagram rows
+              // reflect only what's still surfaced.
               type Bucketed = ScanDiagram & {
                 hangingErrors: ScanHangingMessage[];
                 hangingWarnings: ScanHangingMessage[];
               };
               const bucketed: Bucketed[] = scanResult.diagrams.map((d) => ({
                 ...d,
-                hangingErrors: d.hangingMessages.filter((m) => m.severity !== "warning"),
-                hangingWarnings: d.hangingMessages.filter((m) => m.severity === "warning"),
+                badConnectors:    ignoredErrorTypes.has("pool-lane-connector") ? [] : d.badConnectors,
+                duplicateNames:   ignoredErrorTypes.has("duplicate-name")      ? [] : d.duplicateNames,
+                singleLanePools:  ignoredErrorTypes.has("single-lane-pool")    ? [] : d.singleLanePools,
+                hangingErrors:    ignoredErrorTypes.has("hanging-error")
+                                    ? []
+                                    : d.hangingMessages.filter((m) => m.severity !== "warning"),
+                hangingWarnings:  ignoredWarningTypes.has("hanging-warning")
+                                    ? []
+                                    : d.hangingMessages.filter((m) => m.severity === "warning"),
               }));
               const errorDiagrams = bucketed.filter((d) =>
                 d.badConnectors.length > 0 ||
@@ -2456,15 +2636,26 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
                 d.hangingErrors.length > 0,
               );
               const warningDiagrams = bucketed.filter((d) => d.hangingWarnings.length > 0);
-              const errorTotal =
-                scanResult.totalBadConnectors +
-                scanResult.totalDuplicateGroups +
-                scanResult.totalSingleLanePools +
-                scanResult.totalHangingErrors;
-              const warningTotal = scanResult.totalHangingWarnings;
+              // Totals computed AFTER the ignore filter, so the summary
+              // reflects what's currently shown rather than the raw
+              // scan output.
+              let errorTotal = 0;
+              let warningTotal = 0;
+              for (const d of bucketed) {
+                errorTotal +=
+                  d.badConnectors.length +
+                  d.duplicateNames.length +
+                  d.singleLanePools.length +
+                  d.hangingErrors.length;
+                warningTotal += d.hangingWarnings.length;
+              }
               if (errorTotal === 0 && warningTotal === 0) {
+                const anyIgnored = ignoredErrorTypes.size + ignoredWarningTypes.size > 0;
                 return (
-                  <p className="text-sm text-gray-600">No errors or warnings found across this project&apos;s diagrams.</p>
+                  <p className="text-sm text-gray-600">
+                    No errors or warnings to show
+                    {anyIgnored ? " (some issue types are hidden — uncheck them above to see them)." : "."}
+                  </p>
                 );
               }
 
