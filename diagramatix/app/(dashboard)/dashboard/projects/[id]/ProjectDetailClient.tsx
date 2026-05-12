@@ -1440,10 +1440,41 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
                 onDragStart={() => setDragDiagramId(d.id)}
                 onDragEnd={() => setDragDiagramId(null)}
                 className={`flex items-center gap-1 px-1 py-0.5 rounded cursor-pointer text-[10px] ${
-                  selectedTreeItem === d.id ? "bg-blue-100 text-blue-800" : "text-gray-600 hover:bg-gray-50"
+                  selectedDiagramIds.has(d.id)
+                    ? "bg-blue-200 text-blue-900 ring-1 ring-blue-400"
+                    : selectedTreeItem === d.id ? "bg-blue-100 text-blue-800" : "text-gray-600 hover:bg-gray-50"
                 } ${dragDiagramId === d.id ? "opacity-40" : ""}`}
                 style={{ paddingLeft: (depth + 1) * 12 + 4 }}
-                onClick={(e) => { e.stopPropagation(); setSelectedTreeItem(d.id); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const ctrl = e.ctrlKey || e.metaKey;
+                  if (e.shiftKey && lastSelectedDiagramId) {
+                    // Range select within the diagram's folder.
+                    const folder = folderTree.diagramFolderMap[d.id] ?? ROOT_ID;
+                    const list = getOrderedDiagramsInFolder(folder).map(x => x.id);
+                    const a = list.indexOf(lastSelectedDiagramId);
+                    const b = list.indexOf(d.id);
+                    if (a >= 0 && b >= 0) {
+                      const [lo, hi] = a < b ? [a, b] : [b, a];
+                      const next = new Set(selectedDiagramIds);
+                      for (let i = lo; i <= hi; i++) next.add(list[i]);
+                      setSelectedDiagramIds(next);
+                      return;
+                    }
+                  }
+                  if (ctrl) {
+                    const next = new Set(selectedDiagramIds);
+                    if (next.has(d.id)) next.delete(d.id);
+                    else next.add(d.id);
+                    setSelectedDiagramIds(next);
+                    setLastSelectedDiagramId(d.id);
+                    return;
+                  }
+                  // Plain click in the tree: highlight only, clear multi-select.
+                  if (selectedDiagramIds.size > 0) clearDiagramSelection();
+                  setSelectedTreeItem(d.id);
+                  setLastSelectedDiagramId(d.id);
+                }}
                 onDoubleClick={() => handleOpenDiagram(d.id)}
               >
                 <span className="w-3" />
