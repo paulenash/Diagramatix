@@ -2313,7 +2313,8 @@ function resizeLaneForLabel(
 
     for (const sib of siblings) {
       const oldW = getLaneHeaderWidth(sib);
-      if (oldW === maxNeeded) continue;
+      // GROW-only: never shrink a lane header from a label edit.
+      if (maxNeeded <= oldW) continue;
       const deltaW = maxNeeded - oldW;
       // Direct children of THIS sibling shift by deltaW (they sit at sib.x + oldW).
       const sibDesc = new Set<string>();
@@ -2376,7 +2377,12 @@ function resizePoolForLabel(
   if (!pool || pool.type !== "pool") return { elements: baseElements, connectors: baseConnectors };
 
   const oldHeaderW = getPoolHeaderWidth(pool);
-  const deltaW = headerWidth - oldHeaderW;
+  // Grow-only: never shrink a pool from a label edit. The user has chosen
+  // the pool's dimensions deliberately; an auto-shrink on rename can
+  // displace contained shapes and is rarely what's wanted. We only enlarge
+  // when the new label genuinely needs more room.
+  const deltaW = Math.max(0, headerWidth - oldHeaderW);
+  const effectiveHeaderWidth = oldHeaderW + deltaW;
   const lanes = baseElements.filter(e => e.type === "lane" && e.parentId === poolId);
   const hasLanes = lanes.length > 0;
 
@@ -2392,13 +2398,12 @@ function resizePoolForLabel(
   }
   collect(poolId);
 
-  // Step 1: pool height. Free pool: snap to minHeight (shrink or grow).
-  // Pool with lanes: ensure total lane span >= minHeight, growing the
-  // last lane only when needed; never shrink lanes (preserves user
-  // layout inside lanes).
+  // Step 1: pool height. GROW-only — if the new label needs more vertical
+  // room, expand the pool (or its last lane) to fit; otherwise leave the
+  // pool's height alone so the user's chosen size persists.
   let elements = baseElements;
   if (!hasLanes) {
-    if (pool.height !== minHeight) {
+    if (pool.height < minHeight) {
       elements = elements.map(e => e.id === poolId ? { ...e, height: minHeight } : e);
     }
   } else {
@@ -2419,12 +2424,14 @@ function resizePoolForLabel(
     }
   }
 
-  // Step 2: header width. Store on pool; shift descendants by deltaW so
-  // existing children stay anchored to the body, not the header.
-  if (deltaW !== 0) {
+  // Step 2: header width. GROW-only — if the new label needs a wider
+  // header strip, widen it and shift descendants right by deltaW so
+  // existing children stay anchored to the body, not the header. We
+  // never shrink the header width on rename.
+  if (deltaW > 0) {
     elements = elements.map(e => {
       if (e.id === poolId) {
-        return { ...e, properties: { ...e.properties, poolHeaderWidth: headerWidth } };
+        return { ...e, properties: { ...e.properties, poolHeaderWidth: effectiveHeaderWidth } };
       }
       if (descendantIds.has(e.id)) {
         return { ...e, x: e.x + deltaW };
@@ -2432,10 +2439,9 @@ function resizePoolForLabel(
       return e;
     });
   } else if (typeof pool.properties?.poolHeaderWidth !== "number") {
-    // Persist 36 the first time we touch this pool so subsequent
-    // shrinkages have a baseline to diff against.
+    // Persist a baseline value the first time we touch this pool.
     elements = elements.map(e =>
-      e.id === poolId ? { ...e, properties: { ...e.properties, poolHeaderWidth: headerWidth } } : e
+      e.id === poolId ? { ...e, properties: { ...e.properties, poolHeaderWidth: effectiveHeaderWidth } } : e
     );
   }
 

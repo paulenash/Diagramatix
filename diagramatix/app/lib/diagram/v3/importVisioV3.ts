@@ -2351,13 +2351,20 @@ export async function importVisioV3(
     // walk-up the connector silently drops, which is exactly the
     // missing "Email" message in the user's import.
     //
-    // For SEQUENCE connectors, pool/lane ancestors are rejected — BPMN
-    // sequence flows must never attach to a pool boundary. If the only
-    // resolvable ancestor is a pool/lane, the connector is left with no
-    // glue resolution and falls through to the per-connector skip below
-    // (which logs a warning rather than silently drawing a wrong arrow
-    // from the pool edge).
+    // For SEQUENCE and ASSOCIATION connectors, pool/lane ancestors are
+    // rejected — sequence flows must never attach to a pool boundary, and
+    // an association from a Data Object to a nearby Task / Event /
+    // Gateway must snap to that flow element rather than falling through
+    // to the surrounding pool. If the only resolvable ancestor is a
+    // pool/lane, the connector is left with no glue resolution and falls
+    // through to the per-connector skip below (which logs a warning
+    // rather than silently drawing a wrong arrow from the pool edge).
+    // MESSAGE flows keep the existing pool-attached behaviour: BPMN
+    // message flows between pools legitimately terminate on the pool
+    // boundary.
     const isSequence = r.connectorBase === "sequence";
+    const isAssociation = r.connectorBase === "associationBPMN";
+    const avoidPool = isSequence || isAssociation;
     const isPoolOrLaneEl = (elId: string | undefined): boolean => {
       if (!elId) return false;
       const e = elements.find((x) => x.id === elId);
@@ -2371,8 +2378,8 @@ export async function importVisioV3(
         seen.add(cur);
         const elId = shapeIdToElId.get(cur);
         if (elId) {
-          if (isSequence && isPoolOrLaneEl(elId)) {
-            // Skip pool/lane ancestors for sequence flows; keep climbing.
+          if (avoidPool && isPoolOrLaneEl(elId)) {
+            // Skip pool/lane ancestors; keep climbing.
             const w = walkedById.get(cur);
             cur = w?.parentShapeId ?? null;
             continue;
@@ -2426,19 +2433,25 @@ export async function importVisioV3(
       // free-end that lands "very near" a task/event still snaps to that
       // element instead of falling through to the underlying pool.
       const EPS_DEFAULT = 0.05;
-      const EPS_SEQUENCE = 0.15;
+      const EPS_WIDE = 0.15;
       // Connector-type-aware candidate set:
-      //   • messageBPMN / associationBPMN free end → pools only (these
-      //     connectors typically attach at pool boundaries in BPMN).
+      //   • messageBPMN free end → pools only (BPMN message flows
+      //     terminate on a pool boundary by convention).
       //   • sequence free end → FLOW elements only (task, subprocess,
-      //     subprocess-expanded, gateway, events). NEVER a pool or lane —
-      //     sequence flows must never visually originate at a pool edge.
-      //     If the geometric search finds no flow element under or near
-      //     the free endpoint, the connector falls through to the
-      //     "missing endpoint" skip-with-warning below.
-      const SEQUENCE_FLOW_TYPES = new Set([
+      //     subprocess-expanded, gateway, events). NEVER a pool or lane.
+      //   • associationBPMN free end → FLOW elements + data shapes +
+      //     text annotations. NEVER a pool or lane — an association from
+      //     a Data Object to a nearby Task / Event / Gateway must snap
+      //     to that flow element rather than falling through to the
+      //     enclosing pool. If no candidate matches, the connector
+      //     falls through to the "missing endpoint" skip-with-warning.
+      const FLOW_TYPES = new Set<string>([
         "task", "subprocess", "subprocess-expanded",
         "start-event", "intermediate-event", "end-event", "gateway",
+      ]);
+      const ASSOCIATION_TYPES = new Set<string>([
+        ...FLOW_TYPES,
+        "data-object", "data-store", "text-annotation",
       ]);
       const labelById = new Map<string, string>();
       for (const e of elements) if (e.type === "pool") labelById.set(e.id, e.label ?? "");
@@ -2446,12 +2459,17 @@ export async function importVisioV3(
         if (xIn == null || yIn == null) return undefined;
         let bestId: string | undefined;
         let bestArea = Infinity;
-        const tol = isSequence ? EPS_SEQUENCE : EPS_DEFAULT;
+        const tol = avoidPool ? EPS_WIDE : EPS_DEFAULT;
+        const allowed: Set<string> | null = isSequence
+          ? FLOW_TYPES
+          : isAssociation
+            ? ASSOCIATION_TYPES
+            : null; // null → pool-only path below
         for (const r2 of raw) {
           const t = r2.seed?.type;
           if (!t) continue;
-          if (isSequence) {
-            if (!SEQUENCE_FLOW_TYPES.has(t)) continue;
+          if (allowed) {
+            if (!allowed.has(t)) continue;
           } else {
             if (t !== "pool") continue;
           }
@@ -2475,11 +2493,11 @@ export async function importVisioV3(
       if (!sourceId) sourceId = findContainerAt(begX, begY);
       if (!targetId) targetId = findContainerAt(endX, endY);
     }
-    // Final safety net: even with explicit Connect rows, a sequence
-    // connector that resolved to a pool/lane is wrong. Drop the resolution
-    // and let the skip-with-warning fire so the user can see which arrow
-    // didn't import and where to look in Visio.
-    if (isSequence) {
+    // Final safety net: even with explicit Connect rows, a sequence or
+    // association connector that resolved to a pool/lane is wrong. Drop
+    // the resolution and let the skip-with-warning fire so the user can
+    // see which arrow didn't import and where to look in Visio.
+    if (avoidPool) {
       if (sourceId && isPoolOrLaneEl(sourceId)) sourceId = undefined;
       if (targetId && isPoolOrLaneEl(targetId)) targetId = undefined;
     }
