@@ -1801,7 +1801,7 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
                     }}
                     title="Scan every diagram in this project for sequence/association connectors on a Pool/Lane, duplicate Pool/Lane names, Pools with a single Lane, and hanging messages (red on canvas)."
                   >
-                    {scanBusy ? "Scanning…" : "Scan Diagrams for Errors"}
+                    {scanBusy ? "Scanning…" : "Scan Diagrams for Issues"}
                   </button>
                 </div>
               )}
@@ -1860,74 +1860,91 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
                     ? "Exporting\u2026"
                     : importing
                       ? "Importing\u2026"
-                      : "Import/Export \u25BE"}
+                      : "File \u25BE"}
                 </button>
-                {showFileMenu && (
-                  <div
-                    className="fixed bg-white border border-gray-200 rounded-md shadow-lg py-1"
-                    style={{
-                      zIndex: 9999,
-                      top: fileMenuRef.current
-                        ? fileMenuRef.current.getBoundingClientRect().bottom + 4
-                        : 0,
-                      left: fileMenuRef.current
-                        ? fileMenuRef.current.getBoundingClientRect().left
-                        : 0,
-                      minWidth: 160,
-                    }}
-                  >
-                    <button
-                      className="block w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100"
-                      onClick={() => { setShowFileMenu(false); handleExportProject("json"); }}
-                    >
-                      Export JSON
-                    </button>
-                    <button
-                      className="block w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100"
-                      onClick={() => { setShowFileMenu(false); importJsonInputRef.current?.click(); }}
-                    >
-                      Import JSON
-                    </button>
-                    <div className="border-t border-gray-100" />
-                    <button
-                      className="block w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100"
-                      onClick={() => { setShowFileMenu(false); handleExportProject("xml"); }}
-                    >
-                      Export XML
-                    </button>
-                    <button
-                      className="block w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100"
-                      onClick={() => { setShowFileMenu(false); importXmlInputRef.current?.click(); }}
-                    >
-                      Import XML
-                    </button>
-                    <div className="border-t border-gray-100" />
-                    <button
-                      className="block w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100 disabled:opacity-50"
-                      disabled={visioImportInProgress}
-                      onClick={() => {
-                        setShowFileMenu(false);
-                        // Bulk flow: trigger the file picker; once a file
-                        // is chosen, handleImportVisioFile parses pages
-                        // and opens the bulk-import dialog.
-                        setImportVisioError("");
-                        importVisioInputRef.current?.click();
+                {showFileMenu && (() => {
+                  const itemCls = "block w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100";
+                  return (
+                    <div
+                      className="fixed bg-white border border-gray-200 rounded-md shadow-lg py-1"
+                      style={{
+                        zIndex: 9999,
+                        top: fileMenuRef.current
+                          ? fileMenuRef.current.getBoundingClientRect().bottom + 4
+                          : 0,
+                        left: fileMenuRef.current
+                          ? fileMenuRef.current.getBoundingClientRect().left
+                          : 0,
+                        minWidth: 170,
                       }}
-                      title="Import one or more pages from a Visio .vsdx file as separate diagrams"
                     >
-                      {visioImportInProgress ? "Importing Visio…" : "Import Visio"}
-                    </button>
-                    <a
-                      href="/BPMN%20Diagramatix%20Shapes%20v1.4.vssx"
-                      download
-                      onClick={() => setShowFileMenu(false)}
-                      className="block w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100"
-                      title="Download the BPMN Diagramatix stencil (.vssx) to use in Visio"
-                    >
-                      Export Visio Stencil
-                    </a>
-                  </div>
-                )}
+                      {/* Export ▸ submenu (hover to expand) */}
+                      <div className="group/export relative">
+                        <div className="flex items-center justify-between px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100 cursor-default">
+                          <span>Export</span>
+                          <span className="text-gray-400">{"▸"}</span>
+                        </div>
+                        <div className="hidden group-hover/export:block absolute left-full top-0 -mt-1 ml-px bg-white border border-gray-200 rounded-md shadow-lg py-1" style={{ minWidth: 170 }}>
+                          <button
+                            className={itemCls}
+                            onClick={() => { setShowFileMenu(false); handleExportProject("json"); }}
+                          >
+                            JSON
+                          </button>
+                          <button
+                            className={itemCls}
+                            onClick={() => { setShowFileMenu(false); handleExportProject("xml"); }}
+                          >
+                            XML &amp; XSD
+                          </button>
+                          <a
+                            href="/BPMN%20Diagramatix%20Shapes%20v1.5.vssx"
+                            download
+                            onClick={() => setShowFileMenu(false)}
+                            className={itemCls}
+                            title="Download the BPMN Diagramatix Shapes v1.5 stencil (.vssx) to use in Visio"
+                          >
+                            Visio Stencil
+                          </a>
+                        </div>
+                      </div>
+
+                      {/* Import ▸ submenu (hover to expand) */}
+                      <div className="group/import relative">
+                        <div className="flex items-center justify-between px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100 cursor-default">
+                          <span>Import</span>
+                          <span className="text-gray-400">{"▸"}</span>
+                        </div>
+                        <div className="hidden group-hover/import:block absolute left-full top-0 -mt-1 ml-px bg-white border border-gray-200 rounded-md shadow-lg py-1" style={{ minWidth: 170 }}>
+                          <button
+                            className={itemCls}
+                            onClick={() => { setShowFileMenu(false); importJsonInputRef.current?.click(); }}
+                          >
+                            JSON
+                          </button>
+                          <button
+                            className={itemCls}
+                            onClick={() => { setShowFileMenu(false); importXmlInputRef.current?.click(); }}
+                          >
+                            XML
+                          </button>
+                          <button
+                            className={`${itemCls} disabled:opacity-50`}
+                            disabled={visioImportInProgress}
+                            onClick={() => {
+                              setShowFileMenu(false);
+                              setImportVisioError("");
+                              importVisioInputRef.current?.click();
+                            }}
+                            title="Import one or more pages from a Visio .vsdx file as separate diagrams"
+                          >
+                            {visioImportInProgress ? "Visio (importing…)" : "Visio"}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
               <button
                 onClick={() => setShowNewDiagram(true)}
@@ -2396,13 +2413,23 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
           <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-2xl">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-lg font-semibold text-gray-900">
-                Scan Diagrams for Errors
+                Scan Diagrams for Issues
               </h2>
-              <button
-                onClick={() => { setScanResult(null); setScanError(""); }}
-                className="text-gray-400 hover:text-gray-600 text-lg leading-none"
-                title="Close"
-              >✕</button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleScanPoolConnectors()}
+                  disabled={scanBusy}
+                  className="px-3 py-1 text-xs font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
+                  title="Re-run the scan to refresh the issue list (e.g. after fixing one diagram and coming back)."
+                >
+                  {scanBusy ? "Scanning…" : "Rescan"}
+                </button>
+                <button
+                  onClick={() => { setScanResult(null); setScanError(""); }}
+                  className="text-gray-400 hover:text-gray-600 text-lg leading-none"
+                  title="Close"
+                >✕</button>
+              </div>
             </div>
             {scanError && (
               <p className="mb-3 text-sm text-red-600 bg-red-50 px-3 py-2 rounded">{scanError}</p>
