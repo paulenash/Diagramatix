@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useLayoutEffect, useRef, Fragment } from "react";
 import type {
   BpmnTaskType,
   FlowType,
@@ -57,6 +57,11 @@ interface Props {
   onSetDatabase?: (db: string) => void;
   forceCollapseTitle?: boolean;
 }
+
+// Cap for the task/subprocess Name textarea height. 6 lines × ~16px line-box
+// + ~10px vertical padding ≈ 106px. Beyond this the textarea scrolls
+// rather than continuing to grow.
+const NAME_TEXTAREA_MAX_PX = 106;
 
 const TASK_TYPE_OPTIONS: { value: BpmnTaskType; label: string }[] = [
   { value: "none",          label: "None" },
@@ -593,6 +598,9 @@ export function PropertiesPanel({
   forceCollapseTitle,
 }: Props) {
   const [labelDraft, setLabelDraft] = useState("");
+  // Auto-grow textarea ref for task/subprocess Name editing — height
+  // tracks content up to 6 lines, then scrolls.
+  const nameTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [panelCollapsed, setPanelCollapsed] = useState(false);
   const [titleOpen, setTitleOpen] = useState(true);
   const [connectorOpen, setConnectorOpen] = useState(true);
@@ -604,6 +612,16 @@ export function PropertiesPanel({
   useEffect(() => {
     if (element) setLabelDraft(element.label);
   }, [element]);
+
+  // Auto-grow the task/subprocess Name textarea. Height = scrollHeight up
+  // to the 6-line cap, after which the textarea scrolls internally.
+  useLayoutEffect(() => {
+    const ta = nameTextareaRef.current;
+    if (!ta) return;
+    ta.style.height = "auto";
+    const next = Math.min(ta.scrollHeight, NAME_TEXTAREA_MAX_PX);
+    ta.style.height = next + "px";
+  }, [labelDraft, element?.id]);
 
   // Collapse title and panel when AI panel opens
   useEffect(() => {
@@ -1405,10 +1423,66 @@ export function PropertiesPanel({
            element.type === "task" || element.type === "subprocess" ||
            element.type === "subprocess-expanded" ? "Name" : "Label"}
         </label>
-        {(element.type === "gateway" || isEventElement ||
+        {(element.type === "task" || element.type === "subprocess" || element.type === "subprocess-expanded") ? (
+          // Task / Sub-Process / Expanded Sub-Process Name editor:
+          //  - auto-grows downward as the user adds lines
+          //  - shrinks back upward as lines are removed
+          //  - caps at 6 visible lines; scrolls thereafter
+          //  - a faint ↵ glyph is rendered at every hard newline so
+          //    Shift+Enter breaks are visually distinguishable from
+          //    soft word-wrap.
+          // The ↵ glyphs are drawn by an absolutely-positioned <pre>
+          // beneath a transparent textarea — both share identical font,
+          // padding, and wrap rules so the glyphs line up with the
+          // textarea's own breaks.
+          <div className="relative w-full">
+            <pre
+              aria-hidden="true"
+              className="absolute inset-0 m-0 px-1.5 py-1 border border-transparent rounded text-[11px] pointer-events-none whitespace-pre-wrap break-words overflow-hidden font-sans leading-[1.4] text-gray-900"
+            >
+              {labelDraft.split("\n").map((line, i, arr) => (
+                <Fragment key={i}>
+                  {line}
+                  {i < arr.length - 1 && (
+                    <>
+                      <span className="text-gray-400 select-none">↵</span>
+                      {"\n"}
+                    </>
+                  )}
+                </Fragment>
+              ))}
+              {/* Trailing space so an empty final line is reflected in the
+                  scrollHeight calculation. */}
+              {" "}
+            </pre>
+            <textarea
+              ref={nameTextareaRef}
+              key={element.id}
+              data-properties-label="true"
+              className="relative w-full px-1.5 py-1 border border-gray-300 rounded text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-500 overflow-y-auto whitespace-pre-wrap break-words font-sans leading-[1.4]"
+              style={{
+                background: "transparent",
+                color: "transparent",
+                caretColor: "#111827",
+                resize: "none",
+                maxHeight: NAME_TEXTAREA_MAX_PX,
+              }}
+              rows={1}
+              value={labelDraft}
+              onFocus={(e) => e.target.select()}
+              onChange={(e) => setLabelDraft(e.target.value)}
+              onBlur={() => { if (labelDraft !== element.label) onUpdateLabel(element.id, labelDraft); }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  onUpdateLabel(element.id, labelDraft);
+                }
+              }}
+            />
+          </div>
+        ) : (element.type === "gateway" || isEventElement ||
           element.type === "data-object" || element.type === "data-store" ||
-          element.type === "task" || element.type === "subprocess" ||
-          element.type === "subprocess-expanded" || element.type === "use-case" ||
+          element.type === "use-case" ||
           element.type === "external-entity" || element.type === "process-system" ||
           element.type === "uml-class" || element.type === "uml-enumeration" ||
           element.type === "text-annotation" ||

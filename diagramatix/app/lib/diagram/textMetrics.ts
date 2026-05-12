@@ -9,7 +9,22 @@
 
 export const AVG_CHAR_W_FACTOR = 0.55;
 export const LINE_HEIGHT = 14;
-export const PAD = 4;
+/** 5px gap between the element boundary and the text-box boundary on every
+ *  side. Used by both autosize and the renderer so the two never disagree. */
+export const PAD = 5;
+/** Task marker icon geometry (mirrors SymbolRenderer's BpmnTaskMarker). The
+ *  marker is drawn at offset (4, 4) from the element's top-left at 14×14. */
+export const TASK_MARKER_X = 4;
+export const TASK_MARKER_Y = 4;
+export const MARKER_SIZE = 14;
+/** Subprocess collapsed marker: bottom-centre, 14×14, with a 3px offset
+ *  from the element bottom (top edge at height-17, bottom at height-3). */
+export const SUBPROCESS_MARKER_BOTTOM_OFFSET = 3;
+/** Bottom reserve consumed by the subprocess marker (always, since the
+ *  marker is permanent on a collapsed sub-process). Includes the marker
+ *  itself plus a 2px gap above it. */
+export const SUBPROCESS_BOTTOM_RESERVE =
+  SUBPROCESS_MARKER_BOTTOM_OFFSET + MARKER_SIZE + 2; // 19
 
 /** Word-wrap a label to fit a given pixel width, using a fixed-pitch
  *  character-width estimate (avgCharWidth = fontSize * AVG_CHAR_W_FACTOR).
@@ -64,26 +79,31 @@ export function getDefaultSize(type: AutosizeType): { w: number; h: number } {
     : { w: SUBPROCESS_DEFAULT_W, h: SUBPROCESS_DEFAULT_H };
 }
 
-/** Width consumed by the task-type marker icon on the FIRST line only.
- *  Mirrors the renderer: marker is drawn at (x+4, y+4) at 14×14 with a 2px
- *  gap to text → text on line 1 starts at x+20. Combined with the 4px right
- *  PAD, line 1 has `el.width - 24` of usable horizontal space, while
- *  lines 2+ get the full `el.width - 8`. */
-export const TASK_MARKER_LINE1_RESERVE = 16; // 20 (marker left edge) − 4 (PAD)
+/** Horizontal width reserved on the FIRST line of a task with a marker.
+ *  When the text block is large enough that line 1 vertically overlaps the
+ *  marker zone, line 1 is wrapped at a narrower width so its glyphs sit to
+ *  the right of the marker icon plus an additional marker-width gap (per
+ *  the spec: "leave just enough room for the marker and a marker width
+ *  extra").
+ *
+ *  Reserved area on the left of line 1 (relative to PAD-aligned text-box
+ *  left): marker_x_offset (4) + marker_w (14) + extra_gap (14) - PAD (5)
+ *  = 27. So firstLineWidth = innerW - 27. */
+export const TASK_MARKER_LINE1_RESERVE = TASK_MARKER_X + MARKER_SIZE + MARKER_SIZE - PAD; // 27
 
 /** Vertical "chrome" reserved by the renderer for icons/markers within a
  *  task or sub-process. Subtracted from element height to give usable
  *  vertical space for the label.
- *  - task no marker: 2*PAD = 8 (just top/bottom padding)
- *  - task with marker: 2*PAD = 8 — line 1 wraps AROUND the marker (text
- *    starts beside the marker, not below it), so the marker no longer
- *    reserves vertical space. The marker reserves horizontal space on
- *    line 1 only (see TASK_MARKER_LINE1_RESERVE).
- *  - subprocess (collapsed) with bottom marker: 4 PAD top + 20 reserve = 24 */
-function verticalChrome(type: AutosizeType, _hasTaskMarker: boolean): number {
+ *  - task: 2*PAD = 10 (just top/bottom padding). Even when a marker is
+ *    present, the marker doesn't reserve vertical space — line 1 wraps
+ *    around it horizontally when the text block grows tall enough to
+ *    intersect the marker's vertical band.
+ *  - subprocess (collapsed): PAD top + SUBPROCESS_BOTTOM_RESERVE bottom
+ *    = 5 + 19 = 24. The bottom marker is permanent, so text can never
+ *    extend into the bottom reserve. */
+function verticalChrome(type: AutosizeType): number {
   if (type === "task") return 2 * PAD;
-  // subprocess (collapsed): 4 PAD top + 20 marker reserve bottom
-  return 24;
+  return PAD + SUBPROCESS_BOTTOM_RESERVE;
 }
 
 /** Compute the smallest aspect-locked size (scale factor s ≥ 1 of the type's
@@ -99,7 +119,7 @@ export function autoSizeForType(
   hasTaskMarker = false,
 ): { w: number; h: number } {
   const { w: defaultW, h: defaultH } = getDefaultSize(type);
-  const vChrome = verticalChrome(type, hasTaskMarker);
+  const vChrome = verticalChrome(type);
   const text = label || "";
 
   // Quick path: empty / very short label fits at s = 1.
@@ -108,23 +128,42 @@ export function autoSizeForType(
   const MAX_S = 8;
   const STEP = 0.05;
   for (let s = 1.0; s <= MAX_S + 1e-6; s += STEP) {
+    const H = defaultH * s;
     const innerW = defaultW * s - 2 * PAD;
-    const innerH = defaultH * s - vChrome;
+    const innerH = H - vChrome;
     if (innerW <= 0 || innerH <= 0) continue;
-    const firstLineW = hasTaskMarker ? innerW - TASK_MARKER_LINE1_RESERVE : undefined;
-    if (firstLineW != null && firstLineW <= 0) continue;
-    const lines = wrapText(text, innerW, fontSize, firstLineW);
-    const needsH = lines.length * LINE_HEIGHT;
-    // Longest wrapped line's pixel width (chars × avgCharWidth). Line 0
-    // is checked against firstLineW; lines 1+ against innerW.
+
+    // First pass: try with line 1 at full inner width. Only narrow line 1
+    // if the centred text block extends up into the marker zone — i.e.
+    // line 1's top y crosses the marker's bottom edge (PAD + MARKER_SIZE
+    // − ... using element-local coords: textBlockTop_local < TASK_MARKER_Y
+    // + MARKER_SIZE = 18). This matches the renderer.
+    let firstLineW: number | undefined = undefined;
+    let lines = wrapText(text, innerW, fontSize, firstLineW);
+    let textBlockH = lines.length * LINE_HEIGHT;
+
+    if (hasTaskMarker) {
+      // Text block is centred vertically inside the element.
+      const textBlockTopLocal = (H - textBlockH) / 2;
+      const markerBottomLocal = TASK_MARKER_Y + MARKER_SIZE; // 18
+      if (textBlockTopLocal < markerBottomLocal) {
+        // Marker would overlap line 1 → narrow line 1.
+        firstLineW = innerW - TASK_MARKER_LINE1_RESERVE;
+        if (firstLineW <= 0) continue;
+        lines = wrapText(text, innerW, fontSize, firstLineW);
+        textBlockH = lines.length * LINE_HEIGHT;
+      }
+    }
+
+    // Check fit: every line within its width cap; total height ≤ innerH.
     let widthOK = true;
     for (let i = 0; i < lines.length; i++) {
       const lw = lines[i].length * fontSize * AVG_CHAR_W_FACTOR;
       const cap = (i === 0 && firstLineW != null) ? firstLineW : innerW;
       if (lw > cap) { widthOK = false; break; }
     }
-    if (widthOK && needsH <= innerH) {
-      return { w: Math.round(defaultW * s), h: Math.round(defaultH * s) };
+    if (widthOK && textBlockH <= innerH) {
+      return { w: Math.round(defaultW * s), h: Math.round(H) };
     }
   }
   return { w: Math.round(defaultW * MAX_S), h: Math.round(defaultH * MAX_S) };

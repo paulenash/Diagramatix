@@ -2470,7 +2470,19 @@ export function SymbolRenderer({
         element.type === 'external-entity' ||
         element.type === 'process-system'
       ) && (() => {
-        const PAD = 4;
+        // Geometry constants for task/sub-process text-box layout. PAD is the
+        // gap between the element boundary and the text-box boundary on every
+        // side. Mirrors textMetrics.ts so renderer + autosize agree exactly.
+        const PAD = 5;
+        const TASK_MARKER_X = 4;            // BpmnTaskMarker render offset
+        const TASK_MARKER_Y = 4;
+        const MARKER_SIZE = 14;
+        // Reserved horizontal space on line 1 for the marker icon plus a
+        // marker-width "extra" gap (so line 1 doesn't crowd the marker).
+        const TASK_MARKER_LINE1_RESERVE = TASK_MARKER_X + MARKER_SIZE + MARKER_SIZE - PAD; // 27
+        // Subprocess collapsed marker bottom geometry — text must never
+        // intrude into this reserve.
+        const SUBPROCESS_BOTTOM_RESERVE = 19;
         const el = element;
         const elCenterX = el.x + el.width / 2;
         const elCenterY = el.y + el.height / 2;
@@ -2479,33 +2491,53 @@ export function SymbolRenderer({
         const labelOffsetY = (el.properties.labelOffsetY as number) ?? 0;
         const labelWidth   = (el.properties.labelWidth   as number) ?? defaultW;
         const labelCenterX = elCenterX + labelOffsetX;
-        const labelCenterY = elCenterY + labelOffsetY;
         const lineH = 14;
         const hasTaskMarker = el.type === 'task' && !!el.taskType && el.taskType !== 'none';
-        // When the task carries a type marker, the first line of text wraps
-        // around the marker (text starts beside the marker, not below it).
-        // First line gets a narrower width; subsequent lines use the full
-        // label width. Mirrors the autosize logic in textMetrics.ts.
-        const TASK_MARKER_LINE1_RESERVE = 16;
-        const firstLineWidth = hasTaskMarker ? Math.max(8, labelWidth - TASK_MARKER_LINE1_RESERVE) : undefined;
-        const lines = wrapText(el.label, labelWidth, 12, firstLineWidth);
-        const totalLabelH = lines.length * lineH;
-        const labelTopY = el.type === 'subprocess-expanded'
-          ? el.y + PAD   // pin to top of element
-          : hasTaskMarker
-            ? el.y + PAD  // first line sits beside the marker (marker is at y+4..y+18)
-            : labelCenterY - totalLabelH / 2;
-        const labelLeftX = labelCenterX - labelWidth / 2;
-        // X-centre for the first line of a task with a marker — centred on
-        // the marker-free region so text doesn't overlap the icon.
-        const firstLineCenterX = hasTaskMarker
-          ? el.x + (TASK_MARKER_LINE1_RESERVE + 2 * PAD + el.width) / 2
-          : labelCenterX;
-        const iconReserveTop = 0;
+        const isSubprocessCollapsed = el.type === 'subprocess';
         const hasRepeatMarker = el.repeatType && el.repeatType !== 'none';
-        const iconReserveBot = (el.type === 'subprocess' || hasRepeatMarker) ? 20 : 0;
-        const minY    = el.y + PAD + iconReserveTop;
-        const maxBotY = el.y + el.height - PAD - iconReserveBot;
+        // Usable vertical band for the text block (excludes any permanent
+        // bottom marker space on a subprocess). The text block is centred
+        // within this band, then user labelOffsetY shifts it.
+        const usableTopY = el.y + PAD;
+        const usableBotY = el.y + el.height - PAD
+          - (isSubprocessCollapsed || hasRepeatMarker ? SUBPROCESS_BOTTOM_RESERVE - PAD : 0);
+        const usableCenterY = (usableTopY + usableBotY) / 2 + labelOffsetY;
+        // First pass: wrap at full label width.
+        let firstLineWidth: number | undefined = undefined;
+        let lines = wrapText(el.label, labelWidth, 12, firstLineWidth);
+        let totalLabelH = lines.length * lineH;
+        // Vertical position of the text block.
+        let labelTopY: number;
+        if (el.type === 'subprocess-expanded') {
+          labelTopY = el.y + PAD; // EP keeps label pinned to top
+        } else {
+          labelTopY = usableCenterY - totalLabelH / 2;
+        }
+        // Task marker: if line 1's vertical band intersects the marker
+        // zone, re-wrap with a narrower line 1 (centred on the marker-free
+        // region) and re-position the (potentially taller) block.
+        if (hasTaskMarker) {
+          const markerBottomY = el.y + TASK_MARKER_Y + MARKER_SIZE;
+          if (labelTopY < markerBottomY) {
+            const narrow = Math.max(8, labelWidth - TASK_MARKER_LINE1_RESERVE);
+            firstLineWidth = narrow;
+            lines = wrapText(el.label, labelWidth, 12, firstLineWidth);
+            totalLabelH = lines.length * lineH;
+            labelTopY = usableCenterY - totalLabelH / 2;
+          }
+        }
+        // Clamp top so text never escapes the usable top edge.
+        if (labelTopY < usableTopY) labelTopY = usableTopY;
+        const labelLeftX = labelCenterX - labelWidth / 2;
+        // X-centre for the first line of a task with a narrowed line 1 —
+        // anchored to the marker-free region, ignoring labelOffsetX (the
+        // narrowing is absolute to the marker position, not the user's
+        // drag offset). Other lines centre on labelCenterX as usual.
+        const firstLineCenterX = firstLineWidth != null
+          ? el.x + (TASK_MARKER_X + MARKER_SIZE + MARKER_SIZE + (el.width - PAD)) / 2
+          : labelCenterX;
+        const minY    = el.y + PAD;
+        const maxBotY = el.y + el.height - PAD - (isSubprocessCollapsed || hasRepeatMarker ? SUBPROCESS_BOTTOM_RESERVE - PAD : 0);
         function clamp(v: number, lo: number, hi: number) { return Math.max(lo, Math.min(hi, v)); }
         function handleInteriorLabelMouseDown(ev: React.MouseEvent) {
           ev.stopPropagation();
