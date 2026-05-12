@@ -2481,19 +2481,30 @@ export function SymbolRenderer({
         const labelCenterX = elCenterX + labelOffsetX;
         const labelCenterY = elCenterY + labelOffsetY;
         const lineH = 14;
-        const lines = wrapText(el.label, labelWidth);
-        const totalLabelH = lines.length * lineH;
         const hasTaskMarker = el.type === 'task' && !!el.taskType && el.taskType !== 'none';
+        // When the task carries a type marker, the first line of text wraps
+        // around the marker (text starts beside the marker, not below it).
+        // First line gets a narrower width; subsequent lines use the full
+        // label width. Mirrors the autosize logic in textMetrics.ts.
+        const TASK_MARKER_LINE1_RESERVE = 16;
+        const firstLineWidth = hasTaskMarker ? Math.max(8, labelWidth - TASK_MARKER_LINE1_RESERVE) : undefined;
+        const lines = wrapText(el.label, labelWidth, 12, firstLineWidth);
+        const totalLabelH = lines.length * lineH;
         const labelTopY = el.type === 'subprocess-expanded'
           ? el.y + PAD   // pin to top of element
           : hasTaskMarker
-            ? el.y + 20  // 2px below marker bottom (el.y + 4 offset + 14px icon + 2px gap)
+            ? el.y + PAD  // first line sits beside the marker (marker is at y+4..y+18)
             : labelCenterY - totalLabelH / 2;
         const labelLeftX = labelCenterX - labelWidth / 2;
-        const iconReserveTop = hasTaskMarker ? 20 : 0;
+        // X-centre for the first line of a task with a marker — centred on
+        // the marker-free region so text doesn't overlap the icon.
+        const firstLineCenterX = hasTaskMarker
+          ? el.x + (TASK_MARKER_LINE1_RESERVE + 2 * PAD + el.width) / 2
+          : labelCenterX;
+        const iconReserveTop = 0;
         const hasRepeatMarker = el.repeatType && el.repeatType !== 'none';
         const iconReserveBot = (el.type === 'subprocess' || hasRepeatMarker) ? 20 : 0;
-        const minY    = hasTaskMarker ? el.y + 20 : el.y + PAD + iconReserveTop;
+        const minY    = el.y + PAD + iconReserveTop;
         const maxBotY = el.y + el.height - PAD - iconReserveBot;
         function clamp(v: number, lo: number, hi: number) { return Math.max(lo, Math.min(hi, v)); }
         function handleInteriorLabelMouseDown(ev: React.MouseEvent) {
@@ -2564,7 +2575,11 @@ export function SymbolRenderer({
               style={{ userSelect: "none", pointerEvents: "none" }}
             >
               {lines.map((line, i) => (
-                <tspan key={i} x={labelCenterX} y={labelTopY + i * lineH + lineH * 0.85}>
+                <tspan
+                  key={i}
+                  x={i === 0 ? firstLineCenterX : labelCenterX}
+                  y={labelTopY + i * lineH + lineH * 0.85}
+                >
                   {line}
                 </tspan>
               ))}

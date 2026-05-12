@@ -4499,6 +4499,28 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         });
         return { ...state, elements: resizedElements, connectors };
       }
+      // Task / Sub-Process: any property change can affect the marker
+      // presence (taskType: none ↔ user/service/script/…) which changes
+      // the first-line width budget in autosize. Recompute size, keep the
+      // centre put, recompute attached connectors. Idempotent when the
+      // change didn't affect the marker.
+      if (el && (el.type === "task" || el.type === "subprocess")) {
+        const { w, h } = autoSizeForElement(el);
+        if (w !== el.width || h !== el.height) {
+          const resizedElements = elements.map((e) => {
+            if (e.id !== el.id) return e;
+            const dx = (w - e.width) / 2;
+            const dy = (h - e.height) / 2;
+            return { ...e, x: e.x - dx, y: e.y - dy, width: w, height: h };
+          });
+          const finalElements = ensureContainersEncloseChildren(resizedElements);
+          const connectors = state.connectors.map((conn) => {
+            if (conn.sourceId !== el.id && conn.targetId !== el.id) return conn;
+            return recomputeAllConnectors([conn], finalElements)[0] ?? conn;
+          });
+          return { ...state, elements: finalElements, connectors };
+        }
+      }
       return { ...state, elements };
     }
 

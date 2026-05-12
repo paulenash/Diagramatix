@@ -5010,7 +5010,11 @@ export function Canvas({
             style={{
               position: "absolute",
               left: liveLeft,
-              top: liveTop + (hasTaskMarker ? 20 * zoom : 0),
+              // Marker no longer reserves vertical space — first line of
+              // text wraps around the marker on the same row. The textarea
+              // covers the full element area during edit; the marker
+              // re-appears once commit re-renders the underlying shape.
+              top: liveTop,
               width: liveW,
               height: editH,
               fontSize: (data.fontSize ?? 12) * zoom,

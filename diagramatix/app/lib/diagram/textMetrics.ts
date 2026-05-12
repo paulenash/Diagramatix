@@ -14,17 +14,33 @@ export const PAD = 4;
 /** Word-wrap a label to fit a given pixel width, using a fixed-pitch
  *  character-width estimate (avgCharWidth = fontSize * AVG_CHAR_W_FACTOR).
  *  Splits on '\n' first so explicit Shift+Enter breaks are preserved.
- *  Returns an array of wrapped lines (always ≥ 1, empty string if input empty). */
-export function wrapText(text: string, maxWidth: number, fontSize = 12): string[] {
+ *  Returns an array of wrapped lines (always ≥ 1, empty string if input empty).
+ *
+ *  `firstLineWidth` (optional): if provided, line 1 is wrapped at this
+ *  narrower width while lines 2+ use `maxWidth`. Used for task-with-marker
+ *  geometry where the first line wraps around the marker icon. */
+export function wrapText(
+  text: string,
+  maxWidth: number,
+  fontSize = 12,
+  firstLineWidth?: number,
+): string[] {
   const avgCharWidth = fontSize * AVG_CHAR_W_FACTOR;
-  const charsPerLine = Math.max(1, Math.floor(maxWidth / avgCharWidth));
+  const fullCpl = Math.max(1, Math.floor(maxWidth / avgCharWidth));
+  const firstCpl = firstLineWidth != null
+    ? Math.max(1, Math.floor(firstLineWidth / avgCharWidth))
+    : fullCpl;
   const lines: string[] = [];
   for (const segment of text.split("\n")) {
     const words = segment.split(" ");
     let current = "";
     for (const word of words) {
+      // Choose the line budget for the line we'd be COMMITTING to (the
+      // current accumulating one). lines.length === 0 && current === ""
+      // means we haven't pushed any line yet → still building line 1.
+      const cpl = lines.length === 0 ? firstCpl : fullCpl;
       if (!current) { current = word; }
-      else if (current.length + 1 + word.length <= charsPerLine) { current += " " + word; }
+      else if (current.length + 1 + word.length <= cpl) { current += " " + word; }
       else { lines.push(current); current = word; }
     }
     lines.push(current);
@@ -48,14 +64,24 @@ export function getDefaultSize(type: AutosizeType): { w: number; h: number } {
     : { w: SUBPROCESS_DEFAULT_W, h: SUBPROCESS_DEFAULT_H };
 }
 
+/** Width consumed by the task-type marker icon on the FIRST line only.
+ *  Mirrors the renderer: marker is drawn at (x+4, y+4) at 14×14 with a 2px
+ *  gap to text → text on line 1 starts at x+20. Combined with the 4px right
+ *  PAD, line 1 has `el.width - 24` of usable horizontal space, while
+ *  lines 2+ get the full `el.width - 8`. */
+export const TASK_MARKER_LINE1_RESERVE = 16; // 20 (marker left edge) − 4 (PAD)
+
 /** Vertical "chrome" reserved by the renderer for icons/markers within a
  *  task or sub-process. Subtracted from element height to give usable
  *  vertical space for the label.
  *  - task no marker: 2*PAD = 8 (just top/bottom padding)
- *  - task with marker (user/service/script/etc.): 20 + 4 = 24
- *  - subprocess (collapsed) with bottom + marker: 4 + 20 = 24 */
-function verticalChrome(type: AutosizeType, hasTaskMarker: boolean): number {
-  if (type === "task") return hasTaskMarker ? 24 : 2 * PAD;
+ *  - task with marker: 2*PAD = 8 — line 1 wraps AROUND the marker (text
+ *    starts beside the marker, not below it), so the marker no longer
+ *    reserves vertical space. The marker reserves horizontal space on
+ *    line 1 only (see TASK_MARKER_LINE1_RESERVE).
+ *  - subprocess (collapsed) with bottom marker: 4 PAD top + 20 reserve = 24 */
+function verticalChrome(type: AutosizeType, _hasTaskMarker: boolean): number {
+  if (type === "task") return 2 * PAD;
   // subprocess (collapsed): 4 PAD top + 20 marker reserve bottom
   return 24;
 }
@@ -85,15 +111,19 @@ export function autoSizeForType(
     const innerW = defaultW * s - 2 * PAD;
     const innerH = defaultH * s - vChrome;
     if (innerW <= 0 || innerH <= 0) continue;
-    const lines = wrapText(text, innerW, fontSize);
+    const firstLineW = hasTaskMarker ? innerW - TASK_MARKER_LINE1_RESERVE : undefined;
+    if (firstLineW != null && firstLineW <= 0) continue;
+    const lines = wrapText(text, innerW, fontSize, firstLineW);
     const needsH = lines.length * LINE_HEIGHT;
-    // Longest wrapped line's pixel width (chars × avgCharWidth).
-    let maxLineW = 0;
-    for (const ln of lines) {
-      const lw = ln.length * fontSize * AVG_CHAR_W_FACTOR;
-      if (lw > maxLineW) maxLineW = lw;
+    // Longest wrapped line's pixel width (chars × avgCharWidth). Line 0
+    // is checked against firstLineW; lines 1+ against innerW.
+    let widthOK = true;
+    for (let i = 0; i < lines.length; i++) {
+      const lw = lines[i].length * fontSize * AVG_CHAR_W_FACTOR;
+      const cap = (i === 0 && firstLineW != null) ? firstLineW : innerW;
+      if (lw > cap) { widthOK = false; break; }
     }
-    if (maxLineW <= innerW && needsH <= innerH) {
+    if (widthOK && needsH <= innerH) {
       return { w: Math.round(defaultW * s), h: Math.round(defaultH * s) };
     }
   }
