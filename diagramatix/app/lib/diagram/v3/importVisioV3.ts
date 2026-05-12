@@ -1573,7 +1573,7 @@ export async function importVisioV3(
     // renamed it" (e.g. v5.1 Exclusive Gateway defaults to "Decision?").
     const elMasterId = r.block.match(/Master='(\d+)'/)?.[1];
     const elMasterInfo = elMasterId ? masters.get(elMasterId) : undefined;
-    const label = readText(r.block) || r.props.BpmnName || elMasterInfo?.defaultText || "";
+    let label = readText(r.block) || r.props.BpmnName || elMasterInfo?.defaultText || "";
     const properties: Record<string, unknown> = {};
     if (r.seed.subprocessType) properties.subprocessType = r.seed.subprocessType;
     if (r.seed.poolType) properties.poolType = r.seed.poolType;
@@ -1643,10 +1643,23 @@ export async function importVisioV3(
         if (labelOffsetY !== 7) properties.labelOffsetY = labelOffsetY;
       }
     }
-    // Widen the pool header strip for multi-line labels. Pool labels are
-    // rendered rotated 90° in the left header — each `\n` becomes a
-    // parallel column, so a 3-line label needs ~3× the default 36px.
+    // Pool label auto-wrap. Visio renders a pool label rotated 90° in the
+    // left header; long labels visually wrap to fit the pool's height.
+    // Diagramatix's renderer treats each `\n` as a parallel column but
+    // doesn't auto-wrap on its own — so a single-line label like
+    // "Registered Practitioner" (~150px wide) overflows a 100px-tall pool.
+    // Insert `\n` at word boundaries here so the renderer's per-line
+    // column logic matches what Visio shows.
     if (r.seed.type === "pool" && label) {
+      // Available width for the rotated label ≈ pool height − end PAD.
+      // Use a slightly generous PAD so the rendered text doesn't kiss the
+      // pool's top/bottom edge.
+      const ROT_PAD = 16;
+      const usableRotW = Math.max(20, heightPx - ROT_PAD);
+      const lines = wrapTextShared(label, usableRotW, 12);
+      if (lines.length > 1) {
+        label = lines.join("\n");
+      }
       const lineCount = label.split(/\r?\n/).length;
       if (lineCount > 1) {
         properties.poolHeaderWidth = Math.max(36, lineCount * 30 + 16);
@@ -2337,6 +2350,19 @@ export async function importVisioV3(
     // MasterShape-skip removes from the element list). Without this
     // walk-up the connector silently drops, which is exactly the
     // missing "Email" message in the user's import.
+    //
+    // For SEQUENCE connectors, pool/lane ancestors are rejected — BPMN
+    // sequence flows must never attach to a pool boundary. If the only
+    // resolvable ancestor is a pool/lane, the connector is left with no
+    // glue resolution and falls through to the per-connector skip below
+    // (which logs a warning rather than silently drawing a wrong arrow
+    // from the pool edge).
+    const isSequence = r.connectorBase === "sequence";
+    const isPoolOrLaneEl = (elId: string | undefined): boolean => {
+      if (!elId) return false;
+      const e = elements.find((x) => x.id === elId);
+      return !!e && (e.type === "pool" || e.type === "lane");
+    };
     function resolveGlueId(shapeId: string | undefined): string | undefined {
       if (!shapeId) return undefined;
       let cur: string | null = shapeId;
@@ -2344,7 +2370,15 @@ export async function importVisioV3(
       while (cur && !seen.has(cur)) {
         seen.add(cur);
         const elId = shapeIdToElId.get(cur);
-        if (elId) return elId;
+        if (elId) {
+          if (isSequence && isPoolOrLaneEl(elId)) {
+            // Skip pool/lane ancestors for sequence flows; keep climbing.
+            const w = walkedById.get(cur);
+            cur = w?.parentShapeId ?? null;
+            continue;
+          }
+          return elId;
+        }
         const w = walkedById.get(cur);
         cur = w?.parentShapeId ?? null;
       }
@@ -2384,49 +2418,46 @@ export async function importVisioV3(
       const begY = begYLocal;
       const endX = endXLocal;
       const endY = endYLocal;
-      // EPS tolerance for the inch-coord bbox test. 0.05 inch ≈ 5 px
-      // at 96 DPI — absorbs float noise and the small visual gap that
-      // sometimes exists between a Visio connector end and the pool
-      // edge it "lit up" against without actually gluing. Larger
-      // values risk a free end latching onto a neighbouring pool.
-      const EPS = 0.05;
-      // Restrict the candidate set to "real" pools — pools whose Diagramatix
-      // element still has a non-empty label OR whose shape ID is in the
-      // BPMN_M-authoritative map. Without this filter, free-end message
-      // connectors can latch onto a ghost off-screen Swimlane-List wrapper
-      // (LocPin-shifted unlabelled pool that gets dropped later by the
-      // unlabelled-pool prune) — the prune then drops the connector along
-      // with the ghost, silently losing the message arrow.
-      //
+      // EPS tolerance for the inch-coord bbox test. 0.05 inch ≈ 5 px at
+      // 96 DPI — absorbs float noise and the small visual gap that
+      // sometimes exists between a Visio connector end and the shape
+      // edge it "lit up" against without actually gluing. Sequence
+      // connectors use a wider tolerance (~14 px) so a Visio-author's
+      // free-end that lands "very near" a task/event still snaps to that
+      // element instead of falling through to the underlying pool.
+      const EPS_DEFAULT = 0.05;
+      const EPS_SEQUENCE = 0.15;
       // Connector-type-aware candidate set:
       //   • messageBPMN / associationBPMN free end → pools only (these
       //     connectors typically attach at pool boundaries in BPMN).
-      //   • sequence free end → pools AND subprocess-expanded / subprocess
-      //     (sequence flows live inside a process and routinely attach to
-      //     a subprocess's edge without being formally glued in Visio —
-      //     concrete case: Customer Enquiry sequence 314, begin at
-      //     (6.6457, 5.858) = exactly on GP's right edge but no glue row,
-      //     so without subprocess candidates the begin fell through to
-      //     the enclosing Telstra pool and the connector appeared to
-      //     emerge from the pool instead of GP).
-      // Smallest-area tiebreak picks the most-specific container: GP
-      // wins over Telstra when both bboxes contain the point.
+      //   • sequence free end → FLOW elements only (task, subprocess,
+      //     subprocess-expanded, gateway, events). NEVER a pool or lane —
+      //     sequence flows must never visually originate at a pool edge.
+      //     If the geometric search finds no flow element under or near
+      //     the free endpoint, the connector falls through to the
+      //     "missing endpoint" skip-with-warning below.
+      const SEQUENCE_FLOW_TYPES = new Set([
+        "task", "subprocess", "subprocess-expanded",
+        "start-event", "intermediate-event", "end-event", "gateway",
+      ]);
       const labelById = new Map<string, string>();
       for (const e of elements) if (e.type === "pool") labelById.set(e.id, e.label ?? "");
-      const isSequence = r.connectorBase === "sequence";
       const findContainerAt = (xIn: number | null, yIn: number | null): string | undefined => {
         if (xIn == null || yIn == null) return undefined;
         let bestId: string | undefined;
         let bestArea = Infinity;
+        const tol = isSequence ? EPS_SEQUENCE : EPS_DEFAULT;
         for (const r2 of raw) {
           const t = r2.seed?.type;
           if (!t) continue;
-          const isPool = t === "pool";
-          const isSubprocess = t === "subprocess-expanded" || t === "subprocess";
-          if (!isPool && !(isSequence && isSubprocess)) continue;
+          if (isSequence) {
+            if (!SEQUENCE_FLOW_TYPES.has(t)) continue;
+          } else {
+            if (t !== "pool") continue;
+          }
           const elId = shapeIdToElId.get(r2.shapeId);
           if (!elId) continue;
-          if (isPool) {
+          if (t === "pool") {
             const isAuthoritative = bpmnMPoolByShapeId.has(r2.shapeId);
             const lbl = labelById.get(elId) ?? "";
             if (!isAuthoritative && !lbl.trim()) continue;   // skip ghost wrappers
@@ -2435,7 +2466,7 @@ export async function importVisioV3(
           const x2 = r2.pageX + r2.width / 2;
           const y1 = r2.pageY - r2.height / 2;
           const y2 = r2.pageY + r2.height / 2;
-          if (xIn < x1 - EPS || xIn > x2 + EPS || yIn < y1 - EPS || yIn > y2 + EPS) continue;
+          if (xIn < x1 - tol || xIn > x2 + tol || yIn < y1 - tol || yIn > y2 + tol) continue;
           const area = r2.width * r2.height;
           if (area < bestArea) { bestArea = area; bestId = elId; }
         }
@@ -2443,6 +2474,14 @@ export async function importVisioV3(
       };
       if (!sourceId) sourceId = findContainerAt(begX, begY);
       if (!targetId) targetId = findContainerAt(endX, endY);
+    }
+    // Final safety net: even with explicit Connect rows, a sequence
+    // connector that resolved to a pool/lane is wrong. Drop the resolution
+    // and let the skip-with-warning fire so the user can see which arrow
+    // didn't import and where to look in Visio.
+    if (isSequence) {
+      if (sourceId && isPoolOrLaneEl(sourceId)) sourceId = undefined;
+      if (targetId && isPoolOrLaneEl(targetId)) targetId = undefined;
     }
     // Skip degenerate self-loops with zero geometric length. Visio
     // occasionally leaves behind a sequence-flow shape with Begin == End

@@ -216,6 +216,77 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
   const [importFormat, setImportFormat] = useState<"json" | "xml">("json");
   const fileMenuRef = useRef<HTMLDivElement>(null);
 
+  // Visio Bulk Import (always creates a new project at the dashboard level).
+  const visioInputRef = useRef<HTMLInputElement>(null);
+  const [visioImportFile, setVisioImportFile] = useState<File | null>(null);
+  const [visioImportPages, setVisioImportPages] = useState<{ index: number; name: string }[]>([]);
+  const [visioImportSelected, setVisioImportSelected] = useState<Set<number>>(new Set());
+  const [visioImportProjectName, setVisioImportProjectName] = useState("");
+  const [visioImportFolderName, setVisioImportFolderName] = useState("Imported BPMN Diagrams");
+  const [visioImportBusy, setVisioImportBusy] = useState(false);
+  const [visioImportError, setVisioImportError] = useState("");
+  const [showVisioImportDialog, setShowVisioImportDialog] = useState(false);
+
+  async function handleVisioFileSelected(file: File) {
+    setVisioImportError("");
+    try {
+      const { listVisioPages } = await import("@/app/lib/diagram/v3/visioPages");
+      const buf = await file.arrayBuffer();
+      const pages = await listVisioPages(buf);
+      if (pages.length === 0) {
+        alert("No usable pages found in this .vsdx file.");
+        return;
+      }
+      setVisioImportFile(file);
+      setVisioImportPages(pages.map((p) => ({ index: p.index, name: p.name })));
+      setVisioImportSelected(new Set(pages.map((p) => p.index)));
+      const stem = file.name.replace(/\.vsdx$/i, "");
+      setVisioImportProjectName(stem || "Imported Visio Diagrams");
+      setVisioImportFolderName("Imported BPMN Diagrams");
+      setShowVisioImportDialog(true);
+    } catch (err) {
+      alert(`Failed to read .vsdx: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  async function handleVisioImportConfirm() {
+    if (!visioImportFile) { setVisioImportError("No file selected"); return; }
+    if (visioImportSelected.size === 0) { setVisioImportError("Select at least one page"); return; }
+    if (!visioImportProjectName.trim()) { setVisioImportError("Project name is required"); return; }
+    setVisioImportBusy(true);
+    setVisioImportError("");
+    try {
+      const indices = Array.from(visioImportSelected).sort((a, b) => a - b).join(",");
+      const form = new FormData();
+      form.append("file", visioImportFile);
+      form.append("pageIndices", indices);
+      form.append("folderName", visioImportFolderName.trim());
+      form.append("newProjectName", visioImportProjectName.trim());
+      const resp = await fetch("/api/import/visio-v3/bulk", { method: "POST", body: form });
+      if (!resp.ok) {
+        const txt = await resp.text();
+        setVisioImportError(`Import failed: ${txt || resp.statusText}`);
+        return;
+      }
+      type BulkResult = {
+        project?: { id: string; name: string };
+        diagrams: { diagram: { id: string }; pageName: string }[];
+        errors: { pageIndex: number; pageName: string; message: string }[];
+      };
+      const result = (await resp.json()) as BulkResult;
+      setShowVisioImportDialog(false);
+      if (result.project) {
+        router.push(`/dashboard/projects/${result.project.id}`);
+      } else if (result.errors.length > 0) {
+        alert(`All pages failed:\n` + result.errors.map((e) => `[${e.pageName}] ${e.message}`).join("\n"));
+      }
+    } catch (err) {
+      setVisioImportError(`Visio import failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setVisioImportBusy(false);
+    }
+  }
+
   // DDL Import
   const [showDdlImport, setShowDdlImport] = useState(false);
   const [ddlDbType, setDdlDbType] = useState("postgres");
@@ -796,6 +867,17 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                   e.target.value = "";
                 }}
               />
+              <input
+                ref={visioInputRef}
+                type="file"
+                accept=".vsdx"
+                className="hidden"
+                onChange={e => {
+                  const f = e.target.files?.[0];
+                  e.target.value = "";
+                  if (f) handleVisioFileSelected(f);
+                }}
+              />
 
               {/* Unified File menu */}
               <div className="relative" ref={fileMenuRef}>
@@ -858,6 +940,17 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                       className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
                     >
                       Import DDL
+                    </button>
+                    <button
+                      onClick={() => {
+                        setFileMenuOpen(false);
+                        setVisioImportError("");
+                        visioInputRef.current?.click();
+                      }}
+                      title="Import one or more pages from a Visio .vsdx file into a new project"
+                      className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                    >
+                      Import Visio
                     </button>
                     <div className="border-t border-gray-100" />
                     <a
@@ -1443,6 +1536,107 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
               <button onClick={handleAccountSave} disabled={acctSaving}
                 className="px-4 py-1.5 text-xs text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50">
                 {acctSaving ? "Saving\u2026" : "Save"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Visio Bulk Import dialog (dashboard-level → always creates a
+          new project for the imported diagrams). */}
+      {showVisioImportDialog && visioImportFile && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg">
+            <h2 className="text-lg font-semibold text-gray-900 mb-2">Import Visio Diagrams</h2>
+            <p className="text-xs text-gray-600 mb-4 truncate">
+              <span className="font-mono">{visioImportFile.name}</span> · {visioImportPages.length} page{visioImportPages.length === 1 ? "" : "s"}
+            </p>
+            {visioImportError && (
+              <p className="mb-3 text-sm text-red-600 bg-red-50 px-3 py-2 rounded">{visioImportError}</p>
+            )}
+            <div className="mb-4">
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-sm font-medium text-gray-700">Select pages to import</label>
+                <div className="flex gap-2 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setVisioImportSelected(new Set(visioImportPages.map((p) => p.index)))}
+                    className="text-blue-600 hover:underline"
+                  >Select all</button>
+                  <button
+                    type="button"
+                    onClick={() => setVisioImportSelected(new Set())}
+                    className="text-blue-600 hover:underline"
+                  >Clear</button>
+                </div>
+              </div>
+              <div className="max-h-[40vh] overflow-y-auto border border-gray-300 rounded">
+                {visioImportPages.map((p) => {
+                  const checked = visioImportSelected.has(p.index);
+                  return (
+                    <label
+                      key={p.index}
+                      className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-800 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={(e) => {
+                          setVisioImportSelected((prev) => {
+                            const next = new Set(prev);
+                            if (e.target.checked) next.add(p.index);
+                            else next.delete(p.index);
+                            return next;
+                          });
+                        }}
+                        className="h-3.5 w-3.5"
+                      />
+                      <span className="text-gray-400 text-xs tabular-nums w-6">{p.index + 1}.</span>
+                      <span className="truncate">{p.name}</span>
+                    </label>
+                  );
+                })}
+              </div>
+              <p className="mt-1.5 text-xs text-gray-500">{visioImportSelected.size} of {visioImportPages.length} selected.</p>
+            </div>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">New project name</label>
+              <input
+                type="text"
+                value={visioImportProjectName}
+                onChange={(e) => setVisioImportProjectName(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Folder</label>
+              <input
+                type="text"
+                value={visioImportFolderName}
+                onChange={(e) => setVisioImportFolderName(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Imported BPMN Diagrams"
+              />
+              <p className="mt-1.5 text-xs text-gray-500">Folder inside the new project for the imported diagrams. Leave blank to place them at the project root.</p>
+            </div>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => {
+                  setShowVisioImportDialog(false);
+                  setVisioImportFile(null);
+                  setVisioImportError("");
+                }}
+                disabled={visioImportBusy}
+                className="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleVisioImportConfirm}
+                disabled={visioImportBusy || visioImportSelected.size === 0}
+                className="px-4 py-2 text-sm text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
+              >
+                {visioImportBusy ? "Importing…" : `Import ${visioImportSelected.size} page${visioImportSelected.size === 1 ? "" : "s"}`}
               </button>
             </div>
           </div>
