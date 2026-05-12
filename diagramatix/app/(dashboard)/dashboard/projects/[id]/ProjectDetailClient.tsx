@@ -419,6 +419,7 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
     targetName: string;
     targetType: string;
     reason: string;
+    severity: "error" | "warning";
   }
   interface ScanDiagram {
     diagramId: string;
@@ -435,11 +436,65 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
     totalDuplicateGroups: number;
     totalSingleLanePools: number;
     totalHangingMessages: number;
+    totalHangingErrors: number;
+    totalHangingWarnings: number;
   }
   const [scanBusy, setScanBusy] = useState(false);
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
   const [scanError, setScanError] = useState("");
   const [scanExpanded, setScanExpanded] = useState<Set<string>>(new Set());
+  const [scanErrorsOpen, setScanErrorsOpen] = useState(true);
+  const [scanWarningsOpen, setScanWarningsOpen] = useState(true);
+  /** Per-project sessionStorage key. Saving the scan result + expand
+   *  state survives in-app navigation to a diagram and back so the user
+   *  doesn't have to re-run the scan after fixing one diagram. */
+  const scanStorageKey = `scan-result-${project.id}`;
+
+  // Restore a saved scan result on mount (e.g. after navigating to a
+  // flagged diagram and returning here). sessionStorage scopes to the
+  // browser tab and clears when the tab closes — appropriate lifetime
+  // for "what I was reviewing this session".
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = window.sessionStorage.getItem(scanStorageKey);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as {
+        result?: ScanResult;
+        expanded?: string[];
+        errorsOpen?: boolean;
+        warningsOpen?: boolean;
+      };
+      if (parsed.result) {
+        setScanResult(parsed.result);
+        setScanExpanded(new Set(parsed.expanded ?? []));
+        if (typeof parsed.errorsOpen === "boolean") setScanErrorsOpen(parsed.errorsOpen);
+        if (typeof parsed.warningsOpen === "boolean") setScanWarningsOpen(parsed.warningsOpen);
+      }
+    } catch { /* ignore — corrupt entry; next scan overwrites */ }
+    // Only on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Save the current scan state whenever any of its inputs change.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!scanResult) {
+      window.sessionStorage.removeItem(scanStorageKey);
+      return;
+    }
+    try {
+      window.sessionStorage.setItem(
+        scanStorageKey,
+        JSON.stringify({
+          result: scanResult,
+          expanded: Array.from(scanExpanded),
+          errorsOpen: scanErrorsOpen,
+          warningsOpen: scanWarningsOpen,
+        }),
+      );
+    } catch { /* quota — ignore */ }
+  }, [scanResult, scanExpanded, scanErrorsOpen, scanWarningsOpen, scanStorageKey]);
 
   async function handleScanPoolConnectors() {
     setScanBusy(true);
@@ -453,9 +508,18 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
       } else {
         const data = await res.json();
         setScanResult(data);
-        // Auto-expand every diagram so the user immediately sees the
-        // issues without having to click the ▶ on each row.
-        setScanExpanded(new Set(data.diagrams.map((x: { diagramId: string }) => x.diagramId)));
+        // Auto-expand every diagram row in both groups so the user
+        // immediately sees the per-diagram issues. Keys are
+        // `${"error"|"warning"}:${diagramId}` so each severity bucket
+        // toggles independently.
+        const keys = new Set<string>();
+        for (const x of (data.diagrams as { diagramId: string }[])) {
+          keys.add(`error:${x.diagramId}`);
+          keys.add(`warning:${x.diagramId}`);
+        }
+        setScanExpanded(keys);
+        setScanErrorsOpen(true);
+        setScanWarningsOpen(true);
       }
     } catch (err) {
       setScanError(err instanceof Error ? err.message : "Network error");
@@ -2344,136 +2408,203 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
               <p className="mb-3 text-sm text-red-600 bg-red-50 px-3 py-2 rounded">{scanError}</p>
             )}
             {scanResult && (() => {
-              const total =
+              // Split each diagram's hanging messages into error vs warning
+              // buckets, then build the per-severity diagram lists. A
+              // diagram appears in Errors iff it has any error-grade
+              // issue, in Warnings iff it has any warning-grade issue —
+              // diagrams with both appear in both sections.
+              type Bucketed = ScanDiagram & {
+                hangingErrors: ScanHangingMessage[];
+                hangingWarnings: ScanHangingMessage[];
+              };
+              const bucketed: Bucketed[] = scanResult.diagrams.map((d) => ({
+                ...d,
+                hangingErrors: d.hangingMessages.filter((m) => m.severity !== "warning"),
+                hangingWarnings: d.hangingMessages.filter((m) => m.severity === "warning"),
+              }));
+              const errorDiagrams = bucketed.filter((d) =>
+                d.badConnectors.length > 0 ||
+                d.duplicateNames.length > 0 ||
+                d.singleLanePools.length > 0 ||
+                d.hangingErrors.length > 0,
+              );
+              const warningDiagrams = bucketed.filter((d) => d.hangingWarnings.length > 0);
+              const errorTotal =
                 scanResult.totalBadConnectors +
                 scanResult.totalDuplicateGroups +
                 scanResult.totalSingleLanePools +
-                scanResult.totalHangingMessages;
-              if (total === 0) {
+                scanResult.totalHangingErrors;
+              const warningTotal = scanResult.totalHangingWarnings;
+              if (errorTotal === 0 && warningTotal === 0) {
                 return (
-                  <p className="text-sm text-gray-600">No errors found across this project&apos;s diagrams.</p>
+                  <p className="text-sm text-gray-600">No errors or warnings found across this project&apos;s diagrams.</p>
                 );
               }
-              const summaryParts: string[] = [];
-              if (scanResult.totalBadConnectors > 0)
-                summaryParts.push(`${scanResult.totalBadConnectors} sequence/association on Pool/Lane`);
-              if (scanResult.totalDuplicateGroups > 0)
-                summaryParts.push(`${scanResult.totalDuplicateGroups} duplicate Pool/Lane name${scanResult.totalDuplicateGroups === 1 ? "" : "s"}`);
-              if (scanResult.totalSingleLanePools > 0)
-                summaryParts.push(`${scanResult.totalSingleLanePools} Pool${scanResult.totalSingleLanePools === 1 ? "" : "s"} with a single Lane`);
-              if (scanResult.totalHangingMessages > 0)
-                summaryParts.push(`${scanResult.totalHangingMessages} hanging message${scanResult.totalHangingMessages === 1 ? "" : "s"}`);
-              return (
-                <>
-                  <p className="text-xs text-gray-600 mb-3">
-                    Found <strong>{summaryParts.join(", ")}</strong> across <strong>{scanResult.diagrams.length}</strong> diagram{scanResult.diagrams.length === 1 ? "" : "s"}. Click a diagram name to open it.
-                  </p>
-                  <div className="border border-gray-200 rounded max-h-[60vh] overflow-y-auto">
-                    {scanResult.diagrams.map((d) => {
-                      const open = scanExpanded.has(d.diagramId);
-                      const issueCount =
-                        d.badConnectors.length +
-                        d.duplicateNames.length +
-                        d.singleLanePools.length +
-                        d.hangingMessages.length;
-                      return (
-                        <div key={d.diagramId} className="border-b border-gray-100 last:border-b-0">
-                          <div className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50">
-                            <button
-                              onClick={() => {
-                                setScanExpanded((prev) => {
-                                  const next = new Set(prev);
-                                  if (next.has(d.diagramId)) next.delete(d.diagramId);
-                                  else next.add(d.diagramId);
-                                  return next;
-                                });
-                              }}
-                              className="text-gray-500 hover:text-gray-700 text-xs w-4"
-                            >{open ? "▼" : "▶"}</button>
-                            <a
-                              href={`/diagram/${d.diagramId}`}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="text-sm text-blue-600 hover:underline flex-1 truncate"
-                              title={d.diagramName}
-                            >{d.diagramName}</a>
-                            <span className="text-[10px] text-gray-500">
-                              {issueCount} issue{issueCount === 1 ? "" : "s"}
-                            </span>
+
+              const renderDiagramRow = (d: Bucketed, kind: "error" | "warning") => {
+                const open = scanExpanded.has(`${kind}:${d.diagramId}`);
+                const issueCount = kind === "error"
+                  ? d.badConnectors.length + d.duplicateNames.length + d.singleLanePools.length + d.hangingErrors.length
+                  : d.hangingWarnings.length;
+                return (
+                  <div key={`${kind}:${d.diagramId}`} className="border-b border-gray-100 last:border-b-0">
+                    <div className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50">
+                      <button
+                        onClick={() => {
+                          setScanExpanded((prev) => {
+                            const key = `${kind}:${d.diagramId}`;
+                            const next = new Set(prev);
+                            if (next.has(key)) next.delete(key);
+                            else next.add(key);
+                            return next;
+                          });
+                        }}
+                        className="text-gray-500 hover:text-gray-700 text-xs w-4"
+                      >{open ? "▼" : "▶"}</button>
+                      <a
+                        href={`/diagram/${d.diagramId}`}
+                        className="text-sm text-blue-600 hover:underline flex-1 truncate"
+                        title={`${d.diagramName} — click to open. Use back to return here with the scan still loaded.`}
+                      >{d.diagramName}</a>
+                      <span className="text-[10px] text-gray-500">
+                        {issueCount} issue{issueCount === 1 ? "" : "s"}
+                      </span>
+                    </div>
+                    {open && kind === "error" && (
+                      <div className="pl-9 pr-3 pb-2 space-y-2">
+                        {d.badConnectors.length > 0 && (
+                          <div>
+                            <p className="text-[10px] uppercase tracking-wide text-gray-400 mb-0.5">Connectors on Pool/Lane</p>
+                            <ul className="text-[11px] text-gray-700 space-y-0.5">
+                              {d.badConnectors.map((c) => (
+                                <li key={c.connectorId} className="flex items-center gap-2">
+                                  <span className="px-1.5 py-0.5 bg-gray-100 rounded text-[10px] text-gray-600">{c.type}</span>
+                                  <span className={c.sourceIsContainer ? "text-red-600 font-medium" : ""}>
+                                    {c.sourceName} <span className="text-gray-400">[{c.sourceType}]</span>
+                                  </span>
+                                  <span className="text-gray-400">→</span>
+                                  <span className={c.targetIsContainer ? "text-red-600 font-medium" : ""}>
+                                    {c.targetName} <span className="text-gray-400">[{c.targetType}]</span>
+                                  </span>
+                                </li>
+                              ))}
+                            </ul>
                           </div>
-                          {open && (
-                            <div className="pl-9 pr-3 pb-2 space-y-2">
-                              {d.badConnectors.length > 0 && (
-                                <div>
-                                  <p className="text-[10px] uppercase tracking-wide text-gray-400 mb-0.5">Connectors on Pool/Lane</p>
-                                  <ul className="text-[11px] text-gray-700 space-y-0.5">
-                                    {d.badConnectors.map((c) => (
-                                      <li key={c.connectorId} className="flex items-center gap-2">
-                                        <span className="px-1.5 py-0.5 bg-gray-100 rounded text-[10px] text-gray-600">{c.type}</span>
-                                        <span className={c.sourceIsContainer ? "text-red-600 font-medium" : ""}>
-                                          {c.sourceName} <span className="text-gray-400">[{c.sourceType}]</span>
-                                        </span>
-                                        <span className="text-gray-400">→</span>
-                                        <span className={c.targetIsContainer ? "text-red-600 font-medium" : ""}>
-                                          {c.targetName} <span className="text-gray-400">[{c.targetType}]</span>
-                                        </span>
-                                      </li>
-                                    ))}
-                                  </ul>
-                                </div>
-                              )}
-                              {d.duplicateNames.length > 0 && (
-                                <div>
-                                  <p className="text-[10px] uppercase tracking-wide text-gray-400 mb-0.5">Duplicate Pool/Lane names</p>
-                                  <ul className="text-[11px] text-gray-700 space-y-0.5">
-                                    {d.duplicateNames.map((dn, i) => (
-                                      <li key={i} className="flex items-center gap-2">
-                                        <span className="text-red-600 font-medium">&ldquo;{dn.name}&rdquo;</span>
-                                        <span className="text-gray-500">×{dn.elements.length}</span>
-                                        <span className="text-gray-400 text-[10px]">
-                                          ({dn.elements.map((x) => x.type).join(", ")})
-                                        </span>
-                                      </li>
-                                    ))}
-                                  </ul>
-                                </div>
-                              )}
-                              {d.singleLanePools.length > 0 && (
-                                <div>
-                                  <p className="text-[10px] uppercase tracking-wide text-gray-400 mb-0.5">Pools with a single Lane</p>
-                                  <ul className="text-[11px] text-gray-700 space-y-0.5">
-                                    {d.singleLanePools.map((sl) => (
-                                      <li key={sl.poolId} className="flex items-center gap-2">
-                                        <span className="text-red-600 font-medium">{sl.poolName || "(unnamed pool)"}</span>
-                                        <span className="text-gray-400">contains lane</span>
-                                        <span className="text-gray-700">{sl.laneName || "(unnamed lane)"}</span>
-                                      </li>
-                                    ))}
-                                  </ul>
-                                </div>
-                              )}
-                              {d.hangingMessages.length > 0 && (
-                                <div>
-                                  <p className="text-[10px] uppercase tracking-wide text-gray-400 mb-0.5">Hanging messages (red on canvas)</p>
-                                  <ul className="text-[11px] text-gray-700 space-y-0.5">
-                                    {d.hangingMessages.map((hm) => (
-                                      <li key={hm.connectorId} className="flex items-center gap-2 flex-wrap">
-                                        <span className="text-red-600 font-medium">{hm.sourceName} <span className="text-gray-400">[{hm.sourceType}]</span></span>
-                                        <span className="text-gray-400">→</span>
-                                        <span className="text-red-600 font-medium">{hm.targetName} <span className="text-gray-400">[{hm.targetType}]</span></span>
-                                        <span className="text-gray-500 text-[10px] italic">({hm.reason})</span>
-                                      </li>
-                                    ))}
-                                  </ul>
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
+                        )}
+                        {d.duplicateNames.length > 0 && (
+                          <div>
+                            <p className="text-[10px] uppercase tracking-wide text-gray-400 mb-0.5">Duplicate Pool/Lane names</p>
+                            <ul className="text-[11px] text-gray-700 space-y-0.5">
+                              {d.duplicateNames.map((dn, i) => (
+                                <li key={i} className="flex items-center gap-2">
+                                  <span className="text-red-600 font-medium">&ldquo;{dn.name}&rdquo;</span>
+                                  <span className="text-gray-500">×{dn.elements.length}</span>
+                                  <span className="text-gray-400 text-[10px]">
+                                    ({dn.elements.map((x) => x.type).join(", ")})
+                                  </span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {d.singleLanePools.length > 0 && (
+                          <div>
+                            <p className="text-[10px] uppercase tracking-wide text-gray-400 mb-0.5">Pools with a single Lane</p>
+                            <ul className="text-[11px] text-gray-700 space-y-0.5">
+                              {d.singleLanePools.map((sl) => (
+                                <li key={sl.poolId} className="flex items-center gap-2">
+                                  <span className="text-red-600 font-medium">{sl.poolName || "(unnamed pool)"}</span>
+                                  <span className="text-gray-400">contains lane</span>
+                                  <span className="text-gray-700">{sl.laneName || "(unnamed lane)"}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {d.hangingErrors.length > 0 && (
+                          <div>
+                            <p className="text-[10px] uppercase tracking-wide text-gray-400 mb-0.5">Hanging messages</p>
+                            <ul className="text-[11px] text-gray-700 space-y-0.5">
+                              {d.hangingErrors.map((hm) => (
+                                <li key={hm.connectorId} className="flex items-center gap-2 flex-wrap">
+                                  <span className="text-red-600 font-medium">{hm.sourceName} <span className="text-gray-400">[{hm.sourceType}]</span></span>
+                                  <span className="text-gray-400">→</span>
+                                  <span className="text-red-600 font-medium">{hm.targetName} <span className="text-gray-400">[{hm.targetType}]</span></span>
+                                  <span className="text-gray-500 text-[10px] italic">({hm.reason})</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {open && kind === "warning" && (
+                      <div className="pl-9 pr-3 pb-2 space-y-2">
+                        {d.hangingWarnings.length > 0 && (
+                          <div>
+                            <p className="text-[10px] uppercase tracking-wide text-gray-400 mb-0.5">Messages touching white-box pool</p>
+                            <ul className="text-[11px] text-gray-700 space-y-0.5">
+                              {d.hangingWarnings.map((hm) => (
+                                <li key={hm.connectorId} className="flex items-center gap-2 flex-wrap">
+                                  <span className="text-amber-700 font-medium">{hm.sourceName} <span className="text-gray-400">[{hm.sourceType}]</span></span>
+                                  <span className="text-gray-400">→</span>
+                                  <span className="text-amber-700 font-medium">{hm.targetName} <span className="text-gray-400">[{hm.targetType}]</span></span>
+                                  <span className="text-gray-500 text-[10px] italic">({hm.reason})</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
-                </>
+                );
+              };
+
+              return (
+                <div className="max-h-[60vh] overflow-y-auto space-y-3">
+                  {/* Errors group */}
+                  <div className="border border-red-200 rounded">
+                    <button
+                      onClick={() => setScanErrorsOpen((v) => !v)}
+                      className="w-full flex items-center gap-2 px-3 py-2 bg-red-50 hover:bg-red-100 text-left rounded-t"
+                    >
+                      <span className="text-red-700 text-xs">{scanErrorsOpen ? "▼" : "▶"}</span>
+                      <span className="text-sm font-semibold text-red-800">Errors</span>
+                      <span className="text-[11px] text-red-700">
+                        {errorTotal} issue{errorTotal === 1 ? "" : "s"} across {errorDiagrams.length} diagram{errorDiagrams.length === 1 ? "" : "s"}
+                      </span>
+                    </button>
+                    {scanErrorsOpen && (
+                      errorDiagrams.length === 0 ? (
+                        <p className="px-3 py-2 text-xs text-gray-500 italic">No errors.</p>
+                      ) : (
+                        <div>{errorDiagrams.map((d) => renderDiagramRow(d, "error"))}</div>
+                      )
+                    )}
+                  </div>
+
+                  {/* Warnings group */}
+                  <div className="border border-amber-200 rounded">
+                    <button
+                      onClick={() => setScanWarningsOpen((v) => !v)}
+                      className="w-full flex items-center gap-2 px-3 py-2 bg-amber-50 hover:bg-amber-100 text-left rounded-t"
+                    >
+                      <span className="text-amber-700 text-xs">{scanWarningsOpen ? "▼" : "▶"}</span>
+                      <span className="text-sm font-semibold text-amber-800">Warnings</span>
+                      <span className="text-[11px] text-amber-700">
+                        {warningTotal} issue{warningTotal === 1 ? "" : "s"} across {warningDiagrams.length} diagram{warningDiagrams.length === 1 ? "" : "s"}
+                      </span>
+                    </button>
+                    {scanWarningsOpen && (
+                      warningDiagrams.length === 0 ? (
+                        <p className="px-3 py-2 text-xs text-gray-500 italic">No warnings.</p>
+                      ) : (
+                        <div>{warningDiagrams.map((d) => renderDiagramRow(d, "warning"))}</div>
+                      )
+                    )}
+                  </div>
+                </div>
               );
             })()}
             <div className="flex gap-3 justify-end mt-4">

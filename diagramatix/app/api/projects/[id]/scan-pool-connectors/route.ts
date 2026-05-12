@@ -36,6 +36,11 @@ interface HangingMessageIssue {
   targetName: string;
   targetType: string;
   reason: string;
+  /** "error" — message has no horizontal overlap, clearly broken.
+   *  "warning" — message touches a white-box pool; technically allowed
+   *  in some BPMN styles but flagged because it's usually a sign that
+   *  the user meant to attach to a flow element inside the pool. */
+  severity: "error" | "warning";
 }
 
 interface DiagramIssue {
@@ -107,6 +112,8 @@ export async function GET(_req: Request, { params }: Params) {
   let totalDuplicateGroups = 0;
   let totalSingleLanePools = 0;
   let totalHangingMessages = 0;
+  let totalHangingErrors = 0;
+  let totalHangingWarnings = 0;
 
   for (const d of diagrams) {
     const data = (d.data as Record<string, unknown> | null) ?? null;
@@ -215,8 +222,10 @@ export async function GET(_req: Request, { params }: Params) {
       const tgtIsWhitePool =
         tgt.type === "pool" && (tgt.properties?.poolType ?? "") === "white-box";
       let reason = "";
+      let severity: "error" | "warning" = "error";
       if (srcIsWhitePool || tgtIsWhitePool) {
         reason = "message touches white-box pool";
+        severity = "warning";
       } else if (
         typeof src.x === "number" && typeof src.width === "number" &&
         typeof tgt.x === "number" && typeof tgt.width === "number"
@@ -225,6 +234,7 @@ export async function GET(_req: Request, { params }: Params) {
         const overlapMin = Math.max(src.x, tgt.x);
         if (overlapMax <= overlapMin) {
           reason = "no x-axis overlap between source and target";
+          severity = "error";
         }
       }
       if (!reason) continue;
@@ -235,6 +245,7 @@ export async function GET(_req: Request, { params }: Params) {
         targetName: tgt.label ?? tgt.type,
         targetType: tgt.type,
         reason,
+        severity,
       });
     }
 
@@ -257,6 +268,10 @@ export async function GET(_req: Request, { params }: Params) {
     totalDuplicateGroups += duplicateNames.length;
     totalSingleLanePools += singleLanePools.length;
     totalHangingMessages += hangingMessages.length;
+    for (const hm of hangingMessages) {
+      if (hm.severity === "warning") totalHangingWarnings++;
+      else totalHangingErrors++;
+    }
   }
 
   return NextResponse.json({
@@ -265,6 +280,8 @@ export async function GET(_req: Request, { params }: Params) {
     totalDuplicateGroups,
     totalSingleLanePools,
     totalHangingMessages,
+    totalHangingErrors,
+    totalHangingWarnings,
     // Legacy field name kept for compatibility with the existing UI.
     totalBad: totalBadConnectors,
   });
