@@ -31,7 +31,12 @@ import { PlanPanel } from "./PlanPanel";
 import { HistoryPanel } from "./HistoryPanel";
 
 interface VisioImportResult {
-  diagram: { id: string };
+  // `data` is the parsed DiagramData payload — present only on overwrite
+  // responses so the in-editor flow can push the new content into the
+  // reducer without a page reload. On a fresh-create import we don't
+  // need it (the user navigates to the new diagram via "Open Diagram"
+  // and the standard page-load path fetches the data).
+  diagram: { id: string; data?: DiagramData };
   warnings: string[];
   stats: {
     totalShapesOnPage: number;
@@ -954,22 +959,54 @@ export function DiagramEditor({
     }
   }
 
-  // Import templates from a `.diag_tems` file into the chosen list.
+  // Import a Visio (.vsdx) file from the in-editor menu.
+  //
+  // If the .vsdx file's basename matches the current diagram's name, the
+  // user is prompted to overwrite. On confirm, the import API runs in
+  // overwrite mode (UPDATE the current diagram's data, no new diagram
+  // created) and we push the parsed data straight into the reducer via
+  // setData so the canvas reflects the import without a page reload.
+  //
+  // Otherwise the import follows the standard create path. The API
+  // automatically appends a `dd-mm-yy hh:mm` timestamp suffix when the
+  // requested name collides with another diagram in the same project.
   async function handleImportVisioFile(file: File) {
+    const baseName = file.name.replace(/\.vsdx$/i, "").trim() || "Imported Visio Diagram";
+    const namesMatch = baseName === diagramName;
+    let overwrite = false;
+    if (namesMatch) {
+      // Native confirm() — quickest path and consistent with browser idioms.
+      // Can be upgraded to a styled dialog later if desired.
+      overwrite = window.confirm(
+        `A Visio file named "${baseName}" matches the current diagram. ` +
+        `Overwrite the current diagram with the imported content?\n\n` +
+        `Click OK to overwrite, or Cancel to create a new diagram instead ` +
+        `(a timestamp will be appended to the name to avoid the conflict).`,
+      );
+    }
     try {
       const form = new FormData();
       form.append("file", file);
       if (projectId) form.append("projectId", projectId);
+      form.append("name", baseName);
+      if (overwrite) form.append("overwriteDiagramId", diagramId);
       const resp = await fetch("/api/import/visio-v3", { method: "POST", body: form });
       if (!resp.ok) {
         const txt = await resp.text();
         alert(`Visio import failed: ${txt || resp.statusText}`);
         return;
       }
-      const result = await resp.json() as VisioImportResult;
+      const result = await resp.json() as VisioImportResult & { overwrote?: boolean };
+      if (result.overwrote && result.diagram?.data) {
+        // Replace the in-memory reducer state with the imported parse
+        // result. The auto-save's lastSaved ref still holds the OLD JSON
+        // string, so it'll consider the diagram "unsaved" briefly until
+        // the next user action — that's a harmless visual nuance; the
+        // server already has the imported data committed.
+        setData(result.diagram.data);
+      }
       // Always show the status modal — even on a clean import — so the
-      // user can see the per-master breakdown and decide whether to open
-      // the new diagram or try a different source file.
+      // user can see the per-master breakdown.
       setVisioImportStatus(result);
     } catch (err) {
       alert(`Visio import failed: ${err instanceof Error ? err.message : String(err)}`);

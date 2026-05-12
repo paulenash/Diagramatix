@@ -13,14 +13,30 @@ import {
 /**
  * POST /api/import/visio-v3
  * Multipart upload of a `.vsdx` file → creates a new BPMN diagram in the
- * caller's current org. Returns `{ diagram, warnings }`.
+ * caller's current org, OR overwrites an existing diagram's data when
+ * `overwriteDiagramId` is supplied. Returns `{ diagram, warnings, stats }`.
  *
  * Form fields:
  *  - file (required): the .vsdx binary
  *  - projectId (optional): place the new diagram in this project (must
  *    belong to the calling user + their current org)
  *  - name (optional): override the default diagram name
+ *  - overwriteDiagramId (optional): if supplied, UPDATE that diagram's
+ *    `data` field with the imported parse result instead of creating a
+ *    new diagram. The diagram's name, project and type are preserved.
+ *    Used by the in-editor "Import Visio" flow when the user agrees to
+ *    overwrite a same-named diagram.
+ *
+ * Name-conflict handling (create flow only): if the resolved name
+ * matches an existing diagram in the same project, the new diagram's
+ * name is suffixed with a `dd-mm-yy hh:mm` timestamp so both diagrams
+ * are visible side-by-side in the project tree.
  */
+function timestampSuffix(): string {
+  const d = new Date();
+  const p = (n: number) => n.toString().padStart(2, "0");
+  return `${p(d.getDate())}-${p(d.getMonth() + 1)}-${p(d.getFullYear() % 100)} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
 export async function POST(request: Request) {
   const session = await auth();
   if (!session?.user?.id) {
@@ -74,6 +90,8 @@ export async function POST(request: Request) {
     (form.get("projectId") as string).length > 0
       ? (form.get("projectId") as string)
       : null;
+  const overwriteDiagramId =
+    (form.get("overwriteDiagramId") as string | null)?.trim() || null;
 
   if (projectId) {
     const project = await prisma.project.findFirst({
@@ -99,9 +117,50 @@ export async function POST(request: Request) {
     );
   }
 
+  // ── Overwrite path ──
+  if (overwriteDiagramId) {
+    const existing = await prisma.diagram.findFirst({
+      where: { id: overwriteDiagramId, userId: session.user.id, orgId },
+    });
+    if (!existing) {
+      return NextResponse.json(
+        { error: "Diagram to overwrite not found, or not owned by caller" },
+        { status: 404 },
+      );
+    }
+    const updated = await prisma.diagram.update({
+      where: { id: overwriteDiagramId },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      data: { data: parsed.data as any },
+    });
+    return NextResponse.json(
+      { diagram: updated, warnings: parsed.warnings, stats: parsed.stats, overwrote: true },
+      { status: 200 },
+    );
+  }
+
+  // ── Create path with name-conflict resolution ──
+  // If the requested name already exists on another diagram in the same
+  // project (or anywhere in the org if no project specified), suffix the
+  // new diagram's name with a dd-mm-yy hh:mm timestamp so both remain
+  // visible. Avoids silent same-name collisions while still preserving
+  // the user's intent.
+  let finalName = rawName;
+  const conflict = await prisma.diagram.findFirst({
+    where: {
+      name: rawName,
+      orgId,
+      ...(projectId ? { projectId } : {}),
+    },
+    select: { id: true },
+  });
+  if (conflict) {
+    finalName = `${rawName} ${timestampSuffix()}`;
+  }
+
   const diagram = await prisma.diagram.create({
     data: {
-      name: rawName,
+      name: finalName,
       type: "bpmn",
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       data: parsed.data as any,
