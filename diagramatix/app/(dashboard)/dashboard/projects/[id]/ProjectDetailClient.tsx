@@ -405,6 +405,22 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
   const [importVisioName, setImportVisioName] = useState("");
   const [importVisioFolderName, setImportVisioFolderName] = useState("Imported BPMN Diagrams");
   const [importVisioError, setImportVisioError] = useState("");
+
+  // ── Multi-select for bulk diagram move / delete ────────────────────
+  // Standard desktop selection model:
+  //   • Plain click on a diagram card opens it (and clears any active
+  //     selection — a "preview-mode" exit).
+  //   • Ctrl/Cmd-click toggles that diagram in/out of the selection set
+  //     (multi-select). The clicked card becomes the new range anchor.
+  //   • Shift-click extends a contiguous range from the anchor to the
+  //     clicked card, within the same folder (range is meaningful only
+  //     for the ordered diagram list of one folder).
+  // The selection is cleared on Escape or when the user opens any
+  // diagram via plain click.
+  const [selectedDiagramIds, setSelectedDiagramIds] = useState<Set<string>>(new Set());
+  const [lastSelectedDiagramId, setLastSelectedDiagramId] = useState<string | null>(null);
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
+  const [showBulkMoveDialog, setShowBulkMoveDialog] = useState(false);
   const [projectColorConfig, setProjectColorConfig] = useState<SymbolColorConfig>((project.colorConfig as SymbolColorConfig | null) ?? {});
 
   // Re-fetch project data (diagrams + folderTree) from the API.
@@ -986,6 +1002,103 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
         });
       },
     });
+  }
+
+  // ── Multi-select click handler ───────────────────────────────────────
+  // Reads the modifier keys from the click event and routes to the
+  // appropriate behaviour: plain → open, ctrl/cmd → toggle, shift →
+  // extend range. Range is computed within the folder that owns the
+  // clicked diagram so it's consistent regardless of which folder pane
+  // the user is currently viewing.
+  function handleDiagramCardClick(
+    diagramId: string,
+    mods: { shiftKey: boolean; ctrlKey: boolean; metaKey: boolean },
+  ) {
+    const ctrl = mods.ctrlKey || mods.metaKey;
+    if (mods.shiftKey && lastSelectedDiagramId) {
+      const folder = folderTree.diagramFolderMap[diagramId] ?? ROOT_ID;
+      const list = getOrderedDiagramsInFolder(folder).map(d => d.id);
+      const anchorIdx = list.indexOf(lastSelectedDiagramId);
+      const targetIdx = list.indexOf(diagramId);
+      if (anchorIdx >= 0 && targetIdx >= 0) {
+        const [lo, hi] = anchorIdx < targetIdx
+          ? [anchorIdx, targetIdx]
+          : [targetIdx, anchorIdx];
+        const next = new Set(selectedDiagramIds);
+        for (let i = lo; i <= hi; i++) next.add(list[i]);
+        setSelectedDiagramIds(next);
+        return;
+      }
+      // Anchor in a different folder — fall through to toggle behaviour.
+    }
+    if (ctrl) {
+      const next = new Set(selectedDiagramIds);
+      if (next.has(diagramId)) next.delete(diagramId);
+      else next.add(diagramId);
+      setSelectedDiagramIds(next);
+      setLastSelectedDiagramId(diagramId);
+      return;
+    }
+    // Plain click: clear any existing selection and open the diagram.
+    if (selectedDiagramIds.size > 0) {
+      setSelectedDiagramIds(new Set());
+      setLastSelectedDiagramId(null);
+    }
+    handleOpenDiagram(diagramId);
+  }
+
+  function clearDiagramSelection() {
+    setSelectedDiagramIds(new Set());
+    setLastSelectedDiagramId(null);
+  }
+
+  // Escape clears the selection. Bound to the document so it works no
+  // matter which pane has focus.
+  useEffect(() => {
+    if (selectedDiagramIds.size === 0) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") clearDiagramSelection();
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [selectedDiagramIds.size]);
+
+  // Bulk delete — archive every selected diagram in sequence. Same
+  // /archive endpoint as single delete, so the user can recover from
+  // the system archive if needed. Folder map entries are cleaned up
+  // alongside.
+  async function handleBulkDelete() {
+    const ids = Array.from(selectedDiagramIds);
+    setShowBulkDeleteConfirm(false);
+    try {
+      await Promise.all(ids.map(id =>
+        fetch(`/api/diagrams/${id}/archive`, { method: "POST" }),
+      ));
+    } catch (err) {
+      alert(`Bulk delete failed: ${err instanceof Error ? err.message : String(err)}`);
+      return;
+    }
+    setDiagrams(prev => prev.filter(d => !selectedDiagramIds.has(d.id)));
+    updateTree(t => {
+      const map = { ...t.diagramFolderMap };
+      for (const id of ids) delete map[id];
+      return { ...t, diagramFolderMap: map };
+    });
+    clearDiagramSelection();
+  }
+
+  // Bulk move — reassigns folder for every selected diagram. Works
+  // purely on the project's folderTree (no API call per diagram needed;
+  // updateTree debounce-saves the whole tree).
+  function handleBulkMoveToFolder(targetFolderId: string) {
+    const ids = Array.from(selectedDiagramIds);
+    setShowBulkMoveDialog(false);
+    updateTree(t => {
+      const map = { ...t.diagramFolderMap };
+      for (const id of ids) map[id] = targetFolderId;
+      return { ...t, diagramFolderMap: map };
+    });
+    clearDiagramSelection();
   }
 
   async function handleCloneDiagram(diagramId: string) {
@@ -1588,6 +1701,32 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
 
         {/* Right: Diagram tiles */}
         <main className="flex-1 overflow-y-auto p-4">
+          {selectedDiagramIds.size > 0 && (
+            <div className="mb-3 flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-md sticky top-0 z-10">
+              <span className="text-xs text-blue-900 font-medium">
+                {selectedDiagramIds.size} diagram{selectedDiagramIds.size === 1 ? "" : "s"} selected
+              </span>
+              <button
+                onClick={() => setShowBulkMoveDialog(true)}
+                className="px-2 py-1 text-xs text-white bg-blue-600 rounded hover:bg-blue-700"
+              >
+                Move to folder…
+              </button>
+              <button
+                onClick={() => setShowBulkDeleteConfirm(true)}
+                className="px-2 py-1 text-xs text-white bg-red-600 rounded hover:bg-red-700"
+              >
+                Delete {selectedDiagramIds.size}…
+              </button>
+              <button
+                onClick={clearDiagramSelection}
+                className="ml-auto px-2 py-1 text-xs text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
+                title="Press Escape to clear"
+              >
+                Clear
+              </button>
+            </div>
+          )}
           {visibleDiagrams.length === 0 ? (
             <div className="text-center py-12 bg-white rounded-lg border border-gray-200">
               <p className="text-gray-500 text-sm mb-3">No diagrams in this folder</p>
@@ -1612,7 +1751,8 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
                   onDelete={handleDeleteDiagram}
                   onClone={handleCloneDiagram}
                   onMove={handleMoveDiagram}
-                  onOpen={handleOpenDiagram}
+                  onCardClick={handleDiagramCardClick}
+                  selected={selectedDiagramIds.has(d.id)}
                   colorConfig={projectColorConfig}
                 />
               ))}
@@ -1997,6 +2137,100 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
         </div>
       )}
 
+      {/* Bulk delete confirmation — lists count + first few names so
+          the user can confirm they're deleting what they think they are. */}
+      {showBulkDeleteConfirm && (() => {
+        const ids = Array.from(selectedDiagramIds);
+        const names = ids
+          .map(id => diagrams.find(d => d.id === id)?.name ?? "(unknown)")
+          .slice(0, 5);
+        const more = ids.length - names.length;
+        return (
+          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+              <h2 className="text-lg font-semibold text-gray-900 mb-3">
+                Delete {ids.length} diagram{ids.length === 1 ? "" : "s"}?
+              </h2>
+              <p className="text-sm text-gray-700 mb-3">
+                The following will be moved to the system archive (recoverable):
+              </p>
+              <ul className="mb-4 text-sm text-gray-800 list-disc pl-5 space-y-0.5">
+                {names.map((n, i) => <li key={i} className="truncate">{n}</li>)}
+                {more > 0 && (
+                  <li className="text-gray-500 italic">…and {more} more</li>
+                )}
+              </ul>
+              <div className="flex gap-3 justify-end">
+                <button
+                  onClick={() => setShowBulkDeleteConfirm(false)}
+                  className="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleBulkDelete}
+                  className="px-4 py-2 text-sm text-white bg-red-600 rounded-md hover:bg-red-700"
+                >
+                  Delete {ids.length}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Bulk move — folder picker for in-project folders. Project
+          root + every folder in the tree are listed; clicking one
+          reassigns the diagramFolderMap for every selected diagram. */}
+      {showBulkMoveDialog && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+            <h2 className="text-lg font-semibold text-gray-900 mb-3">
+              Move {selectedDiagramIds.size} diagram{selectedDiagramIds.size === 1 ? "" : "s"} to folder
+            </h2>
+            <p className="text-sm text-gray-600 mb-3">Choose a destination:</p>
+            <div className="max-h-72 overflow-y-auto border border-gray-200 rounded-md divide-y divide-gray-100">
+              <button
+                onClick={() => handleBulkMoveToFolder(ROOT_ID)}
+                className="block w-full text-left px-3 py-2 text-sm hover:bg-blue-50 text-gray-700"
+              >
+                <span className="font-medium">/ Project root</span>
+              </button>
+              {folderTree.folders.map(f => {
+                // Compute a simple path string by walking parents.
+                const parts: string[] = [];
+                let cur: typeof f | undefined = f;
+                const guard = new Set<string>();
+                while (cur && !guard.has(cur.id)) {
+                  guard.add(cur.id);
+                  parts.unshift(cur.name);
+                  cur = cur.parentId
+                    ? folderTree.folders.find(x => x.id === cur!.parentId)
+                    : undefined;
+                }
+                return (
+                  <button
+                    key={f.id}
+                    onClick={() => handleBulkMoveToFolder(f.id)}
+                    className="block w-full text-left px-3 py-2 text-sm hover:bg-blue-50 text-gray-700"
+                  >
+                    / {parts.join(" / ")}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="mt-4 flex justify-end">
+              <button
+                onClick={() => setShowBulkMoveDialog(false)}
+                className="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {confirmDialog && (
         <ConfirmDialog
           title={confirmDialog.title}
@@ -2086,7 +2320,8 @@ function DiagramCard({
   onDelete,
   onClone,
   onMove,
-  onOpen,
+  onCardClick,
+  selected,
   colorConfig,
 }: {
   diagram: DiagramSummary;
@@ -2094,16 +2329,26 @@ function DiagramCard({
   onDelete: (id: string) => void;
   onClone: (id: string) => void;
   onMove: (diagramId: string, projectId: string | null) => void;
-  onOpen: (diagramId: string) => void;
+  onCardClick: (
+    diagramId: string,
+    mods: { shiftKey: boolean; ctrlKey: boolean; metaKey: boolean },
+  ) => void;
+  selected: boolean;
   colorConfig?: SymbolColorConfig;
 }) {
   const [showMove, setShowMove] = useState(false);
 
   return (
     <div
-      onClick={() => onOpen(diagram.id)}
+      onClick={(e) => onCardClick(diagram.id, {
+        shiftKey: e.shiftKey, ctrlKey: e.ctrlKey, metaKey: e.metaKey,
+      })}
       title={diagram.name}
-      className="bg-white border border-gray-200 rounded-md px-2 py-1.5 hover:border-blue-300 hover:shadow-sm cursor-pointer group transition-all relative"
+      className={`bg-white rounded-md px-2 py-1.5 hover:shadow-sm cursor-pointer group transition-all relative ${
+        selected
+          ? "border-2 border-blue-500 ring-2 ring-blue-200"
+          : "border border-gray-200 hover:border-blue-300"
+      }`}
     >
       {/* Row 1: Name + action icons */}
       <div className="flex items-center justify-between">
