@@ -396,6 +396,15 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
   // as the editor's modal so we can show the same diagnostic info here.
   const [visioImportStatus, setVisioImportStatus] = useState<VisioImportResult | null>(null);
   const [visioImportInProgress, setVisioImportInProgress] = useState(false);
+  // "New Diagram → Import from Visio" pre-step: dialog that collects a
+  // diagram name (unique within this project) and a target folder name
+  // (default "Imported BPMN Diagrams", created on demand if missing).
+  // After the user confirms, we open the file picker; the chosen name
+  // and folder are read back inside `handleImportVisioFile`.
+  const [showImportVisioDialog, setShowImportVisioDialog] = useState(false);
+  const [importVisioName, setImportVisioName] = useState("");
+  const [importVisioFolderName, setImportVisioFolderName] = useState("Imported BPMN Diagrams");
+  const [importVisioError, setImportVisioError] = useState("");
   const [projectColorConfig, setProjectColorConfig] = useState<SymbolColorConfig>((project.colorConfig as SymbolColorConfig | null) ?? {});
 
   // Re-fetch project data (diagrams + folderTree) from the API.
@@ -715,23 +724,20 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
   }
 
   // ── Import (Visio .vsdx) ──────────────────────────────────────────────
-  // Creates a new BPMN diagram in THIS project named
-  // "Visio BPMN Diagram Import <nn>" where <nn> is the next number that
-  // doesn't already exist in this project's diagrams. Posts the file to
-  // /api/import/visio-v3 with that name + projectId, then surfaces the
-  // standard import-status modal showing per-master breakdown / warnings.
+  // The flow is split in two: the user first names the new diagram and
+  // picks a target folder (NewVisioImportDialog) — see
+  // `handleImportVisioConfirm` below — then the file picker opens.
+  // `handleImportVisioFile` receives the chosen file, reads the name /
+  // folder from component state, places the new diagram in the folder
+  // (creating the folder if it doesn't exist), and surfaces the import
+  // status modal which carries an "Open Diagram" button to navigate
+  // straight into the newly-imported diagram.
   async function handleImportVisioFile(file: File) {
+    const newName = importVisioName.trim();
+    const folderName = importVisioFolderName.trim();
+    if (!newName) { alert("Diagram name is required"); return; }
     setVisioImportInProgress(true);
     try {
-      // Compute next sequence number from existing diagram names.
-      const re = /^Visio BPMN Diagram Import (\d+)$/;
-      let maxN = 0;
-      for (const d of diagrams) {
-        const m = d.name.match(re);
-        if (m) maxN = Math.max(maxN, parseInt(m[1], 10));
-      }
-      const newName = `Visio BPMN Diagram Import ${maxN + 1}`;
-
       const form = new FormData();
       form.append("file", file);
       form.append("projectId", project.id);
@@ -748,12 +754,47 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
         { id: result.diagram.id, name: newName, type: "bpmn", createdAt: new Date(), updatedAt: new Date() },
         ...prev,
       ]);
+      // Place the new diagram in the chosen folder. If a folder of that
+      // name doesn't exist yet, create one at the project root and use
+      // its id. Empty folderName ⇒ leave at root.
+      if (folderName) {
+        updateTree(t => {
+          const existing = t.folders.find(f => f.name === folderName);
+          if (existing) {
+            return {
+              ...t,
+              diagramFolderMap: { ...t.diagramFolderMap, [result.diagram.id]: existing.id },
+            };
+          }
+          // Create a new root-level folder.
+          const newFolderId = `folder-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+          return {
+            ...t,
+            folders: [...t.folders, { id: newFolderId, name: folderName, parentId: null }],
+            diagramFolderMap: { ...t.diagramFolderMap, [result.diagram.id]: newFolderId },
+          };
+        });
+      }
       setVisioImportStatus(result);
     } catch (err) {
       alert(`Visio import failed: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setVisioImportInProgress(false);
     }
+  }
+
+  // Confirm step from the New Visio Import dialog: validate name
+  // uniqueness within this project, dismiss the dialog, and trigger the
+  // file picker. The chosen name / folder remain in state to be read by
+  // `handleImportVisioFile` once the user selects a .vsdx file.
+  function handleImportVisioConfirm() {
+    const name = importVisioName.trim();
+    if (!name) { setImportVisioError("Name is required"); return; }
+    const clash = diagrams.find(d => d.name.toLowerCase() === name.toLowerCase());
+    if (clash) { setImportVisioError(`A diagram named "${name}" already exists in this project`); return; }
+    setImportVisioError("");
+    setShowImportVisioDialog(false);
+    importVisioInputRef.current?.click();
   }
 
   // ── Import (JSON / XML) ───────────────────────────────────────────────
@@ -1469,7 +1510,20 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
                     <button
                       className="block w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100 disabled:opacity-50"
                       disabled={visioImportInProgress}
-                      onClick={() => { setShowFileMenu(false); importVisioInputRef.current?.click(); }}
+                      onClick={() => {
+                        setShowFileMenu(false);
+                        // Default name = next available "Visio BPMN Diagram Import N".
+                        const re = /^Visio BPMN Diagram Import (\d+)$/;
+                        let maxN = 0;
+                        for (const d of diagrams) {
+                          const m = d.name.match(re);
+                          if (m) maxN = Math.max(maxN, parseInt(m[1], 10));
+                        }
+                        setImportVisioName(`Visio BPMN Diagram Import ${maxN + 1}`);
+                        setImportVisioFolderName("Imported BPMN Diagrams");
+                        setImportVisioError("");
+                        setShowImportVisioDialog(true);
+                      }}
                       title="Create a new BPMN diagram in this project from a Visio .vsdx file"
                     >
                       {visioImportInProgress ? "Importing Visio…" : "Import Visio"}
@@ -1873,6 +1927,70 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
                 } disabled:cursor-not-allowed`}
               >
                 {creating ? "Creating\u2026" : "Create"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* New Visio Import dialog — collects name + target folder before
+          opening the file picker. After name validation, the file input
+          referenced by `importVisioInputRef` is clicked; the rest of the
+          import flow runs inside `handleImportVisioFile`. */}
+      {showImportVisioDialog && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Import Visio Diagram</h2>
+
+            {importVisioError && (
+              <p className="mb-3 text-sm text-red-600 bg-red-50 px-3 py-2 rounded">{importVisioError}</p>
+            )}
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Diagram name</label>
+              <input
+                autoFocus
+                type="text"
+                value={importVisioName}
+                onChange={(e) => setImportVisioName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleImportVisioConfirm()}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="My imported diagram"
+              />
+              <p className="mt-1.5 text-xs text-gray-500">Must be unique within this project.</p>
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Folder</label>
+              <input
+                type="text"
+                value={importVisioFolderName}
+                onChange={(e) => setImportVisioFolderName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleImportVisioConfirm()}
+                list="import-visio-folder-options"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Imported BPMN Diagrams"
+              />
+              <datalist id="import-visio-folder-options">
+                {folderTree.folders
+                  .filter(f => f.parentId === null)
+                  .map(f => <option key={f.id} value={f.name} />)}
+              </datalist>
+              <p className="mt-1.5 text-xs text-gray-500">Created at the project root if it doesn&apos;t exist. Leave blank to keep the diagram at the project root.</p>
+            </div>
+
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => { setShowImportVisioDialog(false); setImportVisioError(""); }}
+                className="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleImportVisioConfirm}
+                className="px-4 py-2 text-sm text-white bg-blue-600 rounded-md hover:bg-blue-700"
+              >
+                Choose .vsdx file…
               </button>
             </div>
           </div>

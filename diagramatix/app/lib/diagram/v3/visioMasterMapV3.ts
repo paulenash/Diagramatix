@@ -83,7 +83,13 @@ function getElementMappingV3Inner(el: DiagramElement, profile: StencilProfile): 
       };
       if (gwInfo.exclusive) gwProps.BpmnExclusiveType = gwInfo.exclusive;
       if (gwInfo.marker) gwProps.BpmnMarkerVisible = "1";  // BOOL: 1=true
-      return { masterId: m.gateway, properties: gwProps };
+      // Diagramatix v1.4 ships separate Decision (with marker) and Merge
+      // (plain diamond) gateway masters. Use the Merge master when the
+      // gateway has no marker (gatewayType "none"). Profiles without
+      // `gatewayMerge` (BPMN_M) fall back to the single `gateway` master.
+      const isPlainMerge = (el.gatewayType ?? "none") === "none";
+      const masterId = (isPlainMerge && m.gatewayMerge) ? m.gatewayMerge : m.gateway;
+      return { masterId, properties: gwProps };
     }
 
     case "start-event": {

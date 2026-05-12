@@ -5,6 +5,7 @@ import { prisma } from "@/app/lib/db";
 import * as fs from "fs";
 import * as path from "path";
 import { exportVisioV3 } from "@/app/lib/diagram/v3/exportVisioV3";
+import { profileByName } from "@/app/lib/diagram/v3/stencilProfile";
 import { DEFAULT_SYMBOL_COLORS, BW_SYMBOL_COLORS } from "@/app/lib/diagram/colors";
 import type { SymbolColorConfig } from "@/app/lib/diagram/colors";
 import { getCurrentOrgId, OrgContextError } from "@/app/lib/auth/orgContext";
@@ -39,11 +40,14 @@ export async function GET(request: Request) {
   if (!diagram) return NextResponse.json({ error: "Diagram not found" }, { status: 404 });
 
   try {
-    // Load V3-specific BPMN_M stencil + template assets (independent copies of
-    // the V2 files so V3 work cannot break V2 exports).
-    const stencilPath = path.join(process.cwd(), "public", "bpmn-stencil-v3.vssx");
+    // Profile selects which stencil flavour to emit. `?profile=` accepts
+    // "bpmn-m" (default) or "diagramatix-v1.4" / "v1.4" / "v14".
+    const profile = profileByName(searchParams.get("profile"));
+
+    // Load the stencil + template files named by the profile.
+    const stencilPath = path.join(process.cwd(), "public", profile.stencilFile);
     const stencilBuf = fs.readFileSync(stencilPath);
-    const templatePath = path.join(process.cwd(), "public", "bpmn-template-v3.vsdx");
+    const templatePath = path.join(process.cwd(), "public", profile.templateFile);
     const templateBuf = fs.readFileSync(templatePath);
 
     const data = diagram.data as any;
@@ -56,12 +60,21 @@ export async function GET(request: Request) {
       ? BW_SYMBOL_COLORS
       : { ...DEFAULT_SYMBOL_COLORS, ...projectColors, ...diagramColors };
 
-    const result = await exportVisioV3(data, diagram.name, stencilBuf.buffer, templateBuf.buffer, displayMode, effectiveColors);
+    const result = await exportVisioV3(
+      data,
+      diagram.name,
+      stencilBuf.buffer,
+      templateBuf.buffer,
+      displayMode,
+      effectiveColors,
+      profile,
+    );
 
+    const suffix = profile.name === "diagramatix-v1.5" ? "v1.5" : "V3";
     return new NextResponse(result as any, {
       headers: {
         "Content-Type": "application/vnd.ms-visio.drawing",
-        "Content-Disposition": `attachment; filename="${diagram.name} (V3).vsdx"`,
+        "Content-Disposition": `attachment; filename="${diagram.name} (${suffix}).vsdx"`,
       },
     });
   } catch (err: any) {

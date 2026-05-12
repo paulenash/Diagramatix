@@ -2024,7 +2024,12 @@ export async function exportVisioV3(
     // size values are rewritten — that aligns the visible body geometry with
     // the instance selection rectangle.
     let effectiveMasterId = mapping.masterId;
-    if (BODY_FILL_TYPES.has(el.type) && isColor && colorMap[el.type]) {
+    // Skip per-instance master cloning entirely for profiles whose
+    // auxiliary stencil already ships with the desired visual styling
+    // (Diagramatix v1.4). The bake/rescale logic assumes BPMN_M-specific
+    // sub-shape IDs and would mis-fire against v1.4's master structure.
+    if (!profile.disableBodyColourBake
+        && BODY_FILL_TYPES.has(el.type) && isColor && colorMap[el.type]) {
       // Merge the top-level `el.gatewayType` into elProps so the per-
       // instance master logic can read it from a single object. Diagramatix
       // sets both `el.gatewayType` and `el.properties.gatewayType`; we
@@ -2053,7 +2058,13 @@ export async function exportVisioV3(
     // Special case: for events, the stub corresponding to the trigger
     // marker MasterShape carries Geometry sub-sections with `NoShow='0'
     // F='Inh'` to force the marker visible.
-    if (BODY_FILL_TYPES.has(el.type) && subShapes === "") {
+    //
+    // Skipped for profiles whose stencils handle marker visibility
+    // internally (Diagramatix v1.4). The sub-shape ID assumptions used
+    // by `triggerMarkers` and the BPMN_M Geometry-IX layout don't apply
+    // to v1.4's master structure.
+    if (!profile.disableBodyColourBake
+        && BODY_FILL_TYPES.has(el.type) && subShapes === "") {
       const masterFileEntry = await zip
         .file(`visio/masters/master${effectiveMasterId}.xml`)
         ?.async("string");

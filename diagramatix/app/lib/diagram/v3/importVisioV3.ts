@@ -78,6 +78,12 @@ interface ElementSeed {
   subprocessType?: string;
   repeatType?: "loop" | "mi-sequential" | "mi-parallel";
   interruptionType?: "interrupting" | "non-interrupting";
+  /** Set when the master NameU itself declares the shape is meant to be
+   *  edge-mounted on a subprocess (v5.1 stencil's "Edge Cancel Event",
+   *  "Edge Start", etc.). Boundary-event detection uses this as a strong
+   *  signal — far wider tolerance than the geometric heuristic — since
+   *  the master name is unambiguous intent. */
+  forceBoundary?: boolean;
 }
 
 type ConnectorBase = "sequence" | "messageBPMN" | "associationBPMN";
@@ -680,6 +686,28 @@ function isConnectorMaster(nameU: string): ConnectorBase | null {
  *  table. Order matters: more specific terms before generic ones. */
 function fuzzyClassifyElement(nameU: string): ElementSeed | null {
   const n = nameU.toLowerCase();
+  // ── Diagramatix v5.1 Edge-event masters ────────────────────────────
+  // v5.1 ships dedicated boundary-event masters with the prefix "Edge"
+  // (e.g. "Edge Cancel Event", "Edge Time out Event"). The NameU itself
+  // declares boundary intent, so we set forceBoundary and let the
+  // boundary-detection pass mount them on the nearest subprocess.
+  // Order matters — "Edge Start" must beat the generic " start" rule,
+  // "Edge End" must beat " end", and the typed Edge intermediates must
+  // beat the generic "Edge ... Event" rule.
+  if (n.includes("edge cancel"))                              return { type: "intermediate-event", eventType: "cancel",   forceBoundary: true };
+  if (n.includes("edge error") || n.includes("edge exception")) return { type: "intermediate-event", eventType: "error",    forceBoundary: true };
+  if (n.includes("edge time") || n.includes("edge timer"))    return { type: "intermediate-event", eventType: "timer",    forceBoundary: true };
+  if (n.includes("edge message"))                             return { type: "intermediate-event", eventType: "message",  forceBoundary: true };
+  if (n.includes("edge signal"))                              return { type: "intermediate-event", eventType: "signal",   forceBoundary: true };
+  if (n.includes("edge compensation"))                        return { type: "intermediate-event", eventType: "compensation", forceBoundary: true };
+  if (n.includes("edge escalation"))                          return { type: "intermediate-event", eventType: "escalation",  forceBoundary: true };
+  if (n.includes("edge conditional"))                         return { type: "intermediate-event", eventType: "conditional", forceBoundary: true };
+  if (n.includes("edge link"))                                return { type: "intermediate-event", eventType: "link",     forceBoundary: true };
+  if (n === "edge start" || n.startsWith("edge start"))       return { type: "start-event",        forceBoundary: true };
+  if (n === "edge end" || n.startsWith("edge end"))           return { type: "end-event",          forceBoundary: true };
+  if (n.includes("edge-mounted") || (n.includes("edge") && n.includes("intermediate")))
+                                                              return { type: "intermediate-event", forceBoundary: true };
+
   // Pools and lanes — Visio cross-functional flowchart files often use
   // names like "Functional Band", "Swimlane" etc. for what we treat as
   // a Pool's lane stripe.
@@ -689,13 +717,28 @@ function fuzzyClassifyElement(nameU: string): ElementSeed | null {
   if (n.includes("lane")) return { type: "lane" };
   // Subprocesses (check before "process" so "Sub-Process" wins).
   if (n.includes("expanded sub")) return { type: "subprocess-expanded" };
+  if (n.includes("call collapsed sub") || n.includes("call sub")) return { type: "subprocess", subprocessType: "call" };
   if (n.includes("collapsed sub") || n.includes("sub-process") || n.includes("subprocess")) return { type: "subprocess" };
   // Gateways
   if (n.includes("exclusive gateway")) return { type: "gateway", gatewayType: "exclusive" };
   if (n.includes("inclusive")) return { type: "gateway", gatewayType: "inclusive" };
   if (n.includes("parallel gateway")) return { type: "gateway", gatewayType: "parallel" };
   if (n.includes("event gateway") || n.includes("event-based")) return { type: "gateway", gatewayType: "event-based" };
+  if (n === "merge" || n.endsWith(" merge")) return { type: "gateway" };       // v5.1 plain Merge gateway
   if (n.includes("gateway")) return { type: "gateway" };
+  // Trigger-typed Start / Intermediate events — v5.1 names like
+  // "Start with Timer", "Receive Message Start", "Send Message End Event"
+  // carry the trigger directly in the master name. Match these BEFORE
+  // the generic Start/End rules so the eventType isn't lost.
+  if (n.includes("start with timer") || n === "timer start")         return { type: "start-event",        eventType: "timer" };
+  if (n.includes("receive message start") || n.includes("message start") || n.includes("start with message"))
+                                                                     return { type: "start-event",        eventType: "message" };
+  if (n.includes("send message end") || n.includes("message end"))   return { type: "end-event",          eventType: "message", flowType: "throwing" };
+  if (n === "send message" || n.endsWith(" send message"))           return { type: "intermediate-event", eventType: "message", flowType: "throwing" };
+  if (n === "receive message" || n.endsWith(" receive message"))     return { type: "intermediate-event", eventType: "message" };
+  if (n === "timer" || n.endsWith(" timer"))                         return { type: "intermediate-event", eventType: "timer" };
+  if (n === "link out" || n.endsWith(" link out"))                   return { type: "intermediate-event", eventType: "link", flowType: "throwing" };
+  if (n === "link in" || n.endsWith(" link in"))                     return { type: "intermediate-event", eventType: "link" };
   // Events
   if (n.includes("start event") || n.endsWith(" start") || n === "start") return { type: "start-event" };
   if (n.includes("end event") || n.endsWith(" end")) return { type: "end-event" };
@@ -711,6 +754,8 @@ function fuzzyClassifyElement(nameU: string): ElementSeed | null {
   if (n.includes("task") || n.includes("activity")) return { type: "task" };
   // Data
   if (n.includes("data store") || n.includes("datastore")) return { type: "data-store" };
+  if (n.includes("input data object")) return { type: "data-object", role: "input" };
+  if (n.includes("output data object")) return { type: "data-object", role: "output" };
   if (n.includes("data object") || n.includes("dataobject")) return { type: "data-object" };
   // Misc
   if (n.includes("text annotation") || n.includes("annotation")) return { type: "text-annotation" };
@@ -1364,11 +1409,17 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
   };
 
   const shapeIdToElId = new Map<string, string>();
+  // Tracks elements whose master NameU explicitly declared they should be
+  // boundary-mounted (v5.1's "Edge ..." masters). Read by the third-pass
+  // boundary detection which uses a very wide tolerance for these
+  // because the master name is unambiguous intent.
+  const forceBoundaryElIds = new Set<string>();
   const elements: DiagramElement[] = [];
   for (const r of raw) {
     if (!r.seed) continue;
     const elId = mintId(r.bpmnId);
     shapeIdToElId.set(r.shapeId, elId);
+    if (r.seed.forceBoundary) forceBoundaryElIds.add(elId);
 
     const pinX = r.pageX;        // page-absolute (after parent transform)
     const pinY = r.pageY;
@@ -1708,6 +1759,37 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
       ];
       const d = Math.min(...candidates);
       if (d <= EDGE_TOL && d < bestDist) { bestDist = d; bestHost = host; }
+    }
+    if (bestHost) ev.boundaryHostId = bestHost.id;
+  }
+
+  // FORCED-BOUNDARY pass — events whose master NameU explicitly declared
+  // boundary intent (v5.1's "Edge Cancel Event", "Edge Start" etc.) get
+  // a much wider geometric tolerance and the same-lane requirement is
+  // skipped. Rationale: the master name IS the signal, so the geometric
+  // proximity test is only used to pick WHICH subprocess to mount on
+  // (the closest one) rather than to validate boundary intent. False
+  // positives are not a concern — the only candidates are events that
+  // were dropped from a stencil whose author explicitly chose an Edge
+  // shape over a regular event.
+  for (const ev of elements) {
+    if (!BPMN_EVENT_TYPES.has(ev.type)) continue;
+    if (ev.boundaryHostId) continue;
+    if (!forceBoundaryElIds.has(ev.id)) continue;
+    const cx = ev.x + ev.width / 2;
+    const cy = ev.y + ev.height / 2;
+    let bestHost: DiagramElement | null = null;
+    let bestDist = Infinity;
+    for (const host of boundaryCandidates) {
+      if (host.id === ev.id) continue;
+      const left = host.x, right = host.x + host.width;
+      const top = host.y,  bottom = host.y + host.height;
+      const dL = Math.abs(cx - left);
+      const dR = Math.abs(cx - right);
+      const dT = Math.abs(cy - top);
+      const dB = Math.abs(cy - bottom);
+      const d = Math.min(dL, dR, dT, dB);
+      if (d < bestDist) { bestDist = d; bestHost = host; }
     }
     if (bestHost) ev.boundaryHostId = bestHost.id;
   }
