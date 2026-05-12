@@ -1401,7 +1401,9 @@ export function PropertiesPanel({
 
       <div>
         <label className="block text-[10px] font-medium text-gray-500 mb-0.5">
-          {element.type === "uml-class" || element.type === "uml-enumeration" ? "Name" : "Label"}
+          {element.type === "uml-class" || element.type === "uml-enumeration" ||
+           element.type === "task" || element.type === "subprocess" ||
+           element.type === "subprocess-expanded" ? "Name" : "Label"}
         </label>
         {(element.type === "gateway" || isEventElement ||
           element.type === "data-object" || element.type === "data-store" ||

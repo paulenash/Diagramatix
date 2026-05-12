@@ -4,6 +4,7 @@ import { useState, createContext, useContext } from "react";
 import type { BpmnTaskType, GatewayType, EventType, DiagramElement, Point, Side, SymbolType } from "@/app/lib/diagram/types";
 import { type SymbolColorConfig, resolveColor } from "@/app/lib/diagram/colors";
 import { DisplayModeCtx, FontScaleCtx, PoolFontSizeCtx, LaneFontSizeCtx, sketchyFilter } from "@/app/lib/diagram/displayMode";
+import { wrapText } from "@/app/lib/diagram/textMetrics";
 import { ArchimateShape } from "./ArchimateShape";
 
 /** React context carrying the active project colour config.  Shape components
@@ -73,23 +74,6 @@ function ellipseOctagonPoints(cx: number, cy: number, rx: number, ry: number): s
     `${cx-rx},${cy+ry*k}`,  `${cx-rx*k},${cy+ry}`,
     `${cx+rx*k},${cy+ry}`,  `${cx+rx},${cy+ry*k}`,
   ].join(" ");
-}
-
-function wrapText(text: string, maxWidth: number, fontSize = 12): string[] {
-  const avgCharWidth = fontSize * 0.55;
-  const charsPerLine = Math.max(1, Math.floor(maxWidth / avgCharWidth));
-  const lines: string[] = [];
-  for (const segment of text.split('\n')) {
-    const words = segment.split(' ');
-    let current = '';
-    for (const word of words) {
-      if (!current) { current = word; }
-      else if (current.length + 1 + word.length <= charsPerLine) { current += ' ' + word; }
-      else { lines.push(current); current = word; }
-    }
-    lines.push(current);
-  }
-  return lines.length ? lines : [''];
 }
 
 const CONNECTION_POINT_SIDES: Side[] = ["top", "right", "bottom", "left"];

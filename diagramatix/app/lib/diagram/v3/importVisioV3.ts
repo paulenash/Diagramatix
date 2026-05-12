@@ -28,6 +28,7 @@ import type {
   Point,
 } from "../types";
 import { recomputeAllConnectors } from "../routing";
+import { autoSizeForType, type AutosizeType } from "../textMetrics";
 
 export interface MasterStat {
   masterId: string;
@@ -1648,6 +1649,21 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
     if (r.seed.eventType) el.eventType = r.seed.eventType;
     if (r.seed.flowType) el.flowType = r.seed.flowType;
     if (r.seed.repeatType) el.repeatType = r.seed.repeatType;
+    // Task / Sub-Process: replace imported dims with the autosize-driven
+    // dims for the label, regardless of what the Visio file declared.
+    // Keeps the rule "revert to Diagramatix default initial size — no
+    // matter how they were created" consistent at the source rather than
+    // relying solely on the SET_DATA migration in useDiagram.
+    if (el.type === "task" || el.type === "subprocess") {
+      const hasTaskMarker = el.type === "task" && !!el.taskType && el.taskType !== "none";
+      const sz = autoSizeForType(el.type as AutosizeType, el.label || "", 12, hasTaskMarker);
+      const dx = (sz.w - el.width) / 2;
+      const dy = (sz.h - el.height) / 2;
+      el.x -= dx;
+      el.y -= dy;
+      el.width = sz.w;
+      el.height = sz.h;
+    }
     elements.push(el);
   }
 

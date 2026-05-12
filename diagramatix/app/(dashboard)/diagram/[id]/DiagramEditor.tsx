@@ -432,6 +432,9 @@ export function DiagramEditor({
     resizeElement,
     resizeElementEnd,
     updateLabel,
+    beginLabelEdit,
+    updateLabelLive,
+    cancelLabelEdit,
     updateProperties,
     updatePropertiesBatch,
     setEventBoundary,
@@ -1917,6 +1920,9 @@ export function DiagramEditor({
           onMoveElement={moveElement}
           onResizeElement={resizeElement}
           onUpdateLabel={updateLabel}
+          onBeginLabelEdit={beginLabelEdit}
+          onUpdateLabelLive={updateLabelLive}
+          onCancelLabelEdit={cancelLabelEdit}
           onDeleteElement={(id) => {
             deleteElement(id);
             setSelectedElementIds((prev) => { const next = new Set(prev); next.delete(id); return next; });

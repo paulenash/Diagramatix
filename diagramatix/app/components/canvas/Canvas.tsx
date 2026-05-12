@@ -158,6 +158,9 @@ interface Props {
   onMoveElement: (id: string, x: number, y: number, unconstrained?: boolean) => void;
   onResizeElement: (id: string, x: number, y: number, width: number, height: number) => void;
   onUpdateLabel: (id: string, label: string) => void;
+  onBeginLabelEdit?: (id: string) => void;
+  onUpdateLabelLive?: (id: string, label: string) => void;
+  onCancelLabelEdit?: () => void;
   onDeleteElement: (id: string) => void;
   onAddConnector: (
     sourceId: string,
@@ -384,6 +387,9 @@ export function Canvas({
   onMoveElement,
   onResizeElement,
   onUpdateLabel,
+  onBeginLabelEdit,
+  onUpdateLabelLive,
+  onCancelLabelEdit,
   onDeleteElement,
   onAddConnector,
   onDeleteConnector,
@@ -2602,6 +2608,9 @@ export function Canvas({
   }
 
   function startEditingLabel(el: DiagramElement) {
+    // Snapshot history once at edit start (for task/subprocess this is used
+    // by updateLabelLive per-keystroke without polluting the undo stack).
+    onBeginLabelEdit?.(el.id);
     // Events, data objects, data stores: skip inline editor — focus Properties Panel label instead
     const SKIP_INLINE_EDIT = new Set(["start-event", "intermediate-event", "end-event", "data-store", "data-object"]);
     if (SKIP_INLINE_EDIT.has(el.type)) {
@@ -4902,6 +4911,12 @@ export function Canvas({
             if (lines.length > 2) val = lines.slice(0, 2).join('\n');
           }
           setEditingLabel(prev => prev ? { ...prev, value: val } : null);
+          // Task / Sub-Process: live autosize during typing — element
+          // grows/shrinks per keystroke. History push happens once on
+          // commitLabel via the preLabelEditRef captured in onBeginLabelEdit.
+          if (editingEl && (editingEl.type === 'task' || editingEl.type === 'subprocess')) {
+            onUpdateLabelLive?.(editingEl.id, val);
+          }
         };
         if (isUseCase) {
           return (
@@ -4970,7 +4985,14 @@ export function Canvas({
         }
         const isUmlEl = editingEl?.type === "uml-class" || editingEl?.type === "uml-enumeration";
         const editLines = editingLabel.value.split("\n").length;
-        const editH = isUmlEl ? Math.max(editingLabel.height, editLines * 16 * zoom + 8) : editingLabel.height;
+        // For task/subprocess, read live element dims so the overlay
+        // visibly grows/shrinks per keystroke as updateLabelLive runs.
+        const isAutoSized = editingEl?.type === "task" || editingEl?.type === "subprocess";
+        const liveLeft = isAutoSized ? (editingEl!.x * zoom + pan.x) : editingLabel.x;
+        const liveTop  = isAutoSized ? (editingEl!.y * zoom + pan.y) : editingLabel.y;
+        const liveW    = isAutoSized ? (editingEl!.width  * zoom) : editingLabel.width;
+        const liveH    = isAutoSized ? (editingEl!.height * zoom) : editingLabel.height;
+        const editH = isUmlEl ? Math.max(editingLabel.height, editLines * 16 * zoom + 8) : liveH;
         return (
           <textarea
             autoFocus
@@ -4980,13 +5002,16 @@ export function Canvas({
             onBlur={commitLabel}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); commitLabel(); }
-              if (e.key === "Escape") setEditingLabel(null);
+              if (e.key === "Escape") {
+                onCancelLabelEdit?.();
+                setEditingLabel(null);
+              }
             }}
             style={{
               position: "absolute",
-              left: editingLabel.x,
-              top: editingLabel.y + (hasTaskMarker ? 20 * zoom : 0),
-              width: editingLabel.width,
+              left: liveLeft,
+              top: liveTop + (hasTaskMarker ? 20 * zoom : 0),
+              width: liveW,
               height: editH,
               fontSize: (data.fontSize ?? 12) * zoom,
               textAlign: "center",

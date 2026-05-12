@@ -22,6 +22,21 @@ import type {
 import { computeWaypoints, recomputeAllConnectors, consolidateWaypoints, rectifyWaypoints, constrainControlPoint, safeSidePair } from "@/app/lib/diagram/routing";
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
 import { CHEVRON_THEMES } from "@/app/lib/diagram/chevronThemes";
+import { autoSizeForType, getDefaultSize, type AutosizeType } from "@/app/lib/diagram/textMetrics";
+
+/** Compute the autosize-driven dimensions for a task or subprocess based on
+ *  its label and (optional) task marker. Returns the rounded element size
+ *  for that label. Used by UPDATE_LABEL, UPDATE_LABEL_LIVE, SET_DATA migration,
+ *  and importVisioV3 element construction.
+ *  Centred re-positioning (adjusting x/y to keep the centre put) is the
+ *  caller's responsibility. */
+function autoSizeForElement(el: DiagramElement): { w: number; h: number } {
+  if (el.type !== "task" && el.type !== "subprocess") {
+    return { w: el.width, h: el.height };
+  }
+  const hasTaskMarker = el.type === "task" && !!el.taskType && el.taskType !== "none";
+  return autoSizeForType(el.type as AutosizeType, el.label || "", 12, hasTaskMarker);
+}
 
 const BPMN_EVENT_TYPES = new Set(["start-event", "intermediate-event", "end-event"]);
 
@@ -227,6 +242,7 @@ type Action =
   | { type: "MOVE_ELEMENT"; payload: { id: string; x: number; y: number; unconstrained?: boolean } }
   | { type: "RESIZE_ELEMENT"; payload: { id: string; x: number; y: number; width: number; height: number } }
   | { type: "UPDATE_LABEL"; payload: { id: string; label: string } }
+  | { type: "UPDATE_LABEL_LIVE"; payload: { id: string; label: string } }
   | { type: "UPDATE_PROPERTIES"; payload: { id: string; properties: Record<string, unknown> } }
   | { type: "SET_EVENT_BOUNDARY"; payload: { id: string; hostId: string | null } }
   | { type: "DELETE_ELEMENT"; payload: { id: string } }
@@ -2722,8 +2738,20 @@ function reducer(state: DiagramData, action: Action): DiagramData {
     console.log(`[TRACE reducer] action=${action.type}`);
   }
   switch (action.type) {
-    case "SET_DATA":
-      return action.payload;
+    case "SET_DATA": {
+      // Normalise task/subprocess sizes on load — they revert to the type's
+      // default size for their label, regardless of saved width/height.
+      // Idempotent: re-loading a normalised diagram is a no-op.
+      const normalisedElements = action.payload.elements.map((e) => {
+        if (e.type !== "task" && e.type !== "subprocess") return e;
+        const sz = autoSizeForElement(e);
+        if (sz.w === e.width && sz.h === e.height) return e;
+        const dx = (sz.w - e.width) / 2;
+        const dy = (sz.h - e.height) / 2;
+        return { ...e, x: e.x - dx, y: e.y - dy, width: sz.w, height: sz.h };
+      });
+      return { ...action.payload, elements: normalisedElements };
+    }
 
     case "ADD_ELEMENT": {
       // ── Pool/Lane drop intercept ─────────────────────────────────────
@@ -4131,8 +4159,25 @@ function reducer(state: DiagramData, action: Action): DiagramData {
     }
 
     case "RESIZE_ELEMENT": {
-      const { id, x: newX, y: newY, width: newW, height: rawNewH } = action.payload;
+      const { id } = action.payload;
+      // eslint-disable-next-line prefer-const
+      let { x: newX, y: newY, width: newW, height: rawNewH } = action.payload;
       const target = state.elements.find((e) => e.id === id);
+      // Task / Sub-Process floor — clamp width/height to the type's default
+      // size. If the user dragged a top/left handle (rawX > target.x or
+      // rawY > target.y), pin the opposite edge so the element doesn't
+      // drift past the cursor when the floor is hit.
+      if (target && (target.type === "task" || target.type === "subprocess")) {
+        const def = getDefaultSize(target.type);
+        if (newW < def.w) {
+          if (newX > target.x) newX = target.x + target.width - def.w;
+          newW = def.w;
+        }
+        if (rawNewH < def.h) {
+          if (newY > target.y) newY = target.y + target.height - def.h;
+          rawNewH = def.h;
+        }
+      }
       const poolFs = state.poolFontSize ?? 12;
       const laneFs = state.laneFontSize ?? 12;
       // Clamp the resize height so labels (own + descendants') can never
@@ -4370,6 +4415,50 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         const updated = resizeLaneForLabel(elements, state.connectors, labelEl.id, fontSize);
         return { ...state, ...updated };
       }
+      // Task / Sub-Process (collapsed): text-driven autosize, aspect-locked
+      // to the type's default size. Centre stays put; attached connectors
+      // recompute; lane reflow runs once via ensureContainersEncloseChildren.
+      if (labelEl && (labelEl.type === "task" || labelEl.type === "subprocess")) {
+        const { w, h } = autoSizeForElement(labelEl);
+        const resizedElements = elements.map((e) => {
+          if (e.id !== labelEl.id) return e;
+          const dx = (w - e.width) / 2;
+          const dy = (h - e.height) / 2;
+          return { ...e, x: e.x - dx, y: e.y - dy, width: w, height: h };
+        });
+        const finalElements = ensureContainersEncloseChildren(resizedElements);
+        const connectors = state.connectors.map((conn) => {
+          if (conn.sourceId !== labelEl.id && conn.targetId !== labelEl.id) return conn;
+          return recomputeAllConnectors([conn], finalElements)[0] ?? conn;
+        });
+        return { ...state, elements: finalElements, connectors };
+      }
+      return { ...state, elements };
+    }
+
+    case "UPDATE_LABEL_LIVE": {
+      // Cheap per-keystroke path: writes label + autosize for task/subprocess,
+      // skips connector recompute and skips ensureContainersEncloseChildren
+      // (deferred until UPDATE_LABEL commit at edit-end). History is NOT
+      // pushed — the calling hook snapshotted once at beginLabelEdit.
+      const target = state.elements.find((e) => e.id === action.payload.id);
+      if (!target) return state;
+      const updatedTarget = { ...target, label: action.payload.label };
+      let newW = target.width;
+      let newH = target.height;
+      let newX = target.x;
+      let newY = target.y;
+      if (target.type === "task" || target.type === "subprocess") {
+        const sz = autoSizeForElement(updatedTarget);
+        newW = sz.w; newH = sz.h;
+        newX = target.x - (newW - target.width) / 2;
+        newY = target.y - (newH - target.height) / 2;
+      }
+      const elements = state.elements.map((e) =>
+        e.id === action.payload.id
+          ? { ...e, label: action.payload.label, x: newX, y: newY, width: newW, height: newH }
+          : e,
+      );
       return { ...state, elements };
     }
 
@@ -6800,6 +6889,12 @@ export function useDiagram(initialData: DiagramData) {
   const preLaneRef        = useRef<Snapshot | null>(null);
   const preWaypointRef    = useRef<Snapshot | null>(null);
   const waypointConnIdRef = useRef<string | null>(null);
+  // Label-edit coalescing: snapshot once at edit start; live keystrokes
+  // dispatch UPDATE_LABEL_LIVE without pushing history. Commit fires the
+  // regular UPDATE_LABEL and pushes the captured snapshot. Mirrors the
+  // preResizeRef / resizingRef pattern.
+  const preLabelEditRef   = useRef<Snapshot | null>(null);
+  const labelEditingRef   = useRef<string | null>(null);
 
   function snapshotData(): Snapshot {
     return { elements: dataRef.current.elements, connectors: dataRef.current.connectors };
@@ -6873,8 +6968,39 @@ export function useDiagram(initialData: DiagramData) {
   }, []);
 
   const updateLabel = useCallback((id: string, label: string) => {
-    pushHistory(snapshotData());
+    // If a live edit is in flight for this element, the snapshot was
+    // already taken at beginLabelEdit — push that and clear the ref.
+    // Otherwise (panel commit without prior beginLabelEdit, or any other
+    // path) snapshot now.
+    if (labelEditingRef.current === id && preLabelEditRef.current) {
+      pushHistory(preLabelEditRef.current);
+      preLabelEditRef.current = null;
+      labelEditingRef.current = null;
+    } else {
+      pushHistory(snapshotData());
+    }
     dispatch({ type: "UPDATE_LABEL", payload: { id, label } });
+  }, []);
+
+  const beginLabelEdit = useCallback((id: string) => {
+    labelEditingRef.current = id;
+    preLabelEditRef.current = snapshotData();
+  }, []);
+
+  const updateLabelLive = useCallback((id: string, label: string) => {
+    // Per-keystroke path; no history push. The reducer applies the
+    // autosize + label change but skips connector recompute and lane
+    // reflow (deferred to UPDATE_LABEL on commit).
+    dispatch({ type: "UPDATE_LABEL_LIVE", payload: { id, label } });
+  }, []);
+
+  const cancelLabelEdit = useCallback(() => {
+    // Edit aborted (Escape) — restore the pre-edit snapshot if one exists.
+    if (labelEditingRef.current && preLabelEditRef.current) {
+      dispatch({ type: "SET_DATA", payload: { ...dataRef.current, elements: preLabelEditRef.current.elements, connectors: preLabelEditRef.current.connectors } });
+      preLabelEditRef.current = null;
+      labelEditingRef.current = null;
+    }
   }, []);
 
   const updateProperties = useCallback(
@@ -7231,6 +7357,9 @@ export function useDiagram(initialData: DiagramData) {
     resizeElement,
     resizeElementEnd,
     updateLabel,
+    beginLabelEdit,
+    updateLabelLive,
+    cancelLabelEdit,
     updateProperties,
     updatePropertiesBatch,
     setEventBoundary,

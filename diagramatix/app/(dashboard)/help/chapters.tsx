@@ -1093,7 +1093,8 @@ export const CHAPTERS: HelpChapter[] = [
         heading: "Element properties",
         body: (
           <ul className="list-disc list-inside space-y-1">
-            <li><strong>Label</strong> — the display text</li>
+            <li><strong>Name</strong> (Task, Sub-Process, Expanded Sub-Process) — the display text inside the element. Tasks and collapsed Sub-Processes auto-grow (aspect-locked to their default size) to fit the name as you type, and shrink back to the default when text is removed. Shift+Enter forces an explicit line break.</li>
+            <li><strong>Label</strong> (Gateways, Events, Connectors, others) — the display text shown beside the element</li>
             <li><strong>Task type</strong> (BPMN) — user, service, script, send, receive, manual, business-rule</li>
             <li><strong>Convert Task ↔ Subprocess</strong> (BPMN) — change a task to a subprocess or vice versa</li>
             <li><strong>Gateway type</strong> (BPMN) — exclusive, inclusive, parallel, event-based</li>
