@@ -80,6 +80,16 @@ interface MasterInfo {
    *  classifier sees `props.BpmnMarkerVisible === undefined` and can't
    *  honour the master's intent. */
   bpmnProps?: Record<string, string>;
+  /** Master's `TxtPinX` / `TxtPinY` cells from its root Shape 5. Used
+   *  as a fallback when an instance shape doesn't override its text-
+   *  block position. Visio stencil masters define a per-shape default
+   *  label location (e.g. v5.1's Exclusive Gateway puts the label
+   *  upper-left of the diamond; Parallel Gateway places it below) that
+   *  instances inherit unless the user explicitly drags the label.
+   *  Values are in inches, local to the shape's bottom-left corner,
+   *  Y-axis pointing UP (Visio convention). */
+  txtPinX?: number;
+  txtPinY?: number;
 }
 
 interface ElementSeed {
@@ -522,8 +532,15 @@ async function loadMasterIndex(zip: JSZip): Promise<Map<string, MasterInfo>> {
     // fallback when the instance shape doesn't override the property.
     // Reuse the same row-bounded reader that processes instance blocks.
     const bpmnProps = readPropValues(masterXml);
-    if (masterWidth || masterHeight || defaultText || Object.keys(bpmnProps).length > 0) {
-      masters.set(id, { ...info, masterWidth, masterHeight, defaultText, bpmnProps });
+    // Master's TxtPinX / TxtPinY — default label position relative to
+    // the shape (Visio local coords, inches, Y-up). Instances inherit
+    // these unless the user explicitly repositioned the label.
+    const txtPinX = readCellNum(head5, "TxtPinX") ?? undefined;
+    const txtPinY = readCellNum(head5, "TxtPinY") ?? undefined;
+    if (masterWidth || masterHeight || defaultText
+        || Object.keys(bpmnProps).length > 0
+        || txtPinX !== undefined || txtPinY !== undefined) {
+      masters.set(id, { ...info, masterWidth, masterHeight, defaultText, bpmnProps, txtPinX, txtPinY });
     }
   }
   return masters;
@@ -1537,6 +1554,55 @@ export async function importVisioV3(buffer: ArrayBuffer): Promise<ImportResult> 
     // Visio's "System Pool" master signals a system participant in BPMN —
     // surface that as the canvas's `isSystem` flag (Black-Box variant).
     if (r.nameU === "System Pool") properties.isSystem = true;
+
+    // ── Label position from Visio TxtPinX / TxtPinY ────────────────────
+    // Diagramatix's SymbolRenderer honours `properties.labelOffsetX/Y`
+    // on gateways, events and data shapes — labels are centred + shifted
+    // horizontally by labelOffsetX, and positioned at `element.bottom +
+    // labelOffsetY` for the label TOP. Convert Visio's TxtPin (local
+    // shape-bottom-left origin, Y-up, inches) to that convention so the
+    // imported label appears where the .vsdx places it.
+    //
+    // The fallback chain mirrors `defaultText`: instance head wins;
+    // otherwise master's value (from `MasterInfo.txtPinX/Y`). Skipped
+    // entirely for shape types whose label position isn't user-
+    // controllable in the renderer (pool/lane/subprocess/task — their
+    // labels are auto-positioned per type semantics).
+    const LABEL_POSITIONABLE_TYPES = new Set<string>([
+      "gateway", "start-event", "intermediate-event", "end-event",
+      "data-object", "data-store",
+    ]);
+    if (LABEL_POSITIONABLE_TYPES.has(r.seed.type)) {
+      const head0 = outerHead(r.block);
+      const tpxInst = readCellNum(head0, "TxtPinX");
+      const tpyInst = readCellNum(head0, "TxtPinY");
+      const txtPinX = tpxInst ?? elMasterInfo?.txtPinX;
+      const txtPinY = tpyInst ?? elMasterInfo?.txtPinY;
+      if (txtPinX !== undefined && txtPinY !== undefined) {
+        // Convert Visio shape-local (bottom-left origin, Y-up) →
+        // Diagramatix labelOffset (centred X offset, Y-down distance
+        // from element bottom to label TOP).
+        //
+        //   labelCentre.x_diag  = element.x + TxtPinX * 96
+        //   element.centre.x    = element.x + width / 2
+        //   labelOffsetX        = labelCentre.x_diag − element.centre.x
+        //                       = TxtPinX*96 − width/2
+        //
+        //   labelCentre.y_diag  = element.y + height − TxtPinY * 96
+        //   labelTopY (renderer) = element.y + height + labelOffsetY
+        //   so labelOffsetY     = labelCentre.y_diag − labelHalfH − (element.y + height)
+        //                       = −TxtPinY*96 − labelHalfH
+        // labelHalfH ≈ 7 px for a single-line 10pt label (matches the
+        // renderer's `?? 7` default for the offset).
+        const LABEL_HALF_H = 7;
+        const labelOffsetX = Math.round(txtPinX * PX_PER_INCH - widthPx / 2);
+        const labelOffsetY = Math.round(-txtPinY * PX_PER_INCH - LABEL_HALF_H);
+        // Skip the write when the result is the renderer's default
+        // (labelOffsetX=0, labelOffsetY=7) to avoid persisting noise.
+        if (labelOffsetX !== 0) properties.labelOffsetX = labelOffsetX;
+        if (labelOffsetY !== 7) properties.labelOffsetY = labelOffsetY;
+      }
+    }
     // Widen the pool header strip for multi-line labels. Pool labels are
     // rendered rotated 90° in the left header — each `\n` becomes a
     // parallel column, so a 3-line label needs ~3× the default 36px.
