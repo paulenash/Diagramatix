@@ -260,27 +260,39 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
   const [showBpmnImportDialog, setShowBpmnImportDialog] = useState(false);
   const [bpmnImportProgress, setBpmnImportProgress] = useState<{ done: number; total: number; current: string }>({ done: 0, total: 0, current: "" });
 
-  function handleBpmnFolderSelected(fileList: FileList) {
+  function openBpmnImportDialog() {
+    setBpmnImportFiles([]);
+    setBpmnImportSelected(new Set());
+    setBpmnImportProjectName("");
+    setBpmnImportFolderName("Imported BPMN Diagrams");
+    setBpmnImportProgress({ done: 0, total: 0, current: "" });
     setBpmnImportError("");
+    setShowBpmnImportDialog(true);
+  }
+
+  function handleBpmnFolderSelected(fileList: FileList) {
     const files = Array.from(fileList).filter((f) => /\.bpmn$/i.test(f.name) || /\.xml$/i.test(f.name));
-    if (files.length === 0) {
-      alert("No .bpmn or .xml files found in the selected folder.");
-      return;
-    }
     // Derive folder name from first file's relative path (webkitdirectory populates .webkitRelativePath).
+    const probe = (files[0] ?? fileList[0]) as (File & { webkitRelativePath?: string }) | undefined;
     let folderName = "";
-    const rel = (files[0] as File & { webkitRelativePath?: string }).webkitRelativePath ?? "";
+    const rel = probe?.webkitRelativePath ?? "";
     if (rel) {
       const parts = rel.split("/");
       if (parts.length > 1) folderName = parts[0];
+    }
+    if (files.length === 0) {
+      setBpmnImportFiles([]);
+      setBpmnImportSelected(new Set());
+      setBpmnImportError(folderName
+        ? `Folder "${folderName}" contains no .bpmn or .xml files.`
+        : "Selected folder contains no .bpmn or .xml files.");
+      return;
     }
     files.sort((a, b) => a.name.localeCompare(b.name));
     setBpmnImportFiles(files);
     setBpmnImportSelected(new Set(files.map((_, i) => i)));
     setBpmnImportProjectName(folderName || "Imported BPMN Diagrams");
-    setBpmnImportFolderName("Imported BPMN Diagrams");
-    setBpmnImportProgress({ done: 0, total: 0, current: "" });
-    setShowBpmnImportDialog(true);
+    setBpmnImportError("");
   }
 
   async function handleBpmnImportConfirm() {
@@ -999,7 +1011,6 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                 ref={bpmnFolderInputRef}
                 type="file"
                 multiple
-                accept=".bpmn,.xml"
                 className="hidden"
                 // @ts-expect-error — webkitdirectory is a non-standard React attribute (Chrome/Edge folder picker).
                 webkitdirectory=""
@@ -1087,8 +1098,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                     <button
                       onClick={() => {
                         setFileMenuOpen(false);
-                        setBpmnImportError("");
-                        bpmnFolderInputRef.current?.click();
+                        openBpmnImportDialog();
                       }}
                       title="Pick a folder of .bpmn files; each file becomes one diagram in a new project named after the folder"
                       className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
@@ -1794,83 +1804,106 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
       )}
 
       {/* BPMN Bulk Import dialog (dashboard-level → always creates a
-          new project for the imported diagrams). */}
-      {showBpmnImportDialog && bpmnImportFiles.length > 0 && (
+          new project for the imported diagrams). Opens FIRST, then hosts
+          a "Choose folder" button that triggers the OS folder picker. */}
+      {showBpmnImportDialog && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg">
             <h2 className="text-lg font-semibold text-gray-900 mb-2">Import BPMN Diagrams</h2>
             <p className="text-xs text-gray-600 mb-4">
-              {bpmnImportFiles.length} BPMN file{bpmnImportFiles.length === 1 ? "" : "s"} found in folder.
+              Pick a folder containing <span className="font-mono">.bpmn</span> files. Each file becomes one diagram in a new project; the project defaults to the folder name and each diagram is named after its filename (without the extension).
             </p>
             {bpmnImportError && (
               <p className="mb-3 text-sm text-red-600 bg-red-50 px-3 py-2 rounded">{bpmnImportError}</p>
             )}
-            <div className="mb-4">
-              <div className="flex items-center justify-between mb-1">
-                <label className="block text-sm font-medium text-gray-700">Select files to import</label>
-                <div className="flex gap-2 text-xs">
-                  <button
-                    type="button"
-                    onClick={() => setBpmnImportSelected(new Set(bpmnImportFiles.map((_, i) => i)))}
-                    className="text-blue-600 hover:underline"
-                  >Select all</button>
-                  <button
-                    type="button"
-                    onClick={() => setBpmnImportSelected(new Set())}
-                    className="text-blue-600 hover:underline"
-                  >Clear</button>
+
+            <div className="mb-4 flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => bpmnFolderInputRef.current?.click()}
+                disabled={bpmnImportBusy}
+                className="px-3 py-1.5 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
+              >
+                {bpmnImportFiles.length === 0 ? "Choose folder…" : "Choose different folder…"}
+              </button>
+              {bpmnImportFiles.length > 0 && (
+                <span className="text-xs text-gray-600">
+                  {bpmnImportFiles.length} BPMN file{bpmnImportFiles.length === 1 ? "" : "s"} found.
+                </span>
+              )}
+            </div>
+
+            {bpmnImportFiles.length > 0 && (
+              <>
+                <div className="mb-4">
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-sm font-medium text-gray-700">Select files to import</label>
+                    <div className="flex gap-2 text-xs">
+                      <button
+                        type="button"
+                        onClick={() => setBpmnImportSelected(new Set(bpmnImportFiles.map((_, i) => i)))}
+                        className="text-blue-600 hover:underline"
+                      >Select all</button>
+                      <button
+                        type="button"
+                        onClick={() => setBpmnImportSelected(new Set())}
+                        className="text-blue-600 hover:underline"
+                      >Clear</button>
+                    </div>
+                  </div>
+                  <div className="max-h-[40vh] overflow-y-auto border border-gray-300 rounded">
+                    {bpmnImportFiles.map((f, i) => {
+                      const checked = bpmnImportSelected.has(i);
+                      return (
+                        <label
+                          key={i}
+                          className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-800 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(e) => {
+                              setBpmnImportSelected((prev) => {
+                                const next = new Set(prev);
+                                if (e.target.checked) next.add(i);
+                                else next.delete(i);
+                                return next;
+                              });
+                            }}
+                            className="h-3.5 w-3.5"
+                          />
+                          <span className="text-gray-400 text-xs tabular-nums w-6">{i + 1}.</span>
+                          <span className="truncate">{f.name}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                  <p className="mt-1.5 text-xs text-gray-500">{bpmnImportSelected.size} of {bpmnImportFiles.length} selected.</p>
                 </div>
-              </div>
-              <div className="max-h-[40vh] overflow-y-auto border border-gray-300 rounded">
-                {bpmnImportFiles.map((f, i) => {
-                  const checked = bpmnImportSelected.has(i);
-                  return (
-                    <label
-                      key={i}
-                      className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-800 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={(e) => {
-                          setBpmnImportSelected((prev) => {
-                            const next = new Set(prev);
-                            if (e.target.checked) next.add(i);
-                            else next.delete(i);
-                            return next;
-                          });
-                        }}
-                        className="h-3.5 w-3.5"
-                      />
-                      <span className="text-gray-400 text-xs tabular-nums w-6">{i + 1}.</span>
-                      <span className="truncate">{f.name}</span>
-                    </label>
-                  );
-                })}
-              </div>
-              <p className="mt-1.5 text-xs text-gray-500">{bpmnImportSelected.size} of {bpmnImportFiles.length} selected.</p>
-            </div>
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">New project name</label>
-              <input
-                type="text"
-                value={bpmnImportProjectName}
-                onChange={(e) => setBpmnImportProjectName(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <p className="mt-1.5 text-xs text-gray-500">Defaults to the source folder name.</p>
-            </div>
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Folder</label>
-              <input
-                type="text"
-                value={bpmnImportFolderName}
-                onChange={(e) => setBpmnImportFolderName(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Imported BPMN Diagrams"
-              />
-              <p className="mt-1.5 text-xs text-gray-500">Folder inside the new project for the imported diagrams. Leave blank to place them at the project root.</p>
-            </div>
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">New project name</label>
+                  <input
+                    type="text"
+                    value={bpmnImportProjectName}
+                    onChange={(e) => setBpmnImportProjectName(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <p className="mt-1.5 text-xs text-gray-500">Defaults to the source folder name.</p>
+                </div>
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Folder</label>
+                  <input
+                    type="text"
+                    value={bpmnImportFolderName}
+                    onChange={(e) => setBpmnImportFolderName(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Imported BPMN Diagrams"
+                  />
+                  <p className="mt-1.5 text-xs text-gray-500">Folder inside the new project for the imported diagrams. Leave blank to place them at the project root.</p>
+                </div>
+              </>
+            )}
+
             {bpmnImportBusy && bpmnImportProgress.total > 0 && (
               <div className="mb-4">
                 <div className="flex items-center justify-between mb-1 text-xs text-gray-600">
@@ -1899,10 +1932,14 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
               </button>
               <button
                 onClick={handleBpmnImportConfirm}
-                disabled={bpmnImportBusy || bpmnImportSelected.size === 0}
+                disabled={bpmnImportBusy || bpmnImportSelected.size === 0 || bpmnImportFiles.length === 0}
                 className="px-4 py-2 text-sm text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
               >
-                {bpmnImportBusy ? "Importing…" : `Import ${bpmnImportSelected.size} file${bpmnImportSelected.size === 1 ? "" : "s"}`}
+                {bpmnImportBusy
+                  ? "Importing…"
+                  : bpmnImportFiles.length === 0
+                    ? "Import"
+                    : `Import ${bpmnImportSelected.size} file${bpmnImportSelected.size === 1 ? "" : "s"}`}
               </button>
             </div>
           </div>
