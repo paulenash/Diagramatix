@@ -2102,10 +2102,10 @@ export function DiagramEditor({
           href="/help"
           target="_blank"
           rel="noopener"
-          className="text-[11px] text-gray-400 hover:text-blue-600"
-          title="User Guide"
+          className="text-[11px] text-gray-600 border border-gray-300 rounded px-2 py-0.5 hover:bg-gray-50 hover:text-blue-600"
+          title="Open the User Guide in a new tab"
         >
-          ?
+          User Guide
         </a>
       </header>
 
