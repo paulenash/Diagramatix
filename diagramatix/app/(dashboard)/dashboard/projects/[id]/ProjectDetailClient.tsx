@@ -1886,19 +1886,26 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
                     onClick={e => e.stopPropagation()}
                     className="flex-1 text-[10px] border border-blue-400 rounded px-1 py-0 outline-none min-w-0" />
                 ) : (
-                  <>
+                  // Wrap the diagram name and its icons in a per-row named hover
+                  // group so that the edit / delete icons reveal ONLY when the
+                  // pointer is over the name (or already over the icons), not
+                  // when the user is anywhere else in the sidebar. The whole
+                  // sidebar has a `group` class higher up — without this scope
+                  // every diagram row's icons would appear at once on sidebar
+                  // hover.
+                  <div className="flex items-center gap-1 flex-1 min-w-0 group/dgname">
                     <span className="truncate flex-1" title={d.name}>{d.name}</span>
                     <button onClick={(e) => { e.stopPropagation(); startRename(d.id, d.name); }}
-                      className="opacity-0 group-hover:opacity-100 hover:!opacity-100 text-gray-400 hover:text-blue-500 px-0.5"
+                      className="opacity-0 group-hover/dgname:opacity-100 hover:!opacity-100 text-gray-400 hover:text-blue-500 px-0.5"
                       title="Rename diagram"
                       style={{ opacity: selectedTreeItem === d.id ? 1 : undefined }}
                     >{PencilIcon}</button>
                     <button onClick={(e) => { e.stopPropagation(); handleDeleteDiagram(d.id); }}
-                      className="opacity-0 group-hover:opacity-100 hover:!opacity-100 text-gray-400 hover:text-red-500 px-0.5"
+                      className="opacity-0 group-hover/dgname:opacity-100 hover:!opacity-100 text-gray-400 hover:text-red-500 px-0.5"
                       title="Delete diagram"
                       style={{ opacity: selectedTreeItem === d.id ? 1 : undefined }}
                     >{TrashIcon}</button>
-                  </>
+                  </div>
                 )}
               </div>
             ))}
