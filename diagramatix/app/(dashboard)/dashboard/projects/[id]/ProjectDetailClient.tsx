@@ -564,6 +564,7 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
   const importJsonInputRef = useRef<HTMLInputElement>(null);
   const importXmlInputRef = useRef<HTMLInputElement>(null);
   const importVisioInputRef = useRef<HTMLInputElement>(null);
+  const importBpmnInputRef = useRef<HTMLInputElement>(null);
   // Import-progress modal state (mirrors the dashboard's import flow).
   const [importing, setImporting] = useState(false);
   const [importLog, setImportLog] = useState<string[]>([]);
@@ -1007,6 +1008,85 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
       setShowImportVisioDialog(true);
     } catch (err) {
       alert(`Failed to read .vsdx: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  // ── Import (BPMN 2.0 .bpmn) ──────────────────────────────────────────
+  // Single-file flow. POST the .bpmn to /api/import/bpmn, mirror the
+  // result into local state, then surface the existing single-import
+  // status modal (BPMN stats reshaped into the VisioImportResult shape).
+  async function handleImportBpmnFile(file: File) {
+    setVisioImportInProgress(true);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      form.append("projectId", project.id);
+      form.append("folderName", "Imported BPMN Diagrams");
+      const resp = await fetch("/api/import/bpmn", { method: "POST", body: form });
+      if (!resp.ok) {
+        const txt = await resp.text();
+        alert(`BPMN import failed: ${txt || resp.statusText}`);
+        return;
+      }
+      const result = await resp.json() as {
+        diagram: { id: string; name: string };
+        warnings: string[];
+        stats: {
+          processCount: number;
+          participantCount: number;
+          elementsCreated: number;
+          connectorsCreated: number;
+          shapesDropped: number;
+          flowsDropped: number;
+        };
+      };
+      // Splice into the local diagram list.
+      setDiagrams((prev) => [
+        { id: result.diagram.id, name: result.diagram.name, type: "bpmn", createdAt: new Date(), updatedAt: new Date() },
+        ...prev,
+      ]);
+      // Mirror the server-side folder placement into the local folderTree
+      // state (so the new diagram appears in the right folder without a
+      // full project refetch).
+      const folderName = "Imported BPMN Diagrams";
+      updateTree((t) => {
+        const existing = t.folders.find((f) => f.parentId === null && f.name === folderName);
+        if (existing) {
+          return {
+            ...t,
+            diagramFolderMap: { ...t.diagramFolderMap, [result.diagram.id]: existing.id },
+          };
+        }
+        const newFolderId = `folder-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+        return {
+          ...t,
+          folders: [...t.folders, { id: newFolderId, name: folderName, parentId: null }],
+          diagramFolderMap: { ...t.diagramFolderMap, [result.diagram.id]: newFolderId },
+        };
+      });
+      // Reshape BPMN stats → VisioImportResult so the existing status
+      // modal can render the warnings + counts without modification.
+      const reshaped: VisioImportResult = {
+        diagram: result.diagram,
+        warnings: [
+          `Imported BPMN file (processes: ${result.stats.processCount}, participants: ${result.stats.participantCount}).`,
+          ...result.warnings,
+        ],
+        stats: {
+          totalShapesOnPage: result.stats.elementsCreated + result.stats.shapesDropped,
+          elementsCreated: result.stats.elementsCreated,
+          connectorsCreated: result.stats.connectorsCreated,
+          shapesSkipped: result.stats.shapesDropped,
+          connectorsSkipped: result.stats.flowsDropped,
+          implicitPools: 0,
+          masters: [],
+        },
+      };
+      setVisioImportStatus(reshaped);
+    } catch (err) {
+      alert(`BPMN import failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setVisioImportInProgress(false);
     }
   }
 
@@ -1927,6 +2007,17 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
                   if (f) handleImportVisioFile(f);
                 }}
               />
+              <input
+                ref={importBpmnInputRef}
+                type="file"
+                accept=".bpmn,.xml"
+                className="hidden"
+                onChange={e => {
+                  const f = e.target.files?.[0];
+                  e.target.value = "";
+                  if (f) handleImportBpmnFile(f);
+                }}
+              />
               {/* Unified File menu — Export JSON / Import JSON / Export XML / Import XML */}
               <div className="relative" ref={fileMenuRef}>
                 <button
@@ -2023,6 +2114,17 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
                             title="Import one or more pages from a Visio .vsdx file as separate diagrams"
                           >
                             {visioImportInProgress ? "Visio (importing…)" : "Visio"}
+                          </button>
+                          <button
+                            className={`${itemCls} disabled:opacity-50`}
+                            disabled={visioImportInProgress}
+                            onClick={() => {
+                              setShowFileMenu(false);
+                              importBpmnInputRef.current?.click();
+                            }}
+                            title="Import an OMG BPMN 2.0 .bpmn file (Signavio / Camunda / bpmn.io export) as a new diagram"
+                          >
+                            {visioImportInProgress ? "BPMN (importing…)" : "BPMN"}
                           </button>
                         </div>
                       </div>
