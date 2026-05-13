@@ -1756,65 +1756,73 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
               onClick={e => e.stopPropagation()}
               className="flex-1 text-[11px] font-medium border border-blue-400 rounded px-1 py-0 outline-none min-w-0" />
           ) : (
-            <span className="truncate flex-1 font-medium" title={name}>{name}</span>
-          )}
-          {/* Refresh icon on root folder */}
-          {isRoot && (
-            <button onClick={(e) => { e.stopPropagation(); refreshProjectData(); }}
-              className="opacity-0 group-hover:opacity-100 hover:!opacity-100 text-gray-400 hover:text-blue-500 px-0.5"
-              title="Refresh project tree"
-              style={{ opacity: isSelected ? 1 : undefined }}
-            >
-              <svg width={11} height={11} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
-                <path d="M1 2v5h5" /><path d="M15 14v-5h-5" />
-                <path d="M2.5 10.5A6 6 0 0113.3 4.3L15 6M13.5 5.5A6 6 0 012.7 11.7L1 10" />
-              </svg>
-            </button>
-          )}
-          {/* Folder action buttons */}
-          {!isRoot && !editingId && (
-            <button onClick={(e) => { e.stopPropagation(); startRename(folderId, name); }}
-              className="opacity-0 group-hover:opacity-100 hover:!opacity-100 text-gray-400 hover:text-blue-500 px-0.5"
-              title="Rename folder"
-              style={{ opacity: selectedTreeItem === folderId ? 1 : undefined }}
-            >{PencilIcon}</button>
-          )}
-          <button onClick={(e) => { e.stopPropagation(); handleAddFolder(folderId); }}
-            className="opacity-0 group-hover:opacity-100 hover:!opacity-100 text-gray-400 hover:text-blue-500 text-[10px] px-0.5 font-bold"
-            title="Add subfolder"
-            style={{ opacity: selectedTreeItem === folderId || isSelected ? 1 : undefined }}
-          >+</button>
-          {childFolders.length > 0 && (
-            <>
-              <button onClick={(e) => { e.stopPropagation(); setAllDescendantsCollapsed(folderId, false); }}
-                className="opacity-0 group-hover:opacity-100 hover:!opacity-100 text-gray-400 hover:text-blue-500 text-[9px] px-0.5"
-                title="Expand all subfolders"
+            // Per-row named hover group. Wraps the folder/project name AND
+            // all of its action buttons so that the icons reveal ONLY when
+            // the pointer is over the name (or already over the icons),
+            // not when the user is hovering anywhere else in the sidebar.
+            // Buttons swap from `group-hover:opacity-100` (sidebar-wide) to
+            // `group-hover/foldername:opacity-100` (this row only).
+            <div className="flex items-center gap-1 flex-1 min-w-0 group/foldername">
+              <span className="truncate flex-1 font-medium" title={name}>{name}</span>
+              {/* Refresh icon on root folder */}
+              {isRoot && (
+                <button onClick={(e) => { e.stopPropagation(); refreshProjectData(); }}
+                  className="opacity-0 group-hover/foldername:opacity-100 hover:!opacity-100 text-gray-400 hover:text-blue-500 px-0.5"
+                  title="Refresh project tree"
+                  style={{ opacity: isSelected ? 1 : undefined }}
+                >
+                  <svg width={11} height={11} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M1 2v5h5" /><path d="M15 14v-5h-5" />
+                    <path d="M2.5 10.5A6 6 0 0113.3 4.3L15 6M13.5 5.5A6 6 0 012.7 11.7L1 10" />
+                  </svg>
+                </button>
+              )}
+              {/* Folder action buttons */}
+              {!isRoot && (
+                <button onClick={(e) => { e.stopPropagation(); startRename(folderId, name); }}
+                  className="opacity-0 group-hover/foldername:opacity-100 hover:!opacity-100 text-gray-400 hover:text-blue-500 px-0.5"
+                  title="Rename folder"
+                  style={{ opacity: selectedTreeItem === folderId ? 1 : undefined }}
+                >{PencilIcon}</button>
+              )}
+              <button onClick={(e) => { e.stopPropagation(); handleAddFolder(folderId); }}
+                className="opacity-0 group-hover/foldername:opacity-100 hover:!opacity-100 text-gray-400 hover:text-blue-500 text-[10px] px-0.5 font-bold"
+                title="Add subfolder"
                 style={{ opacity: selectedTreeItem === folderId || isSelected ? 1 : undefined }}
-              >
-                <svg width={10} height={10} viewBox="0 0 16 16" fill="currentColor"><path d="M1 4l7 8 7-8H1z" /></svg>
-              </button>
-              <button onClick={(e) => { e.stopPropagation(); setAllDescendantsCollapsed(folderId, true); }}
-                className="opacity-0 group-hover:opacity-100 hover:!opacity-100 text-gray-400 hover:text-blue-500 text-[9px] px-0.5"
-                title="Collapse all subfolders"
-                style={{ opacity: selectedTreeItem === folderId || isSelected ? 1 : undefined }}
-              >
-                <svg width={10} height={10} viewBox="0 0 16 16" fill="currentColor"><path d="M4 1l8 7-8 7V1z" /></svg>
-              </button>
-            </>
+              >+</button>
+              {childFolders.length > 0 && (
+                <>
+                  <button onClick={(e) => { e.stopPropagation(); setAllDescendantsCollapsed(folderId, false); }}
+                    className="opacity-0 group-hover/foldername:opacity-100 hover:!opacity-100 text-gray-400 hover:text-blue-500 text-[9px] px-0.5"
+                    title="Expand all subfolders"
+                    style={{ opacity: selectedTreeItem === folderId || isSelected ? 1 : undefined }}
+                  >
+                    <svg width={10} height={10} viewBox="0 0 16 16" fill="currentColor"><path d="M1 4l7 8 7-8H1z" /></svg>
+                  </button>
+                  <button onClick={(e) => { e.stopPropagation(); setAllDescendantsCollapsed(folderId, true); }}
+                    className="opacity-0 group-hover/foldername:opacity-100 hover:!opacity-100 text-gray-400 hover:text-blue-500 text-[9px] px-0.5"
+                    title="Collapse all subfolders"
+                    style={{ opacity: selectedTreeItem === folderId || isSelected ? 1 : undefined }}
+                  >
+                    <svg width={10} height={10} viewBox="0 0 16 16" fill="currentColor"><path d="M4 1l8 7-8 7V1z" /></svg>
+                  </button>
+                </>
+              )}
+              {!isRoot && (() => {
+                const hasContent = folderHasContent(folderId);
+                return (
+                  <button onClick={(e) => { e.stopPropagation(); if (!hasContent) handleDeleteFolder(folderId); }}
+                    disabled={hasContent}
+                    className={`opacity-0 group-hover/foldername:opacity-100 hover:!opacity-100 px-0.5 ${
+                      hasContent ? "text-gray-300 cursor-not-allowed" : "text-gray-400 hover:text-red-500"
+                    }`}
+                    title={hasContent ? "Cannot delete: folder is not empty" : "Delete folder"}
+                    style={{ opacity: selectedTreeItem === folderId ? 1 : undefined }}
+                  >{TrashIcon}</button>
+                );
+              })()}
+            </div>
           )}
-          {!isRoot && (() => {
-            const hasContent = folderHasContent(folderId);
-            return (
-              <button onClick={(e) => { e.stopPropagation(); if (!hasContent) handleDeleteFolder(folderId); }}
-                disabled={hasContent}
-                className={`opacity-0 group-hover:opacity-100 hover:!opacity-100 px-0.5 ${
-                  hasContent ? "text-gray-300 cursor-not-allowed" : "text-gray-400 hover:text-red-500"
-                }`}
-                title={hasContent ? "Cannot delete: folder is not empty" : "Delete folder"}
-                style={{ opacity: selectedTreeItem === folderId ? 1 : undefined }}
-              >{TrashIcon}</button>
-            );
-          })()}
         </div>
         {/* New folder input */}
         {newFolderParent === folderId && (
