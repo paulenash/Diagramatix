@@ -684,13 +684,39 @@ function walkProcessBody(
 
 /** Wire lane parentage. After walkProcessBody has placed every flow element
  *  parented to the pool, this pass re-parents each element to its
- *  containing lane (per the lane's `<flowNodeRef>` children). */
+ *  containing lane (per the lane's `<flowNodeRef>` children).
+ *
+ *  SINGLE-LANE ABSORPTION: a pool with exactly ONE unnamed lane is
+ *  treated as a single-row pool with no visible lane band — the lane's
+ *  child nodes stay parented to the pool and the lane element itself is
+ *  NOT emitted. This matches Visio importer behaviour and avoids an
+ *  empty grey strip running across the pool body. Multi-lane pools, and
+ *  pools with a single NAMED lane (which the user evidently wants to
+ *  see), render every lane. */
 function applyLaneParenting(
   ctx: BuildContext,
   laneSetBody: string,
   poolDiagramId: string,
 ): void {
-  for (const lane of findChildren(laneSetBody, ["lane"])) {
+  const lanes = findChildren(laneSetBody, ["lane"]);
+  // Single-unnamed-lane case: skip the lane entirely.
+  if (lanes.length === 1) {
+    const only = lanes[0];
+    const name = (getAttr(only.openTag, "name") ?? "").trim();
+    if (!name) {
+      // Re-parent the lane's nodes directly to the pool, skip the lane.
+      for (const ref of findChildren(only.body, ["flowNodeRef"])) {
+        const refText = readInnerText(ref.body);
+        if (!refText) continue;
+        const childDiagramId = ctx.idMap.get(refText);
+        if (!childDiagramId) continue;
+        const child = ctx.elements.find((e) => e.id === childDiagramId);
+        if (child) child.parentId = poolDiagramId;
+      }
+      return;
+    }
+  }
+  for (const lane of lanes) {
     const bpmnId = getAttr(lane.openTag, "id");
     if (!bpmnId) continue;
     const name = getAttr(lane.openTag, "name") ?? "";
@@ -717,6 +743,104 @@ function applyLaneParenting(
     const childLaneSet = findChildren(lane.body, ["childLaneSet"])[0];
     if (childLaneSet) {
       applyLaneParenting(ctx, childLaneSet.body, el.id);
+    }
+  }
+}
+
+/** Walk a process body (recursively into nested sub-processes) and emit an
+ *  `associationBPMN` connector for every `<dataInputAssociation>` /
+ *  `<dataOutputAssociation>` whose source/target resolves to a known
+ *  Diagramatix element. These appear as CHILDREN of an activity (task /
+ *  subprocess) and carry their own ids — the BPMN DI section emits a
+ *  matching `<BPMNEdge bpmnElement="associationId">` so we can look up
+ *  waypoints by association id.
+ *
+ *  dataInputAssociation:  source = data object, target = task's input  →
+ *                          arrow from data object → activity.
+ *  dataOutputAssociation: source = task's output,  target = data object →
+ *                          arrow from activity → data object.
+ *  In Diagramatix terms both render as `associationBPMN` between the
+ *  data object and the parent activity.
+ */
+function buildDataAssociations(ctx: BuildContext, body: string): void {
+  // Activities that can carry data associations: task subtypes + subprocess.
+  const activityTags = [
+    ...Object.keys(TASK_LOCAL_NAMES),
+    ...SUBPROCESS_LOCAL_NAMES,
+  ];
+  for (const activity of findChildren(body, activityTags)) {
+    const activityBpmnId = getAttr(activity.openTag, "id");
+    if (!activityBpmnId) continue;
+    const activityDiagramId = ctx.idMap.get(activityBpmnId);
+    if (!activityDiagramId) continue; // activity wasn't imported (no shape)
+
+    const emit = (assocBpmnId: string, otherSideId: string, isInput: boolean) => {
+      const dataDiagramId = ctx.idMap.get(otherSideId);
+      if (!dataDiagramId) {
+        // Common case: the targetRef of a dataInputAssociation points at
+        // an <ioSpecification><dataInput> nested in the activity, which
+        // is not itself imported. Fall back to silent skip — the visual
+        // association from the data object → activity comes from the
+        // OPPOSITE side (sourceRef of dataInputAssociation = data
+        // object). We only emit when the data side resolves.
+        return;
+      }
+      const sourceId = isInput ? dataDiagramId : activityDiagramId;
+      const targetId = isInput ? activityDiagramId : dataDiagramId;
+      let waypoints = ctx.di.edgeWaypoints.get(assocBpmnId);
+      if (!waypoints) {
+        const s = ctx.elements.find((e) => e.id === sourceId);
+        const t = ctx.elements.find((e) => e.id === targetId);
+        if (s && t) {
+          waypoints = [
+            { x: s.x + s.width / 2, y: s.y + s.height / 2 },
+            { x: t.x + t.width / 2, y: t.y + t.height / 2 },
+          ];
+        } else {
+          waypoints = [];
+        }
+      }
+      ctx.connectors.push({
+        id: mintId(ctx, assocBpmnId),
+        sourceId,
+        targetId,
+        sourceSide: "right",
+        targetSide: "left",
+        type: "associationBPMN",
+        directionType: "directed",
+        routingType: "rectilinear",
+        sourceInvisibleLeader: false,
+        targetInvisibleLeader: false,
+        waypoints,
+      });
+      ctx.stats.connectorsCreated++;
+    };
+
+    for (const a of findChildren(activity.body, ["dataInputAssociation"])) {
+      const assocId = getAttr(a.openTag, "id");
+      if (!assocId) continue;
+      // <sourceRef> child = data object id (the side we care about).
+      const srcRef = findChildren(a.body, ["sourceRef"])[0];
+      if (!srcRef) continue;
+      const dataObjectRef = readInnerText(srcRef.body);
+      if (!dataObjectRef) continue;
+      emit(assocId, dataObjectRef, true);
+    }
+    for (const a of findChildren(activity.body, ["dataOutputAssociation"])) {
+      const assocId = getAttr(a.openTag, "id");
+      if (!assocId) continue;
+      // <targetRef> child = data object id.
+      const tgtRef = findChildren(a.body, ["targetRef"])[0];
+      if (!tgtRef) continue;
+      const dataObjectRef = readInnerText(tgtRef.body);
+      if (!dataObjectRef) continue;
+      emit(assocId, dataObjectRef, false);
+    }
+
+    // Recurse into expanded sub-processes so their nested data
+    // associations are also wired.
+    if (SUBPROCESS_LOCAL_NAMES.has(activity.local) && ctx.di.shapeCollapsed.get(activityBpmnId) !== true) {
+      buildDataAssociations(ctx, activity.body);
     }
   }
 }
@@ -842,17 +966,12 @@ export async function importBpmnXml(
     stats,
   };
 
-  // Diagram name resolution: collaboration → process → filename.
-  let diagramName = fileNameStem;
+  // Diagram name: always the filename stem (per user direction). Earlier
+  // versions tried `<collaboration name>` / `<process name>` first, but
+  // Signavio's defaults there are generic ("Pool", participant labels)
+  // and the filename is the most useful, predictable label.
+  const diagramName = fileNameStem.trim();
   const collabs = findChildren(defsBody, ["collaboration"]);
-  const collabName = collabs.length > 0 ? getAttr(collabs[0].openTag, "name") : undefined;
-  if (collabName && collabName.trim()) {
-    diagramName = collabName.trim();
-  } else {
-    const procs = findChildren(defsBody, ["process"]);
-    const procName = procs.length > 0 ? getAttr(procs[0].openTag, "name") : undefined;
-    if (procName && procName.trim()) diagramName = procName.trim();
-  }
 
   // Collaboration → participants → pools. processRef links each participant
   // to its <process>. A participant without a matching process becomes a
@@ -937,9 +1056,13 @@ export async function importBpmnXml(
     // Lane parentage. <laneSet> wraps the lane definitions.
     const laneSet = findChildren(procBody, ["laneSet"])[0];
     if (laneSet) applyLaneParenting(ctx, laneSet.body, poolDiagramId);
-    // Sequence flows + associations within this process.
+    // Sequence flows + plain associations within this process.
     buildFlows(ctx, procBody, "sequence", ["sequenceFlow"]);
     buildFlows(ctx, procBody, "associationBPMN", ["association"]);
+    // Data input / output associations (Signavio's preferred way of
+    // linking data objects to activities — child elements of each
+    // <task>/<subProcess>, not the process body's direct children).
+    buildDataAssociations(ctx, procBody);
   }
 
   // Free-floating processes — those not wrapped by a <participant>. v1
@@ -953,6 +1076,7 @@ export async function importBpmnXml(
     if (laneSet) applyLaneParenting(ctx, laneSet.body, undefined as unknown as string);
     buildFlows(ctx, procBody, "sequence", ["sequenceFlow"]);
     buildFlows(ctx, procBody, "associationBPMN", ["association"]);
+    buildDataAssociations(ctx, procBody);
   }
 
   // Message flows live at the <collaboration> level.

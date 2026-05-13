@@ -592,6 +592,7 @@ export function DiagramEditor({
   const importXmlInputRef = useRef<HTMLInputElement>(null);
   const importTemplatesInputRef = useRef<HTMLInputElement>(null);
   const importVisioInputRef = useRef<HTMLInputElement>(null);
+  const importBpmnInputRef = useRef<HTMLInputElement>(null);
   // Admin-only: prompt the admin to pick the destination list when
   // exporting or importing templates. Non-admins skip the prompt.
   const [templateExportPrompt, setTemplateExportPrompt] = useState(false);
@@ -600,9 +601,11 @@ export function DiagramEditor({
   // Pending Visio import awaiting the user's overwrite-vs-create decision.
   // Set when the chosen .vsdx file's basename matches the current
   // diagram's name; cleared by the ConfirmDialog's Cancel / OK handlers
-  // (which kick off `runVisioImport` with the chosen mode).
+  // (which kick off the right runner for the file kind). The same state
+  // covers both Visio (.vsdx) and BPMN (.bpmn) imports — the dialog
+  // branches on `kind`.
   const [pendingVisioImport, setPendingVisioImport] = useState<
-    { file: File; baseName: string } | null
+    { file: File; baseName: string; kind?: "visio" | "bpmn" } | null
   >(null);
   const [clearConfirmOpen, setClearConfirmOpen] = useState<null | "all" | "unselected">(null);
   const [clearMenuOpen, setClearMenuOpen] = useState(false);
@@ -985,7 +988,7 @@ export function DiagramEditor({
   async function handleImportVisioFile(file: File) {
     const baseName = file.name.replace(/\.vsdx$/i, "").trim() || "Imported Visio Diagram";
     if (baseName === diagramName) {
-      setPendingVisioImport({ file, baseName });
+      setPendingVisioImport({ file, baseName, kind: "visio" });
       return;
     }
     await runVisioImport(file, baseName, false);
@@ -1016,6 +1019,73 @@ export function DiagramEditor({
       setVisioImportStatus(result);
     } catch (err) {
       alert(`Visio import failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  // ── BPMN file import (.bpmn — OMG BPMN 2.0 XML) ─────────────────────
+  // Mirrors the Visio flow: name-conflict prompt → create-or-overwrite,
+  // then surfaces the existing status modal. The single-file BPMN
+  // endpoint accepts the same overwriteDiagramId field as the Visio
+  // route. Stats reshaped into VisioImportResult so the modal renders.
+  async function handleImportBpmnFile(file: File) {
+    const baseName = file.name.replace(/\.bpmn$/i, "").replace(/\.xml$/i, "").trim() || "Imported BPMN Diagram";
+    if (baseName === diagramName) {
+      setPendingVisioImport({ file, baseName, kind: "bpmn" });
+      return;
+    }
+    await runBpmnImport(file, baseName, false);
+  }
+
+  async function runBpmnImport(file: File, baseName: string, overwrite: boolean) {
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      if (projectId) form.append("projectId", projectId);
+      form.append("name", baseName);
+      if (overwrite) form.append("overwriteDiagramId", diagramId);
+      const resp = await fetch("/api/import/bpmn", { method: "POST", body: form });
+      if (!resp.ok) {
+        const txt = await resp.text();
+        alert(`BPMN import failed: ${txt || resp.statusText}`);
+        return;
+      }
+      const result = await resp.json() as {
+        diagram: { id: string; data?: DiagramData };
+        warnings: string[];
+        stats: {
+          processCount: number;
+          participantCount: number;
+          elementsCreated: number;
+          connectorsCreated: number;
+          shapesDropped: number;
+          flowsDropped: number;
+        };
+        overwrote?: boolean;
+      };
+      if (result.overwrote && result.diagram?.data) {
+        setData(result.diagram.data);
+      }
+      // Reshape into the existing single-import status modal shape.
+      const reshaped: VisioImportResult & { overwrote?: boolean } = {
+        diagram: result.diagram,
+        warnings: [
+          `Imported BPMN file (processes: ${result.stats.processCount}, participants: ${result.stats.participantCount}).`,
+          ...result.warnings,
+        ],
+        stats: {
+          totalShapesOnPage: result.stats.elementsCreated + result.stats.shapesDropped,
+          elementsCreated: result.stats.elementsCreated,
+          connectorsCreated: result.stats.connectorsCreated,
+          shapesSkipped: result.stats.shapesDropped,
+          connectorsSkipped: result.stats.flowsDropped,
+          implicitPools: 0,
+          masters: [],
+        },
+        overwrote: result.overwrote,
+      };
+      setVisioImportStatus(reshaped);
+    } catch (err) {
+      alert(`BPMN import failed: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 
@@ -1631,6 +1701,17 @@ export function DiagramEditor({
             if (f) handleImportVisioFile(f);
           }}
         />
+        <input
+          ref={importBpmnInputRef}
+          type="file"
+          accept=".bpmn,.xml"
+          className="hidden"
+          onChange={e => {
+            const f = e.target.files?.[0];
+            e.target.value = "";
+            if (f) handleImportBpmnFile(f);
+          }}
+        />
 
         <div className="relative" ref={fileMenuRef}>
           <button
@@ -1841,6 +1922,13 @@ export function DiagramEditor({
                       title="Import a Visio BPMN .vsdx file as a new diagram"
                     >
                       Visio
+                    </button>
+                    <button
+                      onClick={() => { setFileMenuOpen(false); setFileSubmenu(null); importBpmnInputRef.current?.click(); }}
+                      className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                      title="Import an OMG BPMN 2.0 .bpmn file (Signavio / Camunda / bpmn.io export) as a new diagram"
+                    >
+                      BPMN
                     </button>
                   </div>
                 )}
@@ -2329,8 +2417,10 @@ export function DiagramEditor({
         <ConfirmDialog
           title={`Overwrite "${pendingVisioImport.baseName}"?`}
           message={
-            `The Visio file's name matches this diagram. Overwrite the current ` +
-            `diagram with the imported content?\n\n` +
+            (pendingVisioImport.kind === "bpmn"
+              ? `The BPMN file's name matches this diagram. `
+              : `The Visio file's name matches this diagram. `) +
+            `Overwrite the current diagram with the imported content?\n\n` +
             `Cancel will instead create a new diagram with the same name; if a ` +
             `same-named diagram already exists in this project, a dd-mm-yy hh:mm ` +
             `timestamp will be appended automatically to keep both visible.`
@@ -2341,12 +2431,14 @@ export function DiagramEditor({
           onConfirm={async () => {
             const p = pendingVisioImport;
             setPendingVisioImport(null);
-            await runVisioImport(p.file, p.baseName, true);
+            if (p.kind === "bpmn") await runBpmnImport(p.file, p.baseName, true);
+            else await runVisioImport(p.file, p.baseName, true);
           }}
           onCancel={async () => {
             const p = pendingVisioImport;
             setPendingVisioImport(null);
-            await runVisioImport(p.file, p.baseName, false);
+            if (p.kind === "bpmn") await runBpmnImport(p.file, p.baseName, false);
+            else await runVisioImport(p.file, p.baseName, false);
           }}
         />
       )}

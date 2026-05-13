@@ -249,6 +249,101 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
     }
   }
 
+  // BPMN Bulk Import (folder picker → new project, one diagram per .bpmn file).
+  const bpmnFolderInputRef = useRef<HTMLInputElement>(null);
+  const [bpmnImportFiles, setBpmnImportFiles] = useState<File[]>([]);
+  const [bpmnImportSelected, setBpmnImportSelected] = useState<Set<number>>(new Set());
+  const [bpmnImportProjectName, setBpmnImportProjectName] = useState("");
+  const [bpmnImportFolderName, setBpmnImportFolderName] = useState("Imported BPMN Diagrams");
+  const [bpmnImportBusy, setBpmnImportBusy] = useState(false);
+  const [bpmnImportError, setBpmnImportError] = useState("");
+  const [showBpmnImportDialog, setShowBpmnImportDialog] = useState(false);
+  const [bpmnImportProgress, setBpmnImportProgress] = useState<{ done: number; total: number; current: string }>({ done: 0, total: 0, current: "" });
+
+  function handleBpmnFolderSelected(fileList: FileList) {
+    setBpmnImportError("");
+    const files = Array.from(fileList).filter((f) => /\.bpmn$/i.test(f.name) || /\.xml$/i.test(f.name));
+    if (files.length === 0) {
+      alert("No .bpmn or .xml files found in the selected folder.");
+      return;
+    }
+    // Derive folder name from first file's relative path (webkitdirectory populates .webkitRelativePath).
+    let folderName = "";
+    const rel = (files[0] as File & { webkitRelativePath?: string }).webkitRelativePath ?? "";
+    if (rel) {
+      const parts = rel.split("/");
+      if (parts.length > 1) folderName = parts[0];
+    }
+    files.sort((a, b) => a.name.localeCompare(b.name));
+    setBpmnImportFiles(files);
+    setBpmnImportSelected(new Set(files.map((_, i) => i)));
+    setBpmnImportProjectName(folderName || "Imported BPMN Diagrams");
+    setBpmnImportFolderName("Imported BPMN Diagrams");
+    setBpmnImportProgress({ done: 0, total: 0, current: "" });
+    setShowBpmnImportDialog(true);
+  }
+
+  async function handleBpmnImportConfirm() {
+    if (bpmnImportFiles.length === 0) { setBpmnImportError("No files selected"); return; }
+    if (bpmnImportSelected.size === 0) { setBpmnImportError("Select at least one file"); return; }
+    if (!bpmnImportProjectName.trim()) { setBpmnImportError("Project name is required"); return; }
+    setBpmnImportBusy(true);
+    setBpmnImportError("");
+    setBpmnImportProgress({ done: 0, total: bpmnImportSelected.size, current: "" });
+    try {
+      // Step 1: create the project.
+      const projResp = await fetch("/api/projects", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: bpmnImportProjectName.trim() }),
+      });
+      if (!projResp.ok) {
+        const txt = await projResp.text();
+        setBpmnImportError(`Project creation failed: ${txt || projResp.statusText}`);
+        return;
+      }
+      const project = (await projResp.json()) as { id: string; name: string };
+
+      // Step 2: import each selected .bpmn file into the project.
+      const selectedIdxs = Array.from(bpmnImportSelected).sort((a, b) => a - b);
+      const errors: { file: string; message: string }[] = [];
+      let done = 0;
+      for (const idx of selectedIdxs) {
+        const file = bpmnImportFiles[idx];
+        setBpmnImportProgress({ done, total: selectedIdxs.length, current: file.name });
+        const stem = file.name.replace(/\.bpmn$/i, "").replace(/\.xml$/i, "");
+        const form = new FormData();
+        form.append("file", file);
+        form.append("projectId", project.id);
+        form.append("name", stem);
+        form.append("folderName", bpmnImportFolderName.trim());
+        try {
+          const resp = await fetch("/api/import/bpmn", { method: "POST", body: form });
+          if (!resp.ok) {
+            const txt = await resp.text();
+            errors.push({ file: file.name, message: txt || resp.statusText });
+          }
+        } catch (err) {
+          errors.push({ file: file.name, message: err instanceof Error ? err.message : String(err) });
+        }
+        done += 1;
+        setBpmnImportProgress({ done, total: selectedIdxs.length, current: file.name });
+      }
+
+      setShowBpmnImportDialog(false);
+      if (errors.length > 0 && errors.length === selectedIdxs.length) {
+        alert(`All files failed to import:\n` + errors.map((e) => `[${e.file}] ${e.message}`).join("\n"));
+      } else if (errors.length > 0) {
+        alert(`${selectedIdxs.length - errors.length} of ${selectedIdxs.length} imported. Failures:\n` + errors.map((e) => `[${e.file}] ${e.message}`).join("\n"));
+      }
+      router.push(`/dashboard/projects/${project.id}`);
+    } catch (err) {
+      setBpmnImportError(`BPMN bulk import failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setBpmnImportBusy(false);
+    }
+  }
+
   async function handleVisioImportConfirm() {
     if (!visioImportFile) { setVisioImportError("No file selected"); return; }
     if (visioImportSelected.size === 0) { setVisioImportError("Select at least one page"); return; }
@@ -900,6 +995,21 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                   if (f) handleVisioFileSelected(f);
                 }}
               />
+              <input
+                ref={bpmnFolderInputRef}
+                type="file"
+                multiple
+                accept=".bpmn,.xml"
+                className="hidden"
+                // @ts-expect-error — webkitdirectory is a non-standard React attribute (Chrome/Edge folder picker).
+                webkitdirectory=""
+                directory=""
+                onChange={e => {
+                  const fl = e.target.files;
+                  e.target.value = "";
+                  if (fl && fl.length > 0) handleBpmnFolderSelected(fl);
+                }}
+              />
 
               {/* Unified File menu */}
               <div className="relative" ref={fileMenuRef}>
@@ -973,6 +1083,17 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                       className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
                     >
                       Import Visio
+                    </button>
+                    <button
+                      onClick={() => {
+                        setFileMenuOpen(false);
+                        setBpmnImportError("");
+                        bpmnFolderInputRef.current?.click();
+                      }}
+                      title="Pick a folder of .bpmn files; each file becomes one diagram in a new project named after the folder"
+                      className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                    >
+                      Import BPMN
                     </button>
                     <div className="border-t border-gray-100" />
                     <a
@@ -1666,6 +1787,122 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                 className="px-4 py-2 text-sm text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
               >
                 {visioImportBusy ? "Importing…" : `Import ${visioImportSelected.size} page${visioImportSelected.size === 1 ? "" : "s"}`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* BPMN Bulk Import dialog (dashboard-level → always creates a
+          new project for the imported diagrams). */}
+      {showBpmnImportDialog && bpmnImportFiles.length > 0 && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg">
+            <h2 className="text-lg font-semibold text-gray-900 mb-2">Import BPMN Diagrams</h2>
+            <p className="text-xs text-gray-600 mb-4">
+              {bpmnImportFiles.length} BPMN file{bpmnImportFiles.length === 1 ? "" : "s"} found in folder.
+            </p>
+            {bpmnImportError && (
+              <p className="mb-3 text-sm text-red-600 bg-red-50 px-3 py-2 rounded">{bpmnImportError}</p>
+            )}
+            <div className="mb-4">
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-sm font-medium text-gray-700">Select files to import</label>
+                <div className="flex gap-2 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setBpmnImportSelected(new Set(bpmnImportFiles.map((_, i) => i)))}
+                    className="text-blue-600 hover:underline"
+                  >Select all</button>
+                  <button
+                    type="button"
+                    onClick={() => setBpmnImportSelected(new Set())}
+                    className="text-blue-600 hover:underline"
+                  >Clear</button>
+                </div>
+              </div>
+              <div className="max-h-[40vh] overflow-y-auto border border-gray-300 rounded">
+                {bpmnImportFiles.map((f, i) => {
+                  const checked = bpmnImportSelected.has(i);
+                  return (
+                    <label
+                      key={i}
+                      className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-800 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={(e) => {
+                          setBpmnImportSelected((prev) => {
+                            const next = new Set(prev);
+                            if (e.target.checked) next.add(i);
+                            else next.delete(i);
+                            return next;
+                          });
+                        }}
+                        className="h-3.5 w-3.5"
+                      />
+                      <span className="text-gray-400 text-xs tabular-nums w-6">{i + 1}.</span>
+                      <span className="truncate">{f.name}</span>
+                    </label>
+                  );
+                })}
+              </div>
+              <p className="mt-1.5 text-xs text-gray-500">{bpmnImportSelected.size} of {bpmnImportFiles.length} selected.</p>
+            </div>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">New project name</label>
+              <input
+                type="text"
+                value={bpmnImportProjectName}
+                onChange={(e) => setBpmnImportProjectName(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <p className="mt-1.5 text-xs text-gray-500">Defaults to the source folder name.</p>
+            </div>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Folder</label>
+              <input
+                type="text"
+                value={bpmnImportFolderName}
+                onChange={(e) => setBpmnImportFolderName(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Imported BPMN Diagrams"
+              />
+              <p className="mt-1.5 text-xs text-gray-500">Folder inside the new project for the imported diagrams. Leave blank to place them at the project root.</p>
+            </div>
+            {bpmnImportBusy && bpmnImportProgress.total > 0 && (
+              <div className="mb-4">
+                <div className="flex items-center justify-between mb-1 text-xs text-gray-600">
+                  <span className="truncate">{bpmnImportProgress.current || "Starting…"}</span>
+                  <span className="tabular-nums ml-2 shrink-0">{bpmnImportProgress.done} / {bpmnImportProgress.total}</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded h-1.5 overflow-hidden">
+                  <div
+                    className="bg-blue-600 h-full transition-all"
+                    style={{ width: `${bpmnImportProgress.total > 0 ? (bpmnImportProgress.done / bpmnImportProgress.total) * 100 : 0}%` }}
+                  />
+                </div>
+              </div>
+            )}
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => {
+                  setShowBpmnImportDialog(false);
+                  setBpmnImportFiles([]);
+                  setBpmnImportError("");
+                }}
+                disabled={bpmnImportBusy}
+                className="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleBpmnImportConfirm}
+                disabled={bpmnImportBusy || bpmnImportSelected.size === 0}
+                className="px-4 py-2 text-sm text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
+              >
+                {bpmnImportBusy ? "Importing…" : `Import ${bpmnImportSelected.size} file${bpmnImportSelected.size === 1 ? "" : "s"}`}
               </button>
             </div>
           </div>
