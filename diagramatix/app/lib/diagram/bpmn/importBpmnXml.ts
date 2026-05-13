@@ -699,12 +699,27 @@ function applyLaneParenting(
   poolDiagramId: string,
 ): void {
   const lanes = findChildren(laneSetBody, ["lane"]);
-  // Single-unnamed-lane case: skip the lane entirely.
+  // Single-lane absorption: skip the lane when it carries no name OR when
+  // its name duplicates the pool's name (case-insensitive, whitespace-
+  // collapsed). Both patterns are import artefacts — a pool with a single
+  // lane is never meaningful by itself, and a lane named the same as its
+  // parent pool is a duplicate label that wastes a horizontal band.
+  //
+  // For message connectors that target the absorbed lane (common when the
+  // source authored a black-box pool with a single lane and ran messages
+  // *to the lane*), we map the lane's BPMN id to the pool's Diagramatix id
+  // in ctx.idMap so the later buildFlows pass resolves the endpoint to
+  // the pool itself.
   if (lanes.length === 1) {
     const only = lanes[0];
-    const name = (getAttr(only.openTag, "name") ?? "").trim();
-    if (!name) {
-      // Re-parent the lane's nodes directly to the pool, skip the lane.
+    const laneBpmnId = getAttr(only.openTag, "id") ?? "";
+    const laneName = (getAttr(only.openTag, "name") ?? "").trim();
+    const poolEl = ctx.elements.find((e) => e.id === poolDiagramId);
+    const poolName = (poolEl?.label ?? "").trim();
+    const normalise = (s: string) => s.replace(/\s+/g, " ").trim().toLowerCase();
+    const sameAsPool = !!laneName && !!poolName && normalise(laneName) === normalise(poolName);
+    if (!laneName || sameAsPool) {
+      // Re-parent the lane's direct child flow nodes to the pool.
       for (const ref of findChildren(only.body, ["flowNodeRef"])) {
         const refText = readInnerText(ref.body);
         if (!refText) continue;
@@ -712,6 +727,24 @@ function applyLaneParenting(
         if (!childDiagramId) continue;
         const child = ctx.elements.find((e) => e.id === childDiagramId);
         if (child) child.parentId = poolDiagramId;
+      }
+      // Sub-lanes: when the absorbed lane wraps a nested <childLaneSet>,
+      // those sub-lanes are now what the pool actually contains. Run
+      // applyLaneParenting recursively on the child lane set with the
+      // POOL as the parent so the sub-lanes are emitted at top level
+      // (and themselves get the same absorption logic applied — a sub-
+      // lane of the same name as the pool would also be absorbed).
+      const childLaneSet = findChildren(only.body, ["childLaneSet"])[0];
+      if (childLaneSet) {
+        applyLaneParenting(ctx, childLaneSet.body, poolDiagramId);
+      }
+      // Reroute any message/sequence/association connector that targets
+      // the absorbed lane to the pool. The flow build pass runs later and
+      // uses idMap to resolve sourceRef/targetRef, so overwriting the
+      // mapping here is sufficient.
+      if (laneBpmnId) ctx.idMap.set(laneBpmnId, poolDiagramId);
+      if (sameAsPool) {
+        ctx.warnings.push(`Pool "${poolName}" had a single lane with the same name — lane absorbed into the pool.`);
       }
       return;
     }
@@ -1082,6 +1115,27 @@ export async function importBpmnXml(
   // Message flows live at the <collaboration> level.
   if (collabs.length > 0) {
     buildFlows(ctx, collabs[0].body, "messageBPMN", ["messageFlow"]);
+  }
+
+  // Pool-type sanity pass. A pool marked white-box at the participant
+  // stage (because its <process> body was non-empty) can still end up
+  // with zero Diagramatix children — e.g. when every flow node's
+  // <BPMNShape> was missing and the children were dropped, or when the
+  // process body contained only auditing/monitoring metadata. Visually
+  // such a pool is indistinguishable from a black-box pool, and any
+  // message connector to/from it should attach to the boundary, not to
+  // a non-existent flow element inside. Re-classify these to black-box
+  // so the canvas renderer and the project-wide scan agree on the
+  // pool's true state.
+  for (const pool of ctx.elements) {
+    if (pool.type !== "pool") continue;
+    const props = (pool.properties as Record<string, unknown> | undefined);
+    if (!props || props.poolType !== "white-box") continue;
+    const hasChildren = ctx.elements.some((e) => e.parentId === pool.id);
+    if (!hasChildren) {
+      props.poolType = "black-box";
+      ctx.warnings.push(`Pool "${pool.label}" was marked white-box but has no contents — re-classified as black-box.`);
+    }
   }
 
   // Median-width sanity check — if everything's tiny, the file is probably

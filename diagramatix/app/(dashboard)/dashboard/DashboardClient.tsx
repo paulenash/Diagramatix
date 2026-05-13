@@ -32,6 +32,9 @@ interface Props {
   userName: string;
   userEmail?: string;
   orgName?: string;
+  /** The signed-in user's role in the active org. Used to gate destructive
+   *  admin actions (e.g. hard-delete). Server still re-checks. */
+  orgRole?: string;
   version?: number;
   readOnly?: boolean;
   viewingAsName?: string;
@@ -138,7 +141,11 @@ function DiagramCard({
   );
 }
 
-export function DashboardClient({ projects: initialProjects, unorganized: initialUnorganized, userName, userEmail, orgName, version, readOnly, viewingAsName, viewingAsEmail, isSuperuser: isSu }: Props) {
+export function DashboardClient({ projects: initialProjects, unorganized: initialUnorganized, userName, userEmail, orgName, orgRole, version, readOnly, viewingAsName, viewingAsEmail, isSuperuser: isSu }: Props) {
+  // Owner / Admin can use the destructive hard-delete path. Read-only
+  // (impersonation) sessions are always denied — the server enforces
+  // the same rule independently.
+  const canHardDelete = !readOnly && (orgRole === "Owner" || orgRole === "Admin");
   const router = useRouter();
   const [projects, setProjects] = useState(initialProjects);
   const [unorganized, setUnorganized] = useState(initialUnorganized);
@@ -920,6 +927,60 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
     });
   }
 
+  /** Admin-only PERMANENT hard delete. Skips the archive entirely —
+   *  diagrams are gone forever, not recoverable from
+   *  /dashboard/deleted-diagrams. Two-step confirmation, both steps
+   *  show project name + diagram count. Server-side this hits
+   *  DELETE /api/projects/[id]?hardDelete=true which independently
+   *  re-checks the Owner/Admin role. */
+  function handleHardDeleteProject(id: string, e: React.MouseEvent) {
+    e.stopPropagation();
+    if (!canHardDelete) return;
+    const proj = projects.find(p => p.id === id);
+    const projectName = proj?.name ?? "this project";
+    const count = proj?._count?.diagrams ?? 0;
+    const diagWord = count === 1 ? "diagram" : "diagrams";
+
+    // Step 1 of 2 — initial confirmation.
+    setConfirmDialog({
+      title: "Permanently Delete Project (Admin)",
+      message:
+        `Project: "${projectName}"\n` +
+        `Diagrams to be deleted: ${count} ${diagWord}\n\n` +
+        `This will PERMANENTLY delete the project and every diagram inside it. ` +
+        `Diagrams are NOT moved to the archive and cannot be recovered.\n\n` +
+        `This is step 1 of 2. You will be asked to confirm once more.`,
+      onConfirm: () => {
+        // Step 2 of 2 — final confirmation, repeats the name + count so
+        // the admin can verify before the irreversible action runs.
+        setConfirmDialog({
+          title: "FINAL CONFIRMATION — Permanent Delete",
+          message:
+            `Project: "${projectName}"\n` +
+            `Diagrams to be deleted: ${count} ${diagWord}\n\n` +
+            `There is NO undo. There is NO archive. ` +
+            `Pressing the button below permanently deletes "${projectName}" and all ${count} ${diagWord} inside it.`,
+          onConfirm: async () => {
+            setConfirmDialog(null);
+            const res = await fetch(`/api/projects/${id}?hardDelete=true`, { method: "DELETE" });
+            if (!res.ok) {
+              const txt = await res.text();
+              setConfirmDialog({
+                title: "Hard delete failed",
+                message: `The server refused the request: ${txt || res.statusText}`,
+                onConfirm: () => setConfirmDialog(null),
+              });
+              return;
+            }
+            setProjects((prev) => prev.filter((p) => p.id !== id));
+            if (selectedProjectId === id) setSelectedProjectId(null);
+            // No diagrams come back to Unorganised — they're gone.
+          },
+        });
+      },
+    });
+  }
+
   /** "Delete project AND every diagram in it." Diagrams move to the
    *  system archive (recoverable from /dashboard/deleted-diagrams) and
    *  the project itself is then deleted. Server cascades both via
@@ -1319,6 +1380,15 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                         >
                           {"\u2716+"}
                         </button>
+                        {canHardDelete && (
+                          <button
+                            onClick={(e) => handleHardDeleteProject(p.id, e)}
+                            className="text-gray-400 hover:text-red-700 text-[10px] px-0.5 font-bold"
+                            title="ADMIN: permanently delete project and all diagrams (no archive, not recoverable)"
+                          >
+                            {"\u2716++"}
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>

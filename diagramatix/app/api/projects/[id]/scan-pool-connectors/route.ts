@@ -36,10 +36,16 @@ interface HangingMessageIssue {
   targetName: string;
   targetType: string;
   reason: string;
-  /** "error" — message has no horizontal overlap, clearly broken.
-   *  "warning" — message touches a white-box pool; technically allowed
-   *  in some BPMN styles but flagged because it's usually a sign that
-   *  the user meant to attach to a flow element inside the pool. */
+  /** "error" — one of:
+   *   • message has no horizontal overlap between source and target (broken)
+   *   • message touches a white-box pool that has NO children
+   *     (pool is misclassified — should be black-box).
+   *  "warning" — message is attached directly to the boundary of a
+   *  white-box pool that DOES have children. Technically allowed in some
+   *  BPMN styles but flagged because the user usually meant to attach to
+   *  a flow element inside the pool, not to the pool boundary itself.
+   *  Messages running between flow elements *inside* white-box pools are
+   *  NOT flagged. */
   severity: "error" | "warning";
 }
 
@@ -207,11 +213,30 @@ export async function GET(_req: Request, { params }: Params) {
     }
 
     // ── Hanging Messages (messageBPMN connectors rendered red on canvas) ──
-    // Canvas.tsx flags a messageBPMN connector as "misaligned" (and renders
-    // it red) when either endpoint is a WHITE-BOX pool OR the source and
-    // target shapes have no x-axis overlap. Replicate both rules here so
-    // the project-wide scan surfaces every red message arrow.
+    // Three patterns are surfaced:
+    //   1. ERROR — the message is attached to the boundary of a pool
+    //      that is marked white-box but has NO child elements. A
+    //      white-box pool with no contents is a misclassification — it
+    //      should be black-box. The importer now prevents this, but the
+    //      scan still flags it (catches diagrams that pre-date the fix
+    //      or were edited by hand).
+    //   2. WARNING — the message endpoint IS a white-box pool element
+    //      that DOES have children. Technically allowed in some BPMN
+    //      styles but usually the user meant to attach to a flow
+    //      element inside the pool. Messages between flow elements
+    //      *inside* white-box pools are NOT flagged.
+    //   3. ERROR — no x-axis overlap between source and target shapes
+    //      (message can't render cleanly; almost always broken).
     const hangingMessages: HangingMessageIssue[] = [];
+    // Pre-compute, per pool, whether it has any child elements (any
+    // element whose parentId points at the pool, including lanes).
+    const poolHasChildren = new Map<string, boolean>();
+    for (const e of elements) {
+      if (!e.parentId) continue;
+      const parent = byId.get(e.parentId);
+      if (!parent || parent.type !== "pool") continue;
+      poolHasChildren.set(parent.id, true);
+    }
     for (const c of connectors) {
       if ((c.type ?? "") !== "messageBPMN") continue;
       const src = byId.get(c.sourceId);
@@ -224,8 +249,17 @@ export async function GET(_req: Request, { params }: Params) {
       let reason = "";
       let severity: "error" | "warning" = "error";
       if (srcIsWhitePool || tgtIsWhitePool) {
-        reason = "message touches white-box pool";
-        severity = "warning";
+        // Identify which side is the offending white-box pool. If BOTH
+        // are, prefer the one without children for the error message.
+        const srcEmpty = srcIsWhitePool && !poolHasChildren.get(src.id);
+        const tgtEmpty = tgtIsWhitePool && !poolHasChildren.get(tgt.id);
+        if (srcEmpty || tgtEmpty) {
+          reason = "white-box pool has no contents — should be black-box";
+          severity = "error";
+        } else {
+          reason = "message is attached to white-box pool";
+          severity = "warning";
+        }
       } else if (
         typeof src.x === "number" && typeof src.width === "number" &&
         typeof tgt.x === "number" && typeof tgt.width === "number"

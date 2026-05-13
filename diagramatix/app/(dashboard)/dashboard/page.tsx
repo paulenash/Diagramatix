@@ -51,7 +51,7 @@ export default async function DashboardPage() {
     select: { name: true, email: true },
   });
 
-  const [projects, unorganized, org] = await Promise.all([
+  const [projects, unorganized, org, membership] = await Promise.all([
     prisma.project.findMany({
       where: { userId: effectiveUserId, orgId, name: { not: ARCHIVE_PROJECT_NAME } },
       orderBy: { updatedAt: "desc" },
@@ -63,7 +63,16 @@ export default async function DashboardPage() {
       select: { id: true, name: true, type: true, createdAt: true, updatedAt: true },
     }),
     prisma.org.findUnique({ where: { id: orgId }, select: { name: true } }),
+    // Look up the SIGNED-IN user's role in the active org (NOT the
+    // impersonated user's role — admin actions are gated on the actual
+    // operator). This is the role used to decide whether destructive
+    // actions like hard-delete are exposed in the UI.
+    prisma.orgMember.findFirst({
+      where: { userId: session.user.id, orgId },
+      select: { role: true },
+    }),
   ]);
+  const orgRole = membership?.role ?? "";
 
   // If impersonating, fetch the target user's info for the banner
   let viewingAsName = "";
@@ -89,6 +98,7 @@ export default async function DashboardPage() {
       userName={currentUser?.name ?? session.user.name ?? "User"}
       userEmail={currentUser?.email ?? session.user.email ?? ""}
       orgName={org?.name ?? ""}
+      orgRole={orgRole}
       version={commitCount}
       readOnly={viewing}
       viewingAsName={viewingAsName}

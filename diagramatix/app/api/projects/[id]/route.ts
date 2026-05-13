@@ -9,6 +9,7 @@ import {
   requireRole,
   WRITE_ROLES,
   OrgContextError,
+  type OrgRole,
 } from "@/app/lib/auth/orgContext";
 
 type Params = { params: Promise<{ id: string }> };
@@ -137,9 +138,17 @@ export async function DELETE(req: Request, { params }: Params) {
     return NextResponse.json({ error: "Read-only: viewing another user" }, { status: 403 });
   }
 
+  const { searchParams } = new URL(req.url);
+  const cascade = searchParams.get("cascade");
+  const hardDelete = searchParams.get("hardDelete") === "true";
+
+  // Hard-delete requires the strictest role gate — Owner or Admin only.
+  // Anything else (cascade=archive or default orphan-on-delete) keeps the
+  // existing WRITE_ROLES gate.
+  const allowedRoles: OrgRole[] = hardDelete ? ["Owner", "Admin"] : WRITE_ROLES;
   let orgId: string;
   try {
-    ({ orgId } = await requireRole(session, await cookies(), WRITE_ROLES));
+    ({ orgId } = await requireRole(session, await cookies(), allowedRoles));
   } catch (err) {
     if (err instanceof OrgContextError) {
       return NextResponse.json({ error: err.message }, { status: err.status });
@@ -153,12 +162,24 @@ export async function DELETE(req: Request, { params }: Params) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
+  // ?hardDelete=true → admin-only destructive path. Permanently deletes
+  // every diagram in the project (NOT archived — gone forever) and then
+  // the project itself. DiagramHistory rows cascade-delete via the
+  // Prisma onDelete: Cascade on DiagramHistory.diagram. Wrapped in a
+  // transaction so partial failures leave nothing behind.
+  if (hardDelete) {
+    const result = await prisma.$transaction(async (tx) => {
+      const purged = await tx.diagram.deleteMany({ where: { projectId: id, orgId } });
+      await tx.project.delete({ where: { id } });
+      return { purged: purged.count };
+    });
+    return NextResponse.json({ success: true, hardDeleted: true, purged: result.purged });
+  }
+
   // ?cascade=archive → move every diagram in this project into the system
   // archive (recoverable from /dashboard/deleted-diagrams) BEFORE deleting
   // the project row. Default behaviour (no query param) leaves diagrams
   // orphaned, preserving the existing "move to Unorganised" semantics.
-  const { searchParams } = new URL(req.url);
-  const cascade = searchParams.get("cascade");
   let archived = 0;
   if (cascade === "archive") {
     const userEmail = session.user.email ?? "";

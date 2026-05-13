@@ -24,7 +24,7 @@ export function ConfirmDialog({
       <div className="bg-white rounded-lg shadow-xl w-full max-w-sm mx-4">
         <div className="px-5 py-4">
           <h3 className="text-sm font-semibold text-gray-900 mb-2">{title}</h3>
-          <p className="text-xs text-gray-600 leading-relaxed">{message}</p>
+          <p className="text-xs text-gray-600 leading-relaxed whitespace-pre-line">{message}</p>
         </div>
         <div className="flex justify-end gap-2 px-5 py-3 border-t border-gray-100">
           <button
