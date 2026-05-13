@@ -26,7 +26,11 @@ interface DiagramShape {
   id: string;
   name: string;
   type: string;
-  data: { elements?: ElementLite[]; connectors?: unknown[] } | null;
+  data: {
+    elements?: ElementLite[];
+    connectors?: unknown[];
+    parentDiagramId?: string;
+  } | null;
 }
 
 interface ExistingLink {
@@ -236,7 +240,11 @@ export async function POST(req: Request, { params }: Params) {
   const diagrams = (await prisma.diagram.findMany({
     where: { projectId, orgId, type: "bpmn" },
     select: { id: true, name: true, data: true },
-  })) as unknown as Array<{ id: string; name: string; data: { elements?: ElementLite[]; connectors?: unknown[] } | null }>;
+  })) as unknown as Array<{
+    id: string;
+    name: string;
+    data: { elements?: ElementLite[]; connectors?: unknown[]; parentDiagramId?: string } | null;
+  }>;
 
   const diagramById = new Map(diagrams.map((d) => [d.id, d] as const));
   const touched = new Set<string>(); // diagram ids whose data we modified
@@ -253,11 +261,13 @@ export async function POST(req: Request, { params }: Params) {
     delete target.properties.linkedDiagramId;
     touched.add(parent.id);
 
-    // Remove the return-link on the previously-linked child only if no
-    // OTHER parent diagram still links to that child.
+    // Clean up the child diagram:
+    //   - Drop the on-canvas return-link element that points to THIS parent.
+    //   - If data.parentDiagramId still names this parent, reassign it to
+    //     another remaining parent (any) or clear it when none remain.
     const child = diagramById.get(previousChildId);
     if (child && child.data) {
-      const stillLinkedElsewhere = diagrams.some((d) => {
+      const otherParents = diagrams.filter((d) => {
         if (d.id === parent.id) return false;
         return (d.data?.elements ?? []).some(
           (e) =>
@@ -266,20 +276,32 @@ export async function POST(req: Request, { params }: Params) {
             (e.properties?.linkedDiagramId as string | undefined) === previousChildId,
         );
       });
-      if (!stillLinkedElsewhere) {
-        const childEls = child.data.elements ?? [];
-        const filtered = childEls.filter(
-          (e) =>
-            !(
-              e.type === "subprocess" &&
-              e.properties?.isReturnLink === true &&
-              (e.properties?.linkedDiagramId as string | undefined) === parent.id
-            ),
-        );
-        if (filtered.length !== childEls.length) {
-          child.data.elements = filtered;
-          touched.add(child.id);
+
+      // Always drop the return-link that points to the parent we just
+      // un-linked — there's no other parent forwarding to the child via
+      // THIS return-link instance, so it's stale.
+      const childEls = child.data.elements ?? [];
+      const filtered = childEls.filter(
+        (e) =>
+          !(
+            e.type === "subprocess" &&
+            e.properties?.isReturnLink === true &&
+            (e.properties?.linkedDiagramId as string | undefined) === parent.id
+          ),
+      );
+      if (filtered.length !== childEls.length) {
+        child.data.elements = filtered;
+        touched.add(child.id);
+      }
+
+      // Reassign or clear parentDiagramId.
+      if (child.data.parentDiagramId === parent.id) {
+        if (otherParents.length > 0) {
+          child.data.parentDiagramId = otherParents[0].id;
+        } else {
+          delete child.data.parentDiagramId;
         }
+        touched.add(child.id);
       }
     }
   }
@@ -298,9 +320,14 @@ export async function POST(req: Request, { params }: Params) {
     target.properties.linkedDiagramId = child.id;
     touched.add(parent.id);
 
-    // Ensure a return-link exists on the child pointing back to this parent.
+    // Diagram-level Parent Diagram property on the child — surfaces in
+    // PropertiesPanel as a clickable link. Most-recent add wins when a
+    // child has multiple parents.
     const childData = child.data ?? { elements: [] };
     child.data = childData;
+    childData.parentDiagramId = parent.id;
+
+    // Ensure an on-canvas return-link element also exists on the child.
     const childEls = childData.elements ?? [];
     childData.elements = childEls;
     const existingReturn = childEls.find(
@@ -310,26 +337,32 @@ export async function POST(req: Request, { params }: Params) {
         (e.properties?.linkedDiagramId as string | undefined) === parent.id,
     );
     if (!existingReturn) {
-      // Position: 80px to the left of the leftmost start-event, vertically
-      // aligned to it. Fallback: top-left of the canvas if no start event.
+      // Placement: ABOVE the topmost element of the entire diagram, with a
+      // small gap. This keeps the return-link clear of any pool/lane (pools
+      // start at the topmost element, by definition) and the top-left of
+      // existing return-link elements (if any) so multiple parents stack
+      // horizontally rather than overlap.
       const W = 170;
       const H = 32;
-      const starts = childEls.filter(
-        (e) => e.type === "start-event" && !(e.properties && e.properties.boundaryHostId),
+      const GAP_ABOVE = 24;
+      const otherReturnLinks = childEls.filter(
+        (e) => e.type === "subprocess" && e.properties?.isReturnLink === true,
       );
-      let placeX = 40;
-      let placeY = 40;
-      if (starts.length > 0) {
-        // Leftmost start event.
-        starts.sort((a, b) => (a.x ?? 0) - (b.x ?? 0));
-        const s = starts[0];
-        const sw = s.width ?? 36;
-        const sh = s.height ?? 36;
-        const sx = s.x ?? 0;
-        const sy = s.y ?? 0;
-        placeX = Math.max(10, sx - W - 30);
-        placeY = sy + sh / 2 - H / 2;
+      let topY: number | null = null;
+      let leftX: number | null = null;
+      for (const e of childEls) {
+        if (otherReturnLinks.includes(e)) continue; // ignore existing return-links when finding the topmost CONTENT
+        if (typeof e.x !== "number" || typeof e.y !== "number") continue;
+        if (topY === null || e.y < topY) topY = e.y;
+        if (leftX === null || e.x < leftX) leftX = e.x;
       }
+      let placeX = leftX ?? 40;
+      let placeY = topY !== null ? topY - GAP_ABOVE - H : 40;
+      // Shift right by (existing return-link count × (W+12)) so multiple
+      // parents stack as a row, not on top of each other.
+      placeX += otherReturnLinks.length * (W + 12);
+      // Clamp to a sensible canvas origin if topY would push us off the top.
+      if (placeY < 8) placeY = 8;
       childEls.push({
         id: newId(),
         type: "subprocess",

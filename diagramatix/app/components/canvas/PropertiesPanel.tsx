@@ -49,6 +49,11 @@ interface Props {
   updatedAt?: string;
   siblingDiagrams?: { id: string; name: string; type: string }[];
   currentDiagramId?: string;
+  /** Diagram-level parent — set by the project-wide link scanner. Renders
+   *  as a clickable "Parent Diagram: <name>" row in the diagram title
+   *  section; clicking it drills back to the parent. */
+  parentDiagramId?: string;
+  onNavigateToDiagram?: (diagramId: string) => void;
   onFlipForkJoin?: (id: string) => void;
   onConvertTaskSubprocess?: (id: string) => void;
   onConvertProcessCollapsed?: (id: string) => void;
@@ -589,6 +594,8 @@ export function PropertiesPanel({
   updatedAt,
   siblingDiagrams,
   currentDiagramId,
+  parentDiagramId,
+  onNavigateToDiagram,
   onFlipForkJoin,
   onConvertTaskSubprocess,
   onConvertProcessCollapsed,
@@ -720,6 +727,28 @@ export function PropertiesPanel({
         <InlineField label="Name">
           <span className="text-[9px] text-gray-600 truncate">{diagramName ?? ""}</span>
         </InlineField>
+        {parentDiagramId && (() => {
+          const parent = (siblingDiagrams ?? []).find((d) => d.id === parentDiagramId);
+          const parentName = parent?.name ?? "(missing)";
+          return (
+            <InlineField label="Parent">
+              {parent && onNavigateToDiagram ? (
+                <button
+                  type="button"
+                  onClick={() => onNavigateToDiagram(parentDiagramId)}
+                  className="text-[9px] text-blue-600 hover:underline truncate text-left"
+                  title={`Drill back to "${parentName}"`}
+                >
+                  {parentName}
+                </button>
+              ) : (
+                <span className={`text-[9px] truncate ${parent ? "text-gray-600" : "text-gray-400 italic"}`}>
+                  {parentName}
+                </span>
+              )}
+            </InlineField>
+          );
+        })()}
         <InlineField label="Version">
           <input type="text" className="w-full text-[9px] border border-gray-300 rounded px-1 py-0"
             defaultValue={diagramTitle?.version ?? ""} key={`ver-${diagramName}`}
