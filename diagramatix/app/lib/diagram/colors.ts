@@ -13,7 +13,7 @@ export const DEFAULT_SYMBOL_COLORS: Record<SymbolType, string> = {
   "end-event":           "#fca5a5",
   "subprocess":          "#fef08a",
   "subprocess-expanded": "#fef4a7",
-  "pool":                "#c8956a",   // pool sidebar colour
+  "pool":                "#d4a382",   // pool sidebar colour — slightly lighter than the historical #c8956a, still clearly darker than lane (#e8c4a0)
   "lane":                "#e8c4a0",   // lane sidebar colour
   "sublane":             "#faf0e6",   // sublane sidebar colour (visibly lighter than lane #e8c4a0)
   "data-object":         "#bfdbfe",

@@ -389,9 +389,13 @@ export function DiagramEditor({
       // Append any folder-mates missing from the canonical order (defensive).
       for (const id of sameFolderIds) if (!ordered.includes(id)) ordered.push(id);
     } else {
+      // Include the current diagram with its REAL name so the alphabetical
+      // sort places it correctly relative to its folder-mates. (Earlier
+      // versions used a placeholder name like "(current)" which sorted to
+      // index 0 and disabled the previous button on every navigation.)
       const withSelf = [
         ...siblingDiagrams.filter(d => sameFolderIds.has(d.id)).map(d => ({ id: d.id, name: d.name })),
-        { id: diagramId, name: "(current)" },
+        { id: diagramId, name: (diagramName ?? "").trim() },
       ];
       withSelf.sort((a, b) => a.name.localeCompare(b.name));
       ordered = withSelf.map(d => d.id);
@@ -1385,12 +1389,10 @@ export function DiagramEditor({
       {/* Top bar */}
       <header className={`h-9 border-b border-gray-200 flex items-center px-2 gap-2 flex-shrink-0 ${readOnly ? "bg-orange-50" : ""}`}>
         <button
-          onClick={parentDiagram ? handleDrillBack : handleBackToProject}
+          onClick={handleBackToProject}
           className="text-gray-500 hover:text-gray-700 text-xs"
         >
-          {parentDiagram
-            ? `\u2190 ${parentDiagram.name}`
-            : `\u2190 ${projectId ? "Project" : "Dashboard"}`}
+          {`\u2190 ${projectId ? "Project" : "Dashboard"}`}
         </button>
 
         <div className="flex items-center gap-1.5">
@@ -1407,40 +1409,6 @@ export function DiagramEditor({
             {diagramType}
           </span>
           {version ? <span className="text-[10px] text-gray-400">v{SCHEMA_VERSION}.{version}</span> : null}
-          {/* Prev / next folder-mate navigation. Scoped to the diagram's
-              folder (or to the project root when the diagram isn't filed).
-              Disabled when this is the first / last diagram in the folder. */}
-          {folderMates && (folderMates.total > 1) && (
-            <div className="ml-2 flex items-center gap-1 border-l border-gray-200 pl-2">
-              <button
-                onClick={async () => {
-                  if (!folderMates.prevId) return;
-                  await saveNowRef.current();
-                  router.push(`/diagram/${folderMates.prevId}`);
-                }}
-                disabled={!folderMates.prevId}
-                title={folderMates.prevName ? `Previous in folder: ${folderMates.prevName}` : "First diagram in this folder"}
-                className="w-6 h-6 flex items-center justify-center text-[11px] text-gray-600 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed leading-none"
-              >
-                {"«"}
-              </button>
-              <span className="text-[9px] text-gray-400 tabular-nums" title="Position in folder">
-                {folderMates.position}/{folderMates.total}
-              </span>
-              <button
-                onClick={async () => {
-                  if (!folderMates.nextId) return;
-                  await saveNowRef.current();
-                  router.push(`/diagram/${folderMates.nextId}`);
-                }}
-                disabled={!folderMates.nextId}
-                title={folderMates.nextName ? `Next in folder: ${folderMates.nextName}` : "Last diagram in this folder"}
-                className="w-6 h-6 flex items-center justify-center text-[11px] text-gray-600 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed leading-none"
-              >
-                {"»"}
-              </button>
-            </div>
-          )}
         </div>
 
         <div className="flex-1" />
@@ -1461,6 +1429,41 @@ export function DiagramEditor({
             >
               {saveStatus === "saving" ? "Saving\u2026" : saveStatus === "saved" ? "\u2713 Saved" : "\u25CF Unsaved — Click to Save"}
             </button>
+
+            {/* Prev / next folder-mate navigation. Roughly 2x the size of
+                the other top-bar controls so they're easy to hit. Hidden
+                when the folder has only this one diagram. */}
+            {folderMates && (folderMates.total > 1) && (
+              <div className="flex items-center gap-1 ml-1">
+                <button
+                  onClick={async () => {
+                    if (!folderMates.prevId) return;
+                    await saveNowRef.current();
+                    router.push(`/diagram/${folderMates.prevId}`);
+                  }}
+                  disabled={!folderMates.prevId}
+                  title={folderMates.prevName ? `Previous in folder: ${folderMates.prevName}` : "First diagram in this folder"}
+                  className="w-8 h-8 flex items-center justify-center text-xl text-gray-700 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed leading-none"
+                >
+                  {"«"}
+                </button>
+                <span className="text-[10px] text-gray-500 tabular-nums" title="Position in folder">
+                  {folderMates.position}/{folderMates.total}
+                </span>
+                <button
+                  onClick={async () => {
+                    if (!folderMates.nextId) return;
+                    await saveNowRef.current();
+                    router.push(`/diagram/${folderMates.nextId}`);
+                  }}
+                  disabled={!folderMates.nextId}
+                  title={folderMates.nextName ? `Next in folder: ${folderMates.nextName}` : "Last diagram in this folder"}
+                  className="w-8 h-8 flex items-center justify-center text-xl text-gray-700 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed leading-none"
+                >
+                  {"»"}
+                </button>
+              </div>
+            )}
 
             <div className="flex items-center gap-0.5">
               <button
