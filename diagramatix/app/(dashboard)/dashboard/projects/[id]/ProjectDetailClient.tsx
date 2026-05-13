@@ -6,6 +6,7 @@ import type { DiagramType, DiagramData } from "@/app/lib/diagram/types";
 import { SCHEMA_VERSION } from "@/app/lib/diagram/types";
 import { resolveColor, DEFAULT_SYMBOL_COLORS, type SymbolColorConfig } from "@/app/lib/diagram/colors";
 import { DiagramMaintenanceModal, type FontConfig } from "./DiagramMaintenanceModal";
+import { LinkScanDialog } from "./LinkScanDialog";
 import { ImpersonationBanner } from "@/app/components/ImpersonationBanner";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 
@@ -387,6 +388,7 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
   const fileMenuRef = useRef<HTMLDivElement>(null);
   // "Project ▾" dropdown: groups Project Configuration + Scan together.
   const [showProjectMenu, setShowProjectMenu] = useState(false);
+  const [showLinkScan, setShowLinkScan] = useState(false);
   const projectMenuRef = useRef<HTMLDivElement>(null);
 
   // Scan Diagrams for Errors — three checks per diagram:
@@ -1969,6 +1971,13 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
                   >
                     {scanBusy ? "Scanning…" : "Scan Diagrams for Issues"}
                   </button>
+                  <button
+                    className="block w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100"
+                    onClick={() => { setShowProjectMenu(false); setShowLinkScan(true); }}
+                    title="Find subprocesses whose name matches another diagram in this project and link them. A return marker is placed on the child diagram pointing back to the parent."
+                  >
+                    Scan Diagrams for Links
+                  </button>
                 </div>
               )}
             </div>
@@ -2542,6 +2551,22 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
             setProjectColorConfig(colorConfig);
             setProjectFontConfig(fontConfig);
             // No router.refresh() — React re-renders only affected diagram thumbnails
+          }}
+        />
+      )}
+
+      {/* Scan Diagrams for Links — finds subprocess→diagram name matches and
+          (on Confirm) sets linkedDiagramId on the parent's subprocess plus a
+          return-link marker on the child near its start event. */}
+      {showLinkScan && (
+        <LinkScanDialog
+          projectId={project.id}
+          onClose={() => setShowLinkScan(false)}
+          onApplied={() => {
+            // Refresh project diagrams so any newly-created return-link
+            // elements on children appear immediately if the user is
+            // looking at that diagram next.
+            refreshProjectData();
           }}
         />
       )}

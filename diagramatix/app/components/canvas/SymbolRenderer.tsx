@@ -869,6 +869,49 @@ function SubprocessShape({ el }: { el: DiagramElement }) {
   );
 }
 
+/** Visual variant of `subprocess` used as a clickable "Return to parent
+ *  diagram" marker placed on a child diagram by the project-wide
+ *  "Scan Diagrams for Links" feature. Distinguished from a normal
+ *  subprocess by `el.properties.isReturnLink === true`. Drill-through
+ *  reuses the same `linkedDiagramId` mechanism as regular subprocesses,
+ *  so the existing double-click handler navigates the user back to the
+ *  parent diagram with no special case needed. */
+function ReturnLinkShape({ el }: { el: DiagramElement }) {
+  const hasLink = !!(el.properties.linkedDiagramId as string | undefined);
+  // Pale blue card with a left-pointing arrow icon on the left side and
+  // the parent diagram name (the element's label) on the right.
+  const fill = hasLink ? "#eff6ff" : "#f3f4f6";          // blue-50 / gray-100
+  const stroke = hasLink ? "#3b82f6" : "#9ca3af";        // blue-500 / gray-400
+  const arrowColor = hasLink ? "#1d4ed8" : "#6b7280";    // blue-700 / gray-500
+  // Arrow geometry: a chevron `←` inside a circle on the left edge.
+  const arrowCx = el.x + 16;
+  const arrowCy = el.y + el.height / 2;
+  const r = 9;
+  return (
+    <g>
+      <rect
+        x={el.x} y={el.y}
+        width={el.width} height={el.height}
+        rx={el.height / 2} ry={el.height / 2}
+        fill={fill}
+        stroke={stroke}
+        strokeWidth={1.5}
+        strokeDasharray={hasLink ? undefined : "4 3"}
+      />
+      <circle cx={arrowCx} cy={arrowCy} r={r} fill="white" stroke={stroke} strokeWidth={1.2} />
+      {/* Left-pointing arrowhead */}
+      <path
+        d={`M ${arrowCx + 3} ${arrowCy - 4} L ${arrowCx - 3} ${arrowCy} L ${arrowCx + 3} ${arrowCy + 4}`}
+        fill="none"
+        stroke={arrowColor}
+        strokeWidth={1.6}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </g>
+  );
+}
+
 function ExpandedSubprocessShape({ el }: { el: DiagramElement }) {
   const colors = useContext(SymbolColorCtx);
   const depthMap = useContext(ProcessGroupDepthCtx);
@@ -1421,7 +1464,10 @@ function SymbolShape({ el }: { el: DiagramElement }) {
       case "lane":              return <LaneShape el={el} isSublane={sublaneIds.has(el.id)} />;
       case "task":
         return el.taskType !== undefined ? <BpmnTaskShape el={el} /> : <TaskShape el={el} />;
-      case "subprocess":          return <SubprocessShape el={el} />;
+      case "subprocess":
+        return (el.properties.isReturnLink as boolean | undefined)
+          ? <ReturnLinkShape el={el} />
+          : <SubprocessShape el={el} />;
       case "subprocess-expanded": return <ExpandedSubprocessShape el={el} />;
       case "uml-class":             return <UmlClassShape el={el} />;
       case "uml-enumeration":       return <UmlEnumerationShape el={el} />;
@@ -1859,8 +1905,23 @@ export function SymbolRenderer({
         <ValueBadge el={element} show={true} />
       )}
 
-      {/* Subprocess drill-through — hit area on the + marker (only when linked) */}
+      {/* Subprocess drill-through — hit area on the + marker (only when linked).
+          For return-link variants (isReturnLink: true) the WHOLE element is the
+          hit zone, not just the +/- marker, since the return-link visual has
+          no +/- and is intended to be clickable as one piece. */}
       {element.type === "subprocess" && (element.properties.linkedDiagramId as string | undefined) && (() => {
+        const isReturn = !!(element.properties.isReturnLink as boolean | undefined);
+        if (isReturn) {
+          return (
+            <rect
+              x={element.x} y={element.y} width={element.width} height={element.height}
+              fill="transparent" stroke="none"
+              style={{ cursor: "pointer", pointerEvents: "all" }}
+              onMouseDown={(e) => e.stopPropagation()}
+              onDoubleClick={(e) => { e.stopPropagation(); onDoubleClick(); }}
+            />
+          );
+        }
         const mw = 14, mh = 14;
         const pmx = element.x + element.width / 2 - mw / 2;
         const pmy = element.y + element.height - mh - 3;
