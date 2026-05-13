@@ -1084,7 +1084,9 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
               <rect x={8} y={8} width={5} height={5} rx={1} fill="white" />
             </svg>
           </div>
-          <span className="font-semibold text-gray-900">Diagramatix</span>
+          <span className="font-semibold text-gray-900">
+            Diagramatix<sup className="text-[9px] font-normal text-gray-500 ml-0.5">™</sup>
+          </span>
           {version ? <span className="text-xs text-gray-400 ml-1">v{SCHEMA_VERSION}.{version}</span> : null}
         </div>
         <div className="flex items-center gap-3">
@@ -1355,10 +1357,21 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                     selectedProjectId === p.id ? "border-blue-500 ring-1 ring-blue-300" : "border-gray-200 hover:border-blue-300"
                   }`}
                 >
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-medium text-gray-900 text-xs truncate">{p.name}</h3>
+                  <div className="flex items-center justify-between group/row">
+                    <h3
+                      className="font-medium text-gray-900 text-xs truncate"
+                      title={p.name}
+                    >
+                      {p.name}
+                    </h3>
                     {!readOnly && (
-                      <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 shrink-0 ml-1">
+                      <div
+                        className={`flex gap-0.5 shrink-0 ml-1 transition-opacity ${
+                          selectedProjectId === p.id
+                            ? "opacity-100"
+                            : "opacity-0 group-hover/row:opacity-100"
+                        }`}
+                      >
                         <button
                           onClick={(e) => handleCloneProject(p.id, e)}
                           className="text-gray-400 hover:text-blue-500 text-[10px] px-0.5"
