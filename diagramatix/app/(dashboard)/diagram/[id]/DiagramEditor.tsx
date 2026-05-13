@@ -318,8 +318,17 @@ export function DiagramEditor({
     setParentDiagram(top);
   }, []);
 
-  // Sibling diagrams in the same project (for subprocess linking)
+  // Sibling diagrams in the same project (for subprocess linking AND for
+  // the prev/next folder-mate navigation buttons in the top bar).
   const [siblingDiagrams, setSiblingDiagrams] = useState<{ id: string; name: string; type: string }[]>([]);
+  // Project folder structure — used to scope the prev/next buttons to the
+  // CURRENT folder, not the whole project. Shape mirrors the FolderTree
+  // type used in ProjectDetailClient.
+  const [folderTree, setFolderTree] = useState<{
+    folders?: { id: string; name: string; parentId: string | null }[];
+    diagramFolderMap?: Record<string, string>;
+    diagramOrder?: Record<string, string[]>;
+  } | null>(null);
   useEffect(() => {
     if (!projectId) return;
     fetch(`/api/projects/${projectId}`)
@@ -331,9 +340,78 @@ export function DiagramEditor({
               .filter(d => d.id !== diagramId)
           );
         }
+        if (data?.folderTree) setFolderTree(data.folderTree);
       })
       .catch(() => {});
   }, [projectId, diagramId]);
+
+  // Compute prev / next diagram in the SAME folder. Folder identification:
+  //   - diagramFolderMap[currentId] → folderId. Missing → project root.
+  //   - diagramOrder[folderId] gives the canonical UI order. Fallback when
+  //     the array is missing or doesn't include the current diagram: use
+  //     the FILTERED sibling list ordered by name, with the current
+  //     diagram itself inserted in place.
+  const folderMates = (() => {
+    if (!projectId) return null;
+    const allInProject = (() => {
+      const list: { id: string; name: string }[] = siblingDiagrams.map(d => ({ id: d.id, name: d.name }));
+      return list;
+    })();
+    const folderId = folderTree?.diagramFolderMap?.[diagramId] ?? null;
+    // Diagrams in the same folder as the current one (or all at root if
+    // the current is at root).
+    const sameFolderIds = new Set<string>();
+    if (folderTree?.diagramFolderMap) {
+      for (const [id, fId] of Object.entries(folderTree.diagramFolderMap)) {
+        if ((folderId === null && !fId) || fId === folderId) sameFolderIds.add(id);
+      }
+    }
+    // Anything in the project not present in diagramFolderMap is at root.
+    if (folderId === null) {
+      for (const s of allInProject) {
+        if (!folderTree?.diagramFolderMap || folderTree.diagramFolderMap[s.id] === undefined) {
+          sameFolderIds.add(s.id);
+        }
+      }
+      if (!folderTree?.diagramFolderMap || folderTree.diagramFolderMap[diagramId] === undefined) {
+        sameFolderIds.add(diagramId);
+      }
+    }
+
+    // Canonical order from diagramOrder if it covers this folder; else
+    // alphabetical by name including the current diagram.
+    const canonicalOrder = (folderId !== null
+      ? folderTree?.diagramOrder?.[folderId]
+      : folderTree?.diagramOrder?.root) ?? [];
+    let ordered: string[];
+    if (canonicalOrder.length > 0 && canonicalOrder.includes(diagramId)) {
+      ordered = canonicalOrder.filter((id) => sameFolderIds.has(id));
+      // Append any folder-mates missing from the canonical order (defensive).
+      for (const id of sameFolderIds) if (!ordered.includes(id)) ordered.push(id);
+    } else {
+      const withSelf = [
+        ...siblingDiagrams.filter(d => sameFolderIds.has(d.id)).map(d => ({ id: d.id, name: d.name })),
+        { id: diagramId, name: "(current)" },
+      ];
+      withSelf.sort((a, b) => a.name.localeCompare(b.name));
+      ordered = withSelf.map(d => d.id);
+    }
+
+    const idx = ordered.indexOf(diagramId);
+    if (idx === -1) return null;
+    const prevId = idx > 0 ? ordered[idx - 1] : null;
+    const nextId = idx < ordered.length - 1 ? ordered[idx + 1] : null;
+    const nameOf = (id: string) =>
+      siblingDiagrams.find(d => d.id === id)?.name ?? "(diagram)";
+    return {
+      prevId,
+      nextId,
+      prevName: prevId ? nameOf(prevId) : null,
+      nextName: nextId ? nameOf(nextId) : null,
+      position: idx + 1,
+      total: ordered.length,
+    };
+  })();
 
   // Ref to saveNow so navigation callbacks can call it without stale closures
   const saveNowRef = useRef<() => Promise<void>>(() => Promise.resolve());
@@ -546,12 +624,16 @@ export function DiagramEditor({
   const [showPlanPanel, setShowPlanPanel] = useState(false);
   const [showHistoryPanel, setShowHistoryPanel] = useState(false);
   const [debugMode, setDebugMode] = useState(false);
-  const [showValueDisplay, setShowValueDisplay] = useState(false);
-  const [showBottleneck, setShowBottleneck] = useState(false);
+  // Value Display and Bottleneck Display are ON by default. The user can
+  // turn them off, in which case the explicit "false" value is read back
+  // from localStorage on subsequent loads. Absence of the key keeps the
+  // default ON.
+  const [showValueDisplay, setShowValueDisplay] = useState(true);
+  const [showBottleneck, setShowBottleneck] = useState(true);
   useEffect(() => {
     if (localStorage.getItem(`debug-${projectId}`) === "true") setDebugMode(true);
-    if (localStorage.getItem(`valueDisplay-${diagramId}`) === "true") setShowValueDisplay(true);
-    if (localStorage.getItem(`bottleneck-${diagramId}`) === "true") setShowBottleneck(true);
+    if (localStorage.getItem(`valueDisplay-${diagramId}`) === "false") setShowValueDisplay(false);
+    if (localStorage.getItem(`bottleneck-${diagramId}`) === "false") setShowBottleneck(false);
   }, [projectId, diagramId]);
 
   // Template state (BPMN only)
@@ -1325,6 +1407,40 @@ export function DiagramEditor({
             {diagramType}
           </span>
           {version ? <span className="text-[10px] text-gray-400">v{SCHEMA_VERSION}.{version}</span> : null}
+          {/* Prev / next folder-mate navigation. Scoped to the diagram's
+              folder (or to the project root when the diagram isn't filed).
+              Disabled when this is the first / last diagram in the folder. */}
+          {folderMates && (folderMates.total > 1) && (
+            <div className="ml-2 flex items-center gap-1 border-l border-gray-200 pl-2">
+              <button
+                onClick={async () => {
+                  if (!folderMates.prevId) return;
+                  await saveNowRef.current();
+                  router.push(`/diagram/${folderMates.prevId}`);
+                }}
+                disabled={!folderMates.prevId}
+                title={folderMates.prevName ? `Previous in folder: ${folderMates.prevName}` : "First diagram in this folder"}
+                className="w-6 h-6 flex items-center justify-center text-[11px] text-gray-600 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed leading-none"
+              >
+                {"«"}
+              </button>
+              <span className="text-[9px] text-gray-400 tabular-nums" title="Position in folder">
+                {folderMates.position}/{folderMates.total}
+              </span>
+              <button
+                onClick={async () => {
+                  if (!folderMates.nextId) return;
+                  await saveNowRef.current();
+                  router.push(`/diagram/${folderMates.nextId}`);
+                }}
+                disabled={!folderMates.nextId}
+                title={folderMates.nextName ? `Next in folder: ${folderMates.nextName}` : "Last diagram in this folder"}
+                className="w-6 h-6 flex items-center justify-center text-[11px] text-gray-600 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed leading-none"
+              >
+                {"»"}
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="flex-1" />
@@ -1600,14 +1716,9 @@ export function DiagramEditor({
 
         {templateMode !== "editing" && (
           <>
-        {!readOnly && (
-          <button
-            onClick={() => setShowDiagramMaintenance(true)}
-            className="px-2 py-0.5 text-[11px] text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
-          >
-            Diagram Config
-          </button>
-        )}
+        {/* The Diagram Config, History, and Clear options live inside the
+            unified "Diagram ▾" dropdown further along the toolbar — those
+            standalone buttons were removed in favour of a single menu. */}
 
         {/* AI Generate button. For BPMN this opens the 2-phase Plan panel;
             for other diagram types it opens the legacy one-shot AI panel. */}
@@ -1632,22 +1743,8 @@ export function DiagramEditor({
             AI Generate
           </button>
         )}
-        {!readOnly && (
-          <button
-            onClick={() => {
-              setShowHistoryPanel(prev => !prev);
-              if (!showHistoryPanel) { setShowAiPanel(false); setShowPlanPanel(false); }
-            }}
-            className={`px-2 py-0.5 text-[11px] rounded border ${
-              showHistoryPanel
-                ? "text-blue-700 border-blue-400 bg-blue-50"
-                : "text-gray-700 border-gray-300 hover:bg-gray-50"
-            }`}
-            title="View and restore previous versions"
-          >
-            History
-          </button>
-        )}
+        {/* History was previously a standalone button — now in the
+            unified Diagram ▾ menu further along the toolbar. */}
 
         {/* Hidden file inputs reused by the File menu */}
         <input
@@ -1942,33 +2039,56 @@ export function DiagramEditor({
         {!readOnly && (
           <div className="relative" ref={clearMenuRef}>
             <button
-              onClick={() => {
-                if (data.elements.length === 0 && data.connectors.length === 0) return;
-                setClearMenuOpen(prev => !prev);
-              }}
-              className="px-2 py-0.5 text-[11px] text-gray-700 border border-gray-300 rounded hover:bg-red-50 hover:border-red-300 hover:text-red-700"
-              title="Clear diagram options"
+              onClick={() => setClearMenuOpen(prev => !prev)}
+              className={`px-2 py-0.5 text-[11px] rounded border ${
+                showHistoryPanel
+                  ? "text-blue-700 border-blue-400 bg-blue-50"
+                  : "text-gray-700 border-gray-300 hover:bg-gray-50"
+              }`}
+              title="Diagram-level actions"
             >
-              Clear Diagram ▾
+              Diagram ▾
             </button>
             {clearMenuOpen && (
               <div className="absolute right-0 top-full mt-1 w-56 bg-white border border-gray-200 rounded shadow-lg z-50">
                 <button
                   onClick={() => { setClearMenuOpen(false); setClearConfirmOpen("all"); }}
-                  className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                  disabled={data.elements.length === 0 && data.connectors.length === 0}
+                  className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                  title="Remove every element and connector from this diagram"
                 >
                   Clear Diagram
                 </button>
                 <button
                   onClick={() => { setClearMenuOpen(false); setClearConfirmOpen("unselected"); }}
                   disabled={selectedElementIds.size === 0}
-                  className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed"
                   title={selectedElementIds.size === 0 ? "Select one or more elements first" : "Keep the selection (and connectors between selected elements); clear everything else"}
                 >
                   Clear All but Selected
                   {selectedElementIds.size > 0 && (
                     <span className="text-gray-400 ml-1">({selectedElementIds.size})</span>
                   )}
+                </button>
+                <div className="border-t border-gray-100" />
+                <button
+                  onClick={() => {
+                    setClearMenuOpen(false);
+                    setShowHistoryPanel(prev => !prev);
+                    if (!showHistoryPanel) { setShowAiPanel(false); setShowPlanPanel(false); }
+                  }}
+                  className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                  title="View and restore previous versions"
+                >
+                  History
+                  {showHistoryPanel && <span className="text-blue-600 ml-1">·</span>}
+                </button>
+                <button
+                  onClick={() => { setClearMenuOpen(false); setShowDiagramMaintenance(true); }}
+                  className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                  title="Open the diagram configuration modal"
+                >
+                  Configuration
                 </button>
               </div>
             )}
@@ -2668,6 +2788,7 @@ export function DiagramEditor({
           displayMode={displayMode}
           onDisplayModeChange={handleToggleDisplayMode}
           debugMode={debugMode}
+          isAdmin={isAdmin}
           onDebugModeChange={(on) => {
             setDebugMode(on);
             if (typeof window !== "undefined") {

@@ -15,6 +15,10 @@ interface Props {
   onDisplayModeChange: (mode: DisplayMode) => void;
   debugMode?: boolean;
   onDebugModeChange?: (on: boolean) => void;
+  /** When false, the Debug Mode toggle is hidden entirely. Restricted to
+   *  admin users — the toggle reveals diagnostic internals (element ids,
+   *  connector waypoints, etc.) that aren't useful for normal authors. */
+  isAdmin?: boolean;
   showValueDisplay?: boolean;
   onShowValueDisplayChange?: (on: boolean) => void;
   showBottleneck?: boolean;
@@ -49,6 +53,7 @@ export function DiagramColorModal({
   onDisplayModeChange,
   debugMode,
   onDebugModeChange,
+  isAdmin,
   showValueDisplay,
   onShowValueDisplayChange,
   showBottleneck,
@@ -264,10 +269,12 @@ export function DiagramColorModal({
           </div>
         )}
 
-        {/* 4. Debug Mode */}
-        {onDebugModeChange && (
+        {/* 4. Debug Mode — admin-only. Hidden entirely for non-admin users. */}
+        {onDebugModeChange && isAdmin && (
           <div className="flex items-center justify-between px-5 py-1.5 border-t border-gray-200 flex-shrink-0">
-            <span className="text-xs font-medium text-gray-700">Debug Mode</span>
+            <span className="text-xs font-medium text-gray-700">
+              Debug Mode <span className="text-[9px] font-normal text-gray-400">(admin)</span>
+            </span>
             <label className="flex items-center cursor-pointer">
               <input type="checkbox" checked={debugMode ?? false}
                 onChange={(e) => onDebugModeChange(e.target.checked)}
