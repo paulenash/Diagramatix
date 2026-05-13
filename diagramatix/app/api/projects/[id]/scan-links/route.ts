@@ -261,12 +261,12 @@ export async function POST(req: Request, { params }: Params) {
     delete target.properties.linkedDiagramId;
     touched.add(parent.id);
 
-    // Clean up the child diagram:
-    //   - Drop the on-canvas return-link element that points to THIS parent.
-    //   - If data.parentDiagramId still names this parent, reassign it to
-    //     another remaining parent (any) or clear it when none remain.
+    // Reassign or clear the child's diagram-level Parent Diagram. If
+    // another parent still links to this child, prefer that one; else
+    // clear the field. (Any leftover on-canvas return-link symbols are
+    // dropped by the project-wide sweep further down — see below.)
     const child = diagramById.get(previousChildId);
-    if (child && child.data) {
+    if (child && child.data && child.data.parentDiagramId === parent.id) {
       const otherParents = diagrams.filter((d) => {
         if (d.id === parent.id) return false;
         return (d.data?.elements ?? []).some(
@@ -276,38 +276,23 @@ export async function POST(req: Request, { params }: Params) {
             (e.properties?.linkedDiagramId as string | undefined) === previousChildId,
         );
       });
-
-      // Always drop the return-link that points to the parent we just
-      // un-linked — there's no other parent forwarding to the child via
-      // THIS return-link instance, so it's stale.
-      const childEls = child.data.elements ?? [];
-      const filtered = childEls.filter(
-        (e) =>
-          !(
-            e.type === "subprocess" &&
-            e.properties?.isReturnLink === true &&
-            (e.properties?.linkedDiagramId as string | undefined) === parent.id
-          ),
-      );
-      if (filtered.length !== childEls.length) {
-        child.data.elements = filtered;
-        touched.add(child.id);
+      if (otherParents.length > 0) {
+        child.data.parentDiagramId = otherParents[0].id;
+      } else {
+        delete child.data.parentDiagramId;
       }
-
-      // Reassign or clear parentDiagramId.
-      if (child.data.parentDiagramId === parent.id) {
-        if (otherParents.length > 0) {
-          child.data.parentDiagramId = otherParents[0].id;
-        } else {
-          delete child.data.parentDiagramId;
-        }
-        touched.add(child.id);
-      }
+      touched.add(child.id);
     }
   }
 
   // Apply ADDS.
-  const newId = () => `el-${Math.random().toString(36).slice(2, 10)}-${Date.now().toString(36)}`;
+  //
+  // Note: as of the design revision, we no longer create on-canvas return-
+  // link symbols. The back-link is surfaced via `data.parentDiagramId`
+  // (a diagram-level property) and rendered as a clickable "Parent" row in
+  // PropertiesPanel. The editor's top-bar breadcrumb continues to handle
+  // session-based back navigation. The on-canvas symbol was discarded as
+  // canvas clutter.
   for (const op of adds) {
     const parent = diagramById.get(op.parentDiagramId);
     const child = diagramById.get(op.candidateDiagramId);
@@ -320,63 +305,28 @@ export async function POST(req: Request, { params }: Params) {
     target.properties.linkedDiagramId = child.id;
     touched.add(parent.id);
 
-    // Diagram-level Parent Diagram property on the child — surfaces in
-    // PropertiesPanel as a clickable link. Most-recent add wins when a
-    // child has multiple parents.
+    // Set the diagram-level Parent Diagram on the child. Most-recent add
+    // wins when a child has multiple parents — the user can still drill
+    // back to any specific parent via the breadcrumb / drill stack.
     const childData = child.data ?? { elements: [] };
     child.data = childData;
     childData.parentDiagramId = parent.id;
+    touched.add(child.id);
+  }
 
-    // Ensure an on-canvas return-link element also exists on the child.
-    const childEls = childData.elements ?? [];
-    childData.elements = childEls;
-    const existingReturn = childEls.find(
-      (e) =>
-        e.type === "subprocess" &&
-        e.properties?.isReturnLink === true &&
-        (e.properties?.linkedDiagramId as string | undefined) === parent.id,
+  // Sweep — remove ANY surviving on-canvas return-link symbol from every
+  // diagram in the project. These were created by the earlier design and
+  // are no longer wanted. Running the scan effectively migrates the
+  // project to the canvas-clean design.
+  for (const d of diagrams) {
+    if (!d.data) continue;
+    const els = d.data.elements ?? [];
+    const cleaned = els.filter(
+      (e) => !(e.type === "subprocess" && e.properties?.isReturnLink === true),
     );
-    if (!existingReturn) {
-      // Placement: ABOVE the topmost element of the entire diagram, with a
-      // small gap. This keeps the return-link clear of any pool/lane (pools
-      // start at the topmost element, by definition) and the top-left of
-      // existing return-link elements (if any) so multiple parents stack
-      // horizontally rather than overlap.
-      const W = 170;
-      const H = 32;
-      const GAP_ABOVE = 24;
-      const otherReturnLinks = childEls.filter(
-        (e) => e.type === "subprocess" && e.properties?.isReturnLink === true,
-      );
-      let topY: number | null = null;
-      let leftX: number | null = null;
-      for (const e of childEls) {
-        if (otherReturnLinks.includes(e)) continue; // ignore existing return-links when finding the topmost CONTENT
-        if (typeof e.x !== "number" || typeof e.y !== "number") continue;
-        if (topY === null || e.y < topY) topY = e.y;
-        if (leftX === null || e.x < leftX) leftX = e.x;
-      }
-      let placeX = leftX ?? 40;
-      let placeY = topY !== null ? topY - GAP_ABOVE - H : 40;
-      // Shift right by (existing return-link count × (W+12)) so multiple
-      // parents stack as a row, not on top of each other.
-      placeX += otherReturnLinks.length * (W + 12);
-      // Clamp to a sensible canvas origin if topY would push us off the top.
-      if (placeY < 8) placeY = 8;
-      childEls.push({
-        id: newId(),
-        type: "subprocess",
-        label: `Return to ${parent.name}`,
-        x: placeX,
-        y: placeY,
-        width: W,
-        height: H,
-        properties: {
-          isReturnLink: true,
-          linkedDiagramId: parent.id,
-        },
-      });
-      touched.add(child.id);
+    if (cleaned.length !== els.length) {
+      d.data.elements = cleaned;
+      touched.add(d.id);
     }
   }
 
