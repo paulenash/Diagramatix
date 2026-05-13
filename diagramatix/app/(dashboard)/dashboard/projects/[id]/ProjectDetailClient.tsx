@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import type { DiagramType, DiagramData } from "@/app/lib/diagram/types";
 import { SCHEMA_VERSION } from "@/app/lib/diagram/types";
 import { resolveColor, DEFAULT_SYMBOL_COLORS, type SymbolColorConfig } from "@/app/lib/diagram/colors";
-import { DiagramMaintenanceModal } from "./DiagramMaintenanceModal";
+import { DiagramMaintenanceModal, type FontConfig } from "./DiagramMaintenanceModal";
 import { ImpersonationBanner } from "@/app/components/ImpersonationBanner";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 
@@ -291,6 +291,7 @@ interface ProjectDetail {
   description?: string;
   ownerName?: string;
   colorConfig?: unknown;
+  fontConfig?: unknown;
   folderTree?: unknown;
   diagrams: DiagramSummary[];
 }
@@ -605,6 +606,7 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   const [showBulkMoveDialog, setShowBulkMoveDialog] = useState(false);
   const [projectColorConfig, setProjectColorConfig] = useState<SymbolColorConfig>((project.colorConfig as SymbolColorConfig | null) ?? {});
+  const [projectFontConfig, setProjectFontConfig] = useState<FontConfig>((project.fontConfig as FontConfig | null) ?? {});
 
   // Re-fetch project data (diagrams + folderTree) from the API.
   // Only updates state when the data actually changed, so server-rendered
@@ -2534,9 +2536,11 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
         <DiagramMaintenanceModal
           projectId={project.id}
           initialColorConfig={projectColorConfig}
+          initialFontConfig={projectFontConfig}
           onClose={() => setShowMaintenance(false)}
-          onSaved={(config) => {
-            setProjectColorConfig(config);
+          onSaved={({ colorConfig, fontConfig }) => {
+            setProjectColorConfig(colorConfig);
+            setProjectFontConfig(fontConfig);
             // No router.refresh() — React re-renders only affected diagram thumbnails
           }}
         />

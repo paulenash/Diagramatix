@@ -91,7 +91,7 @@ export async function PUT(req: Request, { params }: Params) {
   }
 
   const body = await req.json();
-  const { name, colorConfig, description, ownerName, folderTree } = body;
+  const { name, colorConfig, fontConfig, description, ownerName, folderTree } = body;
 
   if (name !== undefined && !name?.trim()) {
     return NextResponse.json({ error: "Name is required" }, { status: 400 });
@@ -109,6 +109,13 @@ export async function PUT(req: Request, { params }: Params) {
       await prisma.$executeRawUnsafe(
         'UPDATE "Project" SET "colorConfig" = $1::jsonb, "updatedAt" = NOW() WHERE id = $2',
         JSON.stringify(colorConfig),
+        id
+      );
+    }
+    if (fontConfig !== undefined) {
+      await prisma.$executeRawUnsafe(
+        'UPDATE "Project" SET "fontConfig" = $1::jsonb, "updatedAt" = NOW() WHERE id = $2',
+        JSON.stringify(fontConfig),
         id
       );
     }

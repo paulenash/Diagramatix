@@ -78,13 +78,33 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Name is required" }, { status: 400 });
   }
 
-  // Validate project ownership AND org match if supplied
+  // Validate project ownership AND org match if supplied. Capture
+  // project.fontConfig so we can seed the new diagram with the project-level
+  // typography defaults.
+  let projectFontConfig: Record<string, unknown> | null = null;
   if (projectId) {
     const project = await prisma.project.findFirst({
       where: { id: projectId, userId: session.user.id, orgId },
+      select: { id: true, fontConfig: true },
     });
     if (!project) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
+    }
+    projectFontConfig = (project.fontConfig as Record<string, unknown> | null) ?? null;
+  }
+
+  // Merge project typography defaults into the new diagram's data, unless
+  // the caller already provided values. Per-diagram overrides win; project
+  // defaults fill the gaps.
+  const baseData = (data ?? EMPTY_DIAGRAM) as Record<string, unknown>;
+  const FONT_KEYS = ["fontSize", "connectorFontSize", "titleFontSize", "poolFontSize", "laneFontSize"] as const;
+  const seededData: Record<string, unknown> = { ...baseData };
+  if (projectFontConfig) {
+    for (const k of FONT_KEYS) {
+      const projVal = projectFontConfig[k];
+      if (typeof projVal === "number" && seededData[k] === undefined) {
+        seededData[k] = projVal;
+      }
     }
   }
 
@@ -93,7 +113,7 @@ export async function POST(req: Request) {
       name: name.trim(),
       type,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      data: (data ?? EMPTY_DIAGRAM) as any,
+      data: seededData as any,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ...(colorConfig ? { colorConfig: colorConfig as any } : {}),
       ...(displayMode ? { displayMode } : {}),
