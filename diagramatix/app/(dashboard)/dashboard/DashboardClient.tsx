@@ -260,6 +260,8 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
   const [showBpmnImportDialog, setShowBpmnImportDialog] = useState(false);
   const [bpmnImportProgress, setBpmnImportProgress] = useState<{ done: number; total: number; current: string }>({ done: 0, total: 0, current: "" });
 
+  const [bpmnDragHover, setBpmnDragHover] = useState(false);
+
   function openBpmnImportDialog() {
     setBpmnImportFiles([]);
     setBpmnImportSelected(new Set());
@@ -267,32 +269,82 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
     setBpmnImportFolderName("Imported BPMN Diagrams");
     setBpmnImportProgress({ done: 0, total: 0, current: "" });
     setBpmnImportError("");
+    setBpmnDragHover(false);
     setShowBpmnImportDialog(true);
   }
 
-  function handleBpmnFolderSelected(fileList: FileList) {
-    const files = Array.from(fileList).filter((f) => /\.bpmn$/i.test(f.name) || /\.xml$/i.test(f.name));
-    // Derive folder name from first file's relative path (webkitdirectory populates .webkitRelativePath).
-    const probe = (files[0] ?? fileList[0]) as (File & { webkitRelativePath?: string }) | undefined;
-    let folderName = "";
-    const rel = probe?.webkitRelativePath ?? "";
-    if (rel) {
-      const parts = rel.split("/");
-      if (parts.length > 1) folderName = parts[0];
+  function handleBpmnFolderSelected(allFiles: File[], explicitFolderName?: string) {
+    const files = allFiles.filter((f) => /\.bpmn$/i.test(f.name) || /\.xml$/i.test(f.name));
+    // Derive folder name from explicit drag-drop name, then webkitRelativePath.
+    let folderName = explicitFolderName?.trim() ?? "";
+    if (!folderName) {
+      const probe = (files[0] ?? allFiles[0]) as (File & { webkitRelativePath?: string }) | undefined;
+      const rel = probe?.webkitRelativePath ?? "";
+      if (rel) {
+        const parts = rel.split("/");
+        if (parts.length > 1) folderName = parts[0];
+      }
     }
     if (files.length === 0) {
       setBpmnImportFiles([]);
       setBpmnImportSelected(new Set());
       setBpmnImportError(folderName
-        ? `Folder "${folderName}" contains no .bpmn or .xml files.`
-        : "Selected folder contains no .bpmn or .xml files.");
+        ? `"${folderName}" contains no .bpmn or .xml files (scanned ${allFiles.length} file${allFiles.length === 1 ? "" : "s"}).`
+        : `No .bpmn or .xml files found (scanned ${allFiles.length} file${allFiles.length === 1 ? "" : "s"}).`);
       return;
     }
     files.sort((a, b) => a.name.localeCompare(b.name));
     setBpmnImportFiles(files);
     setBpmnImportSelected(new Set(files.map((_, i) => i)));
-    setBpmnImportProjectName(folderName || "Imported BPMN Diagrams");
+    setBpmnImportProjectName((cur) => cur.trim() || folderName || "Imported BPMN Diagrams");
     setBpmnImportError("");
+  }
+
+  // Recursive walk of a dropped folder. Uses the legacy FileSystem API
+  // (webkitGetAsEntry / createReader / file) which is the only way to
+  // read a dropped folder without the Chrome "Upload N files?" confirm
+  // dialog.
+  function readDroppedEntry(entry: FileSystemEntry, out: File[]): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if (entry.isFile) {
+        (entry as FileSystemFileEntry).file((f) => { out.push(f); resolve(); }, reject);
+      } else if (entry.isDirectory) {
+        const reader = (entry as FileSystemDirectoryEntry).createReader();
+        const readBatch = () => {
+          reader.readEntries(async (entries) => {
+            if (entries.length === 0) { resolve(); return; }
+            try {
+              for (const e of entries) await readDroppedEntry(e, out);
+              readBatch();
+            } catch (err) { reject(err); }
+          }, reject);
+        };
+        readBatch();
+      } else {
+        resolve();
+      }
+    });
+  }
+
+  async function handleBpmnDrop(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    setBpmnDragHover(false);
+    const items = e.dataTransfer.items;
+    const all: File[] = [];
+    let rootName = "";
+    if (items && items.length > 0) {
+      for (let i = 0; i < items.length; i++) {
+        const entry = (items[i] as DataTransferItem).webkitGetAsEntry?.();
+        if (!entry) continue;
+        if (entry.isDirectory && !rootName) rootName = entry.name;
+        try { await readDroppedEntry(entry, all); }
+        catch (err) { setBpmnImportError(`Failed to read dropped folder: ${err instanceof Error ? err.message : String(err)}`); return; }
+      }
+    } else if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      for (let i = 0; i < e.dataTransfer.files.length; i++) all.push(e.dataTransfer.files[i]);
+    }
+    if (all.length === 0) { setBpmnImportError("No files were dropped."); return; }
+    handleBpmnFolderSelected(all, rootName);
   }
 
   async function handleBpmnImportConfirm() {
@@ -1011,14 +1063,13 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                 ref={bpmnFolderInputRef}
                 type="file"
                 multiple
+                accept=".bpmn,.xml"
                 className="hidden"
-                // @ts-expect-error — webkitdirectory is a non-standard React attribute (Chrome/Edge folder picker).
-                webkitdirectory=""
-                directory=""
                 onChange={e => {
                   const fl = e.target.files;
+                  const arr: File[] = fl ? Array.from(fl) : [];
                   e.target.value = "";
-                  if (fl && fl.length > 0) handleBpmnFolderSelected(fl);
+                  if (arr.length > 0) handleBpmnFolderSelected(arr);
                 }}
               />
 
@@ -1817,20 +1868,34 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
               <p className="mb-3 text-sm text-red-600 bg-red-50 px-3 py-2 rounded">{bpmnImportError}</p>
             )}
 
-            <div className="mb-4 flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => bpmnFolderInputRef.current?.click()}
-                disabled={bpmnImportBusy}
-                className="px-3 py-1.5 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
-              >
-                {bpmnImportFiles.length === 0 ? "Choose folder…" : "Choose different folder…"}
-              </button>
-              {bpmnImportFiles.length > 0 && (
-                <span className="text-xs text-gray-600">
-                  {bpmnImportFiles.length} BPMN file{bpmnImportFiles.length === 1 ? "" : "s"} found.
-                </span>
-              )}
+            <div
+              onDragOver={(e) => { e.preventDefault(); if (!bpmnImportBusy) setBpmnDragHover(true); }}
+              onDragLeave={() => setBpmnDragHover(false)}
+              onDrop={(e) => { if (!bpmnImportBusy) handleBpmnDrop(e); }}
+              className={`mb-4 border-2 border-dashed rounded-md p-4 text-center text-sm transition-colors ${
+                bpmnDragHover
+                  ? "border-blue-500 bg-blue-50 text-blue-700"
+                  : bpmnImportFiles.length > 0
+                    ? "border-gray-300 bg-gray-50 text-gray-700"
+                    : "border-gray-300 text-gray-600"
+              }`}
+            >
+              <div className="font-medium">
+                {bpmnImportFiles.length === 0
+                  ? "Drag a folder of .bpmn files here"
+                  : `${bpmnImportFiles.length} BPMN file${bpmnImportFiles.length === 1 ? "" : "s"} loaded`}
+              </div>
+              <div className="mt-1 text-xs text-gray-500">
+                or{" "}
+                <button
+                  type="button"
+                  onClick={() => bpmnFolderInputRef.current?.click()}
+                  disabled={bpmnImportBusy}
+                  className="text-blue-600 hover:underline disabled:opacity-50"
+                >
+                  pick individual .bpmn files
+                </button>
+              </div>
             </div>
 
             {bpmnImportFiles.length > 0 && (
