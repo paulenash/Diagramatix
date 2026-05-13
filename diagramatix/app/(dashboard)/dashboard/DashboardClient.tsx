@@ -1856,16 +1856,19 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
 
       {/* BPMN Bulk Import dialog (dashboard-level → always creates a
           new project for the imported diagrams). Opens FIRST, then hosts
-          a "Choose folder" button that triggers the OS folder picker. */}
+          a drag-and-drop zone + multi-file picker fallback. */}
       {showBpmnImportDialog && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg">
-            <h2 className="text-lg font-semibold text-gray-900 mb-2">Import BPMN Diagrams</h2>
-            <p className="text-xs text-gray-600 mb-4">
-              Pick a folder containing <span className="font-mono">.bpmn</span> files. Each file becomes one diagram in a new project; the project defaults to the folder name and each diagram is named after its filename (without the extension).
-            </p>
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col">
+            <div className="p-6 pb-2 shrink-0">
+              <h2 className="text-lg font-semibold text-gray-900 mb-2">Import BPMN Diagrams</h2>
+              <p className="text-xs text-gray-600">
+                Drag a folder of <span className="font-mono">.bpmn</span> files onto the zone below (or pick files individually). Each file becomes one diagram in a new project; diagram names come from filenames.
+              </p>
+            </div>
+            <div className="px-6 overflow-y-auto flex-1 min-h-0">
             {bpmnImportError && (
-              <p className="mb-3 text-sm text-red-600 bg-red-50 px-3 py-2 rounded">{bpmnImportError}</p>
+              <p className="mb-3 mt-2 text-sm text-red-600 bg-red-50 px-3 py-2 rounded">{bpmnImportError}</p>
             )}
 
             <div
@@ -1916,7 +1919,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                       >Clear</button>
                     </div>
                   </div>
-                  <div className="max-h-[40vh] overflow-y-auto border border-gray-300 rounded">
+                  <div className="max-h-64 overflow-y-auto border border-gray-300 rounded">
                     {bpmnImportFiles.map((f, i) => {
                       const checked = bpmnImportSelected.has(i);
                       return (
@@ -1983,7 +1986,8 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                 </div>
               </div>
             )}
-            <div className="flex gap-3 justify-end">
+            </div>
+            <div className="p-6 pt-3 shrink-0 border-t border-gray-100 flex gap-3 justify-end">
               <button
                 onClick={() => {
                   setShowBpmnImportDialog(false);
