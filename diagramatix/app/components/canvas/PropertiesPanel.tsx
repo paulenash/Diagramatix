@@ -49,10 +49,15 @@ interface Props {
   updatedAt?: string;
   siblingDiagrams?: { id: string; name: string; type: string }[];
   currentDiagramId?: string;
-  /** Diagram-level parent — set by the project-wide link scanner. Renders
-   *  as a clickable "Parent Diagram: <name>" row in the diagram title
-   *  section; clicking it drills back to the parent. */
-  parentDiagramId?: string;
+  /** All parent diagrams that currently link to this diagram (set by the
+   *  project-wide link scanner). Rendered as a list of clickable rows in
+   *  the diagram title section. */
+  parentDiagramIds?: string[];
+  /** The parent diagram the user came FROM in this browser session
+   *  (top of the drill stack). Used to highlight the matching row in the
+   *  parents list. May be undefined if the user opened the diagram
+   *  directly. */
+  sessionParentId?: string;
   onNavigateToDiagram?: (diagramId: string) => void;
   onFlipForkJoin?: (id: string) => void;
   onConvertTaskSubprocess?: (id: string) => void;
@@ -594,7 +599,8 @@ export function PropertiesPanel({
   updatedAt,
   siblingDiagrams,
   currentDiagramId,
-  parentDiagramId,
+  parentDiagramIds,
+  sessionParentId,
   onNavigateToDiagram,
   onFlipForkJoin,
   onConvertTaskSubprocess,
@@ -727,26 +733,50 @@ export function PropertiesPanel({
         <InlineField label="Name">
           <span className="text-[9px] text-gray-600 truncate">{diagramName ?? ""}</span>
         </InlineField>
-        {parentDiagramId && (() => {
-          const parent = (siblingDiagrams ?? []).find((d) => d.id === parentDiagramId);
-          const parentName = parent?.name ?? "(missing)";
+        {parentDiagramIds && parentDiagramIds.length > 0 && (() => {
+          const siblings = siblingDiagrams ?? [];
+          const rows = parentDiagramIds
+            .map((pid) => {
+              const sib = siblings.find((d) => d.id === pid);
+              return { id: pid, name: sib?.name ?? "(missing)", missing: !sib };
+            });
+          const label = rows.length === 1 ? "Parent" : `Parents (${rows.length})`;
           return (
-            <InlineField label="Parent">
-              {parent && onNavigateToDiagram ? (
-                <button
-                  type="button"
-                  onClick={() => onNavigateToDiagram(parentDiagramId)}
-                  className="text-[9px] text-blue-600 hover:underline truncate text-left"
-                  title={`Drill back to "${parentName}"`}
-                >
-                  {parentName}
-                </button>
-              ) : (
-                <span className={`text-[9px] truncate ${parent ? "text-gray-600" : "text-gray-400 italic"}`}>
-                  {parentName}
-                </span>
-              )}
-            </InlineField>
+            <div className="mb-0.5">
+              <div className="flex items-start gap-1">
+                <span className="text-[9px] text-gray-500 w-12 shrink-0 pt-0.5">{label}</span>
+                <div className="flex-1 flex flex-col gap-0.5">
+                  {rows.map((r) => {
+                    const isCurrent = r.id === sessionParentId;
+                    if (r.missing) {
+                      return (
+                        <span key={r.id} className="text-[9px] text-gray-400 italic truncate">
+                          {r.name}
+                        </span>
+                      );
+                    }
+                    return (
+                      <button
+                        key={r.id}
+                        type="button"
+                        onClick={() => onNavigateToDiagram?.(r.id)}
+                        disabled={!onNavigateToDiagram}
+                        className={`text-[9px] text-left truncate rounded px-1 py-0.5 ${
+                          isCurrent
+                            ? "bg-blue-50 text-blue-700 font-semibold border border-blue-200"
+                            : "text-blue-600 hover:underline hover:bg-gray-50 border border-transparent"
+                        }`}
+                        title={isCurrent
+                          ? `Most recently visited parent — "${r.name}"`
+                          : `Drill to "${r.name}"`}
+                      >
+                        {isCurrent ? "▶ " : ""}{r.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
           );
         })()}
         <InlineField label="Version">

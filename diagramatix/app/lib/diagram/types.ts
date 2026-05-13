@@ -224,12 +224,13 @@ export interface DiagramData {
   poolFontSize?: number; // pool header labels font size in px (default 12)
   laneFontSize?: number; // lane header labels font size in px (default 12)
   database?: string; // domain diagram database type: "none" | "postgres" (default "none")
-  /** Diagram-level link back to a parent diagram. Set by the project-wide
-   *  "Scan Diagrams for Links" feature when this diagram is linked as a
-   *  child of another. Drives the "Parent Diagram" entry in the
-   *  PropertiesPanel — clicking that entry drills back. Independent of any
-   *  on-canvas return-link element, which can coexist. */
-  parentDiagramId?: string;
+  /** Diagram-level list of all parent diagrams that currently link TO
+   *  this diagram (managed by the project-wide "Scan Diagrams for Links"
+   *  feature). A diagram can be linked from many parents — every one of
+   *  them is listed. The PropertiesPanel renders each entry as a
+   *  clickable link. Highlighting of the "most recently visited" parent
+   *  comes from session-stack state, not this field. */
+  parentDiagramIds?: string[];
 }
 
 export const EMPTY_DIAGRAM: DiagramData = {

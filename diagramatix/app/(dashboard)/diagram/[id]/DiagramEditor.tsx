@@ -2111,7 +2111,8 @@ export function DiagramEditor({
             updatedAt={effectiveUpdatedAt}
             siblingDiagrams={siblingDiagrams}
             currentDiagramId={diagramId}
-            parentDiagramId={data.parentDiagramId}
+            parentDiagramIds={data.parentDiagramIds}
+            sessionParentId={parentDiagram?.id}
             onNavigateToDiagram={handleDrillIntoSubprocess}
             onFlipForkJoin={flipForkJoin}
             onConvertTaskSubprocess={convertTaskSubprocess}

@@ -29,7 +29,10 @@ interface DiagramShape {
   data: {
     elements?: ElementLite[];
     connectors?: unknown[];
+    /** Legacy single-parent field — superseded by parentDiagramIds. The
+     *  scan sweep deletes it whenever it finds the field set. */
     parentDiagramId?: string;
+    parentDiagramIds?: string[];
   } | null;
 }
 
@@ -243,7 +246,12 @@ export async function POST(req: Request, { params }: Params) {
   })) as unknown as Array<{
     id: string;
     name: string;
-    data: { elements?: ElementLite[]; connectors?: unknown[]; parentDiagramId?: string } | null;
+    data: {
+      elements?: ElementLite[];
+      connectors?: unknown[];
+      parentDiagramId?: string;
+      parentDiagramIds?: string[];
+    } | null;
   }>;
 
   const diagramById = new Map(diagrams.map((d) => [d.id, d] as const));
@@ -261,38 +269,14 @@ export async function POST(req: Request, { params }: Params) {
     delete target.properties.linkedDiagramId;
     touched.add(parent.id);
 
-    // Reassign or clear the child's diagram-level Parent Diagram. If
-    // another parent still links to this child, prefer that one; else
-    // clear the field. (Any leftover on-canvas return-link symbols are
-    // dropped by the project-wide sweep further down — see below.)
-    const child = diagramById.get(previousChildId);
-    if (child && child.data && child.data.parentDiagramId === parent.id) {
-      const otherParents = diagrams.filter((d) => {
-        if (d.id === parent.id) return false;
-        return (d.data?.elements ?? []).some(
-          (e) =>
-            (e.type === "subprocess" || e.type === "subprocess-expanded") &&
-            !e.properties?.isReturnLink &&
-            (e.properties?.linkedDiagramId as string | undefined) === previousChildId,
-        );
-      });
-      if (otherParents.length > 0) {
-        child.data.parentDiagramId = otherParents[0].id;
-      } else {
-        delete child.data.parentDiagramId;
-      }
-      touched.add(child.id);
-    }
+    // (Stale return-link symbols and parentDiagramIds are reconciled by
+    // the project-wide sweep at the end of this handler.)
   }
 
-  // Apply ADDS.
-  //
-  // Note: as of the design revision, we no longer create on-canvas return-
-  // link symbols. The back-link is surfaced via `data.parentDiagramId`
-  // (a diagram-level property) and rendered as a clickable "Parent" row in
-  // PropertiesPanel. The editor's top-bar breadcrumb continues to handle
-  // session-based back navigation. The on-canvas symbol was discarded as
-  // canvas clutter.
+  // Apply ADDS — only the parent-side `linkedDiagramId` is set here.
+  // Back-link metadata on the child (parentDiagramIds list) is recomputed
+  // from scratch during the project-wide normalize pass below, so we don't
+  // duplicate that logic per-add.
   for (const op of adds) {
     const parent = diagramById.get(op.parentDiagramId);
     const child = diagramById.get(op.candidateDiagramId);
@@ -304,28 +288,62 @@ export async function POST(req: Request, { params }: Params) {
     target.properties = target.properties ?? {};
     target.properties.linkedDiagramId = child.id;
     touched.add(parent.id);
-
-    // Set the diagram-level Parent Diagram on the child. Most-recent add
-    // wins when a child has multiple parents — the user can still drill
-    // back to any specific parent via the breadcrumb / drill stack.
-    const childData = child.data ?? { elements: [] };
-    child.data = childData;
-    childData.parentDiagramId = parent.id;
-    touched.add(child.id);
   }
 
-  // Sweep — remove ANY surviving on-canvas return-link symbol from every
-  // diagram in the project. These were created by the earlier design and
-  // are no longer wanted. Running the scan effectively migrates the
-  // project to the canvas-clean design.
+  // Project-wide normalize pass — runs after every scan POST regardless of
+  // whether the user added or removed anything. Does three things:
+  //
+  //   (a) Drops every on-canvas return-link symbol. Older versions of
+  //       this feature created pill-shaped subprocesses with
+  //       isReturnLink=true on child diagrams; they are no longer wanted.
+  //   (b) Drops the legacy `parentDiagramId` (singular) field. It is
+  //       superseded by `parentDiagramIds`.
+  //   (c) Recomputes `parentDiagramIds` for every diagram from the
+  //       canonical source of truth (other diagrams' subprocess
+  //       linkedDiagramId fields). This catches manual edits, race
+  //       conditions, and any drift accumulated by older code paths.
   for (const d of diagrams) {
     if (!d.data) continue;
+
+    // (a) Strip return-link symbols.
     const els = d.data.elements ?? [];
     const cleaned = els.filter(
       (e) => !(e.type === "subprocess" && e.properties?.isReturnLink === true),
     );
     if (cleaned.length !== els.length) {
       d.data.elements = cleaned;
+      touched.add(d.id);
+    }
+
+    // (b) Drop legacy singular field if present.
+    if (d.data.parentDiagramId !== undefined) {
+      delete d.data.parentDiagramId;
+      touched.add(d.id);
+    }
+
+    // (c) Recompute parentDiagramIds. A "parent" is any other diagram
+    //     containing a non-return-link subprocess/subprocess-expanded
+    //     whose linkedDiagramId equals d.id.
+    const parents: string[] = [];
+    for (const other of diagrams) {
+      if (other.id === d.id) continue;
+      const otherEls = other.data?.elements ?? [];
+      const links = otherEls.some(
+        (e) =>
+          (e.type === "subprocess" || e.type === "subprocess-expanded") &&
+          !e.properties?.isReturnLink &&
+          (e.properties?.linkedDiagramId as string | undefined) === d.id,
+      );
+      if (links) parents.push(other.id);
+    }
+    // Stable order by diagram name for the UI.
+    const nameById = new Map(diagrams.map((x) => [x.id, x.name] as const));
+    parents.sort((a, b) => (nameById.get(a) ?? "").localeCompare(nameById.get(b) ?? ""));
+    const existing = d.data.parentDiagramIds ?? [];
+    const same = existing.length === parents.length && existing.every((v, i) => v === parents[i]);
+    if (!same) {
+      if (parents.length === 0) delete d.data.parentDiagramIds;
+      else d.data.parentDiagramIds = parents;
       touched.add(d.id);
     }
   }

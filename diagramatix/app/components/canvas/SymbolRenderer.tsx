@@ -1465,8 +1465,12 @@ function SymbolShape({ el }: { el: DiagramElement }) {
       case "task":
         return el.taskType !== undefined ? <BpmnTaskShape el={el} /> : <TaskShape el={el} />;
       case "subprocess":
+        // Return-link variants are no longer rendered on the canvas — the
+        // back-link is surfaced via the Properties panel's parents list.
+        // Stale return-link elements in existing diagram data are cleaned
+        // up by the scan-links sweep; until then, render nothing.
         return (el.properties.isReturnLink as boolean | undefined)
-          ? <ReturnLinkShape el={el} />
+          ? null
           : <SubprocessShape el={el} />;
       case "subprocess-expanded": return <ExpandedSubprocessShape el={el} />;
       case "uml-class":             return <UmlClassShape el={el} />;
@@ -1577,6 +1581,13 @@ export function SymbolRenderer({
   const [isEditingGatewayLabel, setIsEditingGatewayLabel] = useState(false);
   const [editGatewayLabelValue, setEditGatewayLabelValue] = useState("");
   const [labelHighlighted, setLabelHighlighted] = useState(false);
+  // Return-link variants are no longer rendered on the canvas. Skip the
+  // entire element (shape, label, selection box, drill marker, hit zones).
+  // The scan-links sweep will eventually drop these elements from data;
+  // until then this guard keeps them invisible.
+  const isHiddenReturnLink =
+    element.type === "subprocess" &&
+    (element.properties.isReturnLink as boolean | undefined) === true;
   // Pool edge resize: visible grip only appears while the user is actively
   // dragging an edge. Hit-zones stay invisible & click-catching; grip fades
   // out on mouseup. State tracks WHICH side is active so only that side's
@@ -1785,6 +1796,9 @@ export function SymbolRenderer({
   const isBoundaryStartOrEnd = !!element.boundaryHostId &&
     (element.type === "start-event" || element.type === "end-event");
   const showLabel = element.type !== "initial-state" && element.type !== "final-state" && element.type !== "fork-join" && !isBoundaryStartOrEnd;
+
+  // Return-link elements are no longer rendered.
+  if (isHiddenReturnLink) return null;
 
   return (
     <SymbolColorCtx.Provider value={colorConfig}>
