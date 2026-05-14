@@ -184,7 +184,13 @@ export const diagramatixV15Profile: StencilProfile = {
   disableBodyColourBake: true,
 };
 
-export const DEFAULT_PROFILE = bpmnMProfile;
+// Default profile for the Visio export pipeline. v1.5 ships a curated
+// Diagramatix-authored stencil with separate Decision / Merge masters,
+// pre-coloured masters, and correct event-gateway marker sizing — the
+// behaviour every user-facing export now relies on. BPMN_M remains
+// available via `?profile=bpmn-m` for compatibility, but is no longer
+// the default.
+export const DEFAULT_PROFILE = diagramatixV15Profile;
 
 /** Look up a profile by its `name`. Returns `DEFAULT_PROFILE` if the name
  *  is unrecognised. Used by the API route to honour a `?profile=` query
