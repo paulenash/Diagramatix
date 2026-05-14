@@ -1745,14 +1745,21 @@ export async function exportVisioV3(
     const textEl = el.label && !isMergeGateway
       ? `<Text>${esc(el.label)}</Text>` : "";
 
-    // For Tasks, Subprocesses, Pools, Lanes: set Width/Height + sub-shapes
-    // with F='Inh' so the visual matches the Diagramatix dimensions.
+    // Setting Width/Height on the page shape only renders correctly when
+    // the master's internal sub-shapes scale automatically via formulas
+    // (Sheet.5!Width*0.5, etc.) AND their cached V values happen to match
+    // the new size. For simple masters (Task, Collapsed Subprocess), the
+    // internal shapes are minimal and the formulas re-evaluate cleanly on
+    // first open. For complex masters (Expanded Subprocess, Pool, Lane),
+    // the inner sub-shapes have cached values baked at the master's
+    // natural size — overriding only the root W/H produces a shape whose
+    // selection rectangle is the right size but whose inner content paints
+    // at the master-natural size, mis-located inside the new bounding box.
     //
-    // Gateways and Events are intentionally EXCLUDED so the page instance
-    // inherits the master's natural Width/Height. That keeps the visible
-    // diamond / circle and the selection boundary as the same shape, and
-    // connectors attach cleanly to the master's sides.
-    const isResizable = ["task", "subprocess", "subprocess-expanded", "pool", "lane"].includes(el.type);
+    // Until v1.5 has profile-aware per-instance cloning (sub-issue #5+),
+    // restrict resize to the two safe types. Gateways and Events also stay
+    // at master-natural size (deliberate — keeps standard look).
+    const isResizable = ["task", "subprocess"].includes(el.type);
     const hw = w / 2;
     const hh = h / 2;
 
@@ -2071,15 +2078,38 @@ export async function exportVisioV3(
     // marker MasterShape carries Geometry sub-sections with `NoShow='0'
     // F='Inh'` to force the marker visible.
     //
-    // Skipped for profiles whose stencils handle marker visibility
-    // internally (Diagramatix v1.4). The sub-shape ID assumptions used
-    // by `triggerMarkers` and the BPMN_M Geometry-IX layout don't apply
-    // to v1.4's master structure.
-    if (!profile.disableBodyColourBake
-        && BODY_FILL_TYPES.has(el.type) && subShapes === "") {
-      const masterFileEntry = await zip
-        .file(`visio/masters/master${effectiveMasterId}.xml`)
-        ?.async("string");
+    // Master file lookup uses an in-memory rels resolution against the
+    // CURRENT mastersXml/mastersRels so it works under any profile:
+    //   • BPMN_M: clones are registered with rId → master${cloneId}.xml,
+    //     so the resolver returns the same filename as the legacy
+    //     `master${effectiveMasterId}.xml` path.
+    //   • v1.5: no clones — effectiveMasterId is the template's master ID,
+    //     and the resolver returns the template's actual filename
+    //     (which is NOT the same as `master${id}.xml`, e.g. Task ID 6 lives
+    //     in `master4.xml`).
+    //
+    // Sub-shape ID assumptions in `triggerMarkers` happen to match v1.5's
+    // Task / Event / Gateway masters too (audited against bpmn-template-v14
+    // which is v1.5's base), so the same map produces correct overrides on
+    // both profiles.
+    if (BODY_FILL_TYPES.has(el.type) && subShapes === "") {
+      // Resolve the actual master XML filename via the in-memory rels.
+      let masterFileName: string | null = null;
+      const masterBlockMatch = mastersXml.match(
+        new RegExp(`<Master\\s+ID='${effectiveMasterId}'[\\s\\S]*?</Master>`),
+      );
+      if (masterBlockMatch) {
+        const relIdMatch = masterBlockMatch[0].match(/<Rel\s+r:id='(rId\d+)'/);
+        if (relIdMatch) {
+          const fileMatch = mastersRels.match(
+            new RegExp(`Id=["']${relIdMatch[1]}["'][^>]*Target=["']([^"']+)["']`),
+          );
+          if (fileMatch) masterFileName = fileMatch[1];
+        }
+      }
+      const masterFileEntry = masterFileName
+        ? await zip.file(`visio/masters/${masterFileName}`)?.async("string")
+        : undefined;
       if (masterFileEntry) {
         const root = masterFileEntry.match(/<Shape ID='5'[^>]*>/);
         if (root) {
@@ -2162,63 +2192,6 @@ export async function exportVisioV3(
             }
           }
         }
-      }
-    }
-
-    // v1.5 profile task-type marker stubs.
-    //
-    // The block above is gated on `!disableBodyColourBake` so it doesn't run
-    // under v1.5. But v1.5's Task master also keeps every marker hidden in
-    // its cached V values — Visio paints the first frame from cached V, so
-    // without a per-instance override the User / Service / Send / Receive /
-    // Manual / BusinessRule icons never appear.
-    //
-    // Fix: when targeting v1.5, emit a minimal `<Shapes>` block on the page
-    // shape with one MasterShape stub per task-type marker, each carrying
-    // a `Geometry IX=N NoShow=0` override that forces visibility on first
-    // paint. The master's existing NoShow formulas (e.g. `NOT(Sheet.5!
-    // Actions.User.Checked)`) re-evaluate correctly on subsequent paints,
-    // so this also round-trips to the right state when the user toggles
-    // task type in Visio.
-    //
-    // Sub-shape IDs (verified against bpmn-template-v14's master4 Task,
-    // which is the same structure as v1.5 stencil's Task master):
-    //   18 → User (also Script, shared formula)
-    //   19 → Service (multi-gear)
-    //   21 + 22 → Send (envelope + flag glyphs, two sub-shapes)
-    //   23 → Receive
-    //   25 → Manual
-    //   26 → BusinessRule (multi-line page)
-    if (profile.disableBodyColourBake && el.type === "task" && subShapes === "") {
-      const V15_TASK_MARKER_MAP: Record<string, { shapeId: number; geomIxs: number[] }[]> = {
-        "User":         [{ shapeId: 18, geomIxs: [0] }],
-        "Service":      [{ shapeId: 19, geomIxs: [0] }],
-        "Send":         [{ shapeId: 21, geomIxs: [0] }, { shapeId: 22, geomIxs: [0] }],
-        "Receive":      [{ shapeId: 23, geomIxs: [0, 1] }],
-        "Manual":       [{ shapeId: 25, geomIxs: [0, 1] }],
-        "BusinessRule": [{ shapeId: 26, geomIxs: [0, 1, 2, 3] }],
-      };
-      const stubs: string[] = [];
-      let stubIdCounter = shapeId;
-      for (const action of triggerActions) {
-        const specs = V15_TASK_MARKER_MAP[action];
-        if (!specs) continue;
-        for (const spec of specs) {
-          stubIdCounter += 1;
-          let geomExtras = "";
-          for (const ix of spec.geomIxs) {
-            geomExtras += `<Section N='Geometry' IX='${ix}'><Cell N='NoShow' V='0' F='Inh'/></Section>`;
-          }
-          stubs.push(
-            `<Shape ID='${stubIdCounter}' Type='Shape' MasterShape='${spec.shapeId}'>` +
-            `<Cell N='LayerMember' V=''/>` +
-            geomExtras +
-            `</Shape>`
-          );
-        }
-      }
-      if (stubs.length > 0) {
-        subShapes = `<Shapes>${stubs.join("")}</Shapes>`;
       }
     }
 
