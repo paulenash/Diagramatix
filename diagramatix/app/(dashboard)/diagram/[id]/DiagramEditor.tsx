@@ -1908,28 +1908,43 @@ export function DiagramEditor({
                         </div>
                       )}
                     </div>
-                    {/* Visio (BPMN only) */}
+                    {/* Visio export — two flavours (BPMN only). The user can
+                        target either the Diagramatix v1.5 stencil (best for
+                        recipients who install the Diagramatix stencil and
+                        want to re-import back into Diagramatix) or the
+                        Microsoft BPMN_M format (best for recipients who only
+                        have Visio's built-in BPMN stencil). */}
                     {diagramType === "bpmn" && (
-                      <button
-                        onClick={() => {
-                          setFileMenuOpen(false);
-                          setFileSubmenu(null);
-                          const a = document.createElement("a");
-                          // Pin the v1.5 profile explicitly. v1.5 ships
-                          // the curated Diagramatix stencil with Decision/
-                          // Merge gateway masters + correct event-marker
-                          // sizing. Relying on DEFAULT_PROFILE means an
-                          // older server build could fall back to BPMN_M
-                          // which then triggers Visio's local-master
-                          // substitution and undoes all our fixes.
-                          a.href = `/api/export/visio-v3?diagramId=${diagramId}&profile=v1.5`;
-                          a.rel = "noopener";
-                          a.click();
-                        }}
-                        className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
-                      >
-                        Visio
-                      </button>
+                      <>
+                        <button
+                          onClick={() => {
+                            setFileMenuOpen(false);
+                            setFileSubmenu(null);
+                            const a = document.createElement("a");
+                            a.href = `/api/export/visio-v3?diagramId=${diagramId}&profile=v1.5`;
+                            a.rel = "noopener";
+                            a.click();
+                          }}
+                          className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                          title="Export using the Diagramatix v1.5 stencil — recipient needs the v1.5 stencil installed in Visio to re-author cleanly."
+                        >
+                          Visio (Diagramatix v1.5)
+                        </button>
+                        <button
+                          onClick={() => {
+                            setFileMenuOpen(false);
+                            setFileSubmenu(null);
+                            const a = document.createElement("a");
+                            a.href = `/api/export/visio-v3?diagramId=${diagramId}&profile=bpmn-m`;
+                            a.rel = "noopener";
+                            a.click();
+                          }}
+                          className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                          title="Export using Microsoft's standard BPMN_M format — opens in any Visio install without an extra stencil."
+                        >
+                          Visio (BPMN_M)
+                        </button>
+                      </>
                     )}
                     {/* Visio Stencil download (BPMN only) — install in Visio
                         to author BPMN diagrams natively that import cleanly. */}

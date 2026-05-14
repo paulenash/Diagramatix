@@ -30,13 +30,7 @@ const GATEWAY_TYPE_MAP: Record<string, { type: string; exclusive?: string; marke
   "exclusive": { type: "Exclusive", exclusive: "Data", marker: true },
   "inclusive": { type: "Inclusive" },
   "parallel": { type: "Parallel" },
-  // Use the plain "Exclusive Event" variant rather than the "(Instantiate)"
-  // form. The Instantiate variant draws an EXTRA outer circle around the
-  // pentagon to denote process instantiation — it looks correct on the
-  // event-gateway Merge master but renders oversized inside the Decision
-  // master in the v1.5 stencil. The plain "Exclusive Event" marker scales
-  // cleanly to the instance gateway size from either master.
-  "event-based": { type: "Exclusive Event" },
+  "event-based": { type: "Exclusive Event (Instantiate)" },
 };
 
 // Event trigger/result mapping
@@ -89,17 +83,12 @@ function getElementMappingV3Inner(el: DiagramElement, profile: StencilProfile): 
       };
       if (gwInfo.exclusive) gwProps.BpmnExclusiveType = gwInfo.exclusive;
       if (gwInfo.marker) gwProps.BpmnMarkerVisible = "1";  // BOOL: 1=true
-      // Diagramatix v1.4+ ships separate Decision (with marker) and Merge
-      // (plain diamond) gateway masters. Route through `gatewayMerge` when:
-      //   • the gateway has no marker (gatewayType "none"); OR
-      //   • the gateway is event-based — the Decision master in the
-      //     current stencil renders the event marker incorrectly, while
-      //     the Merge master draws it accurately.
-      // Profiles without `gatewayMerge` (BPMN_M) fall back to the single
-      // `gateway` master.
-      const gwType = el.gatewayType ?? "none";
-      const usesMergeMaster = gwType === "none" || gwType === "event-based";
-      const masterId = (usesMergeMaster && m.gatewayMerge) ? m.gatewayMerge : m.gateway;
+      // Diagramatix v1.4 ships separate Decision (with marker) and Merge
+      // (plain diamond) gateway masters. Use the Merge master when the
+      // gateway has no marker (gatewayType "none"). Profiles without
+      // `gatewayMerge` (BPMN_M) fall back to the single `gateway` master.
+      const isPlainMerge = (el.gatewayType ?? "none") === "none";
+      const masterId = (isPlainMerge && m.gatewayMerge) ? m.gatewayMerge : m.gateway;
       return { masterId, properties: gwProps };
     }
 

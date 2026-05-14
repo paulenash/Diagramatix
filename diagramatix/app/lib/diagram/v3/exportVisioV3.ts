@@ -1732,21 +1732,27 @@ export async function exportVisioV3(
       .map((ix) => `<Section N='Geometry' IX='${ix}'><Cell N='NoShow' V='0' F='Inh'/></Section>`)
       .join("");
 
-    const isPool = mapping.masterId === 19;
+    // Identify shape categories by Diagramatix `el.type` rather than by
+    // BPMN_M master IDs so the same logic works under every profile
+    // (BPMN_M, v1.5, etc.). The previous `mapping.masterId === 19` check
+    // accidentally classified v1.5's Gateway master (also ID 9) as a Task
+    // because the same numeric ID is used for different masters across
+    // profiles.
+    const isPool = el.type === "pool" || el.type === "lane";
     const isMergeGateway = el.type === "gateway" &&
       ((el.properties as Record<string, unknown> | undefined)
         ?.gatewayRole === "merge");
     const textEl = el.label && !isMergeGateway
       ? `<Text>${esc(el.label)}</Text>` : "";
 
-    // For Tasks, Subprocesses, Pools: set Width/Height + sub-shapes with F='Inh'
-    // so the visual matches the Diagramatix dimensions.
+    // For Tasks, Subprocesses, Pools, Lanes: set Width/Height + sub-shapes
+    // with F='Inh' so the visual matches the Diagramatix dimensions.
     //
-    // Gateways are intentionally EXCLUDED from this list so the page instance
-    // inherits the BPMN_M master's natural Width/Height. That keeps the
-    // visible diamond and the selection boundary as the same shape (the
-    // standard Visio gateway), and connectors attach to the master's sides.
-    const isResizable = [9, 33, 19].includes(mapping.masterId); // Task, Subprocess, Pool
+    // Gateways and Events are intentionally EXCLUDED so the page instance
+    // inherits the master's natural Width/Height. That keeps the visible
+    // diamond / circle and the selection boundary as the same shape, and
+    // connectors attach cleanly to the master's sides.
+    const isResizable = ["task", "subprocess", "subprocess-expanded", "pool", "lane"].includes(el.type);
     const hw = w / 2;
     const hh = h / 2;
 
@@ -1765,7 +1771,13 @@ export async function exportVisioV3(
         `<Cell N='TxtLocPinX' V='${hw}' F='Inh'/>`;
       userSection = `<Section N='User'><Row N='IsInstance'><Cell N='Value' V='1' U='BOOL' F='Inh'/></Row></Section>`;
 
-      if (isPool) {
+      // BPMN_M-specific Pool/Lane per-instance master rewriting. The
+      // string replacements below target the BPMN_M template's exact
+      // cached V values and "Function" placeholder text — v1.5's
+      // Pool/Lane master has different numbers and a different layout,
+      // so this branch would corrupt it. Gate on profile to skip.
+      // (Sub-issue #5 will add v1.5-native Pool/Lane handling.)
+      if (isPool && !profile.disableBodyColourBake) {
         // Pool/Lane: create a per-instance master with updated cached dimension values.
         // Sub-shapes have formulas (Sheet.5!Width*1, etc.) but Visio uses cached V= values
         // on file open, so ALL cached values must be updated.
@@ -2150,6 +2162,63 @@ export async function exportVisioV3(
             }
           }
         }
+      }
+    }
+
+    // v1.5 profile task-type marker stubs.
+    //
+    // The block above is gated on `!disableBodyColourBake` so it doesn't run
+    // under v1.5. But v1.5's Task master also keeps every marker hidden in
+    // its cached V values — Visio paints the first frame from cached V, so
+    // without a per-instance override the User / Service / Send / Receive /
+    // Manual / BusinessRule icons never appear.
+    //
+    // Fix: when targeting v1.5, emit a minimal `<Shapes>` block on the page
+    // shape with one MasterShape stub per task-type marker, each carrying
+    // a `Geometry IX=N NoShow=0` override that forces visibility on first
+    // paint. The master's existing NoShow formulas (e.g. `NOT(Sheet.5!
+    // Actions.User.Checked)`) re-evaluate correctly on subsequent paints,
+    // so this also round-trips to the right state when the user toggles
+    // task type in Visio.
+    //
+    // Sub-shape IDs (verified against bpmn-template-v14's master4 Task,
+    // which is the same structure as v1.5 stencil's Task master):
+    //   18 → User (also Script, shared formula)
+    //   19 → Service (multi-gear)
+    //   21 + 22 → Send (envelope + flag glyphs, two sub-shapes)
+    //   23 → Receive
+    //   25 → Manual
+    //   26 → BusinessRule (multi-line page)
+    if (profile.disableBodyColourBake && el.type === "task" && subShapes === "") {
+      const V15_TASK_MARKER_MAP: Record<string, { shapeId: number; geomIxs: number[] }[]> = {
+        "User":         [{ shapeId: 18, geomIxs: [0] }],
+        "Service":      [{ shapeId: 19, geomIxs: [0] }],
+        "Send":         [{ shapeId: 21, geomIxs: [0] }, { shapeId: 22, geomIxs: [0] }],
+        "Receive":      [{ shapeId: 23, geomIxs: [0, 1] }],
+        "Manual":       [{ shapeId: 25, geomIxs: [0, 1] }],
+        "BusinessRule": [{ shapeId: 26, geomIxs: [0, 1, 2, 3] }],
+      };
+      const stubs: string[] = [];
+      let stubIdCounter = shapeId;
+      for (const action of triggerActions) {
+        const specs = V15_TASK_MARKER_MAP[action];
+        if (!specs) continue;
+        for (const spec of specs) {
+          stubIdCounter += 1;
+          let geomExtras = "";
+          for (const ix of spec.geomIxs) {
+            geomExtras += `<Section N='Geometry' IX='${ix}'><Cell N='NoShow' V='0' F='Inh'/></Section>`;
+          }
+          stubs.push(
+            `<Shape ID='${stubIdCounter}' Type='Shape' MasterShape='${spec.shapeId}'>` +
+            `<Cell N='LayerMember' V=''/>` +
+            geomExtras +
+            `</Shape>`
+          );
+        }
+      }
+      if (stubs.length > 0) {
+        subShapes = `<Shapes>${stubs.join("")}</Shapes>`;
       }
     }
 
