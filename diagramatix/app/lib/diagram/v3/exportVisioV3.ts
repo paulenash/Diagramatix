@@ -1771,7 +1771,13 @@ export async function exportVisioV3(
     // Until v1.5 has profile-aware per-instance cloning (sub-issue #5+),
     // restrict resize to the two safe types. Gateways and Events also stay
     // at master-natural size (deliberate — keeps standard look).
-    const isResizable = ["task", "subprocess"].includes(el.type);
+    // Pool/Lane are intentionally back in this list — the BPMN_M pool
+    // branch below (gated on !disableBodyColourBake) needs to run, and the
+    // v1.5 pool branch (gated on disableBodyColourBake) likewise. EP
+    // (subprocess-expanded) stays out for now because the per-instance
+    // resize logic for EP hasn't been ported to v1.5 yet — better to
+    // render EPs at master-natural size than at a half-resized broken size.
+    const isResizable = ["task", "subprocess", "pool", "lane"].includes(el.type);
     const hw = w / 2;
     const hh = h / 2;
 
@@ -2036,6 +2042,153 @@ export async function exportVisioV3(
           continue; // skip the normal shape.push below
         }
         // Fallback: no sub-shapes, just position
+        subShapes = "";
+      } else if (isPool && profile.disableBodyColourBake) {
+        // v1.5 Pool / Lane per-instance master.
+        //
+        // The v1.5 stencil's Pool/Lane master (ID 18 in the stencil,
+        // copied to ID 118 in the output via mastersToAdd) has natural
+        // cached W/H of 5"×1.25" and a "Function" placeholder in its
+        // header text. Without per-instance rewriting every pool exports
+        // at 5×1.25 with "Function" in the header, regardless of the
+        // Diagramatix dimensions and label.
+        //
+        // This branch clones the master per-instance, splice-replaces:
+        //   • cached W (5 → instance w), cached H (1.25 → instance h),
+        //     and the half-values used in LocPin formulas
+        //   • the "Function" placeholder in visHeadingText, BpmnName,
+        //     BpmnPoolName, and the master's literal <Text>Function</Text>
+        // and registers the clone in masters.xml + rels + content-types
+        // the same way `createInstanceMaster` does. The page shape then
+        // references the clone and supplies visHeadingText + a Member
+        // section linking child Lanes.
+        const poolLabel = el.label ?? "Pool";
+        const stencilMastersXml = await bpmnM
+          .file("visio/masters/masters.xml")!.async("string");
+        const stencilMastersRels = await bpmnM
+          .file("visio/masters/_rels/masters.xml.rels")!.async("string");
+        const poolMasterBlock = stencilMastersXml.match(
+          /<Master\s+ID='18'[\s\S]*?<\/Master>/,
+        );
+        const poolRelMatch = poolMasterBlock?.[0].match(
+          /<Rel\s+r:id='(rId\d+)'/,
+        );
+        const poolFileMatch = poolRelMatch
+          ? stencilMastersRels.match(
+              new RegExp(
+                `Id=["']${poolRelMatch[1]}["'][^>]*Target=["']([^"']+)["']`,
+              ),
+            )
+          : null;
+
+        if (poolFileMatch) {
+          let poolMasterXml = await bpmnM
+            .file("visio/masters/" + poolFileMatch[1])!
+            .async("string");
+
+          // Patch cached V values from v1.5 natural dims to instance dims.
+          poolMasterXml = poolMasterXml
+            .split("'5' U='MM' F='5*25.4MM'")
+            .join(`'${w}' U='MM' F='${w}*25.4MM'`);
+          poolMasterXml = poolMasterXml
+            .split("'1.25' U='MM' F='1.25*25.4MM'")
+            .join(`'${h}' U='MM' F='${h}*25.4MM'`);
+          poolMasterXml = poolMasterXml.split("V='2.5'").join(`V='${hw}'`);
+          poolMasterXml = poolMasterXml.split("V='0.625'").join(`V='${hh}'`);
+
+          // Replace the "Function" placeholder text in every location.
+          // Order matters: longer/more specific patterns first.
+          poolMasterXml = poolMasterXml
+            .split(">Function\n<")
+            .join(`>${esc(poolLabel)}\n<`);
+          poolMasterXml = poolMasterXml
+            .split(">Function<")
+            .join(`>${esc(poolLabel)}<`);
+          poolMasterXml = poolMasterXml
+            .split("V='Function'")
+            .join(`V='${esc(poolLabel)}'`);
+
+          // Register the clone in the output file.
+          const poolInstanceId = 200 + shapeId;
+          const poolFileName = `master${poolInstanceId}.xml`;
+          const poolRId = `rId${poolInstanceId}`;
+          zip.file("visio/masters/" + poolFileName, poolMasterXml);
+
+          const newPoolBlock = poolMasterBlock![0]
+            .replace(/ID='18'/, `ID='${poolInstanceId}'`)
+            .replace(
+              /NameU='Pool \/ Lane'/,
+              `NameU='Pool / Lane.${poolInstanceId}'`,
+            )
+            .replace(
+              /Name='Pool \/ Lane'/,
+              `Name='Pool / Lane.${poolInstanceId}'`,
+            )
+            .replace(/<Rel\s+r:id='rId\d+'/, `<Rel r:id='${poolRId}'`);
+          mastersXml = mastersXml.replace(
+            "</Masters>",
+            newPoolBlock + "</Masters>",
+          );
+          mastersRels = mastersRels.replace(
+            "</Relationships>",
+            `<Relationship Id="${poolRId}" Type="http://schemas.microsoft.com/visio/2010/relationships/master" Target="${poolFileName}"/></Relationships>`,
+          );
+          contentTypes = contentTypes.replace(
+            "</Types>",
+            `<Override PartName="/visio/masters/${poolFileName}" ContentType="application/vnd.ms-visio.master+xml"/></Types>`,
+          );
+          zip.file("visio/masters/masters.xml", mastersXml);
+          zip.file("visio/masters/_rels/masters.xml.rels", mastersRels);
+          zip.file("[Content_Types].xml", contentTypes);
+
+          // Page-shape additions: visHeadingText and (for pools) the
+          // Member section linking child lanes.
+          const poolUserSection =
+            `<Section N='User'>` +
+            `<Row N='visHeadingText'><Cell N='Value' V='${esc(poolLabel)}' U='STR' F='Inh'/></Row>` +
+            `</Section>`;
+          let memberSection = "";
+          if (el.type === "pool") {
+            const childLaneIds: number[] = [];
+            for (const child of data.elements) {
+              if (child.type === "lane" && child.parentId === el.id) {
+                const cid = elIdToShapeId.get(child.id);
+                if (cid !== undefined) childLaneIds.push(cid);
+              }
+            }
+            if (childLaneIds.length > 0) {
+              memberSection =
+                `<Section N='Member'>` +
+                childLaneIds
+                  .map(
+                    (cid, i) =>
+                      `<Row IX='${i + 1}'>` +
+                      `<Cell N='ID' V='${cid}'/>` +
+                      `<Cell N='ContainerProperties' V='2'/>` +
+                      `<Cell N='MemberFlags' V='0'/>` +
+                      `</Row>`,
+                  )
+                  .join("") +
+                `</Section>`;
+            }
+          }
+
+          shapes.push(
+            `<Shape ID='${shapeId}' NameU='${esc(poolLabel)}' Type='Group' Master='${poolInstanceId}'>` +
+            `<Cell N='PinX' V='${cx}'/>` +
+            `<Cell N='PinY' V='${cy}'/>` +
+            `<Cell N='Width' V='${w}'/>` +
+            `<Cell N='Height' V='${h}'/>` +
+            `<Cell N='LocPinX' V='${hw}' F='Inh'/>` +
+            `<Cell N='LocPinY' V='${hh}' F='Inh'/>` +
+            poolUserSection +
+            propSection +
+            elCharSection +
+            memberSection +
+            `</Shape>`
+          );
+          continue;
+        }
         subShapes = "";
       } else {
         // Task, Subprocess: NO instance sub-shapes — they would override the
