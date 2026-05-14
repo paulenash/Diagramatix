@@ -30,7 +30,13 @@ const GATEWAY_TYPE_MAP: Record<string, { type: string; exclusive?: string; marke
   "exclusive": { type: "Exclusive", exclusive: "Data", marker: true },
   "inclusive": { type: "Inclusive" },
   "parallel": { type: "Parallel" },
-  "event-based": { type: "Exclusive Event (Instantiate)" },
+  // Use the plain "Exclusive Event" variant rather than the "(Instantiate)"
+  // form. The Instantiate variant draws an EXTRA outer circle around the
+  // pentagon to denote process instantiation — it looks correct on the
+  // event-gateway Merge master but renders oversized inside the Decision
+  // master in the v1.5 stencil. The plain "Exclusive Event" marker scales
+  // cleanly to the instance gateway size from either master.
+  "event-based": { type: "Exclusive Event" },
 };
 
 // Event trigger/result mapping
