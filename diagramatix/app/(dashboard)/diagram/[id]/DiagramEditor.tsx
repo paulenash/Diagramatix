@@ -1915,7 +1915,14 @@ export function DiagramEditor({
                           setFileMenuOpen(false);
                           setFileSubmenu(null);
                           const a = document.createElement("a");
-                          a.href = `/api/export/visio-v3?diagramId=${diagramId}`;
+                          // Pin the v1.5 profile explicitly. v1.5 ships
+                          // the curated Diagramatix stencil with Decision/
+                          // Merge gateway masters + correct event-marker
+                          // sizing. Relying on DEFAULT_PROFILE means an
+                          // older server build could fall back to BPMN_M
+                          // which then triggers Visio's local-master
+                          // substitution and undoes all our fixes.
+                          a.href = `/api/export/visio-v3?diagramId=${diagramId}&profile=v1.5`;
                           a.rel = "noopener";
                           a.click();
                         }}
