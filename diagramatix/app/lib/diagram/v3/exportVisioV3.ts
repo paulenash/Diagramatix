@@ -2244,11 +2244,22 @@ export async function exportVisioV3(
 
     // <cp IX='0'/> in Text links to Character section row 0 — required for
     // the master's character formatting (font size etc) to apply.
-    // Merge / event-based / parallel gateways have no label by convention
-    // — skip the Text element. (See `hideLabel` upstream for rationale.)
-    const textElWithCp = el.label && !hideLabel
-      ? `<Text><cp IX='0'/>${esc(el.label)}</Text>`
-      : "";
+    //
+    // Three cases:
+    //   • hideLabel (merge / event-based / parallel gateways) → emit an
+    //     EXPLICIT EMPTY <Text></Text>. Omitting `<Text>` causes Visio to
+    //     fall back to the master's default text. v1.5's Gateway-Decision
+    //     master (used for event-based + non-plain markers) carries the
+    //     placeholder "Decision", and the event masters carry "Start" /
+    //     "Event 1" / "End"; the empty element overrides those defaults.
+    //   • Has a label → emit Text with the label.
+    //   • No label, no hideLabel → omit Text and inherit master default
+    //     (matches prior BPMN_M behaviour — only changes for hideLabel).
+    const textElWithCp = hideLabel
+      ? `<Text></Text>`
+      : el.label
+        ? `<Text><cp IX='0'/>${esc(el.label)}</Text>`
+        : "";
 
     const escLabel = esc(el.label || el.type);
     shapes.push(
