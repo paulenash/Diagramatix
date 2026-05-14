@@ -1742,7 +1742,19 @@ export async function exportVisioV3(
     const isMergeGateway = el.type === "gateway" &&
       ((el.properties as Record<string, unknown> | undefined)
         ?.gatewayRole === "merge");
-    const textEl = el.label && !isMergeGateway
+    // Suppress the on-canvas label for gateway types that BPMN convention
+    // draws unlabeled inside the diamond:
+    //   • event-based gateways (the pentagon star is self-explanatory and
+    //     the meaning sits on the events fanning out, not on the gateway).
+    //   • parallel gateways (the `+` marker means "fork/join", no decision
+    //     text applies).
+    // Exclusive / Inclusive gateways keep their labels (often the
+    // decision question, e.g. "Approved?"). Merge gateways already drop
+    // labels via `isMergeGateway` above.
+    const isLabellessGateway = el.type === "gateway" &&
+      (el.gatewayType === "event-based" || el.gatewayType === "parallel");
+    const hideLabel = isMergeGateway || isLabellessGateway;
+    const textEl = el.label && !hideLabel
       ? `<Text>${esc(el.label)}</Text>` : "";
 
     // Setting Width/Height on the page shape only renders correctly when
@@ -2232,8 +2244,9 @@ export async function exportVisioV3(
 
     // <cp IX='0'/> in Text links to Character section row 0 — required for
     // the master's character formatting (font size etc) to apply.
-    // Merge gateways have no label by convention — skip the Text element.
-    const textElWithCp = el.label && !isMergeGateway
+    // Merge / event-based / parallel gateways have no label by convention
+    // — skip the Text element. (See `hideLabel` upstream for rationale.)
+    const textElWithCp = el.label && !hideLabel
       ? `<Text><cp IX='0'/>${esc(el.label)}</Text>`
       : "";
 
