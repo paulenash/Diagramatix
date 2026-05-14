@@ -2087,26 +2087,51 @@ export async function exportVisioV3(
             .async("string");
 
           // Patch cached V values from v1.5 natural dims to instance dims.
-          poolMasterXml = poolMasterXml
-            .split("'5' U='MM' F='5*25.4MM'")
-            .join(`'${w}' U='MM' F='${w}*25.4MM'`);
-          poolMasterXml = poolMasterXml
-            .split("'1.25' U='MM' F='1.25*25.4MM'")
-            .join(`'${h}' U='MM' F='${h}*25.4MM'`);
+          //
+          // The natural pool master has THREE places that cache W=5 and
+          // H=1.25, each with a DIFFERENT formula:
+          //   • Shape 5 (root):   F='5*25.4MM'             /  F='1.25*25.4MM'
+          //   • Shape 6 (body):   F='Sheet.5!Width*1'       /  F='Sheet.5!Height*1'
+          //   • Shape 8 (header strip): a GUARD(IF...) formula that picks
+          //     between Sheet.5!Height / Sheet.5!Width based on HSide
+          // We patch only the V= cached value and leave each F= formula
+          // untouched so Visio recalcs correctly when the user resizes
+          // the pool interactively.
+          const escapeFor = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+          const replaceV = (cellName: string, oldV: string, newV: string, formula: string) => {
+            const pattern = new RegExp(
+              `(<Cell N='${escapeFor(cellName)}' V=)'${escapeFor(oldV)}'( U='MM' F='${escapeFor(formula)}'\\/>)`,
+              "g",
+            );
+            poolMasterXml = poolMasterXml.replace(pattern, `$1'${newV}'$2`);
+          };
+          // Shape 5 root W / H
+          replaceV("Width",  "5",    String(w), "5*25.4MM");
+          replaceV("Height", "1.25", String(h), "1.25*25.4MM");
+          // Shape 6 body W / H — formulas reference Sheet.5
+          replaceV("Width",  "5",    String(w), "Sheet.5!Width*1");
+          replaceV("Height", "1.25", String(h), "Sheet.5!Height*1");
+          // Shape 8 header strip W — special GUARD formula. h is the right
+          // value when HSide=1 or HSide=3 (typical horizontal pool with
+          // left-mounted header). Other configurations are uncommon.
+          replaceV("Width", "1.25", String(h),
+            "GUARD(IF(OR(User.HSide=1,User.HSide=3),Sheet.5!Height,Sheet.5!Width))");
+          // Half-value pin cells (LocPin and child PinX/Y on body, etc.)
           poolMasterXml = poolMasterXml.split("V='2.5'").join(`V='${hw}'`);
           poolMasterXml = poolMasterXml.split("V='0.625'").join(`V='${hh}'`);
 
           // Replace the "Function" placeholder text in every location.
-          // Order matters: longer/more specific patterns first.
-          poolMasterXml = poolMasterXml
-            .split(">Function\n<")
-            .join(`>${esc(poolLabel)}\n<`);
-          poolMasterXml = poolMasterXml
-            .split(">Function<")
-            .join(`>${esc(poolLabel)}<`);
-          poolMasterXml = poolMasterXml
-            .split("V='Function'")
-            .join(`V='${esc(poolLabel)}'`);
+          // Use regex with \s* so we catch both `>Function<` and
+          // `>Function\n<` / `>Function\r\n<` variants from different
+          // Visio writers.
+          poolMasterXml = poolMasterXml.replace(
+            />Function\s*</g,
+            `>${esc(poolLabel)}<`,
+          );
+          poolMasterXml = poolMasterXml.replace(
+            /V='Function'/g,
+            `V='${esc(poolLabel)}'`,
+          );
 
           // Register the clone in the output file.
           const poolInstanceId = 200 + shapeId;
