@@ -2105,9 +2105,22 @@ export async function exportVisioV3(
             );
             poolMasterXml = poolMasterXml.replace(pattern, `$1'${newV}'$2`);
           };
-          // Shape 5 root W / H
+          // Shape 5 root W / H — update BOTH the cached V AND the formula.
+          // The natural master uses `5*25.4MM` (= 5 inches as a constant) /
+          // `1.25*25.4MM` as the formulas. If we only patch V, Visio's
+          // recalc-on-open re-evaluates the formula and resets the cache
+          // back to 5 / 1.25, undoing our V patch. Sub-shapes referencing
+          // Sheet.5!Width then resolve to 5 (not the instance Width), and
+          // the body renders at master-natural size even though the page
+          // shape's bounding box is the right size.
           replaceV("Width",  "5",    String(w), "5*25.4MM");
           replaceV("Height", "1.25", String(h), "1.25*25.4MM");
+          poolMasterXml = poolMasterXml
+            .split("F='5*25.4MM'")
+            .join(`F='${w}*25.4MM'`);
+          poolMasterXml = poolMasterXml
+            .split("F='1.25*25.4MM'")
+            .join(`F='${h}*25.4MM'`);
           // Shape 6 body W / H — formulas reference Sheet.5
           replaceV("Width",  "5",    String(w), "Sheet.5!Width*1");
           replaceV("Height", "1.25", String(h), "Sheet.5!Height*1");
