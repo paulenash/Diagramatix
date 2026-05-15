@@ -1243,18 +1243,47 @@ export async function exportVisioV3(
     }
 
     // v1.5 Data Object (master 11) Collection marker — same mechanism as
-    // BPMN_M master 115 but different sub-shape ID. Shape 7's Geometry IX=0
-    // is the three-vertical-bar "collection" marker, gated by
-    // `NOT(Sheet.5!Prop.BpmnCollection)`. Flip the prop value to 1 AND
-    // force the cached NoShow V to 0 so first paint already shows the bars.
+    // BPMN_M master 115 but different sub-shape ID. Shape 7's THREE
+    // Geometry sections each draw one of the collection bars; IX=0 is
+    // gated directly on `NOT(BpmnCollection)`, IX=1 and IX=2 chain via
+    // `Geometry1.NoShow`. The cached NoShow V on all three is 1 (hidden);
+    // unless we flip every one of them, Visio paints only the IX=0 bar
+    // on first frame (single-line marker) until a manual recalc kicks in.
     if (sourceMasterId === 11 && elProps?.multiplicity === "collection") {
       masterContent = masterContent.replace(
         /(<Row N='BpmnCollection'>[\s\S]*?<Cell N='Value' V=')0(' U='BOOL'[^/]*\/>)/,
         "$11$2",
       );
       masterContent = masterContent.replace(
-        /(<Shape ID='7'[^>]*>[\s\S]*?<Cell N='NoShow' V=')1('[^>]*F='NOT\(Sheet\.5!Prop\.BpmnCollection\)')/,
-        "$10$2",
+        /<Shape ID='7'[\s\S]*?<\/Shape>/,
+        (block) => block.replace(/<Cell N='NoShow' V='1'/g, "<Cell N='NoShow' V='0'"),
+      );
+    }
+
+    // v1.5 Data Object (master 11) role=output → filled arrow. Shape 8 is
+    // the input/output arrow marker — currently ALWAYS drawn outlined
+    // (NoFill='1' on Geometry IX=0). For role=output, BPMN convention
+    // calls for a filled arrow; flip NoFill to 0 AND set FillForegnd to
+    // the LineColor (#374151) so the arrow body fills with the outline
+    // colour rather than the master's default warm-orange. role=input
+    // keeps the outlined default. (Role-none data-objects still show
+    // the arrow today — out of scope for this change.)
+    if (sourceMasterId === 11 && elProps?.role === "output") {
+      masterContent = masterContent.replace(
+        /<Shape ID='8'[\s\S]*?<\/Shape>/,
+        (block) =>
+          block
+            // Flip the geometry's NoFill from 1 → 0
+            .replace(
+              /(<Section N='Geometry' IX='0'>[\s\S]*?<Cell N='NoFill' V=')1(')/,
+              "$10$2",
+            )
+            // Repoint FillForegnd to the dark line color so the fill is
+            // visible (the master defaults to #fed7aa themed-background).
+            .replace(
+              /<Cell N='FillForegnd' V='[^']+' F='GUARD\(THEMEGUARD\(THEME\("BackgroundColor"\)\+1\)\)'\/>/,
+              "<Cell N='FillForegnd' V='#374151' F='GUARD(RGB(55,65,81))'/>",
+            ),
       );
     }
 
@@ -2244,11 +2273,20 @@ export async function exportVisioV3(
 
           // Collection / Multi-Instance marker — Diagramatix's "Collection"
           // checkbox maps to Visio's BpmnMultiInstance prop on Pool/Lane.
-          // The marker (three vertical strokes) lives on Shape 7 of the
-          // pool master with NoShow gated by `NOT(Sheet.5!Prop.BpmnMulti
-          // Instance)`. Flip BOTH the prop value AND the cached NoShow V
-          // so first paint already shows the marker (formula recalc would
-          // also show it, but cached V is what Visio paints first).
+          // Shape 7 carries the three vertical strokes across three
+          // Geometry sections (IX=0/1/2). IX=0 is gated directly on
+          // `NOT(BpmnMultiInstance)`; IX=1 and IX=2 chain via
+          // `Geometry1.NoShow`. All three cached NoShow V's are 1 (hidden)
+          // — need to flip ALL of them or Visio paints only one bar on
+          // first frame.
+          //
+          // The marker is also positioned BODY-CENTRE via a HeadingSide
+          // formula on PinX: for HeadingSide=1 (typical left-mounted
+          // header), PinX = `Sheet.8!Height + (Sheet.5!Width - Sheet.8!Height)/2`.
+          // Master-natural cached V is 2.75 (= 0.5 + (5 − 0.5)/2), but
+          // post-instance-clone with Sheet.5!Width = w, the cached V is
+          // still 2.75, so the marker pins at master-natural x. Update
+          // the cached PinX V to the instance-resolved value.
           const poolMult = (el.properties as Record<string, unknown> | undefined)
             ?.multiplicity as string | undefined;
           if (poolMult === "collection") {
@@ -2256,9 +2294,21 @@ export async function exportVisioV3(
               /(<Row N='BpmnMultiInstance'>[\s\S]*?<Cell N='Value' V=')0(' U='BOOL'\/>)/,
               "$11$2",
             );
+            // Flip every NoShow=1 in Shape 7 → 0 (covers all 3 bars).
             poolMasterXml = poolMasterXml.replace(
-              /(<Shape ID='7'[^>]*>[\s\S]*?<Cell N='NoShow' V=')1('[^>]*F='NOT\(Sheet\.5!Prop\.BpmnMultiInstance\)')/,
-              "$10$2",
+              /<Shape ID='7'[\s\S]*?<\/Shape>/,
+              (block) => block.replace(/<Cell N='NoShow' V='1'/g, "<Cell N='NoShow' V='0'"),
+            );
+            // Recompute the marker's body-centre PinX. Sheet.8 (header
+            // strip) Height stays 0.5" — Shape 8 is the rotated header,
+            // its Height is the header thickness, not pool height. So
+            // bodyCx = headerH/2 offset from left + remaining body width
+            // centred. Match the HeadingSide=1 branch.
+            const headerH = 0.5;
+            const markerPinX = headerH + (w - headerH) / 2;
+            poolMasterXml = poolMasterXml.replace(
+              /(<Shape ID='7'[^>]*>[\s\S]*?<Cell N='PinX' V=')[\d.]+(' U='MM' F='IF\(Sheet\.5!User\.HeadingSide=1)/,
+              `$1${markerPinX}$2`,
             );
           }
 
@@ -2376,12 +2426,17 @@ export async function exportVisioV3(
     // a per-instance flip the marker never appears.
     const v15ElProps = el.properties as Record<string, unknown> | undefined;
     const v15Mult = v15ElProps?.multiplicity as string | undefined;
+    const v15Role = v15ElProps?.role as string | undefined;
     const v15NeedsSizeOnly = profile.disableBodyColourBake
       && (el.type === "subprocess" || el.type === "subprocess-expanded");
     const v15NeedsCollectionMarker = profile.disableBodyColourBake
       && el.type === "data-object"
       && v15Mult === "collection";
-    const v15NeedsClone = v15NeedsSizeOnly || v15NeedsCollectionMarker;
+    const v15NeedsOutputMarker = profile.disableBodyColourBake
+      && el.type === "data-object"
+      && v15Role === "output";
+    const v15NeedsClone =
+      v15NeedsSizeOnly || v15NeedsCollectionMarker || v15NeedsOutputMarker;
     if ((!profile.disableBodyColourBake
           && BODY_FILL_TYPES.has(el.type) && isColor && colorMap[el.type])
         || v15NeedsClone) {
