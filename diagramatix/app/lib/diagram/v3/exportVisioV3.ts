@@ -2535,6 +2535,12 @@ export async function exportVisioV3(
     //     event masters' default text ("Start" / "Event 1" / "End") shows
     //     through unless we explicitly empty it. Diagramatix lets the
     //     user leave events unlabeled, so emit empty to honour that.
+    //   • Edge-mounted (boundary) Start / End event → suppress label
+    //     unconditionally. These represent the host EP's entry / exit
+    //     point on the boundary; their position carries the meaning, a
+    //     label adds visual noise. Intermediate boundary events keep
+    //     their label since "Timeout" etc. is the only signal of what
+    //     the boundary catches.
     //   • Has a label → emit Text with the label.
     //   • No label, not in the above cases → omit Text and inherit master
     //     default (matches prior BPMN_M behaviour for non-event shapes).
@@ -2543,7 +2549,10 @@ export async function exportVisioV3(
       el.type === "intermediate-event" ||
       el.type === "end-event"
     );
-    const textElWithCp = hideLabel || isUnlabeledEvent
+    const isEdgeMountedStartOrEnd = !!el.boundaryHostId && (
+      el.type === "start-event" || el.type === "end-event"
+    );
+    const textElWithCp = hideLabel || isUnlabeledEvent || isEdgeMountedStartOrEnd
       ? `<Text></Text>`
       : el.label
         ? `<Text><cp IX='0'/>${esc(el.label)}</Text>`
