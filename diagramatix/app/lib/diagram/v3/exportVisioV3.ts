@@ -1032,6 +1032,7 @@ export async function exportVisioV3(
     elType?: string,
     elProps?: Record<string, unknown>,
     repeatType?: string,
+    skipColourBake?: boolean,
   ): Promise<number> {
     const blockRe = new RegExp(`<Master\\s+ID='${sourceMasterId}'[\\s\\S]*?</Master>`);
     const blockMatch = mastersXml.match(blockRe);
@@ -1049,21 +1050,27 @@ export async function exportVisioV3(
     let masterContent = await zip.file(`visio/masters/${sourceFile}`)?.async("string");
     if (!masterContent) return sourceMasterId;
 
-    masterContent = bakeColourIntoMaster(masterContent, colour, elType);
+    // BPMN_M-specific colour bake + task marker nudge. v1.5 callers pass
+    // skipColourBake=true to reuse only the size-rescaling logic below —
+    // v1.5 masters ship pre-styled and the BPMN_M task marker offsets
+    // (3MM → 4.58MM) would mis-fire on v1.5's different marker layout.
+    if (!skipColourBake) {
+      masterContent = bakeColourIntoMaster(masterContent, colour, elType);
 
-    // Task task-type markers (User/Service/Send/Receive/Manual/Script/
-    // BusinessRule) need to sit 6px to the right and ~1px below the
-    // master's natural `3MM` icon-anchor position so they line up inside
-    // the (corrected) visible body of the resized Task. Apply the nudge
-    // by replacing `3MM` with `4.58MM` for X (3MM + 6px ≈ 1.59mm) and
-    // `3MM` with `3.26MM` for Y (3MM + 1px) inside the marker shape
-    // blocks only — the same `3MM` constant is reused by other task
-    // sub-shapes for body-relative positioning, so a global replace would
-    // break body alignment.
-    if (sourceMasterId === 9) {
-      const taskMarkerShapeIds = [18, 19, 20, 21, 22, 23, 25, 26];
-      for (const msId of taskMarkerShapeIds) {
-        masterContent = nudgeMarkerShapeBlock(masterContent, msId);
+      // Task task-type markers (User/Service/Send/Receive/Manual/Script/
+      // BusinessRule) need to sit 6px to the right and ~1px below the
+      // master's natural `3MM` icon-anchor position so they line up inside
+      // the (corrected) visible body of the resized Task. Apply the nudge
+      // by replacing `3MM` with `4.58MM` for X (3MM + 6px ≈ 1.59mm) and
+      // `3MM` with `3.26MM` for Y (3MM + 1px) inside the marker shape
+      // blocks only — the same `3MM` constant is reused by other task
+      // sub-shapes for body-relative positioning, so a global replace would
+      // break body alignment.
+      if (sourceMasterId === 9) {
+        const taskMarkerShapeIds = [18, 19, 20, 21, 22, 23, 25, 26];
+        for (const msId of taskMarkerShapeIds) {
+          masterContent = nudgeMarkerShapeBlock(masterContent, msId);
+        }
       }
     }
 
@@ -1773,11 +1780,15 @@ export async function exportVisioV3(
     // at master-natural size (deliberate — keeps standard look).
     // Pool/Lane are intentionally back in this list — the BPMN_M pool
     // branch below (gated on !disableBodyColourBake) needs to run, and the
-    // v1.5 pool branch (gated on disableBodyColourBake) likewise. EP
-    // (subprocess-expanded) stays out for now because the per-instance
-    // resize logic for EP hasn't been ported to v1.5 yet — better to
-    // render EPs at master-natural size than at a half-resized broken size.
-    const isResizable = ["task", "subprocess", "pool", "lane"].includes(el.type);
+    // v1.5 pool branch (gated on disableBodyColourBake) likewise. EPs are
+    // included so v1.5 emits Width/Height cells on the page shape — the
+    // v1.5 EP master (Shape 5 root: W=2.3, H=1.5625, no formula) inherits
+    // the cached V cleanly via F='Inh', so the page shape's bounding box
+    // matches the instance dims. Sub-shape geometry uses Sheet.5!Width*1
+    // formulas that recalc to the right size on first interaction.
+    const isResizable = [
+      "task", "subprocess", "subprocess-expanded", "pool", "lane",
+    ].includes(el.type);
     const hw = w / 2;
     const hh = h / 2;
 
@@ -2165,6 +2176,27 @@ export async function exportVisioV3(
             .split("V='1.25' U='MM' F='Geometry1.X2'")
             .join(`V='${h}' U='MM' F='Geometry1.X2'`);
 
+          // Shape 8 header text region — TxtWidth controls the wrap width
+          // of the label. Cached at 1.25 (master-natural Sheet.5!Height);
+          // unless rewritten, "Collections Department" (and any longer
+          // pool name) wraps onto multiple lines inside a 1.25"-wide text
+          // region instead of using the full header strip length.
+          poolMasterXml = poolMasterXml
+            .split("V='1.25' U='MM' F='IF(Sheet.5!User.visRotateLabel,Height*1,Width*1)'")
+            .join(`V='${h}' U='MM' F='IF(Sheet.5!User.visRotateLabel,Height*1,Width*1)'`);
+
+          // Header strip fill — natural master is #c8956a (a generic
+          // pool brown). Re-colour per element type so Pools get the
+          // darker sidebar brown and Lanes get the lighter lane brown.
+          // The body fill (#e8c4a0 on Shape 6) is left alone — both
+          // pool and lane bodies render against the page background.
+          const headerColor = el.type === "lane"
+            ? (colorMap["lane"] ?? "#e8c4a0")
+            : (colorMap["pool"] ?? "#d4a382");
+          poolMasterXml = poolMasterXml
+            .split("FillForegnd' V='#c8956a'")
+            .join(`FillForegnd' V='${headerColor}'`);
+
           // Replace the "Function" placeholder text in every location.
           // Use regex with \s* so we catch both `>Function<` and
           // `>Function\n<` / `>Function\r\n<` variants from different
@@ -2278,12 +2310,20 @@ export async function exportVisioV3(
     // size values are rewritten — that aligns the visible body geometry with
     // the instance selection rectangle.
     let effectiveMasterId = mapping.masterId;
-    // Skip per-instance master cloning entirely for profiles whose
-    // auxiliary stencil already ships with the desired visual styling
-    // (Diagramatix v1.4). The bake/rescale logic assumes BPMN_M-specific
-    // sub-shape IDs and would mis-fire against v1.4's master structure.
-    if (!profile.disableBodyColourBake
-        && BODY_FILL_TYPES.has(el.type) && isColor && colorMap[el.type]) {
+    // BPMN_M profile: full per-instance master clone (colour bake + size
+    // rescale + marker layout) for every body-fill type.
+    //
+    // v1.5 profile: colour bake skipped (masters ship pre-styled and the
+    // BPMN_M sub-shape IDs differ). Pool/Lane has its own dedicated v1.5
+    // branch above. Subprocess + Expanded Subprocess still need the size
+    // rescale though — without it, the master's Shape 6/7 body retains
+    // cached V=2.3/1.5625 (natural EP dims) and Visio first-paints the
+    // body at master-natural size inside a correctly-sized bounding box.
+    const v15NeedsSizeOnly = profile.disableBodyColourBake
+      && (el.type === "subprocess" || el.type === "subprocess-expanded");
+    if ((!profile.disableBodyColourBake
+          && BODY_FILL_TYPES.has(el.type) && isColor && colorMap[el.type])
+        || v15NeedsSizeOnly) {
       // Merge the top-level `el.gatewayType` into elProps so the per-
       // instance master logic can read it from a single object. Diagramatix
       // sets both `el.gatewayType` and `el.properties.gatewayType`; we
@@ -2294,12 +2334,13 @@ export async function exportVisioV3(
       };
       effectiveMasterId = await createInstanceMaster(
         mapping.masterId,
-        colorMap[el.type],
+        v15NeedsSizeOnly ? "" : colorMap[el.type],
         w,
         h,
         el.type,
         mergedProps,
         el.repeatType,
+        v15NeedsSizeOnly, // skipColourBake
       );
     }
 
