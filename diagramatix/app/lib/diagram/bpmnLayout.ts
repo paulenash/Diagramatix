@@ -79,7 +79,10 @@ export function layoutBpmnDiagram(
   // ── R26/R29/R30: Event Subprocess handling ──
   // - Auto-detect event subprocesses
   // - Ensure they are wrapped in a Normal Expanded Subprocess
-  // - Auto-inject a non-interrupting internal start event and internal end event if missing
+  // - Auto-inject an internal start event and internal end event if missing.
+  //   R30 lets the AI choose interrupting vs non-interrupting based on
+  //   semantics; this fallback only runs when the AI omitted the start
+  //   event entirely, so we default to non-interrupting (R30's tiebreaker).
   const injected: AiElement[] = [];
   for (const ai of aiElements) {
     if (ai.type !== "subprocess-expanded") continue;
@@ -127,7 +130,10 @@ export function layoutBpmnDiagram(
       ai.lane = undefined;
     }
 
-    // R30: Ensure internal non-interrupting start event exists
+    // R30: Ensure internal start event exists. Default to non-interrupting
+    // when we have to fabricate one — the AI is responsible for choosing
+    // interrupting when the prompt warrants it; if it skipped the start
+    // event altogether we have no semantic signal, so use the tiebreaker.
     const hasInternalStart = aiElements.some(e =>
       e.parentSubprocess === ai.id && e.type === "start-event" && !e.boundaryHost
     );

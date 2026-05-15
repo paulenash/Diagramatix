@@ -69,7 +69,10 @@ ${rules ? `USER RULES AND PREFERENCES (follow these strictly):\n${rules}\n\n` : 
   * Set subprocessType = "event" on the subprocess-expanded element (at top level, NOT nested under properties). Setting this is MANDATORY — downstream code strips illegal connectors using this flag; without it the diagram is incorrect.
   * An Event Subprocess MUST be placed INSIDE a containing Normal Expanded Subprocess (parentSubprocess = normal subprocess id). Create a wrapping Normal Expanded Subprocess if the user only mentioned the event subprocess.
   * Inside the Event Subprocess, add TWO child elements (not boundary events):
-    - A non-interrupting start event (parentSubprocess = event subprocess id, properties: { interruptionType: "non-interrupting" })
+    - A start event (parentSubprocess = event subprocess id). Choose its interruptionType based on the prompt's semantics:
+      • Non-Interrupting — set properties.interruptionType = "non-interrupting" when the inner tasks run IN PARALLEL with the outer subprocess's tasks (the outer flow keeps going while the event sub also runs). Triggers like "meanwhile", "in parallel", "whilst also listening", "concurrently", "while X is happening", periodic notifications/updates that don't pause outer work, or non-fatal alerts are non-interrupting.
+      • Interrupting — set properties.interruptionType = "interrupting" (or omit the property — interrupting is the default) when the outer tasks are PUT ON HOLD / cancelled / superseded while the inner tasks run. Triggers like "on error", "on failure", "on cancellation", "on escalation", "on abort", "on timeout that stops processing", or "if X then stop and …" are interrupting.
+      • If genuinely ambiguous, default to non-interrupting.
     - An end event (parentSubprocess = event subprocess id)
   * Event subprocesses are small (about 4 task widths wide × 2 task heights tall) — the layout engine will size them automatically
   * NEVER create ANY connector (sequence OR message) TO or FROM an Event Expanded Subprocess — they are triggered by events, not by flow of any kind.

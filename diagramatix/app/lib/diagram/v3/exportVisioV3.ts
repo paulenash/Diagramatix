@@ -2133,6 +2133,38 @@ export async function exportVisioV3(
           poolMasterXml = poolMasterXml.split("V='2.5'").join(`V='${hw}'`);
           poolMasterXml = poolMasterXml.split("V='0.625'").join(`V='${hh}'`);
 
+          // Geometry path coordinates — CRITICAL: Visio paints the first
+          // frame from the cached V on Geometry rows, not from the formula.
+          // The natural master's rectangle path traces (0,0)→(5,0)→(5,1.25)
+          // →(0,1.25), cached at those literals. Even though our patched
+          // Width/Height cells are now (w, h), if we leave the path's
+          // cached coords at (5, 1.25) Visio renders the pool body as a
+          // 5"×1.25" rectangle inside the (otherwise correctly-sized)
+          // bounding box — i.e. the user sees "default size".
+          //
+          // Three patterns appear in the v1.5 pool master:
+          //   • Shape 6 body, X cells: F='Width*1', V='5'  → patch V to w
+          //   • Shape 6 body, Y cells: F='Height*1', V='1.25' → patch V to h
+          //   • Shape 8 header strip (rotated, so its Width = Sheet.5!Height):
+          //     X cells with V='1.25' and formulas referencing Width*1 or
+          //     Geometry1.X2 → patch V to h
+          // Shape 8's Y cells stay at V='0.5' (header thickness, untouched).
+          poolMasterXml = poolMasterXml
+            .split("V='5' U='MM' F='Width*1'")
+            .join(`V='${w}' U='MM' F='Width*1'`);
+          poolMasterXml = poolMasterXml
+            .split("V='1.25' U='MM' F='Height*1'")
+            .join(`V='${h}' U='MM' F='Height*1'`);
+          poolMasterXml = poolMasterXml
+            .split("V='1.25' U='MM' F='Width*1'")
+            .join(`V='${h}' U='MM' F='Width*1'`);
+          poolMasterXml = poolMasterXml
+            .split("V='1.25' U='MM' F='Width*1-User.Inset-User.InsetX'")
+            .join(`V='${h}' U='MM' F='Width*1-User.Inset-User.InsetX'`);
+          poolMasterXml = poolMasterXml
+            .split("V='1.25' U='MM' F='Geometry1.X2'")
+            .join(`V='${h}' U='MM' F='Geometry1.X2'`);
+
           // Replace the "Function" placeholder text in every location.
           // Use regex with \s* so we catch both `>Function<` and
           // `>Function\n<` / `>Function\r\n<` variants from different
