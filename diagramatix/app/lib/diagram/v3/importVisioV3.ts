@@ -1574,12 +1574,27 @@ export async function importVisioV3(
     const elMasterId = r.block.match(/Master='(\d+)'/)?.[1];
     const elMasterInfo = elMasterId ? masters.get(elMasterId) : undefined;
     let label = readText(r.block) || r.props.BpmnName || elMasterInfo?.defaultText || "";
+
+    // Data Object: extract the "[state]" suffix the export appends on a
+    // trailing line so Visio shows the state under the main label. We
+    // recover the state into properties.state and leave only the main
+    // label text; Diagramatix re-renders the [state] badge itself.
+    let extractedState: string | undefined;
+    if (r.seed.type === "data-object" && label) {
+      const m = label.match(/^([\s\S]*?)(?:\r?\n)?\[([^\[\]\r\n]+)\]\s*$/);
+      if (m) {
+        extractedState = m[2].trim();
+        label = m[1].replace(/\s+$/, "");
+      }
+    }
+
     const properties: Record<string, unknown> = {};
     if (r.seed.subprocessType) properties.subprocessType = r.seed.subprocessType;
     if (r.seed.poolType) properties.poolType = r.seed.poolType;
     if (r.seed.role) properties.role = r.seed.role;
     if (r.seed.multiplicity) properties.multiplicity = r.seed.multiplicity;
     if (r.seed.interruptionType) properties.interruptionType = r.seed.interruptionType;
+    if (extractedState) properties.state = extractedState;
     // Visio's "System Pool" master signals a system participant in BPMN —
     // surface that as the canvas's `isSystem` flag (Black-Box variant).
     if (r.nameU === "System Pool") properties.isSystem = true;

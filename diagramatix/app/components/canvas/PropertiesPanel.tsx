@@ -1553,21 +1553,37 @@ export function PropertiesPanel({
               data-properties-label="true"
               className="w-full px-1.5 py-1 border border-gray-300 rounded text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-500 resize-y overflow-y-auto"
               rows={
-                element.type === "archimate-shape"
+                element.type === "archimate-shape" || element.type === "text-annotation"
                   // Starts at 3 lines, grows with each Shift+Enter the
                   // user types (caps at 6 lines so the panel doesn't
                   // stretch excessively). Enter commits, Shift+Enter
-                  // inserts a newline.
+                  // inserts a newline. For text-annotation we add a
+                  // visible ↵ marker before every '\n' inside the draft
+                  // so the line-count basis here ALREADY matches what
+                  // the textarea is rendering.
                   ? Math.max(3, Math.min(6, labelDraft.split("\n").length))
                   : (element.type === "chevron" || element.type === "chevron-collapsed" ? 3 : 2)
               }
-              value={labelDraft}
+              value={
+                element.type === "text-annotation"
+                  // Render embedded newlines with a leading "↵" so the
+                  // user can SEE that a Shift+Enter is sitting in the
+                  // label. The marker is stripped on every commit path
+                  // so it never reaches state / persistence.
+                  ? labelDraft.replace(/\n/g, "↵\n")
+                  : labelDraft
+              }
               onFocus={(e) => e.target.select()}
               onChange={(e) => {
                 let val = e.target.value;
                 if (element.type === "uml-class" || element.type === "uml-enumeration") {
                   const lines = val.split("\n");
                   if (lines.length > 2) val = lines.slice(0, 2).join("\n");
+                }
+                if (element.type === "text-annotation") {
+                  // Strip any "↵" the user typed or that round-tripped
+                  // from the markered render; keep raw \n only.
+                  val = val.replace(/↵/g, "");
                 }
                 setLabelDraft(val);
               }}

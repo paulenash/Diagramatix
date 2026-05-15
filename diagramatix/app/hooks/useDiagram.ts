@@ -22,7 +22,7 @@ import type {
 import { computeWaypoints, recomputeAllConnectors, consolidateWaypoints, rectifyWaypoints, constrainControlPoint, safeSidePair } from "@/app/lib/diagram/routing";
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
 import { CHEVRON_THEMES } from "@/app/lib/diagram/chevronThemes";
-import { autoSizeForType, getDefaultSize, type AutosizeType } from "@/app/lib/diagram/textMetrics";
+import { autoSizeForType, getDefaultSize, wrapText, type AutosizeType } from "@/app/lib/diagram/textMetrics";
 
 /** Compute the autosize-driven dimensions for a task or subprocess based on
  *  its label and (optional) task marker. Returns the rounded element size
@@ -2645,21 +2645,55 @@ function validateConnectorsAgainstObstacles(connectors: Connector[], elements: D
 }
 
 /** Auto-resize a text-annotation element so the bounding rect hugs its text.
- *  Width = longest line in characters × avg char width + left bracket cap +
- *  horizontal pad. Height = line count × line height + top/bottom pad. User
- *  newlines are honoured; no auto-wrapping — the box grows sideways instead. */
+ *
+ *  Two modes, switched by the `userResizedAnnotation` property flag:
+ *
+ *  • Default (no user resize): width snugs around the longest explicit line
+ *    (no auto-wrap — long single lines grow the box sideways), height fits
+ *    the line count. This is the initial creation behaviour and survives
+ *    label edits until the user drags a resize handle.
+ *
+ *  • After user resize: keep `el.width` as-is, wrap the label at that width
+ *    (using the same `wrapText` the renderer uses), and recompute height
+ *    from the wrapped line count. So a user who drags the box narrower
+ *    causes the text to re-flow into more lines and the box height to
+ *    grow with the wrapped text — the box always hugs the visible text.
+ *
+ *  PAD-and-bracket constants match the renderer at `SymbolRenderer.tsx`
+ *  (PAD=10, capLen=24, lineH=14) so the autosize result and the render
+ *  agree on text layout.
+ */
 function autoResizeTextAnnotation(el: DiagramElement): DiagramElement {
   const LINE_H = 14;
   const CHAR_W = 12 * 0.55;         // matches wrapText's avgCharWidth
   const LEFT_BRACKET = 24;          // matches TextAnnotationShape capLen
   const RIGHT_PAD = 10;
+  const PAD = 10;                   // renderer's left padding before text
   const VERT_PAD = 8 * 2 + 6;       // top/bottom 8-px bracket caps + extra
   const MIN_W = 60;
   const MIN_H = 26;
-  const lines = (el.label ?? "").split("\n");
-  const longest = Math.max(1, ...lines.map(l => l.length));
-  const width  = Math.max(MIN_W, Math.round(LEFT_BRACKET + longest * CHAR_W + RIGHT_PAD));
-  const height = Math.max(MIN_H, lines.length * LINE_H + VERT_PAD);
+  const userResized =
+    (el.properties?.userResizedAnnotation as boolean | undefined) === true;
+
+  let width: number;
+  let lineCount: number;
+  if (userResized) {
+    width = Math.max(MIN_W, el.width);
+    // Renderer wraps at `el.width - PAD - 4`; match that exactly so the
+    // line count we compute here is what the renderer will draw.
+    const innerWidthPx = Math.max(1, width - PAD - 4);
+    const wrapped = wrapText(el.label ?? "", innerWidthPx, 12);
+    lineCount = wrapped.length;
+  } else {
+    const lines = (el.label ?? "").split("\n");
+    const longest = Math.max(1, ...lines.map((l) => l.length));
+    width = Math.max(
+      MIN_W,
+      Math.round(LEFT_BRACKET + longest * CHAR_W + RIGHT_PAD),
+    );
+    lineCount = lines.length;
+  }
+  const height = Math.max(MIN_H, lineCount * LINE_H + VERT_PAD);
   return { ...el, width, height };
 }
 
@@ -4174,6 +4208,33 @@ function reducer(state: DiagramData, action: Action): DiagramData {
           if (newY > target.y) newY = target.y + target.height - def.h;
           rawNewH = def.h;
         }
+      }
+      // Text-annotation: user resize locks the width; height is then auto-
+      // recomputed by autoResizeTextAnnotation to wrap the label at the
+      // new width. Vertical drag is ignored because height is text-driven.
+      if (target?.type === "text-annotation") {
+        const widthChanged = Math.abs(newW - target.width) > 0.5;
+        const flagged = (target.properties?.userResizedAnnotation as boolean | undefined) === true;
+        const resized: DiagramElement = {
+          ...target,
+          x: newX,
+          y: newY,
+          width: newW,
+          height: rawNewH,
+          properties: {
+            ...target.properties,
+            userResizedAnnotation: flagged || widthChanged,
+          },
+        };
+        const refit = autoResizeTextAnnotation(resized);
+        const elements = state.elements.map((e) =>
+          e.id === id ? refit : e,
+        );
+        const connectors = state.connectors.map((conn) => {
+          if (conn.sourceId !== id && conn.targetId !== id) return conn;
+          return recomputeAllConnectors([conn], elements)[0] ?? conn;
+        });
+        return { ...state, elements, connectors };
       }
       const poolFs = state.poolFontSize ?? 12;
       const laneFs = state.laneFontSize ?? 12;

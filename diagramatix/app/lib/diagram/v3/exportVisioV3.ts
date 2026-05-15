@@ -1242,6 +1242,22 @@ export async function exportVisioV3(
       );
     }
 
+    // v1.5 Data Object (master 11) Collection marker — same mechanism as
+    // BPMN_M master 115 but different sub-shape ID. Shape 7's Geometry IX=0
+    // is the three-vertical-bar "collection" marker, gated by
+    // `NOT(Sheet.5!Prop.BpmnCollection)`. Flip the prop value to 1 AND
+    // force the cached NoShow V to 0 so first paint already shows the bars.
+    if (sourceMasterId === 11 && elProps?.multiplicity === "collection") {
+      masterContent = masterContent.replace(
+        /(<Row N='BpmnCollection'>[\s\S]*?<Cell N='Value' V=')0(' U='BOOL'[^/]*\/>)/,
+        "$11$2",
+      );
+      masterContent = masterContent.replace(
+        /(<Shape ID='7'[^>]*>[\s\S]*?<Cell N='NoShow' V=')1('[^>]*F='NOT\(Sheet\.5!Prop\.BpmnCollection\)')/,
+        "$10$2",
+      );
+    }
+
     // v1.5 Sub-Process masters (7 = Collapsed, 8 = Expanded) carry the same
     // broken Shape 6 LinePattern formula as BPMN_M's master 33:
     //   GUARD(IF(AND(BoundaryEvent.Checked,CollapsedSubProcess.Checked),3,1))
@@ -2226,6 +2242,26 @@ export async function exportVisioV3(
             `V='${esc(poolLabel)}'`,
           );
 
+          // Collection / Multi-Instance marker — Diagramatix's "Collection"
+          // checkbox maps to Visio's BpmnMultiInstance prop on Pool/Lane.
+          // The marker (three vertical strokes) lives on Shape 7 of the
+          // pool master with NoShow gated by `NOT(Sheet.5!Prop.BpmnMulti
+          // Instance)`. Flip BOTH the prop value AND the cached NoShow V
+          // so first paint already shows the marker (formula recalc would
+          // also show it, but cached V is what Visio paints first).
+          const poolMult = (el.properties as Record<string, unknown> | undefined)
+            ?.multiplicity as string | undefined;
+          if (poolMult === "collection") {
+            poolMasterXml = poolMasterXml.replace(
+              /(<Row N='BpmnMultiInstance'>[\s\S]*?<Cell N='Value' V=')0(' U='BOOL'\/>)/,
+              "$11$2",
+            );
+            poolMasterXml = poolMasterXml.replace(
+              /(<Shape ID='7'[^>]*>[\s\S]*?<Cell N='NoShow' V=')1('[^>]*F='NOT\(Sheet\.5!Prop\.BpmnMultiInstance\)')/,
+              "$10$2",
+            );
+          }
+
           // Register the clone in the output file.
           const poolInstanceId = 200 + shapeId;
           const poolFileName = `master${poolInstanceId}.xml`;
@@ -2335,11 +2371,20 @@ export async function exportVisioV3(
     // rescale though — without it, the master's Shape 6/7 body retains
     // cached V=2.3/1.5625 (natural EP dims) and Visio first-paints the
     // body at master-natural size inside a correctly-sized bounding box.
+    // Data Object with multiplicity=collection also clones — the master
+    // ships with NoShow=1 on the collection-bars sub-shape, so without
+    // a per-instance flip the marker never appears.
+    const v15ElProps = el.properties as Record<string, unknown> | undefined;
+    const v15Mult = v15ElProps?.multiplicity as string | undefined;
     const v15NeedsSizeOnly = profile.disableBodyColourBake
       && (el.type === "subprocess" || el.type === "subprocess-expanded");
+    const v15NeedsCollectionMarker = profile.disableBodyColourBake
+      && el.type === "data-object"
+      && v15Mult === "collection";
+    const v15NeedsClone = v15NeedsSizeOnly || v15NeedsCollectionMarker;
     if ((!profile.disableBodyColourBake
           && BODY_FILL_TYPES.has(el.type) && isColor && colorMap[el.type])
-        || v15NeedsSizeOnly) {
+        || v15NeedsClone) {
       // Merge the top-level `el.gatewayType` into elProps so the per-
       // instance master logic can read it from a single object. Diagramatix
       // sets both `el.gatewayType` and `el.properties.gatewayType`; we
@@ -2350,13 +2395,13 @@ export async function exportVisioV3(
       };
       effectiveMasterId = await createInstanceMaster(
         mapping.masterId,
-        v15NeedsSizeOnly ? "" : colorMap[el.type],
+        v15NeedsClone ? "" : colorMap[el.type],
         w,
         h,
         el.type,
         mergedProps,
         el.repeatType,
-        v15NeedsSizeOnly, // skipColourBake
+        v15NeedsClone, // skipColourBake
       );
     }
 
@@ -2520,17 +2565,62 @@ export async function exportVisioV3(
       const txtH = Math.max(0.21, lines.length * lineH);
       const txtLocX = txtW / 2;
       const txtLocY = txtH / 2;
-      const txtPinY = -txtLocY; // label sits below the body's local Y=0
+
+      // Diagramatix lets the user drag the label anywhere; the offset is
+      // stored as labelOffsetX / labelOffsetY (pixels, relative to the
+      // element's bottom-CENTRE point — labelOffsetY=7 by default puts
+      // the label TOP 7 px below the body bottom). Honour that placement
+      // in Visio by computing TxtPinX / TxtPinY from the offsets rather
+      // than letting them inherit the master's default (which always
+      // pins the label dead centre or just below the body, with no
+      // memory of where the user dragged it).
+      //
+      // TxtPinX/Y are in shape-LOCAL coords (origin at bottom-left of the
+      // master's geometry, Y up). Need the master's natural width to
+      // convert the page-coord offset back into shape-local. Use a
+      // per-type lookup of master widths — same numbers Diagramatix's
+      // master files expose; if a type ever falls outside this table we
+      // fall back to the master's `Width*0.5` formula via F='Inh'.
+      const MASTER_W_BY_TYPE: Record<string, number> = {
+        "start-event":        0.375,
+        "intermediate-event": 0.375,
+        "end-event":          0.375,
+        "gateway":            0.4166666666666667,
+        "data-object":        0.6,
+        "data-store":         0.6,
+      };
+      const masterW = MASTER_W_BY_TYPE[el.type] ?? 0;
+      const labelOffsetX = (elProps2?.labelOffsetX as number | undefined) ?? 0;
+      const labelOffsetY = (elProps2?.labelOffsetY as number | undefined) ?? 7;
+      const txtPinX = masterW > 0
+        ? masterW / 2 + labelOffsetX / 96
+        : null;
+      // Label CENTRE sits below the shape bottom (Y=0 in shape-local) by
+      // labelOffsetY pixels + half the label height (because TxtPinY
+      // names the centre, not the top). Y is up, so this is negative.
+      const txtPinY = -(labelOffsetY / 96) - txtH / 2;
+      // Override Width/Height/etc with F='Inh' so the master's pre-baked
+      // text geometry is replaced by our sized values, but break the
+      // inheritance chain on TxtPinX / TxtPinY by emitting no F= cell —
+      // that anchors the label at our computed coords regardless of the
+      // master's `Controls.Text_Reposition` formula. (Only emit TxtPinX
+      // when we have a master-width lookup; otherwise let it inherit.)
       txtInhCells =
-        `<Cell N='TxtPinY' V='${txtPinY}' F='Inh'/>` +
+        (txtPinX !== null
+          ? `<Cell N='TxtPinX' V='${txtPinX}'/>`
+          : ``) +
+        `<Cell N='TxtPinY' V='${txtPinY}'/>` +
         `<Cell N='TxtWidth' V='${txtW}' F='Inh'/>` +
         `<Cell N='TxtHeight' V='${txtH}' F='Inh'/>` +
         `<Cell N='TxtLocPinX' V='${txtLocX}' F='Inh'/>` +
         `<Cell N='TxtLocPinY' V='${txtLocY}' F='Inh'/>` +
         `<Section N='Control'>` +
           `<Row N='Row_1'>` +
-            `<Cell N='Y' V='${txtPinY}' F='Inh'/>` +
-            `<Cell N='YDyn' V='${txtPinY}' F='Inh'/>` +
+            (txtPinX !== null
+              ? `<Cell N='X' V='${txtPinX}'/><Cell N='XDyn' V='${txtPinX}'/>`
+              : ``) +
+            `<Cell N='Y' V='${txtPinY}'/>` +
+            `<Cell N='YDyn' V='${txtPinY}'/>` +
             `<Cell N='YCon' V='2' F='Inh'/>` +
           `</Row>` +
         `</Section>`;
@@ -2567,10 +2657,24 @@ export async function exportVisioV3(
     const isEdgeMountedStartOrEnd = !!el.boundaryHostId && (
       el.type === "start-event" || el.type === "end-event"
     );
+
+    // Data Object state → append "[state]" on a new line under the label
+    // so Visio shows it the same way Diagramatix renders the state badge.
+    // Round-trip: the import strips this suffix back into properties.state.
+    let displayLabel = el.label ?? "";
+    if (el.type === "data-object") {
+      const elState = (el.properties as Record<string, unknown> | undefined)
+        ?.state as string | undefined;
+      if (elState && elState.trim()) {
+        displayLabel = displayLabel
+          ? `${displayLabel}\n[${elState.trim()}]`
+          : `[${elState.trim()}]`;
+      }
+    }
     const textElWithCp = hideLabel || isUnlabeledEvent || isEdgeMountedStartOrEnd
       ? `<Text></Text>`
-      : el.label
-        ? `<Text><cp IX='0'/>${esc(el.label)}</Text>`
+      : displayLabel
+        ? `<Text><cp IX='0'/>${esc(displayLabel)}</Text>`
         : "";
 
     const escLabel = esc(el.label || el.type);

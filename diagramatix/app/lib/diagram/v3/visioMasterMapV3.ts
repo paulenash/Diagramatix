@@ -59,6 +59,21 @@ export function getElementMappingV3(el: DiagramElement, profile: StencilProfile)
   ) {
     mapping.properties.BpmnMultiplicity = "collection";
   }
+  // Data Object state is appended to the BpmnName as "\n[state]" so the
+  // round-tripped label visible in Visio matches what Diagramatix renders
+  // (label on top line, state badge below). Import strips the suffix back
+  // into properties.state.
+  if (el.type === "data-object") {
+    const elState = elPropsRec?.state as string | undefined;
+    if (elState && elState.trim()) {
+      const label = el.label ?? "";
+      const trimmedState = elState.trim();
+      const augmented = label
+        ? `${label}\n[${trimmedState}]`
+        : `[${trimmedState}]`;
+      mapping.properties.BpmnName = augmented;
+    }
+  }
   return mapping;
 }
 
