@@ -11,6 +11,7 @@ import { DEFAULT_PROFILE } from "./stencilProfile";
 import type { StencilProfile } from "./stencilProfile";
 import { DEFAULT_SYMBOL_COLORS } from "../colors";
 import type { SymbolColorConfig } from "../colors";
+import { wrapText } from "../textMetrics";
 import { randomUUID } from "node:crypto";
 
 /** Visio-style GUID `{XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}`. Used so per-
@@ -2494,14 +2495,28 @@ export async function exportVisioV3(
     // references — without it the inheritance chain has no anchor.
     let txtInhCells = "";
     if (!isResizable && BODY_FILL_TYPES.has(el.type)) {
-      const lines = (el.label ?? "").split("\n");
-      const longestLine = Math.max(1, ...lines.map((l) => l.length));
-      // ~0.075 in per char at 12pt + small horizontal padding; cap to a
-      // generous upper bound so very long labels don't blow up the page.
-      const charWidth = 0.08;
+      // Match Diagramatix's on-canvas wrapping: events / gateways / data
+      // shapes render their label below the body in a fixed-width strip
+      // whose width is `properties.labelWidth` (default 80 px). Wrap the
+      // label at that width using the same algorithm the renderer uses
+      // (textMetrics.wrapText), then size TxtWidth / TxtHeight to match
+      // so Visio's first paint wraps to the same line count.
+      const elProps2 = el.properties as Record<string, unknown> | undefined;
+      const labelWidthPx = (elProps2?.labelWidth as number | undefined) ?? 80;
+      const lines = wrapText(el.label ?? "", labelWidthPx, 12);
       const horizPad = 0.08;
       const lineH = 0.18;
-      const txtW = Math.max(0.4, longestLine * charWidth + horizPad);
+      // TxtWidth must be at least as wide as the longest wrapped line so
+      // the line doesn't get re-wrapped by Visio under its own metric, but
+      // is otherwise pegged to the Diagramatix labelWidth so multi-line
+      // wrapping is preserved (e.g. "Account Becomes Overdue" at 80 px
+      // wraps to 3 lines — set TxtWidth too wide and it collapses to one).
+      const charWidthIn = 12 * 0.55 / 96; // matches textMetrics avgCharWidth
+      const longestLineIn = Math.max(
+        ...lines.map((l) => l.length * charWidthIn),
+        0.32,
+      );
+      const txtW = Math.max(longestLineIn + horizPad, labelWidthPx / 96);
       const txtH = Math.max(0.21, lines.length * lineH);
       const txtLocX = txtW / 2;
       const txtLocY = txtH / 2;
