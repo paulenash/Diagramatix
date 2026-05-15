@@ -1241,6 +1241,21 @@ export async function exportVisioV3(
       );
     }
 
+    // v1.5 Sub-Process masters (7 = Collapsed, 8 = Expanded) carry the same
+    // broken Shape 6 LinePattern formula as BPMN_M's master 33:
+    //   GUARD(IF(AND(BoundaryEvent.Checked,CollapsedSubProcess.Checked),3,1))
+    // The AND clause means an Expanded EP with BoundaryType="Event" never
+    // gets a dashed outline (CollapsedSubProcess.Checked is FALSE for the
+    // expanded variant). Apply the same formula simplification + cached V
+    // override as BPMN_M does.
+    if ((sourceMasterId === 7 || sourceMasterId === 8)
+        && elProps?.subprocessType === "event") {
+      masterContent = masterContent.replace(
+        /(<Shape ID='6'[^>]*>[\s\S]*?<Cell N='LinePattern' V=')\d('[^>]*F=')[^']+(')/,
+        `$13$2GUARD(IF(Sheet.5!Actions.BoundaryEvent.Checked,3,1))$3`,
+      );
+    }
+
     // Data Object Collection marker (master 57 = mapping.masterId 115).
     // Shape 7's three Geometry sections each carry a NoShow cell whose
     // formula is `NOT(Sheet.5!Prop.BpmnCollection)` (or chains off
@@ -2509,17 +2524,26 @@ export async function exportVisioV3(
     // <cp IX='0'/> in Text links to Character section row 0 — required for
     // the master's character formatting (font size etc) to apply.
     //
-    // Three cases:
+    // Cases:
     //   • hideLabel (merge / event-based / parallel gateways) → emit an
     //     EXPLICIT EMPTY <Text></Text>. Omitting `<Text>` causes Visio to
     //     fall back to the master's default text. v1.5's Gateway-Decision
     //     master (used for event-based + non-plain markers) carries the
     //     placeholder "Decision", and the event masters carry "Start" /
     //     "Event 1" / "End"; the empty element overrides those defaults.
+    //   • Unlabeled event (start/intermediate/end) → same treatment: the
+    //     event masters' default text ("Start" / "Event 1" / "End") shows
+    //     through unless we explicitly empty it. Diagramatix lets the
+    //     user leave events unlabeled, so emit empty to honour that.
     //   • Has a label → emit Text with the label.
-    //   • No label, no hideLabel → omit Text and inherit master default
-    //     (matches prior BPMN_M behaviour — only changes for hideLabel).
-    const textElWithCp = hideLabel
+    //   • No label, not in the above cases → omit Text and inherit master
+    //     default (matches prior BPMN_M behaviour for non-event shapes).
+    const isUnlabeledEvent = !el.label && (
+      el.type === "start-event" ||
+      el.type === "intermediate-event" ||
+      el.type === "end-event"
+    );
+    const textElWithCp = hideLabel || isUnlabeledEvent
       ? `<Text></Text>`
       : el.label
         ? `<Text><cp IX='0'/>${esc(el.label)}</Text>`
