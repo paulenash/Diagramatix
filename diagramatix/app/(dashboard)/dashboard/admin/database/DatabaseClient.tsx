@@ -58,6 +58,196 @@ export function DatabaseClient() {
   const [jsonSaving, setJsonSaving] = useState(false);
   const [jsonError, setJsonError] = useState<string | null>(null);
 
+  // ── Full-backup restore state ────────────────────────────────────────
+  // Two modes:
+  //   wipe       — TRUNCATE then re-insert from snapshot. Requires the
+  //                literal word "WIPE" typed in (case-sensitive).
+  //   additive   — admin ticks orgs / users / projects / diagrams in a
+  //                tree built server-side by inspecting the upload; only
+  //                ticked rows are restored, additively.
+  type InspectDiagram = { id: string; name: string };
+  type InspectProject = { id: string; name: string; diagrams: InspectDiagram[] };
+  type InspectUserInOrg = {
+    userId: string; userEmail: string; userName: string | null;
+    projects: InspectProject[]; unfiledDiagrams: InspectDiagram[];
+    promptCount: number; templateCount: number;
+  };
+  type InspectOrg = { id: string; name: string; entityType: string; members: InspectUserInOrg[] };
+  type InspectTree = {
+    meta: { exportedAt: string; exportedBy: string; schemaVersion: string; counts: Record<string, number> };
+    orgs: InspectOrg[];
+  };
+  type RestoreMode = "wipe" | "additive";
+
+  const [restoreFile, setRestoreFile] = useState<File | null>(null);
+  const [restoreMode, setRestoreMode] = useState<RestoreMode>("wipe");
+  const [restoreConfirm, setRestoreConfirm] = useState("");
+  const [restoreRunning, setRestoreRunning] = useState(false);
+  const [restoreError, setRestoreError] = useState<string | null>(null);
+  const [restoreResult, setRestoreResult] = useState<
+    { mode: string; inserted: Record<string, number>; log: string[] } | null
+  >(null);
+  const [showRestoreModal, setShowRestoreModal] = useState(false);
+
+  // Additive-mode tree + selection.
+  const [inspectTree, setInspectTree] = useState<InspectTree | null>(null);
+  const [inspecting, setInspecting] = useState(false);
+  const [sel, setSel] = useState<{
+    orgIds: Set<string>; userIds: Set<string>;
+    projectIds: Set<string>; diagramIds: Set<string>;
+  }>({ orgIds: new Set(), userIds: new Set(), projectIds: new Set(), diagramIds: new Set() });
+
+  async function inspectUpload(file: File) {
+    setInspecting(true);
+    setInspectTree(null);
+    setSel({ orgIds: new Set(), userIds: new Set(), projectIds: new Set(), diagramIds: new Set() });
+    setRestoreError(null);
+    try {
+      const fd = new FormData();
+      fd.set("file", file);
+      fd.set("mode", "inspect");
+      const res = await fetch("/api/admin/full-backup", { method: "POST", body: fd });
+      const data = await res.json();
+      if (!res.ok) { setRestoreError(data.error ?? `HTTP ${res.status}`); return; }
+      setInspectTree(data.tree as InspectTree);
+    } catch (err) {
+      setRestoreError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setInspecting(false);
+    }
+  }
+
+  // Mutate the selection sets in one go. Returns a fresh state object so
+  // React renders the new ticks.
+  function withSelection(mutate: (s: {
+    orgIds: Set<string>; userIds: Set<string>;
+    projectIds: Set<string>; diagramIds: Set<string>;
+  }) => void) {
+    setSel((cur) => {
+      const next = {
+        orgIds: new Set(cur.orgIds),
+        userIds: new Set(cur.userIds),
+        projectIds: new Set(cur.projectIds),
+        diagramIds: new Set(cur.diagramIds),
+      };
+      mutate(next);
+      return next;
+    });
+  }
+
+  // Cascading tick / untick helpers — ticking a parent ticks all visible
+  // descendants; unticking unticks them. The server still computes the
+  // dependency closure (a diagram pulls in its project / user / org
+  // regardless of what was ticked), so partial ticks are safe.
+  function toggleOrg(org: InspectOrg) {
+    withSelection((s) => {
+      const checked = s.orgIds.has(org.id);
+      const apply = (action: "add" | "delete") => {
+        s.orgIds[action](org.id);
+        for (const m of org.members) {
+          s.userIds[action](m.userId);
+          for (const p of m.projects) {
+            s.projectIds[action](p.id);
+            for (const d of p.diagrams) s.diagramIds[action](d.id);
+          }
+          for (const d of m.unfiledDiagrams) s.diagramIds[action](d.id);
+        }
+      };
+      apply(checked ? "delete" : "add");
+    });
+  }
+  function toggleUserInOrg(m: InspectUserInOrg) {
+    withSelection((s) => {
+      const checked = s.userIds.has(m.userId);
+      const apply = (action: "add" | "delete") => {
+        s.userIds[action](m.userId);
+        for (const p of m.projects) {
+          s.projectIds[action](p.id);
+          for (const d of p.diagrams) s.diagramIds[action](d.id);
+        }
+        for (const d of m.unfiledDiagrams) s.diagramIds[action](d.id);
+      };
+      apply(checked ? "delete" : "add");
+    });
+  }
+  function toggleProject(p: InspectProject) {
+    withSelection((s) => {
+      const checked = s.projectIds.has(p.id);
+      const apply = (action: "add" | "delete") => {
+        s.projectIds[action](p.id);
+        for (const d of p.diagrams) s.diagramIds[action](d.id);
+      };
+      apply(checked ? "delete" : "add");
+    });
+  }
+  function toggleDiagram(id: string) {
+    withSelection((s) => {
+      if (s.diagramIds.has(id)) s.diagramIds.delete(id); else s.diagramIds.add(id);
+    });
+  }
+
+  async function runWipeRestore() {
+    if (!restoreFile) return;
+    if (restoreConfirm !== "WIPE") {
+      setRestoreError("Type WIPE (uppercase) to confirm.");
+      return;
+    }
+    setRestoreRunning(true);
+    setRestoreError(null);
+    setRestoreResult(null);
+    try {
+      const fd = new FormData();
+      fd.set("file", restoreFile);
+      fd.set("mode", "wipe");
+      fd.set("confirmPhrase", "WIPE");
+      const res = await fetch("/api/admin/full-backup", { method: "POST", body: fd });
+      const data = await res.json();
+      if (!res.ok) { setRestoreError(data.error ?? `HTTP ${res.status}`); return; }
+      setRestoreResult(data.result);
+      const r = await fetch("/api/admin/database");
+      if (r.ok) setSchemaData(await r.json());
+    } catch (err) {
+      setRestoreError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setRestoreRunning(false);
+    }
+  }
+
+  async function runAdditiveRestore() {
+    if (!restoreFile) return;
+    const selections = {
+      orgIds: [...sel.orgIds],
+      userIds: [...sel.userIds],
+      projectIds: [...sel.projectIds],
+      diagramIds: [...sel.diagramIds],
+    };
+    const total = selections.orgIds.length + selections.userIds.length
+      + selections.projectIds.length + selections.diagramIds.length;
+    if (total === 0) {
+      setRestoreError("Tick at least one row in the tree.");
+      return;
+    }
+    setRestoreRunning(true);
+    setRestoreError(null);
+    setRestoreResult(null);
+    try {
+      const fd = new FormData();
+      fd.set("file", restoreFile);
+      fd.set("mode", "additive");
+      fd.set("selections", JSON.stringify(selections));
+      const res = await fetch("/api/admin/full-backup", { method: "POST", body: fd });
+      const data = await res.json();
+      if (!res.ok) { setRestoreError(data.error ?? `HTTP ${res.status}`); return; }
+      setRestoreResult(data.result);
+      const r = await fetch("/api/admin/database");
+      if (r.ok) setSchemaData(await r.json());
+    } catch (err) {
+      setRestoreError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setRestoreRunning(false);
+    }
+  }
+
   useEffect(() => {
     fetch("/api/admin/database")
       .then((r) => r.ok ? r.json() : null)
@@ -228,6 +418,19 @@ export function DatabaseClient() {
           >
             FULL Backup
           </a>
+          <button
+            onClick={() => {
+              setShowRestoreModal(true);
+              setRestoreFile(null);
+              setRestoreConfirm("");
+              setRestoreError(null);
+              setRestoreResult(null);
+            }}
+            className="text-xs text-red-700 border border-red-300 hover:bg-red-50 rounded px-2.5 py-1"
+            title="Wipe the database and restore from a .diag-full snapshot"
+          >
+            FULL Restore\u2026
+          </button>
           <button
             onClick={() => {
               setLoading(true);
@@ -486,6 +689,271 @@ export function DatabaseClient() {
                   </button>
                 )}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── FULL Restore modal ─────────────────────────────────────────
+          Two modes:
+          • Wipe & Reload (destructive) — TRUNCATE then re-insert
+            every row. Requires typed WIPE confirm.
+          • Selective (Additive) — admin ticks orgs / users / projects /
+            diagrams in a server-built tree; only ticked rows are
+            inserted, additively. Email-matching users are re-parented
+            onto the live row to avoid unique-email collisions. */}
+      {showRestoreModal && (
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+          onClick={restoreRunning ? undefined : () => setShowRestoreModal(false)}
+        >
+          <div
+            className="bg-white rounded-lg shadow-xl w-full max-w-3xl mx-4 flex flex-col max-h-[90vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-4 py-3 border-b flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-red-700">FULL Restore</h2>
+              <button
+                onClick={() => setShowRestoreModal(false)}
+                disabled={restoreRunning}
+                className="text-gray-400 hover:text-gray-600 text-lg leading-none disabled:opacity-30"
+              >
+                &times;
+              </button>
+            </div>
+
+            <div className="px-4 pt-3 border-b flex gap-1">
+              <button
+                onClick={() => { setRestoreMode("wipe"); setRestoreError(null); setRestoreResult(null); }}
+                disabled={restoreRunning}
+                className={`px-3 py-1.5 text-xs rounded-t border-b-2 ${restoreMode === "wipe"
+                  ? "border-red-600 text-red-700 font-semibold"
+                  : "border-transparent text-gray-500 hover:text-gray-700"}`}
+              >
+                Wipe & Reload
+              </button>
+              <button
+                onClick={() => { setRestoreMode("additive"); setRestoreError(null); setRestoreResult(null); }}
+                disabled={restoreRunning}
+                className={`px-3 py-1.5 text-xs rounded-t border-b-2 ${restoreMode === "additive"
+                  ? "border-blue-600 text-blue-700 font-semibold"
+                  : "border-transparent text-gray-500 hover:text-gray-700"}`}
+              >
+                Selective (Additive)
+              </button>
+            </div>
+
+            <div className="px-4 py-4 space-y-3 overflow-y-auto">
+              {/* Common file picker */}
+              <div>
+                <label className="block text-xs text-gray-700 mb-1">Snapshot file (.diag-full)</label>
+                <input
+                  type="file"
+                  accept=".diag-full,application/zip"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0] ?? null;
+                    setRestoreFile(f);
+                    setInspectTree(null);
+                    setSel({ orgIds: new Set(), userIds: new Set(), projectIds: new Set(), diagramIds: new Set() });
+                    setRestoreError(null);
+                    setRestoreResult(null);
+                    // Auto-inspect in additive mode so the tree appears immediately.
+                    if (f && restoreMode === "additive") void inspectUpload(f);
+                  }}
+                  disabled={restoreRunning}
+                  className="block w-full text-xs file:mr-3 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200"
+                />
+                {restoreFile && (
+                  <p className="text-[10px] text-gray-500 mt-1">
+                    Selected: {restoreFile.name} ({(restoreFile.size / 1024).toFixed(1)} KB)
+                  </p>
+                )}
+              </div>
+
+              {restoreMode === "wipe" && (
+                <>
+                  <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded px-3 py-2">
+                    <span className="font-semibold">Destructive.</span> Every table will be truncated and
+                    re-populated from the snapshot. Data created since the snapshot is lost. Your session
+                    survives only if your user row is in the snapshot.
+                  </p>
+                  <div>
+                    <label className="block text-xs text-gray-700 mb-1">
+                      Type <span className="font-mono font-semibold">WIPE</span> to confirm
+                    </label>
+                    <input
+                      type="text"
+                      value={restoreConfirm}
+                      onChange={(e) => setRestoreConfirm(e.target.value)}
+                      disabled={restoreRunning}
+                      placeholder="WIPE"
+                      className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-red-500 font-mono"
+                    />
+                  </div>
+                </>
+              )}
+
+              {restoreMode === "additive" && (
+                <>
+                  <p className="text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded px-3 py-2">
+                    Tick the rows to restore. Ticking a parent auto-ticks its descendants. Users whose
+                    email matches an existing live account are re-parented onto that account (no duplicate
+                    users). The server pulls in dependencies (a ticked diagram brings its project, user,
+                    and org) regardless of what else is ticked.
+                  </p>
+                  {inspecting && <p className="text-xs text-gray-500">Inspecting snapshot…</p>}
+                  {inspectTree && (
+                    <>
+                      <div className="text-[10px] text-gray-500">
+                        Snapshot from <span className="font-mono">{inspectTree.meta.exportedAt}</span>
+                        {" "}by {inspectTree.meta.exportedBy}
+                        {" — "}{Object.entries(inspectTree.meta.counts).map(([k, n]) => `${k}:${n}`).join(", ")}
+                      </div>
+                      <div className="border border-gray-200 rounded p-2 text-[11px] max-h-[40vh] overflow-y-auto">
+                        {inspectTree.orgs.length === 0 && (
+                          <p className="text-gray-500 italic">Snapshot is empty.</p>
+                        )}
+                        {inspectTree.orgs.map((org) => (
+                          <div key={org.id} className="mb-2">
+                            <label className="flex items-center gap-1 font-semibold text-gray-800">
+                              <input
+                                type="checkbox"
+                                checked={sel.orgIds.has(org.id)}
+                                onChange={() => toggleOrg(org)}
+                                disabled={restoreRunning}
+                              />
+                              <span>Org · {org.name}</span>
+                              <span className="text-gray-400 font-normal text-[9px]">({org.entityType})</span>
+                            </label>
+                            <div className="ml-4 mt-0.5">
+                              {org.members.length === 0 && (
+                                <p className="text-gray-400 italic text-[10px]">No members</p>
+                              )}
+                              {org.members.map((m) => (
+                                <div key={`${org.id}:${m.userId}`} className="mt-1">
+                                  <label className="flex items-center gap-1 text-gray-700">
+                                    <input
+                                      type="checkbox"
+                                      checked={sel.userIds.has(m.userId)}
+                                      onChange={() => toggleUserInOrg(m)}
+                                      disabled={restoreRunning}
+                                    />
+                                    <span>User · {m.userEmail}</span>
+                                    {(m.promptCount > 0 || m.templateCount > 0) && (
+                                      <span className="text-gray-400 text-[9px]">
+                                        {m.promptCount > 0 && ` · ${m.promptCount} prompt(s)`}
+                                        {m.templateCount > 0 && ` · ${m.templateCount} template(s)`}
+                                      </span>
+                                    )}
+                                  </label>
+                                  <div className="ml-4">
+                                    {m.projects.map((p) => (
+                                      <div key={p.id} className="mt-0.5">
+                                        <label className="flex items-center gap-1 text-gray-700">
+                                          <input
+                                            type="checkbox"
+                                            checked={sel.projectIds.has(p.id)}
+                                            onChange={() => toggleProject(p)}
+                                            disabled={restoreRunning}
+                                          />
+                                          <span>Project · {p.name}</span>
+                                          <span className="text-gray-400 text-[9px]">({p.diagrams.length} diagram{p.diagrams.length === 1 ? "" : "s"})</span>
+                                        </label>
+                                        <div className="ml-4">
+                                          {p.diagrams.map((d) => (
+                                            <label key={d.id} className="flex items-center gap-1 text-gray-600">
+                                              <input
+                                                type="checkbox"
+                                                checked={sel.diagramIds.has(d.id)}
+                                                onChange={() => toggleDiagram(d.id)}
+                                                disabled={restoreRunning}
+                                              />
+                                              <span>Diagram · {d.name}</span>
+                                            </label>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    ))}
+                                    {m.unfiledDiagrams.length > 0 && (
+                                      <div className="mt-0.5">
+                                        <p className="text-[9px] uppercase tracking-wide text-gray-400">Unfiled diagrams</p>
+                                        {m.unfiledDiagrams.map((d) => (
+                                          <label key={d.id} className="flex items-center gap-1 text-gray-600 ml-2">
+                                            <input
+                                              type="checkbox"
+                                              checked={sel.diagramIds.has(d.id)}
+                                              onChange={() => toggleDiagram(d.id)}
+                                              disabled={restoreRunning}
+                                            />
+                                            <span>Diagram · {d.name}</span>
+                                          </label>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-[10px] text-gray-500">
+                        Selected: {sel.orgIds.size} org · {sel.userIds.size} user · {sel.projectIds.size} project · {sel.diagramIds.size} diagram
+                      </p>
+                    </>
+                  )}
+                </>
+              )}
+
+              {restoreError && (
+                <div className="text-[11px] text-red-700 bg-red-50 border border-red-200 rounded px-3 py-2">
+                  {restoreError}
+                </div>
+              )}
+
+              {restoreResult && (
+                <div className="text-[11px] bg-green-50 border border-green-200 rounded px-3 py-2 space-y-1">
+                  <p className="font-semibold text-green-800">Restore complete ({restoreResult.mode}).</p>
+                  <ul className="text-green-700 font-mono">
+                    {Object.entries(restoreResult.inserted).map(([m, n]) => (
+                      <li key={m}>{m}: {n} row(s)</li>
+                    ))}
+                  </ul>
+                  <details className="mt-1">
+                    <summary className="cursor-pointer text-green-700">Log</summary>
+                    <pre className="text-[10px] whitespace-pre-wrap mt-1">{restoreResult.log.join("\n")}</pre>
+                  </details>
+                </div>
+              )}
+            </div>
+
+            <div className="px-4 py-3 border-t flex justify-end gap-2">
+              <button
+                onClick={() => setShowRestoreModal(false)}
+                disabled={restoreRunning}
+                className="px-3 py-1.5 text-xs text-gray-700 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50"
+              >
+                {restoreResult ? "Close" : "Cancel"}
+              </button>
+              {!restoreResult && restoreMode === "wipe" && (
+                <button
+                  onClick={runWipeRestore}
+                  disabled={restoreRunning || !restoreFile || restoreConfirm !== "WIPE"}
+                  className="px-3 py-1.5 text-xs font-semibold text-white bg-red-600 rounded hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {restoreRunning ? "Restoring…" : "Wipe & Restore"}
+                </button>
+              )}
+              {!restoreResult && restoreMode === "additive" && (
+                <button
+                  onClick={runAdditiveRestore}
+                  disabled={restoreRunning || !restoreFile || !inspectTree
+                    || (sel.orgIds.size + sel.userIds.size + sel.projectIds.size + sel.diagramIds.size) === 0}
+                  className="px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {restoreRunning ? "Restoring…" : "Restore Selected"}
+                </button>
+              )}
             </div>
           </div>
         </div>
