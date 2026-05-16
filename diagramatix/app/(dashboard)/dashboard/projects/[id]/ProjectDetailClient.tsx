@@ -2098,6 +2098,25 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
                           >
                             XML &amp; XSD
                           </button>
+                          {(() => {
+                            const hasBpmn = diagrams.some(d => d.type === "bpmn");
+                            return (
+                              <button
+                                className={`${itemCls} disabled:opacity-50 disabled:cursor-not-allowed`}
+                                disabled={!hasBpmn}
+                                onClick={() => {
+                                  setShowFileMenu(false);
+                                  window.location.href =
+                                    `/api/export/visio-v3/bulk?projectId=${encodeURIComponent(project.id)}&profile=v1.5`;
+                                }}
+                                title={hasBpmn
+                                  ? "Export all BPMN diagrams in this project as one multi-page Visio (.vsdx) file using the v1.5 stencil"
+                                  : "No BPMN diagrams in this project"}
+                              >
+                                Visio (.vsdx) — all BPMN
+                              </button>
+                            );
+                          })()}
                           <a
                             href="/BPMN%20Diagramatix%20Shapes%20v1.5.vssx"
                             download
