@@ -1589,6 +1589,79 @@ export async function importVisioV3(
       }
     }
 
+    // Step 3: placeholder-label demotion. Visio's CFF Container / Swimlane
+    // List / Pool / Lane masters ship with a `BpmnName` cached value of
+    // `"Title"` (and similar — "Pool", "Black-Box Pool", "Lane", "Swimlane")
+    // computed by a `CONTAINERSHEETREF` formula. When a shape doesn't
+    // override the cell, the importer reads the placeholder as the pool's
+    // label, and the dedup passes above keep it because it's "labelled".
+    // Drop these AS LONG AS another non-placeholder pool exists in this
+    // diagram (so we don't strip every pool when the entire diagram only
+    // has placeholder labels, which would be a pathological case).
+    const PLACEHOLDER_LABEL_LC = new Set([
+      "title", "pool", "lane", "swimlane",
+      "black-box pool", "black box pool",
+      "pool / lane", "pool/lane",
+    ]);
+    const isPlaceholderLabel = (s: string) =>
+      PLACEHOLDER_LABEL_LC.has(s.trim().toLowerCase());
+    const liveAfter2 = pools.filter((p) => !survivorById.has(p.shapeId));
+    const hasRealLabelledPool = liveAfter2.some(
+      (p) => labelOf(p) && !isPlaceholderLabel(labelOf(p)),
+    );
+    if (hasRealLabelledPool) {
+      for (const p of liveAfter2) {
+        const lbl = labelOf(p);
+        if (!lbl) continue;                               // empty label — already handled by Step 2
+        if (!isPlaceholderLabel(lbl)) continue;
+        // Anchor onto the spatially-nearest real-labelled pool so any
+        // children re-parent to a sensible owner. Distance = centre-to-
+        // centre Euclidean.
+        let best: RawShape | null = null;
+        let bestD = Infinity;
+        for (const q of liveAfter2) {
+          if (q.shapeId === p.shapeId) continue;
+          if (survivorById.has(q.shapeId)) continue;
+          const qLbl = labelOf(q);
+          if (!qLbl || isPlaceholderLabel(qLbl)) continue;
+          const dx = p.pageX - q.pageX;
+          const dy = p.pageY - q.pageY;
+          const d = dx * dx + dy * dy;
+          if (d < bestD) { bestD = d; best = q; }
+        }
+        if (best) survivorById.set(p.shapeId, best.shapeId);
+      }
+    }
+
+    // Step 4: same-label overlap dedup. If two pools share the same
+    // normalised label AND their bboxes overlap at all, they're almost
+    // certainly the SAME pool surfaced twice by the importer (e.g. once
+    // from the real Pool/Lane shape, once from a Swimlane List header
+    // strip carrying the same heading text). Keep the LARGER bbox — that's
+    // the actual pool body; the smaller is the decoration band.
+    const normName = (s: string) => s.replace(/\s+/g, " ").trim().toLowerCase();
+    const liveAfter3 = pools.filter((p) => !survivorById.has(p.shapeId));
+    const byLabel = new Map<string, RawShape[]>();
+    for (const p of liveAfter3) {
+      const lbl = normName(labelOf(p));
+      if (!lbl) continue;
+      const list = byLabel.get(lbl) ?? [];
+      list.push(p);
+      byLabel.set(lbl, list);
+    }
+    for (const [, group] of byLabel) {
+      if (group.length < 2) continue;
+      // Sort largest area first — survivor is index 0.
+      group.sort((a, b) => (b.width * b.height) - (a.width * a.height));
+      const winner = group[0];
+      const winnerBox = bboxOf(winner);
+      for (let i = 1; i < group.length; i++) {
+        const loser = group[i];
+        const overlap = bboxOverlapArea(winnerBox, bboxOf(loser));
+        if (overlap > 0) survivorById.set(loser.shapeId, winner.shapeId);
+      }
+    }
+
     if (survivorById.size > 0) {
       // Drop the seeds — element-build loop skips r.seed === null.
       for (const r of raw) {
