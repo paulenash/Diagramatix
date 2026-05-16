@@ -1212,77 +1212,75 @@ export async function exportVisioV3(
       }
     }
 
-    // v1.5 Sub-Process masters (ID 7 = Collapsed, ID 8 = Expanded) place
-    // the loop markers inside Shape 11 (a GROUP containing Shape 14
-    // Compensation, 15 ParallelLoop, 17 StandardLoop, 27 SequentialLoop).
-    // AdHoc lives on Shape 10 at top level. The Collapsed-indicator marker
-    // (small + box on collapsed sub-process) is gated separately and isn't
-    // part of this row.
+    // v1.5 Sub-Process masters (ID 7 = Collapsed, ID 8 = Expanded). The
+    // marker row at the bottom of the body has these slot-bearing shapes
+    // (each is gated by its own Action.Checked formula):
     //
-    // Two bugs in the as-shipped master force a per-instance patch:
+    //   Shape 16  StandardLoop group   (contains Shape 17 — the arrow)
+    //   Shape 15  ParallelLoop          (leaf shape)
+    //   Shape 27  SequentialLoop        (leaf shape)
+    //   Shape 14  Compensation          (leaf shape)
+    //   Shape 11  Collapsed indicator   (group with Shapes 12/13 +box)
+    //   Shape 10  AdHoc                 (leaf shape)
     //
-    // 1) Shape 11's PinX cached V is the master-natural body-centre value
-    //    (1.15 inches). After our `scaleLocalLocPin` resize pass it scales
-    //    to instanceW * 0.5 ≈ instance centre, which is fine when Shape 11
-    //    is the only marker — but the cached V doesn't account for any
-    //    AdHoc Shape 10 sitting at right of centre, so multi-marker layouts
-    //    overlap on first paint.
+    // Each marker has its own cached PinX = master-natural body centre
+    // (1.15 in the as-shipped master), so after the size rescale pass
+    // every active marker overlaps at the instance centre on first
+    // paint. The master's PinX formula correctly computes slot offsets
+    // via `(W - IW*NumIconsVisible)/2 - IW/2 + IW*BpmnIconPosition` —
+    // but Visio uses cached V on first paint before that formula runs.
     //
-    // 2) Shape 11's `User.BpmnIconPosition` formula is
-    //      1 + IF(any loop,1,0) + IF(Compensation,1,0)
-    //    which evaluates to 2 when loop is active (with no compensation),
-    //    so after Visio recalcs the loop marker shifts RIGHT of centre
-    //    even when it's the ONLY visible marker (because position=2 means
-    //    "second slot from the left"). User reports "loop marker on bottom
-    //    right" — that's this off-by-one.
-    //
-    // Fix:
-    //   (a) Rewrite cached PinX V's via layoutSubprocessMarkers for the
-    //       ACTIVE markers in body-centre layout order (loop → adhoc).
-    //   (b) For each ACTIVE marker, force its `User.BpmnIconPosition`
-    //       cached V AND formula to a constant matching its slot in the
-    //       active-only ordering. The constant kills the broken formula.
+    // Fix per active marker:
+    //   (a) Rewrite cached PinX to the slot's body-centre offset.
+    //   (b) Bump the marker's `User.BpmnIconWidth` (cached + formula) to
+    //       a wider value so the post-recalc spacing also has a visible
+    //       gap. The shipped 0.18" pitch leaves only a ~0.02" gap between
+    //       Shape 16 (0.157" wide) and Shape 10 (0.157" wide) — close
+    //       enough to look overlapping. 0.27" gives a clean ~0.11" gap.
     if ((sourceMasterId === 7 || sourceMasterId === 8)
         && instanceW !== undefined) {
       const hasAdHocV15 = elProps?.adHoc === true;
-      const hasLoopV15 =
-        repeatType === "loop" ||
-        repeatType === "mi-sequential" ||
-        repeatType === "mi-parallel";
+      // The Collapsed-indicator slot (Shape 11) is only visible on the
+      // Collapsed Sub-Process master (sourceMasterId === 7) AND only
+      // when the Diagramatix element is a collapsed subprocess.
+      const hasCollapsedIndicator = elType === "subprocess" && sourceMasterId === 7;
+      const loopShapeIdV15 =
+        repeatType === "loop"          ? 16
+        : repeatType === "mi-parallel"   ? 15
+        : repeatType === "mi-sequential" ? 27
+        : null;
 
-      // Active markers in left-to-right order. Shape 11 = loop group,
-      // Shape 10 = AdHoc. Collapsed-indicator handled by Shape 6 (always
-      // visible body outline plus the collapsed body shape) — not part
-      // of the bottom-row, so not in this list.
+      // Build the active-marker slot order (left → right). Master's own
+      // `BpmnIconPosition` formulas assume this order: Loop → Compensation
+      // → Collapsed → AdHoc. We don't have Compensation in Diagramatix yet
+      // so it never slots in.
       const orderedV15: number[] = [];
-      if (hasLoopV15) orderedV15.push(11);
+      if (loopShapeIdV15 !== null) orderedV15.push(loopShapeIdV15);
+      if (hasCollapsedIndicator) orderedV15.push(11);
       if (hasAdHocV15) orderedV15.push(10);
 
       if (orderedV15.length > 0) {
-        // (a) Cached PinX V — same icon-spacing math the master's PinX
-        //     formula uses, but with N = orderedV15.length so it matches
-        //     ONLY the active markers (the master's BpmnNumIconsVisible
-        //     formula also uses active count, so this stays consistent
-        //     after recalc).
-        const ICON_W_V15 = 0.19; // matches User.BpmnIconWidth on Shape 11/10
+        const ICON_W_V15 = 0.27; // master ships 0.18, too tight — widen
         const center = instanceW / 2;
         for (let i = 0; i < orderedV15.length; i++) {
           const shapeId = orderedV15[i];
           const position = i + 1;
           const pinX = center + ICON_W_V15 * (position - (orderedV15.length + 1) / 2);
-          const re = new RegExp(
+          // (a) Override the marker's cached PinX V.
+          const pinXRe = new RegExp(
             `(<Shape ID='${shapeId}'[^>]*>[\\s\\S]*?<Cell N='PinX' V=')[\\d.]+(')`,
           );
-          masterContent = masterContent.replace(re, `$1${pinX}$2`);
-          // (b) Override the BpmnIconPosition User row to a constant for
-          //     this active-only layout. The master's formula chains off
-          //     OR(...loop...) / Compensation.Checked / Collapsed.Checked,
-          //     none of which know about THIS instance's selection, so
-          //     freezing the position to its slot index is correct.
-          const posRe = new RegExp(
-            `(<Shape ID='${shapeId}'[^>]*>[\\s\\S]*?<Row N='BpmnIconPosition'><Cell N='Value' V=')\\d+(' F=')[^']+(')`,
+          masterContent = masterContent.replace(pinXRe, `$1${pinX}$2`);
+          // (b) Bump BpmnIconWidth on this marker so post-recalc spacing
+          //     also opens out. Master's row is
+          //       <Row N='BpmnIconWidth'><Cell N='Value' V='0.18' U='PER'
+          //         F='0.18*Sheet.5!DropOnPageScale'/></Row>
+          //     — patch both V and F. (Some shapes use 0.19 instead of
+          //     0.18; the regex covers either.)
+          const iconWRe = new RegExp(
+            `(<Shape ID='${shapeId}'[^>]*>[\\s\\S]*?<Row N='BpmnIconWidth'><Cell N='Value' V=')[\\d.]+(' U='PER' F=')[\\d.]+(\\*Sheet\\.5!DropOnPageScale')`,
           );
-          masterContent = masterContent.replace(posRe, `$1${position}$2GUARD(${position})$3`);
+          masterContent = masterContent.replace(iconWRe, `$1${ICON_W_V15}$2${ICON_W_V15}$3`);
         }
       }
     }
