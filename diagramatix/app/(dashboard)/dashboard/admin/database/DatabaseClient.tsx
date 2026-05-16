@@ -67,10 +67,14 @@ export function DatabaseClient() {
   //                ticked rows are restored, additively.
   type InspectDiagram = { id: string; name: string };
   type InspectProject = { id: string; name: string; diagrams: InspectDiagram[] };
+  type InspectTemplate = {
+    id: string; name: string; diagramType: string;
+    templateType: string; group: string | null;
+  };
   type InspectUserInOrg = {
     userId: string; userEmail: string; userName: string | null;
     projects: InspectProject[]; unfiledDiagrams: InspectDiagram[];
-    promptCount: number; templateCount: number;
+    templates: InspectTemplate[]; promptCount: number;
   };
   type InspectOrg = { id: string; name: string; entityType: string; members: InspectUserInOrg[] };
   type InspectTree = {
@@ -94,13 +98,13 @@ export function DatabaseClient() {
   const [inspecting, setInspecting] = useState(false);
   const [sel, setSel] = useState<{
     orgIds: Set<string>; userIds: Set<string>;
-    projectIds: Set<string>; diagramIds: Set<string>;
-  }>({ orgIds: new Set(), userIds: new Set(), projectIds: new Set(), diagramIds: new Set() });
+    projectIds: Set<string>; diagramIds: Set<string>; templateIds: Set<string>;
+  }>({ orgIds: new Set(), userIds: new Set(), projectIds: new Set(), diagramIds: new Set(), templateIds: new Set() });
 
   async function inspectUpload(file: File) {
     setInspecting(true);
     setInspectTree(null);
-    setSel({ orgIds: new Set(), userIds: new Set(), projectIds: new Set(), diagramIds: new Set() });
+    setSel({ orgIds: new Set(), userIds: new Set(), projectIds: new Set(), diagramIds: new Set(), templateIds: new Set() });
     setRestoreError(null);
     try {
       const fd = new FormData();
@@ -121,7 +125,7 @@ export function DatabaseClient() {
   // React renders the new ticks.
   function withSelection(mutate: (s: {
     orgIds: Set<string>; userIds: Set<string>;
-    projectIds: Set<string>; diagramIds: Set<string>;
+    projectIds: Set<string>; diagramIds: Set<string>; templateIds: Set<string>;
   }) => void) {
     setSel((cur) => {
       const next = {
@@ -129,6 +133,7 @@ export function DatabaseClient() {
         userIds: new Set(cur.userIds),
         projectIds: new Set(cur.projectIds),
         diagramIds: new Set(cur.diagramIds),
+        templateIds: new Set(cur.templateIds),
       };
       mutate(next);
       return next;
@@ -151,6 +156,10 @@ export function DatabaseClient() {
             for (const d of p.diagrams) s.diagramIds[action](d.id);
           }
           for (const d of m.unfiledDiagrams) s.diagramIds[action](d.id);
+          // Templates are user-scoped — global Set, but cascade picks
+          // them up under each org-occurrence so ticking an org also
+          // brings in the templates of its members.
+          for (const t of m.templates) s.templateIds[action](t.id);
         }
       };
       apply(checked ? "delete" : "add");
@@ -166,6 +175,7 @@ export function DatabaseClient() {
           for (const d of p.diagrams) s.diagramIds[action](d.id);
         }
         for (const d of m.unfiledDiagrams) s.diagramIds[action](d.id);
+        for (const t of m.templates) s.templateIds[action](t.id);
       };
       apply(checked ? "delete" : "add");
     });
@@ -183,6 +193,11 @@ export function DatabaseClient() {
   function toggleDiagram(id: string) {
     withSelection((s) => {
       if (s.diagramIds.has(id)) s.diagramIds.delete(id); else s.diagramIds.add(id);
+    });
+  }
+  function toggleTemplate(id: string) {
+    withSelection((s) => {
+      if (s.templateIds.has(id)) s.templateIds.delete(id); else s.templateIds.add(id);
     });
   }
 
@@ -220,9 +235,11 @@ export function DatabaseClient() {
       userIds: [...sel.userIds],
       projectIds: [...sel.projectIds],
       diagramIds: [...sel.diagramIds],
+      templateIds: [...sel.templateIds],
     };
     const total = selections.orgIds.length + selections.userIds.length
-      + selections.projectIds.length + selections.diagramIds.length;
+      + selections.projectIds.length + selections.diagramIds.length
+      + selections.templateIds.length;
     if (total === 0) {
       setRestoreError("Tick at least one row in the tree.");
       return;
@@ -754,7 +771,7 @@ export function DatabaseClient() {
                     const f = e.target.files?.[0] ?? null;
                     setRestoreFile(f);
                     setInspectTree(null);
-                    setSel({ orgIds: new Set(), userIds: new Set(), projectIds: new Set(), diagramIds: new Set() });
+                    setSel({ orgIds: new Set(), userIds: new Set(), projectIds: new Set(), diagramIds: new Set(), templateIds: new Set() });
                     setRestoreError(null);
                     setRestoreResult(null);
                     // Auto-inspect in additive mode so the tree appears immediately.
@@ -839,10 +856,10 @@ export function DatabaseClient() {
                                       disabled={restoreRunning}
                                     />
                                     <span>User · {m.userEmail}</span>
-                                    {(m.promptCount > 0 || m.templateCount > 0) && (
+                                    {(m.promptCount > 0 || m.templates.length > 0) && (
                                       <span className="text-gray-400 text-[9px]">
                                         {m.promptCount > 0 && ` · ${m.promptCount} prompt(s)`}
-                                        {m.templateCount > 0 && ` · ${m.templateCount} template(s)`}
+                                        {m.templates.length > 0 && ` · ${m.templates.length} template(s)`}
                                       </span>
                                     )}
                                   </label>
@@ -890,6 +907,26 @@ export function DatabaseClient() {
                                         ))}
                                       </div>
                                     )}
+                                    {m.templates.length > 0 && (
+                                      <div className="mt-0.5">
+                                        <p className="text-[9px] uppercase tracking-wide text-gray-400">Templates</p>
+                                        {m.templates.map((t) => (
+                                          <label key={t.id} className="flex items-center gap-1 text-gray-600 ml-2">
+                                            <input
+                                              type="checkbox"
+                                              checked={sel.templateIds.has(t.id)}
+                                              onChange={() => toggleTemplate(t.id)}
+                                              disabled={restoreRunning}
+                                            />
+                                            <span>Template · {t.name}</span>
+                                            <span className="text-gray-400 text-[9px]">
+                                              ({t.templateType}
+                                              {t.group ? ` · ${t.group}` : ""})
+                                            </span>
+                                          </label>
+                                        ))}
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
                               ))}
@@ -898,7 +935,7 @@ export function DatabaseClient() {
                         ))}
                       </div>
                       <p className="text-[10px] text-gray-500">
-                        Selected: {sel.orgIds.size} org · {sel.userIds.size} user · {sel.projectIds.size} project · {sel.diagramIds.size} diagram
+                        Selected: {sel.orgIds.size} org · {sel.userIds.size} user · {sel.projectIds.size} project · {sel.diagramIds.size} diagram · {sel.templateIds.size} template
                       </p>
                     </>
                   )}
@@ -948,7 +985,7 @@ export function DatabaseClient() {
                 <button
                   onClick={runAdditiveRestore}
                   disabled={restoreRunning || !restoreFile || !inspectTree
-                    || (sel.orgIds.size + sel.userIds.size + sel.projectIds.size + sel.diagramIds.size) === 0}
+                    || (sel.orgIds.size + sel.userIds.size + sel.projectIds.size + sel.diagramIds.size + sel.templateIds.size) === 0}
                   className="px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {restoreRunning ? "Restoring…" : "Restore Selected"}

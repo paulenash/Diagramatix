@@ -300,17 +300,28 @@ export interface InspectTreeProject {
   name: string;
   diagrams: InspectTreeDiagram[];
 }
+export interface InspectTreeTemplate {
+  id: string;
+  name: string;
+  diagramType: string;
+  templateType: string;       // "user" | "builtin"
+  group: string | null;
+}
 /** Per (org, user) pair — a user shows up under each org they're a
  *  member of. Selecting a user under one org restores their data in that
- *  org without touching data in others. */
+ *  org without touching data in others. Templates are user-scoped (not
+ *  org-scoped) so the same template list appears under every org-instance
+ *  of the same user; per-template checkboxes toggle a GLOBAL template-id
+ *  set, so ticking T1 once is enough regardless of which org-occurrence
+ *  the admin clicked it from. */
 export interface InspectTreeUserInOrg {
   userId: string;
   userEmail: string;
   userName: string | null;
   projects: InspectTreeProject[];
   unfiledDiagrams: InspectTreeDiagram[];
+  templates: InspectTreeTemplate[];
   promptCount: number;
-  templateCount: number;
 }
 export interface InspectTreeOrg {
   id: string;
@@ -368,10 +379,18 @@ export function inspectFullBackup(payload: FullBackupPayload): InspectTree {
       unfiledByOrgUser.set(k, arr);
     }
   }
-  const templatesByUser = new Map<string, number>();
+  const templatesByUser = new Map<string, InspectTreeTemplate[]>();
   for (const t of templates) {
     const k = String(t.userId);
-    templatesByUser.set(k, (templatesByUser.get(k) ?? 0) + 1);
+    const arr = templatesByUser.get(k) ?? [];
+    arr.push({
+      id: String(t.id),
+      name: String(t.name),
+      diagramType: String(t.diagramType ?? "bpmn"),
+      templateType: String(t.templateType ?? "user"),
+      group: (t.group as string | null) ?? null,
+    });
+    templatesByUser.set(k, arr);
   }
   const promptsByOrgUser = new Map<string, number>();
   for (const p of prompts) {
@@ -409,8 +428,8 @@ export function inspectFullBackup(payload: FullBackupPayload): InspectTree {
             id: String(d.id),
             name: String(d.name),
           })),
+          templates: templatesByUser.get(String(user.id)) ?? [],
           promptCount: promptsByOrgUser.get(k) ?? 0,
-          templateCount: templatesByUser.get(String(user.id)) ?? 0,
         } as InspectTreeUserInOrg;
       })
       .filter((x): x is InspectTreeUserInOrg => x !== null);
@@ -442,6 +461,11 @@ export interface AdditiveSelection {
   userIds: string[];
   projectIds: string[];
   diagramIds: string[];
+  /** Templates are user-scoped; ticked independently so an admin can
+   *  pull in a user's data without all their saved templates (or
+   *  vice-versa). When omitted (older API callers), no templates are
+   *  restored — pass an empty array. */
+  templateIds?: string[];
 }
 
 function shortCuid(): string {
@@ -480,6 +504,7 @@ export async function restoreFullBackupAdditive(
   const userSet = new Set<string>(selection.userIds);
   const projectSet = new Set<string>(selection.projectIds);
   const diagramSet = new Set<string>(selection.diagramIds);
+  const templateSet = new Set<string>(selection.templateIds ?? []);
 
   const projectsById = new Map(
     (payload.tables.Project as AnyRow[]).map((p) => [String(p.id), p]),
@@ -634,16 +659,20 @@ export async function restoreFullBackupAdditive(
       });
       inserted.DiagramHistory = (inserted.DiagramHistory ?? 0) + 1;
     }
-    // Templates — for selected users (user-scoped, no org coupling)
+    // Templates — only ticked ids. Their owning user must also be in
+    // scope (closure) or the row would have a dangling userId. Skip
+    // any whose user wasn't selected.
     for (const t of (payload.tables.DiagramTemplate as AnyRow[]).filter(
-      (t) => userSet.has(String(t.userId)),
+      (t) => templateSet.has(String(t.id)),
     )) {
+      const ownerId = String(t.userId);
+      if (!userSet.has(ownerId)) continue;
       await tx.diagramTemplate.create({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         data: {
           ...convertDates("DiagramTemplate", t),
           id: shortCuid(),
-          userId: userIdMap.get(String(t.userId))!,
+          userId: userIdMap.get(ownerId)!,
         } as any,
       });
       inserted.DiagramTemplate = (inserted.DiagramTemplate ?? 0) + 1;

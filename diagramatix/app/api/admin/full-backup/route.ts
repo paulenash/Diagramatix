@@ -154,16 +154,18 @@ export async function POST(req: Request) {
         userIds: Array.isArray(parsed.userIds) ? parsed.userIds.map(String) : [],
         projectIds: Array.isArray(parsed.projectIds) ? parsed.projectIds.map(String) : [],
         diagramIds: Array.isArray(parsed.diagramIds) ? parsed.diagramIds.map(String) : [],
+        templateIds: Array.isArray(parsed.templateIds) ? parsed.templateIds.map(String) : [],
       };
     } catch {
       return NextResponse.json(
-        { error: "Additive restore requires a JSON `selections` field with orgIds/userIds/projectIds/diagramIds arrays" },
+        { error: "Additive restore requires a JSON `selections` field with orgIds/userIds/projectIds/diagramIds/templateIds arrays" },
         { status: 400 },
       );
     }
     const total =
       selection.orgIds.length + selection.userIds.length +
-      selection.projectIds.length + selection.diagramIds.length;
+      selection.projectIds.length + selection.diagramIds.length +
+      (selection.templateIds?.length ?? 0);
     if (total === 0) {
       return NextResponse.json(
         { error: "Nothing selected — tick at least one row in the tree" },
