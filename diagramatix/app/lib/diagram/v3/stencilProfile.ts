@@ -138,7 +138,7 @@ export const bpmnMProfile: StencilProfile = {
  * sub-shapes whose visibility tracks the chosen type. The rest of the
  * stencil is unchanged.
  *
- * Base template (`bpmn-template-v14.vsdx`) already contains the bulk of
+ * Base template (`bpmn-template-v15.vsdx`) already contains the bulk of
  * the masters: Start/Intermediate/End Events, Task, Collapsed and
  * Expanded Sub-Process (separate masters — no `BpmnIsCollapsed` workaround
  * needed), Gateway Decision + Merge, Data Object/Store, Text Annotation,
@@ -155,7 +155,7 @@ export const bpmnMProfile: StencilProfile = {
  */
 export const diagramatixV15Profile: StencilProfile = {
   name: "diagramatix-v1.5",
-  templateFile: "bpmn-template-v14.vsdx",
+  templateFile: "bpmn-template-v15.vsdx",
   stencilFile: "BPMN Diagramatix Shapes v1.5.vssx",
   masterIds: {
     task: 6,

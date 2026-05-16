@@ -33,7 +33,7 @@
  *      visible behind the Terminate marker).
  *
  * Targets:
- *   - public/bpmn-template-v14.vsdx                  (v1.5 template)
+ *   - public/bpmn-template-v15.vsdx                  (v1.5 template)
  *   - public/BPMN Diagramatix Shapes v1.5.vssx       (v1.5 stencil)
  *   - public/bpmn-stencil-v3.vssx                    (BPMN_M stencil)
  *
@@ -48,7 +48,7 @@ const path = require("path");
 const JSZip = require("jszip");
 
 const TARGETS = [
-  { file: "public/bpmn-template-v14.vsdx",            label: "v1.5 template",   nameRe: /^End Event$/ },
+  { file: "public/bpmn-template-v15.vsdx",            label: "v1.5 template",   nameRe: /^End Event$/ },
   { file: "public/BPMN Diagramatix Shapes v1.5.vssx", label: "v1.5 stencil",    nameRe: /^End Event$/ },
   { file: "public/bpmn-stencil-v3.vssx",              label: "BPMN_M stencil",  nameRe: /^End Event$/ },
 ];

@@ -13,7 +13,7 @@
  *   • LineWeight V='0.02777…' U='PT' F='GUARD(2PT)' — visible stroke
  *
  * Targets:
- *   - public/bpmn-template-v14.vsdx        Master ID 9 (Gateway - Decision)
+ *   - public/bpmn-template-v15.vsdx        Master ID 9 (Gateway - Decision)
  *   - public/BPMN Diagramatix Shapes v1.5.vssx  matching gateway master
  *   - public/bpmn-stencil-v3.vssx               BPMN_M Gateway master
  *
@@ -28,7 +28,7 @@ const path = require("path");
 const JSZip = require("jszip");
 
 const TARGETS = [
-  { file: "public/bpmn-template-v14.vsdx",                    label: "v1.5 template",   match: /Gateway - Decision/ },
+  { file: "public/bpmn-template-v15.vsdx",                    label: "v1.5 template",   match: /Gateway - Decision/ },
   { file: "public/BPMN Diagramatix Shapes v1.5.vssx",         label: "v1.5 stencil",    match: /Gateway/ },
   { file: "public/bpmn-stencil-v3.vssx",                      label: "BPMN_M stencil",  match: /Gateway/ },
 ];

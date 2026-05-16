@@ -29,7 +29,7 @@ const JSZip = require("jszip");
 // directory) that have a Conditional Geometry IX=2 to fix.
 const TARGETS = [
   {
-    file: "public/bpmn-template-v14.vsdx",
+    file: "public/bpmn-template-v15.vsdx",
     masters: ["master1.xml", "master2.xml", "master3.xml"],
     label: "v1.5 template",
   },

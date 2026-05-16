@@ -2584,7 +2584,7 @@ export async function exportVisioV3(
     //     in `master4.xml`).
     //
     // Sub-shape ID assumptions in `triggerMarkers` happen to match v1.5's
-    // Task / Event / Gateway masters too (audited against bpmn-template-v14
+    // Task / Event / Gateway masters too (audited against bpmn-template-v15
     // which is v1.5's base), so the same map produces correct overrides on
     // both profiles.
     if (BODY_FILL_TYPES.has(el.type) && subShapes === "") {
