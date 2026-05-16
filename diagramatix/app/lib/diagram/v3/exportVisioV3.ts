@@ -1644,6 +1644,16 @@ export async function exportVisioV3(
     "data-object", "data-store",
   ]);
 
+  // Per-export cache of v1.5 task per-instance master clones keyed by
+  // (sourceMasterId, w, h). Diagrams commonly have many tasks at the same
+  // size; cloning the Task master once per distinct size keeps the file
+  // small while still fixing the cached-V first-paint issue. Sub-process
+  // and data-object clones intentionally do NOT use this cache — their
+  // per-instance content depends on additional element properties
+  // (subprocessType, repeatType, adHoc, collection, role) so they need a
+  // fresh clone per instance.
+  const taskCloneCache = new Map<string, number>();
+
   for (const el of data.elements) {
     const mapping = getElementMappingV3(el, profile);
     if (!mapping) continue;
@@ -2524,6 +2534,14 @@ export async function exportVisioV3(
     // rescale though — without it, the master's Shape 6/7 body retains
     // cached V=2.3/1.5625 (natural EP dims) and Visio first-paints the
     // body at master-natural size inside a correctly-sized bounding box.
+    // Tasks have the SAME issue when the diagram's task size differs from
+    // the v1.5 Task master's natural 1.0625×0.677 — Visio paints the body
+    // outline at master-natural size even though the page-shape box is
+    // correct, so attachment hit-testing works but the visible Task
+    // rectangle is wrong-sized. Cloning + size rescale baked into cached V
+    // makes first paint match the bounding box. Tasks are deduped by
+    // (w, h) below so identical tasks share one clone (instead of one
+    // master per task — that would balloon the file).
     // Data Object with multiplicity=collection also clones — the master
     // ships with NoShow=1 on the collection-bars sub-shape, so without
     // a per-instance flip the marker never appears.
@@ -2531,7 +2549,8 @@ export async function exportVisioV3(
     const v15Mult = v15ElProps?.multiplicity as string | undefined;
     const v15Role = v15ElProps?.role as string | undefined;
     const v15NeedsSizeOnly = profile.disableBodyColourBake
-      && (el.type === "subprocess" || el.type === "subprocess-expanded");
+      && (el.type === "subprocess" || el.type === "subprocess-expanded"
+          || el.type === "task");
     const v15NeedsCollectionMarker = profile.disableBodyColourBake
       && el.type === "data-object"
       && v15Mult === "collection";
@@ -2551,16 +2570,30 @@ export async function exportVisioV3(
         ...(el.properties as Record<string, unknown> | undefined),
         gatewayType: (el.properties as any)?.gatewayType ?? el.gatewayType,
       };
-      effectiveMasterId = await createInstanceMaster(
-        mapping.masterId,
-        v15NeedsClone ? "" : colorMap[el.type],
-        w,
-        h,
-        el.type,
-        mergedProps,
-        el.repeatType,
-        v15NeedsClone, // skipColourBake
-      );
+      // Task clones are content-identical for the same (sourceMasterId,
+      // w, h) — they carry only size rescaling, no per-instance markers.
+      // Reuse via taskCloneCache. 4-decimal rounding so floating-point
+      // noise on the same logical size still hits the cache.
+      const isTaskClone = profile.disableBodyColourBake && el.type === "task";
+      const taskCacheKey = isTaskClone
+        ? `${mapping.masterId}|${w.toFixed(4)}|${h.toFixed(4)}`
+        : null;
+      const cachedTaskId = taskCacheKey ? taskCloneCache.get(taskCacheKey) : undefined;
+      if (cachedTaskId !== undefined) {
+        effectiveMasterId = cachedTaskId;
+      } else {
+        effectiveMasterId = await createInstanceMaster(
+          mapping.masterId,
+          v15NeedsClone ? "" : colorMap[el.type],
+          w,
+          h,
+          el.type,
+          mergedProps,
+          el.repeatType,
+          v15NeedsClone, // skipColourBake
+        );
+        if (taskCacheKey) taskCloneCache.set(taskCacheKey, effectiveMasterId);
+      }
     }
 
     // Stub sub-shape registrations for non-resizable body-fill types AND
