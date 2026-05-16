@@ -1504,6 +1504,119 @@ export async function importVisioV3(
     if (skippedByTag.get(skipTag) === 0) skippedByTag.delete(skipTag);
   }
 
+  // ── Pool deduplication: stacked-wrapper cleanup ─────────────────────────
+  //
+  // Visio CFF (Cross-Functional Flowchart) files routinely pile multiple
+  // pool-classified shapes at the same bbox: a "CFF Container.NN" wrapper,
+  // a "Swimlane List.NN" wrapper, and the real "Pool / Lane" shape — each
+  // a sibling at the top level, each classified as a Pool by master-name
+  // alone. The result is N stacked Pool elements where the user expects
+  // one (symptom: "Online Modules (OM) Pool shown multiple times").
+  //
+  // This pass cleans up in two steps:
+  //   1. **Same-bbox dedup**: any two Pools whose centres are within 0.5"
+  //      AND whose widths and heights match within 10% are essentially
+  //      the same shape. Keep the one with the most useful label (text
+  //      or BpmnName > none; non-wrapper master > CFF/Swimlane wrapper;
+  //      lower shapeId as tiebreak). Drop the rest.
+  //   2. **Wrapper demotion**: any surviving CFF Container / Swimlane List
+  //      shape with an empty label whose bbox overlaps ≥10% with another
+  //      labelled Pool is decoration, not a real BPMN Pool. Drop.
+  //
+  // Children whose `parentShapeId` points at a dropped pool are
+  // re-parented to that pool's survivor so lane→pool wiring still resolves.
+  {
+    const labelOf = (r: RawShape): string =>
+      (readText(r.block) || r.props.BpmnName || "").trim();
+    const isWrapperName = (nameU: string): boolean =>
+      /^(?:CFF Container|Swimlane List)(?:\b|\.|$)/.test(nameU);
+    const bboxOf = (r: RawShape) => ({
+      x1: r.pageX - r.width / 2, y1: r.pageY - r.height / 2,
+      x2: r.pageX + r.width / 2, y2: r.pageY + r.height / 2,
+    });
+    const bboxOverlapArea = (
+      a: ReturnType<typeof bboxOf>,
+      b: ReturnType<typeof bboxOf>,
+    ): number => {
+      const x = Math.max(0, Math.min(a.x2, b.x2) - Math.max(a.x1, b.x1));
+      const y = Math.max(0, Math.min(a.y2, b.y2) - Math.max(a.y1, b.y1));
+      return x * y;
+    };
+    const survivorById = new Map<string, string>(); // dropId → survivorId
+
+    // Step 1: bbox-cluster dedup.
+    const pools = raw.filter((r) => r.seed?.type === "pool");
+    const groups: RawShape[][] = [];
+    for (const p of pools) {
+      let placed = false;
+      for (const g of groups) {
+        const q = g[0];
+        const closeC = Math.abs(p.pageX - q.pageX) < 0.5 && Math.abs(p.pageY - q.pageY) < 0.5;
+        const wRatio = Math.min(p.width, q.width) / Math.max(p.width, q.width);
+        const hRatio = Math.min(p.height, q.height) / Math.max(p.height, q.height);
+        if (closeC && wRatio >= 0.9 && hRatio >= 0.9) { g.push(p); placed = true; break; }
+      }
+      if (!placed) groups.push([p]);
+    }
+    for (const g of groups) {
+      if (g.length < 2) continue;
+      g.sort((a, b) => {
+        const aL = labelOf(a) ? 1 : 0;
+        const bL = labelOf(b) ? 1 : 0;
+        if (aL !== bL) return bL - aL;
+        const aW = isWrapperName(a.nameU) ? 1 : 0;
+        const bW = isWrapperName(b.nameU) ? 1 : 0;
+        if (aW !== bW) return aW - bW;
+        return parseInt(a.shapeId, 10) - parseInt(b.shapeId, 10);
+      });
+      for (let i = 1; i < g.length; i++) survivorById.set(g[i].shapeId, g[0].shapeId);
+    }
+
+    // Step 2: wrapper demotion (skip already-dropped, skip wrappers).
+    const stillLive = pools.filter((p) => !survivorById.has(p.shapeId));
+    for (const p of stillLive) {
+      if (!isWrapperName(p.nameU)) continue;
+      if (labelOf(p)) continue;                        // labelled wrapper IS the pool
+      const pBox = bboxOf(p);
+      const pArea = (pBox.x2 - pBox.x1) * (pBox.y2 - pBox.y1);
+      if (pArea <= 0) continue;
+      for (const q of stillLive) {
+        if (q.shapeId === p.shapeId) continue;
+        if (survivorById.has(q.shapeId)) continue;
+        if (isWrapperName(q.nameU) && !labelOf(q)) continue;   // don't dedupe wrapper-vs-wrapper
+        const overlap = bboxOverlapArea(pBox, bboxOf(q));
+        if (overlap / pArea >= 0.1) { survivorById.set(p.shapeId, q.shapeId); break; }
+      }
+    }
+
+    if (survivorById.size > 0) {
+      // Drop the seeds — element-build loop skips r.seed === null.
+      for (const r of raw) {
+        if (survivorById.has(r.shapeId)) r.seed = null;
+      }
+      // Re-thread parentShapeId so nested children point at the survivor.
+      for (const r of raw) {
+        if (r.parentShapeId && survivorById.has(r.parentShapeId)) {
+          r.parentShapeId = survivorById.get(r.parentShapeId)!;
+        }
+      }
+      // Re-thread bpmnMLaneToPoolId (lane parentage that bypassed parentShapeId).
+      for (const [laneId, poolId] of bpmnMLaneToPoolId) {
+        if (survivorById.has(poolId)) bpmnMLaneToPoolId.set(laneId, survivorById.get(poolId)!);
+      }
+      // Re-thread poolMembers: if a dropped pool had members, merge them
+      // into the survivor's member list (deduplicated).
+      for (const [poolId, members] of poolMembers) {
+        if (!survivorById.has(poolId)) continue;
+        const survivorId = survivorById.get(poolId)!;
+        const existing = poolMembers.get(survivorId) ?? [];
+        const merged = Array.from(new Set([...existing, ...members]));
+        poolMembers.set(survivorId, merged);
+        poolMembers.delete(poolId);
+      }
+    }
+  }
+
   // Build element list.
   // Visio's BPMN_M template defaults BpmnId='0' on lane and other masters
   // when the user hasn't assigned one. Treating "0" as a real ID makes

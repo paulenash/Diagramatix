@@ -58,6 +58,30 @@ function normalize(s: string): string {
   return s.replace(/\s+/g, " ").trim().toLowerCase();
 }
 
+/** Extract a leading "process code" from a name: 1–3 letters, 1–3 digits,
+ *  a `.` separator, then 1–3 digits — e.g. "P1.2", "AR12.3", "ABC123.456".
+ *  Anchored to the start and followed by a word boundary so codes embedded
+ *  later in the name (or longer numeric runs that just happen to share a
+ *  prefix) don't match. Returned uppercase for case-insensitive compare. */
+const CODE_RE = /^([A-Za-z]{1,3}\d{1,3}\.\d{1,3})\b/;
+function extractCode(name: string): string | null {
+  const m = name.trim().match(CODE_RE);
+  return m ? m[1].toUpperCase() : null;
+}
+
+/** Drop the leading process code (if present) and any whitespace/punctuation
+ *  separating it from the descriptive remainder. Used to compare just the
+ *  textual part of two names, ignoring whatever codes they carry — e.g.
+ *  "P1.2 Collections Process" → "collections process". Returns "" when the
+ *  name is only a code or empty after stripping. */
+function stripCodeTail(name: string): string {
+  const trimmed = name.trim();
+  const m = trimmed.match(CODE_RE);
+  const tail = (m ? trimmed.slice(m[0].length) : trimmed)
+    .replace(/^[\s\-:_.]+/, "");
+  return normalize(tail);
+}
+
 /** Levenshtein distance, classic O(n*m) DP. Capped check via early exit
  *  when far over the threshold isn't needed for typical short names. */
 function levenshtein(a: string, b: string): number {
@@ -117,6 +141,10 @@ export async function GET(_req: Request, { params }: Params) {
     byNormName.set(k, list);
   }
   const diagramById = new Map(diagrams.map((d) => [d.id, d] as const));
+  // Precomputed code + post-code tail per diagram name — used by the two
+  // probable-match rules: same code, or same descriptive text after the code.
+  const codeByDiagramId = new Map(diagrams.map((d) => [d.id, extractCode(d.name)] as const));
+  const tailByDiagramId = new Map(diagrams.map((d) => [d.id, stripCodeTail(d.name)] as const));
 
   const existingLinks: ExistingLink[] = [];
   const definiteCandidates: Candidate[] = [];
@@ -150,6 +178,8 @@ export async function GET(_req: Request, { params }: Params) {
 
       if (!label) continue;
       const normLabel = normalize(label);
+      const labelCode = extractCode(label);
+      const labelTail = stripCodeTail(label);
 
       // Exact (normalized) match against any diagram name → definite.
       const exact = byNormName.get(normLabel);
@@ -169,7 +199,9 @@ export async function GET(_req: Request, { params }: Params) {
       }
 
       // Probable: Levenshtein ≤ 3 (relative to the shorter name), OR
-      // either name contains the other after normalization.
+      // either name contains the other after normalization, OR the two
+      // names share the same leading process code (e.g. both start "P1.2"),
+      // OR the descriptive text after the code matches in both names.
       for (const c of diagrams) {
         if (c.id === d.id) continue;
         const normCand = normalize(c.name);
@@ -180,7 +212,11 @@ export async function GET(_req: Request, { params }: Params) {
           (normLabel.includes(normCand) || normCand.includes(normLabel));
         const dist = levenshtein(normLabel, normCand);
         const dynThreshold = Math.min(3, Math.max(1, Math.floor(Math.min(normLabel.length, normCand.length) / 4)));
-        if (contains || dist <= dynThreshold) {
+        const candCode = codeByDiagramId.get(c.id) ?? null;
+        const codesMatch = !!labelCode && labelCode === candCode;
+        const candTail = tailByDiagramId.get(c.id) ?? "";
+        const tailsMatch = !!labelTail && labelTail === candTail;
+        if (contains || dist <= dynThreshold || codesMatch || tailsMatch) {
           probableCandidates.push({
             parentDiagramId: d.id,
             parentDiagramName: d.name,
