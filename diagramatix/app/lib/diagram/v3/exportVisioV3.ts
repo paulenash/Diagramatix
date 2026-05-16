@@ -1765,9 +1765,15 @@ export async function exportVisioV3(
     }
 
     // Each marker is one or more (shapeId, geomIxs) overrides — Geometry IX
-    // values whose NoShow we force to '0'. Discovered by scanning the
-    // master's `Actions.<Name>.Checked` references per sub-shape.
-    type MarkerSpec = { shapeId: number; geomIxs: number[] };
+    // values whose NoShow we force to '0' (visible). A small number of
+    // markers ALSO need to HIDE another sub-shape that would otherwise
+    // paint over them at first paint — Terminate is the canonical case
+    // (Shape 9 = End body, paints over Shape 8 = Terminate filled circle
+    // because of master z-order). For those, the spec sets `noShow: "1"`.
+    // The companion master-stencil patch in
+    // `scripts/fix-terminate-marker.cjs` extends the master's NoShow
+    // formula so Visio's recalc keeps the body hidden too.
+    type MarkerSpec = { shapeId: number; geomIxs: number[]; noShow?: "0" | "1" };
     const TRIGGER_MARKER_MAP: Record<string, MarkerSpec[]> = {
       // Event triggers (BPMN_M Start/Intermediate/End Event masters)
       "Message":      [{ shapeId: 10, geomIxs: [0, 1, 2] }],
@@ -1776,7 +1782,14 @@ export async function exportVisioV3(
       "Signal":       [{ shapeId: 13, geomIxs: [0] }],
       "Compensation": [{ shapeId: 15, geomIxs: [0, 1] }],
       "Escalation":   [{ shapeId: 16, geomIxs: [0] }],
-      "Terminate":    [{ shapeId: 8,  geomIxs: [0] }],
+      // Terminate is two specs: show Shape 8 (filled black inner circle)
+      // AND hide Shape 9 (the coloured End body that ships above Shape 8
+      // in master z-order). Without the Shape 9 hide, the body paints
+      // over the Terminate marker.
+      "Terminate":    [
+        { shapeId: 8, geomIxs: [0] },
+        { shapeId: 9, geomIxs: [0], noShow: "1" },
+      ],
       // Task type markers (Task template master). User and Script share
       // Shape 18 — User uses IX=0/1, Script uses IX=2.
       "User":         [{ shapeId: 18, geomIxs: [0, 1] }],
@@ -2600,8 +2613,9 @@ export async function exportVisioV3(
               const matchingSpecs = triggerMarkers.filter((s) => s.shapeId === node.id);
               let extra = "";
               for (const spec of matchingSpecs) {
+                const v = spec.noShow ?? "0";
                 for (const ix of spec.geomIxs) {
-                  extra += `<Section N='Geometry' IX='${ix}'><Cell N='NoShow' V='0' F='Inh'/></Section>`;
+                  extra += `<Section N='Geometry' IX='${ix}'><Cell N='NoShow' V='${v}' F='Inh'/></Section>`;
                 }
               }
               if (node.type === "Group" && node.children.length > 0) {
