@@ -7,16 +7,23 @@
  *   - All projects (incl. colorConfig, folderTree)
  *   - All diagrams (incl. data, colorConfig, displayMode)
  *   - User templates (templateType: "user" only — built-ins are shared)
+ *   - AI Prompts the user owns (across all orgs they're in)
  *
- * Restore is purely additive: every project / diagram / template gets a fresh
- * cuid and is created alongside whatever the user already has. Internal
- * cross-references (folder tree → diagram IDs, subprocess linkedDiagramId)
- * are remapped to the new IDs at restore time. Project names are suffixed
- * with " (restored)" so the user can tell them apart.
+ * AI Rules (DiagramRules) are deliberately NOT in the backup — they're
+ * system-wide and only admins can edit them; per-user customisation isn't
+ * a concept in the current model. Restore won't recreate or alter rules.
+ *
+ * Restore is purely additive: every project / diagram / template / prompt
+ * gets a fresh cuid and is created alongside whatever the user already has.
+ * Internal cross-references (folder tree → diagram IDs, subprocess
+ * linkedDiagramId) are remapped to the new IDs at restore time. Project
+ * names are suffixed with " (restored)" so the user can tell them apart.
+ * Prompts are deduped by (name + diagramType) within the destination
+ * (user, org) to keep "restore over existing data" idempotent.
  *
  * Excluded from backup: password / reset tokens / Microsoft tokens (security),
- * the user's own row, org membership (multi-tenant scope), built-in templates,
- * the system archive project.
+ * the user's own row, org membership (multi-tenant scope), built-in
+ * templates, the system archive project, AI rules.
  */
 
 import JSZip from "jszip";
@@ -64,6 +71,18 @@ interface BackupTemplate {
   createdAt: string;
 }
 
+interface BackupPrompt {
+  id: string;
+  name: string;
+  text: string;
+  diagramType: string;
+  // Most-recently-saved 2-phase AI Plan for this prompt, if any. The
+  // editor stashes this so the user can resume an in-progress plan.
+  planJson: unknown;
+  planUpdatedAt: string | null;
+  createdAt: string;
+}
+
 export interface BackupPayload {
   schemaVersion: string;
   appVersion: string;
@@ -73,6 +92,9 @@ export interface BackupPayload {
   projects: BackupProject[];
   unfiledDiagrams: BackupDiagram[];
   userTemplates: BackupTemplate[];
+  // Optional so a pre-1.11 backup payload still parses cleanly. Build
+  // always emits this (possibly empty) from 1.11 onwards.
+  userPrompts?: BackupPrompt[];
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -130,6 +152,15 @@ export async function buildUserBackup(
     orderBy: { createdAt: "asc" },
   });
 
+  // Prompts: scoped per (userId, orgId). We back up every prompt this
+  // user owns, across every org they're a member of, so the data is
+  // preserved even if they later switch orgs. Restore re-attaches them
+  // to the user's CURRENT org (mirrors how project restore works).
+  const userPromptsRaw = await prisma.prompt.findMany({
+    where: { userId },
+    orderBy: { createdAt: "asc" },
+  });
+
   const payload: BackupPayload = {
     schemaVersion: SCHEMA_VERSION,
     appVersion,
@@ -146,6 +177,15 @@ export async function buildUserBackup(
       group: t.group ?? null,
       data: t.data,
       createdAt: t.createdAt.toISOString(),
+    })),
+    userPrompts: userPromptsRaw.map((p) => ({
+      id: p.id,
+      name: p.name,
+      text: p.text,
+      diagramType: p.diagramType,
+      planJson: p.planJson,
+      planUpdatedAt: p.planUpdatedAt ? p.planUpdatedAt.toISOString() : null,
+      createdAt: p.createdAt.toISOString(),
     })),
   };
 
@@ -181,6 +221,8 @@ export interface RestoreResult {
   diagramsRestored: number;
   unfiledDiagramsRestored: number;
   templatesRestored: number;
+  promptsRestored: number;
+  promptsSkipped: number;
   log: string[];
 }
 
@@ -309,6 +351,41 @@ export async function restoreUserBackup(
     templatesRestored++;
   }
 
+  // ── AI Prompts ─────────────────────────────────────────────────────────
+  // Restored into the user's CURRENT org. Dedup by (name + diagramType) in
+  // that org so re-running a restore doesn't pile up "Foo (1)", "Foo (2)".
+  let promptsRestored = 0;
+  let promptsSkipped = 0;
+  if (Array.isArray(payload.userPrompts) && payload.userPrompts.length > 0) {
+    const existing = await prisma.prompt.findMany({
+      where: { userId, orgId },
+      select: { name: true, diagramType: true },
+    });
+    const existingKeys = new Set(existing.map((p) => `${p.name}|${p.diagramType}`));
+    for (const pr of payload.userPrompts) {
+      const key = `${pr.name}|${pr.diagramType ?? "bpmn"}`;
+      if (existingKeys.has(key)) { promptsSkipped++; continue; }
+      await prisma.prompt.create({
+        data: {
+          name: pr.name,
+          text: pr.text,
+          diagramType: pr.diagramType ?? "bpmn",
+          userId,
+          orgId,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          planJson: (pr.planJson ?? undefined) as any,
+          planUpdatedAt: pr.planUpdatedAt ? new Date(pr.planUpdatedAt) : null,
+        },
+      });
+      existingKeys.add(key);
+      promptsRestored++;
+    }
+  }
+
+  // AI Rules are system-wide and admin-only — not in backup, nothing to
+  // restore. Older backup files that briefly carried a `userDiagramRules`
+  // array are silently ignored.
+
   // ── Phase 2: rewrite cross-references using the id maps ────────────────
   // 2a. Project folder trees + colorConfig (raw SQL because Prisma 7 doesn't
   //     write JSON columns through model.update for nested structures)
@@ -351,7 +428,9 @@ export async function restoreUserBackup(
 
   log.push(
     `✔ Restore complete: ${projectsRestored} project(s), ${diagramsRestored} diagram(s) ` +
-      `in projects, ${unfiledDiagramsRestored} unfiled diagram(s), ${templatesRestored} template(s)`,
+      `in projects, ${unfiledDiagramsRestored} unfiled diagram(s), ${templatesRestored} template(s), ` +
+      `${promptsRestored} prompt(s)` +
+      (promptsSkipped > 0 ? ` (${promptsSkipped} skipped as duplicates)` : ""),
   );
 
   return {
@@ -359,6 +438,8 @@ export async function restoreUserBackup(
     diagramsRestored,
     unfiledDiagramsRestored,
     templatesRestored,
+    promptsRestored,
+    promptsSkipped,
     log,
   };
 }

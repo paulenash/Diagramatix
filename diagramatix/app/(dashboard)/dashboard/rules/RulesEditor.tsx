@@ -6,6 +6,7 @@ import {
   CODE_REQUIRED_GROUPS,
   RULE_LINE_RE,
   PROPOSED_RE,
+  MODIFIED_RE,
 } from "@/app/lib/ai/splitRules";
 
 interface RuleSet {
@@ -34,7 +35,11 @@ interface ClassifiedLine {
   isGroup: boolean;
   isRule: boolean;
   codeRequired: boolean;
-  proposed: boolean;   // [PROPOSED] marker present (only meaningful for code-required rules)
+  /** [PROPOSED] marker present — new rule, code not yet written. */
+  proposed: boolean;
+  /** [MODIFIED] marker present — existing rule's text edited; code may
+   *  no longer match. Only meaningful on code-backed (red) rules. */
+  modified: boolean;
 }
 
 function classifyLines(text: string): ClassifiedLine[] {
@@ -54,6 +59,7 @@ function classifyLines(text: string): ClassifiedLine[] {
       isRule,
       codeRequired: isRule ? currentGroupIsCode : false,
       proposed: isRule && currentGroupIsCode && PROPOSED_RE.test(line),
+      modified: isRule && currentGroupIsCode && MODIFIED_RE.test(line) && !PROPOSED_RE.test(line),
     };
   });
 }
@@ -152,13 +158,80 @@ function autoNumberRules(text: string): string {
   return out.join("\n");
 }
 
-/** Remove the `[PROPOSED]` marker from the line at `lineIndex` of `text`. */
+/** Remove the `[PROPOSED]` and / or `[MODIFIED]` markers from the line at
+ *  `lineIndex` of `text`. Used when the admin clicks "Mark implemented"
+ *  after updating the layout code to match the rule. */
 function markRuleImplemented(text: string, lineIndex: number): string {
   const lines = text.split("\n");
   if (lineIndex < 0 || lineIndex >= lines.length) return text;
-  // Strip any `[PROPOSED]` token (case-insensitive) plus the single whitespace
-  // that follows it, leaving the rest of the rule body intact.
-  lines[lineIndex] = lines[lineIndex].replace(/\s*\[PROPOSED\]\s*/i, " ").replace(/:\s+/, ": ");
+  lines[lineIndex] = lines[lineIndex]
+    .replace(/\s*\[PROPOSED\]\s*/gi, " ")
+    .replace(/\s*\[MODIFIED\]\s*/gi, " ")
+    .replace(/:\s+/, ": ");
+  return lines.join("\n");
+}
+
+/** Extract numbered-rule bodies from a saved rules text, keyed by rule id
+ *  (e.g. "R30", "R04.1"). Used by `tagModifiedRules` to detect when an
+ *  admin's edit has changed the body of an existing rule. */
+function parseRuleBodies(text: string): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const line of text.split("\n")) {
+    const m = line.trim().match(/^([A-Z]\d+(?:\.\d+)*):\s*(.*)$/);
+    if (m) out.set(m[1], m[2]);
+  }
+  return out;
+}
+
+/** Strip any leading status marker (`[PROPOSED]` / `[MODIFIED]`) so two
+ *  rule bodies can be compared on their actual content alone. */
+function normaliseRuleBody(body: string): string {
+  return body
+    .replace(/^\s*\[(?:PROPOSED|MODIFIED)\]\s*/gi, "")
+    .trim();
+}
+
+/** Compare the saved `oldText` to the in-progress `newText` per rule. Any
+ *  Red (code-backed) rule whose body has changed since the last save AND
+ *  doesn't already carry a `[PROPOSED]` or `[MODIFIED]` marker gets
+ *  prefixed with `[MODIFIED]`. Newly-added rules are left untouched here —
+ *  `autoNumberRules` handles them and assigns `[PROPOSED]`. */
+function tagModifiedRules(newText: string, oldText: string): string {
+  const oldBodies = parseRuleBodies(oldText);
+  const lines = newText.split("\n");
+  let currentGroupIsCode = false;
+  return lines.map((line) => {
+    const trimmed = line.trim();
+    if (trimmed.startsWith("##")) {
+      currentGroupIsCode = CODE_REQUIRED_GROUPS.test(trimmed);
+      return line;
+    }
+    if (!currentGroupIsCode) return line;
+    const m = trimmed.match(/^([A-Z]\d+(?:\.\d+)*):\s*(.*)$/);
+    if (!m) return line;
+    const ruleId = m[1];
+    const body = m[2];
+    // Already flagged — leave as-is. Saving doesn't clear flags, only
+    // "Mark implemented" does.
+    if (PROPOSED_RE.test(body) || MODIFIED_RE.test(body)) return line;
+    const oldBody = oldBodies.get(ruleId);
+    if (oldBody === undefined) return line;        // new rule — autoNumber handles
+    if (normaliseRuleBody(oldBody) === normaliseRuleBody(body)) return line;
+    // Body genuinely differs from the last saved version.
+    const leadingWs = line.match(/^\s*/)![0];
+    return `${leadingWs}${ruleId}: [MODIFIED] ${body}`;
+  }).join("\n");
+}
+
+/** Remove a single rule line from `text`. Used by the per-rule Delete
+ *  button on green (AI-enforced) rules. The save flow re-runs
+ *  `autoNumberRules` afterwards, which leaves the remaining numbered
+ *  rules untouched (no re-numbering on delete — keeps cross-references
+ *  in code stable). */
+function deleteRuleLine(text: string, lineIndex: number): string {
+  const lines = text.split("\n");
+  if (lineIndex < 0 || lineIndex >= lines.length) return text;
+  lines.splice(lineIndex, 1);
   return lines.join("\n");
 }
 
@@ -226,13 +299,27 @@ export function RulesEditor({ isAdmin: _isAdmin }: { isAdmin: boolean }) {
   }
 
   async function handleSave() {
-    const numbered = autoNumberRules(editText);
+    // Diff against the last saved version (read from state) BEFORE
+    // numbering — autoNumberRules only knows about new rules so it
+    // would miss body changes to existing ones. Tag any Red rule whose
+    // text changed with [MODIFIED], then run the numberer.
+    const lastSaved = ruleSets.find((r) => r.category === activeCategory)?.rules ?? "";
+    const tagged = tagModifiedRules(editText, lastSaved);
+    const numbered = autoNumberRules(tagged);
     await persistText(numbered, "Rules saved");
   }
 
   async function handleMarkImplemented(lineIndex: number) {
     const next = markRuleImplemented(editText, lineIndex);
     await persistText(next, "Rule marked implemented");
+  }
+
+  async function handleDeleteRule(lineIndex: number) {
+    const line = editText.split("\n")[lineIndex] ?? "";
+    const ruleId = line.trim().match(/^([A-Z]\d+(?:\.\d+)*):/)?.[1] ?? "rule";
+    if (!confirm(`Delete ${ruleId}? This cannot be undone.`)) return;
+    const next = deleteRuleLine(editText, lineIndex);
+    await persistText(next, `Deleted ${ruleId}`);
   }
 
   async function handleReset() {
@@ -260,9 +347,11 @@ export function RulesEditor({ isAdmin: _isAdmin }: { isAdmin: boolean }) {
 
   const classified = classifyLines(editText);
   const ruleCount = classified.filter(l => l.isRule).length;
-  const codeCount = classified.filter(l => l.isRule && l.codeRequired && !l.proposed).length;
   const proposedCount = classified.filter(l => l.proposed).length;
-  const aiCount = ruleCount - codeCount - proposedCount;
+  const modifiedCount = classified.filter(l => l.modified).length;
+  // "Confirmed" code-backed = red rule with NO pending status marker.
+  const codeCount = classified.filter(l => l.isRule && l.codeRequired && !l.proposed && !l.modified).length;
+  const aiCount = ruleCount - codeCount - proposedCount - modifiedCount;
 
   if (loading) return <div className="p-8 text-gray-500">Loading rules...</div>;
 
@@ -323,10 +412,17 @@ export function RulesEditor({ isAdmin: _isAdmin }: { isAdmin: boolean }) {
                 <span className="w-2.5 h-2.5 rounded-full bg-orange-500 shrink-0" />
                 <span className="text-[10px] text-gray-600">Proposed (not yet coded)</span>
               </div>
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0" />
+                <span className="text-[10px] text-gray-600">Modified (code not yet updated)</span>
+              </div>
               <p className="text-[9px] text-gray-400 mt-1">
                 Type a new rule on its own line (no number needed) and press Save.
-                In layout groups, new rules start as <span className="text-orange-600">proposed</span> until
-                you mark them implemented.
+                In layout groups, new rules start as <span className="text-orange-600">proposed</span>;
+                edits to existing layout rules are flagged <span className="text-amber-600">modified</span> on
+                Save. Click <span className="font-semibold">Mark implemented</span> once the layout code is
+                updated. Green (AI-enforced) rules can be removed in place with their per-rule
+                <span className="font-semibold"> Delete</span> button.
               </p>
             </div>
           </div>
@@ -344,6 +440,7 @@ export function RulesEditor({ isAdmin: _isAdmin }: { isAdmin: boolean }) {
                 {aiCount > 0 && <> &middot; <span className="text-green-600">{aiCount} AI-enforced</span></>}
                 {codeCount > 0 && <> &middot; <span className="text-red-500">{codeCount} code-backed</span></>}
                 {proposedCount > 0 && <> &middot; <span className="text-orange-600">{proposedCount} proposed</span></>}
+                {modifiedCount > 0 && <> &middot; <span className="text-amber-600">{modifiedCount} modified</span></>}
               </p>
             </div>
             <div className="flex gap-2 items-center">
@@ -388,30 +485,53 @@ export function RulesEditor({ isAdmin: _isAdmin }: { isAdmin: boolean }) {
                       );
                     }
                     if (cl.isRule) {
+                      // Priority for visual status: proposed > modified >
+                      // confirmed-red > green. [PROPOSED] beats [MODIFIED]
+                      // if both somehow appear on the same line.
                       const dotColour = cl.proposed
                         ? "bg-orange-500"
-                        : cl.codeRequired
-                          ? "bg-red-500"
-                          : "bg-green-500";
+                        : cl.modified
+                          ? "bg-amber-500"
+                          : cl.codeRequired
+                            ? "bg-red-500"
+                            : "bg-green-500";
                       const textColour = cl.proposed
                         ? "text-orange-700"
-                        : cl.codeRequired
-                          ? "text-red-700"
-                          : "text-green-800";
+                        : cl.modified
+                          ? "text-amber-700"
+                          : cl.codeRequired
+                            ? "text-red-700"
+                            : "text-green-800";
+                      const needsImplementing = cl.proposed || cl.modified;
+                      const btnTone = cl.proposed
+                        ? "text-orange-700 border-orange-300 hover:bg-orange-50"
+                        : "text-amber-700 border-amber-300 hover:bg-amber-50";
                       return (
                         <div key={i} className="flex items-start gap-2 py-0.5">
                           <span className={`w-2 h-2 rounded-full mt-1 shrink-0 ${dotColour}`} />
                           <p className={`text-[11px] leading-snug flex-1 ${textColour}`}>
                             {cl.line}
                           </p>
-                          {cl.proposed && (
+                          {needsImplementing && (
                             <button
                               onClick={() => handleMarkImplemented(cl.index)}
                               disabled={saving}
-                              className="shrink-0 text-[9px] text-orange-700 border border-orange-300 rounded px-1.5 py-0.5 hover:bg-orange-50 disabled:opacity-50"
-                              title="Mark this rule as implemented in code"
+                              className={`shrink-0 text-[9px] border rounded px-1.5 py-0.5 disabled:opacity-50 ${btnTone}`}
+                              title={cl.proposed
+                                ? "Mark this rule as implemented in code"
+                                : "Mark this modified rule as re-implemented in code"}
                             >
                               Mark implemented
+                            </button>
+                          )}
+                          {cl.isRule && !cl.codeRequired && (
+                            <button
+                              onClick={() => handleDeleteRule(cl.index)}
+                              disabled={saving}
+                              className="shrink-0 text-[9px] text-gray-500 border border-gray-300 rounded px-1.5 py-0.5 hover:bg-red-50 hover:text-red-700 hover:border-red-300 disabled:opacity-50"
+                              title="Delete this AI-enforced rule"
+                            >
+                              Delete
                             </button>
                           )}
                         </div>

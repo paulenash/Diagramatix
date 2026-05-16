@@ -30,6 +30,13 @@ export const RULE_LINE_RE = /^[A-Z]\d+(?:\.\d+)*:/;
 /** Body marker indicating a code-backed rule is proposed but not yet implemented. */
 export const PROPOSED_RE = /\[PROPOSED\]/i;
 
+/** Body marker indicating a previously-confirmed code-backed rule's text has
+ *  been changed by an admin but the layout code has NOT yet been updated to
+ *  match. While the marker is present the rule is effectively the same as
+ *  [PROPOSED] for downstream purposes — kept out of the AI prompt so the
+ *  model is never told to honour text the layout code doesn't enforce. */
+export const MODIFIED_RE = /\[MODIFIED\]/i;
+
 export function splitRulesByEnforcement(text: string): { aiRules: string; layoutRules: string } {
   const lines = text.split("\n");
   const aiLines: string[] = [];
@@ -43,10 +50,12 @@ export function splitRulesByEnforcement(text: string): { aiRules: string; layout
     const bucket = currentGroupIsLayout ? layoutLines : aiLines;
     if (currentGroupHeading !== null) bucket.push(currentGroupHeading);
     for (const l of currentGroupBuffer) {
-      // In layout (code-backed) groups, drop rule lines marked [PROPOSED] —
-      // they are unimplemented TODOs and must not flow into either the AI
-      // prompt or the layout-code path.
-      if (currentGroupIsLayout && RULE_LINE_RE.test(l.trim()) && PROPOSED_RE.test(l)) continue;
+      // In layout (code-backed) groups, drop rule lines marked [PROPOSED] OR
+      // [MODIFIED] — both are admin tracking flags for rules whose code is
+      // not yet caught up to the rule text, and must not flow into either
+      // the AI prompt or the layout-code path until the admin marks them
+      // implemented.
+      if (currentGroupIsLayout && RULE_LINE_RE.test(l.trim()) && (PROPOSED_RE.test(l) || MODIFIED_RE.test(l))) continue;
       bucket.push(l);
     }
   }
