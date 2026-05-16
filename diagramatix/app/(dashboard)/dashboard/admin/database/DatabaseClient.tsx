@@ -215,20 +215,34 @@ export function DatabaseClient() {
           <h1 className="font-semibold text-gray-900">Database Manager</h1>
           <span className="text-xs text-gray-400">PGlite :51214</span>
         </div>
-        <button
-          onClick={() => {
-            setLoading(true);
-            fetch("/api/admin/database")
-              .then((r) => r.ok ? r.json() : null)
-              .then((d: SchemaData | null) => { if (d) setSchemaData(d); })
-              .catch(() => {})
-              .finally(() => setLoading(false));
-          }}
-          className="text-xs text-gray-500 hover:text-gray-700 border border-gray-300 rounded px-2 py-1"
-          title="Refresh schema"
-        >
-          {"\u21BB"}
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Admin FULL system backup \u2014 every row, every table, including
+              password hashes + OAuth tokens. Treat the downloaded file
+              as a credential. Restore (wipe / additive) lands in a
+              follow-up phase. */}
+          <a
+            href="/api/admin/full-backup"
+            download
+            className="text-xs text-white bg-red-600 hover:bg-red-700 rounded px-2.5 py-1"
+            title="Download a full system snapshot (every row, every table \u2014 sensitive)"
+          >
+            FULL Backup
+          </a>
+          <button
+            onClick={() => {
+              setLoading(true);
+              fetch("/api/admin/database")
+                .then((r) => r.ok ? r.json() : null)
+                .then((d: SchemaData | null) => { if (d) setSchemaData(d); })
+                .catch(() => {})
+                .finally(() => setLoading(false));
+            }}
+            className="text-xs text-gray-500 hover:text-gray-700 border border-gray-300 rounded px-2 py-1"
+            title="Refresh schema"
+          >
+            {"\u21BB"}
+          </button>
+        </div>
       </header>
 
       <div className="flex flex-1 overflow-hidden">
