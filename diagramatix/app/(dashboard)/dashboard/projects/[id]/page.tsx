@@ -1,5 +1,4 @@
 import { notFound, redirect } from "next/navigation";
-import { execSync } from "child_process";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
@@ -28,10 +27,9 @@ export default async function ProjectPage({ params }: Props) {
   const orgId = await tryGetCurrentOrgId(session, cookieStore);
   if (!orgId) notFound();
 
-  let commitCount = 0;
-  try {
-    commitCount = parseInt(execSync("git rev-list --count HEAD", { encoding: "utf8" }).trim(), 10) || 0;
-  } catch {}
+  // Commit count baked into the build via NEXT_PUBLIC_COMMIT_COUNT
+  // (set from --build-arg GIT_COMMIT_COUNT in the Dockerfile).
+  const commitCount = parseInt(process.env.NEXT_PUBLIC_COMMIT_COUNT ?? "0", 10) || 0;
 
   const [project, otherProjects] = await Promise.all([
     prisma.project.findFirst({

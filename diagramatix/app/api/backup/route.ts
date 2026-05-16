@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { execSync } from "child_process";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { isImpersonating, getEffectiveUserId } from "@/app/lib/superuser";
@@ -20,10 +19,9 @@ import { SCHEMA_VERSION } from "@/app/lib/diagram/types";
  */
 
 function appVersion(): string {
-  let commitCount = 0;
-  try {
-    commitCount = parseInt(execSync("git rev-list --count HEAD", { encoding: "utf8" }).trim(), 10) || 0;
-  } catch {}
+  // Commit count baked into the build via NEXT_PUBLIC_COMMIT_COUNT
+  // (set from --build-arg GIT_COMMIT_COUNT in the Dockerfile).
+  const commitCount = parseInt(process.env.NEXT_PUBLIC_COMMIT_COUNT ?? "0", 10) || 0;
   return `${SCHEMA_VERSION}.${commitCount}`;
 }
 

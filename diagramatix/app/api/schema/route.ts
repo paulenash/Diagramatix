@@ -1,14 +1,13 @@
 import { NextResponse } from "next/server";
-import { execSync } from "child_process";
 import { readFileSync } from "fs";
 import { join } from "path";
 import { SCHEMA_VERSION } from "@/app/lib/diagram/types";
 
 export async function GET() {
-  let commitCount = 0;
-  try {
-    commitCount = parseInt(execSync("git rev-list --count HEAD", { encoding: "utf8" }).trim(), 10) || 0;
-  } catch {}
+  // Commit count is baked into the build via NEXT_PUBLIC_COMMIT_COUNT
+  // (set from --build-arg GIT_COMMIT_COUNT in the Dockerfile). Falls
+  // back to "0" in containers without git or in dev runs.
+  const commitCount = parseInt(process.env.NEXT_PUBLIC_COMMIT_COUNT ?? "0", 10) || 0;
 
   const appVersion = `${SCHEMA_VERSION}.${commitCount}`;
 

@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation";
-import { execSync } from "child_process";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
@@ -86,10 +85,9 @@ export default async function DashboardPage() {
     viewingAsEmail = target?.email ?? "";
   }
 
-  let commitCount = 0;
-  try {
-    commitCount = parseInt(execSync("git rev-list --count HEAD", { encoding: "utf8" }).trim(), 10) || 0;
-  } catch { /* fallback to 0 */ }
+  // Commit count baked into the build via NEXT_PUBLIC_COMMIT_COUNT
+  // (set from --build-arg GIT_COMMIT_COUNT in the Dockerfile).
+  const commitCount = parseInt(process.env.NEXT_PUBLIC_COMMIT_COUNT ?? "0", 10) || 0;
 
   return (
     <DashboardClient
