@@ -1212,6 +1212,29 @@ export async function exportVisioV3(
       }
     }
 
+    // v1.5 Sub-Process masters (ID 7 = Collapsed, ID 8 = Expanded) carry the
+    // same bottom-row marker layout (Loop / Collapsed / AdHoc) at the SAME
+    // sub-shape IDs as BPMN_M (10, 11, 14, 15, 17, 27), but the
+    // `if (sourceMasterId === 33)` block above doesn't fire for them so
+    // every active marker stacks on top of the others at cached PinX=1.15
+    // on first paint. Run JUST the layout pass (no marker scaling — v1.5
+    // markers are sized as the master ships them).
+    if ((sourceMasterId === 7 || sourceMasterId === 8)
+        && instanceW !== undefined) {
+      const hasAdHocV15 = elProps?.adHoc === true;
+      const hasCollapsedV15 = elType === "subprocess";
+      const loopShapeIdV15 =
+        repeatType === "loop" ? 17           // StandardLoop sub-shape
+        : repeatType === "mi-sequential" ? 27 // SequentialLoop
+        : repeatType === "mi-parallel" ? 15   // ParallelLoop
+        : null;
+      masterContent = layoutSubprocessMarkers(
+        masterContent,
+        instanceW,
+        { loopShapeId: loopShapeIdV15, hasCollapsed: hasCollapsedV15, hasAdHoc: hasAdHocV15 },
+      );
+    }
+
     // Non-interrupting events (master 105 = Intermediate, 107 = Start).
     // The body outline shapes (6, 7 for both, plus 9 for Intermediate)
     // have `LinePattern` formulas like:
@@ -1696,6 +1719,14 @@ export async function exportVisioV3(
       // Plus a boundary action (BoundaryEvent / BoundaryCall) when the
       // user has set `subprocessType` to "event" / "call" — which switches
       // the body outline to the appropriate dashed / double border.
+      //
+      // All FOUR loop Action rows (NoLoop / StandardLoop / SequentialLoop /
+      // ParallelLoop) are emitted explicitly with cached Checked V matching
+      // the selected repeat type. Without the explicit NoLoop=0 override,
+      // the master's `NoLoop.Checked = STRSAME(Prop.BpmnLoopType,
+      // INDEX(0,…))` formula keeps its cached V=1 on first paint, and Visio
+      // shows BOTH "Normal" AND the active MI marker checked simultaneously
+      // until a manual recalc kicks in.
       const SUBPROCESS_REPEAT_ACTION: Record<string, string> = {
         "loop":          "StandardLoop",
         "mi-sequential": "SequentialLoop",
@@ -1706,20 +1737,31 @@ export async function exportVisioV3(
         "event": "BoundaryEvent",
       };
       const props = el.properties as Record<string, unknown> | undefined;
-      const acts: string[] = [];
-      const repeatAct = SUBPROCESS_REPEAT_ACTION[el.repeatType ?? "none"];
-      if (repeatAct) acts.push(repeatAct);
-      if (props?.adHoc === true) acts.push("AdHoc");
+      const repeatType = el.repeatType ?? "none";
+      const repeatAct = SUBPROCESS_REPEAT_ACTION[repeatType];
       const boundaryAct = SUBPROCESS_BOUNDARY_ACTION[
         props?.subprocessType as string ?? "normal"
       ];
-      if (boundaryAct) acts.push(boundaryAct);
-      if (acts.length > 0) {
-        actionsSection = `<Section N='Actions'>` +
-          acts.map((a) => `<Row N='${a}'><Cell N='Checked' V='1' F='Inh'/></Row>`).join("") +
-          `</Section>`;
-        triggerActions.push(...acts);
-      }
+      const adHoc = props?.adHoc === true;
+
+      // Build the full loop-action row set. Exactly one is V='1' at any time.
+      const loopRows = [
+        `<Row N='NoLoop'><Cell N='Checked' V='${repeatType === "none" ? "1" : "0"}' F='Inh'/></Row>`,
+        `<Row N='StandardLoop'><Cell N='Checked' V='${repeatType === "loop" ? "1" : "0"}' F='Inh'/></Row>`,
+        `<Row N='SequentialLoop'><Cell N='Checked' V='${repeatType === "mi-sequential" ? "1" : "0"}' F='Inh'/></Row>`,
+        `<Row N='ParallelLoop'><Cell N='Checked' V='${repeatType === "mi-parallel" ? "1" : "0"}' F='Inh'/></Row>`,
+      ];
+      const extraRows: string[] = [];
+      if (adHoc) extraRows.push(`<Row N='AdHoc'><Cell N='Checked' V='1' F='Inh'/></Row>`);
+      if (boundaryAct) extraRows.push(`<Row N='${boundaryAct}'><Cell N='Checked' V='1' F='Inh'/></Row>`);
+      actionsSection = `<Section N='Actions'>` + loopRows.join("") + extraRows.join("") + `</Section>`;
+      // triggerActions drives the per-shape marker NoShow overrides via
+      // TRIGGER_MARKER_MAP. We push only the SELECTED actions (not the
+      // explicitly-unchecked ones) so unrelated marker sub-shapes stay
+      // hidden as the master's NoShow formula intends.
+      if (repeatAct) triggerActions.push(repeatAct);
+      if (adHoc) triggerActions.push("AdHoc");
+      if (boundaryAct) triggerActions.push(boundaryAct);
     }
 
     // Each marker is one or more (shapeId, geomIxs) overrides — Geometry IX

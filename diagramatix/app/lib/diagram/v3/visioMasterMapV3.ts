@@ -21,6 +21,23 @@ const TASK_TYPE_MAP: Record<string, string> = {
   "send": "Send", "receive": "Receive", "manual": "Manual", "business-rule": "Business Rule",
 };
 
+// Loop / multi-instance type mapping — values match the master's
+// `Prop.BpmnLoopType.Format`:
+//   "None;Standard;Parallel MultiInstance;Sequential MultiInstance"
+// Previously the mapper only handled "loop" → "Standard"; the MI cases
+// fell through to "None" so the master's Action formulas evaluated to
+// NoLoop.Checked=1 AND (SequentialLoop|ParallelLoop).Checked=0 — i.e.
+// the Visio right-click panel showed BOTH "Normal" and the MI variant
+// flagged on first paint, and only the cached marker geometry showed
+// the right icon. Setting the loop-type property correctly makes the
+// master's formulas pick the right Action.
+const LOOP_TYPE_MAP: Record<string, string> = {
+  "none":          "None",
+  "loop":          "Standard",
+  "mi-parallel":   "Parallel MultiInstance",
+  "mi-sequential": "Sequential MultiInstance",
+};
+
 // Gateway type mapping. `marker: true` flips Visio's BpmnExclusiveType
 // label to "Exclusive Gateway (with Marker)" so the X is shown; without
 // marker it's just "Exclusive Gateway" (plain diamond, no X). Diagramatix's
@@ -86,7 +103,7 @@ function getElementMappingV3Inner(el: DiagramElement, profile: StencilProfile): 
         properties: {
           BpmnActivityType: "Task",
           BpmnTaskType: TASK_TYPE_MAP[el.taskType ?? "none"] ?? "None",
-          BpmnLoopType: el.repeatType === "loop" ? "Standard" : "None",
+          BpmnLoopType: LOOP_TYPE_MAP[el.repeatType ?? "none"] ?? "None",
           BpmnName: el.label ?? "",
         },
       };
@@ -165,7 +182,7 @@ function getElementMappingV3Inner(el: DiagramElement, profile: StencilProfile): 
         properties: {
           BpmnActivityType: "Sub-Process",
           BpmnBoundaryType: boundary,
-          BpmnLoopType: el.repeatType === "loop" ? "Standard" : "None",
+          BpmnLoopType: LOOP_TYPE_MAP[el.repeatType ?? "none"] ?? "None",
           BpmnIsCollapsed: el.type === "subprocess" ? "1" : "0",
           BpmnName: el.label ?? "",
         },
