@@ -1,0 +1,195 @@
+name: Build and deploy to Azure App Service
+
+# Triggered on every push to main. `workflow_dispatch` keeps a manual
+# button in the GitHub UI for emergency redeploys (e.g. rolling back to a
+# prior tag by re-running an older run).
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# OIDC federation. The `id-token: write` permission lets this job request
+# a short-lived OIDC token GitHub mints; `azure/login@v2` trades that
+# token for an Azure access token via the federated credential configured
+# on the AAD app registration named in `AZURE_CLIENT_ID`.
+#
+# Prerequisites (one-time setup, see deployment plan Phase 7):
+#   1. AAD app registration with federated credentials matching:
+#        repo:<owner>/<repo>:ref:refs/heads/main           (push to main)
+#        repo:<owner>/<repo>:environment:production         (env-gated)
+#      Plus role assignments: AcrPush on `dgxprodacr`, Website Contributor
+#      on `dgx-prod-app`, Key Vault Secrets User on `dgx-kv`.
+#   2. GitHub repo secrets:
+#        AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID
+#   3. GitHub repo variables (or hard-coded here — variables make
+#      re-deploying to a sister environment easier later):
+#        ACR_NAME, RESOURCE_GROUP, APP_SERVICE_NAME, KEY_VAULT_NAME,
+#        DATABASE_URL_SECRET_NAME, IMAGE_REPO
+permissions:
+  id-token: write          # OIDC token for azure/login
+  contents: read           # actions/checkout
+
+# Re-running a workflow for the same ref cancels the prior run — avoids
+# racing two deploys against the same App Service if commits land fast.
+concurrency:
+  group: azure-deploy-${{ github.ref }}
+  cancel-in-progress: false   # let in-flight migrations finish
+
+env:
+  ACR_NAME: dgxprodacr
+  RESOURCE_GROUP: dgx-prod-rg
+  APP_SERVICE_NAME: dgx-prod-app
+  KEY_VAULT_NAME: dgx-kv
+  DATABASE_URL_SECRET_NAME: database-url
+  IMAGE_REPO: diagramatix
+
+jobs:
+  build-and-deploy:
+    # The `production` environment gates this job on whatever protection
+    # rules you configure in Settings → Environments → production
+    # (required reviewers, wait timer, etc.). Empty environments behave
+    # as a pass-through.
+    environment: production
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Full history so `git rev-list --count HEAD` produces the real
+          # commit count for NEXT_PUBLIC_COMMIT_COUNT. Shallow clones
+          # return 1.
+          fetch-depth: 0
+
+      - name: Compute commit count
+        id: commit_count
+        run: |
+          COUNT=$(git rev-list --count HEAD)
+          echo "count=$COUNT" >> "$GITHUB_OUTPUT"
+          echo "Commit count: $COUNT"
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Azure Container Registry login
+        # Uses the Azure CLI session from the OIDC login above to mint
+        # an admin-less ACR token; `docker push` afterwards works without
+        # a registry password baked anywhere.
+        run: az acr login --name "$ACR_NAME"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./diagramatix
+          file: ./diagramatix/Dockerfile
+          build-args: |
+            GIT_COMMIT_COUNT=${{ steps.commit_count.outputs.count }}
+          # Two tags every push: the immutable `:sha-<commit>` for
+          # rollback targeting, and `:latest` so App Service settings
+          # that reference `:latest` pick up the new image on restart.
+          # Production should reference the sha tag — `:latest` is a
+          # convenience for ad-hoc `docker run` and dev pulls.
+          tags: |
+            ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_REPO }}:sha-${{ github.sha }}
+            ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_REPO }}:latest
+          push: true
+          # Registry-side layer cache. Faster warm rebuilds; one-time
+          # cold build still does the full Alpine + node_modules pull.
+          cache-from: type=registry,ref=${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_REPO }}:buildcache
+          cache-to: type=registry,ref=${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_REPO }}:buildcache,mode=max
+
+      - name: Fetch DATABASE_URL from Key Vault
+        id: db
+        # Surface the secret as a step output. Subsequent steps refer to
+        # it via `steps.db.outputs.url` rather than a top-level env var so
+        # the value never appears in the `env` JSON the runner logs.
+        run: |
+          URL=$(az keyvault secret show \
+            --vault-name "$KEY_VAULT_NAME" \
+            --name "$DATABASE_URL_SECRET_NAME" \
+            --query value -o tsv)
+          echo "::add-mask::$URL"
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: diagramatix/package-lock.json
+
+      - name: Install Prisma CLI
+        # `npm ci` is overkill for a migration step — Prisma 7 ships its
+        # CLI in the same package so a focused install + generate keeps
+        # this job tight.
+        working-directory: ./diagramatix
+        run: |
+          npm ci --omit=dev --ignore-scripts
+          npx prisma generate
+
+      - name: Apply database migrations
+        working-directory: ./diagramatix
+        env:
+          DATABASE_URL: ${{ steps.db.outputs.url }}
+        # `prisma migrate deploy` is idempotent: applies pending
+        # migrations from prisma/migrations/ in lexical order, no-op if
+        # the schema is already current. Failures abort the workflow
+        # BEFORE the App Service container is swapped — preventing the
+        # "new code, old schema" failure mode.
+        run: npx prisma migrate deploy
+
+      - name: Update App Service container image
+        # `az webapp config container set` rewrites the container
+        # configuration to point at the new SHA tag. App Service detects
+        # the change, pulls the new image, runs the configured health
+        # probe, and rotates traffic when healthy.
+        run: |
+          az webapp config container set \
+            --resource-group "$RESOURCE_GROUP" \
+            --name "$APP_SERVICE_NAME" \
+            --container-image-name "${ACR_NAME}.azurecr.io/${IMAGE_REPO}:sha-${{ github.sha }}"
+
+      - name: Restart App Service
+        # Belt-and-braces — App Service usually auto-restarts on image
+        # change, but an explicit restart ensures the new container is
+        # active before the post-deploy smoke check below.
+        run: |
+          az webapp restart \
+            --resource-group "$RESOURCE_GROUP" \
+            --name "$APP_SERVICE_NAME"
+
+      - name: Smoke test (health endpoint)
+        # Hit the public URL until it returns 200 or we time out. A
+        # /api/health endpoint that pings the DB is the right shape;
+        # falling back to / works while that route doesn't exist yet.
+        # 12 × 10s = 2 minutes total; raise if cold-start runs longer.
+        run: |
+          APP_URL=$(az webapp show \
+            --resource-group "$RESOURCE_GROUP" \
+            --name "$APP_SERVICE_NAME" \
+            --query defaultHostName -o tsv)
+          echo "Waiting for https://${APP_URL}/ to return 200…"
+          for i in $(seq 1 12); do
+            CODE=$(curl -s -o /dev/null -w "%{http_code}" "https://${APP_URL}/" || echo "000")
+            echo "Attempt $i: HTTP $CODE"
+            if [ "$CODE" = "200" ] || [ "$CODE" = "302" ] || [ "$CODE" = "307" ]; then
+              echo "App is responding — deploy verified."
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::Smoke test failed — app did not return 200 within 2 minutes."
+          exit 1
+
+      - name: Azure logout
+        # Always run — even if the deploy failed, the OIDC token has a
+        # short TTL but explicit logout is good hygiene.
+        if: always()
+        run: az logout --username ${{ secrets.AZURE_CLIENT_ID }} || true
