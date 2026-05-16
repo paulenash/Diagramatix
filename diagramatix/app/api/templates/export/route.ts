@@ -30,16 +30,16 @@ export async function GET(req: Request) {
   try {
     const result = type === "builtin"
       ? await pgPool.query(
-          `SELECT name, "diagramType", data
+          `SELECT name, "diagramType", "group", data
              FROM "DiagramTemplate"
             WHERE "templateType" = 'builtin'
-            ORDER BY "createdAt" ASC`
+            ORDER BY COALESCE("group", '~'), "createdAt" ASC`
         )
       : await pgPool.query(
-          `SELECT name, "diagramType", data
+          `SELECT name, "diagramType", "group", data
              FROM "DiagramTemplate"
             WHERE "templateType" = 'user' AND "userId" = $1
-            ORDER BY "createdAt" ASC`,
+            ORDER BY COALESCE("group", '~'), "createdAt" ASC`,
           [session.user.id]
         );
 
@@ -47,11 +47,18 @@ export async function GET(req: Request) {
       schemaVersion: SCHEMA_VERSION,
       exportedAt: new Date().toISOString(),
       templateType: type,
-      templates: result.rows.map((r: { name: string; diagramType: string; data: unknown }) => ({
-        name: r.name,
-        diagramType: r.diagramType,
-        data: r.data,
-      })),
+      // Templates are ordered by group (NULLs last via the '~' COALESCE
+      // sort key — '~' sorts after any printable ASCII so ungrouped
+      // entries land at the bottom of the file). The `group` field
+      // (string or null) round-trips into the import.
+      templates: result.rows.map(
+        (r: { name: string; diagramType: string; group: string | null; data: unknown }) => ({
+          name: r.name,
+          diagramType: r.diagramType,
+          group: r.group,
+          data: r.data,
+        }),
+      ),
     };
 
     const dateStr = new Date().toISOString().slice(0, 10);

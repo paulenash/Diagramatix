@@ -26,7 +26,7 @@ export async function GET(req: Request) {
     let result;
     if (type === "builtin") {
       result = await pgPool.query(
-        `SELECT id, name, "diagramType", "createdAt"
+        `SELECT id, name, "diagramType", "group", "createdAt"
          FROM "DiagramTemplate"
          WHERE "templateType" = 'builtin'
          ORDER BY "updatedAt" DESC`
@@ -35,7 +35,7 @@ export async function GET(req: Request) {
       let userId = session.user.id;
       try { userId = getEffectiveUserId(session, await cookies()); } catch { /* fallback to session user */ }
       result = await pgPool.query(
-        `SELECT id, name, "diagramType", "createdAt"
+        `SELECT id, name, "diagramType", "group", "createdAt"
          FROM "DiagramTemplate"
          WHERE "templateType" = 'user' AND "userId" = $1
          ORDER BY "updatedAt" DESC`,
@@ -64,7 +64,7 @@ export async function POST(req: Request) {
   } catch { /* proceed normally */ }
 
   const body = await req.json();
-  const { name, diagramType = "bpmn", data, templateType = "user", adminPassword } = body;
+  const { name, diagramType = "bpmn", data, templateType = "user", adminPassword, group } = body;
 
   if (!name?.trim()) {
     return NextResponse.json({ error: "Name is required" }, { status: 400 });
@@ -78,16 +78,20 @@ export async function POST(req: Request) {
     }
   }
 
+  // Normalise group: trim, empty string → null (ungrouped).
+  const groupTrimmed = typeof group === "string" ? group.trim() : "";
+  const groupValue: string | null = groupTrimmed.length > 0 ? groupTrimmed : null;
+
   try {
     const id = cuid();
     const now = new Date();
     await pgPool.query(
-      `INSERT INTO "DiagramTemplate" (id, name, "diagramType", "templateType", data, "userId", "createdAt", "updatedAt")
-       VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8)`,
-      [id, name.trim(), diagramType, templateType, JSON.stringify(data), session.user.id, now, now]
+      `INSERT INTO "DiagramTemplate" (id, name, "diagramType", "templateType", "group", data, "userId", "createdAt", "updatedAt")
+       VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9)`,
+      [id, name.trim(), diagramType, templateType, groupValue, JSON.stringify(data), session.user.id, now, now]
     );
 
-    return NextResponse.json({ id, name: name.trim(), diagramType, createdAt: now }, { status: 201 });
+    return NextResponse.json({ id, name: name.trim(), diagramType, group: groupValue, createdAt: now }, { status: 201 });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("[POST /api/templates] error:", message);

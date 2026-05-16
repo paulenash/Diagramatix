@@ -24,6 +24,7 @@ function cuid() {
 interface IncomingTemplate {
   name: string;
   diagramType: string;
+  group?: string | null;
   data: unknown;
 }
 
@@ -94,11 +95,15 @@ export async function POST(req: Request) {
       }
       const id = cuid();
       const now = new Date();
+      // Normalise incoming group: undefined → null (older files predate
+      // groups), trimmed empty → null, non-empty string → preserved.
+      const incomingGroup = typeof t.group === "string" ? t.group.trim() : "";
+      const groupValue: string | null = incomingGroup.length > 0 ? incomingGroup : null;
       await pgPool.query(
         `INSERT INTO "DiagramTemplate"
-          (id, name, "diagramType", "templateType", data, "userId", "createdAt", "updatedAt")
-         VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8)`,
-        [id, t.name, t.diagramType, targetType, JSON.stringify(t.data ?? {}), session.user.id, now, now]
+          (id, name, "diagramType", "templateType", "group", data, "userId", "createdAt", "updatedAt")
+         VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9)`,
+        [id, t.name, t.diagramType, targetType, groupValue, JSON.stringify(t.data ?? {}), session.user.id, now, now]
       );
       existingKeys.add(key);
       created++;

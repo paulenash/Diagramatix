@@ -59,6 +59,7 @@ interface BackupTemplate {
   name: string;
   diagramType: string;
   templateType: string;
+  group?: string | null;
   data: unknown;
   createdAt: string;
 }
@@ -142,6 +143,7 @@ export async function buildUserBackup(
       name: t.name,
       diagramType: t.diagramType,
       templateType: t.templateType,
+      group: t.group ?? null,
       data: t.data,
       createdAt: t.createdAt.toISOString(),
     })),
@@ -289,11 +291,16 @@ export async function restoreUserBackup(
   // ── User templates ─────────────────────────────────────────────────────
   let templatesRestored = 0;
   for (const tpl of payload.userTemplates ?? []) {
+    // Preserve the template's group on restore. Older backups (pre-1.11)
+    // omit the field; treat that as ungrouped (null).
+    const incomingGroup = typeof tpl.group === "string" ? tpl.group.trim() : "";
+    const groupValue: string | null = incomingGroup.length > 0 ? incomingGroup : null;
     await prisma.diagramTemplate.create({
       data: {
         name: tpl.name,
         diagramType: tpl.diagramType ?? "bpmn",
         templateType: "user", // never restore as built-in
+        group: groupValue,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         data: (tpl.data ?? {}) as any,
         userId,

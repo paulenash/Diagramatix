@@ -24,7 +24,7 @@ export async function GET(_req: Request, { params }: Params) {
     try { userId = getEffectiveUserId(session, await cookies()); } catch { /* fallback */ }
     const { id } = await params;
     const result = await pgPool.query(
-      `SELECT id, name, "diagramType", "templateType", data, "createdAt"
+      `SELECT id, name, "diagramType", "templateType", "group", data, "createdAt"
        FROM "DiagramTemplate"
        WHERE id = $1 AND ("templateType" = 'builtin' OR "userId" = $2)`,
       [id, userId]
@@ -56,7 +56,8 @@ export async function PUT(req: Request, { params }: Params) {
   try {
     const { id } = await params;
     const body = await req.json();
-    const { name, data, adminPassword } = body;
+    const { name, data, adminPassword, group } = body;
+    const groupProvided = Object.prototype.hasOwnProperty.call(body, "group");
 
     // Check if this is a builtin template
     const existing = await pgPool.query(
@@ -82,6 +83,16 @@ export async function PUT(req: Request, { params }: Params) {
 
     if (name?.trim()) { sets.push(`name = $${idx++}`); values.push(name.trim()); }
     if (data) { sets.push(`data = $${idx++}::jsonb`); values.push(JSON.stringify(data)); }
+    // Group is an explicit setter: null / "" → NULL (ungrouped); a non-empty
+    // string → group name. Only touch the column if the caller actually
+    // sent the field (`groupProvided`) so an edit that only renames the
+    // template doesn't accidentally wipe its group.
+    if (groupProvided) {
+      const groupTrimmed = typeof group === "string" ? group.trim() : "";
+      const groupValue: string | null = groupTrimmed.length > 0 ? groupTrimmed : null;
+      sets.push(`"group" = $${idx++}`);
+      values.push(groupValue);
+    }
 
     if (sets.length === 0) {
       return NextResponse.json({ error: "Nothing to update" }, { status: 400 });

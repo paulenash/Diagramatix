@@ -78,6 +78,12 @@ model User {
   orgMembers       OrgMember[]
   prompts          Prompt[]
   diagramRules     DiagramRules[]
+  // Per-user UI prefs. Currently stores the collapsed state of
+  // template-group headers in the editor menu, keyed like
+  // `{ "user:Group A": true, "builtin:Group B": false }`. Templates'
+  // group field is the source of truth; this just remembers which
+  // headers the user wants folded.
+  templateGroupPrefs Json?
   createdAt        DateTime  @default(now())
 }
 
@@ -139,6 +145,11 @@ model DiagramTemplate {
   name         String
   diagramType  String   @default("bpmn")
   templateType String   @default("user")
+  // Free-form group name. Null = ungrouped. Same name across multiple
+  // templates clusters them under one collapsible header in the editor
+  // menu. User and builtin clusters are independent (user-template
+  // "Patterns" and builtin-template "Patterns" are two separate groups).
+  group        String?
   data         Json     @default("{}")
   userId       String
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)

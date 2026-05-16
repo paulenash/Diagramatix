@@ -642,8 +642,22 @@ export function DiagramEditor({
 
   // Template state (BPMN only)
   const isAdmin = userEmail === "paul@nashcc.com.au";
-  const [userTemplates, setUserTemplates] = useState<{ id: string; name: string }[]>([]);
-  const [builtInTemplates, setBuiltInTemplates] = useState<{ id: string; name: string }[]>([]);
+  type TemplateRow = { id: string; name: string; group: string | null };
+  const [userTemplates, setUserTemplates] = useState<TemplateRow[]>([]);
+  const [builtInTemplates, setBuiltInTemplates] = useState<TemplateRow[]>([]);
+  // Per-user collapse state, keyed `<scope>:<group-name>` (scope = "user"
+  // or "builtin"). true = collapsed. Loaded from /api/templates/group-prefs
+  // on mount and updated optimistically on every toggle.
+  const [templateGroupCollapsed, setTemplateGroupCollapsed] = useState<Record<string, boolean>>({});
+  // Which template (if any) is showing a "Move to group..." submenu, and
+  // whether it's in the typed-new-group mode.
+  const [templateMoveMenu, setTemplateMoveMenu] = useState<{
+    templateId: string;
+    scope: "user" | "builtin";
+    currentGroup: string | null;
+    typing: boolean;
+    typedName: string;
+  } | null>(null);
   const [templateMode, setTemplateMode] = useState<"idle" | "capturing" | "capturing-builtin" | "editing">("idle");
   const [deletingTemplateIds, setDeletingTemplateIds] = useState<Set<string>>(new Set());
   const [templateImportInfo, setTemplateImportInfo] = useState<
@@ -726,15 +740,32 @@ export function DiagramEditor({
       try {
         const r1 = await fetch("/api/templates?type=user");
         if (r1.ok) {
-          const list = await r1.json() as { id: string; name: string; diagramType: string }[];
-          setUserTemplates(list.filter((t) => t.diagramType === "bpmn"));
+          const list = await r1.json() as { id: string; name: string; diagramType: string; group: string | null }[];
+          setUserTemplates(
+            list
+              .filter((t) => t.diagramType === "bpmn")
+              .map((t) => ({ id: t.id, name: t.name, group: t.group ?? null })),
+          );
         }
       } catch {}
       try {
         const r2 = await fetch("/api/templates?type=builtin");
         if (r2.ok) {
-          const list = await r2.json() as { id: string; name: string; diagramType: string }[];
-          setBuiltInTemplates(list.filter((t) => t.diagramType === "bpmn"));
+          const list = await r2.json() as { id: string; name: string; diagramType: string; group: string | null }[];
+          setBuiltInTemplates(
+            list
+              .filter((t) => t.diagramType === "bpmn")
+              .map((t) => ({ id: t.id, name: t.name, group: t.group ?? null })),
+          );
+        }
+      } catch {}
+      // Restore group-collapse state for this user. Failure is non-fatal —
+      // all groups default to expanded.
+      try {
+        const rp = await fetch("/api/templates/group-prefs");
+        if (rp.ok) {
+          const { prefs } = await rp.json() as { prefs: Record<string, boolean> };
+          if (prefs && typeof prefs === "object") setTemplateGroupCollapsed(prefs);
         }
       } catch {}
     })();
@@ -746,6 +777,7 @@ export function DiagramEditor({
     function handleClick(e: MouseEvent) {
       if (templateDropdownRef.current && !templateDropdownRef.current.contains(e.target as Node)) {
         setTemplateDropdownOpen(false);
+        setTemplateMoveMenu(null);
       }
     }
     document.addEventListener("mousedown", handleClick);
@@ -1206,8 +1238,10 @@ export function DiagramEditor({
         const which = dest === "builtin" ? "builtin" : "user";
         const refresh = await fetch(`/api/templates?type=${which}`);
         if (refresh.ok) {
-          const list = await refresh.json() as { id: string; name: string; diagramType: string }[];
-          const bpmnOnly = list.filter((t) => t.diagramType === "bpmn").map(t => ({ id: t.id, name: t.name }));
+          const list = await refresh.json() as { id: string; name: string; diagramType: string; group: string | null }[];
+          const bpmnOnly: TemplateRow[] = list
+            .filter((t) => t.diagramType === "bpmn")
+            .map((t) => ({ id: t.id, name: t.name, group: t.group ?? null }));
           if (dest === "builtin") setBuiltInTemplates(bpmnOnly);
           else setUserTemplates(bpmnOnly);
         }
@@ -1240,11 +1274,11 @@ export function DiagramEditor({
     setShowTemplateNameModal(true);
   }
 
-  async function handleConfirmTemplateName(name: string, adminPassword?: string) {
+  async function handleConfirmTemplateName(name: string, group: string | null, adminPassword?: string) {
     if (!pendingTemplateData) return;
     const isBuiltIn = templateMode === "capturing-builtin";
     try {
-      const body: Record<string, unknown> = { name, diagramType: "bpmn", data: pendingTemplateData };
+      const body: Record<string, unknown> = { name, diagramType: "bpmn", data: pendingTemplateData, group };
       if (isBuiltIn) {
         body.templateType = "builtin";
         if (adminPassword) body.adminPassword = adminPassword;
@@ -1260,10 +1294,15 @@ export function DiagramEditor({
         if (res.status === 403) { alert("Invalid admin password"); return; }
       } else {
         const created = await res.json();
+        const createdRow: TemplateRow = {
+          id: created.id,
+          name: created.name,
+          group: created.group ?? null,
+        };
         if (isBuiltIn) {
-          setBuiltInTemplates((prev) => [{ id: created.id, name: created.name }, ...prev]);
+          setBuiltInTemplates((prev) => [createdRow, ...prev]);
         } else {
-          setUserTemplates((prev) => [{ id: created.id, name: created.name }, ...prev]);
+          setUserTemplates((prev) => [createdRow, ...prev]);
         }
       }
     } catch (err) {
@@ -1343,7 +1382,7 @@ export function DiagramEditor({
     }
   }
 
-  async function handleUpdateTemplate(newName: string) {
+  async function handleUpdateTemplate(newName: string, newGroup: string | null) {
     if (!templateEditState) return;
 
     const captured = captureTemplate(data.elements, data.connectors, selectedElementIds);
@@ -1353,14 +1392,15 @@ export function DiagramEditor({
       const res = await fetch(`/api/templates/${templateEditState.templateId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: newName, data: captured }),
+        body: JSON.stringify({ name: newName, data: captured, group: newGroup }),
       });
       if (!res.ok) {
         console.error("Failed to update template:", res.status, await res.text());
       } else {
-        // Update in whichever list contains this template
-        const updater = (prev: { id: string; name: string }[]) =>
-          prev.map((t) => t.id === templateEditState.templateId ? { ...t, name: newName } : t);
+        const updater = (prev: TemplateRow[]) =>
+          prev.map((t) => t.id === templateEditState.templateId
+            ? { ...t, name: newName, group: newGroup }
+            : t);
         setUserTemplates(updater);
         setBuiltInTemplates(updater);
       }
@@ -1379,6 +1419,43 @@ export function DiagramEditor({
     setSelectedElementIds(new Set());
     setSelectedConnectorId(null);
     setShowTemplateNameModal(false);
+  }
+
+  /** Optimistic toggle of a template-group header's collapsed state.
+   *  Persists to the user's row via /api/templates/group-prefs in the
+   *  background — failure is silent (next reload re-reads server state). */
+  function toggleTemplateGroupCollapse(scope: "user" | "builtin", group: string) {
+    const key = `${scope}:${group}`;
+    const next = !templateGroupCollapsed[key];
+    setTemplateGroupCollapsed((p) => ({ ...p, [key]: next }));
+    void fetch("/api/templates/group-prefs", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key, collapsed: next }),
+    });
+  }
+
+  /** Move a template into a group (or out — newGroup = null). Updates the
+   *  in-memory list and PATCHes the server. Closes the move-submenu. */
+  async function moveTemplateToGroup(
+    templateId: string,
+    scope: "user" | "builtin",
+    newGroup: string | null,
+  ) {
+    const trimmed = newGroup ? newGroup.trim() : null;
+    const finalGroup = trimmed && trimmed.length > 0 ? trimmed : null;
+    const setter = scope === "user" ? setUserTemplates : setBuiltInTemplates;
+    setter((prev) => prev.map((t) => t.id === templateId ? { ...t, group: finalGroup } : t));
+    setTemplateMoveMenu(null);
+    try {
+      await fetch(`/api/templates/${templateId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ group: finalGroup }),
+      });
+    } catch (err) {
+      console.error("Failed to move template:", err);
+    }
   }
 
   return (
@@ -1600,73 +1677,146 @@ export function DiagramEditor({
                   </button>
                 )}
 
-                {/* Built-In Templates */}
-                {builtInTemplates.length > 0 && (
-                  <>
-                    <div className="border-t border-gray-100" />
-                    <p className="px-3 py-1.5 text-[10px] text-gray-400 font-semibold uppercase tracking-wide">Built-In</p>
-                    {builtInTemplates.map((t) => {
-                      const isDeleting = deletingTemplateIds.has(t.id);
-                      return (
-                        <div key={t.id} className={`flex items-center ${isDeleting ? "opacity-50" : "hover:bg-gray-50"}`}>
+                {/* Built-In + User template lists. Each list shows ungrouped
+                    templates first (no header), then each named group as a
+                    collapsible row. Per-template "move to group" submenu lets
+                    the user re-organise via existing groups or a typed-in new
+                    group. Collapse state is per-user (server-persisted). */}
+                {(["builtin", "user"] as const).map((scope) => {
+                  const list = scope === "builtin" ? builtInTemplates : userTemplates;
+                  if (list.length === 0) return null;
+                  const scopeLabel = scope === "builtin" ? "Built-In" : "User";
+                  const canEdit = scope === "user" || isAdmin;
+                  const ungrouped: TemplateRow[] = [];
+                  const grouped = new Map<string, TemplateRow[]>();
+                  for (const t of list) {
+                    if (!t.group) ungrouped.push(t);
+                    else {
+                      const arr = grouped.get(t.group);
+                      if (arr) arr.push(t); else grouped.set(t.group, [t]);
+                    }
+                  }
+                  const groupNames = [...grouped.keys()].sort((a, b) => a.localeCompare(b));
+                  const renderItem = (t: TemplateRow, indent: boolean) => {
+                    const isDeleting = deletingTemplateIds.has(t.id);
+                    const showingMove = templateMoveMenu?.templateId === t.id;
+                    return (
+                      <div key={t.id}>
+                        <div className={`flex items-center ${isDeleting ? "opacity-50" : "hover:bg-gray-50"}`}>
                           <button
                             onClick={() => !isDeleting && handleApplyTemplate(t.id)}
                             disabled={isDeleting}
-                            className={`flex-1 text-left px-3 py-1.5 text-xs text-gray-700 ${isDeleting ? "line-through text-gray-400" : ""}`}
+                            className={`flex-1 text-left ${indent ? "pl-6 pr-3" : "px-3"} py-1.5 text-xs text-gray-700 ${isDeleting ? "line-through text-gray-400" : ""}`}
                           >
                             {t.name}{isDeleting ? " (deleting\u2026)" : ""}
                           </button>
-                          {isAdmin && !isDeleting && (
+                          {canEdit && !isDeleting && (
                             <>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setTemplateMoveMenu(showingMove ? null : {
+                                    templateId: t.id,
+                                    scope,
+                                    currentGroup: t.group,
+                                    typing: false,
+                                    typedName: "",
+                                  });
+                                }}
+                                className="px-1.5 py-1.5 text-gray-400 hover:text-blue-500"
+                                title="Move to group"
+                              >
+                                <svg width={11} height={11} viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"><path d="M2 4h8M2 6h8M2 8h5" /></svg>
+                              </button>
                               <button onClick={(e) => { e.stopPropagation(); handleEditTemplate(t.id, t.name); }}
                                 className="px-1.5 py-1.5 text-gray-400 hover:text-blue-500" title="Edit">
                                 <svg width={11} height={11} viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"><path d="M7 2l3 3-7 7H0V9z" /></svg>
                               </button>
-                              <button onClick={(e) => { e.stopPropagation(); setTemplateDeleteConfirm({ id: t.id, name: t.name, isBuiltIn: true }); }}
+                              <button onClick={(e) => { e.stopPropagation(); setTemplateDeleteConfirm({ id: t.id, name: t.name, isBuiltIn: scope === "builtin" }); }}
                                 className="px-1.5 py-1.5 text-gray-400 hover:text-red-500" title="Delete">
                                 <svg width={11} height={11} viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round"><path d="M2 3h8M4.5 3V2h3v1M3 3v7a1 1 0 001 1h4a1 1 0 001-1V3" /></svg>
                               </button>
                             </>
                           )}
                         </div>
-                      );
-                    })}
-                  </>
-                )}
-
-                {/* User Templates */}
-                {userTemplates.length > 0 && (
-                  <>
-                    <div className="border-t border-gray-100" />
-                    <p className="px-3 py-1.5 text-[10px] text-gray-400 font-semibold uppercase tracking-wide">User</p>
-                    {userTemplates.map((t) => {
-                      const isDeleting = deletingTemplateIds.has(t.id);
-                      return (
-                        <div key={t.id} className={`flex items-center ${isDeleting ? "opacity-50" : "hover:bg-gray-50"}`}>
-                          <button
-                            onClick={() => !isDeleting && handleApplyTemplate(t.id)}
-                            disabled={isDeleting}
-                            className={`flex-1 text-left px-3 py-1.5 text-xs text-gray-700 ${isDeleting ? "line-through text-gray-400" : ""}`}
-                          >
-                            {t.name}{isDeleting ? " (deleting\u2026)" : ""}
-                          </button>
-                          {!isDeleting && (
-                            <>
-                              <button onClick={(e) => { e.stopPropagation(); handleEditTemplate(t.id, t.name); }}
-                                className="px-1.5 py-1.5 text-gray-400 hover:text-blue-500" title="Edit">
-                                <svg width={11} height={11} viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"><path d="M7 2l3 3-7 7H0V9z" /></svg>
-                              </button>
-                              <button onClick={(e) => { e.stopPropagation(); setTemplateDeleteConfirm({ id: t.id, name: t.name, isBuiltIn: false }); }}
-                                className="px-1.5 py-1.5 text-gray-400 hover:text-red-500" title="Delete">
-                                <svg width={11} height={11} viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round"><path d="M2 3h8M4.5 3V2h3v1M3 3v7a1 1 0 001 1h4a1 1 0 001-1V3" /></svg>
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </>
-                )}
+                        {showingMove && templateMoveMenu && (
+                          <div className="bg-blue-50 border-y border-blue-100 px-3 py-1.5 text-[10px] space-y-1">
+                            {templateMoveMenu.typing ? (
+                              <div className="flex items-center gap-1">
+                                <input
+                                  type="text"
+                                  autoFocus
+                                  placeholder="Group name"
+                                  value={templateMoveMenu.typedName}
+                                  onChange={(e) => setTemplateMoveMenu({ ...templateMoveMenu, typedName: e.target.value })}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                      const name = templateMoveMenu.typedName.trim();
+                                      if (name) void moveTemplateToGroup(t.id, scope, name);
+                                    } else if (e.key === "Escape") setTemplateMoveMenu(null);
+                                  }}
+                                  className="flex-1 px-1.5 py-0.5 text-[10px] border border-blue-200 rounded outline-none focus:border-blue-400"
+                                />
+                                <button
+                                  onClick={() => {
+                                    const name = templateMoveMenu.typedName.trim();
+                                    if (name) void moveTemplateToGroup(t.id, scope, name);
+                                  }}
+                                  className="px-1.5 py-0.5 text-[10px] text-white bg-blue-600 rounded hover:bg-blue-700"
+                                >Save</button>
+                                <button onClick={() => setTemplateMoveMenu(null)}
+                                  className="px-1.5 py-0.5 text-[10px] text-gray-600">{"\u2715"}</button>
+                              </div>
+                            ) : (
+                              <>
+                                <p className="text-gray-500 uppercase tracking-wide text-[9px]">Move to group</p>
+                                <button
+                                  onClick={() => void moveTemplateToGroup(t.id, scope, null)}
+                                  className={`block w-full text-left px-1.5 py-0.5 rounded ${t.group === null ? "bg-blue-100 text-blue-700" : "hover:bg-blue-100"}`}
+                                >(Ungrouped)</button>
+                                {groupNames.map((g) => (
+                                  <button
+                                    key={g}
+                                    onClick={() => void moveTemplateToGroup(t.id, scope, g)}
+                                    className={`block w-full text-left px-1.5 py-0.5 rounded ${t.group === g ? "bg-blue-100 text-blue-700" : "hover:bg-blue-100"}`}
+                                  >{g}</button>
+                                ))}
+                                <button
+                                  onClick={() => setTemplateMoveMenu({ ...templateMoveMenu, typing: true })}
+                                  className="block w-full text-left px-1.5 py-0.5 rounded text-blue-600 hover:bg-blue-100"
+                                >+ New group{"\u2026"}</button>
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  };
+                  return (
+                    <div key={scope}>
+                      <div className="border-t border-gray-100" />
+                      <p className="px-3 py-1.5 text-[10px] text-gray-400 font-semibold uppercase tracking-wide">{scopeLabel}</p>
+                      {ungrouped.map((t) => renderItem(t, false))}
+                      {groupNames.map((g) => {
+                        const collapsed = !!templateGroupCollapsed[`${scope}:${g}`];
+                        const groupItems = grouped.get(g)!;
+                        return (
+                          <div key={g}>
+                            <button
+                              onClick={() => toggleTemplateGroupCollapse(scope, g)}
+                              className="flex items-center w-full text-left px-3 py-1 text-[11px] text-gray-600 hover:bg-gray-50"
+                            >
+                              <span className="inline-block w-3 mr-1 text-gray-400">{collapsed ? "\u25b6" : "\u25bc"}</span>
+                              <span className="flex-1 truncate font-medium">{g}</span>
+                              <span className="text-gray-400 text-[10px]">{groupItems.length}</span>
+                            </button>
+                            {!collapsed && groupItems.map((t) => renderItem(t, true))}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -2338,14 +2488,37 @@ export function DiagramEditor({
         )}
       </div>
 
-      {showTemplateNameModal && (
-        <TemplateNameModal
-          onSave={templateEditState ? handleUpdateTemplate : (name: string) => handleConfirmTemplateName(name)}
-          onClose={() => { setShowTemplateNameModal(false); setPendingTemplateData(null); setTemplateMode("idle"); }}
-          initialName={templateEditState?.templateName}
-          title={templateEditState ? "Update Template" : templateMode === "capturing-builtin" ? "Save Built-In Template" : "Save User Template"}
-        />
-      )}
+      {showTemplateNameModal && (() => {
+        // Suggest groups from whichever list we're saving into. For an edit,
+        // figure out scope from which list contains the template.
+        let scopeList: TemplateRow[] = userTemplates;
+        let initialGroup: string | null = null;
+        if (templateEditState) {
+          const inBuiltin = builtInTemplates.find((t) => t.id === templateEditState.templateId);
+          if (inBuiltin) { scopeList = builtInTemplates; initialGroup = inBuiltin.group; }
+          else {
+            const inUser = userTemplates.find((t) => t.id === templateEditState.templateId);
+            if (inUser) initialGroup = inUser.group;
+          }
+        } else if (templateMode === "capturing-builtin") {
+          scopeList = builtInTemplates;
+        }
+        const knownGroups = scopeList
+          .map((t) => t.group)
+          .filter((g): g is string => !!g);
+        return (
+          <TemplateNameModal
+            onSave={templateEditState
+              ? handleUpdateTemplate
+              : (name: string, group: string | null) => handleConfirmTemplateName(name, group)}
+            onClose={() => { setShowTemplateNameModal(false); setPendingTemplateData(null); setTemplateMode("idle"); }}
+            initialName={templateEditState?.templateName}
+            initialGroup={initialGroup}
+            knownGroups={knownGroups}
+            title={templateEditState ? "Update Template" : templateMode === "capturing-builtin" ? "Save Built-In Template" : "Save User Template"}
+          />
+        );
+      })()}
 
       {templateImportInfo && (
         <InfoDialog

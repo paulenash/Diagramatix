@@ -24,6 +24,15 @@
     + autosize, Pool/Lane grow-only, Visio bulk import, scan for issues,
     Deleted Diagrams hierarchy, etc.) — none of which alter the data
     shape, so the XSD is unchanged below.
+
+  v1.11 — template groups.
+    No project-export schema shape change. Templates are not carried in
+    this XSD's <diagramatix-export> bundle; the new `DiagramTemplate.group`
+    field is serialised in `.diag_tems` template-export files and in
+    the `/api/backup` user-backup payload (both JSON, not covered by
+    this XSD). The `schemaVersion` attribute below is bumped to 1.11
+    so consumers can detect the new feature window even if no
+    project-XML field changed.
 -->
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
            xmlns:dgx="http://diagramatix.com/export/1.0"

@@ -404,5 +404,16 @@ export interface TemplateData {
  *            - Nav-tree per-project sort: Manual (drag-and-drop),
  *              Name asc/desc, Modified asc/desc. Stored in
  *              localStorage per project.
+ * v1.11:   Template groups — `DiagramTemplate.group` (nullable string)
+ *          clusters templates under a named, collapsible header in the
+ *          editor's Templates dropdown. User templates and built-in
+ *          templates are independent group namespaces. Per-user
+ *          collapse state stored in `User.templateGroupPrefs` (Json).
+ *          Backup payload + `.diag_tems` export carry the group field
+ *          and round-trip cleanly. The project-export XSD does not
+ *          carry templates, so no XSD shape change — `schemaVersion`
+ *          attribute still bumps to 1.11 so importers can detect the
+ *          new feature window. Pre-1.11 backups omit `group`; restore
+ *          treats absent as ungrouped (null).
  */
-export const SCHEMA_VERSION = "1.10";
+export const SCHEMA_VERSION = "1.11";
