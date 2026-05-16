@@ -466,7 +466,7 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
     "pool-lane-connector": "Sequence/Association on Pool or Lane",
     "duplicate-name":      "Duplicate Pool/Lane names",
     "single-lane-pool":    "Pools with a single Lane",
-    "hanging-error":       "Hanging messages (no x-axis overlap)",
+    "hanging-error":       "Hanging or misconnected messages",
   };
   const WARNING_TYPE_LABELS: Record<WarningType, string> = {
     "hanging-warning": "Messages touching a white-box pool",

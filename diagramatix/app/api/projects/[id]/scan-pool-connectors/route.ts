@@ -130,7 +130,12 @@ export async function GET(_req: Request, { params }: Params) {
       properties?: { poolType?: string };
     };
     const elements = (data.elements as ElementLite[] | undefined) ?? [];
-    const connectors = (data.connectors as Array<{ id: string; type?: string; sourceId: string; targetId: string }> | undefined) ?? [];
+    type ConnectorLite = {
+      id: string; type?: string; sourceId: string; targetId: string;
+      sourceSide?: "top" | "right" | "bottom" | "left";
+      targetSide?: "top" | "right" | "bottom" | "left";
+    };
+    const connectors = (data.connectors as ConnectorLite[] | undefined) ?? [];
 
     const byId = new Map<string, ElementLite>();
     for (const e of elements) byId.set(e.id, e);
@@ -237,6 +242,29 @@ export async function GET(_req: Request, { params }: Params) {
       if (!parent || parent.type !== "pool") continue;
       poolHasChildren.set(parent.id, true);
     }
+    // Find the containing pool of an element (or the element itself if it
+    // IS a pool / has no pool ancestor). Walks up the parentId chain so
+    // tasks inside lanes inside pools resolve correctly. The returned bbox
+    // is the reference frame for "above/below" comparisons in the
+    // misconnected-message check below.
+    const getContainerBox = (el: ElementLite): { x: number; y: number; w: number; h: number } | null => {
+      if (
+        typeof el.x !== "number" || typeof el.y !== "number" ||
+        typeof el.width !== "number" || typeof el.height !== "number"
+      ) return null;
+      let cur: ElementLite | undefined = el;
+      while (cur?.parentId) {
+        const p = byId.get(cur.parentId);
+        if (!p) break;
+        if (p.type === "pool" &&
+            typeof p.x === "number" && typeof p.y === "number" &&
+            typeof p.width === "number" && typeof p.height === "number") {
+          return { x: p.x, y: p.y, w: p.width, h: p.height };
+        }
+        cur = p;
+      }
+      return { x: el.x, y: el.y, w: el.width, h: el.height };
+    };
     for (const c of connectors) {
       if ((c.type ?? "") !== "messageBPMN") continue;
       const src = byId.get(c.sourceId);
@@ -268,6 +296,55 @@ export async function GET(_req: Request, { params }: Params) {
         const overlapMin = Math.max(src.x, tgt.x);
         if (overlapMax <= overlapMin) {
           reason = "no x-axis overlap between source and target";
+          severity = "error";
+        }
+      }
+      // ── Misconnected message (top/bottom edge facing the wrong way) ──
+      // Independent of the above — a message can have x-axis overlap and
+      // still be attached to the wrong vertical edge. For each end of the
+      // connector whose attachment side is top or bottom, the OTHER end's
+      // centre must lie on the matching side of THIS end's container pool
+      // (or of THIS end's own bbox if it has no pool ancestor / is itself
+      // a pool). Mismatch → misconnected.
+      //
+      // Per spec:
+      //   • Top-attached on a task: other end must be ABOVE the task's
+      //     containing pool. If below → misconnected.
+      //   • Bottom-attached on a task: other end must be BELOW the task's
+      //     containing pool. If above → misconnected.
+      //   • Top-attached on a pool: other end must be ABOVE this pool.
+      //   • Bottom-attached on a pool: other end must be BELOW this pool.
+      // Y axis here is screen-style (smaller Y = above).
+      if (!reason) {
+        const checkEnd = (
+          endEl: ElementLite,
+          endSide: "top" | "right" | "bottom" | "left" | undefined,
+          otherEl: ElementLite,
+        ): string | null => {
+          if (endSide !== "top" && endSide !== "bottom") return null;
+          const box = getContainerBox(endEl);
+          if (!box) return null;
+          if (
+            typeof otherEl.y !== "number" || typeof otherEl.height !== "number"
+          ) return null;
+          const otherCenterY = otherEl.y + otherEl.height / 2;
+          if (endSide === "top" && otherCenterY > box.y + box.h) {
+            return endEl.type === "pool"
+              ? "message attached to top of pool but other end is below"
+              : "message attached to top of element but other end is below the containing pool";
+          }
+          if (endSide === "bottom" && otherCenterY < box.y) {
+            return endEl.type === "pool"
+              ? "message attached to bottom of pool but other end is above"
+              : "message attached to bottom of element but other end is above the containing pool";
+          }
+          return null;
+        };
+        const srcReason = checkEnd(src, c.sourceSide, tgt);
+        const tgtReason = srcReason ? null : checkEnd(tgt, c.targetSide, src);
+        const msg = srcReason ?? tgtReason;
+        if (msg) {
+          reason = msg;
           severity = "error";
         }
       }
