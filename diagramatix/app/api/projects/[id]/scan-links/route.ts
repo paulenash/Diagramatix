@@ -58,20 +58,25 @@ function normalize(s: string): string {
   return s.replace(/\s+/g, " ").trim().toLowerCase();
 }
 
-/** Extract a leading "process code" from a name: 1–3 letters, 1–3 digits,
- *  a `.` separator, then 1–3 digits — e.g. "P1.2", "AR12.3", "ABC123.456".
- *  Anchored to the start and followed by a word boundary so codes embedded
- *  later in the name (or longer numeric runs that just happen to share a
- *  prefix) don't match. Returned uppercase for case-insensitive compare. */
-const CODE_RE = /^([A-Za-z]{1,3}\d{1,3}\.\d{1,3})\b/;
+/** Extract a leading "process code" from a name. Structure:
+ *    AAAnnn.nn[.nn[.nn]]...
+ *  where AAA is 1–3 letters, nnn is 1–3 digits for the leading group, and
+ *  each subsequent dot-section is 1–3 digits. At least one dot-section is
+ *  required, but the chain can be arbitrarily deep — covers "P1.2",
+ *  "P03.1.1", "AR12.3.45", "ABC123.456.78.9". Anchored to the start and
+ *  followed by a word boundary so codes embedded later in the name (or
+ *  longer numeric runs that just happen to share a prefix) don't match.
+ *  Returned uppercase for case-insensitive compare. */
+const CODE_RE = /^([A-Za-z]{1,3}\d{1,3}(?:\.\d{1,3})+)\b/;
 function extractCode(name: string): string | null {
   const m = name.trim().match(CODE_RE);
   return m ? m[1].toUpperCase() : null;
 }
 
 /** Drop the leading process code (if present) and any whitespace/punctuation
- *  separating it from the descriptive remainder. Used to compare just the
- *  textual part of two names, ignoring whatever codes they carry — e.g.
+ *  separating it from the descriptive remainder. Honours `:` as an explicit
+ *  code-to-text separator alongside whitespace, hyphens, underscores, and
+ *  trailing dots — e.g. "P03.1.1: Change Structure" → "change structure",
  *  "P1.2 Collections Process" → "collections process". Returns "" when the
  *  name is only a code or empty after stripping. */
 function stripCodeTail(name: string): string {
@@ -198,25 +203,48 @@ export async function GET(_req: Request, { params }: Params) {
         continue;
       }
 
-      // Probable: Levenshtein ≤ 3 (relative to the shorter name), OR
-      // either name contains the other after normalization, OR the two
-      // names share the same leading process code (e.g. both start "P1.2"),
-      // OR the descriptive text after the code matches in both names.
+      // Probable match. Strongest signals first:
+      //   • codesMatch — both names carry the same leading process code
+      //     (e.g. both start "P03.1.1"). Strong identity in coded projects.
+      //   • tailsMatch — descriptive text after the code matches in both
+      //     names (4-char floor — single-letter tails like "x" generate
+      //     noise across hundreds of candidate diagrams).
+      // Loose fallbacks — only allowed when codes don't actively disagree:
+      //   • contains — one normalized name contained in the other.
+      //   • Levenshtein ≤ dynThreshold relative to the shorter name.
+      // When BOTH names carry codes AND the codes DIFFER, the loose
+      // fallbacks are suppressed: in a project where everything is
+      // "P03.X.Y Foo", contains/Levenshtein over-fire on the shared
+      // template structure and bury the real matches.
       for (const c of diagrams) {
         if (c.id === d.id) continue;
         const normCand = normalize(c.name);
         if (!normCand) continue;
         if (normCand === normLabel) continue; // already handled above
-        const contains =
-          normLabel.length >= 4 && normCand.length >= 4 &&
-          (normLabel.includes(normCand) || normCand.includes(normLabel));
-        const dist = levenshtein(normLabel, normCand);
-        const dynThreshold = Math.min(3, Math.max(1, Math.floor(Math.min(normLabel.length, normCand.length) / 4)));
+
         const candCode = codeByDiagramId.get(c.id) ?? null;
-        const codesMatch = !!labelCode && labelCode === candCode;
         const candTail = tailByDiagramId.get(c.id) ?? "";
-        const tailsMatch = !!labelTail && labelTail === candTail;
-        if (contains || dist <= dynThreshold || codesMatch || tailsMatch) {
+        const codesMatch = !!labelCode && labelCode === candCode;
+        const tailsMatch =
+          !!labelTail && labelTail.length >= 4 && labelTail === candTail;
+
+        const codesPresentAndDiffer =
+          !!labelCode && !!candCode && labelCode !== candCode;
+        const allowLoose = !codesPresentAndDiffer;
+        let loose = false;
+        if (allowLoose) {
+          const contains =
+            normLabel.length >= 4 && normCand.length >= 4 &&
+            (normLabel.includes(normCand) || normCand.includes(normLabel));
+          const dist = levenshtein(normLabel, normCand);
+          const dynThreshold = Math.min(
+            3,
+            Math.max(1, Math.floor(Math.min(normLabel.length, normCand.length) / 4)),
+          );
+          loose = contains || dist <= dynThreshold;
+        }
+
+        if (codesMatch || tailsMatch || loose) {
           probableCandidates.push({
             parentDiagramId: d.id,
             parentDiagramName: d.name,

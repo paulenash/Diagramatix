@@ -95,19 +95,8 @@ export function LinkScanDialog({ projectId, onClose, onApplied }: Props) {
     setAddSelected((prev) => {
       const k = candidateKey(c);
       const next = new Set(prev);
-      // Adds are mutually exclusive per parent element: a subprocess can
-      // only link to ONE child. Clear any other candidate that targets the
-      // same (parent, element) before adding this one.
-      if (!next.has(k)) {
-        for (const other of next) {
-          if (other.startsWith(`${c.parentDiagramId}::${c.parentElementId}::`)) {
-            next.delete(other);
-          }
-        }
-        next.add(k);
-      } else {
-        next.delete(k);
-      }
+      if (next.has(k)) next.delete(k);
+      else next.add(k);
       return next;
     });
   }
