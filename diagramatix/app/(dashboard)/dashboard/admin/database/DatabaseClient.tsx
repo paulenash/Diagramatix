@@ -101,10 +101,28 @@ export function DatabaseClient() {
     projectIds: Set<string>; diagramIds: Set<string>; templateIds: Set<string>;
   }>({ orgIds: new Set(), userIds: new Set(), projectIds: new Set(), diagramIds: new Set(), templateIds: new Set() });
 
+  // Collapse state for the selective-restore tree. Each level tracks
+  // EXPANDED ids (not collapsed) so a fresh inspect → fully collapsed
+  // by default (the empty Set means "nothing expanded"). User keys are
+  // `<orgId>:<userId>` so the same user collapsed under Org A stays
+  // independent of their state under Org B.
+  const [expandedOrgs, setExpandedOrgs] = useState<Set<string>>(new Set());
+  const [expandedUsers, setExpandedUsers] = useState<Set<string>>(new Set());
+  const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
+
+  function toggleExpanded(set: Set<string>, setter: (s: Set<string>) => void, key: string) {
+    const next = new Set(set);
+    if (next.has(key)) next.delete(key); else next.add(key);
+    setter(next);
+  }
+
   async function inspectUpload(file: File) {
     setInspecting(true);
     setInspectTree(null);
     setSel({ orgIds: new Set(), userIds: new Set(), projectIds: new Set(), diagramIds: new Set(), templateIds: new Set() });
+    setExpandedOrgs(new Set());
+    setExpandedUsers(new Set());
+    setExpandedProjects(new Set());
     setRestoreError(null);
     try {
       const fd = new FormData();
@@ -444,9 +462,9 @@ export function DatabaseClient() {
               setRestoreResult(null);
             }}
             className="text-xs text-red-700 border border-red-300 hover:bg-red-50 rounded px-2.5 py-1"
-            title="Wipe the database and restore from a .diag-full snapshot"
+            title="Full system restore from a .diag-full snapshot \u2014 wipe or selective"
           >
-            FULL Restore\u2026
+            Full &amp; Selective Restore
           </button>
           <button
             onClick={() => {
@@ -772,6 +790,9 @@ export function DatabaseClient() {
                     setRestoreFile(f);
                     setInspectTree(null);
                     setSel({ orgIds: new Set(), userIds: new Set(), projectIds: new Set(), diagramIds: new Set(), templateIds: new Set() });
+    setExpandedOrgs(new Set());
+    setExpandedUsers(new Set());
+    setExpandedProjects(new Set());
                     setRestoreError(null);
                     setRestoreResult(null);
                     // Auto-inspect in additive mode so the tree appears immediately.
@@ -821,18 +842,61 @@ export function DatabaseClient() {
                   {inspecting && <p className="text-xs text-gray-500">Inspecting snapshot…</p>}
                   {inspectTree && (
                     <>
-                      <div className="text-[10px] text-gray-500">
-                        Snapshot from <span className="font-mono">{inspectTree.meta.exportedAt}</span>
-                        {" "}by {inspectTree.meta.exportedBy}
-                        {" — "}{Object.entries(inspectTree.meta.counts).map(([k, n]) => `${k}:${n}`).join(", ")}
+                      <div className="text-[10px] text-gray-500 flex items-center gap-2 flex-wrap">
+                        <span>
+                          Snapshot from <span className="font-mono">{inspectTree.meta.exportedAt}</span>
+                          {" "}by {inspectTree.meta.exportedBy}
+                          {" — "}{Object.entries(inspectTree.meta.counts).map(([k, n]) => `${k}:${n}`).join(", ")}
+                        </span>
+                        <span className="ml-auto flex gap-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              // Expand every node: every Org, every (org:user) pair, every Project.
+                              const allOrgs = new Set(inspectTree.orgs.map(o => o.id));
+                              const allUsers = new Set<string>();
+                              const allProjects = new Set<string>();
+                              for (const o of inspectTree.orgs) {
+                                for (const m of o.members) {
+                                  allUsers.add(`${o.id}:${m.userId}`);
+                                  for (const p of m.projects) allProjects.add(p.id);
+                                }
+                              }
+                              setExpandedOrgs(allOrgs);
+                              setExpandedUsers(allUsers);
+                              setExpandedProjects(allProjects);
+                            }}
+                            className="text-[10px] text-blue-600 hover:text-blue-800 underline"
+                          >Expand all</button>
+                          <span className="text-gray-300">|</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setExpandedOrgs(new Set());
+                              setExpandedUsers(new Set());
+                              setExpandedProjects(new Set());
+                            }}
+                            className="text-[10px] text-blue-600 hover:text-blue-800 underline"
+                          >Collapse all</button>
+                        </span>
                       </div>
                       <div className="border border-gray-200 rounded p-2 text-[11px] max-h-[40vh] overflow-y-auto">
                         {inspectTree.orgs.length === 0 && (
                           <p className="text-gray-500 italic">Snapshot is empty.</p>
                         )}
-                        {inspectTree.orgs.map((org) => (
+                        {inspectTree.orgs.map((org) => {
+                          const orgOpen = expandedOrgs.has(org.id);
+                          return (
                           <div key={org.id} className="mb-2">
-                            <label className="flex items-center gap-1 font-semibold text-gray-800">
+                            <div className="flex items-center gap-1 font-semibold text-gray-800">
+                              <button
+                                type="button"
+                                onClick={() => toggleExpanded(expandedOrgs, setExpandedOrgs, org.id)}
+                                className="w-3 text-gray-400 hover:text-gray-700 select-none"
+                                title={orgOpen ? "Collapse" : "Expand"}
+                              >
+                                {orgOpen ? "▼" : "▶"}
+                              </button>
                               <input
                                 type="checkbox"
                                 checked={sel.orgIds.has(org.id)}
@@ -841,14 +905,29 @@ export function DatabaseClient() {
                               />
                               <span>Org · {org.name}</span>
                               <span className="text-gray-400 font-normal text-[9px]">({org.entityType})</span>
-                            </label>
+                              <span className="text-gray-400 font-normal text-[9px] ml-auto">
+                                {org.members.length} member{org.members.length === 1 ? "" : "s"}
+                              </span>
+                            </div>
+                            {orgOpen && (
                             <div className="ml-4 mt-0.5">
                               {org.members.length === 0 && (
                                 <p className="text-gray-400 italic text-[10px]">No members</p>
                               )}
-                              {org.members.map((m) => (
-                                <div key={`${org.id}:${m.userId}`} className="mt-1">
-                                  <label className="flex items-center gap-1 text-gray-700">
+                              {org.members.map((m) => {
+                                const userKey = `${org.id}:${m.userId}`;
+                                const userOpen = expandedUsers.has(userKey);
+                                return (
+                                <div key={userKey} className="mt-1">
+                                  <div className="flex items-center gap-1 text-gray-700">
+                                    <button
+                                      type="button"
+                                      onClick={() => toggleExpanded(expandedUsers, setExpandedUsers, userKey)}
+                                      className="w-3 text-gray-400 hover:text-gray-700 select-none"
+                                      title={userOpen ? "Collapse" : "Expand"}
+                                    >
+                                      {userOpen ? "▼" : "▶"}
+                                    </button>
                                     <input
                                       type="checkbox"
                                       checked={sel.userIds.has(m.userId)}
@@ -862,11 +941,22 @@ export function DatabaseClient() {
                                         {m.templates.length > 0 && ` · ${m.templates.length} template(s)`}
                                       </span>
                                     )}
-                                  </label>
+                                  </div>
+                                  {userOpen && (
                                   <div className="ml-4">
-                                    {m.projects.map((p) => (
+                                    {m.projects.map((p) => {
+                                      const projectOpen = expandedProjects.has(p.id);
+                                      return (
                                       <div key={p.id} className="mt-0.5">
-                                        <label className="flex items-center gap-1 text-gray-700">
+                                        <div className="flex items-center gap-1 text-gray-700">
+                                          <button
+                                            type="button"
+                                            onClick={() => toggleExpanded(expandedProjects, setExpandedProjects, p.id)}
+                                            className="w-3 text-gray-400 hover:text-gray-700 select-none"
+                                            title={projectOpen ? "Collapse" : "Expand"}
+                                          >
+                                            {projectOpen ? "▼" : "▶"}
+                                          </button>
                                           <input
                                             type="checkbox"
                                             checked={sel.projectIds.has(p.id)}
@@ -875,10 +965,12 @@ export function DatabaseClient() {
                                           />
                                           <span>Project · {p.name}</span>
                                           <span className="text-gray-400 text-[9px]">({p.diagrams.length} diagram{p.diagrams.length === 1 ? "" : "s"})</span>
-                                        </label>
+                                        </div>
+                                        {projectOpen && (
                                         <div className="ml-4">
                                           {p.diagrams.map((d) => (
                                             <label key={d.id} className="flex items-center gap-1 text-gray-600">
+                                              <span className="w-3" />
                                               <input
                                                 type="checkbox"
                                                 checked={sel.diagramIds.has(d.id)}
@@ -889,13 +981,16 @@ export function DatabaseClient() {
                                             </label>
                                           ))}
                                         </div>
+                                        )}
                                       </div>
-                                    ))}
+                                      );
+                                    })}
                                     {m.unfiledDiagrams.length > 0 && (
                                       <div className="mt-0.5">
-                                        <p className="text-[9px] uppercase tracking-wide text-gray-400">Unfiled diagrams</p>
+                                        <p className="text-[9px] uppercase tracking-wide text-gray-400 ml-3">Unfiled diagrams</p>
                                         {m.unfiledDiagrams.map((d) => (
-                                          <label key={d.id} className="flex items-center gap-1 text-gray-600 ml-2">
+                                          <label key={d.id} className="flex items-center gap-1 text-gray-600 ml-3">
+                                            <span className="w-3" />
                                             <input
                                               type="checkbox"
                                               checked={sel.diagramIds.has(d.id)}
@@ -909,9 +1004,10 @@ export function DatabaseClient() {
                                     )}
                                     {m.templates.length > 0 && (
                                       <div className="mt-0.5">
-                                        <p className="text-[9px] uppercase tracking-wide text-gray-400">Templates</p>
+                                        <p className="text-[9px] uppercase tracking-wide text-gray-400 ml-3">Templates</p>
                                         {m.templates.map((t) => (
-                                          <label key={t.id} className="flex items-center gap-1 text-gray-600 ml-2">
+                                          <label key={t.id} className="flex items-center gap-1 text-gray-600 ml-3">
+                                            <span className="w-3" />
                                             <input
                                               type="checkbox"
                                               checked={sel.templateIds.has(t.id)}
@@ -928,11 +1024,15 @@ export function DatabaseClient() {
                                       </div>
                                     )}
                                   </div>
+                                  )}
                                 </div>
-                              ))}
+                                );
+                              })}
                             </div>
+                            )}
                           </div>
-                        ))}
+                          );
+                        })}
                       </div>
                       <p className="text-[10px] text-gray-500">
                         Selected: {sel.orgIds.size} org · {sel.userIds.size} user · {sel.projectIds.size} project · {sel.diagramIds.size} diagram · {sel.templateIds.size} template
