@@ -1212,27 +1212,79 @@ export async function exportVisioV3(
       }
     }
 
-    // v1.5 Sub-Process masters (ID 7 = Collapsed, ID 8 = Expanded) carry the
-    // same bottom-row marker layout (Loop / Collapsed / AdHoc) at the SAME
-    // sub-shape IDs as BPMN_M (10, 11, 14, 15, 17, 27), but the
-    // `if (sourceMasterId === 33)` block above doesn't fire for them so
-    // every active marker stacks on top of the others at cached PinX=1.15
-    // on first paint. Run JUST the layout pass (no marker scaling — v1.5
-    // markers are sized as the master ships them).
+    // v1.5 Sub-Process masters (ID 7 = Collapsed, ID 8 = Expanded) place
+    // the loop markers inside Shape 11 (a GROUP containing Shape 14
+    // Compensation, 15 ParallelLoop, 17 StandardLoop, 27 SequentialLoop).
+    // AdHoc lives on Shape 10 at top level. The Collapsed-indicator marker
+    // (small + box on collapsed sub-process) is gated separately and isn't
+    // part of this row.
+    //
+    // Two bugs in the as-shipped master force a per-instance patch:
+    //
+    // 1) Shape 11's PinX cached V is the master-natural body-centre value
+    //    (1.15 inches). After our `scaleLocalLocPin` resize pass it scales
+    //    to instanceW * 0.5 ≈ instance centre, which is fine when Shape 11
+    //    is the only marker — but the cached V doesn't account for any
+    //    AdHoc Shape 10 sitting at right of centre, so multi-marker layouts
+    //    overlap on first paint.
+    //
+    // 2) Shape 11's `User.BpmnIconPosition` formula is
+    //      1 + IF(any loop,1,0) + IF(Compensation,1,0)
+    //    which evaluates to 2 when loop is active (with no compensation),
+    //    so after Visio recalcs the loop marker shifts RIGHT of centre
+    //    even when it's the ONLY visible marker (because position=2 means
+    //    "second slot from the left"). User reports "loop marker on bottom
+    //    right" — that's this off-by-one.
+    //
+    // Fix:
+    //   (a) Rewrite cached PinX V's via layoutSubprocessMarkers for the
+    //       ACTIVE markers in body-centre layout order (loop → adhoc).
+    //   (b) For each ACTIVE marker, force its `User.BpmnIconPosition`
+    //       cached V AND formula to a constant matching its slot in the
+    //       active-only ordering. The constant kills the broken formula.
     if ((sourceMasterId === 7 || sourceMasterId === 8)
         && instanceW !== undefined) {
       const hasAdHocV15 = elProps?.adHoc === true;
-      const hasCollapsedV15 = elType === "subprocess";
-      const loopShapeIdV15 =
-        repeatType === "loop" ? 17           // StandardLoop sub-shape
-        : repeatType === "mi-sequential" ? 27 // SequentialLoop
-        : repeatType === "mi-parallel" ? 15   // ParallelLoop
-        : null;
-      masterContent = layoutSubprocessMarkers(
-        masterContent,
-        instanceW,
-        { loopShapeId: loopShapeIdV15, hasCollapsed: hasCollapsedV15, hasAdHoc: hasAdHocV15 },
-      );
+      const hasLoopV15 =
+        repeatType === "loop" ||
+        repeatType === "mi-sequential" ||
+        repeatType === "mi-parallel";
+
+      // Active markers in left-to-right order. Shape 11 = loop group,
+      // Shape 10 = AdHoc. Collapsed-indicator handled by Shape 6 (always
+      // visible body outline plus the collapsed body shape) — not part
+      // of the bottom-row, so not in this list.
+      const orderedV15: number[] = [];
+      if (hasLoopV15) orderedV15.push(11);
+      if (hasAdHocV15) orderedV15.push(10);
+
+      if (orderedV15.length > 0) {
+        // (a) Cached PinX V — same icon-spacing math the master's PinX
+        //     formula uses, but with N = orderedV15.length so it matches
+        //     ONLY the active markers (the master's BpmnNumIconsVisible
+        //     formula also uses active count, so this stays consistent
+        //     after recalc).
+        const ICON_W_V15 = 0.19; // matches User.BpmnIconWidth on Shape 11/10
+        const center = instanceW / 2;
+        for (let i = 0; i < orderedV15.length; i++) {
+          const shapeId = orderedV15[i];
+          const position = i + 1;
+          const pinX = center + ICON_W_V15 * (position - (orderedV15.length + 1) / 2);
+          const re = new RegExp(
+            `(<Shape ID='${shapeId}'[^>]*>[\\s\\S]*?<Cell N='PinX' V=')[\\d.]+(')`,
+          );
+          masterContent = masterContent.replace(re, `$1${pinX}$2`);
+          // (b) Override the BpmnIconPosition User row to a constant for
+          //     this active-only layout. The master's formula chains off
+          //     OR(...loop...) / Compensation.Checked / Collapsed.Checked,
+          //     none of which know about THIS instance's selection, so
+          //     freezing the position to its slot index is correct.
+          const posRe = new RegExp(
+            `(<Shape ID='${shapeId}'[^>]*>[\\s\\S]*?<Row N='BpmnIconPosition'><Cell N='Value' V=')\\d+(' F=')[^']+(')`,
+          );
+          masterContent = masterContent.replace(posRe, `$1${position}$2GUARD(${position})$3`);
+        }
+      }
     }
 
     // Non-interrupting events (master 105 = Intermediate, 107 = Start).
@@ -1782,14 +1834,12 @@ export async function exportVisioV3(
       "Signal":       [{ shapeId: 13, geomIxs: [0] }],
       "Compensation": [{ shapeId: 15, geomIxs: [0, 1] }],
       "Escalation":   [{ shapeId: 16, geomIxs: [0] }],
-      // Terminate is two specs: show Shape 8 (filled black inner circle)
-      // AND hide Shape 9 (the coloured End body that ships above Shape 8
-      // in master z-order). Without the Shape 9 hide, the body paints
-      // over the Terminate marker.
-      "Terminate":    [
-        { shapeId: 8, geomIxs: [0] },
-        { shapeId: 9, geomIxs: [0], noShow: "1" },
-      ],
+      // Terminate: show Shape 8 (the smaller black filled disc). The
+      // companion `scripts/fix-terminate-marker.cjs` moves Shape 8 to
+      // render AFTER Shape 9 in master z-order so the disc paints on
+      // top of the coloured End body, with a visible ring of body
+      // colour showing around it.
+      "Terminate":    [{ shapeId: 8, geomIxs: [0] }],
       // Task type markers (Task template master). User and Script share
       // Shape 18 — User uses IX=0/1, Script uses IX=2.
       "User":         [{ shapeId: 18, geomIxs: [0, 1] }],
