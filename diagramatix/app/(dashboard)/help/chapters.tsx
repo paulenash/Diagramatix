@@ -1776,6 +1776,52 @@ export const CHAPTERS: HelpChapter[] = [
         ),
       },
       {
+        heading: "Admin tools — Built-In Templates transfer",
+        body: (
+          <>
+            <p>
+              <strong>Admin-only.</strong> Opens at{" "}
+              <strong>Admin → Database</strong>. Two buttons:
+            </p>
+            <ul className="list-disc list-inside space-y-1 mt-1">
+              <li>
+                <strong>Built-In Templates ↓</strong> downloads a{" "}
+                <code className="text-xs bg-gray-100 px-1 rounded">
+                  .diag_tems
+                </code>{" "}
+                JSON file containing every template where{" "}
+                <code className="text-xs bg-gray-100 px-1 rounded">
+                  templateType
+                </code>{" "}
+                = <code className="text-xs bg-gray-100 px-1 rounded">builtin</code>{" "}
+                — the system-wide templates available to every user.
+              </li>
+              <li>
+                <strong>Built-In Templates ↑</strong> uploads a
+                previously-downloaded{" "}
+                <code className="text-xs bg-gray-100 px-1 rounded">
+                  .diag_tems
+                </code>{" "}
+                file. <strong>Additive by (name, diagramType)</strong>:
+                if a built-in template with the same name + type exists
+                on the target, it&apos;s skipped (not updated);
+                otherwise it&apos;s inserted. The status banner lists any
+                skipped names so you can investigate.
+              </li>
+            </ul>
+            <p className="mt-2">
+              Same migration purpose as{" "}
+              <em>Rules &amp; Prompts</em>: keep local-dev built-in
+              templates in sync with prod. Note: this exposes the SAME
+              endpoints as the diagram editor&apos;s{" "}
+              <strong>File ▸ Export / Import → Templates</strong> menu —
+              if a non-admin uses that menu, it scopes to user templates
+              only.
+            </p>
+          </>
+        ),
+      },
+      {
         heading: "Admin tools — Rules & Prompts transfer",
         body: (
           <>

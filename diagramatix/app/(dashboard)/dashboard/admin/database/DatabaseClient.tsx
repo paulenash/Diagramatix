@@ -129,6 +129,50 @@ export function DatabaseClient() {
     }
   }
 
+  // ── Built-in Templates transfer (.diag_tems) ──
+  // Exports + re-imports `DiagramTemplate` rows where `templateType =
+  // 'builtin'`. The endpoints already exist (used by the diagram editor's
+  // File menu) — this just surfaces them on the admin Database page so an
+  // admin can migrate built-in templates between databases without
+  // diving into an editor. Conflict policy: import is additive by
+  // (name + diagramType), duplicates are skipped (NOT updated).
+  const templatesImportInputRef = useRef<HTMLInputElement | null>(null);
+  const [templatesImportBusy, setTemplatesImportBusy] = useState(false);
+  async function handleTemplatesImport(file: File) {
+    setTemplatesImportBusy(true);
+    setRulesImportStatus(null);
+    try {
+      // The endpoint expects a JSON body, not multipart — same shape the
+      // editor's import flow uses.
+      const text = await file.text();
+      let body: unknown;
+      try { body = JSON.parse(text); } catch {
+        setRulesImportStatus(`Error: ${file.name} is not valid JSON`);
+        return;
+      }
+      const res = await fetch("/api/templates/import?type=builtin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setRulesImportStatus(`Error: ${json?.error ?? res.statusText}`);
+        return;
+      }
+      const skippedDetail = json.skippedNames?.length > 0
+        ? `\nSkipped (duplicates by name + diagramType):\n  - ${json.skippedNames.slice(0, 10).join("\n  - ")}${json.skippedNames.length > 10 ? `\n  ...and ${json.skippedNames.length - 10} more` : ""}`
+        : "";
+      setRulesImportStatus(
+        `Built-In Templates: ${json.created} inserted, ${json.skipped} skipped` + skippedDetail,
+      );
+    } catch (err) {
+      setRulesImportStatus(`Error: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setTemplatesImportBusy(false);
+    }
+  }
+
   // Additive-mode tree + selection.
   const [inspectTree, setInspectTree] = useState<InspectTree | null>(null);
   const [inspecting, setInspecting] = useState(false);
@@ -535,6 +579,39 @@ export function DatabaseClient() {
             onChange={(e) => {
               const f = e.target.files?.[0];
               if (f) handleRulesImport(f);
+              e.currentTarget.value = "";
+            }}
+          />
+          {/* Built-In Templates transfer \u2014 admin-managed templates that
+              are shared across all users. Same migration use case as
+              Rules & Prompts: keep local-dev and prod web in sync. */}
+          <a
+            href="/api/templates/export?type=builtin"
+            download
+            className="text-xs text-white bg-emerald-600 hover:bg-emerald-700 rounded px-2.5 py-1"
+            title="Download built-in templates as a .diag_tems file"
+          >
+            Built-In Templates &darr;
+          </a>
+          <button
+            onClick={() => {
+              setRulesImportStatus(null);
+              templatesImportInputRef.current?.click();
+            }}
+            disabled={templatesImportBusy}
+            className="text-xs text-emerald-700 border border-emerald-300 hover:bg-emerald-50 rounded px-2.5 py-1 disabled:opacity-50"
+            title="Import built-in templates from a .diag_tems file (additive \u2014 duplicates by name+type are skipped)"
+          >
+            {templatesImportBusy ? "Importing\u2026" : "Built-In Templates \u2191"}
+          </button>
+          <input
+            ref={templatesImportInputRef}
+            type="file"
+            accept=".diag_tems,application/json"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) handleTemplatesImport(f);
               e.currentTarget.value = "";
             }}
           />
