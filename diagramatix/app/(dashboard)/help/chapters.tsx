@@ -120,6 +120,114 @@ export const CHAPTERS: HelpChapter[] = [
           </p>
         ),
       },
+      {
+        heading: "Scan Diagrams for Issues",
+        body: (
+          <>
+            <p>
+              Open a project and click <strong>Project ▾ → Scan Diagrams
+              for Issues</strong>. Diagramatix scans every BPMN diagram in
+              the project and reports anything that looks broken or
+              suspicious. Issues are grouped into <strong>Errors</strong>{" "}
+              (red — likely broken) and <strong>Warnings</strong> (amber —
+              probably the user&apos;s intent, but worth a second look).
+            </p>
+            <p className="mt-2">Currently detected:</p>
+            <ul className="list-disc list-inside space-y-1 mt-1">
+              <li>
+                <strong>Sequence/Association on Pool or Lane</strong> —
+                these connectors should attach to flow elements inside
+                the container, not its boundary.
+              </li>
+              <li>
+                <strong>Duplicate Pool/Lane names</strong> — case- and
+                whitespace-insensitive within a single diagram.
+              </li>
+              <li>
+                <strong>Single-lane pools</strong> — typically an import
+                remnant where the pool wrapper carried the title and the
+                lane is empty.
+              </li>
+              <li>
+                <strong>Hanging or misconnected messages</strong> — a
+                message connector with no horizontal overlap between its
+                source and target, OR a message attached to a white-box
+                pool that has no contents, OR a message attached to the
+                top boundary whose other end is below the containing pool
+                (or vice versa). All four collapse under the same filter
+                category so you can park them collectively.
+              </li>
+            </ul>
+            <p className="mt-2">
+              Tick the &ldquo;Ignore issue types&rdquo; checkboxes at the
+              top of the panel to park categories you&apos;ve already
+              triaged; remaining issues stay highlighted across re-scans.
+            </p>
+          </>
+        ),
+      },
+      {
+        heading: "Scan Diagrams for Links",
+        body: (
+          <>
+            <p>
+              Open a project and click <strong>Project ▾ → Scan Diagrams
+              for Links</strong>. Diagramatix looks at every Subprocess
+              shape across the project and suggests which child diagram
+              it should link to.
+            </p>
+            <p className="mt-2">The results are grouped:</p>
+            <ul className="list-disc list-inside space-y-1 mt-1">
+              <li>
+                <strong>Existing Links</strong> — already-wired
+                Subprocess → child relationships. Tick to break.
+              </li>
+              <li>
+                <strong>Definite Candidates</strong> — Subprocess label
+                exactly matches a diagram name. Ticked by default.
+              </li>
+              <li>
+                <strong>Probable Candidates</strong> — Subprocess label
+                is similar to a diagram name. A few rules contribute:
+                <ul className="list-disc list-inside ml-5 mt-1 space-y-0.5">
+                  <li>
+                    <strong>Same leading process code</strong> — both
+                    names start with the same identifier of the form{" "}
+                    <code className="text-xs bg-gray-100 px-1 rounded">
+                      AAAnnn.nn.nn…
+                    </code>{" "}
+                    (1&ndash;3 letters, then dot-separated 1&ndash;3 digit
+                    groups). Catches{" "}
+                    <code className="text-xs bg-gray-100 px-1 rounded">
+                      P03.1.1
+                    </code>{" "}
+                    style codes.
+                  </li>
+                  <li>
+                    <strong>Same descriptive tail</strong> — after
+                    stripping the code (and a leading{" "}
+                    <code className="text-xs bg-gray-100 px-1 rounded">
+                      :
+                    </code>{" "}
+                    separator), the remaining text matches in both.
+                  </li>
+                  <li>
+                    <strong>Fuzzy match</strong> — contains or short
+                    Levenshtein distance. Only applies when the names
+                    don&apos;t both carry differing codes.
+                  </li>
+                </ul>
+              </li>
+            </ul>
+            <p className="mt-2">
+              Checkboxes are independent — tick whichever links you want
+              before clicking Apply. If you tick two candidates targeting
+              the same subprocess, the second one applied wins (one
+              subprocess can only link to one diagram).
+            </p>
+          </>
+        ),
+      },
     ],
   },
 
@@ -1441,11 +1549,43 @@ export const CHAPTERS: HelpChapter[] = [
       {
         heading: "Export Visio",
         body: (
-          <p>
-            Exports the current BPMN diagram as a Microsoft Visio
-            (.vsdx) file. Colours from your diagram settings are applied
-            to the Visio masters. Only available for BPMN diagrams.
-          </p>
+          <>
+            <p>
+              Exports BPMN diagrams as Microsoft Visio{" "}
+              <code className="text-xs bg-gray-100 px-1 rounded">.vsdx</code>{" "}
+              files. The exported file uses the{" "}
+              <strong>BPMN Diagramatix Shapes v1.5</strong> stencil — a
+              modified version of Microsoft&apos;s BPMN_M stencil with
+              corrected markers (Terminate, Inclusive, Conditional, etc).
+              Recipients editing in Visio need this stencil installed:
+              the <strong>File ▾ → Export ▸ Visio Stencil</strong> menu
+              item on a project page downloads it.
+            </p>
+            <p className="mt-2">Two export paths:</p>
+            <ul className="list-disc list-inside space-y-1 mt-1">
+              <li>
+                <strong>Single diagram</strong> — from the diagram editor,
+                <strong> Export ▾ → Visio (Diagramatix v1.5)</strong>{" "}
+                exports just the current diagram. (A second{" "}
+                <strong>Visio (BPMN_M)</strong> option exists but is
+                broken in this build — use v1.5.)
+              </li>
+              <li>
+                <strong>Whole project</strong> — from the project page,
+                <strong> File ▾ → Export ▸ Visio (.vsdx) — all BPMN</strong>{" "}
+                exports every BPMN diagram in the project as one
+                multi-page .vsdx (one Visio Page per diagram, ordered
+                alphabetically by name). Non-BPMN diagrams in the
+                project are skipped silently.
+              </li>
+            </ul>
+            <p className="mt-2">
+              The recipient opens the file in Visio, edits, sends it back,
+              and you can re-import via{" "}
+              <strong>File ▾ → Import ▸ Visio (.vsdx)</strong> on any
+              project page (see Visio import below).
+            </p>
+          </>
         ),
       },
       {
@@ -1504,6 +1644,48 @@ export const CHAPTERS: HelpChapter[] = [
               </li>
             </ul>
           </>
+        ),
+      },
+      {
+        heading: "Import Visio (.vsdx)",
+        body: (
+          <>
+            <p>
+              From a project page, <strong>File ▾ → Import ▸ Visio
+              (.vsdx)</strong> reads a single-page or multi-page Visio
+              file and creates one Diagramatix diagram per selected
+              page. A dialog shows every page in the file with a tick
+              next to each so you can select a subset; choose a target
+              (current project or new), a folder name for the imported
+              batch, and click Import.
+            </p>
+            <p className="mt-2">
+              On import, Diagramatix runs four cleanup passes on each
+              page so the round-trip from Visio doesn&apos;t produce
+              spurious Pool elements: same-bbox clusters collapse,
+              empty-label CFF Container / Swimlane List wrappers demote,
+              placeholder labels (&ldquo;Title&rdquo;, &ldquo;Pool&rdquo;)
+              drop in favour of real-labelled pools, and same-labelled
+              pools that overlap collapse to the larger one. Net effect:
+              Visio files with stacked-wrapper pools (a common pattern in
+              older CFF-style files) come in clean.
+            </p>
+            <p className="mt-2">
+              For details on how Visio export then import together form a
+              round-trip workflow with a recipient editing in Visio, see
+              the <strong>Export Visio</strong> section above.
+            </p>
+          </>
+        ),
+      },
+      {
+        heading: "Import BPMN (.bpmn)",
+        body: (
+          <p>
+            From a project page, <strong>File ▾ → Import ▸ BPMN</strong>{" "}
+            reads a standard OMG BPMN 2.0 XML file (produced by Signavio,
+            Camunda, bpmn.io, etc.) and creates a new BPMN diagram.
+          </p>
         ),
       },
       {
@@ -1591,6 +1773,87 @@ export const CHAPTERS: HelpChapter[] = [
             <li>Subprocess linked-diagram references</li>
             <li>Colour configurations and display settings</li>
           </ul>
+        ),
+      },
+      {
+        heading: "Admin tools — Rules & Prompts transfer",
+        body: (
+          <>
+            <p>
+              <strong>Admin-only.</strong> Opens at{" "}
+              <strong>Admin → Database</strong> in the header. Two
+              buttons:
+            </p>
+            <ul className="list-disc list-inside space-y-1 mt-1">
+              <li>
+                <strong>Rules &amp; Prompts ↓</strong> downloads a{" "}
+                <code className="text-xs bg-gray-100 px-1 rounded">
+                  .diag-rules
+                </code>{" "}
+                JSON file containing every row in the{" "}
+                <code className="text-xs bg-gray-100 px-1 rounded">
+                  DiagramRules
+                </code>{" "}
+                and{" "}
+                <code className="text-xs bg-gray-100 px-1 rounded">
+                  Prompt
+                </code>{" "}
+                tables (AI rules per diagram category + saved AI
+                prompts).
+              </li>
+              <li>
+                <strong>Rules &amp; Prompts ↑</strong> uploads a
+                previously-downloaded{" "}
+                <code className="text-xs bg-gray-100 px-1 rounded">
+                  .diag-rules
+                </code>{" "}
+                file. Rows with a matching id on the target are{" "}
+                <strong>updated</strong>; new rows are{" "}
+                <strong>inserted</strong>; rows that exist on the target
+                but NOT in the file are <strong>left alone</strong>{" "}
+                (never deletes).
+              </li>
+            </ul>
+            <p className="mt-2">
+              Designed for migrating AI configuration between databases
+              (local-dev → prod web, say). Rows whose user or org
+              foreign key doesn&apos;t exist on the target are{" "}
+              <strong>skipped</strong> with the reason shown in the
+              status banner — typical workflow: do the FULL Restore of
+              users/orgs first, then re-run the rules/prompts import.
+            </p>
+          </>
+        ),
+      },
+      {
+        heading: "Admin tools — FULL Backup &amp; Selective Restore",
+        body: (
+          <>
+            <p>
+              <strong>Admin-only.</strong> Also at{" "}
+              <strong>Admin → Database</strong>.
+            </p>
+            <ul className="list-disc list-inside space-y-1 mt-1">
+              <li>
+                <strong>FULL Backup</strong> — downloads a{" "}
+                <code className="text-xs bg-gray-100 px-1 rounded">
+                  .diag-full
+                </code>{" "}
+                snapshot covering every row in every table (including
+                password hashes and OAuth tokens). Treat the file as a
+                credential.
+              </li>
+              <li>
+                <strong>Full &amp; Selective Restore</strong> — opens a
+                tree where you choose which Orgs / Users / Projects /
+                Diagrams / Templates to restore. Two modes available:{" "}
+                <em>WIPE</em> (TRUNCATE every table then re-insert from
+                the file — requires typing &ldquo;WIPE&rdquo; to
+                confirm) and <em>Additive</em> (insert rows that
+                don&apos;t already exist, key Users by email).
+              </li>
+            </ul>
+          </>
         ),
       },
     ],
