@@ -1285,6 +1285,29 @@ export async function exportVisioV3(
       }
     }
 
+    // v1.5 Task master (sourceMasterId === 6). Root Shape 5's TxtPinX /
+    // TxtPinY cells reference `Controls.Text_Reposition` / `…Y` formulas
+    // — but the master ships with NO `<Section N='Controls'>`, so the
+    // formula is dangling. Visio falls back to the cached V (master-
+    // natural 0.53125 / 0.3385) and the text NEVER re-centres when the
+    // task is resized: a 2×-tall task shows the label at the master-
+    // default vertical position instead of centred in the new bounding
+    // box. Replace both the V and the F with `Width*0.5` / `Height*0.5`
+    // on the cloned master so first paint AND post-recalc both agree on
+    // a centred label scaled to the instance dimensions.
+    if (sourceMasterId === 6 && instanceW !== undefined && instanceH !== undefined) {
+      const halfW = instanceW / 2;
+      const halfH = instanceH / 2;
+      masterContent = masterContent.replace(
+        /(<Shape ID='5'[^>]*>[\s\S]*?<Cell N='TxtPinX' V=')[\d.]+(' F=')[^']+(')/,
+        `$1${halfW}$2Width*0.5$3`,
+      );
+      masterContent = masterContent.replace(
+        /(<Shape ID='5'[^>]*>[\s\S]*?<Cell N='TxtPinY' V=')[\d.]+(' F=')[^']+(')/,
+        `$1${halfH}$2Height*0.5$3`,
+      );
+    }
+
     // Non-interrupting events (master 105 = Intermediate, 107 = Start).
     // The body outline shapes (6, 7 for both, plus 9 for Intermediate)
     // have `LinePattern` formulas like:
