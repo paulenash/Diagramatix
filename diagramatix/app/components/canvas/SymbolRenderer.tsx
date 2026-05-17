@@ -1608,6 +1608,17 @@ export function SymbolRenderer({
       ((element.properties.poolType as string | undefined) ?? "black-box") === "white-box";
     const isLane = element.type === "lane";
     if (isWhiteBoxPool || isLane) {
+      // EXCEPTION: when the pool/lane is part of a multi-selection (e.g. a
+      // template was just stamped and the whole group is selected), ANY
+      // click on it — header or body — initiates the group drag. Without
+      // this, clicking a Pool/Lane in the selection either deselects
+      // (header) or bubbles through to a child (body), and the user has
+      // to hunt for a non-Pool element to drag the group.
+      if (multiSelected && onGroupMove) {
+        e.stopPropagation();
+        beginElementDrag(e);
+        return;
+      }
       // Both pools and lanes can have dynamic header widths now.
       const stored = element.type === "pool"
         ? (element.properties?.poolHeaderWidth as number | undefined)
