@@ -93,6 +93,42 @@ export function DatabaseClient() {
   >(null);
   const [showRestoreModal, setShowRestoreModal] = useState(false);
 
+  // ── Rules + Prompts transfer (.diag-rules) ──
+  // GET downloads, POST upserts. Used to migrate AI rules + saved
+  // prompts from local-dev DB to prod web DB (and vice versa).
+  const rulesImportInputRef = useRef<HTMLInputElement | null>(null);
+  const [rulesImportBusy, setRulesImportBusy] = useState(false);
+  const [rulesImportStatus, setRulesImportStatus] = useState<string | null>(null);
+  async function handleRulesImport(file: File) {
+    setRulesImportBusy(true);
+    setRulesImportStatus(null);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/admin/rules-prefs", { method: "POST", body: fd });
+      const json = await res.json();
+      if (!res.ok) {
+        setRulesImportStatus(`Error: ${json?.error ?? res.statusText}`);
+        return;
+      }
+      const r = json.rules;
+      const p = json.prompts;
+      const skippedLines = [...r.skippedReasons, ...p.skippedReasons];
+      const skippedDetail = skippedLines.length > 0
+        ? `\nSkipped (${skippedLines.length}):\n  - ${skippedLines.slice(0, 10).join("\n  - ")}${skippedLines.length > 10 ? `\n  ...and ${skippedLines.length - 10} more` : ""}`
+        : "";
+      setRulesImportStatus(
+        `Rules: ${r.inserted} inserted, ${r.updated} updated, ${r.skipped} skipped\n` +
+        `Prompts: ${p.inserted} inserted, ${p.updated} updated, ${p.skipped} skipped` +
+        skippedDetail,
+      );
+    } catch (err) {
+      setRulesImportStatus(`Error: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setRulesImportBusy(false);
+    }
+  }
+
   // Additive-mode tree + selection.
   const [inspectTree, setInspectTree] = useState<InspectTree | null>(null);
   const [inspecting, setInspecting] = useState(false);
@@ -467,6 +503,41 @@ export function DatabaseClient() {
           >
             Full &amp; Selective Restore
           </button>
+          {/* Rules + Prompts transfer \u2014 for migrating AI configuration
+              between databases (local-dev \u2192 prod, etc.). Additive merge
+              by id; never deletes rows on the target. Treats user/org
+              FKs gracefully \u2014 references that don't exist on the target
+              are skipped with a per-row reason in the status output. */}
+          <a
+            href="/api/admin/rules-prefs"
+            download
+            className="text-xs text-white bg-blue-600 hover:bg-blue-700 rounded px-2.5 py-1"
+            title="Download AI Rules + Prompts as a .diag-rules file"
+          >
+            Rules &amp; Prompts &darr;
+          </a>
+          <button
+            onClick={() => {
+              setRulesImportStatus(null);
+              rulesImportInputRef.current?.click();
+            }}
+            disabled={rulesImportBusy}
+            className="text-xs text-blue-700 border border-blue-300 hover:bg-blue-50 rounded px-2.5 py-1 disabled:opacity-50"
+            title="Import AI Rules + Prompts from a .diag-rules file (additive merge)"
+          >
+            {rulesImportBusy ? "Importing\u2026" : "Rules & Prompts \u2191"}
+          </button>
+          <input
+            ref={rulesImportInputRef}
+            type="file"
+            accept=".diag-rules,application/json"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) handleRulesImport(f);
+              e.currentTarget.value = "";
+            }}
+          />
           <button
             onClick={() => {
               setLoading(true);
@@ -483,6 +554,22 @@ export function DatabaseClient() {
           </button>
         </div>
       </header>
+
+      {/* Rules + Prompts import status banner. Dismissible. */}
+      {rulesImportStatus && (
+        <div className={`px-6 py-2 border-b text-xs whitespace-pre-line ${rulesImportStatus.startsWith("Error") ? "bg-red-50 border-red-200 text-red-700" : "bg-blue-50 border-blue-200 text-blue-800"}`}>
+          <div className="flex items-start justify-between gap-3">
+            <pre className="font-mono whitespace-pre-wrap flex-1">{rulesImportStatus}</pre>
+            <button
+              onClick={() => setRulesImportStatus(null)}
+              className="text-gray-500 hover:text-gray-700 text-xs"
+              title="Dismiss"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-1 overflow-hidden">
         {/* Left: Table list */}

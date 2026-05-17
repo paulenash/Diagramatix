@@ -2080,13 +2080,13 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
                         minWidth: 170,
                       }}
                     >
-                      {/* Export ▸ submenu (hover to expand) */}
+                      {/* Export ◂ submenu (hover to expand, opens to LEFT) */}
                       <div className="group/export relative">
                         <div className="flex items-center justify-between px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100 cursor-default">
+                          <span className="text-gray-400">{"◂"}</span>
                           <span>Export</span>
-                          <span className="text-gray-400">{"▸"}</span>
                         </div>
-                        <div className="hidden group-hover/export:block absolute left-full top-0 -mt-1 ml-px bg-white border border-gray-200 rounded-md shadow-lg py-1" style={{ minWidth: 170 }}>
+                        <div className="hidden group-hover/export:block absolute right-full top-0 -mt-1 mr-px bg-white border border-gray-200 rounded-md shadow-lg py-1" style={{ minWidth: 170 }}>
                           <button
                             className={itemCls}
                             onClick={() => { setShowFileMenu(false); handleExportProject("json"); }}
@@ -2130,13 +2130,13 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
                         </div>
                       </div>
 
-                      {/* Import ▸ submenu (hover to expand) */}
+                      {/* Import ◂ submenu (hover to expand, opens to LEFT) */}
                       <div className="group/import relative">
                         <div className="flex items-center justify-between px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100 cursor-default">
+                          <span className="text-gray-400">{"◂"}</span>
                           <span>Import</span>
-                          <span className="text-gray-400">{"▸"}</span>
                         </div>
-                        <div className="hidden group-hover/import:block absolute left-full top-0 -mt-1 ml-px bg-white border border-gray-200 rounded-md shadow-lg py-1" style={{ minWidth: 170 }}>
+                        <div className="hidden group-hover/import:block absolute right-full top-0 -mt-1 mr-px bg-white border border-gray-200 rounded-md shadow-lg py-1" style={{ minWidth: 170 }}>
                           <button
                             className={itemCls}
                             onClick={() => { setShowFileMenu(false); importJsonInputRef.current?.click(); }}
