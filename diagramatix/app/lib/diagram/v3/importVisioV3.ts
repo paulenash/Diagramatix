@@ -1447,6 +1447,17 @@ export async function importVisioV3(
     if (W <= H) continue;                               // not landscape
     if (W < 2.0) continue;                              // < ~192 px wide
     if (W * H < 4.0) continue;                          // < 4 sq.in area
+    // Minimum height + aspect-ratio cap. A real BPMN pool is at least
+    // ~1 inch tall (Diagramatix's default is 2.08 inches); anything
+    // skinnier is a header band or rotated title strip, not a pool.
+    // The aspect-ratio cap catches very long ribbons that just scrape
+    // past the H >= 0.7 floor — a 18:1 strip is decoration regardless
+    // of absolute dimensions. Both together suppress the Pool/Lane
+    // master's nested heading sub-shape from being promoted to its
+    // own pool element (the "narrow Online Modules (OM) duplicate"
+    // symptom).
+    if (H < 0.7) continue;
+    if (W / H > 10) continue;
     // Require an actual text label — vertical-text-only signals (an
     // unnamed wrapper with rotated empty text frame) produce phantom pools.
     // Also fall back to the BpmnName Property if <Text> is empty.
