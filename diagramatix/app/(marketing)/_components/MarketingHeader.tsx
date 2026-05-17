@@ -4,10 +4,16 @@ export function MarketingHeader({ signedIn }: { signedIn: boolean }) {
   return (
     <header className="border-b border-gray-200 bg-white">
       <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-2 group">
-          <span className="text-base font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
-            Diagramatix
-          </span>
+        <Link href="/" className="flex items-center group">
+          {/* Wordmark (public/logos/diagramatix-logo.svg, 500x120 viewBox).
+              h-8 keeps it in the 14h-tall header with a touch of padding;
+              width auto-scales to preserve the 4.17:1 aspect ratio. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/logos/diagramatix-logo.svg"
+            alt="Diagramatix"
+            className="h-8 w-auto group-hover:opacity-80 transition-opacity"
+          />
         </Link>
 
         <nav className="flex items-center gap-1 text-sm">
