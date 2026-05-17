@@ -2592,7 +2592,17 @@ export async function exportVisioV3(
     const v15Role = v15ElProps?.role as string | undefined;
     const v15NeedsSizeOnly = profile.disableBodyColourBake
       && (el.type === "subprocess" || el.type === "subprocess-expanded"
-          || el.type === "task");
+          || el.type === "task"
+          // Group: page-shape already carries explicit Width/Height (via
+          // isResizable above) so the SELECTION bbox is right, but the
+          // v1.5 Group master's Geometry section caches its dashed
+          // rectangle path at master-natural 6x4 inches with bare
+          // `Width*1` / `Height*1` formulas. Visio's first paint uses the
+          // cached V's, so the visible dashed outline draws at 6x4
+          // anchored at the bottom-left corner instead of filling the
+          // user-drawn bounding box. The per-instance master clone
+          // rescales those Geometry V's to match the instance size.
+          || el.type === "group");
     const v15NeedsCollectionMarker = profile.disableBodyColourBake
       && el.type === "data-object"
       && v15Mult === "collection";
@@ -2612,12 +2622,14 @@ export async function exportVisioV3(
         ...(el.properties as Record<string, unknown> | undefined),
         gatewayType: (el.properties as any)?.gatewayType ?? el.gatewayType,
       };
-      // Task clones are content-identical for the same (sourceMasterId,
-      // w, h) — they carry only size rescaling, no per-instance markers.
-      // Reuse via taskCloneCache. 4-decimal rounding so floating-point
-      // noise on the same logical size still hits the cache.
-      const isTaskClone = profile.disableBodyColourBake && el.type === "task";
-      const taskCacheKey = isTaskClone
+      // Task and Group clones are content-identical for the same
+      // (sourceMasterId, w, h) — they carry only size rescaling, no
+      // per-instance markers/properties. Reuse via taskCloneCache.
+      // 4-decimal rounding so floating-point noise on the same logical
+      // size still hits the cache.
+      const isSizeOnlyClone = profile.disableBodyColourBake
+        && (el.type === "task" || el.type === "group");
+      const taskCacheKey = isSizeOnlyClone
         ? `${mapping.masterId}|${w.toFixed(4)}|${h.toFixed(4)}`
         : null;
       const cachedTaskId = taskCacheKey ? taskCloneCache.get(taskCacheKey) : undefined;

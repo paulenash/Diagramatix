@@ -500,11 +500,13 @@ export function DiagramEditor({
   const handleBackToProject = useCallback(async () => {
     if ((await confirmSaveBeforeLeave()) === "cancel") return;
     sessionStorage.removeItem(STACK_KEY);
-    if (window.history.length > 1) {
-      router.back();
-    } else {
-      router.push(projectId ? `/dashboard/projects/${projectId}` : "/dashboard");
-    }
+    // Always navigate directly to the project (or dashboard if no project).
+    // Previously this fell through to router.back() which walked browser
+    // history one diagram at a time — when the user had clicked through
+    // several diagrams via the prev/next folder traversal, "Back to
+    // Project" would step through each visited diagram instead of
+    // jumping straight to the project screen.
+    router.push(projectId ? `/dashboard/projects/${projectId}` : "/dashboard");
   }, [router, projectId]);
 
   const {
@@ -1467,9 +1469,10 @@ export function DiagramEditor({
       <header className={`h-9 border-b border-gray-200 flex items-center px-2 gap-2 flex-shrink-0 ${readOnly ? "bg-orange-50" : ""}`}>
         <button
           onClick={handleBackToProject}
-          className="text-gray-500 hover:text-gray-700 text-xs"
+          className="text-gray-500 hover:text-gray-700 text-xs flex items-center gap-1"
         >
-          {`\u2190 ${projectId ? "Project" : "Dashboard"}`}
+          <span style={{ fontSize: "1.75em", lineHeight: 1 }}>{"\u2190"}</span>
+          {projectId ? "Project" : "Dashboard"}
         </button>
 
         <div className="flex items-center gap-1.5">

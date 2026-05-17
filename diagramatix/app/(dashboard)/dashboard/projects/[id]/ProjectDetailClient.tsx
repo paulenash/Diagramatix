@@ -1938,9 +1938,10 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
         <div className="flex items-center gap-3">
           <button
             onClick={() => router.push("/dashboard")}
-            className="text-gray-500 hover:text-gray-700 text-sm"
+            className="text-gray-500 hover:text-gray-700 text-sm flex items-center gap-1"
           >
-            {"\u2190"} Dashboard
+            <span style={{ fontSize: "1.75em", lineHeight: 1 }}>{"\u2190"}</span>
+            Dashboard
           </button>
           {/* Project name — editable only when not readOnly */}
           {!readOnly && editingProjectName ? (
