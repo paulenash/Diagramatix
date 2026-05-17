@@ -1563,6 +1563,12 @@ export async function exportVisioV3(
   }
 
   const shapes: string[] = [];
+  // Edge-mounted (boundary) events are emitted into a separate bucket
+  // and appended AFTER connectors, so Visio's draw-order (= declaration
+  // order) paints them on TOP of any connector that crosses them.
+  // Without this, sequence-flow lines slice through the small event
+  // circle on a Subprocess/EP boundary and the event reads as broken.
+  const edgeShapes: string[] = [];
   const connects: string[] = [];
   const elIdToShapeId = new Map<string, number>();
   let nextId = 100;
@@ -1985,6 +1991,19 @@ export async function exportVisioV3(
     // formulas that recalc to the right size on first interaction.
     const isResizable = [
       "task", "subprocess", "subprocess-expanded", "pool", "lane",
+      // Group is a user-drawn bounding rect — without explicit
+      // Width/Height the page shape falls back to the v1.5 Group
+      // master's natural 6×4 inches (576×384 px), so user-sized
+      // groups rendered ~5× too big.
+      "group",
+      // Text-annotation: master 13 is a CFF Callout with a Height
+      // formula `MAX(IF(User.ResizeWithText, CEILING(TxtHeight, …)))`
+      // that auto-grows with text — but only AFTER first recalc.
+      // Without an explicit Width/Height on the page shape the first
+      // paint uses the master-natural 1×0.3125 inches, far smaller
+      // than the text needs, so the annotation looks crushed until
+      // the user nudges its size to trigger recalc.
+      "text-annotation",
     ].includes(el.type);
     const hw = w / 2;
     const hh = h / 2;
@@ -2893,14 +2912,22 @@ export async function exportVisioV3(
         : "";
 
     const escLabel = esc(el.label || el.type);
-    shapes.push(
+    const shapeXml =
       `<Shape ID='${shapeId}' NameU='${escLabel}'` +
       ` IsCustomNameU='1' Name='${escLabel}' IsCustomName='1'` +
       ` Type='Group' Master='${effectiveMasterId}'>` +
       `<Cell N='PinX' V='${cx}'/>` +
       `<Cell N='PinY' V='${cy}'/>` +
       `<Cell N='LayerMember' V=''/>` +
-      fillCells(el.type) +
+      // Only emit page-shape FillForegnd / FillPattern for body-fill
+      // types (tasks, subprocesses, events, gateways, data shapes).
+      // Group + text-annotation use their colorMap entry as the LINE
+      // colour, not a fill — without this guard, fillCells would paint
+      // a group as a solid dark-grey rectangle (the line colour piped
+      // into FillForegnd) instead of the intended transparent dashed
+      // outline. Pool/Lane already bake their colour into the per-
+      // instance master clone, so this skips a redundant override.
+      fillCells(BODY_FILL_TYPES.has(el.type) ? el.type : "") +
       sizeCells +
       txtInhCells +
       userSection +
@@ -2910,8 +2937,13 @@ export async function exportVisioV3(
       rootMarkerSections +
       textElWithCp +
       subShapes +
-      `</Shape>`
-    );
+      `</Shape>`;
+    // Edge-mounted (boundary) events go to the edgeShapes bucket and
+    // are appended AFTER connectors in the final page write, so they
+    // paint on top of any sequence-flow / message line that crosses
+    // them. Non-edge elements go in the main shapes bucket as before.
+    if (el.boundaryHostId) edgeShapes.push(shapeXml);
+    else shapes.push(shapeXml);
   }
 
   // ── Step 4: Connectors ──
@@ -3046,6 +3078,11 @@ export async function exportVisioV3(
       `<Connect FromSheet='${shapeId}' FromCell='EndX' FromPart='12' ToSheet='${tgtShapeId}' ToCell='PinX' ToPart='3'/>`
     );
   }
+
+  // Append edge-mounted boundary events LAST so Visio's declaration-
+  // order paint puts them on top of any sequence-flow / message-flow
+  // lines that pass through them.
+  for (const x of edgeShapes) shapes.push(x);
 
   // ── Step 5: Write page content ──
   zip.file("visio/pages/page1.xml",
