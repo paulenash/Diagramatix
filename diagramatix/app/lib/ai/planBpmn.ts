@@ -205,11 +205,20 @@ export async function planBpmn(opts: PlanBpmnOptions): Promise<PlanBpmnResult> {
   }
   userContent.push({ type: "text", text: prompt.trim() });
 
+  // Assistant prefill: by starting the assistant turn with "{" we force
+  // Sonnet to continue from there as a JSON object. This is the
+  // Anthropic-recommended technique to stop "I'll analyze…" preambles
+  // that have been leaking through with longer system prompts. The
+  // prefilled "{" is NOT echoed back in the response, so we prepend it
+  // when parsing.
   const message = await client.messages.create({
     model,
     max_tokens: 8192,
     system: systemPrompt,
-    messages: [{ role: "user", content: userContent }],
+    messages: [
+      { role: "user", content: userContent },
+      { role: "assistant", content: "{" },
+    ],
   });
 
   const textBlock = message.content.find(b => b.type === "text");
@@ -217,15 +226,27 @@ export async function planBpmn(opts: PlanBpmnOptions): Promise<PlanBpmnResult> {
     return { ok: false, status: 500, error: "No response from AI" };
   }
 
-  let jsonStr = textBlock.text.trim();
+  // Re-attach the prefilled opening brace, then defensively strip any
+  // remaining wrapper (code fences or stray preamble) before parsing.
+  let jsonStr = "{" + textBlock.text;
+  jsonStr = jsonStr.trim();
   if (jsonStr.startsWith("```")) {
     jsonStr = jsonStr.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "").trim();
+  }
+  // Fallback for the rare case prose still leaks through (e.g. prefill
+  // collapsed): clip to the outermost { … } pair.
+  const firstBrace = jsonStr.indexOf("{");
+  const lastBrace = jsonStr.lastIndexOf("}");
+  if (firstBrace > 0 && lastBrace > firstBrace) {
+    jsonStr = jsonStr.slice(firstBrace, lastBrace + 1);
   }
 
   let parsed: { elements: AiElement[]; connections: AiConnection[] };
   try {
     parsed = JSON.parse(jsonStr);
   } catch (parseErr) {
+    console.error("[planBpmn] JSON parse failed. Raw response (first 1 KB):",
+      ("{" + textBlock.text).slice(0, 1024));
     return {
       ok: false,
       status: 500,
