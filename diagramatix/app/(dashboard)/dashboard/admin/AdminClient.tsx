@@ -7,7 +7,10 @@ interface UserRow {
   id: string;
   email: string;
   name: string | null;
-  createdAt: Date;
+  createdAt: string;
+  lastSeenAt: string | null;
+  currentDiagramId: string | null;
+  currentDiagramName: string | null;
   _count: { projects: number; diagrams: number };
 }
 
@@ -16,17 +19,42 @@ interface Props {
   currentUserId: string;
 }
 
+// Users with activity in the last 5 minutes are treated as "online" — the
+// jwt callback updates lastSeenAt once a minute, so anything fresher than
+// that is almost certainly an active session.
+const ONLINE_WINDOW_MS = 5 * 60 * 1000;
+
+function presence(lastSeenAt: string | null, isYou: boolean): { online: boolean; label: string } {
+  if (isYou) return { online: true, label: "Online now" };
+  if (!lastSeenAt) return { online: false, label: "Never signed in" };
+  const seen = new Date(lastSeenAt).getTime();
+  const delta = Date.now() - seen;
+  if (delta < ONLINE_WINDOW_MS) return { online: true, label: "Online now" };
+  if (delta < 60 * 60 * 1000) {
+    const mins = Math.max(1, Math.round(delta / 60_000));
+    return { online: false, label: `${mins} min ago` };
+  }
+  if (delta < 24 * 60 * 60 * 1000) {
+    const hrs = Math.round(delta / (60 * 60_000));
+    return { online: false, label: `${hrs} h ago` };
+  }
+  const days = Math.round(delta / (24 * 60 * 60_000));
+  return { online: false, label: `${days} d ago` };
+}
+
 export function AdminClient({ users, currentUserId }: Props) {
   const router = useRouter();
 
-  async function handleViewAs(userId: string) {
+  async function handleViewAs(userId: string, mode: "view" | "edit", target?: string) {
     await fetch("/api/admin/impersonate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId }),
+      body: JSON.stringify({ userId, mode }),
     });
-    // Hard navigation so server sees the new impersonation cookie
-    window.location.href = "/dashboard";
+    // Hard navigation so the server sees the new impersonation cookies.
+    // Jump directly to the user's open diagram when we have one, otherwise
+    // land on their dashboard.
+    window.location.href = target ?? "/dashboard";
   }
 
   return (
@@ -71,6 +99,8 @@ export function AdminClient({ users, currentUserId }: Props) {
             <tr className="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               <th className="px-4 py-3">Name</th>
               <th className="px-4 py-3">Email</th>
+              <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3">Working on</th>
               <th className="px-4 py-3 text-center">Projects</th>
               <th className="px-4 py-3 text-center">Diagrams</th>
               <th className="px-4 py-3">Registered</th>
@@ -78,34 +108,79 @@ export function AdminClient({ users, currentUserId }: Props) {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {users.map((u) => (
-              <tr key={u.id} className="hover:bg-gray-50">
-                <td className="px-4 py-3 text-sm text-gray-900 font-medium">
-                  {u.name || <span className="text-gray-400 italic">No name</span>}
-                </td>
-                <td className="px-4 py-3 text-sm text-gray-600">{u.email}</td>
-                <td className="px-4 py-3 text-sm text-gray-600 text-center">{u._count.projects}</td>
-                <td className="px-4 py-3 text-sm text-gray-600 text-center">{u._count.diagrams}</td>
-                <td className="px-4 py-3 text-xs text-gray-400">
-                  {new Date(u.createdAt).toLocaleDateString()}
-                </td>
-                <td className="px-4 py-3 text-right">
-                  {u.id === currentUserId ? (
-                    <span className="text-xs text-gray-400">You</span>
-                  ) : (
-                    <button
-                      onClick={() => handleViewAs(u.id)}
-                      className="text-xs text-orange-600 hover:text-orange-800 font-medium border border-orange-300 rounded px-2 py-1 hover:bg-orange-50"
-                    >
-                      View as
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
+            {users.map((u) => {
+              const isYou = u.id === currentUserId;
+              const p = presence(u.lastSeenAt, isYou);
+              // Only surface "Working on" when the user is currently online
+              // — currentDiagramId can otherwise linger from a previous session.
+              const workingOn = p.online && u.currentDiagramId && u.currentDiagramName
+                ? { id: u.currentDiagramId, name: u.currentDiagramName }
+                : null;
+              const diagramHref = workingOn ? `/diagram/${workingOn.id}` : undefined;
+              return (
+                <tr key={u.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-3 text-sm text-gray-900 font-medium">
+                    {u.name || <span className="text-gray-400 italic">No name</span>}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-600">{u.email}</td>
+                  <td className="px-4 py-3 text-xs">
+                    <span className="inline-flex items-center gap-1.5">
+                      <span
+                        className={`inline-block w-2 h-2 rounded-full ${p.online ? "bg-green-500" : "bg-gray-300"}`}
+                        title={u.lastSeenAt ? `Last seen ${new Date(u.lastSeenAt).toLocaleString()}` : "Never signed in"}
+                      />
+                      <span className={p.online ? "text-green-700 font-medium" : "text-gray-500"}>
+                        {p.label}
+                      </span>
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-xs">
+                    {workingOn ? (
+                      <span className="text-gray-700 truncate inline-block max-w-[14rem]" title={workingOn.name}>
+                        {workingOn.name}
+                      </span>
+                    ) : (
+                      <span className="text-gray-300">—</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-600 text-center">{u._count.projects}</td>
+                  <td className="px-4 py-3 text-sm text-gray-600 text-center">{u._count.diagrams}</td>
+                  <td className="px-4 py-3 text-xs text-gray-400">
+                    {new Date(u.createdAt).toLocaleDateString()}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    {isYou ? (
+                      <span className="text-xs text-gray-400">You</span>
+                    ) : (
+                      <div className="inline-flex gap-1">
+                        <button
+                          onClick={() => handleViewAs(u.id, "view", diagramHref)}
+                          className="text-xs text-orange-600 hover:text-orange-800 font-medium border border-orange-300 rounded px-2 py-1 hover:bg-orange-50"
+                          title={workingOn ? `View "${workingOn.name}" (read-only)` : "View this user's dashboard (read-only)"}
+                        >
+                          View
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (!confirm(`Open ${u.email}'s session in EDIT mode? Changes you make will save to their account.`)) return;
+                            handleViewAs(u.id, "edit", diagramHref);
+                          }}
+                          className="text-xs text-red-600 hover:text-red-800 font-medium border border-red-300 rounded px-2 py-1 hover:bg-red-50"
+                          title={workingOn ? `Edit "${workingOn.name}" as ${u.email}` : `Edit ${u.email}'s data for support purposes`}
+                        >
+                          Edit
+                        </button>
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
-        <p className="text-xs text-gray-400 mt-4">{users.length} registered user(s)</p>
+        <p className="text-xs text-gray-400 mt-4">
+          {users.length} registered user(s) — {users.filter(u => presence(u.lastSeenAt, u.id === currentUserId).online).length} online
+        </p>
       </div>
     </div>
   );

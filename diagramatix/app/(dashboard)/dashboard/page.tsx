@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { DashboardClient } from "./DashboardClient";
-import { getEffectiveUserId, isImpersonating, isSuperuser } from "@/app/lib/superuser";
+import { getEffectiveUserId, isImpersonating, isSuperuser, getImpersonationMode } from "@/app/lib/superuser";
 import { ARCHIVE_PROJECT_NAME } from "@/app/lib/archive";
 import { tryGetCurrentOrgId } from "@/app/lib/auth/orgContext";
 
@@ -23,6 +23,18 @@ export default async function DashboardPage() {
       effectiveUserId = session.user.id;
       viewing = false;
     }
+  }
+
+  // Landing on the dashboard means the real user is no longer on a
+  // specific diagram — clear so the admin Registered Users screen
+  // doesn't keep showing a stale "Working on: X".
+  if (!viewing && session.user.id) {
+    try {
+      await prisma.user.update({
+        where: { id: session.user.id },
+        data: { currentDiagramId: null, currentDiagramName: null },
+      });
+    } catch { /* best-effort */ }
   }
 
   const orgId = await tryGetCurrentOrgId(session, cookieStore);
@@ -89,6 +101,8 @@ export default async function DashboardPage() {
   // (set from --build-arg GIT_COMMIT_COUNT in the Dockerfile).
   const commitCount = parseInt(process.env.NEXT_PUBLIC_COMMIT_COUNT ?? "0", 10) || 0;
 
+  const impersonationMode = viewing ? getImpersonationMode(cookieStore) : undefined;
+
   return (
     <DashboardClient
       projects={projects}
@@ -98,9 +112,10 @@ export default async function DashboardPage() {
       orgName={org?.name ?? ""}
       orgRole={orgRole}
       version={commitCount}
-      readOnly={viewing}
+      readOnly={viewing && impersonationMode === "view"}
       viewingAsName={viewingAsName}
       viewingAsEmail={viewingAsEmail}
+      impersonationMode={impersonationMode}
       isSuperuser={isSuperuser(session)}
     />
   );

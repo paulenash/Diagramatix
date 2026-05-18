@@ -323,6 +323,7 @@ interface Props {
   readOnly?: boolean;
   viewingAsName?: string;
   viewingAsEmail?: string;
+  impersonationMode?: "view" | "edit";
 }
 
 const DIAGRAM_TYPE_LABELS: Record<string, string> = {
@@ -346,7 +347,7 @@ const DIAGRAM_TYPES: { value: DiagramType; label: string; description: string }[
   { value: "archimate", label: "ArchiMate", description: "Enterprise architecture using the ArchiMate 3.1 standard (Business, Motivation, Strategy, Application layers)" },
 ];
 
-export function ProjectDetailClient({ project, otherProjects, version, readOnly, viewingAsName, viewingAsEmail }: Props) {
+export function ProjectDetailClient({ project, otherProjects, version, readOnly, viewingAsName, viewingAsEmail, impersonationMode }: Props) {
   const router = useRouter();
   const [diagrams, setDiagrams] = useState(project.diagrams);
   const [projectName, setProjectName] = useState(project.name);
@@ -1931,7 +1932,7 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
   return (
     <div className={`min-h-screen ${readOnly ? "bg-orange-50" : "bg-gray-50"} flex flex-col`}>
       {readOnly && viewingAsName !== undefined && viewingAsEmail !== undefined && (
-        <ImpersonationBanner viewingAsName={viewingAsName ?? ""} viewingAsEmail={viewingAsEmail ?? ""} />
+        <ImpersonationBanner viewingAsName={viewingAsName ?? ""} viewingAsEmail={viewingAsEmail ?? ""} mode={impersonationMode} />
       )}
       {/* Header */}
       <header className={`${readOnly ? "bg-orange-50" : "bg-white"} border-b border-gray-200 px-4 py-2 flex-shrink-0`}>

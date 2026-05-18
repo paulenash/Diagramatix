@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma, pgPool } from "@/app/lib/db";
 import { importBpmnXml } from "@/app/lib/diagram/bpmn/importBpmnXml";
-import { isImpersonating } from "@/app/lib/superuser";
+import { isReadOnlyImpersonation } from "@/app/lib/superuser";
 import {
   requireRole,
   WRITE_ROLES,
@@ -75,7 +75,7 @@ export async function POST(request: Request) {
 
   try {
     const cookieStore = await cookies();
-    if (isImpersonating(session, cookieStore)) {
+    if (isReadOnlyImpersonation(session, cookieStore)) {
       return NextResponse.json(
         { error: "Read-only: viewing another user" },
         { status: 403 },

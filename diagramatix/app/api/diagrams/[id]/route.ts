@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
-import { getEffectiveUserId, isImpersonating } from "@/app/lib/superuser";
+import { getEffectiveUserId, isReadOnlyImpersonation } from "@/app/lib/superuser";
 import {
   getCurrentOrgId,
   requireRole,
@@ -16,9 +16,9 @@ async function getAuthorizedDiagram(id: string, userId: string, orgId: string) {
   return prisma.diagram.findFirst({ where: { id, userId, orgId } });
 }
 
-async function checkImpersonating(session: Parameters<typeof isImpersonating>[0]) {
+async function checkImpersonating(session: Parameters<typeof isReadOnlyImpersonation>[0]) {
   try {
-    return isImpersonating(session, await cookies());
+    return isReadOnlyImpersonation(session, await cookies());
   } catch {
     return false;
   }

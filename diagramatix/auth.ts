@@ -110,6 +110,23 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     async jwt({ token, user, account }) {
       // Set user ID on first sign-in
       if (user) token.id = user.id;
+
+      // Throttled lastSeenAt update — at most once per 60 s per session.
+      // Powers the admin Registered Users "online / last seen" column.
+      if (token.id) {
+        const now = Date.now();
+        const prev = typeof token.lastSeenAt === "number" ? token.lastSeenAt : 0;
+        if (now - prev > 60_000) {
+          token.lastSeenAt = now;
+          try {
+            await prisma.user.update({
+              where: { id: token.id as string },
+              data: { lastSeenAt: new Date(now) },
+            });
+          } catch { /* ignore — admin indicator is best-effort */ }
+        }
+      }
+
       // Store Microsoft tokens for Graph API access
       if (account?.provider === "microsoft-entra-id") {
         token.msAccessToken = account.access_token;

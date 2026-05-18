@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { pgPool, prisma } from "@/app/lib/db";
-import { getEffectiveUserId, isImpersonating, SUPERUSER_EMAILS } from "@/app/lib/superuser";
+import { getEffectiveUserId, isReadOnlyImpersonation, SUPERUSER_EMAILS } from "@/app/lib/superuser";
 
 // Elevation password from env var. See note in /api/templates/route.ts.
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? "";
@@ -49,7 +49,7 @@ export async function PUT(req: Request, { params }: Params) {
 
   try {
     const ck = await cookies();
-    if (isImpersonating(session, ck)) {
+    if (isReadOnlyImpersonation(session, ck)) {
       return NextResponse.json({ error: "Read-only: viewing another user" }, { status: 403 });
     }
   } catch { /* proceed normally */ }
@@ -135,7 +135,7 @@ export async function DELETE(req: Request, { params }: Params) {
 
   try {
     const ck = await cookies();
-    if (isImpersonating(session, ck)) {
+    if (isReadOnlyImpersonation(session, ck)) {
       return NextResponse.json({ error: "Read-only: viewing another user" }, { status: 403 });
     }
   } catch { /* proceed normally */ }

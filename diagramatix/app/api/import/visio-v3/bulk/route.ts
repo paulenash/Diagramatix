@@ -4,7 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { importVisioV3 } from "@/app/lib/diagram/v3/importVisioV3";
 import { listVisioPages } from "@/app/lib/diagram/v3/visioPages";
-import { isImpersonating } from "@/app/lib/superuser";
+import { isReadOnlyImpersonation } from "@/app/lib/superuser";
 import {
   requireRole,
   WRITE_ROLES,
@@ -80,7 +80,7 @@ export async function POST(request: Request) {
 
   try {
     const cookieStore = await cookies();
-    if (isImpersonating(session, cookieStore)) {
+    if (isReadOnlyImpersonation(session, cookieStore)) {
       return NextResponse.json(
         { error: "Read-only: viewing another user" },
         { status: 403 },

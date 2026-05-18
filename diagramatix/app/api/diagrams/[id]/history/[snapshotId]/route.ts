@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
-import { getEffectiveUserId, isImpersonating } from "@/app/lib/superuser";
+import { getEffectiveUserId, isReadOnlyImpersonation } from "@/app/lib/superuser";
 import { getCurrentOrgId, requireRole, WRITE_ROLES, OrgContextError } from "@/app/lib/auth/orgContext";
 
 type Params = { params: Promise<{ id: string; snapshotId: string }> };
@@ -47,7 +47,7 @@ export async function POST(_req: Request, { params }: Params) {
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   try {
-    const impersonating = await (async () => { try { return isImpersonating(session, await cookies()); } catch { return false; } })();
+    const impersonating = await (async () => { try { return isReadOnlyImpersonation(session, await cookies()); } catch { return false; } })();
     if (impersonating) return NextResponse.json({ error: "Read-only: viewing another user" }, { status: 403 });
   } catch { /* ignore */ }
 

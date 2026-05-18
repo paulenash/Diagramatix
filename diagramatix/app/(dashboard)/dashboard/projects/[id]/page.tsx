@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { ProjectDetailClient } from "./ProjectDetailClient";
-import { getEffectiveUserId, isImpersonating } from "@/app/lib/superuser";
+import { getEffectiveUserId, isImpersonating, getImpersonationMode } from "@/app/lib/superuser";
 import { tryGetCurrentOrgId } from "@/app/lib/auth/orgContext";
 
 type Props = { params: Promise<{ id: string }> };
@@ -23,6 +23,16 @@ export default async function ProjectPage({ params }: Props) {
   }
 
   const { id } = await params;
+
+  // Project detail means the real user has navigated off any open diagram.
+  if (!viewing && session.user.id) {
+    try {
+      await prisma.user.update({
+        where: { id: session.user.id },
+        data: { currentDiagramId: null, currentDiagramName: null },
+      });
+    } catch { /* best-effort */ }
+  }
 
   const orgId = await tryGetCurrentOrgId(session, cookieStore);
   if (!orgId) redirect("/dashboard");
@@ -67,14 +77,17 @@ export default async function ProjectPage({ params }: Props) {
     viewingAsEmail = target?.email ?? "";
   }
 
+  const impersonationMode = viewing ? getImpersonationMode(cookieStore) : undefined;
+
   return (
     <ProjectDetailClient
       project={project}
       otherProjects={otherProjects}
       version={commitCount}
-      readOnly={viewing}
+      readOnly={viewing && impersonationMode === "view"}
       viewingAsName={viewingAsName}
       viewingAsEmail={viewingAsEmail}
+      impersonationMode={impersonationMode}
     />
   );
 }

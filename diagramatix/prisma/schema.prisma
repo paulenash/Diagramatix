@@ -85,6 +85,14 @@ model User {
   // headers the user wants folded.
   templateGroupPrefs Json?
   createdAt        DateTime  @default(now())
+  // Updated (throttled) from the Auth.js jwt callback to power the
+  // admin "online / last seen" indicator. Nullable for legacy rows.
+  lastSeenAt       DateTime?
+  // The diagram the user is currently viewing — set when a diagram page
+  // loads, cleared when they navigate back to the dashboard / a project.
+  // Denormalised name avoids a join in the admin Registered Users query.
+  currentDiagramId   String?
+  currentDiagramName String?
 }
 
 model Project {

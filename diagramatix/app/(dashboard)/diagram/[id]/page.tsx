@@ -7,7 +7,7 @@ import type { DiagramData, DiagramType } from "@/app/lib/diagram/types";
 import { EMPTY_DIAGRAM } from "@/app/lib/diagram/types";
 import type { SymbolColorConfig } from "@/app/lib/diagram/colors";
 import type { DisplayMode } from "@/app/lib/diagram/displayMode";
-import { getEffectiveUserId, isImpersonating } from "@/app/lib/superuser";
+import { getEffectiveUserId, isImpersonating, getImpersonationMode } from "@/app/lib/superuser";
 import { tryGetCurrentOrgId } from "@/app/lib/auth/orgContext";
 
 type Props = { params: Promise<{ id: string }> };
@@ -40,6 +40,19 @@ export default async function DiagramPage({ params }: Props) {
   // _not-found InvariantError) is sidestepped.
   if (!diagram) redirect("/dashboard");
 
+  // Track the diagram the *real* user is working on (skip when an admin
+  // is impersonating — we don't want the admin's clicks to overwrite the
+  // target user's actual current diagram). Cleared from dashboard / project
+  // pages so admins see "Working on: <name>" only when accurate.
+  if (!viewing && session.user.id) {
+    try {
+      await prisma.user.update({
+        where: { id: session.user.id },
+        data: { currentDiagramId: diagram.id, currentDiagramName: diagram.name },
+      });
+    } catch { /* best-effort, ignore */ }
+  }
+
   const data: DiagramData =
     diagram.data && typeof diagram.data === "object" && !Array.isArray(diagram.data)
       ? (diagram.data as unknown as DiagramData)
@@ -66,6 +79,8 @@ export default async function DiagramPage({ params }: Props) {
   // (set from --build-arg GIT_COMMIT_COUNT in the Dockerfile).
   const commitCount = parseInt(process.env.NEXT_PUBLIC_COMMIT_COUNT ?? "0", 10) || 0;
 
+  const impersonationMode = viewing ? getImpersonationMode(cookieStore) : undefined;
+
   return (
     <DiagramEditor
         diagramId={diagram.id}
@@ -78,9 +93,10 @@ export default async function DiagramPage({ params }: Props) {
         userEmail={session.user.email ?? ""}
         createdAt={diagram.createdAt.toISOString()}
         updatedAt={diagram.updatedAt.toISOString()}
-        readOnly={viewing}
+        readOnly={viewing && impersonationMode === "view"}
         viewingAsName={viewingAsName}
         viewingAsEmail={viewingAsEmail}
+        impersonationMode={impersonationMode}
         version={commitCount}
       />
   );

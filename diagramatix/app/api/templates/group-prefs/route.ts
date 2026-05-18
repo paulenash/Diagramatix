@@ -18,7 +18,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
-import { getEffectiveUserId, isImpersonating } from "@/app/lib/superuser";
+import { getEffectiveUserId, isReadOnlyImpersonation } from "@/app/lib/superuser";
 
 function readPrefs(value: unknown): Record<string, boolean> {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
@@ -50,7 +50,7 @@ export async function PUT(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {
-    if (isImpersonating(session, await cookies())) {
+    if (isReadOnlyImpersonation(session, await cookies())) {
       return NextResponse.json({ error: "Read-only: viewing another user" }, { status: 403 });
     }
   } catch { /* proceed */ }

@@ -12,7 +12,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { pgPool } from "@/app/lib/db";
-import { isImpersonating } from "@/app/lib/superuser";
+import { isReadOnlyImpersonation } from "@/app/lib/superuser";
 import { isSuperuser } from "@/app/lib/superuser";
 
 function cuid() {
@@ -37,7 +37,7 @@ export async function POST(req: Request) {
   // Impersonation is read-only.
   try {
     const cookieStore = await cookies();
-    if (isImpersonating(session, cookieStore)) {
+    if (isReadOnlyImpersonation(session, cookieStore)) {
       return NextResponse.json({ error: "Read-only: viewing another user" }, { status: 403 });
     }
   } catch { /* ignore — non-critical */ }

@@ -39,6 +39,7 @@ interface Props {
   readOnly?: boolean;
   viewingAsName?: string;
   viewingAsEmail?: string;
+  impersonationMode?: "view" | "edit";
   isSuperuser?: boolean;
 }
 
@@ -141,7 +142,7 @@ function DiagramCard({
   );
 }
 
-export function DashboardClient({ projects: initialProjects, unorganized: initialUnorganized, userName, userEmail, orgName, orgRole, version, readOnly, viewingAsName, viewingAsEmail, isSuperuser: isSu }: Props) {
+export function DashboardClient({ projects: initialProjects, unorganized: initialUnorganized, userName, userEmail, orgName, orgRole, version, readOnly, viewingAsName, viewingAsEmail, impersonationMode, isSuperuser: isSu }: Props) {
   // Owner / Admin can use the destructive hard-delete path. Read-only
   // (impersonation) sessions are always denied — the server enforces
   // the same rule independently.
@@ -1070,7 +1071,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
   return (
     <div className={`min-h-screen ${readOnly ? "bg-orange-50" : "bg-gray-50"}`}>
       {readOnly && viewingAsName !== undefined && viewingAsEmail !== undefined && (
-        <ImpersonationBanner viewingAsName={viewingAsName ?? ""} viewingAsEmail={viewingAsEmail ?? ""} />
+        <ImpersonationBanner viewingAsName={viewingAsName ?? ""} viewingAsEmail={viewingAsEmail ?? ""} mode={impersonationMode} />
       )}
       {/* Header */}
       <header className={`${readOnly ? "bg-orange-50" : "bg-white"} border-b border-gray-200 px-6 py-4 flex items-center justify-between`}>

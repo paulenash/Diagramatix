@@ -16,6 +16,9 @@ export default async function AdminPage() {
       email: true,
       name: true,
       createdAt: true,
+      lastSeenAt: true,
+      currentDiagramId: true,
+      currentDiagramName: true,
       _count: {
         select: {
           projects: true,
@@ -25,5 +28,12 @@ export default async function AdminPage() {
     },
   });
 
-  return <AdminClient users={users} currentUserId={session.user.id} />;
+  // Serialise dates for the client component.
+  const usersForClient = users.map(u => ({
+    ...u,
+    createdAt: u.createdAt.toISOString(),
+    lastSeenAt: u.lastSeenAt ? u.lastSeenAt.toISOString() : null,
+  }));
+
+  return <AdminClient users={usersForClient} currentUserId={session.user.id} />;
 }

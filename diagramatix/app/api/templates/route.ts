@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { pgPool } from "@/app/lib/db";
 import { prisma } from "@/app/lib/db";
-import { getEffectiveUserId, isImpersonating, SUPERUSER_EMAILS } from "@/app/lib/superuser";
+import { getEffectiveUserId, isReadOnlyImpersonation, SUPERUSER_EMAILS } from "@/app/lib/superuser";
 
 // Elevation password for non-superuser callers that want to create
 // built-in templates. Sourced from ADMIN_PASSWORD env var (set in Key
@@ -62,7 +62,7 @@ export async function POST(req: Request) {
 
   try {
     const cookieStore = await cookies();
-    if (isImpersonating(session, cookieStore)) {
+    if (isReadOnlyImpersonation(session, cookieStore)) {
       return NextResponse.json({ error: "Read-only: viewing another user" }, { status: 403 });
     }
   } catch { /* proceed normally */ }

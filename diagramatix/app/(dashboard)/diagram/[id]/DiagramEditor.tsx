@@ -63,6 +63,7 @@ interface Props {
   readOnly?: boolean;
   viewingAsName?: string;
   viewingAsEmail?: string;
+  impersonationMode?: "view" | "edit";
   version?: number;
 }
 
@@ -296,6 +297,7 @@ export function DiagramEditor({
   readOnly,
   viewingAsName,
   viewingAsEmail,
+  impersonationMode,
   version,
 }: Props) {
   const router = useRouter();
@@ -1463,7 +1465,7 @@ export function DiagramEditor({
   return (
     <div className={`flex flex-col h-screen ${readOnly ? "bg-orange-50" : "bg-white"}`}>
       {readOnly && viewingAsName !== undefined && viewingAsEmail !== undefined && (
-        <ImpersonationBanner viewingAsName={viewingAsName ?? ""} viewingAsEmail={viewingAsEmail ?? ""} />
+        <ImpersonationBanner viewingAsName={viewingAsName ?? ""} viewingAsEmail={viewingAsEmail ?? ""} mode={impersonationMode} />
       )}
       {/* Top bar */}
       <header className={`h-9 border-b border-gray-200 flex items-center px-2 gap-2 flex-shrink-0 ${readOnly ? "bg-orange-50" : ""}`}>

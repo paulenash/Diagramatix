@@ -19,6 +19,11 @@ import { PoolsLanesTree } from "./ai-plan/PoolsLanesTree";
 import { ElementsByContainerView } from "./ai-plan/ElementsByContainerView";
 import { ConnectorsByTypeView } from "./ai-plan/ConnectorsByTypeView";
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+declare global {
+  interface Window { SpeechRecognition: any; webkitSpeechRecognition: any; }
+}
+
 interface Props {
   diagramType: string;
   onApplyDiagram: (data: DiagramData) => void;
@@ -60,6 +65,64 @@ export function PlanPanel({
   // state only on explicit "Apply JSON" (or blur with valid JSON).
   const [jsonDraft, setJsonDraft] = useState("");
   const [jsonFocused, setJsonFocused] = useState(false);
+
+  // File attachment (mirrors AiPanel: PDF goes as base64 for Claude's native
+  // PDF support, everything else is read as plain text).
+  const [attachment, setAttachment] = useState<{ name: string; type: string; data: string } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  async function handleFileAttach(file: File) {
+    const MAX_SIZE = 10 * 1024 * 1024; // 10MB
+    if (file.size > MAX_SIZE) { setError("File too large (max 10MB)"); return; }
+    if (file.type === "application/pdf") {
+      const buffer = await file.arrayBuffer();
+      const base64 = btoa(String.fromCharCode(...new Uint8Array(buffer)));
+      setAttachment({ name: file.name, type: "pdf", data: base64 });
+    } else {
+      const text = await file.text();
+      setAttachment({ name: file.name, type: "text", data: text });
+    }
+    setError(null);
+  }
+
+  // Speech-to-text dictation (Chrome / Edge only).
+  const [listening, setListening] = useState(false);
+  const recognitionRef = useRef<any>(null);
+  const speechSupported = typeof window !== "undefined"
+    && !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+
+  function toggleDictation() {
+    if (listening && recognitionRef.current) {
+      recognitionRef.current.stop();
+      return;
+    }
+    const SR = (window as any).SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) return;
+    const recognition = new SR();
+    recognition.continuous = true;
+    recognition.interimResults = false;
+    recognition.lang = "en-AU";
+    recognition.onresult = (event: any) => {
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        if (event.results[i].isFinal) {
+          const text = event.results[i][0].transcript;
+          setPrompt(prev => {
+            const base = prev && !prev.endsWith(" ") && !prev.endsWith("\n") ? prev + " " : prev;
+            return base + text;
+          });
+        }
+      }
+    };
+    recognition.onend = () => setListening(false);
+    recognition.onerror = () => setListening(false);
+    recognitionRef.current = recognition;
+    recognition.start();
+    setListening(true);
+  }
+
+  useEffect(() => {
+    return () => { recognitionRef.current?.stop(); };
+  }, []);
 
   // Resizable sections — Saved Prompts + Tabs. The Description textarea
   // takes whatever's left (flex-1). Dragging the horizontal handles between
@@ -222,7 +285,7 @@ export function PlanPanel({
       const res = await fetch("/api/ai/bpmn/plan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: prompt.trim() }),
+        body: JSON.stringify({ prompt: prompt.trim(), attachment: attachment ?? undefined }),
       });
       const json = await res.json();
       if (!res.ok) {
@@ -240,7 +303,7 @@ export function PlanPanel({
     } finally {
       setBusy(null);
     }
-  }, [prompt, busy, hasPlan, asJson, setPlan]);
+  }, [prompt, busy, hasPlan, asJson, setPlan, attachment]);
 
   const callApplyLayout = useCallback(async () => {
     if (!hasPlan || busy) return;
@@ -348,13 +411,56 @@ export function PlanPanel({
         )}
 
         <div className="flex-1 flex flex-col min-h-0 mb-2">
-          <label className="text-[10px] text-gray-500 font-medium mb-1 block shrink-0">Describe the process</label>
+          <div className="flex items-center justify-between mb-1 shrink-0">
+            <label className="text-[10px] text-gray-500 font-medium">Describe the process</label>
+            {speechSupported && (
+              <button
+                onClick={toggleDictation}
+                className={`flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border ${
+                  listening
+                    ? "text-red-600 border-red-300 bg-red-50 hover:bg-red-100"
+                    : "text-gray-500 border-gray-300 hover:bg-gray-50"
+                }`}
+                title={listening ? "Stop dictation" : "Dictate prompt"}
+              >
+                <svg width={10} height={10} viewBox="0 0 16 16" fill="currentColor">
+                  <path d="M8 11a3 3 0 0 0 3-3V4a3 3 0 1 0-6 0v4a3 3 0 0 0 3 3z" />
+                  <path d="M13 8a1 1 0 1 0-2 0 3 3 0 0 1-6 0 1 1 0 1 0-2 0 5 5 0 0 0 4 4.9V14H5.5a.5.5 0 0 0 0 1h5a.5.5 0 0 0 0-1H9v-1.1A5 5 0 0 0 13 8z" />
+                </svg>
+                {listening ? "Stop" : "Dictate"}
+              </button>
+            )}
+          </div>
           <textarea
             value={prompt}
             onChange={e => setPrompt(e.target.value)}
             placeholder="A customer places an order. The warehouse checks stock. If in stock, it ships the order. Otherwise it notifies the customer."
-            className="flex-1 w-full px-2 py-1.5 text-[11px] border border-gray-300 rounded resize-none focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className={`flex-1 w-full px-2 py-1.5 text-[11px] border rounded resize-none focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+              listening ? "border-red-300 bg-red-50/30" : "border-gray-300"
+            }`}
           />
+          {listening && (
+            <p className="text-[9px] text-red-500 mt-0.5 animate-pulse shrink-0">Listening…</p>
+          )}
+          <div className="flex items-center gap-1.5 mt-1 shrink-0">
+            <input ref={fileInputRef} type="file" className="hidden"
+              accept=".pdf,.txt,.md,.csv,.rtf,.doc,.docx"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFileAttach(f); e.target.value = ""; }} />
+            <button onClick={() => fileInputRef.current?.click()}
+              className="flex items-center gap-1 text-[10px] text-gray-500 border border-gray-300 rounded px-1.5 py-0.5 hover:bg-gray-50"
+              title="Attach a document (PDF, TXT, MD, CSV, RTF, DOC, DOCX)">
+              <svg width={10} height={10} viewBox="0 0 16 16" fill="currentColor">
+                <path d="M4.5 3a2.5 2.5 0 0 1 5 0v9a1.5 1.5 0 0 1-3 0V5a.5.5 0 0 1 1 0v7a.5.5 0 0 0 1 0V3a1.5 1.5 0 0 0-3 0v9a2.5 2.5 0 0 0 5 0V5a.5.5 0 0 1 1 0v7a3.5 3.5 0 0 1-7 0V3z" />
+              </svg>
+              Attach
+            </button>
+            {attachment && (
+              <div className="flex items-center gap-1 flex-1 min-w-0">
+                <span className="text-[10px] text-blue-600 truncate flex-1">{attachment.name}</span>
+                <button onClick={() => setAttachment(null)} className="text-gray-400 hover:text-red-500 text-[10px] shrink-0" title="Remove attachment">&times;</button>
+              </div>
+            )}
+          </div>
         </div>
 
         {isAdmin && (

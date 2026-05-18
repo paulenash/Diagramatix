@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
-import { isImpersonating } from "@/app/lib/superuser";
+import { isReadOnlyImpersonation } from "@/app/lib/superuser";
 import { requireRole, WRITE_ROLES, OrgContextError } from "@/app/lib/auth/orgContext";
 
 type Params = { params: Promise<{ id: string }> };
@@ -15,7 +15,7 @@ export async function POST(_req: Request, { params }: Params) {
 
   try {
     const cookieStore = await cookies();
-    if (isImpersonating(session, cookieStore)) {
+    if (isReadOnlyImpersonation(session, cookieStore)) {
       return NextResponse.json({ error: "Read-only: viewing another user" }, { status: 403 });
     }
   } catch {
