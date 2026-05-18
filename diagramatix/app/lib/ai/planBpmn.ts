@@ -203,22 +203,25 @@ export async function planBpmn(opts: PlanBpmnOptions): Promise<PlanBpmnResult> {
       text: `--- ATTACHED DOCUMENT: ${attachment.name ?? "document"} ---\n${attachment.data}\n--- END DOCUMENT ---`,
     });
   }
-  userContent.push({ type: "text", text: prompt.trim() });
+  // Append a final, extremely explicit "JSON only" instruction to the
+  // user turn itself. Sonnet 4.6 reportedly attends to the last thing the
+  // user said more reliably than to a system-prompt rule, and this model
+  // rejects assistant-message prefill (returns 400 "does not support
+  // assistant message prefill"). Combined with the substring-extraction
+  // fallback below, this kills the "I'll analyze…" preamble in practice.
+  userContent.push({
+    type: "text",
+    text: prompt.trim() +
+      "\n\nReturn ONLY the JSON object. No prose. No preamble like " +
+      "\"I'll analyze\" or \"Here is\". No markdown fences. Your entire " +
+      "response MUST start with `{` and end with `}` — nothing else.",
+  });
 
-  // Assistant prefill: by starting the assistant turn with "{" we force
-  // Sonnet to continue from there as a JSON object. This is the
-  // Anthropic-recommended technique to stop "I'll analyze…" preambles
-  // that have been leaking through with longer system prompts. The
-  // prefilled "{" is NOT echoed back in the response, so we prepend it
-  // when parsing.
   const message = await client.messages.create({
     model,
     max_tokens: 8192,
     system: systemPrompt,
-    messages: [
-      { role: "user", content: userContent },
-      { role: "assistant", content: "{" },
-    ],
+    messages: [{ role: "user", content: userContent }],
   });
 
   const textBlock = message.content.find(b => b.type === "text");
@@ -226,18 +229,15 @@ export async function planBpmn(opts: PlanBpmnOptions): Promise<PlanBpmnResult> {
     return { ok: false, status: 500, error: "No response from AI" };
   }
 
-  // Re-attach the prefilled opening brace, then defensively strip any
-  // remaining wrapper (code fences or stray preamble) before parsing.
-  let jsonStr = "{" + textBlock.text;
-  jsonStr = jsonStr.trim();
+  let jsonStr = textBlock.text.trim();
   if (jsonStr.startsWith("```")) {
     jsonStr = jsonStr.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "").trim();
   }
-  // Fallback for the rare case prose still leaks through (e.g. prefill
-  // collapsed): clip to the outermost { … } pair.
+  // Defence-in-depth: if any prose still leaked in front of or after the
+  // JSON object, clip to the outermost { … } pair before parsing.
   const firstBrace = jsonStr.indexOf("{");
   const lastBrace = jsonStr.lastIndexOf("}");
-  if (firstBrace > 0 && lastBrace > firstBrace) {
+  if (firstBrace >= 0 && lastBrace > firstBrace) {
     jsonStr = jsonStr.slice(firstBrace, lastBrace + 1);
   }
 
@@ -246,7 +246,7 @@ export async function planBpmn(opts: PlanBpmnOptions): Promise<PlanBpmnResult> {
     parsed = JSON.parse(jsonStr);
   } catch (parseErr) {
     console.error("[planBpmn] JSON parse failed. Raw response (first 1 KB):",
-      ("{" + textBlock.text).slice(0, 1024));
+      textBlock.text.slice(0, 1024));
     return {
       ok: false,
       status: 500,
