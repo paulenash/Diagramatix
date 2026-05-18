@@ -24,6 +24,16 @@ declare global {
   interface Window { SpeechRecognition: any; webkitSpeechRecognition: any; }
 }
 
+/** Tiny inline SVG throbber. `animate-spin` is a Tailwind utility. */
+function Spinner({ className = "w-3 h-3 text-current" }: { className?: string }) {
+  return (
+    <svg className={`animate-spin ${className}`} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" strokeOpacity="0.25" />
+      <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 interface Props {
   diagramType: string;
   onApplyDiagram: (data: DiagramData) => void;
@@ -636,16 +646,18 @@ export function PlanPanel({
           <button
             onClick={callPlan}
             disabled={!prompt.trim() || busy !== null}
-            className="flex-1 px-2 py-1 text-[11px] font-medium bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 px-2 py-1 text-[11px] font-medium bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-1.5"
           >
+            {busy === "plan" && <Spinner />}
             {busy === "plan" ? "Planning…" : hasPlan ? "Re-send to Sonnet" : "Plan"}
           </button>
           <button
             onClick={callApplyLayout}
             disabled={!hasPlan || busy !== null}
-            className="flex-1 px-2 py-1 text-[11px] font-medium bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 px-2 py-1 text-[11px] font-medium bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-1.5"
             title="Run the deterministic layout engine on the current plan"
           >
+            {busy === "apply" && <Spinner />}
             {busy === "apply" ? "Applying…" : "Apply Layout"}
           </button>
           <button
@@ -686,6 +698,18 @@ export function PlanPanel({
           </div>
         )}
 
+        {/* G04: prominent throbber banner while Sonnet / layout is running.
+            The button label change alone is easy to miss on a tall panel. */}
+        {(busy === "plan" || busy === "apply") && (
+          <div className="shrink-0 mb-2 flex items-center gap-2 bg-blue-50 border border-blue-200 rounded px-2 py-1.5">
+            <Spinner className="text-blue-600 w-4 h-4" />
+            <span className="text-[11px] text-blue-800 font-medium">
+              {busy === "plan"
+                ? "Asking Sonnet for a plan — this usually takes 15–30 s…"
+                : "Running the layout engine…"}
+            </span>
+          </div>
+        )}
         {status && <p className="text-[10px] text-gray-500 shrink-0 mb-1">{status}</p>}
         {error && (
           <div className="text-[11px] text-red-700 bg-red-50 border border-red-200 rounded px-2 py-1.5 shrink-0 mb-2">

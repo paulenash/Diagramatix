@@ -207,7 +207,8 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
   // New diagram (unorganized) state
   const [showNewDiagram, setShowNewDiagram] = useState(false);
   const [newName, setNewName] = useState("");
-  const [newType, setNewType] = useState<DiagramType>("context");
+  // G03: BPMN is the most-used type — default the New Diagram radio to it.
+  const [newType, setNewType] = useState<DiagramType>("bpmn");
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
 
@@ -892,6 +893,9 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
     setProjects((prev) => [{ ...project, _count: { diagrams: 0 } }, ...prev]);
     setNewProjectName("");
     setShowNewProject(false);
+    // G02: drop the user straight into the new project rather than
+    // making them hunt for it in the list.
+    router.push(`/dashboard/projects/${project.id}`);
   }
 
   async function handleCloneProject(id: string, e: React.MouseEvent) {

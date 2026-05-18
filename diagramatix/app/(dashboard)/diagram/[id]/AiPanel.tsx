@@ -294,9 +294,28 @@ export function AiPanel({ diagramType, onApplyDiagram, onAddToDiagram, onClose }
           </label>
         </div>
 
+        {/* G04: throbber banner while generating. */}
+        {generating && (
+          <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded px-2 py-1.5">
+            <svg className="animate-spin w-4 h-4 text-blue-600" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" strokeOpacity="0.25" />
+              <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+            </svg>
+            <span className="text-[11px] text-blue-800 font-medium">
+              Asking Sonnet \u2014 this usually takes 15\u201330 s\u2026
+            </span>
+          </div>
+        )}
+
         <div className="flex gap-1.5">
           <button onClick={handleGenerate} disabled={generating || !prompt.trim()}
-            className="flex-1 px-3 py-1.5 text-xs text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">
+            className="flex-1 px-3 py-1.5 text-xs text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-1.5">
+            {generating && (
+              <svg className="animate-spin w-3 h-3" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" strokeOpacity="0.25" />
+                <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+              </svg>
+            )}
             {generating ? "Generating\u2026" : "Generate"}
           </button>
           {editingPromptId ? (

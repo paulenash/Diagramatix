@@ -878,7 +878,8 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
   }, [project.id]);
 
   const [newName, setNewName] = useState("");
-  const [newType, setNewType] = useState<DiagramType>("context");
+  // G03: BPMN is the most-used type — default the New Diagram radio to it.
+  const [newType, setNewType] = useState<DiagramType>("bpmn");
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
 
