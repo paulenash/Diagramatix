@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { layoutBpmnDiagram } from "@/app/lib/diagram/bpmnLayout";
 import { planBpmn } from "@/app/lib/ai/planBpmn";
+import { splitRulesByEnforcement } from "@/app/lib/ai/splitRules";
 
 export async function POST(req: Request) {
   const session = await auth();
@@ -20,7 +21,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
   }
 
-  // Load General + BPMN-specific default rules
+  // Load General + BPMN-specific default rules, then filter to GREEN
+  // (AI-enforceable) only. See plan/route.ts for the full reasoning.
   let rules = "";
   try {
     for (const category of ["general", "bpmn"]) {
@@ -32,10 +34,11 @@ export async function POST(req: Request) {
     }
   } catch { /* proceed without rules */ }
 
-  console.log("[AI] Generating BPMN with rules:", rules ? "yes" : "no (defaults)");
+  const { aiRules } = splitRulesByEnforcement(rules);
+  console.log("[AI generate-bpmn] full:", rules.length, "chars → green-only:", aiRules.length, "chars");
 
   try {
-    const result = await planBpmn({ apiKey, prompt, attachment, rules });
+    const result = await planBpmn({ apiKey, prompt, attachment, rules: aiRules });
     if (!result.ok) {
       return NextResponse.json({ error: result.error, raw: result.raw }, { status: result.status });
     }

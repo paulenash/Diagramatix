@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import Anthropic from "@anthropic-ai/sdk";
+import { splitRulesByEnforcement } from "@/app/lib/ai/splitRules";
 
 const DIAGRAM_PROMPTS: Record<string, string> = {
   "state-machine": `You are a UML State Machine diagram expert. Output ONLY valid JSON with elements and connections.
@@ -141,7 +142,8 @@ export async function POST(req: Request) {
   if (!prompt?.trim()) return NextResponse.json({ error: "Prompt required" }, { status: 400 });
   if (!diagramType) return NextResponse.json({ error: "diagramType required" }, { status: 400 });
 
-  // Load General + diagram-specific default rules
+  // Load General + diagram-specific default rules, then filter to GREEN
+  // (AI-enforceable) only. See bpmn/plan/route.ts for the full reasoning.
   let rules = "";
   try {
     for (const category of ["general", diagramType]) {
@@ -152,6 +154,9 @@ export async function POST(req: Request) {
       if (dr?.rules) rules += (rules ? "\n\n" : "") + dr.rules;
     }
   } catch {}
+  const fullLen = rules.length;
+  rules = splitRulesByEnforcement(rules).aiRules;
+  console.log("[AI generate-diagram]", diagramType, "full:", fullLen, "chars → green-only:", rules.length, "chars");
 
   try {
     const client = new Anthropic({ apiKey });

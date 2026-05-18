@@ -8,6 +8,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { planBpmn } from "@/app/lib/ai/planBpmn";
+import { splitRulesByEnforcement } from "@/app/lib/ai/splitRules";
 
 export async function POST(req: Request) {
   const session = await auth();
@@ -25,11 +26,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
   }
 
-  // Load General + BPMN default rules.
-  // NOTE: we currently send ALL rules (same as AI Generate) because some rules
-  // under "Layout Sizing" (R23, R25) are semantic, not layout. Next session:
-  // reorganise Group 6 so the splitRulesByEnforcement() filter can be
-  // re-enabled safely. Tracked via memory "project_ai_plan_rule_reorg".
+  // Load General + BPMN default rules, then filter to GREEN (AI-enforceable)
+  // only. Code-backed layout rules, proposed (orange) and modified (amber)
+  // rules are dropped — the model can't enforce them and they bloat the
+  // system prompt, which has been provoking JSON-preamble regressions on
+  // Sonnet 4.6. Any semantic rule that you still want sent must live in a
+  // non-code-backed group (i.e. NOT under headings matching layout /
+  // positioning / placement / spacing / sizing / arrangement / connector
+  // routing — see CODE_REQUIRED_GROUPS in splitRules.ts).
   let fullRules = "";
   try {
     for (const category of ["general", "bpmn"]) {
@@ -41,10 +45,11 @@ export async function POST(req: Request) {
     }
   } catch { /* proceed without rules */ }
 
-  console.log("[AI plan] sending full rules:", fullRules.length, "chars");
+  const { aiRules } = splitRulesByEnforcement(fullRules);
+  console.log("[AI plan] full:", fullRules.length, "chars → green-only:", aiRules.length, "chars");
 
   try {
-    const result = await planBpmn({ apiKey, prompt, attachment, rules: fullRules });
+    const result = await planBpmn({ apiKey, prompt, attachment, rules: aiRules });
     if (!result.ok) {
       return NextResponse.json({ error: result.error, raw: result.raw }, { status: result.status });
     }
