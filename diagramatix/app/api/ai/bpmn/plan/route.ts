@@ -10,10 +10,22 @@ import { prisma } from "@/app/lib/db";
 import { planBpmn } from "@/app/lib/ai/planBpmn";
 import { splitRulesByEnforcement } from "@/app/lib/ai/splitRules";
 
+// Interim gate (2026-05-18): AI Generate is temporarily restricted to
+// paul@nashcc.com.au while an Apply-Layout regression is investigated.
+// The UI hides the button for everyone else; this server-side gate stops
+// a determined caller from POSTing directly.
+const AI_GENERATE_ALLOWED_EMAIL = "paul@nashcc.com.au";
+
 export async function POST(req: Request) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (session.user.email !== AI_GENERATE_ALLOWED_EMAIL) {
+    return NextResponse.json(
+      { error: "AI Generate is temporarily disabled. Please try again later." },
+      { status: 403 }
+    );
   }
 
   const apiKey = process.env.ANTHROPIC_API_KEY;

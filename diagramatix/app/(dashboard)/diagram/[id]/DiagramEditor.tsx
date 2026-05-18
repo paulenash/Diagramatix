@@ -1879,28 +1879,43 @@ export function DiagramEditor({
             standalone buttons were removed in favour of a single menu. */}
 
         {/* AI Generate button. For BPMN this opens the 2-phase Plan panel;
-            for other diagram types it opens the legacy one-shot AI panel. */}
-        {!readOnly && diagramType !== "basic" && (
-          <button
-            onClick={() => {
-              if (diagramType === "bpmn") {
-                setShowPlanPanel(prev => !prev);
-                if (!showPlanPanel) { setShowAiPanel(false); setShowHistoryPanel(false); }
-              } else {
-                setShowAiPanel(prev => !prev);
-                if (!showAiPanel) { setShowHistoryPanel(false); setShowPlanPanel(false); }
-              }
-            }}
-            className={`px-2 py-0.5 text-[11px] rounded border ${
-              (diagramType === "bpmn" ? showPlanPanel : showAiPanel)
-                ? "text-blue-700 border-blue-400 bg-blue-50"
-                : "text-gray-700 border-gray-300 hover:bg-gray-50"
-            }`}
-            title={diagramType === "bpmn" ? "Two-phase AI generation: plan first, then apply layout" : "Generate a diagram from a natural-language description"}
-          >
-            AI Generate
-          </button>
-        )}
+            for other diagram types it opens the legacy one-shot AI panel.
+            Interim (2026-05-18): gated to paul@nashcc.com.au only while
+            an Apply-Layout regression is investigated — show it disabled
+            for everyone else so they know the feature exists but isn't
+            currently usable. */}
+        {!readOnly && diagramType !== "basic" && (() => {
+          const aiGenAllowed = userEmail === "paul@nashcc.com.au";
+          return (
+            <button
+              onClick={() => {
+                if (!aiGenAllowed) return;
+                if (diagramType === "bpmn") {
+                  setShowPlanPanel(prev => !prev);
+                  if (!showPlanPanel) { setShowAiPanel(false); setShowHistoryPanel(false); }
+                } else {
+                  setShowAiPanel(prev => !prev);
+                  if (!showAiPanel) { setShowHistoryPanel(false); setShowPlanPanel(false); }
+                }
+              }}
+              disabled={!aiGenAllowed}
+              className={`px-2 py-0.5 text-[11px] rounded border ${
+                !aiGenAllowed
+                  ? "text-gray-400 border-gray-200 bg-gray-50 cursor-not-allowed"
+                  : (diagramType === "bpmn" ? showPlanPanel : showAiPanel)
+                    ? "text-blue-700 border-blue-400 bg-blue-50"
+                    : "text-gray-700 border-gray-300 hover:bg-gray-50"
+              }`}
+              title={!aiGenAllowed
+                ? "AI Generate is temporarily disabled while a layout regression is investigated."
+                : diagramType === "bpmn"
+                  ? "Two-phase AI generation: plan first, then apply layout"
+                  : "Generate a diagram from a natural-language description"}
+            >
+              AI Generate
+            </button>
+          );
+        })()}
         {/* History was previously a standalone button — now in the
             unified Diagram ▾ menu further along the toolbar. */}
 
