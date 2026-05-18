@@ -493,11 +493,10 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
   const [acctName, setAcctName] = useState(userName);
   const [acctEmail, setAcctEmail] = useState(userEmail ?? "");
   const [acctOrgName, setAcctOrgName] = useState(orgName ?? "");
-  const isPaulAdmin = userEmail === "paul@nashcc.com.au";
-  const [acctCurPwd, setAcctCurPwd] = useState(isPaulAdmin ? "!Aardwolf2026" : "");
+  const [acctCurPwd, setAcctCurPwd] = useState("");
   const [acctNewPwd, setAcctNewPwd] = useState("");
   const [acctConfirmPwd, setAcctConfirmPwd] = useState("");
-  const [acctShowCurPwd, setAcctShowCurPwd] = useState(isPaulAdmin);
+  const [acctShowCurPwd, setAcctShowCurPwd] = useState(false);
   const [acctShowNewPwd, setAcctShowNewPwd] = useState(false);
   const [acctShowConfirmPwd, setAcctShowConfirmPwd] = useState(false);
   const [acctSaving, setAcctSaving] = useState(false);

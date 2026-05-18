@@ -442,6 +442,17 @@ export function Canvas({
   const [pan, setPan] = useState<Point>({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const baseZoomRef = useRef<number | null>(null); // the "100%" reference zoom
+  // Initialise baseZoomRef on mount so the zoom-slider percent display
+  // works even when the fit-to-content effect below bails (e.g. empty
+  // diagram, SVG not yet measured). Without this, `base ?? zoom` ALWAYS
+  // returns zoom, making (zoom / base) * 100 stuck at 100% even while
+  // the canvas actually zooms.
+  useEffect(() => {
+    if (baseZoomRef.current !== null) return;
+    const stored = typeof window !== "undefined"
+      ? parseFloat(window.localStorage.getItem("initialZoom") ?? "") : NaN;
+    baseZoomRef.current = Number.isFinite(stored) && stored > 0 ? stored : 0.7;
+  }, []);
   const [editingLabel, setEditingLabel] = useState<EditingLabel | null>(null);
   const [draggingConnector, setDraggingConnector] = useState<DraggingConnector | null>(null);
   const [draggingEndpoint, setDraggingEndpoint] = useState<DraggingEndpoint | null>(null);

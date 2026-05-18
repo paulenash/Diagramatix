@@ -5,7 +5,11 @@ import { pgPool } from "@/app/lib/db";
 import { prisma } from "@/app/lib/db";
 import { getEffectiveUserId, isImpersonating, SUPERUSER_EMAILS } from "@/app/lib/superuser";
 
-const ADMIN_PASSWORD = "!Aardwolf2026";
+// Elevation password for non-superuser callers that want to create
+// built-in templates. Sourced from ADMIN_PASSWORD env var (set in Key
+// Vault for prod, in .env locally). Empty fallback disables the
+// elevation path; superuser-email gate still works either way.
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? "";
 
 function cuid() {
   const ts = Date.now().toString(36);

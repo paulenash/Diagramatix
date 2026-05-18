@@ -671,7 +671,6 @@ export function DiagramEditor({
   const [templateDropdownOpen, setTemplateDropdownOpen] = useState(false);
   // builtInDropdownOpen removed — merged into single Templates dropdown
   const [showTemplateNameModal, setShowTemplateNameModal] = useState(false);
-  const [showAdminPasswordModal, setShowAdminPasswordModal] = useState(false);
   const [pendingTemplateData, setPendingTemplateData] = useState<TemplateData | null>(null);
   const getViewportCenterRef = useRef<(() => Point) | null>(null);
   const templateDropdownRef = useRef<HTMLDivElement>(null);
@@ -1276,14 +1275,16 @@ export function DiagramEditor({
     setShowTemplateNameModal(true);
   }
 
-  async function handleConfirmTemplateName(name: string, group: string | null, adminPassword?: string) {
+  async function handleConfirmTemplateName(name: string, group: string | null) {
     if (!pendingTemplateData) return;
     const isBuiltIn = templateMode === "capturing-builtin";
     try {
       const body: Record<string, unknown> = { name, diagramType: "bpmn", data: pendingTemplateData, group };
       if (isBuiltIn) {
         body.templateType = "builtin";
-        if (adminPassword) body.adminPassword = adminPassword;
+        // No adminPassword payload — server gates by session (isSuperuser)
+        // or by ADMIN_PASSWORD env var on the elevation path. Hardcoded
+        // password string removed (was a leak in the client bundle).
       }
       const res = await fetch("/api/templates", {
         method: "POST",
@@ -1312,7 +1313,6 @@ export function DiagramEditor({
     }
     setPendingTemplateData(null);
     setShowTemplateNameModal(false);
-    setShowAdminPasswordModal(false);
     setTemplateMode("idle");
     setSelectedElementIds(new Set());
     setSelectedConnectorId(null);
@@ -2917,68 +2917,12 @@ export function DiagramEditor({
         </div>
       )}
 
-      {showAdminPasswordModal && (
-        <div
-          className="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
-          onClick={() => setShowAdminPasswordModal(false)}
-        >
-          <div
-            className="bg-white rounded-lg shadow-xl w-full max-w-sm flex flex-col"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between px-4 py-3 border-b">
-              <h2 className="text-sm font-semibold text-gray-800">Admin Access Required</h2>
-              <button onClick={() => setShowAdminPasswordModal(false)} className="text-gray-400 hover:text-gray-600 text-lg leading-none">&times;</button>
-            </div>
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                const pwd = (e.currentTarget.elements.namedItem("adminPwd") as HTMLInputElement).value;
-                if (pwd === "!Aardwolf2026") {
-                  setShowAdminPasswordModal(false);
-                  setTemplateMode("capturing-builtin");
-                } else {
-                  alert("Invalid admin password");
-                }
-              }}
-              className="px-4 py-4"
-            >
-              <label className="block text-xs text-gray-600 mb-1">Enter admin password to create built-in templates</label>
-              <input
-                name="adminPwd"
-                type="password"
-                autoFocus
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Admin password..."
-              />
-            </form>
-            <div className="flex justify-end gap-2 px-4 py-3 border-t">
-              <button
-                type="button"
-                onClick={() => setShowAdminPasswordModal(false)}
-                className="px-2 py-0.5 text-[11px] text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  const input = document.querySelector<HTMLInputElement>("input[name=adminPwd]");
-                  if (input?.value === "!Aardwolf2026") {
-                    setShowAdminPasswordModal(false);
-                    setTemplateMode("capturing-builtin");
-                  } else {
-                    alert("Invalid admin password");
-                  }
-                }}
-                className="px-3 py-1.5 text-xs text-white bg-blue-600 rounded hover:bg-blue-700"
-              >
-                Submit
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Admin Access Required modal removed — was dead code (never opened)
+          and the hardcoded password literal "!Aardwolf2026" inside its
+          client-side compare ended up in the bundled JS served to every
+          browser. Built-in template creation is gated by the isAdmin
+          check on the "+ Create Built-In Template" menu item; the server
+          re-checks via SUPERUSER_EMAILS on save. */}
 
       {showDiagramMaintenance && (
         <DiagramColorModal

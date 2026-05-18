@@ -1,4 +1,4 @@
-import { redirect, notFound } from "next/navigation";
+import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
@@ -29,13 +29,16 @@ export default async function DiagramPage({ params }: Props) {
   const { id } = await params;
 
   const orgId = await tryGetCurrentOrgId(session, cookieStore);
-  if (!orgId) notFound();
+  if (!orgId) redirect("/dashboard");
 
   const diagram = await prisma.diagram.findFirst({
     where: { id, userId: effectiveUserId, orgId },
   });
 
-  if (!diagram) notFound();
+  // Redirect rather than notFound() so the not-found chunk-loading
+  // path (a Next.js 16 known issue producing ChunkLoadError +
+  // _not-found InvariantError) is sidestepped.
+  if (!diagram) redirect("/dashboard");
 
   const data: DiagramData =
     diagram.data && typeof diagram.data === "object" && !Array.isArray(diagram.data)

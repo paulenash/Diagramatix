@@ -1,4 +1,4 @@
-import { notFound, redirect } from "next/navigation";
+import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
@@ -25,7 +25,7 @@ export default async function ProjectPage({ params }: Props) {
   const { id } = await params;
 
   const orgId = await tryGetCurrentOrgId(session, cookieStore);
-  if (!orgId) notFound();
+  if (!orgId) redirect("/dashboard");
 
   // Commit count baked into the build via NEXT_PUBLIC_COMMIT_COUNT
   // (set from --build-arg GIT_COMMIT_COUNT in the Dockerfile).
@@ -47,7 +47,13 @@ export default async function ProjectPage({ params }: Props) {
     }),
   ]);
 
-  if (!project) notFound();
+  // Project might not match because: (a) doesn't exist, (b) belongs to
+  // another user, (c) project's orgId differs from the user's current
+  // org context (common after a Full Restore where row IDs preserve but
+  // org membership changes). Redirect rather than notFound() to dodge
+  // a Next.js 16 _not-found chunk-loading bug that produces a 404 on
+  // the resource itself.
+  if (!project) redirect("/dashboard");
 
   // If impersonating, fetch the target user's info for the banner
   let viewingAsName = "";

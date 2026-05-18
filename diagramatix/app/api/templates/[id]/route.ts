@@ -4,7 +4,8 @@ import { auth } from "@/auth";
 import { pgPool, prisma } from "@/app/lib/db";
 import { getEffectiveUserId, isImpersonating, SUPERUSER_EMAILS } from "@/app/lib/superuser";
 
-const ADMIN_PASSWORD = "!Aardwolf2026";
+// Elevation password from env var. See note in /api/templates/route.ts.
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? "";
 
 type Params = { params: Promise<{ id: string }> };
 
