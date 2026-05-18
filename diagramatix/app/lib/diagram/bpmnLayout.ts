@@ -962,18 +962,45 @@ export function layoutBpmnDiagram(
     const sortedPools = elements
       .filter(e => e.type === "pool")
       .sort((a, b) => a.y - b.y);
+
+    // Membership by parentId-chain, NOT Y-overlap. The Y-overlap method
+    // mis-attributes a deeply nested lane / subprocess child to a SIBLING
+    // pool whenever the white-box pool grew downward (via
+    // expandContainerToFitChildren) into the bottom black-box pool's
+    // initial Y range — the lane's centre Y can sit inside the black-box
+    // pool's bounds even though structurally it belongs to the white box.
+    // R52 would then shift it with the black-box pool to maintain
+    // POOL_GAP, producing a gap between lanes and a lane sticking out
+    // below its parent pool. (2026-05-18 regression.)
     const poolDescendants = new Map<string, DiagramElement[]>();
-    for (const pool of sortedPools) {
-      const yTop = pool.y;
-      const yBot = pool.y + pool.height;
-      const descendants: DiagramElement[] = [];
-      for (const el of elements) {
-        if (el.type === "pool") continue;
-        const elMid = el.y + el.height / 2;
-        if (elMid >= yTop && elMid <= yBot) descendants.push(el);
+    for (const pool of sortedPools) poolDescendants.set(pool.id, []);
+    const memo = new Map<string, string | null>(); // elementId → owningPoolId
+    function findOwningPool(el: DiagramElement): string | null {
+      if (el.type === "pool") return el.id;
+      if (memo.has(el.id)) return memo.get(el.id)!;
+      // Walk up the parentId chain, then check boundaryHost as fallback.
+      let cur: DiagramElement | undefined = el;
+      let guard = 0;
+      while (cur && guard++ < 32) {
+        if (cur.type === "pool") {
+          memo.set(el.id, cur.id);
+          return cur.id;
+        }
+        const parentRef: string | undefined = cur.parentId ?? cur.boundaryHostId;
+        if (!parentRef) break;
+        cur = elements.find(e => e.id === parentRef);
       }
-      poolDescendants.set(pool.id, descendants);
+      memo.set(el.id, null);
+      return null;
     }
+    for (const el of elements) {
+      if (el.type === "pool") continue;
+      const owner = findOwningPool(el);
+      if (owner && poolDescendants.has(owner)) {
+        poolDescendants.get(owner)!.push(el);
+      }
+    }
+
     if (sortedPools.length > 0) {
       let stackY = sortedPools[0].y;
       for (const pool of sortedPools) {

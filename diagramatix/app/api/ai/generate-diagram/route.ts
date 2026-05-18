@@ -131,18 +131,9 @@ function buildSystemPrompt(diagramType: string, rules: string): string {
   return basePrompt + ruleBlock;
 }
 
-// Interim gate (2026-05-18): see /api/ai/bpmn/plan/route.ts for context.
-const AI_GENERATE_ALLOWED_EMAIL = "paul@nashcc.com.au";
-
 export async function POST(req: Request) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (session.user.email !== AI_GENERATE_ALLOWED_EMAIL) {
-    return NextResponse.json(
-      { error: "AI Generate is temporarily disabled. Please try again later." },
-      { status: 403 }
-    );
-  }
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return NextResponse.json({ error: "AI not configured. Set ANTHROPIC_API_KEY in .env" }, { status: 503 });

@@ -16,9 +16,6 @@ function trace(line: string) {
   try { process.stderr.write(stamped); } catch { /* ignore */ }
 }
 
-// Interim gate (2026-05-18): see /api/ai/bpmn/plan/route.ts for context.
-const AI_GENERATE_ALLOWED_EMAIL = "paul@nashcc.com.au";
-
 export async function POST(req: Request) {
   trace("[apply-layout] request received");
   const session = await auth();
@@ -26,13 +23,6 @@ export async function POST(req: Request) {
   if (!session?.user?.id) {
     trace("[apply-layout] unauthorized");
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-  if (session.user.email !== AI_GENERATE_ALLOWED_EMAIL) {
-    trace("[apply-layout] forbidden — AI gated");
-    return NextResponse.json(
-      { error: "AI Generate is temporarily disabled. Please try again later." },
-      { status: 403 }
-    );
   }
 
   let body: unknown;
