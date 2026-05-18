@@ -87,6 +87,7 @@ export function PlanPanel({
 
   // Speech-to-text dictation (Chrome / Edge only).
   const [listening, setListening] = useState(false);
+  const [dictateMsg, setDictateMsg] = useState<string | null>(null);
   const recognitionRef = useRef<any>(null);
   const speechSupported = typeof window !== "undefined"
     && !!(window.SpeechRecognition || window.webkitSpeechRecognition);
@@ -114,8 +115,23 @@ export function PlanPanel({
       }
     };
     recognition.onend = () => setListening(false);
-    recognition.onerror = () => setListening(false);
+    recognition.onerror = (ev: any) => {
+      // ev.error is one of: "no-speech", "audio-capture", "not-allowed",
+      // "network", "aborted", "service-not-allowed", "language-not-supported".
+      // Surface it — the user otherwise has no feedback that something failed.
+      const map: Record<string, string> = {
+        "no-speech": "No speech detected. Check the mic with Test below.",
+        "audio-capture": "No microphone found. Pick one in Chrome → Settings → Site settings → Mic.",
+        "not-allowed": "Mic access blocked for this site. Click the padlock in the address bar to allow it.",
+        "network": "Speech-recognition service unreachable (network error).",
+        "service-not-allowed": "Speech recognition blocked by the browser / OS.",
+        "language-not-supported": "Language en-AU not supported by this browser.",
+      };
+      setDictateMsg(map[ev?.error] ?? `Speech error: ${ev?.error ?? "unknown"}`);
+      setListening(false);
+    };
     recognitionRef.current = recognition;
+    setDictateMsg(null);
     recognition.start();
     setListening(true);
   }
@@ -123,6 +139,86 @@ export function PlanPanel({
   useEffect(() => {
     return () => { recognitionRef.current?.stop(); };
   }, []);
+
+  // ── Mic test ──────────────────────────────────────────────────────────────
+  // Independent of the SpeechRecognition API: just grabs the raw audio
+  // stream and shows a live level meter so the user can confirm Chrome is
+  // actually hearing the selected microphone.
+  const [testingMic, setTestingMic] = useState(false);
+  const [micLevel, setMicLevel] = useState(0);          // 0–100
+  const [micDevice, setMicDevice] = useState<string | null>(null);
+  const [micErr, setMicErr] = useState<string | null>(null);
+  const micCleanupRef = useRef<(() => void) | null>(null);
+
+  function stopMicTest() {
+    micCleanupRef.current?.();
+    micCleanupRef.current = null;
+    setTestingMic(false);
+  }
+
+  async function testMicrophone() {
+    if (testingMic) { stopMicTest(); return; }
+    setMicErr(null);
+    setMicLevel(0);
+    setMicDevice(null);
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setMicErr("This browser doesn't expose getUserMedia (mic access).");
+      return;
+    }
+    let stream: MediaStream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (err) {
+      const name = (err as Error & { name?: string }).name;
+      if (name === "NotAllowedError" || name === "SecurityError") {
+        setMicErr("Mic permission denied. Click the padlock in the address bar → Site settings → allow Microphone.");
+      } else if (name === "NotFoundError") {
+        setMicErr("No microphone detected by the browser.");
+      } else {
+        setMicErr(`Mic error: ${(err as Error).message ?? name ?? "unknown"}`);
+      }
+      return;
+    }
+    const track = stream.getAudioTracks()[0];
+    setMicDevice(track?.label || "(unnamed device)");
+    const AC: typeof AudioContext = (window as any).AudioContext || (window as any).webkitAudioContext;
+    const ctx = new AC();
+    const src = ctx.createMediaStreamSource(stream);
+    const analyser = ctx.createAnalyser();
+    analyser.fftSize = 512;
+    src.connect(analyser);
+    const buf = new Uint8Array(analyser.fftSize);
+    let raf = 0;
+    let stopped = false;
+    function tick() {
+      if (stopped) return;
+      analyser.getByteTimeDomainData(buf);
+      // RMS of centred samples (128 = silence in Uint8 time-domain).
+      let sum = 0;
+      for (let i = 0; i < buf.length; i++) {
+        const d = buf[i] - 128;
+        sum += d * d;
+      }
+      const rms = Math.sqrt(sum / buf.length);          // 0–~128
+      setMicLevel(Math.min(100, Math.round((rms / 64) * 100)));
+      raf = requestAnimationFrame(tick);
+    }
+    raf = requestAnimationFrame(tick);
+    setTestingMic(true);
+
+    const cleanup = () => {
+      stopped = true;
+      cancelAnimationFrame(raf);
+      try { src.disconnect(); } catch {}
+      try { ctx.close(); } catch {}
+      stream.getTracks().forEach(t => t.stop());
+    };
+    micCleanupRef.current = cleanup;
+    // Auto-stop after 8 s so we don't hold the mic indefinitely.
+    setTimeout(() => { if (micCleanupRef.current === cleanup) stopMicTest(); }, 8000);
+  }
+
+  useEffect(() => () => { micCleanupRef.current?.(); }, []);
 
   // Resizable sections — Saved Prompts + Tabs. The Description textarea
   // takes whatever's left (flex-1). Dragging the horizontal handles between
@@ -413,23 +509,36 @@ export function PlanPanel({
         <div className="flex-1 flex flex-col min-h-0 mb-2">
           <div className="flex items-center justify-between mb-1 shrink-0">
             <label className="text-[10px] text-gray-500 font-medium">Describe the process</label>
-            {speechSupported && (
+            <div className="flex items-center gap-1">
+              {speechSupported && (
+                <button
+                  onClick={toggleDictation}
+                  className={`flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border ${
+                    listening
+                      ? "text-red-600 border-red-300 bg-red-50 hover:bg-red-100"
+                      : "text-gray-500 border-gray-300 hover:bg-gray-50"
+                  }`}
+                  title={listening ? "Stop dictation" : "Dictate prompt"}
+                >
+                  <svg width={10} height={10} viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M8 11a3 3 0 0 0 3-3V4a3 3 0 1 0-6 0v4a3 3 0 0 0 3 3z" />
+                    <path d="M13 8a1 1 0 1 0-2 0 3 3 0 0 1-6 0 1 1 0 1 0-2 0 5 5 0 0 0 4 4.9V14H5.5a.5.5 0 0 0 0 1h5a.5.5 0 0 0 0-1H9v-1.1A5 5 0 0 0 13 8z" />
+                  </svg>
+                  {listening ? "Stop" : "Dictate"}
+                </button>
+              )}
               <button
-                onClick={toggleDictation}
+                onClick={testMicrophone}
                 className={`flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border ${
-                  listening
-                    ? "text-red-600 border-red-300 bg-red-50 hover:bg-red-100"
+                  testingMic
+                    ? "text-green-700 border-green-300 bg-green-50 hover:bg-green-100"
                     : "text-gray-500 border-gray-300 hover:bg-gray-50"
                 }`}
-                title={listening ? "Stop dictation" : "Dictate prompt"}
+                title="Test the browser's selected microphone for ~8 seconds. Talk and watch the bar move."
               >
-                <svg width={10} height={10} viewBox="0 0 16 16" fill="currentColor">
-                  <path d="M8 11a3 3 0 0 0 3-3V4a3 3 0 1 0-6 0v4a3 3 0 0 0 3 3z" />
-                  <path d="M13 8a1 1 0 1 0-2 0 3 3 0 0 1-6 0 1 1 0 1 0-2 0 5 5 0 0 0 4 4.9V14H5.5a.5.5 0 0 0 0 1h5a.5.5 0 0 0 0-1H9v-1.1A5 5 0 0 0 13 8z" />
-                </svg>
-                {listening ? "Stop" : "Dictate"}
+                {testingMic ? "Stop test" : "Test mic"}
               </button>
-            )}
+            </div>
           </div>
           <textarea
             value={prompt}
@@ -441,6 +550,41 @@ export function PlanPanel({
           />
           {listening && (
             <p className="text-[9px] text-red-500 mt-0.5 animate-pulse shrink-0">Listening…</p>
+          )}
+          {dictateMsg && !listening && (
+            <p className="text-[10px] text-orange-700 bg-orange-50 border border-orange-200 rounded px-1.5 py-0.5 mt-0.5 shrink-0">
+              {dictateMsg}
+            </p>
+          )}
+          {(testingMic || micErr || micDevice) && (
+            <div className="mt-1 shrink-0">
+              {testingMic && (
+                <>
+                  <p className="text-[10px] text-green-700 mb-0.5">
+                    Listening on: <span className="font-medium">{micDevice}</span> — talk now
+                  </p>
+                  <div className="h-2 bg-gray-100 rounded overflow-hidden">
+                    <div
+                      className="h-full bg-green-500 transition-[width] duration-75"
+                      style={{ width: `${micLevel}%` }}
+                    />
+                  </div>
+                  <p className="text-[9px] text-gray-400 mt-0.5">
+                    Bar should jump when you speak. If it stays flat the browser isn't hearing this mic.
+                  </p>
+                </>
+              )}
+              {!testingMic && micDevice && !micErr && (
+                <p className="text-[10px] text-gray-500">
+                  Last test mic: <span className="font-medium">{micDevice}</span>
+                </p>
+              )}
+              {micErr && (
+                <p className="text-[10px] text-red-700 bg-red-50 border border-red-200 rounded px-1.5 py-0.5">
+                  {micErr}
+                </p>
+              )}
+            </div>
           )}
           <div className="flex items-center gap-1.5 mt-1 shrink-0">
             <input ref={fileInputRef} type="file" className="hidden"
