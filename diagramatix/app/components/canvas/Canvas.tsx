@@ -3065,21 +3065,24 @@ export function Canvas({
     return map;
   }, [data.elements]);
 
-  // Stray-element warning. A BPMN element placed outside every pool is
-  // illegal in a final diagram BUT permitted while editing — the user
-  // wants to be able to park a task / annotation anywhere temporarily.
-  // The only signal we surface is a red dashed outline drawn over the
-  // element, which becomes active when:
-  //   (a) the diagram has at least one white-box pool, AND
-  //   (b) the element's parent chain never reaches a pool.
-  // Pool / lane / sublane themselves never qualify (they ARE structural).
-  // Boundary events are attached via boundaryHostId, not parentId, so
-  // they're handled by walking their host's chain.
+  // Stray-element warning. Only the BPMN element types whose semantics
+  // require pool membership get the red outline when placed outside
+  // every pool:
+  //   task, subprocess (collapsed and expanded), start/intermediate/end
+  //   event, data-object, data-store.
+  // Text annotations and groups are intentionally excluded — they're
+  // BPMN artifacts that legitimately float anywhere. Gateways are also
+  // excluded per user spec (the user listed the eligible types
+  // explicitly and gateway wasn't among them).
+  //
+  // The overlay fires only when the diagram contains at least one
+  // white-box pool. Delete the last white-box pool and every previously
+  // stray element drops the red treatment, since a no-white-box diagram
+  // (Context, Process Context, …) is allowed free-floating content.
   const strayElementIds = useMemo(() => {
     const ids = new Set<string>();
     const hasWhiteBox = data.elements.some(
-      (e) => e.type === "pool"
-        && ((e.properties.poolType as string | undefined) ?? "white-box") === "white-box",
+      (e) => e.type === "pool" && e.properties.poolType === "white-box",
     );
     if (!hasWhiteBox) return ids;
     const byId = new Map(data.elements.map((e) => [e.id, e]));
@@ -3094,9 +3097,13 @@ export function Canvas({
       }
       return false;
     }
-    const STRUCTURAL = new Set(["pool", "lane", "sublane"]);
+    const STRAY_ELIGIBLE = new Set<string>([
+      "task", "subprocess", "subprocess-expanded",
+      "start-event", "intermediate-event", "end-event",
+      "data-object", "data-store",
+    ]);
     for (const el of data.elements) {
-      if (STRUCTURAL.has(el.type)) continue;
+      if (!STRAY_ELIGIBLE.has(el.type)) continue;
       if (!poolAncestor(el)) ids.add(el.id);
     }
     return ids;
