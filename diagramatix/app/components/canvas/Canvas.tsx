@@ -2312,7 +2312,9 @@ export function Canvas({
     }
 
     // Check if dropped on a connector (split connector feature)
-    const BPMN_SPLITTABLE = new Set(["gateway", "intermediate-event", "task", "subprocess"]);
+    const BPMN_SPLITTABLE = new Set([
+      "gateway", "intermediate-event", "task", "subprocess", "subprocess-expanded",
+    ]);
     const SM_SPLITTABLE = new Set(["gateway", "state", "submachine", "composite-state", "fork-join"]);
     const SPLITTABLE_DROPS = diagramType === "state-machine" ? SM_SPLITTABLE : BPMN_SPLITTABLE;
     if ((diagramType === "bpmn" || diagramType === "state-machine") && onSplitConnector && SPLITTABLE_DROPS.has(pendingDragSymbol)) {

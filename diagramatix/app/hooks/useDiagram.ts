@@ -1796,9 +1796,12 @@ function ensureContainersEncloseChildren(
     // sub-sublanes) bound the size. Subprocess-expanded children no
     // longer grow their parent lane / pool (user spec: EPs cross
     // lane / sublane boundaries without interacting). For EP parents,
-    // every child still counts so an EP encloses its own contents.
+    // every child still counts so an EP encloses its own contents —
+    // EXCEPT artifacts (data-object / data-store / text-annotation),
+    // which the user has marked inert: an artifact placed near or past
+    // an EP edge must not force the EP to grow.
     const kids = e.type === "subprocess-expanded"
-      ? allKids
+      ? allKids.filter((c) => !DATA_ELEMENT_TYPES.has(c.type))
       : allKids.filter((c) => c.type === "lane" || c.type === "sublane");
     if (kids.length === 0) continue;
     // PAD=0 for lane/sublane children — they fill their pool/lane by
@@ -3428,6 +3431,22 @@ function reducer(state: DiagramData, action: Action): DiagramData {
           });
           return { ...state, elements, connectors };
         }
+      }
+
+      // CASE A1: Artifacts (data-object / data-store / text-annotation) are
+      // inert during the drag. They translate freely without growing or
+      // shifting any container, lane, pool, EP, or sibling element. Their
+      // associationBPMN connectors recompute waypoints so the lines track
+      // the moving artifact. Parent re-detection (e.g. landing inside an
+      // EP and adopting it as a new parent) is deferred to MOVE_END so
+      // the drag itself doesn't churn parentId every frame.
+      if (DATA_ELEMENT_TYPES.has(el.type)) {
+        const elements = state.elements.map((e) => e.id === id ? { ...e, x, y } : e);
+        const connectors = state.connectors.map((conn) => {
+          if (conn.sourceId !== id && conn.targetId !== id) return conn;
+          return recomputeAllConnectors([conn], elements)[0] ?? conn;
+        });
+        return { ...state, elements, connectors };
       }
 
       // CASE A2: Moving a black-box pool — connector attachment points stay fixed in world space.
@@ -6196,11 +6215,17 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       // ended up parented to a subprocess-expanded near (or straddling)
       // an EP edge, grow the EP, place the moved element, and cascade
       // to the enclosing pool / neighbouring pools.
+      //
+      // Artifacts (data-object / data-store / text-annotation) are
+      // adopted as the EP's child (Step 0 above sets parentId) but never
+      // force the EP to grow — per user spec they're inert with respect
+      // to surrounding geometry, even at drop time.
       const elPostReparent = elements.find(e => e.id === id);
       if (
         elPostReparent?.parentId &&
         !elPostReparent.boundaryHostId &&
-        !BOUNDARY_EVENT_TYPES.has(elPostReparent.type)
+        !BOUNDARY_EVENT_TYPES.has(elPostReparent.type) &&
+        !DATA_ELEMENT_TYPES.has(elPostReparent.type)
       ) {
         const parent = elements.find(e => e.id === elPostReparent.parentId);
         if (parent?.type === "subprocess-expanded") {
@@ -6232,7 +6257,9 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       if (!finalEl) {
         return { ...state, elements: updatePoolTypes(elements), connectors };
       }
-      const SPLITTABLE_TYPES = new Set(["gateway", "intermediate-event", "task", "subprocess"]);
+      const SPLITTABLE_TYPES = new Set([
+        "gateway", "intermediate-event", "task", "subprocess", "subprocess-expanded",
+      ]);
       if (!SPLITTABLE_TYPES.has(finalEl.type)) {
         return { ...state, elements: updatePoolTypes(elements), connectors };
       }
@@ -6306,6 +6333,9 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         label = `Task ${count + 1}`;
       } else if (symbolType === "subprocess") {
         const count = state.elements.filter(e => e.type === "subprocess").length;
+        label = `Subprocess ${count + 1}`;
+      } else if (symbolType === "subprocess-expanded") {
+        const count = state.elements.filter(e => e.type === "subprocess-expanded").length;
         label = `Subprocess ${count + 1}`;
       } else if (symbolType === "state") {
         const count = state.elements.filter(e => e.type === "state").length;
