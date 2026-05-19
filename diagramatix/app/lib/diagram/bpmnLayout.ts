@@ -1395,19 +1395,51 @@ export function layoutBpmnDiagram(
     !(isEventSubElement(c.sourceId) || isEventSubElement(c.targetId))
   );
 
+  // BPMN connector-type rules (the AI plan only knows "sequence" vs
+  // "message" — we classify on the rendered geometry):
+  //   • either endpoint is a data-store / data-object / text-annotation
+  //     → associationBPMN (BPMN forbids sequence flow on data artifacts).
+  //   • either endpoint is a pool, or the AI said "message" → messageBPMN.
+  //   • everything else → sequence.
+  // Direction on associations follows the AI's source/target ordering so
+  // "task → data" stays as a write (arrow into the data element) and
+  // "data → task" stays as a read (arrow out of the data element).
+  const DATA_ASSOC_TYPES = new Set(["data-store", "data-object", "text-annotation"]);
   for (const c of finalConnections) {
     const src = elMap.get(c.sourceId);
     const tgt = elMap.get(c.targetId);
     if (!src || !tgt) continue;
 
-    const isMessage = c.type === "message" ||
-      src.type === "pool" || tgt.type === "pool";
+    const isAssociation = DATA_ASSOC_TYPES.has(src.type) || DATA_ASSOC_TYPES.has(tgt.type);
+    const isMessage = !isAssociation && (
+      c.type === "message" ||
+      src.type === "pool" || tgt.type === "pool"
+    );
 
     let connType: string;
     let srcSide: string, tgtSide: string;
     let srcOffsetAlong: number | undefined;
 
-    if (isMessage) {
+    if (isAssociation) {
+      connType = "associationBPMN";
+      // Pick the two closest sides between the data element and its task
+      // partner — associations are drawn straight ("direct" routing) so
+      // we don't need rectilinear elbow logic. Use the centre-to-centre
+      // angle to pick which side of each.
+      const srcCx = src.x + src.width / 2;
+      const tgtCx = tgt.x + tgt.width / 2;
+      const srcCy = src.y + src.height / 2;
+      const tgtCy = tgt.y + tgt.height / 2;
+      const dx = tgtCx - srcCx;
+      const dy = tgtCy - srcCy;
+      if (Math.abs(dx) >= Math.abs(dy)) {
+        srcSide = dx >= 0 ? "right" : "left";
+        tgtSide = dx >= 0 ? "left" : "right";
+      } else {
+        srcSide = dy >= 0 ? "bottom" : "top";
+        tgtSide = dy >= 0 ? "top" : "bottom";
+      }
+    } else if (isMessage) {
       connType = "messageBPMN";
       // Message flow — always vertical
       const srcCy = src.y + src.height / 2;
@@ -1661,6 +1693,15 @@ export function layoutBpmnDiagram(
       }
     }
 
+    // Per-type rendering defaults. Associations are drawn as straight
+    // lines with an "open" arrowhead (the BPMN convention) and follow
+    // the AI's source→target ordering — that ordering carries the read
+    // vs write semantic the user drew in the source diagram.
+    const directionTypeFinal: "directed" | "open-directed" =
+      connType === "associationBPMN" ? "open-directed" : "directed";
+    const routingTypeFinal: "rectilinear" | "direct" =
+      connType === "associationBPMN" ? "direct" : "rectilinear";
+
     connectors.push({
       id: `conn-${c.sourceId}-${c.targetId}`,
       sourceId: c.sourceId,
@@ -1668,8 +1709,8 @@ export function layoutBpmnDiagram(
       sourceSide: srcSide as Connector["sourceSide"],
       targetSide: tgtSide as Connector["targetSide"],
       type: connType as Connector["type"],
-      directionType: "directed",
-      routingType: "rectilinear",
+      directionType: directionTypeFinal,
+      routingType: routingTypeFinal,
       sourceInvisibleLeader: false,
       targetInvisibleLeader: false,
       waypoints: [] as Point[],
