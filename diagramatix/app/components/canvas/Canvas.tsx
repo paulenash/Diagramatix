@@ -3064,6 +3064,44 @@ export function Canvas({
     }
     return map;
   }, [data.elements]);
+
+  // Stray-element warning. A BPMN element placed outside every pool is
+  // illegal in a final diagram BUT permitted while editing — the user
+  // wants to be able to park a task / annotation anywhere temporarily.
+  // The only signal we surface is a red dashed outline drawn over the
+  // element, which becomes active when:
+  //   (a) the diagram has at least one white-box pool, AND
+  //   (b) the element's parent chain never reaches a pool.
+  // Pool / lane / sublane themselves never qualify (they ARE structural).
+  // Boundary events are attached via boundaryHostId, not parentId, so
+  // they're handled by walking their host's chain.
+  const strayElementIds = useMemo(() => {
+    const ids = new Set<string>();
+    const hasWhiteBox = data.elements.some(
+      (e) => e.type === "pool"
+        && ((e.properties.poolType as string | undefined) ?? "white-box") === "white-box",
+    );
+    if (!hasWhiteBox) return ids;
+    const byId = new Map(data.elements.map((e) => [e.id, e]));
+    function poolAncestor(el: DiagramElement): boolean {
+      let cur: DiagramElement | undefined = el;
+      let g = 0;
+      while (cur && g++ < 32) {
+        if (cur.type === "pool") return true;
+        const nextId = cur.parentId ?? cur.boundaryHostId;
+        if (!nextId) return false;
+        cur = byId.get(nextId);
+      }
+      return false;
+    }
+    const STRUCTURAL = new Set(["pool", "lane", "sublane"]);
+    for (const el of data.elements) {
+      if (STRUCTURAL.has(el.type)) continue;
+      if (!poolAncestor(el)) ids.add(el.id);
+    }
+    return ids;
+  }, [data.elements]);
+
   // Sort non-containers by parent nesting depth so children of deeper subprocesses render on top
   const nonContainers = (() => {
     const items = data.elements.filter(
@@ -4173,6 +4211,8 @@ export function Canvas({
               colorConfig={colorConfig}
               debugMode={debugMode}
               shouldSnapBack={(x, y) => {
+                // System-boundary collision still snaps back (context-diagram
+                // rule unchanged).
                 const cx = x + el.width / 2;
                 const cy = y + el.height / 2;
                 const inBoundary = data.elements.some(
@@ -4185,16 +4225,11 @@ export function Canvas({
                     cy >= b.y && cy <= b.y + b.height
                 );
                 if (inBoundary) return true;
-                const containingPool = getContainingPool(el, data.elements);
-                if (containingPool) {
-                  const POOL_LW = 30;
-                  return (
-                    x < containingPool.x + POOL_LW ||
-                    y < containingPool.y ||
-                    x + el.width > containingPool.x + containingPool.width ||
-                    y + el.height > containingPool.y + containingPool.height
-                  );
-                }
+                // No more pool-bounds snap-back. Per user spec, any element
+                // can be placed anywhere on the canvas — including outside
+                // its pool — while editing. Stray-element warning is
+                // delivered by the red outline overlay (see Canvas render
+                // below), not by reverting the user's drag.
                 return false;
               }}
               onDrillBack={(el.type === "start-event" || el.type === "initial-state") ? onDrillBack : undefined}
@@ -4403,6 +4438,32 @@ export function Canvas({
               debugMode={debugMode}
             />
           ))}
+
+          {/* Stray-element red outline overlay — drawn above the symbols
+              but below selection chrome. Only active when the diagram has
+              a white-box pool, since a no-white-box diagram is allowed to
+              have free-floating content (Context/Process Context, etc.). */}
+          {strayElementIds.size > 0 && (
+            <g pointerEvents="none">
+              {data.elements.filter(e => strayElementIds.has(e.id)).map(el => (
+                <rect
+                  key={`stray-${el.id}`}
+                  x={el.x - 3}
+                  y={el.y - 3}
+                  width={el.width + 6}
+                  height={el.height + 6}
+                  fill="none"
+                  stroke="#dc2626"
+                  strokeWidth={2}
+                  strokeDasharray="4 3"
+                  rx={4}
+                  ry={4}
+                >
+                  <title>Outside any pool — illegal in a saved BPMN diagram. Drag into a pool to clear the warning.</title>
+                </rect>
+              ))}
+            </g>
+          )}
 
           {/* Association connectors — rendered above all elements */}
           {data.connectors.filter(c => c.type === "associationBPMN" || c.type === "messageBPMN").map((conn) => {
