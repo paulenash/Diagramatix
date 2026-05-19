@@ -109,16 +109,52 @@ export function buildBpmnPrompt(elements: DiagramElement[], connectors: Connecto
     }
   }
 
+  // Associations to data objects / data stores indexed by the non-data
+  // endpoint (typically a task). BPMN association direction tells us
+  // read vs write:
+  //   task  → data  = task writes to data
+  //   data  → task  = task reads from data
+  // (Non-directed associations are treated as "uses".)
+  const DATA_TYPES = new Set(["data-object", "data-store"]);
+  const associations = connectors.filter(
+    (c) => c.type === "associationBPMN" || c.type === "association",
+  );
+  type DataTouch = { peer: DiagramElement; direction: "reads" | "writes" | "uses" };
+  const dataTouching = new Map<string, DataTouch[]>();
+  for (const c of associations) {
+    const src = byId.get(c.sourceId);
+    const tgt = byId.get(c.targetId);
+    if (!src || !tgt) continue;
+    const srcIsData = DATA_TYPES.has(src.type);
+    const tgtIsData = DATA_TYPES.has(tgt.type);
+    if (srcIsData === tgtIsData) continue; // not a task↔data association
+    const taskEl = srcIsData ? tgt : src;
+    const dataEl = srcIsData ? src : tgt;
+    const directed = c.directionType === "directed" || c.directionType === "open-directed";
+    let direction: DataTouch["direction"];
+    if (!directed) direction = "uses";
+    else if (srcIsData) direction = "reads"; // data → task
+    else direction = "writes";                 // task → data
+    const arr = dataTouching.get(taskEl.id) ?? [];
+    arr.push({ peer: dataEl, direction });
+    dataTouching.set(taskEl.id, arr);
+  }
+
   // Render a single non-flow-control element (task / subprocess / event) as
-  // a short verb-phrase action.
+  // a short verb-phrase action. Message-flow touches and data-object /
+  // data-store associations are both surfaced in-line as parenthetical
+  // notes so the prompt stays narrative.
   function renderAction(el: DiagramElement): string {
     const lbl = labelOf(el);
-    const msgs = messagesTouching.get(el.id) ?? [];
     const tags: string[] = [];
-    for (const m of msgs) {
+    for (const m of messagesTouching.get(el.id) ?? []) {
       const peer = labelOf(m.peer);
       const lbl2 = m.label ? ` "${m.label}"` : "";
       tags.push(m.direction === "out" ? `sends${lbl2} to ${peer}` : `receives${lbl2} from ${peer}`);
+    }
+    for (const d of dataTouching.get(el.id) ?? []) {
+      const peerKind = d.peer.type === "data-store" ? "data store" : "data object";
+      tags.push(`${d.direction} ${peerKind} "${labelOf(d.peer)}"`);
     }
     const tagStr = tags.length ? ` (${tags.join("; ")})` : "";
     if (el.type === "task") return `${lbl}${tagStr}`;
@@ -308,6 +344,42 @@ export function buildBpmnPrompt(elements: DiagramElement[], connectors: Connecto
     sectionLines.push("- (none)");
   } else {
     for (const sp of systemPools) sectionLines.push(`- ${labelOf(sp)}`);
+  }
+  sectionLines.push("");
+
+  // ── Data objects and stores ──
+  // Lists every data artifact with the tasks that read from / write to /
+  // use it. Mirrors what's shown in-line on each task, but gives the user
+  // a per-data-element view too — useful when the same data store is
+  // touched by many tasks across lanes.
+  const dataElements = elements.filter((e) => DATA_TYPES.has(e.type));
+  sectionLines.push("**Data objects and stores**");
+  if (dataElements.length === 0) {
+    sectionLines.push("- (none)");
+  } else {
+    // Build reverse index: dataId → [{ task, direction }]
+    const refsByData = new Map<string, Array<{ task: DiagramElement; direction: DataTouch["direction"] }>>();
+    for (const [taskId, touches] of dataTouching) {
+      const taskEl = byId.get(taskId);
+      if (!taskEl) continue;
+      for (const t of touches) {
+        const arr = refsByData.get(t.peer.id) ?? [];
+        arr.push({ task: taskEl, direction: t.direction });
+        refsByData.set(t.peer.id, arr);
+      }
+    }
+    for (const de of dataElements) {
+      const kind = de.type === "data-store" ? "data store" : "data object";
+      sectionLines.push(`- ${labelOf(de)} (${kind})`);
+      const refs = refsByData.get(de.id) ?? [];
+      if (refs.length === 0) {
+        sectionLines.push(`  - (not referenced by any task)`);
+      } else {
+        for (const r of refs) {
+          sectionLines.push(`  - ${cap(r.direction)} by ${labelOf(r.task)}`);
+        }
+      }
+    }
   }
   sectionLines.push("");
 
