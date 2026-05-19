@@ -1242,6 +1242,28 @@ export function layoutBpmnDiagram(
         lane.width = pool.width - POOL_HEADER_W;
       }
     }
+    // R57 just grew white-box pools left/right to contain stray descendants.
+    // Black-box pools have no descendants so they didn't grow with them —
+    // re-sync widths so every pool's left and right edges line up again
+    // (the same invariant the post-expandContainerToFitChildren pass at
+    // line ~943 establishes, but for the new max width).
+    {
+      const allPoolsForSync = elements.filter(e => e.type === "pool");
+      const whiteBoxPoolEls = allPoolsForSync.filter(
+        p => ((p.properties.poolType as string | undefined) ?? "white-box") === "white-box"
+      );
+      if (whiteBoxPoolEls.length > 0) {
+        const minX = Math.min(...whiteBoxPoolEls.map(p => p.x));
+        const maxRight = Math.max(...whiteBoxPoolEls.map(p => p.x + p.width));
+        const targetWidth = maxRight - minX;
+        for (const bb of allPoolsForSync) {
+          if ((bb.properties.poolType as string | undefined) === "black-box") {
+            bb.x = minX;
+            bb.width = targetWidth;
+          }
+        }
+      }
+    }
     // R52 again — pool growth may have introduced overlaps between pools.
     restackPoolsR52();
   }
