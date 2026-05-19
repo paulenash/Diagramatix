@@ -1,4 +1,4 @@
-import type { Connector, ConnectorType, DiagramElement, DiagramType, SymbolType } from "./types";
+import type { Connector, DiagramElement, DiagramType } from "./types";
 
 /**
  * Router: picks the per-diagram-type prompt generator. Falls back to the
@@ -15,301 +15,322 @@ export function buildPromptFromDiagram(
   return buildBpmnPrompt(elements, connectors);
 }
 
-const FLOW_ELEMENT_TYPES: Set<SymbolType> = new Set<SymbolType>([
-  "task",
-  "subprocess",
-  "subprocess-expanded",
-  "gateway",
-  "start-event",
-  "intermediate-event",
-  "end-event",
-  "data-object",
-  "data-store",
-  "text-annotation",
-  "group",
-]);
-
 /**
- * Reverse-engineer a BPMN diagram into a structured textual prompt that
- * follows the canonical 6-section order:
- *   1. Pools, Lanes, Sublanes
- *   2. Pool properties (Black-box/White-box, System flag, Multiplicity)
- *   3. Pool layout (relative positions)
- *   4. Per-lane elements in left-to-right flow order
- *   5. Edge-mounted (boundary) events and their hosts
- *   6. Connectors grouped by type, listing source → target [+label]
+ * Reverse-engineer a BPMN diagram into a NARRATIVE prompt that reads like
+ * a human's description of the process — the way Greg asks for it
+ * (start trigger → tasks per actor → external participants → systems →
+ * explicit pools/lanes). Designed to be re-fed into the BPMN AI generator
+ * to recreate or adapt the diagram. Verb-phrase task labels carry over
+ * verbatim — refining them is left to the human after the prompt is
+ * pasted into the prompt box.
  *
- * The output is plain markdown-flavoured text designed to be re-fed into
- * the BPMN AI generator to recreate (or adapt) the diagram.
+ * Output sections:
+ *   - **Trigger**       — what kicks the process off
+ *   - **What happens**  — flow narrative grouped by actor (lane / pool),
+ *                         honouring sequence ordering and weaving in
+ *                         message touches and gateway branches
+ *   - **External participants** — black-box pools where isSystem=false
+ *   - **IT systems**    — black-box pools where isSystem=true
+ *   - **Pools and Lanes** — explicit structural summary (point 6 of
+ *                         Greg's list — "of course you can explicitly
+ *                         say what Pools and Lanes you want")
  */
 export function buildBpmnPrompt(elements: DiagramElement[], connectors: Connector[]): string {
   const byId = new Map(elements.map((e) => [e.id, e]));
   const labelOf = (e: DiagramElement | undefined): string =>
     e ? (e.label?.trim() || `<unnamed ${e.type}>`) : "<missing>";
 
-  const pools = elements
-    .filter((e) => e.type === "pool")
-    .sort((a, b) => a.x - b.x || a.y - b.y);
-
-  const lines: string[] = [];
-
+  const pools = elements.filter((e) => e.type === "pool");
   if (pools.length === 0) {
-    return "(No pools in this diagram — nothing to describe in the BPMN structured format.)";
+    return "(No pools in this diagram — nothing to describe.)";
   }
 
-  // ── 1. Pools, Lanes, Sublanes ──
-  lines.push("# 1. Pools, Lanes, and Sublanes");
-  lines.push("");
-  const childLanesOf = (parentId: string) =>
-    elements
-      .filter((e) => e.type === "lane" && e.parentId === parentId)
-      .sort((a, b) => a.y - b.y);
+  // Pool categorisation.
+  const whitePools = pools.filter((p) => ((p.properties?.poolType as string | undefined) ?? "white-box") === "white-box");
+  const externalPools = pools.filter((p) =>
+    (p.properties?.poolType as string | undefined) === "black-box" && !p.properties?.isSystem,
+  );
+  const systemPools = pools.filter((p) =>
+    (p.properties?.poolType as string | undefined) === "black-box" && !!p.properties?.isSystem,
+  );
 
-  const renderSublanes = (parentLaneId: string, indent: number) => {
-    for (const sl of childLanesOf(parentLaneId)) {
-      lines.push(`${"  ".repeat(indent)}- Sublane: "${labelOf(sl)}"`);
-      renderSublanes(sl.id, indent + 1);
+  // Walk parentId chain to find the containing lane (null = direct in pool).
+  function laneOf(el: DiagramElement | undefined): DiagramElement | null {
+    let cur = el;
+    let guard = 0;
+    while (cur && guard++ < 16) {
+      const p = cur.parentId ? byId.get(cur.parentId) : undefined;
+      if (!p) return null;
+      if (p.type === "lane") return p;
+      if (p.type === "pool") return null;
+      cur = p;
     }
-  };
-
-  for (const pool of pools) {
-    lines.push(`Pool: "${labelOf(pool)}"`);
-    const lanes = childLanesOf(pool.id);
-    if (lanes.length === 0) {
-      lines.push(`  (no lanes — flat pool)`);
-    } else {
-      for (const lane of lanes) {
-        lines.push(`  - Lane: "${labelOf(lane)}"`);
-        renderSublanes(lane.id, 2);
-      }
+    return null;
+  }
+  function poolOf(el: DiagramElement | undefined): DiagramElement | null {
+    let cur = el;
+    let guard = 0;
+    while (cur && guard++ < 16) {
+      if (cur.type === "pool") return cur;
+      const p = cur.parentId ? byId.get(cur.parentId) : undefined;
+      if (!p) return null;
+      cur = p;
     }
-    lines.push("");
+    return null;
   }
 
-  // ── 2. Pool properties ──
-  lines.push("# 2. Pool Properties");
-  lines.push("");
-  for (const pool of pools) {
-    const ptype = (pool.properties?.poolType as string | undefined) ?? "black-box";
-    const isSys = !!pool.properties?.isSystem;
-    const mult = (pool.properties?.multiplicity as string | undefined) ?? "single";
-    const parts = [ptype];
-    if (ptype === "black-box" && isSys) parts.push("System");
-    parts.push(`multiplicity=${mult}`);
-    lines.push(`- "${labelOf(pool)}": ${parts.join(", ")}`);
+  // Sequence-flow adjacency (with effective-endpoint resolution for
+  // boundary events — connectors stored on the host's id are re-attributed
+  // to the nearest boundary event when geometry indicates so).
+  const sequences = connectors.filter((c) => c.type === "sequence");
+  const messages = connectors.filter((c) => c.type === "message" || c.type === "messageBPMN");
+  const outgoing = new Map<string, Connector[]>();
+  for (const c of sequences) {
+    if (!outgoing.has(c.sourceId)) outgoing.set(c.sourceId, []);
+    outgoing.get(c.sourceId)!.push(c);
   }
-  lines.push("");
+  // Messages indexed by the non-pool endpoint (in either direction).
+  const messagesTouching = new Map<string, Array<{ peer: DiagramElement; direction: "out" | "in"; label: string }>>();
+  for (const c of messages) {
+    const src = byId.get(c.sourceId);
+    const tgt = byId.get(c.targetId);
+    if (!src || !tgt) continue;
+    const srcIsPool = src.type === "pool";
+    const tgtIsPool = tgt.type === "pool";
+    const lbl = c.label?.trim() ?? "";
+    if (!srcIsPool && tgtIsPool) {
+      const arr = messagesTouching.get(src.id) ?? [];
+      arr.push({ peer: tgt, direction: "out", label: lbl });
+      messagesTouching.set(src.id, arr);
+    } else if (srcIsPool && !tgtIsPool) {
+      const arr = messagesTouching.get(tgt.id) ?? [];
+      arr.push({ peer: src, direction: "in", label: lbl });
+      messagesTouching.set(tgt.id, arr);
+    }
+  }
 
-  // ── 3. Pool layout ──
-  lines.push("# 3. Pool Layout");
-  lines.push("");
-  if (pools.length === 1) {
-    lines.push(`- "${labelOf(pools[0])}" is the only pool.`);
+  // Render a single non-flow-control element (task / subprocess / event) as
+  // a short verb-phrase action.
+  function renderAction(el: DiagramElement): string {
+    const lbl = labelOf(el);
+    const msgs = messagesTouching.get(el.id) ?? [];
+    const tags: string[] = [];
+    for (const m of msgs) {
+      const peer = labelOf(m.peer);
+      const lbl2 = m.label ? ` "${m.label}"` : "";
+      tags.push(m.direction === "out" ? `sends${lbl2} to ${peer}` : `receives${lbl2} from ${peer}`);
+    }
+    const tagStr = tags.length ? ` (${tags.join("; ")})` : "";
+    if (el.type === "task") return `${lbl}${tagStr}`;
+    if (el.type === "subprocess") return `[Subprocess] ${lbl}${tagStr}`;
+    if (el.type === "subprocess-expanded") return `[Expanded Subprocess] ${lbl}${tagStr}`;
+    if (el.type === "intermediate-event") return `[Intermediate event] ${lbl}${tagStr}`;
+    return `${lbl}${tagStr}`;
+  }
+
+  const sectionLines: string[] = [];
+
+  // ── Trigger ──
+  // Pool-level start events on white-box pools.
+  const startEvents = elements.filter((e) =>
+    e.type === "start-event" && !e.boundaryHostId && whitePools.some((wp) => poolOf(e)?.id === wp.id) && !descendsFromSubprocess(e),
+  );
+  sectionLines.push("**Trigger**");
+  if (startEvents.length === 0) {
+    sectionLines.push("- (no start event found)");
   } else {
-    for (let i = 0; i < pools.length; i++) {
-      const p = pools[i];
-      const rels: string[] = [];
-      for (let j = 0; j < pools.length; j++) {
-        if (i === j) continue;
-        const q = pools[j];
-        const dirs: string[] = [];
-        if (p.x + p.width <= q.x) dirs.push("left of");
-        else if (q.x + q.width <= p.x) dirs.push("right of");
-        if (p.y + p.height <= q.y) dirs.push("above");
-        else if (q.y + q.height <= p.y) dirs.push("below");
-        if (dirs.length === 0) dirs.push("overlapping");
-        rels.push(`${dirs.join(" and ")} "${labelOf(q)}"`);
-      }
-      lines.push(`- "${labelOf(p)}" is ${rels.join("; ")}.`);
-    }
-  }
-  lines.push("");
-
-  // ── 4. Per-lane elements (left to right) ──
-  lines.push("# 4. Lane Contents (left to right)");
-  lines.push("");
-  // Walk each pool to find its leaf containers (deepest sublane on each
-  // branch) — that's where flow elements actually live.
-  type LeafCtx = { container: DiagramElement; pool: DiagramElement };
-  const leaves: LeafCtx[] = [];
-  for (const pool of pools) {
-    const topLanes = childLanesOf(pool.id);
-    if (topLanes.length === 0) {
-      leaves.push({ container: pool, pool });
-      continue;
-    }
-    const walk = (laneId: string) => {
-      const subs = childLanesOf(laneId);
-      if (subs.length === 0) {
-        const lane = byId.get(laneId);
-        if (lane) leaves.push({ container: lane, pool });
+    for (const se of startEvents) {
+      const incoming = messagesTouching.get(se.id) ?? [];
+      const fromMsg = incoming.find((m) => m.direction === "in");
+      const lbl = labelOf(se);
+      if (fromMsg) {
+        const ptype = (fromMsg.peer.properties?.poolType as string | undefined) ?? "black-box";
+        const isSys = !!fromMsg.peer.properties?.isSystem;
+        const role = ptype === "black-box" ? (isSys ? " (IT system)" : " (external)") : "";
+        sectionLines.push(`- The process starts when ${labelOf(fromMsg.peer)}${role} sends${fromMsg.label ? ` "${fromMsg.label}"` : ""} — ${lbl}.`);
       } else {
-        for (const sl of subs) walk(sl.id);
-      }
-    };
-    for (const lane of topLanes) walk(lane.id);
-  }
-
-  for (const { container, pool } of leaves) {
-    const isPool = container.type === "pool";
-    const heading = isPool
-      ? `Pool "${labelOf(container)}":`
-      : `Lane "${labelOf(container)}" (in pool "${labelOf(pool)}"):`;
-    const items = elements
-      .filter(
-        (e) =>
-          FLOW_ELEMENT_TYPES.has(e.type) &&
-          e.parentId === container.id &&
-          !e.boundaryHostId,
-      )
-      .sort((a, b) => a.x - b.x || a.y - b.y);
-    if (items.length === 0) {
-      lines.push(`${heading} (empty)`);
-    } else {
-      lines.push(heading);
-      for (const it of items) {
-        lines.push(`  - ${describeElement(it)}: "${labelOf(it)}"`);
+        sectionLines.push(`- The process starts when ${lbl}.`);
       }
     }
   }
-  lines.push("");
+  sectionLines.push("");
 
-  // ── 5. Edge-mounted (boundary) events ──
-  lines.push("# 5. Edge-Mounted (Boundary) Events");
-  lines.push("");
-  const boundary = elements.filter((e) => !!e.boundaryHostId);
-  if (boundary.length === 0) {
-    lines.push("- None.");
-  } else {
-    for (const ev of boundary) {
-      const host = byId.get(ev.boundaryHostId!);
-      lines.push(
-        `- ${describeElement(ev)} "${labelOf(ev)}" attached to ${describeElement(host)} "${labelOf(host)}"`,
-      );
+  function descendsFromSubprocess(el: DiagramElement): boolean {
+    let cur: DiagramElement | undefined = el;
+    let g = 0;
+    while (cur && g++ < 16) {
+      const p: DiagramElement | undefined = cur.parentId ? byId.get(cur.parentId) : undefined;
+      if (!p) return false;
+      if (p.type === "subprocess-expanded" || p.type === "subprocess") return true;
+      cur = p;
     }
+    return false;
   }
-  lines.push("");
 
-  // ── 6. Connectors grouped by type ──
-  // Index boundary events by host so we can re-attribute connectors that
-  // visually leave (or arrive at) a boundary event but whose stored
-  // sourceId/targetId points at the host element instead.
-  const boundariesByHost = new Map<string, DiagramElement[]>();
-  for (const e of elements) {
-    if (!e.boundaryHostId) continue;
-    const arr = boundariesByHost.get(e.boundaryHostId) ?? [];
-    arr.push(e);
-    boundariesByHost.set(e.boundaryHostId, arr);
+  // ── What happens (flow narrative) ──
+  sectionLines.push("**What happens**");
+  // Walk sequence flow from each start, emitting actor-grouped narrative.
+  // Cycles are guarded by a visited set; gateways are described inline.
+  const narrativeLines: string[] = [];
+  const renderedNodes = new Set<string>();
+
+  type StepResult = { line?: string; descendIntoSub?: DiagramElement };
+  function describeStep(el: DiagramElement, indent: number): StepResult {
+    const pad = "  ".repeat(indent);
+    if (el.type === "end-event") {
+      return { line: `${pad}- The process ends with **${labelOf(el)}**.` };
+    }
+    if (el.type === "gateway") {
+      const gt = el.gatewayType;
+      const gtTag = (gt && gt !== "none") ? `${cap(gt)} ` : "";
+      const out = outgoing.get(el.id) ?? [];
+      if (out.length <= 1) {
+        // Converging gateway — silent. Branches were described from the
+        // diverging side; the merge is just where they reconnect.
+        return {};
+      }
+      // Diverging — emit just the header. Each branch is walked recursively
+      // below (in `walk`) under its own "On <flow label>:" sub-heading so
+      // we don't list targets twice (once as summary, once as steps).
+      return { line: `${pad}- Decision (${gtTag}gateway "${labelOf(el)}"):` };
+    }
+    if (el.type === "subprocess-expanded" || el.type === "subprocess") {
+      return { line: `${pad}- **${labelOf(el)}** (subprocess — see steps below)`, descendIntoSub: el };
+    }
+    if (el.type === "task" || el.type === "intermediate-event") {
+      return { line: `${pad}- ${renderAction(el)}` };
+    }
+    if (el.type === "start-event") {
+      // Pool-level starts are covered by the Trigger section; don't repeat.
+      // Subprocess-internal starts: still useful to anchor the inner flow.
+      if (!descendsFromSubprocess(el)) return {};
+      return { line: `${pad}- (subprocess starts: ${labelOf(el)})` };
+    }
+    return { line: `${pad}- ${labelOf(el)}` };
   }
-  const effectiveEndpoint = (c: Connector, end: "source" | "target"): DiagramElement | undefined => {
-    const refId = end === "source" ? c.sourceId : c.targetId;
-    const ref = byId.get(refId);
-    if (!ref) return undefined;
-    const events = boundariesByHost.get(refId);
-    if (!events || events.length === 0) return ref;
-    const side = end === "source" ? c.sourceSide : c.targetSide;
-    const along = (end === "source" ? c.sourceOffsetAlong : c.targetOffsetAlong) ?? 0.5;
-    let ex: number, ey: number;
-    switch (side) {
-      case "top":    ex = ref.x + ref.width * along; ey = ref.y; break;
-      case "bottom": ex = ref.x + ref.width * along; ey = ref.y + ref.height; break;
-      case "left":   ex = ref.x;                     ey = ref.y + ref.height * along; break;
-      case "right":  ex = ref.x + ref.width;         ey = ref.y + ref.height * along; break;
-      default:       return ref;
-    }
-    let best: { ev: DiagramElement; dist: number } | null = null;
-    for (const ev of events) {
-      const cx = ev.x + ev.width / 2;
-      const cy = ev.y + ev.height / 2;
-      const d = Math.hypot(cx - ex, cy - ey);
-      if (!best || d < best.dist) best = { ev, dist: d };
-    }
-    // Threshold: half the event's diameter + a little slack. Boundary
-    // events are typically ~27px wide, so anything within ~18px of the
-    // exit/entry point is "on" the boundary event.
-    if (best && best.dist <= best.ev.width / 2 + 6) return best.ev;
-    return ref;
-  };
 
-  lines.push("# 6. Connectors");
-  lines.push("");
-  if (connectors.length === 0) {
-    lines.push("- No connectors.");
-  } else {
-    const groups = new Map<string, Connector[]>();
-    for (const c of connectors) {
-      const g = friendlyConnectorType(c.type);
-      if (!groups.has(g)) groups.set(g, []);
-      groups.get(g)!.push(c);
-    }
-    for (const [type, conns] of groups) {
-      lines.push(`## ${type}`);
-      for (const c of conns) {
-        const src = effectiveEndpoint(c, "source");
-        const tgt = effectiveEndpoint(c, "target");
-        const lbl = c.label?.trim();
-        lines.push(
-          `- "${labelOf(src)}" → "${labelOf(tgt)}"${lbl ? ` (label: "${lbl}")` : ""}`,
+  function walk(seedId: string, indent: number, lastLaneId?: string) {
+    let curId: string | undefined = seedId;
+    let lastLane = lastLaneId;
+    while (curId && !renderedNodes.has(curId)) {
+      renderedNodes.add(curId);
+      const el = byId.get(curId);
+      if (!el) break;
+
+      // Emit a lane-change heading when the actor changes.
+      const lane = laneOf(el);
+      const laneId = lane?.id ?? `__${poolOf(el)?.id ?? "no-pool"}`;
+      if (laneId !== lastLane) {
+        const pad = "  ".repeat(indent);
+        const actor = lane ? labelOf(lane) : (poolOf(el) ? `${labelOf(poolOf(el)!)} (no lane)` : "Unknown actor");
+        narrativeLines.push(`${pad}**${actor}:**`);
+        lastLane = laneId;
+      }
+
+      const { line, descendIntoSub } = describeStep(el, indent);
+      if (line) narrativeLines.push(line);
+
+      // If the element is a subprocess-expanded, walk its inner flow nested.
+      if (descendIntoSub) {
+        const innerStarts = elements.filter((e) =>
+          e.type === "start-event" && !e.boundaryHostId &&
+          isInside(e, descendIntoSub.id),
         );
+        for (const is of innerStarts) walk(is.id, indent + 1);
       }
-      lines.push("");
+
+      // End event terminates the walk on this branch.
+      if (el.type === "end-event") break;
+
+      // Diverging gateway: emit "On <flow label>:" sub-heading per branch
+      // and recursively walk each one. Visited tracking via renderedNodes
+      // naturally stops duplicate descriptions at the merge point. If a
+      // branch has nothing new to say (e.g. it converges immediately into
+      // a path already described) the sub-heading is replaced with a
+      // "merges back" note so the user isn't left staring at an empty bullet.
+      if (el.type === "gateway") {
+        const outConns: Connector[] = outgoing.get(curId) ?? [];
+        if (outConns.length > 1) {
+          const pad = "  ".repeat(indent + 1);
+          for (const c of outConns) {
+            const flowLabel = c.label?.trim() || "(unlabelled branch)";
+            const before = narrativeLines.length;
+            const headerIdx = narrativeLines.push(`${pad}- On **${flowLabel}**:`) - 1;
+            walk(c.targetId, indent + 2, lastLane);
+            if (narrativeLines.length === before + 1) {
+              // Walk added nothing — the target was already covered.
+              narrativeLines[headerIdx] = `${pad}- On **${flowLabel}**: (merges back into the path above)`;
+            }
+          }
+        } else if (outConns.length === 1) {
+          curId = outConns[0].targetId;
+          continue;
+        }
+        break;
+      }
+
+      const outConns: Connector[] = outgoing.get(curId) ?? [];
+      curId = outConns[0]?.targetId;
     }
   }
 
-  return lines.join("\n").trimEnd();
-}
-
-function describeElement(e: DiagramElement | undefined): string {
-  if (!e) return "(missing)";
-  switch (e.type) {
-    case "task": {
-      const tt = e.taskType ?? "none";
-      return tt === "none" ? "Task" : `${cap(tt)} Task`;
+  function isInside(child: DiagramElement, ancestorId: string): boolean {
+    let cur: DiagramElement | undefined = child;
+    let g = 0;
+    while (cur && g++ < 16) {
+      if (cur.parentId === ancestorId) return true;
+      cur = cur.parentId ? byId.get(cur.parentId) : undefined;
     }
-    case "subprocess":
-      return "Subprocess";
-    case "subprocess-expanded": {
-      const st = (e.properties?.subprocessType as string | undefined) ?? "embedded";
-      return `${cap(st)} Expanded Subprocess`;
-    }
-    case "gateway": {
-      const gt = e.gatewayType ?? "exclusive";
-      return `${cap(gt)} Gateway`;
-    }
-    case "start-event":
-      return eventLabel("Start", e);
-    case "intermediate-event":
-      return eventLabel("Intermediate", e);
-    case "end-event":
-      return eventLabel("End", e);
-    case "data-object":
-      return "Data Object";
-    case "data-store":
-      return "Data Store";
-    case "text-annotation":
-      return "Text Annotation";
-    case "group":
-      return "Group";
-    case "pool":
-      return "Pool";
-    case "lane":
-      return "Lane";
-    default:
-      return e.type;
+    return false;
   }
-}
 
-function eventLabel(prefix: string, e: DiagramElement): string {
-  const et = e.eventType ?? "none";
-  const flow = e.flowType ?? "none";
-  const repeat = e.repeatType ?? "none";
-  const segs: string[] = [prefix];
-  if (et !== "none") segs.push(cap(et));
-  if (flow === "throwing") segs.push("(throwing)");
-  if (flow === "catching") segs.push("(catching)");
-  segs.push("Event");
-  if (repeat !== "none") segs.push(`[${repeat}]`);
-  return segs.join(" ");
+  for (const se of startEvents) walk(se.id, 0);
+
+  if (narrativeLines.length === 0) {
+    sectionLines.push("- (no sequence flow found — diagram has no start event linked by sequence connectors)");
+  } else {
+    for (const l of narrativeLines) sectionLines.push(l);
+  }
+  sectionLines.push("");
+
+  // ── External participants ──
+  sectionLines.push("**External participants**");
+  if (externalPools.length === 0) {
+    sectionLines.push("- (none)");
+  } else {
+    for (const ep of externalPools) sectionLines.push(`- ${labelOf(ep)}`);
+  }
+  sectionLines.push("");
+
+  // ── IT systems ──
+  sectionLines.push("**IT systems involved**");
+  if (systemPools.length === 0) {
+    sectionLines.push("- (none)");
+  } else {
+    for (const sp of systemPools) sectionLines.push(`- ${labelOf(sp)}`);
+  }
+  sectionLines.push("");
+
+  // ── Pools and Lanes (explicit structure — Greg's point 6) ──
+  sectionLines.push("**Pools and Lanes**");
+  const childLanesOf = (parentId: string) =>
+    elements.filter((e) => e.type === "lane" && e.parentId === parentId).sort((a, b) => a.y - b.y);
+  for (const pool of pools) {
+    const ptype = (pool.properties?.poolType as string | undefined) ?? "white-box";
+    const isSys = !!pool.properties?.isSystem;
+    const tag = ptype === "white-box"
+      ? "(main / white-box)"
+      : (isSys ? "(IT system / black-box)" : "(external / black-box)");
+    sectionLines.push(`- Pool: ${labelOf(pool)} ${tag}`);
+    const lanes = childLanesOf(pool.id);
+    for (const lane of lanes) {
+      sectionLines.push(`  - Lane: ${labelOf(lane)}`);
+      const subs = childLanesOf(lane.id);
+      for (const sl of subs) sectionLines.push(`    - Sublane: ${labelOf(sl)}`);
+    }
+  }
+
+  return sectionLines.join("\n").trimEnd();
 }
 
 function cap(s: string): string {
@@ -425,31 +446,3 @@ function arrowFor(d: string | undefined): string {
   }
 }
 
-function friendlyConnectorType(t: ConnectorType): string {
-  switch (t) {
-    case "sequence":
-      return "Sequence Flows";
-    case "messageBPMN":
-      return "Message Flows";
-    case "associationBPMN":
-      return "Associations";
-    case "flow":
-      return "Flows";
-    case "transition":
-      return "Transitions";
-    case "association":
-      return "Associations";
-    case "message":
-      return "Messages";
-    case "uml-association":
-      return "UML Associations";
-    case "uml-aggregation":
-      return "UML Aggregations";
-    case "uml-composition":
-      return "UML Compositions";
-    case "uml-generalisation":
-      return "UML Generalisations";
-    default:
-      return t;
-  }
-}
