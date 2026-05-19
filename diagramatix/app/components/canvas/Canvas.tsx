@@ -3065,46 +3065,49 @@ export function Canvas({
     return map;
   }, [data.elements]);
 
-  // Stray-element warning. Only the BPMN element types whose semantics
-  // require pool membership get the red outline when placed outside
-  // every pool:
-  //   task, subprocess (collapsed and expanded), start/intermediate/end
-  //   event, data-object, data-store.
-  // Text annotations and groups are intentionally excluded — they're
-  // BPMN artifacts that legitimately float anywhere. Gateways are also
-  // excluded per user spec (the user listed the eligible types
-  // explicitly and gateway wasn't among them).
+  // Stray-element warning. An eligible element gets a red outline when
+  // its centre point sits OUTSIDE every pool's bounding rectangle AND
+  // the diagram contains at least one white-box pool.
   //
-  // The overlay fires only when the diagram contains at least one
-  // white-box pool. Delete the last white-box pool and every previously
-  // stray element drops the red treatment, since a no-white-box diagram
-  // (Context, Process Context, …) is allowed free-floating content.
+  // The test is purely geometric — we don't walk the parentId chain.
+  // Without that, the scenario the user flagged would mis-fire:
+  //   1. delete the only white-box pool       → all stray flags clear
+  //   2. drop a new white-box pool that visually covers some elements
+  //      whose parentId is still undefined    → those elements would
+  //      have been mis-flagged red, because their parentId never
+  //      auto-updates just because a pool grew around them.
+  // With geometric containment they read as "inside" the new pool and
+  // stay un-flagged. Elements physically outside the new pool stay
+  // (correctly) red until the user drags them in.
+  //
+  // Eligible types (per user list — gateway and the artifacts
+  // text-annotation/group are deliberately excluded; the artifacts can
+  // legitimately float, gateways were not in the user's list):
+  //   task, subprocess, subprocess-expanded,
+  //   start-event, intermediate-event, end-event,
+  //   data-object, data-store.
   const strayElementIds = useMemo(() => {
     const ids = new Set<string>();
-    const hasWhiteBox = data.elements.some(
-      (e) => e.type === "pool" && e.properties.poolType === "white-box",
-    );
+    const pools = data.elements.filter((e) => e.type === "pool");
+    const hasWhiteBox = pools.some((p) => p.properties.poolType === "white-box");
     if (!hasWhiteBox) return ids;
-    const byId = new Map(data.elements.map((e) => [e.id, e]));
-    function poolAncestor(el: DiagramElement): boolean {
-      let cur: DiagramElement | undefined = el;
-      let g = 0;
-      while (cur && g++ < 32) {
-        if (cur.type === "pool") return true;
-        const nextId = cur.parentId ?? cur.boundaryHostId;
-        if (!nextId) return false;
-        cur = byId.get(nextId);
-      }
-      return false;
-    }
     const STRAY_ELIGIBLE = new Set<string>([
       "task", "subprocess", "subprocess-expanded",
       "start-event", "intermediate-event", "end-event",
       "data-object", "data-store",
     ]);
+    function insideAnyPool(el: DiagramElement): boolean {
+      const cx = el.x + el.width / 2;
+      const cy = el.y + el.height / 2;
+      for (const p of pools) {
+        if (cx >= p.x && cx <= p.x + p.width && cy >= p.y && cy <= p.y + p.height) return true;
+      }
+      return false;
+    }
     for (const el of data.elements) {
       if (!STRAY_ELIGIBLE.has(el.type)) continue;
-      if (!poolAncestor(el)) ids.add(el.id);
+      if (el.boundaryHostId) continue; // attached to a host — host's pool counts
+      if (!insideAnyPool(el)) ids.add(el.id);
     }
     return ids;
   }, [data.elements]);

@@ -3633,8 +3633,13 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       // spec: "an element moving inside an EP should not cause sibling
       // EP or any of their contents to be affected"). Final parent
       // re-detection happens at MOVE_END if needed.
+      //
+      // EXCEPT when the user is Shift-dragging (`unconstrained=true`).
+      // Then we want the parent to re-detect every frame so the moved
+      // element can cross EP boundaries freely — visually it leaves
+      // the EP rather than dragging the EP with it.
       const currentParent = state.elements.find(p => p.id === el.parentId);
-      const lockParentToEP = currentParent?.type === "subprocess-expanded";
+      const lockParentToEP = !unconstrained && currentParent?.type === "subprocess-expanded";
 
       let elements = state.elements.map((e) => {
         if (e.id === id) {
@@ -3860,7 +3865,11 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       // leave its boundary events / connector attachment points stuck
       // at the OLD edges (user issue 1).
       const movedNow = elements.find((e) => e.id === id);
-      const epParent = movedNow?.parentId
+      // Shift-drag (unconstrained=true) lets the user pull an element out
+      // of its EP without the EP chasing it. Skip the EP-grow path
+      // entirely so the moved element can cross EP boundaries freely;
+      // MOVE_END will re-parent it when the drag ends.
+      const epParent = movedNow?.parentId && !unconstrained
         ? elements.find((e) => e.id === movedNow.parentId && e.type === "subprocess-expanded")
         : null;
       let epGrown = false;

@@ -1593,6 +1593,11 @@ export function SymbolRenderer({
   // out on mouseup. State tracks WHICH side is active so only that side's
   // grip renders during a drag.
   const [poolResizeActive, setPoolResizeActive] = useState<null | "e" | "w" | "n" | "s">(null);
+  // Shift-drag visual: flashing purple outline while the user is
+  // holding Shift through a drag (the "escape EP" gesture). State
+  // tracks whether the current drag is in unconstrained mode. The
+  // outline renders only when this is true.
+  const [shiftEscaping, setShiftEscaping] = useState(false);
   // Clear label highlight when element is deselected
   if (!selected && labelHighlighted) setLabelHighlighted(false);
   let dragStart: { mouseX: number; mouseY: number; elX: number; elY: number } | null = null;
@@ -1761,6 +1766,9 @@ export function SymbolRenderer({
       lastX = dragStart.elX + (curWorld.x - startWorld.x);
       lastY = dragStart.elY + (curWorld.y - startWorld.y);
       onMove(lastX, lastY, ev.shiftKey);
+      // Visual feedback for Shift-drag (the EP-escape gesture). Reacts
+      // mid-drag if the user presses or releases Shift between moves.
+      setShiftEscaping(ev.shiftKey);
     }
 
     function onMouseUp() {
@@ -1771,6 +1779,7 @@ export function SymbolRenderer({
       window.removeEventListener("mousemove", onMouseMove);
       window.removeEventListener("mouseup", onMouseUp);
       window.removeEventListener("keydown", onKeyDown);
+      setShiftEscaping(false);
       if (shouldSnapBack?.(lastX, lastY)) {
         onMove(origX, origY);
       } else {
@@ -1786,6 +1795,7 @@ export function SymbolRenderer({
       window.removeEventListener("mousemove", onMouseMove);
       window.removeEventListener("mouseup", onMouseUp);
       window.removeEventListener("keydown", onKeyDown);
+      setShiftEscaping(false);
       onMove(elX, elY);
       onMoveEnd?.();
     }
@@ -1829,6 +1839,29 @@ export function SymbolRenderer({
       style={{ cursor: (isBoundary || isWhiteBoxPool) ? "default" : multiSelected ? "grab" : "move" }}
     >
       <SymbolShape el={element} />
+
+      {/* Shift-drag escape — pulsing purple halo while the user holds
+          Shift through a drag, signalling that the element is free to
+          cross EP / lane / pool boundaries without the EP chasing it.
+          SMIL `animate` keeps the pulse self-contained (no CSS setup
+          needed). Renders just outside the symbol with a 4 px gap so
+          it doesn't clash with the symbol's own stroke. */}
+      {shiftEscaping && (
+        <rect
+          x={element.x - 4}
+          y={element.y - 4}
+          width={element.width + 8}
+          height={element.height + 8}
+          fill="none"
+          stroke="#a855f7"
+          strokeWidth={3}
+          rx={6}
+          ry={6}
+          pointerEvents="none"
+        >
+          <animate attributeName="opacity" values="1;0.25;1" dur="0.6s" repeatCount="indefinite" />
+        </rect>
+      )}
 
       {/* Chevron description box — shown below the chevron when showDescription is true */}
       {(element.type === "chevron" || element.type === "chevron-collapsed") &&
