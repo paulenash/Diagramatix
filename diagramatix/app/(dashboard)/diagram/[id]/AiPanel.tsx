@@ -51,6 +51,10 @@ export function AiPanel({ diagramType, onApplyDiagram, onAddToDiagram, onClose }
       setAttachment({ name: file.name, type: "text", data: text });
     }
     setError(null);
+    // Seed the prompt only if the user hasn't typed anything yet.
+    setPrompt(prev => prev.trim().length > 0
+      ? prev
+      : `I have attached a document, ${file.name}`);
   }
 
   // Speech-to-text dictation

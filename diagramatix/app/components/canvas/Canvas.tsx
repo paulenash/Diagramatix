@@ -590,7 +590,13 @@ export function Canvas({
     screenY: number;
   } | null>(null);
 
-  // Fit-to-content on initial mount.
+  // Fit-to-content. Runs:
+  //   (a) once on initial mount with the loaded diagram
+  //   (b) on the `dgx:fitToContent` window CustomEvent, which the AI Apply
+  //       Layout handler dispatches — large generated diagrams can extend
+  //       well beyond the default 0.7× viewport, so without a re-fit the
+  //       user thinks "Apply Layout didn't produce a diagram" when really
+  //       it's there, just panned off-screen.
   //
   // Default initial zoom is 70% (readable text at most element sizes).
   // Users can override via System Menu → Initial Zoom…, stored in
@@ -598,10 +604,8 @@ export function Canvas({
   // Small diagrams that fit the viewport at the chosen zoom are centred;
   // larger diagrams anchor to the top-left with a margin. The chosen zoom
   // becomes the "100%" reference on the zoom slider.
-  const hasFitted = useRef(false);
-  useEffect(() => {
-    if (hasFitted.current || !svgRef.current || data.elements.length === 0) return;
-    hasFitted.current = true;
+  const performFit = useCallback(() => {
+    if (!svgRef.current || data.elements.length === 0) return;
     const rect = svgRef.current.getBoundingClientRect();
     if (rect.width < 10 || rect.height < 10) return;
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -611,9 +615,8 @@ export function Canvas({
       if (el.x + el.width > maxX) maxX = el.x + el.width;
       if (el.y + el.height > maxY) maxY = el.y + el.height;
     }
-    // Include title block if shown
     if (data.title?.showTitle) {
-      const titleLines = 4; // name + up to 3 sub-lines
+      const titleLines = 4;
       const titleH = titleLines * 16 + 28;
       minY -= titleH;
     }
@@ -639,7 +642,23 @@ export function Canvas({
     setPan({ x: panX, y: panY });
     setZoom(initialZoom);
     baseZoomRef.current = initialZoom;
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [data.elements, data.title]);
+
+  // Initial mount fit — guarded so subsequent re-renders don't keep
+  // re-centring as the user pans/zooms.
+  const hasFitted = useRef(false);
+  useEffect(() => {
+    if (hasFitted.current || data.elements.length === 0) return;
+    hasFitted.current = true;
+    performFit();
+  }, [data.elements.length, performFit]);
+
+  // External "please re-fit" trigger.
+  useEffect(() => {
+    function onFit() { performFit(); }
+    window.addEventListener("dgx:fitToContent", onFit);
+    return () => window.removeEventListener("dgx:fitToContent", onFit);
+  }, [performFit]);
 
   // Reset picker offset when a new pending drop appears
   useEffect(() => { setPickerOffset({ x: 0, y: 0 }); }, [pendingDrop]);

@@ -93,6 +93,12 @@ export function PlanPanel({
       setAttachment({ name: file.name, type: "text", data: text });
     }
     setError(null);
+    // Pre-fill the prompt with a one-liner referencing the attachment so
+    // the user has a starting point and the AI gets a clear pointer to
+    // the doc. Only fill if the user hasn't already typed something.
+    setPrompt(prev => prev.trim().length > 0
+      ? prev
+      : `I have attached a document, ${file.name}`);
   }
 
   // Speech-to-text dictation (Chrome / Edge only).

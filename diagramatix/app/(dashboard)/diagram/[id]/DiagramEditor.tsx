@@ -2433,6 +2433,9 @@ export function DiagramEditor({
                 connectors: aiData.connectors,
                 viewport: aiData.viewport ?? data.viewport,
               });
+              requestAnimationFrame(() => {
+                window.dispatchEvent(new CustomEvent("dgx:fitToContent"));
+              });
             }}
             onAddToDiagram={(elements, connectors) => {
               applyTemplate(elements, connectors);
@@ -2453,6 +2456,13 @@ export function DiagramEditor({
                 elements: aiData.elements,
                 connectors: aiData.connectors,
                 viewport: aiData.viewport ?? data.viewport,
+              });
+              // Wide AI-generated diagrams (especially BPMN with many
+              // columns) extend well past the current viewport — ask the
+              // canvas to re-fit so the user sees the whole thing instead
+              // of thinking "Apply Layout did nothing".
+              requestAnimationFrame(() => {
+                window.dispatchEvent(new CustomEvent("dgx:fitToContent"));
               });
             }}
             onClose={() => setShowPlanPanel(false)}
