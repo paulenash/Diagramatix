@@ -3936,8 +3936,14 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       // expect from a "containing" container. This restores the
       // pre-G07 EP-edge tracking, but ONLY for the immediate EP
       // parent — siblings stay still.
+      //
+      // Shift-drag (`unconstrained=true`) is the explicit "escape"
+      // gesture: the user wants to pull the element OUT of its EP
+      // without the EP chasing. In that mode the per-frame grow is
+      // skipped, letting the element move smoothly across the EP
+      // boundary. The purple halo on the element signals this state.
       const movedNow = elements.find((e) => e.id === id);
-      const epParent = movedNow?.parentId
+      const epParent = movedNow?.parentId && !unconstrained
         ? elements.find((e) => e.id === movedNow.parentId && e.type === "subprocess-expanded")
         : null;
       if (epParent && movedNow) {
@@ -3967,7 +3973,6 @@ function reducer(state: DiagramData, action: Action): DiagramData {
           connectors = r.connectors;
         }
       }
-      void unconstrained;
       // Per-frame connector recompute so lines anchored to the moving
       // element (and to anything the EP grow may have shifted) track
       // their endpoints visually as the drag progresses.
