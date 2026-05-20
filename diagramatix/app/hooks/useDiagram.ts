@@ -3932,7 +3932,13 @@ function reducer(state: DiagramData, action: Action): DiagramData {
 
       // applyEPBoundaryChange already runs ensure-enclose internally;
       // skip the redundant call when it fired so we don't double-bubble.
-      if (!epGrown) {
+      //
+      // Also skip during a Shift-drag (`unconstrained=true`). The user
+      // is explicitly escaping an EP / lane and any container growth
+      // here would just chase the moving element, exactly the "stuck"
+      // behaviour Shift is meant to bypass. Containers re-fit at
+      // MOVE_END if the final placement requires it.
+      if (!epGrown && !unconstrained) {
         // Issue 2 auto-grow path: capture the pre-enclose snapshot so we
         // can push siblings below each grown lane / sublane.
         const elementsBefore = elements;
