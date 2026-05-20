@@ -1458,27 +1458,32 @@ function applyEPBoundaryChange(
       const PAD_INSIDE = 10;
       let cx = newRect.x, cy = newRect.y, cw = newRect.width, ch = newRect.height;
       // Top edge dragged downward → don't cross content top.
+      // Math.max with oldRect.y stops the clamp from ever moving the
+      // top edge UP (which would silently GROW the EP on a shrink
+      // gesture — the source of the "wild" boundary movement).
       if (cy > oldRect.y) {
-        const limit = kMinY - PAD_INSIDE;
+        const limit = Math.max(oldRect.y, kMinY - PAD_INSIDE);
         if (cy > limit) { ch += cy - limit; cy = limit; }
       }
       // Left edge dragged rightward → don't cross content left.
       if (cx > oldRect.x) {
-        const limit = kMinX - PAD_INSIDE;
+        const limit = Math.max(oldRect.x, kMinX - PAD_INSIDE);
         if (cx > limit) { cw += cx - limit; cx = limit; }
       }
       // Bottom edge dragged upward → don't cross content bottom.
+      // Math.min with oldBottom stops the clamp from ever moving the
+      // bottom edge DOWN (which would grow on a shrink gesture).
       const newBottom = cy + ch;
       const oldBottom = oldRect.y + oldRect.height;
       if (newBottom < oldBottom) {
-        const limit = kMaxY + PAD_INSIDE;
+        const limit = Math.min(oldBottom, kMaxY + PAD_INSIDE);
         if (newBottom < limit) ch = limit - cy;
       }
       // Right edge dragged leftward → don't cross content right.
       const newRight = cx + cw;
       const oldRight = oldRect.x + oldRect.width;
       if (newRight < oldRight) {
-        const limit = kMaxX + PAD_INSIDE;
+        const limit = Math.min(oldRight, kMaxX + PAD_INSIDE);
         if (newRight < limit) cw = limit - cx;
       }
       newRect = { x: cx, y: cy, width: cw, height: ch };
