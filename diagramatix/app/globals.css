@@ -28,13 +28,3 @@ body {
 input, textarea, select {
   color: #111827;
 }
-
-/* Cursor scheme (G05). Inline `style={{ cursor }}` can't reach the
- * :active pseudo, so the grab→grabbing swap on element drag uses
- * these utility classes. SVG elements respect cursor like HTML. */
-.dgx-grab        { cursor: grab; }
-.dgx-grab:active { cursor: grabbing; }
-.dgx-pan         { cursor: grab; }
-.dgx-pan:active  { cursor: grabbing; }
-.dgx-connect-target { cursor: crosshair; }
-

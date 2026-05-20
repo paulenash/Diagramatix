@@ -3946,22 +3946,122 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       // ensureContainersEncloseChildren would silently grow the EP but
       // leave its boundary events / connector attachment points stuck
       // at the OLD edges (user issue 1).
-      // G07: MOVE_ELEMENT no longer grows containers or shifts siblings.
-      // The previous block ran an EP-grow step (applyEPBoundaryChange)
-      // followed by ensureContainersEncloseChildren / pushPastLaneGrowth
-      // / applyPoolBelowShift / applyPoolBoundaryShift / syncLanesToPool.
-      // Per user spec they're all deliberately gone — containers re-fit
-      // ONCE at MOVE_END (and only if the drop landed inside a container
-      // that needs to enclose its new child). The `unconstrained` flag
-      // is still accepted on the action for the Shift-drag visual halo
-      // but functionally redundant now.
-      void unconstrained;
       const movedNow = elements.find((e) => e.id === id);
-      void movedNow;
-      // Per-frame connector recompute so lines anchored to the moving
-      // element track its position visually as it travels. Everything
-      // else stays put.
-      connectors = recomputeAllConnectors(connectors, elements);
+      // Shift-drag (unconstrained=true) lets the user pull an element out
+      // of its EP without the EP chasing it. Skip the EP-grow path
+      // entirely so the moved element can cross EP boundaries freely;
+      // MOVE_END will re-parent it when the drag ends.
+      const epParent = movedNow?.parentId && !unconstrained
+        ? elements.find((e) => e.id === movedNow.parentId && e.type === "subprocess-expanded")
+        : null;
+      let epGrown = false;
+      if (epParent && movedNow) {
+        // PAD=10 when an inner EP is moving inside an outer EP (user
+        // rule: parent EP only follows the inner EP's boundary when the
+        // inner edge is within 10 px). PAD=8 when a non-EP element
+        // (task / event / etc.) is moving — preserves the existing
+        // task-in-EP proximity behaviour.
+        const PAD = movedNow.type === "subprocess-expanded" ? 10 : 8;
+        const oldRect = { x: epParent.x, y: epParent.y, width: epParent.width, height: epParent.height };
+        const reqLeft   = movedNow.x - PAD;
+        const reqTop    = movedNow.y - PAD;
+        const reqRight  = movedNow.x + movedNow.width + PAD;
+        const reqBottom = movedNow.y + movedNow.height + PAD;
+        const newLeft   = Math.min(oldRect.x, reqLeft);
+        const newTop    = Math.min(oldRect.y, reqTop);
+        const newRight  = Math.max(oldRect.x + oldRect.width, reqRight);
+        const newBottom = Math.max(oldRect.y + oldRect.height, reqBottom);
+        const newRect = { x: newLeft, y: newTop, width: newRight - newLeft, height: newBottom - newTop };
+        const changed =
+          Math.abs(newRect.x - oldRect.x) > 0.5 ||
+          Math.abs(newRect.y - oldRect.y) > 0.5 ||
+          Math.abs(newRect.width - oldRect.width) > 0.5 ||
+          Math.abs(newRect.height - oldRect.height) > 0.5;
+        if (changed) {
+          const r = applyEPBoundaryChange(elements, connectors, epParent.id, oldRect, newRect, id);
+          elements = r.elements;
+          connectors = r.connectors;
+          epGrown = true;
+        }
+      }
+
+      // applyEPBoundaryChange already runs ensure-enclose internally;
+      // skip the redundant call when it fired so we don't double-bubble.
+      //
+      // Also skip during a Shift-drag (`unconstrained=true`). The user
+      // is explicitly escaping an EP / lane and any container growth
+      // here would just chase the moving element, exactly the "stuck"
+      // behaviour Shift is meant to bypass. Containers re-fit at
+      // MOVE_END if the final placement requires it.
+      if (!epGrown && !unconstrained) {
+        // Issue 2 auto-grow path: capture the pre-enclose snapshot so we
+        // can push siblings below each grown lane / sublane.
+        const elementsBefore = elements;
+        elements = ensureContainersEncloseChildren(elements);
+        // EP-rect-diff resnap — when ensureContainersEncloseChildren
+        // silently grows an EP because an internal child sticks past
+        // its bounds (most visibly TOP edge upward, since EP children
+        // are excluded from non-EP parents but still count for the EP
+        // itself), the EP's own boundary events would otherwise be
+        // left at the OLD edges. Compare every EP's pre/post rect and
+        // re-snap its boundary events on every side that actually
+        // moved. Symmetric with the explicit applyEPBoundaryChange
+        // path that already does this when its `changed` guard fires.
+        for (const before of elementsBefore) {
+          if (before.type !== "subprocess-expanded") continue;
+          const after = elements.find((e) => e.id === before.id);
+          if (!after) continue;
+          if (before.x === after.x && before.y === after.y &&
+              before.width === after.width && before.height === after.height) continue;
+          const ms = new Set<"top" | "bottom" | "left" | "right">();
+          if (after.y !== before.y) ms.add("top");
+          if (after.x !== before.x) ms.add("left");
+          if (after.y + after.height !== before.y + before.height) ms.add("bottom");
+          if (after.x + after.width !== before.x + before.width) ms.add("right");
+          if (ms.size > 0) {
+            elements = resnapEPBoundaryEvents(elements, after, before, ms);
+          }
+        }
+        const pushed = pushPastLaneGrowth(elementsBefore, elements, connectors);
+        elements = pushed.elements;
+        connectors = pushed.connectors;
+        // Cascade pool-below if any pool's bottom moved down because of
+        // the lane growth chain.
+        for (const oldEl of elementsBefore) {
+          if (oldEl.type !== "pool") continue;
+          const newPool = elements.find((e) => e.id === oldEl.id);
+          if (!newPool) continue;
+          const dY = (newPool.y + newPool.height) - (oldEl.y + oldEl.height);
+          if (dY > 0) {
+            const r = applyPoolBelowShift(elements, connectors, oldEl.id, oldEl.y + oldEl.height, dY);
+            elements = r.elements; connectors = r.connectors;
+          }
+        }
+        // Issues 5 + 6: cascade pool L/R growth to OTHER aligned pools
+        // and snap every pool's child lanes to the new L/R bounds. When
+        // ensureContainersEncloseChildren widens a pool because an EP /
+        // task got pushed to its right (or extends past the left), only
+        // that pool's outer rect grew — sibling lanes inside still had
+        // the old width, and other pools didn't follow.
+        for (const oldEl of elementsBefore) {
+          if (oldEl.type !== "pool") continue;
+          const newPool = elements.find((e) => e.id === oldEl.id);
+          if (!newPool) continue;
+          const dX_left  = oldEl.x - newPool.x;                                 // > 0 when left edge moved out
+          const dX_right = (newPool.x + newPool.width) - (oldEl.x + oldEl.width); // > 0 when right edge moved out
+          if (dX_left !== 0 || dX_right !== 0) {
+            const r = applyPoolBoundaryShift(elements, connectors, oldEl.id, -dX_left, dX_right);
+            elements = r.elements; connectors = r.connectors;
+          }
+        }
+        // Snap every pool's child lanes to the pool's current L/R.
+        for (const el of elements) {
+          if (el.type === "pool") {
+            elements = syncLanesToPool(elements, el.id);
+          }
+        }
+        connectors = recomputeAllConnectors(connectors, elements);
+      }
 
       return { ...state, elements: updatePoolTypes(elements), connectors };
     }
