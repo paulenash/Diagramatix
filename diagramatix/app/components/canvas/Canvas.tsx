@@ -1093,6 +1093,16 @@ export function Canvas({
       ? endpoint === "source" ? conn.sourceId : conn.targetId
       : connectorId;
 
+    // Annotation-endpoint freeze: an associationBPMN endpoint attached to
+    // a text-annotation cannot be moved at all (user spec). The opposite
+    // end of the same association remains freely re-targetable. Bail out
+    // of the drag immediately when the user tries to grab the annotation
+    // side.
+    if (conn?.type === "associationBPMN") {
+      const fromEl = data.elements.find((e) => e.id === fromId);
+      if (fromEl?.type === "text-annotation") return;
+    }
+
     setDraggingEndpoint({ connectorId, endpoint, startPos, currentPos: startPos });
 
     function onMouseMove(ev: MouseEvent) {
@@ -1133,6 +1143,18 @@ export function Canvas({
         onSelectConnector(null);
       } else if (!isMsgBPMN && innerTarget) {
         // Dropped on a child or boundary event inside an expanded subprocess.
+        // Same data-side lock as the main targetEl branch: a Data Object
+        // or Data Store endpoint can only re-attach to another data
+        // element — an EP child is never one of those, so abort.
+        const fromElInner = data.elements.find(e => e.id === fromId);
+        const DATA_OBJ_STORE = new Set<string>(["data-object", "data-store"]);
+        if (fromElInner && DATA_OBJ_STORE.has(fromElInner.type) && !DATA_OBJ_STORE.has(innerTarget.type)) {
+          // silently abort
+          setDraggingEndpoint(null);
+          window.removeEventListener("mousemove", onMouseMove);
+          window.removeEventListener("mouseup", onMouseUp);
+          return;
+        }
         // Side selection for boundary events:
         //   - Boundary START event as TARGET → OUTER (incoming flow comes
         //     from outside the host EP).
@@ -1216,6 +1238,18 @@ export function Canvas({
             : undefined;
         const targetEl = findDropTarget(pos, fromId, epFilter);
         if (targetEl) {
+          // Data-side lock: when the endpoint being moved currently sits on
+          // a Data Object or Data Store, it may only be re-attached to
+          // another Data Object or Data Store. Drops on tasks / events /
+          // anything else are silently rejected. Annotation endpoints
+          // are already blocked at drag start, so they don't reach this
+          // path.
+          const fromEl = data.elements.find(e => e.id === fromId);
+          const DATA_OBJ_STORE = new Set<string>(["data-object", "data-store"]);
+          const movingIsDataObjOrStore = !!fromEl && DATA_OBJ_STORE.has(fromEl.type);
+          if (movingIsDataObjOrStore && !DATA_OBJ_STORE.has(targetEl.type)) {
+            // silently abort — data endpoint can only swap to another data element
+          } else
           // Block: non-associationBPMN connectors cannot connect to data elements
           if (!isAssocBPMN && DATA_ELEMENT_TYPES.has(targetEl.type)) {
             // silently abort
@@ -4140,9 +4174,26 @@ export function Canvas({
               }
             } else if (isAssocBpmnEndpointDrag && el.id !== epDragMovingId) {
               const elIsData = DATA_ELEMENT_TYPES.has(el.type);
-              // The fixed end determines what's valid: if fixed is data, targets must be non-data and vice versa
-              if (epDragFixedIsData && !elIsData) elIsAssocTarget = true;
-              else if (!epDragFixedIsData && elIsData) elIsAssocTarget = true;
+              const elIsDataObjOrStore = el.type === "data-object" || el.type === "data-store";
+              const movingEl = data.elements.find(m => m.id === epDragMovingId);
+              const movingIsDataObjOrStore = movingEl?.type === "data-object" || movingEl?.type === "data-store";
+              if (movingIsDataObjOrStore) {
+                // Data Object / Data Store endpoint can only re-attach to
+                // another Data Object / Data Store (user rule).
+                if (elIsDataObjOrStore) elIsAssocTarget = true;
+              } else {
+                // Non-data moving end (task / event / subprocess on a
+                // data-or-annotation association) — keep the existing
+                // "fixed determines valid target" logic.
+                if (epDragFixedIsData && !elIsData) elIsAssocTarget = true;
+                else if (!epDragFixedIsData && elIsData) elIsAssocTarget = true;
+                // Annotation on the fixed side: any non-annotation, non-
+                // pool element is a valid target (annotations clarify
+                // anything).
+                if (epDragFixedEl?.type === "text-annotation" && !elIsData && el.type !== "pool") {
+                  elIsAssocTarget = true;
+                }
+              }
             }
             // Sequence target validation — sync with ADD_CONNECTOR rules
             // Non-boundary start events cannot be sequence targets (boundary ones CAN from outside)
