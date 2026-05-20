@@ -1462,13 +1462,19 @@ export function DiagramEditor({
     }
   }
 
+  // The banner must render whenever an admin is impersonating, regardless
+  // of view vs edit mode. Earlier this was gated on `readOnly`, which is
+  // false in Edit Mode — so the admin saw no banner and no way to return
+  // to their own account from inside a diagram.
+  const isImpersonating = !!impersonationMode;
+
   return (
-    <div className={`flex flex-col h-screen ${readOnly ? "bg-orange-50" : "bg-white"}`}>
-      {readOnly && viewingAsName !== undefined && viewingAsEmail !== undefined && (
+    <div className={`flex flex-col h-screen ${isImpersonating ? "bg-orange-50" : "bg-white"}`}>
+      {isImpersonating && viewingAsName !== undefined && viewingAsEmail !== undefined && (
         <ImpersonationBanner viewingAsName={viewingAsName ?? ""} viewingAsEmail={viewingAsEmail ?? ""} mode={impersonationMode} />
       )}
       {/* Top bar */}
-      <header className={`h-9 border-b border-gray-200 flex items-center px-2 gap-2 flex-shrink-0 ${readOnly ? "bg-orange-50" : ""}`}>
+      <header className={`h-9 border-b border-gray-200 flex items-center px-2 gap-2 flex-shrink-0 ${isImpersonating ? "bg-orange-50" : ""}`}>
         <button
           onClick={handleBackToProject}
           className="text-gray-500 hover:text-gray-700 text-xs flex items-center gap-1"

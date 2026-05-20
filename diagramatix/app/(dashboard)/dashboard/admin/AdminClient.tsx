@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 
 interface UserRow {
   id: string;
@@ -44,6 +45,14 @@ function presence(lastSeenAt: string | null, isYou: boolean): { online: boolean;
 
 export function AdminClient({ users, currentUserId }: Props) {
   const router = useRouter();
+  // Pending Edit confirmation. When the admin clicks "Edit" on a row
+  // we surface a Diagramatix-styled ConfirmDialog rather than the
+  // browser's native confirm() (which the user found jarring).
+  const [editConfirm, setEditConfirm] = useState<{
+    userId: string;
+    email: string;
+    target?: string;
+  } | null>(null);
 
   async function handleViewAs(userId: string, mode: "view" | "edit", target?: string) {
     await fetch("/api/admin/impersonate", {
@@ -93,18 +102,22 @@ export function AdminClient({ users, currentUserId }: Props) {
         </div>
       </header>
 
-      <div className="max-w-4xl mx-auto px-6 py-8">
-        <table className="w-full bg-white rounded-lg border border-gray-200 overflow-hidden">
+      {/* Widened container (was max-w-4xl) so the Name / Status / Working
+          on columns have room to breathe. Per-column min-widths declared
+          on the <th> stops the smaller numeric / date columns from
+          starving the text-heavy ones. */}
+      <div className="max-w-7xl mx-auto px-6 py-8">
+        <table className="w-full bg-white rounded-lg border border-gray-200 overflow-hidden table-fixed">
           <thead>
             <tr className="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              <th className="px-4 py-3">Name</th>
-              <th className="px-4 py-3">Email</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3">Working on</th>
-              <th className="px-4 py-3 text-center">Projects</th>
-              <th className="px-4 py-3 text-center">Diagrams</th>
-              <th className="px-4 py-3">Registered</th>
-              <th className="px-4 py-3"></th>
+              <th className="px-4 py-3" style={{ width: "16%" }}>Name</th>
+              <th className="px-4 py-3" style={{ width: "18%" }}>Email</th>
+              <th className="px-4 py-3" style={{ width: "13%" }}>Status</th>
+              <th className="px-4 py-3" style={{ width: "20%" }}>Working on</th>
+              <th className="px-4 py-3 text-center" style={{ width: "7%" }}>Projects</th>
+              <th className="px-4 py-3 text-center" style={{ width: "7%" }}>Diagrams</th>
+              <th className="px-4 py-3" style={{ width: "9%" }}>Registered</th>
+              <th className="px-4 py-3" style={{ width: "10%" }}></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -136,7 +149,7 @@ export function AdminClient({ users, currentUserId }: Props) {
                   </td>
                   <td className="px-4 py-3 text-xs">
                     {workingOn ? (
-                      <span className="text-gray-700 truncate inline-block max-w-[14rem]" title={workingOn.name}>
+                      <span className="text-gray-700 truncate block w-full" title={workingOn.name}>
                         {workingOn.name}
                       </span>
                     ) : (
@@ -161,10 +174,7 @@ export function AdminClient({ users, currentUserId }: Props) {
                           View
                         </button>
                         <button
-                          onClick={() => {
-                            if (!confirm(`Open ${u.email}'s session in EDIT mode? Changes you make will save to their account.`)) return;
-                            handleViewAs(u.id, "edit", diagramHref);
-                          }}
+                          onClick={() => setEditConfirm({ userId: u.id, email: u.email, target: diagramHref })}
                           className="text-xs text-red-600 hover:text-red-800 font-medium border border-red-300 rounded px-2 py-1 hover:bg-red-50"
                           title={workingOn ? `Edit "${workingOn.name}" as ${u.email}` : `Edit ${u.email}'s data for support purposes`}
                         >
@@ -182,6 +192,22 @@ export function AdminClient({ users, currentUserId }: Props) {
           {users.length} registered user(s) — {users.filter(u => presence(u.lastSeenAt, u.id === currentUserId).online).length} online
         </p>
       </div>
+
+      {editConfirm && (
+        <ConfirmDialog
+          title="Open in Edit Mode?"
+          message={`You are about to open ${editConfirm.email}'s session in EDIT mode. Any changes you make will save to their account.\n\nUse Edit Mode for support and repair only — the user will see your edits when they next sign in.`}
+          confirmLabel="Open in Edit Mode"
+          cancelLabel="Cancel"
+          destructive
+          onCancel={() => setEditConfirm(null)}
+          onConfirm={() => {
+            const c = editConfirm;
+            setEditConfirm(null);
+            if (c) handleViewAs(c.userId, "edit", c.target);
+          }}
+        />
+      )}
     </div>
   );
 }

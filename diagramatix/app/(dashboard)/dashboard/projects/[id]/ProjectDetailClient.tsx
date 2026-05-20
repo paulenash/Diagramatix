@@ -1930,13 +1930,17 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
   const selectedDiagram = selectedTreeItem ? diagrams.find(d => d.id === selectedTreeItem) : null;
   const visibleDiagrams = selectedDiagram ? [selectedDiagram] : getDiagramsInFolder(selectedFolderId);
 
+  // Banner shows in both view and edit modes so the admin always has a
+  // "Return to my account" exit visible while impersonating.
+  const isImpersonating = !!impersonationMode;
+
   return (
-    <div className={`min-h-screen ${readOnly ? "bg-orange-50" : "bg-gray-50"} flex flex-col`}>
-      {readOnly && viewingAsName !== undefined && viewingAsEmail !== undefined && (
+    <div className={`min-h-screen ${isImpersonating ? "bg-orange-50" : "bg-gray-50"} flex flex-col`}>
+      {isImpersonating && viewingAsName !== undefined && viewingAsEmail !== undefined && (
         <ImpersonationBanner viewingAsName={viewingAsName ?? ""} viewingAsEmail={viewingAsEmail ?? ""} mode={impersonationMode} />
       )}
       {/* Header */}
-      <header className={`${readOnly ? "bg-orange-50" : "bg-white"} border-b border-gray-200 px-4 py-2 flex-shrink-0`}>
+      <header className={`${isImpersonating ? "bg-orange-50" : "bg-white"} border-b border-gray-200 px-4 py-2 flex-shrink-0`}>
         <div className="flex items-center gap-3">
           <button
             onClick={() => router.push("/dashboard")}

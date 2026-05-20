@@ -14,8 +14,11 @@ export function ImpersonationBanner({ viewingAsName, viewingAsEmail, mode = "vie
 
   async function handleReturn() {
     await fetch("/api/admin/impersonate", { method: "DELETE" });
-    // Hard navigation ensures the server sees the cleared cookie
-    window.location.href = "/dashboard";
+    // Hard navigation ensures the server sees the cleared cookie.
+    // Return straight to the Admin → Registered Users screen so the
+    // admin can pick another target or end the session cleanly,
+    // instead of being dropped onto their own dashboard.
+    window.location.href = "/dashboard/admin";
   }
 
   const displayName = viewingAsName || viewingAsEmail || "another user";

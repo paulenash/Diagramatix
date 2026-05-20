@@ -1072,13 +1072,18 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
     setProjects((prev) => prev.map((p) => p.id === targetProjectId ? { ...p, _count: { diagrams: p._count.diagrams + 1 } } : p));
   }
 
+  // Banner shows whenever an admin is impersonating — both view and edit
+  // modes — so the admin always has a "Return to my account" button on
+  // screen, not only when read-only.
+  const isImpersonating = !!impersonationMode;
+
   return (
-    <div className={`min-h-screen ${readOnly ? "bg-orange-50" : "bg-gray-50"}`}>
-      {readOnly && viewingAsName !== undefined && viewingAsEmail !== undefined && (
+    <div className={`min-h-screen ${isImpersonating ? "bg-orange-50" : "bg-gray-50"}`}>
+      {isImpersonating && viewingAsName !== undefined && viewingAsEmail !== undefined && (
         <ImpersonationBanner viewingAsName={viewingAsName ?? ""} viewingAsEmail={viewingAsEmail ?? ""} mode={impersonationMode} />
       )}
       {/* Header */}
-      <header className={`${readOnly ? "bg-orange-50" : "bg-white"} border-b border-gray-200 px-6 py-4 flex items-center justify-between`}>
+      <header className={`${isImpersonating ? "bg-orange-50" : "bg-white"} border-b border-gray-200 px-6 py-4 flex items-center justify-between`}>
         <div className="flex items-center gap-3">
           {/* Brand icon (public/logos/diagramatix-icon.svg, 100x100 viewBox). */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
