@@ -6165,7 +6165,6 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       // force the EP to grow — per user spec they're inert with respect
       // to surrounding geometry, even at drop time.
       const elPostReparent = elements.find(e => e.id === id);
-      let epHandledAtDrop = false;
       if (
         elPostReparent?.parentId &&
         !elPostReparent.boundaryHostId &&
@@ -6190,56 +6189,6 @@ function reducer(state: DiagramData, action: Action): DiagramData {
               e.id === id ? { ...e, x: grown.placedX, y: grown.placedY } : e,
             );
             connectors = grown.connectors;
-            epHandledAtDrop = true;
-          }
-        }
-      }
-
-      // Step 1b: Boundary-entry detection. If the element was dropped
-      // OUTSIDE every EP but sits near (within ~30 px of) or straddling
-      // one of its edges, treat that as an entry — grow the EP to include
-      // the element and reparent it. Mirrors the pre-G07 per-frame
-      // behaviour but now fires once, at the drop. Skipped when Step 1
-      // already grew an EP for this element (the centre-was-already-
-      // inside path) or for elements whose semantics don't belong in
-      // an EP (boundary events, artifacts).
-      if (
-        !epHandledAtDrop &&
-        elPostReparent &&
-        !elPostReparent.boundaryHostId &&
-        !BOUNDARY_EVENT_TYPES.has(elPostReparent.type) &&
-        !DATA_ELEMENT_TYPES.has(elPostReparent.type)
-      ) {
-        const eps = elements.filter(e => e.type === "subprocess-expanded" && e.id !== id);
-        // Try each EP; expandEPForBoundaryEntry returns null when the
-        // element is too far from every edge. Sort by centre-distance so
-        // the closest EP is tried first if more than one is candidate.
-        const elCx = elPostReparent.x + elPostReparent.width / 2;
-        const elCy = elPostReparent.y + elPostReparent.height / 2;
-        eps.sort((a, b) => {
-          const da = Math.hypot(elCx - (a.x + a.width / 2), elCy - (a.y + a.height / 2));
-          const db = Math.hypot(elCx - (b.x + b.width / 2), elCy - (b.y + b.height / 2));
-          return da - db;
-        });
-        for (const ep of eps) {
-          // Skip if this EP is a descendant of the moved element (would
-          // create a cycle on adoption).
-          if (wouldCreateCycle(elements, id, ep.id)) continue;
-          const grown = expandEPForBoundaryEntry(elements, connectors, ep.id, {
-            id: elPostReparent.id,
-            x: elPostReparent.x,
-            y: elPostReparent.y,
-            width: elPostReparent.width,
-            height: elPostReparent.height,
-          });
-          if (grown) {
-            elements = grown.elements.map(e =>
-              e.id === id
-                ? { ...e, x: grown.placedX, y: grown.placedY, parentId: ep.id }
-                : e,
-            );
-            connectors = grown.connectors;
-            break;
           }
         }
       }
