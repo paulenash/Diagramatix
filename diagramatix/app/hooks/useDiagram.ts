@@ -1435,6 +1435,61 @@ function applyEPBoundaryChange(
   // scope container itself stays at its old size; ancestors above the
   // scope are untouched; pools below / aligned pools no longer cascade.
 
+  // 0. Clamp inward edge movement so the EP cannot shrink past its
+  //    own descendant content. Without this, dragging an edge inward
+  //    leaves internal elements at their absolute coords and they end
+  //    up outside the new (smaller) rect. Matches the inclusion rules
+  //    used by ensureContainersEncloseChildren for EP children
+  //    (artifacts excluded; boundary events on the EP edge excluded
+  //    via parentId).
+  {
+    let hasKid = false;
+    let kMinX = Infinity, kMinY = Infinity, kMaxX = -Infinity, kMaxY = -Infinity;
+    for (const e of elements) {
+      if (e.parentId !== epId) continue;
+      if (DATA_ELEMENT_TYPES.has(e.type)) continue;
+      hasKid = true;
+      if (e.x < kMinX) kMinX = e.x;
+      if (e.y < kMinY) kMinY = e.y;
+      if (e.x + e.width  > kMaxX) kMaxX = e.x + e.width;
+      if (e.y + e.height > kMaxY) kMaxY = e.y + e.height;
+    }
+    if (hasKid) {
+      const PAD_INSIDE = 10;
+      let cx = newRect.x, cy = newRect.y, cw = newRect.width, ch = newRect.height;
+      // Top edge dragged downward → don't cross content top.
+      // Math.max with oldRect.y stops the clamp from ever moving the
+      // top edge UP (which would silently GROW the EP on a shrink
+      // gesture — the source of the "wild" boundary movement).
+      if (cy > oldRect.y) {
+        const limit = Math.max(oldRect.y, kMinY - PAD_INSIDE);
+        if (cy > limit) { ch += cy - limit; cy = limit; }
+      }
+      // Left edge dragged rightward → don't cross content left.
+      if (cx > oldRect.x) {
+        const limit = Math.max(oldRect.x, kMinX - PAD_INSIDE);
+        if (cx > limit) { cw += cx - limit; cx = limit; }
+      }
+      // Bottom edge dragged upward → don't cross content bottom.
+      // Math.min with oldBottom stops the clamp from ever moving the
+      // bottom edge DOWN (which would grow on a shrink gesture).
+      const newBottom = cy + ch;
+      const oldBottom = oldRect.y + oldRect.height;
+      if (newBottom < oldBottom) {
+        const limit = Math.min(oldBottom, kMaxY + PAD_INSIDE);
+        if (newBottom < limit) ch = limit - cy;
+      }
+      // Right edge dragged leftward → don't cross content right.
+      const newRight = cx + cw;
+      const oldRight = oldRect.x + oldRect.width;
+      if (newRight < oldRight) {
+        const limit = Math.min(oldRight, kMaxX + PAD_INSIDE);
+        if (newRight < limit) cw = limit - cx;
+      }
+      newRect = { x: cx, y: cy, width: cw, height: ch };
+    }
+  }
+
   // 1. Apply newRect to the EP element.
   let updatedEls = elements.map((e) =>
     e.id === epId ? { ...e, x: newRect.x, y: newRect.y, width: newRect.width, height: newRect.height } : e,
@@ -6201,8 +6256,10 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       if (!finalEl) {
         return { ...state, elements: updatePoolTypes(elements), connectors };
       }
+      // EPs deliberately excluded: they're large enough to overlap connectors
+      // on routine moves and would silently split whichever one we hit first.
       const SPLITTABLE_TYPES = new Set([
-        "gateway", "intermediate-event", "task", "subprocess", "subprocess-expanded",
+        "gateway", "intermediate-event", "task", "subprocess",
       ]);
       if (!SPLITTABLE_TYPES.has(finalEl.type)) {
         return { ...state, elements: updatePoolTypes(elements), connectors };
