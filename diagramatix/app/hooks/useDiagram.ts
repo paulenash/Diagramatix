@@ -3926,51 +3926,21 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       // ensureContainersEncloseChildren would silently grow the EP but
       // leave its boundary events / connector attachment points stuck
       // at the OLD edges (user issue 1).
-      // G07 (refined): MOVE_ELEMENT no longer shifts SIBLING elements or
-      // grows lanes / pools — those interactions with "everything
-      // underneath" are gone per user spec. But the CONTAINING EP
-      // (the moved element's current parent, if it's a subprocess-
-      // expanded) is the parent of the moving element, not its
-      // sibling. It SHOULD grow gradually as the element approaches /
-      // crosses its boundary so users get the visual feedback they
-      // expect from a "containing" container. This restores the
-      // pre-G07 EP-edge tracking, but ONLY for the immediate EP
-      // parent — siblings stay still.
-      const movedNow = elements.find((e) => e.id === id);
-      const epParent = movedNow?.parentId
-        ? elements.find((e) => e.id === movedNow.parentId && e.type === "subprocess-expanded")
-        : null;
-      if (epParent && movedNow) {
-        // PAD=10 when an inner EP is moving inside an outer EP (user
-        // rule: parent EP only follows the inner EP's boundary when the
-        // inner edge is within 10 px). PAD=8 for non-EP children
-        // (task / event / etc.) — the pre-G07 default.
-        const PAD = movedNow.type === "subprocess-expanded" ? 10 : 8;
-        const oldRect = { x: epParent.x, y: epParent.y, width: epParent.width, height: epParent.height };
-        const reqLeft   = movedNow.x - PAD;
-        const reqTop    = movedNow.y - PAD;
-        const reqRight  = movedNow.x + movedNow.width + PAD;
-        const reqBottom = movedNow.y + movedNow.height + PAD;
-        const newLeft   = Math.min(oldRect.x, reqLeft);
-        const newTop    = Math.min(oldRect.y, reqTop);
-        const newRight  = Math.max(oldRect.x + oldRect.width, reqRight);
-        const newBottom = Math.max(oldRect.y + oldRect.height, reqBottom);
-        const newRect = { x: newLeft, y: newTop, width: newRight - newLeft, height: newBottom - newTop };
-        const changed =
-          Math.abs(newRect.x - oldRect.x) > 0.5 ||
-          Math.abs(newRect.y - oldRect.y) > 0.5 ||
-          Math.abs(newRect.width - oldRect.width) > 0.5 ||
-          Math.abs(newRect.height - oldRect.height) > 0.5;
-        if (changed) {
-          const r = applyEPBoundaryChange(elements, connectors, epParent.id, oldRect, newRect, id);
-          elements = r.elements;
-          connectors = r.connectors;
-        }
-      }
+      // G07: MOVE_ELEMENT no longer grows containers or shifts siblings.
+      // The previous block ran an EP-grow step (applyEPBoundaryChange)
+      // followed by ensureContainersEncloseChildren / pushPastLaneGrowth
+      // / applyPoolBelowShift / applyPoolBoundaryShift / syncLanesToPool.
+      // Per user spec they're all deliberately gone — containers re-fit
+      // ONCE at MOVE_END (and only if the drop landed inside a container
+      // that needs to enclose its new child). The `unconstrained` flag
+      // is still accepted on the action for the Shift-drag visual halo
+      // but functionally redundant now.
       void unconstrained;
+      const movedNow = elements.find((e) => e.id === id);
+      void movedNow;
       // Per-frame connector recompute so lines anchored to the moving
-      // element (and to anything the EP grow may have shifted) track
-      // their endpoints visually as the drag progresses.
+      // element track its position visually as it travels. Everything
+      // else stays put.
       connectors = recomputeAllConnectors(connectors, elements);
 
       return { ...state, elements: updatePoolTypes(elements), connectors };
@@ -6314,14 +6284,6 @@ function reducer(state: DiagramData, action: Action): DiagramData {
           }
         }
       }
-
-      // Final connector recompute. Step 1 / Step 1b may have moved the
-      // element to placedX/placedY (different from its drag-end x/y) and
-      // grown / shifted other elements via applyEPBoundaryChange; without
-      // this pass, connectors attached to the moved element render to its
-      // pre-grow position and look disconnected. Recompute all connectors
-      // so every endpoint resnaps to its now-final element edge.
-      connectors = recomputeAllConnectors(connectors, elements);
 
       // Step 2: Connector splitting (existing behaviour). Operates on
       // the post-growth elements/connectors so the split uses the final
