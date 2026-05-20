@@ -1684,57 +1684,22 @@ function expandEPForBoundaryEntry(
   const ep = elements.find((e) => e.id === epId);
   if (!ep || ep.type !== "subprocess-expanded") return null;
 
-  // Distance from the nearest edge of newEl to the corresponding edge
-  // of the EP, with the perpendicular projection required to overlap.
-  // This catches every "near" case symmetrically:
-  //   - element fully INSIDE near a wall  → gap from element edge to EP edge
-  //   - element STRADDLING the wall       → 0 (also flagged via straddle)
-  //   - element fully OUTSIDE next to wall → gap from element edge to EP edge
-  // Pre-G07 the per-frame growth used an 8-px PAD on element-edge-to-
-  // EP-edge — that semantic is what users expect. Centre-to-edge fails
-  // for "internal move near edge" because the centre stays half a
-  // element-width away from the wall.
-  // Cache EP edges as locals so TS keeps the non-null narrowing inside
-  // the nested helper.
-  const epLeft = ep.x;
-  const epRight = ep.x + ep.width;
-  const epTop = ep.y;
-  const epBottom = ep.y + ep.height;
-  const xOverlap = newEl.x < epRight && newEl.x + newEl.width > epLeft;
-  const yOverlap = newEl.y < epBottom && newEl.y + newEl.height > epTop;
+  const cx = newEl.x + newEl.width / 2;
+  const cy = newEl.y + newEl.height / 2;
 
-  function gapToEdge(edge: "left" | "right" | "top" | "bottom"): number {
-    if (edge === "left") {
-      if (!yOverlap) return Infinity;
-      if (newEl.x < epLeft && newEl.x + newEl.width > epLeft) return 0; // straddle
-      if (newEl.x >= epLeft) return newEl.x - epLeft;                   // inside
-      return epLeft - (newEl.x + newEl.width);                          // outside
-    }
-    if (edge === "right") {
-      if (!yOverlap) return Infinity;
-      if (newEl.x < epRight && newEl.x + newEl.width > epRight) return 0;
-      if (newEl.x + newEl.width <= epRight) return epRight - (newEl.x + newEl.width);
-      return newEl.x - epRight;
-    }
-    if (edge === "top") {
-      if (!xOverlap) return Infinity;
-      if (newEl.y < epTop && newEl.y + newEl.height > epTop) return 0;
-      if (newEl.y >= epTop) return newEl.y - epTop;
-      return epTop - (newEl.y + newEl.height);
-    }
-    if (!xOverlap) return Infinity;
-    if (newEl.y < epBottom && newEl.y + newEl.height > epBottom) return 0;
-    if (newEl.y + newEl.height <= epBottom) return epBottom - (newEl.y + newEl.height);
-    return newEl.y - epBottom;
-  }
+  // Perpendicular distance from newEl's centre to each EP edge.
+  const distLeft   = Math.abs(cx - ep.x);
+  const distRight  = Math.abs(ep.x + ep.width - cx);
+  const distTop    = Math.abs(cy - ep.y);
+  const distBottom = Math.abs(ep.y + ep.height - cy);
 
-  const distLeft   = gapToEdge("left");
-  const distRight  = gapToEdge("right");
-  const distTop    = gapToEdge("top");
-  const distBottom = gapToEdge("bottom");
-
-  // straddle still computed for the grow-rect branches further down —
-  // they read straddleLeft/Right/Top/Bottom to decide which way to push.
+  // Straddle: newEl's bounding box crosses the edge line AND the
+  // perpendicular projection overlaps the EP — without the
+  // perpendicular-overlap guard, an element far to the right whose
+  // y-range happens to cross the EP top would be treated as straddling
+  // TOP, and we'd grow the EP for an element nowhere near it.
+  const xOverlap = newEl.x < ep.x + ep.width && newEl.x + newEl.width > ep.x;
+  const yOverlap = newEl.y < ep.y + ep.height && newEl.y + newEl.height > ep.y;
   const straddleLeft   = yOverlap && newEl.x < ep.x && newEl.x + newEl.width > ep.x;
   const straddleRight  = yOverlap && newEl.x < ep.x + ep.width && newEl.x + newEl.width > ep.x + ep.width;
   const straddleTop    = xOverlap && newEl.y < ep.y && newEl.y + newEl.height > ep.y;
