@@ -1101,7 +1101,17 @@ export function PropertiesPanel({
 {(() => {
           const isAssocPC = connector.type === "association" && diagramType === "process-context";
           const isAssocBPMN = connector.type === "associationBPMN";
-          const showDirection = connector.type !== "messageBPMN" &&
+          // Annotation associations are inherently non-directional per BPMN —
+          // hide the direction selector entirely. The user requested no
+          // direction UI for these; the connector is also forced to
+          // non-directed at draw time in Canvas.tsx.
+          const involvesAnnotation = isAssocBPMN && allElements && (() => {
+            const s = allElements.find(e => e.id === connector.sourceId);
+            const t = allElements.find(e => e.id === connector.targetId);
+            return s?.type === "text-annotation" || t?.type === "text-annotation";
+          })();
+          const showDirection = !involvesAnnotation &&
+            connector.type !== "messageBPMN" &&
             connector.type !== "uml-association" && connector.type !== "uml-aggregation" &&
             connector.type !== "uml-composition" && connector.type !== "uml-generalisation" &&
             (isAssocBPMN || isAssocPC ||

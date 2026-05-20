@@ -982,15 +982,16 @@ export function recomputeAllConnectors(
         sourceOffsetAlong: repairedSrcOffset };
     }
 
-    // associationBPMN: when either endpoint is a Data Object / Data Store,
-    // both endpoints auto-attach exactly where the centre-to-centre line
-    // crosses each element's boundary. `closestEdgePoint` returns that
-    // intersection directly; `getOffsetAlong` would instead project the
-    // other element's coordinate (wrong for anything but horizontally or
-    // vertically aligned centres). For non-data associations the stored
+    // associationBPMN: when either endpoint is a Data Object, Data Store,
+    // or Text Annotation, both endpoints auto-attach exactly where the
+    // centre-to-centre line crosses each element's boundary.
+    // `closestEdgePoint` returns that intersection directly;
+    // `getOffsetAlong` would instead project the other element's
+    // coordinate (wrong for anything but horizontally or vertically
+    // aligned centres). For non-data associations the stored
     // sides/offsets are preserved.
     if (conn.type === "associationBPMN") {
-      const DATA_TYPES = new Set<string>(["data-object", "data-store"]);
+      const DATA_TYPES = new Set<string>(["data-object", "data-store", "text-annotation"]);
       const involvesData = DATA_TYPES.has(source.type) || DATA_TYPES.has(target.type);
       const srcCx = source.x + source.width / 2, srcCy = source.y + source.height / 2;
       const tgtCx = target.x + target.width / 2, tgtCy = target.y + target.height / 2;
@@ -1018,9 +1019,16 @@ export function recomputeAllConnectors(
       if (typeof window !== "undefined" && (window as unknown as { __DIAGRAMATIX_TRACE?: boolean }).__DIAGRAMATIX_TRACE) {
         console.log(`[TRACE routing.associationBPMN] ${conn.id} involvesData=${involvesData} srcEdge=${JSON.stringify(srcEdge)} tgtEdge=${JSON.stringify(tgtEdge)} side=${srcSide}/${tgtSide} off=${srcOffset.toFixed(2)}/${tgtOffset.toFixed(2)}`);
       }
+      // Annotations are always non-directional in BPMN. Force the
+      // direction regardless of stored value so legacy connectors with
+      // a stale "directed" / "open-directed" still render with no
+      // arrowhead.
+      const involvesAnnotation = source.type === "text-annotation" || target.type === "text-annotation";
+      const directionType = involvesAnnotation ? "non-directed" : conn.directionType;
       return { ...conn,
         sourceSide: srcSide, targetSide: tgtSide,
         sourceOffsetAlong: srcOffset, targetOffsetAlong: tgtOffset,
+        directionType,
         waypoints: [startPt, srcEdge, tgtEdge, endPt],
         sourceInvisibleLeader: true, targetInvisibleLeader: true };
     }
