@@ -1687,6 +1687,23 @@ export function SymbolRenderer({
       element.type === "chevron" ||
       element.type === "chevron-collapsed";
     if (isTaskLike && !multiSelected && onEnterConnectionMode) {
+      // If the click landed inside an EP edge resize zone (±10 px from
+      // any edge), the resize hit rect owns the drag. We deliberately
+      // skip the MOVE drag here so the two don't dispatch concurrent
+      // RESIZE_ELEMENT + MOVE_ELEMENT actions per frame — that produced
+      // EP children drifting downward, top edge appearing to chase the
+      // bottom, and sequence-connected externals jumping aside.
+      if (element.type === "subprocess-expanded" && svgToWorld) {
+        const wp = svgToWorld(e.clientX, e.clientY);
+        if (wp) {
+          const TOL = 10;
+          const onLeft   = Math.abs(wp.x - element.x) <= TOL;
+          const onRight  = Math.abs(wp.x - (element.x + element.width)) <= TOL;
+          const onTop    = Math.abs(wp.y - element.y) <= TOL;
+          const onBottom = Math.abs(wp.y - (element.y + element.height)) <= TOL;
+          if (onLeft || onRight || onTop || onBottom) return;
+        }
+      }
       const MOVE_THRESHOLD = 4;
       const startClientX = e.clientX;
       const startClientY = e.clientY;
