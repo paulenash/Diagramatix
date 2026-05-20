@@ -6118,12 +6118,14 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       // landed — if its centre is now inside a different container
       // (typically a NESTED EP that the user dragged into), update its
       // parentId so the EP-grow path below picks the right container.
+      // Only boundary-mounted elements are skipped; FREE events
+      // (start/intermediate/end NOT attached to a boundary host) still
+      // get re-parented like any other flow element. The earlier guard
+      // here used a BOUNDARY_EVENT_TYPES set name, but that set holds
+      // every event type — so free events were wrongly excluded.
       let elements = state.elements;
       let connectors = state.connectors;
-      if (
-        !initialEl.boundaryHostId &&
-        !BOUNDARY_EVENT_TYPES.has(initialEl.type)
-      ) {
+      if (!initialEl.boundaryHostId) {
         const cx = initialEl.x + initialEl.width / 2;
         const cy = initialEl.y + initialEl.height / 2;
         const candidates = elements.filter(b =>
@@ -6166,10 +6168,15 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       // to surrounding geometry, even at drop time.
       const elPostReparent = elements.find(e => e.id === id);
       let epHandledAtDrop = false;
+      // Boundary-mounted elements are skipped — they move with their
+      // host, not by re-parenting. Artifacts (data-object / data-store /
+      // text-annotation) are skipped because they're inert per user
+      // spec. EVERYTHING ELSE (tasks, gateways, subprocesses, AND free
+      // events like a plain start event inside an EP) goes through the
+      // EP-grow path so the EP follows them outward on drop.
       if (
         elPostReparent?.parentId &&
         !elPostReparent.boundaryHostId &&
-        !BOUNDARY_EVENT_TYPES.has(elPostReparent.type) &&
         !DATA_ELEMENT_TYPES.has(elPostReparent.type)
       ) {
         const parent = elements.find(e => e.id === elPostReparent.parentId);
@@ -6207,7 +6214,6 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         !epHandledAtDrop &&
         elPostReparent &&
         !elPostReparent.boundaryHostId &&
-        !BOUNDARY_EVENT_TYPES.has(elPostReparent.type) &&
         !DATA_ELEMENT_TYPES.has(elPostReparent.type)
       ) {
         const eps = elements.filter(e => e.type === "subprocess-expanded" && e.id !== id);
