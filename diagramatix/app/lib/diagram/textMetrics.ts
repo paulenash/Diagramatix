@@ -80,16 +80,19 @@ export function getDefaultSize(type: AutosizeType): { w: number; h: number } {
 }
 
 /** Small visual breathing space between the marker icon's right edge and
- *  the first character of text on line 1 (when narrowing kicks in). */
-export const TASK_MARKER_LINE1_GAP = 2;
+ *  the first character of text on line 1 (when narrowing kicks in).
+ *  Tightened from 2 → 3 px per user request — slightly more separation
+ *  so the marker and the first character don't visually touch at small
+ *  task widths. */
+export const TASK_MARKER_LINE1_GAP = 3;
 
 /** Horizontal width reserved on the FIRST line of a task with a marker
  *  (only when the text block grows tall enough to vertically intersect the
  *  marker — for 1- and 2-line labels at default size, no reserve applies).
  *
  *  Reserved area on the left of line 1 (relative to PAD-aligned text-box
- *  left): marker_x (4) + marker_w (14) + gap (2) − PAD (5) = 15. So
- *  firstLineWidth = innerW − 15, and text on line 1 starts at x + 20. */
+ *  left): marker_x (4) + marker_w (14) + gap (3) − PAD (5) = 16. So
+ *  firstLineWidth = innerW − 16, and text on line 1 starts at x + 21. */
 export const TASK_MARKER_LINE1_RESERVE = TASK_MARKER_X + MARKER_SIZE + TASK_MARKER_LINE1_GAP - PAD;
 
 /** Vertical "chrome" reserved by the renderer for icons/markers within a

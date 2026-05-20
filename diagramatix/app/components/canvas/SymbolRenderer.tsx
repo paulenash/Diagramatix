@@ -2633,9 +2633,11 @@ export function SymbolRenderer({
         const MARKER_SIZE = 14;
         // Small visual gap between marker right edge and line-1 text. Keeps
         // the marker clearly distinguishable without wasting horizontal room.
-        const TASK_MARKER_LINE1_GAP = 2;
+        // Must mirror TASK_MARKER_LINE1_GAP in textMetrics.ts so the
+        // renderer and the autosizer agree exactly.
+        const TASK_MARKER_LINE1_GAP = 3;
         // Reserved horizontal space on line 1 = marker offset + marker width
-        // + small gap − PAD. Text on line 1 starts at x + 20.
+        // + small gap − PAD. Text on line 1 starts at x + 21.
         const TASK_MARKER_LINE1_RESERVE = TASK_MARKER_X + MARKER_SIZE + TASK_MARKER_LINE1_GAP - PAD;
         // Subprocess collapsed marker bottom geometry — text must never
         // intrude into this reserve.
