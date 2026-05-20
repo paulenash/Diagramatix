@@ -1471,7 +1471,7 @@ export function DiagramEditor({
   return (
     <div className={`flex flex-col h-screen ${isImpersonating ? "bg-orange-50" : "bg-white"}`}>
       {isImpersonating && viewingAsName !== undefined && viewingAsEmail !== undefined && (
-        <ImpersonationBanner viewingAsName={viewingAsName ?? ""} viewingAsEmail={viewingAsEmail ?? ""} mode={impersonationMode} />
+        <ImpersonationBanner viewingAsName={viewingAsName ?? ""} viewingAsEmail={viewingAsEmail ?? ""} mode={impersonationMode} currentDiagramId={diagramId} />
       )}
       {/* Top bar */}
       <header className={`h-9 border-b border-gray-200 flex items-center px-2 gap-2 flex-shrink-0 ${isImpersonating ? "bg-orange-50" : ""}`}>
