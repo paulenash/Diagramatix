@@ -77,6 +77,10 @@ export function AdminClient({ users, currentUserId }: Props) {
             <span style={{ fontSize: "1.75em", lineHeight: 1 }}>{"\u2190"}</span>
             Dashboard
           </button>
+          {/* Brand icon: sits just right of the back link as a permanent
+              "you're inside Diagramatix" cue. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logos/diagramatix-icon.svg" alt="Diagramatix" className="w-7 h-7" />
           <h1 className="font-semibold text-gray-900">Admin — Registered Users</h1>
         </div>
         <div className="flex items-center gap-2">

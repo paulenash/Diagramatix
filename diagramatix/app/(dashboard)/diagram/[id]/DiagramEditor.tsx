@@ -1482,6 +1482,10 @@ export function DiagramEditor({
           <span style={{ fontSize: "1.75em", lineHeight: 1 }}>{"\u2190"}</span>
           {projectId ? "Project" : "Dashboard"}
         </button>
+        {/* Brand icon: sits just right of the back link as a permanent
+            "you're inside Diagramatix" cue. h-5 keeps it inside the h-9 bar. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/logos/diagramatix-icon.svg" alt="Diagramatix" className="w-5 h-5" />
 
         <div className="flex items-center gap-1.5">
           <div className="w-4 h-4 bg-blue-600 rounded flex items-center justify-center">

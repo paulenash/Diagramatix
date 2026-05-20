@@ -1949,6 +1949,10 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
             <span style={{ fontSize: "1.75em", lineHeight: 1 }}>{"\u2190"}</span>
             Dashboard
           </button>
+          {/* Brand icon: sits just right of the back link as a permanent
+              "you're inside Diagramatix" cue. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logos/diagramatix-icon.svg" alt="Diagramatix" className="w-6 h-6" />
           {/* Project name — editable only when not readOnly */}
           {!readOnly && editingProjectName ? (
             <input autoFocus type="text" value={projectName}

@@ -1085,16 +1085,16 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
       {/* Header */}
       <header className={`${isImpersonating ? "bg-orange-50" : "bg-white"} border-b border-gray-200 px-6 py-4 flex items-center justify-between`}>
         <div className="flex items-center gap-3">
-          {/* Brand icon (public/logos/diagramatix-icon.svg, 100x100 viewBox). */}
+          {/* Brand wordmark (public/logos/diagramatix-logo.svg, 500x120 viewBox).
+              Replaces the previous icon + "Diagramatix" span pair so the
+              dashboard header carries the full logo treatment. h-8 keeps
+              it in line with the existing py-4 header height. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/logos/diagramatix-icon.svg"
+            src="/logos/diagramatix-logo.svg"
             alt="Diagramatix"
-            className="w-7 h-7"
+            className="h-8 w-auto"
           />
-          <span className="font-semibold text-gray-900">
-            Diagramatix<sup className="text-[9px] font-normal text-gray-500 ml-0.5">™</sup>
-          </span>
           {version ? <span className="text-xs text-gray-400 ml-1">v{SCHEMA_VERSION}.{version}</span> : null}
         </div>
         <div className="flex items-center gap-3">
