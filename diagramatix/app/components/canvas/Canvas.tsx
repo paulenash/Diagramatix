@@ -3462,7 +3462,10 @@ export function Canvas({
       <svg
         ref={svgRef}
         data-canvas
-        className="w-full h-full outline-none"
+        // dgx-pan applies grab cursor on the canvas background; :active
+        // swaps to grabbing while the user is mid-pan-drag. Elements
+        // override with their own grabbing cursors via .dgx-grab.
+        className="w-full h-full outline-none dgx-pan"
         tabIndex={0}
         onMouseDownCapture={() => svgRef.current?.focus({ preventScroll: true })}
         onMouseDown={handleBackgroundMouseDown}
@@ -3641,7 +3644,10 @@ export function Canvas({
             screenY: e.clientY - rect.top,
           });
         }}
-        style={{ cursor: isDraggingConnector || isDraggingEndpoint ? "crosshair" : "default" }}
+        // While dragging a connector / endpoint, force crosshair on the
+        // whole canvas. Otherwise let the .dgx-pan class on <svg> drive
+        // the grab/grabbing pan cursor.
+        style={isDraggingConnector || isDraggingEndpoint ? { cursor: "crosshair" } : undefined}
       >
         <SketchyFilter />
         <g transform={transform} style={{ ...(displayMode === "hand-drawn" ? { fontStyle: "italic", fontFamily: "var(--font-caveat), 'Segoe Print', 'Comic Sans MS', cursive" } : undefined), ...(readOnly ? { pointerEvents: "none" } : undefined) }}>

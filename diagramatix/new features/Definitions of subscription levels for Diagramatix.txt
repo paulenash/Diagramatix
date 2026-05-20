@@ -1,0 +1,67 @@
+I now need 4 levels of subscription:
+1. Free, 
+2. Introductory, and
+3. Professional,
+4. Expert.
+
+These will be priced at:
+1. Free: $0, no need for subscription details,
+2. Introductory: $70 / month, and
+3. Professional: $150 / month,
+4. Expert: $270 / month.
+
+Each of these subscription levels will have different project and diagram restrictions as follow:
+
+1. Free: Limited to:
+	a. 1 Project, 
+	b. 1 Diagram of each Diagram Type per Project,
+	c. No Archimate Diagrams, 
+	d. 15 elements per non-BPMN diagram, 
+	e. BPMN diagrams element limit will be 20 elements diagram,
+	f. 5 AI Generate attempts in total, 
+	g. 2 individual diagram exports,
+	h. 2 individual diagram imports,
+	i. no bulk exports.
+	j. no bulk imports.
+
+2. Introductory: Limited to:
+	a. 5 Projects, 
+	b. 10 Diagrams of each Diagram Type per Project,
+	c. Only 2 Archimate Diagrams included, 
+	d. unlimited elements per non-BPMN diagram, 
+	e. unlimited elements per BPMN diagram,
+	f. 50 AI Generate attempts per month, 
+	g. unlimited diagram exports,
+	h. unlimited diagram imports.
+	i. 2 bulk exports / month.
+	j. 2 bulk imports / month.
+
+3. Professional: Limited to:
+	a. 10 Projects, 
+	b. 35 Diagrams of each Diagram Type per Project,
+	c. 10 Archimate Diagrams included, 
+	d. unlimited elements per non-BPMN diagram, 
+	e. unlimited elements per BPMN diagram,
+	f. 100 AI Generate attempts / month, 
+	g. unlimited diagram exports,
+	h. unlimited diagram imports.
+	i. unlimited bulk exports / month.
+	j. unlimited bulk imports / month.
+
+4. Expert: Limited to:
+	a. unlimited Projects, 
+	b. unlimited Diagrams of each Diagram Type per Project,
+	c. unlimited Archimate Diagrams included, 
+	d. unlimited elements per non-BPMN diagram, 
+	e. unlimited elements per BPMN diagram,
+	f. 500 AI Generate attempts / month, 
+	g. unlimited diagram exports,
+	h. unlimited diagram imports.
+	i. unlimited bulk exports per month.
+	j. unlimited bulk imports per month.
+
+
+These prices and limits per subscription type need to be editable under a new button "Subscription Prices and Limits" in the Admin Screen.
+
+Of course, Admins are not subject to any of these restrictions and so perhaps their Subscription Type should be "Administration".
+

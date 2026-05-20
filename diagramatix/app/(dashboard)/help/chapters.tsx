@@ -1,4 +1,5 @@
 import type { HelpChapter } from "./HelpViewer";
+import { SCHEMA_VERSION } from "@/app/lib/diagram/types";
 
 /* ================================================================
    Diagramatix In-App User Guide — chapter content
@@ -29,7 +30,7 @@ export const CHAPTERS: HelpChapter[] = [
               domain models and more.
             </p>
             <p className="mt-2 text-xs text-gray-500">
-              This guide covers version <strong>1.9</strong>.
+              This guide covers version <strong>{SCHEMA_VERSION}</strong>.
             </p>
             <p className="mt-2">
               After signing in you land on the <strong>Dashboard</strong> —
