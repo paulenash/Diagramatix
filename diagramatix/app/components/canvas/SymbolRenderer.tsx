@@ -1648,6 +1648,17 @@ export function SymbolRenderer({
           boundaryHit = inX && inY && (onLeft || onRight || onTop || onBottom);
         }
         if (!headerHit && !boundaryHit) return; // body click far from boundary — bubble
+        // Boundary-only click: select the pool but don't kick off a
+        // pool-move drag. The pool's resize handles sit in the same
+        // zone (±10 px around each edge) and a drag started here would
+        // race with the resize tracker. Pool moves are still possible
+        // via the left header strip (`headerHit`).
+        if (boundaryHit && !headerHit) {
+          e.stopPropagation();
+          if (selected) onSelect();                                  // boundary re-click — deselect
+          else onSelect(e);                                           // first-click selection
+          return;
+        }
       }
       e.stopPropagation();
       if (selected) { onSelect(); return; }                        // header re-click — deselect, no drag
@@ -2474,14 +2485,42 @@ export function SymbolRenderer({
                   fill="transparent"
                   style={{ cursor: edge.cursor }}
                   onMouseDown={(e) => {
-                    e.stopPropagation();
-                    setPoolResizeActive(edge.side);
-                    onResizeDragStart(edge.side, e);
-                    const onUp = () => {
-                      setPoolResizeActive(null);
-                      window.removeEventListener("mouseup", onUp);
+                    // Click-vs-drag disambiguation. The resize hit zone
+                    // spans ±10 px around the boundary, which sits inside
+                    // the pool's selectable-boundary tolerance (±8 px). A
+                    // pure click on the edge MUST fall through to the
+                    // outer pool handler so selection works; only a real
+                    // drag (mouse moved > 4 px before mouseup) takes the
+                    // resize path.
+                    const startX = e.clientX, startY = e.clientY;
+                    const THRESH = 4;
+                    let started = false;
+                    const reactEvt = e;
+                    const onMove = (ev: MouseEvent) => {
+                      if (started) return;
+                      if (Math.hypot(ev.clientX - startX, ev.clientY - startY) <= THRESH) return;
+                      started = true;
+                      setPoolResizeActive(edge.side);
+                      onResizeDragStart(edge.side, reactEvt);
                     };
+                    const onUp = () => {
+                      window.removeEventListener("mousemove", onMove);
+                      window.removeEventListener("mouseup", onUp);
+                      if (started) {
+                        setPoolResizeActive(null);
+                      }
+                      // If !started, the click is a pure tap — bubble up
+                      // to the pool's selection handler. We don't dispatch
+                      // anything here because the original mousedown
+                      // already bubbled (no stopPropagation early-out),
+                      // so handleMouseDown on the parent <g> already fired
+                      // and ran its selection / drag logic.
+                    };
+                    window.addEventListener("mousemove", onMove);
                     window.addEventListener("mouseup", onUp);
+                    // Note: NOT calling e.stopPropagation() — the click
+                    // needs to bubble to the pool's handleMouseDown so
+                    // boundary-click selection still works.
                   }}
                 />
                 {poolResizeActive === edge.side && (
