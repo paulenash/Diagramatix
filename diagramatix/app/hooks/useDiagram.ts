@@ -527,12 +527,39 @@ function findConnectorOverlappingElement(
   return null;
 }
 
+// Per-pool poolType auto-flip. A pool is white-box iff it has at least
+// one structural child (lane) OR at least one eligible flow element
+// (Event, Task, Subprocess, Expanded Subprocess) whose centre point
+// sits inside the pool's bounding rectangle. The geometric test is
+// what makes "drop a pool and resize it over existing tasks" flip the
+// new pool to white-box without re-parenting every element — tasks and
+// events keep their existing parentId but the pool reads as populated.
+// Conversely, dragging the LAST flow element out of a pool flips it
+// back to black-box because no eligible centre remains inside.
+// Artifacts (data-object, data-store, text-annotation) deliberately
+// don't count — per the user list they can float without forcing the
+// pool to white-box.
+const FLOW_ELEMENT_TYPES_FOR_POOL = new Set<string>([
+  "start-event", "intermediate-event", "end-event",
+  "task", "subprocess", "subprocess-expanded",
+]);
+
 function updatePoolTypes(elements: DiagramElement[]): DiagramElement[] {
   return elements.map((el) => {
     if (el.type !== "pool") return el;
-    const hasContent = elements.some((e) => e.parentId === el.id);
+    const hasLaneChild = elements.some(
+      (e) => e.type === "lane" && e.parentId === el.id,
+    );
+    const hasFlowInside = !hasLaneChild && elements.some((e) => {
+      if (!FLOW_ELEMENT_TYPES_FOR_POOL.has(e.type)) return false;
+      if (e.boundaryHostId) return false; // boundary events follow their host
+      const cx = e.x + e.width / 2;
+      const cy = e.y + e.height / 2;
+      return cx >= el.x && cx <= el.x + el.width
+          && cy >= el.y && cy <= el.y + el.height;
+    });
     const current = (el.properties.poolType as string | undefined) ?? "black-box";
-    const next = hasContent ? "white-box" : "black-box";
+    const next = (hasLaneChild || hasFlowInside) ? "white-box" : "black-box";
     if (current === next) return el;
     return { ...el, properties: { ...el.properties, poolType: next } };
   });
@@ -4389,7 +4416,9 @@ function reducer(state: DiagramData, action: Action): DiagramData {
           elements = r.elements; connectors = r.connectors;
         }
         connectors = recomputeAllConnectors(connectors, elements);
-        return { ...state, elements, connectors };
+        // Pool may have just grown to cover existing flow elements or
+        // shrunk past its last one — re-evaluate white-box / black-box.
+        return { ...state, elements: updatePoolTypes(elements), connectors };
       }
 
       // EP target: delegate to the shared boundary-change helper.

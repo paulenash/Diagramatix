@@ -1630,7 +1630,25 @@ export function SymbolRenderer({
         : (element.properties?.laneHeaderWidth as number | undefined);
       const HEADER_LW = typeof stored === "number" && stored > 0 ? stored : 36;
       const worldPos = svgToWorld ? svgToWorld(e.clientX, e.clientY) : null;
-      if (worldPos && worldPos.x > element.x + HEADER_LW) return; // body click — bubble
+      if (worldPos) {
+        const headerHit = worldPos.x <= element.x + HEADER_LW;
+        // White-box pools also accept clicks on or near any of the four
+        // boundary edges (per user spec). 8 px tolerance — matches the
+        // resize-handle visual extent. Lanes keep header-only selection.
+        let boundaryHit = false;
+        if (isWhiteBoxPool) {
+          const TOL = 8;
+          const px = worldPos.x, py = worldPos.y;
+          const inX = px >= element.x - TOL && px <= element.x + element.width + TOL;
+          const inY = py >= element.y - TOL && py <= element.y + element.height + TOL;
+          const onLeft   = Math.abs(px - element.x) <= TOL;
+          const onRight  = Math.abs(px - (element.x + element.width)) <= TOL;
+          const onTop    = Math.abs(py - element.y) <= TOL;
+          const onBottom = Math.abs(py - (element.y + element.height)) <= TOL;
+          boundaryHit = inX && inY && (onLeft || onRight || onTop || onBottom);
+        }
+        if (!headerHit && !boundaryHit) return; // body click far from boundary — bubble
+      }
       e.stopPropagation();
       if (selected) { onSelect(); return; }                        // header re-click — deselect, no drag
     } else {
