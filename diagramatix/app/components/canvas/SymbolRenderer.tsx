@@ -1882,7 +1882,12 @@ export function SymbolRenderer({
         }
         onDoubleClick();
       }}
-      style={{ cursor: (isBoundary || isWhiteBoxPool) ? "default" : multiSelected ? "grab" : "move" }}
+      // Cursor scheme (G05): grabbable elements get .dgx-grab so the
+      // CSS :active pseudo swaps grab→grabbing while the mouse is down.
+      // White-box pool bodies and boundary events keep the default
+      // arrow — their interaction is selection, not translation.
+      className={(isBoundary || isWhiteBoxPool) ? undefined : "dgx-grab"}
+      style={(isBoundary || isWhiteBoxPool) ? { cursor: "default" } : undefined}
     >
       <SymbolShape el={element} />
 
