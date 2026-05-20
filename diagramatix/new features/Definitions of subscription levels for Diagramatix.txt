@@ -1,4 +1,4 @@
-I now need 4 levels of subscription:
+A: I now need 4 levels of subscription:
 1. Free, 
 2. Introductory, and
 3. Professional,
@@ -61,7 +61,13 @@ Each of these subscription levels will have different project and diagram restri
 	j. unlimited bulk imports per month.
 
 
-These prices and limits per subscription type need to be editable under a new button "Subscription Prices and Limits" in the Admin Screen.
+B: These prices and limits per subscription type need to be editable under a new button "Subscription Prices and Limits" in the Admin Screen.
 
-Of course, Admins are not subject to any of these restrictions and so perhaps their Subscription Type should be "Administration".
+C: Of course, Admins are not subject to any of these restrictions and so perhaps their Subscription Type should be "Administration".
+
+D: Add the registered users subscription to their details
+
+E: For Each User their Subscription name should be a Button that pops up a small sub-screen over the top of the current screen that shows the user's measurable usage as per each limit.
+
+
 

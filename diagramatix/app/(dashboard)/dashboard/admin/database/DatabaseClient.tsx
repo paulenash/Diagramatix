@@ -518,6 +518,9 @@ export function DatabaseClient() {
             <span style={{ fontSize: "1.75em", lineHeight: 1 }}>{"\u2190"}</span>
             Admin
           </button>
+          {/* Brand icon: matches placement on every other admin sub-screen. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logos/diagramatix-icon.svg" alt="Diagramatix" className="w-7 h-7" />
           <h1 className="font-semibold text-gray-900">Database Manager</h1>
           <span className="text-xs text-gray-400">PGlite :51214</span>
         </div>
