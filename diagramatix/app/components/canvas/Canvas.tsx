@@ -1701,6 +1701,48 @@ export function Canvas({
     setZoom(newZoom);
   }
 
+  // Predict which EP / composite-state will end up as the new element's
+  // parent AFTER the ADD_ELEMENT reducer runs. Mirrors the reducer's
+  // centre-inside-OR-straddle test for subprocess-expanded (the EP
+  // grows to absorb a near-edge drop) and centre-inside for composite-
+  // state. The original auto-connect code used a strict bbox-fully-inside
+  // test, which meant near-edge drops looked "outside" the EP and
+  // auto-connect cheerfully drew sequence flows across the boundary
+  // before the EP had grown.
+  function predictNewExpandedScope(
+    x: number, y: number, w: number, h: number,
+  ): string | null {
+    const cx = x + w / 2;
+    const cy = y + h / 2;
+    const right = x + w;
+    const bottom = y + h;
+    const matches: DiagramElement[] = [];
+    for (const b of data.elements) {
+      if (b.type !== "subprocess-expanded" && b.type !== "composite-state") continue;
+      const centreInside =
+        cx >= b.x && cx <= b.x + b.width &&
+        cy >= b.y && cy <= b.y + b.height;
+      if (centreInside) { matches.push(b); continue; }
+      if (b.type === "subprocess-expanded") {
+        const xOverlap = x < b.x + b.width && right > b.x;
+        const yOverlap = y < b.y + b.height && bottom > b.y;
+        const straddleLR = yOverlap && (
+          (x < b.x && right > b.x) ||
+          (x < b.x + b.width && right > b.x + b.width)
+        );
+        const straddleTB = xOverlap && (
+          (y < b.y && bottom > b.y) ||
+          (y < b.y + b.height && bottom > b.y + b.height)
+        );
+        if (straddleLR || straddleTB) matches.push(b);
+      }
+    }
+    if (matches.length === 0) return null;
+    // Smallest (innermost) wins, matching the reducer's container pick.
+    matches.sort((a, b) => (a.width * a.height) - (b.width * b.height));
+    return matches[0].id;
+  }
+
   // BPMN auto-connect: find the best existing element to connect to a newly placed
   // element, plus which sides to use. Returns null if no suitable source found.
   // Priority order (checked A → B → C):
@@ -1737,21 +1779,12 @@ export function Canvas({
       }
       return null;
     }
-    // The new element doesn't have a parentId yet, so infer the container
-    // that would contain it based on spatial containment (matches the
-    // reducer's ADD_ELEMENT logic).
-    const CONTAINER_TYPES = new Set(["subprocess-expanded", "composite-state"]);
+    // The new element doesn't have a parentId yet, so predict the EP /
+    // composite-state that will be its parent post-drop. Centre-inside
+    // OR straddle (for EPs that grow to absorb) — mirrors ADD_ELEMENT.
     const newRight2 = newX + newW;
     const newBottom2 = newY + newH;
-    let newExpandedScope: string | null = null;
-    for (const cand of data.elements) {
-      if (!CONTAINER_TYPES.has(cand.type)) continue;
-      if (newX >= cand.x && newRight2 <= cand.x + cand.width &&
-          newY >= cand.y && newBottom2 <= cand.y + cand.height) {
-        newExpandedScope = cand.id;
-        break;
-      }
-    }
+    const newExpandedScope = predictNewExpandedScope(newX, newY, newW, newH);
 
     // Infer the pool the new element would land in (spatial containment).
     // Pick the deepest spatial-fit lane (innermost wins) and walk up its
@@ -2076,18 +2109,9 @@ export function Canvas({
       return null;
     }
 
-    const CONTAINER_TYPES = new Set(["subprocess-expanded", "composite-state"]);
     const newRight2 = newX + newW;
     const newBottom2 = newY + newH;
-    let newExpandedScope: string | null = null;
-    for (const cand of data.elements) {
-      if (!CONTAINER_TYPES.has(cand.type)) continue;
-      if (newX >= cand.x && newRight2 <= cand.x + cand.width &&
-          newY >= cand.y && newBottom2 <= cand.y + cand.height) {
-        newExpandedScope = cand.id;
-        break;
-      }
-    }
+    const newExpandedScope = predictNewExpandedScope(newX, newY, newW, newH);
 
     // Pick the deepest spatial-fit lane and walk up to its enclosing pool
     // (issue 3 — sublane parent-chain wasn't always reaching a pool).
