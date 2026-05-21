@@ -415,5 +415,13 @@ export interface TemplateData {
  *          attribute still bumps to 1.11 so importers can detect the
  *          new feature window. Pre-1.11 backups omit `group`; restore
  *          treats absent as ungrouped (null).
+ * v1.12:   Subscriptions — new SubscriptionLevel + UsageCounter models
+ *          and two new User fields (subscriptionLevelId,
+ *          subscriptionAssignedAt). Diagram export payload is unchanged
+ *          (subscriptions are user-level metadata, never embedded in
+ *          a diagram or project export), so no XSD shape change. The
+ *          schemaVersion attribute bumps to 1.12 so importers and the
+ *          User Guide reflect the new feature window. Pre-1.12 backups
+ *          have no subscription state to restore.
  */
-export const SCHEMA_VERSION = "1.11";
+export const SCHEMA_VERSION = "1.12";

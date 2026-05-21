@@ -33,7 +33,15 @@
     this XSD). The `schemaVersion` attribute below is bumped to 1.11
     so consumers can detect the new feature window even if no
     project-XML field changed.
+
+  v1.12 — subscriptions.
+    No project-export schema shape change. Subscriptions are user-level
+    metadata (SubscriptionLevel rows + User.subscriptionLevelId +
+    User.subscriptionAssignedAt + UsageCounter rows) and are never
+    embedded in a diagram or project export. The schemaVersion attribute
+    is bumped to 1.12 so importers can detect the new feature window.
 -->
+
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
            xmlns:dgx="http://diagramatix.com/export/1.0"
            targetNamespace="http://diagramatix.com/export/1.0"
