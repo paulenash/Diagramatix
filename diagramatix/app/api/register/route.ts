@@ -28,7 +28,15 @@ export async function POST(req: Request) {
   // no partial state behind.
   const result = await prisma.$transaction(async (tx) => {
     const user = await tx.user.create({
-      data: { email, name: name || null, password: hashedPassword },
+      data: {
+        email,
+        name: name || null,
+        password: hashedPassword,
+        // New sign-ups start on Free. Existing users were grandfathered to
+        // Expert by scripts/seed-subscriptions.ts so launch doesn't impose
+        // limits retroactively.
+        subscriptionLevelId: "free",
+      },
       select: { id: true, email: true, name: true },
     });
     const displayName = user.name ?? user.email;

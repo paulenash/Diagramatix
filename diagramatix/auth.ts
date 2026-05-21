@@ -90,6 +90,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 email: user.email,
                 name: user.name ?? user.email.split("@")[0],
                 password: "",
+                // New sign-ups start on Free. Existing users were
+                // grandfathered to Expert by scripts/seed-subscriptions.ts.
+                subscriptionLevelId: "free",
               },
             });
             user.id = created.id;

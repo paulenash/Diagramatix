@@ -78,6 +78,14 @@ model User {
   orgMembers       OrgMember[]
   prompts          Prompt[]
   diagramRules     DiagramRules[]
+  // Subscription tier. Nullable for migration safety; the seed script
+  // grandfathers every existing user to "expert" and the registration
+  // flow sets "free" on new sign-ups. Admins (per SUPERUSER_EMAILS in
+  // app/lib/superuser.ts) bypass all limits regardless of this field —
+  // the "Administration" tier shown in the UI is derived, not stored.
+  subscriptionLevelId String?
+  subscriptionLevel   SubscriptionLevel? @relation(fields: [subscriptionLevelId], references: [id])
+  usageCounters       UsageCounter[]
   // Per-user UI prefs. Currently stores the collapsed state of
   // template-group headers in the editor menu, keyed like
   // `{ "user:Group A": true, "builtin:Group B": false }`. Templates'
@@ -198,4 +206,60 @@ model DiagramRules {
   updatedAt DateTime @updatedAt
 
   @@unique([category, userId, orgId]) // one set of rules per category per user per org
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Subscriptions — four real tiers (Free / Introductory / Professional /
+// Expert) plus a derived "Administration" view for SUPERUSER_EMAILS users
+// (never stored as a row, never enforces limits).
+//
+// SubscriptionLevel rows are seeded with the canonical limits but editable
+// by admins via /dashboard/admin/subscriptions. Limit columns are nullable
+// where null = unlimited.
+//
+// UsageCounter tracks event metrics (AI attempts, exports, imports) keyed
+// by (userId, periodKey, metric). periodKey is "YYYY-MM" for monthly
+// resetting counters and "all-time" for Free's lifetime counters.
+// Point-in-time metrics (project count, diagram count, archimate total,
+// element counts) are computed from the actual tables and don't need a
+// UsageCounter row.
+// ────────────────────────────────────────────────────────────────────────────
+
+model SubscriptionLevel {
+  id                            String   @id              // "free" | "introductory" | "professional" | "expert"
+  name                          String                    // display name
+  priceMonthly                  Int      @default(0)      // AUD cents
+  sortOrder                     Int                       // for UI ordering
+
+  // Limits. null = unlimited.
+  maxProjects                   Int?
+  maxDiagramsPerTypePerProject  Int?
+  maxArchimateDiagramsTotal     Int?
+  maxNonBpmnElementsPerDiagram  Int?
+  maxBpmnElementsPerDiagram     Int?
+  maxAiAttempts                 Int?
+  aiAttemptsResetMonthly        Boolean  @default(true)   // false → lifetime counter (Free)
+  maxIndividualExports          Int?
+  individualExportsResetMonthly Boolean  @default(true)
+  maxIndividualImports          Int?
+  individualImportsResetMonthly Boolean  @default(true)
+  maxBulkExports                Int?
+  maxBulkImports                Int?
+
+  users     User[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model UsageCounter {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  periodKey String                                          // "2026-05" | "all-time"
+  metric    String                                          // "ai_attempts" | "individual_exports" | "individual_imports" | "bulk_exports" | "bulk_imports"
+  count     Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, periodKey, metric])
+  @@index([userId])
 }
