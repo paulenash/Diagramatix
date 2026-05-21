@@ -2313,6 +2313,22 @@ export async function exportVisioV3(
             .file("visio/masters/" + poolFileMatch[1])!
             .async("string");
 
+          // Enable resize handles. The natural v1.5 Pool / Lane master
+          // carries N='NoObjHandles' V='1', which hides Visio's standard
+          // resize handles on the assumption that the CFF (Cross-
+          // Functional Flowchart) addon will manage resize via its own
+          // container behaviour. With our phase-1 CFF metadata
+          // (msvShapeCategories / numLanes) Visio now RECOGNISES the
+          // shape as a CFF candidate but our cloned master doesn't have
+          // the full CFF plumbing — so Visio locks resize entirely.
+          // Patching this cell to V='0' restores the standard handles
+          // and unlocks click-drag resize. Mirrors the BPMN_M-branch
+          // patch at lines ~2069-2074. No-op if the cell isn't present.
+          poolMasterXml = poolMasterXml.replace(
+            "N='NoObjHandles' V='1'",
+            "N='NoObjHandles' V='0'",
+          );
+
           // Patch cached V values from v1.5 natural dims to instance dims.
           //
           // The natural pool master has THREE places that cache W=5 and
