@@ -54,6 +54,8 @@ export default async function DashboardPage() {
         viewingAsEmail=""
         isSuperuser={isSuperuser(session)}
         usageSnapshot={null}
+        showTierPicker={false}
+        tierCards={[]}
       />
     );
   }
@@ -111,6 +113,34 @@ export default async function DashboardPage() {
   // the chip just doesn't render in that case.
   const usageSnapshot = await getUsageSnapshot(effectiveUserId);
 
+  // Tier picker on first sign-in: load hasChosenTier flag for the
+  // SIGNED-IN user (not the impersonated one — an admin viewing another
+  // user shouldn't see THEIR picker). If false AND no impersonation,
+  // we'll render the welcome modal. The four tier rows ship along so
+  // the picker can render without a separate client-side fetch.
+  const realUser = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { hasChosenTier: true },
+  });
+  const showTierPicker = !viewing && !realUser?.hasChosenTier;
+  const tierCards = showTierPicker
+    ? await prisma.subscriptionLevel.findMany({
+        orderBy: { sortOrder: "asc" },
+        select: {
+          id: true,
+          name: true,
+          priceMonthly: true,
+          maxProjects: true,
+          maxDiagramsPerTypePerProject: true,
+          maxArchimateDiagramsTotal: true,
+          maxAiAttempts: true,
+          maxIndividualExports: true,
+          maxBulkExports: true,
+          trialDays: true,
+        },
+      })
+    : [];
+
   return (
     <DashboardClient
       projects={projects}
@@ -126,6 +156,8 @@ export default async function DashboardPage() {
       impersonationMode={impersonationMode}
       isSuperuser={isSuperuser(session)}
       usageSnapshot={usageSnapshot}
+      showTierPicker={showTierPicker}
+      tierCards={tierCards}
     />
   );
 }

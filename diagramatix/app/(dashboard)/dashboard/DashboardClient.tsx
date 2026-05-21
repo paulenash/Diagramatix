@@ -8,6 +8,7 @@ import { SCHEMA_VERSION } from "@/app/lib/diagram/types";
 import { ImpersonationBanner } from "@/app/components/ImpersonationBanner";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 import { UsagePopover } from "@/app/components/UsagePopover";
+import { TierPicker, type TierCard } from "@/app/components/TierPicker";
 
 interface DiagramSummary {
   id: string;
@@ -46,6 +47,11 @@ interface Props {
    *  has no tier (legacy) or hasn't yet been seeded. Drives the
    *  subscription chip + popover. */
   usageSnapshot?: import("@/app/lib/subscription").UsageSnapshot | null;
+  /** When true, render the welcome TierPicker modal until the user
+   *  picks or skips. Suppressed during impersonation. */
+  showTierPicker?: boolean;
+  /** Tier rows for the picker. Empty if showTierPicker is false. */
+  tierCards?: TierCard[];
 }
 
 const DIAGRAM_TYPE_LABELS: Record<string, string> = {
@@ -147,7 +153,7 @@ function DiagramCard({
   );
 }
 
-export function DashboardClient({ projects: initialProjects, unorganized: initialUnorganized, userName, userEmail, orgName, orgRole, version, readOnly, viewingAsName, viewingAsEmail, impersonationMode, isSuperuser: isSu, usageSnapshot }: Props) {
+export function DashboardClient({ projects: initialProjects, unorganized: initialUnorganized, userName, userEmail, orgName, orgRole, version, readOnly, viewingAsName, viewingAsEmail, impersonationMode, isSuperuser: isSu, usageSnapshot, showTierPicker, tierCards }: Props) {
   // Owner / Admin can use the destructive hard-delete path. Read-only
   // (impersonation) sessions are always denied — the server enforces
   // the same rule independently.
@@ -156,6 +162,10 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
   const [projects, setProjects] = useState(initialProjects);
   const [unorganized, setUnorganized] = useState(initialUnorganized);
   const [showUsagePopover, setShowUsagePopover] = useState(false);
+  // Welcome tier picker — initialised from the SSR-fetched flag. After
+  // the user picks or skips, we close locally (router.refresh() is fired
+  // by the picker itself so the next render gets hasChosenTier=true).
+  const [tierPickerOpen, setTierPickerOpen] = useState(!!showTierPicker);
 
   // Re-fetch projects + unorganised diagrams from the API and update local
   // state. Used after operations that mutate the user's content from outside
@@ -1105,26 +1115,33 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
           {usageSnapshot && (
             <button
               onClick={() => setShowUsagePopover(true)}
-              className={`text-xs font-medium border rounded px-2 py-0.5 ml-2 hover:bg-blue-50 ${
+              className={`inline-flex items-center gap-2 text-sm font-medium border rounded-md px-3 py-1.5 ml-3 transition-colors ${
                 usageSnapshot.isAdmin
-                  ? "text-orange-600 border-orange-300"
+                  ? "text-orange-700 border-orange-300 bg-orange-50 hover:bg-orange-100"
                   : usageSnapshot.trial.expired
-                  ? "text-red-700 border-red-300 hover:bg-red-50"
-                  : "text-blue-700 border-blue-300"
+                  ? "text-red-700 border-red-300 bg-red-50 hover:bg-red-100"
+                  : "text-blue-700 border-blue-300 bg-blue-50 hover:bg-blue-100"
               }`}
               title={
                 usageSnapshot.isAdmin
-                  ? "Administrator — bypasses all limits"
+                  ? "Administrator — bypasses all limits. Click for usage details."
                   : usageSnapshot.trial.expired
-                  ? "Trial expired — click for details"
-                  : "View subscription usage"
+                  ? "Trial expired — click for details and upgrade"
+                  : "View subscription usage and limits"
               }
             >
-              {usageSnapshot.tier.name}
+              <svg width={14} height={14} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <rect x={2} y={3} width={12} height={10} rx={2} />
+                <path d="M2 7h12" />
+                <path d="M5 11h3" />
+              </svg>
+              <span>Subscription:</span>
+              <strong className="font-semibold">{usageSnapshot.tier.name}</strong>
               {usageSnapshot.trial.daysRemaining !== null && !usageSnapshot.isAdmin && !usageSnapshot.trial.expired && (
-                <span className="ml-1 text-[10px] opacity-70">
-                  • {usageSnapshot.trial.daysRemaining}d
-                </span>
+                <span className="text-xs opacity-80">• {usageSnapshot.trial.daysRemaining}d left</span>
+              )}
+              {usageSnapshot.trial.expired && !usageSnapshot.isAdmin && (
+                <span className="text-xs font-semibold">• expired</span>
               )}
             </button>
           )}
@@ -2303,6 +2320,13 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
         <UsagePopover
           mode={{ kind: "self", initial: usageSnapshot }}
           onClose={() => setShowUsagePopover(false)}
+        />
+      )}
+
+      {tierPickerOpen && tierCards && tierCards.length > 0 && (
+        <TierPicker
+          tiers={tierCards}
+          onDismiss={() => setTierPickerOpen(false)}
         />
       )}
     </div>
