@@ -261,6 +261,13 @@ function isAdminEmail(email: string): boolean {
 // Current-usage computation
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** Artifacts (data-object / data-store / text-annotation) are excluded
+ *  from element counts per the subscription spec. Shared with the
+ *  snapshot's element-max computation below. */
+const ELEMENT_ARTIFACT_TYPES = new Set([
+  "data-object", "data-store", "text-annotation",
+]);
+
 async function currentUsageFor(
   user: UserWithTier,
   metric: LimitMetric,
@@ -272,10 +279,25 @@ async function currentUsageFor(
       return prisma.project.count({ where: { userId: user.id } });
 
     case "diagramsPerTypePerProject": {
-      if (!ctx.projectId || !ctx.diagramType) return 0;
-      return prisma.diagram.count({
-        where: { projectId: ctx.projectId, type: ctx.diagramType },
+      // Per-action check: count diagrams matching the (project, type) tuple.
+      if (ctx.projectId && ctx.diagramType) {
+        return prisma.diagram.count({
+          where: { projectId: ctx.projectId, type: ctx.diagramType },
+        });
+      }
+      // Snapshot path (no ctx): worst-case across every (project, type)
+      // pair the user owns. Tells the popover "are you at the cap in any
+      // single project for any single type?" — same shape as the limit.
+      const groups = await prisma.diagram.groupBy({
+        by: ["projectId", "type"],
+        where: { userId: user.id, projectId: { not: null } },
+        _count: { id: true },
       });
+      let max = 0;
+      for (const g of groups) {
+        if (g._count.id > max) max = g._count.id;
+      }
+      return max;
     }
 
     case "archimateDiagramsTotal":
@@ -284,11 +306,35 @@ async function currentUsageFor(
       });
 
     case "nonBpmnElementsPerDiagram":
-    case "bpmnElementsPerDiagram":
-      // Element counts are NOT tracked in the DB — the caller passes the
-      // proposed count via ctx.proposedElementCount. Returning that value
-      // here means the >= check below compares like-with-like.
-      return ctx.proposedElementCount ?? 0;
+    case "bpmnElementsPerDiagram": {
+      // Per-action check: caller passes the proposed total count.
+      if (typeof ctx.proposedElementCount === "number") {
+        return ctx.proposedElementCount;
+      }
+      // Snapshot path (no ctx): max non-artifact element count across
+      // every diagram the user owns of the matching type. Loads `data`
+      // for each diagram so artifacts can be excluded; for popover use
+      // (one call per modal open) the cost is acceptable.
+      const isBpmn = metric === "bpmnElementsPerDiagram";
+      const diagrams = await prisma.diagram.findMany({
+        where: {
+          userId: user.id,
+          ...(isBpmn ? { type: "bpmn" } : { type: { not: "bpmn" } }),
+        },
+        select: { data: true },
+      });
+      let elementMax = 0;
+      for (const d of diagrams) {
+        const els = (d.data as { elements?: { type?: string }[] } | null)?.elements;
+        if (!Array.isArray(els)) continue;
+        let n = 0;
+        for (const e of els) {
+          if (e && typeof e === "object" && !ELEMENT_ARTIFACT_TYPES.has(e.type ?? "")) n++;
+        }
+        if (n > elementMax) elementMax = n;
+      }
+      return elementMax;
+    }
 
     case "aiAttempts":
     case "individualExports":
@@ -506,6 +552,17 @@ export async function getUsageSnapshot(
           periodLabel = `this month (resets ${isoDateUTC(next)})`;
         }
       }
+    } else if (metric === "diagramsPerTypePerProject") {
+      // Worst-case value: the highest count across every (project, type)
+      // pair the user owns. Tells them "are you at the cap somewhere?".
+      periodLabel = "max in any project";
+    } else if (
+      metric === "bpmnElementsPerDiagram" ||
+      metric === "nonBpmnElementsPerDiagram"
+    ) {
+      // Worst-case value: the highest element count across every diagram
+      // of this type. Tells them "is any single diagram at the cap?".
+      periodLabel = "max in any diagram";
     } else {
       periodLabel = "current count";
     }
