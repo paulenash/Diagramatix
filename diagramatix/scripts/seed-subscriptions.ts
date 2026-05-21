@@ -137,6 +137,17 @@ async function main() {
     console.log(`  ✔ ${backfill.count} user(s) backfilled with subscriptionAssignedAt`);
   }
 
+  // Backfill hasChosenTier=true for every existing user — the welcome
+  // TierPicker modal only fires for accounts that haven't actively
+  // picked, and grandfathered accounts never had the chance to. Idempotent.
+  const tierPickerBackfill = await prisma.user.updateMany({
+    where: { hasChosenTier: false, subscriptionLevelId: { not: null } },
+    data: { hasChosenTier: true },
+  });
+  if (tierPickerBackfill.count > 0) {
+    console.log(`  ✔ ${tierPickerBackfill.count} existing user(s) marked hasChosenTier=true`);
+  }
+
   const counts = await prisma.user.groupBy({
     by: ["subscriptionLevelId"],
     _count: { id: true },

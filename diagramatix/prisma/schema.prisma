@@ -89,6 +89,12 @@ model User {
   // expiry (30 days from this date for Free). Set on registration and
   // updated by the admin "Change Tier" action.
   subscriptionAssignedAt DateTime?
+  // True once the user has actively chosen (or skipped past) the
+  // welcome tier picker. Existing users are backfilled to true by
+  // scripts/seed-subscriptions.ts so they don't see the picker on
+  // their next visit. New sign-ups start at false; the dashboard
+  // shows the TierPicker modal until the user picks or skips.
+  hasChosenTier       Boolean  @default(false)
   usageCounters       UsageCounter[]
   // Per-user UI prefs. Currently stores the collapsed state of
   // template-group headers in the editor menu, keyed like
