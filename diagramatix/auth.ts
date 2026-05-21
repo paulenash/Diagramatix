@@ -92,7 +92,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 password: "",
                 // New sign-ups start on Free. Existing users were
                 // grandfathered to Expert by scripts/seed-subscriptions.ts.
+                // subscriptionAssignedAt drives Free's 30-day trial expiry.
                 subscriptionLevelId: "free",
+                subscriptionAssignedAt: new Date(),
               },
             });
             user.id = created.id;

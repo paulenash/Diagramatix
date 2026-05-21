@@ -34,8 +34,10 @@ export async function POST(req: Request) {
         password: hashedPassword,
         // New sign-ups start on Free. Existing users were grandfathered to
         // Expert by scripts/seed-subscriptions.ts so launch doesn't impose
-        // limits retroactively.
+        // limits retroactively. subscriptionAssignedAt drives the Free
+        // tier's 30-day trial expiry.
         subscriptionLevelId: "free",
+        subscriptionAssignedAt: new Date(),
       },
       select: { id: true, email: true, name: true },
     });

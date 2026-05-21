@@ -85,6 +85,10 @@ model User {
   // the "Administration" tier shown in the UI is derived, not stored.
   subscriptionLevelId String?
   subscriptionLevel   SubscriptionLevel? @relation(fields: [subscriptionLevelId], references: [id])
+  // When the user landed on their current tier. Drives Free-tier trial
+  // expiry (30 days from this date for Free). Set on registration and
+  // updated by the admin "Change Tier" action.
+  subscriptionAssignedAt DateTime?
   usageCounters       UsageCounter[]
   // Per-user UI prefs. Currently stores the collapsed state of
   // template-group headers in the editor menu, keyed like
@@ -245,6 +249,11 @@ model SubscriptionLevel {
   individualImportsResetMonthly Boolean  @default(true)
   maxBulkExports                Int?
   maxBulkImports                Int?
+  // Days from subscriptionAssignedAt before the tier expires and the
+  // user is soft-blocked from any further creation / AI / export /
+  // import action. Null = no expiry (the default for paid tiers).
+  // Free is seeded with 30.
+  trialDays                     Int?
 
   users     User[]
   createdAt DateTime @default(now())

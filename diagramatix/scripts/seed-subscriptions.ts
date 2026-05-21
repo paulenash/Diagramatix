@@ -41,6 +41,7 @@ type TierSeed = {
   individualImportsResetMonthly: boolean;
   maxBulkExports: number | null;
   maxBulkImports: number | null;
+  trialDays: number | null;
 };
 
 const TIERS: TierSeed[] = [
@@ -59,6 +60,7 @@ const TIERS: TierSeed[] = [
     individualImportsResetMonthly: false,   // "2 individual diagram imports" — lifetime
     maxBulkExports: 0,
     maxBulkImports: 0,
+    trialDays: 30,                          // Free is time-limited to 30 days from signup
   },
   {
     id: "introductory", name: "Introductory", priceMonthly: 7000, sortOrder: 1,
@@ -72,6 +74,7 @@ const TIERS: TierSeed[] = [
     maxIndividualImports: null, individualImportsResetMonthly: true,
     maxBulkExports: 2,
     maxBulkImports: 2,
+    trialDays: null,
   },
   {
     id: "professional", name: "Professional", priceMonthly: 15000, sortOrder: 2,
@@ -85,6 +88,7 @@ const TIERS: TierSeed[] = [
     maxIndividualImports: null, individualImportsResetMonthly: true,
     maxBulkExports: null,
     maxBulkImports: null,
+    trialDays: null,
   },
   {
     id: "expert", name: "Expert", priceMonthly: 27000, sortOrder: 3,
@@ -98,6 +102,7 @@ const TIERS: TierSeed[] = [
     maxIndividualImports: null, individualImportsResetMonthly: true,
     maxBulkExports: null,
     maxBulkImports: null,
+    trialDays: null,
   },
 ];
 
@@ -114,11 +119,23 @@ async function main() {
   }
 
   console.log("\nGrandfathering existing users to Expert...");
+  const now = new Date();
   const result = await prisma.user.updateMany({
     where: { subscriptionLevelId: null },
-    data: { subscriptionLevelId: "expert" },
+    data: { subscriptionLevelId: "expert", subscriptionAssignedAt: now },
   });
   console.log(`  ✔ ${result.count} user(s) set to expert`);
+
+  // Backfill subscriptionAssignedAt for any user who already has a tier
+  // but no assignment timestamp (e.g. an earlier run of this seed before
+  // the trial-expiry change). Idempotent — only touches null timestamps.
+  const backfill = await prisma.user.updateMany({
+    where: { subscriptionAssignedAt: null, subscriptionLevelId: { not: null } },
+    data: { subscriptionAssignedAt: now },
+  });
+  if (backfill.count > 0) {
+    console.log(`  ✔ ${backfill.count} user(s) backfilled with subscriptionAssignedAt`);
+  }
 
   const counts = await prisma.user.groupBy({
     by: ["subscriptionLevelId"],

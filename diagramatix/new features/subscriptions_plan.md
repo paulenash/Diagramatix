@@ -17,6 +17,7 @@ This plan introduces four real subscription tiers — **Free, Introductory, Prof
 - **Admin tier**: derived from `isSuperuser(session)`, not stored. Admins always bypass enforcement; their popover shows usage but every "limit" displays as "—".
 - **Subscription scope**: per User (not per Org). `User.subscriptionLevelId` foreign-keys the `SubscriptionLevel` table.
 - **Existing-user default at launch**: all existing users are grandfathered to **Expert** (the top tier). New signups after launch start on **Free**. Admin downgrades grandfathered users manually as the user base evolves.
+- **Free is a 30-day trial.** `SubscriptionLevel.trialDays` is `30` for Free, `null` for paid tiers. `User.subscriptionAssignedAt` is set to `NOW()` on signup and on every admin tier change. Once `subscriptionAssignedAt + trialDays` is past, the user is soft-blocked from any further creation / AI / export / import (same shape as over-limit handling). Existing content stays viewable and editable.
 - **Over-limit handling**: soft block. Existing over-limit content stays read/edit-able; new creation / new AI attempt / new export is blocked until the user is back under the cap or upgrades.
 
 ---
