@@ -41,7 +41,13 @@ const FULL_BACKUP_ENTRY = "full-backup.json";
  *  predictably in the JSON for human inspection. */
 export const FULL_BACKUP_TABLE_ORDER = [
   "Org",
+  // SubscriptionLevel must restore BEFORE User — User.subscriptionLevelId
+  // FKs this table. Free's trialDays + every admin-edited limit lives here.
+  "SubscriptionLevel",
   "User",
+  // UsageCounter FKs User. Restores immediately after so each user's
+  // event-counter history (AI attempts, exports, imports) carries.
+  "UsageCounter",
   "OrgMember",
   "Project",
   "Diagram",
@@ -70,7 +76,9 @@ export interface FullBackupPayload {
    *  strings, Json columns are pass-through objects. */
   tables: {
     Org: unknown[];
+    SubscriptionLevel: unknown[];
     User: unknown[];
+    UsageCounter: unknown[];
     OrgMember: unknown[];
     Project: unknown[];
     Diagram: unknown[];
@@ -93,11 +101,13 @@ export async function buildFullBackup(
   // path, and the dataset size at the pilot scale (<50 users, <500
   // diagrams) easily fits in RAM.
   const [
-    orgs, users, orgMembers, projects, diagrams, history,
-    templates, prompts, rules,
+    orgs, subscriptionLevels, users, usageCounters, orgMembers,
+    projects, diagrams, history, templates, prompts, rules,
   ] = await Promise.all([
     prisma.org.findMany({ orderBy: { createdAt: "asc" } }),
+    prisma.subscriptionLevel.findMany({ orderBy: { sortOrder: "asc" } }),
     prisma.user.findMany({ orderBy: { createdAt: "asc" } }),
+    prisma.usageCounter.findMany({ orderBy: { updatedAt: "asc" } }),
     prisma.orgMember.findMany({ orderBy: { createdAt: "asc" } }),
     prisma.project.findMany({ orderBy: { createdAt: "asc" } }),
     prisma.diagram.findMany({ orderBy: { createdAt: "asc" } }),
@@ -128,7 +138,9 @@ export async function buildFullBackup(
     tableOrder: FULL_BACKUP_TABLE_ORDER,
     counts: {
       Org: orgs.length,
+      SubscriptionLevel: subscriptionLevels.length,
       User: users.length,
+      UsageCounter: usageCounters.length,
       OrgMember: orgMembers.length,
       Project: projects.length,
       Diagram: diagrams.length,
@@ -139,7 +151,9 @@ export async function buildFullBackup(
     },
     tables: {
       Org: serialise(orgs as Record<string, unknown>[]),
+      SubscriptionLevel: serialise(subscriptionLevels as Record<string, unknown>[]),
       User: serialise(users as Record<string, unknown>[]),
+      UsageCounter: serialise(usageCounters as Record<string, unknown>[]),
       OrgMember: serialise(orgMembers as Record<string, unknown>[]),
       Project: serialise(projects as Record<string, unknown>[]),
       Diagram: serialise(diagrams as Record<string, unknown>[]),
@@ -197,15 +211,17 @@ export interface FullRestoreResult {
  *  must be converted back to a `Date` before Prisma will accept it. Json
  *  columns are pass-through (Prisma takes plain objects). */
 const DATE_FIELDS_BY_MODEL: Record<string, string[]> = {
-  Org:             ["createdAt"],
-  User:            ["resetTokenExpiry", "createdAt"],
-  OrgMember:       ["createdAt"],
-  Project:         ["createdAt", "updatedAt"],
-  Diagram:         ["createdAt", "updatedAt"],
-  DiagramHistory:  ["createdAt"],
-  DiagramTemplate: ["createdAt", "updatedAt"],
-  Prompt:          ["planUpdatedAt", "createdAt", "updatedAt"],
-  DiagramRules:    ["createdAt", "updatedAt"],
+  Org:               ["createdAt"],
+  SubscriptionLevel: ["createdAt", "updatedAt"],
+  User:              ["resetTokenExpiry", "createdAt", "lastSeenAt", "subscriptionAssignedAt"],
+  UsageCounter:      ["updatedAt"],
+  OrgMember:         ["createdAt"],
+  Project:           ["createdAt", "updatedAt"],
+  Diagram:           ["createdAt", "updatedAt"],
+  DiagramHistory:    ["createdAt"],
+  DiagramTemplate:   ["createdAt", "updatedAt"],
+  Prompt:            ["planUpdatedAt", "createdAt", "updatedAt"],
+  DiagramRules:      ["createdAt", "updatedAt"],
 };
 
 function convertDates(model: string, row: Record<string, unknown>): Record<string, unknown> {
@@ -248,7 +264,8 @@ export async function restoreFullBackupWipe(
     await tx.$executeRawUnsafe(
       'TRUNCATE TABLE ' +
       '"DiagramRules", "Prompt", "DiagramTemplate", "DiagramHistory", ' +
-      '"Diagram", "Project", "OrgMember", "User", "Org" ' +
+      '"Diagram", "Project", "OrgMember", "UsageCounter", "User", ' +
+      '"SubscriptionLevel", "Org" ' +
       'RESTART IDENTITY CASCADE',
     );
     log.push("Truncated all tables");
@@ -268,20 +285,31 @@ export async function restoreFullBackupWipe(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const anyData = data as any[];
       switch (model) {
-        case "Org":             await tx.org.createMany({ data: anyData }); break;
-        case "User":            await tx.user.createMany({ data: anyData }); break;
-        case "OrgMember":       await tx.orgMember.createMany({ data: anyData }); break;
-        case "Project":         await tx.project.createMany({ data: anyData }); break;
-        case "Diagram":         await tx.diagram.createMany({ data: anyData }); break;
-        case "DiagramHistory":  await tx.diagramHistory.createMany({ data: anyData }); break;
-        case "DiagramTemplate": await tx.diagramTemplate.createMany({ data: anyData }); break;
-        case "Prompt":          await tx.prompt.createMany({ data: anyData }); break;
-        case "DiagramRules":    await tx.diagramRules.createMany({ data: anyData }); break;
+        case "Org":               await tx.org.createMany({ data: anyData }); break;
+        case "SubscriptionLevel": await tx.subscriptionLevel.createMany({ data: anyData }); break;
+        case "User":              await tx.user.createMany({ data: anyData }); break;
+        case "UsageCounter":      await tx.usageCounter.createMany({ data: anyData }); break;
+        case "OrgMember":         await tx.orgMember.createMany({ data: anyData }); break;
+        case "Project":           await tx.project.createMany({ data: anyData }); break;
+        case "Diagram":           await tx.diagram.createMany({ data: anyData }); break;
+        case "DiagramHistory":    await tx.diagramHistory.createMany({ data: anyData }); break;
+        case "DiagramTemplate":   await tx.diagramTemplate.createMany({ data: anyData }); break;
+        case "Prompt":            await tx.prompt.createMany({ data: anyData }); break;
+        case "DiagramRules":      await tx.diagramRules.createMany({ data: anyData }); break;
       }
       inserted[model] = rows.length;
       log.push(`  ${model}: ${rows.length} row(s) inserted`);
     }
   });
+
+  // Pre-1.12 backups won't carry SubscriptionLevel rows. Users restored
+  // from those backups have subscriptionLevelId = null (the column itself
+  // is also new), so there's no FK violation, but the admin will want to
+  // run scripts/seed-subscriptions.ts afterwards to populate the tiers
+  // and grandfather everyone. Warn in the log so it's obvious.
+  if ((inserted.SubscriptionLevel ?? 0) === 0) {
+    log.push("⚠ SubscriptionLevel table is empty after restore (pre-1.12 backup?). Run scripts/seed-subscriptions.ts to populate tiers and grandfather existing users.");
+  }
 
   log.push("✔ Wipe-and-reload restore complete");
   return { mode: "wipe", inserted, log };
