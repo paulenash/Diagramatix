@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
+import { UsagePopover } from "@/app/components/UsagePopover";
 
 interface UserRow {
   id: string;
@@ -13,6 +14,10 @@ interface UserRow {
   currentDiagramId: string | null;
   currentDiagramName: string | null;
   _count: { projects: number; diagrams: number };
+  /** Display label for the Subscription column — "Administration" for
+   *  SUPERUSER_EMAILS users, otherwise the SubscriptionLevel.name. */
+  subscriptionLabel: string;
+  isAdmin: boolean;
 }
 
 interface Props {
@@ -52,6 +57,15 @@ export function AdminClient({ users, currentUserId }: Props) {
     userId: string;
     email: string;
     target?: string;
+  } | null>(null);
+
+  // UsagePopover target — null when closed. Opening the popover fetches
+  // fresh usage data from /api/admin/users/[id]/usage so the admin sees
+  // up-to-the-moment counts.
+  const [usagePopover, setUsagePopover] = useState<{
+    userId: string;
+    userEmail: string;
+    userName: string | null;
   } | null>(null);
 
   async function handleViewAs(userId: string, mode: "view" | "edit", target?: string) {
@@ -120,14 +134,15 @@ export function AdminClient({ users, currentUserId }: Props) {
         <table className="w-full bg-white rounded-lg border border-gray-200 overflow-hidden table-fixed">
           <thead>
             <tr className="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              <th className="px-4 py-3" style={{ width: "16%" }}>Name</th>
-              <th className="px-4 py-3" style={{ width: "18%" }}>Email</th>
-              <th className="px-4 py-3" style={{ width: "13%" }}>Status</th>
-              <th className="px-4 py-3" style={{ width: "20%" }}>Working on</th>
-              <th className="px-4 py-3 text-center" style={{ width: "7%" }}>Projects</th>
-              <th className="px-4 py-3 text-center" style={{ width: "7%" }}>Diagrams</th>
-              <th className="px-4 py-3" style={{ width: "9%" }}>Registered</th>
-              <th className="px-4 py-3" style={{ width: "10%" }}></th>
+              <th className="px-4 py-3" style={{ width: "15%" }}>Name</th>
+              <th className="px-4 py-3" style={{ width: "17%" }}>Email</th>
+              <th className="px-4 py-3" style={{ width: "11%" }}>Status</th>
+              <th className="px-4 py-3" style={{ width: "18%" }}>Working on</th>
+              <th className="px-4 py-3" style={{ width: "11%" }}>Subscription</th>
+              <th className="px-4 py-3 text-center" style={{ width: "6%" }}>Projects</th>
+              <th className="px-4 py-3 text-center" style={{ width: "6%" }}>Diagrams</th>
+              <th className="px-4 py-3" style={{ width: "8%" }}>Registered</th>
+              <th className="px-4 py-3" style={{ width: "8%" }}></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -165,6 +180,19 @@ export function AdminClient({ users, currentUserId }: Props) {
                     ) : (
                       <span className="text-gray-300">—</span>
                     )}
+                  </td>
+                  <td className="px-4 py-3 text-xs">
+                    <button
+                      onClick={() => setUsagePopover({ userId: u.id, userEmail: u.email, userName: u.name })}
+                      className={`inline-block text-left font-medium border rounded px-2 py-0.5 hover:bg-blue-50 ${
+                        u.isAdmin
+                          ? "text-orange-600 border-orange-300"
+                          : "text-blue-700 border-blue-300"
+                      }`}
+                      title={u.isAdmin ? "Administrator — bypasses all limits" : "View usage and change tier"}
+                    >
+                      {u.subscriptionLabel}
+                    </button>
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-600 text-center">{u._count.projects}</td>
                   <td className="px-4 py-3 text-sm text-gray-600 text-center">{u._count.diagrams}</td>
@@ -216,6 +244,19 @@ export function AdminClient({ users, currentUserId }: Props) {
             setEditConfirm(null);
             if (c) handleViewAs(c.userId, "edit", c.target);
           }}
+        />
+      )}
+
+      {usagePopover && (
+        <UsagePopover
+          mode={{
+            kind: "admin",
+            userId: usagePopover.userId,
+            userEmail: usagePopover.userEmail,
+            userName: usagePopover.userName,
+          }}
+          onClose={() => setUsagePopover(null)}
+          onTierChanged={() => router.refresh()}
         />
       )}
     </div>

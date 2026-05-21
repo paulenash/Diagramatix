@@ -6,6 +6,7 @@ import { DashboardClient } from "./DashboardClient";
 import { getEffectiveUserId, isImpersonating, isSuperuser, getImpersonationMode } from "@/app/lib/superuser";
 import { ARCHIVE_PROJECT_NAME } from "@/app/lib/archive";
 import { tryGetCurrentOrgId } from "@/app/lib/auth/orgContext";
+import { getUsageSnapshot } from "@/app/lib/subscription";
 
 export default async function DashboardPage() {
   const session = await auth();
@@ -52,6 +53,7 @@ export default async function DashboardPage() {
         viewingAsName=""
         viewingAsEmail=""
         isSuperuser={isSuperuser(session)}
+        usageSnapshot={null}
       />
     );
   }
@@ -103,6 +105,12 @@ export default async function DashboardPage() {
 
   const impersonationMode = viewing ? getImpersonationMode(cookieStore) : undefined;
 
+  // Subscription snapshot for the chip + popover. Computed for the
+  // EFFECTIVE user so impersonation surfaces the impersonated user's
+  // tier and counts. Tolerate null (e.g. user not found mid-flight) —
+  // the chip just doesn't render in that case.
+  const usageSnapshot = await getUsageSnapshot(effectiveUserId);
+
   return (
     <DashboardClient
       projects={projects}
@@ -117,6 +125,7 @@ export default async function DashboardPage() {
       viewingAsEmail={viewingAsEmail}
       impersonationMode={impersonationMode}
       isSuperuser={isSuperuser(session)}
+      usageSnapshot={usageSnapshot}
     />
   );
 }

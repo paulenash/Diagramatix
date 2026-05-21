@@ -7,6 +7,7 @@ import type { DiagramType } from "@/app/lib/diagram/types";
 import { SCHEMA_VERSION } from "@/app/lib/diagram/types";
 import { ImpersonationBanner } from "@/app/components/ImpersonationBanner";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
+import { UsagePopover } from "@/app/components/UsagePopover";
 
 interface DiagramSummary {
   id: string;
@@ -41,6 +42,10 @@ interface Props {
   viewingAsEmail?: string;
   impersonationMode?: "view" | "edit";
   isSuperuser?: boolean;
+  /** Subscription snapshot for the effective user. Null when the user
+   *  has no tier (legacy) or hasn't yet been seeded. Drives the
+   *  subscription chip + popover. */
+  usageSnapshot?: import("@/app/lib/subscription").UsageSnapshot | null;
 }
 
 const DIAGRAM_TYPE_LABELS: Record<string, string> = {
@@ -142,7 +147,7 @@ function DiagramCard({
   );
 }
 
-export function DashboardClient({ projects: initialProjects, unorganized: initialUnorganized, userName, userEmail, orgName, orgRole, version, readOnly, viewingAsName, viewingAsEmail, impersonationMode, isSuperuser: isSu }: Props) {
+export function DashboardClient({ projects: initialProjects, unorganized: initialUnorganized, userName, userEmail, orgName, orgRole, version, readOnly, viewingAsName, viewingAsEmail, impersonationMode, isSuperuser: isSu, usageSnapshot }: Props) {
   // Owner / Admin can use the destructive hard-delete path. Read-only
   // (impersonation) sessions are always denied — the server enforces
   // the same rule independently.
@@ -150,6 +155,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
   const router = useRouter();
   const [projects, setProjects] = useState(initialProjects);
   const [unorganized, setUnorganized] = useState(initialUnorganized);
+  const [showUsagePopover, setShowUsagePopover] = useState(false);
 
   // Re-fetch projects + unorganised diagrams from the API and update local
   // state. Used after operations that mutate the user's content from outside
@@ -1096,6 +1102,32 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
             className="h-8 w-auto"
           />
           {version ? <span className="text-xs text-gray-400 ml-1">v{SCHEMA_VERSION}.{version}</span> : null}
+          {usageSnapshot && (
+            <button
+              onClick={() => setShowUsagePopover(true)}
+              className={`text-xs font-medium border rounded px-2 py-0.5 ml-2 hover:bg-blue-50 ${
+                usageSnapshot.isAdmin
+                  ? "text-orange-600 border-orange-300"
+                  : usageSnapshot.trial.expired
+                  ? "text-red-700 border-red-300 hover:bg-red-50"
+                  : "text-blue-700 border-blue-300"
+              }`}
+              title={
+                usageSnapshot.isAdmin
+                  ? "Administrator — bypasses all limits"
+                  : usageSnapshot.trial.expired
+                  ? "Trial expired — click for details"
+                  : "View subscription usage"
+              }
+            >
+              {usageSnapshot.tier.name}
+              {usageSnapshot.trial.daysRemaining !== null && !usageSnapshot.isAdmin && !usageSnapshot.trial.expired && (
+                <span className="ml-1 text-[10px] opacity-70">
+                  • {usageSnapshot.trial.daysRemaining}d
+                </span>
+              )}
+            </button>
+          )}
         </div>
         <div className="flex items-center gap-3">
           {!readOnly && (
@@ -2264,6 +2296,13 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
           message={confirmDialog.message}
           onConfirm={confirmDialog.onConfirm}
           onCancel={() => setConfirmDialog(null)}
+        />
+      )}
+
+      {showUsagePopover && usageSnapshot && (
+        <UsagePopover
+          mode={{ kind: "self", initial: usageSnapshot }}
+          onClose={() => setShowUsagePopover(false)}
         />
       )}
     </div>
