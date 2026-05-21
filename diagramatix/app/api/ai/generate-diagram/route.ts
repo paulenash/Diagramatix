@@ -3,7 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import Anthropic from "@anthropic-ai/sdk";
 import { splitRulesByEnforcement } from "@/app/lib/ai/splitRules";
-import { gateLimit, recordUsage } from "@/app/lib/subscription-route";
+import { gateLimit, gateElementCount, recordUsage } from "@/app/lib/subscription-route";
 
 const DIAGRAM_PROMPTS: Record<string, string> = {
   "state-machine": `You are a UML State Machine diagram expert. Output ONLY valid JSON with elements and connections.
@@ -214,6 +214,17 @@ export async function POST(req: Request) {
       }
     }
 
+    // Element-count gate. Non-BPMN diagrams are capped on Free at 15
+    // nodes; reject before recording the AI quota so users don't burn
+    // attempts on over-cap output.
+    if (Array.isArray(parsed.elements)) {
+      const elementBlock = await gateElementCount(
+        session.user.id,
+        diagramType,
+        { elements: parsed.elements },
+      );
+      if (elementBlock) return elementBlock;
+    }
     // Record AFTER success so failed attempts don't burn the user's quota.
     await recordUsage(session.user.id, "aiAttempts");
     return NextResponse.json({ parsed, diagramType });

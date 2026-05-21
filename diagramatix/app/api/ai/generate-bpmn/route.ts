@@ -4,7 +4,7 @@ import { prisma } from "@/app/lib/db";
 import { layoutBpmnDiagram } from "@/app/lib/diagram/bpmnLayout";
 import { planBpmn } from "@/app/lib/ai/planBpmn";
 import { splitRulesByEnforcement } from "@/app/lib/ai/splitRules";
-import { gateLimit, recordUsage } from "@/app/lib/subscription-route";
+import { gateLimit, gateElementCount, recordUsage } from "@/app/lib/subscription-route";
 
 export async function POST(req: Request) {
   const session = await auth();
@@ -51,6 +51,16 @@ export async function POST(req: Request) {
     const { plan } = result;
     console.log("[AI] Normalized:", plan.elements.length, "elements,", plan.connections.length, "connections");
     console.log("[AI] Types:", [...new Set(plan.elements.map(e => e.type))].join(", "));
+
+    // Element-count gate on the AI's element list BEFORE layout +
+    // counter bump. If we generated too many for the user's tier,
+    // return 403 without burning the AI quota.
+    const elementBlock = await gateElementCount(
+      session.user.id,
+      "bpmn",
+      { elements: plan.elements },
+    );
+    if (elementBlock) return elementBlock;
 
     const diagramData = layoutBpmnDiagram(plan.elements, plan.connections);
 

@@ -54,3 +54,48 @@ export async function recordUsage(
 ): Promise<void> {
   return recordUsageLib(userId, metric, delta);
 }
+
+/**
+ * Element-counting rules per the subscription spec: nodes only.
+ * Excludes connectors (which live in `data.connectors`, not
+ * `data.elements`, so they're already out) and artifact types
+ * (data-object, data-store, text-annotation).
+ */
+const ARTIFACT_TYPES = new Set(["data-object", "data-store", "text-annotation"]);
+
+export function countNodeElements(diagramData: unknown): number {
+  if (!diagramData || typeof diagramData !== "object") return 0;
+  const elements = (diagramData as { elements?: { type?: string }[] }).elements;
+  if (!Array.isArray(elements)) return 0;
+  let n = 0;
+  for (const e of elements) {
+    if (!e || typeof e !== "object") continue;
+    if (ARTIFACT_TYPES.has((e as { type?: string }).type ?? "")) continue;
+    n++;
+  }
+  return n;
+}
+
+/**
+ * Gate a per-diagram element-count limit at an AI / import entry point.
+ * Picks the BPMN or non-BPMN metric based on the diagram type, counts
+ * nodes in the proposed data, and returns a 403 NextResponse if the
+ * tier's cap is exceeded.
+ *
+ * Use at routes that bring in element data from outside:
+ *   - AI generate / plan routes (after the model returns)
+ *   - Import routes (after the parser succeeds)
+ *
+ * Do NOT use on the diagram-save endpoint — saves of already-over-cap
+ * diagrams must succeed so users can edit their way back under.
+ */
+export async function gateElementCount(
+  userId: string,
+  diagramType: string,
+  diagramData: unknown,
+): Promise<NextResponse | null> {
+  const count = countNodeElements(diagramData);
+  const metric: LimitMetric =
+    diagramType === "bpmn" ? "bpmnElementsPerDiagram" : "nonBpmnElementsPerDiagram";
+  return gateLimit(userId, metric, { proposedElementCount: count });
+}

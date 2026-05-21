@@ -4,7 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { importVisioV3 } from "@/app/lib/diagram/v3/importVisioV3";
 import { isReadOnlyImpersonation } from "@/app/lib/superuser";
-import { gateLimit, recordUsage } from "@/app/lib/subscription-route";
+import { gateLimit, gateElementCount, recordUsage } from "@/app/lib/subscription-route";
 import {
   requireRole,
   WRITE_ROLES,
@@ -121,6 +121,11 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   }
+
+  // Element-count gate on the parsed diagram. Reject BEFORE we touch
+  // the DB so the import counter isn't spent on an over-cap result.
+  const elementBlock = await gateElementCount(session.user.id, "bpmn", parsed.data);
+  if (elementBlock) return elementBlock;
 
   // ── Overwrite path ──
   if (overwriteDiagramId) {

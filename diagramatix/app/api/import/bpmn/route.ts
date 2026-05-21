@@ -4,7 +4,7 @@ import { auth } from "@/auth";
 import { prisma, pgPool } from "@/app/lib/db";
 import { importBpmnXml } from "@/app/lib/diagram/bpmn/importBpmnXml";
 import { isReadOnlyImpersonation } from "@/app/lib/superuser";
-import { gateLimit, recordUsage } from "@/app/lib/subscription-route";
+import { gateLimit, gateElementCount, recordUsage } from "@/app/lib/subscription-route";
 import {
   requireRole,
   WRITE_ROLES,
@@ -154,6 +154,12 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   }
+
+  // Element-count gate on the parsed diagram data. Reject BEFORE we
+  // touch the DB so the user's individualImports counter isn't spent
+  // on an over-cap import that never lands.
+  const elementBlock = await gateElementCount(session.user.id, "bpmn", parsed.data);
+  if (elementBlock) return elementBlock;
 
   // ── Overwrite path ──
   if (overwriteDiagramId) {

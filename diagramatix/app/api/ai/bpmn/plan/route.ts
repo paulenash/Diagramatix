@@ -9,7 +9,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { planBpmn } from "@/app/lib/ai/planBpmn";
 import { splitRulesByEnforcement } from "@/app/lib/ai/splitRules";
-import { gateLimit, recordUsage } from "@/app/lib/subscription-route";
+import { gateLimit, gateElementCount, recordUsage } from "@/app/lib/subscription-route";
 
 export async function POST(req: Request) {
   const session = await auth();
@@ -62,6 +62,15 @@ export async function POST(req: Request) {
     }
     const { plan, model } = result;
     console.log("[AI plan] returned:", plan.elements.length, "elements,", plan.connections.length, "connections");
+    // Element-count gate BEFORE we record the attempt — Free tier caps
+    // BPMN diagrams at 20 nodes; if the model returned more, surface a
+    // 403 and DON'T burn the user's quota.
+    const elementBlock = await gateElementCount(
+      session.user.id,
+      "bpmn",
+      { elements: plan.elements },
+    );
+    if (elementBlock) return elementBlock;
     // Record AFTER success so failed attempts don't burn the user's quota.
     await recordUsage(session.user.id, "aiAttempts");
     return NextResponse.json({

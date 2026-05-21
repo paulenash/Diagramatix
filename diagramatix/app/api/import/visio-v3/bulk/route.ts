@@ -5,7 +5,7 @@ import { prisma } from "@/app/lib/db";
 import { importVisioV3 } from "@/app/lib/diagram/v3/importVisioV3";
 import { listVisioPages } from "@/app/lib/diagram/v3/visioPages";
 import { isReadOnlyImpersonation } from "@/app/lib/superuser";
-import { gateLimit, recordUsage } from "@/app/lib/subscription-route";
+import { gateLimit, gateElementCount, recordUsage } from "@/app/lib/subscription-route";
 import {
   requireRole,
   WRITE_ROLES,
@@ -209,6 +209,21 @@ export async function POST(request: Request) {
     const pageMeta = pages[pageIndex];
     try {
       const parsed = await importVisioV3(buf, pageIndex);
+
+      // Element-count gate per page. If a page exceeds the user's BPMN
+      // cap, record it as an error and skip — other pages continue.
+      // Returning early would punish pages that are within the cap.
+      const elementBlock = await gateElementCount(session.user.id, "bpmn", parsed.data);
+      if (elementBlock) {
+        const body = await elementBlock.json().catch(() => ({}));
+        errors.push({
+          pageIndex,
+          pageName: pageMeta.name || `Page-${pageIndex + 1}`,
+          message: (body as { error?: string }).error ?? "Element-count limit exceeded for this page",
+        });
+        continue;
+      }
+
       // Resolve a non-clashing name: page name → +" (n)" within batch →
       // +" dd-mm-yy hh:mm" if it collides with an existing diagram.
       let name = pageMeta.name || `Page-${pageIndex + 1}`;

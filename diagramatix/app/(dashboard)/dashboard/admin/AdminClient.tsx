@@ -68,6 +68,47 @@ export function AdminClient({ users, currentUserId }: Props) {
     userName: string | null;
   } | null>(null);
 
+  // Two-stage delete confirmation. Stage 1: confirm the destructive
+  // action with a project/diagram count summary. Stage 2: require the
+  // admin to type the target email exactly. The server re-validates
+  // confirmEmail too, so a forged client can't skip stage 2.
+  const [deleteStage1, setDeleteStage1] = useState<{
+    userId: string;
+    email: string;
+    name: string | null;
+    projects: number;
+    diagrams: number;
+  } | null>(null);
+  const [deleteStage2, setDeleteStage2] = useState<typeof deleteStage1>(null);
+  const [deleteTypedEmail, setDeleteTypedEmail] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  async function performDelete() {
+    if (!deleteStage2) return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      const res = await fetch(`/api/admin/users/${deleteStage2.userId}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirmEmail: deleteTypedEmail }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setDeleteError(body.error ?? `Delete failed (${res.status})`);
+        return;
+      }
+      setDeleteStage2(null);
+      setDeleteTypedEmail("");
+      router.refresh();
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : "Delete failed");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   async function handleViewAs(userId: string, mode: "view" | "edit", target?: string) {
     await fetch("/api/admin/impersonate", {
       method: "POST",
@@ -218,6 +259,21 @@ export function AdminClient({ users, currentUserId }: Props) {
                         >
                           Edit
                         </button>
+                        {!u.isAdmin && (
+                          <button
+                            onClick={() => setDeleteStage1({
+                              userId: u.id,
+                              email: u.email,
+                              name: u.name,
+                              projects: u._count.projects,
+                              diagrams: u._count.diagrams,
+                            })}
+                            className="text-xs text-white font-medium border border-red-600 bg-red-600 hover:bg-red-700 rounded px-2 py-1"
+                            title={`Permanently delete ${u.email} and all their data`}
+                          >
+                            Delete
+                          </button>
+                        )}
                       </div>
                     )}
                   </td>
@@ -258,6 +314,93 @@ export function AdminClient({ users, currentUserId }: Props) {
           onClose={() => setUsagePopover(null)}
           onTierChanged={() => router.refresh()}
         />
+      )}
+
+      {/* Delete user — stage 1: count summary + warning, click-to-continue */}
+      {deleteStage1 && (
+        <ConfirmDialog
+          title="Delete user permanently?"
+          message={
+            `This will permanently delete ${deleteStage1.email} (${deleteStage1.name ?? "no name"}) and all of their data:\n\n` +
+            `  • ${deleteStage1.projects} project(s)\n` +
+            `  • ${deleteStage1.diagrams} diagram(s)\n` +
+            `  • All AI / export / import usage history\n` +
+            `  • Org memberships, templates, prompts, and rules\n\n` +
+            `This cannot be undone. The Org row itself is NOT deleted — it persists as an empty container even if this was its only member.\n\n` +
+            `Click Continue to confirm by typing the email.`
+          }
+          confirmLabel="Continue"
+          cancelLabel="Cancel"
+          destructive
+          onCancel={() => setDeleteStage1(null)}
+          onConfirm={() => {
+            const s = deleteStage1;
+            setDeleteStage1(null);
+            setDeleteTypedEmail("");
+            setDeleteError(null);
+            setDeleteStage2(s);
+          }}
+        />
+      )}
+
+      {/* Delete user — stage 2: type-email confirm */}
+      {deleteStage2 && (
+        <div
+          className="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !deleting) setDeleteStage2(null);
+          }}
+        >
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+            <div className="px-5 py-4">
+              <h3 className="text-sm font-semibold text-gray-900 mb-2">
+                Confirm by typing the email
+              </h3>
+              <p className="text-xs text-gray-600 mb-3">
+                To delete this account, type <strong>{deleteStage2.email}</strong> below.
+                This is irreversible.
+              </p>
+              <input
+                type="text"
+                autoFocus
+                value={deleteTypedEmail}
+                onChange={(e) => {
+                  setDeleteTypedEmail(e.target.value);
+                  setDeleteError(null);
+                }}
+                placeholder={deleteStage2.email}
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:border-red-400 focus:outline-none"
+              />
+              {deleteError && (
+                <p className="mt-2 text-xs text-red-700">{deleteError}</p>
+              )}
+            </div>
+            <div className="flex justify-end gap-2 px-5 py-3 border-t border-gray-100">
+              <button
+                disabled={deleting}
+                onClick={() => {
+                  setDeleteStage2(null);
+                  setDeleteTypedEmail("");
+                  setDeleteError(null);
+                }}
+                className="px-3 py-1.5 text-xs font-medium text-gray-700 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                disabled={
+                  deleting ||
+                  deleteTypedEmail.trim().toLowerCase() !==
+                    deleteStage2.email.trim().toLowerCase()
+                }
+                onClick={performDelete}
+                className="px-3 py-1.5 text-xs font-medium text-white rounded bg-red-600 hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {deleting ? "Deleting…" : "Delete permanently"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

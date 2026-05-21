@@ -65,6 +65,11 @@ interface Props {
   viewingAsEmail?: string;
   impersonationMode?: "view" | "edit";
   version?: number;
+  /** Subscription per-diagram element cap for THIS diagram's type.
+   *  null when the tier is unlimited or the user is a superuser. The
+   *  client-side ADD gate compares (current node count + 1) against
+   *  this value and shows a toast when blocked. */
+  elementCountLimit?: number | null;
 }
 
 function useAutoSave(
@@ -299,6 +304,7 @@ export function DiagramEditor({
   viewingAsEmail,
   impersonationMode,
   version,
+  elementCountLimit,
 }: Props) {
   const router = useRouter();
 
@@ -572,6 +578,31 @@ export function DiagramEditor({
     canUndo,
     canRedo,
   } = useDiagram(initialData);
+
+  // Subscription element-count gate. addElementGated wraps the reducer's
+  // addElement: when the user's tier sets a finite cap and the current
+  // node count is at or above it, we show a brief toast banner and
+  // refuse the add. Artifacts (data-object / data-store / text-
+  // annotation) don't count toward the cap, so we let them through.
+  const ARTIFACT_TYPES_GATED = new Set(["data-object", "data-store", "text-annotation"]);
+  const [elementLimitToast, setElementLimitToast] = useState<string | null>(null);
+  useEffect(() => {
+    if (!elementLimitToast) return;
+    const t = setTimeout(() => setElementLimitToast(null), 4000);
+    return () => clearTimeout(t);
+  }, [elementLimitToast]);
+  const addElementGated: typeof addElement = (symbolType, position, taskType, eventType, id, initial) => {
+    if (typeof elementCountLimit === "number" && !ARTIFACT_TYPES_GATED.has(symbolType)) {
+      const nodes = data.elements.filter(e => !ARTIFACT_TYPES_GATED.has(e.type)).length;
+      if (nodes >= elementCountLimit) {
+        setElementLimitToast(
+          `Element limit reached (${nodes}/${elementCountLimit}). Upgrade your subscription to add more.`,
+        );
+        return;
+      }
+    }
+    addElement(symbolType, position, taskType, eventType, id, initial);
+  };
 
   // Template edit state
   const [templateEditState, setTemplateEditState] = useState<{
@@ -1473,6 +1504,17 @@ export function DiagramEditor({
       {isImpersonating && viewingAsName !== undefined && viewingAsEmail !== undefined && (
         <ImpersonationBanner viewingAsName={viewingAsName ?? ""} viewingAsEmail={viewingAsEmail ?? ""} mode={impersonationMode} currentDiagramId={diagramId} />
       )}
+      {elementLimitToast && (
+        <div className="bg-red-50 border-b border-red-200 px-4 py-2 text-xs text-red-800 flex items-center justify-between">
+          <span>{elementLimitToast}</span>
+          <button
+            onClick={() => setElementLimitToast(null)}
+            className="text-red-700 hover:text-red-900 font-medium"
+          >
+            ✕
+          </button>
+        </div>
+      )}
       {/* Top bar */}
       <header className={`h-9 border-b border-gray-200 flex items-center px-2 gap-2 flex-shrink-0 ${isImpersonating ? "bg-orange-50" : ""}`}>
         <button
@@ -2306,7 +2348,7 @@ export function DiagramEditor({
         <Canvas
           data={data}
           diagramType={diagramType}
-          onAddElement={addElement}
+          onAddElement={addElementGated}
           onMoveElement={moveElement}
           onResizeElement={resizeElement}
           onUpdateLabel={updateLabel}
