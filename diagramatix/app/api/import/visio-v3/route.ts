@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { importVisioV3 } from "@/app/lib/diagram/v3/importVisioV3";
 import { isReadOnlyImpersonation } from "@/app/lib/superuser";
+import { gateLimit, recordUsage } from "@/app/lib/subscription-route";
 import {
   requireRole,
   WRITE_ROLES,
@@ -102,6 +103,10 @@ export async function POST(request: Request) {
     }
   }
 
+  // Subscription cap: individual imports.
+  const limitBlock = await gateLimit(session.user.id, "individualImports");
+  if (limitBlock) return limitBlock;
+
   let parsed: Awaited<ReturnType<typeof importVisioV3>>;
   try {
     const buf = await upload.arrayBuffer();
@@ -170,6 +175,8 @@ export async function POST(request: Request) {
     },
   });
 
+  // Record AFTER the diagram is committed so a failed parse doesn't burn quota.
+  await recordUsage(session.user.id, "individualImports");
   return NextResponse.json(
     { diagram, warnings: parsed.warnings, stats: parsed.stats },
     { status: 201 },

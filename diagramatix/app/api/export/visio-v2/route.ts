@@ -8,6 +8,7 @@ import { exportVisioV2 } from "@/app/lib/diagram/v2/exportVisioV2";
 import { DEFAULT_SYMBOL_COLORS, BW_SYMBOL_COLORS } from "@/app/lib/diagram/colors";
 import type { SymbolColorConfig } from "@/app/lib/diagram/colors";
 import { getCurrentOrgId, OrgContextError } from "@/app/lib/auth/orgContext";
+import { gateLimit, recordUsage } from "@/app/lib/subscription-route";
 
 /**
  * GET /api/export/visio-v2?diagramId=<id>
@@ -37,6 +38,10 @@ export async function GET(request: Request) {
   });
   if (!diagram) return NextResponse.json({ error: "Diagram not found" }, { status: 404 });
 
+  // Subscription cap: individual exports (V2 and V3 share the counter).
+  const limitBlock = await gateLimit(session.user.id, "individualExports");
+  if (limitBlock) return limitBlock;
+
   try {
     // Load BPMN_M stencil (has all masters) + template (has document.xml/theme for rendering)
     const stencilPath = path.join(process.cwd(), "public", "bpmn-stencil-v2.vssx");
@@ -58,6 +63,7 @@ export async function GET(request: Request) {
     const result = await exportVisioV2(data, diagram.name, stencilBuf.buffer, templateBuf.buffer, displayMode, effectiveColors);
     console.log("[visio-v2] Output size:", result.length, "bytes");
 
+    await recordUsage(session.user.id, "individualExports");
     return new NextResponse(result as any, {
       headers: {
         "Content-Type": "application/vnd.ms-visio.drawing",

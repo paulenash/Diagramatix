@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma, pgPool } from "@/app/lib/db";
 import { importBpmnXml } from "@/app/lib/diagram/bpmn/importBpmnXml";
 import { isReadOnlyImpersonation } from "@/app/lib/superuser";
+import { gateLimit, recordUsage } from "@/app/lib/subscription-route";
 import {
   requireRole,
   WRITE_ROLES,
@@ -124,6 +125,10 @@ export async function POST(request: Request) {
     }
   }
 
+  // Subscription cap: individual imports (BPMN + Visio single share the counter).
+  const limitBlock = await gateLimit(session.user.id, "individualImports");
+  if (limitBlock) return limitBlock;
+
   // Read the file as text. BPMN XML is UTF-8.
   let xmlText: string;
   try {
@@ -220,6 +225,8 @@ export async function POST(request: Request) {
     }
   }
 
+  // Record AFTER the diagram is committed so a failed parse doesn't burn quota.
+  await recordUsage(session.user.id, "individualImports");
   return NextResponse.json(
     { diagram, warnings: parsed.warnings, stats: parsed.stats },
     { status: 201 },

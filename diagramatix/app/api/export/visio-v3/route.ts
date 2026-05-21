@@ -9,6 +9,7 @@ import { profileByName } from "@/app/lib/diagram/v3/stencilProfile";
 import { DEFAULT_SYMBOL_COLORS, BW_SYMBOL_COLORS } from "@/app/lib/diagram/colors";
 import type { SymbolColorConfig } from "@/app/lib/diagram/colors";
 import { getCurrentOrgId, OrgContextError } from "@/app/lib/auth/orgContext";
+import { gateLimit, recordUsage } from "@/app/lib/subscription-route";
 
 /**
  * GET /api/export/visio-v3?diagramId=<id>
@@ -38,6 +39,12 @@ export async function GET(request: Request) {
     include: { project: true },
   });
   if (!diagram) return NextResponse.json({ error: "Diagram not found" }, { status: 404 });
+
+  // Subscription cap: individual exports. Free is lifetime; paid tiers are
+  // monthly. Bulk exports go through /api/export/visio-v3/bulk and use the
+  // separate bulkExports metric.
+  const limitBlock = await gateLimit(session.user.id, "individualExports");
+  if (limitBlock) return limitBlock;
 
   try {
     // Profile selects which stencil flavour to emit. `?profile=` accepts
@@ -71,6 +78,8 @@ export async function GET(request: Request) {
     );
 
     const suffix = profile.name === "diagramatix-v1.5" ? "v1.5" : "V3";
+    // Record AFTER the file is generated. Failed exports don't burn a quota.
+    await recordUsage(session.user.id, "individualExports");
     return new NextResponse(result as any, {
       headers: {
         "Content-Type": "application/vnd.ms-visio.drawing",

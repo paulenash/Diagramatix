@@ -4,6 +4,7 @@ import { prisma } from "@/app/lib/db";
 import { layoutBpmnDiagram } from "@/app/lib/diagram/bpmnLayout";
 import { planBpmn } from "@/app/lib/ai/planBpmn";
 import { splitRulesByEnforcement } from "@/app/lib/ai/splitRules";
+import { gateLimit, recordUsage } from "@/app/lib/subscription-route";
 
 export async function POST(req: Request) {
   const session = await auth();
@@ -20,6 +21,11 @@ export async function POST(req: Request) {
   if (!prompt?.trim()) {
     return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
   }
+
+  // Subscription cap: AI attempts. Check before the model call so a
+  // doomed request doesn't cost real API tokens.
+  const aiBlock = await gateLimit(session.user.id, "aiAttempts");
+  if (aiBlock) return aiBlock;
 
   // Load General + BPMN-specific default rules, then filter to GREEN
   // (AI-enforceable) only. See plan/route.ts for the full reasoning.
@@ -48,6 +54,8 @@ export async function POST(req: Request) {
 
     const diagramData = layoutBpmnDiagram(plan.elements, plan.connections);
 
+    // Record AFTER success so model errors don't burn the user's quota.
+    await recordUsage(session.user.id, "aiAttempts");
     return NextResponse.json({
       diagramData,
       elementCount: plan.elements.length,

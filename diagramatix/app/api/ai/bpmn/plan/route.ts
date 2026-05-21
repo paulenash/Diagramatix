@@ -9,6 +9,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { planBpmn } from "@/app/lib/ai/planBpmn";
 import { splitRulesByEnforcement } from "@/app/lib/ai/splitRules";
+import { gateLimit, recordUsage } from "@/app/lib/subscription-route";
 
 export async function POST(req: Request) {
   const session = await auth();
@@ -25,6 +26,12 @@ export async function POST(req: Request) {
   if (!prompt?.trim()) {
     return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
   }
+
+  // Subscription cap: AI attempts. Free is lifetime (5 total); paid
+  // tiers are monthly. Check BEFORE the model call so we don't burn an
+  // API request that's about to be rejected anyway.
+  const aiBlock = await gateLimit(session.user.id, "aiAttempts");
+  if (aiBlock) return aiBlock;
 
   // Load General + BPMN default rules, then filter to GREEN (AI-enforceable)
   // only. Code-backed layout rules, proposed (orange) and modified (amber)
@@ -55,6 +62,8 @@ export async function POST(req: Request) {
     }
     const { plan, model } = result;
     console.log("[AI plan] returned:", plan.elements.length, "elements,", plan.connections.length, "connections");
+    // Record AFTER success so failed attempts don't burn the user's quota.
+    await recordUsage(session.user.id, "aiAttempts");
     return NextResponse.json({
       plan,
       model,

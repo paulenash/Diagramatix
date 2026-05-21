@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { getEffectiveUserId, isReadOnlyImpersonation } from "@/app/lib/superuser";
+import { gateLimit } from "@/app/lib/subscription-route";
 import { ARCHIVE_PROJECT_NAME } from "@/app/lib/archive";
 import {
   getCurrentOrgId,
@@ -70,6 +71,10 @@ export async function POST(req: Request) {
   if (!name?.trim()) {
     return NextResponse.json({ error: "Name is required" }, { status: 400 });
   }
+
+  // Subscription cap: total projects per user.
+  const limitBlock = await gateLimit(session.user.id, "projects");
+  if (limitBlock) return limitBlock;
 
   const project = await prisma.project.create({
     data: {

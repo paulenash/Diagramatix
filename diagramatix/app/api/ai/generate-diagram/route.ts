@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import Anthropic from "@anthropic-ai/sdk";
 import { splitRulesByEnforcement } from "@/app/lib/ai/splitRules";
+import { gateLimit, recordUsage } from "@/app/lib/subscription-route";
 
 const DIAGRAM_PROMPTS: Record<string, string> = {
   "state-machine": `You are a UML State Machine diagram expert. Output ONLY valid JSON with elements and connections.
@@ -142,6 +143,10 @@ export async function POST(req: Request) {
   if (!prompt?.trim()) return NextResponse.json({ error: "Prompt required" }, { status: 400 });
   if (!diagramType) return NextResponse.json({ error: "diagramType required" }, { status: 400 });
 
+  // Subscription cap: AI attempts. Check before the model call.
+  const aiBlock = await gateLimit(session.user.id, "aiAttempts");
+  if (aiBlock) return aiBlock;
+
   // Load General + diagram-specific default rules, then filter to GREEN
   // (AI-enforceable) only. See bpmn/plan/route.ts for the full reasoning.
   let rules = "";
@@ -209,6 +214,8 @@ export async function POST(req: Request) {
       }
     }
 
+    // Record AFTER success so failed attempts don't burn the user's quota.
+    await recordUsage(session.user.id, "aiAttempts");
     return NextResponse.json({ parsed, diagramType });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

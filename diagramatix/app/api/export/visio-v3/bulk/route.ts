@@ -13,6 +13,7 @@ import {
 } from "@/app/lib/diagram/colors";
 import type { SymbolColorConfig } from "@/app/lib/diagram/colors";
 import { getCurrentOrgId, OrgContextError } from "@/app/lib/auth/orgContext";
+import { gateLimit, recordUsage } from "@/app/lib/subscription-route";
 
 /**
  * GET /api/export/visio-v3/bulk?projectId=<id>[&profile=v1.5]
@@ -76,6 +77,11 @@ export async function GET(request: Request) {
     );
   }
 
+  // Subscription cap: bulk exports. Always monthly for tiers that allow
+  // them (Free has bulkExports=0 so this always blocks for Free users).
+  const limitBlock = await gateLimit(session.user.id, "bulkExports");
+  if (limitBlock) return limitBlock;
+
   try {
     // v1.5 default for bulk — the recipient gets the modified stencil that
     // we've been fixing up. Caller can override via ?profile=bpmn-m.
@@ -117,6 +123,8 @@ export async function GET(request: Request) {
     const suffix = profile.name === "diagramatix-v1.5" ? "v1.5" : "V3";
     // Strip filename-invalid chars (Windows + macOS): \ / : * ? " < > |
     const safeName = project.name.replace(/[\\/:*?"<>|]/g, "_").trim() || "Project";
+    // Record AFTER the file is built. Failed exports don't burn the quota.
+    await recordUsage(session.user.id, "bulkExports");
     return new NextResponse(result as unknown as BodyInit, {
       headers: {
         "Content-Type": "application/vnd.ms-visio.drawing",

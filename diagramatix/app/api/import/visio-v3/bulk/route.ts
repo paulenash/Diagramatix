@@ -5,6 +5,7 @@ import { prisma } from "@/app/lib/db";
 import { importVisioV3 } from "@/app/lib/diagram/v3/importVisioV3";
 import { listVisioPages } from "@/app/lib/diagram/v3/visioPages";
 import { isReadOnlyImpersonation } from "@/app/lib/superuser";
+import { gateLimit, recordUsage } from "@/app/lib/subscription-route";
 import {
   requireRole,
   WRITE_ROLES,
@@ -155,6 +156,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Either projectId or newProjectName required" }, { status: 400 });
   }
 
+  // Subscription cap: bulk imports.
+  const limitBlock = await gateLimit(session.user.id, "bulkImports");
+  if (limitBlock) return limitBlock;
+
   // Load .vsdx into memory once.
   const buf = await upload.arrayBuffer();
 
@@ -263,6 +268,8 @@ export async function POST(request: Request) {
     );
   }
 
+  // Record AFTER the bulk insert. Failures don't burn the user's quota.
+  await recordUsage(session.user.id, "bulkImports");
   return NextResponse.json(
     {
       project: createdNewProject ? { id: project.id, name: newProjectNameRaw } : undefined,

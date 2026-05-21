@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { EMPTY_DIAGRAM } from "@/app/lib/diagram/types";
 import { getEffectiveUserId, isReadOnlyImpersonation } from "@/app/lib/superuser";
+import { gateLimit } from "@/app/lib/subscription-route";
 import {
   getCurrentOrgId,
   requireRole,
@@ -91,6 +92,23 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
     projectFontConfig = (project.fontConfig as Record<string, unknown> | null) ?? null;
+  }
+
+  // Subscription caps. Order matters: archimate cap is total-across-account
+  // and should fire first when it applies, so the user gets the most
+  // relevant message ("you've used your archimate allotment") instead of
+  // a per-project cap message that's actually OK in their case.
+  if (type === "archimate") {
+    const archimateBlock = await gateLimit(session.user.id, "archimateDiagramsTotal");
+    if (archimateBlock) return archimateBlock;
+  }
+  if (projectId) {
+    const perTypeBlock = await gateLimit(
+      session.user.id,
+      "diagramsPerTypePerProject",
+      { projectId, diagramType: type },
+    );
+    if (perTypeBlock) return perTypeBlock;
   }
 
   // Merge project typography defaults into the new diagram's data, unless
