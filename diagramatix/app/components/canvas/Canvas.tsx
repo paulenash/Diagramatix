@@ -497,7 +497,18 @@ export function Canvas({
   ): { focusZoom: number; focusPan: Point } | null {
     const rect = svgRef.current?.getBoundingClientRect();
     if (!rect || rect.width <= 0 || rect.height <= 0) return null;
-    const TARGET_FRACTION = 0.3;
+    // Edit-zoom fraction is user-tunable via Dashboard → File → Zoom →
+    // Edit Zoom (stored in localStorage as `editZoomFraction`, default
+    // 0.3). Clamp 0.05..0.95 here too so a malformed key can't break
+    // the math; the dashboard already clamps on save.
+    const storedFraction =
+      typeof window !== "undefined"
+        ? parseFloat(window.localStorage.getItem("editZoomFraction") ?? "")
+        : NaN;
+    const TARGET_FRACTION =
+      Number.isFinite(storedFraction) && storedFraction > 0
+        ? Math.max(0.05, Math.min(0.95, storedFraction))
+        : 0.3;
     // Clamp tiny features (events, short connector labels) so they
     // don't drive an absurd zoom level.
     const effectiveWidth = Math.max(60, worldWidth);

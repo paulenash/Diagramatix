@@ -506,6 +506,36 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
     setShowInitialZoom(false);
   }
 
+  // Edit Zoom — the fraction of screen width the element occupies in
+  // focus-edit zoom (canvas snap when a label is being edited).
+  // Stored as a fraction (0.30 = 30%) so Canvas.tsx can multiply
+  // directly. Default 30%.
+  const EDIT_ZOOM_DEFAULT_PCT = 30;
+  const [showEditZoom, setShowEditZoom] = useState(false);
+  const [editZoomInput, setEditZoomInput] = useState<string>(() => {
+    if (typeof window === "undefined") return String(EDIT_ZOOM_DEFAULT_PCT);
+    const stored = window.localStorage.getItem("editZoomFraction");
+    if (!stored) return String(EDIT_ZOOM_DEFAULT_PCT);
+    const n = parseFloat(stored);
+    return Number.isFinite(n) && n > 0 ? String(Math.round(n * 100)) : String(EDIT_ZOOM_DEFAULT_PCT);
+  });
+
+  function handleEditZoomSave() {
+    const n = parseFloat(editZoomInput);
+    if (!Number.isFinite(n) || n <= 0) {
+      window.localStorage.removeItem("editZoomFraction");
+      setEditZoomInput(String(EDIT_ZOOM_DEFAULT_PCT));
+    } else {
+      // Clamp 5%..95% so the snap stays meaningful (too small → no zoom,
+      // too large → element overflows the viewport).
+      window.localStorage.setItem(
+        "editZoomFraction",
+        String(Math.max(0.05, Math.min(0.95, n / 100))),
+      );
+    }
+    setShowEditZoom(false);
+  }
+
   // Account modal
   const [showAccount, setShowAccount] = useState(false);
   const [acctName, setAcctName] = useState(userName);
@@ -1307,13 +1337,35 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                       {"Restore\u2026"}
                     </button>
                     <div className="border-t border-gray-100" />
-                    <button
-                      onClick={() => { setFileMenuOpen(false); setShowInitialZoom(true); }}
-                      title="Zoom level used when opening a diagram. Small diagrams centre; large diagrams anchor to top-left."
-                      className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
-                    >
-                      {"Initial Zoom\u2026"}
-                    </button>
+                    {/* Zoom flyout \u2014 hover the parent to reveal a sub-panel
+                        with the two specific zoom tunables. Uses Tailwind
+                        group-hover so no extra state is needed. */}
+                    <div className="relative group">
+                      <button
+                        type="button"
+                        className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 flex items-center justify-between"
+                        title="Adjust zoom defaults: Initial Zoom (open-a-diagram) and Edit Zoom (focus-edit snap)."
+                      >
+                        <span>{"Zoom"}</span>
+                        <span className="text-gray-400">{"\u25b8"}</span>
+                      </button>
+                      <div className="absolute left-full top-0 hidden group-hover:block bg-white border border-gray-200 rounded shadow-lg min-w-[160px] z-50">
+                        <button
+                          onClick={() => { setFileMenuOpen(false); setShowInitialZoom(true); }}
+                          title="Zoom level used when opening a diagram. Small diagrams centre; large diagrams anchor to top-left."
+                          className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                        >
+                          {"Initial Zoom\u2026"}
+                        </button>
+                        <button
+                          onClick={() => { setFileMenuOpen(false); setShowEditZoom(true); }}
+                          title="How much of the screen width the edited element occupies when you double-click to edit a label (focus-edit snap)."
+                          className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                        >
+                          {"Edit Zoom\u2026"}
+                        </button>
+                      </div>
+                    </div>
                     {isSu && (
                       <>
                         <div className="border-t border-gray-100" />
@@ -2149,6 +2201,50 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                   : bpmnImportFiles.length === 0
                     ? "Import"
                     : `Import ${bpmnImportSelected.size} file${bpmnImportSelected.size === 1 ? "" : "s"}`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Zoom dialog */}
+      {showEditZoom && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm">
+            <h2 className="text-lg font-semibold text-gray-900 mb-2">Edit Zoom</h2>
+            <p className="text-xs text-gray-500 mb-4">
+              When you double-click a label, the canvas snaps so the edited
+              element occupies this fraction of the screen width. Default is 30%.
+              5% (almost no zoom) to 95% (fills the viewport). Leave blank to
+              revert to 30%.
+            </p>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Element width %</label>
+              <input
+                autoFocus
+                type="number"
+                min={5}
+                max={95}
+                step={5}
+                value={editZoomInput}
+                onChange={(e) => setEditZoomInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleEditZoomSave()}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="e.g. 30"
+              />
+            </div>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setShowEditZoom(false)}
+                className="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleEditZoomSave}
+                className="px-4 py-2 text-sm text-white bg-blue-600 rounded-md hover:bg-blue-700"
+              >
+                Save
               </button>
             </div>
           </div>
