@@ -1490,7 +1490,8 @@ export function PropertiesPanel({
         <label className="block text-[10px] font-medium text-gray-500 mb-0.5">
           {element.type === "uml-class" || element.type === "uml-enumeration" ||
            element.type === "task" || element.type === "subprocess" ||
-           element.type === "subprocess-expanded" ? "Name" : "Label"}
+           element.type === "subprocess-expanded" ||
+           element.type === "pool" || element.type === "lane" ? "Name" : "Label"}
         </label>
         {(element.type === "task" || element.type === "subprocess" || element.type === "subprocess-expanded") ? (
           // Task / Sub-Process / Expanded Sub-Process Name editor:

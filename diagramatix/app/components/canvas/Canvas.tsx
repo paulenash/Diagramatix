@@ -2830,17 +2830,32 @@ export function Canvas({
     if (LABEL_ONLY_ZOOM.has(el.type)) return;
 
     // Focus-edit zoom: snap the canvas via the shared helper so the
-    // element centres at ~30% of the screen width. The textarea's screen
+    // element centres at ~20% of the screen width. The textarea's screen
     // coords below are computed using the POST-SNAP zoom/pan so it lines
     // up immediately rather than chasing the canvas during the snap.
     // Restore happens via the useEffect above when setEditingLabel(null)
     // fires from any of the five Enter / Escape / blur exit paths.
-    const snap = enterFocusModeAt(
-      el.x + el.width / 2,
-      el.y + el.height / 2,
-      el.width,
-      "element",
-    );
+    //
+    // Pool/Lane special-case: a pool is hundreds of pixels wide so the
+    // "only zoom IN" guard would skip the snap entirely. The actual
+    // editable text lives in a small textarea positioned just right of
+    // the header strip; aim the focus zoom at THAT region so the snap
+    // fires and the editor lands centred on screen.
+    let zoomCenterX = el.x + el.width / 2;
+    let zoomCenterY = el.y + el.height / 2;
+    let zoomWorldWidth = el.width;
+    if (el.type === "pool" || el.type === "lane") {
+      const storedW = el.type === "pool"
+        ? (el.properties?.poolHeaderWidth as number | undefined)
+        : (el.properties?.laneHeaderWidth as number | undefined);
+      const lw = typeof storedW === "number" && storedW > 0 ? storedW : 36;
+      const taW = Math.min(180, el.width - lw);
+      const taH = Math.min(80, el.height);
+      zoomCenterX = el.x + lw + taW / 2;
+      zoomCenterY = el.y + taH / 2;
+      zoomWorldWidth = taW;
+    }
+    const snap = enterFocusModeAt(zoomCenterX, zoomCenterY, zoomWorldWidth, "element");
     const effectiveZoom = snap?.focusZoom ?? zoom;
     const effectivePan = snap?.focusPan ?? pan;
 
