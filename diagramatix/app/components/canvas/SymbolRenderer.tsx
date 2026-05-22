@@ -2733,19 +2733,10 @@ export function SymbolRenderer({
         } else {
           labelTopY = usableCenterY - totalLabelH / 2;
         }
-        // Task marker: if line 1's vertical band intersects the marker
-        // zone, re-wrap with a narrower line 1 (centred on the marker-free
-        // region) and re-position the (potentially taller) block.
-        if (hasTaskMarker) {
-          const markerBottomY = el.y + TASK_MARKER_Y + MARKER_SIZE;
-          if (labelTopY < markerBottomY) {
-            const narrow = Math.max(8, labelWidth - TASK_MARKER_LINE1_RESERVE);
-            firstLineWidth = narrow;
-            lines = wrapText(el.label, labelWidth, 12, firstLineWidth);
-            totalLabelH = lines.length * lineH;
-            labelTopY = usableCenterY - totalLabelH / 2;
-          }
-        }
+        // Task marker buffer removed — text is allowed to overlap the
+        // top-left task-type marker. Previously a narrowed first-line
+        // wrap kept the text band clear of the marker; pending a
+        // re-think of the marker-vs-text layout.
         // Clamp top so text never escapes the usable top edge.
         if (labelTopY < usableTopY) labelTopY = usableTopY;
         const labelLeftX = labelCenterX - labelWidth / 2;
