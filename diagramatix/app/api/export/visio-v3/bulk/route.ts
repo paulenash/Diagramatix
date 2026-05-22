@@ -121,7 +121,10 @@ export async function GET(request: Request) {
       project.name,
     );
 
-    const suffix = profile.name === "diagramatix-v1.5" ? "v1.5" : "V3";
+    const suffix =
+      profile.name === "diagramatix-v1.6" ? "v1.6"
+      : profile.name === "diagramatix-v1.5" ? "v1.5"
+      : "V3";
     // Strip filename-invalid chars (Windows + macOS): \ / : * ? " < > |
     const safeName = project.name.replace(/[\\/:*?"<>|]/g, "_").trim() || "Project";
     // Record AFTER the file is built. Failed exports don't burn the quota.

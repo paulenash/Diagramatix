@@ -77,7 +77,10 @@ export async function GET(request: Request) {
       profile,
     );
 
-    const suffix = profile.name === "diagramatix-v1.5" ? "v1.5" : "V3";
+    const suffix =
+      profile.name === "diagramatix-v1.6" ? "v1.6"
+      : profile.name === "diagramatix-v1.5" ? "v1.5"
+      : "V3";
     // Record AFTER the file is generated. Failed exports don't burn a quota.
     await recordUsage(session.user.id, "individualExports");
     return new NextResponse(result as any, {
