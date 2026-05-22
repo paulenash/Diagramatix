@@ -2184,7 +2184,20 @@ export function SymbolRenderer({
               stroke={selected && !multiSelected ? "#2563eb" : "none"}
               strokeWidth={1}
               strokeDasharray={selected && !multiSelected ? "3 2" : undefined}
-              style={{ cursor: onUpdateProperties ? "grab" : "default" }}
+              style={{
+                cursor: onUpdateProperties ? "grab" : "default",
+                // While the inline label editor is open, the rect (which
+                // sits BEHIND the foreignObject) must not steal clicks
+                // from the textarea — SVG hit testing can route a click
+                // back to this rect when the click lands on a region of
+                // the foreignObject the browser treats as transparent.
+                // Disabling pointer events keeps focus inside the
+                // textarea so clicking to position the cursor doesn't
+                // accidentally re-trigger handleLabelMouseDown (which
+                // calls onSelect → re-renders parents → unmounts the
+                // edit) and doesn't commit on first click.
+                pointerEvents: isEditingGatewayLabel ? "none" : "auto",
+              }}
               onMouseDown={handleLabelMouseDown}
               onDoubleClick={(e) => {
                 e.stopPropagation();
@@ -2237,11 +2250,14 @@ export function SymbolRenderer({
                   // beneath. Without this, clicking inside the textarea
                   // bubbled up to the canvas's mousedown handler, which
                   // treated it as a click outside the textarea and
-                  // committed the edit immediately. Same for the second
-                  // click of any in-textarea double-click.
-                  onMouseDown={(e) => e.stopPropagation()}
-                  onClick={(e) => e.stopPropagation()}
-                  onDoubleClick={(e) => e.stopPropagation()}
+                  // committed the edit immediately. stopImmediatePropagation
+                  // on the native event covers any native event listeners
+                  // the canvas attaches via addEventListener (React's
+                  // synthetic stopPropagation only stops bubbling through
+                  // the React tree).
+                  onMouseDown={(e) => { e.stopPropagation(); e.nativeEvent.stopImmediatePropagation(); }}
+                  onClick={(e) => { e.stopPropagation(); e.nativeEvent.stopImmediatePropagation(); }}
+                  onDoubleClick={(e) => { e.stopPropagation(); e.nativeEvent.stopImmediatePropagation(); }}
                   onChange={(e) => setEditGatewayLabelValue(e.target.value)}
                   onBlur={(e) => {
                     setIsEditingGatewayLabel(false);
