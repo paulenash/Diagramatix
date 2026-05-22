@@ -2108,11 +2108,14 @@ export function DiagramEditor({
                       )}
                     </div>
                     {/* Visio export — two flavours (BPMN only). The user can
-                        target either the Diagramatix v1.5 stencil (best for
+                        target either the Diagramatix v1.6 stencil (best for
                         recipients who install the Diagramatix stencil and
                         want to re-import back into Diagramatix) or the
                         Microsoft BPMN_M format (best for recipients who only
-                        have Visio's built-in BPMN stencil). */}
+                        have Visio's built-in BPMN stencil). v1.6 supersedes
+                        v1.5 with fresh master GUIDs that don't collide with
+                        v1.4 in Visio's stencil resolver. v1.5 stays callable
+                        via direct URL for legacy / debug use. */}
                     {diagramType === "bpmn" && (
                       <>
                         <button
@@ -2120,14 +2123,14 @@ export function DiagramEditor({
                             setFileMenuOpen(false);
                             setFileSubmenu(null);
                             const a = document.createElement("a");
-                            a.href = `/api/export/visio-v3?diagramId=${diagramId}&profile=v1.5`;
+                            a.href = `/api/export/visio-v3?diagramId=${diagramId}&profile=v1.6`;
                             a.rel = "noopener";
                             a.click();
                           }}
                           className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
-                          title="Export using the Diagramatix v1.5 stencil — recipient needs the v1.5 stencil installed in Visio to re-author cleanly."
+                          title="Export using the Diagramatix v1.6 stencil — recipient needs the v1.6 stencil installed in Visio to re-author cleanly. v1.6 fixes a GUID collision with v1.4 that caused shape resolution issues in v1.5."
                         >
-                          Visio (Diagramatix v1.5)
+                          Visio (for stencil v1.6)
                         </button>
                         <button
                           onClick={() => {
@@ -2141,19 +2144,21 @@ export function DiagramEditor({
                           className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
                           title="Export using Microsoft's standard BPMN_M format — opens in any Visio install without an extra stencil."
                         >
-                          Visio (BPMN_M)
+                          Visio (for stencil BPMN_M)
                         </button>
                       </>
                     )}
                     {/* Visio Stencil download (BPMN only) — install in Visio
-                        to author BPMN diagrams natively that import cleanly. */}
+                        to author BPMN diagrams natively that import cleanly.
+                        Points at the v1.6 stencil to match the default
+                        Visio export profile above. */}
                     {diagramType === "bpmn" && (
                       <a
-                        href="/BPMN%20Diagramatix%20Shapes%20v1.5.vssx"
+                        href="/BPMN%20Diagramatix%20Shapes%20v1.6.vssx"
                         download
                         onClick={() => { setFileMenuOpen(false); setFileSubmenu(null); }}
                         className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
-                        title="Download the BPMN Diagramatix stencil (.vssx) to use in Visio"
+                        title="Download the BPMN Diagramatix v1.6 stencil (.vssx) to use in Visio"
                       >
                         Visio Stencil
                       </a>

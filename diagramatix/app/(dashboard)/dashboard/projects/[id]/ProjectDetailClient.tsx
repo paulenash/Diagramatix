@@ -2118,10 +2118,10 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
                                 onClick={() => {
                                   setShowFileMenu(false);
                                   window.location.href =
-                                    `/api/export/visio-v3/bulk?projectId=${encodeURIComponent(project.id)}&profile=v1.5`;
+                                    `/api/export/visio-v3/bulk?projectId=${encodeURIComponent(project.id)}&profile=v1.6`;
                                 }}
                                 title={hasBpmn
-                                  ? "Export all BPMN diagrams in this project as one multi-page Visio (.vsdx) file using the v1.5 stencil"
+                                  ? "Export all BPMN diagrams in this project as one multi-page Visio (.vsdx) file using the v1.6 stencil"
                                   : "No BPMN diagrams in this project"}
                               >
                                 Visio (.vsdx) — all BPMN
@@ -2129,11 +2129,11 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
                             );
                           })()}
                           <a
-                            href="/BPMN%20Diagramatix%20Shapes%20v1.5.vssx"
+                            href="/BPMN%20Diagramatix%20Shapes%20v1.6.vssx"
                             download
                             onClick={() => setShowFileMenu(false)}
                             className={itemCls}
-                            title="Download the BPMN Diagramatix Shapes v1.5 stencil (.vssx) to use in Visio"
+                            title="Download the BPMN Diagramatix Shapes v1.6 stencil (.vssx) to use in Visio"
                           >
                             Visio Stencil
                           </a>

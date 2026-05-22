@@ -16,7 +16,7 @@ import { getCurrentOrgId, OrgContextError } from "@/app/lib/auth/orgContext";
 import { gateLimit, recordUsage } from "@/app/lib/subscription-route";
 
 /**
- * GET /api/export/visio-v3/bulk?projectId=<id>[&profile=v1.5]
+ * GET /api/export/visio-v3/bulk?projectId=<id>[&profile=v1.6]
  *
  * Exports every BPMN diagram in the project as one multi-page .vsdx —
  * pages ordered alphabetically by diagram name (case-insensitive). Default
@@ -83,9 +83,10 @@ export async function GET(request: Request) {
   if (limitBlock) return limitBlock;
 
   try {
-    // v1.5 default for bulk — the recipient gets the modified stencil that
-    // we've been fixing up. Caller can override via ?profile=bpmn-m.
-    const profile = profileByName(searchParams.get("profile") ?? "v1.5");
+    // v1.6 default for bulk — fresh GUIDs avoid the v1.4/v1.5 stencil
+    // resolver collision in Visio. Caller can still pass ?profile=v1.5
+    // (legacy) or ?profile=bpmn-m to override.
+    const profile = profileByName(searchParams.get("profile") ?? "v1.6");
 
     const stencilPath = path.join(process.cwd(), "public", profile.stencilFile);
     const stencilBuf = fs.readFileSync(stencilPath);
