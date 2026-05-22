@@ -454,6 +454,74 @@ export function Canvas({
     baseZoomRef.current = Number.isFinite(stored) && stored > 0 ? stored : 0.7;
   }, []);
   const [editingLabel, setEditingLabel] = useState<EditingLabel | null>(null);
+  // Focus-edit zoom: when an inline label edit begins we snap the canvas
+  // so the edited target is centred and its width is ~30% of the screen,
+  // then restore the pre-edit zoom/pan when the edit ends. `null` = not
+  // in focus mode.
+  //
+  // Two entry points:
+  //   • Element labels — startEditingLabel() below sets scope="element".
+  //     Restore is driven by the useEffect: when editingLabel goes back
+  //     to null (Enter / Escape / blur — all five exit paths flow
+  //     through setEditingLabel(null)), the canvas snaps back. Scope
+  //     check stops the effect from firing prematurely on the connector
+  //     path (which never sets editingLabel).
+  //   • Connector labels — InteractionLabel inside ConnectorRenderer
+  //     manages its own edit state, so it calls enterFocusMode / exit
+  //     FocusMode explicitly through props plumbed from this component.
+  const [focusModeRestore, setFocusModeRestore] = useState<
+    { zoom: number; pan: Point; scope: "element" | "connector" } | null
+  >(null);
+  useEffect(() => {
+    if (editingLabel === null && focusModeRestore?.scope === "element") {
+      setZoom(focusModeRestore.zoom);
+      setPan(focusModeRestore.pan);
+      setFocusModeRestore(null);
+    }
+  }, [editingLabel, focusModeRestore]);
+
+  /**
+   * Snap the canvas so (centerX, centerY) is in the centre of the viewport
+   * and a feature of `worldWidth` covers ~30% of the screen. Returns the
+   * post-snap zoom/pan so the caller can use them to position any HTML
+   * overlay it's about to render (SVG-internal foreignObjects re-layout
+   * automatically, but HTML overlays positioned in screen coords need
+   * the new values supplied to them). Returns null if no snap was needed
+   * (current zoom is already comfortable) or measurement failed.
+   */
+  function enterFocusModeAt(
+    centerX: number,
+    centerY: number,
+    worldWidth: number,
+    scope: "element" | "connector",
+  ): { focusZoom: number; focusPan: Point } | null {
+    const rect = svgRef.current?.getBoundingClientRect();
+    if (!rect || rect.width <= 0 || rect.height <= 0) return null;
+    const TARGET_FRACTION = 0.3;
+    // Clamp tiny features (events, short connector labels) so they
+    // don't drive an absurd zoom level.
+    const effectiveWidth = Math.max(60, worldWidth);
+    const idealZoom = (TARGET_FRACTION * rect.width) / effectiveWidth;
+    const focusZoom = Math.min(4, Math.max(zoom, idealZoom));
+    // Only enter focus mode if the snap meaningfully changes zoom.
+    if (focusZoom <= zoom + 0.01) return null;
+    const focusPan = {
+      x: rect.width / 2 - centerX * focusZoom,
+      y: rect.height / 2 - centerY * focusZoom,
+    };
+    setFocusModeRestore({ zoom, pan, scope });
+    setZoom(focusZoom);
+    setPan(focusPan);
+    return { focusZoom, focusPan };
+  }
+
+  function exitFocusMode() {
+    if (focusModeRestore) {
+      setZoom(focusModeRestore.zoom);
+      setPan(focusModeRestore.pan);
+      setFocusModeRestore(null);
+    }
+  }
   const [draggingConnector, setDraggingConnector] = useState<DraggingConnector | null>(null);
   const [draggingEndpoint, setDraggingEndpoint] = useState<DraggingEndpoint | null>(null);
   const [pendingDrop, setPendingDrop] = useState<PendingDrop | null>(null);
@@ -2732,6 +2800,21 @@ export function Canvas({
       return;
     }
 
+    // Focus-edit zoom: snap the canvas via the shared helper so the
+    // element centres at ~30% of the screen width. The textarea's screen
+    // coords below are computed using the POST-SNAP zoom/pan so it lines
+    // up immediately rather than chasing the canvas during the snap.
+    // Restore happens via the useEffect above when setEditingLabel(null)
+    // fires from any of the five Enter / Escape / blur exit paths.
+    const snap = enterFocusModeAt(
+      el.x + el.width / 2,
+      el.y + el.height / 2,
+      el.width,
+      "element",
+    );
+    const effectiveZoom = snap?.focusZoom ?? zoom;
+    const effectivePan = snap?.focusPan ?? pan;
+
     const isOldContainer = el.type === "system-boundary" || el.type === "composite-state" || el.type === "subprocess-expanded" || el.type === "group";
     if (el.type === "pool" || el.type === "lane") {
       // Both pool and lane support dynamic header widths.
@@ -2741,10 +2824,10 @@ export function Canvas({
       const lw = typeof storedW === "number" && storedW > 0 ? storedW : 36;
       setEditingLabel({
         elementId: el.id,
-        x: (el.x + lw) * zoom + pan.x,
-        y: el.y * zoom + pan.y,
-        width: Math.min(180, (el.width - lw) * zoom),
-        height: Math.min(80, el.height * zoom),
+        x: (el.x + lw) * effectiveZoom + effectivePan.x,
+        y: el.y * effectiveZoom + effectivePan.y,
+        width: Math.min(180, (el.width - lw) * effectiveZoom),
+        height: Math.min(80, el.height * effectiveZoom),
         value: el.label,
       });
     } else if (el.type === 'text-annotation') {
@@ -2768,20 +2851,20 @@ export function Canvas({
       const textTopY = el.y + el.height / 2 - textH / 2;
       setEditingLabel({
         elementId: el.id,
-        x: (el.x + PAD) * zoom + pan.x,
-        y: textTopY * zoom + pan.y,
-        width: (el.width - PAD - 4) * zoom,
-        height: (textH + 4) * zoom,
+        x: (el.x + PAD) * effectiveZoom + effectivePan.x,
+        y: textTopY * effectiveZoom + effectivePan.y,
+        width: (el.width - PAD - 4) * effectiveZoom,
+        height: (textH + 4) * effectiveZoom,
         value: el.label,
       });
     } else {
       const isUmlElement = el.type === "uml-class" || el.type === "uml-enumeration";
       setEditingLabel({
         elementId: el.id,
-        x: el.x * zoom + pan.x,
-        y: el.y * zoom + pan.y,
-        width: el.width * zoom,
-        height: (isOldContainer || isUmlElement) ? HEADER_H * zoom : el.height * zoom,
+        x: el.x * effectiveZoom + effectivePan.x,
+        y: el.y * effectiveZoom + effectivePan.y,
+        width: el.width * effectiveZoom,
+        height: (isOldContainer || isUmlElement) ? HEADER_H * effectiveZoom : el.height * effectiveZoom,
         value: el.label,
       });
     }
@@ -4062,6 +4145,8 @@ export function Canvas({
                 misaligned={obstacleViolationConnIds.has(conn.id)}
                 onUpdateEndOffset={handleUpdateEndOffset}
                 showBottleneck={showBottleneck}
+                onLabelFocusEditStart={(cx, cy, w) => enterFocusModeAt(cx, cy, w, "connector")}
+                onLabelFocusEditEnd={exitFocusMode}
               />
             ));
           })()}
@@ -4607,6 +4692,8 @@ export function Canvas({
                 targetPoolHeight={tgtPoolH}
                 sourceIsPool={srcIsPool}
                 targetIsPool={tgtIsPool}
+                onLabelFocusEditStart={(cx, cy, w) => enterFocusModeAt(cx, cy, w, "connector")}
+                onLabelFocusEditEnd={exitFocusMode}
               />
             );
           })}
@@ -4648,6 +4735,8 @@ export function Canvas({
                 misaligned={obstacleViolationConnIds.has(conn.id)}
                 onUpdateEndOffset={handleUpdateEndOffset}
                 showBottleneck={showBottleneck}
+                onLabelFocusEditStart={(cx, cy, w) => enterFocusModeAt(cx, cy, w, "connector")}
+                onLabelFocusEditEnd={exitFocusMode}
               />
             );
           })()}

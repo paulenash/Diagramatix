@@ -42,6 +42,12 @@ interface Props {
   sourceIsPool?: boolean;
   /** True if the target element IS a pool (not a task inside one). Debug only. */
   targetIsPool?: boolean;
+  /** Focus-edit zoom — Canvas asks the canvas to snap-zoom to the
+   *  connector label when its inline edit starts, and restore when it
+   *  ends. Optional; when omitted the connector label edits at the
+   *  current zoom level (no snap). */
+  onLabelFocusEditStart?: (centerX: number, centerY: number, worldWidth: number) => void;
+  onLabelFocusEditEnd?: () => void;
 }
 
 // Line segment intersection: returns the parameter t along segment (a1→a2) where it crosses (b1→b2), or null
@@ -300,9 +306,11 @@ interface InteractionLabelProps {
   visibleWaypoints: Point[];
   svgToWorld?: (clientX: number, clientY: number) => Point;
   onUpdateLabel?: (label: string, offsetX: number, offsetY: number, width: number) => void;
+  onLabelFocusEditStart?: (centerX: number, centerY: number, worldWidth: number) => void;
+  onLabelFocusEditEnd?: () => void;
 }
 
-function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, onUpdateLabel }: InteractionLabelProps) {
+function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, onUpdateLabel, onLabelFocusEditStart, onLabelFocusEditEnd }: InteractionLabelProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState("");
   const [isLabelFocused, setIsLabelFocused] = useState(false);
@@ -398,11 +406,20 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
     e.stopPropagation();
     setEditValue(label);
     setIsEditing(true);
+    // Focus-edit zoom — ask Canvas to snap-zoom to the label box.
+    // Restore fires from commitEdit / cancelEdit below.
+    onLabelFocusEditStart?.(lCx, lMidY, effectiveLWidth);
   }
 
   function commitEdit(newText: string) {
     setIsEditing(false);
     onUpdateLabel?.(newText, offsetX, offsetY, lWidth);
+    onLabelFocusEditEnd?.();
+  }
+
+  function cancelEdit() {
+    setIsEditing(false);
+    onLabelFocusEditEnd?.();
   }
 
   return (
@@ -470,7 +487,7 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
             onChange={(e) => setEditValue(e.target.value)}
             onBlur={(e) => commitEdit(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Escape") setIsEditing(false);
+              if (e.key === "Escape") cancelEdit();
               if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); commitEdit(editValue); }
             }}
             style={{
@@ -489,7 +506,7 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
   );
 }
 
-export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, onUpdateWaypoints, onWaypointsDragEnd, onUpdateLabel, onUpdateCurveHandles, misaligned, otherConnectorWaypoints, debugMode, onUpdateEndOffset, showBottleneck, sourceBounds, targetBounds, sourcePoolHeight, targetPoolHeight, sourceIsPool, targetIsPool }: Props) {
+export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, onUpdateWaypoints, onWaypointsDragEnd, onUpdateLabel, onUpdateCurveHandles, misaligned, otherConnectorWaypoints, debugMode, onUpdateEndOffset, showBottleneck, sourceBounds, targetBounds, sourcePoolHeight, targetPoolHeight, sourceIsPool, targetIsPool, onLabelFocusEditStart, onLabelFocusEditEnd }: Props) {
   const displayMode = useContext(DisplayModeCtx);
   const connFontScale = useContext(ConnectorFontScaleCtx);
   const [draggingEndLabel, setDraggingEndLabel] = useState<string | null>(null);
@@ -930,6 +947,8 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
           visibleWaypoints={visibleWaypoints}
           svgToWorld={svgToWorld}
           onUpdateLabel={onUpdateLabel}
+          onLabelFocusEditStart={onLabelFocusEditStart}
+          onLabelFocusEditEnd={onLabelFocusEditEnd}
         />
       )}
 
