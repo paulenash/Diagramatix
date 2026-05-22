@@ -2313,22 +2313,6 @@ export async function exportVisioV3(
             .file("visio/masters/" + poolFileMatch[1])!
             .async("string");
 
-          // Enable resize handles. The natural v1.5 Pool / Lane master
-          // carries N='NoObjHandles' V='1', which hides Visio's standard
-          // resize handles on the assumption that the CFF (Cross-
-          // Functional Flowchart) addon will manage resize via its own
-          // container behaviour. With our phase-1 CFF metadata
-          // (msvShapeCategories / numLanes) Visio now RECOGNISES the
-          // shape as a CFF candidate but our cloned master doesn't have
-          // the full CFF plumbing — so Visio locks resize entirely.
-          // Patching this cell to V='0' restores the standard handles
-          // and unlocks click-drag resize. Mirrors the BPMN_M-branch
-          // patch at lines ~2069-2074. No-op if the cell isn't present.
-          poolMasterXml = poolMasterXml.replace(
-            "N='NoObjHandles' V='1'",
-            "N='NoObjHandles' V='0'",
-          );
-
           // Patch cached V values from v1.5 natural dims to instance dims.
           //
           // The natural pool master has THREE places that cache W=5 and
@@ -2516,62 +2500,36 @@ export async function exportVisioV3(
           zip.file("visio/masters/_rels/masters.xml.rels", mastersRels);
           zip.file("[Content_Types].xml", contentTypes);
 
-          // Compute child lane IDs first — needed for BOTH the new
-          // numLanes CFF cell AND the existing Member section. Empty
-          // for lanes (lanes don't have child lanes).
-          const childLaneIds: number[] = [];
+          // Page-shape additions: visHeadingText and (for pools) the
+          // Member section linking child lanes.
+          const poolUserSection =
+            `<Section N='User'>` +
+            `<Row N='visHeadingText'><Cell N='Value' V='${esc(poolLabel)}' U='STR' F='Inh'/></Row>` +
+            `</Section>`;
+          let memberSection = "";
           if (el.type === "pool") {
+            const childLaneIds: number[] = [];
             for (const child of data.elements) {
               if (child.type === "lane" && child.parentId === el.id) {
                 const cid = elIdToShapeId.get(child.id);
                 if (cid !== undefined) childLaneIds.push(cid);
               }
             }
-          }
-
-          // CFF (Cross-Functional Flowchart) metadata — Phase 1 of the
-          // v1.5 CFF wiring. Visio's CFF addon keys off two user-section
-          // rows to recognise a shape as a real CFF container:
-          //   - msvShapeCategories = "CFF Container" on the pool / "Swimlane"
-          //     on the lane.
-          //   - numLanes = number of lanes the pool contains (pool only).
-          // The Member section (below) already carries the pool → lane
-          // child references; together these three pieces are what makes
-          // Visio offer "Add Lane" / auto-span-lane-to-pool-width / etc.
-          // on the imported diagram. importVisioV3 already maps both
-          // category values back to the right Diagramatix type, so the
-          // round-trip is stable.
-          const cffCategoryValue =
-            el.type === "pool" ? "CFF Container" : "Swimlane";
-          const numLanesRow =
-            el.type === "pool"
-              ? `<Row N='numLanes'><Cell N='Value' V='${childLaneIds.length}'/></Row>`
-              : "";
-
-          // Page-shape additions: visHeadingText (label), CFF category +
-          // numLanes (new), and for pools the Member section linking
-          // child lane shape IDs.
-          const poolUserSection =
-            `<Section N='User'>` +
-            `<Row N='visHeadingText'><Cell N='Value' V='${esc(poolLabel)}' U='STR' F='Inh'/></Row>` +
-            `<Row N='msvShapeCategories'><Cell N='Value' V='${cffCategoryValue}' U='STR'/></Row>` +
-            numLanesRow +
-            `</Section>`;
-          let memberSection = "";
-          if (el.type === "pool" && childLaneIds.length > 0) {
-            memberSection =
-              `<Section N='Member'>` +
-              childLaneIds
-                .map(
-                  (cid, i) =>
-                    `<Row IX='${i + 1}'>` +
-                    `<Cell N='ID' V='${cid}'/>` +
-                    `<Cell N='ContainerProperties' V='2'/>` +
-                    `<Cell N='MemberFlags' V='0'/>` +
-                    `</Row>`,
-                )
-                .join("") +
-              `</Section>`;
+            if (childLaneIds.length > 0) {
+              memberSection =
+                `<Section N='Member'>` +
+                childLaneIds
+                  .map(
+                    (cid, i) =>
+                      `<Row IX='${i + 1}'>` +
+                      `<Cell N='ID' V='${cid}'/>` +
+                      `<Cell N='ContainerProperties' V='2'/>` +
+                      `<Cell N='MemberFlags' V='0'/>` +
+                      `</Row>`,
+                  )
+                  .join("") +
+                `</Section>`;
+            }
           }
 
           shapes.push(
