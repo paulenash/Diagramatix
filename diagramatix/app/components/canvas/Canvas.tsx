@@ -4012,6 +4012,8 @@ export function Canvas({
               svgToWorld={clientToWorld}
               onUpdateProperties={onUpdateProperties}
               onUpdateLabel={onUpdateLabel}
+              onLabelFocusEditStart={(cx, cy, w) => enterFocusModeAt(cx, cy, w, "external")}
+              onLabelFocusEditEnd={exitFocusMode}
               colorConfig={colorConfig}
               debugMode={debugMode}
             />
@@ -4413,6 +4415,8 @@ export function Canvas({
               svgToWorld={clientToWorld}
               onUpdateProperties={onUpdateProperties}
               onUpdateLabel={onUpdateLabel}
+              onLabelFocusEditStart={(cx, cy, w) => enterFocusModeAt(cx, cy, w, "external")}
+              onLabelFocusEditEnd={exitFocusMode}
               onMoveEnd={() => { setDraggingElementId(null); onElementMoveEnd?.(el.id); }}
               multiSelected={selectedElementIds.size > 1 && selectedElementIds.has(el.id)}
               onGroupMove={onMoveElements ? (dx, dy) => onMoveElements([...selectedElementIds], dx / zoom, dy / zoom) : undefined}
@@ -4641,6 +4645,8 @@ export function Canvas({
               onResizeDragStart={(handle, e) => handleResizeDragStart(el.id, handle, e)}
               svgToWorld={clientToWorld}
               onUpdateLabel={onUpdateLabel}
+              onLabelFocusEditStart={(cx, cy, w) => enterFocusModeAt(cx, cy, w, "external")}
+              onLabelFocusEditEnd={exitFocusMode}
               onMoveEnd={() => { setDraggingElementId(null); onElementMoveEnd?.(el.id); }}
               multiSelected={selectedElementIds.size > 1 && selectedElementIds.has(el.id)}
               onGroupMove={onMoveElements ? (dx, dy) => onMoveElements([...selectedElementIds], dx / zoom, dy / zoom) : undefined}
