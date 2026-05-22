@@ -507,11 +507,23 @@ export function Canvas({
     worldWidth: number,
     scope: "element" | "connector" | "external",
   ): { focusZoom: number; focusPan: Point } | null {
+    // Edit-zoom can be disabled entirely via the Active checkbox in
+    // Dashboard → File → Zoom → Edit Zoom (localStorage key
+    // `editZoomActive` — missing or "true" = on, "false" = off).
+    // When off, return null so callers fall back to current zoom/pan
+    // and no restore state is set up. Editors still open normally,
+    // just without the canvas snap.
+    if (
+      typeof window !== "undefined" &&
+      window.localStorage.getItem("editZoomActive") === "false"
+    ) {
+      return null;
+    }
     const rect = svgRef.current?.getBoundingClientRect();
     if (!rect || rect.width <= 0 || rect.height <= 0) return null;
     // Edit-zoom fraction is user-tunable via Dashboard → File → Zoom →
     // Edit Zoom (stored in localStorage as `editZoomFraction`, default
-    // 0.3). Clamp 0.05..0.95 here too so a malformed key can't break
+    // 0.2). Clamp 0.05..0.95 here too so a malformed key can't break
     // the math; the dashboard already clamps on save.
     const storedFraction =
       typeof window !== "undefined"

@@ -509,7 +509,9 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
   // Edit Zoom — the fraction of screen width the element occupies in
   // focus-edit zoom (canvas snap when a label is being edited).
   // Stored as a fraction (0.20 = 20%) so Canvas.tsx can multiply
-  // directly. Default 20%.
+  // directly. Default 20%. A separate Active flag (localStorage
+  // "editZoomActive" — "true"/"false", default true) lets the user
+  // disable the snap entirely without losing their chosen percentage.
   const EDIT_ZOOM_DEFAULT_PCT = 20;
   const [showEditZoom, setShowEditZoom] = useState(false);
   const [editZoomInput, setEditZoomInput] = useState<string>(() => {
@@ -518,6 +520,10 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
     if (!stored) return String(EDIT_ZOOM_DEFAULT_PCT);
     const n = parseFloat(stored);
     return Number.isFinite(n) && n > 0 ? String(Math.round(n * 100)) : String(EDIT_ZOOM_DEFAULT_PCT);
+  });
+  const [editZoomActive, setEditZoomActive] = useState<boolean>(() => {
+    if (typeof window === "undefined") return true;
+    return window.localStorage.getItem("editZoomActive") !== "false";
   });
 
   function handleEditZoomSave() {
@@ -533,6 +539,9 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
         String(Math.max(0.05, Math.min(0.95, n / 100))),
       );
     }
+    // Persist the Active flag separately so the user keeps their
+    // chosen percentage when they toggle off + back on.
+    window.localStorage.setItem("editZoomActive", String(editZoomActive));
     setShowEditZoom(false);
   }
 
@@ -2216,8 +2225,18 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
               When you double-click a label, the canvas snaps so the edited
               element occupies this fraction of the screen width. Default is 20%.
               5% (almost no zoom) to 95% (fills the viewport). Leave blank to
-              revert to 20%.
+              revert to 20%. Turn Active off to disable the snap entirely (your
+              chosen percentage is remembered for when you turn it back on).
             </p>
+            <label className="flex items-center gap-2 mb-4 text-sm text-gray-700 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={editZoomActive}
+                onChange={(e) => setEditZoomActive(e.target.checked)}
+                className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+              />
+              <span className="font-medium">Active</span>
+            </label>
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-1">Element width %</label>
               <input
@@ -2229,8 +2248,9 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                 value={editZoomInput}
                 onChange={(e) => setEditZoomInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleEditZoomSave()}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="e.g. 30"
+                disabled={!editZoomActive}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-400"
+                placeholder="e.g. 20"
               />
             </div>
             <div className="flex gap-3 justify-end">
