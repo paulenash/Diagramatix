@@ -2132,20 +2132,22 @@ export function DiagramEditor({
                         >
                           Visio (for stencil v1.6)
                         </button>
-                        <button
-                          onClick={() => {
-                            setFileMenuOpen(false);
-                            setFileSubmenu(null);
-                            const a = document.createElement("a");
-                            a.href = `/api/export/visio-v3?diagramId=${diagramId}&profile=bpmn-m`;
-                            a.rel = "noopener";
-                            a.click();
-                          }}
-                          className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
-                          title="Export using Microsoft's standard BPMN_M format — opens in any Visio install without an extra stencil."
-                        >
-                          Visio (for stencil BPMN_M)
-                        </button>
+                        {isAdmin && (
+                          <button
+                            onClick={() => {
+                              setFileMenuOpen(false);
+                              setFileSubmenu(null);
+                              const a = document.createElement("a");
+                              a.href = `/api/export/visio-v3?diagramId=${diagramId}&profile=bpmn-m`;
+                              a.rel = "noopener";
+                              a.click();
+                            }}
+                            className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                            title="Admin only — BPMN_M export needs further work before general release."
+                          >
+                            Visio (for stencil BPMN_M)
+                          </button>
+                        )}
                       </>
                     )}
                     {/* Visio Stencil download (BPMN only) — install in Visio
