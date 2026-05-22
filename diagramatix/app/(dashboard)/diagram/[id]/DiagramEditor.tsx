@@ -676,7 +676,7 @@ export function DiagramEditor({
   }, [projectId, diagramId]);
 
   // Template state (BPMN only)
-  const isAdmin = userEmail === "paul@nashcc.com.au";
+  const isAdmin = userEmail?.toLowerCase() === "paul@nashcc.com.au";
   type TemplateRow = { id: string; name: string; group: string | null };
   const [userTemplates, setUserTemplates] = useState<TemplateRow[]>([]);
   const [builtInTemplates, setBuiltInTemplates] = useState<TemplateRow[]>([]);
@@ -2142,7 +2142,7 @@ export function DiagramEditor({
                               a.rel = "noopener";
                               a.click();
                             }}
-                            className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                            className="w-full text-left px-3 py-2 text-xs text-red-700 hover:bg-red-50"
                             title="Admin only — BPMN_M export needs further work before general release."
                           >
                             Visio (for stencil BPMN_M)
