@@ -2313,6 +2313,19 @@ export async function exportVisioV3(
             .file("visio/masters/" + poolFileMatch[1])!
             .async("string");
 
+          // CFF Phase 1.5 — enable resize handles on the cloned master.
+          // The natural v1.5 master sets NoObjHandles='1' on the assumption
+          // that Visio's container addon will take over resize. Our
+          // instance carries the User.msvSDContainerLocked = 1 cell that
+          // SHOULD trigger that addon, but if it doesn't, the user is
+          // left with no handles. NoObjHandles=0 keeps the standard
+          // handles available as a fallback. No-op if the cell isn't
+          // present in the master.
+          poolMasterXml = poolMasterXml.replace(
+            "N='NoObjHandles' V='1'",
+            "N='NoObjHandles' V='0'",
+          );
+
           // Patch cached V values from v1.5 natural dims to instance dims.
           //
           // The natural pool master has THREE places that cache W=5 and
@@ -2500,36 +2513,62 @@ export async function exportVisioV3(
           zip.file("visio/masters/_rels/masters.xml.rels", mastersRels);
           zip.file("[Content_Types].xml", contentTypes);
 
-          // Page-shape additions: visHeadingText and (for pools) the
-          // Member section linking child lanes.
-          const poolUserSection =
-            `<Section N='User'>` +
-            `<Row N='visHeadingText'><Cell N='Value' V='${esc(poolLabel)}' U='STR' F='Inh'/></Row>` +
-            `</Section>`;
-          let memberSection = "";
+          // Compute child lane IDs first — needed for numLanes (Phase 1.5
+          // metadata) AND for the Member section. Empty for lanes.
+          const childLaneIds: number[] = [];
           if (el.type === "pool") {
-            const childLaneIds: number[] = [];
             for (const child of data.elements) {
               if (child.type === "lane" && child.parentId === el.id) {
                 const cid = elIdToShapeId.get(child.id);
                 if (cid !== undefined) childLaneIds.push(cid);
               }
             }
-            if (childLaneIds.length > 0) {
-              memberSection =
-                `<Section N='Member'>` +
-                childLaneIds
-                  .map(
-                    (cid, i) =>
-                      `<Row IX='${i + 1}'>` +
-                      `<Cell N='ID' V='${cid}'/>` +
-                      `<Cell N='ContainerProperties' V='2'/>` +
-                      `<Cell N='MemberFlags' V='0'/>` +
-                      `</Row>`,
-                  )
-                  .join("") +
-                `</Section>`;
-            }
+          }
+
+          // CFF Phase 1.5 — activate Visio's container engine on the
+          // instance. The v1.5 master already declares ObjType='4'
+          // (container) + ShapePlaceStyle='15' (free-place) + EventDrop
+          // running the CFF addon, so the container DNA is at the master
+          // level. The missing piece was the instance-level activation
+          // cell User.msvSDContainerLocked = 1, which Visio reads at
+          // page-shape load time to decide whether to ENABLE container
+          // behaviour for this specific instance. Plus the round-trip
+          // metadata (msvShapeCategories + numLanes) so importVisioV3
+          // can identify pool vs lane unambiguously.
+          const cffCategoryValue =
+            el.type === "pool" ? "CFF Container" : "Swimlane";
+          const numLanesRow =
+            el.type === "pool"
+              ? `<Row N='numLanes'><Cell N='Value' V='${childLaneIds.length}'/></Row>`
+              : "";
+
+          // Page-shape additions: visHeadingText (label), container
+          // activation (msvSDContainerLocked=1), CFF round-trip metadata
+          // (msvShapeCategories + numLanes), plus for pools the Member
+          // section listing child lane shape IDs (Visio uses this to
+          // know which shapes are list members of the container).
+          const poolUserSection =
+            `<Section N='User'>` +
+            `<Row N='visHeadingText'><Cell N='Value' V='${esc(poolLabel)}' U='STR' F='Inh'/></Row>` +
+            `<Row N='msvSDContainerLocked'><Cell N='Value' V='1' U='BOOL'/></Row>` +
+            `<Row N='msvShapeCategories'><Cell N='Value' V='${cffCategoryValue}' U='STR'/></Row>` +
+            numLanesRow +
+            `</Section>`;
+          let memberSection = "";
+          if (el.type === "pool" && childLaneIds.length > 0) {
+            memberSection =
+              `<Section N='Member'>` +
+              childLaneIds
+                .map(
+                  (cid, i) =>
+                    `<Row IX='${i + 1}'>` +
+                    `<Cell N='ID' V='${cid}'/>` +
+                    `<Cell N='ContainerProperties' V='2'/>` +
+                    `<Cell N='MemberFlags' V='0'/>` +
+                    `</Row>`,
+                )
+                .join("") +
+              `</Section>`;
           }
 
           shapes.push(
