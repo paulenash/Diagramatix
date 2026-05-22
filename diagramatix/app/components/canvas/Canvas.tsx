@@ -3618,7 +3618,19 @@ export function Canvas({
         // override with their own grabbing cursors via .dgx-grab.
         className="w-full h-full outline-none dgx-pan"
         tabIndex={0}
-        onMouseDownCapture={() => svgRef.current?.focus({ preventScroll: true })}
+        onMouseDownCapture={(e) => {
+          // Don't steal focus when the click landed inside a
+          // foreignObject — that's where the inline label editors
+          // (event / gateway / data-object / data-store) live, and
+          // they NEED to keep keyboard focus so clicks inside the
+          // textarea can place the cursor / extend selection. Capture
+          // phase fires BEFORE the textarea's own handlers, so without
+          // this guard the SVG steals focus on every click and the
+          // textarea blurs → commits.
+          const t = e.target as Element;
+          if (t && typeof t.closest === "function" && t.closest("foreignObject")) return;
+          svgRef.current?.focus({ preventScroll: true });
+        }}
         onMouseDown={handleBackgroundMouseDown}
         onWheel={handleWheel}
         onDrop={(e) => { setPoolDropPreview(null); handleDrop(e); }}
