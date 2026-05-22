@@ -2736,10 +2736,28 @@ export async function exportVisioV3(
 
           // CFF Phase 2b — emit the Swimlane List sibling shape for
           // pools that own lanes. Lazily register the master first.
-          // Positioning: flush with the pool's body bounds (same
-          // pin/size). Visio doesn't strictly require the list to
-          // overlap the pool — its membership wiring is by GUID — but
-          // co-located lays out cleanly for the user.
+          //
+          // Geometry: the Swimlane List covers the LANE AREA only, NOT
+          // the full pool. The v1.5/v1.6 pool master ships with a 0.5"
+          // header strip on the left side (HSide=1) — the lanes occupy
+          // the area to the right of it. Mirroring Microsoft's BPMN
+          // Basic Shapes reference file:
+          //   • Pool PinX = body centre, Width = full pool W
+          //   • List PinX shifted right by HEADER_W/2 so the list's
+          //     left edge sits at the lane area left edge
+          //   • List Width = poolW - HEADER_W
+          //   • LocPin anchored at TOP-LEFT (LocPinX=0, LocPinY=Height)
+          //     so the list resizes from its left/top edges, matching
+          //     how Visio's CFF engine grows the list when Add Lane is
+          //     used. Centre-pinned lists snap lanes to wrong page
+          //     positions when the engine recomputes.
+          //
+          // If the list spans the FULL pool (including the header
+          // strip area) the engine sees lanes occupying only the right
+          // chunk of the list's width — when the user drags to insert
+          // a lane, the engine "tidies" by spreading lanes to fill the
+          // full list width, which is what was causing the lane-blast
+          // symptom in the prior iteration.
           if (
             el.type === "pool" &&
             swimlaneListShapeId !== undefined &&
@@ -2747,6 +2765,17 @@ export async function exportVisioV3(
             childLaneIds.length > 0
           ) {
             ensureSwimlaneListMasterRegistered();
+            const HEADER_W = 0.5; // v1.5/v1.6 pool master header strip
+            const listW = w - HEADER_W;
+            const listH = h;
+            // Page-space top-left corner of the lane area:
+            //   leftEdge   = poolLeft + HEADER_W = (cx - w/2) + HEADER_W
+            //   topEdge    = poolTop             = cy + h/2
+            // With LocPinX=0, PinX is the page-X of the shape's left
+            // edge. With LocPinY=Height, PinY is the page-Y of the
+            // shape's top edge.
+            const listPinX = cx - w / 2 + HEADER_W;
+            const listPinY = cy + h / 2;
             // DEPENDSON formula listing each lane SheetRef + the pool
             // SheetRef. The flag values (4 and 2) mirror Microsoft's
             // reference file; the exact integers are bookkeeping for
@@ -2758,12 +2787,12 @@ export async function exportVisioV3(
               `<Cell N='Relationships' V='0' F='SUM(DEPENDSON(4,Sheet.${shapeId}!SheetRef()),DEPENDSON(2,${laneRefs}))'/>`;
             shapes.push(
               `<Shape ID='${swimlaneListShapeId}' NameU='Swimlane List' Name='Swimlane List' Type='Shape' Master='${SWIMLANE_LIST_OUTPUT_MASTER_ID}' UniqueID='${swimlaneListGuid}'>` +
-              `<Cell N='PinX' V='${cx}'/>` +
-              `<Cell N='PinY' V='${cy}'/>` +
-              `<Cell N='Width' V='${w}'/>` +
-              `<Cell N='Height' V='${h}'/>` +
-              `<Cell N='LocPinX' V='${hw}' F='Inh'/>` +
-              `<Cell N='LocPinY' V='${hh}' F='Inh'/>` +
+              `<Cell N='PinX' V='${listPinX}'/>` +
+              `<Cell N='PinY' V='${listPinY}'/>` +
+              `<Cell N='Width' V='${listW}'/>` +
+              `<Cell N='Height' V='${listH}'/>` +
+              `<Cell N='LocPinX' V='0' F='Inh'/>` +
+              `<Cell N='LocPinY' V='${listH}' F='Inh'/>` +
               listRelationships +
               `<Section N='User'>` +
               `<Row N='msvSDContainerStyle'><Cell N='Value' V='7' F='IFERROR(CONTAINERSHEETREF(1)!User.VISCFFSTYLE,1)'/></Row>` +
