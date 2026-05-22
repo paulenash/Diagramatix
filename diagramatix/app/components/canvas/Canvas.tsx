@@ -520,7 +520,7 @@ export function Canvas({
     const TARGET_FRACTION =
       Number.isFinite(storedFraction) && storedFraction > 0
         ? Math.max(0.05, Math.min(0.95, storedFraction))
-        : 0.3;
+        : 0.2;
     // Clamp tiny features (events, short connector labels) so they
     // don't drive an absurd zoom level.
     const effectiveWidth = Math.max(60, worldWidth);
@@ -2815,54 +2815,19 @@ export function Canvas({
     // Snapshot history once at edit start (for task/subprocess this is used
     // by updateLabelLive per-keystroke without polluting the undo stack).
     onBeginLabelEdit?.(el.id);
-    // Events, data objects, data stores: skip inline editor — focus
-    // Properties Panel label instead, but STILL apply the focus-edit
-    // zoom snap so editing these element types feels consistent with
-    // the inline-edit ones. Exit fires from a blur/keydown listener
-    // attached to the PropertiesPanel label field (one-shot — removes
-    // itself once any exit key fires).
-    const SKIP_INLINE_EDIT = new Set(["start-event", "intermediate-event", "end-event", "data-store", "data-object"]);
-    if (SKIP_INLINE_EDIT.has(el.type)) {
-      enterFocusModeAt(
-        el.x + el.width / 2,
-        el.y + el.height / 2,
-        el.width,
-        "external",
-      );
-      setTimeout(() => {
-        const labelField = document.querySelector<HTMLTextAreaElement | HTMLInputElement>(
-          "[data-properties-label]"
-        );
-        if (!labelField) {
-          // Couldn't find the panel input — bail out of focus mode so
-          // we don't strand the user at a zoom they can't dismiss.
-          exitFocusMode();
-          return;
-        }
-        labelField.focus();
-        labelField.select();
-        // Exit focus zoom when the user leaves the field (blur),
-        // presses Escape (cancel), or presses Enter (commit). Enter
-        // also blurs to keep the commit/exit timing consistent with
-        // the inline-edit Enter behaviour.
-        const cleanup = () => {
-          labelField.removeEventListener("blur", onBlur);
-          labelField.removeEventListener("keydown", onKey);
-          exitFocusMode();
-        };
-        const onBlur = () => cleanup();
-        const onKey = (ev: Event) => {
-          const ke = ev as KeyboardEvent;
-          if (ke.key === "Escape" || ke.key === "Enter") {
-            ev.preventDefault();
-            labelField.blur();
-          }
-        };
-        labelField.addEventListener("blur", onBlur);
-        labelField.addEventListener("keydown", onKey);
-      }, 50);
-      return;
-    }
+    // Events, gateways, data objects, data stores: shape-dblclick is a
+    // no-op for these types. The user explicitly asked that only
+    // double-clicking the LABEL trigger the focus-edit zoom + editor;
+    // the shape body should not. SymbolRenderer renders the label as a
+    // separate hit target below the shape with its own inline editor
+    // (isEditingGatewayLabel state) and calls onLabelFocusEditStart /
+    // End on the Canvas-supplied focus-zoom hooks. Single-click on the
+    // shape still selects the element (handled upstream).
+    const LABEL_ONLY_ZOOM = new Set([
+      "start-event", "intermediate-event", "end-event",
+      "gateway", "data-store", "data-object",
+    ]);
+    if (LABEL_ONLY_ZOOM.has(el.type)) return;
 
     // Focus-edit zoom: snap the canvas via the shared helper so the
     // element centres at ~30% of the screen width. The textarea's screen
@@ -4012,6 +3977,8 @@ export function Canvas({
                 svgToWorld={clientToWorld}
                 onUpdateProperties={onUpdateProperties}
                 onUpdateLabel={onUpdateLabel}
+                onLabelFocusEditStart={(cx, cy, w) => enterFocusModeAt(cx, cy, w, "external")}
+                onLabelFocusEditEnd={exitFocusMode}
                 onMoveEnd={() => { setDraggingElementId(null); onElementMoveEnd?.(el.id); }}
                 multiSelected={selectedElementIds.size > 1 && selectedElementIds.has(el.id)}
                 onGroupMove={onMoveElements ? (dx, dy) => onMoveElements([...selectedElementIds], dx / zoom, dy / zoom) : undefined}
@@ -4162,6 +4129,8 @@ export function Canvas({
                 svgToWorld={clientToWorld}
                 onUpdateProperties={onUpdateProperties}
                 onUpdateLabel={onUpdateLabel}
+                onLabelFocusEditStart={(cx, cy, w) => enterFocusModeAt(cx, cy, w, "external")}
+                onLabelFocusEditEnd={exitFocusMode}
                 onMoveEnd={() => { setDraggingElementId(null); onElementMoveEnd?.(el.id); }}
                 multiSelected={selectedElementIds.size > 1 && selectedElementIds.has(el.id)}
                 onGroupMove={onMoveElements ? (dx, dy) => onMoveElements([...selectedElementIds], dx / zoom, dy / zoom) : undefined}
@@ -4635,6 +4604,8 @@ export function Canvas({
                 svgToWorld={clientToWorld}
                 onUpdateProperties={onUpdateProperties}
                 onUpdateLabel={onUpdateLabel}
+                onLabelFocusEditStart={(cx, cy, w) => enterFocusModeAt(cx, cy, w, "external")}
+                onLabelFocusEditEnd={exitFocusMode}
                 multiSelected={selectedElementIds.size > 1 && selectedElementIds.has(el.id)}
                 onGroupMove={onMoveElements ? (dx, dy) => onMoveElements([...selectedElementIds], dx / zoom, dy / zoom) : undefined}
                 onGroupMoveEnd={onElementsMoveEnd}

@@ -508,9 +508,9 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
 
   // Edit Zoom — the fraction of screen width the element occupies in
   // focus-edit zoom (canvas snap when a label is being edited).
-  // Stored as a fraction (0.30 = 30%) so Canvas.tsx can multiply
-  // directly. Default 30%.
-  const EDIT_ZOOM_DEFAULT_PCT = 30;
+  // Stored as a fraction (0.20 = 20%) so Canvas.tsx can multiply
+  // directly. Default 20%.
+  const EDIT_ZOOM_DEFAULT_PCT = 20;
   const [showEditZoom, setShowEditZoom] = useState(false);
   const [editZoomInput, setEditZoomInput] = useState<string>(() => {
     if (typeof window === "undefined") return String(EDIT_ZOOM_DEFAULT_PCT);
@@ -2214,9 +2214,9 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
             <h2 className="text-lg font-semibold text-gray-900 mb-2">Edit Zoom</h2>
             <p className="text-xs text-gray-500 mb-4">
               When you double-click a label, the canvas snaps so the edited
-              element occupies this fraction of the screen width. Default is 30%.
+              element occupies this fraction of the screen width. Default is 20%.
               5% (almost no zoom) to 95% (fills the viewport). Leave blank to
-              revert to 30%.
+              revert to 20%.
             </p>
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-1">Element width %</label>

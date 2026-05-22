@@ -47,6 +47,14 @@ interface Props {
   onMoveEnd?: () => void;
   onUpdateProperties?: (id: string, props: Record<string, unknown>) => void;
   onUpdateLabel?: (id: string, label: string) => void;
+  /** Focus-edit zoom hooks — fired when the user double-clicks the
+   *  separate-label area of an event / gateway / data-object /
+   *  data-store. Shape-dblclick is intentionally no-op for these
+   *  types now (see Canvas.startEditingLabel), so the label is the
+   *  only entry point for both opening the inline editor AND
+   *  triggering the canvas snap. */
+  onLabelFocusEditStart?: (centerX: number, centerY: number, worldWidth: number) => void;
+  onLabelFocusEditEnd?: () => void;
   colorConfig?: SymbolColorConfig;
   multiSelected?: boolean;
   onGroupMove?: (dx: number, dy: number) => void;
@@ -1565,6 +1573,8 @@ export function SymbolRenderer({
   onMoveEnd,
   onUpdateProperties,
   onUpdateLabel,
+  onLabelFocusEditStart,
+  onLabelFocusEditEnd,
   colorConfig,
   multiSelected,
   onGroupMove,
@@ -2180,6 +2190,13 @@ export function SymbolRenderer({
                 e.stopPropagation();
                 setEditGatewayLabelValue(element.label);
                 setIsEditingGatewayLabel(true);
+                // Focus-edit zoom — snap the canvas to centre this label.
+                // Exits fire from the onBlur / Escape paths below.
+                onLabelFocusEditStart?.(
+                  labelCenterX,
+                  labelTopY + Math.max(totalLabelH, 16) / 2,
+                  labelWidth,
+                );
               }}
             />
             {!isEditingGatewayLabel && (
@@ -2220,9 +2237,13 @@ export function SymbolRenderer({
                   onBlur={(e) => {
                     setIsEditingGatewayLabel(false);
                     onUpdateLabel?.(element.id, e.target.value);
+                    onLabelFocusEditEnd?.();
                   }}
                   onKeyDown={(e) => {
-                    if (e.key === "Escape") setIsEditingGatewayLabel(false);
+                    if (e.key === "Escape") {
+                      setIsEditingGatewayLabel(false);
+                      onLabelFocusEditEnd?.();
+                    }
                     if (e.key === "Enter" && !e.shiftKey) {
                       e.preventDefault();
                       (e.target as HTMLTextAreaElement).blur();
