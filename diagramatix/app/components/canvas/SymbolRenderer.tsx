@@ -2233,6 +2233,15 @@ export function SymbolRenderer({
                   autoFocus
                   onFocus={(e) => { const t = e.target; setTimeout(() => t.select(), 0); }}
                   value={editGatewayLabelValue}
+                  // Stop pointer events from reaching the SVG canvas
+                  // beneath. Without this, clicking inside the textarea
+                  // bubbled up to the canvas's mousedown handler, which
+                  // treated it as a click outside the textarea and
+                  // committed the edit immediately. Same for the second
+                  // click of any in-textarea double-click.
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
+                  onDoubleClick={(e) => e.stopPropagation()}
                   onChange={(e) => setEditGatewayLabelValue(e.target.value)}
                   onBlur={(e) => {
                     setIsEditingGatewayLabel(false);
