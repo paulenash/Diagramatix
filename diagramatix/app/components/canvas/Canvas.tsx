@@ -470,9 +470,21 @@ export function Canvas({
   //     manages its own edit state, so it calls enterFocusMode / exit
   //     FocusMode explicitly through props plumbed from this component.
   const [focusModeRestore, setFocusModeRestore] = useState<
-    { zoom: number; pan: Point; scope: "element" | "connector" } | null
+    { zoom: number; pan: Point; scope: "element" | "connector" | "external" } | null
   >(null);
+  // Ref mirror so exitFocusMode() called from event listeners attached
+  // in a previous render still sees the latest focusModeRestore value
+  // (the function closure would otherwise see the value at attach time,
+  // which is stale by the time the user blurs out of the field).
+  const focusModeRestoreRef = useRef<typeof focusModeRestore>(null);
   useEffect(() => {
+    focusModeRestoreRef.current = focusModeRestore;
+  }, [focusModeRestore]);
+  useEffect(() => {
+    // Only the inline-element-edit path is restore-on-editingLabel-null.
+    // "connector" (InteractionLabel) and "external" (PropertiesPanel
+    // redirect for events / data objects) both call exitFocusMode()
+    // explicitly because their edit lifecycle isn't tied to editingLabel.
     if (editingLabel === null && focusModeRestore?.scope === "element") {
       setZoom(focusModeRestore.zoom);
       setPan(focusModeRestore.pan);
@@ -493,7 +505,7 @@ export function Canvas({
     centerX: number,
     centerY: number,
     worldWidth: number,
-    scope: "element" | "connector",
+    scope: "element" | "connector" | "external",
   ): { focusZoom: number; focusPan: Point } | null {
     const rect = svgRef.current?.getBoundingClientRect();
     if (!rect || rect.width <= 0 || rect.height <= 0) return null;
@@ -527,9 +539,14 @@ export function Canvas({
   }
 
   function exitFocusMode() {
-    if (focusModeRestore) {
-      setZoom(focusModeRestore.zoom);
-      setPan(focusModeRestore.pan);
+    // Read via the ref so deferred-fired event listeners (e.g. the
+    // PropertiesPanel blur handler attached in a previous render)
+    // still restore the correct zoom/pan instead of an empty
+    // closure-captured null.
+    const restore = focusModeRestoreRef.current;
+    if (restore) {
+      setZoom(restore.zoom);
+      setPan(restore.pan);
       setFocusModeRestore(null);
     }
   }
@@ -2798,15 +2815,51 @@ export function Canvas({
     // Snapshot history once at edit start (for task/subprocess this is used
     // by updateLabelLive per-keystroke without polluting the undo stack).
     onBeginLabelEdit?.(el.id);
-    // Events, data objects, data stores: skip inline editor — focus Properties Panel label instead
+    // Events, data objects, data stores: skip inline editor — focus
+    // Properties Panel label instead, but STILL apply the focus-edit
+    // zoom snap so editing these element types feels consistent with
+    // the inline-edit ones. Exit fires from a blur/keydown listener
+    // attached to the PropertiesPanel label field (one-shot — removes
+    // itself once any exit key fires).
     const SKIP_INLINE_EDIT = new Set(["start-event", "intermediate-event", "end-event", "data-store", "data-object"]);
     if (SKIP_INLINE_EDIT.has(el.type)) {
-      // Element is already selected from the first click — focus the Properties Panel label field
+      enterFocusModeAt(
+        el.x + el.width / 2,
+        el.y + el.height / 2,
+        el.width,
+        "external",
+      );
       setTimeout(() => {
         const labelField = document.querySelector<HTMLTextAreaElement | HTMLInputElement>(
           "[data-properties-label]"
         );
-        if (labelField) { labelField.focus(); labelField.select(); }
+        if (!labelField) {
+          // Couldn't find the panel input — bail out of focus mode so
+          // we don't strand the user at a zoom they can't dismiss.
+          exitFocusMode();
+          return;
+        }
+        labelField.focus();
+        labelField.select();
+        // Exit focus zoom when the user leaves the field (blur),
+        // presses Escape (cancel), or presses Enter (commit). Enter
+        // also blurs to keep the commit/exit timing consistent with
+        // the inline-edit Enter behaviour.
+        const cleanup = () => {
+          labelField.removeEventListener("blur", onBlur);
+          labelField.removeEventListener("keydown", onKey);
+          exitFocusMode();
+        };
+        const onBlur = () => cleanup();
+        const onKey = (ev: Event) => {
+          const ke = ev as KeyboardEvent;
+          if (ke.key === "Escape" || ke.key === "Enter") {
+            ev.preventDefault();
+            labelField.blur();
+          }
+        };
+        labelField.addEventListener("blur", onBlur);
+        labelField.addEventListener("keydown", onKey);
       }, 50);
       return;
     }
