@@ -40,6 +40,17 @@
     User.subscriptionAssignedAt + UsageCounter rows) and are never
     embedded in a diagram or project export. The schemaVersion attribute
     is bumped to 1.12 so importers can detect the new feature window.
+
+  v1.13 — subscriptions phase 2 foundation (Stripe wiring).
+    No project-export schema shape change. New User columns
+    (stripeCustomerId, stripeSubscriptionId, stripeSubscriptionStatus,
+    currentPeriodEnd, subscriptionEndsAt) plus
+    SubscriptionLevel.stripePriceId are user-level / catalog metadata
+    only — never embedded in a diagram or project export. Same release
+    also covers the Visio v1.6 stencil (fresh BaseID GUIDs vs v1.5),
+    focus-edit zoom on label edits, and the Pool/Lane "Label" → "Name"
+    rename. The schemaVersion attribute is bumped to 1.13 so importers
+    and the User Guide reflect the new feature window.
 -->
 
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"

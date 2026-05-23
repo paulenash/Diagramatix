@@ -423,5 +423,16 @@ export interface TemplateData {
  *          schemaVersion attribute bumps to 1.12 so importers and the
  *          User Guide reflect the new feature window. Pre-1.12 backups
  *          have no subscription state to restore.
+ * v1.13:   Subscriptions Phase 2 foundation — Stripe-payment wiring.
+ *          New User columns (stripeCustomerId, stripeSubscriptionId,
+ *          stripeSubscriptionStatus, currentPeriodEnd,
+ *          subscriptionEndsAt) plus SubscriptionLevel.stripePriceId.
+ *          Diagram export payload is unchanged (Stripe identifiers
+ *          are user-level metadata, never embedded in a diagram or
+ *          project export), so no XSD shape change. Also released
+ *          alongside: Visio v1.6 stencil + template (fresh BaseID
+ *          GUIDs eliminate the v1.4↔v1.5 master collision), focus-
+ *          edit zoom for label edits (Dashboard → File → Zoom →
+ *          Edit Zoom), and Pool/Lane "Label" → "Name" rename.
  */
-export const SCHEMA_VERSION = "1.12";
+export const SCHEMA_VERSION = "1.13";

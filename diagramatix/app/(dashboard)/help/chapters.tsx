@@ -29,7 +29,7 @@ export const CHAPTERS: HelpChapter[] = [
               domain models and more.
             </p>
             <p className="mt-2 text-xs text-gray-500">
-              This guide covers version <strong>1.9</strong>.
+              This guide covers version <strong>1.13</strong>.
             </p>
             <p className="mt-2">
               After signing in you land on the <strong>Dashboard</strong> —
@@ -1554,9 +1554,11 @@ export const CHAPTERS: HelpChapter[] = [
               Exports BPMN diagrams as Microsoft Visio{" "}
               <code className="text-xs bg-gray-100 px-1 rounded">.vsdx</code>{" "}
               files. The exported file uses the{" "}
-              <strong>BPMN Diagramatix Shapes v1.5</strong> stencil — a
+              <strong>BPMN Diagramatix Shapes v1.6</strong> stencil — a
               modified version of Microsoft&apos;s BPMN_M stencil with
               corrected markers (Terminate, Inclusive, Conditional, etc).
+              v1.6 supersedes v1.5 with fresh master GUIDs that no
+              longer collide with v1.4 in Visio&apos;s stencil resolver.
               Recipients editing in Visio need this stencil installed:
               the <strong>File ▾ → Export ▸ Visio Stencil</strong> menu
               item on a project page downloads it.
@@ -1565,10 +1567,11 @@ export const CHAPTERS: HelpChapter[] = [
             <ul className="list-disc list-inside space-y-1 mt-1">
               <li>
                 <strong>Single diagram</strong> — from the diagram editor,
-                <strong> Export ▾ → Visio (Diagramatix v1.5)</strong>{" "}
+                <strong> Export ▾ → Visio (for stencil v1.6)</strong>{" "}
                 exports just the current diagram. (A second{" "}
-                <strong>Visio (BPMN_M)</strong> option exists but is
-                broken in this build — use v1.5.)
+                <strong>Visio (for stencil BPMN_M)</strong> option is
+                admin-only — it still needs polishing before general
+                release.)
               </li>
               <li>
                 <strong>Whole project</strong> — from the project page,
@@ -1619,7 +1622,7 @@ export const CHAPTERS: HelpChapter[] = [
             </p>
             <p className="mt-2">
               The XSD file is versioned (e.g.{" "}
-              <code className="text-xs bg-gray-100 px-1 rounded">diagramatix-export-v1.3.xsd</code>)
+              <code className="text-xs bg-gray-100 px-1 rounded">diagramatix-export-v1.13.xsd</code>)
               to match the export format version.
             </p>
           </>
