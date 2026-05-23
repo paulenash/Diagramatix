@@ -134,16 +134,31 @@ jobs:
           npm ci --omit=dev --ignore-scripts
           npx prisma generate
 
-      - name: Apply database migrations
+      - name: Apply database schema
         working-directory: ./diagramatix
         env:
           DATABASE_URL: ${{ steps.db.outputs.url }}
-        # `prisma migrate deploy` is idempotent: applies pending
-        # migrations from prisma/migrations/ in lexical order, no-op if
-        # the schema is already current. Failures abort the workflow
-        # BEFORE the App Service container is swapped — preventing the
-        # "new code, old schema" failure mode.
-        run: npx prisma migrate deploy
+        # `prisma db push` (NOT `migrate deploy`): this project doesn't
+        # maintain prisma/migrations/ files — schema is the single source
+        # of truth and pushed directly (matches CLAUDE.md "Schema managed
+        # via npx prisma db push (NOT migrations)"). `migrate deploy` was
+        # a silent no-op here (no migration files exist), which is why
+        # the Subscriptions Phase 1 deploy on 2026-05-23 left the prod DB
+        # without the Stripe columns and the next code-swap 500'd on any
+        # user-data route.
+        #
+        # `--accept-data-loss` is required even for additive changes
+        # because Prisma flags every new unique constraint as a possible
+        # data-loss warning. Reviewers MUST inspect `prisma/schema.prisma`
+        # diffs carefully before pushing to main — a destructive column
+        # rename or drop would land on prod without confirmation.
+        #
+        # `--skip-generate` because the Install Prisma CLI step above
+        # already ran `prisma generate`.
+        #
+        # Failures abort the workflow BEFORE the App Service container
+        # is swapped — preventing the "new code, old schema" failure.
+        run: npx prisma db push --accept-data-loss --skip-generate
 
       - name: Update App Service container image
         # `az webapp config container set` rewrites the container
