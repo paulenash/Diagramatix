@@ -199,12 +199,21 @@ export function UsagePopover({
               </>
             )}
             {mode.kind === "self" && snapshot && !snapshot.isAdmin && (
-              <SelfUpgradeButtons
-                currentTierId={snapshot.tier.id}
-                disabled={changing}
-                onStart={() => { setChanging(true); setError(null); }}
-                onError={(msg) => { setError(msg); setChanging(false); }}
-              />
+              <>
+                <SelfUpgradeButtons
+                  currentTierId={snapshot.tier.id}
+                  disabled={changing}
+                  onStart={() => { setChanging(true); setError(null); }}
+                  onError={(msg) => { setError(msg); setChanging(false); }}
+                />
+                {snapshot.tier.id !== "free" && (
+                  <ManageSubscriptionButton
+                    disabled={changing}
+                    onStart={() => { setChanging(true); setError(null); }}
+                    onError={(msg) => { setError(msg); setChanging(false); }}
+                  />
+                )}
+              </>
             )}
           </div>
           <button
@@ -281,5 +290,47 @@ function SelfUpgradeButtons({
         </button>
       ))}
     </>
+  );
+}
+
+/**
+ * Opens the Stripe Billing Portal for the signed-in user — where they
+ * update card details, view invoices, and cancel their subscription.
+ * Cancellation handled there flows back via the
+ * customer.subscription.deleted webhook.
+ */
+function ManageSubscriptionButton({
+  disabled,
+  onStart,
+  onError,
+}: {
+  disabled: boolean;
+  onStart: () => void;
+  onError: (msg: string) => void;
+}) {
+  async function openPortal() {
+    onStart();
+    try {
+      const res = await fetch("/api/stripe/portal", { method: "POST" });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error ?? `Portal failed (${res.status})`);
+      }
+      const { url } = (await res.json()) as { url?: string };
+      if (!url) throw new Error("Portal returned no URL");
+      window.location.href = url;
+    } catch (err) {
+      onError(err instanceof Error ? err.message : "Portal failed");
+    }
+  }
+
+  return (
+    <button
+      onClick={openPortal}
+      disabled={disabled}
+      className="px-3 py-1.5 text-xs font-medium rounded border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+    >
+      Manage Subscription
+    </button>
   );
 }
