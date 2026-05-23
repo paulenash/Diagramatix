@@ -58,22 +58,44 @@ export function TierPicker({
     setSubmitting(tierId);
     setError(null);
     try {
-      const res = await fetch("/api/me/subscription", {
-        method: "PATCH",
+      // Free tier doesn't go through Stripe — just flip
+      // hasChosenTier via the existing PATCH path. Paid tiers go
+      // through Stripe Checkout; the webhook will set the tier on
+      // payment success.
+      if (tierId === "free") {
+        const res = await fetch("/api/me/subscription", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tierId }),
+        });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body.error ?? `Selection failed (${res.status})`);
+        }
+        router.refresh();
+        onDismiss();
+        return;
+      }
+
+      const res = await fetch("/api/stripe/checkout", {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tierId }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        throw new Error(body.error ?? `Selection failed (${res.status})`);
+        throw new Error(body.error ?? `Checkout failed (${res.status})`);
       }
-      router.refresh();
-      onDismiss();
+      const { url } = (await res.json()) as { url?: string };
+      if (!url) throw new Error("Checkout returned no URL");
+      window.location.href = url;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Selection failed");
-    } finally {
       setSubmitting(null);
     }
+    // NOTE: don't clear submitting in the success path — we're about
+    // to navigate away. Clearing would briefly show all buttons re-
+    // enabled before the redirect lands.
   }
 
   async function skip() {

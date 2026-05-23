@@ -198,14 +198,13 @@ export function UsagePopover({
                 })}
               </>
             )}
-            {mode.kind === "self" && (
-              <button
-                disabled
-                title="Self-serve upgrade coming soon"
-                className="px-3 py-1.5 text-xs font-medium rounded bg-blue-600 text-white opacity-50 cursor-not-allowed"
-              >
-                Upgrade (coming soon)
-              </button>
+            {mode.kind === "self" && snapshot && !snapshot.isAdmin && (
+              <SelfUpgradeButtons
+                currentTierId={snapshot.tier.id}
+                disabled={changing}
+                onStart={() => { setChanging(true); setError(null); }}
+                onError={(msg) => { setError(msg); setChanging(false); }}
+              />
             )}
           </div>
           <button
@@ -217,5 +216,70 @@ export function UsagePopover({
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * Renders one button per paid tier above the user's current tier. Click
+ * → POST /api/stripe/checkout → redirect to Stripe Checkout. The
+ * webhook (Stage 3) will set the new tier when payment completes;
+ * Stripe's success_url returns the user to /dashboard?checkout=success.
+ */
+function SelfUpgradeButtons({
+  currentTierId,
+  disabled,
+  onStart,
+  onError,
+}: {
+  currentTierId: string;
+  disabled: boolean;
+  onStart: () => void;
+  onError: (msg: string) => void;
+}) {
+  const TIER_ORDER = ["free", "introductory", "professional", "expert"];
+  const PAID = [
+    { id: "introductory", label: "Introductory" },
+    { id: "professional", label: "Professional" },
+    { id: "expert", label: "Expert" },
+  ];
+  const currentRank = TIER_ORDER.indexOf(currentTierId);
+  const upgradeOptions = PAID.filter(
+    (p) => TIER_ORDER.indexOf(p.id) > currentRank,
+  );
+  if (upgradeOptions.length === 0) return null;
+
+  async function startCheckout(tierId: string) {
+    onStart();
+    try {
+      const res = await fetch("/api/stripe/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tierId }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error ?? `Checkout failed (${res.status})`);
+      }
+      const { url } = (await res.json()) as { url?: string };
+      if (!url) throw new Error("Checkout returned no URL");
+      window.location.href = url;
+    } catch (err) {
+      onError(err instanceof Error ? err.message : "Checkout failed");
+    }
+  }
+
+  return (
+    <>
+      {upgradeOptions.map((opt) => (
+        <button
+          key={opt.id}
+          onClick={() => startCheckout(opt.id)}
+          disabled={disabled}
+          className="px-3 py-1.5 text-xs font-medium rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+        >
+          Upgrade to {opt.label}
+        </button>
+      ))}
+    </>
   );
 }

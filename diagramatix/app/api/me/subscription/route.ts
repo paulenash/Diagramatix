@@ -1,17 +1,17 @@
 /**
- * Self-serve subscription tier change (testing phase / pre-Stripe).
+ * Self-serve subscription tier change — Free only.
  *
  *   PATCH /api/me/subscription
- *     Body: { tierId: "free" | "introductory" | "professional" | "expert" }
+ *     Body: { tierId: "free" }
  *
- * Updates the signed-in user's own subscriptionLevelId, restamps
+ * Free tier is the only tier reachable via this endpoint now. Paid
+ * tiers must go through Stripe Checkout (POST /api/stripe/checkout)
+ * so the actual payment happens and the webhook can set state.
+ *
+ * For Free: updates subscriptionLevelId, restamps
  * subscriptionAssignedAt to NOW() (the 30-day Free trial clock starts
- * here when a user lands on Free), and flips hasChosenTier=true so the
- * welcome TierPicker stops appearing on the dashboard.
- *
- * Auth: signed-in user; no payment integration in this phase, so any
- * tier is selectable freely. Once Stripe is wired up, this endpoint
- * will need to verify a paid invoice before accepting paid tiers.
+ * here), and flips hasChosenTier=true so the welcome TierPicker stops
+ * appearing.
  *
  * Impersonation: blocked in view mode (the admin can't change the
  * impersonated user's tier through this endpoint — they use the admin
@@ -55,6 +55,16 @@ export async function PATCH(req: Request) {
   if (typeof tierId !== "string" || !ALLOWED_TIER_IDS.has(tierId)) {
     return NextResponse.json(
       { error: `Unknown tier id: ${String(tierId ?? "(missing)")}` },
+      { status: 400 },
+    );
+  }
+  // Paid tiers must go through Stripe Checkout — webhook sets the
+  // tier on payment success. This endpoint is now Free-only.
+  if (tierId !== "free") {
+    return NextResponse.json(
+      {
+        error: "Paid tiers must be purchased via Stripe Checkout. Use POST /api/stripe/checkout.",
+      },
       { status: 400 },
     );
   }

@@ -27,6 +27,10 @@ export interface TierRow {
   maxBulkExports: number | null;
   maxBulkImports: number | null;
   trialDays: number | null;
+  /** Stripe Price ID (price_…). Null for Free; required for paid
+   *  tiers before Checkout can use them. Created in the Stripe
+   *  dashboard, then pasted here. */
+  stripePriceId: string | null;
 }
 
 /** Limit-row metadata. `kind` decides the input type and validation. */
@@ -59,10 +63,16 @@ type LimitRow =
         | "aiAttemptsResetMonthly"
         | "individualExportsResetMonthly"
         | "individualImportsResetMonthly";
+    }
+  | {
+      kind: "stringNullable";
+      label: string;
+      key: "stripePriceId";
     };
 
 const ROWS: LimitRow[] = [
   { kind: "money", label: "Price ($ / month)", key: "priceMonthly" },
+  { kind: "stringNullable", label: "Stripe Price ID", key: "stripePriceId" },
   { kind: "intNullable", label: "Projects", key: "maxProjects" },
   { kind: "intNullable", label: "Diagrams per type per project", key: "maxDiagramsPerTypePerProject" },
   { kind: "intNullable", label: "Archimate diagrams (total)", key: "maxArchimateDiagramsTotal" },
@@ -214,6 +224,22 @@ function Cell({
         checked={checked}
         onChange={(e) => onPatch(tier.id, { [row.key]: e.target.checked } as Partial<TierRow>)}
         className="h-4 w-4 cursor-pointer"
+      />
+    );
+  }
+
+  if (row.kind === "stringNullable") {
+    const current = tier[row.key] as string | null;
+    return (
+      <input
+        type="text"
+        value={current ?? ""}
+        placeholder={tier.id === "free" ? "(not needed)" : "price_…"}
+        onChange={(e) => {
+          const raw = e.target.value.trim();
+          onPatch(tier.id, { [row.key]: raw === "" ? null : raw } as Partial<TierRow>);
+        }}
+        className="w-40 px-2 py-1 text-xs font-mono border border-gray-300 rounded focus:border-blue-400 focus:outline-none"
       />
     );
   }

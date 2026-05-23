@@ -52,6 +52,7 @@ interface TierInput {
   maxBulkExports?: number | null;
   maxBulkImports?: number | null;
   trialDays?: number | null;
+  stripePriceId?: string | null;
 }
 
 export async function PUT(req: Request) {
@@ -108,6 +109,7 @@ export async function PUT(req: Request) {
       copy("maxBulkExports");
       copy("maxBulkImports");
       copy("trialDays");
+      copy("stripePriceId");
 
       const row = await tx.subscriptionLevel.update({
         where: { id: t.id },
