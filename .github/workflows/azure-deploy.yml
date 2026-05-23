@@ -153,12 +153,17 @@ jobs:
         # diffs carefully before pushing to main — a destructive column
         # rename or drop would land on prod without confirmation.
         #
-        # `--skip-generate` because the Install Prisma CLI step above
-        # already ran `prisma generate`.
+        # `--url` passed explicitly rather than relying on the
+        # prisma.config.ts datasource block — that file does
+        # `import "dotenv/config"` which is a no-op (no .env on the
+        # runner) but the URL precedence is clearer this way.
+        #
+        # `--skip-generate` is NOT used: it was removed in Prisma 7's
+        # `db push` and trips an "unknown flag" error.
         #
         # Failures abort the workflow BEFORE the App Service container
         # is swapped — preventing the "new code, old schema" failure.
-        run: npx prisma db push --accept-data-loss --skip-generate
+        run: npx prisma db push --accept-data-loss --url "$DATABASE_URL"
 
       - name: Update App Service container image
         # `az webapp config container set` rewrites the container
