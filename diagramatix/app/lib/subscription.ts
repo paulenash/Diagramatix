@@ -235,8 +235,36 @@ type UserWithTier = {
   email: string;
   createdAt: Date;
   subscriptionAssignedAt: Date | null;
+  subscriptionEndsAt: Date | null;
   subscriptionLevel: SubscriptionLevelRow | null;
 };
+
+/**
+ * Resolve the EFFECTIVE subscription tier id for a user, accounting for
+ * a canceled-and-expired Stripe subscription. When `subscriptionEndsAt`
+ * has passed, the user is downgraded to Free lazily (no cron job
+ * needed — every code path that reads the tier goes through this
+ * helper or through `loadUserWithTier` which already applies it).
+ *
+ * Pure function. Doesn't touch the DB; the caller must already have
+ * read `subscriptionEndsAt` and `subscriptionLevelId`.
+ */
+export function getEffectiveSubscriptionLevelId(
+  user: {
+    subscriptionLevelId: string | null;
+    subscriptionEndsAt: Date | null;
+  },
+  now: Date = new Date(),
+): string {
+  if (
+    user.subscriptionEndsAt &&
+    user.subscriptionEndsAt <= now &&
+    user.subscriptionLevelId !== "free"
+  ) {
+    return "free";
+  }
+  return user.subscriptionLevelId ?? "free";
+}
 
 async function loadUserWithTier(userId: string): Promise<UserWithTier | null> {
   const u = await prisma.user.findUnique({
@@ -244,12 +272,28 @@ async function loadUserWithTier(userId: string): Promise<UserWithTier | null> {
     include: { subscriptionLevel: true },
   });
   if (!u) return null;
+  // If the user has a canceled-and-expired Stripe subscription, load
+  // the Free tier and use it as the effective tier here so every
+  // downstream check (checkLimit, getUsageSnapshot, the chip) sees the
+  // post-downgrade state without each call site having to re-implement
+  // the rule.
+  const effectiveId = getEffectiveSubscriptionLevelId({
+    subscriptionLevelId: u.subscriptionLevelId,
+    subscriptionEndsAt: u.subscriptionEndsAt,
+  });
+  let effectiveLevel = u.subscriptionLevel;
+  if (effectiveLevel && effectiveId !== effectiveLevel.id) {
+    effectiveLevel = await prisma.subscriptionLevel.findUnique({
+      where: { id: effectiveId },
+    });
+  }
   return {
     id: u.id,
     email: u.email,
     createdAt: u.createdAt,
     subscriptionAssignedAt: u.subscriptionAssignedAt,
-    subscriptionLevel: u.subscriptionLevel,
+    subscriptionEndsAt: u.subscriptionEndsAt,
+    subscriptionLevel: effectiveLevel,
   };
 }
 

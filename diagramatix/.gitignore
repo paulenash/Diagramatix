@@ -42,3 +42,8 @@ yarn-error.log*
 next-env.d.ts
 
 /app/generated/prisma
+
+# Paul's working notes folder — may contain real test/live API keys
+# pasted in for reference; GitHub's secret scanner blocks pushes
+# otherwise.
+/new features/

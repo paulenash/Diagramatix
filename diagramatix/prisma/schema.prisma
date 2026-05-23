@@ -95,6 +95,28 @@ model User {
   // their next visit. New sign-ups start at false; the dashboard
   // shows the TierPicker modal until the user picks or skips.
   hasChosenTier       Boolean  @default(false)
+  // ── Stripe wiring (Subscriptions Phase 2) ────────────────────────────
+  // Stripe Customer ID for this user. Created lazily on first Checkout
+  // session attempt; reused for all subsequent payments and Portal
+  // sessions so cards / invoices stay attached to one Customer.
+  stripeCustomerId         String?   @unique
+  // Active Stripe Subscription ID. Null while on Free or after a fully-
+  // expired cancellation. Set by the `checkout.session.completed`
+  // webhook and cleared by `customer.subscription.deleted` once the
+  // grace period (subscriptionEndsAt) elapses.
+  stripeSubscriptionId     String?   @unique
+  // Mirror of Stripe's subscription status. Drives UI badges (past_due
+  // warning chip, etc.). Values we set: "active" | "trialing" |
+  // "past_due" | "canceled" | "incomplete". Null = no Stripe subscription.
+  stripeSubscriptionStatus String?
+  // Copied from Stripe — when the current billing period ends / renews.
+  // The webhook updates this on every subscription.updated event.
+  currentPeriodEnd         DateTime?
+  // Cancellation grace marker. Set to currentPeriodEnd when Stripe
+  // emits subscription.deleted. While now() < this date the user keeps
+  // their paid tier; after, `getEffectiveSubscriptionLevelId` returns
+  // "free" so we downgrade lazily without a cron job.
+  subscriptionEndsAt       DateTime?
   usageCounters       UsageCounter[]
   // Per-user UI prefs. Currently stores the collapsed state of
   // template-group headers in the editor menu, keyed like
@@ -260,6 +282,13 @@ model SubscriptionLevel {
   // import action. Null = no expiry (the default for paid tiers).
   // Free is seeded with 30.
   trialDays                     Int?
+
+  // Stripe Price ID linking this tier to a recurring price in Stripe.
+  // Null for Free (no payment). Set once via the admin Subscriptions
+  // editor (or a seed script) after creating the matching Product +
+  // Price in the Stripe dashboard. The Checkout flow looks this up by
+  // tier ID and refuses to start if it's missing for a paid tier.
+  stripePriceId                 String?
 
   users     User[]
   createdAt DateTime @default(now())
