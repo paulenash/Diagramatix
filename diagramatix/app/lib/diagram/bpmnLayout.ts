@@ -1285,6 +1285,65 @@ export function layoutBpmnDiagram(
     }
   }
 
+  // R52: Auto-position Data Stores near the elements they're connected
+  // to. Different geometry from R51 because data stores frequently
+  // serve multiple consumers — single-link case centres them
+  // above (preferred) or below the associated element; multi-link case
+  // centres them at the horizontal centroid of all associated elements
+  // and offsets vertically out of the way of the sequence connectors
+  // flowing horizontally between those elements.
+  //
+  // Above-vs-below preference: above unless the associated element(s)
+  // sit near the top of their parent's content area (which would push
+  // the data store outside the lane on the top side); in that case
+  // fall back to below. The lane growth pass (R57) below handles
+  // either direction.
+  const DATA_STORE_VGAP = 40;
+  for (const el of elements) {
+    if (el.type !== "data-store") continue;
+    // Find every association touching this data store.
+    const conns = aiConnections.filter(
+      (c) =>
+        (c.sourceId === el.id || c.targetId === el.id) &&
+        c.type !== "message" &&
+        c.type !== "sequence",
+    );
+    if (conns.length === 0) continue;
+
+    const associatedIds = conns.map((c) => (c.sourceId === el.id ? c.targetId : c.sourceId));
+    const associated = associatedIds
+      .map((id) => elMap.get(id))
+      .filter((x): x is DiagramElement => !!x);
+    if (associated.length === 0) continue;
+
+    // Inherit parentId from the first associated element (most are
+    // expected to share a lane; if they don't, the data store still
+    // logically belongs with the first one for lane-grow purposes).
+    if (associated[0].parentId) el.parentId = associated[0].parentId;
+
+    // Horizontal centroid of associated elements' centres.
+    const centroidX =
+      associated.reduce((s, a) => s + a.x + a.width / 2, 0) / associated.length;
+
+    // Vertical position — above (preferred) or below the row.
+    const minTop = Math.min(...associated.map((a) => a.y));
+    const maxBottom = Math.max(...associated.map((a) => a.y + a.height));
+    const aboveY = minTop - el.height - DATA_STORE_VGAP;
+    const belowY = maxBottom + DATA_STORE_VGAP;
+
+    // Pick above unless it would land above the parent's top edge with
+    // less than 10px of breathing room — then prefer below. Lanes / pools
+    // can still grow via R57 to accommodate either choice; this just
+    // avoids the visual surprise of a data store hovering well above its
+    // pool when an equally good slot exists below.
+    let chosenY = aboveY;
+    const parent = el.parentId ? elMap.get(el.parentId) : undefined;
+    if (parent && aboveY < parent.y + 10) chosenY = belowY;
+
+    el.x = centroidX - el.width / 2;
+    el.y = chosenY;
+  }
+
   // R57: pools must enclose every non-annotation, non-group element that
   // belongs to them. R44/R55 can push a deeply-nested decision branch
   // above or below the pool's current bounds (e.g. inner "yes" branch of
