@@ -237,25 +237,45 @@ type UserWithTier = {
   subscriptionAssignedAt: Date | null;
   subscriptionEndsAt: Date | null;
   subscriptionLevel: SubscriptionLevelRow | null;
+  /** When the effective tier is from an active admin comp grant, this
+   *  carries the grant metadata so the UI can show "(comp · expires X)"
+   *  and the admin popover can offer a Revoke button. Null when the
+   *  effective tier comes from the regular paid/free path. */
+  comp: { tierLevelId: string; expiresAt: Date; grantedAt: Date | null } | null;
 };
 
 /**
- * Resolve the EFFECTIVE subscription tier id for a user, accounting for
- * a canceled-and-expired Stripe subscription. When `subscriptionEndsAt`
- * has passed, the user is downgraded to Free lazily (no cron job
- * needed — every code path that reads the tier goes through this
- * helper or through `loadUserWithTier` which already applies it).
+ * Resolve the EFFECTIVE subscription tier id for a user, accounting for:
+ *
+ *   1. An active admin-granted comp tier (highest priority — comp wins
+ *      over both the paid sub and any grace-period downgrade).
+ *   2. A canceled-and-expired Stripe subscription — when
+ *      `subscriptionEndsAt` has passed, the user lazy-downgrades to
+ *      Free without a cron job.
+ *   3. The user's stored `subscriptionLevelId`, defaulting to "free"
+ *      when null.
  *
  * Pure function. Doesn't touch the DB; the caller must already have
- * read `subscriptionEndsAt` and `subscriptionLevelId`.
+ * read the relevant columns.
  */
 export function getEffectiveSubscriptionLevelId(
   user: {
     subscriptionLevelId: string | null;
     subscriptionEndsAt: Date | null;
+    compTierLevelId?: string | null;
+    compTierExpiresAt?: Date | null;
   },
   now: Date = new Date(),
 ): string {
+  // 1. Comp grant wins if still active.
+  if (
+    user.compTierLevelId &&
+    user.compTierExpiresAt &&
+    user.compTierExpiresAt > now
+  ) {
+    return user.compTierLevelId;
+  }
+  // 2. Grace-period downgrade for canceled paid subs.
   if (
     user.subscriptionEndsAt &&
     user.subscriptionEndsAt <= now &&
@@ -263,6 +283,7 @@ export function getEffectiveSubscriptionLevelId(
   ) {
     return "free";
   }
+  // 3. Whatever the paid path / TierPicker set.
   return user.subscriptionLevelId ?? "free";
 }
 
@@ -272,21 +293,29 @@ async function loadUserWithTier(userId: string): Promise<UserWithTier | null> {
     include: { subscriptionLevel: true },
   });
   if (!u) return null;
-  // If the user has a canceled-and-expired Stripe subscription, load
-  // the Free tier and use it as the effective tier here so every
-  // downstream check (checkLimit, getUsageSnapshot, the chip) sees the
-  // post-downgrade state without each call site having to re-implement
-  // the rule.
-  const effectiveId = getEffectiveSubscriptionLevelId({
-    subscriptionLevelId: u.subscriptionLevelId,
-    subscriptionEndsAt: u.subscriptionEndsAt,
-  });
+  // Resolve the effective tier via the same helper UI / API uses. This
+  // collapses the comp-vs-paid-vs-canceled-grace decision into a single
+  // string the rest of the system can treat uniformly.
+  const now = new Date();
+  const effectiveId = getEffectiveSubscriptionLevelId(
+    {
+      subscriptionLevelId: u.subscriptionLevelId,
+      subscriptionEndsAt: u.subscriptionEndsAt,
+      compTierLevelId: u.compTierLevelId,
+      compTierExpiresAt: u.compTierExpiresAt,
+    },
+    now,
+  );
   let effectiveLevel = u.subscriptionLevel;
   if (effectiveLevel && effectiveId !== effectiveLevel.id) {
     effectiveLevel = await prisma.subscriptionLevel.findUnique({
       where: { id: effectiveId },
     });
   }
+  const compActive =
+    u.compTierLevelId !== null &&
+    u.compTierExpiresAt !== null &&
+    u.compTierExpiresAt > now;
   return {
     id: u.id,
     email: u.email,
@@ -294,6 +323,13 @@ async function loadUserWithTier(userId: string): Promise<UserWithTier | null> {
     subscriptionAssignedAt: u.subscriptionAssignedAt,
     subscriptionEndsAt: u.subscriptionEndsAt,
     subscriptionLevel: effectiveLevel,
+    comp: compActive
+      ? {
+          tierLevelId: u.compTierLevelId!,
+          expiresAt: u.compTierExpiresAt!,
+          grantedAt: u.compTierGrantedAt,
+        }
+      : null,
   };
 }
 
@@ -524,6 +560,16 @@ export interface UsageSnapshot {
     daysRemaining: number | null;
     expired: boolean;
   };
+  /** Active admin-granted comp grant, if any. Null when the effective
+   *  tier comes from the regular paid / free path. UI uses this to
+   *  show "(comp · expires X)" badges and the admin Revoke button. */
+  comp: {
+    tierLevelId: string;
+    /** ISO-8601 string so it survives JSON serialisation through the
+     *  API route. UI parses back to Date for display. */
+    expiresAt: string;
+    grantedAt: string | null;
+  } | null;
   metrics: UsageMetricRow[];
 }
 
@@ -626,6 +672,13 @@ export async function getUsageSnapshot(
     tier: tierDescriptor,
     isAdmin: admin,
     trial,
+    comp: user.comp
+      ? {
+          tierLevelId: user.comp.tierLevelId,
+          expiresAt: user.comp.expiresAt.toISOString(),
+          grantedAt: user.comp.grantedAt ? user.comp.grantedAt.toISOString() : null,
+        }
+      : null,
     metrics: rows,
   };
 }

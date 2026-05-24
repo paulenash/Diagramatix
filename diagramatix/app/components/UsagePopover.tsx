@@ -86,16 +86,68 @@ export function UsagePopover({
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error ?? `Tier change failed (${res.status})`);
       }
-      // Refetch the snapshot so the popover reflects the new tier
-      // immediately, then notify the parent.
-      const refetch = await fetch(`/api/admin/users/${mode.userId}/usage`);
-      if (refetch.ok) {
-        const fresh: UsageSnapshot = await refetch.json();
-        setSnapshot(fresh);
-      }
+      await refetchSnapshot();
       onTierChanged?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Tier change failed");
+    } finally {
+      setChanging(false);
+    }
+  }
+
+  async function refetchSnapshot() {
+    if (mode.kind !== "admin") return;
+    const refetch = await fetch(`/api/admin/users/${mode.userId}/usage`);
+    if (refetch.ok) {
+      const fresh: UsageSnapshot = await refetch.json();
+      setSnapshot(fresh);
+    }
+  }
+
+  // Comp modal state.
+  const [showCompModal, setShowCompModal] = useState(false);
+  const [compTierId, setCompTierId] = useState<"introductory" | "professional" | "expert">("expert");
+  const [compDurationDays, setCompDurationDays] = useState<number>(30);
+
+  async function grantComp() {
+    if (mode.kind !== "admin") return;
+    setChanging(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/users/${mode.userId}/comp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tierId: compTierId, durationDays: compDurationDays }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error ?? `Comp grant failed (${res.status})`);
+      }
+      setShowCompModal(false);
+      await refetchSnapshot();
+      onTierChanged?.();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Comp grant failed");
+    } finally {
+      setChanging(false);
+    }
+  }
+
+  async function revokeComp() {
+    if (mode.kind !== "admin") return;
+    if (!confirm("Revoke this comp grant now? The user reverts to their underlying tier on next page load.")) return;
+    setChanging(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/users/${mode.userId}/comp`, { method: "DELETE" });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error ?? `Comp revoke failed (${res.status})`);
+      }
+      await refetchSnapshot();
+      onTierChanged?.();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Comp revoke failed");
     } finally {
       setChanging(false);
     }
@@ -127,8 +179,22 @@ export function UsagePopover({
             {snapshot && (
               <div className="text-right">
                 <p className="text-xs text-gray-500">Current tier</p>
-                <p className="text-sm font-semibold text-gray-900">{snapshot.tier.name}</p>
-                {snapshot.trial.daysRemaining !== null && !snapshot.isAdmin && (
+                <p className="text-sm font-semibold text-gray-900">
+                  {snapshot.tier.name}
+                  {snapshot.comp && (
+                    <span className="ml-1.5 text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-purple-100 text-purple-800 font-medium align-middle">
+                      comp
+                    </span>
+                  )}
+                </p>
+                {snapshot.comp && (
+                  <p className="text-[10px] text-purple-700">
+                    Expires {new Date(snapshot.comp.expiresAt).toLocaleDateString()}
+                    {" · "}
+                    {Math.max(0, Math.ceil((new Date(snapshot.comp.expiresAt).getTime() - Date.now()) / 86400000))} day(s) left
+                  </p>
+                )}
+                {snapshot.trial.daysRemaining !== null && !snapshot.isAdmin && !snapshot.comp && (
                   <p className={`text-[10px] ${snapshot.trial.expired ? "text-red-600" : "text-gray-500"}`}>
                     {snapshot.trial.expired
                       ? "Trial expired"
@@ -196,6 +262,26 @@ export function UsagePopover({
                     </button>
                   );
                 })}
+                <span className="ml-3 text-xs text-gray-300">|</span>
+                {snapshot.comp ? (
+                  <button
+                    disabled={changing}
+                    onClick={revokeComp}
+                    className="px-2 py-1 text-xs rounded border border-purple-300 text-purple-700 hover:bg-purple-50 disabled:opacity-50"
+                    title="Cancel the active comp grant now; user reverts to underlying tier."
+                  >
+                    Revoke comp
+                  </button>
+                ) : (
+                  <button
+                    disabled={changing}
+                    onClick={() => setShowCompModal(true)}
+                    className="px-2 py-1 text-xs rounded border border-purple-300 text-purple-700 hover:bg-purple-50 disabled:opacity-50"
+                    title="Grant a higher tier temporarily without touching the user's underlying Stripe subscription."
+                  >
+                    Grant comp
+                  </button>
+                )}
               </>
             )}
             {mode.kind === "self" && snapshot && !snapshot.isAdmin && (
@@ -224,6 +310,89 @@ export function UsagePopover({
           </button>
         </div>
       </div>
+
+      {/* Grant comp modal — admin picks a tier + duration. Rendered
+          INSIDE the popover root so its z-index sits above the
+          popover backdrop. Clicking the modal backdrop closes it
+          without affecting the popover behind. */}
+      {showCompModal && (
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowCompModal(false); }}
+        >
+          <div className="bg-white rounded-lg shadow-xl p-5 w-full max-w-sm">
+            <h3 className="text-sm font-semibold text-gray-900 mb-1">Grant comp tier</h3>
+            <p className="text-[11px] text-gray-500 mb-4">
+              Temporarily grant a higher tier without touching the user&apos;s
+              underlying Stripe subscription. Monthly usage counters reset to
+              zero so they get a fresh quota at the new tier.
+            </p>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Tier</label>
+            <div className="flex gap-2 mb-4">
+              {(["introductory", "professional", "expert"] as const).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setCompTierId(t)}
+                  className={`flex-1 px-2 py-1 text-xs rounded border ${
+                    compTierId === t
+                      ? "bg-purple-100 border-purple-400 text-purple-800 font-medium"
+                      : "border-gray-300 text-gray-700 hover:bg-gray-50"
+                  }`}
+                >
+                  {t.charAt(0).toUpperCase() + t.slice(1)}
+                </button>
+              ))}
+            </div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Duration (days)</label>
+            <div className="flex gap-2 mb-2">
+              {[7, 30, 90, 365].map((d) => (
+                <button
+                  key={d}
+                  onClick={() => setCompDurationDays(d)}
+                  className={`flex-1 px-2 py-1 text-xs rounded border ${
+                    compDurationDays === d
+                      ? "bg-purple-100 border-purple-400 text-purple-800 font-medium"
+                      : "border-gray-300 text-gray-700 hover:bg-gray-50"
+                  }`}
+                >
+                  {d}
+                </button>
+              ))}
+            </div>
+            <input
+              type="number"
+              min={1}
+              max={365 * 3}
+              value={compDurationDays}
+              onChange={(e) => {
+                const n = parseInt(e.target.value, 10);
+                if (Number.isFinite(n) && n > 0) setCompDurationDays(n);
+              }}
+              className="w-full px-2 py-1 text-xs border border-gray-300 rounded mb-4"
+              placeholder="Custom number of days"
+            />
+            <p className="text-[10px] text-gray-500 mb-4">
+              Expires {new Date(Date.now() + compDurationDays * 86400000).toLocaleDateString()}.
+            </p>
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => setShowCompModal(false)}
+                disabled={changing}
+                className="px-3 py-1.5 text-xs text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={grantComp}
+                disabled={changing}
+                className="px-3 py-1.5 text-xs text-white bg-purple-600 rounded hover:bg-purple-700 disabled:opacity-50"
+              >
+                {changing ? "Granting…" : "Grant"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

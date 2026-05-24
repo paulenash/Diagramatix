@@ -117,6 +117,19 @@ model User {
   // their paid tier; after, `getEffectiveSubscriptionLevelId` returns
   // "free" so we downgrade lazily without a cron job.
   subscriptionEndsAt       DateTime?
+  // ── Admin-granted comp tier (Option A from 2026-05-25) ───────────────
+  // Lets an admin temporarily grant a higher tier to a user (e.g. comp
+  // an influencer to Expert for 30 days) without touching their
+  // underlying Stripe subscription. While compTierExpiresAt > now AND
+  // compTierLevelId is set, `getEffectiveSubscriptionLevelId` returns
+  // the comp tier instead of the paid tier. After expiry, the user
+  // reverts silently to whatever their underlying subscription says.
+  compTierLevelId          String?
+  compTierExpiresAt        DateTime?
+  // Audit: when the comp was granted (most recent grant if multiple).
+  // A future CompGrant table can replace this with a full log, but
+  // for now we just track the latest issue date.
+  compTierGrantedAt        DateTime?
   usageCounters       UsageCounter[]
   // Per-user UI prefs. Currently stores the collapsed state of
   // template-group headers in the editor menu, keyed like
