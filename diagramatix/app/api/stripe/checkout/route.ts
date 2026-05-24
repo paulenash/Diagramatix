@@ -23,9 +23,21 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { isSuperuser } from "@/app/lib/superuser";
-import { createCheckoutSession } from "@/app/lib/stripe";
+import { createCheckoutSession, stripe } from "@/app/lib/stripe";
 
 const PAID_TIER_IDS = new Set(["introductory", "professional", "expert"]);
+
+/** Stripe subscription statuses that count as "the user already pays" —
+ *  no new Checkout allowed; tier changes must go through the Customer
+ *  Portal's switch-plans flow instead. `canceled` / `incomplete_expired`
+ *  / `unpaid` deliberately omitted: those are dead subscriptions and the
+ *  user is free to start a fresh one. */
+const ACTIVE_SUB_STATUSES = new Set([
+  "active",
+  "trialing",
+  "past_due",
+  "incomplete",
+]);
 
 export async function POST(req: Request) {
   const session = await auth();
@@ -62,6 +74,8 @@ export async function POST(req: Request) {
         email: true,
         name: true,
         stripeCustomerId: true,
+        stripeSubscriptionId: true,
+        subscriptionEndsAt: true,
       },
     }),
     prisma.subscriptionLevel.findUnique({
@@ -76,6 +90,44 @@ export async function POST(req: Request) {
   if (!tier) {
     return NextResponse.json({ error: "Tier not found" }, { status: 404 });
   }
+
+  // Existing-active-subscription guard. Without this, a user with a
+  // paid sub who clicks Upgrade gets a SECOND parallel sub in Stripe
+  // (we hit this on 2026-05-24's live test: $50 Introductory + $120
+  // Professional both active on one user).
+  //
+  // Skip the Stripe round-trip if subscriptionEndsAt has already
+  // passed — that means the user lazy-downgraded to Free even though
+  // stripeSubscriptionId is still populated (the column is only
+  // cleared on customer.subscription.deleted webhook).
+  if (user.stripeSubscriptionId) {
+    const expired =
+      user.subscriptionEndsAt !== null && user.subscriptionEndsAt <= new Date();
+    if (!expired) {
+      try {
+        const existing = await stripe.subscriptions.retrieve(user.stripeSubscriptionId);
+        if (ACTIVE_SUB_STATUSES.has(existing.status)) {
+          return NextResponse.json(
+            {
+              error:
+                "You already have an active subscription. To change tier, open Manage Subscription on your dashboard and use the Switch plans option.",
+            },
+            { status: 409 },
+          );
+        }
+      } catch (err) {
+        // Stripe returns 404 when the subscription no longer exists.
+        // Treat as "no active sub" and continue with a fresh Checkout.
+        // Anything else is a real failure — surface it.
+        const stripeErr = err as { statusCode?: number };
+        if (stripeErr.statusCode !== 404) {
+          console.error("[stripe/checkout] subscription lookup error:", err);
+          throw err;
+        }
+      }
+    }
+  }
+
   if (!tier.stripePriceId) {
     // Admin forgot to paste the Price ID in the Subscriptions editor.
     // Surface a clear message so it's obvious how to fix.
