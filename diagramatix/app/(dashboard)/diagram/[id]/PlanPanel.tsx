@@ -34,6 +34,94 @@ function Spinner({ className = "w-3 h-3 text-current" }: { className?: string })
   );
 }
 
+/**
+ * AI-planning throbber. Diagramatix icon with the central triangle
+ * (lines + 3 dots) rotating around its centroid, and a throbbing
+ * light-blue aura pulsing behind the icon. Used during the Sonnet
+ * plan-generation phase to give a recognisable, on-brand wait state
+ * that's distinct from the generic spinner.
+ *
+ * The viewBox is intentionally enlarged from the icon's native
+ * 0 0 100 100 to -25 -25 150 150 so the aura has room to grow past
+ * the icon's bounds without being clipped. Rotation origin is the
+ * triangle's centroid (38.64, 50.92) computed from the three vertex
+ * circles.
+ */
+function DiagramatixThrobber({ size = 36 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="-25 -25 150 150"
+      fill="none"
+      role="img"
+      aria-label="AI planning"
+    >
+      <defs>
+        <style>{`
+          @keyframes dgxThrobberRotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+          }
+          @keyframes dgxThrobberAura {
+            0%, 100% {
+              transform: scale(1);
+              opacity: 0.55;
+            }
+            50% {
+              transform: scale(1.18);
+              opacity: 0;
+            }
+          }
+          .dgx-throbber-aura {
+            transform-origin: 50px 50px;
+            transform-box: fill-box;
+            animation: dgxThrobberAura 1.6s ease-in-out infinite;
+          }
+          .dgx-throbber-triangle {
+            transform-origin: 38.64px 50.92px;
+            transform-box: view-box;
+            animation: dgxThrobberRotate 2.4s linear infinite;
+          }
+        `}</style>
+      </defs>
+      {/* Throbbing aura — concentric circle behind the icon, scales
+          + fades in a continuous loop. Light blue (#93c5fd) so it
+          reads as "thinking" without competing with the icon's
+          primary blue (#2E5BD6). */}
+      <circle
+        className="dgx-throbber-aura"
+        cx="50"
+        cy="50"
+        r="55"
+        fill="#93c5fd"
+      />
+      {/* Static outer D-shape — same path as the source SVG icon. */}
+      <path
+        d="M 5.5 5.5 L 50 5.5 A 44.5 44.5 0 0 1 50 94.5 L 5.5 94.5 Z"
+        fill="white"
+        stroke="#2E5BD6"
+        strokeWidth="11"
+        strokeLinejoin="round"
+      />
+      {/* Rotating triangle (lines + dots) — spins around the
+          triangle's centroid for a balanced visual rotation. */}
+      <g className="dgx-throbber-triangle">
+        <g stroke="#2E5BD6" strokeWidth="2.5" strokeLinecap="round">
+          <line x1="26.03" y1="30.62" x2="61.48" y2="50" />
+          <line x1="61.48" y1="50" x2="28.40" y2="72.14" />
+          <line x1="26.03" y1="30.62" x2="28.40" y2="72.14" />
+        </g>
+        <g fill="#1B3A95">
+          <circle cx="26.03" cy="30.62" r="5.5" />
+          <circle cx="61.48" cy="50" r="5.5" />
+          <circle cx="28.40" cy="72.14" r="5.5" />
+        </g>
+      </g>
+    </svg>
+  );
+}
+
 interface Props {
   diagramType: string;
   onApplyDiagram: (data: DiagramData) => void;
@@ -705,10 +793,16 @@ export function PlanPanel({
         )}
 
         {/* G04: prominent throbber banner while Sonnet / layout is running.
-            The button label change alone is easy to miss on a tall panel. */}
+            The button label change alone is easy to miss on a tall panel.
+            "plan" state uses the on-brand DiagramatixThrobber (rotating
+            triangle + throbbing aura); "apply" stays on the generic
+            spinner because layout-engine work is computationally
+            different and isn't tied to the AI brand. */}
         {(busy === "plan" || busy === "apply") && (
           <div className="shrink-0 mb-2 flex items-center gap-2 bg-blue-50 border border-blue-200 rounded px-2 py-1.5">
-            <Spinner className="text-blue-600 w-4 h-4" />
+            {busy === "plan"
+              ? <DiagramatixThrobber size={28} />
+              : <Spinner className="text-blue-600 w-4 h-4" />}
             <span className="text-[11px] text-blue-800 font-medium">
               {busy === "plan"
                 ? "Asking Sonnet for a plan — this usually takes 15–30 s…"
