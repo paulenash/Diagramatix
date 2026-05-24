@@ -24,12 +24,32 @@
  * Centroid (38.64, 50.92) computed from the three vertex circles in
  * public/logos/diagramatix-icon.svg.
  */
-export function DiagramatixThrobber({ size = 36 }: { size?: number }) {
+export function DiagramatixThrobber({
+  size = 36,
+  /** Aura radius in viewBox units. Default 55 matches the small sidebar
+   *  throbber; canvas overlay uses 110 for a doubly-wide pulse. The
+   *  viewBox grows automatically to fit the scaled aura. */
+  auraRadius = 55,
+}: {
+  size?: number;
+  auraRadius?: number;
+}) {
+  // Aura grows to scale 1.18 at peak. Add 5-unit padding so the
+  // anti-aliased edge isn't clipped. viewBox is centred on the icon
+  // centre (50, 50) and sized to fit the peak aura.
+  const margin = Math.ceil(auraRadius * 1.2) + 5;
+  const vbOrigin = 50 - margin;
+  const vbSize = margin * 2;
+  // Triangle shifted 10 units right via a wrapping <g translate(10 0)>;
+  // the SMIL rotate stays around the triangle's local centroid
+  // (38.64, 50.92), which post-translate visually rotates around
+  // (48.64, 50.92) — visually closer to the centre of the D-shape's
+  // body than the raw centroid was.
   return (
     <svg
       width={size}
       height={size}
-      viewBox="-25 -25 150 150"
+      viewBox={`${vbOrigin} ${vbOrigin} ${vbSize} ${vbSize}`}
       fill="none"
       role="img"
       aria-label="AI planning"
@@ -37,7 +57,7 @@ export function DiagramatixThrobber({ size = 36 }: { size?: number }) {
       {/* Throbbing aura — circle wrapped in a translate(50 50) group
           so the SMIL scale transform stays centred on the icon. */}
       <g transform="translate(50 50)">
-        <circle r="55" fill="#93c5fd" opacity="0.55">
+        <circle r={auraRadius} fill="#93c5fd" opacity="0.55">
           <animateTransform
             attributeName="transform"
             type="scale"
@@ -67,27 +87,31 @@ export function DiagramatixThrobber({ size = 36 }: { size?: number }) {
         strokeWidth="11"
         strokeLinejoin="round"
       />
-      {/* Rotating triangle (lines + dots) — three-arg rotate pivots
-          around the triangle centroid in one transform. */}
-      <g>
-        <g stroke="#2E5BD6" strokeWidth="2.5" strokeLinecap="round">
-          <line x1="26.03" y1="30.62" x2="61.48" y2="50" />
-          <line x1="61.48" y1="50" x2="28.40" y2="72.14" />
-          <line x1="26.03" y1="30.62" x2="28.40" y2="72.14" />
+      {/* Rotating triangle — wrapped in a +10 x-translate to nudge the
+          rotation centre toward the centre of the D-shape body. Inner
+          group carries the SMIL rotation around the triangle's local
+          centroid (38.64, 50.92). */}
+      <g transform="translate(10 0)">
+        <g>
+          <g stroke="#2E5BD6" strokeWidth="2.5" strokeLinecap="round">
+            <line x1="26.03" y1="30.62" x2="61.48" y2="50" />
+            <line x1="61.48" y1="50" x2="28.40" y2="72.14" />
+            <line x1="26.03" y1="30.62" x2="28.40" y2="72.14" />
+          </g>
+          <g fill="#1B3A95">
+            <circle cx="26.03" cy="30.62" r="5.5" />
+            <circle cx="61.48" cy="50" r="5.5" />
+            <circle cx="28.40" cy="72.14" r="5.5" />
+          </g>
+          <animateTransform
+            attributeName="transform"
+            type="rotate"
+            from="0 38.64 50.92"
+            to="360 38.64 50.92"
+            dur="2.4s"
+            repeatCount="indefinite"
+          />
         </g>
-        <g fill="#1B3A95">
-          <circle cx="26.03" cy="30.62" r="5.5" />
-          <circle cx="61.48" cy="50" r="5.5" />
-          <circle cx="28.40" cy="72.14" r="5.5" />
-        </g>
-        <animateTransform
-          attributeName="transform"
-          type="rotate"
-          from="0 38.64 50.92"
-          to="360 38.64 50.92"
-          dur="2.4s"
-          repeatCount="indefinite"
-        />
       </g>
     </svg>
   );

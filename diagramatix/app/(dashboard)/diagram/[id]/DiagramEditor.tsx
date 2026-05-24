@@ -2537,7 +2537,7 @@ export function DiagramEditor({
             className="fixed inset-0 z-40 flex flex-col items-center justify-center"
             style={{ pointerEvents: "none" }}
           >
-            <DiagramatixThrobber size={140} />
+            <DiagramatixThrobber size={240} auraRadius={110} />
             <p className="mt-3 text-sm font-medium text-blue-800 bg-white/85 backdrop-blur-sm px-4 py-2 rounded-lg shadow-md">
               {aiBusy === "plan"
                 ? "Asking Sonnet for a plan — this usually takes 15–30 seconds…"
