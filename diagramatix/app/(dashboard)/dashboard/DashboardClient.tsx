@@ -1393,6 +1393,15 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
             </>
           )}
           <a
+            href="/features"
+            target="_blank"
+            rel="noopener"
+            className="text-xs text-gray-500 hover:text-blue-600"
+            title="What Diagramatix can do (opens the public Features page in a new tab)"
+          >
+            Features
+          </a>
+          <a
             href="/help"
             className="text-xs text-gray-500 hover:text-blue-600"
             title="User Guide"

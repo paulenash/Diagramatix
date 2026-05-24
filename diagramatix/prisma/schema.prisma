@@ -307,3 +307,39 @@ model UsageCounter {
   @@unique([userId, periodKey, metric])
   @@index([userId])
 }
+
+// ────────────────────────────────────────────────────────────────────────────
+// Feature catalog — admin-editable, two-stage (draft + published).
+//
+// Admin edits the `name` / `summary` / `details` / `hidden` / `sortOrder`
+// fields freely. They show up in the admin editor only. The dashboard
+// "Features" modal AND the public /features marketing page read the
+// `published*` mirror fields exclusively. Clicking "Publish All" in
+// the admin editor copies draft → published in one transaction.
+//
+// `details` is markdown — typically a list of 3-5 bullets per feature.
+// Stored as one string so the editor stays simple (no per-bullet rows).
+// ────────────────────────────────────────────────────────────────────────────
+
+model Feature {
+  id                 String  @id @default(cuid())
+  sortOrder          Int     @default(0)
+
+  // Draft fields — only admins see these.
+  name               String
+  summary            String
+  details            String
+  hidden             Boolean @default(false)
+
+  // Published snapshot — what the marketing page + dashboard show.
+  // Null = never published yet.
+  publishedName      String?
+  publishedSummary   String?
+  publishedDetails   String?
+  publishedHidden    Boolean?
+  publishedSortOrder Int?
+  publishedAt        DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
