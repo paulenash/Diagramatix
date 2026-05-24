@@ -87,10 +87,17 @@ export async function POST(req: Request) {
     );
   }
 
-  // Build success / cancel URLs from the incoming request's origin so
-  // they resolve correctly across local dev / staging / production
-  // without an extra env var.
-  const origin = new URL(req.url).origin;
+  // Build success / cancel URLs from the incoming request, preferring
+  // X-Forwarded-* headers that Azure App Service sets when proxying
+  // to the Next.js standalone server. Without these, `req.url` would
+  // resolve to the internal bind address (`http://0.0.0.0:3000/...`)
+  // because Next.js standalone doesn't know it's behind a proxy, and
+  // Stripe would redirect users to a URL their browser can't reach.
+  const fwdHost = req.headers.get("x-forwarded-host");
+  const fwdProto = req.headers.get("x-forwarded-proto");
+  const origin = fwdHost
+    ? `${fwdProto ?? "https"}://${fwdHost}`
+    : new URL(req.url).origin;
   const successUrl = `${origin}/dashboard?checkout=success`;
   const cancelUrl = `${origin}/dashboard?checkout=cancel`;
 

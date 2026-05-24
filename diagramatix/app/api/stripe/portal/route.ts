@@ -38,7 +38,13 @@ export async function POST(req: Request) {
     );
   }
 
-  const origin = new URL(req.url).origin;
+  // Prefer X-Forwarded-* headers so the return URL works behind
+  // Azure App Service's proxy (see equivalent comment in checkout/route.ts).
+  const fwdHost = req.headers.get("x-forwarded-host");
+  const fwdProto = req.headers.get("x-forwarded-proto");
+  const origin = fwdHost
+    ? `${fwdProto ?? "https"}://${fwdHost}`
+    : new URL(req.url).origin;
   const returnUrl = `${origin}/dashboard`;
 
   try {
