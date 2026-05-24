@@ -1159,6 +1159,132 @@ export function layoutBpmnDiagram(
     }
   }
 
+  // R50: Decision/merge gateway pairs sit at the Y midpoint of the FIRST
+  // following Task / Subprocess of each outgoing branch, irrespective of
+  // which lanes those branches enter. R44 above aligns the decision to
+  // its immediate predecessor's Y — that's a sensible default when both
+  // branches stay in one lane, but biases the diamond toward the
+  // incoming-flow lane when branches diverge across lanes. R50 overrides
+  // that with the branch midpoint so the gateway band reads as a clean
+  // horizontal split-and-rejoin across the spanned lanes.
+  //
+  // Only fires when at least one branch's first-following task/subprocess
+  // sits in a different lane from the decision gateway itself — i.e.
+  // when there's a real cross-lane spread to centre on. Within-lane
+  // decisions keep R44/R55's predecessor-anchored Y.
+  for (const dec of decisionElsSorted) {
+    const outConns = outgoing.get(dec.id) ?? [];
+    if (outConns.length < 2) continue;
+
+    // First task/subprocess on each branch — BFS forward from each
+    // outgoing target until we hit a non-gateway, non-event element
+    // (skip over intermediate gateways that would otherwise distort
+    // the midpoint with their own Y).
+    const branchAnchorYs: number[] = [];
+    const branchParentIds = new Set<string | undefined>();
+    for (const outConn of outConns) {
+      const visited = new Set<string>();
+      const queue: string[] = [outConn.targetId];
+      let anchor: DiagramElement | undefined;
+      while (queue.length > 0) {
+        const cur = queue.shift()!;
+        if (visited.has(cur)) continue;
+        visited.add(cur);
+        const el = elMap.get(cur);
+        if (!el) continue;
+        if (el.type === "task" || el.type === "subprocess" || el.type === "subprocess-expanded") {
+          anchor = el;
+          break;
+        }
+        // Skip through gateways / events; collect their successors.
+        for (const c of outgoing.get(cur) ?? []) queue.push(c.targetId);
+      }
+      if (anchor) {
+        branchAnchorYs.push(anchor.y + anchor.height / 2);
+        branchParentIds.add(anchor.parentId);
+      }
+    }
+
+    // Only re-centre when branches genuinely span multiple lanes —
+    // otherwise R44's predecessor anchor reads better. Require ≥ 2
+    // anchors found, and at least one anchor in a different parent
+    // from the decision (so we know lanes are actually spanned).
+    if (branchAnchorYs.length < 2) continue;
+    const spansMultipleParents =
+      branchParentIds.size > 1 || (branchParentIds.size === 1 && !branchParentIds.has(dec.parentId));
+    if (!spansMultipleParents) continue;
+
+    const midY = branchAnchorYs.reduce((s, y) => s + y, 0) / branchAnchorYs.length;
+    dec.y = midY - dec.height / 2;
+    const mergeId = findPairedMerge(dec.id);
+    if (mergeId) {
+      const merge = elMap.get(mergeId);
+      if (merge) merge.y = midY - merge.height / 2;
+    }
+  }
+
+  // R51: Auto-position Data Objects relative to their associated element.
+  // A connector from data-object → element (data is the source, element
+  // is the target) means the data is an INPUT to the element — placed
+  // upper-left (preferred) or lower-left of the element. A connector
+  // from element → data-object means OUTPUT — placed upper-right or
+  // lower-right. We also stamp data.properties.role = "input"|"output"
+  // so the rendering matches the placement.
+  //
+  // Pre-existing parentId is preserved (data inherits the associated
+  // element's lane parent so R57 below grows the lane to accommodate
+  // the data object's new bounds).
+  const DATA_GAP = 30; // horizontal gap between data and element
+  const DATA_VGAP = 20; // vertical gap when above/below the element
+  // Track occupied quadrants per associated element so two data objects
+  // sharing the same task don't stack on top of each other.
+  const usedQuadrants = new Map<string, Set<"UL" | "LL" | "UR" | "LR">>();
+  for (const el of elements) {
+    if (el.type !== "data-object") continue;
+    // Find the FIRST associationBPMN-eligible connector touching this
+    // data object. aiConnections is the AI's intent; we look at both
+    // directions to determine input vs output.
+    const conn = aiConnections.find(
+      (c) =>
+        (c.sourceId === el.id || c.targetId === el.id) &&
+        c.type !== "message" &&
+        c.type !== "sequence",
+    );
+    if (!conn) continue;
+    const isOutput = conn.sourceId !== el.id; // element → data → output
+    const associatedId = isOutput ? conn.sourceId : conn.targetId;
+    const associated = elMap.get(associatedId);
+    if (!associated) continue;
+    // Stamp the role property so rendering reflects placement.
+    el.properties = { ...el.properties, role: isOutput ? "output" : "input" };
+    // Inherit parentId from the associated element so the lane/pool
+    // grows to fit the data object via R57.
+    if (associated.parentId) el.parentId = associated.parentId;
+
+    // Choose quadrant: upper first, fall back to lower if upper is
+    // already taken for this element.
+    const used = usedQuadrants.get(associatedId) ?? new Set();
+    const upper = isOutput ? "UR" as const : "UL" as const;
+    const lower = isOutput ? "LR" as const : "LL" as const;
+    const pick = used.has(upper) ? lower : upper;
+    used.add(pick);
+    usedQuadrants.set(associatedId, used);
+
+    if (pick === "UL") {
+      el.x = associated.x - el.width - DATA_GAP;
+      el.y = associated.y - el.height - DATA_VGAP;
+    } else if (pick === "LL") {
+      el.x = associated.x - el.width - DATA_GAP;
+      el.y = associated.y + associated.height + DATA_VGAP;
+    } else if (pick === "UR") {
+      el.x = associated.x + associated.width + DATA_GAP;
+      el.y = associated.y - el.height - DATA_VGAP;
+    } else {
+      el.x = associated.x + associated.width + DATA_GAP;
+      el.y = associated.y + associated.height + DATA_VGAP;
+    }
+  }
+
   // R57: pools must enclose every non-annotation, non-group element that
   // belongs to them. R44/R55 can push a deeply-nested decision branch
   // above or below the pool's current bounds (e.g. inner "yes" branch of
