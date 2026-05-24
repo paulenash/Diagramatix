@@ -1,6 +1,12 @@
 // Seed default DiagramRules for all diagram types
 const pg = require("pg");
-const pool = new pg.Pool({ connectionString: "postgres://postgres:postgres@localhost:5432/diagramatix", max: 1 });
+// Honour DATABASE_URL when provided (so the same script seeds prod via
+// `DATABASE_URL="<prod>" node scripts/seed-diagram-rules.cjs`); fall
+// back to the local-dev default otherwise.
+const pool = new pg.Pool({
+  connectionString: process.env.DATABASE_URL ?? "postgres://postgres:postgres@localhost:5432/diagramatix",
+  max: 1,
+});
 
 const rules = {
   general: `## Group 1: General Layout
