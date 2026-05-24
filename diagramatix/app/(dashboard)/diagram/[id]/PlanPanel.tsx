@@ -38,14 +38,23 @@ function Spinner({ className = "w-3 h-3 text-current" }: { className?: string })
  * AI-planning throbber. Diagramatix icon with the central triangle
  * (lines + 3 dots) rotating around its centroid, and a throbbing
  * light-blue aura pulsing behind the icon. Used during the Sonnet
- * plan-generation phase to give a recognisable, on-brand wait state
- * that's distinct from the generic spinner.
+ * plan-generation phase to give a recognisable, on-brand wait state.
  *
- * The viewBox is intentionally enlarged from the icon's native
- * 0 0 100 100 to -25 -25 150 150 so the aura has room to grow past
- * the icon's bounds without being clipped. Rotation origin is the
- * triangle's centroid (38.64, 50.92) computed from the three vertex
- * circles.
+ * Implementation note: animations use SMIL `<animateTransform>` /
+ * `<animate>` elements rather than CSS keyframes + transform-box.
+ * SMIL is universally supported wherever SVG is and sidesteps the
+ * `transform-box: view-box` / `fill-box` coordinate maths that broke
+ * the first cut of this throbber. The aura circle is wrapped in a
+ * `translate(50 50)` group so its scaling stays centred without a
+ * compensating translate, and the triangle rotation uses the
+ * three-arg `rotate(angle cx cy)` form to pivot around the centroid.
+ *
+ * ViewBox is enlarged from the icon's native 0 0 100 100 to
+ * -25 -25 150 150 so the throbbing aura has room to grow past the
+ * icon's bounds without clipping.
+ *
+ * Centroid (38.64, 50.92) computed from the three vertex circles in
+ * public/logos/diagramatix-icon.svg.
  */
 function DiagramatixThrobber({ size = 36 }: { size?: number }) {
   return (
@@ -57,45 +66,31 @@ function DiagramatixThrobber({ size = 36 }: { size?: number }) {
       role="img"
       aria-label="AI planning"
     >
-      <defs>
-        <style>{`
-          @keyframes dgxThrobberRotate {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
-          }
-          @keyframes dgxThrobberAura {
-            0%, 100% {
-              transform: scale(1);
-              opacity: 0.55;
-            }
-            50% {
-              transform: scale(1.18);
-              opacity: 0;
-            }
-          }
-          .dgx-throbber-aura {
-            transform-origin: 50px 50px;
-            transform-box: fill-box;
-            animation: dgxThrobberAura 1.6s ease-in-out infinite;
-          }
-          .dgx-throbber-triangle {
-            transform-origin: 38.64px 50.92px;
-            transform-box: view-box;
-            animation: dgxThrobberRotate 2.4s linear infinite;
-          }
-        `}</style>
-      </defs>
-      {/* Throbbing aura — concentric circle behind the icon, scales
-          + fades in a continuous loop. Light blue (#93c5fd) so it
-          reads as "thinking" without competing with the icon's
-          primary blue (#2E5BD6). */}
-      <circle
-        className="dgx-throbber-aura"
-        cx="50"
-        cy="50"
-        r="55"
-        fill="#93c5fd"
-      />
+      {/* Throbbing aura — circle wrapped in a translate(50 50) group
+          so the SMIL scale transform stays centred on the icon. */}
+      <g transform="translate(50 50)">
+        <circle r="55" fill="#93c5fd" opacity="0.55">
+          <animateTransform
+            attributeName="transform"
+            type="scale"
+            values="1; 1.18; 1"
+            keyTimes="0; 0.5; 1"
+            dur="1.6s"
+            repeatCount="indefinite"
+            calcMode="spline"
+            keySplines="0.4 0 0.2 1; 0.4 0 0.2 1"
+          />
+          <animate
+            attributeName="opacity"
+            values="0.55; 0; 0.55"
+            keyTimes="0; 0.5; 1"
+            dur="1.6s"
+            repeatCount="indefinite"
+            calcMode="spline"
+            keySplines="0.4 0 0.2 1; 0.4 0 0.2 1"
+          />
+        </circle>
+      </g>
       {/* Static outer D-shape — same path as the source SVG icon. */}
       <path
         d="M 5.5 5.5 L 50 5.5 A 44.5 44.5 0 0 1 50 94.5 L 5.5 94.5 Z"
@@ -104,9 +99,9 @@ function DiagramatixThrobber({ size = 36 }: { size?: number }) {
         strokeWidth="11"
         strokeLinejoin="round"
       />
-      {/* Rotating triangle (lines + dots) — spins around the
-          triangle's centroid for a balanced visual rotation. */}
-      <g className="dgx-throbber-triangle">
+      {/* Rotating triangle (lines + dots) — three-arg rotate pivots
+          around the triangle centroid in one transform. */}
+      <g>
         <g stroke="#2E5BD6" strokeWidth="2.5" strokeLinecap="round">
           <line x1="26.03" y1="30.62" x2="61.48" y2="50" />
           <line x1="61.48" y1="50" x2="28.40" y2="72.14" />
@@ -117,6 +112,14 @@ function DiagramatixThrobber({ size = 36 }: { size?: number }) {
           <circle cx="61.48" cy="50" r="5.5" />
           <circle cx="28.40" cy="72.14" r="5.5" />
         </g>
+        <animateTransform
+          attributeName="transform"
+          type="rotate"
+          from="0 38.64 50.92"
+          to="360 38.64 50.92"
+          dur="2.4s"
+          repeatCount="indefinite"
+        />
       </g>
     </svg>
   );
