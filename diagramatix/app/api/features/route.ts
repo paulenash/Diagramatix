@@ -7,14 +7,17 @@
  * Only rows that have been published at least once AND aren't hidden
  * in their published snapshot are returned. Sorted by publishedSortOrder.
  *
- * Cached for 60s via Next.js fetch revalidate; CDN cache headers
- * make repeat visits hit the edge instead of the database.
+ * `dynamic = "force-dynamic"` stops Next.js trying to PRE-render this
+ * route at Docker build time (the build environment has no DB to call
+ * into). Repeat-visitor caching is handled by the Cache-Control headers
+ * the response carries — Azure App Service / any CDN in front will
+ * serve cached responses for `s-maxage=60` before revalidating.
  */
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/app/lib/db";
 
-export const revalidate = 60;
+export const dynamic = "force-dynamic";
 
 export async function GET() {
   const features = await prisma.feature.findMany({

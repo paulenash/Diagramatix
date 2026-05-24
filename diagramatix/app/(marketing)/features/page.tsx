@@ -6,9 +6,11 @@ export const metadata = {
   description: "Every feature Diagramatix ships with — from BPMN to ArchiMate, AI generation to Visio round-trip.",
 };
 
-// Refresh the rendered HTML at most once per minute. Admin can force-bust
-// via a hard reload of /features if needed.
-export const revalidate = 60;
+// Always render at request time — Next.js can't pre-render this at
+// Docker build time because the build environment has no DB. The CDN
+// (Azure Front Door / any reverse proxy) handles repeat-visitor
+// caching via the response Cache-Control if we want it later.
+export const dynamic = "force-dynamic";
 
 export default async function FeaturesPage() {
   const features = await prisma.feature.findMany({
