@@ -311,14 +311,21 @@ function buildOrthogonalPath(
     return false;
   }
 
+  // Per-call diagnostic. Enable via `window.__DIAGRAMATIX_TRACE_MARGIN = true`
+  // in the browser dev tools, then drag/delete and read the console.
+  const trace = typeof window !== "undefined"
+    && !!(window as unknown as { __DIAGRAMATIX_TRACE_MARGIN?: boolean }).__DIAGRAMATIX_TRACE_MARGIN;
+
   // SOUTH detour — line below all x-overlapping obstacles.
   let bottomY = yMax;
   if (obsX.length > 0) {
     const blockerBottom = Math.max(...obsX.map(o => o.y + o.height));
     const base = Math.max(bottomY, blockerBottom);
     const tent = base + BIG_MARGIN;
-    const margin = isCrowded(tent, "y", 1, blockerBottom, obsX, poolsX) ? SMALL_MARGIN : BIG_MARGIN;
+    const crowded = isCrowded(tent, "y", 1, blockerBottom, obsX, poolsX);
+    const margin = crowded ? SMALL_MARGIN : BIG_MARGIN;
     bottomY = base + margin;
+    if (trace) console.log(`[MARGIN south] base=${base} tent=${tent} pools=${JSON.stringify(poolsX)} obs=${JSON.stringify(obsX)} crowded=${crowded} margin=${margin}`);
   }
   // NORTH detour — line above all x-overlapping obstacles.
   let topY = yMin;
@@ -326,8 +333,10 @@ function buildOrthogonalPath(
     const blockerTop = Math.min(...obsX.map(o => o.y));
     const base = Math.min(topY, blockerTop);
     const tent = base - BIG_MARGIN;
-    const margin = isCrowded(tent, "y", -1, blockerTop, obsX, poolsX) ? SMALL_MARGIN : BIG_MARGIN;
+    const crowded = isCrowded(tent, "y", -1, blockerTop, obsX, poolsX);
+    const margin = crowded ? SMALL_MARGIN : BIG_MARGIN;
     topY = base - margin;
+    if (trace) console.log(`[MARGIN north] base=${base} tent=${tent} crowded=${crowded} margin=${margin}`);
   }
   // EAST detour — line right of all y-overlapping obstacles.
   let rightX = xMax;
@@ -335,8 +344,10 @@ function buildOrthogonalPath(
     const blockerRight = Math.max(...obsY.map(o => o.x + o.width));
     const base = Math.max(rightX, blockerRight);
     const tent = base + BIG_MARGIN;
-    const margin = isCrowded(tent, "x", 1, blockerRight, obsY, poolsY) ? SMALL_MARGIN : BIG_MARGIN;
+    const crowded = isCrowded(tent, "x", 1, blockerRight, obsY, poolsY);
+    const margin = crowded ? SMALL_MARGIN : BIG_MARGIN;
     rightX = base + margin;
+    if (trace) console.log(`[MARGIN east] base=${base} tent=${tent} crowded=${crowded} margin=${margin}`);
   }
   // WEST detour — line left of all y-overlapping obstacles.
   let leftX = xMin;
@@ -344,8 +355,10 @@ function buildOrthogonalPath(
     const blockerLeft = Math.min(...obsY.map(o => o.x));
     const base = Math.min(leftX, blockerLeft);
     const tent = base - BIG_MARGIN;
-    const margin = isCrowded(tent, "x", -1, blockerLeft, obsY, poolsY) ? SMALL_MARGIN : BIG_MARGIN;
+    const crowded = isCrowded(tent, "x", -1, blockerLeft, obsY, poolsY);
+    const margin = crowded ? SMALL_MARGIN : BIG_MARGIN;
     leftX = base - margin;
+    if (trace) console.log(`[MARGIN west] base=${base} tent=${tent} crowded=${crowded} margin=${margin}`);
   }
 
   // Clamp to containment box: keep the routing safely inside the
