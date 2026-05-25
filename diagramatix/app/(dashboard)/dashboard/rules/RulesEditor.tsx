@@ -8,6 +8,7 @@ import {
   PROPOSED_RE,
   MODIFIED_RE,
 } from "@/app/lib/ai/splitRules";
+import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 
 interface RuleSet {
   id: string | null;
@@ -243,6 +244,8 @@ export function RulesEditor({ isAdmin: _isAdmin }: { isAdmin: boolean }) {
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
   const [loading, setLoading] = useState(true);
   const [showPreview, setShowPreview] = useState(true);
+  const [deleteRuleConfirm, setDeleteRuleConfirm] = useState<{ lineIndex: number; ruleId: string } | null>(null);
+  const [resetConfirm, setResetConfirm] = useState(false);
 
   useEffect(() => {
     fetch("/api/bpmn-rules", {
@@ -314,16 +317,26 @@ export function RulesEditor({ isAdmin: _isAdmin }: { isAdmin: boolean }) {
     await persistText(next, "Rule marked implemented");
   }
 
-  async function handleDeleteRule(lineIndex: number) {
+  function handleDeleteRule(lineIndex: number) {
     const line = editText.split("\n")[lineIndex] ?? "";
     const ruleId = line.trim().match(/^([A-Z]\d+(?:\.\d+)*):/)?.[1] ?? "rule";
-    if (!confirm(`Delete ${ruleId}? This cannot be undone.`)) return;
+    setDeleteRuleConfirm({ lineIndex, ruleId });
+  }
+
+  async function performDeleteRule() {
+    if (!deleteRuleConfirm) return;
+    const { lineIndex, ruleId } = deleteRuleConfirm;
+    setDeleteRuleConfirm(null);
     const next = deleteRuleLine(editText, lineIndex);
     await persistText(next, `Deleted ${ruleId}`);
   }
 
-  async function handleReset() {
-    if (!confirm("Reset to system defaults? Your customisations for this category will be deleted.")) return;
+  function handleReset() {
+    setResetConfirm(true);
+  }
+
+  async function performReset() {
+    setResetConfirm(false);
     setSaving(true);
     try {
       await fetch("/api/bpmn-rules", {
@@ -571,6 +584,30 @@ export function RulesEditor({ isAdmin: _isAdmin }: { isAdmin: boolean }) {
           </p>
         </main>
       </div>
+
+      {deleteRuleConfirm && (
+        <ConfirmDialog
+          title={`Delete ${deleteRuleConfirm.ruleId}?`}
+          message="This cannot be undone."
+          confirmLabel="Delete"
+          cancelLabel="Cancel"
+          destructive
+          onCancel={() => setDeleteRuleConfirm(null)}
+          onConfirm={performDeleteRule}
+        />
+      )}
+
+      {resetConfirm && (
+        <ConfirmDialog
+          title="Reset to system defaults?"
+          message="Your customisations for this category will be deleted."
+          confirmLabel="Reset"
+          cancelLabel="Cancel"
+          destructive
+          onCancel={() => setResetConfirm(false)}
+          onConfirm={performReset}
+        />
+      )}
     </div>
   );
 }

@@ -236,7 +236,15 @@ type UserWithTier = {
   createdAt: Date;
   subscriptionAssignedAt: Date | null;
   subscriptionEndsAt: Date | null;
+  /** The EFFECTIVE tier — comp wins when active, otherwise the
+   *  underlying. Null only if neither is set (shouldn't happen in
+   *  practice since registration assigns Free). */
   subscriptionLevel: SubscriptionLevelRow | null;
+  /** The UNDERLYING tier — what the user would be on if the comp
+   *  weren't active. Populated whenever a comp is overriding a
+   *  different tier; same as `subscriptionLevel` when no comp.
+   *  Lets the UI render `Free → Expert · COMP`. */
+  underlyingLevel: SubscriptionLevelRow | null;
   /** When the effective tier is from an active admin comp grant, this
    *  carries the grant metadata so the UI can show "(comp · expires X)"
    *  and the admin popover can offer a Revoke button. Null when the
@@ -306,8 +314,28 @@ async function loadUserWithTier(userId: string): Promise<UserWithTier | null> {
     },
     now,
   );
-  let effectiveLevel = u.subscriptionLevel;
-  if (effectiveLevel && effectiveId !== effectiveLevel.id) {
+  // Underlying tier (what the user would be on without the comp).
+  // This is `u.subscriptionLevel` straight from the Prisma include,
+  // possibly downgraded to Free by the grace-period rule. Compute
+  // separately from the effective tier so the UI can show both.
+  const underlyingId = getEffectiveSubscriptionLevelId(
+    {
+      subscriptionLevelId: u.subscriptionLevelId,
+      subscriptionEndsAt: u.subscriptionEndsAt,
+      // Comp columns deliberately omitted — we want the
+      // "without-comp" answer here.
+    },
+    now,
+  );
+  let underlyingLevel = u.subscriptionLevel;
+  if (underlyingLevel && underlyingId !== underlyingLevel.id) {
+    underlyingLevel = await prisma.subscriptionLevel.findUnique({
+      where: { id: underlyingId },
+    });
+  }
+  // Effective tier (comp wins when active).
+  let effectiveLevel = underlyingLevel;
+  if (effectiveId !== underlyingId) {
     effectiveLevel = await prisma.subscriptionLevel.findUnique({
       where: { id: effectiveId },
     });
@@ -323,6 +351,7 @@ async function loadUserWithTier(userId: string): Promise<UserWithTier | null> {
     subscriptionAssignedAt: u.subscriptionAssignedAt,
     subscriptionEndsAt: u.subscriptionEndsAt,
     subscriptionLevel: effectiveLevel,
+    underlyingLevel,
     comp: compActive
       ? {
           tierLevelId: u.compTierLevelId!,
@@ -553,7 +582,15 @@ export interface UsageMetricRow {
 }
 
 export interface UsageSnapshot {
+  /** Effective tier (the one whose limits apply). When a comp grant
+   *  is active and overrides a different underlying tier, this carries
+   *  the comp tier; otherwise it's the underlying tier. */
   tier: { id: string; name: string };
+  /** Set only when a comp is active AND it overrides a DIFFERENT
+   *  underlying tier — lets the UI render `Free → Expert · COMP`.
+   *  Null when there's no comp, or when the comp tier happens to
+   *  match the underlying tier (no visual change needed). */
+  underlyingTier: { id: string; name: string } | null;
   isAdmin: boolean;
   trial: {
     /** null when the user's tier has no trial window. */
@@ -668,8 +705,18 @@ export async function getUsageSnapshot(
     });
   }
 
+  // Underlying tier — only worth surfacing to the UI when it actually
+  // differs from the effective tier (i.e. a comp is overriding it).
+  // When effective === underlying, the UI just shows one badge.
+  const showUnderlying =
+    user.comp !== null &&
+    user.underlyingLevel !== null &&
+    user.underlyingLevel.id !== tierDescriptor.id;
   return {
     tier: tierDescriptor,
+    underlyingTier: showUnderlying
+      ? { id: user.underlyingLevel!.id, name: user.underlyingLevel!.name }
+      : null,
     isAdmin: admin,
     trial,
     comp: user.comp

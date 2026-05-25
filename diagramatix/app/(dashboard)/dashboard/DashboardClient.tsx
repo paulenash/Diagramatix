@@ -1175,11 +1175,22 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                 <path d="M5 11h3" />
               </svg>
               <span>Subscription:</span>
+              {usageSnapshot.underlyingTier && (
+                <>
+                  <span className="text-xs opacity-70 line-through">{usageSnapshot.underlyingTier.name}</span>
+                  <span className="text-xs opacity-70">→</span>
+                </>
+              )}
               <strong className="font-semibold">{usageSnapshot.tier.name}</strong>
-              {usageSnapshot.trial.daysRemaining !== null && !usageSnapshot.isAdmin && !usageSnapshot.trial.expired && (
+              {usageSnapshot.comp && (
+                <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-purple-200 text-purple-800 font-medium">
+                  comp · {Math.max(0, Math.ceil((new Date(usageSnapshot.comp.expiresAt).getTime() - Date.now()) / 86400000))}d
+                </span>
+              )}
+              {usageSnapshot.trial.daysRemaining !== null && !usageSnapshot.isAdmin && !usageSnapshot.trial.expired && !usageSnapshot.comp && (
                 <span className="text-xs opacity-80">• {usageSnapshot.trial.daysRemaining}d left</span>
               )}
-              {usageSnapshot.trial.expired && !usageSnapshot.isAdmin && (
+              {usageSnapshot.trial.expired && !usageSnapshot.isAdmin && !usageSnapshot.comp && (
                 <span className="text-xs font-semibold">• expired</span>
               )}
             </button>

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { UsageSnapshot } from "@/app/lib/subscription";
+import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 
 /**
  * Subscription usage popover. Two modes:
@@ -133,9 +134,16 @@ export function UsagePopover({
     }
   }
 
-  async function revokeComp() {
+  const [showRevokeConfirm, setShowRevokeConfirm] = useState(false);
+
+  function requestRevokeComp() {
     if (mode.kind !== "admin") return;
-    if (!confirm("Revoke this comp grant now? The user reverts to their underlying tier on next page load.")) return;
+    setShowRevokeConfirm(true);
+  }
+
+  async function performRevokeComp() {
+    if (mode.kind !== "admin") return;
+    setShowRevokeConfirm(false);
     setChanging(true);
     setError(null);
     try {
@@ -266,7 +274,7 @@ export function UsagePopover({
                 {snapshot.comp ? (
                   <button
                     disabled={changing}
-                    onClick={revokeComp}
+                    onClick={requestRevokeComp}
                     className="px-2 py-1 text-xs rounded border border-purple-300 text-purple-700 hover:bg-purple-50 disabled:opacity-50"
                     title="Cancel the active comp grant now; user reverts to underlying tier."
                   >
@@ -392,6 +400,18 @@ export function UsagePopover({
             </div>
           </div>
         </div>
+      )}
+
+      {showRevokeConfirm && (
+        <ConfirmDialog
+          title="Revoke comp grant?"
+          message="The user reverts to their underlying subscription tier on next page load. Their monthly usage counters are not reset."
+          confirmLabel="Revoke comp"
+          cancelLabel="Cancel"
+          destructive
+          onCancel={() => setShowRevokeConfirm(false)}
+          onConfirm={performRevokeComp}
+        />
       )}
     </div>
   );

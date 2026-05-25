@@ -19,6 +19,7 @@ import { PoolsLanesTree } from "./ai-plan/PoolsLanesTree";
 import { ElementsByContainerView } from "./ai-plan/ElementsByContainerView";
 import { ConnectorsByTypeView } from "./ai-plan/ConnectorsByTypeView";
 import { DiagramatixThrobber } from "@/app/components/DiagramatixThrobber";
+import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 declare global {
@@ -82,6 +83,7 @@ export function PlanPanel({
   const [saveName, setSaveName] = useState("");
   const [showSave, setShowSave] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [replacePlanConfirm, setReplacePlanConfirm] = useState(false);
 
   // Raw JSON tab has its own draft so mid-typing doesn't nuke structured state.
   // It syncs FROM `asJson` whenever the tab is NOT focused; pushes BACK to
@@ -396,12 +398,7 @@ export function PlanPanel({
     } catch { /* ignore */ }
   }, [editingPromptId, loadPromptList]);
 
-  const callPlan = useCallback(async () => {
-    if (!prompt.trim() || busy) return;
-    // If the user has an edited plan in state, warn before clobbering.
-    if (hasPlan && lastSonnetResponseRef.current != null && asJson !== lastSonnetResponseRef.current) {
-      if (!confirm("You have edits on the current plan. Re-sending to Sonnet will replace them. Continue?")) return;
-    }
+  const executePlanCall = useCallback(async () => {
     setBusy("plan");
     setError(null);
     setIssues(null);
@@ -428,7 +425,17 @@ export function PlanPanel({
     } finally {
       setBusy(null);
     }
-  }, [prompt, busy, hasPlan, asJson, setPlan, attachment]);
+  }, [prompt, setPlan, attachment]);
+
+  const callPlan = useCallback(async () => {
+    if (!prompt.trim() || busy) return;
+    // If the user has an edited plan in state, warn before clobbering.
+    if (hasPlan && lastSonnetResponseRef.current != null && asJson !== lastSonnetResponseRef.current) {
+      setReplacePlanConfirm(true);
+      return;
+    }
+    await executePlanCall();
+  }, [prompt, busy, hasPlan, asJson, executePlanCall]);
 
   const callApplyLayout = useCallback(async () => {
     if (!hasPlan || busy) return;
@@ -827,6 +834,21 @@ export function PlanPanel({
           )}
         </div>
       </div>
+
+      {replacePlanConfirm && (
+        <ConfirmDialog
+          title="Replace your plan edits?"
+          message="You have edits on the current plan. Re-sending to Sonnet will replace them."
+          confirmLabel="Re-send to Sonnet"
+          cancelLabel="Keep edits"
+          destructive
+          onCancel={() => setReplacePlanConfirm(false)}
+          onConfirm={() => {
+            setReplacePlanConfirm(false);
+            void executePlanCall();
+          }}
+        />
+      )}
     </div>
   );
 }

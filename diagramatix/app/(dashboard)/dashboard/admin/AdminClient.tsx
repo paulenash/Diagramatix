@@ -15,8 +15,16 @@ interface UserRow {
   currentDiagramName: string | null;
   _count: { projects: number; diagrams: number };
   /** Display label for the Subscription column — "Administration" for
-   *  SUPERUSER_EMAILS users, otherwise the SubscriptionLevel.name. */
+   *  SUPERUSER_EMAILS users, otherwise the EFFECTIVE tier name (comp
+   *  wins when active). */
   subscriptionLabel: string;
+  /** When the effective tier comes from a comp grant overriding a
+   *  different underlying tier, this is the underlying name (shown
+   *  struck-through before the effective name to signal the override).
+   *  Null when there's no comp or the comp tier matches underlying. */
+  underlyingLabel: string | null;
+  /** ISO timestamp when the active comp lapses. Null when no comp. */
+  compExpiresAt: string | null;
   isAdmin: boolean;
 }
 
@@ -231,14 +239,39 @@ export function AdminClient({ users, currentUserId }: Props) {
                   <td className="px-4 py-3 text-xs">
                     <button
                       onClick={() => setUsagePopover({ userId: u.id, userEmail: u.email, userName: u.name })}
-                      className={`inline-block text-left font-medium border rounded px-2 py-0.5 hover:bg-blue-50 ${
+                      className={`inline-flex items-center gap-1 text-left font-medium border rounded px-2 py-0.5 hover:bg-blue-50 ${
                         u.isAdmin
                           ? "text-orange-600 border-orange-300"
                           : "text-blue-700 border-blue-300"
                       }`}
-                      title={u.isAdmin ? "Administrator — bypasses all limits" : "View usage and change tier"}
+                      title={
+                        u.isAdmin
+                          ? "Administrator — bypasses all limits"
+                          : u.compExpiresAt
+                            ? `Comp grant active until ${new Date(u.compExpiresAt).toLocaleDateString()}`
+                            : "View usage and change tier"
+                      }
                     >
-                      {u.subscriptionLabel}
+                      {u.underlyingLabel && (
+                        <>
+                          <span className="opacity-60 line-through">{u.underlyingLabel}</span>
+                          <span className="opacity-60">{"→"}</span>
+                        </>
+                      )}
+                      <span>{u.subscriptionLabel}</span>
+                      {u.compExpiresAt && (
+                        <span className="text-[9px] uppercase tracking-wide px-1 py-0.5 rounded bg-purple-200 text-purple-800 font-medium">
+                          comp{" "}
+                          {Math.max(
+                            0,
+                            Math.ceil(
+                              (new Date(u.compExpiresAt).getTime() - Date.now()) /
+                                86_400_000,
+                            ),
+                          )}
+                          d
+                        </span>
+                      )}
                     </button>
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-600 text-center">{u._count.projects}</td>

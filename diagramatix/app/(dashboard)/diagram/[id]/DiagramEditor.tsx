@@ -747,6 +747,15 @@ export function DiagramEditor({
     { file: File; baseName: string; kind?: "visio" | "bpmn" } | null
   >(null);
   const [clearConfirmOpen, setClearConfirmOpen] = useState<null | "all" | "unselected">(null);
+  // Pending import confirmation: holds the parsed-first-diagram payload
+  // and the message to show. The dialog's Confirm handler applies it.
+  // Replaces a pair of native window.confirm() prompts that the user
+  // found jarring next to the rest of the Diagramatix-styled dialogs.
+  const [pendingImport, setPendingImport] = useState<null | {
+    message: string;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    apply: () => void;
+  }>(null);
   const [clearMenuOpen, setClearMenuOpen] = useState(false);
   const clearMenuRef = useRef<HTMLDivElement>(null);
 
@@ -1034,23 +1043,21 @@ export function DiagramEditor({
         }
       }
       const diagCount = parsed.diagrams.length;
-      if (diagCount > 1) {
-        if (!window.confirm(
-          `This file contains ${diagCount} diagrams. Only the first one ("${first.name ?? "(unnamed)"}") ` +
-            `will be imported into the current diagram, replacing its contents. Continue?`,
-        )) return;
-      } else {
-        if (!window.confirm(
-          `Replace the current diagram contents with the imported diagram "${first.name ?? "(unnamed)"}"? This cannot be undone.`,
-        )) return;
-      }
-      setData(first.data);
-      if (first.colorConfig && typeof first.colorConfig === "object") {
-        setDiagramColorConfig(first.colorConfig as SymbolColorConfig);
-      }
-      if (typeof first.displayMode === "string") {
-        setDisplayMode(first.displayMode as DisplayMode);
-      }
+      const message = diagCount > 1
+        ? `This file contains ${diagCount} diagrams. Only the first one ("${first.name ?? "(unnamed)"}") will be imported into the current diagram, replacing its contents. Continue?`
+        : `Replace the current diagram contents with the imported diagram "${first.name ?? "(unnamed)"}"? This cannot be undone.`;
+      setPendingImport({
+        message,
+        apply: () => {
+          setData(first.data);
+          if (first.colorConfig && typeof first.colorConfig === "object") {
+            setDiagramColorConfig(first.colorConfig as SymbolColorConfig);
+          }
+          if (typeof first.displayMode === "string") {
+            setDisplayMode(first.displayMode as DisplayMode);
+          }
+        },
+      });
     } catch (err) {
       alert(`Import failed: ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -2682,6 +2689,22 @@ export function DiagramEditor({
           />
         );
       })()}
+
+      {pendingImport && (
+        <ConfirmDialog
+          title="Import diagram?"
+          message={pendingImport.message}
+          confirmLabel="Import"
+          cancelLabel="Cancel"
+          destructive
+          onCancel={() => setPendingImport(null)}
+          onConfirm={() => {
+            const apply = pendingImport.apply;
+            setPendingImport(null);
+            apply();
+          }}
+        />
+      )}
 
       {showSaveAs && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">

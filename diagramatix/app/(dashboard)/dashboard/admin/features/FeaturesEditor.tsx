@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 
 /**
  * Editable feature row. Mirrors the Feature Prisma model with date
@@ -48,6 +49,7 @@ export function FeaturesEditor({ initial }: { initial: FeatureRow[] }) {
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; name: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const dirtyCount = useMemo(() => rows.filter(isDirty).length, [rows]);
@@ -307,9 +309,7 @@ export function FeaturesEditor({ initial }: { initial: FeatureRow[] }) {
                         Hide
                       </label>
                       <button
-                        onClick={() => {
-                          if (confirm(`Delete "${r.name}"?`)) deleteRow(r.id);
-                        }}
+                        onClick={() => setDeleteConfirm({ id: r.id, name: r.name })}
                         disabled={busy}
                         title="Delete"
                         className="p-1 text-red-600 hover:bg-red-50 rounded text-xs"
@@ -356,6 +356,22 @@ export function FeaturesEditor({ initial }: { initial: FeatureRow[] }) {
           </div>
         </div>
       </main>
+
+      {deleteConfirm && (
+        <ConfirmDialog
+          title={`Delete "${deleteConfirm.name || "feature"}"?`}
+          message="This removes the draft row. If the feature has been published, it stays live until you publish again."
+          confirmLabel="Delete"
+          cancelLabel="Cancel"
+          destructive
+          onCancel={() => setDeleteConfirm(null)}
+          onConfirm={() => {
+            const { id } = deleteConfirm;
+            setDeleteConfirm(null);
+            deleteRow(id);
+          }}
+        />
+      )}
     </div>
   );
 }
