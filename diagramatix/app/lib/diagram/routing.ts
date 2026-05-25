@@ -232,6 +232,10 @@ function buildOrthogonalPath(
   // within the box. Without this, an internal obstacle between two
   // EP children would push the route OUTSIDE the EP boundary.
   containment?: Bounds,
+  // Pool bounds — used as a "near boundary" trigger to fall back to
+  // the small margin so the detour doesn't crowd the pool wall.
+  // Pools are NOT in `obstacles` (connectors route through them).
+  poolBounds: Bounds[] = [],
 ): Point[] {
   const mid1: Point = { x: end.x, y: start.y };
   const mid2: Point = { x: start.x, y: end.y };
@@ -242,29 +246,107 @@ function buildOrthogonalPath(
   if (!pathHitsObstacles(pathA, obstacles)) return pathA;
   if (!pathHitsObstacles(pathB, obstacles)) return pathB;
 
-  // Both L-shaped paths blocked — route around the obstacles, hugging
-  // them (10 px clearance) instead of swinging far out. Each detour
-  // direction only considers obstacles whose perpendicular projection
-  // overlaps the start↔end span on the OTHER axis — so a far-away
-  // obstacle off to the side doesn't push the detour wider than needed.
-  const MARGIN = 10;
+  // Both L-shaped paths blocked — route around the obstacles.
+  // Margin defaults to ½ default-Task-height (= 33 px) for a visually
+  // generous detour. Falls back to 10 px when the wide detour would
+  // either (a) squeeze a second obstacle between the blocker and the
+  // detour line, or (b) push the detour past a pool wall on the side
+  // the detour is heading toward.
+  // Each detour direction only considers obstacles whose perpendicular
+  // projection overlaps the start↔end span on the OTHER axis — so a
+  // far-away obstacle off to the side doesn't push the detour wider
+  // than needed.
+  const SMALL_MARGIN = 10;
+  const BIG_MARGIN = 33; // ½ × default Task height (65 px)
+  const POOL_INSET = 4;  // detour line must stay at least this far inside the pool wall
   const xMin = Math.min(start.x, end.x);
   const xMax = Math.max(start.x, end.x);
   const yMin = Math.min(start.y, end.y);
   const yMax = Math.max(start.y, end.y);
-  // Obstacles whose x-range overlaps the start-end x-range affect a
-  // SOUTH/NORTH detour (vertical clearance); y-range overlap affects
-  // EAST/WEST detours.
   const obsX = obstacles.filter(o => o.x < xMax && o.x + o.width > xMin);
   const obsY = obstacles.filter(o => o.y < yMax && o.y + o.height > yMin);
+  const poolsX = poolBounds.filter(p => p.x < xMax && p.x + p.width > xMin);
+  const poolsY = poolBounds.filter(p => p.y < yMax && p.y + p.height > yMin);
+
+  // Directional crowding test. `dir` says which way the detour is
+  // heading (the side of the blocker the line is being placed on).
+  // For each obstacle on that side: trigger if its near edge sits
+  // between `line` and `line + dir*BIG_MARGIN` — i.e., the detour
+  // would visibly squeeze it. For each pool: trigger only if the
+  // wall on the detour's heading direction is at/past `line`
+  // (the line would clip or breach the pool boundary).
+  function isCrowded(
+    line: number,
+    axis: "y" | "x",
+    dir: 1 | -1,
+    blockerEdge: number,
+    relevantObs: Bounds[],
+    relevantPools: Bounds[],
+  ): boolean {
+    for (const o of relevantObs) {
+      const lo = axis === "y" ? o.y : o.x;
+      const hi = lo + (axis === "y" ? o.height : o.width);
+      // Near edge = the side facing the blocker.
+      const nearEdge = dir > 0 ? lo : hi;
+      // Only obstacles strictly past the blocker on the detour side
+      // can squeeze (the blocker itself sits at blockerEdge).
+      if (dir > 0 ? nearEdge <= blockerEdge + 0.5 : nearEdge >= blockerEdge - 0.5) continue;
+      // Squeeze test: near edge is between the detour line and one
+      // BIG_MARGIN further out.
+      if (dir > 0) {
+        if (nearEdge > line && nearEdge <= line + BIG_MARGIN) return true;
+      } else {
+        if (nearEdge < line && nearEdge >= line - BIG_MARGIN) return true;
+      }
+    }
+    for (const p of relevantPools) {
+      const lo = axis === "y" ? p.y : p.x;
+      const hi = lo + (axis === "y" ? p.height : p.width);
+      // Wall on the detour's heading direction.
+      const wall = dir > 0 ? hi : lo;
+      // Trigger if the BIG detour line would be at-or-past the wall
+      // (allowing a small visual inset before counting as clipped).
+      if (dir > 0 ? line > wall - POOL_INSET : line < wall + POOL_INSET) return true;
+    }
+    return false;
+  }
+
+  // SOUTH detour — line below all x-overlapping obstacles.
   let bottomY = yMax;
-  if (obsX.length > 0) bottomY = Math.max(bottomY, ...obsX.map(o => o.y + o.height)) + MARGIN;
+  if (obsX.length > 0) {
+    const blockerBottom = Math.max(...obsX.map(o => o.y + o.height));
+    const base = Math.max(bottomY, blockerBottom);
+    const tent = base + BIG_MARGIN;
+    const margin = isCrowded(tent, "y", 1, blockerBottom, obsX, poolsX) ? SMALL_MARGIN : BIG_MARGIN;
+    bottomY = base + margin;
+  }
+  // NORTH detour — line above all x-overlapping obstacles.
   let topY = yMin;
-  if (obsX.length > 0) topY = Math.min(topY, ...obsX.map(o => o.y)) - MARGIN;
+  if (obsX.length > 0) {
+    const blockerTop = Math.min(...obsX.map(o => o.y));
+    const base = Math.min(topY, blockerTop);
+    const tent = base - BIG_MARGIN;
+    const margin = isCrowded(tent, "y", -1, blockerTop, obsX, poolsX) ? SMALL_MARGIN : BIG_MARGIN;
+    topY = base - margin;
+  }
+  // EAST detour — line right of all y-overlapping obstacles.
   let rightX = xMax;
-  if (obsY.length > 0) rightX = Math.max(rightX, ...obsY.map(o => o.x + o.width)) + MARGIN;
+  if (obsY.length > 0) {
+    const blockerRight = Math.max(...obsY.map(o => o.x + o.width));
+    const base = Math.max(rightX, blockerRight);
+    const tent = base + BIG_MARGIN;
+    const margin = isCrowded(tent, "x", 1, blockerRight, obsY, poolsY) ? SMALL_MARGIN : BIG_MARGIN;
+    rightX = base + margin;
+  }
+  // WEST detour — line left of all y-overlapping obstacles.
   let leftX = xMin;
-  if (obsY.length > 0) leftX = Math.min(leftX, ...obsY.map(o => o.x)) - MARGIN;
+  if (obsY.length > 0) {
+    const blockerLeft = Math.min(...obsY.map(o => o.x));
+    const base = Math.min(leftX, blockerLeft);
+    const tent = base - BIG_MARGIN;
+    const margin = isCrowded(tent, "x", -1, blockerLeft, obsY, poolsY) ? SMALL_MARGIN : BIG_MARGIN;
+    leftX = base - margin;
+  }
 
   // Clamp to containment box: keep the routing safely inside the
   // enclosing EP (with a small inset so the route doesn't sit on the
@@ -307,7 +389,7 @@ function buildOrthogonalPath(
   // outside the EP — accept that it may clip an internal obstacle rather
   // than break out of the EP boundary.
   if (!containment) {
-    const farY = topY - MARGIN;
+    const farY = topY - SMALL_MARGIN;
     const farPath = [start, { x: start.x, y: farY }, { x: end.x, y: farY }, end];
     if (!pathHitsObstacles(farPath, obstacles)) return farPath;
   }
@@ -642,6 +724,12 @@ export function computeWaypoints(
       containmentBounds = getBounds(innermost);
     }
   }
+  // Pool bounds — passed to buildOrthogonalPath as a "near boundary"
+  // hint so detours don't crowd a pool wall. NOT obstacles.
+  const poolBounds = allElements
+    .filter(el => el.type === "pool")
+    .map(getBounds);
+
   const obstacles = allElements
     .filter((el) => {
       if (el.id === source.id || el.id === target.id) return false;
@@ -749,7 +837,7 @@ export function computeWaypoints(
         ? [exitPt, approachPt]
         : [exitPt, { x: midX, y: exitPt.y }, { x: midX, y: approachPt.y }, approachPt];
     } else {
-      midPath = buildOrthogonalPath(exitPt, approachPt, obstaclesForDetour, containmentBounds);
+      midPath = buildOrthogonalPath(exitPt, approachPt, obstaclesForDetour, containmentBounds, poolBounds);
     }
   } else if (
     exitOutward && approachOutward &&
@@ -765,7 +853,7 @@ export function computeWaypoints(
         ? [exitPt, approachPt]
         : [exitPt, { x: exitPt.x, y: midY }, { x: approachPt.x, y: midY }, approachPt];
     } else {
-      midPath = buildOrthogonalPath(exitPt, approachPt, obstaclesForDetour, containmentBounds);
+      midPath = buildOrthogonalPath(exitPt, approachPt, obstaclesForDetour, containmentBounds, poolBounds);
     }
   } else {
     // Perpendicular sides (e.g., right→top, bottom→left, etc.)
@@ -800,7 +888,7 @@ export function computeWaypoints(
       // source / target gateway body when the natural straight middle
       // would (e.g., source ABOVE gateway, target = gateway BOTTOM
       // vertex — the detour routes the path AROUND the gateway).
-      midPath = buildOrthogonalPath(exitPt, approachPt, obstaclesForDetour, containmentBounds);
+      midPath = buildOrthogonalPath(exitPt, approachPt, obstaclesForDetour, containmentBounds, poolBounds);
     }
   }
 

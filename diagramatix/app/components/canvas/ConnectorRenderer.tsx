@@ -2,14 +2,6 @@
 
 import { useState, useContext } from "react";
 
-// Module-level double-click tracking. Must NOT be a per-component ref:
-// Canvas renders the SELECTED connector and the UNSELECTED connectors
-// in two different JSX branches, so a click that toggles selection
-// causes the connector's React instance to re-mount on a new branch.
-// useRef would lose the previous click time across that re-mount and
-// the double-click would never register.
-let lastConnectorClickId: string | null = null;
-let lastConnectorClickTime = 0;
 import type { Connector, Point, Side } from "@/app/lib/diagram/types";
 import { DisplayModeCtx, ConnectorFontScaleCtx, sketchyFilter } from "@/app/lib/diagram/displayMode";
 import { waypointsToSvgPath, waypointsToCurvePath, waypointsToRoundedPath } from "@/app/lib/diagram/routing";
@@ -681,94 +673,8 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
     window.addEventListener("mouseup", onUp);
   }
 
-  // Insert a small, visible U-shaped jog at the click point. Four new
-  // waypoints break the segment into five orthogonal pieces; the bottom
-  // (or side) of the U becomes immediately draggable for re-routing.
-  // The jog direction (above/below for horizontal, left/right for
-  // vertical) follows the click position relative to the segment so the
-  // bend appears on the side the user clicked.
-  function insertWaypointAt(click: Point) {
-    // Accept any non-curvilinear routing — including older connectors
-    // that may have routingType undefined. Only curvilinear has its
-    // own dedicated handle-drag model.
-    if (connector.routingType === "curvilinear") return false;
-    if (!onUpdateWaypoints) return false;
-    let bestSegIdx = -1;
-    let bestDist = Infinity;
-    let bestProjection: Point | null = null;
-    for (let i = 0; i < visibleWaypoints.length - 1; i++) {
-      const p1 = visibleWaypoints[i];
-      const p2 = visibleWaypoints[i + 1];
-      const proj = closestPointOnSegment(p1, p2, click);
-      const d = Math.hypot(click.x - proj.x, click.y - proj.y);
-      if (d < bestDist) { bestDist = d; bestSegIdx = i; bestProjection = proj; }
-    }
-    if (bestSegIdx < 0 || bestProjection == null || bestDist > 20) return false;
-    const p1 = visibleWaypoints[bestSegIdx];
-    const p2 = visibleWaypoints[bestSegIdx + 1];
-    const isHoriz = Math.abs(p1.y - p2.y) < 1;
-    // The segment must be long enough for the U-jog to fit with margin
-    // at each end; otherwise the inserted waypoints would land too
-    // close to existing ones and `consolidateWaypoints` would drop them.
-    const segLen = isHoriz ? Math.abs(p2.x - p1.x) : Math.abs(p2.y - p1.y);
-    const HALF_W = 10;       // half-width of the U along the segment direction
-    const JOG_H  = 15;       // perpendicular height of the U
-    const END_MIN = 4;       // distance from each segment endpoint to U-corner
-    if (segLen < 2 * HALF_W + 2 * END_MIN) return false;
-    let q1: Point, q2: Point, q3: Point, q4: Point;
-    if (isHoriz) {
-      // Direction from click to perpendicular: above the segment → up,
-      // else → down. Click is within 20 px of segment by construction.
-      const jogDir = click.y < p1.y ? -1 : 1;
-      // Centre the U on the projection, but clamp so corners stay
-      // END_MIN px from segment endpoints.
-      const lo = Math.min(p1.x, p2.x) + END_MIN + HALF_W;
-      const hi = Math.max(p1.x, p2.x) - END_MIN - HALF_W;
-      const cx = Math.max(lo, Math.min(hi, bestProjection.x));
-      q1 = { x: cx - HALF_W, y: p1.y };
-      q2 = { x: cx - HALF_W, y: p1.y + jogDir * JOG_H };
-      q3 = { x: cx + HALF_W, y: p1.y + jogDir * JOG_H };
-      q4 = { x: cx + HALF_W, y: p1.y };
-    } else {
-      const jogDir = click.x < p1.x ? -1 : 1;
-      const lo = Math.min(p1.y, p2.y) + END_MIN + HALF_W;
-      const hi = Math.max(p1.y, p2.y) - END_MIN - HALF_W;
-      const cy = Math.max(lo, Math.min(hi, bestProjection.y));
-      q1 = { x: p1.x,                     y: cy - HALF_W };
-      q2 = { x: p1.x + jogDir * JOG_H,    y: cy - HALF_W };
-      q3 = { x: p1.x + jogDir * JOG_H,    y: cy + HALF_W };
-      q4 = { x: p1.x,                     y: cy + HALF_W };
-    }
-    const fullIdx = visStart + bestSegIdx + 1;
-    const newWaypoints = [
-      ...connector.waypoints.slice(0, fullIdx),
-      q1, q2, q3, q4,
-      ...connector.waypoints.slice(fullIdx),
-    ];
-    onUpdateWaypoints(connector.id, newWaypoints);
-    return true;
-  }
-
-  // Combined click + double-click handler. First click selects the
-  // connector; a second click within 400 ms on the SAME connector
-  // inserts a U-jog at the click position. Module-level state survives
-  // the React instance re-mount when selection toggles which JSX
-  // branch the connector lives in.
   function handleConnectorClick(e: React.MouseEvent) {
     e.stopPropagation();
-    const now = Date.now();
-    const isDouble = lastConnectorClickId === connector.id && now - lastConnectorClickTime < 400;
-    if (isDouble) {
-      lastConnectorClickId = null;
-      lastConnectorClickTime = 0;
-    } else {
-      lastConnectorClickId = connector.id;
-      lastConnectorClickTime = now;
-    }
-    if (isDouble && svgToWorld) {
-      const inserted = insertWaypointAt(svgToWorld(e.clientX, e.clientY));
-      if (inserted) return;
-    }
     onSelect();
   }
 

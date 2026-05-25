@@ -5738,11 +5738,10 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         return { ...c, waypoints: newWaypoints, ...labelAdj };
       });
       // Skip obstacle validation entirely. UPDATE_CONNECTOR_WAYPOINTS is
-      // only fired by user-initiated waypoint changes (segment drag,
-      // double-click insert). Running the validator here would
-      // recompute the route around any obstacle the user's path
-      // crosses — instantly reverting an intentional re-route through
-      // an EP, double-click U-jog, or any other manual reshape.
+      // only fired by user-initiated waypoint changes (segment drag).
+      // Running the validator here would recompute the route around any
+      // obstacle the user's path crosses — instantly reverting an
+      // intentional re-route through an EP or any other manual reshape.
       // Element-move flows still validate via their own
       // `validateConnectorsAgainstObstacles` calls.
       return { ...state, connectors: updatedConns };
