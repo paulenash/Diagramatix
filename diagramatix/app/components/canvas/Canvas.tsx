@@ -18,6 +18,7 @@ import type {
   SymbolType,
 } from "@/app/lib/diagram/types";
 import { ArchimateConnectorPicker } from "./ArchimateConnectorPicker";
+import { BubbleHelp } from "./BubbleHelp";
 import { SymbolRenderer, SublaneIdsCtx, ProcessGroupDepthCtx, LaneDepthCtx, DatabaseCtx, ArchimateDepthCtx, type ResizeHandle } from "./SymbolRenderer";
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
 import { PaletteSymbolPreview } from "./Palette";
@@ -587,6 +588,60 @@ export function Canvas({
       window.localStorage.setItem("diagramatix.autoConnect", autoConnectMode);
     }
   }, [autoConnectMode]);
+
+  // Bubble-help toggle. Master enable for the "Click and Drag to create
+  // a connector" hint cloud. ON by default; persisted in localStorage so
+  // the user's preference survives reloads. When ON, the cloud appears
+  // every time the user clicks (single-selects) an element and
+  // auto-dismisses after 10 seconds or on the next mousedown.
+  const [bubbleHelpEnabled, setBubbleHelpEnabled] = useState<boolean>(() => {
+    if (typeof window === "undefined") return true;
+    const v = window.localStorage.getItem("diagramatix.bubbleHelp");
+    if (v === "off") return false;
+    return true;
+  });
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("diagramatix.bubbleHelp", bubbleHelpEnabled ? "on" : "off");
+    }
+  }, [bubbleHelpEnabled]);
+  // Currently-shown bubble's anchor element (null = hidden).
+  const [bubbleHelpFor, setBubbleHelpFor] = useState<DiagramElement | null>(null);
+  const bubbleHelpTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showBubbleHelp = useCallback((el: DiagramElement) => {
+    if (!bubbleHelpEnabled) return;
+    if (bubbleHelpTimerRef.current) clearTimeout(bubbleHelpTimerRef.current);
+    setBubbleHelpFor(el);
+    bubbleHelpTimerRef.current = setTimeout(() => setBubbleHelpFor(null), 10_000);
+  }, [bubbleHelpEnabled]);
+  const hideBubbleHelp = useCallback(() => {
+    if (bubbleHelpTimerRef.current) {
+      clearTimeout(bubbleHelpTimerRef.current);
+      bubbleHelpTimerRef.current = null;
+    }
+    setBubbleHelpFor(null);
+  }, []);
+  // Clear timer on unmount so a navigation-away doesn't leak it.
+  useEffect(() => () => {
+    if (bubbleHelpTimerRef.current) clearTimeout(bubbleHelpTimerRef.current);
+  }, []);
+  // Dismiss the bubble on the user's next mousedown — that covers
+  // "starts a click and drag" plus any other follow-up interaction.
+  // Skipped while the bubble is hidden so we don't leak a listener.
+  useEffect(() => {
+    if (!bubbleHelpFor) return;
+    // Skip the mousedown that triggered the bubble itself: ignore for
+    // one tick so it doesn't dismiss immediately.
+    let armed = false;
+    const arm = () => { armed = true; };
+    const tick = setTimeout(arm, 0);
+    const onDown = () => { if (armed) hideBubbleHelp(); };
+    window.addEventListener("mousedown", onDown, true);
+    return () => {
+      clearTimeout(tick);
+      window.removeEventListener("mousedown", onDown, true);
+    };
+  }, [bubbleHelpFor, hideBubbleHelp]);
 
   // Drop-preview line:
   //   "lane"        → bright green  — any LANE insert
@@ -3991,6 +4046,10 @@ export function Canvas({
                   } else if (!selectedElementIds.has(el.id)) {
                     onSetSelectedElements(new Set([el.id]));
                   }
+                  // Bubble help: fire on any non-shift single-click of an
+                  // element (whether or not selection actually changed)
+                  // so the user can re-trigger the cloud while testing.
+                  if (!e?.shiftKey) showBubbleHelp(el);
                   onSelectConnector(null);
                 }}
                 onMove={(x, y, uc) => { setDraggingElementId(el.id); onMoveElement(el.id, x, y, uc); }}
@@ -4977,6 +5036,18 @@ export function Canvas({
             </g>
           )}
 
+          {/* Bubble-help cloud — anchored to the upper-right of the last
+              single-selected element. Rendered inside the world-space
+              transform so it pans/zooms with the diagram. */}
+          {bubbleHelpFor && (
+            <BubbleHelp
+              anchorX={bubbleHelpFor.x}
+              anchorY={bubbleHelpFor.y}
+              anchorWidth={bubbleHelpFor.width}
+              lines={["Click and Drag", "to create a", "connector"]}
+            />
+          )}
+
           {/* Auto-connect flashing preview — user can press Esc to abort */}
           {autoConnectFlash && autoConnectFlash.visible && (() => {
             const dx = autoConnectFlash.to.x - autoConnectFlash.from.x;
@@ -5863,7 +5934,7 @@ export function Canvas({
         return (
           <div
             className="absolute bottom-2 flex items-center gap-1.5 bg-white/90 border border-gray-200 rounded-full px-2 py-1 shadow-sm backdrop-blur-sm z-30 select-none"
-            style={{ right: "calc(0.5rem + 156px + 6px)" }}
+            style={{ right: "calc(0.5rem + 156px + 6px + 130px + 6px)" }}
           >
             <button
               onClick={() => applyZoomPct(displayPct - 10)}
@@ -5933,6 +6004,40 @@ export function Canvas({
           <line x1="5" y1="8" x2="11" y2="8" />
         </svg>
         Auto-connect: {autoConnectMode === "on" ? "ON" : autoConnectMode === "to-only" ? "TO ONLY" : "OFF"}
+      </button>
+
+      {/* Bubble-help master toggle. ON = show the "Click and Drag to
+          create a connector" cloud each time an element is single-
+          selected (auto-dismiss after 10 s or next mousedown). OFF =
+          never show. Persists across reloads. */}
+      <button
+        onClick={() => setBubbleHelpEnabled(v => !v)}
+        style={{ right: "calc(0.5rem + 156px + 6px)" }}
+        className={`absolute bottom-2 flex items-center gap-1 rounded-full px-2 py-1 shadow-sm backdrop-blur-sm z-30 select-none border text-[11px] font-medium transition-colors ${
+          bubbleHelpEnabled
+            ? "bg-blue-600 text-white border-blue-600 hover:bg-blue-700"
+            : "bg-white/90 text-gray-600 border-gray-300 hover:bg-gray-50"
+        }`}
+        title={
+          bubbleHelpEnabled
+            ? "Bubble help ON — a help cloud appears when you single-click an element. Click to turn OFF."
+            : "Bubble help OFF — no help clouds. Click to turn ON."
+        }
+      >
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 16 16"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M3 5c0-1.1.9-2 2-2h6c1.1 0 2 .9 2 2v4c0 1.1-.9 2-2 2H8l-3 3v-3H5c-1.1 0-2-.9-2-2V5Z" />
+        </svg>
+        Bubble help: {bubbleHelpEnabled ? "ON" : "OFF"}
       </button>
 
       {pendingArchiConn && (
