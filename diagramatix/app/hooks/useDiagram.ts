@@ -4060,7 +4060,27 @@ function reducer(state: DiagramData, action: Action): DiagramData {
             elements = syncLanesToPool(elements, el.id);
           }
         }
-        connectors = recomputeAllConnectors(connectors, elements);
+        // Only recompute connectors whose source or target's rect
+        // actually changed during the cascade above. Recomputing
+        // every connector on every move tick produced spurious
+        // re-routes for unrelated connectors far from the moved
+        // element, causing visible "snap" jitter and burning CPU.
+        const beforeById = new Map(elementsBefore.map((e) => [e.id, e]));
+        const changedElIds = new Set<string>();
+        for (const after of elements) {
+          const before = beforeById.get(after.id);
+          if (!before) { changedElIds.add(after.id); continue; }
+          if (before.x !== after.x || before.y !== after.y
+              || before.width !== after.width || before.height !== after.height) {
+            changedElIds.add(after.id);
+          }
+        }
+        if (changedElIds.size > 0) {
+          connectors = connectors.map((conn) => {
+            if (!changedElIds.has(conn.sourceId) && !changedElIds.has(conn.targetId)) return conn;
+            return recomputeAllConnectors([conn], elements)[0] ?? conn;
+          });
+        }
       }
 
       return { ...state, elements: updatePoolTypes(elements), connectors };

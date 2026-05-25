@@ -212,15 +212,24 @@ function segmentHitsObstacle(p1: Point, p2: Point, obs: Bounds, margin = 4): boo
   return false;
 }
 
-// Check if any segment of a path hits any obstacle
-function pathHitsObstacles(path: Point[], obstacles: Bounds[]): boolean {
+// Check if any segment of a path hits any obstacle. `margin` widens the
+// obstacle's hit rect — pass a generous value (e.g. ½ Task height) when
+// you want the path to maintain visible clearance, not just avoid
+// crossing the rect interior.
+function pathHitsObstacles(path: Point[], obstacles: Bounds[], margin = 4): boolean {
   for (let i = 0; i < path.length - 1; i++) {
     for (const obs of obstacles) {
-      if (segmentHitsObstacle(path[i], path[i + 1], obs)) return true;
+      if (segmentHitsObstacle(path[i], path[i + 1], obs, margin)) return true;
     }
   }
   return false;
 }
+
+// Generous clearance used for "would this L-shape look cramped?" checks
+// in both buildOrthogonalPath and computeWaypoints. When an obstacle is
+// within this distance of an L-segment we reject the L and force a
+// proper detour. Matches the BIG_MARGIN used inside buildOrthogonalPath.
+const L_SHAPE_CLEARANCE = 33; // ½ × default Task height (65 px)
 
 function buildOrthogonalPath(
   start: Point,
@@ -243,8 +252,11 @@ function buildOrthogonalPath(
   const pathA = [start, mid1, end];
   const pathB = [start, mid2, end];
 
-  if (!pathHitsObstacles(pathA, obstacles)) return pathA;
-  if (!pathHitsObstacles(pathB, obstacles)) return pathB;
+  // Use generous clearance for the simple L-shape: if the L grazes any
+  // obstacle within L_SHAPE_CLEARANCE we'd rather detour properly than
+  // sit ~4 px from a shape's edge.
+  if (!pathHitsObstacles(pathA, obstacles, L_SHAPE_CLEARANCE)) return pathA;
+  if (!pathHitsObstacles(pathB, obstacles, L_SHAPE_CLEARANCE)) return pathB;
 
   // Both L-shaped paths blocked — route around the obstacles.
   // Margin defaults to ½ default-Task-height (= 33 px) for a visually
@@ -891,9 +903,9 @@ export function computeWaypoints(
     const a1Perp = isPerpendicular(lCorner1);
     const a2Perp = isPerpendicular(lCorner2);
 
-    if (a1Perp && !pathHitsObstacles([effectiveSrcEdge, lCorner1, effectiveTgtEdge], obstacles)) {
+    if (a1Perp && !pathHitsObstacles([effectiveSrcEdge, lCorner1, effectiveTgtEdge], obstacles, L_SHAPE_CLEARANCE)) {
       midPath = [lCorner1];
-    } else if (a2Perp && !pathHitsObstacles([effectiveSrcEdge, lCorner2, effectiveTgtEdge], obstacles)) {
+    } else if (a2Perp && !pathHitsObstacles([effectiveSrcEdge, lCorner2, effectiveTgtEdge], obstacles, L_SHAPE_CLEARANCE)) {
       midPath = [lCorner2];
     } else {
       // Fall back to stub-based routing (guarantees perpendicularity, may have more corners).
