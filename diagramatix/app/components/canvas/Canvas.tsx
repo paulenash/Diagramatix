@@ -692,7 +692,7 @@ export function Canvas({
     switch (type) {
       case "pool": return "pool-header";
       case "lane": return "lane-header";
-      case "subprocess-expanded": return "ep-body";
+      case "subprocess-expanded": return "Enhanced Subprocess Usage";
       case "start-event": return "start-event";
       case "intermediate-event": return "intermediate-event";
       case "end-event": return "end-event";

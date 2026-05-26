@@ -65,8 +65,8 @@ const ROWS: SeedRow[] = [
   // `showBubbleHelp` means no cloud fires until the admin adds content.
   {
     diagramType: "bpmn",
-    topicKey: "ep-body",
-    conditionLabel: "Click in an Expanded Subprocess body",
+    topicKey: "Enhanced Subprocess Usage",
+    conditionLabel: "Click on an Enhanced Subprocess",
     text: "",
     durationMs: 10_000,
     sortOrder: 50,

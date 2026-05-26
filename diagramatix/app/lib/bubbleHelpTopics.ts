@@ -15,7 +15,11 @@ export const IMPLEMENTED_BUBBLE_TOPICS: ReadonlySet<string> = new Set([
   "select-multiple",
   "pool-header",
   "lane-header",
-  "ep-body",
+  // EP-body trigger: topic key matches the row the admin created
+  // on prod ("Enhanced Subprocess Usage"). The earlier seeded
+  // key ("ep-body") is intentionally dropped — admin should delete
+  // the now-orphan ep-body row in the editor.
+  "Enhanced Subprocess Usage",
   "start-event",
   "intermediate-event",
   "end-event",

@@ -588,6 +588,22 @@ function EnumValuesList({ element, onUpdateProperties }: {
   );
 }
 
+// Compact inline row: label + value on same line. Defined at module
+// scope (NOT inside PropertiesPanel) — React keeps a stable component
+// identity across renders so the wrapped input keeps focus while the
+// user is typing. When this lived inside PropertiesPanel each render
+// created a fresh function reference, React unmounted/remounted the
+// wrapped child on every keystroke, and any focused input lost focus
+// after a single character.
+function InlineField({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-1">
+      <label className="text-[9px] text-gray-500 whitespace-nowrap w-12 shrink-0">{label}</label>
+      <div className="flex-1 min-w-0">{children}</div>
+    </div>
+  );
+}
+
 export function PropertiesPanel({
   element,
   connector,
@@ -806,15 +822,9 @@ export function PropertiesPanel({
     );
   }
 
-  // Compact inline row: label + value on same line
-  function InlineField({ label, children }: { label: string; children: React.ReactNode }) {
-    return (
-      <div className="flex items-center gap-1">
-        <label className="text-[9px] text-gray-500 whitespace-nowrap w-12 shrink-0">{label}</label>
-        <div className="flex-1 min-w-0">{children}</div>
-      </div>
-    );
-  }
+  // InlineField is now defined at module scope (above) — see comment
+  // there for why. Keeping this reference site comment so future
+  // maintainers don't move it back inside.
 
   // Sub-section header inside DIAGRAM PROPERTIES. Smaller + italic
   // than the top-level SectionHeader.
