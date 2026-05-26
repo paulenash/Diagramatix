@@ -1425,6 +1425,14 @@ function applyEPBoundaryChange(
   oldRect: { x: number; y: number; width: number; height: number },
   newRect: { x: number; y: number; width: number; height: number },
   excludeId?: string,
+  // Default TRUE — suppresses section 5 (shift sibling elements in the
+  // scope container out of the way of the growing EP). Per user spec:
+  // pushing an element inside an EP must NOT move any other element in
+  // the surrounding pool, in any direction. Pools / lanes themselves
+  // are unaffected (the cascade was the only thing that moved them).
+  // Explicit user resize (RESIZE_ELEMENT) is the one case that still
+  // wants the make-room cascade — passes `skipExternalShifts: false`.
+  skipExternalShifts: boolean = true,
 ): { elements: DiagramElement[]; connectors: Connector[] } {
   const ep0 = elements.find((e) => e.id === epId);
   if (!ep0 || ep0.type !== "subprocess-expanded") return { elements, connectors };
@@ -1554,8 +1562,9 @@ function applyEPBoundaryChange(
   }
 
   // 5. External shifts on each edge that grew outward, scoped to the
-  //    scope container's perpendicular extent.
-  if (scopeContainer) {
+  //    scope container's perpendicular extent. Suppressed by default
+  //    (see `skipExternalShifts` doc on the function signature).
+  if (!skipExternalShifts && scopeContainer) {
     const scXMin = scopeContainer.x;
     const scXMax = scopeContainer.x + scopeContainer.width;
     const scYMin = scopeContainer.y;
@@ -4048,10 +4057,19 @@ function reducer(state: DiagramData, action: Action): DiagramData {
           if (oldEl.type !== "pool") continue;
           const newPool = elements.find((e) => e.id === oldEl.id);
           if (!newPool) continue;
-          const dX_left  = oldEl.x - newPool.x;                                 // > 0 when left edge moved out
-          const dX_right = (newPool.x + newPool.width) - (oldEl.x + oldEl.width); // > 0 when right edge moved out
-          if (dX_left !== 0 || dX_right !== 0) {
-            const r = applyPoolBoundaryShift(elements, connectors, oldEl.id, -dX_left, dX_right);
+          const dX_left  = oldEl.x - newPool.x;                                 // > 0 when left edge moved out (leftward)
+          const dX_right = (newPool.x + newPool.width) - (oldEl.x + oldEl.width); // > 0 when right edge moved out (rightward)
+          // Only cascade RIGHT-edge growth to the other pools. The
+          // LEFT-edge cascade is deliberately suppressed — when an EP
+          // child is pushed past the EP's left and
+          // ensureContainersEncloseChildren extends the pool leftward,
+          // visibly shifting every other pool / element left feels like
+          // the whole diagram is sliding. User spec: leftward growth
+          // must NOT move anything else on the canvas. (Other
+          // directions — right, top, bottom — keep their existing
+          // cascade behaviour.)
+          if (dX_right !== 0) {
+            const r = applyPoolBoundaryShift(elements, connectors, oldEl.id, 0, dX_right);
             elements = r.elements; connectors = r.connectors;
           }
         }
@@ -4511,7 +4529,10 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       if (target?.type === "subprocess-expanded") {
         const oldEpRect = { x: target.x, y: target.y, width: target.width, height: target.height };
         const newEpRect = { x: newX, y: newY, width: newW, height: newH };
-        const r = applyEPBoundaryChange(state.elements, state.connectors, id, oldEpRect, newEpRect);
+        // RESIZE_ELEMENT is the one call site that still wants the
+        // make-room cascade — explicit user resize → siblings shift
+        // to keep clear of the newly sized EP.
+        const r = applyEPBoundaryChange(state.elements, state.connectors, id, oldEpRect, newEpRect, undefined, /* skipExternalShifts */ false);
         const validated = validateConnectorsAgainstObstacles(r.connectors, r.elements);
         return { ...state, elements: r.elements, connectors: validated };
       }

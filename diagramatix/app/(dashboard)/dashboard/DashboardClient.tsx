@@ -521,10 +521,15 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
     const n = parseFloat(stored);
     return Number.isFinite(n) && n > 0 ? String(Math.round(n * 100)) : String(EDIT_ZOOM_DEFAULT_PCT);
   });
-  const [editZoomActive, setEditZoomActive] = useState<boolean>(() => {
-    if (typeof window === "undefined") return true;
-    return window.localStorage.getItem("editZoomActive") !== "false";
-  });
+  // Edit Zoom Active defaults to true on every load. Per user spec the
+  // checkbox should always start checked when the dialog opens; the
+  // previous localStorage-backed persistence meant users who had ever
+  // disabled the snap stayed opted-out forever. The Save handler
+  // (handleEditZoomSave) still writes the current state to
+  // localStorage, but we no longer read it back here — so any cached
+  // "false" from before this release is ignored, and every page load
+  // starts the user with edit-zoom active again.
+  const [editZoomActive, setEditZoomActive] = useState<boolean>(true);
 
   function handleEditZoomSave() {
     const n = parseFloat(editZoomInput);
