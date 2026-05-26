@@ -1228,45 +1228,74 @@ export const CHAPTERS: HelpChapter[] = [
         ),
       },
       {
-        heading: "Diagram title block",
+        heading: "Diagram properties panel",
         body: (
           <>
             <p>
               When nothing is selected, the Properties Panel shows the{" "}
-              <strong>Diagram Title</strong> section. Here you can configure
-              a title block that appears centred above the diagram content:
+              <strong>Diagram Properties</strong> section, grouped into
+              nested sub-sections you can open or close independently:
             </p>
             <ul className="list-disc list-inside space-y-1 mt-2">
               <li>
-                <strong>Show (On/Off)</strong> — toggle the title block
-                on the canvas. When Off, the title is hidden but the
-                metadata is still saved.
+                <strong>Title</strong> — Show toggle, Status (Draft /
+                Final / Production), Name (read-only), Version, Authors,
+                Created &amp; Modified dates. The on-canvas title block
+                renders when Show is on.
               </li>
               <li>
-                <strong>Status</strong> — Draft, Final, or Production.
-                Displayed in the title block.
+                <strong>Database</strong> (Domain diagrams only) —
+                target database family for DDL generation: None,
+                PostgreSQL, MySQL, SQL&nbsp;Server.
               </li>
               <li>
-                <strong>Name</strong> — the diagram name (set when the
-                diagram was created; rename from the project page).
+                <strong>Process Owner</strong> — optional Name + Email
+                of the person accountable for the process. Round-trips
+                via XML export.
               </li>
               <li>
-                <strong>Version</strong> — free-text version string
-                (e.g. &ldquo;1.0&rdquo;, &ldquo;2.3-beta&rdquo;).
-              </li>
-              <li>
-                <strong>Authors</strong> — free-text author name(s).
+                <strong>Bubble Help</strong> (admins only) — manages the
+                help-cloud text shown when users click elements / canvas
+                / pool &amp; lane headers. See &ldquo;Bubble Help&rdquo;
+                below.
               </li>
             </ul>
-            <p className="mt-2">
-              The title block also shows the <strong>Created</strong> date
-              and <strong>Modified</strong> date/time automatically.
-            </p>
           </>
         ),
         image: "/help/images/title-block.png",
-        imageAlt: "Diagram title block",
-        imageCaption: "The title block shown above the diagram content.",
+        imageAlt: "Diagram properties panel",
+        imageCaption: "Nested sub-sections under Diagram Properties.",
+      },
+      {
+        heading: "Bubble Help",
+        body: (
+          <>
+            <p>
+              Single-clicking an element, pool header, lane header, or
+              empty canvas pops a short comic-style help cloud near the
+              cursor explaining the next action available there
+              (e.g. &ldquo;Click and Drag to create a connector&rdquo;).
+              The cloud auto-dismisses after a few seconds or on the
+              next mousedown.
+            </p>
+            <p className="mt-2">
+              The master toggle <strong>Bubble help: ON/OFF</strong>{" "}
+              sits next to the zoom slider at the bottom-right of the
+              canvas. With it ON, the cloud fires on the 1st, 3rd, 5th,
+              … click for each topic — backing off so it doesn&apos;t
+              repeat on every interaction. Toggling OFF→ON resets the
+              per-topic counters.
+            </p>
+            <p className="mt-2">
+              Admins (superusers) can edit the cloud text and duration
+              per diagram type from the <strong>Bubble Help</strong>{" "}
+              sub-section in Diagram Properties. Each row has an
+              initiating-condition label, an internal topic key,
+              multi-line text, and a duration. Saved edits are live
+              for everyone on next page load.
+            </p>
+          </>
+        ),
       },
       {
         heading: "Diagram settings",
@@ -2974,9 +3003,10 @@ export const CHAPTERS: HelpChapter[] = [
         body: (
           <p>
             Domain diagrams can be configured as <strong>database schema
-            diagrams</strong> by setting a Database type in the Diagram
-            Title section. This changes stereotype labels, attribute types,
-            and enables database-specific features.
+            diagrams</strong> by setting a Database type in the
+            <strong> Diagram Properties &rarr; Database</strong>{" "}
+            sub-section. This changes stereotype labels, attribute
+            types, and enables database-specific features.
           </p>
         ),
       },
@@ -2988,9 +3018,8 @@ export const CHAPTERS: HelpChapter[] = [
               Click on empty canvas to open the Properties Panel.
             </li>
             <li>
-              In the <strong>Diagram Title</strong> section, set the{" "}
-              <strong>Database</strong> dropdown to PostgreSQL, MySQL,
-              or SQL Server.
+              In <strong>Diagram Properties &rarr; Database</strong>,
+              set the dropdown to PostgreSQL, MySQL, or SQL Server.
             </li>
           </ol>
         ),

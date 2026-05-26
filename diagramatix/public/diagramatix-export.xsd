@@ -51,6 +51,14 @@
     focus-edit zoom on label edits, and the Pool/Lane "Label" → "Name"
     rename. The schemaVersion attribute is bumped to 1.13 so importers
     and the User Guide reflect the new feature window.
+
+  v1.14 — Bubble Help v2 + Diagram Properties restructure.
+    Adds one new optional element to <dgx:data>:
+      <dgx:processOwner name="…" email="…"/>
+    Both attributes optional. Pre-v1.14 exports omit the element;
+    importers treat it as no owner. Bubble Help itself is admin-
+    managed catalog data (per-diagramType rows in the BubbleHelp
+    Prisma table) and is NOT embedded in diagram exports.
 -->
 
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
@@ -156,10 +164,12 @@
   <!-- ============================================================ -->
   <xs:complexType name="DiagramDataType">
     <xs:sequence>
-      <xs:element name="elements"   type="dgx:ElementListType"/>
-      <xs:element name="connectors" type="dgx:ConnectorListType"/>
-      <xs:element name="viewport"   type="dgx:ViewportType"/>
-      <xs:element name="title"      type="dgx:DiagramTitleType" minOccurs="0"/>
+      <xs:element name="elements"     type="dgx:ElementListType"/>
+      <xs:element name="connectors"   type="dgx:ConnectorListType"/>
+      <xs:element name="viewport"     type="dgx:ViewportType"/>
+      <xs:element name="title"        type="dgx:DiagramTitleType"  minOccurs="0"/>
+      <!-- schema 1.14 — per-diagram process owner (name + email). -->
+      <xs:element name="processOwner" type="dgx:ProcessOwnerType"  minOccurs="0"/>
     </xs:sequence>
     <xs:attribute name="fontSize"          type="xs:decimal" use="optional"/>
     <xs:attribute name="connectorFontSize" type="xs:decimal" use="optional"/>
@@ -179,6 +189,14 @@
     <xs:attribute name="authors"   type="xs:string"          use="optional"/>
     <xs:attribute name="status"    type="dgx:DiagramStatusEnum" use="optional"/>
     <xs:attribute name="showTitle" type="xs:boolean"         use="optional"/>
+  </xs:complexType>
+
+  <!-- ============================================================ -->
+  <!-- ProcessOwner — schema 1.14                                    -->
+  <!-- ============================================================ -->
+  <xs:complexType name="ProcessOwnerType">
+    <xs:attribute name="name"  type="xs:string" use="optional"/>
+    <xs:attribute name="email" type="xs:string" use="optional"/>
   </xs:complexType>
 
   <xs:simpleType name="DiagramStatusEnum">

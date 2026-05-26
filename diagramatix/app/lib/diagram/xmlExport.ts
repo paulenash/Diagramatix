@@ -96,6 +96,12 @@ export function diagramDataXml(dd: DiagramData, ind: string): string {
     x += `${ind}  <dgx:title${attr("version", dd.title.version)}${attr("authors", dd.title.authors)}${attr("status", dd.title.status)}${attr("showTitle", dd.title.showTitle)}/>\n`;
   }
 
+  // Process Owner — schema v1.14. Optional element so pre-v1.14
+  // round-trips stay clean; omit entirely when both fields blank.
+  if (dd.processOwner && (dd.processOwner.name || dd.processOwner.email)) {
+    x += `${ind}  <dgx:processOwner${attr("name", dd.processOwner.name)}${attr("email", dd.processOwner.email)}/>\n`;
+  }
+
   x += `${ind}</dgx:data>\n`;
   return x;
 }
@@ -411,6 +417,20 @@ export function parseDiagramatixXml(xmlText: string): any {
         status: titleEl.getAttribute("status") ?? "",
         showTitle: bool(titleEl.getAttribute("showTitle")) ?? false,
       };
+    }
+
+    // Process Owner — schema v1.14. Optional; missing on pre-1.14
+    // exports, in which case leave dd.processOwner undefined.
+    const poEl = getChild(dataEl, "processOwner");
+    if (poEl) {
+      const name = poEl.getAttribute("name") ?? "";
+      const email = poEl.getAttribute("email") ?? "";
+      if (name || email) {
+        data.processOwner = {
+          name: name || undefined,
+          email: email || undefined,
+        };
+      }
     }
 
     return data;

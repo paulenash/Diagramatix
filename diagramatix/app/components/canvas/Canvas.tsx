@@ -193,6 +193,11 @@ interface Props {
   pendingDragSymbol: SymbolType | null;
   pendingArchimateShapeKey?: string | null;
   pendingArchimateIconOnly?: boolean;
+  /** Bump this number to force a re-fetch of /api/bubble-helps.
+   *  Used by the admin Bubble Help editor inside PropertiesPanel
+   *  after it saves a new set, so the live cloud picks up changes
+   *  without a page reload. */
+  bubbleHelpRefreshToken?: number;
   defaultDirectionType: DirectionType;
   defaultRoutingType: RoutingType;
   onUpdateProperties?: (id: string, props: Record<string, unknown>) => void;
@@ -404,6 +409,7 @@ export function Canvas({
   pendingDragSymbol,
   pendingArchimateShapeKey,
   pendingArchimateIconOnly,
+  bubbleHelpRefreshToken,
   defaultDirectionType,
   defaultRoutingType,
   onUpdateProperties,
@@ -589,11 +595,12 @@ export function Canvas({
     }
   }, [autoConnectMode]);
 
-  // Bubble-help toggle. Master enable for the "Click and Drag to create
-  // a connector" hint cloud. ON by default; persisted in localStorage so
-  // the user's preference survives reloads. When ON, the cloud appears
-  // every time the user clicks (single-selects) an element and
-  // auto-dismisses after 10 seconds or on the next mousedown.
+  // Bubble-help master toggle. ON by default; persisted in localStorage
+  // so the user's preference survives reloads. Each bubble TYPE (e.g.
+  // "create-connector") appears at most BUBBLE_HELP_MAX_PER_TYPE times
+  // per browser session — counts kept in sessionStorage so they reset
+  // when the tab closes. Toggling OFF→ON also resets the counters so
+  // users can re-trigger bubbles for testing without a full reload.
   const [bubbleHelpEnabled, setBubbleHelpEnabled] = useState<boolean>(() => {
     if (typeof window === "undefined") return true;
     const v = window.localStorage.getItem("diagramatix.bubbleHelp");
@@ -605,21 +612,99 @@ export function Canvas({
       window.localStorage.setItem("diagramatix.bubbleHelp", bubbleHelpEnabled ? "on" : "off");
     }
   }, [bubbleHelpEnabled]);
-  // Currently-shown bubble's anchor element (null = hidden).
-  const [bubbleHelpFor, setBubbleHelpFor] = useState<DiagramElement | null>(null);
+  // Bubble-help data, keyed by topicKey. Fetched per-diagramType
+  // from /api/bubble-helps. Each row supplies text + duration. When
+  // the toggle is ON and the user triggers a topic that has a row
+  // here, the cloud renders. Topics absent from the map are silently
+  // no-ops (useful while admins stage new triggers).
+  interface BubbleHelpRow {
+    topicKey: string;
+    text: string;
+    durationMs: number;
+  }
+  const [bubbleHelpMap, setBubbleHelpMap] = useState<Map<string, BubbleHelpRow>>(new Map());
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    let cancelled = false;
+    fetch(`/api/bubble-helps?diagramType=${encodeURIComponent(diagramType)}`)
+      .then(r => r.ok ? r.json() : { rows: [] })
+      .then((data: { rows?: BubbleHelpRow[] }) => {
+        if (cancelled) return;
+        const rows = Array.isArray(data.rows) ? data.rows : [];
+        const map = new Map<string, BubbleHelpRow>();
+        for (const row of rows) {
+          if (row && row.topicKey) map.set(row.topicKey, row);
+        }
+        setBubbleHelpMap(map);
+      })
+      .catch(() => { /* offline / 404 — leave map empty */ });
+    return () => { cancelled = true; };
+  }, [diagramType, bubbleHelpRefreshToken]);
+  // Currently-shown bubble. Always point-anchored — the cloud sits to
+  // the upper-right of where the user clicked rather than where the
+  // element is, so the hint appears right next to the user's cursor.
+  const [bubbleHelpAnchor, setBubbleHelpAnchor] = useState<{
+    x: number;
+    y: number;
+    text: string;
+  } | null>(null);
   const bubbleHelpTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const showBubbleHelp = useCallback((el: DiagramElement) => {
+  // Per-topic click counter. Bubble fires on odd clicks (1, 3, 5, …)
+  // and stays silent on even clicks — gives the user the hint once,
+  // then backs off until their next deliberate click on that topic.
+  // Reset to 0 when the master toggle is flipped ON (so admins can
+  // re-test from a clean state).
+  const bubbleHelpClickCountsRef = useRef<Record<string, number>>({});
+  function bumpClickCountAndShouldShow(topicKey: string): boolean {
+    const next = (bubbleHelpClickCountsRef.current[topicKey] ?? 0) + 1;
+    bubbleHelpClickCountsRef.current = { ...bubbleHelpClickCountsRef.current, [topicKey]: next };
+    return next % 2 === 1; // show on 1st, 3rd, 5th… ; skip 2nd, 4th, …
+  }
+  // Unified trigger — every call site supplies a world-space (x, y)
+  // for the click point. The bubble's bottom-left lands above/right
+  // of that point; BubbleHelp itself flips below if there's no room.
+  const showBubbleHelp = useCallback((topicKey: string, worldX: number, worldY: number) => {
     if (!bubbleHelpEnabled) return;
+    const row = bubbleHelpMap.get(topicKey);
+    if (!row || !row.text.trim()) return;
+    if (!bumpClickCountAndShouldShow(topicKey)) return;
     if (bubbleHelpTimerRef.current) clearTimeout(bubbleHelpTimerRef.current);
-    setBubbleHelpFor(el);
-    bubbleHelpTimerRef.current = setTimeout(() => setBubbleHelpFor(null), 10_000);
-  }, [bubbleHelpEnabled]);
+    setBubbleHelpAnchor({ x: worldX, y: worldY, text: row.text });
+    bubbleHelpTimerRef.current = setTimeout(() => setBubbleHelpAnchor(null), row.durationMs);
+  }, [bubbleHelpEnabled, bubbleHelpMap]);
+  // Canvas-background trigger uses the same function — the
+  // background-click path already had world coords.
+  const showBubbleHelpAtPoint = showBubbleHelp;
+  const toggleBubbleHelp = useCallback(() => {
+    setBubbleHelpEnabled((prev) => {
+      // Toggling ON resets per-topic counts so testers see the hint
+      // again immediately rather than having to click twice.
+      if (!prev) bubbleHelpClickCountsRef.current = {};
+      return !prev;
+    });
+  }, []);
+  // Maps element type → bubble-help topic key. Used by all single-
+  // select onSelect handlers so each type triggers its own admin-
+  // editable cloud. Falls back to "create-connector" for any type
+  // that doesn't have a dedicated topic (covers tasks, gateways,
+  // data objects, archi shapes, etc.).
+  function topicForElement(type: string): string {
+    switch (type) {
+      case "pool": return "pool-header";
+      case "lane": return "lane-header";
+      case "subprocess-expanded": return "ep-body";
+      case "start-event": return "start-event";
+      case "intermediate-event": return "intermediate-event";
+      case "end-event": return "end-event";
+      default: return "create-connector";
+    }
+  }
   const hideBubbleHelp = useCallback(() => {
     if (bubbleHelpTimerRef.current) {
       clearTimeout(bubbleHelpTimerRef.current);
       bubbleHelpTimerRef.current = null;
     }
-    setBubbleHelpFor(null);
+    setBubbleHelpAnchor(null);
   }, []);
   // Clear timer on unmount so a navigation-away doesn't leak it.
   useEffect(() => () => {
@@ -629,7 +714,7 @@ export function Canvas({
   // "starts a click and drag" plus any other follow-up interaction.
   // Skipped while the bubble is hidden so we don't leak a listener.
   useEffect(() => {
-    if (!bubbleHelpFor) return;
+    if (!bubbleHelpAnchor) return;
     // Skip the mousedown that triggered the bubble itself: ignore for
     // one tick so it doesn't dismiss immediately.
     let armed = false;
@@ -641,7 +726,7 @@ export function Canvas({
       clearTimeout(tick);
       window.removeEventListener("mousedown", onDown, true);
     };
-  }, [bubbleHelpFor, hideBubbleHelp]);
+  }, [bubbleHelpAnchor, hideBubbleHelp]);
 
   // Drop-preview line:
   //   "lane"        → bright green  — any LANE insert
@@ -1750,6 +1835,9 @@ export function Canvas({
       // --- Pan mode ---
       const startCX = e.clientX;
       const startCY = e.clientY;
+      // Cache the world-space click position so the bubble-help cloud
+      // can anchor here if this turns out to be a click-without-drag.
+      const clickWorld = clientToWorld(e.clientX, e.clientY);
       let didPanDrag = false;
       panStart.current = {
         mouseX: e.clientX,
@@ -1772,12 +1860,16 @@ export function Canvas({
         panStart.current = null;
         window.removeEventListener("mousemove", onMouseMove);
         window.removeEventListener("mouseup", onMouseUp);
-        // Simple click (no drag) — clear selection
+        // Simple click (no drag) — clear selection + show the
+        // canvas-click bubble help (topic "select-multiple"). The
+        // bubble itself decides if it should render based on the
+        // toggle + admin-configured map.
         if (!didPanDrag) {
           onSetSelectedElements(new Set());
           onSelectConnector(null);
           if (pendingConnSourceId) setPendingConnSourceId(null);
           if (forceConnect) setForceConnect(null);
+          showBubbleHelpAtPoint("select-multiple", clickWorld.x, clickWorld.y);
         }
       }
 
@@ -2561,7 +2653,11 @@ export function Canvas({
       }
     }
 
-    if ((pendingDragSymbol === "task" || pendingDragSymbol === "intermediate-event") && diagramType === "bpmn") {
+    if (pendingDragSymbol === "intermediate-event" && diagramType === "bpmn") {
+      // Intermediate events look completely different per trigger
+      // type (message, timer, error, …) so the picker still pops on
+      // drop. Tasks now start with no marker — user right-clicks to
+      // pick a marker afterwards.
       const containerRect = (e.currentTarget as HTMLElement).getBoundingClientRect();
       setPendingDrop({
         worldPos,
@@ -3399,6 +3495,16 @@ export function Canvas({
   })();
   const boundaryEvents = data.elements.filter((el) => !!el.boundaryHostId);
 
+  // Active multi-selection (e.g. a template was just stamped onto the
+  // diagram). When non-empty, those elements are re-rendered at the
+  // END of the world group so the whole moving group sits visually on
+  // top of every existing diagram element — pools / lanes / tasks
+  // alike. Matches the user spec: every part of the moving template
+  // should always be above anything on the existing diagram.
+  const inActiveGroup = (id: string): boolean =>
+    selectedElementIds.size > 1 && selectedElementIds.has(id);
+  const hasActiveGroup = selectedElementIds.size > 1;
+
   // Precompute messageBPMN highlight context
   const BPMN_TRIGGER_TYPES = new Set<string>(["task", "subprocess", "subprocess-expanded", "intermediate-event", "end-event", "pool"]);
   const draggingSourceEl = draggingConnector
@@ -3953,8 +4059,11 @@ export function Canvas({
               </g>
             );
           })()}
-          {/* Pools render first (deepest layer) */}
-          {[...pools, ...otherContainers].map((el) => {
+          {/* Pools render first (deepest layer). Elements in an active
+              multi-selection are skipped here and re-rendered in the
+              overlay block at the END of this group, so the whole
+              moving template stays above the existing diagram. */}
+          {[...pools, ...otherContainers].filter(el => !inActiveGroup(el.id)).map((el) => {
             const isMsgTarget =
               (isDraggingConnector && isBpmnSource &&
                 el.type === "pool" && el.id !== draggingSourcePoolId &&
@@ -4049,7 +4158,13 @@ export function Canvas({
                   // Bubble help: fire on any non-shift single-click of an
                   // element (whether or not selection actually changed)
                   // so the user can re-trigger the cloud while testing.
-                  if (!e?.shiftKey) showBubbleHelp(el);
+                  // Pools get their own topic ("pool-header") so the
+                  // hint text can talk about lane drops instead of
+                  // connector drags.
+                  if (!e?.shiftKey && e) {
+                    const wp = clientToWorld(e.clientX, e.clientY);
+                    showBubbleHelp(topicForElement(el.type), wp.x, wp.y);
+                  }
                   onSelectConnector(null);
                 }}
                 onMove={(x, y, uc) => { setDraggingElementId(el.id); onMoveElement(el.id, x, y, uc); }}
@@ -4092,15 +4207,25 @@ export function Canvas({
             );
           })}
 
-          {/* Lanes — selectable (for deletion) but not draggable */}
-          {lanes.map((el) => (
+          {/* Lanes — selectable (for deletion) but not individually draggable.
+              Lanes still participate in GROUP moves when part of a
+              multi-selection (e.g. a template was just stamped), so we
+              wire multiSelected + onGroupMove so a click-and-drag on
+              any part of the lane body (which sits above the pool body)
+              moves the whole group. Active-group lanes are skipped here
+              and re-rendered in the overlay block at the end. */}
+          {lanes.filter(el => !inActiveGroup(el.id)).map((el) => (
             <SymbolRenderer
               key={el.id}
               element={el}
               selected={selectedElementIds.has(el.id)}
               isDropTarget={false}
-              onSelect={() => {
+              onSelect={(ev) => {
                 onSetSelectedElements(new Set([el.id]));
+                if (ev) {
+                  const wp = clientToWorld(ev.clientX, ev.clientY);
+                  showBubbleHelp(topicForElement(el.type), wp.x, wp.y);
+                }
                 onSelectConnector(null);
               }}
               onMove={() => {}}
@@ -4112,6 +4237,9 @@ export function Canvas({
               onUpdateLabel={onUpdateLabel}
               onLabelFocusEditStart={(cx, cy, w) => enterFocusModeAt(cx, cy, w, "external")}
               onLabelFocusEditEnd={exitFocusMode}
+              multiSelected={selectedElementIds.size > 1 && selectedElementIds.has(el.id)}
+              onGroupMove={onMoveElements ? (dx, dy) => onMoveElements([...selectedElementIds], dx / zoom, dy / zoom) : undefined}
+              onGroupMoveEnd={onElementsMoveEnd}
               colorConfig={colorConfig}
               debugMode={debugMode}
             />
@@ -4170,7 +4298,7 @@ export function Canvas({
           {/* Expanded Subprocesses — rendered AFTER lanes / sublanes so EPs
               sit above the lane background (issue 5). Depth-sorted so a
               nested EP paints over its parent EP. */}
-          {expandedSubprocesses.map((el) => {
+          {expandedSubprocesses.filter(el => !inActiveGroup(el.id)).map((el) => {
             const isEventSubprocess = el.type === "subprocess-expanded" &&
               (el.properties.subprocessType as string | undefined) === "event";
             const isSubExpDropTarget = isDraggingConnector && !draggingSourceIsData &&
@@ -4213,6 +4341,10 @@ export function Canvas({
                     onSetSelectedElements((prev) => { const next = new Set(prev); if (next.has(el.id)) next.delete(el.id); else next.add(el.id); return next; });
                   } else if (!selectedElementIds.has(el.id)) {
                     onSetSelectedElements(new Set([el.id]));
+                  }
+                  if (!e?.shiftKey && e) {
+                    const wp = clientToWorld(e.clientX, e.clientY);
+                    showBubbleHelp(topicForElement(el.type), wp.x, wp.y);
                   }
                   onSelectConnector(null);
                 }}
@@ -4287,7 +4419,7 @@ export function Canvas({
           {/* Debug labels rendered at end of SVG for z-order */}
 
           {/* Non-container elements */}
-          {nonContainers.map((el) => {
+          {nonContainers.filter(el => !inActiveGroup(el.id)).map((el) => {
             let elIsDropTarget = false;
             let elIsMsgTarget = false;
             let elIsAssocTarget = false;
@@ -4489,6 +4621,10 @@ export function Canvas({
                 } else if (!selectedElementIds.has(el.id)) {
                   onSetSelectedElements(new Set([el.id]));
                 }
+                if (!ev?.shiftKey && ev) {
+                  const wp = clientToWorld(ev.clientX, ev.clientY);
+                  showBubbleHelp(topicForElement(el.type), wp.x, wp.y);
+                }
                 onSelectConnector(null);
               }}
               onMove={(x, y, uc) => { setDraggingElementId(el.id); onMoveElement(el.id, x, y, uc); }}
@@ -4550,7 +4686,7 @@ export function Canvas({
           })}
 
           {/* Boundary events — rendered on top of their hosts */}
-          {boundaryEvents.map((el) => {
+          {boundaryEvents.filter(el => !inActiveGroup(el.id)).map((el) => {
             let elIsDropTarget = false;
             let elIsMsgTarget = false;
             let elIsAssocTarget = false;
@@ -4694,6 +4830,10 @@ export function Canvas({
                   } else if (!selectedElementIds.has(el.id)) {
                     onSetSelectedElements(new Set([el.id]));
                   }
+                  if (!ev?.shiftKey && ev) {
+                  const wp = clientToWorld(ev.clientX, ev.clientY);
+                  showBubbleHelp(topicForElement(el.type), wp.x, wp.y);
+                }
                   onSelectConnector(null);
                 }}
                 onMove={(x, y, uc) => { setDraggingElementId(el.id); onMoveElement(el.id, x, y, uc); }}
@@ -4721,7 +4861,7 @@ export function Canvas({
           })}
 
           {/* Group elements — rendered on top of all other elements */}
-          {groupElements.map((el) => (
+          {groupElements.filter(el => !inActiveGroup(el.id)).map((el) => (
             <SymbolRenderer
               key={el.id}
               element={el}
@@ -4733,6 +4873,10 @@ export function Canvas({
                   onSetSelectedElements((prev) => { const next = new Set(prev); if (next.has(el.id)) next.delete(el.id); else next.add(el.id); return next; });
                 } else if (!selectedElementIds.has(el.id)) {
                   onSetSelectedElements(new Set([el.id]));
+                }
+                if (!ev?.shiftKey && ev) {
+                  const wp = clientToWorld(ev.clientX, ev.clientY);
+                  showBubbleHelp(topicForElement(el.type), wp.x, wp.y);
                 }
                 onSelectConnector(null);
               }}
@@ -4753,6 +4897,60 @@ export function Canvas({
               debugMode={debugMode}
             />
           ))}
+
+          {/* Active-group overlay — when a multi-selection is active
+              (most often a template was just stamped) every selected
+              element is re-rendered here at the END of the world group
+              so the whole moving group sits above every existing
+              diagram element. Drop targets / connection points are
+              suppressed since they're not meaningful during a group
+              move. */}
+          {hasActiveGroup && (() => {
+            // Layer-ordered iteration so the overlay preserves natural
+            // internal z-order (pool < lane < EP < non-container <
+            // boundary event < group).
+            const layered = [
+              ...pools, ...otherContainers,
+              ...lanes,
+              ...expandedSubprocesses,
+              ...nonContainers,
+              ...boundaryEvents,
+              ...groupElements,
+            ].filter(el => selectedElementIds.has(el.id));
+            return layered.map(el => (
+              <SymbolRenderer
+                key={`overlay-${el.id}`}
+                element={el}
+                selected={true}
+                isDropTarget={false}
+                isDisallowedTarget={false}
+                isMessageBpmnTarget={false}
+                isAssocBpmnTarget={false}
+                isErrorTarget={false}
+                onSelect={(ev) => {
+                  if (ev?.shiftKey) {
+                    onSetSelectedElements((prev) => { const next = new Set(prev); if (next.has(el.id)) next.delete(el.id); else next.add(el.id); return next; });
+                  }
+                }}
+                onMove={el.type === "lane" ? () => {} : (x, y, uc) => { setDraggingElementId(el.id); onMoveElement(el.id, x, y, uc); }}
+                onDoubleClick={() => startEditingLabel(el)}
+                onConnectionPointDragStart={() => {}}
+                showConnectionPoints={false}
+                onResizeDragStart={el.type === "lane" ? undefined : (handle, e) => handleResizeDragStart(el.id, handle, e)}
+                svgToWorld={clientToWorld}
+                onUpdateProperties={onUpdateProperties}
+                onUpdateLabel={onUpdateLabel}
+                onLabelFocusEditStart={(cx, cy, w) => enterFocusModeAt(cx, cy, w, "external")}
+                onLabelFocusEditEnd={exitFocusMode}
+                onMoveEnd={() => { setDraggingElementId(null); onElementMoveEnd?.(el.id); }}
+                multiSelected={true}
+                onGroupMove={onMoveElements ? (dx, dy) => onMoveElements([...selectedElementIds], dx / zoom, dy / zoom) : undefined}
+                onGroupMoveEnd={onElementsMoveEnd}
+                colorConfig={colorConfig}
+                debugMode={debugMode}
+              />
+            ));
+          })()}
 
           {/* Stray-element red outline overlay — drawn above the symbols
               but below selection chrome. Only active when the diagram has
@@ -5036,15 +5234,14 @@ export function Canvas({
             </g>
           )}
 
-          {/* Bubble-help cloud — anchored to the upper-right of the last
-              single-selected element. Rendered inside the world-space
+          {/* Bubble-help cloud — always anchored to the upper-right of
+              the user's click point. Rendered inside the world-space
               transform so it pans/zooms with the diagram. */}
-          {bubbleHelpFor && (
+          {bubbleHelpAnchor && (
             <BubbleHelp
-              anchorX={bubbleHelpFor.x}
-              anchorY={bubbleHelpFor.y}
-              anchorWidth={bubbleHelpFor.width}
-              lines={["Click and Drag", "to create a", "connector"]}
+              pointX={bubbleHelpAnchor.x}
+              pointY={bubbleHelpAnchor.y}
+              text={bubbleHelpAnchor.text}
             />
           )}
 
@@ -6011,7 +6208,7 @@ export function Canvas({
           selected (auto-dismiss after 10 s or next mousedown). OFF =
           never show. Persists across reloads. */}
       <button
-        onClick={() => setBubbleHelpEnabled(v => !v)}
+        onClick={toggleBubbleHelp}
         style={{ right: "calc(0.5rem + 156px + 6px)" }}
         className={`absolute bottom-2 flex items-center gap-1 rounded-full px-2 py-1 shadow-sm backdrop-blur-sm z-30 select-none border text-[11px] font-medium transition-colors ${
           bubbleHelpEnabled
@@ -6020,8 +6217,8 @@ export function Canvas({
         }`}
         title={
           bubbleHelpEnabled
-            ? "Bubble help ON — a help cloud appears when you single-click an element. Click to turn OFF."
-            : "Bubble help OFF — no help clouds. Click to turn ON."
+            ? "Bubble help ON — each cloud topic shows up to 3 times per session. Click to turn OFF."
+            : "Bubble help OFF — no help clouds. Click to turn ON (resets per-topic counts)."
         }
       >
         <svg

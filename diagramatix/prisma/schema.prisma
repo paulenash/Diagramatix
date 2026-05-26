@@ -356,3 +356,25 @@ model Feature {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+// Admin-editable per-diagram-type bubble-help cards. Each row binds a
+// code-level trigger (`topicKey`, e.g. "create-connector",
+// "select-multiple") to the human-readable text shown in the cloud and
+// the duration the cloud stays visible. `conditionLabel` is purely
+// descriptive — it lets admins remember what each topic key fires on
+// (e.g. "Click on an Element"). One set per diagramType — global
+// across all users / diagrams of that type.
+model BubbleHelp {
+  id             String   @id @default(cuid())
+  diagramType    String
+  topicKey       String
+  conditionLabel String
+  text           String
+  durationMs     Int      @default(10000)
+  sortOrder      Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([diagramType, topicKey])
+  @@index([diagramType])
+}

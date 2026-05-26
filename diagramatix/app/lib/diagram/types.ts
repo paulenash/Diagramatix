@@ -231,6 +231,14 @@ export interface DiagramData {
    *  clickable link. Highlighting of the "most recently visited" parent
    *  comes from session-stack state, not this field. */
   parentDiagramIds?: string[];
+  /** Per-diagram process owner — shown in the Diagram Properties panel
+   *  alongside Title / Authors. Both fields optional and free-text. */
+  processOwner?: ProcessOwner;
+}
+
+export interface ProcessOwner {
+  name?: string;
+  email?: string;
 }
 
 export const EMPTY_DIAGRAM: DiagramData = {
@@ -434,5 +442,20 @@ export interface TemplateData {
  *          GUIDs eliminate the v1.4↔v1.5 master collision), focus-
  *          edit zoom for label edits (Dashboard → File → Zoom →
  *          Edit Zoom), and Pool/Lane "Label" → "Name" rename.
+ * v1.14:   Bubble Help v2 + Diagram Properties restructure.
+ *          - New BubbleHelp Prisma model (admin-editable, per
+ *            diagramType bubble-help text/duration); not exported
+ *            with diagrams.
+ *          - New per-diagram `processOwner` field
+ *            ({ name?, email? }) on DiagramData — written into the
+ *            diagram's XML export so it round-trips.
+ *          - Right-hand panel renamed "Diagram Title" → "Diagram
+ *            Properties" with nested sub-sections; admin sub-section
+ *            for Bubble Help editor.
+ *          - New click-driven bubble triggers: ep-body, start-event,
+ *            intermediate-event, end-event (admin fills the text).
+ *          - Task drop no longer auto-pops the marker picker;
+ *            tasks start markerless and the right-click menu sets
+ *            the type.
  */
-export const SCHEMA_VERSION = "1.13";
+export const SCHEMA_VERSION = "1.14";

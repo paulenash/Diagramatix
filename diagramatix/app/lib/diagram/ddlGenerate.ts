@@ -49,7 +49,7 @@ const refs: RefTable[] = [
   { name: "ref_org_entity_type", values: ["ADI","Insurer","LifeInsurer","HealthInsurer","RSE","Other"] },
   { name: "ref_org_role", values: ["Owner","Admin","RiskOwner","ProcessOwner","ControlOwner","InternalAudit","BoardObserver","Viewer"] },
   { name: "ref_diagram_type", values: ["context","basic","process-context","state-machine","bpmn","domain","value-chain"] },
-  { name: "ref_symbol_type", values: ["task","gateway","start-event","intermediate-event","end-event","use-case","actor","team","state","initial-state","final-state","pool","lane","subprocess","subprocess-expanded","system-boundary","system-boundary-body","hourglass","composite-state","composite-state-body","system","data-object","data-store","group","text-annotation","external-entity","process-system","uml-class","uml-enumeration","sublane","fork-join","submachine","chevron","chevron-collapsed","process-group"] },
+  { name: "ref_symbol_type", values: ["task","gateway","start-event","intermediate-event","end-event","use-case","actor","team","state","initial-state","final-state","pool","lane","subprocess","subprocess-expanded","system-boundary","system-boundary-body","hourglass","composite-state","composite-state-body","system","data-object","data-store","group","text-annotation","external-entity","process-system","uml-class","uml-enumeration","sublane","fork-join","submachine","chevron","chevron-collapsed","process-group","archimate-shape"] },
   { name: "ref_bpmn_task_type", values: ["none","user","service","script","send","receive","manual","business-rule"] },
   { name: "ref_gateway_type", values: ["none","exclusive","inclusive","parallel","event-based"] },
   { name: "ref_gateway_role", values: ["decision","merge"] },
@@ -139,6 +139,11 @@ const entityTables: Table[] = [
     c("version", T.text), c("authors", T.text),
     c("status", T.text, refFk("ref_diagram_status")),
     c("show_title", T.bool),
+  ]},
+  // schema 1.14 — per-diagram process owner (name + email; both optional).
+  { name: "diagram_process_owner", columns: [
+    c("diagram_id", T.text, { pk: true, nn: true, fk: fk("diagram", "id", "CASCADE") }),
+    c("name", T.text), c("email", T.text),
   ]},
   { name: "element", columns: [
     c("id", T.text, pk),

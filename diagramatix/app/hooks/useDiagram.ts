@@ -299,6 +299,7 @@ type Action =
   | { type: "SET_POOL_FONT_SIZE"; payload: number }
   | { type: "SET_LANE_FONT_SIZE"; payload: number }
   | { type: "SET_DATABASE"; payload: string }
+  | { type: "SET_PROCESS_OWNER"; payload: { name?: string; email?: string } }
   | { type: "CORRECT_ALL_CONNECTORS" }
   | { type: "INSERT_SPACE"; payload: { markerX: number; markerY: number; dx: number; dy: number } }
   | { type: "REMOVE_SPACE"; payload: { zone: { x: number; y: number; width: number; height: number }; preserveIds?: string[]; extraDeleteIds?: string[]; leaveAloneIds?: string[] } }
@@ -5864,6 +5865,15 @@ function reducer(state: DiagramData, action: Action): DiagramData {
     case "SET_DATABASE":
       return { ...state, database: action.payload || undefined };
 
+    case "SET_PROCESS_OWNER": {
+      const { name, email } = action.payload;
+      const hasContent = (name && name.trim().length > 0) || (email && email.trim().length > 0);
+      return {
+        ...state,
+        processOwner: hasContent ? { name: name?.trim() || undefined, email: email?.trim() || undefined } : undefined,
+      };
+    }
+
     case "INSERT_SPACE": {
       const { markerX, markerY, dx, dy } = action.payload;
 
@@ -7645,6 +7655,12 @@ export function useDiagram(initialData: DiagramData) {
     setDatabase: useCallback(
       (db: string) => {
         dispatch({ type: "SET_DATABASE", payload: db });
+      }, []
+    ),
+    setProcessOwner: useCallback(
+      (owner: { name?: string; email?: string }) => {
+        pushHistory(snapshotData());
+        dispatch({ type: "SET_PROCESS_OWNER", payload: owner });
       }, []
     ),
     convertTaskSubprocess: useCallback((id: string) => {
