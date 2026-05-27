@@ -56,7 +56,7 @@ ${rules ? `USER RULES AND PREFERENCES (follow these strictly):\n${rules}\n\n` : 
 - Flow elements (tasks, gateways, events) MUST have: pool (pool id). Include "lane" ONLY if the prompt mentions specific roles, teams, or performers responsible for elements.
 - DO NOT create default/placeholder lanes (e.g. "Team", "Process Team", "Main Lane"). Only create lanes when the prompt implies multiple performers/roles. If no roles are mentioned, elements go directly in the pool with NO lane.
 - Tasks should have: taskType ("user", "service", "send", "receive", "manual", "none")
-- Gateways should have: gatewayType ("exclusive", "parallel", "inclusive")
+- Gateways should have: gatewayType ("exclusive", "parallel", "inclusive", "event-based"). Use "event-based" ONLY when the prompt describes one of several alternative EVENTS racing to occur (whichever happens first) — see the USER RULES for the exact trigger and wiring. The matching merge gateway MUST use the same gatewayType.
 - Expanded subprocesses use type "subprocess-expanded". They CAN contain child elements: set their "parentSubprocess" property to the subprocess id instead of "lane"
 - EVENT SUBPROCESS DETECTION — an Event Expanded Subprocess is ANY subprocess that is TRIGGERED BY AN EVENT rather than by sequence flow. Recognise these triggers in the prompt (match case-insensitively and treat as event subs even when the user's label does NOT contain the words "event" or "subprocess"):
   * Any mention of "event subprocess" / "event expanded subprocess" / "interrupt" / "non-interrupting" in relation to a subprocess
@@ -156,6 +156,7 @@ export function normaliseAiPlan(parsed: { elements: AiElement[]; connections: Ai
       if (el.type === "exclusiveGateway") el.gatewayType = "exclusive";
       else if (el.type === "parallelGateway") el.gatewayType = "parallel";
       else if (el.type === "inclusiveGateway") el.gatewayType = "inclusive";
+      else if (el.type === "eventBasedGateway") el.gatewayType = "event-based";
       else if (el.type === "sendTask") el.taskType = "send";
       else if (el.type === "receiveTask") el.taskType = "receive";
       else if (el.type === "userTask") el.taskType = "user";
