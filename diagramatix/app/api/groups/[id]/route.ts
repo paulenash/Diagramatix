@@ -139,6 +139,22 @@ export async function DELETE(
   if (group.isOrgGroup) {
     return NextResponse.json({ error: "Org groups cannot be deleted" }, { status: 400 });
   }
+  // Owner must be the sole occupant — any other user in invited or
+  // accepted state blocks deletion. Transfer ownership or remove
+  // the other members first.
+  const otherActive = await prisma.collaborationGroupMember.count({
+    where: {
+      groupId: id,
+      userId: { not: group.ownerId },
+      status: { in: ["invited", "accepted"] },
+    },
+  });
+  if (otherActive > 0) {
+    return NextResponse.json(
+      { error: "Remove all other members before deleting the group" },
+      { status: 400 },
+    );
+  }
   await prisma.collaborationGroup.delete({ where: { id } });
   return NextResponse.json({ ok: true });
 }

@@ -421,6 +421,10 @@ function GroupDetailPanel(props: {
   const visibleMembers = members.filter(m => m.status === "invited" || m.status === "accepted");
   const incomingTransfer = pendingTransfers.find(t => t.toUserId === currentUserId);
   const outgoingTransfer = isOwner ? pendingTransfers.find(t => t.fromUserId === currentUserId) : undefined;
+  // Only allow Delete when the Owner is the sole occupant — no other
+  // users in invited or accepted state.
+  const ownerIsAlone = visibleMembers.every(m => m.userId === group.ownerId);
+  const canDeleteGroup = isOwner && !group.isOrgGroup && ownerIsAlone;
 
   return (
     <div className="space-y-4">
@@ -452,8 +456,12 @@ function GroupDetailPanel(props: {
               </button>
             </>
           )}
-          {isOwner && !group.isOrgGroup && (
-            <button onClick={onDeleteGroup} className="text-xs text-red-600 border border-red-300 rounded px-2 py-1 hover:bg-red-50">
+          {canDeleteGroup && (
+            <button
+              onClick={onDeleteGroup}
+              title="Only available when you are the sole member"
+              className="text-xs text-red-600 border border-red-300 rounded px-2 py-1 hover:bg-red-50"
+            >
               Delete group
             </button>
           )}
