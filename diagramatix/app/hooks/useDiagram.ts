@@ -4557,10 +4557,16 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       if (target?.type === "subprocess-expanded") {
         const oldEpRect = { x: target.x, y: target.y, width: target.width, height: target.height };
         const newEpRect = { x: newX, y: newY, width: newW, height: newH };
-        // RESIZE_ELEMENT is the one call site that still wants the
-        // make-room cascade — explicit user resize → siblings shift
-        // to keep clear of the newly sized EP.
-        const r = applyEPBoundaryChange(state.elements, state.connectors, id, oldEpRect, newEpRect, undefined, /* skipExternalShifts */ false);
+        // Suppress the make-room cascade (section 5) on EP resize. When an
+        // EP sits inside a Pool/Lane, scopeContainer is non-null and the
+        // cascade shifted every element past the growing edge across the
+        // container's FULL span — so resizing one EP edge yanked unrelated
+        // elements on the far side of the pool. When the EP is NOT in a
+        // pool, scopeContainer is null and the cascade never fired, so
+        // nothing moved. Passing skipExternalShifts=true makes both cases
+        // behave identically: the EP rect changes, its own boundary events
+        // re-snap, but no sibling element is pushed.
+        const r = applyEPBoundaryChange(state.elements, state.connectors, id, oldEpRect, newEpRect, undefined, /* skipExternalShifts */ true);
         const validated = validateConnectorsAgainstObstacles(r.connectors, r.elements);
         return { ...state, elements: r.elements, connectors: validated };
       }
