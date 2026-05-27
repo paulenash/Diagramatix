@@ -257,6 +257,22 @@ function deleteRuleLine(text: string, lineIndex: number): string {
   return lines.join("\n");
 }
 
+/** IDs of every rule that sits in a code-backed (red) group. Used by the
+ *  Save guard to detect a code-backed rule removed via the raw textarea
+ *  (the per-rule Delete button only exists on green rules). */
+function codeBackedRuleIds(text: string): Set<string> {
+  const ids = new Set<string>();
+  let inCode = false;
+  for (const line of text.split("\n")) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith("##")) { inCode = CODE_REQUIRED_GROUPS.test(trimmed); continue; }
+    if (!inCode) continue;
+    const m = trimmed.match(/^([A-Z]\d+(?:\.\d+)*):/);
+    if (m) ids.add(m[1]);
+  }
+  return ids;
+}
+
 export function RulesEditor({ isAdmin: _isAdmin }: { isAdmin: boolean }) {
   const [ruleSets, setRuleSets] = useState<RuleSet[]>([]);
   const [activeCategory, setActiveCategory] = useState("general");
@@ -267,6 +283,9 @@ export function RulesEditor({ isAdmin: _isAdmin }: { isAdmin: boolean }) {
   const [showPreview, setShowPreview] = useState(true);
   const [deleteRuleConfirm, setDeleteRuleConfirm] = useState<{ lineIndex: number; ruleId: string } | null>(null);
   const [resetConfirm, setResetConfirm] = useState(false);
+  // Pending save that would remove one or more code-backed (red) rules
+  // via a raw textarea edit — held until the admin confirms.
+  const [pendingRedDelete, setPendingRedDelete] = useState<{ ids: string[]; text: string } | null>(null);
 
   useEffect(() => {
     fetch("/api/bpmn-rules", {
@@ -330,7 +349,24 @@ export function RulesEditor({ isAdmin: _isAdmin }: { isAdmin: boolean }) {
     const lastSaved = ruleSets.find((r) => r.category === activeCategory)?.rules ?? "";
     const tagged = tagModifiedRules(editText, lastSaved);
     const numbered = autoNumberRules(tagged);
+    // Guard: a code-backed (red) rule can only disappear through a manual
+    // textarea edit (no Delete button exists for red rules). That would
+    // leave its layout-engine code undocumented, so confirm first.
+    const before = codeBackedRuleIds(lastSaved);
+    const after = codeBackedRuleIds(numbered);
+    const removed = [...before].filter((id) => !after.has(id));
+    if (removed.length > 0) {
+      setPendingRedDelete({ ids: removed, text: numbered });
+      return;
+    }
     await persistText(numbered, "Rules saved");
+  }
+
+  async function performGuardedSave() {
+    if (!pendingRedDelete) return;
+    const { text } = pendingRedDelete;
+    setPendingRedDelete(null);
+    await persistText(text, "Rules saved");
   }
 
   async function handleMarkImplemented(lineIndex: number) {
@@ -598,7 +634,7 @@ export function RulesEditor({ isAdmin: _isAdmin }: { isAdmin: boolean }) {
           )}
 
           <p className="mt-2 text-[10px] text-gray-400">
-            Format: <code>## Group N: Name</code> for sections, <code>R01:</code> or <code>R04.1:</code> for rules.
+            Format: <code>## Group N: Name</code> for sections; rule IDs are group-scoped, e.g. <code>R3.01:</code> (BPMN group 3, rule 1).
             New rules can be typed without a number — they will be appended at the end of their section and
             numbered on Save. Rules in <span className="text-red-600">layout</span> groups start as
             <span className="text-orange-600"> proposed</span> until you mark them implemented.
@@ -615,6 +651,21 @@ export function RulesEditor({ isAdmin: _isAdmin }: { isAdmin: boolean }) {
           destructive
           onCancel={() => setDeleteRuleConfirm(null)}
           onConfirm={performDeleteRule}
+        />
+      )}
+
+      {pendingRedDelete && (
+        <ConfirmDialog
+          title={pendingRedDelete.ids.length === 1 ? "Delete code-backed rule?" : "Delete code-backed rules?"}
+          message={
+            `You're removing ${pendingRedDelete.ids.join(", ")}, which ${pendingRedDelete.ids.length === 1 ? "is" : "are"} enforced by layout-engine code. ` +
+            `The code will keep running with no rule documenting it.\n\nDelete anyway?`
+          }
+          confirmLabel="Delete anyway"
+          cancelLabel="Cancel"
+          destructive
+          onCancel={() => setPendingRedDelete(null)}
+          onConfirm={performGuardedSave}
         />
       )}
 
