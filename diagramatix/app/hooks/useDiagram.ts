@@ -4527,7 +4527,23 @@ function reducer(state: DiagramData, action: Action): DiagramData {
           const r = applyPoolBoundaryShift(elements, connectors, id, dLeft, dRight);
           elements = r.elements; connectors = r.connectors;
         }
-        connectors = recomputeAllConnectors(connectors, elements);
+        // Recompute routes AND keep connector labels anchored. A bare
+        // recomputeAllConnectors moves each label's anchor (the midpoint
+        // of its visible waypoints) while leaving labelOffsetX/Y fixed,
+        // so labels drift — most visibly the message-flow labels between
+        // pools — every time a pool boundary moves. Mirror the
+        // MOVE_ELEMENT pattern: adjustMsgLabelOffset for messageBPMN,
+        // preserveLabelWorldPos for the rest, comparing each connector's
+        // pre-resize waypoints (orig) to the freshly routed ones.
+        const origById = new Map(state.connectors.map(c => [c.id, c]));
+        connectors = recomputeAllConnectors(connectors, elements).map(conn => {
+          const orig = origById.get(conn.id);
+          if (!orig) return conn;
+          const labelAdj = conn.type === "messageBPMN"
+            ? adjustMsgLabelOffset(orig, orig.waypoints, conn.waypoints)
+            : preserveLabelWorldPos(orig, conn.waypoints);
+          return Object.keys(labelAdj).length > 0 ? { ...conn, ...labelAdj } : conn;
+        });
         // Pool may have just grown to cover existing flow elements or
         // shrunk past its last one — re-evaluate white-box / black-box.
         return { ...state, elements: updatePoolTypes(elements), connectors };
