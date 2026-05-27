@@ -2464,6 +2464,9 @@ export function SymbolRenderer({
       {selected && !multiSelected && canResize && onResizeDragStart &&
         RESIZE_HANDLES
         .filter(({ handle }) => {
+          // Pools never move their LEFT boundary — drop every west-side
+          // handle (w + the nw/sw corners that would drag the left edge).
+          if (element.type === "pool" && (handle === "w" || handle === "nw" || handle === "sw")) return false;
           // Fork-join: only show handles on the long axis ends
           if (element.type !== "fork-join") return true;
           const isVertical = element.height >= element.width;
@@ -2540,7 +2543,11 @@ export function SymbolRenderer({
 
         return (
           <g data-interactive>
-            {edges.map((edge) => (
+            {edges
+              // Pools never move their LEFT boundary — suppress the west
+              // edge hit-zone (EPs keep all four).
+              .filter((edge) => !(element.type === "pool" && edge.side === "w"))
+              .map((edge) => (
               <g key={edge.side}>
                 <rect
                   x={edge.hit.x} y={edge.hit.y}
