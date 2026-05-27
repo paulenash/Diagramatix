@@ -8,6 +8,7 @@ import { SCHEMA_VERSION } from "@/app/lib/diagram/types";
 import { ImpersonationBanner } from "@/app/components/ImpersonationBanner";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 import { UsagePopover } from "@/app/components/UsagePopover";
+import { NotificationsBell } from "@/app/components/NotificationsBell";
 import { TierPicker, type TierCard } from "@/app/components/TierPicker";
 
 interface DiagramSummary {
@@ -1247,6 +1248,20 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                   if (arr.length > 0) handleBpmnFolderSelected(arr);
                 }}
               />
+
+              {/* Collaboration Groups — opens the Groups dashboard page */}
+              <button
+                onClick={() => router.push("/dashboard/groups")}
+                className="text-xs font-medium rounded px-2 py-1 border text-gray-600 border-gray-300 hover:bg-gray-50"
+                title="Manage Collaboration Groups"
+              >
+                Groups
+              </button>
+
+              {/* In-app notifications */}
+              <NotificationsBell onNavigateToGroups={(groupId) => {
+                router.push(groupId ? `/dashboard/groups?group=${groupId}` : "/dashboard/groups");
+              }} />
 
               {/* Unified File menu */}
               <div className="relative" ref={fileMenuRef}>

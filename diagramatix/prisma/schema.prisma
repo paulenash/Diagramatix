@@ -25,14 +25,14 @@ enum OrgEntityType {
 }
 
 enum OrgRole {
-  Owner          // full control of the org, including billing and deletion
-  Admin          // manage members and settings, no destructive ops
-  RiskOwner      // create/edit Risks, Controls, link to processes
-  ProcessOwner   // create/edit critical operations + BPMN process content
-  ControlOwner   // edit Controls and test outcomes
-  InternalAudit  // read-only across the whole org, can export
-  BoardObserver  // read-only access to BCPs, registers and dashboards
-  Viewer         // read-only access to diagrams and registers
+  Owner // full control of the org, including billing and deletion
+  Admin // manage members and settings, no destructive ops
+  RiskOwner // create/edit Risks, Controls, link to processes
+  ProcessOwner // create/edit critical operations + BPMN process content
+  ControlOwner // edit Controls and test outcomes
+  InternalAudit // read-only across the whole org, can export
+  BoardObserver // read-only access to BCPs, registers and dashboards
+  Viewer // read-only access to diagrams and registers
 }
 
 model Org {
@@ -41,11 +41,12 @@ model Org {
   entityType OrgEntityType @default(Other)
   createdAt  DateTime      @default(now())
 
-  members   OrgMember[]
-  projects  Project[]
-  diagrams  Diagram[]
-  prompts   Prompt[]
-  diagramRules DiagramRules[]
+  members             OrgMember[]
+  projects            Project[]
+  diagrams            Diagram[]
+  prompts             Prompt[]
+  diagramRules        DiagramRules[]
+  collaborationGroups CollaborationGroup[]
 }
 
 model OrgMember {
@@ -66,57 +67,57 @@ model OrgMember {
 // ────────────────────────────────────────────────────────────────────────────
 
 model User {
-  id               String    @id @default(cuid())
-  email            String    @unique
-  name             String?
-  password         String    @default("")
-  resetToken       String?   @unique
-  resetTokenExpiry DateTime?
-  diagrams         Diagram[]
-  projects         Project[]
-  templates        DiagramTemplate[]
-  orgMembers       OrgMember[]
-  prompts          Prompt[]
-  diagramRules     DiagramRules[]
+  id                            String                     @id @default(cuid())
+  email                         String                     @unique
+  name                          String?
+  password                      String                     @default("")
+  resetToken                    String?                    @unique
+  resetTokenExpiry              DateTime?
+  diagrams                      Diagram[]
+  projects                      Project[]
+  templates                     DiagramTemplate[]
+  orgMembers                    OrgMember[]
+  prompts                       Prompt[]
+  diagramRules                  DiagramRules[]
   // Subscription tier. Nullable for migration safety; the seed script
   // grandfathers every existing user to "expert" and the registration
   // flow sets "free" on new sign-ups. Admins (per SUPERUSER_EMAILS in
   // app/lib/superuser.ts) bypass all limits regardless of this field —
   // the "Administration" tier shown in the UI is derived, not stored.
-  subscriptionLevelId String?
-  subscriptionLevel   SubscriptionLevel? @relation(fields: [subscriptionLevelId], references: [id])
+  subscriptionLevelId           String?
+  subscriptionLevel             SubscriptionLevel?         @relation(fields: [subscriptionLevelId], references: [id])
   // When the user landed on their current tier. Drives Free-tier trial
   // expiry (30 days from this date for Free). Set on registration and
   // updated by the admin "Change Tier" action.
-  subscriptionAssignedAt DateTime?
+  subscriptionAssignedAt        DateTime?
   // True once the user has actively chosen (or skipped past) the
   // welcome tier picker. Existing users are backfilled to true by
   // scripts/seed-subscriptions.ts so they don't see the picker on
   // their next visit. New sign-ups start at false; the dashboard
   // shows the TierPicker modal until the user picks or skips.
-  hasChosenTier       Boolean  @default(false)
+  hasChosenTier                 Boolean                    @default(false)
   // ── Stripe wiring (Subscriptions Phase 2) ────────────────────────────
   // Stripe Customer ID for this user. Created lazily on first Checkout
   // session attempt; reused for all subsequent payments and Portal
   // sessions so cards / invoices stay attached to one Customer.
-  stripeCustomerId         String?   @unique
+  stripeCustomerId              String?                    @unique
   // Active Stripe Subscription ID. Null while on Free or after a fully-
   // expired cancellation. Set by the `checkout.session.completed`
   // webhook and cleared by `customer.subscription.deleted` once the
   // grace period (subscriptionEndsAt) elapses.
-  stripeSubscriptionId     String?   @unique
+  stripeSubscriptionId          String?                    @unique
   // Mirror of Stripe's subscription status. Drives UI badges (past_due
   // warning chip, etc.). Values we set: "active" | "trialing" |
   // "past_due" | "canceled" | "incomplete". Null = no Stripe subscription.
-  stripeSubscriptionStatus String?
+  stripeSubscriptionStatus      String?
   // Copied from Stripe — when the current billing period ends / renews.
   // The webhook updates this on every subscription.updated event.
-  currentPeriodEnd         DateTime?
+  currentPeriodEnd              DateTime?
   // Cancellation grace marker. Set to currentPeriodEnd when Stripe
   // emits subscription.deleted. While now() < this date the user keeps
   // their paid tier; after, `getEffectiveSubscriptionLevelId` returns
   // "free" so we downgrade lazily without a cron job.
-  subscriptionEndsAt       DateTime?
+  subscriptionEndsAt            DateTime?
   // ── Admin-granted comp tier (Option A from 2026-05-25) ───────────────
   // Lets an admin temporarily grant a higher tier to a user (e.g. comp
   // an influencer to Expert for 30 days) without touching their
@@ -124,28 +125,35 @@ model User {
   // compTierLevelId is set, `getEffectiveSubscriptionLevelId` returns
   // the comp tier instead of the paid tier. After expiry, the user
   // reverts silently to whatever their underlying subscription says.
-  compTierLevelId          String?
-  compTierExpiresAt        DateTime?
+  compTierLevelId               String?
+  compTierExpiresAt             DateTime?
   // Audit: when the comp was granted (most recent grant if multiple).
   // A future CompGrant table can replace this with a full log, but
   // for now we just track the latest issue date.
-  compTierGrantedAt        DateTime?
-  usageCounters       UsageCounter[]
+  compTierGrantedAt             DateTime?
+  usageCounters                 UsageCounter[]
   // Per-user UI prefs. Currently stores the collapsed state of
   // template-group headers in the editor menu, keyed like
   // `{ "user:Group A": true, "builtin:Group B": false }`. Templates'
   // group field is the source of truth; this just remembers which
   // headers the user wants folded.
-  templateGroupPrefs Json?
-  createdAt        DateTime  @default(now())
+  templateGroupPrefs            Json?
+  createdAt                     DateTime                   @default(now())
   // Updated (throttled) from the Auth.js jwt callback to power the
   // admin "online / last seen" indicator. Nullable for legacy rows.
-  lastSeenAt       DateTime?
+  lastSeenAt                    DateTime?
   // The diagram the user is currently viewing — set when a diagram page
   // loads, cleared when they navigate back to the dashboard / a project.
   // Denormalised name avoids a join in the admin Registered Users query.
-  currentDiagramId   String?
-  currentDiagramName String?
+  currentDiagramId              String?
+  currentDiagramName            String?
+  // Collaboration Groups (Phase 1) back-relations.
+  collaborationGroupsOwned      CollaborationGroup[]       @relation("CollaborationGroupOwner")
+  collaborationGroupMemberships CollaborationGroupMember[] @relation("CollaborationGroupMembership")
+  collaborationGroupInvitesSent CollaborationGroupMember[] @relation("CollaborationGroupInvitesSent")
+  ownershipTransfersFrom        OwnershipTransfer[]        @relation("OwnershipTransferFrom")
+  ownershipTransfersTo          OwnershipTransfer[]        @relation("OwnershipTransferTo")
+  notifications                 Notification[]
 }
 
 model Project {
@@ -169,34 +177,34 @@ model Project {
 }
 
 model Diagram {
-  id          String   @id @default(cuid())
+  id          String           @id @default(cuid())
   name        String
-  type        String   @default("basic")
-  data        Json     @default("{}")
-  colorConfig Json     @default("{}")
-  displayMode String   @default("normal")
+  type        String           @default("basic")
+  data        Json             @default("{}")
+  colorConfig Json             @default("{}")
+  displayMode String           @default("normal")
   userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   projectId   String?
-  project     Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  project     Project?         @relation(fields: [projectId], references: [id], onDelete: SetNull)
   // Denormalised from Project for query performance — kept in sync by the
   // application layer. Required after Phase 0 backfill.
   orgId       String
-  org         Org      @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  org         Org              @relation(fields: [orgId], references: [id], onDelete: Restrict)
   history     DiagramHistory[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
 
   @@index([orgId])
 }
 
 model DiagramHistory {
-  id          String   @id @default(cuid())
-  diagramId   String
-  diagram     Diagram  @relation(fields: [diagramId], references: [id], onDelete: Cascade)
-  snapshot    Json     // full diagram data { name, type, data, colorConfig, displayMode }
-  userId      String?  // who triggered the save (nullable for legacy)
-  createdAt   DateTime @default(now())
+  id        String   @id @default(cuid())
+  diagramId String
+  diagram   Diagram  @relation(fields: [diagramId], references: [id], onDelete: Cascade)
+  snapshot  Json // full diagram data { name, type, data, colorConfig, displayMode }
+  userId    String? // who triggered the save (nullable for legacy)
+  createdAt DateTime @default(now())
 
   @@index([diagramId, createdAt])
 }
@@ -219,20 +227,20 @@ model DiagramTemplate {
 }
 
 model Prompt {
-  id            String   @id @default(cuid())
+  id            String    @id @default(cuid())
   name          String
   text          String
-  diagramType   String   @default("bpmn")
+  diagramType   String    @default("bpmn")
   userId        String
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   orgId         String
-  org           Org      @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  org           Org       @relation(fields: [orgId], references: [id], onDelete: Restrict)
   // Last edited 2-phase AI Plan for this prompt (AiElement[] + AiConnection[]).
   // null until the user saves with a plan present.
   planJson      Json?
   planUpdatedAt DateTime?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   @@index([orgId])
   @@index([userId, diagramType])
@@ -240,8 +248,8 @@ model Prompt {
 
 model DiagramRules {
   id        String   @id @default(cuid())
-  category  String   // "general", "bpmn", "state-machine", "value-chain", "domain", "context", "process-context"
-  rules     String   // multiline text — numbered rules in groups
+  category  String // "general", "bpmn", "state-machine", "value-chain", "domain", "context", "process-context"
+  rules     String // multiline text — numbered rules in groups
   isDefault Boolean  @default(false) // true = admin-set system default
   userId    String?
   user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -271,10 +279,10 @@ model DiagramRules {
 // ────────────────────────────────────────────────────────────────────────────
 
 model SubscriptionLevel {
-  id                            String   @id              // "free" | "introductory" | "professional" | "expert"
-  name                          String                    // display name
-  priceMonthly                  Int      @default(0)      // AUD cents
-  sortOrder                     Int                       // for UI ordering
+  id           String @id // "free" | "introductory" | "professional" | "expert"
+  name         String // display name
+  priceMonthly Int    @default(0) // AUD cents
+  sortOrder    Int // for UI ordering
 
   // Limits. null = unlimited.
   maxProjects                   Int?
@@ -283,11 +291,11 @@ model SubscriptionLevel {
   maxNonBpmnElementsPerDiagram  Int?
   maxBpmnElementsPerDiagram     Int?
   maxAiAttempts                 Int?
-  aiAttemptsResetMonthly        Boolean  @default(true)   // false → lifetime counter (Free)
+  aiAttemptsResetMonthly        Boolean @default(true) // false → lifetime counter (Free)
   maxIndividualExports          Int?
-  individualExportsResetMonthly Boolean  @default(true)
+  individualExportsResetMonthly Boolean @default(true)
   maxIndividualImports          Int?
-  individualImportsResetMonthly Boolean  @default(true)
+  individualImportsResetMonthly Boolean @default(true)
   maxBulkExports                Int?
   maxBulkImports                Int?
   // Days from subscriptionAssignedAt before the tier expires and the
@@ -301,7 +309,7 @@ model SubscriptionLevel {
   // editor (or a seed script) after creating the matching Product +
   // Price in the Stripe dashboard. The Checkout flow looks this up by
   // tier ID and refuses to start if it's missing for a paid tier.
-  stripePriceId                 String?
+  stripePriceId String?
 
   users     User[]
   createdAt DateTime @default(now())
@@ -312,8 +320,8 @@ model UsageCounter {
   id        String   @id @default(cuid())
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  periodKey String                                          // "2026-05" | "all-time"
-  metric    String                                          // "ai_attempts" | "individual_exports" | "individual_imports" | "bulk_exports" | "bulk_imports"
+  periodKey String // "2026-05" | "all-time"
+  metric    String // "ai_attempts" | "individual_exports" | "individual_imports" | "bulk_exports" | "bulk_imports"
   count     Int      @default(0)
   updatedAt DateTime @updatedAt
 
@@ -335,14 +343,14 @@ model UsageCounter {
 // ────────────────────────────────────────────────────────────────────────────
 
 model Feature {
-  id                 String  @id @default(cuid())
-  sortOrder          Int     @default(0)
+  id        String @id @default(cuid())
+  sortOrder Int    @default(0)
 
   // Draft fields — only admins see these.
-  name               String
-  summary            String
-  details            String
-  hidden             Boolean @default(false)
+  name    String
+  summary String
+  details String
+  hidden  Boolean @default(false)
 
   // Published snapshot — what the marketing page + dashboard show.
   // Null = never published yet.
@@ -377,4 +385,82 @@ model BubbleHelp {
 
   @@unique([diagramType, topicKey])
   @@index([diagramType])
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Collaboration Groups + in-app Notifications (Phase 1 of the Collaboration
+// Groups feature). Phase 2 adds DiagramReview / DiagramReviewer; Phase 3
+// adds the connector-kind columns. See plan in
+// `.claude/plans/nifty-singing-hennessy.md`.
+// ────────────────────────────────────────────────────────────────────────────
+
+// Minimal in-app notification inbox. Polled from the dashboard bell.
+// `type` is a string discriminator (kept loose so Phases 2 + 3 can add
+// new event types without a schema bump); `payload` is the type-specific
+// JSON used by the bell popover to render the link / row.
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  payload   Json
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, readAt])
+  @@index([userId, createdAt])
+}
+
+model CollaborationGroup {
+  id         String   @id @default(cuid())
+  name       String
+  ownerId    String
+  owner      User     @relation("CollaborationGroupOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  // When set, this is the auto-created Org-wide group. Org Owner is
+  // the group's owner; deletion / rename are forbidden in v1.
+  orgId      String?
+  org        Org?     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  isOrgGroup Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  members   CollaborationGroupMember[]
+  transfers OwnershipTransfer[]
+
+  @@index([ownerId])
+  @@index([orgId])
+}
+
+model CollaborationGroupMember {
+  id          String             @id @default(cuid())
+  groupId     String
+  group       CollaborationGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User               @relation("CollaborationGroupMembership", fields: [userId], references: [id], onDelete: Cascade)
+  // "invited" | "accepted" | "declined" | "left" | "removed"
+  status      String
+  invitedAt   DateTime           @default(now())
+  joinedAt    DateTime?
+  invitedById String?
+  invitedBy   User?              @relation("CollaborationGroupInvitesSent", fields: [invitedById], references: [id], onDelete: SetNull)
+
+  @@unique([groupId, userId])
+  @@index([userId, status])
+}
+
+model OwnershipTransfer {
+  id         String             @id @default(cuid())
+  groupId    String
+  group      CollaborationGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  fromUserId String
+  fromUser   User               @relation("OwnershipTransferFrom", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUserId   String
+  toUser     User               @relation("OwnershipTransferTo", fields: [toUserId], references: [id], onDelete: Cascade)
+  // "pending" | "accepted" | "declined" | "cancelled"
+  status     String             @default("pending")
+  createdAt  DateTime           @default(now())
+  resolvedAt DateTime?
+
+  @@index([toUserId, status])
+  @@index([groupId, status])
 }
