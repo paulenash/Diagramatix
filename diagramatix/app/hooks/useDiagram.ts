@@ -137,7 +137,7 @@ function messageBpmnWaypoints(
  * Edge indices are picked from the leader flags so either format works.
  */
 /**
- * R54: preserve a connector's label world position when waypoints change
+ * R6.18: preserve a connector's label world position when waypoints change
  * programmatically (e.g. waypoint drag + obstacle-validation reroute,
  * curvilinear control-point drag). The InteractionLabel renderer places
  * the label at `anchor + (labelOffsetX, labelOffsetY)` where the anchor
@@ -5414,7 +5414,7 @@ function reducer(state: DiagramData, action: Action): DiagramData {
           if (!inside) return state;
         }
 
-        // Rule (R43): an edge-mounted Start event represents an external
+        // Rule (R3.08): an edge-mounted Start event represents an external
         // trigger — it can only be reached from OUTSIDE its host EP. A
         // source inside the same host (or a descendant of it) is rejected.
         if (target.boundaryHostId && target.type === "start-event") {
@@ -5456,7 +5456,7 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         && (gwType === "none" || gwType === "exclusive" || gwType === "inclusive");
       const isDecisionGatewayOutgoing = (connectorType === "sequence" || connectorType === "transition") && isDecisionGateway;
 
-      // R42: per-side label placement for decision-gateway outgoing connectors.
+      // R3.07: per-side label placement for decision-gateway outgoing connectors.
       // Mirrors bpmnLayout.ts. Label is empty at creation, so estimated width
       // collapses to the renderer's 30px minimum.
       const decisionLabelOffsets: { x: number; y: number } | null = isDecisionGatewayOutgoing
@@ -5856,7 +5856,7 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         if (c.type === "messageBPMN") {
           return { ...c, waypoints: newWaypoints };
         }
-        // R54: preserve label world position across the waypoint change
+        // R6.18: preserve label world position across the waypoint change
         const labelAdj = preserveLabelWorldPos(c, newWaypoints);
         return { ...c, waypoints: newWaypoints, ...labelAdj };
       });

@@ -3301,12 +3301,12 @@ export const CHAPTERS: HelpChapter[] = [
               <li>
                 <strong>Apply Layout</strong> — the (possibly edited) plan is
                 handed to the BPMN layout engine which positions every element
-                and applies the layout rules (R16–R32). This second step is
+                and applies the layout rules (R5.01–R6.13). This second step is
                 local and fast; no AI call.
               </li>
             </ol>
             <p className="mt-2 text-xs text-gray-600">
-              Layout rules referenced below (R42–R44) are enforced by the
+              Layout rules referenced below (R3.07–R3.09) are enforced by the
               engine in the Apply Layout step, regardless of what the AI
               emitted.
             </p>
@@ -3473,7 +3473,7 @@ export const CHAPTERS: HelpChapter[] = [
             </p>
             <ul className="list-disc list-inside space-y-2 mt-2">
               <li>
-                <strong>R47 — Edge-mounted intermediate event exit point.</strong>{" "}
+                <strong>R7.02 — Edge-mounted intermediate event exit point.</strong>{" "}
                 A connector from a boundary-mounted intermediate event
                 exits from the event&rsquo;s connection point{" "}
                 <em>furthest from the host edge the event is mounted upon</em>.
@@ -3481,7 +3481,7 @@ export const CHAPTERS: HelpChapter[] = [
                 edge exits from the event&rsquo;s top connection point.
               </li>
               <li>
-                <strong>R42 — Decision-gateway outgoing label placement.</strong>{" "}
+                <strong>R3.07 — Decision-gateway outgoing label placement.</strong>{" "}
                 Labels on outgoing sequence connectors from a decision
                 gateway are anchored to the gateway&rsquo;s source
                 attachment point, not the connector midpoint:
@@ -3504,7 +3504,7 @@ export const CHAPTERS: HelpChapter[] = [
                 </ul>
               </li>
               <li>
-                <strong>R43 — Start Event in topmost lane.</strong>{" "}
+                <strong>R3.08 — Start Event in topmost lane.</strong>{" "}
                 Every process-level Start Event is placed in the topmost
                 lane of its pool. If the AI plan assigned the Start Event
                 to a different lane, the layout engine moves it. Boundary
@@ -3512,7 +3512,7 @@ export const CHAPTERS: HelpChapter[] = [
                 unaffected.
               </li>
               <li>
-                <strong>R44 — Nested gateway Y alignment.</strong>{" "}
+                <strong>R3.09 — Nested gateway Y alignment.</strong>{" "}
                 A decision gateway (and its paired merge gateway) is
                 positioned at the same Y as its immediate sequence-flow
                 predecessor. This keeps a nested diamond on the branch row
@@ -3522,22 +3522,22 @@ export const CHAPTERS: HelpChapter[] = [
                 a matching in-degree.
               </li>
               <li>
-                <strong>R51 — Internal Start/End horizontal inset.</strong>{" "}
+                <strong>R8.02 — Internal Start/End horizontal inset.</strong>{" "}
                 Start and End events placed inside an Expanded Subprocess
                 (including Event Subprocesses and the top-row placement
-                used by R50) have their centres sit{" "}
+                used by R8.01) have their centres sit{" "}
                 <strong>1.5 × event width</strong> from their respective
                 vertical boundaries — Start from the left edge, End from
                 the right edge. Keeps them clear of the subprocess
                 border.
               </li>
               <li>
-                <strong>R50 — Boundary Start/End events on an outer sub
+                <strong>R8.01 — Boundary Start/End events on an outer sub
                 with embedded event subs.</strong>{" "}
                 Boundary Start events are placed on the LEFT edge;
                 boundary End events on the RIGHT edge. Their Y is
                 aligned with the centre of the task or subprocess they
-                are connected to (explicit connector or R27/R28 auto-
+                are connected to (explicit connector or R6.08/R6.09 auto-
                 connect target), not the middle of the host edge.
                 Internal (non-boundary) Start/End direct children of the
                 outer subprocess are placed in the top row of the grid.

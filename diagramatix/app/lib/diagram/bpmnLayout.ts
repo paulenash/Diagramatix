@@ -76,13 +76,13 @@ export function layoutBpmnDiagram(
   };
   phase("start");
 
-  // ── R26/R29/R30: Event Subprocess handling ──
+  // ── R6.07/R6.10/R6.11: Event Subprocess handling ──
   // - Auto-detect event subprocesses
   // - Ensure they are wrapped in a Normal Expanded Subprocess
   // - Auto-inject an internal start event and internal end event if missing.
-  //   R30 lets the AI choose interrupting vs non-interrupting based on
+  //   R6.11 lets the AI choose interrupting vs non-interrupting based on
   //   semantics; this fallback only runs when the AI omitted the start
-  //   event entirely, so we default to non-interrupting (R30's tiebreaker).
+  //   event entirely, so we default to non-interrupting (R6.11's tiebreaker).
   const injected: AiElement[] = [];
   for (const ai of aiElements) {
     if (ai.type !== "subprocess-expanded") continue;
@@ -91,7 +91,7 @@ export function layoutBpmnDiagram(
     // non-interrupting start event. AI sometimes forgets to set
     // subprocessType="event" even when it emits the characteristic
     // non-interrupting internal start event (which is only valid inside
-    // an event sub). Catching this avoids missed R48 connector-stripping.
+    // an event sub). Catching this avoids missed R7.03 connector-stripping.
     const hasNonInterruptingStart = aiElements.some(child =>
       child.parentSubprocess === ai.id &&
       child.type === "start-event" &&
@@ -107,7 +107,7 @@ export function layoutBpmnDiagram(
     // Ensure subprocessType is set
     if (!ai.subprocessType) ai.subprocessType = "event";
 
-    // R29: Ensure the event subprocess is inside a Normal Expanded Subprocess
+    // R6.10: Ensure the event subprocess is inside a Normal Expanded Subprocess
     // If parentSubprocess is not set, or it's set to a pool/lane context, wrap it
     const parentSub = ai.parentSubprocess
       ? aiElements.find(e => e.id === ai.parentSubprocess)
@@ -130,7 +130,7 @@ export function layoutBpmnDiagram(
       ai.lane = undefined;
     }
 
-    // R30: Ensure internal start event exists. Default to non-interrupting
+    // R6.11: Ensure internal start event exists. Default to non-interrupting
     // when we have to fabricate one — the AI is responsible for choosing
     // interrupting when the prompt warrants it; if it skipped the start
     // event altogether we have no semantic signal, so use the tiebreaker.
@@ -147,7 +147,7 @@ export function layoutBpmnDiagram(
         properties: { interruptionType: "non-interrupting" },
       });
     }
-    // R30: Ensure internal end event exists
+    // R6.11: Ensure internal end event exists
     const hasInternalEnd = aiElements.some(e =>
       e.parentSubprocess === ai.id && e.type === "end-event" && !e.boundaryHost
     );
@@ -192,7 +192,7 @@ export function layoutBpmnDiagram(
     pools.push(defaultPool);
   }
 
-  // R32: Every process must have a process-level Start Event and End Event in each white-box pool.
+  // R6.13: Every process must have a process-level Start Event and End Event in each white-box pool.
   // Check each white-box pool; if missing, inject them at top level.
   const processLevelInjections: AiElement[] = [];
   for (const pool of pools.filter(p => (p.poolType ?? "white-box") === "white-box")) {
@@ -260,7 +260,7 @@ export function layoutBpmnDiagram(
     poolLanes.set(pool.id, poolLaneList);
   }
 
-  // R43: Process-level Start Events must be placed in the TOPMOST lane of
+  // R3.08: Process-level Start Events must be placed in the TOPMOST lane of
   // their pool. Override any AI-set lane assignment so the process entry
   // point always reads top-down. Boundary starts and event-subprocess
   // internal starts are excluded — they belong with their host.
@@ -350,12 +350,12 @@ export function layoutBpmnDiagram(
 
   // ── Pool width: content columns + 1 task width padding for user adjustment room ──
   let curY = START_Y;
-  // R21: content width + 1 task width padding
+  // R6.02: content width + 1 task width padding
   const contentWidth = (maxCol + 1) * COL_SPACING;
   const poolWidth = POOL_HEADER_W + contentWidth + LANE_PAD_X + TASK_W;
 
   for (const bbp of topBlackBoxes) {
-    // R20: black-box pool height = horizontal text width (rotated vertical) + buffer
+    // R6.01: black-box pool height = horizontal text width (rotated vertical) + buffer
     const textW = bbp.label.length * 7 + 20; // ~7px per char at 12px font + 20px buffer each side
     const bbH = Math.max(BLACK_BOX_H, textW);
     elements.push({
@@ -372,7 +372,7 @@ export function layoutBpmnDiagram(
     const pLanes = poolLanes.get(pool.id) ?? [];
     const poolStartY = curY;
 
-    // R21: Compute lane heights — each lane needs room for its elements + vertical padding
+    // R6.02: Compute lane heights — each lane needs room for its elements + vertical padding
     const taskDef = getSymbolDefinition("task");
     const laneHeights: number[] = [];
     for (const lane of pLanes) {
@@ -393,7 +393,7 @@ export function layoutBpmnDiagram(
 
     let totalLaneH = laneHeights.reduce((s, h) => s + h, 0);
 
-    // R20: Ensure pool is tall enough to display the vertical pool name
+    // R6.01: Ensure pool is tall enough to display the vertical pool name
     // Same formula as black-box: horizontal text width + buffer, used as height
     const nameH = pool.label.length * 7 + 40;
     // Always apply: expand lanes if pool name needs more room
@@ -424,7 +424,7 @@ export function layoutBpmnDiagram(
     let laneY = poolStartY;
     if (pLanes.length === 0) {
       // No lanes: place elements directly in pool (assigned to pool, no lane).
-      // R45 (also applied in the lane path): when multiple elements share a
+      // R3.10 (also applied in the lane path): when multiple elements share a
       // column (e.g. decision-gateway branch targets), stack them vertically
       // so they don't overlap at the pool centre. n ≤ 2 uses the symmetric
       // split; n ≥ 3 stacks asymmetrically (idx 0 above, idx 1 level, idx 2+
@@ -498,7 +498,7 @@ export function layoutBpmnDiagram(
             const def = getSymbolDefinition(el.type as DiagramElement["type"]);
             const elX = START_X + POOL_HEADER_W + LANE_PAD_X + col * COL_SPACING;
             const stackSpacing = def.defaultHeight + 30;
-            // R45 (Y stacking): for n ≥ 3, stack asymmetrically to mirror
+            // R3.10 (Y stacking): for n ≥ 3, stack asymmetrically to mirror
             // decision-gateway exit placement — index 0 above, index 1
             // level with the lane centre, index 2+ below (one row each).
             // n ≤ 2 keeps the original symmetric split.
@@ -576,7 +576,7 @@ export function layoutBpmnDiagram(
   const EVENT_SUB_H = taskDefForEvSub.defaultHeight * 2 + 40;
   const EVENT_SUB_GAP = 20;
 
-  // R50: set of outer expanded-subprocess ids that contain embedded event
+  // R8.01: set of outer expanded-subprocess ids that contain embedded event
   // subs. When an outer sub is in this set, boundary Start/End events on
   // that host are forced to the TOP edge, and internal Start/End events
   // are placed in the top row of the grid.
@@ -588,7 +588,7 @@ export function layoutBpmnDiagram(
     if (!spEl) continue;
     const isEventSub = (spEl.properties.subprocessType as string | undefined) === "event";
 
-    // R49: inside a NORMAL outer expanded subprocess, separate embedded
+    // R7.04: inside a NORMAL outer expanded subprocess, separate embedded
     // Event Expanded Subprocesses from the other children. Grid-place the
     // normal children at the top; stack the event subs at the bottom.
     const isChildEventSub = (ai: AiElement) =>
@@ -597,7 +597,7 @@ export function layoutBpmnDiagram(
     const normalChildren = isEventSub ? children : children.filter(ai => !isChildEventSub(ai));
     const eventSubChildren = isEventSub ? [] : children.filter(ai => isChildEventSub(ai));
 
-    // R50: when the outer has event subs, internal Start/End events are
+    // R8.01: when the outer has event subs, internal Start/End events are
     // reserved for the top row; the rest fill the grid from row 1.
     const hasEventSubs = eventSubChildren.length > 0;
     const startEndCount = hasEventSubs
@@ -662,7 +662,7 @@ export function layoutBpmnDiagram(
     }
     if (isEventSub) {
       // Event subprocess: Start event on the left, End event on the right,
-      // both vertically centred. R51: Start/End centres sit 1.5 × event
+      // both vertically centred. R8.02: Start/End centres sit 1.5 × event
       // width from their respective vertical boundaries (left for Start,
       // right for End) so they aren't cramped against the edge.
       const cyCentre = spEl.height / 2;
@@ -689,7 +689,7 @@ export function layoutBpmnDiagram(
       }
     } else {
       // Normal subprocess: grid layout for regular children.
-      // R50: if this outer has embedded event subs, reserve the TOP row for
+      // R8.01: if this outer has embedded event subs, reserve the TOP row for
       // internal Start/End events and grid-place the rest starting row 1.
       const hasEventSubs = eventSubChildren.length > 0;
       if (hasEventSubs) outerSpsWithEventSubs.add(spId);
@@ -701,7 +701,7 @@ export function layoutBpmnDiagram(
         : normalChildren;
 
       // Place Start/End events in the top row: Start on the left, End on
-      // the right. R51: centres sit 1.5 × event width from their
+      // the right. R8.02: centres sit 1.5 × event width from their
       // respective vertical boundaries.
       for (const ai of topRowEvents) {
         const def = getSymbolDefinition(ai.type as DiagramElement["type"]);
@@ -742,7 +742,7 @@ export function layoutBpmnDiagram(
           ...(ai.eventType ? { eventType: ai.eventType as DiagramElement["eventType"] } : {}),
         });
       }
-      // R49: stack embedded event subprocesses at the BOTTOM of the outer
+      // R7.04: stack embedded event subprocesses at the BOTTOM of the outer
       // subprocess, one above the next. Centred horizontally.
       if (eventSubChildren.length > 0) {
         const stackTotalH = eventSubChildren.length * EVENT_SUB_H
@@ -781,7 +781,7 @@ export function layoutBpmnDiagram(
         else if (ev.type === "end-event") side = "right";
         else side = "top"; // intermediate events default to top
       }
-      // R50 (boundary): when the host is an outer expanded sub containing
+      // R8.01 (boundary): when the host is an outer expanded sub containing
       // embedded event subs, force boundary Start events to the LEFT edge
       // and boundary End events to the RIGHT edge (regardless of what
       // the plan declared). Y will be re-aligned to the connected task's
@@ -816,7 +816,7 @@ export function layoutBpmnDiagram(
           id: ev.id, type: ev.type as DiagramElement["type"],
           x: ex, y: ey, width: W, height: H,
           label: ev.label,
-          // R47: store boundarySide on the placed element so the wiring
+          // R7.02: store boundarySide on the placed element so the wiring
           // pass can exit outgoing connectors from the connection point
           // furthest from the host edge the event is mounted on.
           properties: { ...buildProps(ev), boundarySide: side },
@@ -853,7 +853,7 @@ export function layoutBpmnDiagram(
 
   phase(`subprocess+boundary placement done (${elements.length} elements total)`);
 
-  // ── R24: Grow pools and lanes to contain all their elements ──
+  // ── R6.05: Grow pools and lanes to contain all their elements ──
   // After all placement (including enlarged expanded subprocesses and boundary events),
   // expand pools and lanes so every process element fits fully inside.
   function expandContainerToFitChildren(containerId: string, containerType: "pool" | "lane") {
@@ -950,7 +950,7 @@ export function layoutBpmnDiagram(
 
   phase("containers expanded");
 
-  // R52: Pools must never overlap. The expandContainerToFitChildren pass
+  // R8.03: Pools must never overlap. The expandContainerToFitChildren pass
   // above can grow a white-box pool downward to accommodate its lanes and
   // subprocess contents; if a bottom black-box pool was already placed at
   // the pre-grown Y, the two now overlap. Re-stack every pool top-to-bottom
@@ -969,7 +969,7 @@ export function layoutBpmnDiagram(
     // expandContainerToFitChildren) into the bottom black-box pool's
     // initial Y range — the lane's centre Y can sit inside the black-box
     // pool's bounds even though structurally it belongs to the white box.
-    // R52 would then shift it with the black-box pool to maintain
+    // R8.03 would then shift it with the black-box pool to maintain
     // POOL_GAP, producing a gap between lanes and a lane sticking out
     // below its parent pool. (2026-05-18 regression.)
     const poolDescendants = new Map<string, DiagramElement[]>();
@@ -1021,14 +1021,14 @@ export function layoutBpmnDiagram(
   // Helper: check if element is a gateway
   const isGateway = (el: DiagramElement) => el.type === "gateway";
 
-  // Gateway classification — strict topology test per AI layout rules R33/R34:
+  // Gateway classification — strict topology test per AI layout rules R6.14/R6.15:
   //   Decision: exactly one (or zero) sequence inputs, two or more sequence outputs.
   //   Merge:    two or more sequence inputs, exactly one (or zero) sequence outputs.
   //   Neither:  falls through to default wiring.
   const incomingCount = new Map<string, number>();
   const outgoingCount = new Map<string, number>();
   // Ordered per-gateway connector lists (sequence flows only) — preserve the
-  // AI's ordering so wiring (R35/R36) is deterministic across re-layouts.
+  // AI's ordering so wiring (R6.16/R6.17) is deterministic across re-layouts.
   const decisionOutgoings = new Map<string, AiConnection[]>();
   const mergeIncomings    = new Map<string, AiConnection[]>();
   for (const c of aiConnections) {
@@ -1041,12 +1041,12 @@ export function layoutBpmnDiagram(
   const isMergeGateway = (el: DiagramElement) =>
     isGateway(el) && (incomingCount.get(el.id) ?? 0) >= 2 && (outgoingCount.get(el.id) ?? 0) <= 1;
 
-  // R33/R34: patch classified gateways' properties so rendering and downstream
+  // R6.14/R6.15: patch classified gateways' properties so rendering and downstream
   // checks (e.g. Canvas.tsx gatewayRole reads) see the correct role. We only
   // OVERRIDE gatewayType when it's unset or "exclusive" default from the AI —
   // if the user / AI explicitly set a specific marker (parallel, inclusive),
   // preserve it since that's a deliberate semantic choice.
-  // R40: decision-gateway labels are placed upper-left of the gateway diamond
+  // R6.22: decision-gateway labels are placed upper-left of the gateway diamond
   //      (above the top edge, offset left) rather than centred below it.
   for (const el of elements) {
     if (!isGateway(el)) continue;
@@ -1057,9 +1057,9 @@ export function layoutBpmnDiagram(
     };
     if (isDecisionGateway(el)) {
       const t = (el.properties.gatewayType as string | undefined) ?? el.gatewayType ?? "exclusive";
-      // R41: an EXCLUSIVE decision gateway without a label gets a default
+      // R6.23: an EXCLUSIVE decision gateway without a label gets a default
       // "Test?" so the diagram asks a clear question at the branch point.
-      // Event-based gateways (R54) are NOT questions — they route to
+      // Event-based gateways (R6.18) are NOT questions — they route to
       // whichever enumerated event fires first — so they stay unlabelled;
       // the pentagon marker is self-explanatory. Parallel / inclusive
       // gateways aren't questions either, so the default is exclusive-only.
@@ -1081,7 +1081,7 @@ export function layoutBpmnDiagram(
     }
   }
 
-  // R44: Nested decision-gateway Y alignment. A decision gateway should sit
+  // R3.09: Nested decision-gateway Y alignment. A decision gateway should sit
   // at the same Y as its immediate sequence-flow predecessor so a branch
   // continuing through a nested diamond doesn't zig-zag back to the lane
   // centre. The paired merge gateway is aligned to the same Y for symmetry.
@@ -1142,7 +1142,7 @@ export function layoutBpmnDiagram(
     // around the decision's (possibly-moved) Y so nested branches don't
     // remain centred on the pool/lane. Initial placement stacked them
     // around the container centre; here we snap them to match the
-    // decision's actual Y. Uses the same formula as R45 (n ≤ 2 symmetric,
+    // decision's actual Y. Uses the same formula as R3.10 (n ≤ 2 symmetric,
     // n ≥ 3 asymmetric). Only moves same-container siblings; branches in
     // different lanes/containers stay put.
     const outConns = outgoing.get(dec.id) ?? [];
@@ -1163,19 +1163,19 @@ export function layoutBpmnDiagram(
     }
   }
 
-  // R50: Decision/merge gateway pairs sit at the Y midpoint of the FIRST
+  // R8.01: Decision/merge gateway pairs sit at the Y midpoint of the FIRST
   // following Task / Subprocess of each outgoing branch, irrespective of
-  // which lanes those branches enter. R44 above aligns the decision to
+  // which lanes those branches enter. R3.09 above aligns the decision to
   // its immediate predecessor's Y — that's a sensible default when both
   // branches stay in one lane, but biases the diamond toward the
-  // incoming-flow lane when branches diverge across lanes. R50 overrides
+  // incoming-flow lane when branches diverge across lanes. R8.01 overrides
   // that with the branch midpoint so the gateway band reads as a clean
   // horizontal split-and-rejoin across the spanned lanes.
   //
   // Only fires when at least one branch's first-following task/subprocess
   // sits in a different lane from the decision gateway itself — i.e.
   // when there's a real cross-lane spread to centre on. Within-lane
-  // decisions keep R44/R55's predecessor-anchored Y.
+  // decisions keep R3.09/R55's predecessor-anchored Y.
   for (const dec of decisionElsSorted) {
     const outConns = outgoing.get(dec.id) ?? [];
     if (outConns.length < 2) continue;
@@ -1210,7 +1210,7 @@ export function layoutBpmnDiagram(
     }
 
     // Only re-centre when branches genuinely span multiple lanes —
-    // otherwise R44's predecessor anchor reads better. Require ≥ 2
+    // otherwise R3.09's predecessor anchor reads better. Require ≥ 2
     // anchors found, and at least one anchor in a different parent
     // from the decision (so we know lanes are actually spanned).
     if (branchAnchorYs.length < 2) continue;
@@ -1227,7 +1227,7 @@ export function layoutBpmnDiagram(
     }
   }
 
-  // R51: Auto-position Data Objects relative to their associated element.
+  // R8.02: Auto-position Data Objects relative to their associated element.
   // A connector from data-object → element (data is the source, element
   // is the target) means the data is an INPUT to the element — placed
   // upper-left (preferred) or lower-left of the element. A connector
@@ -1289,8 +1289,8 @@ export function layoutBpmnDiagram(
     }
   }
 
-  // R52: Auto-position Data Stores near the elements they're connected
-  // to. Different geometry from R51 because data stores frequently
+  // R8.03: Auto-position Data Stores near the elements they're connected
+  // to. Different geometry from R8.02 because data stores frequently
   // serve multiple consumers — single-link case centres them
   // above (preferred) or below the associated element; multi-link case
   // centres them at the horizontal centroid of all associated elements
@@ -1349,7 +1349,7 @@ export function layoutBpmnDiagram(
   }
 
   // R57: pools must enclose every non-annotation, non-group element that
-  // belongs to them. R44/R55 can push a deeply-nested decision branch
+  // belongs to them. R3.09/R55 can push a deeply-nested decision branch
   // above or below the pool's current bounds (e.g. inner "yes" branch of
   // an inner decision whose predecessor is itself the outer "yes" branch
   // — lands two stack-rows above the pool centre). Grow the pool in
@@ -1453,20 +1453,20 @@ export function layoutBpmnDiagram(
         }
       }
     }
-    // R52 again — pool growth may have introduced overlaps between pools.
+    // R8.03 again — pool growth may have introduced overlaps between pools.
     restackPoolsR52();
   }
 
-  // Build the ordered lists for the wiring pass (R35/R36).
+  // Build the ordered lists for the wiring pass (R6.16/R6.17).
   //   Decision outgoings: sorted by target element vertical position — topmost
   //                       target exits at "top", bottommost at "bottom", any
-  //                       middles exit at "right" (mirrors R37 for merges).
+  //                       middles exit at "right" (mirrors R6.19 for merges).
   //                       This prevents branch connectors from criss-crossing
   //                       when the AI's emission order differs from the
   //                       physical lane/row order of the branch targets.
   //   Merge incomings:    sorted by source element vertical position so the
   //                       topmost source enters at "top", bottommost at "bottom",
-  //                       and any middle sources enter at "left" (R37).
+  //                       and any middle sources enter at "left" (R6.19).
   for (const c of aiConnections) {
     if (c.type === "message") continue;
     const srcEl = elements.find(e => e.id === c.sourceId);
@@ -1504,7 +1504,7 @@ export function layoutBpmnDiagram(
     mergeIncomings.set(mergeId, list);
   }
 
-  // ── R27/R28: Auto-connect boundary start/end events to nearest internal task/subprocess ──
+  // ── R6.08/R6.09: Auto-connect boundary start/end events to nearest internal task/subprocess ──
   // Boundary start events → connect FROM start TO nearest child task/subprocess
   // Boundary end events → connect FROM nearest child task/subprocess TO end event
   const TASK_LIKE_TYPES = new Set(["task", "subprocess", "subprocess-expanded"]);
@@ -1524,7 +1524,7 @@ export function layoutBpmnDiagram(
     const host = elements.find(h => h.id === el.boundaryHostId);
     if (!host || host.type !== "subprocess-expanded") continue;
     // Find children of the host that are task-like, EXCLUDING event subs
-    // (R48: connectors to/from event subs are forbidden, so the auto-
+    // (R7.03: connectors to/from event subs are forbidden, so the auto-
     // connect heuristic must not pick one as its nearest candidate).
     const candidates = elements.filter(c =>
       c.parentId === host.id &&
@@ -1549,10 +1549,10 @@ export function layoutBpmnDiagram(
     }
   }
 
-  // R50 (boundary Y-alignment): for boundary Start/End events on outer
+  // R8.01 (boundary Y-alignment): for boundary Start/End events on outer
   // subs that contain embedded event subs, re-set the event's Y to the
   // centre Y of the task/subprocess it connects to (explicit plan
-  // connector or R27/R28 auto-connect). Runs AFTER auto-connect so the
+  // connector or R6.08/R6.09 auto-connect). Runs AFTER auto-connect so the
   // connection target is known.
   const allConnsForAlign = [...aiConnections, ...autoConns];
   for (const el of elements) {
@@ -1575,9 +1575,9 @@ export function layoutBpmnDiagram(
     const partnerCY = partner.y + partner.height / 2;
     el.y = partnerCY - el.height / 2;
   }
-  // R31/R48: Drop ANY connector (sequence OR message) that touches an Event
+  // R6.12/R7.03: Drop ANY connector (sequence OR message) that touches an Event
   // Expanded Subprocess. Event subs are triggered by events, not by any kind
-  // of flow — the rule is broader than R31's original sequence-only scope.
+  // of flow — the rule is broader than R6.12's original sequence-only scope.
   // Apply the filter AFTER merging autoConns so auto-generated connectors
   // can't bypass it.
   const finalConnections = [...aiConnections, ...autoConns].filter(c =>
@@ -1650,13 +1650,13 @@ export function layoutBpmnDiagram(
       const srcCy = src.y + src.height / 2;
       const tgtCy = tgt.y + tgt.height / 2;
 
-      // Gateway wiring (R35/R36/R37):
+      // Gateway wiring (R6.16/R6.17/R6.19):
       //   Decision gateway: incoming → left; outgoing assigned by target
       //                     vertical position — topmost target → top,
       //                     bottommost target → bottom, any middles → right.
       //   Merge gateway:    outgoing → right; incoming assigned by source
       //                     vertical position — topmost source → top,
-      //                     bottommost → bottom, any middles → left. R37.
+      //                     bottommost → bottom, any middles → left. R6.19.
       // Each end is resolved independently so decision-to-merge connectors
       // pick the correct side at BOTH ends.
       const srcIsDecision = isDecisionGateway(src);
@@ -1666,7 +1666,7 @@ export function layoutBpmnDiagram(
 
       if (srcIsDecision || tgtIsMerge || srcIsMerge || tgtIsDecision) {
         if (srcIsDecision) {
-          // R45 (decision side): idx 0 → top, idx 1 → right (when n ≥ 3),
+          // R3.10 (decision side): idx 0 → top, idx 1 → right (when n ≥ 3),
           // idx ≥ 2 → bottom. For n=2 fall back to top/bottom.
           const list = decisionOutgoings.get(src.id) ?? [];
           const idx = list.indexOf(c);
@@ -1682,7 +1682,7 @@ export function layoutBpmnDiagram(
           srcSide = "right";
         }
         if (tgtIsMerge) {
-          // R45 (merge side): mirror — idx 0 → top, idx 1 → left (when n ≥ 3),
+          // R3.10 (merge side): mirror — idx 0 → top, idx 1 → left (when n ≥ 3),
           // idx ≥ 2 → bottom.
           const list = mergeIncomings.get(tgt.id) ?? [];
           const idx = list.indexOf(c);
@@ -1708,11 +1708,11 @@ export function layoutBpmnDiagram(
       }
     }
 
-    // R53: when source or target is an Event (start/end/intermediate), the
+    // R3.06: when source or target is an Event (start/end/intermediate), the
     // connector must attach on the side of the event FACING the other end
     // — so the line doesn't clip through the event's body. Skip boundary
-    // intermediate events (R47 already handled those) and gateways (their
-    // own rules R35/R36/R37/R45 dictate sides).
+    // intermediate events (R7.02 already handled those) and gateways (their
+    // own rules R6.16/R6.17/R6.19/R3.10 dictate sides).
     const EVENT_TYPES = new Set(["start-event", "end-event", "intermediate-event"]);
     function sideFacing(el: DiagramElement, px: number, py: number): string {
       const ecx = el.x + el.width / 2, ecy = el.y + el.height / 2;
@@ -1731,11 +1731,11 @@ export function layoutBpmnDiagram(
       if (EVENT_TYPES.has(tgt.type) && !tgt.boundaryHostId) {
         tgtSide = sideFacing(tgt, _srcCx, _srcCy);
       }
-      // R54: a connector leaving an Event-based DECISION gateway must
+      // R6.18: a connector leaving an Event-based DECISION gateway must
       // enter its target event on the event's LEFT connection point —
       // never top/bottom — so every branch reads left-to-right out of
       // the gateway (the top/bottom branches route up/down then right
-      // into the event's left side). Overrides the generic R53
+      // into the event's left side). Overrides the generic R3.06
       // sideFacing choice above, which would otherwise pick top/bottom
       // for the up/down branches.
       const srcGwType = (src.properties?.gatewayType as string | undefined) ?? src.gatewayType;
@@ -1745,7 +1745,7 @@ export function layoutBpmnDiagram(
       }
     }
 
-    // R47: connectors from an edge-mounted intermediate event must exit
+    // R7.02: connectors from an edge-mounted intermediate event must exit
     // from the event's connection point FURTHEST FROM the host edge the
     // event is mounted upon. That point sits on the event's own side that
     // matches boundarySide (e.g. event mounted on host's top edge exits
@@ -1771,10 +1771,10 @@ export function layoutBpmnDiagram(
 
     // Connector label positioning:
     //   - Decision gateway outgoing → anchor to source edge, offset outward
-    //     from whichever face the connector exits (R38).
+    //     from whichever face the connector exits (R6.20).
     //   - Message flow → position the label vertically in the GAP between
     //     source and target pools so it reads cleanly in the inter-pool
-    //     space (R39). Offset relative to connector midpoint.
+    //     space (R6.21). Offset relative to connector midpoint.
     //   - Other (sequence fallback) → minor offset above the line.
     let labelOffsetX: number | undefined;
     let labelOffsetY: number | undefined;
@@ -1782,7 +1782,7 @@ export function layoutBpmnDiagram(
     let labelAnchor: "source" | "target" | undefined;
     if (c.label) {
       if (isDecisionGateway(src)) {
-        // R42: outgoing sequence connector labels from a decision gateway
+        // R3.07: outgoing sequence connector labels from a decision gateway
         // anchor to the source attachment point. Per-side placement:
         //   - top:    label sits ABOVE the gateway, RIGHT of the connector;
         //             left edge of text +6px from the connector,

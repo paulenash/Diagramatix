@@ -84,6 +84,15 @@ function autoNumberRules(text: string): string {
   // section-scoped and we have no section.
   if (headingIdx.length === 0) return text;
 
+  // Category prefix (R / G / S / …) taken from the first existing rule
+  // anywhere in the doc, so a brand-new (empty) group still mints the
+  // right letter instead of defaulting to "R".
+  let docPrefix = "R";
+  for (const ln of lines) {
+    const m = ln.trim().match(/^([A-Z])\d+(?:\.\d+)*:/);
+    if (m) { docPrefix = m[1]; break; }
+  }
+
   // Build sections: [start, end) line ranges. Anything before the first
   // heading is preserved verbatim.
   const out: string[] = [];
@@ -97,16 +106,25 @@ function autoNumberRules(text: string): string {
     const isCode = CODE_REQUIRED_GROUPS.test(heading.trim());
     const body = lines.slice(start + 1, end);
 
-    // Find existing rule lines, their letter prefix, and the max top-level number.
-    let prefix = "R";
-    let maxNum = 0;
+    // Group-scoped IDs: "## Group 3: …" → new rules become R3.NN. The
+    // group number comes from the heading; the sequence continues this
+    // group's own highest number, so IDs stay contiguous within a group
+    // and can never collide with another group. Headings without a
+    // group number fall back to legacy flat numbering.
+    const groupMatch = heading.trim().match(/##\s*Group\s+(\d+)/i);
+    const groupNum = groupMatch ? parseInt(groupMatch[1], 10) : null;
+
+    // Find the category prefix and the max sequence already used here.
+    let prefix = docPrefix;
+    let maxSeq = 0;
     for (const ln of body) {
-      const m = ln.trim().match(/^([A-Z])(\d+)(?:\.\d+)*:/);
-      if (m) {
-        prefix = m[1];
-        const n = parseInt(m[2], 10);
-        if (Number.isFinite(n) && n > maxNum) maxNum = n;
-      }
+      const m = ln.trim().match(/^([A-Z])(\d+)(?:\.(\d+))?:/);
+      if (!m) continue;
+      prefix = m[1];
+      // Dotted (R3.05) → seq is after the dot. Legacy flat (R35) → the
+      // whole number is the seq for max purposes.
+      const seq = m[3] !== undefined ? parseInt(m[3], 10) : parseInt(m[2], 10);
+      if (Number.isFinite(seq) && seq > maxSeq) maxSeq = seq;
     }
 
     // Partition body into kept lines + candidate new-rule lines.
@@ -144,11 +162,14 @@ function autoNumberRules(text: string): string {
     out.push(heading);
     for (const ln of kept) out.push(ln);
 
-    let n = maxNum;
+    let n = maxSeq;
     for (const c of candidates) {
       n += 1;
-      const body = isCode ? `[PROPOSED] ${c}` : c;
-      out.push(`${prefix}${String(n).padStart(2, "0")}: ${body}`);
+      const ruleBody = isCode ? `[PROPOSED] ${c}` : c;
+      const id = groupNum !== null
+        ? `${prefix}${groupNum}.${String(n).padStart(2, "0")}`
+        : `${prefix}${String(n).padStart(2, "0")}`;
+      out.push(`${id}: ${ruleBody}`);
     }
 
     // Restore one trailing blank line if there was at least one originally
