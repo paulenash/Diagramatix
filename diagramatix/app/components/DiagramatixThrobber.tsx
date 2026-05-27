@@ -26,20 +26,16 @@
  */
 export function DiagramatixThrobber({
   size = 36,
-  /** Aura radius in viewBox units. Default 55 matches the small sidebar
-   *  throbber; canvas overlay uses 110 for a doubly-wide pulse. The
-   *  viewBox grows automatically to fit the scaled aura. */
-  auraRadius = 55,
+  /** @deprecated The throbbing blue aura was removed; this prop is kept
+   *  only so existing call sites keep compiling. It has no effect. */
+  auraRadius: _auraRadius,
 }: {
   size?: number;
   auraRadius?: number;
 }) {
-  // Aura grows to scale 1.18 at peak. Add 5-unit padding so the
-  // anti-aliased edge isn't clipped. viewBox is centred on the icon
-  // centre (50, 50) and sized to fit the peak aura.
-  const margin = Math.ceil(auraRadius * 1.2) + 5;
-  const vbOrigin = 50 - margin;
-  const vbSize = margin * 2;
+  // No aura — the icon fills its native 0 0 100 100 viewBox so it
+  // renders at the requested `size`. Only the triangle rotates; there
+  // is no throbbing blue circle behind it any more.
   // Triangle shifted 10 units right via a wrapping <g translate(10 0)>;
   // the SMIL rotate stays around the triangle's local centroid
   // (38.64, 50.92), which post-translate visually rotates around
@@ -49,36 +45,11 @@ export function DiagramatixThrobber({
     <svg
       width={size}
       height={size}
-      viewBox={`${vbOrigin} ${vbOrigin} ${vbSize} ${vbSize}`}
+      viewBox="0 0 100 100"
       fill="none"
       role="img"
       aria-label="AI planning"
     >
-      {/* Throbbing aura — circle wrapped in a translate(50 50) group
-          so the SMIL scale transform stays centred on the icon. */}
-      <g transform="translate(50 50)">
-        <circle r={auraRadius} fill="#93c5fd" opacity="0.55">
-          <animateTransform
-            attributeName="transform"
-            type="scale"
-            values="1; 1.18; 1"
-            keyTimes="0; 0.5; 1"
-            dur="1.6s"
-            repeatCount="indefinite"
-            calcMode="spline"
-            keySplines="0.4 0 0.2 1; 0.4 0 0.2 1"
-          />
-          <animate
-            attributeName="opacity"
-            values="0.55; 0; 0.55"
-            keyTimes="0; 0.5; 1"
-            dur="1.6s"
-            repeatCount="indefinite"
-            calcMode="spline"
-            keySplines="0.4 0 0.2 1; 0.4 0 0.2 1"
-          />
-        </circle>
-      </g>
       {/* Static outer D-shape — same path as the source SVG icon. */}
       <path
         d="M 5.5 5.5 L 50 5.5 A 44.5 44.5 0 0 1 50 94.5 L 5.5 94.5 Z"
