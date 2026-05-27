@@ -1731,6 +1731,18 @@ export function layoutBpmnDiagram(
       if (EVENT_TYPES.has(tgt.type) && !tgt.boundaryHostId) {
         tgtSide = sideFacing(tgt, _srcCx, _srcCy);
       }
+      // R54: a connector leaving an Event-based DECISION gateway must
+      // enter its target event on the event's LEFT connection point —
+      // never top/bottom — so every branch reads left-to-right out of
+      // the gateway (the top/bottom branches route up/down then right
+      // into the event's left side). Overrides the generic R53
+      // sideFacing choice above, which would otherwise pick top/bottom
+      // for the up/down branches.
+      const srcGwType = (src.properties?.gatewayType as string | undefined) ?? src.gatewayType;
+      if (isDecisionGateway(src) && srcGwType === "event-based"
+          && EVENT_TYPES.has(tgt.type) && !tgt.boundaryHostId) {
+        tgtSide = "left";
+      }
     }
 
     // R47: connectors from an edge-mounted intermediate event must exit
