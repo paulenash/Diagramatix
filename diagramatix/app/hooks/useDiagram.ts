@@ -240,7 +240,8 @@ type Action =
   | { type: "SET_DATA"; payload: DiagramData }
   | { type: "ADD_ELEMENT"; payload: { symbolType: SymbolType; position: Point; taskType?: BpmnTaskType; eventType?: EventType; id?: string; initial?: { properties?: Record<string, unknown>; width?: number; height?: number; label?: string } } }
   | { type: "MOVE_ELEMENT"; payload: { id: string; x: number; y: number; unconstrained?: boolean } }
-  | { type: "RESIZE_ELEMENT"; payload: { id: string; x: number; y: number; width: number; height: number } }
+  | { type: "RESIZE_ELEMENT"; payload: { id: string; x: number; y: number; width: number; height: number; wasWhiteBoxAtResizeStart?: boolean } }
+  | { type: "RESIZE_END"; payload: { id: string } }
   | { type: "UPDATE_LABEL"; payload: { id: string; label: string } }
   | { type: "UPDATE_LABEL_LIVE"; payload: { id: string; label: string } }
   | { type: "UPDATE_PROPERTIES"; payload: { id: string; properties: Record<string, unknown> } }
@@ -4500,48 +4501,6 @@ function reducer(state: DiagramData, action: Action): DiagramData {
             elements = clampChildrenToLane(elements, e);
           }
         }
-        // Auto-adopt orphan BPMN elements that the pool resize has just
-        // enclosed. Without this, a user who creates a pool and then
-        // drags its boundary over pre-existing tasks/events/etc. has
-        // to nudge each element individually to "activate" containment.
-        // Innermost wins (smallest EP → smallest archimate-shape →
-        // smallest lane → pool itself), and adoption is scoped to this
-        // pool's subtree so we never poach children from another pool.
-        // Only true orphans (parentId == null) are touched — elements
-        // already parented elsewhere are left alone.
-        {
-          const poolDescendantIds = getAllDescendantIds(elements, id);
-          elements = elements.map(el => {
-            if (el.id === id) return el;
-            if (el.parentId != null) return el;
-            if (el.type === "lane") return el;
-            if (!containerAccepts("pool", el.type) && !containerAccepts("lane", el.type)) return el;
-            const cx = el.x + el.width / 2;
-            const cy = el.y + el.height / 2;
-            const insidePool =
-              cx >= newX && cx <= newX + newW &&
-              cy >= newY && cy <= newY + newH;
-            if (!insidePool) return el;
-            if (wouldCreateCycle(elements, el.id, id)) return el;
-            const candidates = elements.filter(b =>
-              (b.id === id || poolDescendantIds.has(b.id)) &&
-              isContainerType(b.type) &&
-              containerAccepts(b.type, el.type) &&
-              cx >= b.x && cx <= b.x + b.width &&
-              cy >= b.y && cy <= b.y + b.height,
-            );
-            const newParent =
-              candidates.filter(b => b.type === "subprocess-expanded")
-                .sort((a, b) => a.width * a.height - b.width * b.height)[0] ??
-              candidates.filter(b => b.type === "archimate-shape")
-                .sort((a, b) => a.width * a.height - b.width * b.height)[0] ??
-              candidates.filter(b => b.type === "lane")
-                .sort((a, b) => a.width * a.height - b.width * b.height)[0] ??
-              candidates.find(b => b.type === "pool");
-            if (!newParent) return el;
-            return { ...el, parentId: newParent.id };
-          });
-        }
         // White-box pool L/R lockstep (user rule): when a white-box
         // pool's left or right boundary moves — manually here, or via
         // EP cascade in applyEPBoundaryChange — every other pool's
@@ -4549,11 +4508,22 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         // distance. Black-box pool resizes don't cascade (no internal
         // content to coordinate). Vertical (top/bottom) deltas don't
         // trigger pool lockstep — each pool sets its own height.
-        const isWhiteBox = ((target.properties.poolType as string | undefined) ?? "black-box") === "white-box";
+        //
+        // IMPORTANT: gate this on `wasWhiteBoxAtResizeStart` (passed in
+        // via the payload from resizeElement()), NOT on the pool's
+        // *current* poolType. updatePoolTypes flips a pool to white-box
+        // mid-drag the moment any flow element's centre lands inside
+        // its bounds (by geometry alone). Reading the current poolType
+        // means tick N+1 sees "white-box" and fires the lockstep cascade
+        // — shifting every other pool left/right while the user is
+        // simply growing an empty pool to cover orphans. The drag-start
+        // poolType is the only safe signal that the user actually meant
+        // to resize an already-settled white-box pool.
+        const wasWhiteBox = action.payload.wasWhiteBoxAtResizeStart === true;
         const dLeft  = newX - target.x;
         const dRight = (newX + newW) - (target.x + target.width);
         let connectors = state.connectors;
-        if (isWhiteBox && (dLeft !== 0 || dRight !== 0)) {
+        if (wasWhiteBox && (dLeft !== 0 || dRight !== 0)) {
           const r = applyPoolBoundaryShift(elements, connectors, id, dLeft, dRight);
           elements = r.elements; connectors = r.connectors;
         }
@@ -4628,6 +4598,53 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       finalElements = ensureContainersEncloseChildren(finalElements);
 
       return { ...state, elements: finalElements, connectors };
+    }
+
+    case "RESIZE_END": {
+      // Fires once at drag-release for ANY resize. For pool resizes it
+      // adopts orphan BPMN elements whose centre now sits inside the
+      // pool's final bounds. Doing this at drag-end (not on every
+      // RESIZE_ELEMENT tick) means we never flip the pool's poolType
+      // mid-drag and so never trigger the white-box L/R lockstep
+      // cascade as a side effect of adoption.
+      const { id } = action.payload;
+      const pool = state.elements.find(e => e.id === id);
+      if (!pool || pool.type !== "pool") return state;
+      const poolDescendantIds = getAllDescendantIds(state.elements, id);
+      const elements = state.elements.map(el => {
+        if (el.id === id) return el;
+        if (el.parentId != null) return el;
+        if (el.type === "lane") return el;
+        if (!containerAccepts("pool", el.type) && !containerAccepts("lane", el.type)) return el;
+        const cx = el.x + el.width / 2;
+        const cy = el.y + el.height / 2;
+        const insidePool =
+          cx >= pool.x && cx <= pool.x + pool.width &&
+          cy >= pool.y && cy <= pool.y + pool.height;
+        if (!insidePool) return el;
+        if (wouldCreateCycle(state.elements, el.id, id)) return el;
+        // Innermost wins (smallest EP → smallest archimate-shape →
+        // smallest lane → pool itself), scoped to this pool's subtree
+        // so we never poach children from another pool.
+        const candidates = state.elements.filter(b =>
+          (b.id === id || poolDescendantIds.has(b.id)) &&
+          isContainerType(b.type) &&
+          containerAccepts(b.type, el.type) &&
+          cx >= b.x && cx <= b.x + b.width &&
+          cy >= b.y && cy <= b.y + b.height,
+        );
+        const newParent =
+          candidates.filter(b => b.type === "subprocess-expanded")
+            .sort((a, b) => a.width * a.height - b.width * b.height)[0] ??
+          candidates.filter(b => b.type === "archimate-shape")
+            .sort((a, b) => a.width * a.height - b.width * b.height)[0] ??
+          candidates.filter(b => b.type === "lane")
+            .sort((a, b) => a.width * a.height - b.width * b.height)[0] ??
+          candidates.find(b => b.type === "pool");
+        if (!newParent) return el;
+        return { ...el, parentId: newParent.id };
+      });
+      return { ...state, elements: updatePoolTypes(elements) };
     }
 
     case "UPDATE_LABEL": {
@@ -7259,7 +7276,14 @@ export function useDiagram(initialData: DiagramData) {
       resizingRef.current = id;
       preResizeRef.current = snapshotData(); // snapshot before resize starts
     }
-    dispatch({ type: "RESIZE_ELEMENT", payload: { id, x, y, width, height } });
+    // For pool resizes, capture whether the pool was settled as
+    // white-box BEFORE the drag began. Carry it through on every tick
+    // so the reducer's lockstep gate can ignore mid-drag flips caused
+    // by updatePoolTypes detecting newly-enclosed flow elements.
+    const startEl = preResizeRef.current?.elements.find(e => e.id === id);
+    const wasWhiteBoxAtResizeStart = startEl?.type === "pool"
+      && ((startEl.properties.poolType as string | undefined) ?? "black-box") === "white-box";
+    dispatch({ type: "RESIZE_ELEMENT", payload: { id, x, y, width, height, wasWhiteBoxAtResizeStart } });
   }, []);
 
   const resizeElementEnd = useCallback((id: string) => {
@@ -7268,6 +7292,8 @@ export function useDiagram(initialData: DiagramData) {
       preResizeRef.current = null;
       resizingRef.current = null;
     }
+    // Run end-of-resize adoption for pool resizes.
+    dispatch({ type: "RESIZE_END", payload: { id } });
   }, []);
 
   const updateLabel = useCallback((id: string, label: string) => {
