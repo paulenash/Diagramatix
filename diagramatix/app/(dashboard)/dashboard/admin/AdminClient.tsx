@@ -3,7 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
+import { AlertDialog } from "@/app/components/AlertDialog";
 import { UsagePopover } from "@/app/components/UsagePopover";
+import { AdminNotificationsButton } from "@/app/components/AdminNotificationsButton";
 
 interface UserRow {
   id: string;
@@ -178,6 +180,13 @@ export function AdminClient({ users, currentUserId }: Props) {
           >
             Features Catalog
           </a>
+          <a
+            href="/dashboard/admin/groups"
+            className="text-xs text-orange-600 hover:text-orange-800 font-medium border border-orange-300 rounded px-2 py-1"
+          >
+            Groups
+          </a>
+          <AdminNotificationsButton />
         </div>
       </header>
 
@@ -449,6 +458,7 @@ function GenerateDdlButton() {
   const [open, setOpen] = useState(false);
   const [dbType, setDbType] = useState("postgres");
   const [generating, setGenerating] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   async function handleGenerate() {
     setGenerating(true);
@@ -468,7 +478,7 @@ function GenerateDdlButton() {
       setTimeout(() => URL.revokeObjectURL(url), 1000);
       setOpen(false);
     } catch (err) {
-      alert("Failed to generate DDL: " + (err instanceof Error ? err.message : String(err)));
+      setErrorMessage("Failed to generate DDL: " + (err instanceof Error ? err.message : String(err)));
     } finally {
       setGenerating(false);
     }
@@ -498,6 +508,14 @@ function GenerateDdlButton() {
             </button>
           </div>
         </div>
+      )}
+      {errorMessage && (
+        <AlertDialog
+          title="DDL generation failed"
+          message={errorMessage}
+          tone="error"
+          onClose={() => setErrorMessage(null)}
+        />
       )}
     </div>
   );
