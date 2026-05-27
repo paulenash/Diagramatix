@@ -15,7 +15,12 @@ export type NotificationType =
   | "group-removed"
   | "ownership-transfer"
   | "ownership-transfer-accepted"
-  | "ownership-transfer-declined";
+  | "ownership-transfer-declined"
+  // Phase 2 — Send for Review.
+  | "diagram-review-requested"   // → each assigned reviewer when owner sends
+  | "diagram-review-submitted"   // → requester when a reviewer submits
+  | "diagram-review-approved"    // → requester when a reviewer approves
+  | "diagram-review-declined";   // → requester when a reviewer declines to review
 
 export interface NotificationPayload {
   // group-invite / group-invite-accepted / group-invite-declined /
@@ -28,6 +33,12 @@ export interface NotificationPayload {
   fromUserEmail?: string;
   // ownership-transfer*: the pending OwnershipTransfer row.
   transferId?: string;
+  // diagram-review-*: the review + diagram it concerns.
+  reviewId?: string;
+  diagramId?: string;
+  diagramName?: string;
+  objective?: string;
+  dueDate?: string;   // ISO
 }
 
 export async function createNotification(

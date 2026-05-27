@@ -154,6 +154,9 @@ model User {
   ownershipTransfersFrom        OwnershipTransfer[]        @relation("OwnershipTransferFrom")
   ownershipTransfersTo          OwnershipTransfer[]        @relation("OwnershipTransferTo")
   notifications                 Notification[]
+  // Phase 2 — Send for Review back-relations.
+  diagramReviewsRequested       DiagramReview[]            @relation("DiagramReviewRequester")
+  diagramReviewerEntries        DiagramReviewer[]          @relation("DiagramReviewerUser")
 }
 
 model Project {
@@ -192,6 +195,7 @@ model Diagram {
   orgId       String
   org         Org              @relation(fields: [orgId], references: [id], onDelete: Restrict)
   history     DiagramHistory[]
+  reviews     DiagramReview[]
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
 
@@ -426,6 +430,7 @@ model CollaborationGroup {
 
   members   CollaborationGroupMember[]
   transfers OwnershipTransfer[]
+  reviews   DiagramReview[]
 
   @@index([ownerId])
   @@index([orgId])
@@ -445,6 +450,45 @@ model CollaborationGroupMember {
   invitedBy   User?              @relation("CollaborationGroupInvitesSent", fields: [invitedById], references: [id], onDelete: SetNull)
 
   @@unique([groupId, userId])
+  @@index([userId, status])
+}
+
+// Phase 2 — Send for Review. One DiagramReview per (diagram, group) the
+// owner sends to; one DiagramReviewer per assigned reviewer within it.
+// Both feed the virtual "Diagrams Sent / Received for Review" projects —
+// membership is derived from these rows, not Diagram.projectId.
+model DiagramReview {
+  id          String          @id @default(cuid())
+  diagramId   String
+  diagram     Diagram         @relation(fields: [diagramId], references: [id], onDelete: Cascade)
+  groupId     String
+  group       CollaborationGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  requesterId String
+  requester   User            @relation("DiagramReviewRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  objective   String
+  dueDate     DateTime
+  // "open" | "resubmitted" | "closed"
+  status      String          @default("open")
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  reviewers   DiagramReviewer[]
+
+  @@index([diagramId])
+  @@index([groupId])
+  @@index([requesterId])
+}
+
+model DiagramReviewer {
+  id             String        @id @default(cuid())
+  reviewId       String
+  review         DiagramReview @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User          @relation("DiagramReviewerUser", fields: [userId], references: [id], onDelete: Cascade)
+  // "pending" | "in-progress" | "submitted" | "approved" | "declined-to-review"
+  status         String        @default("pending")
+  lastActivityAt DateTime?
+
+  @@unique([reviewId, userId])
   @@index([userId, status])
 }
 
