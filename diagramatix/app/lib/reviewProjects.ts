@@ -23,6 +23,20 @@ export function isReviewVirtualProject(id: string): boolean {
   return id === REVIEWS_RECEIVED_ID || id === REVIEWS_SENT_ID;
 }
 
+/**
+ * True if `userId` is an assigned reviewer on any review of `diagramId`.
+ * Grants a non-owner reviewer the right to open + comment on the
+ * diagram (Phase 3 Review Mode), checked by the diagram page and the
+ * diagram save endpoint.
+ */
+export async function isAssignedReviewer(userId: string, diagramId: string): Promise<boolean> {
+  const row = await prisma.diagramReviewer.findFirst({
+    where: { userId, review: { diagramId } },
+    select: { id: true },
+  });
+  return !!row;
+}
+
 /** Uniform reviewer-status → pill style across the feature. */
 export const REVIEWER_STATUS_STYLE: Record<string, string> = {
   pending: "bg-gray-100 text-gray-600",

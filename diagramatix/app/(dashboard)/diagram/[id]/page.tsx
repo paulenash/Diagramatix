@@ -9,10 +9,11 @@ import type { SymbolColorConfig } from "@/app/lib/diagram/colors";
 import type { DisplayMode } from "@/app/lib/diagram/displayMode";
 import { getEffectiveUserId, isImpersonating, getImpersonationMode, SUPERUSER_EMAILS } from "@/app/lib/superuser";
 import { tryGetCurrentOrgId } from "@/app/lib/auth/orgContext";
+import { isAssignedReviewer } from "@/app/lib/reviewProjects";
 
-type Props = { params: Promise<{ id: string }> };
+type Props = { params: Promise<{ id: string }>; searchParams: Promise<{ review?: string }> };
 
-export default async function DiagramPage({ params }: Props) {
+export default async function DiagramPage({ params, searchParams }: Props) {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
@@ -27,13 +28,24 @@ export default async function DiagramPage({ params }: Props) {
   }
 
   const { id } = await params;
+  const { review: reviewParam } = await searchParams;
 
   const orgId = await tryGetCurrentOrgId(session, cookieStore);
   if (!orgId) redirect("/dashboard");
 
-  const diagram = await prisma.diagram.findFirst({
+  let diagram = await prisma.diagram.findFirst({
     where: { id, userId: effectiveUserId, orgId },
   });
+
+  // Review Mode access (Phase 3): a diagram opened with ?review= that the
+  // user doesn't own is allowed IF they're an assigned reviewer on it.
+  // The diagram lives in the owner's org, so load it by id alone once the
+  // reviewer relationship is confirmed.
+  let reviewerAccess = false;
+  if (!diagram && reviewParam && await isAssignedReviewer(session.user.id, id)) {
+    diagram = await prisma.diagram.findUnique({ where: { id } });
+    reviewerAccess = !!diagram;
+  }
 
   // Redirect rather than notFound() so the not-found chunk-loading
   // path (a Next.js 16 known issue producing ChunkLoadError +
@@ -98,7 +110,7 @@ export default async function DiagramPage({ params }: Props) {
     },
   });
   const effectiveIsAdmin = effectiveUser ? SUPERUSER_EMAILS.has(effectiveUser.email) : false;
-  const elementCountLimit = effectiveIsAdmin
+  const elementCountLimit = (effectiveIsAdmin || reviewerAccess)
     ? null
     : diagram.type === "bpmn"
     ? effectiveUser?.subscriptionLevel?.maxBpmnElementsPerDiagram ?? null

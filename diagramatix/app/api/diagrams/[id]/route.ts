@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { getEffectiveUserId, isReadOnlyImpersonation } from "@/app/lib/superuser";
+import { isAssignedReviewer } from "@/app/lib/reviewProjects";
 import {
   getCurrentOrgId,
   requireRole,
@@ -44,7 +45,12 @@ export async function GET(_req: Request, { params }: Params) {
   }
 
   const { id } = await params;
-  const diagram = await getAuthorizedDiagram(id, userId, orgId);
+  let diagram = await getAuthorizedDiagram(id, userId, orgId);
+  // Review Mode (Phase 3): assigned reviewers may read a diagram they
+  // don't own.
+  if (!diagram && await isAssignedReviewer(session.user.id, id)) {
+    diagram = await prisma.diagram.findUnique({ where: { id } });
+  }
   if (!diagram) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
@@ -73,13 +79,28 @@ export async function PUT(req: Request, { params }: Params) {
   }
 
   const { id } = await params;
-  const existing = await getAuthorizedDiagram(id, session.user.id, orgId);
+  let existing = await getAuthorizedDiagram(id, session.user.id, orgId);
+
+  // Review Mode (Phase 3): an assigned reviewer may save to a diagram
+  // they don't own. Their write is restricted to the `data` field below
+  // (comments round-trip through the diagram JSON) — they can't rename,
+  // re-project, or restyle the owner's diagram.
+  let reviewerAccess = false;
+  if (!existing && await isAssignedReviewer(session.user.id, id)) {
+    existing = await prisma.diagram.findUnique({ where: { id } });
+    reviewerAccess = !!existing;
+  }
   if (!existing) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
   const body = await req.json();
-  const { name, data, projectId, colorConfig, displayMode } = body;
+  const { data } = body;
+  // Owner-only mutable fields — ignored for reviewer saves.
+  const name = reviewerAccess ? undefined : body.name;
+  const projectId = reviewerAccess ? undefined : body.projectId;
+  const colorConfig = reviewerAccess ? undefined : body.colorConfig;
+  const displayMode = reviewerAccess ? undefined : body.displayMode;
 
   // Validate project ownership AND org match if non-null projectId supplied
   if (projectId !== undefined && projectId !== null) {
