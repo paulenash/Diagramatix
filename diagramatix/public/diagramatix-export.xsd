@@ -59,6 +59,19 @@
     importers treat it as no owner. Bubble Help itself is admin-
     managed catalog data (per-diagramType rows in the BubbleHelp
     Prisma table) and is NOT embedded in diagram exports.
+
+  v1.15 — Collaboration & Review (Phases 1-3).
+    Two additive enum members, both round-tripped as ordinary diagram
+    content:
+      SymbolTypeEnum    + "review-comment"      (a reviewer's pink note;
+                                                  element.properties carries
+                                                  reviewId / reviewerId /
+                                                  reviewerName / reviewerEmail)
+      ConnectorTypeEnum + "review-comment-link"  (pink link note -> element)
+    The rest of the feature — Collaboration Groups, DiagramReview /
+    DiagramReviewer, Notifications — is relational metadata and is NOT
+    embedded in a diagram or project export. Pre-v1.15 exports simply
+    contain neither enum value.
 -->
 
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
@@ -329,6 +342,10 @@
            in element.properties.shapeKey (resolved against the runtime
            ArchiMate catalogue under public/archimate-catalogue.json). -->
       <xs:enumeration value="archimate-shape"/>
+      <!-- schema 1.15 — reviewer's comment note (Phase 3). The review
+           it belongs to and its author are stored in element.properties
+           (reviewId, reviewerId, reviewerName, reviewerEmail). -->
+      <xs:enumeration value="review-comment"/>
     </xs:restriction>
   </xs:simpleType>
 
@@ -795,6 +812,9 @@
       <xs:enumeration value="archi-flow"/>
       <!-- Other -->
       <xs:enumeration value="archi-specialisation"/>
+      <!-- schema 1.15 — pink link from a review-comment note to the
+           element it concerns (Phase 3). -->
+      <xs:enumeration value="review-comment-link"/>
     </xs:restriction>
   </xs:simpleType>
 

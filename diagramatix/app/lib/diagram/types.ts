@@ -459,5 +459,17 @@ export interface TemplateData {
  *          - Task drop no longer auto-pops the marker picker;
  *            tasks start markerless and the right-click menu sets
  *            the type.
+ * v1.15:   Collaboration & Review (Phases 1–3). Two additive enum
+ *          values reach the diagram-export shape:
+ *          - SymbolType "review-comment" — a reviewer's pink note,
+ *            stored like any element; carries free-form properties
+ *            reviewId / reviewerId / reviewerName / reviewerEmail.
+ *          - ConnectorType "review-comment-link" — the pink link from
+ *            a note to the element it concerns.
+ *          Everything else in the feature (CollaborationGroup,
+ *          DiagramReview / DiagramReviewer, Notification rows) is
+ *          relational metadata and is never embedded in a diagram or
+ *          project export, so the only XSD change is the two new enum
+ *          members. Pre-1.15 exports simply contain neither.
  */
-export const SCHEMA_VERSION = "1.14";
+export const SCHEMA_VERSION = "1.15";

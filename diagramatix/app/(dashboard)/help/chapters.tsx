@@ -29,7 +29,7 @@ export const CHAPTERS: HelpChapter[] = [
               domain models and more.
             </p>
             <p className="mt-2 text-xs text-gray-500">
-              This guide covers version <strong>1.13</strong>.
+              This guide covers version <strong>1.15</strong>.
             </p>
             <p className="mt-2">
               After signing in you land on the <strong>Dashboard</strong> —
@@ -3550,6 +3550,118 @@ export const CHAPTERS: HelpChapter[] = [
   },
 
   /* ──────────────────────────────────────────────── 29 ── */
+  {
+    slug: "collaboration-review",
+    title: "Collaboration & Review",
+    sections: [
+      {
+        body: (
+          <>
+            <p>
+              Diagramatix lets you circulate a diagram to colleagues for
+              feedback before it&apos;s considered done. You build a{" "}
+              <strong>Collaboration Group</strong>, <strong>send</strong> a
+              diagram to that group for review, reviewers leave{" "}
+              <strong>Review Comments</strong> on the diagram, and you watch
+              their statuses come back — all inside the app.
+            </p>
+          </>
+        ),
+      },
+      {
+        heading: "Collaboration Groups",
+        body: (
+          <>
+            <p>
+              Open <strong>Dashboard → Collaboration Groups</strong>. Click{" "}
+              <strong>+ New Group</strong> to create one (you become its{" "}
+              <em>Owner</em>), then invite people by typing their name or
+              email. Invitees get an in-app notification (the{" "}
+              <strong>🔔 bell</strong> in the header) and can accept or decline.
+            </p>
+            <ul className="list-disc list-inside space-y-1 mt-2">
+              <li>Owners can invite, remove members, and transfer ownership (the new owner must accept).</li>
+              <li>Members can leave at any time; rejoining needs a fresh invite.</li>
+              <li>Each Organisation also has an automatic <strong>Org group</strong> containing all its members.</li>
+              <li>The <strong>Delete group</strong> button appears only when you&apos;re the Owner and the sole remaining member.</li>
+            </ul>
+          </>
+        ),
+      },
+      {
+        heading: "Sending a diagram for review",
+        body: (
+          <ol className="list-decimal list-inside space-y-1">
+            <li>Open the diagram and click <strong>Send for Review</strong> in the toolbar (next to AI Generate).</li>
+            <li>Pick one or more Collaboration Groups you belong to; tick which members should review (all are selected by default).</li>
+            <li>Write an <strong>Objective</strong> (what to check) and set a <strong>Due date</strong> (defaults to 7 days out).</li>
+            <li>Click <strong>Send for Review</strong>. Each reviewer is notified and the diagram appears under their <strong>Diagrams Received for Review</strong>.</li>
+          </ol>
+        ),
+      },
+      {
+        heading: "Tracking reviews on the dashboard",
+        body: (
+          <>
+            <p>
+              Two collections appear at the top of your dashboard when
+              relevant:
+            </p>
+            <ul className="list-disc list-inside space-y-1 mt-2">
+              <li><strong>Diagrams Received for Review</strong> — diagrams others have asked you to review.</li>
+              <li><strong>Diagrams Sent for Review</strong> — diagrams you&apos;ve sent out; expand a tile to see each reviewer&apos;s status.</li>
+            </ul>
+            <p className="mt-2">
+              Each tile&apos;s left border is colour-coded by due date —{" "}
+              <span className="text-green-600">green</span> when there&apos;s
+              time, <span className="text-orange-600">orange</span> within two
+              days, <span className="text-red-600">red</span> once overdue.
+            </p>
+          </>
+        ),
+      },
+      {
+        heading: "Reviewing a diagram (Review Mode)",
+        body: (
+          <>
+            <p>
+              Open a diagram from your <strong>Received for Review</strong> tile
+              (or the review notification). It opens in <strong>Review Mode</strong>:
+              a pink banner shows the requester, objective and due date, and a{" "}
+              <strong>Review Comment</strong> symbol appears at the bottom of the
+              palette.
+            </p>
+            <ol className="list-decimal list-inside space-y-1 mt-2">
+              <li>Drag a <strong>Review Comment</strong> onto the element you want to comment on — a pink note auto-links to it, pre-filled with your name and email.</li>
+              <li>Type your comment in the note.</li>
+              <li>In the banner, choose <strong>Approve</strong> (sign off), <strong>Submit comments</strong> (notes for the owner to address), or <strong>Decline</strong>.</li>
+            </ol>
+            <p className="mt-2 text-xs text-gray-500">
+              You can also Approve / Submit / Decline straight from the
+              Received tile without opening the diagram.
+            </p>
+          </>
+        ),
+      },
+      {
+        heading: "Finishing a review (owner)",
+        body: (
+          <>
+            <p>
+              On each <strong>Sent for Review</strong> tile you can:
+            </p>
+            <ul className="list-disc list-inside space-y-1 mt-2">
+              <li>Filter comments by reviewer inside the editor — the toolbar shows a <strong>Comments: All / None / &lt;reviewer&gt;</strong> selector once a diagram carries review comments.</li>
+              <li><strong>Re-submit for final approval</strong> — resets every reviewer to pending and re-notifies them for a fresh round (previous comments stay).</li>
+              <li><strong>Finish review</strong> — closes it; the tile drops off both dashboards (the record is kept for history).</li>
+            </ul>
+          </>
+        ),
+      },
+    ],
+  },
+
+  /* ──────────────────────────────────────────────── 30 ── */
   {
     slug: "tips",
     title: "Tips & Troubleshooting",

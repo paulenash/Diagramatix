@@ -194,6 +194,18 @@ const FEATURES: Array<{ name: string; summary: string; details: string }> = [
       "- AUD billing; international cards accepted",
     ].join("\n"),
   },
+  {
+    name: "Collaboration & Diagram Review",
+    summary: "Circulate a diagram to colleagues, gather comments, and track sign-off — all inside Diagramatix.",
+    details: [
+      "- Collaboration Groups: invite teammates by name or email, with in-app notifications, accept/decline, leave, remove, and ownership transfer",
+      "- Send any diagram to one or more groups with an objective and a due date",
+      "- Reviewers comment directly on the diagram — drag a pink Review Comment onto any element; it auto-links and is tagged with the reviewer",
+      "- Dashboard collections for diagrams Received and Sent for review, colour-coded by due date",
+      "- Live reviewer statuses (pending / in-progress / submitted / approved / declined) with Approve, Submit, and Decline actions",
+      "- Owner controls: filter comments by reviewer, re-submit for a fresh approval round, and finish the review when done",
+    ].join("\n"),
+  },
 ];
 
 async function main() {
