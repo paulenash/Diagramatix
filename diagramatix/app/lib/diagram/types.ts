@@ -36,7 +36,8 @@ export type SymbolType =
   | "chevron"
   | "chevron-collapsed"
   | "process-group"
-  | "archimate-shape";
+  | "archimate-shape"
+  | "review-comment";
 
 export type BpmnTaskType =
   | "none"
@@ -81,6 +82,7 @@ export type ConnectorType =
   | "sequence" | "message" | "association" | "transition"
   | "associationBPMN" | "messageBPMN" | "flow"
   | "uml-association" | "uml-aggregation" | "uml-composition" | "uml-generalisation"
+  | "review-comment-link"
   | ArchimateConnectorType;
 
 export type Side = "top" | "right" | "bottom" | "left";

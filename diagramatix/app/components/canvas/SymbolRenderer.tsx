@@ -646,6 +646,28 @@ function TextAnnotationShape({ el }: { el: DiagramElement }) {
   );
 }
 
+/** Phase 3 — reviewer's comment note. A light-pink sticky with a folded
+ *  top-right corner. The comment text is rendered by the shared label
+ *  path (wrapped inside the box), modelled on text-annotation. */
+function ReviewCommentShape({ el }: { el: DiagramElement }) {
+  const FILL = "#fce7f3";   // rose-100
+  const STROKE = "#ec4899"; // pink-500
+  const fold = 12;
+  const x = el.x, y = el.y, w = el.width, h = el.height;
+  // Body path with a clipped (folded) top-right corner.
+  const body = `M ${x} ${y} L ${x + w - fold} ${y} L ${x + w} ${y + fold} L ${x + w} ${y + h} L ${x} ${y + h} Z`;
+  return (
+    <g>
+      <path d={body} fill={FILL} stroke={STROKE} strokeWidth={1.5} strokeLinejoin="round" />
+      {/* Folded corner triangle */}
+      <path d={`M ${x + w - fold} ${y} L ${x + w - fold} ${y + fold} L ${x + w} ${y + fold}`}
+        fill="#f9a8d4" stroke={STROKE} strokeWidth={1} strokeLinejoin="round" />
+      {/* Left accent bar to signal "comment" */}
+      <rect x={x} y={y} width={3} height={h} fill={STROKE} />
+    </g>
+  );
+}
+
 // Reusable stick figure
 function StickFigure({
   cx, top, headR = 8, bodyLen = 16, armHalfSpan = 18, legSpread = 16, legLen = 12, stroke = "#374151",
@@ -1467,6 +1489,7 @@ function SymbolShape({ el }: { el: DiagramElement }) {
       case "composite-state":   return <CompositeStateShape el={el} />;
       case "group":             return <GroupShape el={el} />;
       case "text-annotation":   return <TextAnnotationShape el={el} />;
+      case "review-comment":    return <ReviewCommentShape el={el} />;
       case "system":            return <SystemShape el={el} />;
       case "pool":              return <PoolShape el={el} />;
       case "lane":              return <LaneShape el={el} isSublane={sublaneIds.has(el.id)} />;
@@ -2308,6 +2331,20 @@ export function SymbolRenderer({
             style={{ userSelect: "none", pointerEvents: "none", fontStyle }}>
             {lines.map((line, i) => (
               <tspan key={i} x={element.x + PAD} y={topY + i * lineH + lineH * 0.85}>
+                {line}
+              </tspan>
+            ))}
+          </text>
+        );
+      })() : showLabel && element.type === 'review-comment' ? (() => {
+        const PAD = 8;
+        const lines = wrapText(element.label, element.width - PAD - 6);
+        const lineH = 13;
+        return (
+          <text textAnchor="start" fontSize={fs(11)} fill="#831843"
+            style={{ userSelect: "none", pointerEvents: "none" }}>
+            {lines.map((line, i) => (
+              <tspan key={i} x={element.x + PAD} y={element.y + PAD + i * lineH + lineH * 0.8}>
                 {line}
               </tspan>
             ))}

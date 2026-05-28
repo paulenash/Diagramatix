@@ -1146,6 +1146,25 @@ export function recomputeAllConnectors(
         sourceInvisibleLeader: true, targetInvisibleLeader: true };
     }
 
+    // review-comment-link (Phase 3): a direct line from the review-comment
+    // note to the element it concerns. Both ends snap to the boundary
+    // point along the centre-to-centre ray (same maths as a data
+    // association), so the line never clips through either box.
+    if (conn.type === "review-comment-link") {
+      const srcCx = source.x + source.width / 2, srcCy = source.y + source.height / 2;
+      const tgtCx = target.x + target.width / 2, tgtCy = target.y + target.height / 2;
+      const srcEdge = closestEdgePoint({ x: tgtCx, y: tgtCy }, getBounds(source));
+      const tgtEdge = closestEdgePoint({ x: srcCx, y: srcCy }, getBounds(target));
+      const srcSide = sideFromPoint(source, srcEdge);
+      const tgtSide = sideFromPoint(target, tgtEdge);
+      return { ...conn,
+        sourceSide: srcSide, targetSide: tgtSide,
+        sourceOffsetAlong: offsetAlongFromPoint(source, srcSide, srcEdge),
+        targetOffsetAlong: offsetAlongFromPoint(target, tgtSide, tgtEdge),
+        waypoints: [{ x: srcCx, y: srcCy }, srcEdge, tgtEdge, { x: tgtCx, y: tgtCy }],
+        sourceInvisibleLeader: true, targetInvisibleLeader: true };
+    }
+
     // Curvilinear: if the user has adjusted handles, preserve control points relative to edges
     if (conn.routingType === "curvilinear" && conn.cp1RelOffset && conn.cp2RelOffset) {
       const srcEdge = sidePoint(source, conn.sourceSide, conn.sourceOffsetAlong ?? 0.5);

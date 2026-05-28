@@ -525,12 +525,14 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
   const isMessage = connector.type === "message";
   const isAssocBPMN = connector.type === "associationBPMN";
   const isMessageBPMN = connector.type === "messageBPMN";
+  const isReviewLink = connector.type === "review-comment-link";
   const isBottleneck = connector.type === "sequence" && !!connector.bottleneck && !!showBottleneck;
   const strokeColor = selected ? "#2563eb"
     : misaligned ? "#dc2626"
     : isBottleneck ? "#9333ea"
     : isMessageBPMN ? "#b0b7c3"
     : isAssocBPMN ? "#9ca3af"
+    : isReviewLink ? "#ec4899"   // pink-500, matches the note
     : "#6b7280";
   const isUmlConn = connector.type === "uml-association" || connector.type === "uml-aggregation"
     || connector.type === "uml-composition" || connector.type === "uml-generalisation";
@@ -541,9 +543,10 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
   const umlTriangleId = `uml-triangle-${connector.id}`;
   const showArrow = connector.directionType !== "non-directed";
   const isBothArrow = connector.directionType === "both";
-  // associationBPMN always uses open arrowheads (never filled)
+  // associationBPMN + review-comment-link always use open arrowheads (never filled)
   const isOpenArrow = connector.directionType === "open-directed" || isBothArrow ||
-    (isAssocBPMN && connector.directionType === "directed");
+    (isAssocBPMN && connector.directionType === "directed") ||
+    (isReviewLink && connector.directionType === "directed");
 
   // Trim invisible leader segments for visible rendering
   const visStart = connector.sourceInvisibleLeader ? 1 : 0;
@@ -764,7 +767,7 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
         fill="none"
         stroke={strokeColor}
         strokeWidth={isAssocBPMN ? (selected ? 2.5 : 2) : (selected ? 2 : 1.5)}
-        strokeDasharray={isMessageBPMN ? "10 5" : isAssocBPMN ? "0.5 3" : (isMessage ? "6 3" : undefined)}
+        strokeDasharray={isMessageBPMN ? "10 5" : isAssocBPMN ? "0.5 3" : isReviewLink ? "4 3" : (isMessage ? "6 3" : undefined)}
         strokeLinecap={isAssocBPMN ? "round" : undefined}
         markerStart={(displayMode === "hand-drawn" && !isMessageBPMN) ? undefined :
           isMessageBPMN ? `url(#msg-start-${connector.id})`

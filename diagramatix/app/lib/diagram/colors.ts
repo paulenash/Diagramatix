@@ -50,6 +50,8 @@ export const DEFAULT_SYMBOL_COLORS: Record<SymbolType, string> = {
   // at render time; this is only a fallback when rendering outside the
   // canvas (e.g. a minimap thumbnail).
   "archimate-shape":     "#ffffff",
+  // Review (Phase 3) — pink note accent / link colour.
+  "review-comment":      "#ec4899",
 };
 
 /** Black & white colour scheme: fills → white, lines/strokes → black. */
@@ -95,6 +97,7 @@ export const BW_SYMBOL_COLORS: Record<SymbolType, string> = {
   "uml-class":           "#ffffff",
   "uml-enumeration":     "#ffffff",
   "archimate-shape":     "#ffffff",
+  "review-comment":      "#000000",
 };
 
 /** Return the effective colour for a symbol type, preferring the project config over defaults. */

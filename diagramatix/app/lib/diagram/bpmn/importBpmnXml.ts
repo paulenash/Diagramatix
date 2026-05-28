@@ -444,6 +444,7 @@ const FALLBACK_SIZE: Record<SymbolType, { w: number; h: number }> = {
   "chevron-collapsed":  { w: 60, h: 30 },
   "process-group":      { w: 400, h: 200 },
   "archimate-shape":    { w: 120, h: 60 },
+  "review-comment":     { w: 160, h: 80 },
 };
 
 interface BuiltElement {

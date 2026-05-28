@@ -261,6 +261,13 @@ export const ALL_SYMBOLS: SymbolDefinition[] = [
     defaultHeight: 60,
     description: "Generic ArchiMate 3.1 shape — geometry, fill, and icon resolved from the catalogue by properties.shapeKey",
   },
+  {
+    type: "review-comment",
+    label: "Review Comment",
+    defaultWidth: 160,
+    defaultHeight: 80,
+    description: "A reviewer's comment note (Phase 3) — pink sticky linked to the element it concerns",
+  },
 ];
 
 export const PALETTE_BY_DIAGRAM_TYPE: Record<DiagramType, SymbolType[]> = {
