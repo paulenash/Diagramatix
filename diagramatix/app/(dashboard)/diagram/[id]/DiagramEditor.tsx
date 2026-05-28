@@ -28,6 +28,8 @@ import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 import { InfoDialog } from "@/app/components/InfoDialog";
 import { AiPanel } from "./AiPanel";
 import { PlanPanel } from "./PlanPanel";
+import { SendForReviewDialog } from "./SendForReviewDialog";
+import { AlertDialog } from "@/app/components/AlertDialog";
 import { DiagramatixThrobber } from "@/app/components/DiagramatixThrobber";
 import { HistoryPanel } from "./HistoryPanel";
 
@@ -663,6 +665,8 @@ export function DiagramEditor({
   const [showDiagramMaintenance, setShowDiagramMaintenance] = useState(false);
   const [showAiPanel, setShowAiPanel] = useState(false);
   const [showPlanPanel, setShowPlanPanel] = useState(false);
+  const [showSendReview, setShowSendReview] = useState(false);
+  const [reviewSentMsg, setReviewSentMsg] = useState<string | null>(null);
   // Mirror of PlanPanel's `busy` state so we can overlay a centred
   // wait indicator on the canvas while Sonnet plans. Sidebar banner
   // alone is easy to miss when the user's eyes are on the diagram.
@@ -1962,6 +1966,17 @@ export function DiagramEditor({
             AI Generate
           </button>
         )}
+        {/* Send for Review (Phase 2) — owner sends the diagram to one or
+            more Collaboration Groups for feedback. */}
+        {!readOnly && (
+          <button
+            onClick={() => setShowSendReview(true)}
+            className="px-2 py-0.5 text-[11px] rounded border text-gray-700 border-gray-300 hover:bg-gray-50"
+            title="Send this diagram to a Collaboration Group for review"
+          >
+            Send for Review
+          </button>
+        )}
         {/* History was previously a standalone button — now in the
             unified Diagram ▾ menu further along the toolbar. */}
 
@@ -2540,6 +2555,31 @@ export function DiagramEditor({
             }}
             onClose={() => setShowPlanPanel(false)}
             onBusyChange={setAiBusy}
+          />
+        )}
+
+        {showSendReview && (
+          <SendForReviewDialog
+            diagramId={diagramId}
+            diagramName={diagramName}
+            currentUserEmail={userEmail}
+            onClose={() => setShowSendReview(false)}
+            onSent={({ reviews, reviewers }) => {
+              setShowSendReview(false);
+              setReviewSentMsg(
+                `Sent for review to ${reviewers} reviewer${reviewers === 1 ? "" : "s"} ` +
+                `across ${reviews} group${reviews === 1 ? "" : "s"}.`,
+              );
+            }}
+          />
+        )}
+
+        {reviewSentMsg && (
+          <AlertDialog
+            title="Sent for review"
+            message={reviewSentMsg}
+            tone="info"
+            onClose={() => setReviewSentMsg(null)}
           />
         )}
 

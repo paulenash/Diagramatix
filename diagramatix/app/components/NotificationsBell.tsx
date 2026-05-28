@@ -117,6 +117,27 @@ export function NotificationsBell({
           label: `${fromName} declined ownership of "${groupName}"`,
           onClick: () => { onNavigateToGroups(p.groupId); markRead(r.id); setOpen(false); },
         };
+      // Phase 2 — Send for Review. Clicking opens the diagram.
+      case "diagram-review-requested": {
+        const diagramName = p.diagramName ?? "a diagram";
+        return {
+          label: `${fromName} asked you to review "${diagramName}"`,
+          sublabel: "Click to open the diagram",
+          onClick: () => { markRead(r.id); setOpen(false); if (p.diagramId) window.location.href = `/diagram/${p.diagramId}`; },
+        };
+      }
+      case "diagram-review-submitted":
+      case "diagram-review-approved":
+      case "diagram-review-declined": {
+        const diagramName = p.diagramName ?? "a diagram";
+        const verb = r.type === "diagram-review-submitted" ? "submitted their review of"
+          : r.type === "diagram-review-approved" ? "approved"
+          : "declined to review";
+        return {
+          label: `${fromName} ${verb} "${diagramName}"`,
+          onClick: () => { markRead(r.id); setOpen(false); if (p.diagramId) window.location.href = `/diagram/${p.diagramId}`; },
+        };
+      }
       default:
         return { label: r.type };
     }
