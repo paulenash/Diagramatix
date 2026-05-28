@@ -16,6 +16,9 @@ interface Props {
   onDragStart: (symbolType: SymbolType, extras?: { shapeKey?: string; iconOnly?: boolean }) => void;
   disabledSymbols?: SymbolType[];
   colorConfig?: SymbolColorConfig;
+  /** Appended to the diagram's normal palette — used to surface the
+   *  review-comment symbol only while in Review Mode. */
+  extraSymbols?: SymbolType[];
 }
 
 export function PaletteSymbolPreview({ type, colorConfig }: { type: SymbolType; colorConfig?: SymbolColorConfig }) {
@@ -280,6 +283,16 @@ export function PaletteSymbolPreview({ type, colorConfig }: { type: SymbolType; 
           <rect x={2} y={2} width={44} height={28} rx={3} fill="#fcebdd" stroke="#374151" strokeWidth={1.5} />
         </svg>
       );
+    case "review-comment":
+      return (
+        <svg width={36} height={21} viewBox="0 0 48 28">
+          <path d="M2 2 L40 2 L46 8 L46 26 L2 26 Z" fill="#fce7f3" stroke="#ec4899" strokeWidth={1.5} strokeLinejoin="round" />
+          <path d="M40 2 L40 8 L46 8" fill="#f9a8d4" stroke="#ec4899" strokeWidth={1} strokeLinejoin="round" />
+          <rect x={2} y={2} width={3} height={24} fill="#ec4899" />
+          <line x1={9} y1={13} x2={34} y2={13} stroke="#ec4899" strokeWidth={1} />
+          <line x1={9} y1={18} x2={28} y2={18} stroke="#ec4899" strokeWidth={1} />
+        </svg>
+      );
     default:
       return (
         <svg width={36} height={21} viewBox="0 0 48 28">
@@ -511,13 +524,13 @@ function ArchimatePalette({
   );
 }
 
-export function Palette({ diagramType, onDragStart, disabledSymbols = [], colorConfig }: Props) {
+export function Palette({ diagramType, onDragStart, disabledSymbols = [], colorConfig, extraSymbols = [] }: Props) {
   const [collapsed, setCollapsed] = useState(false);
   // ArchiMate gets its own catalogue-driven accordion palette
   if (diagramType === "archimate") {
     return <ArchimatePalette onDragStart={onDragStart} collapsed={collapsed} setCollapsed={setCollapsed} />;
   }
-  const paletteTypes = PALETTE_BY_DIAGRAM_TYPE[diagramType] ?? ["task"];
+  const paletteTypes = [...(PALETTE_BY_DIAGRAM_TYPE[diagramType] ?? ["task"]), ...extraSymbols];
   const symbols = paletteTypes
     .map((t) => ALL_SYMBOLS.find((s) => s.type === t))
     .filter((s): s is (typeof ALL_SYMBOLS)[number] => !!s);

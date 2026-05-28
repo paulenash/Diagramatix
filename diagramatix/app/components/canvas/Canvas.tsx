@@ -205,6 +205,10 @@ interface Props {
   onUpdateConnectorWaypoints?: (id: string, waypoints: Point[]) => void;
   onUpdateConnectorLabel?: (id: string, label?: string, offsetX?: number, offsetY?: number, width?: number) => void;
   onSplitConnector?: (symbolType: SymbolType, position: Point, connectorId: string, taskType?: BpmnTaskType, eventType?: EventType) => void;
+  /** Review Mode: dropping a review-comment calls this with the drop
+   *  point + the id of the element under the cursor (or null). The
+   *  editor creates the pink note + a review-comment-link to it. */
+  onAddReviewComment?: (worldPos: Point, targetElementId: string | null) => void;
   onElementMoveEnd?: (id: string) => void;
   onMoveLaneBoundary?: (aboveLaneId: string, belowLaneId: string, dy: number) => void;
   onResizeElementEnd?: (id: string) => void;
@@ -417,6 +421,7 @@ export function Canvas({
   onUpdateConnectorWaypoints,
   onUpdateConnectorLabel,
   onSplitConnector,
+  onAddReviewComment,
   onElementMoveEnd,
   onMoveLaneBoundary,
   onResizeElementEnd,
@@ -2621,6 +2626,22 @@ export function Canvas({
         initial = { properties: { shapeKey: pendingArchimateShapeKey, archimateIconOnly: iconOnly } };
       }
       onAddElement("archimate-shape", worldPos, undefined, undefined, undefined, initial);
+      return;
+    }
+
+    // Review Mode: a review-comment drops as a pink note auto-linked to
+    // whatever element sits under the cursor (smallest enclosing element
+    // wins; review-comments themselves are never targets). The editor
+    // creates both the note and the review-comment-link.
+    if (pendingDragSymbol === "review-comment" && onAddReviewComment) {
+      const under = data.elements
+        .filter((el) =>
+          el.type !== "review-comment" &&
+          worldPos.x >= el.x && worldPos.x <= el.x + el.width &&
+          worldPos.y >= el.y && worldPos.y <= el.y + el.height,
+        )
+        .sort((a, b) => a.width * a.height - b.width * b.height);
+      onAddReviewComment(worldPos, under[0]?.id ?? null);
       return;
     }
 

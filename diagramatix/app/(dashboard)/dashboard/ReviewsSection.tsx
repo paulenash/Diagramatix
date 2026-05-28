@@ -78,9 +78,14 @@ function ReviewTileCard({ tile, onAction }: {
   const router = useRouter();
   const [showReviewers, setShowReviewers] = useState(false);
   const c = tile.reviewContext;
+  // Received tiles open in Review Mode (?review=) so the reviewer gets the
+  // banner + the review-comment tool; sent tiles open the diagram normally.
+  const href = c.role === "received"
+    ? `/diagram/${tile.diagramId}?review=${c.reviewId}`
+    : `/diagram/${tile.diagramId}`;
   return (
     <div
-      onClick={() => router.push(`/diagram/${tile.diagramId}`)}
+      onClick={() => router.push(href)}
       className={`bg-white border border-gray-200 border-l-4 ${dueDateBorderClass(c.dueDate)} rounded px-3 py-2 hover:shadow-sm cursor-pointer transition-all`}
     >
       <div className="flex items-center justify-between gap-2">

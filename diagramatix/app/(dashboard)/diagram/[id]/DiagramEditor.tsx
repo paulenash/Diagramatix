@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   SCHEMA_VERSION,
   type ConnectorType,
@@ -18,7 +18,7 @@ import { BW_SYMBOL_COLORS, DEFAULT_SYMBOL_COLORS, type SymbolColorConfig } from 
 import type { DisplayMode } from "@/app/lib/diagram/displayMode";
 import { DiagramColorModal } from "./DiagramColorModal";
 import { TemplateNameModal } from "./TemplateNameModal";
-import { useDiagram } from "@/app/hooks/useDiagram";
+import { useDiagram, nanoid } from "@/app/hooks/useDiagram";
 import { Canvas } from "@/app/components/canvas/Canvas";
 import { Palette } from "@/app/components/canvas/Palette";
 import { PropertiesPanel } from "@/app/components/canvas/PropertiesPanel";
@@ -667,6 +667,49 @@ export function DiagramEditor({
   const [showPlanPanel, setShowPlanPanel] = useState(false);
   const [showSendReview, setShowSendReview] = useState(false);
   const [reviewSentMsg, setReviewSentMsg] = useState<string | null>(null);
+
+  // Review Mode — active when the diagram was opened from a Received-for-
+  // Review tile (?review=<reviewId>). Surfaces the review-comment symbol,
+  // a context banner, and Submit/Decline.
+  const searchParams = useSearchParams();
+  const reviewIdParam = searchParams.get("review");
+  const [reviewCtx, setReviewCtx] = useState<{
+    reviewId: string; diagramId: string; objective: string; dueDate: string; status: string;
+    requesterName: string; requesterEmail: string; isRequester: boolean;
+    myStatus: string | null; myUserId: string; myName: string | null; myEmail: string | null;
+  } | null>(null);
+  const [reviewActionMsg, setReviewActionMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!reviewIdParam) { setReviewCtx(null); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/reviews/${reviewIdParam}`);
+        if (!res.ok) return;
+        const ctx = await res.json();
+        if (!cancelled) setReviewCtx(ctx);
+      } catch { /* ignore */ }
+    })();
+    return () => { cancelled = true; };
+  }, [reviewIdParam]);
+
+  const reviewMode = !!reviewCtx && !reviewCtx.isRequester;
+
+  async function reviewStatusAction(action: "submit" | "decline") {
+    if (!reviewCtx) return;
+    try {
+      const res = await fetch(`/api/reviews/${reviewCtx.reviewId}/status`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      if (!res.ok) return;
+      const d = await res.json();
+      setReviewCtx((prev) => (prev ? { ...prev, myStatus: d.status } : prev));
+      setReviewActionMsg(action === "decline" ? "You declined this review." : "Review submitted — thank you!");
+    } catch { /* ignore */ }
+  }
   // Mirror of PlanPanel's `busy` state so we can overlay a centred
   // wait indicator on the canvas while Sonnet plans. Sidebar banner
   // alone is easy to miss when the user's eyes are on the diagram.
@@ -955,6 +998,32 @@ export function DiagramEditor({
       addConnector(sourceId, targetId, type, directionType, routingType, sourceSide, targetSide, sourceOffsetAlong, targetOffsetAlong, force);
     },
     [addConnector]
+  );
+
+  // Review Mode: place a pink note (pre-filled with the reviewer's name +
+  // email) and, when dropped over an element, a review-comment-link to it.
+  const handleAddReviewComment = useCallback(
+    (worldPos: { x: number; y: number }, targetElementId: string | null) => {
+      if (!reviewCtx) return;
+      const commentId = nanoid();
+      const header = `${reviewCtx.myName ?? "Reviewer"}\n${reviewCtx.myEmail ?? ""}\n---\n`;
+      addElementGated("review-comment", worldPos, undefined, undefined, commentId, {
+        label: header,
+        width: 170,
+        height: 96,
+        properties: {
+          reviewId: reviewCtx.reviewId,
+          reviewerId: reviewCtx.myUserId,
+          reviewerName: reviewCtx.myName,
+          reviewerEmail: reviewCtx.myEmail,
+        },
+      });
+      if (targetElementId) {
+        addConnector(commentId, targetElementId, "review-comment-link", "directed", "direct", "left", "right", undefined, undefined, true);
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [reviewCtx, addConnector]
   );
 
   function handleToggleDisplayMode(mode?: DisplayMode) {
@@ -2370,6 +2439,37 @@ export function DiagramEditor({
       </header>
 
       {/* Main editor area */}
+      {reviewMode && reviewCtx && (
+        <div className="bg-pink-50 border-b border-pink-200 px-4 py-1.5 flex items-center gap-3 text-xs">
+          <span className="text-pink-700 font-semibold uppercase tracking-wide text-[10px]">Review Mode</span>
+          <span className="text-gray-700 truncate flex-1">
+            <strong>{reviewCtx.requesterName}</strong> · {reviewCtx.objective}
+            <span className="text-gray-400"> · due {new Date(reviewCtx.dueDate).toLocaleDateString()}</span>
+          </span>
+          <span className="text-[10px] text-pink-700">Drag a Review Comment onto an element to comment.</span>
+          {(reviewCtx.myStatus === "pending" || reviewCtx.myStatus === "in-progress") ? (
+            <>
+              <button
+                onClick={() => reviewStatusAction("submit")}
+                className="text-[11px] text-white bg-green-600 hover:bg-green-700 rounded px-2 py-0.5"
+              >
+                Submit review
+              </button>
+              <button
+                onClick={() => reviewStatusAction("decline")}
+                className="text-[11px] text-gray-700 border border-gray-300 rounded px-2 py-0.5 hover:bg-gray-50"
+              >
+                Decline
+              </button>
+            </>
+          ) : (
+            <span className="text-[10px] uppercase tracking-wide bg-white border border-pink-200 text-pink-700 rounded px-1.5 py-0.5">
+              {(reviewCtx.myStatus ?? "").replace(/-/g, " ")}
+            </span>
+          )}
+        </div>
+      )}
+
       <div className="flex flex-1 overflow-hidden">
         {!readOnly && (
           <Palette
@@ -2381,6 +2481,7 @@ export function DiagramEditor({
             }}
             disabledSymbols={disabledSymbols}
             colorConfig={effectiveColorConfig}
+            extraSymbols={reviewMode ? ["review-comment"] : []}
           />
         )}
 
@@ -2399,6 +2500,7 @@ export function DiagramEditor({
             setSelectedElementIds((prev) => { const next = new Set(prev); next.delete(id); return next; });
           }}
           onAddConnector={handleAddConnector}
+          onAddReviewComment={reviewMode ? handleAddReviewComment : undefined}
           onDeleteConnector={(id) => {
             deleteConnector(id);
             setSelectedConnectorId(null);
@@ -2580,6 +2682,15 @@ export function DiagramEditor({
             message={reviewSentMsg}
             tone="info"
             onClose={() => setReviewSentMsg(null)}
+          />
+        )}
+
+        {reviewActionMsg && (
+          <AlertDialog
+            title="Review"
+            message={reviewActionMsg}
+            tone="info"
+            onClose={() => setReviewActionMsg(null)}
           />
         )}
 

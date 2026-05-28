@@ -122,8 +122,15 @@ export function NotificationsBell({
         const diagramName = p.diagramName ?? "a diagram";
         return {
           label: `${fromName} asked you to review "${diagramName}"`,
-          sublabel: "Click to open the diagram",
-          onClick: () => { markRead(r.id); setOpen(false); if (p.diagramId) window.location.href = `/diagram/${p.diagramId}`; },
+          sublabel: "Click to open in Review Mode",
+          onClick: () => {
+            markRead(r.id); setOpen(false);
+            if (p.diagramId) {
+              window.location.href = p.reviewId
+                ? `/diagram/${p.diagramId}?review=${p.reviewId}`
+                : `/diagram/${p.diagramId}`;
+            }
+          },
         };
       }
       case "diagram-review-submitted":
