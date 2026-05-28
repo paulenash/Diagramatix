@@ -69,7 +69,12 @@ function statusPill(status: string) {
   );
 }
 
-function ReviewTileCard({ tile }: { tile: ReviewTile }) {
+const ACTIONABLE = new Set(["pending", "in-progress"]);
+
+function ReviewTileCard({ tile, onAction }: {
+  tile: ReviewTile;
+  onAction: (reviewId: string, action: "submit" | "decline") => void;
+}) {
   const router = useRouter();
   const [showReviewers, setShowReviewers] = useState(false);
   const c = tile.reviewContext;
@@ -90,6 +95,22 @@ function ReviewTileCard({ tile }: { tile: ReviewTile }) {
           : <span>{c.reviewerStatuses?.length ?? 0} reviewer{(c.reviewerStatuses?.length ?? 0) === 1 ? "" : "s"}</span>}
         {c.role === "received" && c.myStatus && <span className="ml-auto">{statusPill(c.myStatus)}</span>}
       </div>
+      {c.role === "received" && ACTIONABLE.has(c.myStatus ?? "pending") && (
+        <div className="flex gap-1.5 mt-1.5" onClick={(e) => e.stopPropagation()}>
+          <button
+            onClick={() => onAction(c.reviewId, "submit")}
+            className="text-[9px] text-white bg-green-600 hover:bg-green-700 rounded px-2 py-0.5"
+          >
+            Mark reviewed
+          </button>
+          <button
+            onClick={() => onAction(c.reviewId, "decline")}
+            className="text-[9px] text-gray-700 border border-gray-300 rounded px-2 py-0.5 hover:bg-gray-50"
+          >
+            Decline
+          </button>
+        </div>
+      )}
       {c.role === "sent" && (c.reviewerStatuses?.length ?? 0) > 0 && (
         <div className="mt-1">
           <button
@@ -133,6 +154,24 @@ export function ReviewsSection() {
 
   useEffect(() => { load(); }, [load]);
 
+  const handleAction = useCallback(async (reviewId: string, action: "submit" | "decline") => {
+    // Optimistic: reflect the new status immediately.
+    const newStatus = action === "submit" ? "submitted" : "declined-to-review";
+    setReceived((prev) => prev.map((t) =>
+      t.reviewContext.reviewId === reviewId
+        ? { ...t, reviewContext: { ...t.reviewContext, myStatus: newStatus } }
+        : t,
+    ));
+    try {
+      const res = await fetch(`/api/reviews/${reviewId}/status`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      if (!res.ok) await load();   // reconcile on failure
+    } catch { await load(); }
+  }, [load]);
+
   // Nothing to show — stay out of the way entirely.
   if (!loaded || (received.length === 0 && sent.length === 0)) return null;
 
@@ -144,7 +183,7 @@ export function ReviewsSection() {
             Diagrams Received for Review <span className="text-gray-400 font-normal">({received.length})</span>
           </h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            {received.map((t) => <ReviewTileCard key={t.reviewContext.reviewId} tile={t} />)}
+            {received.map((t) => <ReviewTileCard key={t.reviewContext.reviewId} tile={t} onAction={handleAction} />)}
           </div>
         </section>
       )}
@@ -154,7 +193,7 @@ export function ReviewsSection() {
             Diagrams Sent for Review <span className="text-gray-400 font-normal">({sent.length})</span>
           </h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            {sent.map((t) => <ReviewTileCard key={t.reviewContext.reviewId} tile={t} />)}
+            {sent.map((t) => <ReviewTileCard key={t.reviewContext.reviewId} tile={t} onAction={handleAction} />)}
           </div>
         </section>
       )}
