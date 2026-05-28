@@ -71,10 +71,11 @@ function statusPill(status: string) {
 
 const ACTIONABLE = new Set(["pending", "in-progress"]);
 
-function ReviewTileCard({ tile, onAction, onResubmit }: {
+function ReviewTileCard({ tile, onAction, onResubmit, onClose }: {
   tile: ReviewTile;
-  onAction: (reviewId: string, action: "submit" | "decline") => void;
+  onAction: (reviewId: string, action: "submit" | "decline" | "approve") => void;
   onResubmit: (reviewId: string) => void;
+  onClose: (reviewId: string) => void;
 }) {
   const router = useRouter();
   const [showReviewers, setShowReviewers] = useState(false);
@@ -102,12 +103,20 @@ function ReviewTileCard({ tile, onAction, onResubmit }: {
         {c.role === "received" && c.myStatus && <span className="ml-auto">{statusPill(c.myStatus)}</span>}
       </div>
       {c.role === "received" && ACTIONABLE.has(c.myStatus ?? "pending") && (
-        <div className="flex gap-1.5 mt-1.5" onClick={(e) => e.stopPropagation()}>
+        <div className="flex flex-wrap gap-1.5 mt-1.5" onClick={(e) => e.stopPropagation()}>
+          <button
+            onClick={() => onAction(c.reviewId, "approve")}
+            className="text-[9px] text-white bg-yellow-600 hover:bg-yellow-700 rounded px-2 py-0.5"
+            title="Sign off — the diagram is good to go"
+          >
+            Approve
+          </button>
           <button
             onClick={() => onAction(c.reviewId, "submit")}
             className="text-[9px] text-white bg-green-600 hover:bg-green-700 rounded px-2 py-0.5"
+            title="Submit your comments (the owner may still need to address them)"
           >
-            Mark reviewed
+            Submit comments
           </button>
           <button
             onClick={() => onAction(c.reviewId, "decline")}
@@ -135,13 +144,22 @@ function ReviewTileCard({ tile, onAction, onResubmit }: {
               ))}
             </ul>
           )}
-          <button
-            onClick={(e) => { e.stopPropagation(); onResubmit(c.reviewId); }}
-            className="mt-1 text-[9px] text-pink-700 border border-pink-300 rounded px-2 py-0.5 hover:bg-pink-50"
-            title="Reset all reviewers to pending and notify them for a fresh approval round"
-          >
-            Re-submit for final approval
-          </button>
+          <div className="flex flex-wrap gap-1.5 mt-1">
+            <button
+              onClick={(e) => { e.stopPropagation(); onResubmit(c.reviewId); }}
+              className="text-[9px] text-pink-700 border border-pink-300 rounded px-2 py-0.5 hover:bg-pink-50"
+              title="Reset all reviewers to pending and notify them for a fresh approval round"
+            >
+              Re-submit for final approval
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); onClose(c.reviewId); }}
+              className="text-[9px] text-white bg-gray-700 hover:bg-gray-800 rounded px-2 py-0.5"
+              title="Finish this review — closes it and removes it from both dashboards"
+            >
+              Finish review
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -167,9 +185,11 @@ export function ReviewsSection() {
 
   useEffect(() => { load(); }, [load]);
 
-  const handleAction = useCallback(async (reviewId: string, action: "submit" | "decline") => {
+  const handleAction = useCallback(async (reviewId: string, action: "submit" | "decline" | "approve") => {
     // Optimistic: reflect the new status immediately.
-    const newStatus = action === "submit" ? "submitted" : "declined-to-review";
+    const newStatus = action === "submit" ? "submitted"
+      : action === "approve" ? "approved"
+      : "declined-to-review";
     setReceived((prev) => prev.map((t) =>
       t.reviewContext.reviewId === reviewId
         ? { ...t, reviewContext: { ...t.reviewContext, myStatus: newStatus } }
@@ -192,6 +212,16 @@ export function ReviewsSection() {
     } catch { /* ignore */ }
   }, [load]);
 
+  const handleClose = useCallback(async (reviewId: string) => {
+    // Optimistic: drop the closed review from both lists immediately.
+    setReceived((prev) => prev.filter((t) => t.reviewContext.reviewId !== reviewId));
+    setSent((prev) => prev.filter((t) => t.reviewContext.reviewId !== reviewId));
+    try {
+      const res = await fetch(`/api/reviews/${reviewId}/close`, { method: "POST" });
+      if (!res.ok) await load();   // reconcile on failure
+    } catch { await load(); }
+  }, [load]);
+
   // Nothing to show — stay out of the way entirely.
   if (!loaded || (received.length === 0 && sent.length === 0)) return null;
 
@@ -203,7 +233,7 @@ export function ReviewsSection() {
             Diagrams Received for Review <span className="text-gray-400 font-normal">({received.length})</span>
           </h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            {received.map((t) => <ReviewTileCard key={t.reviewContext.reviewId} tile={t} onAction={handleAction} onResubmit={handleResubmit} />)}
+            {received.map((t) => <ReviewTileCard key={t.reviewContext.reviewId} tile={t} onAction={handleAction} onResubmit={handleResubmit} onClose={handleClose} />)}
           </div>
         </section>
       )}
@@ -213,7 +243,7 @@ export function ReviewsSection() {
             Diagrams Sent for Review <span className="text-gray-400 font-normal">({sent.length})</span>
           </h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            {sent.map((t) => <ReviewTileCard key={t.reviewContext.reviewId} tile={t} onAction={handleAction} onResubmit={handleResubmit} />)}
+            {sent.map((t) => <ReviewTileCard key={t.reviewContext.reviewId} tile={t} onAction={handleAction} onResubmit={handleResubmit} onClose={handleClose} />)}
           </div>
         </section>
       )}

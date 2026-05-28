@@ -92,7 +92,7 @@ export interface ReviewTile {
 /** Diagrams the user has been asked to review (one tile per assignment). */
 export async function getReceivedForReviewDiagrams(userId: string): Promise<ReviewTile[]> {
   const rows = await prisma.diagramReviewer.findMany({
-    where: { userId },
+    where: { userId, review: { status: { not: "closed" } } },
     include: {
       review: {
         include: {
@@ -125,7 +125,7 @@ export async function getReceivedForReviewDiagrams(userId: string): Promise<Revi
 /** Diagrams the user has sent for review (one tile per DiagramReview). */
 export async function getSentForReviewDiagrams(userId: string): Promise<ReviewTile[]> {
   const reviews = await prisma.diagramReview.findMany({
-    where: { requesterId: userId },
+    where: { requesterId: userId, status: { not: "closed" } },
     include: {
       diagram: { select: { id: true, name: true, type: true } },
       group: { select: { name: true } },

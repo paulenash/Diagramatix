@@ -696,7 +696,7 @@ export function DiagramEditor({
 
   const reviewMode = !!reviewCtx && !reviewCtx.isRequester;
 
-  async function reviewStatusAction(action: "submit" | "decline") {
+  async function reviewStatusAction(action: "submit" | "decline" | "approve") {
     if (!reviewCtx) return;
     try {
       const res = await fetch(`/api/reviews/${reviewCtx.reviewId}/status`, {
@@ -707,7 +707,11 @@ export function DiagramEditor({
       if (!res.ok) return;
       const d = await res.json();
       setReviewCtx((prev) => (prev ? { ...prev, myStatus: d.status } : prev));
-      setReviewActionMsg(action === "decline" ? "You declined this review." : "Review submitted — thank you!");
+      setReviewActionMsg(
+        action === "decline" ? "You declined this review."
+        : action === "approve" ? "Approved — thank you!"
+        : "Comments submitted — thank you!",
+      );
     } catch { /* ignore */ }
   }
 
@@ -2505,10 +2509,18 @@ export function DiagramEditor({
           {(reviewCtx.myStatus === "pending" || reviewCtx.myStatus === "in-progress") ? (
             <>
               <button
+                onClick={() => reviewStatusAction("approve")}
+                className="text-[11px] text-white bg-yellow-600 hover:bg-yellow-700 rounded px-2 py-0.5"
+                title="Sign off — the diagram is good to go"
+              >
+                Approve
+              </button>
+              <button
                 onClick={() => reviewStatusAction("submit")}
                 className="text-[11px] text-white bg-green-600 hover:bg-green-700 rounded px-2 py-0.5"
+                title="Submit your comments for the owner to address"
               >
-                Submit review
+                Submit comments
               </button>
               <button
                 onClick={() => reviewStatusAction("decline")}
