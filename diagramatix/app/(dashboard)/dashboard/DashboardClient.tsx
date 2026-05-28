@@ -10,6 +10,7 @@ import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 import { UsagePopover } from "@/app/components/UsagePopover";
 import { NotificationsBell } from "@/app/components/NotificationsBell";
 import { TierPicker, type TierCard } from "@/app/components/TierPicker";
+import { ReviewsSection } from "./ReviewsSection";
 
 interface DiagramSummary {
   id: string;
@@ -1463,6 +1464,10 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
       </header>
 
       <main className="max-w-5xl mx-auto px-6 py-6 space-y-6">
+        {/* Send-for-Review collections (Phase 2) — pinned above projects.
+            Renders nothing when the user has no reviews either way. */}
+        <ReviewsSection />
+
         {/* Projects section */}
         <section>
           <div className="flex items-center justify-between mb-3">
