@@ -71,9 +71,10 @@ function statusPill(status: string) {
 
 const ACTIONABLE = new Set(["pending", "in-progress"]);
 
-function ReviewTileCard({ tile, onAction }: {
+function ReviewTileCard({ tile, onAction, onResubmit }: {
   tile: ReviewTile;
   onAction: (reviewId: string, action: "submit" | "decline") => void;
+  onResubmit: (reviewId: string) => void;
 }) {
   const router = useRouter();
   const [showReviewers, setShowReviewers] = useState(false);
@@ -134,6 +135,13 @@ function ReviewTileCard({ tile, onAction }: {
               ))}
             </ul>
           )}
+          <button
+            onClick={(e) => { e.stopPropagation(); onResubmit(c.reviewId); }}
+            className="mt-1 text-[9px] text-pink-700 border border-pink-300 rounded px-2 py-0.5 hover:bg-pink-50"
+            title="Reset all reviewers to pending and notify them for a fresh approval round"
+          >
+            Re-submit for final approval
+          </button>
         </div>
       )}
     </div>
@@ -177,6 +185,13 @@ export function ReviewsSection() {
     } catch { await load(); }
   }, [load]);
 
+  const handleResubmit = useCallback(async (reviewId: string) => {
+    try {
+      const res = await fetch(`/api/reviews/${reviewId}/resubmit`, { method: "POST" });
+      if (res.ok) await load();   // refresh statuses (reviewers reset to pending)
+    } catch { /* ignore */ }
+  }, [load]);
+
   // Nothing to show — stay out of the way entirely.
   if (!loaded || (received.length === 0 && sent.length === 0)) return null;
 
@@ -188,7 +203,7 @@ export function ReviewsSection() {
             Diagrams Received for Review <span className="text-gray-400 font-normal">({received.length})</span>
           </h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            {received.map((t) => <ReviewTileCard key={t.reviewContext.reviewId} tile={t} onAction={handleAction} />)}
+            {received.map((t) => <ReviewTileCard key={t.reviewContext.reviewId} tile={t} onAction={handleAction} onResubmit={handleResubmit} />)}
           </div>
         </section>
       )}
@@ -198,7 +213,7 @@ export function ReviewsSection() {
             Diagrams Sent for Review <span className="text-gray-400 font-normal">({sent.length})</span>
           </h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            {sent.map((t) => <ReviewTileCard key={t.reviewContext.reviewId} tile={t} onAction={handleAction} />)}
+            {sent.map((t) => <ReviewTileCard key={t.reviewContext.reviewId} tile={t} onAction={handleAction} onResubmit={handleResubmit} />)}
           </div>
         </section>
       )}

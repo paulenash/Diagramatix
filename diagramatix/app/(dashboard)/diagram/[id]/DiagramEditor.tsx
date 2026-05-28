@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   SCHEMA_VERSION,
@@ -710,6 +710,42 @@ export function DiagramEditor({
       setReviewActionMsg(action === "decline" ? "You declined this review." : "Review submitted — thank you!");
     } catch { /* ignore */ }
   }
+
+  // Owner-side reviewer filter — show all / none / a single reviewer's
+  // review-comments on the canvas. Distinct commenters are derived from
+  // the review-comment elements already on the diagram.
+  const [reviewFilter, setReviewFilter] = useState<string>("all");
+  const reviewCommenters = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const el of data.elements) {
+      if (el.type !== "review-comment") continue;
+      const id = (el.properties?.reviewerId as string | undefined) ?? "";
+      if (!id || seen.has(id)) continue;
+      seen.set(id, (el.properties?.reviewerName as string | undefined) ?? "Reviewer");
+    }
+    return [...seen.entries()].map(([id, name]) => ({ id, name }));
+  }, [data.elements]);
+
+  // What the canvas actually renders. When a filter is active we drop the
+  // hidden review-comment elements AND their review-comment-link
+  // connectors — never any real diagram content, and never the saved
+  // `data` (autosave/export keep the full set).
+  const displayData = useMemo(() => {
+    if (reviewFilter === "all") return data;
+    const hiddenIds = new Set(
+      data.elements
+        .filter((el) => el.type === "review-comment" &&
+          (reviewFilter === "none" || (el.properties?.reviewerId as string | undefined) !== reviewFilter))
+        .map((el) => el.id),
+    );
+    if (hiddenIds.size === 0) return data;
+    return {
+      ...data,
+      elements: data.elements.filter((el) => !hiddenIds.has(el.id)),
+      connectors: data.connectors.filter((c) =>
+        c.type !== "review-comment-link" || (!hiddenIds.has(c.sourceId) && !hiddenIds.has(c.targetId))),
+    };
+  }, [data, reviewFilter]);
   // Mirror of PlanPanel's `busy` state so we can overlay a centred
   // wait indicator on the canvas while Sonnet plans. Sidebar banner
   // alone is easy to miss when the user's eyes are on the diagram.
@@ -2046,6 +2082,25 @@ export function DiagramEditor({
             Send for Review
           </button>
         )}
+        {/* Review-comment filter — appears once a diagram carries review
+            comments, letting the owner focus on one reviewer at a time. */}
+        {reviewCommenters.length > 0 && (
+          <label className="flex items-center gap-1 text-[11px] text-pink-700">
+            Comments:
+            <select
+              value={reviewFilter}
+              onChange={(e) => setReviewFilter(e.target.value)}
+              className="text-[11px] border border-pink-300 rounded px-1 py-0.5 bg-white text-gray-700"
+              title="Show review comments from all reviewers, none, or one reviewer"
+            >
+              <option value="all">All reviewers</option>
+              <option value="none">None</option>
+              {reviewCommenters.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          </label>
+        )}
         {/* History was previously a standalone button — now in the
             unified Diagram ▾ menu further along the toolbar. */}
 
@@ -2486,7 +2541,7 @@ export function DiagramEditor({
         )}
 
         <Canvas
-          data={data}
+          data={displayData}
           diagramType={diagramType}
           onAddElement={addElementGated}
           onMoveElement={moveElement}
