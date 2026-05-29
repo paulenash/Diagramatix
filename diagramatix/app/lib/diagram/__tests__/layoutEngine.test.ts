@@ -116,6 +116,48 @@ describe("event subprocess nested in a normal subprocess (sizing)", () => {
   });
 });
 
+describe("lane re-stack keeps contents inside their lane", () => {
+  // A tall expanded subprocess in the FIRST lane forces that lane to grow.
+  // Every later lane then shifts down — its contents must ride with it.
+  // The bug: re-stack moved lane.y but left children behind, so a whole
+  // lane's tasks rendered hundreds of px above their own lane band.
+  const plan: AiElement[] = [
+    { id: "p1", type: "pool", label: "Company", poolType: "white-box" },
+    { id: "lTop", type: "lane", label: "Sales", parentPool: "p1", pool: "p1" },
+    { id: "lBot", type: "lane", label: "Finance", parentPool: "p1", pool: "p1" },
+    { id: "s", type: "start-event", label: "Start", pool: "p1", lane: "lTop" },
+    { id: "spBig", type: "subprocess-expanded", label: "Fulfil Order", subprocessType: "normal", pool: "p1", lane: "lTop" },
+    // six children → a multi-row grid, making spBig (and thus lTop) tall
+    ...["a", "b", "c", "d", "e", "f"].map((k) => ({
+      id: `c${k}`, type: "task" as const, label: `Step ${k}`, parentSubprocess: "spBig",
+    })),
+    { id: "tFin1", type: "task", label: "Invoice", pool: "p1", lane: "lBot" },
+    { id: "tFin2", type: "task", label: "Reconcile", pool: "p1", lane: "lBot" },
+    { id: "e", type: "end-event", label: "End", pool: "p1", lane: "lBot" },
+  ];
+  const conns: AiConnection[] = [
+    { sourceId: "s", targetId: "spBig", type: "sequence" },
+    { sourceId: "spBig", targetId: "tFin1", type: "sequence" },
+    { sourceId: "tFin1", targetId: "tFin2", type: "sequence" },
+    { sourceId: "tFin2", targetId: "e", type: "sequence" },
+  ];
+
+  it("Finance-lane tasks stay inside the Finance lane after re-stack", () => {
+    const { byId } = run(plan, conns);
+    const lBot = byId.get("lBot")!;
+    for (const id of ["tFin1", "tFin2", "e"]) {
+      const el = byId.get(id)!;
+      expect(contains(lBot, el), `${id} (y=${Math.round(el.y)}) inside lBot band ${Math.round(lBot.y)}..${Math.round(lBot.y + lBot.height)}`).toBe(true);
+    }
+  });
+
+  it("has no containment ERRORs", () => {
+    const data = run(plan, conns).data;
+    const errs = checkDiagram(data).filter((v) => v.rule === "containment" && v.severity === "error");
+    expect(errs, formatViolations(errs)).toEqual([]);
+  });
+});
+
 describe("rework loop merge placement (column collapse)", () => {
   // Validate → decision; on "Rejected" return for correction then loop back
   // to a merge that re-enters Validate. The loop back-edge must NOT drag the

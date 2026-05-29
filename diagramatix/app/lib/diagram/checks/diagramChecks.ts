@@ -101,23 +101,40 @@ export function checkReferentialIntegrity(d: DiagramLike): Violation[] {
 }
 
 /** Every container (pool, lane, expanded subprocess) fully encloses each of
- *  its direct children. Boundary events straddle their host edge and are exempt. */
+ *  its direct children. Boundary events straddle their host edge and are exempt.
+ *
+ *  Severity: overflowing a POOL or SUBPROCESS is a structural ERROR (the
+ *  element escapes the process boundary). Overflowing only a LANE while still
+ *  inside the pool is a WARNING — the element is correctly in the process
+ *  hierarchy, it just crosses a swimlane divider (common for cross-lane
+ *  gateways, and the symptom of a lane sized smaller than its content). */
 export function checkContainment(d: DiagramLike): Violation[] {
   const byId = new Map(d.elements.map((e) => [e.id, e]));
   const CONTAINERS = new Set(["pool", "lane", "subprocess-expanded"]);
+  const poolAncestor = (e: DiagramElement): DiagramElement | undefined => {
+    let cur: DiagramElement | undefined = e.parentId ? byId.get(e.parentId) : undefined;
+    for (let i = 0; i < 32 && cur; i++) {
+      if (cur.type === "pool") return cur;
+      cur = cur.parentId ? byId.get(cur.parentId) : undefined;
+    }
+    return undefined;
+  };
   const out: Violation[] = [];
   for (const child of d.elements) {
     if (!child.parentId || child.boundaryHostId) continue;
     const parent = byId.get(child.parentId);
     if (!parent || !CONTAINERS.has(parent.type)) continue;
-    if (!contains(parent, child)) {
-      out.push({
-        rule: "containment",
-        severity: "error",
-        ids: [parent.id, child.id],
-        message: `${parent.type} "${parent.id}" does not fully contain child "${child.id}" (child ${Math.round(child.x)},${Math.round(child.y)} ${Math.round(child.width)}×${Math.round(child.height)} vs parent ${Math.round(parent.x)},${Math.round(parent.y)} ${Math.round(parent.width)}×${Math.round(parent.height)})`,
-      });
-    }
+    if (contains(parent, child)) continue;
+    // Lane overflow that's still inside the pool → warning; anything else → error.
+    const pool = parent.type === "lane" ? poolAncestor(parent) : undefined;
+    const withinPool = !!pool && contains(pool, child);
+    const note = withinPool ? " — outside its lane but still within the pool" : "";
+    out.push({
+      rule: "containment",
+      severity: withinPool ? "warning" : "error",
+      ids: [parent.id, child.id],
+      message: `${parent.type} "${parent.id}" does not fully contain child "${child.id}"${note} (child ${Math.round(child.x)},${Math.round(child.y)} ${Math.round(child.width)}×${Math.round(child.height)} vs parent ${Math.round(parent.x)},${Math.round(parent.y)} ${Math.round(parent.width)}×${Math.round(parent.height)})`,
+    });
   }
   return out;
 }

@@ -928,6 +928,29 @@ export function layoutBpmnDiagram(
 
   phase(`subprocess+boundary placement done (${elements.length} elements total)`);
 
+  // Move every transitive child of a container (parentId chain + boundary
+  // events mounted on any descendant) vertically by dy. Used when a lane is
+  // re-stacked so its contents move with it.
+  function shiftSubtree(rootId: string, dy: number) {
+    const ids = new Set<string>();
+    let added = true;
+    while (added) {
+      added = false;
+      for (const e of elements) {
+        if (e.id === rootId || ids.has(e.id)) continue;
+        if (e.parentId === rootId || (e.parentId && ids.has(e.parentId)) ||
+            (e.boundaryHostId && (e.boundaryHostId === rootId || ids.has(e.boundaryHostId)))) {
+          ids.add(e.id);
+          added = true;
+        }
+      }
+    }
+    for (const id of ids) {
+      const el = elements.find(e => e.id === id);
+      if (el) el.y += dy;
+    }
+  }
+
   // ── R6.05: Grow pools and lanes to contain all their elements ──
   // After all placement (including enlarged expanded subprocesses and boundary events),
   // expand pools and lanes so every process element fits fully inside.
@@ -975,10 +998,19 @@ export function layoutBpmnDiagram(
           directLanes[directLanes.length - 1].height += (neededH - laneTotalH);
           laneTotalH = neededH;
         }
-        // Stack lanes contiguously starting at pool.y
+        // Stack lanes contiguously starting at pool.y. When an earlier lane
+        // grew (e.g. to fit a tall expanded subprocess), every later lane
+        // shifts down — and its CONTENTS must ride with it. Moving only
+        // lane.y left the children behind in the lane above, so a whole
+        // lane's worth of tasks/events rendered hundreds of px outside (and
+        // above) their own lane band.
         let stackY = container.y;
         for (const lane of directLanes) {
-          lane.y = stackY;
+          const dy = stackY - lane.y;
+          if (dy !== 0) {
+            lane.y = stackY;
+            shiftSubtree(lane.id, dy);
+          }
           stackY += lane.height;
         }
         container.height = laneTotalH;
