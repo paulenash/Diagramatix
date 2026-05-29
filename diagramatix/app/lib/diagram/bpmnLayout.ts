@@ -1799,6 +1799,23 @@ export function layoutBpmnDiagram(
           && EVENT_TYPES.has(tgt.type) && !tgt.boundaryHostId) {
         tgtSide = "left";
       }
+
+      // R8.04 (loop-back routing): when the target sits to the LEFT — or
+      // LOWER-LEFT — of the source, this sequence flow is a rework / loop
+      // edge. The default right→left (or gateway-branch) sides would drag it
+      // back ACROSS the forward flow. Route it UNDER instead: exit the
+      // source's bottom and enter the target's bottom, so the implied loop
+      // reads clearly below the main path and the SOUTH-detour machinery in
+      // computeWaypoints keeps it clear of the intervening elements. Events
+      // keep their own facing rule (assigned just above); skip them here.
+      if (
+        connType === "sequence" &&
+        _tgtCx < _srcCx - 4 && _tgtCy >= _srcCy - 4 &&
+        !EVENT_TYPES.has(src.type) && !EVENT_TYPES.has(tgt.type)
+      ) {
+        srcSide = "bottom";
+        tgtSide = "bottom";
+      }
     }
 
     // R7.02: connectors from an edge-mounted intermediate event must exit
