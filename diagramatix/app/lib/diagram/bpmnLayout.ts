@@ -325,9 +325,51 @@ export function layoutBpmnDiagram(
   );
   if (startEls.length === 0 && flowElements.length > 0) startEls.push(flowElements[0]);
 
-  // Multi-pass: keep updating columns until stable (handles merge gateways correctly)
+  // Back-edge detection. Rework / iteration loops ("rejected → revise →
+  // re-check") are valid BPMN, but the longest-path relaxation below keeps
+  // the MAX column, so a loop's back-edge would pump every loop node's
+  // column up by one on each pass — dragging the whole downstream chain to
+  // the far right and collapsing the diagram into a single vertical column.
+  // DFS the sequence-flow graph and flag any edge pointing back to a node
+  // still on the current DFS stack (an ancestor) as a back-edge; those are
+  // excluded from the column relaxation. Forward / cross edges are kept
+  // (they don't create cycles). Acyclic diagrams find zero back-edges, so
+  // this is a no-op for them.
+  const backEdges = new Set<string>(); // key: `${sourceId}->${targetId}`
+  {
+    const WHITE = 0, GRAY = 1, BLACK = 2;
+    const colour = new Map<string, number>();
+    const roots = [...startEls.map(e => e.id), ...flowElements.map(e => e.id)];
+    for (const root of roots) {
+      if ((colour.get(root) ?? WHITE) !== WHITE) continue;
+      // Iterative DFS (explicit stack) — avoids blowing the call stack on
+      // large generated diagrams.
+      const stack: { id: string; i: number }[] = [{ id: root, i: 0 }];
+      colour.set(root, GRAY);
+      while (stack.length > 0) {
+        const frame = stack[stack.length - 1];
+        const outs = outgoing.get(frame.id) ?? [];
+        if (frame.i >= outs.length) { colour.set(frame.id, BLACK); stack.pop(); continue; }
+        const target = outs[frame.i++].targetId;
+        const tc = colour.get(target) ?? WHITE;
+        if (tc === GRAY) {
+          backEdges.add(`${frame.id}->${target}`);        // closes a cycle — skip in ranking
+        } else if (tc === WHITE) {
+          colour.set(target, GRAY);
+          stack.push({ id: target, i: 0 });
+        }
+        // BLACK target = forward / cross edge — keep it as a normal ranking edge
+      }
+    }
+  }
+
+  // Multi-pass longest-path relaxation over the acyclic edge set (back-edges
+  // excluded). The pass cap is bounded by the node count — a DAG's longest
+  // path can't exceed that — replacing the old fixed 20-pass ceiling that
+  // truncated deep flows.
+  const colPassCap = Math.max(20, flowElements.length + 1);
   const queue: { id: string; col: number }[] = startEls.map(e => ({ id: e.id, col: 0 }));
-  for (let pass = 0; pass < 20 && queue.length > 0; pass++) {
+  for (let pass = 0; pass < colPassCap && queue.length > 0; pass++) {
     const next: typeof queue = [];
     while (queue.length > 0) {
       const { id, col } = queue.shift()!;
@@ -335,6 +377,7 @@ export function layoutBpmnDiagram(
       if (col <= existing) continue; // already has a later column
       colMap.set(id, col);
       for (const c of (outgoing.get(id) ?? [])) {
+        if (backEdges.has(`${id}->${c.targetId}`)) continue; // don't rank through loops
         next.push({ id: c.targetId, col: col + 1 });
       }
     }
@@ -345,7 +388,7 @@ export function layoutBpmnDiagram(
     if (!colMap.has(el.id)) colMap.set(el.id, colMap.size);
   }
 
-  phase(`column map done (${colMap.size} elements, maxCol=${Math.max(0, ...colMap.values())})`);
+  phase(`column map done (${colMap.size} elements, maxCol=${Math.max(0, ...colMap.values())}, backEdges=${backEdges.size})`);
   const maxCol = Math.max(0, ...colMap.values());
 
   // ── Pool width: content columns + 1 task width padding for user adjustment room ──
