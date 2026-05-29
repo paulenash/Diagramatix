@@ -29,8 +29,7 @@ export default function AboutPage() {
           information to perform the task comes from and goes to. <Wordmark />{" "}
           imports and exports BPMN diagrams in a wide variety of formats.
           That&apos;s what we built it for. In particular it can round-trip Visio
-          diagrams using its specially designed Visio Shapes file, or just the
-          standard BPMN-M shapes stencil.
+          diagrams using its specially designed Visio Shapes file.
         </p>
 
         <p className="mt-4 text-base text-gray-700 leading-relaxed">
