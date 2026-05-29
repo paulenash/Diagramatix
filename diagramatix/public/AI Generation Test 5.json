@@ -1,0 +1,2716 @@
+{
+  "schemaVersion": "1.15",
+  "appVersion": "1.15.939",
+  "exportedAt": "2026-05-29T06:21:49.248Z",
+  "project": {
+    "name": "(single diagram)",
+    "description": "",
+    "ownerName": "",
+    "colorConfig": {}
+  },
+  "diagrams": [
+    {
+      "originalId": "cmpqiui2u000001mrr4f4zkkd",
+      "name": "AI Generation Test 5",
+      "type": "bpmn",
+      "data": {
+        "elements": [
+          {
+            "id": "pCustomer",
+            "type": "pool",
+            "x": 50,
+            "y": 50,
+            "width": 3990,
+            "height": 76,
+            "label": "Customer",
+            "properties": {
+              "poolType": "black-box",
+              "isSystem": false
+            }
+          },
+          {
+            "id": "pMain",
+            "type": "pool",
+            "x": 50,
+            "y": 216,
+            "width": 3990,
+            "height": 4349,
+            "label": "Company",
+            "properties": {
+              "poolType": "white-box"
+            }
+          },
+          {
+            "id": "lSales",
+            "type": "lane",
+            "x": 86,
+            "y": 216,
+            "width": 3954,
+            "height": 480,
+            "label": "Sales",
+            "properties": {},
+            "parentId": "pMain"
+          },
+          {
+            "id": "eStart",
+            "type": "start-event",
+            "x": 140,
+            "y": 448,
+            "width": 36,
+            "height": 36,
+            "label": "PO Received",
+            "properties": {},
+            "parentId": "lSales"
+          },
+          {
+            "id": "tReceivePO",
+            "type": "task",
+            "x": 300,
+            "y": 433.5,
+            "width": 102,
+            "height": 65,
+            "label": "Receive Purchase Order",
+            "properties": {},
+            "parentId": "lSales",
+            "taskType": "receive"
+          },
+          {
+            "id": "tValidatePO",
+            "type": "task",
+            "x": 3180,
+            "y": 338.5,
+            "width": 102,
+            "height": 65,
+            "label": "Validate PO vs Price List",
+            "properties": {},
+            "parentId": "lSales",
+            "taskType": "user"
+          },
+          {
+            "id": "gwValidate",
+            "type": "gateway",
+            "x": 3180,
+            "y": 551.8333333333334,
+            "width": 40,
+            "height": 40,
+            "label": "PO Valid?",
+            "properties": {
+              "gatewayType": "none",
+              "gatewayRole": "decision",
+              "labelOffsetX": -60,
+              "labelOffsetY": -55,
+              "labelWidth": 80
+            },
+            "parentId": "lSales",
+            "gatewayType": "none"
+          },
+          {
+            "id": "tReturnPO",
+            "type": "task",
+            "x": 3180,
+            "y": 291,
+            "width": 102,
+            "height": 65,
+            "label": "Return PO for Correction",
+            "properties": {},
+            "parentId": "lSales",
+            "taskType": "send"
+          },
+          {
+            "id": "gwValidateMerge",
+            "type": "gateway",
+            "x": 3180,
+            "y": 386,
+            "width": 40,
+            "height": 40,
+            "label": "PO Validated Merge",
+            "properties": {
+              "gatewayType": "none",
+              "gatewayRole": "merge"
+            },
+            "parentId": "lSales",
+            "gatewayType": "none"
+          },
+          {
+            "id": "lOps",
+            "type": "lane",
+            "x": 86,
+            "y": 696,
+            "width": 3954,
+            "height": 1329.5,
+            "label": "Operations",
+            "properties": {},
+            "parentId": "pMain"
+          },
+          {
+            "id": "gwParallelSplit",
+            "type": "gateway",
+            "x": 3180,
+            "y": 1444.75,
+            "width": 40,
+            "height": 40,
+            "label": "Start Parallel Work",
+            "properties": {
+              "gatewayRole": "decision",
+              "labelOffsetX": -60,
+              "labelOffsetY": -55,
+              "labelWidth": 80
+            },
+            "parentId": "lOps",
+            "gatewayType": "parallel"
+          },
+          {
+            "id": "tReserveStock",
+            "type": "task",
+            "x": 3180,
+            "y": 988.5,
+            "width": 102,
+            "height": 65,
+            "label": "Reserve Stock in ERP",
+            "properties": {},
+            "parentId": "lOps",
+            "taskType": "user"
+          },
+          {
+            "id": "tScheduleDispatch",
+            "type": "task",
+            "x": 3180,
+            "y": 1083.5,
+            "width": 102,
+            "height": 65,
+            "label": "Schedule Dispatch",
+            "properties": {},
+            "parentId": "lOps",
+            "taskType": "user"
+          },
+          {
+            "id": "gwParallelMerge",
+            "type": "gateway",
+            "x": 3180,
+            "y": 1444.75,
+            "width": 40,
+            "height": 40,
+            "label": "Parallel Work Complete",
+            "properties": {
+              "gatewayRole": "merge"
+            },
+            "parentId": "lOps",
+            "gatewayType": "parallel"
+          },
+          {
+            "id": "tShipGoods",
+            "type": "task",
+            "x": 3180,
+            "y": 1835.5,
+            "width": 102,
+            "height": 65,
+            "label": "Ship Goods",
+            "properties": {},
+            "parentId": "lOps",
+            "taskType": "user"
+          },
+          {
+            "id": "tSendDispatchNotice",
+            "type": "task",
+            "x": 3180,
+            "y": 1930.5,
+            "width": 102,
+            "height": 65,
+            "label": "Send Dispatch Notice",
+            "properties": {},
+            "parentId": "lOps",
+            "taskType": "send"
+          },
+          {
+            "id": "spMain",
+            "type": "subprocess-expanded",
+            "x": 950,
+            "y": 898,
+            "width": 180,
+            "height": 108,
+            "label": "Order Fulfillment",
+            "properties": {},
+            "parentId": "lOps"
+          },
+          {
+            "id": "_wrapper_spCancellation",
+            "type": "subprocess-expanded",
+            "x": 140,
+            "y": 1036,
+            "width": 780,
+            "height": 670,
+            "label": "Main Process",
+            "properties": {
+              "subprocessType": "normal"
+            },
+            "parentId": "lOps"
+          },
+          {
+            "id": "lFinance",
+            "type": "lane",
+            "x": 86,
+            "y": 2025.5,
+            "width": 3954,
+            "height": 2059.5,
+            "label": "Finance",
+            "properties": {},
+            "parentId": "pMain"
+          },
+          {
+            "id": "tCreditCheck",
+            "type": "task",
+            "x": 3180,
+            "y": 1876,
+            "width": 102,
+            "height": 65,
+            "label": "Run Credit Check",
+            "properties": {},
+            "parentId": "lFinance",
+            "taskType": "user"
+          },
+          {
+            "id": "gwCredit",
+            "type": "gateway",
+            "x": 3180,
+            "y": 2312,
+            "width": 40,
+            "height": 40,
+            "label": "Credit Check Passed?",
+            "properties": {
+              "gatewayType": "none",
+              "gatewayRole": "decision",
+              "labelOffsetX": -60,
+              "labelOffsetY": -55,
+              "labelWidth": 80
+            },
+            "parentId": "lFinance",
+            "gatewayType": "none"
+          },
+          {
+            "id": "gwCreditMerge",
+            "type": "gateway",
+            "x": 3180,
+            "y": 2312,
+            "width": 40,
+            "height": 40,
+            "label": "Credit Cleared Merge",
+            "properties": {
+              "gatewayType": "none",
+              "gatewayRole": "merge"
+            },
+            "parentId": "lFinance",
+            "gatewayType": "none"
+          },
+          {
+            "id": "tIssueInvoice",
+            "type": "task",
+            "x": 3180,
+            "y": 2161,
+            "width": 102,
+            "height": 65,
+            "label": "Issue Invoice to Customer",
+            "properties": {},
+            "parentId": "lFinance",
+            "taskType": "send"
+          },
+          {
+            "id": "gwEventSplit",
+            "type": "gateway",
+            "x": 3180,
+            "y": 2173.5,
+            "width": 40,
+            "height": 40,
+            "label": "Await Next Event",
+            "properties": {
+              "gatewayRole": "decision",
+              "labelOffsetX": -60,
+              "labelOffsetY": -55,
+              "labelWidth": 80
+            },
+            "parentId": "lFinance",
+            "gatewayType": "event-based"
+          },
+          {
+            "id": "iePayment",
+            "type": "intermediate-event",
+            "x": 3180,
+            "y": 2109.5,
+            "width": 36,
+            "height": 36,
+            "label": "Payment Received",
+            "properties": {},
+            "parentId": "lFinance",
+            "eventType": "message"
+          },
+          {
+            "id": "tCloseOrder",
+            "type": "task",
+            "x": 3180,
+            "y": 2446,
+            "width": 102,
+            "height": 65,
+            "label": "Close Order",
+            "properties": {},
+            "parentId": "lFinance",
+            "taskType": "none"
+          },
+          {
+            "id": "ieDispute",
+            "type": "intermediate-event",
+            "x": 3180,
+            "y": 2175.5,
+            "width": 36,
+            "height": 36,
+            "label": "Dispute Raised",
+            "properties": {},
+            "parentId": "lFinance",
+            "eventType": "message"
+          },
+          {
+            "id": "spDispute",
+            "type": "subprocess-expanded",
+            "x": 3180,
+            "y": 2915.5,
+            "width": 780,
+            "height": 460,
+            "label": "Resolve Dispute",
+            "properties": {},
+            "parentId": "lFinance"
+          },
+          {
+            "id": "ieTimeout",
+            "type": "intermediate-event",
+            "x": 3180,
+            "y": 2241.5,
+            "width": 36,
+            "height": 36,
+            "label": "30 Days Elapsed",
+            "properties": {},
+            "parentId": "lFinance",
+            "eventType": "timer"
+          },
+          {
+            "id": "tSendReminder",
+            "type": "task",
+            "x": 3180,
+            "y": 2826,
+            "width": 102,
+            "height": 65,
+            "label": "Send Payment Reminder",
+            "properties": {},
+            "parentId": "lFinance",
+            "taskType": "send"
+          },
+          {
+            "id": "gwEventMerge",
+            "type": "gateway",
+            "x": 3180,
+            "y": 551.8333333333334,
+            "width": 40,
+            "height": 40,
+            "label": "Event Handled Merge",
+            "properties": {
+              "gatewayRole": "merge"
+            },
+            "parentId": "lFinance",
+            "gatewayType": "event-based"
+          },
+          {
+            "id": "eProcessEnd",
+            "type": "end-event",
+            "x": 3180,
+            "y": 2711.5,
+            "width": 36,
+            "height": 36,
+            "label": "Process End",
+            "properties": {},
+            "parentId": "lFinance"
+          },
+          {
+            "id": "eOrderClosed",
+            "type": "end-event",
+            "x": 140,
+            "y": 1985.5,
+            "width": 36,
+            "height": 36,
+            "label": "Order Closed",
+            "properties": {},
+            "parentId": "lFinance"
+          },
+          {
+            "id": "lCredit",
+            "type": "lane",
+            "x": 86,
+            "y": 4085,
+            "width": 3954,
+            "height": 480,
+            "label": "Credit Manager",
+            "properties": {},
+            "parentId": "pMain"
+          },
+          {
+            "id": "tEscalate",
+            "type": "task",
+            "x": 3180,
+            "y": 2763.5,
+            "width": 102,
+            "height": 65,
+            "label": "Escalate to Credit Manager",
+            "properties": {},
+            "parentId": "lCredit",
+            "taskType": "user"
+          },
+          {
+            "id": "gwException",
+            "type": "gateway",
+            "x": 3180,
+            "y": 2312,
+            "width": 40,
+            "height": 40,
+            "label": "Exception Granted?",
+            "properties": {
+              "gatewayType": "none",
+              "gatewayRole": "decision",
+              "labelOffsetX": -60,
+              "labelOffsetY": -55,
+              "labelWidth": 80
+            },
+            "parentId": "lCredit",
+            "gatewayType": "none"
+          },
+          {
+            "id": "tCancelOrder",
+            "type": "task",
+            "x": 3180,
+            "y": 2763.5,
+            "width": 102,
+            "height": 65,
+            "label": "Cancel Order",
+            "properties": {},
+            "parentId": "lCredit",
+            "taskType": "none"
+          },
+          {
+            "id": "eCancelEnd",
+            "type": "end-event",
+            "x": 3180,
+            "y": 3005,
+            "width": 36,
+            "height": 36,
+            "label": "Order Cancelled",
+            "properties": {},
+            "parentId": "lCredit"
+          },
+          {
+            "id": "pSalesforce",
+            "type": "pool",
+            "x": 50,
+            "y": 4655,
+            "width": 3990,
+            "height": 90,
+            "label": "Salesforce",
+            "properties": {
+              "poolType": "black-box",
+              "isSystem": true
+            }
+          },
+          {
+            "id": "pERP",
+            "type": "pool",
+            "x": 50,
+            "y": 4835,
+            "width": 3990,
+            "height": 90,
+            "label": "ERP System",
+            "properties": {
+              "poolType": "black-box",
+              "isSystem": true
+            }
+          },
+          {
+            "id": "spDisputeStart",
+            "type": "start-event",
+            "x": 3272,
+            "y": 2992.5,
+            "width": 36,
+            "height": 36,
+            "label": "Dispute Start",
+            "properties": {},
+            "parentId": "spDispute"
+          },
+          {
+            "id": "tResolveDispute",
+            "type": "task",
+            "x": 3379,
+            "y": 2978,
+            "width": 102,
+            "height": 65,
+            "label": "Resolve Customer Dispute",
+            "properties": {},
+            "parentId": "spDispute",
+            "taskType": "user"
+          },
+          {
+            "id": "spDisputeEnd",
+            "type": "end-event",
+            "x": 3552,
+            "y": 2992.5,
+            "width": 36,
+            "height": 36,
+            "label": "Dispute Resolved",
+            "properties": {},
+            "parentId": "spDispute"
+          },
+          {
+            "id": "spCancellation",
+            "type": "subprocess-expanded",
+            "x": 326,
+            "y": 1516,
+            "width": 408,
+            "height": 170,
+            "label": "Handle Cancellation",
+            "properties": {
+              "subprocessType": "event"
+            },
+            "parentId": "_wrapper_spCancellation"
+          },
+          {
+            "id": "spCancelStart",
+            "type": "start-event",
+            "x": 362,
+            "y": 1583,
+            "width": 36,
+            "height": 36,
+            "label": "Cancellation Received",
+            "properties": {
+              "interruptionType": "interrupting"
+            },
+            "parentId": "spCancellation",
+            "eventType": "message"
+          },
+          {
+            "id": "tReleaseStock",
+            "type": "task",
+            "x": 479,
+            "y": 1568.5,
+            "width": 102,
+            "height": 65,
+            "label": "Release Stock Reservation",
+            "properties": {},
+            "parentId": "spCancellation",
+            "taskType": "user"
+          },
+          {
+            "id": "tCloseCancelledOrder",
+            "type": "task",
+            "x": 479,
+            "y": 1568.5,
+            "width": 102,
+            "height": 65,
+            "label": "Close Cancelled Order",
+            "properties": {},
+            "parentId": "spCancellation",
+            "taskType": "none"
+          },
+          {
+            "id": "spCancelEnd",
+            "type": "end-event",
+            "x": 662,
+            "y": 1583,
+            "width": 36,
+            "height": 36,
+            "label": "Order Cancelled",
+            "properties": {},
+            "parentId": "spCancellation"
+          },
+          {
+            "id": "_ai_gen_annotation",
+            "type": "text-annotation",
+            "x": 78,
+            "y": 152,
+            "width": 160,
+            "height": 44,
+            "label": "AI Generated\nLevel 10 - Order to Cash for B2b Supplier",
+            "properties": {}
+          }
+        ],
+        "connectors": [
+          {
+            "id": "conn-eStart-tReceivePO",
+            "sourceId": "eStart",
+            "targetId": "tReceivePO",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 158,
+                "y": 466
+              },
+              {
+                "x": 176,
+                "y": 466
+              },
+              {
+                "x": 194,
+                "y": 466
+              },
+              {
+                "x": 276,
+                "y": 466
+              },
+              {
+                "x": 300,
+                "y": 466
+              },
+              {
+                "x": 351,
+                "y": 466
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-tReceivePO-tValidatePO",
+            "sourceId": "tReceivePO",
+            "targetId": "tValidatePO",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 351,
+                "y": 466
+              },
+              {
+                "x": 402,
+                "y": 466
+              },
+              {
+                "x": 426,
+                "y": 466
+              },
+              {
+                "x": 1791,
+                "y": 466
+              },
+              {
+                "x": 1791,
+                "y": 371
+              },
+              {
+                "x": 3156,
+                "y": 371
+              },
+              {
+                "x": 3180,
+                "y": 371
+              },
+              {
+                "x": 3231,
+                "y": 371
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-tValidatePO-pSalesforce",
+            "sourceId": "tValidatePO",
+            "targetId": "pSalesforce",
+            "sourceSide": "bottom",
+            "targetSide": "top",
+            "type": "messageBPMN",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": false,
+            "targetInvisibleLeader": false,
+            "waypoints": [
+              {
+                "x": 3231,
+                "y": 403.5
+              },
+              {
+                "x": 3231,
+                "y": 4655
+              }
+            ],
+            "label": "Price list query",
+            "targetOffsetAlong": 0.7972431077694235,
+            "labelOffsetX": 45,
+            "labelOffsetY": 2068.75,
+            "labelWidth": 80,
+            "sourceOffsetAlong": 0.5
+          },
+          {
+            "id": "conn-tValidatePO-gwValidate",
+            "sourceId": "tValidatePO",
+            "targetId": "gwValidate",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 3231,
+                "y": 371
+              },
+              {
+                "x": 3282,
+                "y": 371
+              },
+              {
+                "x": 3286,
+                "y": 371
+              },
+              {
+                "x": 107,
+                "y": 371
+              },
+              {
+                "x": 107,
+                "y": 571.8333333333334
+              },
+              {
+                "x": 3176,
+                "y": 571.8333333333334
+              },
+              {
+                "x": 3180,
+                "y": 571.8333333333334
+              },
+              {
+                "x": 3200,
+                "y": 571.8333333333334
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-gwValidate-tReturnPO",
+            "sourceId": "gwValidate",
+            "targetId": "tReturnPO",
+            "sourceSide": "top",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 3200,
+                "y": 571.8333333333334
+              },
+              {
+                "x": 3200,
+                "y": 551.8333333333334
+              },
+              {
+                "x": 3200,
+                "y": 531.8333333333334
+              },
+              {
+                "x": 3315,
+                "y": 531.8333333333334
+              },
+              {
+                "x": 3315,
+                "y": 323.5
+              },
+              {
+                "x": 3156,
+                "y": 323.5
+              },
+              {
+                "x": 3180,
+                "y": 323.5
+              },
+              {
+                "x": 3231,
+                "y": 323.5
+              }
+            ],
+            "label": "Not Valid",
+            "labelOffsetX": 39,
+            "labelOffsetY": -24,
+            "labelWidth": 60,
+            "labelAnchor": "source"
+          },
+          {
+            "id": "conn-gwValidate-gwValidateMerge",
+            "sourceId": "gwValidate",
+            "targetId": "gwValidateMerge",
+            "sourceSide": "right",
+            "targetSide": "bottom",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 3200,
+                "y": 571.8333333333334
+              },
+              {
+                "x": 3220,
+                "y": 571.8333333333334
+              },
+              {
+                "x": 3240,
+                "y": 571.8333333333334
+              },
+              {
+                "x": 3273,
+                "y": 571.8333333333334
+              },
+              {
+                "x": 3273,
+                "y": 446
+              },
+              {
+                "x": 3200,
+                "y": 446
+              },
+              {
+                "x": 3200,
+                "y": 426
+              },
+              {
+                "x": 3200,
+                "y": 406
+              }
+            ],
+            "label": "Valid",
+            "labelOffsetX": 24,
+            "labelOffsetY": 2,
+            "labelWidth": 60,
+            "labelAnchor": "source"
+          },
+          {
+            "id": "conn-tReturnPO-pCustomer",
+            "sourceId": "tReturnPO",
+            "targetId": "pCustomer",
+            "sourceSide": "top",
+            "targetSide": "bottom",
+            "type": "messageBPMN",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": false,
+            "targetInvisibleLeader": false,
+            "waypoints": [
+              {
+                "x": 3231,
+                "y": 291
+              },
+              {
+                "x": 3231,
+                "y": 126
+              }
+            ],
+            "label": "PO correction request",
+            "targetOffsetAlong": 0.7972431077694235,
+            "labelOffsetX": 45,
+            "labelOffsetY": -39.5,
+            "labelWidth": 80,
+            "sourceOffsetAlong": 0.5
+          },
+          {
+            "id": "conn-tReturnPO-gwValidateMerge",
+            "sourceId": "tReturnPO",
+            "targetId": "gwValidateMerge",
+            "sourceSide": "right",
+            "targetSide": "top",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 3231,
+                "y": 323.5
+              },
+              {
+                "x": 3180,
+                "y": 323.5
+              },
+              {
+                "x": 3176,
+                "y": 323.5
+              },
+              {
+                "x": 3176,
+                "y": 313.5
+              },
+              {
+                "x": 3224,
+                "y": 313.5
+              },
+              {
+                "x": 3224,
+                "y": 406
+              },
+              {
+                "x": 3220,
+                "y": 406
+              },
+              {
+                "x": 3200,
+                "y": 406
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-gwValidateMerge-tValidatePO",
+            "sourceId": "gwValidateMerge",
+            "targetId": "tValidatePO",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 3200,
+                "y": 406
+              },
+              {
+                "x": 3220,
+                "y": 406
+              },
+              {
+                "x": 3224,
+                "y": 406
+              },
+              {
+                "x": 3257,
+                "y": 406
+              },
+              {
+                "x": 3257,
+                "y": 371
+              },
+              {
+                "x": 3176,
+                "y": 371
+              },
+              {
+                "x": 3180,
+                "y": 371
+              },
+              {
+                "x": 3231,
+                "y": 371
+              }
+            ],
+            "label": "Revalidate",
+            "labelOffsetX": 0,
+            "labelOffsetY": -20,
+            "labelWidth": 80
+          },
+          {
+            "id": "conn-gwValidate-gwParallelSplit",
+            "sourceId": "gwValidate",
+            "targetId": "gwParallelSplit",
+            "sourceSide": "bottom",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 3200,
+                "y": 571.8333333333334
+              },
+              {
+                "x": 3200,
+                "y": 591.8333333333334
+              },
+              {
+                "x": 3200,
+                "y": 611.8333333333334
+              },
+              {
+                "x": 3315,
+                "y": 611.8333333333334
+              },
+              {
+                "x": 3315,
+                "y": 1464.75
+              },
+              {
+                "x": 3160,
+                "y": 1464.75
+              },
+              {
+                "x": 3180,
+                "y": 1464.75
+              },
+              {
+                "x": 3200,
+                "y": 1464.75
+              }
+            ],
+            "label": "Accepted",
+            "labelOffsetX": 36,
+            "labelOffsetY": 10,
+            "labelWidth": 60,
+            "labelAnchor": "source"
+          },
+          {
+            "id": "conn-gwParallelSplit-tReserveStock",
+            "sourceId": "gwParallelSplit",
+            "targetId": "tReserveStock",
+            "sourceSide": "top",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 3200,
+                "y": 1464.75
+              },
+              {
+                "x": 3200,
+                "y": 1444.75
+              },
+              {
+                "x": 3200,
+                "y": 1424.75
+              },
+              {
+                "x": 3315,
+                "y": 1424.75
+              },
+              {
+                "x": 3315,
+                "y": 1021
+              },
+              {
+                "x": 3156,
+                "y": 1021
+              },
+              {
+                "x": 3180,
+                "y": 1021
+              },
+              {
+                "x": 3231,
+                "y": 1021
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-tReserveStock-pERP",
+            "sourceId": "tReserveStock",
+            "targetId": "pERP",
+            "sourceSide": "bottom",
+            "targetSide": "top",
+            "type": "messageBPMN",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": false,
+            "targetInvisibleLeader": false,
+            "waypoints": [
+              {
+                "x": 3231,
+                "y": 1053.5
+              },
+              {
+                "x": 3231,
+                "y": 4835
+              }
+            ],
+            "label": "Reserve stock request",
+            "targetOffsetAlong": 0.7972431077694235,
+            "labelOffsetX": 45,
+            "labelOffsetY": 1833.75,
+            "labelWidth": 80,
+            "sourceOffsetAlong": 0.5
+          },
+          {
+            "id": "conn-tReserveStock-tScheduleDispatch",
+            "sourceId": "tReserveStock",
+            "targetId": "tScheduleDispatch",
+            "sourceSide": "bottom",
+            "targetSide": "top",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 3231,
+                "y": 1021
+              },
+              {
+                "x": 3231,
+                "y": 1053.5
+              },
+              {
+                "x": 3231,
+                "y": 1066.5
+              },
+              {
+                "x": 3231,
+                "y": 1070.5
+              },
+              {
+                "x": 3231,
+                "y": 1083.5
+              },
+              {
+                "x": 3231,
+                "y": 1116
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-gwParallelSplit-tCreditCheck",
+            "sourceId": "gwParallelSplit",
+            "targetId": "tCreditCheck",
+            "sourceSide": "bottom",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 3200,
+                "y": 1464.75
+              },
+              {
+                "x": 3200,
+                "y": 1484.75
+              },
+              {
+                "x": 3200,
+                "y": 1504.75
+              },
+              {
+                "x": 3315,
+                "y": 1504.75
+              },
+              {
+                "x": 3315,
+                "y": 1908.5
+              },
+              {
+                "x": 3156,
+                "y": 1908.5
+              },
+              {
+                "x": 3180,
+                "y": 1908.5
+              },
+              {
+                "x": 3231,
+                "y": 1908.5
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-tCreditCheck-gwCredit",
+            "sourceId": "tCreditCheck",
+            "targetId": "gwCredit",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 3231,
+                "y": 1908.5
+              },
+              {
+                "x": 3282,
+                "y": 1908.5
+              },
+              {
+                "x": 3286,
+                "y": 1908.5
+              },
+              {
+                "x": 107,
+                "y": 1908.5
+              },
+              {
+                "x": 107,
+                "y": 2332
+              },
+              {
+                "x": 3176,
+                "y": 2332
+              },
+              {
+                "x": 3180,
+                "y": 2332
+              },
+              {
+                "x": 3200,
+                "y": 2332
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-gwCredit-gwCreditMerge",
+            "sourceId": "gwCredit",
+            "targetId": "gwCreditMerge",
+            "sourceSide": "top",
+            "targetSide": "top",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 3200,
+                "y": 2332
+              },
+              {
+                "x": 3200,
+                "y": 2312
+              },
+              {
+                "x": 3200,
+                "y": 2312
+              },
+              {
+                "x": 3200,
+                "y": 2312
+              },
+              {
+                "x": 3200,
+                "y": 2332
+              }
+            ],
+            "label": "Passed",
+            "labelOffsetX": 30,
+            "labelOffsetY": -24,
+            "labelWidth": 60,
+            "labelAnchor": "source"
+          },
+          {
+            "id": "conn-gwCredit-tEscalate",
+            "sourceId": "gwCredit",
+            "targetId": "tEscalate",
+            "sourceSide": "bottom",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 3200,
+                "y": 2332
+              },
+              {
+                "x": 3200,
+                "y": 2352
+              },
+              {
+                "x": 3200,
+                "y": 2372
+              },
+              {
+                "x": 3123,
+                "y": 2372
+              },
+              {
+                "x": 3123,
+                "y": 2796
+              },
+              {
+                "x": 3156,
+                "y": 2796
+              },
+              {
+                "x": 3180,
+                "y": 2796
+              },
+              {
+                "x": 3231,
+                "y": 2796
+              }
+            ],
+            "label": "Failed",
+            "labelOffsetX": 30,
+            "labelOffsetY": 10,
+            "labelWidth": 60,
+            "labelAnchor": "source"
+          },
+          {
+            "id": "conn-tEscalate-gwException",
+            "sourceId": "tEscalate",
+            "targetId": "gwException",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 3231,
+                "y": 2796
+              },
+              {
+                "x": 3282,
+                "y": 2796
+              },
+              {
+                "x": 3286,
+                "y": 2796
+              },
+              {
+                "x": 3319,
+                "y": 2796
+              },
+              {
+                "x": 3319,
+                "y": 2332
+              },
+              {
+                "x": 3176,
+                "y": 2332
+              },
+              {
+                "x": 3180,
+                "y": 2332
+              },
+              {
+                "x": 3200,
+                "y": 2332
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-gwException-gwCreditMerge",
+            "sourceId": "gwException",
+            "targetId": "gwCreditMerge",
+            "sourceSide": "top",
+            "targetSide": "bottom",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 3200,
+                "y": 2332
+              },
+              {
+                "x": 3200,
+                "y": 2312
+              },
+              {
+                "x": 3200,
+                "y": 2308
+              },
+              {
+                "x": 3253,
+                "y": 2308
+              },
+              {
+                "x": 3253,
+                "y": 2356
+              },
+              {
+                "x": 3200,
+                "y": 2356
+              },
+              {
+                "x": 3200,
+                "y": 2352
+              },
+              {
+                "x": 3200,
+                "y": 2332
+              }
+            ],
+            "label": "Exception Granted",
+            "labelOffsetX": 63,
+            "labelOffsetY": -24,
+            "labelWidth": 60,
+            "labelAnchor": "source"
+          },
+          {
+            "id": "conn-gwException-tCancelOrder",
+            "sourceId": "gwException",
+            "targetId": "tCancelOrder",
+            "sourceSide": "bottom",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 3200,
+                "y": 2332
+              },
+              {
+                "x": 3200,
+                "y": 2352
+              },
+              {
+                "x": 3200,
+                "y": 2372
+              },
+              {
+                "x": 3123,
+                "y": 2372
+              },
+              {
+                "x": 3123,
+                "y": 2796
+              },
+              {
+                "x": 3156,
+                "y": 2796
+              },
+              {
+                "x": 3180,
+                "y": 2796
+              },
+              {
+                "x": 3231,
+                "y": 2796
+              }
+            ],
+            "label": "Cancel Order",
+            "labelOffsetX": 48,
+            "labelOffsetY": 10,
+            "labelWidth": 60,
+            "labelAnchor": "source"
+          },
+          {
+            "id": "conn-tCancelOrder-eCancelEnd",
+            "sourceId": "tCancelOrder",
+            "targetId": "eCancelEnd",
+            "sourceSide": "bottom",
+            "targetSide": "top",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 3231,
+                "y": 2796
+              },
+              {
+                "x": 3282,
+                "y": 2796
+              },
+              {
+                "x": 3286,
+                "y": 2796
+              },
+              {
+                "x": 3286,
+                "y": 2909.5
+              },
+              {
+                "x": 3176,
+                "y": 2909.5
+              },
+              {
+                "x": 3176,
+                "y": 3023
+              },
+              {
+                "x": 3180,
+                "y": 3023
+              },
+              {
+                "x": 3198,
+                "y": 3023
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-gwCreditMerge-gwParallelMerge",
+            "sourceId": "gwCreditMerge",
+            "targetId": "gwParallelMerge",
+            "sourceSide": "right",
+            "targetSide": "bottom",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 3200,
+                "y": 2332
+              },
+              {
+                "x": 3220,
+                "y": 2332
+              },
+              {
+                "x": 3240,
+                "y": 2332
+              },
+              {
+                "x": 3315,
+                "y": 2332
+              },
+              {
+                "x": 3315,
+                "y": 1504.75
+              },
+              {
+                "x": 3200,
+                "y": 1504.75
+              },
+              {
+                "x": 3200,
+                "y": 1484.75
+              },
+              {
+                "x": 3200,
+                "y": 1464.75
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-tScheduleDispatch-gwParallelMerge",
+            "sourceId": "tScheduleDispatch",
+            "targetId": "gwParallelMerge",
+            "sourceSide": "right",
+            "targetSide": "top",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 3231,
+                "y": 1116
+              },
+              {
+                "x": 3282,
+                "y": 1116
+              },
+              {
+                "x": 3306,
+                "y": 1116
+              },
+              {
+                "x": 3339,
+                "y": 1116
+              },
+              {
+                "x": 3339,
+                "y": 1424.75
+              },
+              {
+                "x": 3200,
+                "y": 1424.75
+              },
+              {
+                "x": 3200,
+                "y": 1444.75
+              },
+              {
+                "x": 3200,
+                "y": 1464.75
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-gwParallelMerge-tShipGoods",
+            "sourceId": "gwParallelMerge",
+            "targetId": "tShipGoods",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 3200,
+                "y": 1464.75
+              },
+              {
+                "x": 3220,
+                "y": 1464.75
+              },
+              {
+                "x": 3224,
+                "y": 1464.75
+              },
+              {
+                "x": 3257,
+                "y": 1464.75
+              },
+              {
+                "x": 3257,
+                "y": 1868
+              },
+              {
+                "x": 3176,
+                "y": 1868
+              },
+              {
+                "x": 3180,
+                "y": 1868
+              },
+              {
+                "x": 3231,
+                "y": 1868
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-tShipGoods-tSendDispatchNotice",
+            "sourceId": "tShipGoods",
+            "targetId": "tSendDispatchNotice",
+            "sourceSide": "bottom",
+            "targetSide": "top",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 3231,
+                "y": 1868
+              },
+              {
+                "x": 3180,
+                "y": 1868
+              },
+              {
+                "x": 3176,
+                "y": 1868
+              },
+              {
+                "x": 3176,
+                "y": 1915.5
+              },
+              {
+                "x": 3286,
+                "y": 1915.5
+              },
+              {
+                "x": 3286,
+                "y": 1963
+              },
+              {
+                "x": 3282,
+                "y": 1963
+              },
+              {
+                "x": 3231,
+                "y": 1963
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-tSendDispatchNotice-pCustomer",
+            "sourceId": "tSendDispatchNotice",
+            "targetId": "pCustomer",
+            "sourceSide": "top",
+            "targetSide": "bottom",
+            "type": "messageBPMN",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": false,
+            "targetInvisibleLeader": false,
+            "waypoints": [
+              {
+                "x": 3231,
+                "y": 1930.5
+              },
+              {
+                "x": 3231,
+                "y": 126
+              }
+            ],
+            "label": "Dispatch notice",
+            "targetOffsetAlong": 0.7972431077694235,
+            "labelOffsetX": 45,
+            "labelOffsetY": -859.25,
+            "labelWidth": 80,
+            "sourceOffsetAlong": 0.5
+          },
+          {
+            "id": "conn-tSendDispatchNotice-tIssueInvoice",
+            "sourceId": "tSendDispatchNotice",
+            "targetId": "tIssueInvoice",
+            "sourceSide": "bottom",
+            "targetSide": "top",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 3231,
+                "y": 1963
+              },
+              {
+                "x": 3231,
+                "y": 1995.5
+              },
+              {
+                "x": 3231,
+                "y": 2019.5
+              },
+              {
+                "x": 3231,
+                "y": 2137
+              },
+              {
+                "x": 3231,
+                "y": 2161
+              },
+              {
+                "x": 3231,
+                "y": 2193.5
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-tIssueInvoice-pCustomer",
+            "sourceId": "tIssueInvoice",
+            "targetId": "pCustomer",
+            "sourceSide": "top",
+            "targetSide": "bottom",
+            "type": "messageBPMN",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": false,
+            "targetInvisibleLeader": false,
+            "waypoints": [
+              {
+                "x": 3231,
+                "y": 2161
+              },
+              {
+                "x": 3231,
+                "y": 126
+              }
+            ],
+            "label": "Invoice",
+            "targetOffsetAlong": 0.7972431077694235,
+            "labelOffsetX": 45,
+            "labelOffsetY": -974.5,
+            "labelWidth": 80,
+            "sourceOffsetAlong": 0.5
+          },
+          {
+            "id": "conn-tIssueInvoice-gwEventSplit",
+            "sourceId": "tIssueInvoice",
+            "targetId": "gwEventSplit",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 3231,
+                "y": 2193.5
+              },
+              {
+                "x": 3282,
+                "y": 2193.5
+              },
+              {
+                "x": 3286,
+                "y": 2193.5
+              },
+              {
+                "x": 3319,
+                "y": 2193.5
+              },
+              {
+                "x": 3319,
+                "y": 2193.5
+              },
+              {
+                "x": 3176,
+                "y": 2193.5
+              },
+              {
+                "x": 3180,
+                "y": 2193.5
+              },
+              {
+                "x": 3200,
+                "y": 2193.5
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-gwEventSplit-iePayment",
+            "sourceId": "gwEventSplit",
+            "targetId": "iePayment",
+            "sourceSide": "top",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 3200,
+                "y": 2193.5
+              },
+              {
+                "x": 3200,
+                "y": 2173.5
+              },
+              {
+                "x": 3200,
+                "y": 2153.5
+              },
+              {
+                "x": 3200,
+                "y": 2153.5
+              },
+              {
+                "x": 3200,
+                "y": 2127.5
+              },
+              {
+                "x": 3162,
+                "y": 2127.5
+              },
+              {
+                "x": 3180,
+                "y": 2127.5
+              },
+              {
+                "x": 3198,
+                "y": 2127.5
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-iePayment-tCloseOrder",
+            "sourceId": "iePayment",
+            "targetId": "tCloseOrder",
+            "sourceSide": "bottom",
+            "targetSide": "top",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 3198,
+                "y": 2127.5
+              },
+              {
+                "x": 3216,
+                "y": 2127.5
+              },
+              {
+                "x": 3220,
+                "y": 2127.5
+              },
+              {
+                "x": 3220,
+                "y": 2303
+              },
+              {
+                "x": 3176,
+                "y": 2303
+              },
+              {
+                "x": 3176,
+                "y": 2478.5
+              },
+              {
+                "x": 3180,
+                "y": 2478.5
+              },
+              {
+                "x": 3231,
+                "y": 2478.5
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-tCloseOrder-gwEventMerge",
+            "sourceId": "tCloseOrder",
+            "targetId": "gwEventMerge",
+            "sourceSide": "right",
+            "targetSide": "top",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 3231,
+                "y": 2478.5
+              },
+              {
+                "x": 3282,
+                "y": 2478.5
+              },
+              {
+                "x": 3306,
+                "y": 2478.5
+              },
+              {
+                "x": 3339,
+                "y": 2478.5
+              },
+              {
+                "x": 3339,
+                "y": 531.8333333333334
+              },
+              {
+                "x": 3200,
+                "y": 531.8333333333334
+              },
+              {
+                "x": 3200,
+                "y": 551.8333333333334
+              },
+              {
+                "x": 3200,
+                "y": 571.8333333333334
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-gwEventSplit-ieDispute",
+            "sourceId": "gwEventSplit",
+            "targetId": "ieDispute",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 3200,
+                "y": 2193.5
+              },
+              {
+                "x": 3220,
+                "y": 2193.5
+              },
+              {
+                "x": 3224,
+                "y": 2193.5
+              },
+              {
+                "x": 3143,
+                "y": 2193.5
+              },
+              {
+                "x": 3143,
+                "y": 2193.5
+              },
+              {
+                "x": 3176,
+                "y": 2193.5
+              },
+              {
+                "x": 3180,
+                "y": 2193.5
+              },
+              {
+                "x": 3198,
+                "y": 2193.5
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-ieDispute-spDispute",
+            "sourceId": "ieDispute",
+            "targetId": "spDispute",
+            "sourceSide": "bottom",
+            "targetSide": "top",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 3198,
+                "y": 2193.5
+              },
+              {
+                "x": 3198,
+                "y": 2211.5
+              },
+              {
+                "x": 3198,
+                "y": 2229.5
+              },
+              {
+                "x": 3198,
+                "y": 2560.5
+              },
+              {
+                "x": 3570,
+                "y": 2560.5
+              },
+              {
+                "x": 3570,
+                "y": 2891.5
+              },
+              {
+                "x": 3570,
+                "y": 2915.5
+              },
+              {
+                "x": 3570,
+                "y": 3145.5
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-spDisputeStart-tResolveDispute",
+            "sourceId": "spDisputeStart",
+            "targetId": "tResolveDispute",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 3290,
+                "y": 3010.5
+              },
+              {
+                "x": 3308,
+                "y": 3010.5
+              },
+              {
+                "x": 3326,
+                "y": 3010.5
+              },
+              {
+                "x": 3355,
+                "y": 3010.5
+              },
+              {
+                "x": 3379,
+                "y": 3010.5
+              },
+              {
+                "x": 3430,
+                "y": 3010.5
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-tResolveDispute-spDisputeEnd",
+            "sourceId": "tResolveDispute",
+            "targetId": "spDisputeEnd",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 3430,
+                "y": 3010.5
+              },
+              {
+                "x": 3481,
+                "y": 3010.5
+              },
+              {
+                "x": 3505,
+                "y": 3010.5
+              },
+              {
+                "x": 3534,
+                "y": 3010.5
+              },
+              {
+                "x": 3552,
+                "y": 3010.5
+              },
+              {
+                "x": 3570,
+                "y": 3010.5
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-spDispute-gwEventMerge",
+            "sourceId": "spDispute",
+            "targetId": "gwEventMerge",
+            "sourceSide": "right",
+            "targetSide": "bottom",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 3570,
+                "y": 3145.5
+              },
+              {
+                "x": 3960,
+                "y": 3145.5
+              },
+              {
+                "x": 3984,
+                "y": 3145.5
+              },
+              {
+                "x": 4017,
+                "y": 3145.5
+              },
+              {
+                "x": 4017,
+                "y": 611.8333333333334
+              },
+              {
+                "x": 3200,
+                "y": 611.8333333333334
+              },
+              {
+                "x": 3200,
+                "y": 591.8333333333334
+              },
+              {
+                "x": 3200,
+                "y": 571.8333333333334
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-gwEventSplit-ieTimeout",
+            "sourceId": "gwEventSplit",
+            "targetId": "ieTimeout",
+            "sourceSide": "bottom",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 3200,
+                "y": 2193.5
+              },
+              {
+                "x": 3200,
+                "y": 2213.5
+              },
+              {
+                "x": 3200,
+                "y": 2233.5
+              },
+              {
+                "x": 3200,
+                "y": 2233.5
+              },
+              {
+                "x": 3200,
+                "y": 2259.5
+              },
+              {
+                "x": 3162,
+                "y": 2259.5
+              },
+              {
+                "x": 3180,
+                "y": 2259.5
+              },
+              {
+                "x": 3198,
+                "y": 2259.5
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-ieTimeout-tSendReminder",
+            "sourceId": "ieTimeout",
+            "targetId": "tSendReminder",
+            "sourceSide": "bottom",
+            "targetSide": "top",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 3198,
+                "y": 2259.5
+              },
+              {
+                "x": 3216,
+                "y": 2259.5
+              },
+              {
+                "x": 3220,
+                "y": 2259.5
+              },
+              {
+                "x": 3220,
+                "y": 2559
+              },
+              {
+                "x": 3176,
+                "y": 2559
+              },
+              {
+                "x": 3176,
+                "y": 2858.5
+              },
+              {
+                "x": 3180,
+                "y": 2858.5
+              },
+              {
+                "x": 3231,
+                "y": 2858.5
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-tSendReminder-pCustomer",
+            "sourceId": "tSendReminder",
+            "targetId": "pCustomer",
+            "sourceSide": "top",
+            "targetSide": "bottom",
+            "type": "messageBPMN",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": false,
+            "targetInvisibleLeader": false,
+            "waypoints": [
+              {
+                "x": 3231,
+                "y": 2826
+              },
+              {
+                "x": 3231,
+                "y": 126
+              }
+            ],
+            "label": "Payment reminder",
+            "targetOffsetAlong": 0.7972431077694235,
+            "labelOffsetX": 45,
+            "labelOffsetY": -1307,
+            "labelWidth": 80,
+            "sourceOffsetAlong": 0.5
+          },
+          {
+            "id": "conn-tSendReminder-gwEventMerge",
+            "sourceId": "tSendReminder",
+            "targetId": "gwEventMerge",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 3231,
+                "y": 2858.5
+              },
+              {
+                "x": 3282,
+                "y": 2858.5
+              },
+              {
+                "x": 3286,
+                "y": 2858.5
+              },
+              {
+                "x": 107,
+                "y": 2858.5
+              },
+              {
+                "x": 107,
+                "y": 571.8333333333334
+              },
+              {
+                "x": 3176,
+                "y": 571.8333333333334
+              },
+              {
+                "x": 3180,
+                "y": 571.8333333333334
+              },
+              {
+                "x": 3200,
+                "y": 571.8333333333334
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-gwEventMerge-eProcessEnd",
+            "sourceId": "gwEventMerge",
+            "targetId": "eProcessEnd",
+            "sourceSide": "right",
+            "targetSide": "top",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 3200,
+                "y": 571.8333333333334
+              },
+              {
+                "x": 3220,
+                "y": 571.8333333333334
+              },
+              {
+                "x": 3240,
+                "y": 571.8333333333334
+              },
+              {
+                "x": 3315,
+                "y": 571.8333333333334
+              },
+              {
+                "x": 3315,
+                "y": 2693.5
+              },
+              {
+                "x": 3198,
+                "y": 2693.5
+              },
+              {
+                "x": 3198,
+                "y": 2711.5
+              },
+              {
+                "x": 3198,
+                "y": 2729.5
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-pCustomer-eStart",
+            "sourceId": "pCustomer",
+            "targetId": "eStart",
+            "sourceSide": "bottom",
+            "targetSide": "top",
+            "type": "messageBPMN",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": false,
+            "targetInvisibleLeader": false,
+            "waypoints": [
+              {
+                "x": 158,
+                "y": 126
+              },
+              {
+                "x": 158,
+                "y": 448
+              }
+            ],
+            "label": "Purchase order email",
+            "sourceOffsetAlong": 0.02706766917293233,
+            "targetOffsetAlong": 0.5,
+            "labelOffsetX": 45,
+            "labelOffsetY": -118,
+            "labelWidth": 80
+          },
+          {
+            "id": "conn-pCustomer-ieDispute",
+            "sourceId": "pCustomer",
+            "targetId": "ieDispute",
+            "sourceSide": "bottom",
+            "targetSide": "top",
+            "type": "messageBPMN",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": false,
+            "targetInvisibleLeader": false,
+            "waypoints": [
+              {
+                "x": 3198,
+                "y": 126
+              },
+              {
+                "x": 3198,
+                "y": 2175.5
+              }
+            ],
+            "label": "Dispute notification",
+            "sourceOffsetAlong": 0.7889724310776942,
+            "targetOffsetAlong": 0.5,
+            "labelOffsetX": 45,
+            "labelOffsetY": -981.75,
+            "labelWidth": 80
+          },
+          {
+            "id": "conn-pCustomer-iePayment",
+            "sourceId": "pCustomer",
+            "targetId": "iePayment",
+            "sourceSide": "bottom",
+            "targetSide": "top",
+            "type": "messageBPMN",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": false,
+            "targetInvisibleLeader": false,
+            "waypoints": [
+              {
+                "x": 3198,
+                "y": 126
+              },
+              {
+                "x": 3198,
+                "y": 2109.5
+              }
+            ],
+            "label": "Payment",
+            "sourceOffsetAlong": 0.7889724310776942,
+            "targetOffsetAlong": 0.5,
+            "labelOffsetX": 45,
+            "labelOffsetY": -948.75,
+            "labelWidth": 80
+          },
+          {
+            "id": "conn-spCancelStart-tReleaseStock",
+            "sourceId": "spCancelStart",
+            "targetId": "tReleaseStock",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 380,
+                "y": 1601
+              },
+              {
+                "x": 398,
+                "y": 1601
+              },
+              {
+                "x": 416,
+                "y": 1601
+              },
+              {
+                "x": 455,
+                "y": 1601
+              },
+              {
+                "x": 479,
+                "y": 1601
+              },
+              {
+                "x": 530,
+                "y": 1601
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-tReleaseStock-tCloseCancelledOrder",
+            "sourceId": "tReleaseStock",
+            "targetId": "tCloseCancelledOrder",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 530,
+                "y": 1601
+              },
+              {
+                "x": 581,
+                "y": 1601
+              },
+              {
+                "x": 585,
+                "y": 1601
+              },
+              {
+                "x": 475,
+                "y": 1601
+              },
+              {
+                "x": 475,
+                "y": 1601
+              },
+              {
+                "x": 479,
+                "y": 1601
+              },
+              {
+                "x": 530,
+                "y": 1601
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-tCloseCancelledOrder-spCancelEnd",
+            "sourceId": "tCloseCancelledOrder",
+            "targetId": "spCancelEnd",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 530,
+                "y": 1601
+              },
+              {
+                "x": 581,
+                "y": 1601
+              },
+              {
+                "x": 605,
+                "y": 1601
+              },
+              {
+                "x": 644,
+                "y": 1601
+              },
+              {
+                "x": 662,
+                "y": 1601
+              },
+              {
+                "x": 680,
+                "y": 1601
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-_ai_gen_annotation-eStart",
+            "sourceId": "_ai_gen_annotation",
+            "targetId": "eStart",
+            "sourceSide": "bottom",
+            "targetSide": "top",
+            "type": "associationBPMN",
+            "directionType": "non-directed",
+            "routingType": "direct",
+            "sourceInvisibleLeader": false,
+            "targetInvisibleLeader": false,
+            "waypoints": [
+              {
+                "x": 158,
+                "y": 196
+              },
+              {
+                "x": 158,
+                "y": 448
+              }
+            ],
+            "label": ""
+          }
+        ],
+        "viewport": {
+          "x": 0,
+          "y": 0,
+          "zoom": 0.6
+        }
+      },
+      "colorConfig": {},
+      "displayMode": "normal"
+    }
+  ]
+}

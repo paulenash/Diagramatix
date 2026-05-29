@@ -1,0 +1,137 @@
+DIAGRAMATIX — SAMPLE BPMN PROCESS-DESCRIPTION PROMPTS
+=====================================================
+
+A graded set, Level 1 (trivial) to Level 10 (the full enterprise works).
+Each is written the way a business analyst would describe the process, and
+each is phrased to trigger specific BPMN features. They are paste-ready into
+the AI Generate -> Plan panel (BPMN). The note after each level says what it
+exercises.
+
+HOW THE AI READS YOUR WORDING
+-----------------------------
+  roles / teams ................... lanes
+  an outside party (customer,
+    supplier) ..................... black-box pool + message flows
+  a named system (Salesforce, SAP,
+    Active Directory) ............. system pool
+  "either / or" ................... exclusive gateway
+  "at the same time / in parallel"  parallel gateway
+  "whichever happens first" ....... event-based gateway
+  "at any time / if X interrupts" . event subprocess
+
+
+-----------------------------------------------------------------------------
+LEVEL 1 — Linear flow
+(start -> tasks -> end; no roles)
+-----------------------------------------------------------------------------
+A customer places an online order. The warehouse picks the items, packs the
+box, and ships it. The process then ends.
+
+
+-----------------------------------------------------------------------------
+LEVEL 2 — One decision
+(exclusive gateway + merge)
+-----------------------------------------------------------------------------
+An employee submits a leave request. The manager reviews it and either
+approves or rejects it. If approved, HR updates the leave balance and notifies
+the employee. If rejected, the employee is notified of the rejection. Either
+way the process ends.
+
+
+-----------------------------------------------------------------------------
+LEVEL 3 — Roles become lanes
+(2-3 lanes)
+-----------------------------------------------------------------------------
+In the Sales team a rep qualifies a new lead and prepares a quote. The Sales
+Manager reviews and approves the quote. Once approved, the rep sends the quote
+to the customer and the Finance team raises the invoice.
+
+
+-----------------------------------------------------------------------------
+LEVEL 4 — External participant
+(black-box pool + message flows, send/receive tasks)
+-----------------------------------------------------------------------------
+A customer emails a support request. The Support team logs a ticket,
+investigates the issue, and emails a resolution back to the customer. The
+customer confirms the issue is resolved.
+
+
+-----------------------------------------------------------------------------
+LEVEL 5 — System pools
+(black-box system pools + user tasks)
+-----------------------------------------------------------------------------
+When a new employee is hired, HR creates their record in Workday and asks IT
+to set up access. IT provisions a laptop and creates the email account in
+Active Directory. HR then sends the welcome pack to the new starter.
+
+
+-----------------------------------------------------------------------------
+LEVEL 6 — Parallel work
+(parallel fork/join + lanes)
+-----------------------------------------------------------------------------
+After a loan application is received, the bank simultaneously runs a credit
+check and verifies the applicant's identity. Once both checks are complete, a
+loan officer makes a decision and notifies the applicant.
+
+
+-----------------------------------------------------------------------------
+LEVEL 7 — Subprocess
+(expanded subprocess + exclusive gateway)
+-----------------------------------------------------------------------------
+An insurance claim is lodged. It goes through an assessment subprocess that
+validates the policy, estimates the damage, and checks for fraud. Based on the
+assessment the claim is either approved and paid, or declined with a decline
+letter sent to the policyholder.
+
+
+-----------------------------------------------------------------------------
+LEVEL 8 — Event-based gateway
+(the "wait for one of several events" feature)
+-----------------------------------------------------------------------------
+After sending a payment request to the customer, the company waits for
+whichever of these happens first: the payment is received, the customer
+cancels the order, or 48 hours pass with no response. If payment is received,
+the order is fulfilled. If the customer cancels, the order is voided. If the
+48-hour timeout is reached, a reminder is sent and the order is put on hold.
+
+
+-----------------------------------------------------------------------------
+LEVEL 9 — Event subprocesses (interrupting + non-interrupting)
+(boundary / event handlers)
+-----------------------------------------------------------------------------
+A manufacturing run cuts, assembles, finishes, and inspects the product. At
+any time during the run, if a defect is reported, work must pause while the
+defect is investigated and corrected, then resume. Separately, if the customer
+submits a change request mid-production, it should be logged without stopping
+the line.
+
+
+-----------------------------------------------------------------------------
+LEVEL 10 — Full enterprise order-to-cash
+(everything: external + system pools, lanes, loop, exclusive + parallel +
+event-based gateways, subprocess, event subprocess, data objects)
+-----------------------------------------------------------------------------
+Order-to-cash for a B2B supplier. The Customer (external) submits a purchase
+order by email. In the Sales lane, a rep validates the PO against the price
+list in Salesforce and either accepts it or returns it to the customer for
+correction, looping until it's accepted. Once accepted, Operations and Finance
+work in parallel: Operations reserves stock in the ERP and schedules dispatch,
+while Finance runs a credit check. If the credit check fails, the order is
+escalated to the Credit Manager, who either grants an exception or cancels the
+order. When stock is reserved and credit is cleared, Operations ships the
+goods and sends a dispatch notice to the customer, and Finance issues the
+invoice to the customer. The company then waits for whichever happens first:
+payment received, a dispute raised by the customer, or 30 days elapsing —
+payment closes the order, a dispute triggers a resolution subprocess, and the
+timeout sends a reminder. At any point before dispatch, if the customer
+cancels, a handler releases the stock reservation and closes the order.
+
+
+-----------------------------------------------------------------------------
+USAGE TIPS
+-----------------------------------------------------------------------------
+- Run these through the 2-phase Plan flow so you can eyeball/edit the
+  structure before Apply Layout. Levels 8-10 are the best stress-tests of the
+  layout engine and the event-based gateway wiring.
+- Levels 4, 5 and 10 are also good Visio round-trip test cases (multiple pools
+  + message flows).
