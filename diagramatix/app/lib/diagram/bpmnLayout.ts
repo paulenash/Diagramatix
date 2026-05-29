@@ -651,15 +651,25 @@ export function layoutBpmnDiagram(
     const rows = Math.max(1, contentRows || 1);
     const cols = Math.min(CHILD_COLS, Math.max(gridChildCount, startEndCount));
     // Event subprocess: 4 task widths × 2 task heights (small)
-    // Normal subprocess: at least 5 tasks × 4 tasks (large), plus room
-    // below the grid for any embedded event subs stacked vertically.
+    // Normal subprocess: sized to its content (a modest 2×2 floor so even a
+    // tiny EP still reads as a container), plus room below the grid for any
+    // embedded event subs stacked vertically.
     let neededW: number, neededH: number;
     if (isEventSub) {
-      neededW = EVENT_SUB_W;
+      // Flexible sizing: an event subprocess lays its children out in a
+      // single row (start → middle elements → end), so its width must grow
+      // with the child count rather than being pinned to a fixed 4-task
+      // box. EVENT_SUB_W stays the floor (start/end only); more children
+      // widen it so they don't cram or overlap.
+      const evChildCount = Math.max(2, children.length);
+      neededW = Math.max(EVENT_SUB_W, evChildCount * CHILD_COL_SPACING + EXPANDED_PAD_X * 2);
       neededH = EVENT_SUB_H;
     } else {
-      const minCols = Math.max(5, cols);
-      const minRows = Math.max(4, rows);
+      // Content-driven: grow with the actual child grid, with a small 2×2
+      // floor (was a rigid 5×4, which bloated small subprocesses with empty
+      // space). Embedded event subs add height below the grid (handled next).
+      const minCols = Math.max(2, cols);
+      const minRows = Math.max(2, rows);
       neededW = minCols * CHILD_COL_SPACING + EXPANDED_PAD_X * 2;
       neededH = minRows * CHILD_ROW_SPACING + EXPANDED_PAD_Y * 2;
       if (eventSubChildren.length > 0) {
@@ -704,21 +714,24 @@ export function layoutBpmnDiagram(
       }
     }
     if (isEventSub) {
-      // Event subprocess: Start event on the left, End event on the right,
-      // both vertically centred. R8.02: Start/End centres sit 1.5 × event
-      // width from their respective vertical boundaries (left for Start,
-      // right for End) so they aren't cramped against the edge.
+      // Event subprocess: lay children out left-to-right in a single row —
+      // Start first, End last, any middle elements (tasks/gateways) evenly
+      // spaced between them, all vertically centred. The previous rule put
+      // EVERY non-start/end child at the centre x, so two or more middle
+      // elements overlapped. Even distribution + the content-driven width
+      // above keeps them readable however many there are.
+      const ordered = [
+        ...children.filter(c => c.type === "start-event"),
+        ...children.filter(c => c.type !== "start-event" && c.type !== "end-event"),
+        ...children.filter(c => c.type === "end-event"),
+      ];
       const cyCentre = spEl.height / 2;
-      for (const ai of children) {
+      const n = ordered.length;
+      const usableW = spEl.width - EXPANDED_PAD_X * 2;
+      for (let i = 0; i < n; i++) {
+        const ai = ordered[i];
         const def = getSymbolDefinition(ai.type as DiagramElement["type"]);
-        let cx: number;
-        if (ai.type === "start-event") {
-          cx = 1.5 * def.defaultWidth;
-        } else if (ai.type === "end-event") {
-          cx = spEl.width - 1.5 * def.defaultWidth;
-        } else {
-          cx = spEl.width / 2; // middle for any other elements
-        }
+        const cx = n <= 1 ? spEl.width / 2 : EXPANDED_PAD_X + (usableW * i) / (n - 1);
         elements.push({
           id: ai.id, type: ai.type as DiagramElement["type"],
           x: spEl.x + cx - def.defaultWidth / 2,
