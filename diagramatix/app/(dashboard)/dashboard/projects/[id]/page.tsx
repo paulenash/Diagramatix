@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { ProjectDetailClient } from "./ProjectDetailClient";
-import { getEffectiveUserId, isImpersonating, getImpersonationMode } from "@/app/lib/superuser";
+import { getEffectiveUserId, isImpersonating, getImpersonationMode, isSuperuser } from "@/app/lib/superuser";
 import { tryGetCurrentOrgId } from "@/app/lib/auth/orgContext";
 
 type Props = { params: Promise<{ id: string }> };
@@ -88,6 +88,7 @@ export default async function ProjectPage({ params }: Props) {
       viewingAsName={viewingAsName}
       viewingAsEmail={viewingAsEmail}
       impersonationMode={impersonationMode}
+      isAdmin={isSuperuser(session)}
     />
   );
 }

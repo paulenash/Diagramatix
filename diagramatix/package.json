@@ -11,7 +11,9 @@
     "start": "next start",
     "start:prod": "node .next/standalone/server.js",
     "go": "next build && next start",
-    "kill": "npx kill-port 3000"
+    "kill": "npx kill-port 3000",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "0.88.0",
@@ -44,6 +46,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.7"
   }
 }

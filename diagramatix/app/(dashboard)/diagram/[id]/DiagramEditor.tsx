@@ -31,6 +31,7 @@ import { PlanPanel } from "./PlanPanel";
 import { SendForReviewDialog } from "./SendForReviewDialog";
 import { AlertDialog } from "@/app/components/AlertDialog";
 import { DiagramatixThrobber } from "@/app/components/DiagramatixThrobber";
+import { checkDiagram, rulesMetadata, type Violation } from "@/app/lib/diagram/checks/diagramChecks";
 import { HistoryPanel } from "./HistoryPanel";
 
 interface VisioImportResult {
@@ -850,6 +851,9 @@ export function DiagramEditor({
   }>(null);
   const [clearMenuOpen, setClearMenuOpen] = useState(false);
   const clearMenuRef = useRef<HTMLDivElement>(null);
+  // Per-diagram "Scan for Issues" (BPMN only) — runs the shared rule registry
+  // on the live diagram client-side; null = modal closed.
+  const [diagramScan, setDiagramScan] = useState<Violation[] | null>(null);
 
   useEffect(() => {
     if (!projectId) return;
@@ -2481,6 +2485,18 @@ export function DiagramEditor({
                 >
                   Configuration
                 </button>
+                {diagramType === "bpmn" && (
+                  <>
+                    <div className="border-t border-gray-100" />
+                    <button
+                      onClick={() => { setClearMenuOpen(false); setDiagramScan(checkDiagram(data)); }}
+                      className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                      title="Check this diagram against the BPMN structural rules (the same rules the project-level scan uses)."
+                    >
+                      Scan Diagram for Issues
+                    </button>
+                  </>
+                )}
               </div>
             )}
           </div>
@@ -2772,7 +2788,7 @@ export function DiagramEditor({
             className="fixed inset-0 z-40 flex flex-col items-center justify-center"
             style={{ pointerEvents: "none" }}
           >
-            <DiagramatixThrobber size={240} auraRadius={110} />
+            <DiagramatixThrobber size={120} auraRadius={110} />
             <p className="mt-3 text-sm font-medium text-blue-800 bg-white/85 backdrop-blur-sm px-4 py-2 rounded-lg shadow-md">
               {aiBusy === "plan"
                 ? "Asking Sonnet for a plan — this usually takes 15–30 seconds…"
@@ -2780,6 +2796,65 @@ export function DiagramEditor({
             </p>
           </div>
         )}
+
+        {/* Per-diagram "Scan for Issues" results (BPMN only). Runs the shared
+            rule registry on the live diagram — same rules as the project scan
+            and the test harness. */}
+        {diagramScan !== null && (() => {
+          const titles = new Map(rulesMetadata().map((r) => [r.id, r.title]));
+          const errors = diagramScan.filter((v) => v.severity === "error");
+          const warnings = diagramScan.filter((v) => v.severity === "warning");
+          const renderList = (list: Violation[]) => (
+            <ul className="space-y-1.5">
+              {list.map((v, i) => (
+                <li key={`${v.rule}:${i}`} className="border border-gray-100 rounded px-3 py-2">
+                  <div className="flex items-center gap-2">
+                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${v.severity === "warning" ? "bg-amber-100 text-amber-800" : "bg-red-100 text-red-700"}`}>
+                      {v.severity}
+                    </span>
+                    <span className="text-xs font-medium text-gray-900">{titles.get(v.rule) ?? v.rule}</span>
+                  </div>
+                  <p className="text-[11px] text-gray-600 mt-1">{v.message}</p>
+                </li>
+              ))}
+            </ul>
+          );
+          return (
+            <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+              <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-xl max-h-[80vh] overflow-y-auto">
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="text-lg font-semibold text-gray-900">Diagram Issues</h2>
+                  <button
+                    onClick={() => setDiagramScan(null)}
+                    className="text-gray-400 hover:text-gray-600 text-lg leading-none"
+                    title="Close"
+                  >✕</button>
+                </div>
+                {diagramScan.length === 0 ? (
+                  <p className="text-sm text-gray-600">No issues found in this diagram.</p>
+                ) : (
+                  <div className="space-y-4">
+                    <p className="text-xs text-gray-500">
+                      {errors.length} error{errors.length === 1 ? "" : "s"}, {warnings.length} warning{warnings.length === 1 ? "" : "s"}.
+                    </p>
+                    {errors.length > 0 && (
+                      <div>
+                        <p className="text-[11px] uppercase tracking-wide text-red-700 mb-1">Errors</p>
+                        {renderList(errors)}
+                      </div>
+                    )}
+                    {warnings.length > 0 && (
+                      <div>
+                        <p className="text-[11px] uppercase tracking-wide text-amber-700 mb-1">Warnings</p>
+                        {renderList(warnings)}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })()}
 
         {showHistoryPanel && (
           <HistoryPanel

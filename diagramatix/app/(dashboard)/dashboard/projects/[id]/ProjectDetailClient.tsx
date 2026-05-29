@@ -9,6 +9,7 @@ import { DiagramMaintenanceModal, type FontConfig } from "./DiagramMaintenanceMo
 import { LinkScanDialog } from "./LinkScanDialog";
 import { ImpersonationBanner } from "@/app/components/ImpersonationBanner";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
+import { rulesMetadata } from "@/app/lib/diagram/checks/diagramChecks";
 
 // --- Folder tree types ---
 interface FolderNode {
@@ -324,6 +325,7 @@ interface Props {
   viewingAsName?: string;
   viewingAsEmail?: string;
   impersonationMode?: "view" | "edit";
+  isAdmin?: boolean;
 }
 
 const DIAGRAM_TYPE_LABELS: Record<string, string> = {
@@ -347,7 +349,7 @@ const DIAGRAM_TYPES: { value: DiagramType; label: string; description: string }[
   { value: "archimate", label: "ArchiMate", description: "Enterprise architecture using the ArchiMate 3.1 standard (Business, Motivation, Strategy, Application layers)" },
 ];
 
-export function ProjectDetailClient({ project, otherProjects, version, readOnly, viewingAsName, viewingAsEmail, impersonationMode }: Props) {
+export function ProjectDetailClient({ project, otherProjects, version, readOnly, viewingAsName, viewingAsEmail, impersonationMode, isAdmin }: Props) {
   const router = useRouter();
   const [diagrams, setDiagrams] = useState(project.diagrams);
   const [projectName, setProjectName] = useState(project.name);
@@ -389,6 +391,8 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
   const fileMenuRef = useRef<HTMLDivElement>(null);
   // "Project ▾" dropdown: groups Project Configuration + Scan together.
   const [showProjectMenu, setShowProjectMenu] = useState(false);
+  // Admin-only: modal listing the active scanner rules (the shared registry).
+  const [showRulesViewer, setShowRulesViewer] = useState(false);
   const [showLinkScan, setShowLinkScan] = useState(false);
   const projectMenuRef = useRef<HTMLDivElement>(null);
 
@@ -425,6 +429,14 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
     reason: string;
     severity: "error" | "warning";
   }
+  // BPMN-correctness issues from the shared rule registry (containment,
+  // merge placement, boundary-on-pool, event-sub connectors, dangling refs…).
+  interface ScanStructuralIssue {
+    rule: string;
+    message: string;
+    severity: "error" | "warning";
+    ids: string[];
+  }
   interface ScanDiagram {
     diagramId: string;
     diagramName: string;
@@ -433,6 +445,7 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
     duplicateNames: ScanDuplicateName[];
     singleLanePools: ScanSingleLanePool[];
     hangingMessages: ScanHangingMessage[];
+    structuralIssues: ScanStructuralIssue[];
   }
   interface ScanResult {
     diagrams: ScanDiagram[];
@@ -442,6 +455,7 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
     totalHangingMessages: number;
     totalHangingErrors: number;
     totalHangingWarnings: number;
+    totalStructuralIssues: number;
   }
   const [scanBusy, setScanBusy] = useState(false);
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
@@ -458,7 +472,8 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
     | "pool-lane-connector"
     | "duplicate-name"
     | "single-lane-pool"
-    | "hanging-error";
+    | "hanging-error"
+    | "structural-error";
   type WarningType = "hanging-warning";
   const [ignoredErrorTypes, setIgnoredErrorTypes] = useState<Set<ErrorType>>(new Set());
   const [ignoredWarningTypes, setIgnoredWarningTypes] = useState<Set<WarningType>>(new Set());
@@ -468,6 +483,7 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
     "duplicate-name":      "Duplicate Pool/Lane names",
     "single-lane-pool":    "Pools with a single Lane",
     "hanging-error":       "Hanging or misconnected messages",
+    "structural-error":    "BPMN structure (containment, merge, event-sub…)",
   };
   const WARNING_TYPE_LABELS: Record<WarningType, string> = {
     "hanging-warning": "Messages touching a white-box pool",
@@ -2004,6 +2020,15 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
                   >
                     Scan Diagrams for Links
                   </button>
+                  {isAdmin && (
+                    <button
+                      className="block w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100 border-t border-gray-100"
+                      onClick={() => { setShowProjectMenu(false); setShowRulesViewer(true); }}
+                      title="Admin only — view the rules the 'Scan Diagrams for Issues' check applies (the shared rule registry)."
+                    >
+                      View Scanner Issues Rules
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -2687,6 +2712,58 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
           opening the file picker. After name validation, the file input
           referenced by `importVisioInputRef` is clicked; the rest of the
           import flow runs inside `handleImportVisioFile`. */}
+      {/* Admin-only — View Scanner Issues Rules. Lists the shared rule
+          registry that BOTH the in-app scan and the test harness run, so the
+          rules shown here are always exactly what the scanner applies. */}
+      {showRulesViewer && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-lg font-semibold text-gray-900">Scanner Issues Rules</h2>
+              <button
+                onClick={() => setShowRulesViewer(false)}
+                className="text-gray-400 hover:text-gray-600 text-lg leading-none"
+                title="Close"
+              >✕</button>
+            </div>
+            <p className="text-xs text-gray-500 mb-3">
+              These {rulesMetadata().length} rules are the single source of truth: the same registry runs in
+              &ldquo;Scan Diagrams for Issues&rdquo; and in the automated layout tests.
+            </p>
+            {(() => {
+              const CATEGORY_LABELS: Record<string, string> = {
+                "pool-lane-connector": "Connectors on Pool/Lane",
+                "duplicate-name": "Duplicate names",
+                "single-lane-pool": "Single-lane pools",
+                "hanging-message": "Hanging messages",
+                "bpmn-structure": "BPMN structure",
+              };
+              const rules = rulesMetadata();
+              const cats = Array.from(new Set(rules.map((r) => r.category)));
+              return cats.map((cat) => (
+                <div key={cat} className="mb-4">
+                  <p className="text-[11px] uppercase tracking-wide text-gray-400 mb-1">{CATEGORY_LABELS[cat] ?? cat}</p>
+                  <ul className="space-y-1.5">
+                    {rules.filter((r) => r.category === cat).map((r) => (
+                      <li key={r.id} className="border border-gray-100 rounded px-3 py-2">
+                        <div className="flex items-center gap-2">
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${r.severity === "warning" ? "bg-amber-100 text-amber-800" : "bg-red-100 text-red-700"}`}>
+                            {r.severity}
+                          </span>
+                          <span className="text-sm font-medium text-gray-900">{r.title}</span>
+                          <span className="ml-auto text-[10px] text-gray-400 font-mono">{r.id}</span>
+                        </div>
+                        <p className="text-[11px] text-gray-600 mt-1">{r.description}</p>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ));
+            })()}
+          </div>
+        </div>
+      )}
+
       {/* Scan Diagrams for Errors — three checks per diagram:
             1. sequence / association connectors on a Pool or Lane
             2. duplicate Pool/Lane names
@@ -2798,6 +2875,7 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
                 badConnectors:    ignoredErrorTypes.has("pool-lane-connector") ? [] : d.badConnectors,
                 duplicateNames:   ignoredErrorTypes.has("duplicate-name")      ? [] : d.duplicateNames,
                 singleLanePools:  ignoredErrorTypes.has("single-lane-pool")    ? [] : d.singleLanePools,
+                structuralIssues: ignoredErrorTypes.has("structural-error")    ? [] : (d.structuralIssues ?? []),
                 hangingErrors:    ignoredErrorTypes.has("hanging-error")
                                     ? []
                                     : d.hangingMessages.filter((m) => m.severity !== "warning"),
@@ -2809,6 +2887,7 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
                 d.badConnectors.length > 0 ||
                 d.duplicateNames.length > 0 ||
                 d.singleLanePools.length > 0 ||
+                d.structuralIssues.length > 0 ||
                 d.hangingErrors.length > 0,
               );
               const warningDiagrams = bucketed.filter((d) => d.hangingWarnings.length > 0);
@@ -2822,6 +2901,7 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
                   d.badConnectors.length +
                   d.duplicateNames.length +
                   d.singleLanePools.length +
+                  d.structuralIssues.length +
                   d.hangingErrors.length;
                 warningTotal += d.hangingWarnings.length;
               }
@@ -2838,7 +2918,7 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
               const renderDiagramRow = (d: Bucketed, kind: "error" | "warning") => {
                 const open = scanExpanded.has(`${kind}:${d.diagramId}`);
                 const issueCount = kind === "error"
-                  ? d.badConnectors.length + d.duplicateNames.length + d.singleLanePools.length + d.hangingErrors.length
+                  ? d.badConnectors.length + d.duplicateNames.length + d.singleLanePools.length + d.structuralIssues.length + d.hangingErrors.length
                   : d.hangingWarnings.length;
                 return (
                   <div key={`${kind}:${d.diagramId}`} className="border-b border-gray-100 last:border-b-0">
@@ -2925,6 +3005,19 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
                                   <span className="text-gray-400">→</span>
                                   <span className="text-red-600 font-medium">{hm.targetName} <span className="text-gray-400">[{hm.targetType}]</span></span>
                                   <span className="text-gray-500 text-[10px] italic">({hm.reason})</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {d.structuralIssues.length > 0 && (
+                          <div>
+                            <p className="text-[10px] uppercase tracking-wide text-gray-400 mb-0.5">BPMN structure</p>
+                            <ul className="text-[11px] text-gray-700 space-y-0.5">
+                              {d.structuralIssues.map((si, i) => (
+                                <li key={`${si.rule}:${i}`} className="flex items-start gap-2">
+                                  <span className="px-1.5 py-0.5 bg-gray-100 rounded text-[10px] text-gray-600 shrink-0">{si.rule}</span>
+                                  <span className="text-red-600">{si.message}</span>
                                 </li>
                               ))}
                             </ul>

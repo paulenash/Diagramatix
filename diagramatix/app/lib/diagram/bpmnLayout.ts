@@ -107,27 +107,23 @@ export function layoutBpmnDiagram(
     // Ensure subprocessType is set
     if (!ai.subprocessType) ai.subprocessType = "event";
 
-    // R6.10: Ensure the event subprocess is inside a Normal Expanded Subprocess
-    // If parentSubprocess is not set, or it's set to a pool/lane context, wrap it
+    // R6.10: A process-level Event Sub-Process renders directly inside its
+    // pool. BPMN allows an Event Sub-Process at the top level of a Process —
+    // it does NOT need a wrapping subprocess. We used to fabricate a "Main
+    // Process" Normal Expanded Subprocess to host it, but that produced a
+    // confusingly-named box containing only the event handler. If the AI
+    // legitimately nested the event sub inside a real Normal Expanded
+    // Subprocess, that nesting is preserved; otherwise it stays a top-level
+    // flow element placed by the pool/lane layout.
     const parentSub = ai.parentSubprocess
       ? aiElements.find(e => e.id === ai.parentSubprocess)
       : undefined;
     const parentIsNormalSub = parentSub?.type === "subprocess-expanded" &&
       (parentSub.subprocessType ?? "normal") !== "event";
-    if (!parentIsNormalSub) {
-      // Create a wrapping Normal Expanded Subprocess
-      const wrapperId = `_wrapper_${ai.id}`;
-      injected.push({
-        id: wrapperId,
-        type: "subprocess-expanded",
-        label: "Main Process",
-        subprocessType: "normal",
-        pool: ai.pool,
-        lane: ai.lane,
-      });
-      ai.parentSubprocess = wrapperId;
-      ai.pool = undefined;
-      ai.lane = undefined;
+    if (!parentIsNormalSub && ai.parentSubprocess) {
+      // parentSubprocess pointed at something that can't host it (a pool, an
+      // event sub, or a missing id) — detach so it sits at the pool level.
+      ai.parentSubprocess = undefined;
     }
 
     // R6.11: Ensure internal start event exists. Default to non-interrupting
@@ -618,6 +614,15 @@ export function layoutBpmnDiagram(
   const EVENT_SUB_W = taskDefForEvSub.defaultWidth * 4;
   const EVENT_SUB_H = taskDefForEvSub.defaultHeight * 2 + 40;
   const EVENT_SUB_GAP = 20;
+  // Content-driven event-subprocess footprint. An event sub lays its children
+  // out in a single row, so its width grows with the child count (height is
+  // fixed). Shared by the event sub's own resize AND a parent normal sub's
+  // width budget, so the parent reserves enough room to actually contain it
+  // — a fixed EVENT_SUB_W budget overflows once the event sub has >2 children.
+  const eventSubSize = (childCount: number) => ({
+    w: Math.max(EVENT_SUB_W, Math.max(2, childCount) * CHILD_COL_SPACING + EXPANDED_PAD_X * 2),
+    h: EVENT_SUB_H,
+  });
 
   // R8.01: set of outer expanded-subprocess ids that contain embedded event
   // subs. When an outer sub is in this set, boundary Start/End events on
@@ -658,24 +663,34 @@ export function layoutBpmnDiagram(
     if (isEventSub) {
       // Flexible sizing: an event subprocess lays its children out in a
       // single row (start → middle elements → end), so its width must grow
-      // with the child count rather than being pinned to a fixed 4-task
-      // box. EVENT_SUB_W stays the floor (start/end only); more children
-      // widen it so they don't cram or overlap.
-      const evChildCount = Math.max(2, children.length);
-      neededW = Math.max(EVENT_SUB_W, evChildCount * CHILD_COL_SPACING + EXPANDED_PAD_X * 2);
-      neededH = EVENT_SUB_H;
+      // with the child count rather than being pinned to a fixed 4-task box.
+      const sz = eventSubSize(children.length);
+      neededW = sz.w;
+      neededH = sz.h;
     } else {
       // Content-driven: grow with the actual child grid, with a small 2×2
       // floor (was a rigid 5×4, which bloated small subprocesses with empty
       // space). Embedded event subs add height below the grid (handled next).
+      const hasGridContent = gridChildCount > 0 || startEndCount > 0;
       const minCols = Math.max(2, cols);
-      const minRows = Math.max(2, rows);
+      // Skip the 2-row grid floor when there are no grid children — e.g. an
+      // auto-injected wrapper ("Main Process") whose only child is an embedded
+      // event sub. Otherwise the wrapper carries ~2 empty rows of dead height
+      // above the event sub.
+      const minRows = hasGridContent ? Math.max(2, rows) : 0;
       neededW = minCols * CHILD_COL_SPACING + EXPANDED_PAD_X * 2;
       neededH = minRows * CHILD_ROW_SPACING + EXPANDED_PAD_Y * 2;
       if (eventSubChildren.length > 0) {
         // Room for stacked event subs plus padding above the stack
         neededH += eventSubChildren.length * (EVENT_SUB_H + EVENT_SUB_GAP) + EVENT_SUB_GAP;
-        neededW = Math.max(neededW, EVENT_SUB_W + EXPANDED_PAD_X * 2);
+        // Reserve the WIDEST embedded event sub at its real, content-driven
+        // width — not the EVENT_SUB_W floor, which a multi-task event sub
+        // overflows (it would then stick out past the wrapper's right edge).
+        let maxEvW = EVENT_SUB_W;
+        for (const es of eventSubChildren) {
+          maxEvW = Math.max(maxEvW, eventSubSize((subprocessChildren.get(es.id) ?? []).length).w);
+        }
+        neededW = Math.max(neededW, maxEvW + EXPANDED_PAD_X * 2);
       }
     }
     const oldRight = spEl.x + spEl.width;
@@ -807,12 +822,16 @@ export function layoutBpmnDiagram(
         const stackCx = spEl.x + spEl.width / 2;
         for (let i = 0; i < eventSubChildren.length; i++) {
           const ai = eventSubChildren[i];
+          // Place at the event sub's FINAL content-driven size so it sits
+          // centred and stays inside the wrapper; the event sub's own resize
+          // pass (it's processed later) then finds the size already correct.
+          const sz = eventSubSize((subprocessChildren.get(ai.id) ?? []).length);
           const y = stackTopY + i * (EVENT_SUB_H + EVENT_SUB_GAP);
           elements.push({
             id: ai.id, type: ai.type as DiagramElement["type"],
-            x: stackCx - EVENT_SUB_W / 2,
+            x: stackCx - sz.w / 2,
             y,
-            width: EVENT_SUB_W, height: EVENT_SUB_H,
+            width: sz.w, height: sz.h,
             label: ai.label, properties: buildProps(ai), parentId: spEl.id,
             ...(ai.taskType ? { taskType: ai.taskType as DiagramElement["taskType"] } : {}),
             ...(ai.gatewayType ? { gatewayType: ai.gatewayType as DiagramElement["gatewayType"] } : {}),
