@@ -931,7 +931,7 @@ export function layoutBpmnDiagram(
   // Move every transitive child of a container (parentId chain + boundary
   // events mounted on any descendant) vertically by dy. Used when a lane is
   // re-stacked so its contents move with it.
-  function shiftSubtree(rootId: string, dy: number) {
+  function collectSubtreeIds(rootId: string): Set<string> {
     const ids = new Set<string>();
     let added = true;
     while (added) {
@@ -945,9 +945,71 @@ export function layoutBpmnDiagram(
         }
       }
     }
-    for (const id of ids) {
+    return ids;
+  }
+
+  function shiftSubtree(rootId: string, dy: number) {
+    for (const id of collectSubtreeIds(rootId)) {
       const el = elements.find(e => e.id === id);
       if (el) el.y += dy;
+    }
+  }
+
+  // Re-fit every lane to enclose its (post-Y-adjustment) children, then
+  // re-stack the lanes contiguously starting at pool.y. Run AFTER all the
+  // gateway-Y passes (R3.09 / R55 / R8.01) and R57, so cross-lane decision
+  // gateways and pulled-up predecessors don't leave their parent lane —
+  // logical containment (parentId) and visual containment (geometric bounds)
+  // stay aligned, which kills the "lane does not fully contain child"
+  // warnings the scanner reports. Floats (annotations, groups) are excluded
+  // from the bounds check so a stray annotation can't bloat a lane.
+  function fitLanesToChildren() {
+    const FLOAT = new Set(["text-annotation", "group"]);
+    const PAD = 10;
+    for (const pool of elements.filter(e => e.type === "pool")) {
+      const lanes = elements.filter(e => e.type === "lane" && e.parentId === pool.id).sort((a, b) => a.y - b.y);
+      if (lanes.length === 0) continue;
+      // 1. Grow each lane to cover its descendants (top + bottom). Growing
+      //    upward keeps children at their current y (lane expands around them);
+      //    re-stack in step 2 normalises the lane.y to pool.y and moves
+      //    children with it.
+      for (const lane of lanes) {
+        const kidIds = collectSubtreeIds(lane.id);
+        let minY = Infinity, maxY = -Infinity;
+        for (const id of kidIds) {
+          const el = elements.find(e => e.id === id);
+          if (!el || FLOAT.has(el.type)) continue;
+          minY = Math.min(minY, el.y);
+          maxY = Math.max(maxY, el.y + el.height);
+        }
+        if (!isFinite(minY)) continue;
+        const neededTop = minY - PAD;
+        const neededBot = maxY + PAD;
+        if (neededTop < lane.y) {
+          const grow = lane.y - neededTop;
+          lane.y -= grow;
+          lane.height += grow;
+        }
+        if (neededBot > lane.y + lane.height) {
+          lane.height = neededBot - lane.y;
+        }
+      }
+      // 2. Re-stack contiguously from pool.y, carrying each lane's subtree.
+      let stackY = pool.y;
+      for (const lane of lanes) {
+        const dy = stackY - lane.y;
+        if (dy !== 0) {
+          lane.y = stackY;
+          shiftSubtree(lane.id, dy);
+        }
+        stackY += lane.height;
+      }
+      pool.height = lanes.reduce((s, l) => s + l.height, 0);
+      // 3. Match lane x/width to the pool's (R57 may have moved/widened it).
+      for (const lane of lanes) {
+        lane.x = pool.x + POOL_HEADER_W;
+        lane.width = pool.width - POOL_HEADER_W;
+      }
     }
   }
 
@@ -1563,6 +1625,16 @@ export function layoutBpmnDiagram(
     // R8.03 again — pool growth may have introduced overlaps between pools.
     restackPoolsR52();
   }
+
+  // Final lane fit — make every lane visually contain its (now-finalised)
+  // children. Cross-lane decision gateways (R8.01) and predecessor-aligned
+  // decisions (R3.09) can otherwise leave their assigned lane's vertical
+  // band, producing "element outside its lane" warnings even though the
+  // parentId is correct. After this pass, logical == visual containment.
+  fitLanesToChildren();
+  // Lane growth may have changed pool heights; re-stack pools so they
+  // don't overlap.
+  restackPoolsR52();
 
   // Build the ordered lists for the wiring pass (R6.16/R6.17).
   //   Decision outgoings: sorted by target element vertical position — topmost

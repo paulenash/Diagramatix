@@ -158,6 +158,50 @@ describe("lane re-stack keeps contents inside their lane", () => {
   });
 });
 
+describe("cross-lane decision gateway stays inside its parent lane", () => {
+  // Decision in lSales whose branches go to BOTH lSales and lOps tasks.
+  // R8.01 centres the gateway at the cross-lane Y midpoint, which used to
+  // push it 20px out of lSales's bottom — a warning even though the
+  // parentId said lSales. The post-fit pass grows lSales to cover it.
+  const plan: AiElement[] = [
+    { id: "p1", type: "pool", label: "Company", poolType: "white-box" },
+    { id: "lSales", type: "lane", label: "Sales", parentPool: "p1", pool: "p1" },
+    { id: "lOps", type: "lane", label: "Operations", parentPool: "p1", pool: "p1" },
+    { id: "s", type: "start-event", label: "Start", pool: "p1", lane: "lSales" },
+    { id: "tCheck", type: "task", label: "Check Order", pool: "p1", lane: "lSales" },
+    { id: "gw", type: "gateway", label: "Approved?", gatewayType: "exclusive", pool: "p1", lane: "lSales" },
+    { id: "tReject", type: "task", label: "Reject", pool: "p1", lane: "lSales" }, // stays in Sales
+    { id: "tFulfil", type: "task", label: "Fulfil", pool: "p1", lane: "lOps" },   // branch into Ops
+    { id: "gwMerge", type: "gateway", label: "Done", gatewayType: "exclusive", pool: "p1", lane: "lOps" },
+    { id: "e", type: "end-event", label: "End", pool: "p1", lane: "lOps" },
+  ];
+  const conns: AiConnection[] = [
+    { sourceId: "s", targetId: "tCheck", type: "sequence" },
+    { sourceId: "tCheck", targetId: "gw", type: "sequence" },
+    { sourceId: "gw", targetId: "tFulfil", label: "Yes", type: "sequence" },
+    { sourceId: "gw", targetId: "tReject", label: "No", type: "sequence" },
+    { sourceId: "tFulfil", targetId: "gwMerge", type: "sequence" },
+    { sourceId: "tReject", targetId: "gwMerge", type: "sequence" },
+    { sourceId: "gwMerge", targetId: "e", type: "sequence" },
+  ];
+
+  it("every lane-parented element sits fully inside its parent lane", () => {
+    const { data, byId } = run(plan, conns);
+    for (const el of data.elements) {
+      if (!el.parentId) continue;
+      const parent = byId.get(el.parentId);
+      if (!parent || parent.type !== "lane") continue;
+      expect(contains(parent, el), `${el.id} (${el.label}) inside lane ${parent.id}`).toBe(true);
+    }
+  });
+
+  it("no containment violations (errors or warnings)", () => {
+    const data = run(plan, conns).data;
+    const conts = checkDiagram(data).filter((v) => v.rule === "containment");
+    expect(conts, formatViolations(conts)).toEqual([]);
+  });
+});
+
 describe("rework loop merge placement (column collapse)", () => {
   // Validate → decision; on "Rejected" return for correction then loop back
   // to a merge that re-enters Validate. The loop back-edge must NOT drag the

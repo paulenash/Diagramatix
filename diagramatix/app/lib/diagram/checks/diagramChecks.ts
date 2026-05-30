@@ -79,6 +79,9 @@ const isEventSub = (e: DiagramElement) =>
 
 const poolTypeOf = (e: DiagramElement) => (e.properties?.poolType as string | undefined) ?? "";
 const labelOrType = (e: DiagramElement | undefined) => e?.label || e?.type || "(unknown)";
+// Human-readable name for messages: prefer the user-visible label, fall back
+// to the internal id only when the element has no label set.
+const nameOf = (e: DiagramElement | undefined) => (e?.label?.trim()) || e?.id || "(unknown)";
 const normaliseName = (s: string) => s.replace(/\s+/g, " ").trim().toLowerCase();
 
 const num = (v: unknown): v is number => typeof v === "number";
@@ -133,7 +136,7 @@ export function checkContainment(d: DiagramLike): Violation[] {
       rule: "containment",
       severity: withinPool ? "warning" : "error",
       ids: [parent.id, child.id],
-      message: `${parent.type} "${parent.id}" does not fully contain child "${child.id}"${note} (child ${Math.round(child.x)},${Math.round(child.y)} ${Math.round(child.width)}×${Math.round(child.height)} vs parent ${Math.round(parent.x)},${Math.round(parent.y)} ${Math.round(parent.width)}×${Math.round(parent.height)})`,
+      message: `${parent.type} "${nameOf(parent)}" does not fully contain "${nameOf(child)}"${note}`,
     });
   }
   return out;
@@ -144,17 +147,19 @@ export function checkContainment(d: DiagramLike): Violation[] {
 export function checkNoFabricatedWrapper(d: DiagramLike): Violation[] {
   return d.elements
     .filter((e) => e.id.startsWith("_wrapper_") || (e.type === "subprocess-expanded" && e.label === "Main Process"))
-    .map((e) => ({ rule: "no-fabricated-wrapper", severity: "error" as const, ids: [e.id], message: `fabricated wrapper "${e.id}" (${e.label}) present — pool-level event subs should not be wrapped` }));
+    .map((e) => ({ rule: "no-fabricated-wrapper", severity: "error" as const, ids: [e.id], message: `fabricated wrapper "${nameOf(e)}" present — pool-level event sub-processes should not be wrapped` }));
 }
 
 /** BPMN: an Event Sub-Process is triggered by an event, never by sequence or
  *  message flow — so no connector may touch it (R6.12/R7.03). */
 export function checkEventSubHasNoConnectors(d: DiagramLike): Violation[] {
+  const byId = new Map(d.elements.map((e) => [e.id, e]));
   const eventSubIds = new Set(d.elements.filter(isEventSub).map((e) => e.id));
   const out: Violation[] = [];
   for (const c of d.connectors) {
     if (eventSubIds.has(c.sourceId) || eventSubIds.has(c.targetId)) {
-      out.push({ rule: "event-sub-no-connectors", severity: "error", ids: [c.id], message: `connector ${c.id} touches event sub-process (forbidden)` });
+      const evId = eventSubIds.has(c.sourceId) ? c.sourceId : c.targetId;
+      out.push({ rule: "event-sub-no-connectors", severity: "error", ids: [c.id], message: `connector touches event sub-process "${nameOf(byId.get(evId))}" — forbidden` });
     }
   }
   return out;
@@ -169,7 +174,7 @@ export function checkNoBoundaryEventsOnPool(d: DiagramLike): Violation[] {
     if (!e.boundaryHostId) continue;
     const host = byId.get(e.boundaryHostId);
     if (host && (host.type === "pool" || host.type === "lane")) {
-      out.push({ rule: "no-boundary-on-pool", severity: "error", ids: [e.id, host.id], message: `event "${e.id}" is mounted on ${host.type} "${host.id}" — boundary events may only attach to a task or subprocess` });
+      out.push({ rule: "no-boundary-on-pool", severity: "error", ids: [e.id, host.id], message: `event "${nameOf(e)}" is mounted on ${host.type} "${nameOf(host)}" — boundary events may only attach to a task or subprocess` });
     }
   }
   return out;
@@ -199,7 +204,7 @@ export function checkMergeRightOfForwardInputs(d: DiagramLike): Violation[] {
       .map((c) => byId.get(c.sourceId))
       .filter((s): s is DiagramElement => !!s && s.x + s.width / 2 < gcx);
     if (forward.length === 0) {
-      out.push({ rule: "merge-placement", severity: "error", ids: [g.id], message: `merge gateway "${g.id}" sits left of ALL its inputs (loop back-edge likely dragged its column)` });
+      out.push({ rule: "merge-placement", severity: "error", ids: [g.id], message: `merge gateway "${nameOf(g)}" sits left of ALL its inputs (loop back-edge likely dragged its column)` });
     }
   }
   return out;
@@ -288,7 +293,7 @@ export function checkSingleLanePool(d: DiagramLike): Violation[] {
       rule: "single-lane-pool",
       severity: "error",
       ids: [poolId, lanes[0].id],
-      message: `pool "${pool.label || "(unnamed)"}" contains a single lane "${lanes[0].label || "(unnamed)"}"`,
+      message: `pool "${nameOf(pool)}" contains a single lane "${nameOf(lanes[0])}"`,
       data: { poolId, poolName: pool.label ?? "", laneId: lanes[0].id, laneName: lanes[0].label ?? "" },
     });
   }

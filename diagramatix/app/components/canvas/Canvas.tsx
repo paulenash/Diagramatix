@@ -186,6 +186,10 @@ interface Props {
   ) => void;
   selectedElementIds: Set<string>;
   selectedConnectorId: string | null;
+  /** After the user closes "Scan Diagram for Issues", flagged elements are
+   *  tinted on the canvas (red = error, orange = warning) for a short window.
+   *  The map is element id → severity; undefined / empty means no tint. */
+  scanHighlightById?: Map<string, "error" | "warning">;
   onSetSelectedElements: (ids: Set<string> | ((prev: Set<string>) => Set<string>)) => void;
   onSelectConnector: (id: string | null) => void;
   onMoveElements?: (ids: string[], dx: number, dy: number) => void;
@@ -406,6 +410,7 @@ export function Canvas({
   onUpdateConnectorEndpoint,
   selectedElementIds,
   selectedConnectorId,
+  scanHighlightById,
   onSetSelectedElements,
   onSelectConnector,
   onMoveElements,
@@ -5576,6 +5581,30 @@ export function Canvas({
               pointerEvents="none"
             />
           )}
+
+          {/* Scan-issue tint — drawn LAST so it overlays everything. Red for
+              errors, orange for warnings. Cleared after the 20s window by
+              the editor. */}
+          {scanHighlightById && scanHighlightById.size > 0 && data.elements
+            .filter((el: DiagramElement) => scanHighlightById.has(el.id))
+            .map((el: DiagramElement) => {
+              const severity = scanHighlightById.get(el.id);
+              const color = severity === "warning" ? "#f59e0b" : "#dc2626";
+              return (
+                <rect
+                  key={`scan-hl-${el.id}`}
+                  x={el.x - 3}
+                  y={el.y - 3}
+                  width={el.width + 6}
+                  height={el.height + 6}
+                  fill="none"
+                  stroke={color}
+                  strokeWidth={3 / zoom}
+                  rx={4}
+                  pointerEvents="none"
+                />
+              );
+            })}
 
         </g>
       </svg>

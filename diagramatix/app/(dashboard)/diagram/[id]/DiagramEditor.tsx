@@ -854,6 +854,33 @@ export function DiagramEditor({
   // Per-diagram "Scan for Issues" (BPMN only) — runs the shared rule registry
   // on the live diagram client-side; null = modal closed.
   const [diagramScan, setDiagramScan] = useState<Violation[] | null>(null);
+  // Collapsible state for the Errors / Warnings sections inside the dialog.
+  const [scanErrorsOpen, setScanErrorsOpen] = useState(true);
+  const [scanWarningsOpen, setScanWarningsOpen] = useState(true);
+  // After the user closes the scan dialog, tint the flagged elements on the
+  // canvas (red for error, orange for warning) for a short window so they
+  // can see WHICH elements were flagged. Cleared by a setTimeout below.
+  const [scanHighlight, setScanHighlight] = useState<Map<string, "error" | "warning"> | null>(null);
+  const closeDiagramScan = useCallback(() => {
+    if (diagramScan && diagramScan.length > 0) {
+      // Build id → worst-severity. An element flagged as an error AND a
+      // warning ends up as error (more severe wins).
+      const elIds = new Set(data.elements.map((e) => e.id));
+      const hl = new Map<string, "error" | "warning">();
+      for (const v of diagramScan) {
+        for (const id of v.ids) {
+          if (!elIds.has(id)) continue; // connectors / dangling refs — skip
+          const prev = hl.get(id);
+          if (v.severity === "error" || !prev) hl.set(id, v.severity);
+        }
+      }
+      if (hl.size > 0) {
+        setScanHighlight(hl);
+        window.setTimeout(() => setScanHighlight(null), 20_000);
+      }
+    }
+    setDiagramScan(null);
+  }, [diagramScan, data.elements]);
 
   useEffect(() => {
     if (!projectId) return;
@@ -2591,6 +2618,7 @@ export function DiagramEditor({
           onUpdateConnectorEndpoint={updateConnectorEndpoint}
           selectedElementIds={selectedElementIds}
           selectedConnectorId={selectedConnectorId}
+          scanHighlightById={scanHighlight ?? undefined}
           onSetSelectedElements={setSelectedElementIds}
           onSelectConnector={setSelectedConnectorId}
           onMoveElements={moveElements}
@@ -2821,36 +2849,69 @@ export function DiagramEditor({
           );
           return (
             <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-              <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-xl max-h-[80vh] overflow-y-auto">
-                <div className="flex items-center justify-between mb-3">
-                  <h2 className="text-lg font-semibold text-gray-900">Diagram Issues</h2>
-                  <button
-                    onClick={() => setDiagramScan(null)}
-                    className="text-gray-400 hover:text-gray-600 text-lg leading-none"
-                    title="Close"
-                  >✕</button>
-                </div>
-                {diagramScan.length === 0 ? (
-                  <p className="text-sm text-gray-600">No issues found in this diagram.</p>
-                ) : (
-                  <div className="space-y-4">
-                    <p className="text-xs text-gray-500">
-                      {errors.length} error{errors.length === 1 ? "" : "s"}, {warnings.length} warning{warnings.length === 1 ? "" : "s"}.
-                    </p>
-                    {errors.length > 0 && (
-                      <div>
-                        <p className="text-[11px] uppercase tracking-wide text-red-700 mb-1">Errors</p>
-                        {renderList(errors)}
+              <div className="bg-white rounded-lg shadow-xl w-full max-w-xl max-h-[80vh] flex flex-col">
+                {/* Pinned header — Close is always visible while the list scrolls. */}
+                <div className="px-6 py-4 border-b border-gray-200 flex items-start justify-between shrink-0">
+                  <div>
+                    <h2 className="text-lg font-semibold text-gray-900">Diagram Issues</h2>
+                    {diagramScan.length > 0 ? (
+                      <div className="flex items-center gap-3 mt-1 text-xs">
+                        <span className="inline-flex items-center gap-1">
+                          <span className="inline-block w-2 h-2 rounded-full bg-red-600" />
+                          <span className="text-gray-700"><strong>{errors.length}</strong> error{errors.length === 1 ? "" : "s"}</span>
+                        </span>
+                        <span className="inline-flex items-center gap-1">
+                          <span className="inline-block w-2 h-2 rounded-full bg-amber-500" />
+                          <span className="text-gray-700"><strong>{warnings.length}</strong> warning{warnings.length === 1 ? "" : "s"}</span>
+                        </span>
                       </div>
-                    )}
-                    {warnings.length > 0 && (
-                      <div>
-                        <p className="text-[11px] uppercase tracking-wide text-amber-700 mb-1">Warnings</p>
-                        {renderList(warnings)}
-                      </div>
+                    ) : (
+                      <p className="text-xs text-gray-500 mt-1">No issues found.</p>
                     )}
                   </div>
-                )}
+                  <button
+                    onClick={closeDiagramScan}
+                    className="px-3 py-1 text-xs font-medium text-gray-700 border border-gray-300 rounded hover:bg-gray-50 shrink-0"
+                    title="Close (flagged elements will tint on the canvas for ~20 seconds)"
+                  >
+                    Close
+                  </button>
+                </div>
+                {/* Scrolling body */}
+                <div className="overflow-y-auto px-6 py-4 flex-1 space-y-3">
+                  {diagramScan.length === 0 ? (
+                    <p className="text-sm text-gray-600">Nothing to report — this diagram passes every rule.</p>
+                  ) : (
+                    <>
+                      {errors.length > 0 && (
+                        <div className="border border-gray-200 rounded">
+                          <button
+                            onClick={() => setScanErrorsOpen((v) => !v)}
+                            className="w-full flex items-center gap-2 px-3 py-2 bg-red-50 hover:bg-red-100 text-left rounded-t"
+                          >
+                            <span className="text-xs text-gray-500">{scanErrorsOpen ? "▼" : "▶"}</span>
+                            <span className="text-[11px] uppercase tracking-wide font-semibold text-red-700">Errors</span>
+                            <span className="text-[10px] text-gray-600">({errors.length})</span>
+                          </button>
+                          {scanErrorsOpen && <div className="px-3 py-2">{renderList(errors)}</div>}
+                        </div>
+                      )}
+                      {warnings.length > 0 && (
+                        <div className="border border-gray-200 rounded">
+                          <button
+                            onClick={() => setScanWarningsOpen((v) => !v)}
+                            className="w-full flex items-center gap-2 px-3 py-2 bg-amber-50 hover:bg-amber-100 text-left rounded-t"
+                          >
+                            <span className="text-xs text-gray-500">{scanWarningsOpen ? "▼" : "▶"}</span>
+                            <span className="text-[11px] uppercase tracking-wide font-semibold text-amber-700">Warnings</span>
+                            <span className="text-[10px] text-gray-600">({warnings.length})</span>
+                          </button>
+                          {scanWarningsOpen && <div className="px-3 py-2">{renderList(warnings)}</div>}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
               </div>
             </div>
           );
