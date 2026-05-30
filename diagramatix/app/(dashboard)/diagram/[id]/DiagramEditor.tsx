@@ -857,30 +857,87 @@ export function DiagramEditor({
   // Collapsible state for the Errors / Warnings sections inside the dialog.
   const [scanErrorsOpen, setScanErrorsOpen] = useState(true);
   const [scanWarningsOpen, setScanWarningsOpen] = useState(true);
-  // After the user closes the scan dialog, tint the flagged elements on the
-  // canvas (red for error, orange for warning) for a short window so they
-  // can see WHICH elements were flagged. Cleared by a setTimeout below.
-  const [scanHighlight, setScanHighlight] = useState<Map<string, "error" | "warning"> | null>(null);
-  const closeDiagramScan = useCallback(() => {
-    if (diagramScan && diagramScan.length > 0) {
-      // Build id → worst-severity. An element flagged as an error AND a
-      // warning ends up as error (more severe wins).
-      const elIds = new Set(data.elements.map((e) => e.id));
-      const hl = new Map<string, "error" | "warning">();
-      for (const v of diagramScan) {
-        for (const id of v.ids) {
-          if (!elIds.has(id)) continue; // connectors / dangling refs — skip
-          const prev = hl.get(id);
-          if (v.severity === "error" || !prev) hl.set(id, v.severity);
-        }
-      }
-      if (hl.size > 0) {
-        setScanHighlight(hl);
-        window.setTimeout(() => setScanHighlight(null), 20_000);
+  // Review Mode — after the user closes the scan dialog they step through
+  // the flagged elements one by one. `accepted` is the set of indices into
+  // `violations` the user has dismissed in this session; running a new scan
+  // resets it. Outlines persist until the user clicks Exit (no timer).
+  const [reviewIssues, setReviewIssues] = useState<{
+    violations: Violation[];
+    accepted: Set<number>;
+    cursor: number;
+  } | null>(null);
+
+  const activeIssues = useMemo(() => {
+    if (!reviewIssues) return null;
+    return reviewIssues.violations
+      .map((v, i) => ({ v, i }))
+      .filter(({ i }) => !reviewIssues.accepted.has(i));
+  }, [reviewIssues]);
+
+  const currentIssue = activeIssues && activeIssues.length > 0
+    ? activeIssues[Math.min(reviewIssues!.cursor, activeIssues.length - 1)]
+    : null;
+
+  // Tint every (non-accepted) flagged element while review is active. Worst-
+  // severity wins when one element is hit by both an error and a warning.
+  const scanHighlight = useMemo<Map<string, "error" | "warning"> | null>(() => {
+    if (!activeIssues || activeIssues.length === 0) return null;
+    const elIds = new Set(data.elements.map((e) => e.id));
+    const m = new Map<string, "error" | "warning">();
+    for (const { v } of activeIssues) {
+      for (const id of v.ids) {
+        if (!elIds.has(id)) continue; // skip connector ids / dangling refs
+        if (v.severity === "error" || !m.has(id)) m.set(id, v.severity);
       }
     }
+    return m.size > 0 ? m : null;
+  }, [activeIssues, data.elements]);
+
+  const closeDiagramScan = useCallback(() => {
+    if (diagramScan && diagramScan.length > 0) {
+      setReviewIssues({ violations: diagramScan, accepted: new Set(), cursor: 0 });
+    }
     setDiagramScan(null);
-  }, [diagramScan, data.elements]);
+  }, [diagramScan]);
+
+  const reviewNext = useCallback(() => {
+    setReviewIssues((r) => {
+      if (!r) return r;
+      const active = r.violations.map((v, i) => ({ v, i })).filter(({ i }) => !r.accepted.has(i));
+      if (active.length === 0) return null;
+      return { ...r, cursor: Math.min(r.cursor + 1, active.length - 1) };
+    });
+  }, []);
+  const reviewPrev = useCallback(() => {
+    setReviewIssues((r) => (r ? { ...r, cursor: Math.max(0, r.cursor - 1) } : r));
+  }, []);
+  const reviewAcceptCurrent = useCallback(() => {
+    setReviewIssues((r) => {
+      if (!r) return r;
+      const active = r.violations.map((v, i) => ({ v, i })).filter(({ i }) => !r.accepted.has(i));
+      const idx = active.length > 0 ? active[Math.min(r.cursor, active.length - 1)].i : -1;
+      if (idx < 0) return null;
+      const accepted = new Set(r.accepted);
+      accepted.add(idx);
+      const newActive = r.violations.map((v, i) => ({ v, i })).filter(({ i }) => !accepted.has(i));
+      if (newActive.length === 0) return null;
+      return { ...r, accepted, cursor: Math.min(r.cursor, newActive.length - 1) };
+    });
+  }, []);
+  const reviewExit = useCallback(() => setReviewIssues(null), []);
+
+  // When the cursor lands on an issue, select the flagged element on the
+  // canvas (the "child" for containment, otherwise whatever the rule names).
+  useEffect(() => {
+    if (!currentIssue) return;
+    const elIds = new Set(data.elements.map((e) => e.id));
+    // Containment ids are [parent, child] — the child is the interesting one,
+    // so prefer the LAST element id in the violation's ids list.
+    const targetId = [...currentIssue.v.ids].reverse().find((id) => elIds.has(id));
+    if (targetId) setSelectedElementIds(new Set([targetId]));
+    // selectedElementIds is intentionally omitted — we only re-select when the cursor changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentIssue?.i]);
 
   useEffect(() => {
     if (!projectId) return;
@@ -2516,7 +2573,7 @@ export function DiagramEditor({
                   <>
                     <div className="border-t border-gray-100" />
                     <button
-                      onClick={() => { setClearMenuOpen(false); setDiagramScan(checkDiagram(data)); }}
+                      onClick={() => { setClearMenuOpen(false); setReviewIssues(null); setDiagramScan(checkDiagram(data)); }}
                       className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
                       title="Check this diagram against the BPMN structural rules (the same rules the project-level scan uses)."
                     >
@@ -2825,6 +2882,56 @@ export function DiagramEditor({
           </div>
         )}
 
+        {/* Review Mode — footer banner that steps through the flagged elements
+            one at a time. Outlines + selection persist until Exit. Accepting
+            an issue dismisses it for THIS session only; running the scan again
+            re-surfaces every issue (including previously accepted ones). */}
+        {reviewIssues && currentIssue && activeIssues && (() => {
+          const titles = new Map(rulesMetadata().map((r) => [r.id, r.title]));
+          const v = currentIssue.v;
+          return (
+            <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40">
+              <div className="bg-white border border-gray-300 rounded-lg shadow-xl px-3 py-2 flex items-center gap-3 max-w-3xl">
+                <span className="text-[11px] text-gray-500 shrink-0">
+                  Issue <strong className="text-gray-900">{reviewIssues.cursor + 1}</strong> of {activeIssues.length}
+                  {reviewIssues.accepted.size > 0 && (
+                    <span className="text-gray-400"> · {reviewIssues.accepted.size} accepted</span>
+                  )}
+                </span>
+                <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium shrink-0 ${v.severity === "warning" ? "bg-amber-100 text-amber-800" : "bg-red-100 text-red-700"}`}>
+                  {v.severity}
+                </span>
+                <span className="text-xs font-medium text-gray-900 shrink-0">{titles.get(v.rule) ?? v.rule}</span>
+                <span className="text-[11px] text-gray-600 truncate min-w-0" title={v.message}>{v.message}</span>
+                <div className="flex items-center gap-1 shrink-0 ml-2">
+                  <button
+                    onClick={reviewPrev}
+                    disabled={reviewIssues.cursor === 0}
+                    className="px-2 py-1 text-xs text-gray-700 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed"
+                    title="Previous issue"
+                  >‹ Prev</button>
+                  <button
+                    onClick={reviewAcceptCurrent}
+                    className="px-2 py-1 text-xs text-gray-700 border border-gray-300 rounded hover:bg-green-50 hover:border-green-300"
+                    title="Accept this issue for this session (it will reappear on the next scan)"
+                  >Accept</button>
+                  <button
+                    onClick={reviewNext}
+                    disabled={reviewIssues.cursor >= activeIssues.length - 1}
+                    className="px-2 py-1 text-xs text-gray-700 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed"
+                    title="Next issue"
+                  >Next ›</button>
+                  <button
+                    onClick={reviewExit}
+                    className="px-2 py-1 text-xs text-gray-500 hover:text-gray-700 ml-1"
+                    title="Exit review (clears the outlines)"
+                  >✕</button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Per-diagram "Scan for Issues" results (BPMN only). Runs the shared
             rule registry on the live diagram — same rules as the project scan
             and the test harness. */}
@@ -2872,7 +2979,7 @@ export function DiagramEditor({
                   <button
                     onClick={closeDiagramScan}
                     className="px-3 py-1 text-xs font-medium text-gray-700 border border-gray-300 rounded hover:bg-gray-50 shrink-0"
-                    title="Close (flagged elements will tint on the canvas for ~20 seconds)"
+                    title="Close — when there are issues you'll step through them in Review Mode"
                   >
                     Close
                   </button>
