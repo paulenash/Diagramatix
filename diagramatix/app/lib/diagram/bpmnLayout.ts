@@ -964,7 +964,16 @@ export function layoutBpmnDiagram(
   // warnings the scanner reports. Floats (annotations, groups) are excluded
   // from the bounds check so a stray annotation can't bloat a lane.
   function fitLanesToChildren() {
-    const FLOAT = new Set(["text-annotation", "group"]);
+    // Float types never belong in a lane's bounds; neither do gateways or
+    // events. BPMN lanes represent PERFORMERS — only activities (tasks /
+    // subprocesses) need to fit inside their lane, so gateways and events
+    // are free to ride a cross-lane midpoint (R8.01) without forcing the
+    // lane to stretch around them.
+    const NON_LANE_BOUND = new Set([
+      "text-annotation", "group",
+      "gateway",
+      "start-event", "intermediate-event", "end-event",
+    ]);
     const PAD = 10;
     for (const pool of elements.filter(e => e.type === "pool")) {
       const lanes = elements.filter(e => e.type === "lane" && e.parentId === pool.id).sort((a, b) => a.y - b.y);
@@ -978,7 +987,7 @@ export function layoutBpmnDiagram(
         let minY = Infinity, maxY = -Infinity;
         for (const id of kidIds) {
           const el = elements.find(e => e.id === id);
-          if (!el || FLOAT.has(el.type)) continue;
+          if (!el || NON_LANE_BOUND.has(el.type)) continue;
           minY = Math.min(minY, el.y);
           maxY = Math.max(maxY, el.y + el.height);
         }

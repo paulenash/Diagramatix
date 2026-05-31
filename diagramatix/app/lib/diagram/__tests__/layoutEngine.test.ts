@@ -185,17 +185,21 @@ describe("cross-lane decision gateway stays inside its parent lane", () => {
     { sourceId: "gwMerge", targetId: "e", type: "sequence" },
   ];
 
-  it("every lane-parented element sits fully inside its parent lane", () => {
+  it("every lane-parented ACTIVITY sits fully inside its parent lane", () => {
+    // Gateways and events are intentionally lane-independent (BPMN: only
+    // performers — i.e. activities — are bound to a lane).
+    const ACTIVITY = new Set(["task", "subprocess", "subprocess-expanded"]);
     const { data, byId } = run(plan, conns);
     for (const el of data.elements) {
       if (!el.parentId) continue;
+      if (!ACTIVITY.has(el.type)) continue;
       const parent = byId.get(el.parentId);
       if (!parent || parent.type !== "lane") continue;
       expect(contains(parent, el), `${el.id} (${el.label}) inside lane ${parent.id}`).toBe(true);
     }
   });
 
-  it("no containment violations (errors or warnings)", () => {
+  it("no containment violations from the checker (gateways/events exempt)", () => {
     const data = run(plan, conns).data;
     const conts = checkDiagram(data).filter((v) => v.rule === "containment");
     expect(conts, formatViolations(conts)).toEqual([]);

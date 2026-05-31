@@ -103,14 +103,23 @@ export function checkReferentialIntegrity(d: DiagramLike): Violation[] {
   return out;
 }
 
+/** BPMN lanes represent PERFORMERS (roles / systems). Only *activities* have
+ *  a performer — gateways are pure flow-routing and events are triggers, so
+ *  neither needs to sit inside a specific lane. Pools, however, are the
+ *  process scope: every flow element must stay inside its pool regardless
+ *  of type. */
+const ACTIVITY_TYPES = new Set<string>(["task", "subprocess", "subprocess-expanded"]);
+
 /** Every container (pool, lane, expanded subprocess) fully encloses each of
- *  its direct children. Boundary events straddle their host edge and are exempt.
+ *  its direct children — with one BPMN-aware exemption: a gateway or event
+ *  that overflows only its LANE (while staying inside the pool) is NOT
+ *  flagged, because non-activities aren't bound to a performer's lane. They
+ *  ARE still required to stay inside the pool.
  *
  *  Severity: overflowing a POOL or SUBPROCESS is a structural ERROR (the
- *  element escapes the process boundary). Overflowing only a LANE while still
- *  inside the pool is a WARNING — the element is correctly in the process
- *  hierarchy, it just crosses a swimlane divider (common for cross-lane
- *  gateways, and the symptom of a lane sized smaller than its content). */
+ *  element escapes the process boundary). An activity overflowing only a
+ *  LANE while still inside the pool is a WARNING (a lane that's too small
+ *  for the work it contains). */
 export function checkContainment(d: DiagramLike): Violation[] {
   const byId = new Map(d.elements.map((e) => [e.id, e]));
   const CONTAINERS = new Set(["pool", "lane", "subprocess-expanded"]);
@@ -128,7 +137,25 @@ export function checkContainment(d: DiagramLike): Violation[] {
     const parent = byId.get(child.parentId);
     if (!parent || !CONTAINERS.has(parent.type)) continue;
     if (contains(parent, child)) continue;
-    // Lane overflow that's still inside the pool → warning; anything else → error.
+
+    // Lane overflow for a non-activity (gateway / event) is acceptable in
+    // BPMN — only the pool boundary matters for these. Verify it didn't
+    // escape the pool, then move on.
+    if (parent.type === "lane" && !ACTIVITY_TYPES.has(child.type)) {
+      const pool = poolAncestor(parent);
+      if (pool && !contains(pool, child)) {
+        out.push({
+          rule: "containment",
+          severity: "error",
+          ids: [pool.id, child.id],
+          message: `${child.type} "${nameOf(child)}" sits outside its pool "${nameOf(pool)}"`,
+        });
+      }
+      continue;
+    }
+
+    // Activity overflowing a lane (still inside the pool) → warning. Any
+    // overflow of a pool or subprocess (or activity escaping its pool) → error.
     const pool = parent.type === "lane" ? poolAncestor(parent) : undefined;
     const withinPool = !!pool && contains(pool, child);
     const note = withinPool ? " — outside its lane but still within the pool" : "";
