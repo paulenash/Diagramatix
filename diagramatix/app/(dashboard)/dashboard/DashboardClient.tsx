@@ -552,6 +552,26 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
     setShowEditZoom(false);
   }
 
+  // Matrix screensaver config — idle seconds before the green katakana rain
+  // takes over. The on/off switch is the floating green "M" in the bottom-
+  // right corner; this dialog just lets the user set the timeout.
+  const MATRIX_IDLE_DEFAULT = 30;
+  const [showMatrixConfig, setShowMatrixConfig] = useState(false);
+  const [matrixIdleInput, setMatrixIdleInput] = useState<string>(() => {
+    if (typeof window === "undefined") return String(MATRIX_IDLE_DEFAULT);
+    const stored = window.localStorage.getItem("diagramatix.matrix.idleSeconds");
+    const n = parseInt(stored ?? "", 10);
+    return Number.isFinite(n) && n > 0 ? String(n) : String(MATRIX_IDLE_DEFAULT);
+  });
+  function handleMatrixConfigSave() {
+    const n = parseInt(matrixIdleInput, 10);
+    const seconds = Number.isFinite(n) && n > 0 ? Math.min(3600, n) : MATRIX_IDLE_DEFAULT;
+    window.localStorage.setItem("diagramatix.matrix.idleSeconds", String(seconds));
+    window.dispatchEvent(new Event("diagramatix.matrix.config-changed"));
+    setMatrixIdleInput(String(seconds));
+    setShowMatrixConfig(false);
+  }
+
   // Account modal
   const [showAccount, setShowAccount] = useState(false);
   const [acctName, setAcctName] = useState(userName);
@@ -1407,6 +1427,13 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                         </button>
                       </div>
                     </div>
+                    <button
+                      onClick={() => { setFileMenuOpen(false); setShowMatrixConfig(true); }}
+                      title="Set how long the screen must be idle before the Matrix screensaver kicks in (when the green M in the bottom-right is on)."
+                      className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                    >
+                      {"Matrix Screensaver\u2026"}
+                    </button>
                     {isSu && (
                       <>
                         <div className="border-t border-gray-100" />
@@ -2308,6 +2335,50 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
               <button
                 onClick={handleEditZoomSave}
                 className="px-4 py-2 text-sm text-white bg-blue-600 rounded-md hover:bg-blue-700"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Matrix Screensaver dialog */}
+      {showMatrixConfig && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm">
+            <h2 className="text-lg font-semibold text-gray-900 mb-2">Matrix Screensaver</h2>
+            <p className="text-xs text-gray-500 mb-4">
+              Set how many seconds the page must be idle before the green
+              katakana rain kicks in. The screensaver only activates while the
+              floating green M (bottom-right) is on; any keyboard or mouse
+              activity dismisses it. Default is 30. Range 5–3600 seconds.
+            </p>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Idle time (seconds)</label>
+              <input
+                autoFocus
+                type="number"
+                min={5}
+                max={3600}
+                step={5}
+                value={matrixIdleInput}
+                onChange={(e) => setMatrixIdleInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleMatrixConfigSave()}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                placeholder="30"
+              />
+            </div>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setShowMatrixConfig(false)}
+                className="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleMatrixConfigSave}
+                className="px-4 py-2 text-sm text-white bg-green-600 rounded-md hover:bg-green-700"
               >
                 Save
               </button>

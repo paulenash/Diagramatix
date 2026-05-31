@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Caveat } from "next/font/google";
 import { SessionProvider } from "@/app/components/SessionProvider";
+import { MatrixToggle } from "@/app/components/MatrixToggle";
 import "./globals.css";
 
 const geist = Geist({
@@ -26,7 +27,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${geist.variable} ${caveat.variable} antialiased`}>
-          <SessionProvider>{children}</SessionProvider>
+          <SessionProvider>
+            {children}
+            <MatrixToggle />
+          </SessionProvider>
         </body>
     </html>
   );
