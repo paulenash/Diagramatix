@@ -18,10 +18,13 @@ export default function MatrixPage() {
     if (!ctx) return;
 
     // Tunables. Lower FADE_ALPHA = longer trails (each frame paints a less
-    // opaque black over the canvas before drawing the next head).
+    // opaque black over the canvas before drawing the next head). SPEED_DIVISOR
+    // throttles the cascade by only stepping every Nth animation frame —
+    // 4 ≈ quarter-speed at 60 fps.
     const FONT_SIZE = 16;
     const FADE_ALPHA = 0.06;
     const RESET_PROBABILITY = 0.025; // chance per frame a finished column restarts
+    const SPEED_DIVISOR = 4;
     const CHARS =
       "アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン" +
       "0123456789ABCDEF" +
@@ -67,8 +70,10 @@ export default function MatrixPage() {
     };
 
     let raf = 0;
+    let frame = 0;
     const loop = () => {
-      draw();
+      if (frame % SPEED_DIVISOR === 0) draw();
+      frame++;
       raf = window.requestAnimationFrame(loop);
     };
     loop();
