@@ -72,6 +72,24 @@
     DiagramReviewer, Notifications — is relational metadata and is NOT
     embedded in a diagram or project export. Pre-v1.15 exports simply
     contain neither enum value.
+
+  v1.16 — BPMN right-click picker + editor polish. No schema shape
+    change; both GatewayTypeEnum and GatewayRoleEnum already existed.
+    The bump documents three behavioural changes worth knowing about
+    when comparing exports across versions:
+      - The gateway right-click "type-picker" now exposes both
+        gatewayType (None / Exclusive / Inclusive / Parallel /
+        Event-based) AND properties.gatewayRole (Decision / Merge) in
+        a single multi-section menu. Pre-v1.16 the user could only
+        set gatewayRole via the Properties panel.
+      - The intermediate-event right-click Trigger list no longer
+        offers "Terminate" — BPMN reserves the terminate trigger for
+        end events only. Exports that already carry eventType =
+        "terminate" on an intermediate-event remain readable (the
+        schema still allows the enum value); the change is purely
+        in the picker UI.
+      - Properties-panel label "Element" renamed to "Gateway Type"
+        for consistency with the right-click section header.
 -->
 
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"

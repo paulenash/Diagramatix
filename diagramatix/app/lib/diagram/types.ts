@@ -471,5 +471,18 @@ export interface TemplateData {
  *          relational metadata and is never embedded in a diagram or
  *          project export, so the only XSD change is the two new enum
  *          members. Pre-1.15 exports simply contain neither.
+ * v1.16:   BPMN right-click picker + small editor polish. No schema
+ *          shape change — both `gatewayType` and `properties.gatewayRole`
+ *          already existed (GatewayTypeEnum / GatewayRoleEnum). Bump is
+ *          for the behavioural changes:
+ *          - The gateway right-click "type-picker" now shows TWO sections:
+ *            Gateway Type (None / Exclusive / Inclusive / Parallel /
+ *            Event-based) and Role (Decision / Merge). Arrow keys
+ *            navigate across both sections, skipping the headers.
+ *          - The intermediate-event right-click Trigger list no longer
+ *            offers "Terminate" — BPMN reserves the terminate trigger
+ *            for end events only.
+ *          - Properties panel label "Element" renamed to "Gateway Type"
+ *            for clarity (matches the right-click section heading).
  */
-export const SCHEMA_VERSION = "1.15";
+export const SCHEMA_VERSION = "1.16";

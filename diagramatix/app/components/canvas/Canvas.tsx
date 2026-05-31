@@ -20,6 +20,7 @@ import type {
 import { ArchimateConnectorPicker } from "./ArchimateConnectorPicker";
 import { BubbleHelp } from "./BubbleHelp";
 import { SymbolRenderer, SublaneIdsCtx, ProcessGroupDepthCtx, LaneDepthCtx, DatabaseCtx, ArchimateDepthCtx, type ResizeHandle } from "./SymbolRenderer";
+import { ElementContextMenu } from "./ElementContextMenu";
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
 import { PaletteSymbolPreview } from "./Palette";
 import { CHEVRON_THEMES } from "@/app/lib/diagram/chevronThemes";
@@ -5914,129 +5915,36 @@ export function Canvas({
       })()}
 
       {/* Element-specific right-click context menu (task / gateway /
-          subprocess / data-object / event). Replaces the quick-add palette
-          when the right-click lands on a supported element type. */}
+          subprocess / data-object / event). For gateways this now shows two
+          sections — Gateway Type AND Role — and supports ↑/↓/Enter/Esc
+          keyboard navigation that skips section headers. */}
       {elementContextMenu && (() => {
         const ecm = elementContextMenu;
         const el = data.elements.find(e => e.id === ecm.elementId);
         if (!el) { setElementContextMenu(null); return null; }
-        type Opt = { value: string; label: string };
-        const TASK_OPTS: Opt[] = [
-          { value: "none",          label: "None" },
-          { value: "user",          label: "User" },
-          { value: "service",       label: "Service" },
-          { value: "script",        label: "Script" },
-          { value: "send",          label: "Send" },
-          { value: "receive",       label: "Receive" },
-          { value: "manual",        label: "Manual" },
-          { value: "business-rule", label: "Business Rule" },
-        ];
-        const GATEWAY_OPTS: Opt[] = [
-          { value: "none",        label: "None" },
-          { value: "exclusive",   label: "Exclusive ×" },
-          { value: "inclusive",   label: "Inclusive ○" },
-          { value: "parallel",    label: "Parallel +" },
-          { value: "event-based", label: "Event-based ⬠" },
-        ];
-        const SUBPROCESS_OPTS: Opt[] = [
-          { value: "normal",      label: "Normal" },
-          { value: "call",        label: "Call" },
-          { value: "event",       label: "Event" },
-          { value: "transaction", label: "Transaction" },
-        ];
-        const DATA_OBJECT_OPTS: Opt[] = [
-          { value: "none",   label: "None" },
-          { value: "input",  label: "Input" },
-          { value: "output", label: "Output" },
-        ];
-        const EVENT_OPTS: Opt[] = [
-          { value: "none",         label: "None" },
-          { value: "message",      label: "Message" },
-          { value: "timer",        label: "Timer" },
-          { value: "error",        label: "Error" },
-          { value: "signal",       label: "Signal" },
-          { value: "terminate",    label: "Terminate" },
-          { value: "conditional",  label: "Conditional" },
-          { value: "escalation",   label: "Escalation" },
-          { value: "cancel",       label: "Cancel" },
-          { value: "compensation", label: "Compensation" },
-          { value: "link",         label: "Link" },
-        ];
-        const HEADERS: Record<typeof ecm.kind, string> = {
-          "task":        "Task Type",
-          "gateway":     "Gateway Type",
-          "subprocess":  "Sub-Process Usage",
-          "data-object": "Role",
-          "event":       "Trigger",
-        };
-        const OPT_MAP: Record<typeof ecm.kind, Opt[]> = {
-          "task":        TASK_OPTS,
-          "gateway":     GATEWAY_OPTS,
-          "subprocess":  SUBPROCESS_OPTS,
-          "data-object": DATA_OBJECT_OPTS,
-          "event":       EVENT_OPTS,
-        };
-        const PROP_KEY: Record<typeof ecm.kind, string> = {
-          "task":        "taskType",
-          "gateway":     "gatewayType",
-          "subprocess":  "subprocessType",
-          "data-object": "role",
-          "event":       "eventType",
-        };
-        const opts = OPT_MAP[ecm.kind];
-        const header = HEADERS[ecm.kind];
-        const propKey = PROP_KEY[ecm.kind];
-        // Current value to highlight as selected. taskType / gatewayType /
-        // eventType live on the element directly; subprocessType / role live
-        // in element.properties.
-        const currentValue = (() => {
-          switch (ecm.kind) {
-            case "task":        return el.taskType ?? "none";
-            case "gateway":     return el.gatewayType ?? "none";
-            case "event":       return el.eventType ?? "none";
-            case "subprocess":  return (el.properties.subprocessType as string | undefined) ?? "normal";
-            case "data-object": return (el.properties.role as string | undefined) ?? "none";
-          }
-        })();
-        const ITEM_H = 24;
-        const HEADER_H = 22;
-        const PAD = 4;
+        // Generous height estimate covering the largest menu (Event Trigger
+        // with 11 entries). Used only to keep the popup inside the canvas
+        // container on right-clicks near a viewport edge.
         const POPUP_W = 160;
-        const POPUP_H = HEADER_H + opts.length * ITEM_H + 2 * PAD;
+        const POPUP_H_MAX = 320;
         const containerRect = svgRef.current?.parentElement?.getBoundingClientRect();
         const containerW = containerRect?.width ?? window.innerWidth;
         const containerH = containerRect?.height ?? window.innerHeight;
         const left = Math.min(ecm.screenX, containerW - POPUP_W - 4);
-        const top = Math.min(ecm.screenY, containerH - POPUP_H - 4);
+        const top = Math.min(ecm.screenY, containerH - POPUP_H_MAX - 4);
         return (
-          <div
-            style={{ position: "absolute", left, top, zIndex: 50, width: POPUP_W }}
-            className="bg-white border border-gray-300 rounded shadow-lg py-1 flex flex-col"
-            onMouseDown={(e) => e.stopPropagation()}
-            onContextMenu={(e) => e.preventDefault()}
-          >
-            <div className="px-3 py-0.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wide border-b border-gray-100 select-none">
-              {header}
-            </div>
-            {opts.map((opt) => (
-              <button
-                key={opt.value}
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  onUpdateProperties?.(el.id, { [propKey]: opt.value });
-                  setElementContextMenu(null);
-                }}
-                className={`text-left px-3 py-0.5 text-sm hover:bg-gray-50 ${
-                  opt.value === currentValue
-                    ? "text-blue-700 font-medium bg-blue-50"
-                    : "text-gray-700"
-                }`}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
+          <ElementContextMenu
+            el={el}
+            kind={ecm.kind}
+            left={left}
+            top={top}
+            width={POPUP_W}
+            onSelect={(propKey, value) => {
+              onUpdateProperties?.(el.id, { [propKey]: value });
+              setElementContextMenu(null);
+            }}
+            onClose={() => setElementContextMenu(null)}
+          />
         );
       })()}
 

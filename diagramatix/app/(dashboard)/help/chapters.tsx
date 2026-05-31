@@ -551,6 +551,47 @@ export const CHAPTERS: HelpChapter[] = [
         imageCaption: "Right-click quick-add popup.",
       },
       {
+        heading: "Right-click type-picker on an existing element",
+        body: (
+          <>
+            <p>
+              Right-clicking on an existing <strong>task</strong>,{" "}
+              <strong>gateway</strong>, <strong>sub-process</strong>,{" "}
+              <strong>data object</strong> or <strong>event</strong> opens
+              a small picker that lets you change its type or role without
+              going through the Properties panel. The popup is keyboard-
+              navigable:
+            </p>
+            <ul className="list-disc list-inside space-y-1 mt-2">
+              <li><strong>↑ / ↓</strong> — move between options (section headers are skipped automatically).</li>
+              <li><strong>Enter / Space</strong> — apply the focused option.</li>
+              <li><strong>Esc</strong> — close without changing anything.</li>
+              <li>Mouse hover also moves the keyboard focus, so the two work together.</li>
+            </ul>
+            <p className="mt-2">
+              <strong>Gateways</strong> are the only multi-section picker:
+            </p>
+            <ul className="list-disc list-inside space-y-1 mt-1">
+              <li>
+                <strong>Gateway Type</strong> — None, Exclusive ×,
+                Inclusive ○, Parallel +, Event-based ⬠.
+              </li>
+              <li>
+                <strong>Role</strong> — Decision or Merge. Decision is the
+                default. The role is also editable from the Properties panel.
+              </li>
+            </ul>
+            <p className="mt-2">
+              <strong>Intermediate events</strong> can use Message, Timer,
+              Error, Signal, Conditional, Escalation, Cancel, Compensation
+              or Link as their trigger. <strong>Terminate</strong> is
+              deliberately not offered for intermediate events — BPMN
+              reserves it for end events only.
+            </p>
+          </>
+        ),
+      },
+      {
         heading: "Dropping into expanded subprocesses",
         body: (
           <p>

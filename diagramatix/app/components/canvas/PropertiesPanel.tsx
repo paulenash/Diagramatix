@@ -2384,7 +2384,7 @@ export function PropertiesPanel({
 
       {element.type === "gateway" && diagramType !== "state-machine" && (
         <div className="flex items-center gap-1">
-          <label className="text-[10px] text-gray-500 whitespace-nowrap w-14 shrink-0">Element</label>
+          <label className="text-[10px] text-gray-500 whitespace-nowrap w-14 shrink-0">Gateway Type</label>
           <select
             value={element.gatewayType ?? "none"}
             onChange={(e) => onUpdateProperties(element.id, { gatewayType: e.target.value })}
