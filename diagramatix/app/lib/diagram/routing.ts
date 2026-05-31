@@ -1172,19 +1172,16 @@ export function recomputeAllConnectors(
       };
     }
 
-    // For rectilinear connectors, try to PRESERVE the interior of the
-    // existing path and just re-anchor the entry/exit segments to the moved
-    // endpoint. That avoids redrawing the whole connector on every mouse
-    // move; only the segments nearest the moved element change. Applies to
-    // every path with interior waypoints (N ≥ 7 — single L-shape and up);
-    // the validation below (orthogonal, outward, no obstacle within ½ task
-    // height) falls through to a full recompute whenever the preserved
-    // path would no longer be valid — e.g. the moved element invalidated
-    // the geometry or the path would now hug an obstacle.
+    // For rectilinear connectors with USER-CUSTOMISED interior routing,
+    // try to preserve their waypoints. Auto-generated routes (single L-shape
+    // = 7 waypoints, single vertical jog = 8 waypoints) are NOT preserved —
+    // they should always recompute from scratch so jogs stay centred between
+    // the two elements as they move. Only when N >= 9 do we have evidence of
+    // user customisation worth preserving.
     if (conn.routingType === "rectilinear") {
       const wp = conn.waypoints;
       const N = wp.length;
-      if (N >= 7) {
+      if (N >= 9) {
         const newSrcCenter  = getConnectionPointBySide(source, conn.sourceSide);
         const newTgtCenter  = getConnectionPointBySide(target, conn.targetSide);
         const newSrcEdge    = sidePoint(source, conn.sourceSide, conn.sourceOffsetAlong ?? 0.5);
@@ -1258,13 +1255,10 @@ export function recomputeAllConnectors(
           const dy = Math.abs(candidate[i].y - candidate[i - 1].y);
           if (dx > 0.5 && dy > 0.5) { allOrthogonal = false; break; }
         }
-        // Require ½-task-height clearance — same margin as the main router's
-        // detours. Without this, a preserved path could end up hugging an
-        // obstacle even though the live router would have given it 33 px.
-        if (allOrthogonal && outwardOk && !pathHitsObstacles(candidate, obstacles, L_SHAPE_CLEARANCE)) {
+        if (allOrthogonal && outwardOk && !pathHitsObstacles(candidate, obstacles)) {
           return { ...conn, waypoints: candidate };
         }
-        // Interior routing hits obstacle, hugs it, goes inward, or is non-orthogonal — fall through
+        // Interior routing hits obstacle, goes inward, or is non-orthogonal — fall through
       }
     }
 

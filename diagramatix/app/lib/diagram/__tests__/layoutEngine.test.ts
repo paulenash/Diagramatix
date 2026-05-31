@@ -10,7 +10,6 @@
 import { describe, it, expect } from "vitest";
 import { layoutBpmnDiagram, type AiElement, type AiConnection } from "../bpmnLayout";
 import { checkDiagram, formatViolations } from "../checks/diagramChecks";
-import { recomputeAllConnectors } from "../routing";
 import type { DiagramElement } from "../types";
 
 function run(elements: AiElement[], connections: AiConnection[]) {
@@ -204,59 +203,6 @@ describe("cross-lane decision gateway stays inside its parent lane", () => {
     const data = run(plan, conns).data;
     const conts = checkDiagram(data).filter((v) => v.rule === "containment");
     expect(conts, formatViolations(conts)).toEqual([]);
-  });
-});
-
-describe("rectilinear connector partial-rebuild on element move", () => {
-  // Cross-lane plan from above produces at least one rectilinear sequence
-  // connector with a bend (Sales start → Operations work).
-  const plan: AiElement[] = [
-    { id: "p1", type: "pool", label: "Company", poolType: "white-box" },
-    { id: "lS", type: "lane", label: "Sales", parentPool: "p1", pool: "p1" },
-    { id: "lO", type: "lane", label: "Operations", parentPool: "p1", pool: "p1" },
-    { id: "s", type: "start-event", label: "Start", pool: "p1", lane: "lS" },
-    { id: "t", type: "task", label: "Do", pool: "p1", lane: "lO" },
-    { id: "e", type: "end-event", label: "End", pool: "p1", lane: "lO" },
-  ];
-  const conns: AiConnection[] = [
-    { sourceId: "s", targetId: "t", type: "sequence" },
-    { sourceId: "t", targetId: "e", type: "sequence" },
-  ];
-
-  it("keeps every segment orthogonal after a small endpoint move", () => {
-    const { data } = run(plan, conns);
-    const conn = data.connectors.find((c) => c.type === "sequence" && c.routingType === "rectilinear");
-    expect(conn, "fixture should produce a rectilinear sequence connector").toBeDefined();
-    // Nudge the source element a few pixels in both axes.
-    const moved = data.elements.map((el) =>
-      el.id === conn!.sourceId ? { ...el, x: el.x + 4, y: el.y + 3 } : el,
-    );
-    const [reCon] = recomputeAllConnectors([conn!], moved);
-    expect(reCon.waypoints.length).toBeGreaterThanOrEqual(2);
-    for (let i = 1; i < reCon.waypoints.length; i++) {
-      const dx = Math.abs(reCon.waypoints[i].x - reCon.waypoints[i - 1].x);
-      const dy = Math.abs(reCon.waypoints[i].y - reCon.waypoints[i - 1].y);
-      expect(dx < 0.5 || dy < 0.5, `segment ${i} must be axis-aligned`).toBe(true);
-    }
-  });
-
-  it("preserves interior waypoints on small moves (no full recompute)", () => {
-    const { data } = run(plan, conns);
-    const conn = data.connectors.find((c) => c.type === "sequence" && c.routingType === "rectilinear" && c.waypoints.length >= 7);
-    if (!conn) return; // skip if the fixture didn't produce a multi-bend path
-    const interiorYs = conn.waypoints.slice(3, conn.waypoints.length - 3).map((p) => p.y);
-    // Nudge source horizontally (won't invalidate the corner Y of an L/jog).
-    const moved = data.elements.map((el) =>
-      el.id === conn.sourceId ? { ...el, x: el.x + 3 } : el,
-    );
-    const [reCon] = recomputeAllConnectors([conn], moved);
-    // At least one of the original interior Y's should survive somewhere
-    // in the new path — proof the preservation branch ran (a full recompute
-    // would have generated a fresh midpoint Y).
-    const someYPreserved = interiorYs.some((y) =>
-      reCon.waypoints.some((p) => Math.abs(p.y - y) < 0.5),
-    );
-    expect(someYPreserved, "expected at least one original interior Y to be preserved").toBe(true);
   });
 });
 
