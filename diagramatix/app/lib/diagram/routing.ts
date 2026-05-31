@@ -258,18 +258,17 @@ function buildOrthogonalPath(
   if (!pathHitsObstacles(pathA, obstacles, L_SHAPE_CLEARANCE)) return pathA;
   if (!pathHitsObstacles(pathB, obstacles, L_SHAPE_CLEARANCE)) return pathB;
 
-  // Both L-shaped paths blocked — route around the obstacles. Each detour
-  // line maintains a generous ½-Task-height (33 px) gap from the blocker.
-  // A second obstacle within that gap is NOT a reason to hug closer — the
-  // path-acceptance check below rejects the candidate and another detour
-  // direction is tried. The ONLY case where we accept less than BIG_MARGIN
-  // is when a pool wall is in the way; there we clamp to wall − POOL_INSET
-  // so the route stays just inside the pool rather than breaching it.
-  //
+  // Both L-shaped paths blocked — route around the obstacles.
+  // Margin defaults to ½ default-Task-height (= 33 px) for a visually
+  // generous detour. Falls back to 10 px when the wide detour would
+  // either (a) squeeze a second obstacle between the blocker and the
+  // detour line, or (b) push the detour past a pool wall on the side
+  // the detour is heading toward.
   // Each detour direction only considers obstacles whose perpendicular
   // projection overlaps the start↔end span on the OTHER axis — so a
   // far-away obstacle off to the side doesn't push the detour wider
   // than needed.
+  const SMALL_MARGIN = 10;
   const BIG_MARGIN = 33; // ½ × default Task height (65 px)
   const POOL_INSET = 4;  // detour line must stay at least this far inside the pool wall
   const xMin = Math.min(start.x, end.x);
@@ -281,58 +280,97 @@ function buildOrthogonalPath(
   const poolsX = poolBounds.filter(p => p.x < xMax && p.x + p.width > xMin);
   const poolsY = poolBounds.filter(p => p.y < yMax && p.y + p.height > yMin);
 
+  // Directional crowding test. `dir` says which way the detour is
+  // heading (the side of the blocker the line is being placed on).
+  // For each obstacle on that side: trigger if its near edge sits
+  // between `line` and `line + dir*BIG_MARGIN` — i.e., the detour
+  // would visibly squeeze it. For each pool: trigger only if the
+  // wall on the detour's heading direction is at/past `line`
+  // (the line would clip or breach the pool boundary).
+  function isCrowded(
+    line: number,
+    axis: "y" | "x",
+    dir: 1 | -1,
+    blockerEdge: number,
+    relevantObs: Bounds[],
+    relevantPools: Bounds[],
+  ): boolean {
+    for (const o of relevantObs) {
+      const lo = axis === "y" ? o.y : o.x;
+      const hi = lo + (axis === "y" ? o.height : o.width);
+      // Near edge = the side facing the blocker.
+      const nearEdge = dir > 0 ? lo : hi;
+      // Only obstacles strictly past the blocker on the detour side
+      // can squeeze (the blocker itself sits at blockerEdge).
+      if (dir > 0 ? nearEdge <= blockerEdge + 0.5 : nearEdge >= blockerEdge - 0.5) continue;
+      // Squeeze test: near edge is between the detour line and one
+      // BIG_MARGIN further out.
+      if (dir > 0) {
+        if (nearEdge > line && nearEdge <= line + BIG_MARGIN) return true;
+      } else {
+        if (nearEdge < line && nearEdge >= line - BIG_MARGIN) return true;
+      }
+    }
+    for (const p of relevantPools) {
+      const lo = axis === "y" ? p.y : p.x;
+      const hi = lo + (axis === "y" ? p.height : p.width);
+      // Wall on the detour's heading direction.
+      const wall = dir > 0 ? hi : lo;
+      // Trigger if the BIG detour line would be at-or-past the wall
+      // (allowing a small visual inset before counting as clipped).
+      if (dir > 0 ? line > wall - POOL_INSET : line < wall + POOL_INSET) return true;
+    }
+    return false;
+  }
+
   // Per-call diagnostic. Enable via `window.__DIAGRAMATIX_TRACE_MARGIN = true`
   // in the browser dev tools, then drag/delete and read the console.
   const trace = typeof window !== "undefined"
     && !!(window as unknown as { __DIAGRAMATIX_TRACE_MARGIN?: boolean }).__DIAGRAMATIX_TRACE_MARGIN;
-
-  // Clamp a detour line so it stays just inside any pool wall on the
-  // detour's heading direction (otherwise the route would breach the pool).
-  // Returns the line moved to wall − POOL_INSET when the wall would have
-  // been crossed; otherwise returns the line unchanged.
-  function clampToPoolWall(line: number, axis: "y" | "x", dir: 1 | -1, pools: Bounds[]): number {
-    let out = line;
-    for (const p of pools) {
-      const lo = axis === "y" ? p.y : p.x;
-      const hi = lo + (axis === "y" ? p.height : p.width);
-      const wall = dir > 0 ? hi : lo;
-      if (dir > 0) { if (out > wall - POOL_INSET) out = wall - POOL_INSET; }
-      else         { if (out < wall + POOL_INSET) out = wall + POOL_INSET; }
-    }
-    return out;
-  }
 
   // SOUTH detour — line below all x-overlapping obstacles.
   let bottomY = yMax;
   if (obsX.length > 0) {
     const blockerBottom = Math.max(...obsX.map(o => o.y + o.height));
     const base = Math.max(bottomY, blockerBottom);
-    bottomY = clampToPoolWall(base + BIG_MARGIN, "y", 1, poolsX);
-    if (trace) console.log(`[MARGIN south] base=${base} line=${bottomY}`);
+    const tent = base + BIG_MARGIN;
+    const crowded = isCrowded(tent, "y", 1, blockerBottom, obsX, poolsX);
+    const margin = crowded ? SMALL_MARGIN : BIG_MARGIN;
+    bottomY = base + margin;
+    if (trace) console.log(`[MARGIN south] base=${base} tent=${tent} pools=${JSON.stringify(poolsX)} obs=${JSON.stringify(obsX)} crowded=${crowded} margin=${margin}`);
   }
   // NORTH detour — line above all x-overlapping obstacles.
   let topY = yMin;
   if (obsX.length > 0) {
     const blockerTop = Math.min(...obsX.map(o => o.y));
     const base = Math.min(topY, blockerTop);
-    topY = clampToPoolWall(base - BIG_MARGIN, "y", -1, poolsX);
-    if (trace) console.log(`[MARGIN north] base=${base} line=${topY}`);
+    const tent = base - BIG_MARGIN;
+    const crowded = isCrowded(tent, "y", -1, blockerTop, obsX, poolsX);
+    const margin = crowded ? SMALL_MARGIN : BIG_MARGIN;
+    topY = base - margin;
+    if (trace) console.log(`[MARGIN north] base=${base} tent=${tent} crowded=${crowded} margin=${margin}`);
   }
   // EAST detour — line right of all y-overlapping obstacles.
   let rightX = xMax;
   if (obsY.length > 0) {
     const blockerRight = Math.max(...obsY.map(o => o.x + o.width));
     const base = Math.max(rightX, blockerRight);
-    rightX = clampToPoolWall(base + BIG_MARGIN, "x", 1, poolsY);
-    if (trace) console.log(`[MARGIN east] base=${base} line=${rightX}`);
+    const tent = base + BIG_MARGIN;
+    const crowded = isCrowded(tent, "x", 1, blockerRight, obsY, poolsY);
+    const margin = crowded ? SMALL_MARGIN : BIG_MARGIN;
+    rightX = base + margin;
+    if (trace) console.log(`[MARGIN east] base=${base} tent=${tent} crowded=${crowded} margin=${margin}`);
   }
   // WEST detour — line left of all y-overlapping obstacles.
   let leftX = xMin;
   if (obsY.length > 0) {
     const blockerLeft = Math.min(...obsY.map(o => o.x));
     const base = Math.min(leftX, blockerLeft);
-    leftX = clampToPoolWall(base - BIG_MARGIN, "x", -1, poolsY);
-    if (trace) console.log(`[MARGIN west] base=${base} line=${leftX}`);
+    const tent = base - BIG_MARGIN;
+    const crowded = isCrowded(tent, "x", -1, blockerLeft, obsY, poolsY);
+    const margin = crowded ? SMALL_MARGIN : BIG_MARGIN;
+    leftX = base - margin;
+    if (trace) console.log(`[MARGIN west] base=${base} tent=${tent} crowded=${crowded} margin=${margin}`);
   }
 
   // Clamp to containment box: keep the routing safely inside the
@@ -376,7 +414,7 @@ function buildOrthogonalPath(
   // outside the EP — accept that it may clip an internal obstacle rather
   // than break out of the EP boundary.
   if (!containment) {
-    const farY = topY - BIG_MARGIN;
+    const farY = topY - SMALL_MARGIN;
     const farPath = [start, { x: start.x, y: farY }, { x: end.x, y: farY }, end];
     if (!pathHitsObstacles(farPath, obstacles)) return farPath;
   }
