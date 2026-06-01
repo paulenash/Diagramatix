@@ -528,20 +528,22 @@ function angleToRectSideOffset(angle: number, el: DiagramElement): { side: Side;
 }
 
 /** Layout context diagrams: central process with entities arranged in a
- *  circle. Implements four AI-rule constraints deterministically so the
- *  output matches the rules even if the model returns naive coordinates:
+ *  circle. Implements the Context Diagram rules deterministically so the
+ *  output matches the rules even when the model returns naive coordinates:
  *
- *  • C3.04 — Size the central circle so every flow connector attaches
- *    with visible spacing. Radius scales with connector count.
- *  • C3.02 — Process-side attachment points for connectors belonging to
- *    a given entity cluster near that entity's side of the circle, but
- *    are spread along the circumference so no two share the same point.
- *  • C3.01 / C3.05 — Entity-side attachment points spread across the
- *    2 or 3 entity faces that face inward toward the central process,
- *    never all on one face.
- *
- *  Label collision avoidance (C3.03) is not handled here — labels remain
- *  at their default midpoint and can be tuned by the user. */
+ *  • C3.01 — Entity-side attachment points spread across the 2 or 3
+ *    entity faces that face inward toward the central process; all
+ *    attachment points on a face are at least 20 px apart when the face
+ *    is wide enough.
+ *  • C3.02 — Process-side attachment points cluster near each entity's
+ *    bearing on the circle but are spaced at least 20 px apart along
+ *    the circumference (capped when many connectors share one cluster).
+ *  • C3.03 — Flow labels are staggered within each entity's cluster so
+ *    adjacent labels don't overlap. The stagger axis is perpendicular
+ *    to the connector's dominant direction.
+ *  • C3.04 — The process circle is sized from the connector count but
+ *    its radius never grows by more than 15 % over the 100 px baseline,
+ *    keeping the diagram compact. */
 function layoutContextDiagram(
   aiElements: AiParsed["elements"] & object[],
   aiConnections: AiParsed["connections"] & object[],
@@ -555,15 +557,19 @@ function layoutContextDiagram(
   const centerX = 500;
   const centerY = 400;
 
-  // ── C3.04 — Size the process circle from the connector count.
-  // Each connector wants ≈30px of arc length to avoid visual crowding.
-  // Floor at radius 100 (smallest comfortable circle) so a sparse diagram
-  // doesn't look puny.
+  // ── C3.04 — Size the process circle from the connector count, capped
+  // at +15 % over the baseline so the circle stays compact. When the
+  // ideal radius (30 px of arc per connector) exceeds the cap, connectors
+  // share the available circumference at < 30 px each — the layout still
+  // works but visible spacing tightens.
   const ARC_PER_CONN = 30;
   const MIN_RADIUS = 100;
+  const MAX_RADIUS = Math.round(MIN_RADIUS * 1.15); // 115 px
   const totalConns = aiConnections.length;
   const requiredRadius = (totalConns * ARC_PER_CONN) / (2 * Math.PI);
-  const processRadius = Math.max(MIN_RADIUS, Math.ceil(requiredRadius / 10) * 10);
+  const processRadius = Math.round(
+    Math.max(MIN_RADIUS, Math.min(MAX_RADIUS, requiredRadius))
+  );
   const processW = processRadius * 2;
   const processH = processRadius * 2;
 
@@ -622,17 +628,32 @@ function layoutContextDiagram(
     connByEntity.set(entId, list);
   }
 
-  // ── C3.02 angular cluster + C3.01/C3.05 entity-face spread.
-  // For each entity:
+  // ── C3.01 (entity face spread) + C3.02 (circle cluster) + C3.03
+  // (label stagger). For each entity:
   //   • Pick the 2 or 3 entity faces that face the central process
-  //     (primary face + the two perpendicular "shoulders").
-  //   • Round-robin connectors across those faces so they never all
-  //     land on a single face.
-  //   • Each connector's process-side endpoint clusters around the
-  //     entity's bearing on the circle, spread across a ±CLUSTER_HALF
-  //     window so multiple connectors don't share a single point.
-  const CLUSTER_HALF = 0.18; // ≈10° each side of the entity bearing
-  type Attach = { procSide: Side; procOffset: number; entSide: Side; entOffset: number };
+  //     (primary face + two perpendicular "shoulders") and round-robin
+  //     connectors across them, with attachment points ≥ MIN_PX apart
+  //     within each face when the face is wide enough.
+  //   • Cluster each connector's process-side endpoint around the
+  //     entity's bearing on the circle, with members spaced by the
+  //     angle that corresponds to MIN_PX of arc. The cluster is capped
+  //     so it never spills into an adjacent entity's angular slot.
+  //   • Stagger each connector's label perpendicular to the connector's
+  //     dominant axis so labels in the same cluster don't overlap.
+  const MIN_PX = 20;
+  const EDGE_PAD = 10; // px reserved at each end of a face
+  // Maximum half-angle for any one entity's circle cluster — 80 % of the
+  // half-slot it owns so adjacent clusters don't merge.
+  const maxClusterHalf = entityCount > 0
+    ? (Math.PI / Math.max(entityCount, 1)) * 0.8
+    : Math.PI;
+  // Angular spacing needed for MIN_PX of arc at the current radius.
+  const minAngularSpacing = MIN_PX / processRadius;
+  type Attach = {
+    procSide: Side; procOffset: number;
+    entSide: Side; entOffset: number;
+    labelOffsetX: number; labelOffsetY: number;
+  };
   const attachments = new Map<string, Attach>();
   const connKey = (c: { sourceId: string; targetId: string }, idx: number) =>
     `${c.sourceId}->${c.targetId}#${idx}`;
@@ -647,9 +668,24 @@ function layoutContextDiagram(
     return i;
   }
 
+  /** Evenly distributed offsets along a single face, respecting the
+   *  MIN_PX minimum spacing where possible. Falls back to uniform
+   *  spread across the usable span when K is too high to honour
+   *  MIN_PX. Returns fractional offsets in [EDGE_PAD/face, 1 - EDGE_PAD/face]. */
+  function faceOffsets(K: number, facePx: number): number[] {
+    if (K <= 0) return [];
+    const usable = Math.max(0, facePx - 2 * EDGE_PAD);
+    const requiredSpan = (K - 1) * MIN_PX;
+    const span = Math.min(usable, requiredSpan);
+    const startPx = EDGE_PAD + (usable - span) / 2;
+    const step = K > 1 ? span / (K - 1) : 0;
+    return Array.from({ length: K }, (_, i) => (startPx + i * step) / facePx);
+  }
+
   for (const [entId, group] of connByEntity) {
     const theta = entityAngle.get(entId)!;
     const K = group.length;
+    const entEl = elMap.get(entId)!;
     // Pick the entity's 2-3 inward-facing sides. The primary inward side
     // is the one perpendicular to (-cos θ, -sin θ) — the direction back
     // toward the process. The two adjacent sides are also still "inward"
@@ -674,34 +710,57 @@ function layoutContextDiagram(
       const f = faces[k % faces.length];
       faceBuckets.get(f)!.push(k);
     }
+    // Pre-compute offset arrays per face so MIN_PX spacing is enforced.
+    const faceOffsetsByFace = new Map<Side, number[]>();
+    for (const [face, ks] of faceBuckets) {
+      const facePx = (face === "top" || face === "bottom")
+        ? entEl.width : entEl.height;
+      faceOffsetsByFace.set(face, faceOffsets(ks.length, facePx));
+    }
 
-    // Now assign positions.
+    // ── C3.02 — cluster angular spread, with MIN_PX-driven spacing and
+    // the per-entity cap so we don't bleed into the neighbour's slot.
+    const desiredHalf = Math.max(0, (K - 1) * minAngularSpacing / 2);
+    const clusterHalf = Math.min(desiredHalf, maxClusterHalf);
+
+    // C3.03 — direction the entity sits relative to the process; we use
+    // it to decide which axis to stagger labels along (perpendicular to
+    // the connector's dominant direction).
+    const isHorizontalRun = Math.abs(Math.cos(theta)) >= Math.abs(Math.sin(theta));
+    const LABEL_STAGGER = 18; // ≈ one text line of separation
+    const LABEL_BASELINE = -30; // default label-above-anchor offset
+
     for (let k = 0; k < K; k++) {
       const { conn: c } = group[k];
       const idx = nextIdx(c);
-      // Cluster the process-side around theta. Spread across ±CLUSTER_HALF
-      // so even a single entity with many connectors has visible gaps.
+      // Cluster the process-side around theta.
       const ratio = K === 1 ? 0 : (k - (K - 1) / 2) / Math.max(K - 1, 1);
-      const procAngle = theta + ratio * 2 * CLUSTER_HALF;
+      const procAngle = theta + ratio * 2 * clusterHalf;
       const procAttach = processEl
         ? angleToRectSideOffset(procAngle, processEl)
         : { side: "left" as Side, offset: 0.5 };
-      // Entity-side: which face was this k assigned to, and what's its
-      // position within the bucket?
+      // Entity-side face + spaced offset within that face.
       let entSide: Side = primary;
       let entOffset = 0.5;
       for (const [face, ks] of faceBuckets) {
         const pos = ks.indexOf(k);
         if (pos !== -1) {
           entSide = face;
-          const count = ks.length;
-          entOffset = (pos + 1) / (count + 1); // evenly spread within face
+          const offs = faceOffsetsByFace.get(face)!;
+          entOffset = offs[pos] ?? 0.5;
           break;
         }
       }
+      // C3.03 — stagger label perpendicular to the connector's run so
+      // adjacent labels in the same cluster don't pile up. Centred so
+      // K=1 stays at the default position.
+      const stagger = (k - (K - 1) / 2) * LABEL_STAGGER;
+      const labelOffsetX = isHorizontalRun ? 0 : stagger;
+      const labelOffsetY = isHorizontalRun ? LABEL_BASELINE + stagger : LABEL_BASELINE;
       attachments.set(connKey(c, idx), {
         procSide: procAttach.side, procOffset: procAttach.offset,
         entSide, entOffset,
+        labelOffsetX, labelOffsetY,
       });
     }
   }
@@ -751,6 +810,9 @@ function layoutContextDiagram(
       targetInvisibleLeader: false,
       waypoints: [] as Point[],
       label: c.label ?? "",
+      // C3.03 — label stagger computed per cluster above.
+      labelOffsetX: att?.labelOffsetX ?? 0,
+      labelOffsetY: att?.labelOffsetY ?? -30,
     } as Connector);
   }
 
