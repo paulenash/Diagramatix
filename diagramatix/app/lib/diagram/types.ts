@@ -503,5 +503,26 @@ export interface TemplateData {
  *                with a message TO a non-IT external pool should be
  *                Send; FROM a non-IT pool should be Receive; TO/FROM
  *                an IT system pool should be User.
+ *          - Sub-process right-click picker gets a second section,
+ *            "Repeat" (None / Loop / MI Sequential / MI Parallel),
+ *            writing to the existing top-level element.repeatType
+ *            field. Applies to both subprocess and subprocess-expanded.
+ *          - Two ad-hoc-aware diagram-check rules + matching changes
+ *            to activity-no-in/out:
+ *              * adhoc-ep-no-start-end (error) — Expanded Sub-Process
+ *                marked Ad-Hoc must not contain or boundary-mount
+ *                Start/End events.
+ *              * adhoc-ep-no-sequence-between-children (error) —
+ *                Ad-Hoc EP must not have sequence connectors between
+ *                its child activities.
+ *              * activity-no-incoming / activity-no-outgoing are now
+ *                EP-aware: activities inside an ad-hoc EP are never
+ *                flagged; inside a non-ad-hoc EP one orphan per EP is
+ *                allowed (the entry/exit activity), 2+ orphans become
+ *                errors. Top-level activities keep the strict rule.
+ *          - Scan-highlight connector overlay no longer draws through
+ *            the centre of the source/target elements — the invisible-
+ *            leader endpoints at element centres are sliced off before
+ *            drawing the orange/red polyline.
  */
 export const SCHEMA_VERSION = "1.16";

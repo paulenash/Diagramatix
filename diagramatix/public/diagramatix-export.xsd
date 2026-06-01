@@ -102,6 +102,26 @@
         type should match its message flows (Send to / Receive from a
         non-IT pool; User for any flow to or from an IT system pool).
         No XSD shape change — these rules read existing fields only.
+      - Sub-process right-click picker gets a second section, "Repeat"
+        (None / Loop / MI Sequential / MI Parallel), writing to the
+        existing top-level RepeatTypeEnum-typed repeatType attribute.
+      - Two ad-hoc-aware rules and matching changes to the activity
+        flow-connectivity rules:
+          * adhoc-ep-no-start-end (error): an Expanded Sub-Process
+            marked Ad-Hoc must not contain or boundary-mount Start or
+            End events.
+          * adhoc-ep-no-sequence-between-children (error): an Ad-Hoc
+            EP must not have sequence connectors between its child
+            activities.
+          * activity-no-incoming / activity-no-outgoing are now
+            EP-aware: activities inside an ad-hoc EP are never flagged,
+            and inside a non-ad-hoc EP one orphan per EP is allowed
+            (the entry/exit activity). Two or more orphans of either
+            kind in a non-ad-hoc EP are errors.
+      - Scan-highlight connector overlay (Review Mode) no longer draws
+        an orange line through the centre of the source/target element
+        — the invisible-leader waypoints at element centres are
+        excluded from the overlay polyline.
 -->
 
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"

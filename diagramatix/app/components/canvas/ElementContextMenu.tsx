@@ -56,6 +56,12 @@ const SUBPROCESS_OPTS: Opt[] = [
   { value: "event",       label: "Event" },
   { value: "transaction", label: "Transaction" },
 ];
+const REPEAT_OPTS: Opt[] = [
+  { value: "none",          label: "None" },
+  { value: "loop",          label: "Loop" },
+  { value: "mi-sequential", label: "MI Sequential" },
+  { value: "mi-parallel",   label: "MI Parallel" },
+];
 const DATA_OBJECT_OPTS: Opt[] = [
   { value: "none",   label: "None" },
   { value: "input",  label: "Input" },
@@ -108,12 +114,20 @@ function sectionsFor(kind: ContextMenuKind, el: DiagramElement): Section[] {
         },
       ];
     case "subprocess":
-      return [{
-        header: "Sub-Process Usage",
-        propKey: "subprocessType",
-        opts: SUBPROCESS_OPTS,
-        currentValue: (el.properties.subprocessType as string | undefined) ?? "normal",
-      }];
+      return [
+        {
+          header: "Sub-Process Usage",
+          propKey: "subprocessType",
+          opts: SUBPROCESS_OPTS,
+          currentValue: (el.properties.subprocessType as string | undefined) ?? "normal",
+        },
+        {
+          header: "Repeat",
+          propKey: "repeatType",
+          opts: REPEAT_OPTS,
+          currentValue: el.repeatType ?? "none",
+        },
+      ];
     case "data-object":
       return [{
         header: "Role",

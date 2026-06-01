@@ -175,7 +175,17 @@ export const CHAPTERS: HelpChapter[] = [
                 — a Task, Sub-Process or Expanded Sub-Process with neither
                 in nor out is unreachable / dead-ended. Event sub-processes
                 and process-scope expanded subs (those containing their own
-                Start event) are exempt.
+                Start event) are exempt. Inside a non-ad-hoc EP one orphan
+                activity is allowed (the entry / exit activity), but a
+                second one is an error. Inside an <em>ad-hoc</em> EP the
+                rule is bypassed entirely — see the next bullet.
+              </li>
+              <li>
+                <strong>Ad-Hoc Expanded Sub-Process</strong> — an EP marked
+                Ad-Hoc cannot contain or boundary-mount Start or End events
+                (error), and cannot have any sequence flow between its
+                child activities (error). The children run in any order
+                triggered by the user / process.
               </li>
               <li>
                 <strong>Connector takes too many bends</strong> — sequence
@@ -629,6 +639,13 @@ export const CHAPTERS: HelpChapter[] = [
               choices None / Catching / Throwing (start events are always
               catching and end events are always throwing, so they don&rsquo;t
               show this section).
+            </p>
+            <p className="mt-2">
+              <strong>Sub-Processes</strong> (collapsed or expanded) get
+              two sections — <em>Sub-Process Usage</em> (Normal / Call /
+              Event / Transaction) and <em>Repeat</em> (None / Loop /
+              MI Sequential / MI Parallel). The Repeat marker controls the
+              small icon Diagramatix draws beneath the sub-process body.
             </p>
           </>
         ),

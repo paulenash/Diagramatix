@@ -248,53 +248,165 @@ function isScopeSubprocess(e: DiagramElement, all: DiagramElement[]): boolean {
   return all.some((c) => c.parentId === e.id && c.type === "start-event");
 }
 
+/** An Expanded Sub-Process is "ad-hoc" when its element.properties.adHoc
+ *  flag is true. Activities inside an ad-hoc EP run in any order — no
+ *  sequence flow between them, no start/end events on or inside the EP. */
+function isAdHocEP(e: DiagramElement | undefined): boolean {
+  if (!e) return false;
+  return e.type === "subprocess-expanded" &&
+    (e.properties?.adHoc as boolean | undefined) === true;
+}
+
+/** Walk the parentId chain and return the nearest enclosing expanded
+ *  sub-process, if any. Used by the EP-aware activity rules. */
+function findEnclosingEP(e: DiagramElement, byId: Map<string, DiagramElement>): DiagramElement | undefined {
+  let cur: DiagramElement | undefined = e.parentId ? byId.get(e.parentId) : undefined;
+  for (let i = 0; i < 32 && cur; i++) {
+    if (cur.type === "subprocess-expanded") return cur;
+    cur = cur.parentId ? byId.get(cur.parentId) : undefined;
+  }
+  return undefined;
+}
+
 /** Every Activity (Task / Sub-Process / Expanded Sub-Process) must have at
- *  least one incoming sequence connector. An activity with no inbound
- *  sequence flow is unreachable. Event sub-processes and process-scope
- *  expanded subprocesses are exempt — they're triggered or self-contained. */
+ *  least one incoming sequence connector — with two EP-aware allowances:
+ *    1. Activities inside an ad-hoc EP are NEVER flagged (ad-hoc EPs
+ *       have no sequence flow between children by definition).
+ *    2. Inside a non-ad-hoc EP up to ONE orphan activity is allowed
+ *       (the entry point). The second-and-beyond orphans are errors.
+ *  Top-level activities (not inside any EP) keep the strict rule —
+ *  every one of them must have an incoming sequence connector. */
 export function checkActivityHasIncoming(d: DiagramLike): Violation[] {
+  const byId = new Map(d.elements.map((e) => [e.id, e]));
   const incoming = new Map<string, number>();
   for (const c of d.connectors) {
     if (c.type !== "sequence") continue;
     incoming.set(c.targetId, (incoming.get(c.targetId) ?? 0) + 1);
   }
-  const out: Violation[] = [];
+  const topLevelOrphans: DiagramElement[] = [];
+  const epOrphans = new Map<string, DiagramElement[]>();
   for (const e of d.elements) {
     if (!ACTIVITY_TYPES.has(e.type)) continue;
     if (isScopeSubprocess(e, d.elements)) continue;
-    if ((incoming.get(e.id) ?? 0) === 0) {
+    if ((incoming.get(e.id) ?? 0) > 0) continue;
+    const ep = findEnclosingEP(e, byId);
+    if (!ep) { topLevelOrphans.push(e); continue; }
+    if (isAdHocEP(ep)) continue;
+    (epOrphans.get(ep.id) ?? epOrphans.set(ep.id, []).get(ep.id)!).push(e);
+  }
+  const out: Violation[] = [];
+  for (const e of topLevelOrphans) {
+    out.push({
+      rule: "activity-no-incoming",
+      severity: "error",
+      ids: [e.id],
+      message: `${e.type} "${nameOf(e)}" has no incoming sequence connector`,
+    });
+  }
+  for (const [epId, orphans] of epOrphans) {
+    if (orphans.length <= 1) continue; // one orphan per non-ad-hoc EP is allowed
+    const ep = byId.get(epId)!;
+    for (let i = 1; i < orphans.length; i++) {
+      const e = orphans[i];
       out.push({
         rule: "activity-no-incoming",
         severity: "error",
-        ids: [e.id],
-        message: `${e.type} "${nameOf(e)}" has no incoming sequence connector`,
+        ids: [e.id, ep.id],
+        message: `${e.type} "${nameOf(e)}" inside Sub-Process "${nameOf(ep)}" has no incoming sequence (only one entry activity allowed per non-ad-hoc Sub-Process)`,
       });
     }
   }
   return out;
 }
 
-/** Every Activity must have at least one outgoing sequence connector.
- *  A dead-end activity blocks process completion. Same exemptions as
- *  checkActivityHasIncoming. */
+/** Every Activity must have at least one outgoing sequence connector,
+ *  with the same EP-aware allowances as checkActivityHasIncoming. */
 export function checkActivityHasOutgoing(d: DiagramLike): Violation[] {
+  const byId = new Map(d.elements.map((e) => [e.id, e]));
   const outgoing = new Map<string, number>();
   for (const c of d.connectors) {
     if (c.type !== "sequence") continue;
     outgoing.set(c.sourceId, (outgoing.get(c.sourceId) ?? 0) + 1);
   }
-  const out: Violation[] = [];
+  const topLevelOrphans: DiagramElement[] = [];
+  const epOrphans = new Map<string, DiagramElement[]>();
   for (const e of d.elements) {
     if (!ACTIVITY_TYPES.has(e.type)) continue;
     if (isScopeSubprocess(e, d.elements)) continue;
-    if ((outgoing.get(e.id) ?? 0) === 0) {
+    if ((outgoing.get(e.id) ?? 0) > 0) continue;
+    const ep = findEnclosingEP(e, byId);
+    if (!ep) { topLevelOrphans.push(e); continue; }
+    if (isAdHocEP(ep)) continue;
+    (epOrphans.get(ep.id) ?? epOrphans.set(ep.id, []).get(ep.id)!).push(e);
+  }
+  const out: Violation[] = [];
+  for (const e of topLevelOrphans) {
+    out.push({
+      rule: "activity-no-outgoing",
+      severity: "error",
+      ids: [e.id],
+      message: `${e.type} "${nameOf(e)}" has no outgoing sequence connector`,
+    });
+  }
+  for (const [epId, orphans] of epOrphans) {
+    if (orphans.length <= 1) continue;
+    const ep = byId.get(epId)!;
+    for (let i = 1; i < orphans.length; i++) {
+      const e = orphans[i];
       out.push({
         rule: "activity-no-outgoing",
         severity: "error",
-        ids: [e.id],
-        message: `${e.type} "${nameOf(e)}" has no outgoing sequence connector`,
+        ids: [e.id, ep.id],
+        message: `${e.type} "${nameOf(e)}" inside Sub-Process "${nameOf(ep)}" has no outgoing sequence (only one exit activity allowed per non-ad-hoc Sub-Process)`,
       });
     }
+  }
+  return out;
+}
+
+/** An ad-hoc EP must not contain or boundary-mount Start or End events —
+ *  the whole point of ad-hoc is that its activities run in any order with
+ *  no defined start / end semantics. */
+export function checkAdHocEPHasNoStartEnd(d: DiagramLike): Violation[] {
+  const byId = new Map(d.elements.map((e) => [e.id, e]));
+  const out: Violation[] = [];
+  for (const e of d.elements) {
+    if (e.type !== "start-event" && e.type !== "end-event") continue;
+    const host = e.boundaryHostId
+      ? byId.get(e.boundaryHostId)
+      : (e.parentId ? byId.get(e.parentId) : undefined);
+    if (!isAdHocEP(host)) continue;
+    const where = e.boundaryHostId ? "is mounted on the boundary of" : "is inside";
+    out.push({
+      rule: "adhoc-ep-no-start-end",
+      severity: "error",
+      ids: [e.id, host!.id],
+      message: `${e.type} "${nameOf(e)}" ${where} ad-hoc Sub-Process "${nameOf(host!)}" — ad-hoc Sub-Processes cannot have Start or End events`,
+    });
+  }
+  return out;
+}
+
+/** An ad-hoc EP must not have sequence connectors between its child
+ *  activities — children run in any order, no ordering implied. */
+export function checkAdHocEPNoSequenceBetweenChildren(d: DiagramLike): Violation[] {
+  const byId = new Map(d.elements.map((e) => [e.id, e]));
+  const out: Violation[] = [];
+  for (const c of d.connectors) {
+    if (c.type !== "sequence") continue;
+    const src = byId.get(c.sourceId);
+    const tgt = byId.get(c.targetId);
+    if (!src || !tgt) continue;
+    if (!ACTIVITY_TYPES.has(src.type) || !ACTIVITY_TYPES.has(tgt.type)) continue;
+    if (!src.parentId || src.parentId !== tgt.parentId) continue;
+    const parent = byId.get(src.parentId);
+    if (!isAdHocEP(parent)) continue;
+    out.push({
+      rule: "adhoc-ep-no-sequence-between-children",
+      severity: "error",
+      ids: [c.id, parent!.id],
+      message: `sequence connector between activities inside ad-hoc Sub-Process "${nameOf(parent!)}" — ad-hoc Sub-Processes cannot have sequence flow between their child activities`,
+    });
   }
   return out;
 }
@@ -699,6 +811,22 @@ export const RULES: Rule[] = [
     severity: "warning",
     category: "bpmn-structure",
     check: checkTaskTypeForMessages,
+  },
+  {
+    id: "adhoc-ep-no-start-end",
+    title: "Ad-hoc Sub-Process has Start or End event",
+    description: "An Expanded Sub-Process marked Ad-Hoc must not contain or boundary-mount Start or End events — the whole point of ad-hoc is that its activities run in any order with no defined start/end semantics.",
+    severity: "error",
+    category: "bpmn-structure",
+    check: checkAdHocEPHasNoStartEnd,
+  },
+  {
+    id: "adhoc-ep-no-sequence-between-children",
+    title: "Ad-hoc Sub-Process has sequence flow",
+    description: "An Ad-Hoc Expanded Sub-Process must not have sequence connectors between its child activities. Ad-hoc children run in any order; ordering them with sequence flow contradicts the marker.",
+    severity: "error",
+    category: "bpmn-structure",
+    check: checkAdHocEPNoSequenceBetweenChildren,
   },
 ];
 

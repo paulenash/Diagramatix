@@ -5613,14 +5613,18 @@ export function Canvas({
             })}
 
           {/* Connector scan highlights — drawn LAST so they overlay the
-              normal connector strokes. A thicker semi-transparent stroke
-              along the connector's waypoints, severity-coloured. */}
+              normal connector strokes. The first and last waypoints of a
+              Diagramatix connector are INVISIBLE LEADERS at the source/
+              target element centres; including them in the overlay paints
+              an orange line across the centre of each end element. Slice
+              them off so the overlay traces only the visible segments. */}
           {scanHighlightConnectorById && scanHighlightConnectorById.size > 0 && data.connectors
-            .filter((c) => scanHighlightConnectorById.has(c.id) && (c.waypoints?.length ?? 0) >= 2)
+            .filter((c) => scanHighlightConnectorById.has(c.id) && (c.waypoints?.length ?? 0) >= 4)
             .map((c) => {
               const severity = scanHighlightConnectorById.get(c.id);
               const color = severity === "warning" ? "#f59e0b" : "#dc2626";
-              const points = c.waypoints.map((p) => `${p.x},${p.y}`).join(" ");
+              const visible = c.waypoints.slice(1, -1);
+              const points = visible.map((p) => `${p.x},${p.y}`).join(" ");
               return (
                 <polyline
                   key={`scan-hl-conn-${c.id}`}
