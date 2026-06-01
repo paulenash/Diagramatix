@@ -74,6 +74,14 @@ const EVENT_OPTS: Opt[] = [
   { value: "compensation", label: "Compensation" },
   { value: "link",         label: "Link" },
 ];
+// Flow direction — only meaningful for intermediate events. Start events
+// are always catching and end events are always throwing, so they don't
+// get this section.
+const FLOW_TYPE_OPTS: Opt[] = [
+  { value: "none",     label: "None" },
+  { value: "catching", label: "Catching" },
+  { value: "throwing", label: "Throwing" },
+];
 
 function sectionsFor(kind: ContextMenuKind, el: DiagramElement): Section[] {
   switch (kind) {
@@ -120,12 +128,23 @@ function sectionsFor(kind: ContextMenuKind, el: DiagramElement): Section[] {
       const opts = el.type === "intermediate-event"
         ? EVENT_OPTS.filter((o) => o.value !== "terminate")
         : EVENT_OPTS;
-      return [{
+      const sections: Section[] = [{
         header: "Trigger",
         propKey: "eventType",
         opts,
         currentValue: el.eventType ?? "none",
       }];
+      // Flow Type is only meaningful on intermediate events — start events
+      // are always catching, end events are always throwing.
+      if (el.type === "intermediate-event") {
+        sections.push({
+          header: "Flow Type",
+          propKey: "flowType",
+          opts: FLOW_TYPE_OPTS,
+          currentValue: el.flowType ?? "none",
+        });
+      }
+      return sections;
     }
   }
 }

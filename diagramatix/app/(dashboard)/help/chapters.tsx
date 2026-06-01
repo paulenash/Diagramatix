@@ -586,7 +586,11 @@ export const CHAPTERS: HelpChapter[] = [
               Error, Signal, Conditional, Escalation, Cancel, Compensation
               or Link as their trigger. <strong>Terminate</strong> is
               deliberately not offered for intermediate events — BPMN
-              reserves it for end events only.
+              reserves it for end events only. Intermediate events also
+              get a second section, <strong>Flow Type</strong>, with the
+              choices None / Catching / Throwing (start events are always
+              catching and end events are always throwing, so they don&rsquo;t
+              show this section).
             </p>
           </>
         ),

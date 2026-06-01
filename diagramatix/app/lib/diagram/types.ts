@@ -482,6 +482,9 @@ export interface TemplateData {
  *          - The intermediate-event right-click Trigger list no longer
  *            offers "Terminate" — BPMN reserves the terminate trigger
  *            for end events only.
+ *          - Intermediate events get a second right-click section,
+ *            Flow Type (None / Catching / Throwing), writing to the
+ *            existing top-level element.flowType field.
  *          - Properties panel label "Element" renamed to "Gateway Type"
  *            for clarity (matches the right-click section heading).
  */

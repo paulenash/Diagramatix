@@ -88,6 +88,9 @@
         "terminate" on an intermediate-event remain readable (the
         schema still allows the enum value); the change is purely
         in the picker UI.
+      - Intermediate events get a second right-click section,
+        "Flow Type" (None / Catching / Throwing), writing to the
+        existing top-level FlowTypeEnum-typed flowType attribute.
       - Properties-panel label "Element" renamed to "Gateway Type"
         for consistency with the right-click section header.
 -->
