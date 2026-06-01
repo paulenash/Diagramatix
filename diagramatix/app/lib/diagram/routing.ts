@@ -1167,8 +1167,13 @@ export function recomputeAllConnectors(
 
     // Curvilinear: if the user has adjusted handles, preserve control points relative to edges
     if (conn.routingType === "curvilinear" && conn.cp1RelOffset && conn.cp2RelOffset) {
-      const srcEdge = sidePoint(source, conn.sourceSide, conn.sourceOffsetAlong ?? 0.5);
-      const tgtEdge = sidePoint(target, conn.targetSide, conn.targetOffsetAlong ?? 0.5);
+      const CIRC_TYPES = new Set(["use-case", "process-system"]);
+      const srcEdgeRaw = sidePoint(source, conn.sourceSide, conn.sourceOffsetAlong ?? 0.5);
+      const tgtEdgeRaw = sidePoint(target, conn.targetSide, conn.targetOffsetAlong ?? 0.5);
+      // Project onto circle boundary for circular elements — otherwise the
+      // endpoint snaps to the bounding rect when an attached element moves.
+      const srcEdge = CIRC_TYPES.has(source.type) ? ellipseEdgePoint(srcEdgeRaw, source) : srcEdgeRaw;
+      const tgtEdge = CIRC_TYPES.has(target.type) ? ellipseEdgePoint(tgtEdgeRaw, target) : tgtEdgeRaw;
       const startPt = { x: source.x + source.width / 2, y: source.y + source.height / 2 };
       const endPt   = { x: target.x + target.width / 2, y: target.y + target.height / 2 };
       let cp1 = { x: srcEdge.x + conn.cp1RelOffset.x, y: srcEdge.y + conn.cp1RelOffset.y };
