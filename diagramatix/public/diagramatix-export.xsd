@@ -93,6 +93,15 @@
         existing top-level FlowTypeEnum-typed flowType attribute.
       - Properties-panel label "Element" renamed to "Gateway Type"
         for consistency with the right-click section header.
+      - Four additive diagram-check rules in the shared rule registry
+        (Scan Diagrams for Issues / Diagram Scan for Issues): every
+        Activity must have an incoming AND outgoing sequence connector
+        (errors; event sub-processes and process-scope expanded subs
+        exempt); sequence connectors with 4+ bends are flagged as
+        warnings and highlighted orange on the canvas; Task/Sub-Process
+        type should match its message flows (Send to / Receive from a
+        non-IT pool; User for any flow to or from an IT system pool).
+        No XSD shape change — these rules read existing fields only.
 -->
 
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"

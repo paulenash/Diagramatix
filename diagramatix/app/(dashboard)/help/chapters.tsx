@@ -159,9 +159,47 @@ export const CHAPTERS: HelpChapter[] = [
               </li>
             </ul>
             <p className="mt-2">
+              <strong>BPMN-structure rules</strong> (per-diagram scan + the
+              same registry that powers the project-wide scan):
+            </p>
+            <ul className="list-disc list-inside space-y-1 mt-1">
+              <li>
+                <strong>Element outside its container</strong> — escapes
+                its pool / subprocess = error; outside its lane but still
+                inside the pool = warning (gateways and events are exempt
+                from the lane check because they aren&apos;t lane-bound in
+                BPMN). Dangling parent / connector references = error.
+              </li>
+              <li>
+                <strong>Activity must have incoming AND outgoing sequence</strong>{" "}
+                — a Task, Sub-Process or Expanded Sub-Process with neither
+                in nor out is unreachable / dead-ended. Event sub-processes
+                and process-scope expanded subs (those containing their own
+                Start event) are exempt.
+              </li>
+              <li>
+                <strong>Connector takes too many bends</strong> — sequence
+                connectors with 4+ direction changes are highlighted
+                <em> orange</em> on the canvas during Review Mode, the way
+                flagged elements get a coloured outline.
+              </li>
+              <li>
+                <strong>Task type vs message flows</strong> — sending a
+                message to a non-IT pool ⇒ Send; receiving from a non-IT
+                pool ⇒ Receive; communicating with an IT-system pool ⇒ User.
+              </li>
+              <li>
+                <strong>BPMN-specific structural rules</strong> — fabricated
+                wrapper, boundary event on a Pool/Lane, connector touching
+                an Event Sub-Process, merge gateway left of its inputs.
+              </li>
+            </ul>
+            <p className="mt-2">
               Tick the &ldquo;Ignore issue types&rdquo; checkboxes at the
               top of the panel to park categories you&apos;ve already
               triaged; remaining issues stay highlighted across re-scans.
+              Admins can see the full active rule registry at{" "}
+              <strong>Project ▾ → View Scanner Issues Rules</strong>.
             </p>
           </>
         ),

@@ -237,6 +237,168 @@ export function checkMergeRightOfForwardInputs(d: DiagramLike): Violation[] {
   return out;
 }
 
+/** Subprocess-expanded that is acting as a process scope (event sub OR
+ *  contains its own Start event — e.g. a "Main Process" wrapper) doesn't
+ *  participate in the outer sequence flow, so the activity-no-incoming /
+ *  outgoing rules below exempt it. Event sub-processes are trigger-driven
+ *  by definition; wrapper subprocesses are containers, not flow steps. */
+function isScopeSubprocess(e: DiagramElement, all: DiagramElement[]): boolean {
+  if (e.type !== "subprocess-expanded") return false;
+  if (isEventSub(e)) return true;
+  return all.some((c) => c.parentId === e.id && c.type === "start-event");
+}
+
+/** Every Activity (Task / Sub-Process / Expanded Sub-Process) must have at
+ *  least one incoming sequence connector. An activity with no inbound
+ *  sequence flow is unreachable. Event sub-processes and process-scope
+ *  expanded subprocesses are exempt — they're triggered or self-contained. */
+export function checkActivityHasIncoming(d: DiagramLike): Violation[] {
+  const incoming = new Map<string, number>();
+  for (const c of d.connectors) {
+    if (c.type !== "sequence") continue;
+    incoming.set(c.targetId, (incoming.get(c.targetId) ?? 0) + 1);
+  }
+  const out: Violation[] = [];
+  for (const e of d.elements) {
+    if (!ACTIVITY_TYPES.has(e.type)) continue;
+    if (isScopeSubprocess(e, d.elements)) continue;
+    if ((incoming.get(e.id) ?? 0) === 0) {
+      out.push({
+        rule: "activity-no-incoming",
+        severity: "error",
+        ids: [e.id],
+        message: `${e.type} "${nameOf(e)}" has no incoming sequence connector`,
+      });
+    }
+  }
+  return out;
+}
+
+/** Every Activity must have at least one outgoing sequence connector.
+ *  A dead-end activity blocks process completion. Same exemptions as
+ *  checkActivityHasIncoming. */
+export function checkActivityHasOutgoing(d: DiagramLike): Violation[] {
+  const outgoing = new Map<string, number>();
+  for (const c of d.connectors) {
+    if (c.type !== "sequence") continue;
+    outgoing.set(c.sourceId, (outgoing.get(c.sourceId) ?? 0) + 1);
+  }
+  const out: Violation[] = [];
+  for (const e of d.elements) {
+    if (!ACTIVITY_TYPES.has(e.type)) continue;
+    if (isScopeSubprocess(e, d.elements)) continue;
+    if ((outgoing.get(e.id) ?? 0) === 0) {
+      out.push({
+        rule: "activity-no-outgoing",
+        severity: "error",
+        ids: [e.id],
+        message: `${e.type} "${nameOf(e)}" has no outgoing sequence connector`,
+      });
+    }
+  }
+  return out;
+}
+
+/** Count direction changes (bends) along an orthogonal connector path.
+ *  Zero-length segments are ignored so a duplicated waypoint can't add a
+ *  phantom bend. Used by checkConnectorBendiness. */
+function countConnectorBends(waypoints: { x: number; y: number }[]): number {
+  let bends = 0;
+  for (let i = 1; i < waypoints.length - 1; i++) {
+    const dx1 = waypoints[i].x - waypoints[i - 1].x;
+    const dy1 = waypoints[i].y - waypoints[i - 1].y;
+    const dx2 = waypoints[i + 1].x - waypoints[i].x;
+    const dy2 = waypoints[i + 1].y - waypoints[i].y;
+    if ((Math.abs(dx1) < 0.5 && Math.abs(dy1) < 0.5) || (Math.abs(dx2) < 0.5 && Math.abs(dy2) < 0.5)) continue;
+    const horiz1 = Math.abs(dx1) > Math.abs(dy1);
+    const horiz2 = Math.abs(dx2) > Math.abs(dy2);
+    if (horiz1 !== horiz2) bends++;
+  }
+  return bends;
+}
+
+/** A sequence connector with too many bends is visually noisy and usually
+ *  signals a layout problem (cramped detour, misplaced element, etc.). Flag
+ *  anything with 4 or more direction changes as a warning. */
+export function checkConnectorBendiness(d: DiagramLike): Violation[] {
+  const BEND_THRESHOLD = 4;
+  const out: Violation[] = [];
+  for (const c of d.connectors) {
+    if (c.type !== "sequence") continue;
+    const bends = countConnectorBends(c.waypoints ?? []);
+    if (bends >= BEND_THRESHOLD) {
+      out.push({
+        rule: "connector-bends",
+        severity: "warning",
+        ids: [c.id],
+        message: `connector takes ${bends} bends — consider simplifying the route`,
+      });
+    }
+  }
+  return out;
+}
+
+/** BPMN convention: a Task/Sub-Process's message flows should drive its
+ *  task type.
+ *   - Message TO an external entity (non-IT black-box pool, e.g. Customer)
+ *     → the task should be a Send task.
+ *   - Message FROM an external entity → Receive task.
+ *   - Message TO or FROM an IT system pool (e.g. Salesforce, SAP) →
+ *     User task (because a human is interacting with the system).
+ *  Emits one warning per mismatched message edge; ids include both the task
+ *  and the offending connector so the connector can also be highlighted. */
+export function checkTaskTypeForMessages(d: DiagramLike): Violation[] {
+  const byId = new Map(d.elements.map((e) => [e.id, e]));
+  const TASK_LIKE = new Set(["task", "subprocess", "subprocess-expanded"]);
+  const poolAncestor = (e: DiagramElement | undefined): DiagramElement | undefined => {
+    let cur = e;
+    for (let i = 0; i < 32 && cur; i++) {
+      if (cur.type === "pool") return cur;
+      cur = cur.parentId ? byId.get(cur.parentId) : undefined;
+    }
+    return undefined;
+  };
+  const poolKind = (p: DiagramElement | undefined): "external" | "system" | "white-box" | "unknown" => {
+    if (!p) return "unknown";
+    const poolType = (p.properties?.poolType as string | undefined) ?? "white-box";
+    if (poolType !== "black-box") return "white-box";
+    const isSystem = (p.properties?.isSystem as boolean | undefined) ?? false;
+    return isSystem ? "system" : "external";
+  };
+
+  const out: Violation[] = [];
+  for (const c of d.connectors) {
+    if (c.type !== "messageBPMN") continue;
+    const src = byId.get(c.sourceId);
+    const tgt = byId.get(c.targetId);
+    if (!src || !tgt) continue;
+    // Identify the task end and the direction relative to the task.
+    let task: DiagramElement | undefined;
+    let otherEnd: DiagramElement | undefined;
+    let dir: "to" | "from";
+    if (TASK_LIKE.has(src.type)) { task = src; otherEnd = tgt; dir = "to"; }
+    else if (TASK_LIKE.has(tgt.type)) { task = tgt; otherEnd = src; dir = "from"; }
+    else continue;
+    const otherPool = otherEnd.type === "pool" ? otherEnd : poolAncestor(otherEnd);
+    const kind = poolKind(otherPool);
+    let expected: "send" | "receive" | "user" | undefined;
+    if (kind === "external") expected = dir === "to" ? "send" : "receive";
+    else if (kind === "system") expected = "user";
+    else continue; // white-box / unknown — no recommendation
+    const actual = task.taskType ?? "none";
+    if (actual === expected) continue;
+    const verb = dir === "to" ? "sends a message to" : "receives a message from";
+    const poolKindLabel = kind === "external" ? "external entity" : "IT system";
+    out.push({
+      rule: "task-type-for-messages",
+      severity: "warning",
+      ids: [task.id, c.id],
+      message: `${task.type} "${nameOf(task)}" ${verb} ${poolKindLabel} "${nameOf(otherPool)}" — task type should be "${expected}" (currently "${actual}")`,
+    });
+  }
+  return out;
+}
+
 // ── Import-hygiene / pool rules (ported from the in-app scanner) ─────────────
 
 const SEQUENCE_LIKE = new Set<string>(["sequence", "flow", "associationBPMN", "association"]);
@@ -505,6 +667,38 @@ export const RULES: Rule[] = [
     severity: "error",
     category: "bpmn-structure",
     check: checkMergeRightOfForwardInputs,
+  },
+  {
+    id: "activity-no-incoming",
+    title: "Activity has no incoming sequence",
+    description: "A Task, Sub-Process or Expanded Sub-Process has no incoming sequence connector. Every activity must be reachable from a Start Event via sequence flow.",
+    severity: "error",
+    category: "bpmn-structure",
+    check: checkActivityHasIncoming,
+  },
+  {
+    id: "activity-no-outgoing",
+    title: "Activity has no outgoing sequence",
+    description: "A Task, Sub-Process or Expanded Sub-Process has no outgoing sequence connector. A dead-end activity blocks process completion.",
+    severity: "error",
+    category: "bpmn-structure",
+    check: checkActivityHasOutgoing,
+  },
+  {
+    id: "connector-bends",
+    title: "Connector takes too many bends",
+    description: "A sequence connector has 4 or more direction changes — usually a sign of cramped routing or a misplaced element. Flagged as a warning; the connector itself is highlighted orange on the canvas during Review Mode.",
+    severity: "warning",
+    category: "bpmn-structure",
+    check: checkConnectorBendiness,
+  },
+  {
+    id: "task-type-for-messages",
+    title: "Task type doesn't match its message flows",
+    description: "BPMN convention: a Task/Sub-Process with a message TO a non-IT (external entity) pool should be a Send task; FROM a non-IT pool should be Receive; TO or FROM an IT-system pool should be User. One warning per mismatched message edge.",
+    severity: "warning",
+    category: "bpmn-structure",
+    check: checkTaskTypeForMessages,
   },
 ];
 

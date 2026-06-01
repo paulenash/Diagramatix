@@ -893,6 +893,21 @@ export function DiagramEditor({
     return m.size > 0 ? m : null;
   }, [activeIssues, data.elements]);
 
+  // Parallel highlight map for connectors — same severity-wins rule but keyed
+  // by connector id. Drives the orange overlay path drawn in Canvas.
+  const scanConnectorHighlight = useMemo<Map<string, "error" | "warning"> | null>(() => {
+    if (!activeIssues || activeIssues.length === 0) return null;
+    const connIds = new Set(data.connectors.map((c) => c.id));
+    const m = new Map<string, "error" | "warning">();
+    for (const { v } of activeIssues) {
+      for (const id of v.ids) {
+        if (!connIds.has(id)) continue;
+        if (v.severity === "error" || !m.has(id)) m.set(id, v.severity);
+      }
+    }
+    return m.size > 0 ? m : null;
+  }, [activeIssues, data.connectors]);
+
   const closeDiagramScan = useCallback(() => {
     if (diagramScan && diagramScan.length > 0) {
       setReviewIssues({ violations: diagramScan, accepted: new Set(), cursor: 0 });
@@ -926,16 +941,26 @@ export function DiagramEditor({
   }, []);
   const reviewExit = useCallback(() => setReviewIssues(null), []);
 
-  // When the cursor lands on an issue, select the flagged element on the
-  // canvas (the "child" for containment, otherwise whatever the rule names).
+  // When the cursor lands on an issue, select the flagged target on the
+  // canvas. Prefer the LAST id in violation.ids (heuristic: child for
+  // containment) and route element ids to setSelectedElementIds, connector
+  // ids to setSelectedConnectorId.
   useEffect(() => {
     if (!currentIssue) return;
     const elIds = new Set(data.elements.map((e) => e.id));
-    // Containment ids are [parent, child] — the child is the interesting one,
-    // so prefer the LAST element id in the violation's ids list.
-    const targetId = [...currentIssue.v.ids].reverse().find((id) => elIds.has(id));
-    if (targetId) setSelectedElementIds(new Set([targetId]));
-    // selectedElementIds is intentionally omitted — we only re-select when the cursor changes.
+    const connIds = new Set(data.connectors.map((c) => c.id));
+    for (const id of [...currentIssue.v.ids].reverse()) {
+      if (elIds.has(id)) {
+        setSelectedElementIds(new Set([id]));
+        setSelectedConnectorId(null);
+        return;
+      }
+      if (connIds.has(id)) {
+        setSelectedConnectorId(id);
+        setSelectedElementIds(new Set());
+        return;
+      }
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentIssue?.i]);
 
@@ -2676,6 +2701,7 @@ export function DiagramEditor({
           selectedElementIds={selectedElementIds}
           selectedConnectorId={selectedConnectorId}
           scanHighlightById={scanHighlight ?? undefined}
+          scanHighlightConnectorById={scanConnectorHighlight ?? undefined}
           onSetSelectedElements={setSelectedElementIds}
           onSelectConnector={setSelectedConnectorId}
           onMoveElements={moveElements}

@@ -487,5 +487,21 @@ export interface TemplateData {
  *            existing top-level element.flowType field.
  *          - Properties panel label "Element" renamed to "Gateway Type"
  *            for clarity (matches the right-click section heading).
+ *          - Four new diagram-check rules in the shared registry:
+ *              * activity-no-incoming (error) — every Task / Sub-Process
+ *                / Expanded Sub-Process must have an incoming sequence
+ *                connector. Event sub-processes and process-scope
+ *                expanded subs (those containing their own Start event)
+ *                are exempt.
+ *              * activity-no-outgoing (error) — same, for outgoing.
+ *              * connector-bends (warning) — flags sequence connectors
+ *                with 4 or more direction changes. Flagged connectors
+ *                get an orange stroke overlay on the canvas during
+ *                Review Mode (new scanHighlightConnectorById prop on
+ *                Canvas).
+ *              * task-type-for-messages (warning) — Task/Sub-Process
+ *                with a message TO a non-IT external pool should be
+ *                Send; FROM a non-IT pool should be Receive; TO/FROM
+ *                an IT system pool should be User.
  */
 export const SCHEMA_VERSION = "1.16";

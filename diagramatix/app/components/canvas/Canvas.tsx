@@ -191,6 +191,10 @@ interface Props {
    *  tinted on the canvas (red = error, orange = warning) for a short window.
    *  The map is element id → severity; undefined / empty means no tint. */
   scanHighlightById?: Map<string, "error" | "warning">;
+  /** Same idea, but for connectors. A flagged connector gets a thicker
+   *  semi-transparent stroke painted along its waypoints in the severity
+   *  colour. Used by rules like `connector-bends`. */
+  scanHighlightConnectorById?: Map<string, "error" | "warning">;
   onSetSelectedElements: (ids: Set<string> | ((prev: Set<string>) => Set<string>)) => void;
   onSelectConnector: (id: string | null) => void;
   onMoveElements?: (ids: string[], dx: number, dy: number) => void;
@@ -412,6 +416,7 @@ export function Canvas({
   selectedElementIds,
   selectedConnectorId,
   scanHighlightById,
+  scanHighlightConnectorById,
   onSetSelectedElements,
   onSelectConnector,
   onMoveElements,
@@ -5602,6 +5607,30 @@ export function Canvas({
                   stroke={color}
                   strokeWidth={3 / zoom}
                   rx={4}
+                  pointerEvents="none"
+                />
+              );
+            })}
+
+          {/* Connector scan highlights — drawn LAST so they overlay the
+              normal connector strokes. A thicker semi-transparent stroke
+              along the connector's waypoints, severity-coloured. */}
+          {scanHighlightConnectorById && scanHighlightConnectorById.size > 0 && data.connectors
+            .filter((c) => scanHighlightConnectorById.has(c.id) && (c.waypoints?.length ?? 0) >= 2)
+            .map((c) => {
+              const severity = scanHighlightConnectorById.get(c.id);
+              const color = severity === "warning" ? "#f59e0b" : "#dc2626";
+              const points = c.waypoints.map((p) => `${p.x},${p.y}`).join(" ");
+              return (
+                <polyline
+                  key={`scan-hl-conn-${c.id}`}
+                  points={points}
+                  fill="none"
+                  stroke={color}
+                  strokeWidth={6 / zoom}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  opacity={0.55}
                   pointerEvents="none"
                 />
               );
