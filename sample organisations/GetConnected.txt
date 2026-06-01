@@ -1,0 +1,25 @@
+I want a series of descriptions of a number of aspects of a new start-up company that is intending to become a Membership Organisation that satifies the needs of its members by providing discounted goods and services to its members from an assortment of providers and giving members value for money while at the same time making a reaonable margin to cover its overheads and a profit margin.
+
+I want descriptions of an organisation called GetConnected in the following way so that these details can be usded as realistic prompts for Diagramatix to create the
+
+1. The Organisational Context (Context Diagram)
+What entities does this organisation interact with in order to conduct its business, e.g. Members, ATO, Other Professional Organnisations, Main Regulatory Bodies, etc.?
+What information or main documents pass between the orgaisation and these entities.
+
+2. The Organisational Capabilities and Services (Archimate Diagrams)
+What Capabilities, Teams, and Roles would this organisation need to have in order to carry on its business?
+What processes and functions would it need to have?
+What IT Systems and IT System components would it need to have?
+
+3. Value Chains (Value Chain Diagrams) 
+What Departments and Value Chains would this organisation need to have in place?
+What would be the Process Groups and Processes that would make up these Value Chains?
+
+4. Process Groups (Process Context Diagrams)
+What are these process groups and the processes that make up the group?
+That Roles, Teams and External participants take part in the processes?
+What IT Systems and Data Store or spreadsheets take part in the processes in the process groups?
+
+5. The Detailed Process descriptions (BPMN Diagrams)
+What are the detailed description of each process in enough detail to create reasonable BPMN Process Diagrams for Each process?
+Which Teams and Roles do what? With what (documents and system information) for each main process?
