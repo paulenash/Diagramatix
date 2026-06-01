@@ -1399,9 +1399,16 @@ export function Canvas({
           )
         : null;
       const innerTarget = childUnderCursor ?? boundaryUnderCursor;
+      // Drop on (or NEAR) the same element → reposition along its boundary.
+      // Using a 30px MARGIN — same tolerance findDropTarget already uses for
+      // reconnects — fixes the "endpoint snaps back" UX when the user drags
+      // an endpoint slightly past the element's edge. Without the margin the
+      // strict bounds-check failed, findDropTarget excluded the current
+      // element via `fromId`, and no update was emitted.
+      const SAME_EL_MARGIN = 30;
       if (!isMsgBPMN && currentEl && !innerTarget &&
-        pos.x >= currentEl.x && pos.x <= currentEl.x + currentEl.width &&
-        pos.y >= currentEl.y && pos.y <= currentEl.y + currentEl.height) {
+        pos.x >= currentEl.x - SAME_EL_MARGIN && pos.x <= currentEl.x + currentEl.width + SAME_EL_MARGIN &&
+        pos.y >= currentEl.y - SAME_EL_MARGIN && pos.y <= currentEl.y + currentEl.height + SAME_EL_MARGIN) {
         const { side, offsetAlong } = pointToBoundaryOffset(pos, currentEl);
         onUpdateConnectorEndpoint(connectorId, endpoint, currentEl.id, side, offsetAlong);
         onSelectConnector(null);

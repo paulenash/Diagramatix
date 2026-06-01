@@ -1856,25 +1856,22 @@ export function PropertiesPanel({
                   : (element.type === "chevron" || element.type === "chevron-collapsed" ? 3 : 2)
               }
               value={
-                element.type === "text-annotation"
-                  // Render embedded newlines with a leading "↵" so the
-                  // user can SEE that a Shift+Enter is sitting in the
-                  // label. The marker is stripped on every commit path
-                  // so it never reaches state / persistence.
-                  ? labelDraft.replace(/\n/g, "↵\n")
-                  : labelDraft
+                // Render embedded newlines with a leading "↵" so the user
+                // can SEE that a Shift+Enter is sitting in the label —
+                // soft word-wrap looks identical to a hard newline without
+                // the marker. The glyph is stripped on every onChange/commit
+                // path so it never reaches state / persistence.
+                labelDraft.replace(/\n/g, "↵\n")
               }
               onFocus={(e) => e.target.select()}
               onChange={(e) => {
                 let val = e.target.value;
+                // Strip any "↵" markers (user-typed or round-tripped from
+                // our markered render). We keep raw \n only.
+                val = val.replace(/↵/g, "");
                 if (element.type === "uml-class" || element.type === "uml-enumeration") {
                   const lines = val.split("\n");
                   if (lines.length > 2) val = lines.slice(0, 2).join("\n");
-                }
-                if (element.type === "text-annotation") {
-                  // Strip any "↵" the user typed or that round-tripped
-                  // from the markered render; keep raw \n only.
-                  val = val.replace(/↵/g, "");
                 }
                 setLabelDraft(val);
               }}
