@@ -2664,14 +2664,17 @@ function connectorHitsAnyElement(conn: Connector, elements: DiagramElement[]): b
       // flagged. Most visible on EPs where a poor side pick can route
       // the path back through the rectangle body.
       //
-      // Gateways are skipped here: their bounding rect inscribes a
-      // rhombus, so the rect interior includes large empty (transparent)
-      // corner regions. A nudged endpoint on the rhombus naturally
-      // produces a perpendicular exit segment that grazes the bounding-
-      // rect interior even though it never crosses the diamond body —
-      // flagging it would force `validateConnectorsAgainstObstacles` to
-      // reset the offset to 0.5, undoing every endpoint nudge.
-      if (obs.type !== "gateway") {
+      // Gateways and circular shapes (process-system, use-case) are
+      // skipped here: their bounding rect inscribes a smaller body, so
+      // the rect interior includes large empty (transparent) corner
+      // regions. A nudged endpoint produces a curve that naturally
+      // grazes those corners even though it never crosses the actual
+      // diamond or circle body — flagging it would force
+      // `validateConnectorsAgainstObstacles` to reset the offsets to
+      // 0.5, undoing every endpoint nudge after the second or third
+      // press.
+      const INSCRIBED_TYPES = new Set<string>(["gateway", "process-system", "use-case"]);
+      if (!INSCRIBED_TYPES.has(obs.type)) {
         const visible = wp.slice(vs, ve + 1);
         for (let i = 0; i < visible.length - 1; i++) {
           if (segmentHitsRect(visible[i], visible[i + 1], b, -1)) return true;
