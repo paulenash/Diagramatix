@@ -524,5 +524,8 @@ export interface TemplateData {
  *            the centre of the source/target elements — the invisible-
  *            leader endpoints at element centres are sliced off before
  *            drawing the orange/red polyline.
+ *          - Two new data-artefact rules (warnings): Data Object and
+ *            Data Store with no association connector flag a warning
+ *            so the modeller wires it up or removes it.
  */
 export const SCHEMA_VERSION = "1.16";

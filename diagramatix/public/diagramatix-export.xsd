@@ -122,6 +122,11 @@
         an orange line through the centre of the source/target element
         — the invisible-leader waypoints at element centres are
         excluded from the overlay polyline.
+      - Two new data-artefact rules (warnings):
+          * data-object-no-association: a Data Object with no
+            association connector.
+          * data-store-no-association: a Data Store with no
+            association connector.
 -->
 
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"

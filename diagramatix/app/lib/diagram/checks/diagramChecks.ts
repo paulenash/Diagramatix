@@ -387,6 +387,54 @@ export function checkAdHocEPHasNoStartEnd(d: DiagramLike): Violation[] {
   return out;
 }
 
+/** Returns the set of element ids touched by ANY association connector
+ *  (either side). Shared by the data-object and data-store rules below. */
+function associationConnectedIds(d: DiagramLike): Set<string> {
+  const ids = new Set<string>();
+  for (const c of d.connectors) {
+    if (c.type !== "associationBPMN" && c.type !== "association") continue;
+    ids.add(c.sourceId);
+    ids.add(c.targetId);
+  }
+  return ids;
+}
+
+/** A Data Object that isn't connected to anything via an association
+ *  isn't doing any work — flag as a warning so the modeller wires it up
+ *  or removes it. */
+export function checkDataObjectHasAssociation(d: DiagramLike): Violation[] {
+  const connected = associationConnectedIds(d);
+  const out: Violation[] = [];
+  for (const e of d.elements) {
+    if (e.type !== "data-object") continue;
+    if (connected.has(e.id)) continue;
+    out.push({
+      rule: "data-object-no-association",
+      severity: "warning",
+      ids: [e.id],
+      message: `Data Object "${nameOf(e)}" has no association connector — connect it to the activity it informs or attach data flow`,
+    });
+  }
+  return out;
+}
+
+/** Same as above for Data Stores. */
+export function checkDataStoreHasAssociation(d: DiagramLike): Violation[] {
+  const connected = associationConnectedIds(d);
+  const out: Violation[] = [];
+  for (const e of d.elements) {
+    if (e.type !== "data-store") continue;
+    if (connected.has(e.id)) continue;
+    out.push({
+      rule: "data-store-no-association",
+      severity: "warning",
+      ids: [e.id],
+      message: `Data Store "${nameOf(e)}" has no association connector — connect it to the activities that read from or write to it`,
+    });
+  }
+  return out;
+}
+
 /** An ad-hoc EP must not have sequence connectors between its child
  *  activities — children run in any order, no ordering implied. */
 export function checkAdHocEPNoSequenceBetweenChildren(d: DiagramLike): Violation[] {
@@ -827,6 +875,22 @@ export const RULES: Rule[] = [
     severity: "error",
     category: "bpmn-structure",
     check: checkAdHocEPNoSequenceBetweenChildren,
+  },
+  {
+    id: "data-object-no-association",
+    title: "Data Object without an association",
+    description: "A Data Object is not connected to any activity via an association connector. Either wire it to the task / process step that produces or consumes it, or remove it.",
+    severity: "warning",
+    category: "bpmn-structure",
+    check: checkDataObjectHasAssociation,
+  },
+  {
+    id: "data-store-no-association",
+    title: "Data Store without an association",
+    description: "A Data Store is not connected to any activity via an association connector. Either wire it to the activities that read from or write to it, or remove it.",
+    severity: "warning",
+    category: "bpmn-structure",
+    check: checkDataStoreHasAssociation,
   },
 ];
 

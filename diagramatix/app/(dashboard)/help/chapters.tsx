@@ -188,6 +188,12 @@ export const CHAPTERS: HelpChapter[] = [
                 triggered by the user / process.
               </li>
               <li>
+                <strong>Data Object / Data Store without an association</strong>{" "}
+                — a data artefact that isn&rsquo;t connected to any
+                activity is doing no work; flagged as a warning so it can
+                be wired up or removed.
+              </li>
+              <li>
                 <strong>Connector takes too many bends</strong> — sequence
                 connectors with 4+ direction changes are highlighted
                 <em> orange</em> on the canvas during Review Mode, the way
