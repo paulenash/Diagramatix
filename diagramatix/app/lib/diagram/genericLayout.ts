@@ -3,7 +3,7 @@
  * Positions elements in a grid and creates connectors with waypoints.
  */
 
-import type { DiagramData, DiagramElement, Connector, Point } from "./types";
+import type { DiagramData, DiagramElement, Connector, Point, Side } from "./types";
 import { getSymbolDefinition } from "./symbols/definitions";
 import { computeWaypoints } from "./routing";
 import { CHEVRON_THEMES } from "./chevronThemes";
@@ -497,7 +497,51 @@ function buildProperties(ai: Record<string, unknown>, diagramType: string): Reco
   return props;
 }
 
-/** Layout context diagrams: central process with entities arranged in a circle */
+/** Convert a ray angle from the centre of `el` to a (rect-side, offset) on
+ *  the element's bounding box. For circular elements (process-system /
+ *  use-case) the caller passes the desired angle on the circle and this
+ *  finds the matching point on the surrounding rect — the renderer then
+ *  projects back onto the circle via ellipseEdgePoint, so the final
+ *  attachment lands exactly on the circumference at that angle. */
+function angleToRectSideOffset(angle: number, el: DiagramElement): { side: Side; offset: number } {
+  const halfW = el.width / 2, halfH = el.height / 2;
+  const cx = el.x + halfW, cy = el.y + halfH;
+  const dxC = Math.cos(angle), dyC = Math.sin(angle);
+  const angTL = Math.atan2(-halfH, -halfW);
+  const angTR = Math.atan2(-halfH,  halfW);
+  const angBL = Math.atan2( halfH, -halfW);
+  const angBR = Math.atan2( halfH,  halfW);
+  const clamp = (v: number) => Math.max(0.05, Math.min(0.95, v));
+  if (angle > angTL && angle <= angTR) {
+    const t = dyC !== 0 ? -halfH / dyC : 1;
+    return { side: "top", offset: clamp((cx + dxC * t - el.x) / el.width) };
+  } else if (angle > angTR && angle <= angBR) {
+    const t = dxC !== 0 ? halfW / dxC : 1;
+    return { side: "right", offset: clamp((cy + dyC * t - el.y) / el.height) };
+  } else if (angle > angBR && angle <= angBL) {
+    const t = dyC !== 0 ? halfH / dyC : 1;
+    return { side: "bottom", offset: clamp((cx + dxC * t - el.x) / el.width) };
+  } else {
+    const t = dxC !== 0 ? -halfW / dxC : 1;
+    return { side: "left", offset: clamp((cy + dyC * t - el.y) / el.height) };
+  }
+}
+
+/** Layout context diagrams: central process with entities arranged in a
+ *  circle. Implements four AI-rule constraints deterministically so the
+ *  output matches the rules even if the model returns naive coordinates:
+ *
+ *  • C3.04 — Size the central circle so every flow connector attaches
+ *    with visible spacing. Radius scales with connector count.
+ *  • C3.02 — Process-side attachment points for connectors belonging to
+ *    a given entity cluster near that entity's side of the circle, but
+ *    are spread along the circumference so no two share the same point.
+ *  • C3.01 / C3.05 — Entity-side attachment points spread across the
+ *    2 or 3 entity faces that face inward toward the central process,
+ *    never all on one face.
+ *
+ *  Label collision avoidance (C3.03) is not handled here — labels remain
+ *  at their default midpoint and can be tuned by the user. */
 function layoutContextDiagram(
   aiElements: AiParsed["elements"] & object[],
   aiConnections: AiParsed["connections"] & object[],
@@ -505,15 +549,23 @@ function layoutContextDiagram(
   const elements: DiagramElement[] = [];
   const connectors: Connector[] = [];
 
-  // Find the central process (process-system) and entities (external-entity)
   const central = aiElements.find(e => e.type === "process-system");
   const entities = aiElements.filter(e => e.type === "external-entity");
 
-  // Central process: large, in the centre
   const centerX = 500;
   const centerY = 400;
-  const processW = 200;
-  const processH = 200;
+
+  // ── C3.04 — Size the process circle from the connector count.
+  // Each connector wants ≈30px of arc length to avoid visual crowding.
+  // Floor at radius 100 (smallest comfortable circle) so a sparse diagram
+  // doesn't look puny.
+  const ARC_PER_CONN = 30;
+  const MIN_RADIUS = 100;
+  const totalConns = aiConnections.length;
+  const requiredRadius = (totalConns * ARC_PER_CONN) / (2 * Math.PI);
+  const processRadius = Math.max(MIN_RADIUS, Math.ceil(requiredRadius / 10) * 10);
+  const processW = processRadius * 2;
+  const processH = processRadius * 2;
 
   if (central) {
     elements.push({
@@ -528,23 +580,24 @@ function layoutContextDiagram(
     });
   }
 
-  // Arrange entities in a circle around the process
-  const radius = 300; // distance from centre to entity centre
+  // Entity ring: keep a constant gap between the circle edge and entity
+  // centres so a bigger circle pushes entities further out automatically.
+  const def = getSymbolDefinition("external-entity");
+  const ENTITY_GAP = 150;
+  const entityRingRadius = processRadius + ENTITY_GAP;
   const entityCount = entities.length;
+  const entityAngle = new Map<string, number>(); // id → angle on the layout circle
 
   for (let i = 0; i < entityCount; i++) {
     const ent = entities[i];
-    // Distribute evenly around the circle, starting from top
-    const angle = (i / entityCount) * 2 * Math.PI - Math.PI / 2;
-    const def = getSymbolDefinition("external-entity");
-    const ex = centerX + radius * Math.cos(angle) - def.defaultWidth / 2;
-    const ey = centerY + radius * Math.sin(angle) - def.defaultHeight / 2;
-
+    const angle = (i / entityCount) * 2 * Math.PI - Math.PI / 2; // first entity at the top
+    entityAngle.set(ent.id, angle);
+    const ex = centerX + entityRingRadius * Math.cos(angle) - def.defaultWidth / 2;
+    const ey = centerY + entityRingRadius * Math.sin(angle) - def.defaultHeight / 2;
     elements.push({
       id: ent.id,
       type: "external-entity",
-      x: ex,
-      y: ey,
+      x: ex, y: ey,
       width: def.defaultWidth,
       height: def.defaultHeight,
       label: ent.label ?? ent.name ?? "Entity",
@@ -552,70 +605,145 @@ function layoutContextDiagram(
     });
   }
 
-  // Create connectors with angle-based side selection to avoid crossings
   const elMap = new Map(elements.map(e => [e.id, e]));
-  const centralEl = central ? elMap.get(central.id) : undefined;
+  const processEl = central ? elMap.get(central.id) : undefined;
 
-  // Determine the best side based on angle from one element's centre to another's
-  // This ensures connectors radiate outward naturally without crossing
-  function angleSide(fromX: number, fromY: number, toX: number, toY: number): string {
-    const angle = Math.atan2(toY - fromY, toX - fromX); // -PI to PI
-    // Map angle to nearest side:
-    //   right: -45° to 45°    (−π/4 to π/4)
-    //   bottom: 45° to 135°   (π/4 to 3π/4)
-    //   left: 135° to -135°   (3π/4 to π or -π to -3π/4)
-    //   top: -135° to -45°    (-3π/4 to -π/4)
-    if (angle >= -Math.PI / 4 && angle < Math.PI / 4) return "right";
-    if (angle >= Math.PI / 4 && angle < 3 * Math.PI / 4) return "bottom";
-    if (angle >= -3 * Math.PI / 4 && angle < -Math.PI / 4) return "top";
-    return "left";
+  // Group every connector by the entity it touches so we can plan its
+  // attachment in a single pass.
+  type ConnGroup = { conn: AiParsed["connections"] extends (infer T)[] | undefined ? T : never; entIsSrc: boolean };
+  const connByEntity = new Map<string, ConnGroup[]>();
+  const ungroupedConns: typeof aiConnections = [];
+  for (const c of aiConnections) {
+    const entId = entityAngle.has(c.sourceId) ? c.sourceId
+                : entityAngle.has(c.targetId) ? c.targetId : null;
+    if (!entId) { ungroupedConns.push(c); continue; }
+    const list = connByEntity.get(entId) ?? [];
+    list.push({ conn: c, entIsSrc: c.sourceId === entId });
+    connByEntity.set(entId, list);
   }
 
-  // Track offset along each side per element so multiple endpoints are spread out
-  const sideOffsets = new Map<string, Map<string, number>>(); // elId → side → next offset fraction
+  // ── C3.02 angular cluster + C3.01/C3.05 entity-face spread.
+  // For each entity:
+  //   • Pick the 2 or 3 entity faces that face the central process
+  //     (primary face + the two perpendicular "shoulders").
+  //   • Round-robin connectors across those faces so they never all
+  //     land on a single face.
+  //   • Each connector's process-side endpoint clusters around the
+  //     entity's bearing on the circle, spread across a ±CLUSTER_HALF
+  //     window so multiple connectors don't share a single point.
+  const CLUSTER_HALF = 0.18; // ≈10° each side of the entity bearing
+  type Attach = { procSide: Side; procOffset: number; entSide: Side; entOffset: number };
+  const attachments = new Map<string, Attach>();
+  const connKey = (c: { sourceId: string; targetId: string }, idx: number) =>
+    `${c.sourceId}->${c.targetId}#${idx}`;
 
-  function getOffset(elId: string, side: string, total: number): number {
-    if (!sideOffsets.has(elId)) sideOffsets.set(elId, new Map());
-    const offsets = sideOffsets.get(elId)!;
-    const count = offsets.get(side) ?? 0;
-    offsets.set(side, count + 1);
-    // Spread evenly: if total connections on this side = n, positions are 1/(n+1), 2/(n+1), etc.
-    // But we don't know total in advance, so use incremental spacing
-    return 0.3 + count * 0.2; // 0.3, 0.5, 0.7 for up to 3 connections per side
+  // Track each AI connection's index so duplicates (same source/target
+  // pair) get unique attachments.
+  const connIdx = new Map<string, number>();
+  function nextIdx(c: { sourceId: string; targetId: string }): number {
+    const k = `${c.sourceId}->${c.targetId}`;
+    const i = connIdx.get(k) ?? 0;
+    connIdx.set(k, i + 1);
+    return i;
   }
 
-  function getBestSides(src: DiagramElement, tgt: DiagramElement): { srcSide: string; tgtSide: string; srcOffset: number; tgtOffset: number } {
-    const srcCx = src.x + src.width / 2;
-    const srcCy = src.y + src.height / 2;
-    const tgtCx = tgt.x + tgt.width / 2;
-    const tgtCy = tgt.y + tgt.height / 2;
+  for (const [entId, group] of connByEntity) {
+    const theta = entityAngle.get(entId)!;
+    const K = group.length;
+    // Pick the entity's 2-3 inward-facing sides. The primary inward side
+    // is the one perpendicular to (-cos θ, -sin θ) — the direction back
+    // toward the process. The two adjacent sides are also still "inward"
+    // for any reasonable circle layout.
+    const inwardX = -Math.cos(theta), inwardY = -Math.sin(theta);
+    let primary: Side, adj1: Side, adj2: Side;
+    if (Math.abs(inwardX) > Math.abs(inwardY)) {
+      primary = inwardX > 0 ? "right" : "left";
+      adj1 = "top"; adj2 = "bottom";
+    } else {
+      primary = inwardY > 0 ? "bottom" : "top";
+      adj1 = "left"; adj2 = "right";
+    }
+    const faces: Side[] = K <= 1 ? [primary]
+                        : K === 2 ? [primary, adj1]
+                        : [primary, adj1, adj2];
 
-    // Source side: direction from source towards target
-    const srcSide = angleSide(srcCx, srcCy, tgtCx, tgtCy);
-    // Target side: direction from target towards source (opposite direction)
-    const tgtSide = angleSide(tgtCx, tgtCy, srcCx, srcCy);
+    // Bucket connector indices into faces, primary first.
+    const faceBuckets = new Map<Side, number[]>();
+    faces.forEach(f => faceBuckets.set(f, []));
+    for (let k = 0; k < K; k++) {
+      const f = faces[k % faces.length];
+      faceBuckets.get(f)!.push(k);
+    }
 
-    const srcOffset = getOffset(src.id, srcSide, 1);
-    const tgtOffset = getOffset(tgt.id, tgtSide, 1);
+    // Now assign positions.
+    for (let k = 0; k < K; k++) {
+      const { conn: c } = group[k];
+      const idx = nextIdx(c);
+      // Cluster the process-side around theta. Spread across ±CLUSTER_HALF
+      // so even a single entity with many connectors has visible gaps.
+      const ratio = K === 1 ? 0 : (k - (K - 1) / 2) / Math.max(K - 1, 1);
+      const procAngle = theta + ratio * 2 * CLUSTER_HALF;
+      const procAttach = processEl
+        ? angleToRectSideOffset(procAngle, processEl)
+        : { side: "left" as Side, offset: 0.5 };
+      // Entity-side: which face was this k assigned to, and what's its
+      // position within the bucket?
+      let entSide: Side = primary;
+      let entOffset = 0.5;
+      for (const [face, ks] of faceBuckets) {
+        const pos = ks.indexOf(k);
+        if (pos !== -1) {
+          entSide = face;
+          const count = ks.length;
+          entOffset = (pos + 1) / (count + 1); // evenly spread within face
+          break;
+        }
+      }
+      attachments.set(connKey(c, idx), {
+        procSide: procAttach.side, procOffset: procAttach.offset,
+        entSide, entOffset,
+      });
+    }
+  }
 
-    return { srcSide, tgtSide, srcOffset, tgtOffset };
+  // Now emit the connectors using the planned attachments.
+  const seenIdx = new Map<string, number>();
+  function popIdx(c: { sourceId: string; targetId: string }): number {
+    const k = `${c.sourceId}->${c.targetId}`;
+    const i = seenIdx.get(k) ?? 0;
+    seenIdx.set(k, i + 1);
+    return i;
   }
 
   for (const c of aiConnections) {
     const src = elMap.get(c.sourceId);
     const tgt = elMap.get(c.targetId);
     if (!src || !tgt) continue;
-
-    const { srcSide, tgtSide, srcOffset, tgtOffset } = getBestSides(src, tgt);
-
+    const idx = popIdx(c);
+    const att = attachments.get(connKey(c, idx));
+    let srcSide: Side, tgtSide: Side, srcOffset: number, tgtOffset: number;
+    if (att) {
+      const entIsSrc = entityAngle.has(c.sourceId);
+      if (entIsSrc) {
+        srcSide = att.entSide; srcOffset = att.entOffset;
+        tgtSide = att.procSide; tgtOffset = att.procOffset;
+      } else {
+        srcSide = att.procSide; srcOffset = att.procOffset;
+        tgtSide = att.entSide; tgtOffset = att.entOffset;
+      }
+    } else {
+      // Fallback for connectors that touch neither an entity nor the
+      // process (rare — usually orphaned AI output).
+      srcSide = "right"; tgtSide = "left"; srcOffset = 0.5; tgtOffset = 0.5;
+    }
     connectors.push({
-      id: `conn-${c.sourceId}-${c.targetId}`,
+      id: `conn-${c.sourceId}-${c.targetId}-${idx}`,
       sourceId: c.sourceId,
       targetId: c.targetId,
-      sourceSide: srcSide as Connector["sourceSide"],
-      targetSide: tgtSide as Connector["targetSide"],
-      sourceOffsetAlong: Math.max(0.1, Math.min(0.9, srcOffset)),
-      targetOffsetAlong: Math.max(0.1, Math.min(0.9, tgtOffset)),
+      sourceSide: srcSide,
+      targetSide: tgtSide,
+      sourceOffsetAlong: srcOffset,
+      targetOffsetAlong: tgtOffset,
       type: "flow",
       directionType: "open-directed",
       routingType: "curvilinear",
