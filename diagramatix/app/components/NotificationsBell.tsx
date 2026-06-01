@@ -182,7 +182,7 @@ export function NotificationsBell({
         )}
       </button>
       {open && (
-        <div className="absolute right-0 top-full mt-1 w-80 bg-white border border-gray-200 rounded shadow-lg z-50">
+        <div className="absolute right-0 top-full mt-1 w-[480px] bg-white border border-gray-200 rounded shadow-lg z-50">
           <div className="flex items-center justify-between border-b border-gray-100 px-3 py-2">
             <span className="text-xs font-semibold text-gray-700">Notifications</span>
             {unreadCount > 0 && (
@@ -191,7 +191,7 @@ export function NotificationsBell({
               </button>
             )}
           </div>
-          <div className="max-h-80 overflow-y-auto">
+          <div className="max-h-96 overflow-y-auto">
             {rows.length === 0 ? (
               <p className="text-xs text-gray-400 italic p-3">No notifications yet.</p>
             ) : (
@@ -204,10 +204,17 @@ export function NotificationsBell({
                     onClick={view.onClick ?? (() => markRead(r.id))}
                     className={`w-full text-left px-3 py-2 border-b border-gray-100 hover:bg-gray-50 flex items-start gap-2 ${unread ? "bg-blue-50/50" : ""}`}
                   >
-                    <span className={`mt-1 inline-block w-2 h-2 rounded-full ${unread ? "bg-blue-500" : "bg-transparent"}`} />
+                    <span className={`mt-1 inline-block w-2 h-2 rounded-full shrink-0 ${unread ? "bg-blue-500" : "bg-transparent"}`} />
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs text-gray-800 truncate">{view.label}</p>
-                      {view.sublabel && <p className="text-[10px] text-gray-500 truncate">{view.sublabel}</p>}
+                      {/* Two-line layout: label on top, optional sublabel below.
+                          Each line is clamp-2 so an unusually long label still
+                          stays bounded but every relevant word is visible. */}
+                      <p className="text-xs text-gray-800 line-clamp-2 break-words">{view.label}</p>
+                      {view.sublabel && (
+                        <p className="text-[10px] text-gray-500 line-clamp-2 break-words mt-0.5">
+                          {view.sublabel}
+                        </p>
+                      )}
                     </div>
                     <span className="text-[9px] text-gray-400 shrink-0">{timeAgo(r.createdAt)}</span>
                   </button>
