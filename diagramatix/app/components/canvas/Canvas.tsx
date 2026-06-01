@@ -35,6 +35,16 @@ const MIN_BOUNDARY_H = HEADER_H + 40;
 
 const DATA_ELEMENT_TYPES = new Set<SymbolType>(["data-object", "data-store", "text-annotation"]);
 
+// Context-Diagram flow rule: connectors only go entity ↔ process.
+// entity → entity or process → process is invalid in a Context Diagram.
+// Used to filter drop targets when dragging a new connector from one of the
+// two Context-Diagram symbol types so only the complementary type lights up.
+function isValidContextFlowPair(sourceType: string, targetType: string): boolean {
+  if (sourceType === "external-entity") return targetType === "process-system";
+  if (sourceType === "process-system") return targetType === "external-entity";
+  return false;
+}
+
 function getElementPoolId(el: DiagramElement, elements: DiagramElement[]): string | null {
   if (el.type === "pool") return el.id;
   // Try parentId chain first (fast path)
@@ -1103,7 +1113,14 @@ export function Canvas({
         window.removeEventListener("mouseup", onMouseUp);
         return;
       }
-      const targetEl = findDropTarget(pos, elementId);
+      // Context-Diagram drop filter: enforce entity ↔ process pairing so
+      // the connector creation matches the drop-target highlight rule.
+      const isCtxDiagram = diagramType === "context" || diagramType === "basic";
+      const ctxSrcEl = isCtxDiagram ? data.elements.find((e) => e.id === elementId) : null;
+      const ctxFilter = ctxSrcEl
+        ? (cand: DiagramElement) => isValidContextFlowPair(ctxSrcEl.type, cand.type)
+        : undefined;
+      const targetEl = findDropTarget(pos, elementId, ctxFilter);
       if (targetEl) {
         const sourceEl = data.elements.find((e) => e.id === elementId);
         const actorLike = ["actor", "team", "system", "hourglass"];
@@ -4548,7 +4565,14 @@ export function Canvas({
                 // Rule 3 (receive): only children of its parent subprocess
                 if (el.parentId === draggingSourceBoundaryHostId) elIsDropTarget = true;
               } else if (!isBpmnSource || !draggingSourcePoolId) {
-                elIsDropTarget = true;
+                // Context-Diagram rule: only the complementary type
+                // (entity ↔ process) is a valid flow target. Other diagram
+                // types remain unrestricted.
+                if ((diagramType === "context" || diagramType === "basic") && draggingSourceEl) {
+                  elIsDropTarget = isValidContextFlowPair(draggingSourceEl.type, el.type);
+                } else {
+                  elIsDropTarget = true;
+                }
               } else {
                 const elPoolId = getElementPoolId(el, data.elements);
                 if (elPoolId === draggingSourcePoolId) {

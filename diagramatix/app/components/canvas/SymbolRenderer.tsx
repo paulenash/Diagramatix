@@ -2405,15 +2405,25 @@ export function SymbolRenderer({
         );
       })()}
 
-      {/* Selection outline */}
+      {/* Selection outline — ellipse for circular shapes, rect otherwise. */}
       {selected && !isContainer && (
-        <rect data-interactive
-          x={element.x - 3} y={element.y - 3}
-          width={element.width + 6} height={element.height + 6}
-          fill="none" stroke="#2563eb" strokeWidth={1.5}
-          strokeDasharray="4 2" rx={4}
-          style={{ pointerEvents: "none" }}
-        />
+        (element.type === "process-system" || element.type === "use-case") ? (
+          <ellipse data-interactive
+            cx={element.x + element.width / 2} cy={element.y + element.height / 2}
+            rx={element.width / 2 + 3} ry={element.height / 2 + 3}
+            fill="none" stroke="#2563eb" strokeWidth={1.5}
+            strokeDasharray="4 2"
+            style={{ pointerEvents: "none" }}
+          />
+        ) : (
+          <rect data-interactive
+            x={element.x - 3} y={element.y - 3}
+            width={element.width + 6} height={element.height + 6}
+            fill="none" stroke="#2563eb" strokeWidth={1.5}
+            strokeDasharray="4 2" rx={4}
+            style={{ pointerEvents: "none" }}
+          />
+        )
       )}
       {/* Lane/pool selection outline */}
       {selected && isPoolLane && (
