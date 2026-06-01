@@ -5814,8 +5814,68 @@ function reducer(state: DiagramData, action: Action): DiagramData {
             }
             return vertex ? { side: vertex, offset: 0.5 } : { side, offset: newOffset };
           }
-          if (side === "top" || side === "bottom") return { side, offset: clamp(offset + dx * 0.02) };
-          return { side, offset: clamp(offset + dy * 0.02) };
+          if (!el) {
+            if (side === "top" || side === "bottom") return { side, offset: clamp(offset + dx * 0.02) };
+            return { side, offset: clamp(offset + dy * 0.02) };
+          }
+          // Position-based nudge: lets the endpoint travel around corners on
+          // rectangular elements and around the boundary on circular ones,
+          // matching the cursor's intent on every arrow press.
+          const halfW = el.width / 2, halfH = el.height / 2;
+          const cx = el.x + halfW, cy = el.y + halfH;
+          const CIRC = new Set<string>(["process-system", "use-case"]);
+          const isCirc = CIRC.has(el.type);
+          // Current visible boundary point in world coords.
+          let curX: number, curY: number;
+          switch (side) {
+            case "top":    curX = el.x + el.width * offset; curY = el.y; break;
+            case "bottom": curX = el.x + el.width * offset; curY = el.y + el.height; break;
+            case "left":   curX = el.x; curY = el.y + el.height * offset; break;
+            default:       curX = el.x + el.width; curY = el.y + el.height * offset; break;
+          }
+          if (isCirc) {
+            // Project rect-edge point onto the ellipse boundary first.
+            const rxA = (curX - cx) / halfW, ryA = (curY - cy) / halfH;
+            const s = 1 / (Math.hypot(rxA, ryA) || 1);
+            curX = cx + (curX - cx) * s;
+            curY = cy + (curY - cy) * s;
+          }
+          // Apply the pixel-space nudge from the arrow key.
+          const newX = curX + dx, newY = curY + dy;
+          // Convert back to (side, offset). For circular elements we use the
+          // angle of the new point; for rectangular ones we project to the
+          // perimeter and wrap across corners.
+          const dxC = newX - cx, dyC = newY - cy;
+          const angTL = Math.atan2(-halfH, -halfW);
+          const angTR = Math.atan2(-halfH,  halfW);
+          const angBL = Math.atan2( halfH, -halfW);
+          const angBR = Math.atan2( halfH,  halfW);
+          const ang = Math.atan2(dyC, dxC);
+          let newSide: Side;
+          let newOffset: number;
+          if (ang > angTL && ang <= angTR) {
+            newSide = "top";
+            // Top edge crosses ray at y = el.y → t = -halfH / dyC
+            const t = dyC !== 0 ? -halfH / dyC : 1;
+            const rectX = cx + dxC * t;
+            newOffset = (rectX - el.x) / el.width;
+          } else if (ang > angTR && ang <= angBR) {
+            newSide = "right";
+            const t = dxC !== 0 ? halfW / dxC : 1;
+            const rectY = cy + dyC * t;
+            newOffset = (rectY - el.y) / el.height;
+          } else if (ang > angBR && ang <= angBL) {
+            newSide = "bottom";
+            const t = dyC !== 0 ? halfH / dyC : 1;
+            const rectX = cx + dxC * t;
+            newOffset = (rectX - el.x) / el.width;
+          } else {
+            newSide = "left";
+            const t = dxC !== 0 ? -halfW / dxC : 1;
+            const rectY = cy + dyC * t;
+            newOffset = (rectY - el.y) / el.height;
+          }
+          return { side: newSide, offset: clamp(newOffset) };
         }
         const r = nudgeOffset(
           endpoint === "source" ? conn.sourceSide : conn.targetSide,
