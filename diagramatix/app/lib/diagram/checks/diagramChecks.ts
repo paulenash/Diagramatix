@@ -709,9 +709,10 @@ export function checkEpNoAutoConnectToDescendant(d: DiagramLike): Violation[] {
 }
 
 /** R8.09 — A sequence connector LEAVING an edge-mounted Intermediate
- *  Event must emit from the INNER side (the side facing into the host
- *  EP). Counterpart to R1/B19 which covers INCOMING flow. */
-export function checkBoundaryIntermediateOutgoingInner(d: DiagramLike): Violation[] {
+ *  Event must emit from the OUTER side (the side facing AWAY from the
+ *  host EP). Counterpart to B19 which covers INCOMING flow; both ends
+ *  attach OUTER so the path never routes through the host body. */
+export function checkBoundaryIntermediateOutgoingOuter(d: DiagramLike): Violation[] {
   const byId = new Map(d.elements.map(e => [e.id, e]));
   const out: Violation[] = [];
   for (const c of d.connectors) {
@@ -721,13 +722,12 @@ export function checkBoundaryIntermediateOutgoingInner(d: DiagramLike): Violatio
     const host = byId.get(src.boundaryHostId);
     if (!host) continue;
     const outer = outerSideOfEdgeMountEvent(src, host);
-    const inner = oppositeSide(outer);
-    if (c.sourceSide && c.sourceSide !== inner) {
+    if (c.sourceSide && c.sourceSide !== outer) {
       out.push({
-        rule: "boundary-intermediate-outgoing-inner",
+        rule: "boundary-intermediate-outgoing-outer",
         severity: "error",
         ids: [c.id, src.id, host.id],
-        message: `Outgoing sequence from edge-mounted Intermediate Event "${nameOf(src)}" emits from "${c.sourceSide}" — must emit from the INNER side ("${inner}") so the flow runs into the host EP.`,
+        message: `Outgoing sequence from edge-mounted Intermediate Event "${nameOf(src)}" emits from "${c.sourceSide}" — must emit from the OUTER side ("${outer}") so the flow heads away from the host.`,
       });
     }
   }
@@ -1321,12 +1321,12 @@ export const RULES: Rule[] = [
   },
   {
     code: "B27",
-    id: "boundary-intermediate-outgoing-inner",
-    title: "Boundary Intermediate Event outgoing flow not on inner side",
-    description: "Outgoing sequence from an edge-mounted Intermediate Event must emit from the INNER side (the side facing into the host EP). Counterpart to B19 which governs incoming flow.",
+    id: "boundary-intermediate-outgoing-outer",
+    title: "Boundary Intermediate Event outgoing flow not on outer side",
+    description: "Outgoing sequence from an edge-mounted Intermediate Event must emit from the OUTER side (the side facing away from the host element). Counterpart to B19 which governs incoming flow.",
     severity: "error",
     category: "bpmn-structure",
-    check: checkBoundaryIntermediateOutgoingInner,
+    check: checkBoundaryIntermediateOutgoingOuter,
   },
 ];
 
