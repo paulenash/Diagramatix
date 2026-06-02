@@ -60,7 +60,7 @@ ${rules ? `USER RULES AND PREFERENCES (follow these strictly):\n${rules}\n\n` : 
   * Task with messages BOTH TO AND FROM an EXTERNAL ENTITY (isSystem=false): default "none"; never use "send", "receive", or "user".
   * Task with messages BOTH TO AND FROM an IT SYSTEM (isSystem=true): default "user"; never use "send", "receive", or "manual".
   * Task that only RECEIVES a message from an EXTERNAL ENTITY: default "receive"; never use "send".
-  * Task that only SENDS a message to an EXTERNAL ENTITY: default "user" (the value "send" is also allowed); never use "receive".
+  * Task that only SENDS a message to an EXTERNAL ENTITY: default "send"; never use "receive" or "user".
   * Task with messages to/from an IT SYSTEM in only one direction: default "user"; never use "send", "receive", or "manual".
   * Send and Receive each represent ONE direction of a message exchange — never use them on a task that has messages in BOTH directions.
   * ABSOLUTE RULE: a Manual task must NEVER exchange messages with an IT-system pool (isSystem=true) in any direction.
@@ -127,7 +127,7 @@ Example 2 — Roles mentioned (Sales, Finance), message flows to Customer (exter
     { "id": "l2", "type": "lane", "label": "Finance", "parentPool": "p1" },
     { "id": "pS", "type": "pool", "label": "Salesforce", "poolType": "black-box", "isSystem": true },
     { "id": "e1", "type": "start-event", "label": "Start", "pool": "p1", "lane": "l1" },
-    { "id": "t1", "type": "task", "label": "Notify Customer", "taskType": "user", "pool": "p1", "lane": "l1" },
+    { "id": "t1", "type": "task", "label": "Notify Customer", "taskType": "send", "pool": "p1", "lane": "l1" },
     { "id": "t2", "type": "task", "label": "Record Payment", "taskType": "user", "pool": "p1", "lane": "l2" },
     { "id": "e2", "type": "end-event", "label": "End", "pool": "p1", "lane": "l2" }
   ],

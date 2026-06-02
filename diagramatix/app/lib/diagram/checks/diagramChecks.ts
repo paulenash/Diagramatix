@@ -1081,9 +1081,12 @@ export function checkTaskTypeForMessages(d: DiagramLike): Violation[] {
       dflt = "receive";
       caseLabel = "an incoming message from an external entity";
     } else if (!hasIn && hasOut && kind === "external") {
-      banned = new Set(["receive"]);
-      dflt = "user";
-      alsoAllowed = new Set(["send"]);
+      banned = new Set(["receive", "user"]);
+      dflt = "send";
+      // All non-banned triggers are silently allowed for this case —
+      // the default is informational only; the scanner doesn't warn
+      // when other valid markers (service / manual / none) are used.
+      alsoAllowed = new Set(["service", "manual", "none"]);
       caseLabel = "an outgoing message to an external entity";
     } else {
       // Single-direction IT system — treated same as case 2 per user.
