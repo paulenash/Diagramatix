@@ -48,6 +48,10 @@ export interface Violation {
 }
 
 export interface Rule {
+  /** Stable short code (B01, B02, …) used in conversation and bug
+   *  reports. Assign manually; never derive from array order — adding a
+   *  rule in the middle of the list must not renumber the others. */
+  code: string;
   id: string;
   title: string;
   description: string;
@@ -456,61 +460,57 @@ function outerSideOfEdgeMountEvent(
   return "right";
 }
 
-/** Edge-mounted intermediate events must (a) attach every connector at
- *  the OUTER side of the event, and (b) connect that other end to an
- *  element OUTSIDE the host subprocess — never to a child of the host.
- *  Anything else routes the path back through the host body and is the
- *  most common cause of "the connector goes through the event" reports. */
+/** Walk an element's parentId chain and return true if `ancestorId`
+ *  appears in it (the element is a descendant). Shared by several
+ *  edge-mount and EP rules below. */
+function isDescendantOfId(
+  byId: Map<string, DiagramElement>,
+  elId: string | undefined,
+  ancestorId: string,
+): boolean {
+  let cur: DiagramElement | undefined = elId ? byId.get(elId) : undefined;
+  const visited = new Set<string>();
+  while (cur && !visited.has(cur.id)) {
+    visited.add(cur.id);
+    if (cur.parentId === ancestorId) return true;
+    cur = cur.parentId ? byId.get(cur.parentId) : undefined;
+  }
+  return false;
+}
+
+/** Edge-mounted intermediate events used as the TARGET of an incoming
+ *  sequence connector must (a) attach on the OUTER side of the event
+ *  and (b) have a source that sits OUTSIDE the host subprocess. This
+ *  enforces the "external trigger" pattern. Outgoing connectors from
+ *  these events are handled by R8.09 (B27) which requires INNER. */
 export function checkEdgeMountEventOuterRouting(d: DiagramLike): Violation[] {
   const byId = new Map(d.elements.map((e) => [e.id, e]));
   const out: Violation[] = [];
-
-  function isDescendantOf(elId: string | undefined, ancestorId: string): boolean {
-    let cur: DiagramElement | undefined = elId ? byId.get(elId) : undefined;
-    const visited = new Set<string>();
-    while (cur && !visited.has(cur.id)) {
-      visited.add(cur.id);
-      if (cur.parentId === ancestorId) return true;
-      cur = cur.parentId ? byId.get(cur.parentId) : undefined;
-    }
-    return false;
-  }
-
-  for (const e of d.elements) {
-    if (e.type !== "intermediate-event" || !e.boundaryHostId) continue;
-    const host = byId.get(e.boundaryHostId);
+  for (const c of d.connectors) {
+    if (c.type !== "sequence") continue;
+    const tgt = byId.get(c.targetId);
+    if (!tgt || tgt.type !== "intermediate-event" || !tgt.boundaryHostId) continue;
+    const host = byId.get(tgt.boundaryHostId);
     if (!host) continue;
-    const outer = outerSideOfEdgeMountEvent(e, host);
-    for (const c of d.connectors) {
-      if (c.type !== "sequence") continue;
-      const eventIsSrc = c.sourceId === e.id;
-      const eventIsTgt = c.targetId === e.id;
-      if (!eventIsSrc && !eventIsTgt) continue;
-      const eventSide = eventIsSrc ? c.sourceSide : c.targetSide;
-      if (eventSide && eventSide !== outer) {
-        out.push({
-          rule: "edge-mount-event-outer-routing",
-          severity: "error",
-          ids: [c.id, e.id, host.id],
-          message: `Edge-mounted intermediate event "${nameOf(e)}" has a sequence connector attached on its inner side ("${eventSide}") — must attach on the outer side ("${outer}") so the path doesn't route back through the event.`,
-        });
-        continue;
-      }
-      const otherId = eventIsSrc ? c.targetId : c.sourceId;
-      const other = byId.get(otherId);
-      if (!other) continue;
-      // The other end of the flow must NOT be a descendant of the host
-      // subprocess — that would force the connector back through the host
-      // body. The boundary event itself, and other boundary events on the
-      // same host, are not descendants by parentId so we don't trip on them.
-      if (other.parentId === host.id || isDescendantOf(other.parentId, host.id)) {
-        out.push({
-          rule: "edge-mount-event-outer-routing",
-          severity: "error",
-          ids: [c.id, e.id, host.id, other.id],
-          message: `Edge-mounted intermediate event "${nameOf(e)}" connects to "${nameOf(other)}" which sits inside its host "${nameOf(host)}" — connectors on edge-mounted intermediate events must route outward, not back into the host.`,
-        });
-      }
+    const outer = outerSideOfEdgeMountEvent(tgt, host);
+    if (c.targetSide && c.targetSide !== outer) {
+      out.push({
+        rule: "edge-mount-event-outer-routing",
+        severity: "error",
+        ids: [c.id, tgt.id, host.id],
+        message: `Incoming sequence on edge-mounted intermediate event "${nameOf(tgt)}" attached on its inner side ("${c.targetSide}") — must attach on the outer side ("${outer}") so the trigger comes from outside the host.`,
+      });
+      continue;
+    }
+    const src = byId.get(c.sourceId);
+    if (!src) continue;
+    if (src.parentId === host.id || isDescendantOfId(byId, src.parentId, host.id)) {
+      out.push({
+        rule: "edge-mount-event-outer-routing",
+        severity: "error",
+        ids: [c.id, tgt.id, host.id, src.id],
+        message: `Incoming sequence on edge-mounted intermediate event "${nameOf(tgt)}" originates inside its host "${nameOf(host)}" — boundary intermediate events represent external triggers; the source must sit outside the host.`,
+      });
     }
   }
   return out;
@@ -548,6 +548,194 @@ export function checkMessageFlowMoveable(d: DiagramLike): Violation[] {
     });
   }
   return out;
+}
+
+/** R8.04 — Loop-back (rework) sequence connectors. When the target sits
+ *  to the LEFT of the source (or directly below and to the left), the
+ *  flow is a rework loop and BPMN convention routes it underneath the
+ *  forward flow: attach at BOTTOM of both source and target. Flag any
+ *  loop-back whose source or target side is not "bottom". */
+export function checkLoopBackRouting(d: DiagramLike): Violation[] {
+  const byId = new Map(d.elements.map(e => [e.id, e]));
+  const out: Violation[] = [];
+  for (const c of d.connectors) {
+    if (c.type !== "sequence") continue;
+    const src = byId.get(c.sourceId);
+    const tgt = byId.get(c.targetId);
+    if (!src || !tgt) continue;
+    const srcCx = src.x + src.width / 2;
+    const tgtCx = tgt.x + tgt.width / 2;
+    // Loop-back = target's centre is to the LEFT of source's centre
+    // (using element width as the threshold so neighbouring elements
+    // at roughly the same x don't trip it).
+    if (tgtCx >= srcCx - src.width / 4) continue;
+    if (c.sourceSide !== "bottom" || c.targetSide !== "bottom") {
+      out.push({
+        rule: "loop-back-routing",
+        severity: "warning",
+        ids: [c.id, src.id, tgt.id],
+        message: `Loop-back sequence "${nameOf(src)}" → "${nameOf(tgt)}" runs from source-side "${c.sourceSide ?? "?"}" to target-side "${c.targetSide ?? "?"}" — rework loops should attach BOTTOM-to-BOTTOM and detour underneath.`,
+      });
+    }
+  }
+  return out;
+}
+
+/** R8.05 — A sequence connector LEAVING an edge-mounted Start Event
+ *  must emit from the INNER side (the side facing into the host EP).
+ *  Catches AI-generated diagrams that exit the start event outward,
+ *  away from its handler. */
+export function checkBoundaryStartOutgoingInner(d: DiagramLike): Violation[] {
+  const byId = new Map(d.elements.map(e => [e.id, e]));
+  const out: Violation[] = [];
+  for (const c of d.connectors) {
+    if (c.type !== "sequence") continue;
+    const src = byId.get(c.sourceId);
+    if (!src || src.type !== "start-event" || !src.boundaryHostId) continue;
+    const host = byId.get(src.boundaryHostId);
+    if (!host) continue;
+    const outer = outerSideOfEdgeMountEvent(src, host);
+    const inner = oppositeSide(outer);
+    if (c.sourceSide && c.sourceSide !== inner) {
+      out.push({
+        rule: "boundary-start-outgoing-inner",
+        severity: "error",
+        ids: [c.id, src.id, host.id],
+        message: `Outgoing sequence from edge-mounted Start Event "${nameOf(src)}" emits from "${c.sourceSide}" — must emit from the INNER side ("${inner}") so the flow runs into the host EP.`,
+      });
+    }
+  }
+  return out;
+}
+
+/** R8.06 — A sequence connector TARGETING an edge-mounted Start Event
+ *  must attach at the OUTER side AND originate from an element OUTSIDE
+ *  the host EP. A boundary start represents an external trigger; an
+ *  internal element handing flow to it would be nonsensical. */
+export function checkBoundaryStartIncomingOuter(d: DiagramLike): Violation[] {
+  const byId = new Map(d.elements.map(e => [e.id, e]));
+  const out: Violation[] = [];
+  for (const c of d.connectors) {
+    if (c.type !== "sequence") continue;
+    const tgt = byId.get(c.targetId);
+    if (!tgt || tgt.type !== "start-event" || !tgt.boundaryHostId) continue;
+    const host = byId.get(tgt.boundaryHostId);
+    if (!host) continue;
+    const outer = outerSideOfEdgeMountEvent(tgt, host);
+    if (c.targetSide && c.targetSide !== outer) {
+      out.push({
+        rule: "boundary-start-incoming-outer",
+        severity: "error",
+        ids: [c.id, tgt.id, host.id],
+        message: `Incoming sequence to edge-mounted Start Event "${nameOf(tgt)}" attaches at "${c.targetSide}" — must attach on the OUTER side ("${outer}").`,
+      });
+      continue;
+    }
+    const src = byId.get(c.sourceId);
+    if (!src) continue;
+    if (src.parentId === host.id || isDescendantOfId(byId, src.parentId, host.id)) {
+      out.push({
+        rule: "boundary-start-incoming-outer",
+        severity: "error",
+        ids: [c.id, tgt.id, host.id, src.id],
+        message: `Edge-mounted Start Event "${nameOf(tgt)}" receives flow from "${nameOf(src)}" inside its host "${nameOf(host)}" — boundary start events represent external triggers; the source must sit outside the host.`,
+      });
+    }
+  }
+  return out;
+}
+
+/** R8.07 — A sequence connector TARGETING an edge-mounted End Event
+ *  must attach at the INNER side AND originate from an element INSIDE
+ *  the host EP. Boundary end events terminate an internal sub-flow
+ *  along the host's boundary — nothing outside the host should hand
+ *  flow to them. */
+export function checkBoundaryEndIncomingInner(d: DiagramLike): Violation[] {
+  const byId = new Map(d.elements.map(e => [e.id, e]));
+  const out: Violation[] = [];
+  for (const c of d.connectors) {
+    if (c.type !== "sequence") continue;
+    const tgt = byId.get(c.targetId);
+    if (!tgt || tgt.type !== "end-event" || !tgt.boundaryHostId) continue;
+    const host = byId.get(tgt.boundaryHostId);
+    if (!host) continue;
+    const outer = outerSideOfEdgeMountEvent(tgt, host);
+    const inner = oppositeSide(outer);
+    if (c.targetSide && c.targetSide !== inner) {
+      out.push({
+        rule: "boundary-end-incoming-inner",
+        severity: "error",
+        ids: [c.id, tgt.id, host.id],
+        message: `Incoming sequence to edge-mounted End Event "${nameOf(tgt)}" attaches at "${c.targetSide}" — must attach on the INNER side ("${inner}").`,
+      });
+      continue;
+    }
+    const src = byId.get(c.sourceId);
+    if (!src) continue;
+    if (src.parentId !== host.id && !isDescendantOfId(byId, src.parentId, host.id)) {
+      out.push({
+        rule: "boundary-end-incoming-inner",
+        severity: "error",
+        ids: [c.id, tgt.id, host.id, src.id],
+        message: `Edge-mounted End Event "${nameOf(tgt)}" receives flow from "${nameOf(src)}" outside its host "${nameOf(host)}" — boundary end events terminate an internal sub-flow; the source must sit inside the host.`,
+      });
+    }
+  }
+  return out;
+}
+
+/** R8.08 — An Expanded Subprocess must never directly auto-connect to
+ *  one of its own descendants via a sequence connector. EP-to-child
+ *  sequence flow is disallowed regardless of how deeply the child sits
+ *  inside the EP. */
+export function checkEpNoAutoConnectToDescendant(d: DiagramLike): Violation[] {
+  const byId = new Map(d.elements.map(e => [e.id, e]));
+  const out: Violation[] = [];
+  for (const c of d.connectors) {
+    if (c.type !== "sequence") continue;
+    const src = byId.get(c.sourceId);
+    const tgt = byId.get(c.targetId);
+    if (!src || !tgt) continue;
+    if (src.type !== "subprocess-expanded") continue;
+    if (!isDescendantOfId(byId, tgt.id, src.id)) continue;
+    out.push({
+      rule: "ep-no-autoconnect-descendant",
+      severity: "error",
+      ids: [c.id, src.id, tgt.id],
+      message: `Expanded Sub-Process "${nameOf(src)}" has a sequence connector to its own descendant "${nameOf(tgt)}" — EPs cannot connect directly to anything they contain.`,
+    });
+  }
+  return out;
+}
+
+/** R8.09 — A sequence connector LEAVING an edge-mounted Intermediate
+ *  Event must emit from the INNER side (the side facing into the host
+ *  EP). Counterpart to R1/B19 which covers INCOMING flow. */
+export function checkBoundaryIntermediateOutgoingInner(d: DiagramLike): Violation[] {
+  const byId = new Map(d.elements.map(e => [e.id, e]));
+  const out: Violation[] = [];
+  for (const c of d.connectors) {
+    if (c.type !== "sequence") continue;
+    const src = byId.get(c.sourceId);
+    if (!src || src.type !== "intermediate-event" || !src.boundaryHostId) continue;
+    const host = byId.get(src.boundaryHostId);
+    if (!host) continue;
+    const outer = outerSideOfEdgeMountEvent(src, host);
+    const inner = oppositeSide(outer);
+    if (c.sourceSide && c.sourceSide !== inner) {
+      out.push({
+        rule: "boundary-intermediate-outgoing-inner",
+        severity: "error",
+        ids: [c.id, src.id, host.id],
+        message: `Outgoing sequence from edge-mounted Intermediate Event "${nameOf(src)}" emits from "${c.sourceSide}" — must emit from the INNER side ("${inner}") so the flow runs into the host EP.`,
+      });
+    }
+  }
+  return out;
+}
+
+function oppositeSide(side: "top" | "bottom" | "left" | "right"): "top" | "bottom" | "left" | "right" {
+  return side === "top" ? "bottom" : side === "bottom" ? "top" : side === "left" ? "right" : "left";
 }
 
 /** BPMN forbids more than one sequence connector between the same
@@ -898,6 +1086,7 @@ export function checkHangingMessage(d: DiagramLike): Violation[] {
 
 export const RULES: Rule[] = [
   {
+    code: "B01",
     id: "connector-on-container",
     title: "Sequence/association connector on a Pool or Lane",
     description: "A sequence, association or flow connector attaches to a Pool or Lane. In BPMN these must connect to flow elements inside the container, not to the container boundary.",
@@ -906,6 +1095,7 @@ export const RULES: Rule[] = [
     check: checkConnectorOnContainer,
   },
   {
+    code: "B02",
     id: "duplicate-container-name",
     title: "Duplicate Pool/Lane names",
     description: "Two or more Pools or Lanes in the same diagram share an identical name (ignoring case and whitespace) — usually an import remnant.",
@@ -914,6 +1104,7 @@ export const RULES: Rule[] = [
     check: checkDuplicateContainerName,
   },
   {
+    code: "B03",
     id: "single-lane-pool",
     title: "Pool with a single Lane",
     description: "A Pool contains exactly one Lane. Usually the lane should be absorbed into the pool.",
@@ -922,6 +1113,7 @@ export const RULES: Rule[] = [
     check: checkSingleLanePool,
   },
   {
+    code: "B04",
     id: "hanging-message",
     title: "Hanging / misconnected message flow",
     description: "A message flow renders badly: attached to an empty white-box pool (should be black-box), attached to a white-box pool (warning), no horizontal overlap between its ends, or attached to the wrong top/bottom edge.",
@@ -930,6 +1122,7 @@ export const RULES: Rule[] = [
     check: checkHangingMessage,
   },
   {
+    code: "B05",
     id: "containment",
     title: "Element outside its container",
     description: "An element is rendered outside the bounds of its parent Pool, Lane or expanded Sub-Process.",
@@ -938,6 +1131,7 @@ export const RULES: Rule[] = [
     check: checkContainment,
   },
   {
+    code: "B06",
     id: "ref-integrity",
     title: "Dangling reference",
     description: "A connector endpoint, parentId or boundaryHostId points at an element id that does not exist.",
@@ -946,6 +1140,7 @@ export const RULES: Rule[] = [
     check: checkReferentialIntegrity,
   },
   {
+    code: "B07",
     id: "no-fabricated-wrapper",
     title: "Fabricated 'Main Process' wrapper",
     description: "A pool-level event sub-process is wrapped in an auto-generated 'Main Process' container. It should render directly in its pool.",
@@ -954,6 +1149,7 @@ export const RULES: Rule[] = [
     check: checkNoFabricatedWrapper,
   },
   {
+    code: "B08",
     id: "event-sub-no-connectors",
     title: "Connector on an Event Sub-Process",
     description: "A sequence or message flow touches an Event Sub-Process. Event sub-processes are triggered by events, never by flow.",
@@ -962,6 +1158,7 @@ export const RULES: Rule[] = [
     check: checkEventSubHasNoConnectors,
   },
   {
+    code: "B09",
     id: "no-boundary-on-pool",
     title: "Boundary event on a Pool or Lane",
     description: "A boundary (intermediate) event is mounted on a Pool or Lane. Boundary events may only attach to an activity (Task or Sub-Process).",
@@ -970,6 +1167,7 @@ export const RULES: Rule[] = [
     check: checkNoBoundaryEventsOnPool,
   },
   {
+    code: "B10",
     id: "merge-placement",
     title: "Merge gateway left of its inputs",
     description: "A merge gateway is positioned to the left of all its forward inputs — typically a rework loop's back-edge dragging its column to the far right.",
@@ -978,6 +1176,7 @@ export const RULES: Rule[] = [
     check: checkMergeRightOfForwardInputs,
   },
   {
+    code: "B11",
     id: "activity-no-incoming",
     title: "Activity has no incoming sequence",
     description: "A Task, Sub-Process or Expanded Sub-Process has no incoming sequence connector. Every activity must be reachable from a Start Event via sequence flow.",
@@ -986,6 +1185,7 @@ export const RULES: Rule[] = [
     check: checkActivityHasIncoming,
   },
   {
+    code: "B12",
     id: "activity-no-outgoing",
     title: "Activity has no outgoing sequence",
     description: "A Task, Sub-Process or Expanded Sub-Process has no outgoing sequence connector. A dead-end activity blocks process completion.",
@@ -994,6 +1194,7 @@ export const RULES: Rule[] = [
     check: checkActivityHasOutgoing,
   },
   {
+    code: "B13",
     id: "connector-bends",
     title: "Connector takes too many bends",
     description: "A sequence connector has 4 or more direction changes — usually a sign of cramped routing or a misplaced element. Flagged as a warning; the connector itself is highlighted orange on the canvas during Review Mode.",
@@ -1002,6 +1203,7 @@ export const RULES: Rule[] = [
     check: checkConnectorBendiness,
   },
   {
+    code: "B14",
     id: "task-type-for-messages",
     title: "Task type doesn't match its message flows",
     description: "BPMN convention: a Task/Sub-Process with a message TO a non-IT (external entity) pool should be a Send task; FROM a non-IT pool should be Receive; TO or FROM an IT-system pool should be User. One warning per mismatched message edge.",
@@ -1010,6 +1212,7 @@ export const RULES: Rule[] = [
     check: checkTaskTypeForMessages,
   },
   {
+    code: "B15",
     id: "adhoc-ep-no-start-end",
     title: "Ad-hoc Sub-Process has Start or End event",
     description: "An Expanded Sub-Process marked Ad-Hoc must not contain or boundary-mount Start or End events — the whole point of ad-hoc is that its activities run in any order with no defined start/end semantics.",
@@ -1018,6 +1221,7 @@ export const RULES: Rule[] = [
     check: checkAdHocEPHasNoStartEnd,
   },
   {
+    code: "B16",
     id: "adhoc-ep-no-sequence-between-children",
     title: "Ad-hoc Sub-Process has sequence flow",
     description: "An Ad-Hoc Expanded Sub-Process must not have sequence connectors between its child activities. Ad-hoc children run in any order; ordering them with sequence flow contradicts the marker.",
@@ -1026,6 +1230,7 @@ export const RULES: Rule[] = [
     check: checkAdHocEPNoSequenceBetweenChildren,
   },
   {
+    code: "B17",
     id: "data-object-no-association",
     title: "Data Object without an association",
     description: "A Data Object is not connected to any activity via an association connector. Either wire it to the task / process step that produces or consumes it, or remove it.",
@@ -1034,6 +1239,7 @@ export const RULES: Rule[] = [
     check: checkDataObjectHasAssociation,
   },
   {
+    code: "B18",
     id: "data-store-no-association",
     title: "Data Store without an association",
     description: "A Data Store is not connected to any activity via an association connector. Either wire it to the activities that read from or write to it, or remove it.",
@@ -1042,14 +1248,16 @@ export const RULES: Rule[] = [
     check: checkDataStoreHasAssociation,
   },
   {
+    code: "B19",
     id: "edge-mount-event-outer-routing",
-    title: "Edge-mounted event routed back through its host",
-    description: "A sequence connector on an edge-mounted intermediate event attaches on the event's inner side, or its other end sits inside the host Sub-Process. Both shapes force the path to route back through the host body and through the event itself. Edge-mounted intermediate events must attach on the OUTER side and connect outward.",
+    title: "Edge-mounted intermediate event: incoming trigger must come from outside",
+    description: "An incoming sequence connector to an edge-mounted intermediate event must attach on the OUTER side of the event and its source must sit OUTSIDE the host Sub-Process. Boundary intermediate events represent external triggers; any other shape routes the path back through the host body.",
     severity: "error",
     category: "bpmn-structure",
     check: checkEdgeMountEventOuterRouting,
   },
   {
+    code: "B20",
     id: "duplicate-sequence",
     title: "Duplicate sequence connectors between two elements",
     description: "Two or more sequence connectors share the same (source, target) pair. Only one sequence flow is allowed per ordered pair — back-edges (A→B and B→A) are fine, but A→B twice is a redundancy.",
@@ -1058,12 +1266,67 @@ export const RULES: Rule[] = [
     check: checkDuplicateSequenceConnector,
   },
   {
+    code: "B21",
     id: "message-not-moveable",
     title: "Message flow can't be moved or re-attached",
     description: "A messageBPMN connector is missing one or more of the fields the editor needs to support body drag and endpoint re-attach (4 waypoints, sourceSide, targetSide, sourceOffsetAlong). Common with hand-edited imports and legacy data.",
     severity: "warning",
     category: "bpmn-structure",
     check: checkMessageFlowMoveable,
+  },
+  {
+    code: "B22",
+    id: "loop-back-routing",
+    title: "Loop-back sequence not routed underneath",
+    description: "A sequence connector runs back to an element to its left (a rework loop) but does not attach BOTTOM-to-BOTTOM. Loop-backs should leave the source's bottom edge, detour below the intervening elements, and re-enter the target's bottom edge so the loop stays clear of the forward flow.",
+    severity: "warning",
+    category: "bpmn-structure",
+    check: checkLoopBackRouting,
+  },
+  {
+    code: "B23",
+    id: "boundary-start-outgoing-inner",
+    title: "Boundary Start Event outgoing flow not on inner side",
+    description: "Outgoing sequence from an edge-mounted Start Event must emit from the INNER side (the side facing into the host EP). A left-edge mount, for instance, must emit from the right-hand connection point.",
+    severity: "error",
+    category: "bpmn-structure",
+    check: checkBoundaryStartOutgoingInner,
+  },
+  {
+    code: "B24",
+    id: "boundary-start-incoming-outer",
+    title: "Boundary Start Event incoming flow not from outside",
+    description: "Incoming sequence to an edge-mounted Start Event must attach on the OUTER side and originate from an element OUTSIDE the host EP — the boundary start represents an external trigger.",
+    severity: "error",
+    category: "bpmn-structure",
+    check: checkBoundaryStartIncomingOuter,
+  },
+  {
+    code: "B25",
+    id: "boundary-end-incoming-inner",
+    title: "Boundary End Event incoming flow not from inside",
+    description: "Incoming sequence to an edge-mounted End Event must attach on the INNER side and originate from an element INSIDE the host EP. Boundary end events terminate an internal sub-flow; no element outside the EP may connect to them.",
+    severity: "error",
+    category: "bpmn-structure",
+    check: checkBoundaryEndIncomingInner,
+  },
+  {
+    code: "B26",
+    id: "ep-no-autoconnect-descendant",
+    title: "Expanded Sub-Process auto-connected to its own descendant",
+    description: "A sequence connector runs directly from an Expanded Sub-Process to one of the elements nested inside it. EPs may never auto-connect to anything they contain — regardless of the child's position inside the EP.",
+    severity: "error",
+    category: "bpmn-structure",
+    check: checkEpNoAutoConnectToDescendant,
+  },
+  {
+    code: "B27",
+    id: "boundary-intermediate-outgoing-inner",
+    title: "Boundary Intermediate Event outgoing flow not on inner side",
+    description: "Outgoing sequence from an edge-mounted Intermediate Event must emit from the INNER side (the side facing into the host EP). Counterpart to B19 which governs incoming flow.",
+    severity: "error",
+    category: "bpmn-structure",
+    check: checkBoundaryIntermediateOutgoingInner,
   },
 ];
 

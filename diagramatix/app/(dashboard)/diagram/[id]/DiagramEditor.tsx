@@ -2609,18 +2609,19 @@ export function DiagramEditor({
                     {/* Admin-only: jump to the catalog of every rule the
                         scanner runs. Lives here on the BPMN Diagram menu
                         rather than buried under Admin so admins can flick
-                        between the diagram and the rule list. */}
+                        between the diagram and the rule list. Rendered
+                        red so admins can spot it instantly among the
+                        regular gray menu items. */}
                     {isAdmin && (
                       <a
                         href="/dashboard/admin/scanner-rules"
                         target="_blank"
                         rel="noopener"
-                        className="w-full block text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
-                        title="Open the full BPMN scanner rule catalog (admin)."
+                        className="w-full block text-left px-3 py-2 text-xs text-red-600 hover:bg-gray-50 font-medium"
+                        title="Open the full BPMN scanner rule catalog."
                         onClick={() => setClearMenuOpen(false)}
                       >
-                        Scanner Issues Rules{" "}
-                        <span className="text-[9px] text-gray-400">(admin)</span>
+                        Scanner Issues Rules
                       </a>
                     )}
                   </>
