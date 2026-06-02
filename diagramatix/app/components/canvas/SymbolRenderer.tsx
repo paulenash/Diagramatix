@@ -3,7 +3,7 @@
 import { useState, createContext, useContext } from "react";
 import type { BpmnTaskType, GatewayType, EventType, DiagramElement, Point, Side, SymbolType } from "@/app/lib/diagram/types";
 import { type SymbolColorConfig, resolveColor } from "@/app/lib/diagram/colors";
-import { DisplayModeCtx, FontScaleCtx, PoolFontSizeCtx, LaneFontSizeCtx, sketchyFilter } from "@/app/lib/diagram/displayMode";
+import { DisplayModeCtx, FontScaleCtx, PoolFontSizeCtx, LaneFontSizeCtx, ProcessFontSizeCtx, sketchyFilter } from "@/app/lib/diagram/displayMode";
 import { wrapText } from "@/app/lib/diagram/textMetrics";
 import { ArchimateShape } from "./ArchimateShape";
 
@@ -1610,6 +1610,7 @@ export function SymbolRenderer({
   debugMode,
 }: Props) {
   const fontScale = useContext(FontScaleCtx);
+  const processFontSize = useContext(ProcessFontSizeCtx);
   const fs = (base: number) => Math.round(base * fontScale * 10) / 10;
   const [isEditingGatewayLabel, setIsEditingGatewayLabel] = useState(false);
   const [editGatewayLabelValue, setEditGatewayLabelValue] = useState("");
@@ -2913,7 +2914,11 @@ export function SymbolRenderer({
             />
             <text
               textAnchor="middle"
-              fontSize={fs(12)}
+              // Context-Diagram processes render at their own absolute
+              // size (ProcessFontSizeCtx, default 16 px) so the user can
+              // tune Process Names independently of Entity Names. Other
+              // interior labels stay on the element scale.
+              fontSize={element.type === "process-system" ? processFontSize : fs(12)}
               fill="#111827"
               style={{ userSelect: "none", pointerEvents: "none" }}
             >

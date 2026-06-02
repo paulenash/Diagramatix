@@ -299,6 +299,7 @@ type Action =
   | { type: "SET_TITLE_FONT_SIZE"; payload: number }
   | { type: "SET_POOL_FONT_SIZE"; payload: number }
   | { type: "SET_LANE_FONT_SIZE"; payload: number }
+  | { type: "SET_PROCESS_FONT_SIZE"; payload: number }
   | { type: "SET_DATABASE"; payload: string }
   | { type: "SET_PROCESS_OWNER"; payload: { name?: string; email?: string } }
   | { type: "CORRECT_ALL_CONNECTORS" }
@@ -5995,6 +5996,9 @@ function reducer(state: DiagramData, action: Action): DiagramData {
     case "SET_TITLE_FONT_SIZE":
       return { ...state, titleFontSize: action.payload };
 
+    case "SET_PROCESS_FONT_SIZE":
+      return { ...state, processFontSize: action.payload };
+
     case "SET_POOL_FONT_SIZE": {
       // Recompute every pool's (minHeight, headerWidth) for the new
       // font size so the rotated label still fits and the header
@@ -7824,6 +7828,11 @@ export function useDiagram(initialData: DiagramData) {
     setLaneFontSize: useCallback(
       (size: number) => {
         dispatch({ type: "SET_LANE_FONT_SIZE", payload: size });
+      }, []
+    ),
+    setProcessFontSize: useCallback(
+      (size: number) => {
+        dispatch({ type: "SET_PROCESS_FONT_SIZE", payload: size });
       }, []
     ),
     setDatabase: useCallback(

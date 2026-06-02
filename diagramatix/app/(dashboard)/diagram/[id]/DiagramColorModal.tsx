@@ -33,6 +33,10 @@ interface Props {
   onPoolFontSizeChange?: (size: number) => void;
   laneFontSize?: number;
   onLaneFontSizeChange?: (size: number) => void;
+  /** Context-Diagram only — independent control over the process-system
+   *  (central circle) label font size. */
+  processFontSize?: number;
+  onProcessFontSizeChange?: (size: number) => void;
   onClose: () => void;
   onSaved: (config: SymbolColorConfig, settings?: {
     displayMode?: DisplayMode;
@@ -41,6 +45,7 @@ interface Props {
     titleFontSize?: number;
     poolFontSize?: number;
     laneFontSize?: number;
+    processFontSize?: number;
   }) => void;
 }
 
@@ -68,20 +73,28 @@ export function DiagramColorModal({
   onPoolFontSizeChange,
   laneFontSize,
   onLaneFontSizeChange,
+  processFontSize,
+  onProcessFontSizeChange,
   onClose,
   onSaved,
 }: Props) {
+  const isContext = diagramType === "context" || diagramType === "basic";
   const [workingColors, setWorkingColors] = useState<SymbolColorConfig>({
     ...DEFAULT_SYMBOL_COLORS,
     ...projectColors,
     ...initialColorConfig,
   });
   const [workingDisplayMode, setWorkingDisplayMode] = useState<DisplayMode>(displayMode);
-  const [workingFontSize, setWorkingFontSize] = useState(fontSize ?? 12);
-  const [workingConnectorFontSize, setWorkingConnectorFontSize] = useState(connectorFontSize ?? 10);
+  // Context-Diagram defaults: Entity Names 14 / Process Names 16 / Flow Labels 12.
+  const defaultElementFontSize = isContext ? 14 : 12;
+  const defaultConnectorFontSize = isContext ? 12 : 10;
+  const defaultProcessFontSize = 16;
+  const [workingFontSize, setWorkingFontSize] = useState(fontSize ?? defaultElementFontSize);
+  const [workingConnectorFontSize, setWorkingConnectorFontSize] = useState(connectorFontSize ?? defaultConnectorFontSize);
   const [workingTitleFontSize, setWorkingTitleFontSize] = useState(titleFontSize ?? 14);
   const [workingPoolFontSize, setWorkingPoolFontSize] = useState(poolFontSize ?? 12);
   const [workingLaneFontSize, setWorkingLaneFontSize] = useState(laneFontSize ?? 12);
+  const [workingProcessFontSize, setWorkingProcessFontSize] = useState(processFontSize ?? defaultProcessFontSize);
   // saving/saveError no longer needed — save happens in background after modal closes
 
   const symbols: SymbolType[] = COLOR_PALETTE_BY_DIAGRAM_TYPE[diagramType];
@@ -106,6 +119,7 @@ export function DiagramColorModal({
     if (onTitleFontSizeChange) onTitleFontSizeChange(workingTitleFontSize);
     if (onPoolFontSizeChange) onPoolFontSizeChange(workingPoolFontSize);
     if (onLaneFontSizeChange) onLaneFontSizeChange(workingLaneFontSize);
+    if (onProcessFontSizeChange) onProcessFontSizeChange(workingProcessFontSize);
     onSaved(workingColors);
     onClose();
 
@@ -192,85 +206,61 @@ export function DiagramColorModal({
           })}
         </div>
 
-        {/* 3. Font Sizes */}
-        {(onFontSizeChange || onConnectorFontSizeChange || onTitleFontSizeChange || onPoolFontSizeChange || onLaneFontSizeChange) && (
-          <div className="px-5 py-1.5 border-t border-gray-200 flex-shrink-0 space-y-1">
-            <span className="text-xs font-medium text-gray-700">Font Sizes</span>
-            {onFontSizeChange && (
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] text-gray-500">Elements</span>
-                <div className="flex items-center gap-1">
-                  <button onClick={() => setWorkingFontSize(12)} disabled={workingFontSize === 12} title="Default (12px)"
-                    className="text-[10px] text-gray-400 hover:text-gray-600 disabled:opacity-30">{"\u21BA"}</button>
-                  <button onClick={() => setWorkingFontSize(Math.max(6, workingFontSize - 1))}
-                    className="w-5 h-5 flex items-center justify-center text-[10px] font-bold text-gray-700 border border-gray-400 rounded hover:bg-gray-100">-</button>
-                  <span className="text-xs font-mono font-semibold text-gray-800 w-6 text-center">{workingFontSize}</span>
-                  <button onClick={() => setWorkingFontSize(Math.min(24, workingFontSize + 1))}
-                    className="w-5 h-5 flex items-center justify-center text-[10px] font-bold text-gray-700 border border-gray-400 rounded hover:bg-gray-100">+</button>
+        {/* 3. Font Sizes \u2014 every diagram type defines its own list of
+            controls so labels match the element vocabulary the user
+            actually sees on the canvas. Context-Diagram uses
+            Entity / Process / Flow; everything else keeps the legacy
+            Elements / Connectors / Title (+ Pools / Lanes for BPMN). */}
+        {(onFontSizeChange || onConnectorFontSizeChange || onTitleFontSizeChange || onPoolFontSizeChange || onLaneFontSizeChange || onProcessFontSizeChange) && (() => {
+          interface FontControl {
+            label: string;
+            value: number;
+            setValue: (v: number) => void;
+            default: number;
+            min: number;
+            max: number;
+            enabled: boolean;
+          }
+          const controls: FontControl[] = isContext
+            ? [
+                { label: "Entity Names",  value: workingFontSize,          setValue: setWorkingFontSize,          default: 14, min: 6,  max: 30, enabled: !!onFontSizeChange },
+                { label: "Process Names", value: workingProcessFontSize,   setValue: setWorkingProcessFontSize,   default: 16, min: 8,  max: 36, enabled: !!onProcessFontSizeChange },
+                { label: "Flow Labels",   value: workingConnectorFontSize, setValue: setWorkingConnectorFontSize, default: 12, min: 6,  max: 24, enabled: !!onConnectorFontSizeChange },
+              ]
+            : [
+                { label: "Elements",   value: workingFontSize,          setValue: setWorkingFontSize,          default: 12, min: 6,  max: 24, enabled: !!onFontSizeChange },
+                { label: "Connectors", value: workingConnectorFontSize, setValue: setWorkingConnectorFontSize, default: 10, min: 6,  max: 24, enabled: !!onConnectorFontSizeChange },
+                { label: "Title",      value: workingTitleFontSize,     setValue: setWorkingTitleFontSize,     default: 14, min: 8,  max: 30, enabled: !!onTitleFontSizeChange },
+                { label: "Pools",      value: workingPoolFontSize,      setValue: setWorkingPoolFontSize,      default: 12, min: 6,  max: 24, enabled: !!onPoolFontSizeChange && diagramType === "bpmn" },
+                { label: "Lanes",      value: workingLaneFontSize,      setValue: setWorkingLaneFontSize,      default: 12, min: 6,  max: 24, enabled: !!onLaneFontSizeChange && diagramType === "bpmn" },
+              ];
+          const visible = controls.filter(c => c.enabled);
+          if (visible.length === 0) return null;
+          return (
+            <div className="px-5 py-1.5 border-t border-gray-200 flex-shrink-0 space-y-1">
+              <span className="text-xs font-medium text-gray-700">Font Sizes</span>
+              {visible.map(c => (
+                <div key={c.label} className="flex items-center justify-between">
+                  <span className="text-[10px] text-gray-500">{c.label}</span>
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => c.setValue(c.default)} disabled={c.value === c.default} title={`Default (${c.default}px)`}
+                      className="text-[10px] text-gray-400 hover:text-gray-600 disabled:opacity-30">{"\u21BA"}</button>
+                    <button onClick={() => c.setValue(Math.max(c.min, c.value - 1))}
+                      className="w-5 h-5 flex items-center justify-center text-[10px] font-bold text-gray-700 border border-gray-400 rounded hover:bg-gray-100">-</button>
+                    <span className="text-xs font-mono font-semibold text-gray-800 w-6 text-center">{c.value}</span>
+                    <button onClick={() => c.setValue(Math.min(c.max, c.value + 1))}
+                      className="w-5 h-5 flex items-center justify-center text-[10px] font-bold text-gray-700 border border-gray-400 rounded hover:bg-gray-100">+</button>
+                  </div>
                 </div>
-              </div>
-            )}
-            {onConnectorFontSizeChange && (
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] text-gray-500">Connectors</span>
-                <div className="flex items-center gap-1">
-                  <button onClick={() => setWorkingConnectorFontSize(10)} disabled={workingConnectorFontSize === 10} title="Default (10px)"
-                    className="text-[10px] text-gray-400 hover:text-gray-600 disabled:opacity-30">{"\u21BA"}</button>
-                  <button onClick={() => setWorkingConnectorFontSize(Math.max(6, workingConnectorFontSize - 1))}
-                    className="w-5 h-5 flex items-center justify-center text-[10px] font-bold text-gray-700 border border-gray-400 rounded hover:bg-gray-100">-</button>
-                  <span className="text-xs font-mono font-semibold text-gray-800 w-6 text-center">{workingConnectorFontSize}</span>
-                  <button onClick={() => setWorkingConnectorFontSize(Math.min(24, workingConnectorFontSize + 1))}
-                    className="w-5 h-5 flex items-center justify-center text-[10px] font-bold text-gray-700 border border-gray-400 rounded hover:bg-gray-100">+</button>
-                </div>
-              </div>
-            )}
-            {onTitleFontSizeChange && (
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] text-gray-500">Title</span>
-                <div className="flex items-center gap-1">
-                  <button onClick={() => setWorkingTitleFontSize(14)} disabled={workingTitleFontSize === 14} title="Default (14px)"
-                    className="text-[10px] text-gray-400 hover:text-gray-600 disabled:opacity-30">{"\u21BA"}</button>
-                  <button onClick={() => setWorkingTitleFontSize(Math.max(8, workingTitleFontSize - 1))}
-                    className="w-5 h-5 flex items-center justify-center text-[10px] font-bold text-gray-700 border border-gray-400 rounded hover:bg-gray-100">-</button>
-                  <span className="text-xs font-mono font-semibold text-gray-800 w-6 text-center">{workingTitleFontSize}</span>
-                  <button onClick={() => setWorkingTitleFontSize(Math.min(30, workingTitleFontSize + 1))}
-                    className="w-5 h-5 flex items-center justify-center text-[10px] font-bold text-gray-700 border border-gray-400 rounded hover:bg-gray-100">+</button>
-                </div>
-              </div>
-            )}
-            {onPoolFontSizeChange && (
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] text-gray-500">Pools</span>
-                <div className="flex items-center gap-1">
-                  <button onClick={() => setWorkingPoolFontSize(12)} disabled={workingPoolFontSize === 12} title="Default (12px)"
-                    className="text-[10px] text-gray-400 hover:text-gray-600 disabled:opacity-30">{"\u21BA"}</button>
-                  <button onClick={() => setWorkingPoolFontSize(Math.max(6, workingPoolFontSize - 1))}
-                    className="w-5 h-5 flex items-center justify-center text-[10px] font-bold text-gray-700 border border-gray-400 rounded hover:bg-gray-100">-</button>
-                  <span className="text-xs font-mono font-semibold text-gray-800 w-6 text-center">{workingPoolFontSize}</span>
-                  <button onClick={() => setWorkingPoolFontSize(Math.min(24, workingPoolFontSize + 1))}
-                    className="w-5 h-5 flex items-center justify-center text-[10px] font-bold text-gray-700 border border-gray-400 rounded hover:bg-gray-100">+</button>
-                </div>
-              </div>
-            )}
-            {onLaneFontSizeChange && (
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] text-gray-500">Lanes</span>
-                <div className="flex items-center gap-1">
-                  <button onClick={() => setWorkingLaneFontSize(12)} disabled={workingLaneFontSize === 12} title="Default (12px)"
-                    className="text-[10px] text-gray-400 hover:text-gray-600 disabled:opacity-30">{"\u21BA"}</button>
-                  <button onClick={() => setWorkingLaneFontSize(Math.max(6, workingLaneFontSize - 1))}
-                    className="w-5 h-5 flex items-center justify-center text-[10px] font-bold text-gray-700 border border-gray-400 rounded hover:bg-gray-100">-</button>
-                  <span className="text-xs font-mono font-semibold text-gray-800 w-6 text-center">{workingLaneFontSize}</span>
-                  <button onClick={() => setWorkingLaneFontSize(Math.min(24, workingLaneFontSize + 1))}
-                    className="w-5 h-5 flex items-center justify-center text-[10px] font-bold text-gray-700 border border-gray-400 rounded hover:bg-gray-100">+</button>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
+              ))}
+            </div>
+          );
+        })()}
 
-        {/* 4. Debug Mode — admin-only. Hidden entirely for non-admin users. */}
-        {onDebugModeChange && isAdmin && (
+        {/* 4. Debug Mode — BPMN-only, and admin-only within BPMN. Hidden
+            entirely for non-admin users and for every non-BPMN diagram
+            type (those don't have meaningful debug overlays). */}
+        {onDebugModeChange && isAdmin && diagramType === "bpmn" && (
           <div className="flex items-center justify-between px-5 py-1.5 border-t border-gray-200 flex-shrink-0">
             <span className="text-xs font-medium text-gray-700">
               Debug Mode <span className="text-[9px] font-normal text-gray-400">(admin)</span>
@@ -283,8 +273,9 @@ export function DiagramColorModal({
           </div>
         )}
 
-        {/* 5. Value Display */}
-        {onShowValueDisplayChange && (
+        {/* 5. Value Display — BPMN-only (value-per-task overlays don't
+            apply to other diagram types). */}
+        {onShowValueDisplayChange && diagramType === "bpmn" && (
           <div className="flex items-center justify-between px-5 py-1.5 border-t border-gray-200 flex-shrink-0">
             <span className="text-xs font-medium text-gray-700">Value Display</span>
             <label className="flex items-center cursor-pointer">
@@ -295,8 +286,9 @@ export function DiagramColorModal({
           </div>
         )}
 
-        {/* 6. Bottleneck Display */}
-        {onShowBottleneckChange && (
+        {/* 6. Bottleneck Display — BPMN-only (bottleneck is a flow-time
+            concept; not meaningful outside BPMN). */}
+        {onShowBottleneckChange && diagramType === "bpmn" && (
           <div className="flex items-center justify-between px-5 py-1.5 border-t border-gray-200 flex-shrink-0">
             <span className="text-xs font-medium text-gray-700">Bottleneck Display</span>
             <label className="flex items-center cursor-pointer">

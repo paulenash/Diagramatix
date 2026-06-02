@@ -220,11 +220,12 @@ export interface DiagramData {
   connectors: Connector[];
   viewport: Viewport;
   title?: DiagramTitle;
-  fontSize?: number; // element names/labels font size in px (default 12)
-  connectorFontSize?: number; // connector labels font size in px (default 10)
+  fontSize?: number; // element names/labels font size in px (default 12; Context Diagram entities default 14)
+  connectorFontSize?: number; // connector labels font size in px (default 10; Context Diagram flow labels default 12)
   titleFontSize?: number; // diagram title font size in px (default 14)
   poolFontSize?: number; // pool header labels font size in px (default 12)
   laneFontSize?: number; // lane header labels font size in px (default 12)
+  processFontSize?: number; // process-system label font size — Context Diagram only (default 16)
   database?: string; // domain diagram database type: "none" | "postgres" (default "none")
   /** Diagram-level list of all parent diagrams that currently link TO
    *  this diagram (managed by the project-wide "Scan Diagrams for Links"

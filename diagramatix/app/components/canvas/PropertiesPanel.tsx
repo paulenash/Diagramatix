@@ -1771,7 +1771,8 @@ export function PropertiesPanel({
           {element.type === "uml-class" || element.type === "uml-enumeration" ||
            element.type === "task" || element.type === "subprocess" ||
            element.type === "subprocess-expanded" ||
-           element.type === "pool" || element.type === "lane" ? "Name" : "Label"}
+           element.type === "pool" || element.type === "lane" ||
+           element.type === "external-entity" || element.type === "process-system" ? "Name" : "Label"}
         </label>
         {(element.type === "task" || element.type === "subprocess" || element.type === "subprocess-expanded") ? (
           // Task / Sub-Process / Expanded Sub-Process Name editor:

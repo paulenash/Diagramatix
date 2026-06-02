@@ -24,7 +24,7 @@ import { ElementContextMenu } from "./ElementContextMenu";
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
 import { PaletteSymbolPreview } from "./Palette";
 import { CHEVRON_THEMES } from "@/app/lib/diagram/chevronThemes";
-import { DisplayModeCtx, FontScaleCtx, ConnectorFontScaleCtx, TitleFontSizeCtx, PoolFontSizeCtx, LaneFontSizeCtx, SketchyFilter } from "@/app/lib/diagram/displayMode";
+import { DisplayModeCtx, FontScaleCtx, ConnectorFontScaleCtx, TitleFontSizeCtx, PoolFontSizeCtx, LaneFontSizeCtx, ProcessFontSizeCtx, SketchyFilter } from "@/app/lib/diagram/displayMode";
 import { ConnectorRenderer } from "./ConnectorRenderer";
 import { findShapeByKey as findArchimateShapeByKey } from "@/app/lib/archimate/catalogue";
 import { RemoveSpaceDialog, type RsRef, type RsSelection } from "@/app/components/RemoveSpaceDialog";
@@ -3828,12 +3828,16 @@ export function Canvas({
         backgroundSize: "20px 20px",
       }}
     >
+      {/* Context-Diagram defaults differ: Entity Names 14 px, Flow Labels
+          12 px, Process Names 16 px. Other diagram types keep the old
+          12/10/14 defaults. */}
       <DisplayModeCtx.Provider value={displayMode}>
-      <FontScaleCtx.Provider value={((data.fontSize ?? 12) / 12) * (displayMode === "hand-drawn" ? 1.3 : 1)}>
-      <ConnectorFontScaleCtx.Provider value={((data.connectorFontSize ?? 10) / 10) * (displayMode === "hand-drawn" ? 1.3 : 1)}>
+      <FontScaleCtx.Provider value={((data.fontSize ?? ((diagramType === "context" || diagramType === "basic") ? 14 : 12)) / 12) * (displayMode === "hand-drawn" ? 1.3 : 1)}>
+      <ConnectorFontScaleCtx.Provider value={((data.connectorFontSize ?? ((diagramType === "context" || diagramType === "basic") ? 12 : 10)) / 10) * (displayMode === "hand-drawn" ? 1.3 : 1)}>
       <TitleFontSizeCtx.Provider value={data.titleFontSize ?? 14}>
       <PoolFontSizeCtx.Provider value={(data.poolFontSize ?? 12) * (displayMode === "hand-drawn" ? 1.3 : 1)}>
       <LaneFontSizeCtx.Provider value={(data.laneFontSize ?? 12) * (displayMode === "hand-drawn" ? 1.3 : 1)}>
+      <ProcessFontSizeCtx.Provider value={(data.processFontSize ?? 16) * (displayMode === "hand-drawn" ? 1.3 : 1)}>
       <SublaneIdsCtx.Provider value={sublaneIds}>
       <ProcessGroupDepthCtx.Provider value={processGroupDepthMap}>
       <LaneDepthCtx.Provider value={laneDepthMap}>
@@ -5678,6 +5682,7 @@ export function Canvas({
       </LaneDepthCtx.Provider>
       </ProcessGroupDepthCtx.Provider>
       </SublaneIdsCtx.Provider>
+      </ProcessFontSizeCtx.Provider>
       </LaneFontSizeCtx.Provider>
       </PoolFontSizeCtx.Provider>
       </TitleFontSizeCtx.Provider>
