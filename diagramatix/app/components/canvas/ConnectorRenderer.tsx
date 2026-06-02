@@ -1298,8 +1298,10 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
         );
       })()}
 
-      {/* Segment drag handles (rectilinear, selected, interior segments only) */}
-      {selected && draggableSegments.map((segIdx) => {
+      {/* Segment drag handles (rectilinear, selected, interior segments only).
+          Suppressed for messageBPMN — the entire highlighted body is the
+          drag surface for those (see handleMessageBPMNBodyMouseDown). */}
+      {selected && !isMessageBPMN && draggableSegments.map((segIdx) => {
         const p1 = visibleWaypoints[segIdx];
         const p2 = visibleWaypoints[segIdx + 1];
         const isHorizontal = Math.abs(p1.y - p2.y) < 1;

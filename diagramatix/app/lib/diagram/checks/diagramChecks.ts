@@ -858,37 +858,6 @@ export function checkSequenceClipsForeignNode(d: DiagramLike): Violation[] {
   return out;
 }
 
-/** B28 — A Task with both an incoming and an outgoing messageBPMN
- *  connector must not carry the Send or Receive trigger (taskType).
- *  Send / Receive each model a one-way message; a task in the middle
- *  of a message round-trip should be a different trigger (User,
- *  Service, Manual, etc.). */
-export function checkTaskBothMessagesNotSendReceive(d: DiagramLike): Violation[] {
-  const incoming = new Map<string, number>(); // taskId → count
-  const outgoing = new Map<string, number>();
-  for (const c of d.connectors) {
-    if (c.type !== "messageBPMN") continue;
-    incoming.set(c.targetId, (incoming.get(c.targetId) ?? 0) + 1);
-    outgoing.set(c.sourceId, (outgoing.get(c.sourceId) ?? 0) + 1);
-  }
-  const out: Violation[] = [];
-  for (const e of d.elements) {
-    if (e.type !== "task") continue;
-    if ((incoming.get(e.id) ?? 0) === 0) continue;
-    if ((outgoing.get(e.id) ?? 0) === 0) continue;
-    const trigger = e.taskType;
-    if (trigger === "send" || trigger === "receive") {
-      out.push({
-        rule: "task-bothmsg-not-send-receive",
-        severity: "error",
-        ids: [e.id],
-        message: `Task "${nameOf(e)}" has both incoming and outgoing message flows but is marked "${trigger}" — Send/Receive model a one-way message. Use User/Service/Manual/etc. instead.`,
-      });
-    }
-  }
-  return out;
-}
-
 /** BPMN forbids more than one sequence connector between the same
  *  ordered (source → target) pair — duplicates are almost always an
  *  accidental drag-create or an import artefact. Direction matters:
@@ -986,63 +955,198 @@ export function checkConnectorBendiness(d: DiagramLike): Violation[] {
   return out;
 }
 
-/** BPMN convention: a Task/Sub-Process's message flows should drive its
- *  task type.
- *   - Message TO an external entity (non-IT black-box pool, e.g. Customer)
- *     → the task should be a Send task.
- *   - Message FROM an external entity → Receive task.
- *   - Message TO or FROM an IT system pool (e.g. Salesforce, SAP) →
- *     User task (because a human is interacting with the system).
- *  Emits one warning per mismatched message edge; ids include both the task
- *  and the offending connector so the connector can also be highlighted. */
+/** Walk an element's parentId chain to find its pool ancestor (or
+ *  return the element itself if it IS a pool). Returns undefined if
+ *  no pool sits on the chain. Shared by B14 + B31. */
+function poolAncestor(
+  byId: Map<string, DiagramElement>,
+  e: DiagramElement | undefined,
+): DiagramElement | undefined {
+  let cur = e;
+  for (let i = 0; i < 32 && cur; i++) {
+    if (cur.type === "pool") return cur;
+    cur = cur.parentId ? byId.get(cur.parentId) : undefined;
+  }
+  return undefined;
+}
+
+/** Classify a pool by the kind of partner it represents. */
+type PoolKind = "external" | "system" | "white-box" | "unknown";
+function poolKind(p: DiagramElement | undefined): PoolKind {
+  if (!p) return "unknown";
+  const poolType = (p.properties?.poolType as string | undefined) ?? "white-box";
+  if (poolType !== "black-box") return "white-box";
+  const isSystem = (p.properties?.isSystem as boolean | undefined) ?? false;
+  return isSystem ? "system" : "external";
+}
+
+/** B14 — consolidated task-trigger-vs-message-flow matrix.
+ *
+ *  Applies ONLY to elements of type "task" with one or more
+ *  messageBPMN edges to a black-box pool. For each task, this looks
+ *  at the direction-pattern (both / incoming-only / outgoing-only)
+ *  combined with the pool kind (external entity / IT system) and
+ *  decides which taskType triggers are forbidden (→ error), which
+ *  trigger is the default (→ warning when something else is used),
+ *  and which extra triggers are silently allowed alongside the
+ *  default (case 4 only — Send is allowed alongside the User default
+ *  for an outgoing-only message to a non-IT pool).
+ *
+ *  Mixed pool kinds in the same direction → silent. (The Manual-Task
+ *  + IT-system rule B31 still applies on top of this.) */
 export function checkTaskTypeForMessages(d: DiagramLike): Violation[] {
   const byId = new Map(d.elements.map((e) => [e.id, e]));
-  const TASK_LIKE = new Set(["task", "subprocess", "subprocess-expanded"]);
-  const poolAncestor = (e: DiagramElement | undefined): DiagramElement | undefined => {
-    let cur = e;
-    for (let i = 0; i < 32 && cur; i++) {
-      if (cur.type === "pool") return cur;
-      cur = cur.parentId ? byId.get(cur.parentId) : undefined;
-    }
-    return undefined;
-  };
-  const poolKind = (p: DiagramElement | undefined): "external" | "system" | "white-box" | "unknown" => {
-    if (!p) return "unknown";
-    const poolType = (p.properties?.poolType as string | undefined) ?? "white-box";
-    if (poolType !== "black-box") return "white-box";
-    const isSystem = (p.properties?.isSystem as boolean | undefined) ?? false;
-    return isSystem ? "system" : "external";
-  };
-
   const out: Violation[] = [];
+
+  // Index messageBPMN edges by task id, separated by direction.
+  const inEdges = new Map<string, { conn: Connector; partnerPool: DiagramElement | undefined }[]>();
+  const outEdges = new Map<string, { conn: Connector; partnerPool: DiagramElement | undefined }[]>();
   for (const c of d.connectors) {
     if (c.type !== "messageBPMN") continue;
     const src = byId.get(c.sourceId);
     const tgt = byId.get(c.targetId);
     if (!src || !tgt) continue;
-    // Identify the task end and the direction relative to the task.
-    let task: DiagramElement | undefined;
-    let otherEnd: DiagramElement | undefined;
-    let dir: "to" | "from";
-    if (TASK_LIKE.has(src.type)) { task = src; otherEnd = tgt; dir = "to"; }
-    else if (TASK_LIKE.has(tgt.type)) { task = tgt; otherEnd = src; dir = "from"; }
-    else continue;
-    const otherPool = otherEnd.type === "pool" ? otherEnd : poolAncestor(otherEnd);
-    const kind = poolKind(otherPool);
-    let expected: "send" | "receive" | "user" | undefined;
-    if (kind === "external") expected = dir === "to" ? "send" : "receive";
-    else if (kind === "system") expected = "user";
-    else continue; // white-box / unknown — no recommendation
-    const actual = task.taskType ?? "none";
-    if (actual === expected) continue;
-    const verb = dir === "to" ? "sends a message to" : "receives a message from";
-    const poolKindLabel = kind === "external" ? "external entity" : "IT system";
+    if (src.type === "task") {
+      const partner = tgt.type === "pool" ? tgt : poolAncestor(byId, tgt);
+      const arr = outEdges.get(src.id) ?? [];
+      arr.push({ conn: c, partnerPool: partner });
+      outEdges.set(src.id, arr);
+    }
+    if (tgt.type === "task") {
+      const partner = src.type === "pool" ? src : poolAncestor(byId, src);
+      const arr = inEdges.get(tgt.id) ?? [];
+      arr.push({ conn: c, partnerPool: partner });
+      inEdges.set(tgt.id, arr);
+    }
+  }
+
+  // Per-task decision via the matrix.
+  for (const e of d.elements) {
+    if (e.type !== "task") continue;
+    const ins = inEdges.get(e.id) ?? [];
+    const outs = outEdges.get(e.id) ?? [];
+    if (ins.length === 0 && outs.length === 0) continue;
+
+    // Reduce both directions to the set of pool kinds they touch,
+    // ignoring white-box / unknown partners.
+    function kindsOf(edges: { partnerPool: DiagramElement | undefined }[]): Set<PoolKind> {
+      const set = new Set<PoolKind>();
+      for (const x of edges) {
+        const k = poolKind(x.partnerPool);
+        if (k === "external" || k === "system") set.add(k);
+      }
+      return set;
+    }
+    const inKinds = kindsOf(ins);
+    const outKinds = kindsOf(outs);
+    const allKinds = new Set<PoolKind>([...inKinds, ...outKinds]);
+    if (allKinds.size === 0) continue; // no black-box partners
+    if (inKinds.size > 1 || outKinds.size > 1) continue; // mixed in-direction — silent
+
+    const hasIn = inKinds.size > 0;
+    const hasOut = outKinds.size > 0;
+    // The kind in the only-direction (or the single combined kind if
+    // both directions agree). If the two directions disagree on kind,
+    // treat as mixed → silent.
+    let kind: "external" | "system" | undefined;
+    if (hasIn && hasOut) {
+      if (inKinds.size === 1 && outKinds.size === 1) {
+        const ik = [...inKinds][0];
+        const ok = [...outKinds][0];
+        if (ik !== ok) continue; // mixed kinds across directions — silent
+        kind = ik as "external" | "system";
+      } else continue;
+    } else if (hasIn) {
+      kind = [...inKinds][0] as "external" | "system";
+    } else {
+      kind = [...outKinds][0] as "external" | "system";
+    }
+
+    // Resolve banned / default / also-allowed per the matrix.
+    type Trig = "send" | "receive" | "user" | "service" | "manual" | "none";
+    let banned: Set<Trig>;
+    let dflt: Trig;
+    let alsoAllowed: Set<Trig> = new Set();
+    let caseLabel: string;
+    if (hasIn && hasOut && kind === "external") {
+      banned = new Set(["send", "receive", "user"]);
+      dflt = "none";
+      caseLabel = "two-way messages with an external entity";
+    } else if (hasIn && hasOut && kind === "system") {
+      banned = new Set(["send", "receive"]);
+      dflt = "user";
+      caseLabel = "two-way messages with an IT system";
+    } else if (hasIn && !hasOut && kind === "external") {
+      banned = new Set(["send"]);
+      dflt = "receive";
+      caseLabel = "an incoming message from an external entity";
+    } else if (!hasIn && hasOut && kind === "external") {
+      banned = new Set(["receive"]);
+      dflt = "user";
+      alsoAllowed = new Set(["send"]);
+      caseLabel = "an outgoing message to an external entity";
+    } else {
+      // Single-direction IT system — treated same as case 2 per user.
+      banned = new Set(["send", "receive"]);
+      dflt = "user";
+      caseLabel = hasIn
+        ? "an incoming message from an IT system"
+        : "an outgoing message to an IT system";
+    }
+
+    const actual = (e.taskType ?? "none") as Trig;
+    if (banned.has(actual)) {
+      out.push({
+        rule: "task-type-for-messages",
+        severity: "error",
+        ids: [e.id],
+        message: `Task "${nameOf(e)}" has ${caseLabel} but is marked "${actual}" — that trigger is forbidden for this case. Default is "${dflt}".`,
+      });
+      continue;
+    }
+    if (actual === dflt || alsoAllowed.has(actual)) continue;
     out.push({
       rule: "task-type-for-messages",
       severity: "warning",
-      ids: [task.id, c.id],
-      message: `${task.type} "${nameOf(task)}" ${verb} ${poolKindLabel} "${nameOf(otherPool)}" — task type should be "${expected}" (currently "${actual}")`,
+      ids: [e.id],
+      message: `Task "${nameOf(e)}" has ${caseLabel} — recommended trigger is "${dflt}" (currently "${actual}").`,
     });
+  }
+  return out;
+}
+
+/** B31 — Manual Tasks must NEVER exchange messages with an IT-system
+ *  pool. Fires regardless of direction pattern; catches the mixed-kind
+ *  case where B14 stays silent. One violation per task. */
+export function checkManualTaskNoITSystemMessage(d: DiagramLike): Violation[] {
+  const byId = new Map(d.elements.map(e => [e.id, e]));
+  const out: Violation[] = [];
+  for (const e of d.elements) {
+    if (e.type !== "task") continue;
+    if (e.taskType !== "manual") continue;
+    let bad = false;
+    let partner: DiagramElement | undefined;
+    for (const c of d.connectors) {
+      if (c.type !== "messageBPMN") continue;
+      let other: DiagramElement | undefined;
+      if (c.sourceId === e.id) other = byId.get(c.targetId);
+      else if (c.targetId === e.id) other = byId.get(c.sourceId);
+      else continue;
+      const pool = other?.type === "pool" ? other : poolAncestor(byId, other);
+      if (poolKind(pool) === "system") {
+        bad = true;
+        partner = pool;
+        break;
+      }
+    }
+    if (bad) {
+      out.push({
+        rule: "manual-task-no-it-system-message",
+        severity: "error",
+        ids: [e.id],
+        message: `Manual Task "${nameOf(e)}" exchanges messages with IT-system pool "${nameOf(partner)}" — Manual tasks must never message an IT system. Switch the task to User (or another non-Manual trigger) or change the partner pool.`,
+      });
+    }
   }
   return out;
 }
@@ -1356,9 +1460,9 @@ export const RULES: Rule[] = [
   {
     code: "B14",
     id: "task-type-for-messages",
-    title: "Task type doesn't match its message flows",
-    description: "BPMN convention: a Task/Sub-Process with a message TO a non-IT (external entity) pool should be a Send task; FROM a non-IT pool should be Receive; TO or FROM an IT-system pool should be User. One warning per mismatched message edge.",
-    severity: "warning",
+    title: "Task trigger doesn't fit its message flow pattern",
+    description: "A Task with message flows to/from black-box pools must use a taskType compatible with the message direction and the pool kind. Errors flag forbidden triggers (e.g. Send on a two-way exchange, or Receive on an outgoing-only message). Warnings recommend the default trigger when the task uses an allowed-but-non-default value.",
+    severity: "error",
     category: "bpmn-structure",
     check: checkTaskTypeForMessages,
   },
@@ -1471,15 +1575,6 @@ export const RULES: Rule[] = [
     check: checkBoundaryIntermediateOutgoingOuter,
   },
   {
-    code: "B28",
-    id: "task-bothmsg-not-send-receive",
-    title: "Two-way message task marked Send/Receive",
-    description: "A Task with both an incoming and an outgoing message flow must not carry the Send or Receive trigger. Send and Receive each model a one-way message; a task involved in a round-trip should use a different trigger (User, Service, Manual, etc.).",
-    severity: "error",
-    category: "bpmn-structure",
-    check: checkTaskBothMessagesNotSendReceive,
-  },
-  {
     code: "B29",
     id: "sequence-clips-own-endpoint",
     title: "Sequence connector routed through its own source or target",
@@ -1496,6 +1591,15 @@ export const RULES: Rule[] = [
     severity: "error",
     category: "bpmn-structure",
     check: checkSequenceClipsForeignNode,
+  },
+  {
+    code: "B31",
+    id: "manual-task-no-it-system-message",
+    title: "Manual Task has message flows to/from an IT system",
+    description: "Manual tasks must never exchange messages with an IT-system pool. Switch the task to User (or another non-Manual trigger) or change the partner pool.",
+    severity: "error",
+    category: "bpmn-structure",
+    check: checkManualTaskNoITSystemMessage,
   },
 ];
 

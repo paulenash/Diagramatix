@@ -56,6 +56,14 @@ ${rules ? `USER RULES AND PREFERENCES (follow these strictly):\n${rules}\n\n` : 
 - Flow elements (tasks, gateways, events) MUST have: pool (pool id). Include "lane" ONLY if the prompt mentions specific roles, teams, or performers responsible for elements.
 - DO NOT create default/placeholder lanes (e.g. "Team", "Process Team", "Main Lane"). Only create lanes when the prompt implies multiple performers/roles. If no roles are mentioned, elements go directly in the pool with NO lane.
 - Tasks should have: taskType ("user", "service", "send", "receive", "manual", "none")
+- TASKTYPE RULES FOR TASKS WITH BLACK-BOX MESSAGE FLOWS:
+  * Task with messages BOTH TO AND FROM an EXTERNAL ENTITY (isSystem=false): default "none"; never use "send", "receive", or "user".
+  * Task with messages BOTH TO AND FROM an IT SYSTEM (isSystem=true): default "user"; never use "send", "receive", or "manual".
+  * Task that only RECEIVES a message from an EXTERNAL ENTITY: default "receive"; never use "send".
+  * Task that only SENDS a message to an EXTERNAL ENTITY: default "user" (the value "send" is also allowed); never use "receive".
+  * Task with messages to/from an IT SYSTEM in only one direction: default "user"; never use "send", "receive", or "manual".
+  * Send and Receive each represent ONE direction of a message exchange — never use them on a task that has messages in BOTH directions.
+  * ABSOLUTE RULE: a Manual task must NEVER exchange messages with an IT-system pool (isSystem=true) in any direction.
 - Gateways should have: gatewayType ("exclusive", "parallel", "inclusive", "event-based"). Use "event-based" ONLY when the prompt describes one of several alternative EVENTS racing to occur (whichever happens first) — see the USER RULES for the exact trigger and wiring. The matching merge gateway MUST use the same gatewayType.
 - Expanded subprocesses use type "subprocess-expanded". They CAN contain child elements: set their "parentSubprocess" property to the subprocess id instead of "lane"
 - EVENT SUBPROCESS DETECTION — an Event Expanded Subprocess is ANY subprocess that is TRIGGERED BY AN EVENT rather than by sequence flow. Recognise these triggers in the prompt (match case-insensitively and treat as event subs even when the user's label does NOT contain the words "event" or "subprocess"):
@@ -119,7 +127,7 @@ Example 2 — Roles mentioned (Sales, Finance), message flows to Customer (exter
     { "id": "l2", "type": "lane", "label": "Finance", "parentPool": "p1" },
     { "id": "pS", "type": "pool", "label": "Salesforce", "poolType": "black-box", "isSystem": true },
     { "id": "e1", "type": "start-event", "label": "Start", "pool": "p1", "lane": "l1" },
-    { "id": "t1", "type": "task", "label": "Notify Customer", "taskType": "send", "pool": "p1", "lane": "l1" },
+    { "id": "t1", "type": "task", "label": "Notify Customer", "taskType": "user", "pool": "p1", "lane": "l1" },
     { "id": "t2", "type": "task", "label": "Record Payment", "taskType": "user", "pool": "p1", "lane": "l2" },
     { "id": "e2", "type": "end-event", "label": "End", "pool": "p1", "lane": "l2" }
   ],
