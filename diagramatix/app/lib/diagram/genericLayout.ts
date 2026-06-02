@@ -699,16 +699,24 @@ function layoutContextDiagram(
       primary = inwardY > 0 ? "bottom" : "top";
       adj1 = "left"; adj2 = "right";
     }
-    const faces: Side[] = K <= 1 ? [primary]
-                        : K === 2 ? [primary, adj1]
-                        : [primary, adj1, adj2];
-
-    // Bucket connector indices into faces, primary first.
+    // C3.01 — Keep every connector on the primary inward face until K > 8.
+    // Only then start using the perpendicular shoulders, filling primary
+    // first (8 max) and overflow round-robin between adj1 and adj2.
+    const FACE_PRIMARY_CAP = 8;
+    const faces: Side[] = K <= FACE_PRIMARY_CAP ? [primary] : [primary, adj1, adj2];
     const faceBuckets = new Map<Side, number[]>();
     faces.forEach(f => faceBuckets.set(f, []));
-    for (let k = 0; k < K; k++) {
-      const f = faces[k % faces.length];
-      faceBuckets.get(f)!.push(k);
+    if (K <= FACE_PRIMARY_CAP) {
+      for (let k = 0; k < K; k++) faceBuckets.get(primary)!.push(k);
+    } else {
+      // First 8 stay on the primary face; the rest alternate adj1 / adj2.
+      for (let k = 0; k < FACE_PRIMARY_CAP; k++) {
+        faceBuckets.get(primary)!.push(k);
+      }
+      for (let k = FACE_PRIMARY_CAP; k < K; k++) {
+        const shoulder = (k - FACE_PRIMARY_CAP) % 2 === 0 ? adj1 : adj2;
+        faceBuckets.get(shoulder)!.push(k);
+      }
     }
     // Pre-compute offset arrays per face so MIN_PX spacing is enforced.
     const faceOffsetsByFace = new Map<Side, number[]>();

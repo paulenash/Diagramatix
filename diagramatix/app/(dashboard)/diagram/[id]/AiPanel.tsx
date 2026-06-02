@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { DiagramData, DiagramElement, Connector } from "@/app/lib/diagram/types";
+import { DiagramatixThrobber } from "@/app/components/DiagramatixThrobber";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 declare global {
@@ -15,11 +16,16 @@ interface Props {
   onApplyDiagram: (data: DiagramData) => void;
   onAddToDiagram: (elements: DiagramElement[], connectors: Connector[]) => void;
   onClose: () => void;
+  /** Reports the panel's `generating` state to the parent so a
+   *  full-canvas overlay can be rendered while Sonnet runs. */
+  onGeneratingChange?: (generating: boolean) => void;
 }
 
-export function AiPanel({ diagramType, onApplyDiagram, onAddToDiagram, onClose }: Props) {
+export function AiPanel({ diagramType, onApplyDiagram, onAddToDiagram, onClose, onGeneratingChange }: Props) {
   const [prompt, setPrompt] = useState("");
   const [generating, setGenerating] = useState(false);
+  // Notify the parent so it can render a full-canvas Diagramatix overlay.
+  useEffect(() => { onGeneratingChange?.(generating); }, [generating, onGeneratingChange]);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [mode, setMode] = useState<"replace" | "add">("replace");
@@ -298,15 +304,14 @@ export function AiPanel({ diagramType, onApplyDiagram, onAddToDiagram, onClose }
           </label>
         </div>
 
-        {/* G04: throbber banner while generating. */}
+        {/* Throbber banner while generating — same on-brand
+            DiagramatixThrobber the BPMN PlanPanel uses, for visual
+            consistency across every AI Generation flow. */}
         {generating && (
           <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded px-2 py-1.5">
-            <svg className="animate-spin w-4 h-4 text-blue-600" viewBox="0 0 24 24" fill="none" aria-hidden>
-              <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" strokeOpacity="0.25" />
-              <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-            </svg>
+            <DiagramatixThrobber size={28} />
             <span className="text-[11px] text-blue-800 font-medium">
-              Asking Sonnet \u2014 this usually takes 15\u201330 s\u2026
+              Asking Sonnet — this usually takes 15–30 s…
             </span>
           </div>
         )}
@@ -320,7 +325,7 @@ export function AiPanel({ diagramType, onApplyDiagram, onAddToDiagram, onClose }
                 <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
               </svg>
             )}
-            {generating ? "Generating\u2026" : "Generate"}
+            {generating ? "Generating…" : "Generate"}
           </button>
           {editingPromptId ? (
             <>
