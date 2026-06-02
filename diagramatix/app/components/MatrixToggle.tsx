@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 /**
  * Global Matrix-rain screensaver. The little green "M" pinned to the
- * bottom-right of every page is the on/off switch:
+ * bottom-left of every page is the on/off switch:
  *
  *   - OFF  → feature disabled, nothing happens.
  *   - ON   → after the idle timeout (default 30 s, configurable via the
@@ -174,7 +174,7 @@ export function MatrixToggle() {
       {running && <canvas ref={canvasRef} className="fixed inset-0 z-[60] bg-black" />}
       <button
         onClick={() => setArmed(!armed)}
-        className={`fixed bottom-4 right-4 z-[70] w-10 h-10 flex items-center justify-center rounded-full border-2 font-mono font-bold text-lg transition-all bg-black ${
+        className={`fixed bottom-4 left-4 z-[70] w-10 h-10 flex items-center justify-center rounded-full border-2 font-mono font-bold text-lg transition-all bg-black ${
           armed
             ? "border-green-400 text-green-400 shadow-[0_0_15px_rgba(74,222,128,0.7)] hover:scale-110"
             : "border-green-700/60 text-green-700/60 hover:border-green-400 hover:text-green-400 hover:scale-110"

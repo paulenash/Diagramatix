@@ -531,19 +531,27 @@ function angleToRectSideOffset(angle: number, el: DiagramElement): { side: Side;
  *  circle. Implements the Context Diagram rules deterministically so the
  *  output matches the rules even when the model returns naive coordinates:
  *
- *  • C3.01 — Entity-side attachment points spread across the 2 or 3
- *    entity faces that face inward toward the central process; all
- *    attachment points on a face are at least 20 px apart when the face
- *    is wide enough.
+ *  • C3.01 — Entity-side attachment points stay on the entity's primary
+ *    inward face until K > 8; only then do the two perpendicular
+ *    shoulders start filling. Attachment offsets within a face are at
+ *    least 20 px apart when the face is wide enough.
  *  • C3.02 — Process-side attachment points cluster near each entity's
  *    bearing on the circle but are spaced at least 20 px apart along
  *    the circumference (capped when many connectors share one cluster).
- *  • C3.03 — Flow labels are staggered within each entity's cluster so
- *    adjacent labels don't overlap. The stagger axis is perpendicular
- *    to the connector's dominant direction.
+ *  • C3.03 — Flow labels are staggered ALONG the connector axis within
+ *    each entity's cluster so adjacent labels don't overlap and stay
+ *    readable.
  *  • C3.04 — The process circle is sized from the connector count but
  *    its radius never grows by more than 15 % over the 100 px baseline,
- *    keeping the diagram compact. */
+ *    keeping the diagram compact.
+ *  • C3.05 — Each entity is sized so its wrapped label fits inside the
+ *    square shape; size scales with label length, capped at 160 px.
+ *  • C3.06 — Entities sit at least 4 × the default entity width from
+ *    the process edge to leave generous room for the flows.
+ *  • C3.07 — Within each cluster the entity-side offset assignment is
+ *    reversed when the primary face is "top" or "right", so the order
+ *    of process-side angles always matches the order of entity-side
+ *    offsets and connectors in the same cluster never cross. */
 function layoutContextDiagram(
   aiElements: AiParsed["elements"] & object[],
   aiConnections: AiParsed["connections"] & object[],
@@ -586,27 +594,56 @@ function layoutContextDiagram(
     });
   }
 
-  // Entity ring: keep a constant gap between the circle edge and entity
-  // centres so a bigger circle pushes entities further out automatically.
+  // ── C3.05 — Each entity is sized to fit its wrapped label inside a
+  // square. The square side scales with label length: short labels stay
+  // at the 80 px default; long ones grow up to 160 px. Formula derives
+  // from the worst case that text fills the square (rendered font ≈ 12 px
+  // tall, ~7 px wide per char). Inner padding leaves room for the box
+  // stroke and a comfortable text margin.
   const def = getSymbolDefinition("external-entity");
-  const ENTITY_GAP = 150;
-  const entityRingRadius = processRadius + ENTITY_GAP;
+  const DEFAULT_ENTITY_W = def.defaultWidth;
+  const ENTITY_PAD = 16;
+  const CHAR_W = 7;
+  const LINE_H = 14;
+  const MIN_SIDE = DEFAULT_ENTITY_W;
+  const MAX_SIDE = 160;
+  function entitySide(label: string): number {
+    const n = Math.max(1, (label ?? "").trim().length);
+    const ideal = Math.sqrt(CHAR_W * LINE_H * n) + 2 * ENTITY_PAD;
+    return Math.round(Math.max(MIN_SIDE, Math.min(MAX_SIDE, ideal)) / 10) * 10;
+  }
+  const entityLabels = entities.map(e =>
+    (e.label ?? e.name ?? "Entity") as string
+  );
+  const entitySides = entityLabels.map(entitySide);
+  const maxEntityHalf = (entitySides.length > 0 ? Math.max(...entitySides) : MIN_SIDE) / 2;
+
+  // ── C3.06 — Push entities at least 4 × the default entity width away
+  // from the process edge so flows have generous room. The "+ max
+  // entity half" term keeps the rule honoured even for the largest
+  // entity in the diagram (which has the smallest entity-edge to
+  // process-edge gap when entity sizes vary).
+  const C3_06_GAP = 4 * DEFAULT_ENTITY_W;
+  const entityRingRadius = processRadius + C3_06_GAP + maxEntityHalf;
   const entityCount = entities.length;
   const entityAngle = new Map<string, number>(); // id → angle on the layout circle
+  const entitySideById = new Map<string, number>(); // id → square side px
 
   for (let i = 0; i < entityCount; i++) {
     const ent = entities[i];
+    const side = entitySides[i];
+    entitySideById.set(ent.id, side);
     const angle = (i / entityCount) * 2 * Math.PI - Math.PI / 2; // first entity at the top
     entityAngle.set(ent.id, angle);
-    const ex = centerX + entityRingRadius * Math.cos(angle) - def.defaultWidth / 2;
-    const ey = centerY + entityRingRadius * Math.sin(angle) - def.defaultHeight / 2;
+    const ex = centerX + entityRingRadius * Math.cos(angle) - side / 2;
+    const ey = centerY + entityRingRadius * Math.sin(angle) - side / 2;
     elements.push({
       id: ent.id,
       type: "external-entity",
       x: ex, y: ey,
-      width: def.defaultWidth,
-      height: def.defaultHeight,
-      label: ent.label ?? ent.name ?? "Entity",
+      width: side,
+      height: side,
+      label: entityLabels[i],
       properties: {},
     });
   }
@@ -718,6 +755,17 @@ function layoutContextDiagram(
         faceBuckets.get(shoulder)!.push(k);
       }
     }
+    // ── C3.07 — Reverse the bucket order on the primary face when the
+    // entity sits in a position where the cluster's counterclockwise
+    // direction maps to high offsets (primary face is "top" or "right").
+    // This keeps the order of process-side angles aligned with the order
+    // of entity-side offsets so connectors in the same cluster do not
+    // cross each other.
+    const reverseOrder = primary === "top" || primary === "right";
+    if (reverseOrder) {
+      const ks = faceBuckets.get(primary)!;
+      faceBuckets.set(primary, ks.slice().reverse());
+    }
     // Pre-compute offset arrays per face so MIN_PX spacing is enforced.
     const faceOffsetsByFace = new Map<Side, number[]>();
     for (const [face, ks] of faceBuckets) {
@@ -731,11 +779,12 @@ function layoutContextDiagram(
     const desiredHalf = Math.max(0, (K - 1) * minAngularSpacing / 2);
     const clusterHalf = Math.min(desiredHalf, maxClusterHalf);
 
-    // C3.03 — direction the entity sits relative to the process; we use
-    // it to decide which axis to stagger labels along (perpendicular to
-    // the connector's dominant direction).
+    // C3.03 — Stagger labels ALONG the connector's dominant axis so
+    // adjacent labels in the same cluster sit at distinct distances
+    // along the connector path. Horizontal-run clusters spread their
+    // labels in X; vertical-run clusters spread in Y.
     const isHorizontalRun = Math.abs(Math.cos(theta)) >= Math.abs(Math.sin(theta));
-    const LABEL_STAGGER = 18; // ≈ one text line of separation
+    const LABEL_STAGGER = 22; // px between adjacent label centres
     const LABEL_BASELINE = -30; // default label-above-anchor offset
 
     for (let k = 0; k < K; k++) {
@@ -759,12 +808,12 @@ function layoutContextDiagram(
           break;
         }
       }
-      // C3.03 — stagger label perpendicular to the connector's run so
-      // adjacent labels in the same cluster don't pile up. Centred so
-      // K=1 stays at the default position.
-      const stagger = (k - (K - 1) / 2) * LABEL_STAGGER;
-      const labelOffsetX = isHorizontalRun ? 0 : stagger;
-      const labelOffsetY = isHorizontalRun ? LABEL_BASELINE + stagger : LABEL_BASELINE;
+      // C3.03 — slide labels along the connector axis so labels in the
+      // same cluster sit at different positions along the connector,
+      // not stacked perpendicular. K=1 stays at the default position.
+      const slide = (k - (K - 1) / 2) * LABEL_STAGGER;
+      const labelOffsetX = isHorizontalRun ? slide : 0;
+      const labelOffsetY = isHorizontalRun ? LABEL_BASELINE : LABEL_BASELINE + slide;
       attachments.set(connKey(c, idx), {
         procSide: procAttach.side, procOffset: procAttach.offset,
         entSide, entOffset,
