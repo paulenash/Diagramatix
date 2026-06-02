@@ -26,9 +26,14 @@ const CATEGORY_LABELS: Record<string, string> = {
   domain: "Domain Model",
   context: "Context Diagram",
   "process-context": "Process Context",
+  // "staff-narrative" is not a diagram-type rule but the editable
+  // briefing the Staff Narrative prompt generator sends to Claude as
+  // its system prompt. Lives in the same editor so admins can tune
+  // the voice / vocabulary without code changes.
+  "staff-narrative": "Staff Narrative Briefing",
 };
 
-const CATEGORY_ORDER = ["general", "bpmn", "state-machine", "value-chain", "domain", "context", "process-context"];
+const CATEGORY_ORDER = ["general", "bpmn", "state-machine", "value-chain", "domain", "context", "process-context", "staff-narrative"];
 
 interface ClassifiedLine {
   index: number;       // original line index

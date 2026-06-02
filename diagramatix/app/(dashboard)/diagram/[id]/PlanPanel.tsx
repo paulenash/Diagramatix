@@ -50,7 +50,7 @@ interface Props {
    *  parent (DiagramEditor) overlay a wait indicator on the canvas
    *  itself — the sidebar banner alone is easy to miss while the
    *  user's eyes are on the diagram. */
-  onBusyChange?: (busy: "plan" | "apply" | "save" | "load" | null) => void;
+  onBusyChange?: (busy: "plan" | "apply" | "save" | "load" | "narrative" | null) => void;
 }
 
 interface SavedPrompt { id: string; name: string; text: string; }
@@ -69,7 +69,7 @@ export function PlanPanel({
   const [prompt, setPrompt] = useState("");
   const { plan, setPlan, updateElement, deleteElement, updateConnection, deleteConnection, moveElementRelativeTo, asJson } = usePlanState();
   const [activeTab, setActiveTab] = useState<Tab>("pools");
-  const [busy, setBusy] = useState<"plan" | "apply" | "save" | "load" | null>(null);
+  const [busy, setBusy] = useState<"plan" | "apply" | "save" | "load" | "narrative" | null>(null);
   // Propagate busy transitions up so DiagramEditor can overlay a wait
   // indicator on the canvas.
   useEffect(() => { onBusyChange?.(busy); }, [busy, onBusyChange]);
@@ -437,6 +437,51 @@ export function PlanPanel({
     await executePlanCall();
   }, [prompt, busy, hasPlan, asJson, executePlanCall]);
 
+  /** Generate a Staff Narrative from the current diagram. Builds the
+   *  Technical Description with the same walker the other button uses,
+   *  sends it to /api/ai/staff-narrative, and drops the narrative back
+   *  into the prompt textarea — same destination as Technical
+   *  Description so the existing edit-and-resubmit workflow still
+   *  works. */
+  const callNarrative = useCallback(async () => {
+    if (busy) return;
+    const technicalDescription = buildPromptFromDiagram(
+      currentElements ?? [],
+      currentConnectors ?? [],
+      diagramType as DiagramType,
+    );
+    if (!technicalDescription.trim()) {
+      setError("Diagram is empty — nothing to narrate yet.");
+      return;
+    }
+    setBusy("narrative");
+    setError(null);
+    setStatus("Asking Sonnet for a staff narrative (15–30 s)…");
+    try {
+      const res = await fetch("/api/ai/staff-narrative", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ technicalDescription }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error ?? "Staff narrative generation failed");
+        setStatus(null);
+        return;
+      }
+      setPrompt(json.narrative ?? "");
+      setEditingPromptId(null);
+      setSaveName("");
+      setShowSave(false);
+      setStatus("Staff narrative generated. Edit and save if you'd like.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Network error");
+      setStatus(null);
+    } finally {
+      setBusy(null);
+    }
+  }, [busy, currentElements, currentConnectors, diagramType, setPrompt]);
+
   const callApplyLayout = useCallback(async () => {
     if (!hasPlan || busy) return;
     // If the user is in the JSON tab with uncommitted edits, commit them first.
@@ -645,26 +690,42 @@ export function PlanPanel({
 
         {isAdmin && (
           <div className="shrink-0 mb-2">
-            <button
-              onClick={() => {
-                const generated = buildPromptFromDiagram(
-                  currentElements ?? [],
-                  currentConnectors ?? [],
-                  diagramType as DiagramType,
-                );
-                setPrompt(generated);
-                setEditingPromptId(null);
-                setSaveName("");
-                setShowSave(false);
-                setError(null);
-                setStatus("Created prompt from current diagram. Edit and save if you'd like.");
-              }}
-              disabled={busy !== null}
-              className="w-full px-2 py-1 text-[11px] font-medium text-purple-700 bg-purple-50 border border-purple-300 rounded hover:bg-purple-100 disabled:opacity-50"
-              title="Admin only — reverse-engineer the current diagram into a structured prompt"
-            >
+            {/* Admin-only red banner + two reverse-engineering options.
+                Red picks them out from the regular blue/grey controls
+                so admins spot them instantly. */}
+            <p className="text-[10px] font-semibold text-red-600 mb-1 uppercase tracking-wide">
               Create Prompt from Diagram
-            </button>
+            </p>
+            <div className="flex gap-1.5">
+              <button
+                onClick={() => {
+                  const generated = buildPromptFromDiagram(
+                    currentElements ?? [],
+                    currentConnectors ?? [],
+                    diagramType as DiagramType,
+                  );
+                  setPrompt(generated);
+                  setEditingPromptId(null);
+                  setSaveName("");
+                  setShowSave(false);
+                  setError(null);
+                  setStatus("Created prompt from current diagram. Edit and save if you'd like.");
+                }}
+                disabled={busy !== null}
+                className="flex-1 px-2 py-1 text-[11px] font-medium text-red-700 bg-red-50 border border-red-300 rounded hover:bg-red-100 disabled:opacity-50"
+                title="Admin only — reverse-engineer the current diagram into a structured Technical Description"
+              >
+                Technical Description
+              </button>
+              <button
+                onClick={callNarrative}
+                disabled={busy !== null}
+                className="flex-1 px-2 py-1 text-[11px] font-medium text-red-700 bg-red-50/60 border border-red-300 rounded hover:bg-red-100 disabled:opacity-50"
+                title="Admin only — ask Sonnet to rewrite the diagram as a Staff Narrative (uses the editable briefing in /dashboard/rules → Staff Narrative)"
+              >
+                Staff Narrative
+              </button>
+            </div>
           </div>
         )}
 
@@ -730,15 +791,17 @@ export function PlanPanel({
             triangle + throbbing aura); "apply" stays on the generic
             spinner because layout-engine work is computationally
             different and isn't tied to the AI brand. */}
-        {(busy === "plan" || busy === "apply") && (
+        {(busy === "plan" || busy === "apply" || busy === "narrative") && (
           <div className="shrink-0 mb-2 flex items-center gap-2 bg-blue-50 border border-blue-200 rounded px-2 py-1.5">
-            {busy === "plan"
-              ? <DiagramatixThrobber size={28} />
-              : <Spinner className="text-blue-600 w-4 h-4" />}
+            {busy === "apply"
+              ? <Spinner className="text-blue-600 w-4 h-4" />
+              : <DiagramatixThrobber size={28} />}
             <span className="text-[11px] text-blue-800 font-medium">
-              {busy === "plan"
-                ? "Asking Sonnet for a plan — this usually takes 15–30 s…"
-                : "Running the layout engine…"}
+              {busy === "apply"
+                ? "Running the layout engine…"
+                : busy === "narrative"
+                  ? "Asking Sonnet for a staff narrative — this usually takes 15–30 s…"
+                  : "Asking Sonnet for a plan — this usually takes 15–30 s…"}
             </span>
           </div>
         )}

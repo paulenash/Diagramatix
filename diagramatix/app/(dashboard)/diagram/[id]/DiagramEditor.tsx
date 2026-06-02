@@ -756,7 +756,7 @@ export function DiagramEditor({
   // Mirror of PlanPanel's `busy` state so we can overlay a centred
   // wait indicator on the canvas while Sonnet plans. Sidebar banner
   // alone is easy to miss when the user's eyes are on the diagram.
-  const [aiBusy, setAiBusy] = useState<"plan" | "apply" | "save" | "load" | null>(null);
+  const [aiBusy, setAiBusy] = useState<"plan" | "apply" | "save" | "load" | "narrative" | null>(null);
   const [showHistoryPanel, setShowHistoryPanel] = useState(false);
   const [debugMode, setDebugMode] = useState(false);
   // Value Display and Bottleneck Display are ON by default. The user can
@@ -2926,7 +2926,7 @@ export function DiagramEditor({
             just a tiny sidebar banner they might miss. Pointer events
             pass through (style.pointerEvents = "none") so the user can
             still pan / zoom underneath if they want. */}
-        {(aiBusy === "plan" || aiBusy === "apply" || aiPanelGenerating) && (
+        {(aiBusy === "plan" || aiBusy === "apply" || aiBusy === "narrative" || aiPanelGenerating) && (
           <div
             className="fixed inset-0 z-40 flex flex-col items-center justify-center"
             style={{ pointerEvents: "none" }}
@@ -2935,7 +2935,9 @@ export function DiagramEditor({
             <p className="mt-3 text-sm font-medium text-blue-800 bg-white/85 backdrop-blur-sm px-4 py-2 rounded-lg shadow-md">
               {aiBusy === "apply"
                 ? "Running the layout engine…"
-                : "Asking Sonnet for a plan — this usually takes 15–30 seconds…"}
+                : aiBusy === "narrative"
+                  ? "Asking Sonnet for a staff narrative — this usually takes 15–30 seconds…"
+                  : "Asking Sonnet for a plan — this usually takes 15–30 seconds…"}
             </p>
           </div>
         )}
