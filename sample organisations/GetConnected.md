@@ -389,6 +389,16 @@ Each prompt below follows the canonical 6-section BPMN structure: Pools / Lanes 
 > - Message flow: "Deliver Welcome Pack" → `Member`, labelled "Welcome email + member number"
 > - Message flow: "Notify Member of Payment Failure" → `Member`, labelled "Payment failure email"
 
+**Staff Narrative — Sam, Member Services Officer**
+
+When a Member finishes their paid signup on our website, the signup form lands in front of me first. I open it in our Membership CRM and check the basics — does the name match the email domain at all, is the home address a real address, is the date of birth at least 18 years old. If anything looks off or is missing, I email the Member asking them to fill in the gaps. If I don't hear back within seven days I close the application as "abandoned" so we're not chasing it forever.
+
+Once the details check out, I create the Member's profile in the Membership CRM and run their card through Stripe to collect the first year's subscription. Stripe normally tells me within a second or two whether the card went through. If the charge fails I email the Member with the bad news; some come back a day later with a different card, but if we can't get a successful charge I close the signup as failed and the Member is free to try again at their leisure.
+
+If the charge succeeds I trigger the Welcome Sequence inside the Membership CRM, which flips the Member's lifecycle stage over to "Active", and I open an onboarding case so the team knows there's a brand-new Member to keep an eye on for the first month.
+
+Meanwhile, Jess in Marketing is already on it: she pulls the Welcome Pack template, drops in the Member's name and member number, and posts it out. She also queues up the first "Member Offer of the Month" email so it lands in the Member's inbox a fortnight after they sign up — that's the email that historically wins us the second-year renewal.
+
 ### Prompt 5.2 — Discount Redemption
 
 > **Diagram type:** BPMN
@@ -430,6 +440,16 @@ Each prompt below follows the canonical 6-section BPMN structure: Pools / Lanes 
 > - Message flow: `Member` → `Partner Provider`, labelled "Presents code in store / at checkout"
 > - Message flow: `Partner Provider` → "Mark Redemption Confirmed", labelled "Redemption webhook"
 > - Message flow: `Member` → "Record Feedback Signal", labelled "Star rating + review"
+
+**Staff Narrative — Nikki, Offer Catalogue Coordinator**
+
+Members log into the Member Portal whenever they fancy a deal. They scroll the catalogue, filter by category or location, and tap "Save offer" on whatever catches their eye. Once they pick something to actually redeem, the Member Portal asks the Offer Catalogue Service to check the Member's eligibility for me — is the account current, have they already maxed their monthly redemption cap, is the offer still live. If anything's off, the Member just sees a friendly "sorry, you're not eligible" notice and that's the end of the trip.
+
+If the Member can redeem, I generate a one-time code (or a QR code if the Partner Provider prefers to scan), tag a slot in the offer's monthly quota as reserved for that Member, and pop the code back into the Member Portal so the Member can show it at the checkout. They've got 30 days to use it; if they don't, I quietly release the reserved slot back into the pool.
+
+When the Member walks into the Partner Provider's shop and hands over the code, the Partner Provider's checkout pings a redemption webhook into the Offer Catalogue Service. I mark the redemption confirmed and drop a settlement entry into next month's payment queue for Margaret in Finance to pay out. At the same time, I poke the Recommendation Engine so the Member's next browse leans toward similar offers — it's amazing how often someone who redeems a coffee deal redeems another one in the same week.
+
+Members usually rate the offer a day or two later; their stars and review go straight into the Recommendation Engine too, which uses them to tune next month's "For You" panel.
 
 ### Prompt 5.3 — Provider Onboarding
 
@@ -479,6 +499,18 @@ Each prompt below follows the canonical 6-section BPMN structure: Pools / Lanes 
 > - Message flow: "Create Provider Payee Record" → `Accounting System (Xero)`, labelled "Payee + bank details"
 > - Message flow: "Publish Offer to Newsletter" → `Partner Provider`, labelled "Go-live confirmation"
 
+**Staff Narrative — Daniel, Partnerships Manager**
+
+Once our sales team qualifies a Partner Provider lead and hands them across, I take over. I open the latest Partnership Agreement template, fill in the Provider's trading name, ABN, contacts, and the commission terms we negotiated, then email the agreement straight to the Partner Provider for counter-signing.
+
+While I'm waiting on the signature, Sara in Compliance runs her due diligence checklist — an ABN lookup, an ASIC current-and-historical extract, a sanctions screen, and a quick spot-check that the trading address on the form matches what's on the public register. If Sara flags anything serious we reject the Provider then and there and email them a polite "not this time". If they pass, Sara signs the agreement on our side and files the fully executed PDF into Document Management so we can pull it up at audit time.
+
+When the counter-signed agreement comes back, I activate the Provider Account on the Provider Portal and email the Partner Provider their login credentials. If the signed copy hasn't landed within fourteen days I send a reminder; if another fortnight goes by with nothing, I close the file as "lapsed before signing" and move on.
+
+Once they're activated, the Partner Provider and I work through their first two or three offers and I load drafts into the Provider Portal for them to publish.
+
+Around the same time, Tim in Marketing builds the launch content (one image, one paragraph, one button) and queues it for the next Member Newsletter so we make a bit of noise about the new Provider. Margaret in Finance creates a payee record for the Provider in Xero using the BSB, account number and bank statement the Provider sent across, and sets the agreed commission rate against the payee.
+
 ### Prompt 5.4 — Annual Subscription Renewal with Failed-Payment Recovery
 
 > **Diagram type:** BPMN
@@ -527,6 +559,16 @@ Each prompt below follows the canonical 6-section BPMN structure: Pools / Lanes 
 > - Message flow: `Member` → "Capture Updated Card", labelled "New card details (over secure form)"
 > - Message flow: "Send Final Notice" → `Member`, labelled "Final notice email"
 
+**Staff Narrative — Priya, Billing Officer**
+
+Every Member's renewal date sits on their record in the Membership CRM. A month out, Marketing automatically fires off the first reminder email ("Hi Member, your GetConnected membership renews on date X — here's what you've used this year"). A week out, the same email goes again, slightly more urgent.
+
+On the renewal date I run the Annual Charge through Stripe against the card on file. Most of the time Stripe says "yep, paid", I update the Member's subscription period in the Membership CRM, and we're done for another year. If Stripe declines the card, the retry routine kicks in: I retry on Day 1, Day 4, and Day 7. If any retry succeeds, the subscription rolls over as normal and the Member never knows a thing.
+
+When all three retries fail, the Member's account moves to Past Due. Glen in Member Services picks the case up: he phones the Member, talks them through whether the card has expired or the bank has changed, and captures a new card on a secure form. The new card flows straight back into the next available retry slot. If Glen can't get hold of the Member within three days, or if they're not interested in renewing, we send the Final Notice email and the membership lapses.
+
+We follow our "Past Due Outreach" procedure for the phone calls — three attempts at different times of day, a voicemail script if we get an answering machine, and a polite SMS on the third attempt if the call doesn't connect.
+
 ### Prompt 5.5 — Member Cancellation with Exit Survey
 
 > **Diagram type:** BPMN
@@ -572,6 +614,18 @@ Each prompt below follows the canonical 6-section BPMN structure: Pools / Lanes 
 > - Message flow: "Process Refund" → `Stripe`, labelled "Refund request"
 > - Message flow: "Send Cancellation Confirmation Email" → `Member`, labelled "Confirmation email"
 > - Message flow: "Schedule Off-boarding" → `Membership CRM`, labelled "Lifecycle stage = Cancelled"
+
+**Staff Narrative — Tariq, Retention Specialist**
+
+When a Member calls or emails to cancel, the request lands in front of me. First I verify the Member is who they say they are — full name plus date of birth plus member number, or a quick call-back on the phone number sitting on their record if I have any doubt.
+
+Then I take my best shot at retention. The conversation depends on why they're leaving: if it's "I'm not using it enough", I usually offer a free month plus a tailored roundup of high-value offers near them; if it's "too expensive", I can put a 20% discount on next year's renewal for long-standing Members. If the Member accepts, I apply the retention offer to their record in the Membership CRM and we keep them. If they decline — or if I haven't heard back within three days — I take the silence as "no" and move on.
+
+For the cancellers, I confirm they really do want to cancel, then walk them through our four-question Exit Survey ("what changed", "what would have kept you", "best thing about us", "worst thing about us"). The answers go into the Exit Survey workbook so Marketing can spot any patterns at the quarterly review. I then schedule the off-boarding to take effect at the end of the current billing period.
+
+Once off-boarding is scheduled, Finance cancels the Stripe subscription so the Member won't be charged again. If we owe them a pro-rata refund — depending on how far through their period they cancelled — Finance processes the refund through Stripe too.
+
+Marketing sends a cancellation confirmation email so the Member has it in writing, and adds them to the Re-engagement Audience. Marketing usually hits the audience with a "we miss you, come back" email about six months later — historically that wins back roughly one in eight.
 
 ### Prompt 5.6 — Monthly Provider Settlement
 
@@ -620,6 +674,16 @@ Each prompt below follows the canonical 6-section BPMN structure: Pools / Lanes 
 > - Message flow: "Upload Payment File to Bank" → `Business Bank`, labelled "ABA file"
 > - Message flow: "Reconcile Payments" → `Accounting System (Xero)`, labelled "Payment confirmations"
 
+**Staff Narrative — Margaret, Finance Manager**
+
+First business day of every month, I pull last month's redemption ledger out of the Offer Catalogue Service. It's a long export, basically one row per redemption — Member, Partner Provider, offer, value, redemption date. I drop the export into the Provider Commissions workbook and run our standard commissions calculation per Provider (12.5% house rate, or whatever rate the agreement specifies for the bigger Providers we negotiated bespoke deals with). The workbook generates each Provider's statement page, and I post the matching journal draft straight into Xero.
+
+Once the statements are drafted, Daniel in Provider Relations emails each Partner Provider their statement PDF for the month. While Daniel chases queries, I review every statement in parallel — looking for anything odd, like a Provider with double their usual redemption count, or a code redeeming at a value way off the offer's ticket price. If anything looks fishy I flag it to Daniel, and the two of us work it out with the Provider together. Sometimes that ends in a credit or debit note, which means I re-run the statement and we go around again.
+
+If a Provider hasn't queried their statement within five business days, I take that as a quiet "all good" and push the settlement through anyway.
+
+Once everything's clean I approve the payment batch, generate the ABA payment file out of Xero, upload the file to the Business Bank, and reconcile the bank confirmations back into Xero so the cash and journal sides agree. From start to bank-uploaded usually takes me three working days, four if there are queries.
+
 ### Prompt 5.7 — Quarterly BAS Lodgement
 
 > **Diagram type:** BPMN
@@ -666,3 +730,13 @@ Each prompt below follows the canonical 6-section BPMN structure: Pools / Lanes 
 > - Message flow: "Lodge BAS to ATO Portal" → `Australian Taxation Office (ATO)`, labelled "Lodged BAS"
 > - Message flow: `Australian Taxation Office (ATO)` → "Lodge BAS to ATO Portal", labelled "Lodgement receipt"
 > - Message flow: "Sign Off BAS" → `External Auditor`, labelled "Filed copy for audit trail"
+
+**Staff Narrative — Ava, Bookkeeper**
+
+At the end of each quarter I set aside a quiet morning and reconcile everything. I start with the bank feeds for our trading and trust accounts, then move on to Stripe payouts (matching each payout against the cluster of charges and refunds that fed it), then to the monthly Provider settlements (making sure each ABA payment ties back to its journal entry). Once everything reconciles, I press "Generate Activity Statement" in Xero, save the draft as a PDF, and email it to Marcus the Financial Controller for review.
+
+Marcus reads through the draft for an hour or so, working off our BAS Review checklist. He pays particular attention to anything where the GST collected and the GST paid look out of whack with what we'd usually expect for the quarter. If he spots a problem he sends the draft back to me with notes; I tweak the entry in Xero, regenerate the BAS, and we go around again. When he's satisfied he signs off and forwards the BAS to Karen, our Managing Director.
+
+Karen reviews the BAS once more, then authorises the lodgement. She's the only one with the ATO Portal credentials, so she's the one who actually presses the button. The ATO Portal returns a lodgement receipt within seconds; Karen forwards the receipt to me and to Marcus, and I drop a filed copy with our External Auditor so they've got the full paper trail when they come for the annual audit.
+
+The ATO gives us 28 days after quarter end to lodge. If we're still not done by then, our late-lodgement procedure kicks in and I escalate straight to Karen — the ATO charges a penalty unit per fortnight late, so we'd far rather hear about it sooner than later.
