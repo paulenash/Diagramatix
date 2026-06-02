@@ -516,6 +516,40 @@ export function checkEdgeMountEventOuterRouting(d: DiagramLike): Violation[] {
   return out;
 }
 
+/** A messageBPMN connector is "moveable" — its body can slide
+ *  horizontally and its endpoints can re-attach — only when the
+ *  structure the renderer + reducer rely on is fully populated:
+ *
+ *    • exactly 4 waypoints (centre, srcEdge, tgtEdge, centre)
+ *    • sourceSide and targetSide set
+ *    • sourceOffsetAlong set so recomputeAllConnectors places the edge
+ *      points at the correct shared X
+ *
+ *  Connectors that fail any of these tests render but resist drag and
+ *  endpoint move. This typically happens with hand-edited imports or
+ *  legacy data from before the messageBPMN structure was finalised. */
+export function checkMessageFlowMoveable(d: DiagramLike): Violation[] {
+  const out: Violation[] = [];
+  for (const c of d.connectors) {
+    if (c.type !== "messageBPMN") continue;
+    const problems: string[] = [];
+    if (!c.waypoints || c.waypoints.length !== 4) {
+      problems.push(`has ${c.waypoints?.length ?? 0} waypoints (must be 4)`);
+    }
+    if (!c.sourceSide) problems.push("sourceSide not set");
+    if (!c.targetSide) problems.push("targetSide not set");
+    if (c.sourceOffsetAlong == null) problems.push("sourceOffsetAlong not set");
+    if (problems.length === 0) continue;
+    out.push({
+      rule: "message-not-moveable",
+      severity: "warning",
+      ids: [c.id, c.sourceId, c.targetId],
+      message: `Message flow ${c.id} cannot be moved or re-attached: ${problems.join(", ")}.`,
+    });
+  }
+  return out;
+}
+
 /** BPMN forbids more than one sequence connector between the same
  *  ordered (source → target) pair — duplicates are almost always an
  *  accidental drag-create or an import artefact. Direction matters:
@@ -1022,6 +1056,14 @@ export const RULES: Rule[] = [
     severity: "error",
     category: "bpmn-structure",
     check: checkDuplicateSequenceConnector,
+  },
+  {
+    id: "message-not-moveable",
+    title: "Message flow can't be moved or re-attached",
+    description: "A messageBPMN connector is missing one or more of the fields the editor needs to support body drag and endpoint re-attach (4 waypoints, sourceSide, targetSide, sourceOffsetAlong). Common with hand-edited imports and legacy data.",
+    severity: "warning",
+    category: "bpmn-structure",
+    check: checkMessageFlowMoveable,
   },
 ];
 

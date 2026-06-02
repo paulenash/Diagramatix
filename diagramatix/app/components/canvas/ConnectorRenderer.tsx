@@ -676,6 +676,43 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
     window.addEventListener("mouseup", onUp);
   }
 
+  /** Body drag for a messageBPMN connector. Shifts the shared X of all
+   *  four waypoints together so the vertical line stays vertical and
+   *  both ends remain on their respective elements. Clamped so neither
+   *  end falls off its source / target boundary; sourceOffsetAlong is
+   *  derived from the new X in the reducer (UPDATE_CONNECTOR_WAYPOINTS
+   *  messageBPMN branch) so subsequent recomputes preserve the drag. */
+  function handleMessageBPMNBodyMouseDown(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (!svgToWorld || !onUpdateWaypoints) return;
+    if (!isMessageBPMN || connector.waypoints.length < 4) return;
+    const startWorld = svgToWorld(e.clientX, e.clientY);
+    const startX = connector.waypoints[1].x;
+    const initialWaypoints = connector.waypoints.map(p => ({ ...p }));
+    // Clamp range: the shared x must stay inside the overlap of source
+    // and target boundaries so both edge points land on their elements.
+    const minX = sourceBounds && targetBounds
+      ? Math.max(sourceBounds.x, targetBounds.x)
+      : Number.NEGATIVE_INFINITY;
+    const maxX = sourceBounds && targetBounds
+      ? Math.min(sourceBounds.x + sourceBounds.width, targetBounds.x + targetBounds.width)
+      : Number.POSITIVE_INFINITY;
+    function onMove(ev: MouseEvent) {
+      const cur = svgToWorld!(ev.clientX, ev.clientY);
+      const rawX = startX + (cur.x - startWorld.x);
+      const newX = Math.max(minX, Math.min(maxX, rawX));
+      const updated = initialWaypoints.map(p => ({ ...p, x: newX }));
+      onUpdateWaypoints?.(connector.id, updated);
+    }
+    function onUp() {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      onWaypointsDragEnd?.();
+    }
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  }
+
   function handleConnectorClick(e: React.MouseEvent) {
     e.stopPropagation();
     onSelect();
@@ -754,9 +791,15 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
         fill="none"
         stroke="transparent"
         strokeWidth={12}
-        style={{ cursor: "pointer" }}
+        style={{ cursor: isMessageBPMN ? "ew-resize" : "pointer" }}
         mask={isAssocBPMN && (sourceBounds || targetBounds) ? `url(#assoc-hit-mask-${connector.id})` : undefined}
-        onMouseDown={(e) => e.stopPropagation()}
+        onMouseDown={(e) => {
+          if (isMessageBPMN && selected) {
+            handleMessageBPMNBodyMouseDown(e);
+            return;
+          }
+          e.stopPropagation();
+        }}
         onClick={handleConnectorClick}
       />
 

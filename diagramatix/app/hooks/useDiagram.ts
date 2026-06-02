@@ -5918,6 +5918,16 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         // the label with it, instead of pinning the label in place
         // while the connector slides underneath.
         if (c.type === "messageBPMN") {
+          // Persist the new shared X as sourceOffsetAlong so subsequent
+          // recomputes (e.g. element move, validate pass) preserve the
+          // user's body drag instead of snapping the connector back to
+          // its stored offset.
+          const source = state.elements.find(el => el.id === c.sourceId);
+          const sharedX = newWaypoints[1]?.x;
+          if (source && sharedX != null && source.width > 0) {
+            const offset = Math.max(0.02, Math.min(0.98, (sharedX - source.x) / source.width));
+            return { ...c, waypoints: newWaypoints, sourceOffsetAlong: offset };
+          }
           return { ...c, waypoints: newWaypoints };
         }
         // R6.18: preserve label world position across the waypoint change

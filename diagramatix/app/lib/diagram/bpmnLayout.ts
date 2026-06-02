@@ -2146,7 +2146,12 @@ export function layoutBpmnDiagram(
       const srcOffset = conn.sourceOffsetAlong ?? 0.5;
       const tgtOffset = conn.targetOffsetAlong ?? 0.5;
 
-      // Message connectors: compute vertical waypoints manually so they display correctly
+      // Message connectors: build the canonical 4-waypoint moveable
+      // structure (sourceCentre → srcEdge → tgtEdge → targetCentre) so
+      // the user can later drag the body horizontally and re-attach the
+      // endpoints. Anything less than 4 waypoints / missing the
+      // invisible-leader flags would land in the editor as a static
+      // (un-moveable) message flow.
       if (conn.type === "messageBPMN") {
         const srcSide = conn.sourceSide;
         const tgtSide = conn.targetSide;
@@ -2161,13 +2166,15 @@ export function layoutBpmnDiagram(
         return {
           ...conn,
           waypoints: [
+            { x: src.x + src.width / 2, y: src.y + src.height / 2 },
             { x: alignX, y: srcY },
             { x: alignX, y: tgtY },
+            { x: tgt.x + tgt.width / 2, y: tgt.y + tgt.height / 2 },
           ],
           sourceOffsetAlong: (alignX - src.x) / src.width,
           targetOffsetAlong: (alignX - tgt.x) / tgt.width,
-          sourceInvisibleLeader: false,
-          targetInvisibleLeader: false,
+          sourceInvisibleLeader: true,
+          targetInvisibleLeader: true,
         };
       }
 
