@@ -435,6 +435,121 @@ export function checkDataStoreHasAssociation(d: DiagramLike): Violation[] {
   return out;
 }
 
+/** Return the host's side on which an edge-mounted event sits, based on
+ *  the event's centre relative to the host's centre. "top"/"bottom"/
+ *  "left"/"right" — the side AWAY from the host body, i.e. the outer
+ *  attachment side. Used by checkEdgeMountEventOuterRouting. */
+function outerSideOfEdgeMountEvent(
+  e: DiagramElement,
+  host: DiagramElement,
+): "top" | "bottom" | "left" | "right" {
+  const ecx = e.x + e.width / 2;
+  const ecy = e.y + e.height / 2;
+  const distTop    = Math.abs(ecy - host.y);
+  const distBottom = Math.abs(ecy - (host.y + host.height));
+  const distLeft   = Math.abs(ecx - host.x);
+  const distRight  = Math.abs(ecx - (host.x + host.width));
+  const min = Math.min(distTop, distBottom, distLeft, distRight);
+  if (min === distTop) return "top";
+  if (min === distBottom) return "bottom";
+  if (min === distLeft) return "left";
+  return "right";
+}
+
+/** Edge-mounted intermediate events must (a) attach every connector at
+ *  the OUTER side of the event, and (b) connect that other end to an
+ *  element OUTSIDE the host subprocess — never to a child of the host.
+ *  Anything else routes the path back through the host body and is the
+ *  most common cause of "the connector goes through the event" reports. */
+export function checkEdgeMountEventOuterRouting(d: DiagramLike): Violation[] {
+  const byId = new Map(d.elements.map((e) => [e.id, e]));
+  const out: Violation[] = [];
+
+  function isDescendantOf(elId: string | undefined, ancestorId: string): boolean {
+    let cur: DiagramElement | undefined = elId ? byId.get(elId) : undefined;
+    const visited = new Set<string>();
+    while (cur && !visited.has(cur.id)) {
+      visited.add(cur.id);
+      if (cur.parentId === ancestorId) return true;
+      cur = cur.parentId ? byId.get(cur.parentId) : undefined;
+    }
+    return false;
+  }
+
+  for (const e of d.elements) {
+    if (e.type !== "intermediate-event" || !e.boundaryHostId) continue;
+    const host = byId.get(e.boundaryHostId);
+    if (!host) continue;
+    const outer = outerSideOfEdgeMountEvent(e, host);
+    for (const c of d.connectors) {
+      if (c.type !== "sequence") continue;
+      const eventIsSrc = c.sourceId === e.id;
+      const eventIsTgt = c.targetId === e.id;
+      if (!eventIsSrc && !eventIsTgt) continue;
+      const eventSide = eventIsSrc ? c.sourceSide : c.targetSide;
+      if (eventSide && eventSide !== outer) {
+        out.push({
+          rule: "edge-mount-event-outer-routing",
+          severity: "error",
+          ids: [c.id, e.id, host.id],
+          message: `Edge-mounted intermediate event "${nameOf(e)}" has a sequence connector attached on its inner side ("${eventSide}") — must attach on the outer side ("${outer}") so the path doesn't route back through the event.`,
+        });
+        continue;
+      }
+      const otherId = eventIsSrc ? c.targetId : c.sourceId;
+      const other = byId.get(otherId);
+      if (!other) continue;
+      // The other end of the flow must NOT be a descendant of the host
+      // subprocess — that would force the connector back through the host
+      // body. The boundary event itself, and other boundary events on the
+      // same host, are not descendants by parentId so we don't trip on them.
+      if (other.parentId === host.id || isDescendantOf(other.parentId, host.id)) {
+        out.push({
+          rule: "edge-mount-event-outer-routing",
+          severity: "error",
+          ids: [c.id, e.id, host.id, other.id],
+          message: `Edge-mounted intermediate event "${nameOf(e)}" connects to "${nameOf(other)}" which sits inside its host "${nameOf(host)}" — connectors on edge-mounted intermediate events must route outward, not back into the host.`,
+        });
+      }
+    }
+  }
+  return out;
+}
+
+/** BPMN forbids more than one sequence connector between the same
+ *  ordered (source → target) pair — duplicates are almost always an
+ *  accidental drag-create or an import artefact. Direction matters:
+ *  A→B and B→A together (a rework loop) is fine. Two A→B is not. */
+export function checkDuplicateSequenceConnector(d: DiagramLike): Violation[] {
+  const counts = new Map<string, string[]>(); // "src->tgt" → connector ids
+  for (const c of d.connectors) {
+    if (c.type !== "sequence") continue;
+    const key = `${c.sourceId}->${c.targetId}`;
+    const ids = counts.get(key) ?? [];
+    ids.push(c.id);
+    counts.set(key, ids);
+  }
+  const byId = new Map(d.elements.map((e) => [e.id, e]));
+  const out: Violation[] = [];
+  for (const [key, ids] of counts) {
+    if (ids.length < 2) continue;
+    const [srcId, tgtId] = key.split("->");
+    const src = byId.get(srcId);
+    const tgt = byId.get(tgtId);
+    // Flag every duplicate after the first so the user sees exactly
+    // which connectors are redundant — the first is treated as canonical.
+    for (let i = 1; i < ids.length; i++) {
+      out.push({
+        rule: "duplicate-sequence",
+        severity: "error",
+        ids: [ids[i], srcId, tgtId],
+        message: `Duplicate sequence connector from "${nameOf(src)}" to "${nameOf(tgt)}" — only one sequence flow is allowed per (source, target) pair.`,
+      });
+    }
+  }
+  return out;
+}
+
 /** An ad-hoc EP must not have sequence connectors between its child
  *  activities — children run in any order, no ordering implied. */
 export function checkAdHocEPNoSequenceBetweenChildren(d: DiagramLike): Violation[] {
@@ -891,6 +1006,22 @@ export const RULES: Rule[] = [
     severity: "warning",
     category: "bpmn-structure",
     check: checkDataStoreHasAssociation,
+  },
+  {
+    id: "edge-mount-event-outer-routing",
+    title: "Edge-mounted event routed back through its host",
+    description: "A sequence connector on an edge-mounted intermediate event attaches on the event's inner side, or its other end sits inside the host Sub-Process. Both shapes force the path to route back through the host body and through the event itself. Edge-mounted intermediate events must attach on the OUTER side and connect outward.",
+    severity: "error",
+    category: "bpmn-structure",
+    check: checkEdgeMountEventOuterRouting,
+  },
+  {
+    id: "duplicate-sequence",
+    title: "Duplicate sequence connectors between two elements",
+    description: "Two or more sequence connectors share the same (source, target) pair. Only one sequence flow is allowed per ordered pair — back-edges (A→B and B→A) are fine, but A→B twice is a redundancy.",
+    severity: "error",
+    category: "bpmn-structure",
+    check: checkDuplicateSequenceConnector,
   },
 ];
 
