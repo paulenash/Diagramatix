@@ -910,6 +910,16 @@ export function DiagramEditor({
     return m.size > 0 ? m : null;
   }, [activeIssues, data.connectors]);
 
+  /** Ids that belong to the issue the cursor is currently sitting on.
+   *  Canvas uses this to render full-strength tint on these and fade
+   *  every other flagged element/connector so the user can see at a
+   *  glance which issue they're on while keeping the wider scan
+   *  context visible. */
+  const currentIssueIds = useMemo<Set<string>>(() => {
+    if (!currentIssue) return new Set();
+    return new Set(currentIssue.v.ids);
+  }, [currentIssue]);
+
   const closeDiagramScan = useCallback(() => {
     if (diagramScan && diagramScan.length > 0) {
       setReviewIssues({ violations: diagramScan, accepted: new Set(), cursor: 0 });
@@ -2722,6 +2732,7 @@ export function DiagramEditor({
           selectedConnectorId={selectedConnectorId}
           scanHighlightById={scanHighlight ?? undefined}
           scanHighlightConnectorById={scanConnectorHighlight ?? undefined}
+          currentIssueIds={currentIssueIds.size > 0 ? currentIssueIds : undefined}
           onSetSelectedElements={setSelectedElementIds}
           onSelectConnector={setSelectedConnectorId}
           onMoveElements={moveElements}

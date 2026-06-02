@@ -550,37 +550,6 @@ export function checkMessageFlowMoveable(d: DiagramLike): Violation[] {
   return out;
 }
 
-/** R8.04 — Loop-back (rework) sequence connectors. When the target sits
- *  to the LEFT of the source (or directly below and to the left), the
- *  flow is a rework loop and BPMN convention routes it underneath the
- *  forward flow: attach at BOTTOM of both source and target. Flag any
- *  loop-back whose source or target side is not "bottom". */
-export function checkLoopBackRouting(d: DiagramLike): Violation[] {
-  const byId = new Map(d.elements.map(e => [e.id, e]));
-  const out: Violation[] = [];
-  for (const c of d.connectors) {
-    if (c.type !== "sequence") continue;
-    const src = byId.get(c.sourceId);
-    const tgt = byId.get(c.targetId);
-    if (!src || !tgt) continue;
-    const srcCx = src.x + src.width / 2;
-    const tgtCx = tgt.x + tgt.width / 2;
-    // Loop-back = target's centre is to the LEFT of source's centre
-    // (using element width as the threshold so neighbouring elements
-    // at roughly the same x don't trip it).
-    if (tgtCx >= srcCx - src.width / 4) continue;
-    if (c.sourceSide !== "bottom" || c.targetSide !== "bottom") {
-      out.push({
-        rule: "loop-back-routing",
-        severity: "warning",
-        ids: [c.id, src.id, tgt.id],
-        message: `Loop-back sequence "${nameOf(src)}" → "${nameOf(tgt)}" runs from source-side "${c.sourceSide ?? "?"}" to target-side "${c.targetSide ?? "?"}" — rework loops should attach BOTTOM-to-BOTTOM and detour underneath.`,
-      });
-    }
-  }
-  return out;
-}
-
 /** R8.05 — A sequence connector LEAVING an edge-mounted Start Event
  *  must emit from the INNER side (the side facing into the host EP).
  *  Catches AI-generated diagrams that exit the start event outward,
@@ -736,6 +705,188 @@ export function checkBoundaryIntermediateOutgoingOuter(d: DiagramLike): Violatio
 
 function oppositeSide(side: "top" | "bottom" | "left" | "right"): "top" | "bottom" | "left" | "right" {
   return side === "top" ? "bottom" : side === "bottom" ? "top" : side === "left" ? "right" : "left";
+}
+
+/** Element types that act as obstacles for the visible path of a
+ *  sequence connector — anything that has a solid body the path could
+ *  cross through. Pools/lanes/EPs are not obstacles (they're routing
+ *  containers, not flow nodes). */
+const FLOW_NODE_TYPES = new Set<string>([
+  "task", "subprocess",
+  "start-event", "intermediate-event", "end-event",
+  "gateway", "fork-join",
+]);
+
+/** Inscribed shapes whose bounding rect has large transparent corner
+ *  regions (circles for events, diamonds for gateways). For these, an
+ *  axis-aligned visible segment grazing a corner of the bounding rect
+ *  doesn't actually cross the shape's body and shouldn't be flagged. */
+const INSCRIBED_BODY_TYPES = new Set<string>([
+  "start-event", "intermediate-event", "end-event", "gateway", "fork-join",
+]);
+
+function pointInRectInterior(
+  p: { x: number; y: number },
+  b: { x: number; y: number; width: number; height: number },
+  margin = 1,
+): boolean {
+  return p.x > b.x + margin && p.x < b.x + b.width - margin
+      && p.y > b.y + margin && p.y < b.y + b.height - margin;
+}
+
+/** Axis-aligned segment-vs-rect interior crossing (Liang-Barsky). True
+ *  iff the open segment passes through the rect's strict interior. */
+function segmentCrossesRectInterior(
+  p1: { x: number; y: number }, p2: { x: number; y: number },
+  b: { x: number; y: number; width: number; height: number },
+  margin = 1,
+): boolean {
+  const left = b.x + margin, right = b.x + b.width - margin;
+  const top = b.y + margin, bottom = b.y + b.height - margin;
+  if (left >= right || top >= bottom) return false;
+  const dx = p2.x - p1.x, dy = p2.y - p1.y;
+  let t0 = 0, t1 = 1;
+  const ps = [-dx, dx, -dy, dy];
+  const qs = [p1.x - left, right - p1.x, p1.y - top, bottom - p1.y];
+  for (let i = 0; i < 4; i++) {
+    if (ps[i] === 0) {
+      if (qs[i] < 0) return false;
+    } else {
+      const t = qs[i] / ps[i];
+      if (ps[i] < 0) {
+        if (t > t1) return false;
+        if (t > t0) t0 = t;
+      } else {
+        if (t < t0) return false;
+        if (t < t1) t1 = t;
+      }
+    }
+  }
+  return t0 < t1 - 1e-6;
+}
+
+/** Visible waypoints for a connector — strips the invisible-leader
+ *  centre points so only the on-canvas path is inspected. */
+function visibleWaypoints(c: Connector): { x: number; y: number }[] {
+  const wp = c.waypoints ?? [];
+  const vs = c.sourceInvisibleLeader ? 1 : 0;
+  const ve = c.targetInvisibleLeader ? wp.length - 2 : wp.length - 1;
+  if (ve < vs) return [];
+  return wp.slice(vs, ve + 1);
+}
+
+/** B29 — A sequence connector must not route through the body of its
+ *  own source or target. The visible path's interior waypoints must
+ *  not land strictly inside either endpoint's body. Circles and
+ *  diamonds (events / gateways) are exempted because their bounding
+ *  rect has large transparent corners. */
+export function checkSequenceClipsOwnEndpoint(d: DiagramLike): Violation[] {
+  const byId = new Map(d.elements.map(e => [e.id, e]));
+  const out: Violation[] = [];
+  for (const c of d.connectors) {
+    if (c.type !== "sequence") continue;
+    const src = byId.get(c.sourceId);
+    const tgt = byId.get(c.targetId);
+    if (!src || !tgt) continue;
+    const visible = visibleWaypoints(c);
+    if (visible.length < 3) continue; // need at least srcEdge, mid, tgtEdge
+    const interior = visible.slice(1, visible.length - 1);
+    for (const ep of [src, tgt] as DiagramElement[]) {
+      if (INSCRIBED_BODY_TYPES.has(ep.type)) continue;
+      if (ep.type === "pool" || ep.type === "lane"
+          || ep.type === "subprocess-expanded" || ep.type === "composite-state") continue;
+      const b = { x: ep.x, y: ep.y, width: ep.width, height: ep.height };
+      let clip = false;
+      for (const pt of interior) {
+        if (pointInRectInterior(pt, b, 1)) { clip = true; break; }
+      }
+      if (clip) {
+        out.push({
+          rule: "sequence-clips-own-endpoint",
+          severity: "error",
+          ids: [c.id, ep.id],
+          message: `Sequence connector "${nameOf(src)}" → "${nameOf(tgt)}" routes through the body of its own ${ep.id === src.id ? "source" : "target"} "${nameOf(ep)}".`,
+        });
+        break;
+      }
+    }
+  }
+  return out;
+}
+
+/** B30 — A sequence connector must not route through the body of any
+ *  Activity, Event or Gateway it isn't connected to. Same circle /
+ *  diamond exemption as B29. */
+export function checkSequenceClipsForeignNode(d: DiagramLike): Violation[] {
+  const byId = new Map(d.elements.map(e => [e.id, e]));
+  const out: Violation[] = [];
+  for (const c of d.connectors) {
+    if (c.type !== "sequence") continue;
+    const src = byId.get(c.sourceId);
+    const tgt = byId.get(c.targetId);
+    if (!src || !tgt) continue;
+    const visible = visibleWaypoints(c);
+    if (visible.length < 2) continue;
+    for (const ob of d.elements) {
+      if (ob.id === src.id || ob.id === tgt.id) continue;
+      if (!FLOW_NODE_TYPES.has(ob.type)) continue;
+      if (INSCRIBED_BODY_TYPES.has(ob.type)) continue;
+      if (ob.boundaryHostId === src.id || ob.boundaryHostId === tgt.id) continue;
+      const b = { x: ob.x, y: ob.y, width: ob.width, height: ob.height };
+      let clip = false;
+      for (const pt of visible) {
+        if (pointInRectInterior(pt, b, 1)) { clip = true; break; }
+      }
+      if (!clip) {
+        for (let i = 0; i < visible.length - 1; i++) {
+          if (segmentCrossesRectInterior(visible[i], visible[i + 1], b, 1)) {
+            clip = true; break;
+          }
+        }
+      }
+      if (clip) {
+        out.push({
+          rule: "sequence-clips-foreign-node",
+          severity: "error",
+          ids: [c.id, ob.id, src.id, tgt.id],
+          message: `Sequence connector "${nameOf(src)}" → "${nameOf(tgt)}" passes through "${nameOf(ob)}" — sequence flow must not cross another activity, event or gateway.`,
+        });
+        break;
+      }
+    }
+  }
+  return out;
+}
+
+/** B28 — A Task with both an incoming and an outgoing messageBPMN
+ *  connector must not carry the Send or Receive trigger (taskType).
+ *  Send / Receive each model a one-way message; a task in the middle
+ *  of a message round-trip should be a different trigger (User,
+ *  Service, Manual, etc.). */
+export function checkTaskBothMessagesNotSendReceive(d: DiagramLike): Violation[] {
+  const incoming = new Map<string, number>(); // taskId → count
+  const outgoing = new Map<string, number>();
+  for (const c of d.connectors) {
+    if (c.type !== "messageBPMN") continue;
+    incoming.set(c.targetId, (incoming.get(c.targetId) ?? 0) + 1);
+    outgoing.set(c.sourceId, (outgoing.get(c.sourceId) ?? 0) + 1);
+  }
+  const out: Violation[] = [];
+  for (const e of d.elements) {
+    if (e.type !== "task") continue;
+    if ((incoming.get(e.id) ?? 0) === 0) continue;
+    if ((outgoing.get(e.id) ?? 0) === 0) continue;
+    const trigger = e.taskType;
+    if (trigger === "send" || trigger === "receive") {
+      out.push({
+        rule: "task-bothmsg-not-send-receive",
+        severity: "error",
+        ids: [e.id],
+        message: `Task "${nameOf(e)}" has both incoming and outgoing message flows but is marked "${trigger}" — Send/Receive model a one-way message. Use User/Service/Manual/etc. instead.`,
+      });
+    }
+  }
+  return out;
 }
 
 /** BPMN forbids more than one sequence connector between the same
@@ -1275,15 +1426,6 @@ export const RULES: Rule[] = [
     check: checkMessageFlowMoveable,
   },
   {
-    code: "B22",
-    id: "loop-back-routing",
-    title: "Loop-back sequence not routed underneath",
-    description: "A sequence connector runs back to an element to its left (a rework loop) but does not attach BOTTOM-to-BOTTOM. Loop-backs should leave the source's bottom edge, detour below the intervening elements, and re-enter the target's bottom edge so the loop stays clear of the forward flow.",
-    severity: "warning",
-    category: "bpmn-structure",
-    check: checkLoopBackRouting,
-  },
-  {
     code: "B23",
     id: "boundary-start-outgoing-inner",
     title: "Boundary Start Event outgoing flow not on inner side",
@@ -1327,6 +1469,33 @@ export const RULES: Rule[] = [
     severity: "error",
     category: "bpmn-structure",
     check: checkBoundaryIntermediateOutgoingOuter,
+  },
+  {
+    code: "B28",
+    id: "task-bothmsg-not-send-receive",
+    title: "Two-way message task marked Send/Receive",
+    description: "A Task with both an incoming and an outgoing message flow must not carry the Send or Receive trigger. Send and Receive each model a one-way message; a task involved in a round-trip should use a different trigger (User, Service, Manual, etc.).",
+    severity: "error",
+    category: "bpmn-structure",
+    check: checkTaskBothMessagesNotSendReceive,
+  },
+  {
+    code: "B29",
+    id: "sequence-clips-own-endpoint",
+    title: "Sequence connector routed through its own source or target",
+    description: "A sequence connector's visible path passes through the body of its own source or target element. The path must always stay outside its endpoint shapes.",
+    severity: "error",
+    category: "bpmn-structure",
+    check: checkSequenceClipsOwnEndpoint,
+  },
+  {
+    code: "B30",
+    id: "sequence-clips-foreign-node",
+    title: "Sequence connector routed through another activity/event/gateway",
+    description: "A sequence connector passes through the body of an activity, event or gateway it isn't connected to. Sequence flow must route around every other flow node.",
+    severity: "error",
+    category: "bpmn-structure",
+    check: checkSequenceClipsForeignNode,
   },
 ];
 

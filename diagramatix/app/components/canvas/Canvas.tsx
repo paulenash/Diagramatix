@@ -205,6 +205,11 @@ interface Props {
    *  semi-transparent stroke painted along its waypoints in the severity
    *  colour. Used by rules like `connector-bends`. */
   scanHighlightConnectorById?: Map<string, "error" | "warning">;
+  /** When cycling through issues in Review Mode, only this issue's ids
+   *  render at full strength. Everything else in the scan highlights
+   *  fades so the user can see where they are without losing the wider
+   *  scan context. */
+  currentIssueIds?: Set<string>;
   onSetSelectedElements: (ids: Set<string> | ((prev: Set<string>) => Set<string>)) => void;
   onSelectConnector: (id: string | null) => void;
   onMoveElements?: (ids: string[], dx: number, dy: number) => void;
@@ -427,6 +432,7 @@ export function Canvas({
   selectedConnectorId,
   scanHighlightById,
   scanHighlightConnectorById,
+  currentIssueIds,
   onSetSelectedElements,
   onSelectConnector,
   onMoveElements,
@@ -5631,6 +5637,12 @@ export function Canvas({
             .map((el: DiagramElement) => {
               const severity = scanHighlightById.get(el.id);
               const color = severity === "warning" ? "#f59e0b" : "#dc2626";
+              // Dim flagged elements that don't belong to the current
+              // cycled issue. When no issue is active (currentIssueIds
+              // undefined / empty), every flagged element stays at full
+              // strength as before.
+              const isCurrent = !currentIssueIds || currentIssueIds.size === 0
+                || currentIssueIds.has(el.id);
               return (
                 <rect
                   key={`scan-hl-${el.id}`}
@@ -5640,7 +5652,8 @@ export function Canvas({
                   height={el.height + 6}
                   fill="none"
                   stroke={color}
-                  strokeWidth={3 / zoom}
+                  strokeWidth={(isCurrent ? 3 : 2) / zoom}
+                  opacity={isCurrent ? 1 : 0.25}
                   rx={4}
                   pointerEvents="none"
                 />
@@ -5660,16 +5673,21 @@ export function Canvas({
               const color = severity === "warning" ? "#f59e0b" : "#dc2626";
               const visible = c.waypoints.slice(1, -1);
               const points = visible.map((p) => `${p.x},${p.y}`).join(" ");
+              // Connectors not in the current cycled issue fade to a
+              // breadcrumb so the user can still see where every flagged
+              // connector is without losing focus on the current one.
+              const isCurrent = !currentIssueIds || currentIssueIds.size === 0
+                || currentIssueIds.has(c.id);
               return (
                 <polyline
                   key={`scan-hl-conn-${c.id}`}
                   points={points}
                   fill="none"
                   stroke={color}
-                  strokeWidth={6 / zoom}
+                  strokeWidth={(isCurrent ? 6 : 4) / zoom}
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  opacity={0.55}
+                  opacity={isCurrent ? 0.55 : 0.18}
                   pointerEvents="none"
                 />
               );
