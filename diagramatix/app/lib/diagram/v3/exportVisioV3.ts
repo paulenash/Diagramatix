@@ -2913,15 +2913,15 @@ export async function exportVisioV3(
               }),
             );
 
-            // Swimlane List page-shape uses LocPin=(0, H) which acts
-            // like a TOP-LEFT pivot in Visio's coord system, but the
-            // master has its own Pin offset that means the effective
-            // pivot lands at HALF the top-edge offset. Paul confirmed
-            // empirically (rect at top-right when offset by +h/2, at
-            // bottom-right when offset by 0) that the correct offset
-            // is the midpoint: cy + h/4.
+            // Swimlane List page-shape uses LocPin=(0, H). Visio
+            // interprets this as the SHAPE'S BOTTOM-LEFT (not top-left
+            // as I initially assumed): the shape extends UP from its
+            // Pin in Visio's Y-up page coords. So to land the list
+            // bounding box exactly on the pool body, PinX needs to be
+            // the pool's body-left edge and PinY needs to be the pool's
+            // BOTTOM edge (not top).
             const listPinX = cx - w / 2 + headerH;     // pool left edge + header thickness
-            const listPinY = cy - h / 4;               // midpoint between pool centre and pool bottom
+            const listPinY = cy - h / 2;               // pool BOTTOM edge (Visio Y-up)
             shapes.push(
               emitSwimlaneListShape({
                 shapeId: listShapeId,
