@@ -259,7 +259,11 @@ export function emitSwimlaneListShape(opts: {
  */
 export function deterministicGuid(seed: string): string {
   // Simple FNV-1a 32-bit hash, expanded to 128 bits via repeated mixing.
-  // Sufficient for uniqueness within a single VSDX file.
+  // Sufficient for uniqueness within a single VSDX file. The canonical
+  // Visio GUID layout is 8-4-4-4-12 hex digits = 32 chars total. The
+  // last group MUST be 12 chars — a malformed GUID makes Visio's CFF
+  // engine silently reject the lane↔list pairing (lanes don't follow
+  // pool resize, Add Lane stays greyed).
   let h = 2166136261;
   for (let i = 0; i < seed.length; i++) {
     h ^= seed.charCodeAt(i);
@@ -269,5 +273,9 @@ export function deterministicGuid(seed: string): string {
   const h2 = Math.imul(h, 2654435761);
   const h3 = Math.imul(h2, 2246822519);
   const h4 = Math.imul(h3, 3266489917);
-  return `{${hex(h)}-${hex(h2).slice(0, 4)}-${hex(h3).slice(0, 4)}-${hex(h4).slice(0, 4)}-${hex(h2).slice(4) + hex(h3).slice(4)}}`;
+  const h5 = Math.imul(h4, 374761393);
+  // Layout: 8 (h) - 4 (h2[0..4]) - 4 (h3[0..4]) - 4 (h4[0..4])
+  //         - 12 (h2[4..8] + h3[4..8] + h5[0..4]) = 32 hex chars.
+  const fifth = hex(h2).slice(4) + hex(h3).slice(4) + hex(h5).slice(0, 4);
+  return `{${hex(h)}-${hex(h2).slice(0, 4)}-${hex(h3).slice(0, 4)}-${hex(h4).slice(0, 4)}-${fifth}}`;
 }
