@@ -2858,9 +2858,18 @@ export async function exportVisioV3(
               relIdOut: listRId,
               fileNameOut: listFileName,
             });
+            // Swimlane List is structural-only; suppress its geometry
+            // entirely so it doesn't paint a spurious rectangle over
+            // the pool body. The master ships with `NoShow' V='0'` in
+            // its Geometry section — REPLACE that existing cell (don't
+            // just prepend a `V='1'` cell). Visio reads sibling cells
+            // in document order and the LAST occurrence wins, so a
+            // naive prepend leaves the master-natural NoShow=0 still
+            // dominant. This was the source of the "spurious additional
+            // rectangle" Paul saw in (5).vsdx after commit 1ad461e.
             const hiddenListContent = list.content.replace(
-              /<Section N='Geometry'([^>]*)>/g,
-              "<Section N='Geometry'$1><Cell N='NoShow' V='1'/>",
+              /<Cell N='NoShow' V='0'\/>/g,
+              "<Cell N='NoShow' V='1'/>",
             );
             zip.file("visio/masters/" + listFileName, hiddenListContent);
             mastersXml = mastersXml.replace(
