@@ -346,8 +346,8 @@ export const CHAPTERS: HelpChapter[] = [
             <strong>Team</strong> (department/group),{" "}
             <strong>System</strong> (IT system),{" "}
             <strong>Hourglass</strong> (auto-scheduler/timer).
-            AI generation includes process numbering (P-XX-NN format),
-            zigzag layout, and smart actor placement.
+            AI generation uses a zigzag layout for processes and places
+            actors / teams / systems beside the processes they connect to.
           </p>
         ),
       },
@@ -2922,8 +2922,8 @@ export const CHAPTERS: HelpChapter[] = [
           <ul className="list-disc list-inside space-y-1">
             <li>
               <strong>Use Case</strong> (ellipse) — represents a process.
-              AI-generated processes are numbered in P-XX-NN format
-              (e.g. P-HR-01, P-FI-02).
+              AI-generated processes use whatever names appear in your
+              prompt; add a numbering scheme yourself if you want one.
             </li>
             <li>
               <strong>Actor</strong> (stick figure) — an individual
