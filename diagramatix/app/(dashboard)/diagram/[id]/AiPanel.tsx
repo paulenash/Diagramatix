@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import type { DiagramData, DiagramElement, Connector } from "@/app/lib/diagram/types";
+import type { DiagramData, DiagramElement, Connector, DiagramType } from "@/app/lib/diagram/types";
 import { DiagramatixThrobber } from "@/app/components/DiagramatixThrobber";
+import { buildPromptFromDiagram } from "@/app/lib/diagram/prompt-from-diagram";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 declare global {
@@ -19,13 +20,31 @@ interface Props {
   /** Reports the panel's `generating` state to the parent so a
    *  full-canvas overlay can be rendered while Sonnet runs. */
   onGeneratingChange?: (generating: boolean) => void;
+  /** Admin-only Create Prompt from Diagram block. The two buttons —
+   *  Technical Description (deterministic walker) and Staff Narrative
+   *  (Sonnet rewrite under the editable briefing) — only render when
+   *  isAdmin is true. */
+  isAdmin?: boolean;
+  /** Current diagram contents fed into buildPromptFromDiagram for both
+   *  the Technical Description and the Staff Narrative paths. */
+  currentElements?: DiagramElement[];
+  currentConnectors?: Connector[];
+  /** Reports the Staff Narrative call's busy state so the parent can
+   *  flip the full-canvas overlay copy to "Asking Sonnet for a staff
+   *  narrative…" while the call is in-flight. */
+  onNarrativeGeneratingChange?: (generating: boolean) => void;
 }
 
-export function AiPanel({ diagramType, onApplyDiagram, onAddToDiagram, onClose, onGeneratingChange }: Props) {
+export function AiPanel({
+  diagramType, onApplyDiagram, onAddToDiagram, onClose, onGeneratingChange,
+  isAdmin, currentElements, currentConnectors, onNarrativeGeneratingChange,
+}: Props) {
   const [prompt, setPrompt] = useState("");
   const [generating, setGenerating] = useState(false);
+  const [narrativeGenerating, setNarrativeGenerating] = useState(false);
   // Notify the parent so it can render a full-canvas Diagramatix overlay.
   useEffect(() => { onGeneratingChange?.(generating); }, [generating, onGeneratingChange]);
+  useEffect(() => { onNarrativeGeneratingChange?.(narrativeGenerating); }, [narrativeGenerating, onNarrativeGeneratingChange]);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [mode, setMode] = useState<"replace" | "add">("replace");
@@ -105,6 +124,72 @@ export function AiPanel({ diagramType, onApplyDiagram, onAddToDiagram, onClose, 
   useEffect(() => {
     return () => { recognitionRef.current?.stop(); };
   }, []);
+
+  /** Admin-only — reverse-engineer the current diagram into a
+   *  structured Technical Description and drop it into the prompt
+   *  textarea so the user can refine it and re-feed AI Generate. Sync
+   *  walker; no Sonnet call. */
+  const callTechnicalDescription = useCallback(() => {
+    if (generating || narrativeGenerating) return;
+    const text = buildPromptFromDiagram(
+      currentElements ?? [],
+      currentConnectors ?? [],
+      diagramType as DiagramType,
+    );
+    if (!text.trim()) {
+      setError("Diagram is empty — nothing to describe yet.");
+      return;
+    }
+    setPrompt(text);
+    setEditingPromptId(null);
+    setSaveName("");
+    setShowSave(false);
+    setError(null);
+    setStatus("Created prompt from current diagram. Edit and save if you'd like.");
+  }, [currentElements, currentConnectors, diagramType, generating, narrativeGenerating]);
+
+  /** Admin-only — send the structured Technical Description to Sonnet
+   *  under the editable briefing (DiagramRules category="staff-narrative")
+   *  and drop the returned first-person narrative into the prompt
+   *  textarea. */
+  const callStaffNarrative = useCallback(async () => {
+    if (generating || narrativeGenerating) return;
+    const technicalDescription = buildPromptFromDiagram(
+      currentElements ?? [],
+      currentConnectors ?? [],
+      diagramType as DiagramType,
+    );
+    if (!technicalDescription.trim()) {
+      setError("Diagram is empty — nothing to narrate yet.");
+      return;
+    }
+    setNarrativeGenerating(true);
+    setError(null);
+    setStatus("Asking Sonnet for a staff narrative (15–30 s)…");
+    try {
+      const res = await fetch("/api/ai/staff-narrative", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ technicalDescription }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error ?? "Staff narrative generation failed");
+        setStatus(null);
+        return;
+      }
+      setPrompt(json.narrative ?? "");
+      setEditingPromptId(null);
+      setSaveName("");
+      setShowSave(false);
+      setStatus("Staff narrative generated. Edit and save if you'd like.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Network error");
+      setStatus(null);
+    } finally {
+      setNarrativeGenerating(false);
+    }
+  }, [generating, narrativeGenerating, currentElements, currentConnectors, diagramType]);
 
   const loadPrompts = useCallback(async () => {
     try {
@@ -241,6 +326,35 @@ export function AiPanel({ diagramType, onApplyDiagram, onAddToDiagram, onClose, 
       )}
 
       <div className="flex-1 px-3 py-2 flex flex-col gap-2 overflow-y-auto">
+        {isAdmin && (
+          <div>
+            {/* Admin-only red banner + two reverse-engineering options.
+                Red picks them out from the regular blue/grey controls
+                so admins spot them instantly. Mirrors the same block on
+                the BPMN PlanPanel. */}
+            <p className="text-[10px] font-semibold text-red-600 mb-1 uppercase tracking-wide">
+              Create Prompt from Diagram
+            </p>
+            <div className="flex gap-1.5">
+              <button
+                onClick={callTechnicalDescription}
+                disabled={generating || narrativeGenerating}
+                className="flex-1 px-2 py-1 text-[11px] font-medium text-red-700 bg-red-50 border border-red-300 rounded hover:bg-red-100 disabled:opacity-50"
+                title="Admin only — reverse-engineer the current diagram into a structured Technical Description"
+              >
+                Technical Description
+              </button>
+              <button
+                onClick={callStaffNarrative}
+                disabled={generating || narrativeGenerating}
+                className="flex-1 px-2 py-1 text-[11px] font-medium text-red-700 bg-red-50/60 border border-red-300 rounded hover:bg-red-100 disabled:opacity-50"
+                title="Admin only — ask Sonnet to rewrite the diagram as a Staff Narrative (uses the editable briefing in /dashboard/rules → Staff Narrative Briefing)"
+              >
+                Staff Narrative
+              </button>
+            </div>
+          </div>
+        )}
         <div>
           <div className="flex items-center justify-between mb-1">
             <label className="text-[10px] text-gray-500 font-medium">Describe the process</label>
@@ -307,11 +421,13 @@ export function AiPanel({ diagramType, onApplyDiagram, onAddToDiagram, onClose, 
         {/* Throbber banner while generating — same on-brand
             DiagramatixThrobber the BPMN PlanPanel uses, for visual
             consistency across every AI Generation flow. */}
-        {generating && (
+        {(generating || narrativeGenerating) && (
           <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded px-2 py-1.5">
             <DiagramatixThrobber size={28} />
             <span className="text-[11px] text-blue-800 font-medium">
-              Asking Sonnet — this usually takes 15–30 s…
+              {narrativeGenerating
+                ? "Asking Sonnet for a staff narrative — this usually takes 15–30 s…"
+                : "Asking Sonnet — this usually takes 15–30 s…"}
             </span>
           </div>
         )}

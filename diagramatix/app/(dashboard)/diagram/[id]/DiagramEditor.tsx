@@ -667,6 +667,7 @@ export function DiagramEditor({
   const [showDiagramMaintenance, setShowDiagramMaintenance] = useState(false);
   const [showAiPanel, setShowAiPanel] = useState(false);
   const [aiPanelGenerating, setAiPanelGenerating] = useState(false);
+  const [aiPanelNarrativeGenerating, setAiPanelNarrativeGenerating] = useState(false);
   const [showPlanPanel, setShowPlanPanel] = useState(false);
   const [showSendReview, setShowSendReview] = useState(false);
   const [reviewSentMsg, setReviewSentMsg] = useState<string | null>(null);
@@ -2891,6 +2892,10 @@ export function DiagramEditor({
             }}
             onClose={() => setShowAiPanel(false)}
             onGeneratingChange={setAiPanelGenerating}
+            isAdmin={isAdmin}
+            currentElements={data.elements}
+            currentConnectors={data.connectors}
+            onNarrativeGeneratingChange={setAiPanelNarrativeGenerating}
           />
         )}
 
@@ -2960,7 +2965,7 @@ export function DiagramEditor({
             just a tiny sidebar banner they might miss. Pointer events
             pass through (style.pointerEvents = "none") so the user can
             still pan / zoom underneath if they want. */}
-        {(aiBusy === "plan" || aiBusy === "apply" || aiBusy === "narrative" || aiPanelGenerating) && (
+        {(aiBusy === "plan" || aiBusy === "apply" || aiBusy === "narrative" || aiPanelGenerating || aiPanelNarrativeGenerating) && (
           <div
             className="fixed inset-0 z-40 flex flex-col items-center justify-center"
             style={{ pointerEvents: "none" }}
@@ -2969,7 +2974,7 @@ export function DiagramEditor({
             <p className="mt-3 text-sm font-medium text-blue-800 bg-white/85 backdrop-blur-sm px-4 py-2 rounded-lg shadow-md">
               {aiBusy === "apply"
                 ? "Running the layout engine…"
-                : aiBusy === "narrative"
+                : (aiBusy === "narrative" || aiPanelNarrativeGenerating)
                   ? "Asking Sonnet for a staff narrative — this usually takes 15–30 seconds…"
                   : "Asking Sonnet for a plan — this usually takes 15–30 seconds…"}
             </p>
