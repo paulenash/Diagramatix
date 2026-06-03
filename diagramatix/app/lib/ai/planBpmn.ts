@@ -15,6 +15,11 @@ import type { AiElement, AiConnection } from "@/app/lib/diagram/bpmnLayout";
 export type Attachment =
   | { type: "pdf"; data: string; name?: string }
   | { type: "text"; data: string; name?: string }
+  /** A diagram image (PNG / JPEG / WebP / GIF) that Sonnet should
+   *  reverse-engineer into the plan. `data` is the raw bytes, base64
+   *  encoded; `mediaType` is the matching IANA type sent to Claude's
+   *  vision API. */
+  | { type: "image"; data: string; mediaType: string; name?: string }
   | null
   | undefined;
 
@@ -41,6 +46,13 @@ const DEFAULT_MODEL = "claude-sonnet-4-6";
  */
 export function buildSystemPrompt(rules: string): string {
   return `You are a BPMN process modelling expert. Given a description of a business process, output a valid JSON object that defines the process as BPMN elements and connections.
+
+IMAGE INPUT — when an image of an existing diagram is attached:
+- Treat the image as the source of truth. Reverse-engineer the process from what is drawn, then express it in the BPMN JSON format below.
+- If the image is already a BPMN diagram: copy the structure faithfully. Read pool names, lane names, task labels, gateway labels and event labels off the image. Map every shape to its hyphenated type: rounded rectangle → "task" (or "subprocess" / "subprocess-expanded" if it contains its own sub-flow), diamond → "gateway", circle with thin border → "start-event", circle with thick border → "end-event", circle with double border → "intermediate-event", parallel horizontal lines → "pool" / "lane", dashed-rectangle around tasks → "group", document icon → "data-object", cylinder → "data-store", sticky-note → "text-annotation".
+- If the image is a non-BPMN flowchart: TRANSLATE shapes to BPMN. Rectangle → "task". Diamond with two outgoing branches → exclusive "gateway" (decision); diamond at the join → exclusive "gateway" (merge). Oval / pill at top → "start-event". Oval / pill at bottom → "end-event". Document → "data-object". Database cylinder → "data-store". Off-page connectors and arrow labels become sequence-flow labels. If no pools / lanes are drawn, wrap everything in a single white-box pool named after the process.
+- Read labels with OCR. Do NOT invent tasks, branches or roles that are not visible in the image. If a label is unreadable, use a short descriptive placeholder rather than guessing.
+- Where the user's text prompt adds detail beyond the image (extra rules, role names, message flows), apply it. Where the prompt CONTRADICTS the image, prefer the image.
 
 ${rules ? `USER RULES AND PREFERENCES (follow these strictly):\n${rules}\n\n` : ""}CRITICAL FORMAT RULES — you MUST follow these exactly:
 - Use ONLY these type values: "pool", "lane", "start-event", "end-event", "task", "gateway", "subprocess", "subprocess-expanded", "intermediate-event", "data-object", "data-store", "text-annotation", "group"
@@ -210,6 +222,24 @@ export async function planBpmn(opts: PlanBpmnOptions): Promise<PlanBpmnResult> {
     userContent.push({
       type: "text",
       text: `--- ATTACHED DOCUMENT: ${attachment.name ?? "document"} ---\n${attachment.data}\n--- END DOCUMENT ---`,
+    });
+  } else if (attachment?.type === "image" && attachment.data && attachment.mediaType) {
+    // Sonnet vision — feed the image as the source of truth so the
+    // model can reverse-engineer a BPMN-shaped plan from a screenshot
+    // of a BPMN diagram or a flowchart. The system prompt teaches the
+    // shape translation; here we just hand the bytes over.
+    userContent.push({
+      type: "image",
+      source: {
+        type: "base64",
+        media_type: attachment.mediaType as
+          "image/png" | "image/jpeg" | "image/webp" | "image/gif",
+        data: attachment.data,
+      },
+    } as Anthropic.Messages.ContentBlockParam);
+    userContent.push({
+      type: "text",
+      text: `An image of an existing process diagram is attached above (${attachment.name ?? "diagram.png"}). Treat the image as the source of truth and reverse-engineer the BPMN plan from it. If the text prompt below adds or contradicts anything visible in the image, prefer what the image shows.`,
     });
   }
   // Append a final, extremely explicit "JSON only" instruction to the

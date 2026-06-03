@@ -91,10 +91,23 @@ export function PlanPanel({
   const [jsonDraft, setJsonDraft] = useState("");
   const [jsonFocused, setJsonFocused] = useState(false);
 
-  // File attachment (mirrors AiPanel: PDF goes as base64 for Claude's native
-  // PDF support, everything else is read as plain text).
-  const [attachment, setAttachment] = useState<{ name: string; type: string; data: string } | null>(null);
+  // File attachment. PDF and image bytes go as base64 (Claude has native
+  // support for both PDF documents and the four supported image types);
+  // everything else is read as plain text.
+  const [attachment, setAttachment] = useState<
+    | { name: string; type: "pdf" | "text"; data: string }
+    | { name: string; type: "image"; data: string; mediaType: string }
+    | null
+  >(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const IMAGE_TYPES: Record<string, string> = {
+    "image/png": "image/png",
+    "image/jpeg": "image/jpeg",
+    "image/jpg": "image/jpeg",
+    "image/webp": "image/webp",
+    "image/gif": "image/gif",
+  };
 
   async function handleFileAttach(file: File) {
     const MAX_SIZE = 10 * 1024 * 1024; // 10MB
@@ -103,17 +116,25 @@ export function PlanPanel({
       const buffer = await file.arrayBuffer();
       const base64 = btoa(String.fromCharCode(...new Uint8Array(buffer)));
       setAttachment({ name: file.name, type: "pdf", data: base64 });
+      setPrompt(prev => prev.trim().length > 0
+        ? prev : `I have attached a document, ${file.name}`);
+    } else if (IMAGE_TYPES[file.type]) {
+      // Image of a BPMN diagram or a flowchart — feed Sonnet's vision
+      // API so it can reverse-engineer the process. The system prompt
+      // teaches the shape-to-BPMN mapping.
+      const buffer = await file.arrayBuffer();
+      const base64 = btoa(String.fromCharCode(...new Uint8Array(buffer)));
+      setAttachment({ name: file.name, type: "image", data: base64, mediaType: IMAGE_TYPES[file.type] });
+      setPrompt(prev => prev.trim().length > 0
+        ? prev
+        : `I have attached an image of a process diagram (${file.name}). Reverse-engineer the BPMN from it.`);
     } else {
       const text = await file.text();
       setAttachment({ name: file.name, type: "text", data: text });
+      setPrompt(prev => prev.trim().length > 0
+        ? prev : `I have attached a document, ${file.name}`);
     }
     setError(null);
-    // Pre-fill the prompt with a one-liner referencing the attachment so
-    // the user has a starting point and the AI gets a clear pointer to
-    // the doc. Only fill if the user hasn't already typed something.
-    setPrompt(prev => prev.trim().length > 0
-      ? prev
-      : `I have attached a document, ${file.name}`);
   }
 
   // Speech-to-text dictation (Chrome / Edge only).
@@ -669,11 +690,11 @@ export function PlanPanel({
           )}
           <div className="flex items-center gap-1.5 mt-1 shrink-0">
             <input ref={fileInputRef} type="file" className="hidden"
-              accept=".pdf,.txt,.md,.csv,.rtf,.doc,.docx"
+              accept=".pdf,.txt,.md,.csv,.rtf,.doc,.docx,.png,.jpg,.jpeg,.webp,.gif,image/*"
               onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFileAttach(f); e.target.value = ""; }} />
             <button onClick={() => fileInputRef.current?.click()}
               className="flex items-center gap-1 text-[10px] text-gray-500 border border-gray-300 rounded px-1.5 py-0.5 hover:bg-gray-50"
-              title="Attach a document (PDF, TXT, MD, CSV, RTF, DOC, DOCX)">
+              title="Attach a document (PDF, TXT, MD, CSV, RTF, DOC, DOCX) or an image of a BPMN diagram / flowchart (PNG, JPEG, WebP, GIF)">
               <svg width={10} height={10} viewBox="0 0 16 16" fill="currentColor">
                 <path d="M4.5 3a2.5 2.5 0 0 1 5 0v9a1.5 1.5 0 0 1-3 0V5a.5.5 0 0 1 1 0v7a.5.5 0 0 0 1 0V3a1.5 1.5 0 0 0-3 0v9a2.5 2.5 0 0 0 5 0V5a.5.5 0 0 1 1 0v7a3.5 3.5 0 0 1-7 0V3z" />
               </svg>
