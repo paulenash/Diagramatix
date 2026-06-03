@@ -1,0 +1,2226 @@
+{
+  "schemaVersion": "1.16",
+  "appVersion": "1.16.994",
+  "exportedAt": "2026-06-03T05:54:30.238Z",
+  "project": {
+    "name": "(single diagram)",
+    "description": "",
+    "ownerName": "",
+    "colorConfig": {}
+  },
+  "diagrams": [
+    {
+      "originalId": "cmpv0xtp4000101ulbhc92laa",
+      "name": "Organisational Context",
+      "type": "context",
+      "data": {
+        "elements": [
+          {
+            "id": "e1",
+            "type": "process-system",
+            "x": 385,
+            "y": 285,
+            "width": 230,
+            "height": 230,
+            "label": "GetConnected Membership System",
+            "properties": {}
+          },
+          {
+            "id": "e2",
+            "type": "external-entity",
+            "x": 460.00000000000006,
+            "y": -125,
+            "width": 80,
+            "height": 80,
+            "label": "Members",
+            "properties": {}
+          },
+          {
+            "id": "e3",
+            "type": "external-entity",
+            "x": 702.5,
+            "y": -60.022320835452774,
+            "width": 80,
+            "height": 80,
+            "label": "Partner Providers",
+            "properties": {}
+          },
+          {
+            "id": "e4",
+            "type": "external-entity",
+            "x": 880.0223208354528,
+            "y": 117.5,
+            "width": 80,
+            "height": 80,
+            "label": "Payment Gateway (Stripe)",
+            "properties": {}
+          },
+          {
+            "id": "e5",
+            "type": "external-entity",
+            "x": 945,
+            "y": 360,
+            "width": 80,
+            "height": 80,
+            "label": "Business Bank",
+            "properties": {}
+          },
+          {
+            "id": "e6",
+            "type": "external-entity",
+            "x": 880.0223208354528,
+            "y": 602.4999999999999,
+            "width": 80,
+            "height": 80,
+            "label": "Australian Taxation Office",
+            "properties": {}
+          },
+          {
+            "id": "e7",
+            "type": "external-entity",
+            "x": 702.5,
+            "y": 780.0223208354528,
+            "width": 80,
+            "height": 80,
+            "label": "ASIC",
+            "properties": {}
+          },
+          {
+            "id": "e8",
+            "type": "external-entity",
+            "x": 450.00000000000006,
+            "y": 835,
+            "width": 100,
+            "height": 100,
+            "label": "Office of the Australian Information Commissioner",
+            "properties": {}
+          },
+          {
+            "id": "e9",
+            "type": "external-entity",
+            "x": 207.4999999999999,
+            "y": 770.0223208354527,
+            "width": 100,
+            "height": 100,
+            "label": "Australian Competition & Consumer Commission",
+            "properties": {}
+          },
+          {
+            "id": "e10",
+            "type": "external-entity",
+            "x": 39.97767916454734,
+            "y": 602.5000000000002,
+            "width": 80,
+            "height": 80,
+            "label": "External Auditor",
+            "properties": {}
+          },
+          {
+            "id": "e11",
+            "type": "external-entity",
+            "x": -25,
+            "y": 360.00000000000006,
+            "width": 80,
+            "height": 80,
+            "label": "Insurance Broker",
+            "properties": {}
+          },
+          {
+            "id": "e12",
+            "type": "external-entity",
+            "x": 39.97767916454728,
+            "y": 117.49999999999994,
+            "width": 80,
+            "height": 80,
+            "label": "Email / SMS Service",
+            "properties": {}
+          },
+          {
+            "id": "e13",
+            "type": "external-entity",
+            "x": 217.49999999999977,
+            "y": -60.022320835452604,
+            "width": 80,
+            "height": 80,
+            "label": "Cloud Hosting Provider",
+            "properties": {}
+          }
+        ],
+        "fontSize": 14,
+        "viewport": {
+          "x": 0,
+          "y": 0,
+          "zoom": 0.7
+        },
+        "connectors": [
+          {
+            "id": "conn-e2-e1-0",
+            "sourceId": "e2",
+            "targetId": "e1",
+            "sourceSide": "bottom",
+            "targetSide": "top",
+            "sourceOffsetAlong": 0.125,
+            "targetOffsetAlong": 0.39372171916498905,
+            "type": "flow",
+            "directionType": "open-directed",
+            "routingType": "curvilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 500.00000000000006,
+                "y": -85
+              },
+              {
+                "x": 470.00000000000006,
+                "y": -45
+              },
+              {
+                "x": 470.00000000000006,
+                "y": 65.85626449408984
+              },
+              {
+                "x": 453.0418421672508,
+                "y": 179.07923677440618
+              },
+              {
+                "x": 476.0901555559577,
+                "y": 287.51302591561233
+              },
+              {
+                "x": 500,
+                "y": 400
+              }
+            ],
+            "label": "Membership Application",
+            "labelOffsetX": 0,
+            "labelOffsetY": -107
+          },
+          {
+            "id": "conn-e2-e1-1",
+            "sourceId": "e2",
+            "targetId": "e1",
+            "sourceSide": "bottom",
+            "targetSide": "top",
+            "sourceOffsetAlong": 0.23214285714285712,
+            "targetOffsetAlong": 0.42463712587463276,
+            "type": "flow",
+            "directionType": "open-directed",
+            "routingType": "curvilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 500.00000000000006,
+                "y": -85
+              },
+              {
+                "x": 478.5714285714286,
+                "y": -45
+              },
+              {
+                "x": 478.5714285714286,
+                "y": 65.4374046712043
+              },
+              {
+                "x": 466.40029832692835,
+                "y": 177.08054487692436
+              },
+              {
+                "x": 482.8601393897399,
+                "y": 286.2844549841102
+              },
+              {
+                "x": 500,
+                "y": 400
+              }
+            ],
+            "label": "Annual Subscription Payment",
+            "labelOffsetX": 0,
+            "labelOffsetY": -85
+          },
+          {
+            "id": "conn-e2-e1-2",
+            "sourceId": "e2",
+            "targetId": "e1",
+            "sourceSide": "bottom",
+            "targetSide": "top",
+            "sourceOffsetAlong": 0.3392857142857143,
+            "targetOffsetAlong": 0.4549991854991279,
+            "type": "flow",
+            "directionType": "open-directed",
+            "routingType": "curvilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 500.00000000000006,
+                "y": -85
+              },
+              {
+                "x": 487.1428571428572,
+                "y": -45
+              },
+              {
+                "x": 487.1428571428572,
+                "y": 65.1575946289846
+              },
+              {
+                "x": 479.8170288230984,
+                "y": 175.74882365173085
+              },
+              {
+                "x": 489.69147947610514,
+                "y": 285.4629561905475
+              },
+              {
+                "x": 500,
+                "y": 400
+              }
+            ],
+            "label": "Discount Offer Redemption",
+            "labelOffsetX": 0,
+            "labelOffsetY": -63
+          },
+          {
+            "id": "conn-e2-e1-3",
+            "sourceId": "e2",
+            "targetId": "e1",
+            "sourceSide": "bottom",
+            "targetSide": "top",
+            "sourceOffsetAlong": 0.44642857142857145,
+            "targetOffsetAlong": 0.4850355693192324,
+            "type": "flow",
+            "directionType": "open-directed",
+            "routingType": "curvilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 500.00000000000006,
+                "y": -85
+              },
+              {
+                "x": 495.7142857142858,
+                "y": -45
+              },
+              {
+                "x": 495.7142857142858,
+                "y": 65.01751769622632
+              },
+              {
+                "x": 493.2684960618366,
+                "y": 175.08319288034073
+              },
+              {
+                "x": 496.5597213905192,
+                "y": 285.05147028739714
+              },
+              {
+                "x": 500,
+                "y": 400
+              }
+            ],
+            "label": "Support Enquiry",
+            "labelOffsetX": 0,
+            "labelOffsetY": -41
+          },
+          {
+            "id": "conn-e1-e2-0",
+            "sourceId": "e1",
+            "targetId": "e2",
+            "sourceSide": "top",
+            "targetSide": "bottom",
+            "sourceOffsetAlong": 0.5149644306807678,
+            "targetOffsetAlong": 0.5535714285714286,
+            "type": "flow",
+            "directionType": "open-directed",
+            "routingType": "curvilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 500,
+                "y": 400
+              },
+              {
+                "x": 503.44027860948086,
+                "y": 285.05147028739714
+              },
+              {
+                "x": 506.73150393816354,
+                "y": 175.08319288034073
+              },
+              {
+                "x": 504.28571428571433,
+                "y": 65.01751769622632
+              },
+              {
+                "x": 504.28571428571433,
+                "y": -45
+              },
+              {
+                "x": 500.00000000000006,
+                "y": -85
+              }
+            ],
+            "label": "Welcome Pack",
+            "labelOffsetX": 0,
+            "labelOffsetY": -19
+          },
+          {
+            "id": "conn-e1-e2-1",
+            "sourceId": "e1",
+            "targetId": "e2",
+            "sourceSide": "top",
+            "targetSide": "bottom",
+            "sourceOffsetAlong": 0.5450008145008721,
+            "targetOffsetAlong": 0.6607142857142857,
+            "type": "flow",
+            "directionType": "open-directed",
+            "routingType": "curvilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 500,
+                "y": 400
+              },
+              {
+                "x": 510.30852052389486,
+                "y": 285.4629561905475
+              },
+              {
+                "x": 520.1829711769017,
+                "y": 175.74882365173085
+              },
+              {
+                "x": 512.8571428571429,
+                "y": 65.1575946289846
+              },
+              {
+                "x": 512.8571428571429,
+                "y": -45
+              },
+              {
+                "x": 500.00000000000006,
+                "y": -85
+              }
+            ],
+            "label": "Monthly Newsletter",
+            "labelOffsetX": 0,
+            "labelOffsetY": 3
+          },
+          {
+            "id": "conn-e1-e2-2",
+            "sourceId": "e1",
+            "targetId": "e2",
+            "sourceSide": "top",
+            "targetSide": "bottom",
+            "sourceOffsetAlong": 0.5753628741253672,
+            "targetOffsetAlong": 0.7678571428571429,
+            "type": "flow",
+            "directionType": "open-directed",
+            "routingType": "curvilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 500,
+                "y": 400
+              },
+              {
+                "x": 517.13986061026,
+                "y": 286.2844549841102
+              },
+              {
+                "x": 533.5997016730715,
+                "y": 177.08054487692436
+              },
+              {
+                "x": 521.4285714285714,
+                "y": 65.4374046712043
+              },
+              {
+                "x": 521.4285714285714,
+                "y": -45
+              },
+              {
+                "x": 500.00000000000006,
+                "y": -85
+              }
+            ],
+            "label": "Renewal Reminder",
+            "labelOffsetX": 0,
+            "labelOffsetY": 25
+          },
+          {
+            "id": "conn-e1-e2-3",
+            "sourceId": "e1",
+            "targetId": "e2",
+            "sourceSide": "top",
+            "targetSide": "bottom",
+            "sourceOffsetAlong": 0.6062782808350112,
+            "targetOffsetAlong": 0.875,
+            "type": "flow",
+            "directionType": "open-directed",
+            "routingType": "curvilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 500,
+                "y": 400
+              },
+              {
+                "x": 523.9098444440424,
+                "y": 287.51302591561233
+              },
+              {
+                "x": 546.9581578327494,
+                "y": 179.07923677440618
+              },
+              {
+                "x": 530,
+                "y": 65.85626449408984
+              },
+              {
+                "x": 530,
+                "y": -45
+              },
+              {
+                "x": 500.00000000000006,
+                "y": -85
+              }
+            ],
+            "label": "Personalised Offer Recommendations",
+            "labelOffsetX": 0,
+            "labelOffsetY": 47
+          },
+          {
+            "id": "conn-e3-e1-0",
+            "sourceId": "e3",
+            "targetId": "e1",
+            "sourceSide": "bottom",
+            "targetSide": "top",
+            "sourceOffsetAlong": 0.125,
+            "targetOffsetAlong": 0.6624598481164531,
+            "type": "flow",
+            "directionType": "open-directed",
+            "routingType": "curvilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 742.5,
+                "y": -20.022320835452774
+              },
+              {
+                "x": 712.5,
+                "y": 19.977679164547226
+              },
+              {
+                "x": 712.5,
+                "y": 127.7674883522077
+              },
+              {
+                "x": 568.8458372125389,
+                "y": 188.1143002079216
+              },
+              {
+                "x": 535.536954353119,
+                "y": 290.6285006260573
+              },
+              {
+                "x": 500,
+                "y": 400
+              }
+            ],
+            "label": "Partnership Agreement",
+            "labelOffsetX": 0,
+            "labelOffsetY": -63
+          },
+          {
+            "id": "conn-e3-e1-1",
+            "sourceId": "e3",
+            "targetId": "e1",
+            "sourceSide": "bottom",
+            "targetSide": "top",
+            "sourceOffsetAlong": 0.375,
+            "targetOffsetAlong": 0.7438662942829306,
+            "type": "flow",
+            "directionType": "open-directed",
+            "routingType": "curvilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 742.5,
+                "y": -20.022320835452774
+              },
+              {
+                "x": 732.5,
+                "y": 19.977679164547226
+              },
+              {
+                "x": 732.5,
+                "y": 130.37952264263794
+              },
+              {
+                "x": 598.8096646138628,
+                "y": 197.41016505703527
+              },
+              {
+                "x": 550.4126818807439,
+                "y": 296.63868467559575
+              },
+              {
+                "x": 500,
+                "y": 400
+              }
+            ],
+            "label": "Discount Code / Voucher List",
+            "labelOffsetX": 0,
+            "labelOffsetY": -41
+          },
+          {
+            "id": "conn-e3-e1-2",
+            "sourceId": "e3",
+            "targetId": "e1",
+            "sourceSide": "bottom",
+            "targetSide": "top",
+            "sourceOffsetAlong": 0.625,
+            "targetOffsetAlong": 0.837254258421213,
+            "type": "flow",
+            "directionType": "open-directed",
+            "routingType": "curvilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 742.5,
+                "y": -20.022320835452774
+              },
+              {
+                "x": 752.5,
+                "y": 19.977679164547226
+              },
+              {
+                "x": 752.5,
+                "y": 133.73226223031702
+              },
+              {
+                "x": 627.917939486788,
+                "y": 210.3538557443136
+              },
+              {
+                "x": 564.3071838991359,
+                "y": 304.6606791561702
+              },
+              {
+                "x": 500,
+                "y": 400
+              }
+            ],
+            "label": "Redemption Report",
+            "labelOffsetX": 0,
+            "labelOffsetY": -19
+          },
+          {
+            "id": "conn-e1-e3-0",
+            "sourceId": "e1",
+            "targetId": "e3",
+            "sourceSide": "top",
+            "targetSide": "bottom",
+            "sourceOffsetAlong": 0.95,
+            "targetOffsetAlong": 0.875,
+            "type": "flow",
+            "directionType": "open-directed",
+            "routingType": "curvilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 500,
+                "y": 400
+              },
+              {
+                "x": 576.9309441365817,
+                "y": 314.5211731815759
+              },
+              {
+                "x": 655.7701794437628,
+                "y": 226.92202284026354
+              },
+              {
+                "x": 772.5,
+                "y": 137.83028271805773
+              },
+              {
+                "x": 772.5,
+                "y": 19.977679164547226
+              },
+              {
+                "x": 742.5,
+                "y": -20.022320835452774
+              }
+            ],
+            "label": "Monthly Commission Settlement",
+            "labelOffsetX": 0,
+            "labelOffsetY": 3
+          },
+          {
+            "id": "conn-e1-e4-0",
+            "sourceId": "e1",
+            "targetId": "e4",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "sourceOffsetAlong": 0.08097807646031815,
+            "targetOffsetAlong": 0.25,
+            "type": "flow",
+            "directionType": "open-directed",
+            "routingType": "curvilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 500,
+                "y": 400
+              },
+              {
+                "x": 588.1409160436594,
+                "y": 326.1340476336724
+              },
+              {
+                "x": 676.9283669628671,
+                "y": 251.72627069296936
+              },
+              {
+                "x": 764.1787681016551,
+                "y": 137.5
+              },
+              {
+                "x": 880.0223208354528,
+                "y": 137.5
+              },
+              {
+                "x": 920.0223208354528,
+                "y": 157.5
+              }
+            ],
+            "label": "Card Payment Request",
+            "labelOffsetX": -22,
+            "labelOffsetY": -30
+          },
+          {
+            "id": "conn-e4-e1-0",
+            "sourceId": "e4",
+            "targetId": "e1",
+            "sourceSide": "left",
+            "targetSide": "right",
+            "sourceOffsetAlong": 0.5,
+            "targetOffsetAlong": 0.21132486540518708,
+            "type": "flow",
+            "directionType": "open-directed",
+            "routingType": "curvilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 920.0223208354528,
+                "y": 157.5
+              },
+              {
+                "x": 880.0223208354528,
+                "y": 157.5
+              },
+              {
+                "x": 768.0373773792599,
+                "y": 157.5
+              },
+              {
+                "x": 696.5747273096375,
+                "y": 286.5075282719035
+              },
+              {
+                "x": 599.5929214352104,
+                "y": 342.5
+              },
+              {
+                "x": 500,
+                "y": 400
+              }
+            ],
+            "label": "Settlement Report",
+            "labelOffsetX": 0,
+            "labelOffsetY": -30
+          },
+          {
+            "id": "conn-e4-e1-1",
+            "sourceId": "e4",
+            "targetId": "e1",
+            "sourceSide": "left",
+            "targetSide": "right",
+            "sourceOffsetAlong": 0.75,
+            "targetOffsetAlong": 0.31766380354306667,
+            "type": "flow",
+            "directionType": "open-directed",
+            "routingType": "curvilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 920.0223208354528,
+                "y": 157.5
+              },
+              {
+                "x": 880.0223208354528,
+                "y": 177.5
+              },
+              {
+                "x": 770.7316203112408,
+                "y": 177.5
+              },
+              {
+                "x": 710.7167233752268,
+                "y": 323.1574282597867
+              },
+              {
+                "x": 608.0402492458006,
+                "y": 360.6007037765233
+              },
+              {
+                "x": 500,
+                "y": 400
+              }
+            ],
+            "label": "Refund Confirmation",
+            "labelOffsetX": 22,
+            "labelOffsetY": -30
+          },
+          {
+            "id": "conn-e5-e1-0",
+            "sourceId": "e5",
+            "targetId": "e1",
+            "sourceSide": "left",
+            "targetSide": "right",
+            "sourceOffsetAlong": 0.25,
+            "targetOffsetAlong": 0.41215605205526173,
+            "type": "flow",
+            "directionType": "open-directed",
+            "routingType": "curvilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 985,
+                "y": 400
+              },
+              {
+                "x": 945,
+                "y": 380
+              },
+              {
+                "x": 834.4217444386161,
+                "y": 380
+              },
+              {
+                "x": 722.1754538488221,
+                "y": 360.9664619950109
+              },
+              {
+                "x": 613.2652485898043,
+                "y": 380.10066679785876
+              },
+              {
+                "x": 500,
+                "y": 400
+              }
+            ],
+            "label": "Bank Statement",
+            "labelOffsetX": -22,
+            "labelOffsetY": -30
+          },
+          {
+            "id": "conn-e5-e1-1",
+            "sourceId": "e5",
+            "targetId": "e1",
+            "sourceSide": "left",
+            "targetSide": "right",
+            "sourceOffsetAlong": 0.5,
+            "targetOffsetAlong": 0.5,
+            "type": "flow",
+            "directionType": "open-directed",
+            "routingType": "curvilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 985,
+                "y": 400
+              },
+              {
+                "x": 945,
+                "y": 400
+              },
+              {
+                "x": 835,
+                "y": 400
+              },
+              {
+                "x": 725,
+                "y": 400
+              },
+              {
+                "x": 615,
+                "y": 400
+              },
+              {
+                "x": 500,
+                "y": 400
+              }
+            ],
+            "label": "Direct Debit / BPAY Payment Confirmation",
+            "labelOffsetX": 0,
+            "labelOffsetY": -30
+          },
+          {
+            "id": "conn-e1-e5-0",
+            "sourceId": "e1",
+            "targetId": "e5",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "sourceOffsetAlong": 0.5878439479447383,
+            "targetOffsetAlong": 0.75,
+            "type": "flow",
+            "directionType": "open-directed",
+            "routingType": "curvilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 500,
+                "y": 400
+              },
+              {
+                "x": 613.2652485898043,
+                "y": 419.89933320214124
+              },
+              {
+                "x": 722.1754538488221,
+                "y": 439.0335380049891
+              },
+              {
+                "x": 834.4217444386161,
+                "y": 420
+              },
+              {
+                "x": 945,
+                "y": 420
+              },
+              {
+                "x": 985,
+                "y": 400
+              }
+            ],
+            "label": "Outbound Payment Instructions",
+            "labelOffsetX": 22,
+            "labelOffsetY": -30
+          },
+          {
+            "id": "conn-e1-e6-0",
+            "sourceId": "e1",
+            "targetId": "e6",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "sourceOffsetAlong": 0.6624598481164531,
+            "targetOffsetAlong": 0.125,
+            "type": "flow",
+            "directionType": "open-directed",
+            "routingType": "curvilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 500,
+                "y": 400
+              },
+              {
+                "x": 609.3714993739427,
+                "y": 435.5369543531189
+              },
+              {
+                "x": 711.8856997920784,
+                "y": 468.8458372125388
+              },
+              {
+                "x": 772.2325116477923,
+                "y": 612.4999999999999
+              },
+              {
+                "x": 880.0223208354528,
+                "y": 612.4999999999999
+              },
+              {
+                "x": 920.0223208354528,
+                "y": 642.4999999999999
+              }
+            ],
+            "label": "Quarterly Business Activity Statement",
+            "labelOffsetX": -55,
+            "labelOffsetY": -30
+          },
+          {
+            "id": "conn-e1-e6-1",
+            "sourceId": "e1",
+            "targetId": "e6",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "sourceOffsetAlong": 0.7101806465440985,
+            "targetOffsetAlong": 0.275,
+            "type": "flow",
+            "directionType": "open-directed",
+            "routingType": "curvilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 500,
+                "y": 400
+              },
+              {
+                "x": 606.0142624326776,
+                "y": 444.5642924419918
+              },
+              {
+                "x": 706.7452548111381,
+                "y": 486.9077026522588
+              },
+              {
+                "x": 770.7533992987944,
+                "y": 624.4999999999999
+              },
+              {
+                "x": 880.0223208354528,
+                "y": 624.4999999999999
+              },
+              {
+                "x": 920.0223208354528,
+                "y": 642.4999999999999
+              }
+            ],
+            "label": "PAYG Instalment",
+            "labelOffsetX": -33,
+            "labelOffsetY": -30
+          },
+          {
+            "id": "conn-e1-e6-2",
+            "sourceId": "e1",
+            "targetId": "e6",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "sourceOffsetAlong": 0.7613936831093443,
+            "targetOffsetAlong": 0.425,
+            "type": "flow",
+            "directionType": "open-directed",
+            "routingType": "curvilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 500,
+                "y": 400
+              },
+              {
+                "x": 601.9134116115897,
+                "y": 453.2790440387841
+              },
+              {
+                "x": 700.293311607484,
+                "y": 504.7108128464957
+              },
+              {
+                "x": 769.009566766868,
+                "y": 636.4999999999999
+              },
+              {
+                "x": 880.0223208354528,
+                "y": 636.4999999999999
+              },
+              {
+                "x": 920.0223208354528,
+                "y": 642.4999999999999
+              }
+            ],
+            "label": "Annual Income Tax Return",
+            "labelOffsetX": -11,
+            "labelOffsetY": -30
+          },
+          {
+            "id": "conn-e1-e6-3",
+            "sourceId": "e1",
+            "targetId": "e6",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "sourceOffsetAlong": 0.8173096487720739,
+            "targetOffsetAlong": 0.575,
+            "type": "flow",
+            "directionType": "open-directed",
+            "routingType": "curvilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 500,
+                "y": 400
+              },
+              {
+                "x": 597.0977114327318,
+                "y": 461.6200814225846
+              },
+              {
+                "x": 692.5272871125666,
+                "y": 522.1815317054574
+              },
+              {
+                "x": 766.9980173658088,
+                "y": 648.4999999999999
+              },
+              {
+                "x": 880.0223208354528,
+                "y": 648.4999999999999
+              },
+              {
+                "x": 920.0223208354528,
+                "y": 642.4999999999999
+              }
+            ],
+            "label": "Superannuation Guarantee Report",
+            "labelOffsetX": 11,
+            "labelOffsetY": -30
+          },
+          {
+            "id": "conn-e6-e1-0",
+            "sourceId": "e6",
+            "targetId": "e1",
+            "sourceSide": "left",
+            "targetSide": "right",
+            "sourceOffsetAlong": 0.725,
+            "targetOffsetAlong": 0.8795206565260544,
+            "type": "flow",
+            "directionType": "open-directed",
+            "routingType": "curvilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 920.0223208354528,
+                "y": 642.4999999999999
+              },
+              {
+                "x": 880.0223208354528,
+                "y": 660.4999999999999
+              },
+              {
+                "x": 764.71748123777,
+                "y": 660.4999999999999
+              },
+              {
+                "x": 683.444695005318,
+                "y": 539.2421021692802
+              },
+              {
+                "x": 591.6009405727826,
+                "y": 469.5288982091731
+              },
+              {
+                "x": 500,
+                "y": 400
+              }
+            ],
+            "label": "Tax Assessment",
+            "labelOffsetX": 33,
+            "labelOffsetY": -30
+          },
+          {
+            "id": "conn-e6-e1-1",
+            "sourceId": "e6",
+            "targetId": "e1",
+            "sourceSide": "left",
+            "targetSide": "right",
+            "sourceOffsetAlong": 0.875,
+            "targetOffsetAlong": 0.95,
+            "type": "flow",
+            "directionType": "open-directed",
+            "routingType": "curvilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 920.0223208354528,
+                "y": 642.4999999999999
+              },
+              {
+                "x": 880.0223208354528,
+                "y": 672.4999999999999
+              },
+              {
+                "x": 762.1697172819423,
+                "y": 672.4999999999999
+              },
+              {
+                "x": 673.0779771597364,
+                "y": 555.7701794437629
+              },
+              {
+                "x": 585.4788268184241,
+                "y": 476.93094413658173
+              },
+              {
+                "x": 500,
+                "y": 400
+              }
+            ],
+            "label": "Regulatory Notice",
+            "labelOffsetX": 55,
+            "labelOffsetY": -30
+          },
+          {
+            "id": "conn-e1-e7-0",
+            "sourceId": "e1",
+            "targetId": "e7",
+            "sourceSide": "bottom",
+            "targetSide": "top",
+            "sourceOffsetAlong": 0.9190219235396818,
+            "targetOffsetAlong": 0.75,
+            "type": "flow",
+            "directionType": "open-directed",
+            "routingType": "curvilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 500,
+                "y": 400
+              },
+              {
+                "x": 573.8659523663276,
+                "y": 488.14091604365944
+              },
+              {
+                "x": 648.2737293070307,
+                "y": 576.9283669628671
+              },
+              {
+                "x": 762.5,
+                "y": 664.1787681016551
+              },
+              {
+                "x": 762.5,
+                "y": 780.0223208354528
+              },
+              {
+                "x": 742.5,
+                "y": 820.0223208354528
+              }
+            ],
+            "label": "Annual Company Return",
+            "labelOffsetX": 0,
+            "labelOffsetY": -52
+          },
+          {
+            "id": "conn-e1-e7-1",
+            "sourceId": "e1",
+            "targetId": "e7",
+            "sourceSide": "bottom",
+            "targetSide": "top",
+            "sourceOffsetAlong": 0.7886751345948126,
+            "targetOffsetAlong": 0.5,
+            "type": "flow",
+            "directionType": "open-directed",
+            "routingType": "curvilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 500,
+                "y": 400
+              },
+              {
+                "x": 557.5,
+                "y": 499.5929214352105
+              },
+              {
+                "x": 613.4924717280965,
+                "y": 596.5747273096375
+              },
+              {
+                "x": 742.5,
+                "y": 668.0373773792599
+              },
+              {
+                "x": 742.5,
+                "y": 780.0223208354528
+              },
+              {
+                "x": 742.5,
+                "y": 820.0223208354528
+              }
+            ],
+            "label": "Change of Officeholder Notification",
+            "labelOffsetX": 0,
+            "labelOffsetY": -30
+          },
+          {
+            "id": "conn-e1-e7-2",
+            "sourceId": "e1",
+            "targetId": "e7",
+            "sourceSide": "bottom",
+            "targetSide": "top",
+            "sourceOffsetAlong": 0.6823361964569333,
+            "targetOffsetAlong": 0.25,
+            "type": "flow",
+            "directionType": "open-directed",
+            "routingType": "curvilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 500,
+                "y": 400
+              },
+              {
+                "x": 539.3992962234767,
+                "y": 508.0402492458007
+              },
+              {
+                "x": 576.8425717402132,
+                "y": 610.7167233752269
+              },
+              {
+                "x": 722.5,
+                "y": 670.7316203112408
+              },
+              {
+                "x": 722.5,
+                "y": 780.0223208354528
+              },
+              {
+                "x": 742.5,
+                "y": 820.0223208354528
+              }
+            ],
+            "label": "Registered Office Update",
+            "labelOffsetX": 0,
+            "labelOffsetY": -8
+          },
+          {
+            "id": "conn-e1-e8-0",
+            "sourceId": "e1",
+            "targetId": "e8",
+            "sourceSide": "bottom",
+            "targetSide": "top",
+            "sourceOffsetAlong": 0.5435881793770119,
+            "targetOffsetAlong": 0.6,
+            "type": "flow",
+            "directionType": "open-directed",
+            "routingType": "curvilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 500,
+                "y": 400
+              },
+              {
+                "x": 509.98740236929774,
+                "y": 514.5654912873582
+              },
+              {
+                "x": 519.2636585258039,
+                "y": 620.9734244596981
+              },
+              {
+                "x": 510.00000000000006,
+                "y": 728.1884970132418
+              },
+              {
+                "x": 510.00000000000006,
+                "y": 835
+              },
+              {
+                "x": 500.00000000000006,
+                "y": 885
+              }
+            ],
+            "label": "Data Breach Notification",
+            "labelOffsetX": 0,
+            "labelOffsetY": -41
+          },
+          {
+            "id": "conn-e1-e8-1",
+            "sourceId": "e1",
+            "targetId": "e8",
+            "sourceSide": "bottom",
+            "targetSide": "top",
+            "sourceOffsetAlong": 0.45641182062298813,
+            "targetOffsetAlong": 0.4,
+            "type": "flow",
+            "directionType": "open-directed",
+            "routingType": "curvilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 500,
+                "y": 400
+              },
+              {
+                "x": 490.01259763070226,
+                "y": 514.5654912873582
+              },
+              {
+                "x": 480.73634147419614,
+                "y": 620.9734244596981
+              },
+              {
+                "x": 490.00000000000006,
+                "y": 728.1884970132418
+              },
+              {
+                "x": 490.00000000000006,
+                "y": 835
+              },
+              {
+                "x": 500.00000000000006,
+                "y": 885
+              }
+            ],
+            "label": "Privacy Policy Compliance Report",
+            "labelOffsetX": 0,
+            "labelOffsetY": -19
+          },
+          {
+            "id": "conn-e1-e9-0",
+            "sourceId": "e1",
+            "targetId": "e9",
+            "sourceSide": "bottom",
+            "targetSide": "top",
+            "sourceOffsetAlong": 0.2666574760052571,
+            "targetOffsetAlong": 0.6,
+            "type": "flow",
+            "directionType": "open-directed",
+            "routingType": "curvilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 500,
+                "y": 400
+              },
+              {
+                "x": 451.3665985259496,
+                "y": 504.21032703654583
+              },
+              {
+                "x": 405.80523874078233,
+                "y": 601.8379668794099
+              },
+              {
+                "x": 267.4999999999999,
+                "y": 662.2865627661773
+              },
+              {
+                "x": 267.4999999999999,
+                "y": 770.0223208354527
+              },
+              {
+                "x": 257.4999999999999,
+                "y": 820.0223208354527
+              }
+            ],
+            "label": "Consumer Complaint Record",
+            "labelOffsetX": 0,
+            "labelOffsetY": -41
+          },
+          {
+            "id": "conn-e1-e9-1",
+            "sourceId": "e1",
+            "targetId": "e9",
+            "sourceSide": "bottom",
+            "targetSide": "top",
+            "sourceOffsetAlong": 0.1501271317667671,
+            "targetOffsetAlong": 0.4,
+            "type": "flow",
+            "directionType": "open-directed",
+            "routingType": "curvilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 500,
+                "y": 400
+              },
+              {
+                "x": 434.0679101866922,
+                "y": 494.2229246672481
+              },
+              {
+                "x": 370.4337327724994,
+                "y": 585.1619245038586
+              },
+              {
+                "x": 247.4999999999999,
+                "y": 659.030383171206
+              },
+              {
+                "x": 247.4999999999999,
+                "y": 770.0223208354527
+              },
+              {
+                "x": 257.4999999999999,
+                "y": 820.0223208354527
+              }
+            ],
+            "label": "Marketing Claim Dispute Notification",
+            "labelOffsetX": 0,
+            "labelOffsetY": -19
+          },
+          {
+            "id": "conn-e1-e10-0",
+            "sourceId": "e1",
+            "targetId": "e10",
+            "sourceSide": "left",
+            "targetSide": "right",
+            "sourceOffsetAlong": 0.9190219235396818,
+            "targetOffsetAlong": 0.75,
+            "type": "flow",
+            "directionType": "open-directed",
+            "routingType": "curvilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 500,
+                "y": 400
+              },
+              {
+                "x": 411.85908395634056,
+                "y": 473.8659523663276
+              },
+              {
+                "x": 323.0716330371328,
+                "y": 548.2737293070306
+              },
+              {
+                "x": 235.82123189834493,
+                "y": 662.5000000000002
+              },
+              {
+                "x": 119.97767916454734,
+                "y": 662.5000000000002
+              },
+              {
+                "x": 79.97767916454734,
+                "y": 642.5000000000002
+              }
+            ],
+            "label": "Annual Financial Statements",
+            "labelOffsetX": -22,
+            "labelOffsetY": -30
+          },
+          {
+            "id": "conn-e1-e10-1",
+            "sourceId": "e1",
+            "targetId": "e10",
+            "sourceSide": "left",
+            "targetSide": "right",
+            "sourceOffsetAlong": 0.7886751345948132,
+            "targetOffsetAlong": 0.5,
+            "type": "flow",
+            "directionType": "open-directed",
+            "routingType": "curvilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 500,
+                "y": 400
+              },
+              {
+                "x": 400.4070785647896,
+                "y": 457.50000000000006
+              },
+              {
+                "x": 303.42527269036253,
+                "y": 513.4924717280966
+              },
+              {
+                "x": 231.96262262074032,
+                "y": 642.5000000000002
+              },
+              {
+                "x": 119.97767916454734,
+                "y": 642.5000000000002
+              },
+              {
+                "x": 79.97767916454734,
+                "y": 642.5000000000002
+              }
+            ],
+            "label": "Supporting Ledgers",
+            "labelOffsetX": 0,
+            "labelOffsetY": -30
+          },
+          {
+            "id": "conn-e10-e1-0",
+            "sourceId": "e10",
+            "targetId": "e1",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "sourceOffsetAlong": 0.25,
+            "targetOffsetAlong": 0.6823361964569336,
+            "type": "flow",
+            "directionType": "open-directed",
+            "routingType": "curvilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 79.97767916454734,
+                "y": 642.5000000000002
+              },
+              {
+                "x": 119.97767916454734,
+                "y": 622.5000000000002
+              },
+              {
+                "x": 229.26837968875924,
+                "y": 622.5000000000002
+              },
+              {
+                "x": 289.2832766247731,
+                "y": 476.8425717402134
+              },
+              {
+                "x": 391.9597507541993,
+                "y": 439.39929622347677
+              },
+              {
+                "x": 500,
+                "y": 400
+              }
+            ],
+            "label": "Audit Opinion",
+            "labelOffsetX": 22,
+            "labelOffsetY": -30
+          },
+          {
+            "id": "conn-e1-e11-0",
+            "sourceId": "e1",
+            "targetId": "e11",
+            "sourceSide": "left",
+            "targetSide": "right",
+            "sourceOffsetAlong": 0.606278280835011,
+            "targetOffsetAlong": 0.875,
+            "type": "flow",
+            "directionType": "open-directed",
+            "routingType": "curvilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 500,
+                "y": 400
+              },
+              {
+                "x": 387.51302591561233,
+                "y": 423.9098444440423
+              },
+              {
+                "x": 279.0792367744062,
+                "y": 446.9581578327492
+              },
+              {
+                "x": 165.85626449408983,
+                "y": 430.00000000000006
+              },
+              {
+                "x": 55,
+                "y": 430.00000000000006
+              },
+              {
+                "x": 15,
+                "y": 400.00000000000006
+              }
+            ],
+            "label": "Renewal Information",
+            "labelOffsetX": -33,
+            "labelOffsetY": -30
+          },
+          {
+            "id": "conn-e1-e11-1",
+            "sourceId": "e1",
+            "targetId": "e11",
+            "sourceSide": "left",
+            "targetSide": "right",
+            "sourceOffsetAlong": 0.5349634059717553,
+            "targetOffsetAlong": 0.625,
+            "type": "flow",
+            "directionType": "open-directed",
+            "routingType": "curvilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 500,
+                "y": 400
+              },
+              {
+                "x": 385.2801342201202,
+                "y": 408.02199448057445
+              },
+              {
+                "x": 275.45296857245546,
+                "y": 415.7018580391075
+              },
+              {
+                "x": 165.09535239272037,
+                "y": 410.00000000000006
+              },
+              {
+                "x": 55,
+                "y": 410.00000000000006
+              },
+              {
+                "x": 15,
+                "y": 400.00000000000006
+              }
+            ],
+            "label": "Risk Disclosure",
+            "labelOffsetX": -11,
+            "labelOffsetY": -30
+          },
+          {
+            "id": "conn-e11-e1-0",
+            "sourceId": "e11",
+            "targetId": "e1",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "sourceOffsetAlong": 0.375,
+            "targetOffsetAlong": 0.46503659402824493,
+            "type": "flow",
+            "directionType": "open-directed",
+            "routingType": "curvilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 15,
+                "y": 400.00000000000006
+              },
+              {
+                "x": 55,
+                "y": 390.00000000000006
+              },
+              {
+                "x": 165.09535239272037,
+                "y": 390.00000000000006
+              },
+              {
+                "x": 275.45296857245546,
+                "y": 384.2981419608926
+              },
+              {
+                "x": 385.2801342201202,
+                "y": 391.9780055194256
+              },
+              {
+                "x": 500,
+                "y": 400
+              }
+            ],
+            "label": "Policy Schedule",
+            "labelOffsetX": 11,
+            "labelOffsetY": -30
+          },
+          {
+            "id": "conn-e11-e1-1",
+            "sourceId": "e11",
+            "targetId": "e1",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "sourceOffsetAlong": 0.125,
+            "targetOffsetAlong": 0.39372171916498905,
+            "type": "flow",
+            "directionType": "open-directed",
+            "routingType": "curvilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 15,
+                "y": 400.00000000000006
+              },
+              {
+                "x": 55,
+                "y": 370.00000000000006
+              },
+              {
+                "x": 165.85626449408983,
+                "y": 370.00000000000006
+              },
+              {
+                "x": 279.0792367744062,
+                "y": 353.0418421672508
+              },
+              {
+                "x": 387.51302591561233,
+                "y": 376.0901555559577
+              },
+              {
+                "x": 500,
+                "y": 400
+              }
+            ],
+            "label": "Certificate of Currency",
+            "labelOffsetX": 33,
+            "labelOffsetY": -30
+          },
+          {
+            "id": "conn-e1-e12-0",
+            "sourceId": "e1",
+            "targetId": "e12",
+            "sourceSide": "left",
+            "targetSide": "right",
+            "sourceOffsetAlong": 0.3375401518835467,
+            "targetOffsetAlong": 0.875,
+            "type": "flow",
+            "directionType": "open-directed",
+            "routingType": "curvilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 500,
+                "y": 400
+              },
+              {
+                "x": 390.6285006260573,
+                "y": 364.463045646881
+              },
+              {
+                "x": 288.1143002079216,
+                "y": 331.1541627874611
+              },
+              {
+                "x": 227.76748835220775,
+                "y": 187.49999999999994
+              },
+              {
+                "x": 119.97767916454728,
+                "y": 187.49999999999994
+              },
+              {
+                "x": 79.97767916454728,
+                "y": 157.49999999999994
+              }
+            ],
+            "label": "Campaign Content",
+            "labelOffsetX": -33,
+            "labelOffsetY": -30
+          },
+          {
+            "id": "conn-e1-e12-1",
+            "sourceId": "e1",
+            "targetId": "e12",
+            "sourceSide": "left",
+            "targetSide": "right",
+            "sourceOffsetAlong": 0.2561337057170694,
+            "targetOffsetAlong": 0.625,
+            "type": "flow",
+            "directionType": "open-directed",
+            "routingType": "curvilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 500,
+                "y": 400
+              },
+              {
+                "x": 396.63868467559575,
+                "y": 349.5873181192561
+              },
+              {
+                "x": 297.4101650570353,
+                "y": 301.1903353861373
+              },
+              {
+                "x": 230.379522642638,
+                "y": 167.49999999999994
+              },
+              {
+                "x": 119.97767916454728,
+                "y": 167.49999999999994
+              },
+              {
+                "x": 79.97767916454728,
+                "y": 157.49999999999994
+              }
+            ],
+            "label": "Recipient List",
+            "labelOffsetX": -11,
+            "labelOffsetY": -30
+          },
+          {
+            "id": "conn-e12-e1-0",
+            "sourceId": "e12",
+            "targetId": "e1",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "sourceOffsetAlong": 0.375,
+            "targetOffsetAlong": 0.16274574157878652,
+            "type": "flow",
+            "directionType": "open-directed",
+            "routingType": "curvilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 79.97767916454728,
+                "y": 157.49999999999994
+              },
+              {
+                "x": 119.97767916454728,
+                "y": 147.49999999999994
+              },
+              {
+                "x": 233.73226223031708,
+                "y": 147.49999999999994
+              },
+              {
+                "x": 310.3538557443136,
+                "y": 272.082060513212
+              },
+              {
+                "x": 404.6606791561702,
+                "y": 335.6928161008641
+              },
+              {
+                "x": 500,
+                "y": 400
+              }
+            ],
+            "label": "Delivery Report",
+            "labelOffsetX": 11,
+            "labelOffsetY": -30
+          },
+          {
+            "id": "conn-e12-e1-1",
+            "sourceId": "e12",
+            "targetId": "e1",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "sourceOffsetAlong": 0.125,
+            "targetOffsetAlong": 0.05,
+            "type": "flow",
+            "directionType": "open-directed",
+            "routingType": "curvilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 79.97767916454728,
+                "y": 157.49999999999994
+              },
+              {
+                "x": 119.97767916454728,
+                "y": 127.49999999999994
+              },
+              {
+                "x": 237.8302827180578,
+                "y": 127.49999999999994
+              },
+              {
+                "x": 326.92202284026354,
+                "y": 244.22982055623714
+              },
+              {
+                "x": 414.5211731815759,
+                "y": 323.06905586341827
+              },
+              {
+                "x": 500,
+                "y": 400
+              }
+            ],
+            "label": "Open and Click Report",
+            "labelOffsetX": 33,
+            "labelOffsetY": -30
+          },
+          {
+            "id": "conn-e1-e13-0",
+            "sourceId": "e1",
+            "targetId": "e13",
+            "sourceSide": "left",
+            "targetSide": "bottom",
+            "sourceOffsetAlong": 0.05,
+            "targetOffsetAlong": 0.125,
+            "type": "flow",
+            "directionType": "open-directed",
+            "routingType": "curvilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 500,
+                "y": 400
+              },
+              {
+                "x": 414.5211731815759,
+                "y": 323.06905586341827
+              },
+              {
+                "x": 326.2802987279771,
+                "y": 243.65226885517936
+              },
+              {
+                "x": 227.49999999999977,
+                "y": 138.6936342129223
+              },
+              {
+                "x": 227.49999999999977,
+                "y": 19.977679164547396
+              },
+              {
+                "x": 257.4999999999998,
+                "y": -20.022320835452604
+              }
+            ],
+            "label": "Deployment Artefacts",
+            "labelOffsetX": 0,
+            "labelOffsetY": -74
+          },
+          {
+            "id": "conn-e1-e13-1",
+            "sourceId": "e1",
+            "targetId": "e13",
+            "sourceSide": "left",
+            "targetSide": "bottom",
+            "sourceOffsetAlong": 0.05,
+            "targetOffsetAlong": 0.3125,
+            "type": "flow",
+            "directionType": "open-directed",
+            "routingType": "curvilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 500,
+                "y": 400
+              },
+              {
+                "x": 414.5211731815759,
+                "y": 323.06905586341827
+              },
+              {
+                "x": 328.17395534003936,
+                "y": 245.35655980603536
+              },
+              {
+                "x": 242.49999999999977,
+                "y": 136.1459797996282
+              },
+              {
+                "x": 242.49999999999977,
+                "y": 19.977679164547396
+              },
+              {
+                "x": 257.4999999999998,
+                "y": -20.022320835452604
+              }
+            ],
+            "label": "Configuration Settings",
+            "labelOffsetX": 0,
+            "labelOffsetY": -52
+          },
+          {
+            "id": "conn-e13-e1-0",
+            "sourceId": "e13",
+            "targetId": "e1",
+            "sourceSide": "bottom",
+            "targetSide": "left",
+            "sourceOffsetAlong": 0.5,
+            "targetOffsetAlong": 0.05,
+            "type": "flow",
+            "directionType": "open-directed",
+            "routingType": "curvilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 257.4999999999998,
+                "y": -20.022320835452604
+              },
+              {
+                "x": 257.4999999999998,
+                "y": 19.977679164547396
+              },
+              {
+                "x": 257.4999999999998,
+                "y": 133.76111452241162
+              },
+              {
+                "x": 329.94661174018256,
+                "y": 246.95195056616427
+              },
+              {
+                "x": 414.5211731815759,
+                "y": 323.06905586341827
+              },
+              {
+                "x": 500,
+                "y": 400
+              }
+            ],
+            "label": "Infrastructure Services",
+            "labelOffsetX": 0,
+            "labelOffsetY": -30
+          },
+          {
+            "id": "conn-e13-e1-1",
+            "sourceId": "e13",
+            "targetId": "e1",
+            "sourceSide": "bottom",
+            "targetSide": "left",
+            "sourceOffsetAlong": 0.6875,
+            "targetOffsetAlong": 0.05,
+            "type": "flow",
+            "directionType": "open-directed",
+            "routingType": "curvilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 257.4999999999998,
+                "y": -20.022320835452604
+              },
+              {
+                "x": 272.4999999999998,
+                "y": 19.977679164547396
+              },
+              {
+                "x": 272.4999999999998,
+                "y": 131.54947780216014
+              },
+              {
+                "x": 331.59050836797076,
+                "y": 248.43145753117363
+              },
+              {
+                "x": 414.5211731815759,
+                "y": 323.06905586341827
+              },
+              {
+                "x": 500,
+                "y": 400
+              }
+            ],
+            "label": "Uptime Report",
+            "labelOffsetX": 0,
+            "labelOffsetY": -8
+          },
+          {
+            "id": "conn-e13-e1-2",
+            "sourceId": "e13",
+            "targetId": "e1",
+            "sourceSide": "bottom",
+            "targetSide": "left",
+            "sourceOffsetAlong": 0.875,
+            "targetOffsetAlong": 0.05,
+            "type": "flow",
+            "directionType": "open-directed",
+            "routingType": "curvilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 257.4999999999998,
+                "y": -20.022320835452604
+              },
+              {
+                "x": 287.4999999999998,
+                "y": 19.977679164547396
+              },
+              {
+                "x": 287.4999999999998,
+                "y": 129.5215623375788
+              },
+              {
+                "x": 333.09784606187816,
+                "y": 249.78806145569033
+              },
+              {
+                "x": 414.5211731815759,
+                "y": 323.06905586341827
+              },
+              {
+                "x": 500,
+                "y": 400
+              }
+            ],
+            "label": "Hosting Invoice",
+            "labelOffsetX": 0,
+            "labelOffsetY": 14
+          }
+        ],
+        "laneFontSize": 12,
+        "poolFontSize": 12,
+        "titleFontSize": 14,
+        "processFontSize": 16,
+        "connectorFontSize": 14
+      },
+      "colorConfig": {
+        "lane": "#e8c4a0",
+        "pool": "#d4a382",
+        "task": "#fef9c3",
+        "team": "#374151",
+        "actor": "#374151",
+        "group": "#374151",
+        "state": "#dbeafe",
+        "system": "#f8fafc",
+        "chevron": "#fbd7bb",
+        "gateway": "#f3e8ff",
+        "sublane": "#faf0e6",
+        "use-case": "#fef9c3",
+        "end-event": "#fca5a5",
+        "fork-join": "#1f2937",
+        "hourglass": "#ffffff",
+        "uml-class": "#fed7aa",
+        "data-store": "#60a5fa",
+        "submachine": "#bfdbfe",
+        "subprocess": "#fef08a",
+        "data-object": "#bfdbfe",
+        "final-state": "#374151",
+        "start-event": "#dcfce7",
+        "initial-state": "#374151",
+        "process-group": "#fcebdd",
+        "process-system": "#e9d5ff",
+        "review-comment": "#ec4899",
+        "archimate-shape": "#ffffff",
+        "composite-state": "#ede9fe",
+        "external-entity": "#bfdbfe",
+        "system-boundary": "#dbeafe",
+        "text-annotation": "#374151",
+        "uml-enumeration": "#bbf7d0",
+        "chevron-collapsed": "#fbd7bb",
+        "intermediate-event": "#fed7aa",
+        "subprocess-expanded": "#fef4a7",
+        "composite-state-body": "#ede9fe",
+        "system-boundary-body": "#dbeafe"
+      },
+      "displayMode": "normal"
+    }
+  ]
+}
