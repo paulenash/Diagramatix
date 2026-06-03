@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   CODE_REQUIRED_GROUPS,
   RULE_LINE_RE,
@@ -279,8 +280,16 @@ function codeBackedRuleIds(text: string): Set<string> {
 }
 
 export function RulesEditor({ isAdmin: _isAdmin }: { isAdmin: boolean }) {
+  // ?category=<slug> on the URL pins the editor to a single category
+  // and hides the sidebar. Used by the per-diagram "AI Rules &
+  // Preferences — <Type>" admin link so the admin sees only the rules
+  // that apply to the diagram they came from. Without the param the
+  // editor renders the full multi-category view as before.
+  const searchParams = useSearchParams();
+  const scopedCategory = searchParams?.get("category") ?? null;
+  const isScoped = !!(scopedCategory && CATEGORY_ORDER.includes(scopedCategory));
   const [ruleSets, setRuleSets] = useState<RuleSet[]>([]);
-  const [activeCategory, setActiveCategory] = useState("general");
+  const [activeCategory, setActiveCategory] = useState(isScoped ? scopedCategory! : "general");
   const [editText, setEditText] = useState("");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
@@ -301,7 +310,8 @@ export function RulesEditor({ isAdmin: _isAdmin }: { isAdmin: boolean }) {
       .then(r => r.json())
       .then(data => {
         setRuleSets(data);
-        const active = data.find((r: RuleSet) => r.category === "general") ?? data[0];
+        const preferred = isScoped ? scopedCategory! : "general";
+        const active = data.find((r: RuleSet) => r.category === preferred) ?? data[0];
         if (active) setEditText(active.rules);
         setLoading(false);
       })
@@ -440,18 +450,34 @@ export function RulesEditor({ isAdmin: _isAdmin }: { isAdmin: boolean }) {
           {/* Brand icon: matches the placement on every other admin sub-screen. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logos/diagramatix-icon.svg" alt="Diagramatix" className="w-7 h-7" />
-          <h1 className="text-lg font-semibold text-gray-900">AI Rules &amp; Preferences</h1>
+          <h1 className="text-lg font-semibold text-gray-900">
+            AI Rules &amp; Preferences
+            {isScoped && (
+              <span className="ml-2 text-base font-normal text-gray-500">
+                &mdash; {CATEGORY_LABELS[scopedCategory!] ?? scopedCategory}
+              </span>
+            )}
+          </h1>
         </div>
         <div className="flex items-center gap-3">
           <p className="text-xs text-gray-400">
             Rules are sent with every AI generation request to guide diagram creation
           </p>
+          {isScoped && (
+            <Link href="/dashboard/rules" className="text-xs text-blue-600 hover:underline shrink-0">
+              View all categories
+            </Link>
+          )}
           <Link href="/help" className="text-xs text-blue-600 hover:underline shrink-0">User Guide</Link>
         </div>
       </header>
 
       <div className="flex-1 flex">
-        {/* Sidebar — category list */}
+        {/* Sidebar — category list. Hidden when scoped to a single
+            diagram type so the admin sees only the rules they came
+            for. Use the "View all categories" link above to return to
+            the multi-category view. */}
+        {!isScoped && (
         <nav className="w-52 bg-white border-r border-gray-200 p-3 flex flex-col">
           <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide mb-2">Categories</p>
           <div className="space-y-1 flex-1">
@@ -505,6 +531,7 @@ export function RulesEditor({ isAdmin: _isAdmin }: { isAdmin: boolean }) {
             </div>
           </div>
         </nav>
+        )}
 
         {/* Editor + Preview */}
         <main className="flex-1 p-4 flex flex-col">

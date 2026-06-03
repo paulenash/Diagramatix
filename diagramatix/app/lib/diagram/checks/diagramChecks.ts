@@ -35,7 +35,8 @@ export type RuleCategory =
   | "duplicate-name"
   | "single-lane-pool"
   | "hanging-message"
-  | "bpmn-structure";
+  | "bpmn-structure"
+  | "process-context-structure";
 
 export interface Violation {
   rule: string;
@@ -1340,6 +1341,79 @@ export function checkHangingMessage(d: DiagramLike): Violation[] {
   return out;
 }
 
+// ── Process Context rules ────────────────────────────────────────────────────
+
+/** Actor-like Process Context symbols whose icons sit next to a text
+ *  label. The label takes vertical space below the icon, so two actors
+ *  placed side-by-side or stacked tightly run their labels together. */
+const PROCESS_CONTEXT_ACTOR_TYPES = new Set<string>([
+  "actor", "team", "system", "hourglass",
+]);
+const PC_LABEL_ALLOWANCE_PX = 24; // typical ~1.5 lines of label below the icon
+const PC_MIN_GAP_PX = 30;         // minimum clear space between two actor boxes
+
+/** P2.08 — Actors (and similar Process Context icons) need a clear gap
+ *  so their labels don't collide. Walks every pair of actor-like
+ *  elements and flags any whose effective bounds (icon + label
+ *  allowance) sit within PC_MIN_GAP_PX of each other. */
+export function checkProcessContextActorGap(d: DiagramLike): Violation[] {
+  const out: Violation[] = [];
+  const actors = d.elements.filter(e => PROCESS_CONTEXT_ACTOR_TYPES.has(e.type));
+  for (let i = 0; i < actors.length; i++) {
+    for (let j = i + 1; j < actors.length; j++) {
+      const a = actors[i], b = actors[j];
+      const ax2 = a.x + a.width, ay2 = a.y + a.height + PC_LABEL_ALLOWANCE_PX;
+      const bx2 = b.x + b.width, by2 = b.y + b.height + PC_LABEL_ALLOWANCE_PX;
+      const hgap = b.x > ax2
+        ? b.x - ax2
+        : a.x > bx2
+          ? a.x - bx2
+          : -Math.min(ax2 - b.x, bx2 - a.x);
+      const vgap = b.y > ay2
+        ? b.y - ay2
+        : a.y > by2
+          ? a.y - by2
+          : -Math.min(ay2 - b.y, by2 - a.y);
+      // max(hgap, vgap) is the minimum separation distance: positive
+      // means the boxes are apart in at least one axis by that much.
+      const sep = Math.max(hgap, vgap);
+      if (sep < PC_MIN_GAP_PX) {
+        out.push({
+          rule: "actor-placement-gap",
+          severity: "warning",
+          ids: [a.id, b.id],
+          message: `"${nameOf(a)}" and "${nameOf(b)}" are placed too close — leave at least ${PC_MIN_GAP_PX} px clear so their labels don't run together.`,
+        });
+      }
+    }
+  }
+  return out;
+}
+
+/** P2.09 — Process Context: an association connector running between
+ *  two process (use-case) elements is not legal. Processes connect to
+ *  actors / teams / systems via associations; process-to-process
+ *  relationships belong on a different diagram. */
+export function checkNoAssociationBetweenProcesses(d: DiagramLike): Violation[] {
+  const byId = new Map(d.elements.map(e => [e.id, e]));
+  const out: Violation[] = [];
+  for (const c of d.connectors) {
+    if (c.type !== "association") continue;
+    const src = byId.get(c.sourceId);
+    const tgt = byId.get(c.targetId);
+    if (!src || !tgt) continue;
+    if (src.type === "use-case" && tgt.type === "use-case") {
+      out.push({
+        rule: "no-association-between-processes",
+        severity: "error",
+        ids: [c.id, src.id, tgt.id],
+        message: `Association between processes "${nameOf(src)}" and "${nameOf(tgt)}" is not allowed in a Process Context diagram — associations should run between processes and actors/teams/systems.`,
+      });
+    }
+  }
+  return out;
+}
+
 // ── Registry ─────────────────────────────────────────────────────────────────
 
 export const RULES: Rule[] = [
@@ -1603,6 +1677,24 @@ export const RULES: Rule[] = [
     severity: "error",
     category: "bpmn-structure",
     check: checkManualTaskNoITSystemMessage,
+  },
+  {
+    code: "P2.08",
+    id: "actor-placement-gap",
+    title: "Process Context actors placed too close",
+    description: "Two actor-like Process Context elements (actor, team, system, hourglass) sit close enough that their labels will run together. Leave at least 30 px of clear space between each pair so every label is independently legible.",
+    severity: "warning",
+    category: "process-context-structure",
+    check: checkProcessContextActorGap,
+  },
+  {
+    code: "P2.09",
+    id: "no-association-between-processes",
+    title: "Association connector between two processes",
+    description: "Process Context associations must run between a process and an actor / team / system. A process-to-process association is not legal in this diagram — relationships between processes belong on a different diagram type.",
+    severity: "error",
+    category: "process-context-structure",
+    check: checkNoAssociationBetweenProcesses,
   },
 ];
 
