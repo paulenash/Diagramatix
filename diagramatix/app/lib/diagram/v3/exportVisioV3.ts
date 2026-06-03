@@ -2848,11 +2848,19 @@ export async function exportVisioV3(
               `<Override PartName="/visio/masters/${containerFileName}" ContentType="application/vnd.ms-visio.master+xml"/></Types>`,
             );
 
-            // Match Diagramatix's POOL_HEADER_W (36 px = 0.375 IN).
-            // CFF Container header thickness is patched to the same
-            // value in cloneCffContainer.
-            const headerH = 0.375;
-            const listW = w - headerH;
+            // Swimlane List geometry intentionally matches the pool's
+            // selection rectangle byte-for-byte: same W, same H, same
+            // Pin, same LocPin convention. Paul's observation: any
+            // offset between the list bbox and the pool bbox renders
+            // as a visible "spurious rectangle" in Visio because the
+            // CFF engine draws an outline at the list's bbox.
+            //
+            // Strictly the list area is the body MINUS the header
+            // strip, but Visio's CFF engine treats the list's
+            // bounding-box as the host frame for its members and is
+            // tolerant of header overlap. Aligning bbox = pool bbox
+            // eliminates the dual-rectangle appearance.
+            const listW = w;
             const listH = h;
             const list = cloneSwimlaneList(cffSource, {
               w: listW,
@@ -2913,15 +2921,12 @@ export async function exportVisioV3(
               }),
             );
 
-            // Swimlane List page-shape uses LocPin=(0, H). Visio
-            // interprets this as the SHAPE'S BOTTOM-LEFT (not top-left
-            // as I initially assumed): the shape extends UP from its
-            // Pin in Visio's Y-up page coords. So to land the list
-            // bounding box exactly on the pool body, PinX needs to be
-            // the pool's body-left edge and PinY needs to be the pool's
-            // BOTTOM edge (not top).
-            const listPinX = cx - w / 2 + headerH;     // pool left edge + header thickness
-            const listPinY = cy - h / 2;               // pool BOTTOM edge (Visio Y-up)
+            // Swimlane List uses LocPin=(0, H) (top-left pin) per its
+            // master. To match the pool's bbox exactly:
+            //   listPinX = pool_left  = cx - w/2
+            //   listPinY = pool_top   = cy + h/2
+            const listPinX = cx - w / 2;
+            const listPinY = cy + h / 2;
             shapes.push(
               emitSwimlaneListShape({
                 shapeId: listShapeId,
