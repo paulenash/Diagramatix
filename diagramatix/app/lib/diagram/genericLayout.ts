@@ -611,19 +611,30 @@ function buildProperties(ai: Record<string, unknown>, diagramType: string): Reco
 function angleToRectSideOffset(angle: number, el: DiagramElement): { side: Side; offset: number } {
   const halfW = el.width / 2, halfH = el.height / 2;
   const cx = el.x + halfW, cy = el.y + halfH;
-  const dxC = Math.cos(angle), dyC = Math.sin(angle);
+  // Normalise the angle to (-π, π] so the angTL/angTR/angBL/angBR
+  // ranges below (all from atan2, which lives in (-π, π]) cover every
+  // possible input. Callers like the Context-Diagram cluster compute
+  // procAngle = θ ± clusterHalf where θ comes from
+  // `(i / N) * 2π - π/2` and can sit anywhere in (-π/2, 3π/2). Without
+  // this wrap, every angle > angBL (≈ 3π/4) falls into the catch-all
+  // "left" branch — turning entities in the upper-left quadrant into a
+  // pile of connectors all landing on the same clamped left-side point.
+  let a = angle;
+  while (a > Math.PI) a -= 2 * Math.PI;
+  while (a <= -Math.PI) a += 2 * Math.PI;
+  const dxC = Math.cos(a), dyC = Math.sin(a);
   const angTL = Math.atan2(-halfH, -halfW);
   const angTR = Math.atan2(-halfH,  halfW);
   const angBL = Math.atan2( halfH, -halfW);
   const angBR = Math.atan2( halfH,  halfW);
   const clamp = (v: number) => Math.max(0.05, Math.min(0.95, v));
-  if (angle > angTL && angle <= angTR) {
+  if (a > angTL && a <= angTR) {
     const t = dyC !== 0 ? -halfH / dyC : 1;
     return { side: "top", offset: clamp((cx + dxC * t - el.x) / el.width) };
-  } else if (angle > angTR && angle <= angBR) {
+  } else if (a > angTR && a <= angBR) {
     const t = dxC !== 0 ? halfW / dxC : 1;
     return { side: "right", offset: clamp((cy + dyC * t - el.y) / el.height) };
-  } else if (angle > angBR && angle <= angBL) {
+  } else if (a > angBR && a <= angBL) {
     const t = dyC !== 0 ? halfH / dyC : 1;
     return { side: "bottom", offset: clamp((cx + dxC * t - el.x) / el.width) };
   } else {
