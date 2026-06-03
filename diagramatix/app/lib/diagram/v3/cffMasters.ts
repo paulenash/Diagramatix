@@ -403,8 +403,13 @@ export function emitSwimlaneListShape(opts: {
     `<Cell N='PinY' V='${opts.cy}'/>` +
     `<Cell N='Width' V='${opts.w}'/>` +
     `<Cell N='Height' V='${opts.h}'/>` +
-    `<Cell N='LocPinX' V='0' F='Inh'/>` +
-    `<Cell N='LocPinY' V='${opts.h}' F='Inh'/>` +
+    // CENTRE pin — override the master's LocPin=(0, H) (top-left
+    // convention) so the math is unambiguous. With LocPin=(W/2, H/2)
+    // and PinX/PinY = pool centre, the list bbox equals the pool
+    // bbox exactly, independent of any Y-up/Y-down or master Pin
+    // offset interpretation.
+    `<Cell N='LocPinX' V='${opts.w / 2}'/>` +
+    `<Cell N='LocPinY' V='${opts.h / 2}'/>` +
     `<Section N='User'>` +
     `<Row N='msvSDContainerStyle'><Cell N='Value' V='7' F='IFERROR(CONTAINERSHEETREF(1)!User.VISCFFSTYLE,1)'/></Row>` +
     `<Row N='visHeadingHeight'><Cell N='Value' V='0.5' U='IN'/></Row>` +

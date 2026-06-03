@@ -2921,12 +2921,12 @@ export async function exportVisioV3(
               }),
             );
 
-            // Swimlane List uses LocPin=(0, H) (top-left pin) per its
-            // master. To match the pool's bbox exactly:
-            //   listPinX = pool_left  = cx - w/2
-            //   listPinY = pool_top   = cy + h/2
-            const listPinX = cx - w / 2;
-            const listPinY = cy + h / 2;
+            // Swimlane List's LocPin is overridden to (W/2, H/2)
+            // (centre pin) in emitSwimlaneListShape, so Pin = the
+            // shape's centre. Set list centre = pool centre → list
+            // bbox = pool bbox.
+            const listPinX = cx;
+            const listPinY = cy;
             shapes.push(
               emitSwimlaneListShape({
                 shapeId: listShapeId,
