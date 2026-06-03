@@ -2505,6 +2505,36 @@ export async function exportVisioV3(
             .split("FillForegnd' V='#c8956a'")
             .join(`FillForegnd' V='${headerColor}'`);
 
+          // Phase 3 follow-on: Shape 6 (body) of the v1.5 Pool/Lane
+          // master ships with `FillForegndTrans V='1' F='THEMEGUARD(
+          // User.FillForegndTrans)'` — User.FillForegndTrans resolves
+          // to 100% when User.CFFStyle is in {1,2,3} (default 7→1),
+          // making the body 100% transparent. In the v1.5 era this
+          // didn't matter because Visio re-rendered correctly for
+          // the standalone Pool/Lane use. In Phase 3 with the CFF
+          // Container painting the pool body underneath, the
+          // transparent lane body leaves a visible-border-only
+          // wireframe — the "filled-with-lane-colour" rectangle Paul
+          // saw after the CFF Container Shape 6 fix.
+          //
+          // Override Shape 6's FillForegndTrans to 0% (opaque) so
+          // the lane body paints its lane colour solidly.
+          //
+          // Only Shape 6 has this hard-guarded transparency in the
+          // lane master — Shape 5 (root group) has no Geometry,
+          // Shape 7 (multi-instance marker) is conditionally hidden
+          // via NoShow, Shape 8 (header strip) has no transparency
+          // cell (defaults opaque). So a single first-match replace
+          // is sufficient and safe.
+          poolMasterXml = poolMasterXml.replace(
+            /<Cell N='FillForegndTrans' V='1' F='THEMEGUARD\(User\.FillForegndTrans\)'\/>/,
+            `<Cell N='FillForegndTrans' V='0' F='GUARD(0%)'/>`,
+          );
+          poolMasterXml = poolMasterXml.replace(
+            /<Cell N='FillBkgndTrans' V='1' F='THEMEGUARD\(User\.FillForegndTrans\)'\/>/,
+            `<Cell N='FillBkgndTrans' V='0' F='GUARD(0%)'/>`,
+          );
+
           // Replace the "Function" placeholder text in every location.
           // Use regex with \s* so we catch both `>Function<` and
           // `>Function\n<` / `>Function\r\n<` variants from different
