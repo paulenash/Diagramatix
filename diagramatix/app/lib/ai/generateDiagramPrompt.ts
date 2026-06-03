@@ -109,6 +109,7 @@ IMPORTANT rules:
 - ORDER the elements array so that actors/teams/systems appear in the JSON between the processes they connect to. This helps the layout engine place them optimally to minimise crossing lines.
 - ABSOLUTE: NEVER create a connection whose source AND target are BOTH "use-case" (process) elements. Process-to-process associations are not allowed on this diagram. Every association must run between a process and an actor / team / system / hourglass. Any process-to-process connection will be silently dropped at layout time.
 - ABSOLUTE: leave generous space between actors, teams, systems and hourglasses on the same side of the diagram. Their labels render below the icon, so two of these placed close together will run their labels into each other. Order them so the layout engine can give each at least 30 px of clear space below its label before the next icon begins.
+- LAYOUT BEHAVIOUR (informational — you do not need to position elements yourself): actors / teams / systems / hourglasses on each vertical side of the boundary will be centred as a group on the midpoint of that boundary. Use-case (process) ellipses will be grown to fully contain their labels, keeping their default width / height aspect ratio — so long process names are fine, the shape just becomes a wider ellipse.
 
 Output format:
 {

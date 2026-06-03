@@ -47,6 +47,45 @@ const GRID_GAP_Y = 40;
 const START_X = 100;
 const START_Y = 100;
 
+/** P2.11 — return the minimum width / height for a use-case ellipse
+ *  that fully contains its label, while preserving the default
+ *  width / height aspect ratio. Falls back to the default when the
+ *  text is short enough to fit. Also returns the wrapped label so the
+ *  renderer doesn't have to wrap again. */
+function sizeUseCaseForLabel(
+  rawLabel: string, baseW: number, baseH: number,
+): { width: number; height: number; label: string } {
+  // Rough text-metric estimates that match the renderer's defaults.
+  const CHAR_W = 7;        // average glyph width at 12 px
+  const LINE_H = 16;       // line height for 12 px text
+  const H_PAD = 12;        // horizontal padding inside the ellipse
+  const V_PAD = 8;         // vertical padding inside the ellipse
+  const aspect = baseW / baseH; // a / b for the ellipse — preserved
+
+  // Wrap at ~75 % of the base width: the inscribed rectangle inside the
+  // default ellipse is roughly base × 0.7, so this stays comfortably
+  // away from the curved edges. Long single words still survive as
+  // one line — the ellipse grows below to fit them.
+  const wrapWidthPx = Math.max(40, baseW * 0.75 - 2 * H_PAD);
+  const wrapped = wrapLabel(rawLabel, wrapWidthPx);
+  const lines = wrapped.text.split("\n");
+  const longestLine = lines.reduce((m, l) => Math.max(m, l.length), 0);
+  const textW = longestLine * CHAR_W + 2 * H_PAD;
+  const textH = lines.length * LINE_H + 2 * V_PAD;
+
+  // Smallest semi-axes (a, b) for the ellipse to contain a textW × textH
+  // rectangle, with a / b fixed to `aspect`. The four corners of the
+  // rectangle sit on the ellipse when (W/2)²/a² + (H/2)²/b² = 1.
+  // Substituting a = aspect · b gives b² = (W/2)² / aspect² + (H/2)².
+  const halfW = textW / 2;
+  const halfH = textH / 2;
+  const bMin = Math.sqrt((halfW * halfW) / (aspect * aspect) + halfH * halfH);
+  const aMin = aspect * bMin;
+  const width = Math.max(baseW, Math.ceil(aMin * 2));
+  const height = Math.max(baseH, Math.ceil(bMin * 2));
+  return { width, height, label: wrapped.text };
+}
+
 interface AiParsed {
   elements?: Array<{
     id: string;
@@ -141,31 +180,52 @@ export function layoutGenericDiagram(
     // Process-context: zigzag layout — 1 process per row, alternating left/right
     if (isProcessContext) {
       const ucDef = getSymbolDefinition("use-case");
-      const ucW = ucDef.defaultWidth, ucH = ucDef.defaultHeight;
+      const baseUcW = ucDef.defaultWidth, baseUcH = ucDef.defaultHeight;
       const padTop = 50, rowGap = 25;
-      const leftX = container.x + 40; // left-side process position
-      const rightX = container.x + container.width - ucW - 40; // right-side position
 
-      for (let ci = 0; ci < children.length; ci++) {
-        const ai = children[ci];
+      // P2.11 — pre-compute each child's dimensions. Use-case ellipses
+      // grow to contain their labels while preserving the default
+      // width / height aspect ratio; other element types keep their
+      // symbol-definition defaults.
+      const sized = children.map(ai => {
+        const rawLabel = ai.label ?? ai.name ?? ai.type;
+        if (ai.type === "use-case") {
+          const s = sizeUseCaseForLabel(rawLabel, baseUcW, baseUcH);
+          return { ai, label: s.label, width: s.width, height: s.height };
+        }
         const def = getSymbolDefinition(ai.type as DiagramElement["type"]);
+        return { ai, label: rawLabel, width: def.defaultWidth, height: def.defaultHeight };
+      });
+
+      // Container width must hold the widest use-case in BOTH columns
+      // plus the 40 px side padding either side.
+      const widestUc = sized
+        .filter(s => s.ai.type === "use-case")
+        .reduce((m, s) => Math.max(m, s.width), baseUcW);
+      const neededContainerW = widestUc * 2 + 100;
+      container.width = Math.max(container.width, neededContainerW);
+      const leftX = container.x + 40;
+
+      let cursorY = container.y + padTop;
+      for (let ci = 0; ci < sized.length; ci++) {
+        const s = sized[ci];
         const isLeft = ci % 2 === 0;
-        const ex = isLeft ? leftX : rightX;
-        const ey = container.y + padTop + ci * (ucH + rowGap);
-        const label = ai.label ?? ai.name ?? ai.type;
+        const ex = isLeft
+          ? leftX
+          : container.x + container.width - s.width - 40;
         const el: DiagramElement = {
-          id: ai.id, type: ai.type as DiagramElement["type"],
-          x: ex, y: ey, width: def.defaultWidth, height: def.defaultHeight,
-          label, properties: buildProperties(ai, diagramType),
+          id: s.ai.id, type: s.ai.type as DiagramElement["type"],
+          x: ex, y: cursorY, width: s.width, height: s.height,
+          label: s.label, properties: buildProperties(s.ai, diagramType),
           parentId: containerId,
         };
         elements.push(el);
-        placed.add(ai.id);
+        placed.add(s.ai.id);
+        cursorY += s.height + rowGap;
       }
-      // Resize container to fit children if needed
+      // Resize container to fit children if needed.
       if (children.length > 0) {
-        const neededH = padTop + children.length * (ucH + rowGap) + 20;
-        container.height = Math.max(container.height, neededH);
+        container.height = Math.max(container.height, cursorY - container.y + 20);
       }
     } else {
       // Value chains and other diagram types: horizontal row
@@ -265,6 +325,11 @@ export function layoutGenericDiagram(
       return y;
     }
 
+    // Track which actors land on each side so we can centre the
+    // resulting groups on the container midpoint (P2.10).
+    const leftActors: DiagramElement[] = [];
+    const rightActors: DiagramElement[] = [];
+
     for (const ai of actorEls) {
       const def = getSymbolDefinition(ai.type as DiagramElement["type"]);
       const label = ai.label ?? ai.name ?? ai.type;
@@ -313,6 +378,27 @@ export function layoutGenericDiagram(
       };
       elements.push(el);
       placed.add(ai.id);
+      (placeRight ? rightActors : leftActors).push(el);
+    }
+
+    // P2.10 — centre each side's actor group on the container's
+    // vertical midpoint. After the connection-driven placement above
+    // assigns relative positions, shift the whole stack uniformly so
+    // its centre lines up with the boundary midpoint. The relative
+    // ordering (which keeps connector crossings minimal) is preserved.
+    if (container) {
+      const midY = container.y + container.height / 2;
+      const centreGroup = (group: DiagramElement[]) => {
+        if (group.length === 0) return;
+        const top = group.reduce((m, e) => Math.min(m, e.y), Infinity);
+        const bottom = group.reduce((m, e) => Math.max(m, e.y + e.height), -Infinity);
+        const groupMid = (top + bottom) / 2;
+        const dy = midY - groupMid;
+        if (Math.abs(dy) < 1) return;
+        for (const el of group) el.y += dy;
+      };
+      centreGroup(leftActors);
+      centreGroup(rightActors);
     }
   }
 
