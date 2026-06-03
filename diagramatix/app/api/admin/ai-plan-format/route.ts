@@ -1,8 +1,13 @@
 /**
- * GET /api/admin/ai-plan-format
- *   Superuser-only. Returns the exact system prompt the BPMN planner
- *   sends to the model, with the current green (AI-enforceable) rules
- *   injected — so an admin can see precisely what the AI receives.
+ * GET /api/admin/ai-plan-format?type=<diagram-type>
+ *   Superuser-only. Returns the exact system prompt that AI Generate
+ *   sends to the model for the given diagram type, with the current
+ *   green (AI-enforceable) rules injected — so an admin can see
+ *   precisely what the AI receives.
+ *
+ *   `type` defaults to `bpmn` for backward compatibility. BPMN uses the
+ *   dedicated two-phase planner in `planBpmn.ts`; every other type
+ *   uses the shared generic prompt builder in `generateDiagramPrompt.ts`.
  *
  *   Also returns the green-only and layout-only (red, code-backed)
  *   rule slices separately so it's obvious which rules reach the model
@@ -13,10 +18,21 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { isSuperuser } from "@/app/lib/superuser";
 import { prisma } from "@/app/lib/db";
-import { buildSystemPrompt } from "@/app/lib/ai/planBpmn";
+import { buildSystemPrompt as buildBpmnSystemPrompt } from "@/app/lib/ai/planBpmn";
+import {
+  buildGenericSystemPrompt,
+  DIAGRAM_PROMPTS,
+} from "@/app/lib/ai/generateDiagramPrompt";
 import { splitRulesByEnforcement } from "@/app/lib/ai/splitRules";
 
-export async function GET() {
+const SUPPORTED_TYPES = ["bpmn", ...Object.keys(DIAGRAM_PROMPTS)] as const;
+type SupportedType = (typeof SUPPORTED_TYPES)[number];
+
+function isSupported(t: string | null): t is SupportedType {
+  return !!t && (SUPPORTED_TYPES as readonly string[]).includes(t);
+}
+
+export async function GET(req: Request) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -25,9 +41,13 @@ export async function GET() {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  // Same load order the AI endpoints use: general + bpmn default rules.
+  const url = new URL(req.url);
+  const requested = url.searchParams.get("type");
+  const diagramType: SupportedType = isSupported(requested) ? requested : "bpmn";
+
+  // Same load order the AI endpoints use: general + diagram-specific.
   let fullRules = "";
-  for (const category of ["general", "bpmn"]) {
+  for (const category of ["general", diagramType]) {
     const dr = await prisma.diagramRules.findFirst({
       where: { category, isDefault: true },
       select: { rules: true },
@@ -36,12 +56,16 @@ export async function GET() {
   }
 
   const { aiRules, layoutRules } = splitRulesByEnforcement(fullRules);
-  // The prompt the model actually receives — green rules injected.
-  const assembledPrompt = buildSystemPrompt(aiRules);
-  // The prompt template alone (no rules) for reference.
-  const promptTemplate = buildSystemPrompt("");
+  const assembledPrompt = diagramType === "bpmn"
+    ? buildBpmnSystemPrompt(aiRules)
+    : buildGenericSystemPrompt(diagramType, aiRules);
+  const promptTemplate = diagramType === "bpmn"
+    ? buildBpmnSystemPrompt("")
+    : buildGenericSystemPrompt(diagramType, "");
 
   return NextResponse.json({
+    diagramType,
+    supportedTypes: SUPPORTED_TYPES,
     assembledPrompt,
     promptTemplate,
     aiRules,

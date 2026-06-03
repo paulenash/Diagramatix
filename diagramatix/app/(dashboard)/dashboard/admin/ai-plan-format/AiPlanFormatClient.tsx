@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 interface PlanFormat {
+  diagramType: string;
+  supportedTypes: string[];
   assembledPrompt: string;
   promptTemplate: string;
   aiRules: string;
@@ -25,25 +27,42 @@ const TABS: Array<{ key: Tab; label: string; hint: string }> = [
   { key: "red", label: "Red rules (layout code)", hint: "Code-backed rules NOT sent to the model — enforced by the layout engine." },
 ];
 
+// Display labels for the type selector. Falls back to the slug if a
+// supported type lands here without an entry — keeps the UI alive when
+// new types are added on the backend before the labels list is updated.
+const TYPE_LABELS: Record<string, string> = {
+  bpmn: "BPMN",
+  "state-machine": "State Machine",
+  "value-chain": "Value Chain",
+  domain: "Domain Model",
+  context: "Context Diagram",
+  "process-context": "Process Context",
+};
+
 export function AiPlanFormatClient() {
   const router = useRouter();
+  const [type, setType] = useState<string>("bpmn");
   const [data, setData] = useState<PlanFormat | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("assembled");
   const [copied, setCopied] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (t: string) => {
     setError(null);
+    setLoading(true);
     try {
-      const res = await fetch("/api/admin/ai-plan-format");
+      const res = await fetch(`/api/admin/ai-plan-format?type=${encodeURIComponent(t)}`);
       if (!res.ok) throw new Error(`Failed to load (${res.status})`);
       setData(await res.json());
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load");
+    } finally {
+      setLoading(false);
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(type); }, [load, type]);
 
   const text = data
     ? tab === "assembled" ? data.assembledPrompt
@@ -60,6 +79,9 @@ export function AiPlanFormatClient() {
     } catch { /* clipboard blocked — ignore */ }
   }
 
+  const supportedTypes = data?.supportedTypes
+    ?? ["bpmn", "state-machine", "value-chain", "domain", "context", "process-context"];
+
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
@@ -68,7 +90,7 @@ export function AiPlanFormatClient() {
             <span style={{ fontSize: "1.5em", lineHeight: 1 }}>{"←"}</span>
             Admin
           </button>
-          <h1 className="font-semibold text-gray-900">Admin — AI Plan Format</h1>
+          <h1 className="font-semibold text-gray-900">Admin — AI Plan Formats</h1>
         </div>
         <button
           onClick={copyText}
@@ -81,15 +103,35 @@ export function AiPlanFormatClient() {
 
       <div className="max-w-5xl mx-auto px-6 py-6">
         <p className="text-xs text-gray-500 mb-3">
-          This is the BPMN planner system prompt sent to the model on every
-          AI generation (Quick generate + 2-phase plan). The green rules are
-          injected verbatim; red (layout) rules are filtered out before the
-          model sees them and enforced by the layout engine instead.
+          The system prompt sent to the model on every AI generation
+          request for the selected diagram type. Green rules from{" "}
+          <code className="text-[10px] bg-gray-100 px-1 rounded">/dashboard/rules</code>{" "}
+          are injected verbatim; red (layout) rules are filtered out and
+          enforced by the layout engine instead. BPMN uses the
+          two-phase planner (plan + apply-layout); every other type
+          uses the shared generic prompt builder.
         </p>
+
+        {/* Diagram-type selector — same shape as the existing tab row. */}
+        <div className="flex flex-wrap gap-1 mb-3">
+          {supportedTypes.map(t => (
+            <button
+              key={t}
+              onClick={() => setType(t)}
+              className={`text-xs rounded px-2.5 py-1 border ${
+                type === t
+                  ? "bg-purple-600 text-white border-purple-600"
+                  : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+              }`}
+            >
+              {TYPE_LABELS[t] ?? t}
+            </button>
+          ))}
+        </div>
 
         {error ? (
           <p className="text-xs text-red-700">{error}</p>
-        ) : !data ? (
+        ) : !data || loading ? (
           <p className="text-xs text-gray-400 italic">Loading…</p>
         ) : (
           <>
