@@ -2460,6 +2460,39 @@ export async function exportVisioV3(
             .split("V='1.25' U='MM' F='IF(Sheet.5!User.visRotateLabel,Height*1,Width*1)'")
             .join(`V='${h}' U='MM' F='IF(Sheet.5!User.visRotateLabel,Height*1,Width*1)'`);
 
+          // Header strip THICKNESS — natural master is 0.5" (48px) but
+          // Diagramatix positions lanes at pool.x + POOL_HEADER_W
+          // (36px = 0.375"). Without patching, lanes overlap the header
+          // by 12px because Shape 8 paints 12px wider than the lane
+          // offset accounts for. Patch every cached V tied to Shape 8's
+          // Height (the rotated header's thickness) and Height/2.
+          //
+          // Mirrors the BPMN_M-profile patch at line ~2118 (which
+          // converts 12MM → 9.525MM = 0.375"). The v1.5 master uses
+          // 0.5*25.4MM*DropOnPageScale instead, so the patch shape is
+          // different but the goal is identical.
+          poolMasterXml = poolMasterXml
+            .split("V='0.5' U='MM' F='0.5*25.4MM*DropOnPageScale'")
+            .join("V='0.375' U='MM' F='0.375*25.4MM*DropOnPageScale'")
+            .split("V='0.5' U='MM' F='Height*1'")
+            .join("V='0.375' U='MM' F='Height*1'")
+            .split("V='0.5' U='MM' F='Height*1-User.Inset-User.InsetY'")
+            .join("V='0.375' U='MM' F='Height*1-User.Inset-User.InsetY'")
+            .split("V='0.5' U='MM' F='Geometry1.Y3'")
+            .join("V='0.375' U='MM' F='Geometry1.Y3'")
+            .split("V='0.5' U='MM' F='IF(Sheet.5!User.visRotateLabel,Width*1,Height*1)'")
+            .join("V='0.375' U='MM' F='IF(Sheet.5!User.visRotateLabel,Width*1,Height*1)'")
+            .split("V='0.5' U='MM' F='MAX(TEXTHEIGHT(TheText,TxtWidth),Height)'")
+            .join("V='0.375' U='MM' F='MAX(TEXTHEIGHT(TheText,TxtWidth),Height)'")
+            .split("V='0.25' U='MM' F='GUARD(Height*0.5)'")
+            .join("V='0.1875' U='MM' F='GUARD(Height*0.5)'")
+            .split("V='0.25' U='MM' F='Height*0.5'")
+            .join("V='0.1875' U='MM' F='Height*0.5'")
+            .split("V='0.25' U='MM' F='TxtHeight*0.5'")
+            .join("V='0.1875' U='MM' F='TxtHeight*0.5'")
+            .split("V='0.25' U='MM' F='GUARD(IF(User.HeadingPos=1,Sheet.5!Width-Height*0.5,IF(User.HeadingPos=3,Height*0.5,Sheet.5!Width*0.5)))'")
+            .join("V='0.1875' U='MM' F='GUARD(IF(User.HeadingPos=1,Sheet.5!Width-Height*0.5,IF(User.HeadingPos=3,Height*0.5,Sheet.5!Width*0.5)))'");
+
           // Header strip fill — natural master is #c8956a (a generic
           // pool brown). Re-colour per element type so Pools get the
           // darker sidebar brown and Lanes get the lighter lane brown.
@@ -2581,10 +2614,28 @@ export async function exportVisioV3(
           // behaviour for this specific instance. Plus the round-trip
           // metadata (msvShapeCategories + numLanes) so importVisioV3
           // can identify pool vs lane unambiguously.
-          const cffCategoryValue =
-            el.type === "pool" ? "CFF Container" : "Swimlane;Lane;DoNotContain";
+          // Phase 3 commit 2 hotfix — when we have a real CFF Container
+          // shape (cffSource present), strip the visible Pool's claim of
+          // being a CFF Container. Otherwise we have TWO competing
+          // containers at the same spatial location and Visio binds
+          // lanes to whichever comes first in document order (= the
+          // visible Pool), then fails to reconcile because the visible
+          // Pool doesn't list the Swimlane List as a member. Result:
+          // lanes don't track the pool on resize.
+          //
+          // For lanes, the Swimlane;Lane;DoNotContain category is what
+          // tags them as CFF list members.
+          //
+          // Fallback (no cffSource): retain the original 'CFF Container'
+          // category on pools so Phase 1.5 behaviour is unchanged.
+          let cffCategoryValue;
+          if (el.type === "pool") {
+            cffCategoryValue = cffSource ? "" : "CFF Container";
+          } else {
+            cffCategoryValue = "Swimlane;Lane;DoNotContain";
+          }
           const numLanesRow =
-            el.type === "pool"
+            el.type === "pool" && !cffSource
               ? `<Row N='numLanes'><Cell N='Value' V='${childLaneIds.length}'/></Row>`
               : "";
 
@@ -2666,23 +2717,38 @@ export async function exportVisioV3(
           //
           // For lanes the msvSDContainerLocked row is dropped — Visio
           // treats that cell as the activation flag for CFF containers,
-          // and lanes are MEMBERS not containers. Leaving it set to 1
-          // on lanes confused Visio's CFF engine in early Phase 1.5
-          // experiments. Pools keep it (they activate the container).
+          // and lanes are MEMBERS not containers.
+          // For pools with cffSource present, also drop it — the
+          // real CFF Container @ 60000 carries the activation flag now,
+          // and leaving msvSDContainerLocked=1 on the visible Pool
+          // makes it compete for container ownership.
+          // Pools without cffSource (fallback) keep the original flag.
           const containerLockedRow =
-            el.type === "pool"
+            el.type === "pool" && !cffSource
               ? `<Row N='msvSDContainerLocked'><Cell N='Value' V='1' U='BOOL'/></Row>`
               : "";
+          // msvShapeCategories row is only emitted when the value is
+          // non-empty (pools with cffSource drop the row entirely).
+          const categoriesRow = cffCategoryValue
+            ? `<Row N='msvShapeCategories'><Cell N='Value' V='${cffCategoryValue}' U='STR'/></Row>`
+            : "";
           const poolUserSection =
             `<Section N='User'>` +
             `<Row N='visHeadingText'><Cell N='Value' V='${esc(poolLabel)}' U='STR' F='Inh'/></Row>` +
             containerLockedRow +
-            `<Row N='msvShapeCategories'><Cell N='Value' V='${cffCategoryValue}' U='STR'/></Row>` +
+            categoriesRow +
             numLanesRow +
             laneCffUserRows +
             `</Section>`;
+          // Member section on the visible Pool — Phase 1.5 used this to
+          // tell Visio's static Container API that lanes belong to the
+          // pool. With cffSource, the CFF Container @ 60000 is the
+          // authoritative parent and carries its own Member section
+          // (see emitCffContainerShape). Keeping the visible Pool's
+          // Member section creates a second parentage claim that
+          // confuses CFF resize behaviour.
           let memberSection = "";
-          if (el.type === "pool" && childLaneIds.length > 0) {
+          if (el.type === "pool" && !cffSource && childLaneIds.length > 0) {
             memberSection =
               `<Section N='Member'>` +
               childLaneIds
@@ -2816,6 +2882,13 @@ export async function exportVisioV3(
                 w,
                 h,
                 numLanes: childLaneIds.length,
+                // The CFF Container declares itself parent of the
+                // Swimlane List + every lane via the Member section.
+                // Without this, Visio's CFF engine can't resolve
+                // `CONTAINERSHEETREF(1)` on the list, so the
+                // list-style numLanes write-back stalls and lanes
+                // don't follow pool resize.
+                memberShapeIds: [listShapeId, ...childLaneIds],
               }),
             );
 

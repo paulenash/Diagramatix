@@ -191,10 +191,31 @@ export function emitCffContainerShape(opts: {
   w: number;
   h: number;
   numLanes: number;
+  /** Page-shape IDs to register as container members — the Swimlane
+   *  List shape + every lane shape. Required for Visio's CFF engine
+   *  to resolve `CONTAINERSHEETREF(1)` on the list and the lanes back
+   *  to this container's sheet. Without the Member section, Visio
+   *  silently fails the parent lookup and the lanes don't track the
+   *  container on resize. */
+  memberShapeIds: number[];
 }): string {
   const escAttr = (s: string) => s.replace(/&/g, "&amp;").replace(/'/g, "&apos;").replace(/</g, "&lt;");
   const hw = opts.w / 2;
   const hh = opts.h / 2;
+  const memberSection = opts.memberShapeIds.length > 0
+    ? `<Section N='Member'>` +
+      opts.memberShapeIds
+        .map(
+          (mid, i) =>
+            `<Row IX='${i + 1}'>` +
+            `<Cell N='ID' V='${mid}'/>` +
+            `<Cell N='ContainerProperties' V='2'/>` +
+            `<Cell N='MemberFlags' V='0'/>` +
+            `</Row>`,
+        )
+        .join("") +
+      `</Section>`
+    : "";
   return (
     `<Shape ID='${opts.shapeId}' NameU='${escAttr(opts.poolLabel)}' Name='${escAttr(opts.poolLabel)}' ` +
     `IsCustomNameU='1' IsCustomName='1' Type='Group' Master='${opts.masterIdOut}' UniqueID='${opts.uniqueGuid}'>` +
@@ -213,6 +234,7 @@ export function emitCffContainerShape(opts: {
     `<Row N='BpmnName'><Cell N='Value' V='${escAttr(opts.poolLabel)}' U='STR' F='Inh'/></Row>` +
     `<Row N='BPMNLanes'><Cell N='Value' V='${opts.numLanes}' F='Inh'/></Row>` +
     `</Section>` +
+    memberSection +
     `</Shape>`
   );
 }
