@@ -1270,6 +1270,19 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                 }}
               />
 
+              {/* Admin shortcut — leftmost item in the header menu cluster,
+                  admin-only. Same destination as the entry that used to live
+                  inside the System menu (now removed). */}
+              {isSu && (
+                <a
+                  href="/dashboard/admin"
+                  className="text-xs text-orange-600 hover:text-orange-800 font-medium border border-orange-300 rounded px-2 py-1"
+                  title="Open the Admin dashboard"
+                >
+                  Admin
+                </a>
+              )}
+
               {/* Collaboration Groups — opens the Groups dashboard page */}
               <button
                 onClick={() => router.push("/dashboard/groups")}
@@ -1434,18 +1447,8 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                     >
                       {"Matrix Screensaver\u2026"}
                     </button>
-                    {isSu && (
-                      <>
-                        <div className="border-t border-gray-100" />
-                        <a
-                          href="/dashboard/admin"
-                          onClick={() => setFileMenuOpen(false)}
-                          className="block w-full text-left px-3 py-2 text-xs text-orange-600 hover:bg-orange-50 font-medium"
-                        >
-                          Admin
-                        </a>
-                      </>
-                    )}
+                    {/* Admin moved out of the System menu and into the
+                        top-level header bar as the leftmost menu item. */}
                   </div>
                 )}
               </div>

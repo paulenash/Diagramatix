@@ -1983,6 +1983,17 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
             <span className="text-[10px] text-gray-400">Owner: <strong className="text-gray-600">{projectOwner}</strong></span>
           )}
           {version ? <span className="text-[10px] text-gray-400">v{SCHEMA_VERSION}.{version}</span> : null}
+          {/* Admin shortcut — leftmost item in the header menu cluster,
+              admin-only. Mirrors the Dashboard placement. */}
+          {isAdmin && (
+            <a
+              href="/dashboard/admin"
+              className="text-xs text-orange-600 hover:text-orange-800 font-medium border border-orange-300 rounded px-2 py-1"
+              title="Open the Admin dashboard"
+            >
+              Admin
+            </a>
+          )}
           {!readOnly && (
             <div className="relative" ref={projectMenuRef}>
               <button
