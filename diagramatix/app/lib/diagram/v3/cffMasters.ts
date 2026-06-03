@@ -214,6 +214,7 @@ export function cloneCffContainer(
     `MAX(${HEADER_THICKNESS}IN*Sheet.5!DropOnPageScale,Scratch.Y1)`,
   );
 
+
   // Body + header fill — the master ships with V='1' F='THEMEVAL("FillColor",1)'
   // on every FillForegnd, which paints whatever the document theme
   // resolves "FillColor" to (typically pale or white). Replace with
