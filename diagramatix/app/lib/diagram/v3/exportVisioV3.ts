@@ -2913,15 +2913,15 @@ export async function exportVisioV3(
               }),
             );
 
-            // Swimlane List page-shape uses LocPin=(0, H) which means
-            // its `PinX/PinY` cells locate the shape's TOP-LEFT corner
-            // on the page (not its centre). Compute the list's top-left
-            // from the pool's bounding box: shifted right by the header
-            // strip (so the list spans only the body area), at the same
-            // top edge as the pool. Pool cx/cy are the pool's CENTRE in
-            // Visio Y-up coordinates.
+            // Swimlane List page-shape uses LocPin=(0, H) which acts
+            // like a TOP-LEFT pivot in Visio's coord system, but the
+            // master has its own Pin offset that means the effective
+            // pivot lands at HALF the top-edge offset. Paul confirmed
+            // empirically (rect at top-right when offset by +h/2, at
+            // bottom-right when offset by 0) that the correct offset
+            // is the midpoint: cy + h/4.
             const listPinX = cx - w / 2 + headerH;     // pool left edge + header thickness
-            const listPinY = cy + h / 2;               // pool top edge (Visio Y-up)
+            const listPinY = cy + h / 4;               // midpoint between pool centre and pool top
             shapes.push(
               emitSwimlaneListShape({
                 shapeId: listShapeId,
