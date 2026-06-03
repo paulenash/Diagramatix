@@ -99,10 +99,38 @@ export function cloneCffContainer(
   opts: ContainerCloneOpts,
 ): { content: string; wrapper: string } {
   let content = source.containerContent;
+  const escAttr = (s: string) => s.replace(/&/g, "&amp;").replace(/'/g, "&apos;").replace(/</g, "&lt;");
 
   // Rewrite cached W / H from natural (4×4 IN) to instance dims.
+  // The master mixes Width-derived and Height-derived cells, both
+  // naturally cached at V='4' (because natural is square). Distinguish
+  // them by their F= formula — patch Height-derived cells FIRST so the
+  // remaining V='4' U='IN' cells are all Width-derived, then a default
+  // sweep catches them.
+  //
+  // Height-derived V='4' patterns:
+  //   • F='Height*1'                                       (Shape 6 body height + similar)
+  //   • F='IF(User.CFFVertical,Height*N/16,Height*1)'      (lane-fraction Y guides, N=2..15)
+  content = content
+    .split("V='4' U='IN' F='Height*1'")
+    .join(`V='${opts.h}' U='IN' F='Height*1'`);
+  for (let i = 1; i < 16; i++) {
+    const pat = `V='4' U='IN' F='IF(User.CFFVertical,Height*${i}/16,Height*1)'`;
+    content = content.split(pat).join(`V='${opts.h}' U='IN' F='IF(User.CFFVertical,Height*${i}/16,Height*1)'`);
+  }
+  // Default (remaining) → Width.
   content = content.split("V='4' U='IN'").join(`V='${opts.w}' U='IN'`);
-  // Half-pin values appear as 2 (= 4/2). Patch to instance half.
+
+  // Half values: V='2' similarly split between Width/2 and Height/2.
+  // Patch Height-derived first.
+  content = content
+    .split("V='2' U='IN' F='Height*0.5'")
+    .join(`V='${opts.h / 2}' U='IN' F='Height*0.5'`)
+    .split("V='2' U='IN' F='Sheet.5!Height*0.5'")
+    .join(`V='${opts.h / 2}' U='IN' F='Sheet.5!Height*0.5'`)
+    .split("V='2' U='IN' F='GUARD(IF(User.HeadingPos=2,Sheet.5!Height-Height*0.5,IF(User.HeadingPos=4,Height*0.5,Sheet.5!Height*0.5)))'")
+    .join(`V='${opts.h / 2}' U='IN' F='GUARD(IF(User.HeadingPos=2,Sheet.5!Height-Height*0.5,IF(User.HeadingPos=4,Height*0.5,Sheet.5!Height*0.5)))'`);
+  // Default V='2' → Width/2.
   content = content.split("V='2' U='IN'").join(`V='${opts.w / 2}' U='IN'`);
 
   // Header fill — the master's header strip carries
@@ -114,22 +142,23 @@ export function cloneCffContainer(
     `FillForegnd' V='${opts.headerColor}' F='THEMEGUARD(MSOTINT`,
   );
 
-  // Phase 3 commit 1 — fully suppress visible text on the CFF Container
-  // so it doesn't double-paint with the Phase 1.5 visible Pool/Lane
-  // shape. The master's header sub-shape paints via a
-  // `GUARD(SHAPETEXT(Sheet.5!visHeadingText))` formula whose cached V
-  // is the literal "Title". Text rendering doesn't depend on Geometry
-  // NoShow, so emptying those cells is what actually stops the paint.
-  // poolLabel is still set on the page-shape's Property.BpmnName via
-  // emitCffContainerShape, so nothing is lost.
-  // Use non-greedy [\s\S]*? — the master's painted text block is
-  // `<Text><pp IX='0'/>Title\r\n</Text>` and contains an inner `<pp/>`
-  // marker. A naive [^<]* pattern would skip the whole block on the
-  // `<` boundary and leave the literal "Title" intact.
-  content = content.replace(/<Text>[\s\S]*?<\/Text>/g, `<Text></Text>`);
+  // Phase 3 commit 2 follow-on — substitute "Title" (master placeholder
+  // text) with the actual pool label. The header sub-shape paints
+  // visHeadingText via `GUARD(SHAPETEXT(Sheet.5!visHeadingText))`; the
+  // cached V on that cell + the literal text block in the master both
+  // need the pool label so first-paint shows the right text.
+  //
+  // Previously (commit 1 / hotfix 5b2ce1b / 5b2ce1b follow-up) we emptied
+  // these to suppress double-painting with the Phase 1.5 visible Pool.
+  // Now that the visible Pool is removed when cffSource is on, restore
+  // the substitution so the CFF Container is the visible pool header.
+  //
+  // The master's painted block is `<Text><pp IX='0'/>Title\r\n</Text>`;
+  // the `[\s\S]*?` pattern catches it including the `<pp/>` marker.
+  content = content.replace(/<Text>[\s\S]*?<\/Text>/g, `<Text>${escAttr(opts.poolLabel)}\n</Text>`);
   content = content.replace(
     /<Cell N='Value' V='Title' U='STR'/g,
-    `<Cell N='Value' V='' U='STR'`,
+    `<Cell N='Value' V='${escAttr(opts.poolLabel)}' U='STR'`,
   );
 
   // Wrapper — substitute the master ID, the NameU and Name, swap rId.

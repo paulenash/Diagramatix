@@ -2764,34 +2764,41 @@ export async function exportVisioV3(
               `</Section>`;
           }
 
-          shapes.push(
-            `<Shape ID='${shapeId}' NameU='${esc(poolLabel)}' Type='Group' Master='${poolInstanceId}'>` +
-            `<Cell N='PinX' V='${cx}'/>` +
-            `<Cell N='PinY' V='${cy}'/>` +
-            `<Cell N='Width' V='${w}'/>` +
-            `<Cell N='Height' V='${h}'/>` +
-            `<Cell N='LocPinX' V='${hw}' F='Inh'/>` +
-            `<Cell N='LocPinY' V='${hh}' F='Inh'/>` +
-            laneRelationshipsCell +
-            poolUserSection +
-            propSection +
-            elCharSection +
-            memberSection +
-            `</Shape>`
-          );
+          // Phase 3 commit 2 follow-on — when the CFF Container will be
+          // emitted as the user-visible pool decoration (cffSource +
+          // pool branch), skip the standalone visible Pool page-shape
+          // entirely. Otherwise the user drags the visible Pool (which
+          // is just decorative) and the invisible CFF Container stays
+          // put, breaking lane↔pool sync. Lanes (el.type === 'lane')
+          // and pools without cffSource (fallback) still emit normally.
+          const skipVisiblePool = cffSource && el.type === "pool";
+          if (!skipVisiblePool) {
+            shapes.push(
+              `<Shape ID='${shapeId}' NameU='${esc(poolLabel)}' Type='Group' Master='${poolInstanceId}'>` +
+              `<Cell N='PinX' V='${cx}'/>` +
+              `<Cell N='PinY' V='${cy}'/>` +
+              `<Cell N='Width' V='${w}'/>` +
+              `<Cell N='Height' V='${h}'/>` +
+              `<Cell N='LocPinX' V='${hw}' F='Inh'/>` +
+              `<Cell N='LocPinY' V='${hh}' F='Inh'/>` +
+              laneRelationshipsCell +
+              poolUserSection +
+              propSection +
+              elCharSection +
+              memberSection +
+              `</Shape>`
+            );
+          }
 
           // Phase 3 commit 1 — additionally emit a CFF Container shape +
           // Swimlane List shape per pool. Together they wire Visio's CFF
           // engine: right-click container submenu, container ribbon, etc.
-          // Lanes stay as standalone Phase 1.5 sibling shapes for now;
-          // commit 2 will rewire them as proper CFF list members.
           //
-          // The CFF Container is positioned at the same (cx, cy, w, h) as
-          // the Phase 1.5 pool shape, but its visible decoration is
-          // suppressed by NoShow=1 patches in the cloned master content
-          // so it doesn't double-paint with the visible Pool/Lane shape.
-          // The Swimlane List sits over the lane area and is also
-          // suppressed.
+          // The CFF Container is now the user-visible pool: its cloned
+          // master's body + header sub-shapes paint the pool body +
+          // header strip, with the pool label substituted in via
+          // cloneCffContainer. The Swimlane List sits over the lane
+          // area and is structural-only (its geometry stays hidden).
           if (cffSource && el.type === "pool") {
             // Phase 3 commit 2 — pull the pre-allocated container/list
             // shape IDs and GUIDs from the pre-pass so lanes (which may
@@ -2821,11 +2828,13 @@ export async function exportVisioV3(
               relIdOut: containerRId,
               fileNameOut: containerFileName,
             });
-            const hiddenContainerContent = container.content.replace(
-              /<Section N='Geometry'([^>]*)>/g,
-              "<Section N='Geometry'$1><Cell N='NoShow' V='1'/>",
-            );
-            zip.file("visio/masters/" + containerFileName, hiddenContainerContent);
+            // Phase 3 commit 2 follow-on — keep the CFF Container's
+            // geometry visible (its body + header sub-shapes draw the
+            // pool). Commit 1's NoShow=1 patches were there to suppress
+            // double-painting alongside the visible Pool/Lane shape;
+            // with the visible Pool now removed (skipVisiblePool), the
+            // container becomes the user-facing pool decoration.
+            zip.file("visio/masters/" + containerFileName, container.content);
             mastersXml = mastersXml.replace(
               "</Masters>",
               container.wrapper + "</Masters>",
