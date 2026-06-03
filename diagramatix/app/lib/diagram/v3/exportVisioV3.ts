@@ -13,6 +13,15 @@ import { DEFAULT_SYMBOL_COLORS } from "../colors";
 import type { SymbolColorConfig } from "../colors";
 import { wrapText } from "../textMetrics";
 import { randomUUID } from "node:crypto";
+import {
+  loadCffMasterSource,
+  cloneCffContainer,
+  cloneSwimlaneList,
+  emitCffContainerShape,
+  emitSwimlaneListShape,
+  deterministicGuid,
+  type CffMasterSource,
+} from "./cffMasters";
 
 /** Visio-style GUID `{XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}`. Used so per-
  *  instance master copies don't share BaseID/UniqueID with anything in the
@@ -63,9 +72,26 @@ export async function exportVisioV3(
   displayMode: string = "normal",
   colorConfig?: SymbolColorConfig,
   profile: StencilProfile = DEFAULT_PROFILE,
+  cffRefBuffer?: ArrayBuffer,
 ): Promise<Uint8Array> {
   const base = await JSZip.loadAsync(templateBuffer);
   const bpmnM = await JSZip.loadAsync(stencilBuffer);
+  // CFF reference VSDX — optional; when present we clone CFF Container +
+  // Swimlane List masters from it on a per-pool basis (Phase 3). When
+  // absent the exporter falls back to Phase 1.5 behaviour.
+  const cffRefZip = cffRefBuffer
+    ? await JSZip.loadAsync(cffRefBuffer)
+    : null;
+  const cffSource: CffMasterSource | null = cffRefZip
+    ? await loadCffMasterSource(cffRefZip)
+    : null;
+  // Shape ID range for CFF Container + Swimlane List instances. Well
+  // beyond the per-element pre-pass allocations (max ~elements×100 starting
+  // at 100), so no collision with element IDs.
+  let cffNextShapeId = 60000;
+  // Master ID range for CFF clones. Each pool consumes 2 master IDs (one
+  // for the CFF Container, one for the Swimlane List).
+  let cffNextMasterId = 1000;
 
   const bounds = getDiagramBounds(data);
   const diagramW = (bounds.maxX - bounds.minX) / 96;
@@ -2585,6 +2611,125 @@ export async function exportVisioV3(
             memberSection +
             `</Shape>`
           );
+
+          // Phase 3 commit 1 — additionally emit a CFF Container shape +
+          // Swimlane List shape per pool. Together they wire Visio's CFF
+          // engine: right-click container submenu, container ribbon, etc.
+          // Lanes stay as standalone Phase 1.5 sibling shapes for now;
+          // commit 2 will rewire them as proper CFF list members.
+          //
+          // The CFF Container is positioned at the same (cx, cy, w, h) as
+          // the Phase 1.5 pool shape, but its visible decoration is
+          // suppressed by NoShow=1 patches in the cloned master content
+          // so it doesn't double-paint with the visible Pool/Lane shape.
+          // The Swimlane List sits over the lane area and is also
+          // suppressed.
+          if (cffSource && el.type === "pool") {
+            const containerShapeId = cffNextShapeId++;
+            const listShapeId = cffNextShapeId++;
+            const containerMasterId = cffNextMasterId++;
+            const listMasterId = cffNextMasterId++;
+            const containerRId = `rId${nextRId++}`;
+            const listRId = `rId${nextRId++}`;
+            const containerFileNum = nextFileNum++;
+            const listFileNum = nextFileNum++;
+            const containerFileName = `master${containerFileNum}.xml`;
+            const listFileName = `master${listFileNum}.xml`;
+
+            const headerColor = colorMap["pool"] ?? "#d4a382";
+
+            const container = cloneCffContainer(cffSource, {
+              poolLabel,
+              w,
+              h,
+              headerColor,
+              masterIdOut: containerMasterId,
+              relIdOut: containerRId,
+              fileNameOut: containerFileName,
+            });
+            const hiddenContainerContent = container.content.replace(
+              /<Section N='Geometry'([^>]*)>/g,
+              "<Section N='Geometry'$1><Cell N='NoShow' V='1'/>",
+            );
+            zip.file("visio/masters/" + containerFileName, hiddenContainerContent);
+            mastersXml = mastersXml.replace(
+              "</Masters>",
+              container.wrapper + "</Masters>",
+            );
+            mastersRels = mastersRels.replace(
+              "</Relationships>",
+              `<Relationship Id="${containerRId}" Type="http://schemas.microsoft.com/visio/2010/relationships/master" Target="${containerFileName}"/></Relationships>`,
+            );
+            contentTypes = contentTypes.replace(
+              "</Types>",
+              `<Override PartName="/visio/masters/${containerFileName}" ContentType="application/vnd.ms-visio.master+xml"/></Types>`,
+            );
+
+            const headerH = 0.5;
+            const listW = w - headerH;
+            const listH = h;
+            const list = cloneSwimlaneList(cffSource, {
+              w: listW,
+              h: listH,
+              masterIdOut: listMasterId,
+              relIdOut: listRId,
+              fileNameOut: listFileName,
+            });
+            const hiddenListContent = list.content.replace(
+              /<Section N='Geometry'([^>]*)>/g,
+              "<Section N='Geometry'$1><Cell N='NoShow' V='1'/>",
+            );
+            zip.file("visio/masters/" + listFileName, hiddenListContent);
+            mastersXml = mastersXml.replace(
+              "</Masters>",
+              list.wrapper + "</Masters>",
+            );
+            mastersRels = mastersRels.replace(
+              "</Relationships>",
+              `<Relationship Id="${listRId}" Type="http://schemas.microsoft.com/visio/2010/relationships/master" Target="${listFileName}"/></Relationships>`,
+            );
+            contentTypes = contentTypes.replace(
+              "</Types>",
+              `<Override PartName="/visio/masters/${listFileName}" ContentType="application/vnd.ms-visio.master+xml"/></Types>`,
+            );
+
+            zip.file("visio/masters/masters.xml", mastersXml);
+            zip.file("visio/masters/_rels/masters.xml.rels", mastersRels);
+            zip.file("[Content_Types].xml", contentTypes);
+
+            const containerGuid = deterministicGuid(`cff-container-${el.id}`);
+            const listGuid = deterministicGuid(`cff-list-${el.id}`);
+
+            shapes.push(
+              emitCffContainerShape({
+                shapeId: containerShapeId,
+                uniqueGuid: containerGuid,
+                masterIdOut: containerMasterId,
+                poolLabel,
+                cx,
+                cy,
+                w,
+                h,
+                numLanes: childLaneIds.length,
+              }),
+            );
+
+            const listCx = cx + headerH / 2;
+            const listCy = cy;
+            shapes.push(
+              emitSwimlaneListShape({
+                shapeId: listShapeId,
+                uniqueGuid: listGuid,
+                masterIdOut: listMasterId,
+                containerShapeId,
+                cx: listCx,
+                cy: listCy,
+                w: listW,
+                h: listH,
+              }),
+            );
+          }
+
           continue;
         }
         subShapes = "";

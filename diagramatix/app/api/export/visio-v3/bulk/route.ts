@@ -93,6 +93,13 @@ export async function GET(request: Request) {
     const templatePath = path.join(process.cwd(), "public", profile.templateFile);
     const templateBuf = fs.readFileSync(templatePath);
 
+    const cffRefPath = path.join(
+      process.cwd(),
+      "public",
+      "Pools and Lanes Master using BPMN Basic Shapes.vsdx",
+    );
+    const cffRefBuf = fs.existsSync(cffRefPath) ? fs.readFileSync(cffRefPath) : null;
+
     const projectColors =
       ((project as unknown as { colorConfig?: SymbolColorConfig }).colorConfig) ?? {};
 
@@ -119,6 +126,7 @@ export async function GET(request: Request) {
       templateBuf.buffer as ArrayBuffer,
       profile,
       project.name,
+      cffRefBuf ? (cffRefBuf.buffer as ArrayBuffer) : undefined,
     );
 
     const suffix =

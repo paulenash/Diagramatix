@@ -57,6 +57,17 @@ export async function GET(request: Request) {
     const templatePath = path.join(process.cwd(), "public", profile.templateFile);
     const templateBuf = fs.readFileSync(templatePath);
 
+    // CFF reference VSDX — source of CFF Container + Swimlane List masters
+    // used by Phase 3 of pool/lane export. Optional; if missing, the export
+    // falls back to Phase 1.5 behaviour (single visible Pool/Lane shape per
+    // pool, no CFF container constellation).
+    const cffRefPath = path.join(
+      process.cwd(),
+      "public",
+      "Pools and Lanes Master using BPMN Basic Shapes.vsdx",
+    );
+    const cffRefBuf = fs.existsSync(cffRefPath) ? fs.readFileSync(cffRefPath) : null;
+
     const data = diagram.data as any;
     const displayMode = (diagram as any).displayMode ?? "normal";
 
@@ -75,6 +86,7 @@ export async function GET(request: Request) {
       displayMode,
       effectiveColors,
       profile,
+      cffRefBuf ? cffRefBuf.buffer : undefined,
     );
 
     const suffix =

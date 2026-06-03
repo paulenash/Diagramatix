@@ -147,6 +147,7 @@ export async function exportVisioV3Bulk(
   templateBuffer: ArrayBuffer,
   profile: StencilProfile = DEFAULT_PROFILE,
   projectTitle: string = "Diagramatix Export",
+  cffRefBuffer?: ArrayBuffer,
 ): Promise<Uint8Array> {
   if (diagrams.length === 0) throw new Error("exportVisioV3Bulk: no diagrams supplied");
 
@@ -161,6 +162,7 @@ export async function exportVisioV3Bulk(
       d.displayMode ?? "normal",
       d.colorConfig,
       profile,
+      cffRefBuffer,
     );
     perDiagramBytes.push(bytes);
   }
