@@ -114,10 +114,19 @@ export function cloneCffContainer(
     `FillForegnd' V='${opts.headerColor}' F='THEMEGUARD(MSOTINT`,
   );
 
-  // Pool label — the master ships with literal placeholder text inside
-  // the header sub-shape (MasterShape 7). Replace it.
-  content = content.replace(/>Pool<\/Text>/g, `>${opts.poolLabel}</Text>`);
-  content = content.replace(/<Text>[^<]*<\/Text>/g, `<Text>${opts.poolLabel}</Text>`);
+  // Phase 3 commit 1 — fully suppress visible text on the CFF Container
+  // so it doesn't double-paint with the Phase 1.5 visible Pool/Lane
+  // shape. The master's header sub-shape paints via a
+  // `GUARD(SHAPETEXT(Sheet.5!visHeadingText))` formula whose cached V
+  // is the literal "Title". Text rendering doesn't depend on Geometry
+  // NoShow, so emptying those cells is what actually stops the paint.
+  // poolLabel is still set on the page-shape's Property.BpmnName via
+  // emitCffContainerShape, so nothing is lost.
+  content = content.replace(/<Text>[^<]*<\/Text>/g, `<Text></Text>`);
+  content = content.replace(
+    /<Cell N='Value' V='Title' U='STR'/g,
+    `<Cell N='Value' V='' U='STR'`,
+  );
 
   // Wrapper — substitute the master ID, the NameU and Name, swap rId.
   let wrapper = source.containerWrapper
