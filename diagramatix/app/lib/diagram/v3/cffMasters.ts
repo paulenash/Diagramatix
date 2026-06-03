@@ -147,8 +147,25 @@ export function cloneCffContainer(
     });
   };
 
-  // Shape 5 root group — bare Width / Height + LocPin cells. No
-  // Geometry section visible (rendered as transparent).
+  // Shape 5 root group — bare Width / Height + Pin + LocPin cells.
+  // The master ships with PinX=2, PinY=2 (master-canvas coords),
+  // which Visio uses as an inner-shape positioning offset when the
+  // master is instantiated as a page-shape. Result: Shape 6 (body)
+  // paints at page-shape position + (2, 2) instead of at page-shape
+  // position. That's the spurious-rectangle-offset-up-right Paul
+  // saw in "Latest 1.jpg".
+  //
+  // Fix: align Shape 5's Pin with its LocPin so the shape's local
+  // origin coincides with the rendering anchor, no inner offset.
+  // Pin = LocPin = (W/2, H/2).
+  content = content.replace(
+    /(<Shape ID='5'[\s\S]*?)<Cell N='PinX' V='[^']+'\/>/,
+    `$1<Cell N='PinX' V='${opts.w / 2}'/>`,
+  );
+  content = content.replace(
+    /(<Shape ID='5'[\s\S]*?)<Cell N='PinY' V='[^']+'\/>/,
+    `$1<Cell N='PinY' V='${opts.h / 2}'/>`,
+  );
   content = content.replace(
     /(<Shape ID='5'[\s\S]*?)<Cell N='Width' V='[^']+' U='IN'\/>/,
     `$1<Cell N='Width' V='${opts.w}' U='IN'/>`,
