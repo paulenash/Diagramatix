@@ -101,45 +101,150 @@ export function cloneCffContainer(
   let content = source.containerContent;
   const escAttr = (s: string) => s.replace(/&/g, "&amp;").replace(/'/g, "&apos;").replace(/</g, "&lt;");
 
-  // Rewrite cached W / H from natural (4×4 IN) to instance dims.
-  // The master mixes Width-derived and Height-derived cells, both
-  // naturally cached at V='4' (because natural is square). Distinguish
-  // them by their F= formula — patch Height-derived cells FIRST so the
-  // remaining V='4' U='IN' cells are all Width-derived, then a default
-  // sweep catches them.
+  // Rewrite cached W / H values. The natural master is 6 IN × 4 IN
+  // BUT its cached V values are not uniformly 6 / 4 — many W-derived
+  // cells cache stale V='4' or V='2' (probably leftovers from an
+  // earlier 4×4 reference). Splitting on V= alone hits the wrong
+  // cells. Drive the substitution by F= formula context instead.
   //
-  // Height-derived V='4' patterns:
-  //   • F='Height*1'                                       (Shape 6 body height + similar)
-  //   • F='IF(User.CFFVertical,Height*N/16,Height*1)'      (lane-fraction Y guides, N=2..15)
-  content = content
-    .split("V='4' U='IN' F='Height*1'")
-    .join(`V='${opts.h}' U='IN' F='Height*1'`);
+  // For each (V-old, F-pattern) → V-new substitution, regex-match
+  // the cell and rewrite only the V attribute. The F= formula stays
+  // intact so Visio recomputes after any resize.
+  const patchV = (formulaPattern: string, newV: number) => {
+    const escF = formulaPattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const re = new RegExp(
+      `(<Cell N='[^']+' )V='[^']+'( U='IN' F='${escF}'\\/>)`,
+      "g",
+    );
+    content = content.replace(re, `$1V='${newV}'$2`);
+  };
+
+  // Width-derived formulas → opts.w
+  for (const f of [
+    "Width*1",
+    "Width*1-User.Inset-User.InsetX",
+    "Sheet.5!Width*1",
+    "Geometry1.X2",
+  ]) patchV(f, opts.w);
+
+  // Height-derived formulas → opts.h
+  patchV("Height*1", opts.h);
+  patchV("Sheet.5!Height*1", opts.h);
+  patchV("GUARD(IF(OR(User.HSide=1,User.HSide=3),Sheet.5!Height,Sheet.5!Width))", opts.h);
   for (let i = 1; i < 16; i++) {
-    const pat = `V='4' U='IN' F='IF(User.CFFVertical,Height*${i}/16,Height*1)'`;
-    content = content.split(pat).join(`V='${opts.h}' U='IN' F='IF(User.CFFVertical,Height*${i}/16,Height*1)'`);
+    patchV(`IF(User.CFFVertical,Height*${i}/16,Height*1)`, opts.h);
   }
-  // Default (remaining) → Width.
-  content = content.split("V='4' U='IN'").join(`V='${opts.w}' U='IN'`);
 
-  // Half values: V='2' similarly split between Width/2 and Height/2.
-  // Patch Height-derived first.
-  content = content
-    .split("V='2' U='IN' F='Height*0.5'")
-    .join(`V='${opts.h / 2}' U='IN' F='Height*0.5'`)
-    .split("V='2' U='IN' F='Sheet.5!Height*0.5'")
-    .join(`V='${opts.h / 2}' U='IN' F='Sheet.5!Height*0.5'`)
-    .split("V='2' U='IN' F='GUARD(IF(User.HeadingPos=2,Sheet.5!Height-Height*0.5,IF(User.HeadingPos=4,Height*0.5,Sheet.5!Height*0.5)))'")
-    .join(`V='${opts.h / 2}' U='IN' F='GUARD(IF(User.HeadingPos=2,Sheet.5!Height-Height*0.5,IF(User.HeadingPos=4,Height*0.5,Sheet.5!Height*0.5)))'`);
-  // Default V='2' → Width/2.
-  content = content.split("V='2' U='IN'").join(`V='${opts.w / 2}' U='IN'`);
+  // Width/2 → opts.w/2
+  for (const f of ["Width*0.5", "GUARD(Width*0.5)", "Sheet.5!Width*0.5", "TxtWidth*0.5"]) {
+    patchV(f, opts.w / 2);
+  }
+  for (const i of [0, 1]) {
+    patchV(`IF(User.CFFVertical,Width*${i},Width*8/16)`, opts.w / 2);
+  }
 
-  // Header fill — the master's header strip carries
-  // `FillForegnd V='#92cddc' F='THEMEGUARD(MSOTINT(THEMEVAL("AccentColor4"),40))'`.
-  // Replace the cached V so first-paint matches the Diagramatix lane colour
-  // map instead of Visio's default light blue.
+  // Height/2 → opts.h/2
+  for (const f of [
+    "Sheet.5!Height*0.5",
+    "GUARD(IF(User.HeadingPos=2,Sheet.5!Height-Height*0.5,IF(User.HeadingPos=4,Height*0.5,Sheet.5!Height*0.5)))",
+  ]) patchV(f, opts.h / 2);
+
+  // CFF Container header (Shape 7) thickness — natural 0.5 IN but
+  // Diagramatix positions lanes at pool.x + POOL_HEADER_W = 0.375 IN.
+  // Without patching, lanes overlap the visible header by 0.125 IN
+  // (12 px). Same fix as the v1.5 visible-Pool master patch applied
+  // earlier in exportVisioV3.ts, just adapted to this master's cells.
+  //
+  // Cells whose F= references the header's own Height (NOT the
+  // pool Sheet.5!Height) get patched to 0.375. F='Height*0.5' on
+  // Shape 7 (inside the rotated header) → 0.1875. NOTE: this also
+  // patches the Shape 6 (body) Height cells that reference
+  // F='Height*1' on themselves — but Shape 6's Height already got
+  // patched to opts.h above via the patchV("Height*1", opts.h) call,
+  // which uses regex replace and only updates V. So Shape 6's
+  // V='0.5' F='Height*1' (which doesn't exist — its V was 4) is
+  // distinct from Shape 7's V='0.5' F='Height*1' (which DOES exist
+  // and needs 0.375).
+  patchV(
+    "GUARD(IF(Sheet.5!User.visShowTitle,MAX(0.5IN*Sheet.5!DropOnPageScale,Scratch.Y1),0))",
+    0.375,
+  );
+  // Also patch the 0.5IN literal inside that formula.
   content = content.replace(
-    /FillForegnd' V='#[0-9a-fA-F]{6}' F='THEMEGUARD\(MSOTINT/g,
-    `FillForegnd' V='${opts.headerColor}' F='THEMEGUARD(MSOTINT`,
+    /MAX\(0\.5IN\*Sheet\.5!DropOnPageScale,Scratch\.Y1\)/g,
+    `MAX(0.375IN*Sheet.5!DropOnPageScale,Scratch.Y1)`,
+  );
+  // Other cells derived from header Height = 0.5
+  for (const f of [
+    "Height*1",
+    "Height*1-User.Inset-User.InsetY",
+    "Geometry1.Y3",
+    "Sheet.7!Height",
+  ]) {
+    const re = new RegExp(
+      `(<Cell N='[^']+' )V='0\\.5'( U='IN' F='${f.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}'\\/>)`,
+      "g",
+    );
+    content = content.replace(re, `$1V='0.375'$2`);
+  }
+  // Half-thickness (Height/2 = 0.25 → 0.1875)
+  for (const f of [
+    "Height*0.5",
+    "GUARD(Height*0.5)",
+    "TxtHeight*0.5",
+    "GUARD(IF(User.HeadingPos=1,Sheet.5!Width-Height*0.5,IF(User.HeadingPos=3,Height*0.5,Sheet.5!Width*0.5)))",
+  ]) {
+    const re = new RegExp(
+      `(<Cell N='[^']+' )V='0\\.25'( U='IN' F='${f.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}'\\/>)`,
+      "g",
+    );
+    content = content.replace(re, `$1V='0.1875'$2`);
+  }
+
+  // Bare cells with no F= attr — the Shape 5 root Width/Height.
+  // Pattern: `<Cell N='Width' V='6' U='IN'/>` and `<Cell N='Height' V='4' U='IN'/>`.
+  content = content
+    .replace(/<Cell N='Width' V='[^']+' U='IN'\/>/, `<Cell N='Width' V='${opts.w}' U='IN'/>`)
+    .replace(/<Cell N='Height' V='[^']+' U='IN'\/>/, `<Cell N='Height' V='${opts.h}' U='IN'/>`);
+
+  // Body + header fill — the master ships with V='1' F='THEMEVAL("FillColor",1)'
+  // on every FillForegnd, which paints whatever the document theme
+  // resolves "FillColor" to (typically pale or white). Replace with
+  // the pool colour baked in so the body + header paint Diagramatix
+  // colours instead. Three cells: Shape 5 (group root — affects
+  // grouped selection only), Shape 6 (visible body), Shape 7 (visible
+  // header). Patch all three: body gets a light tint, header gets the
+  // pool colour. Done in document order — first occurrence = Shape 5,
+  // second = Shape 6 (body, lighter), third = Shape 7 (header).
+  const hexToRgb = (hex: string) => {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return `RGB(${r},${g},${b})`;
+  };
+  // Lighten the pool colour for the body so the header stands out.
+  // Simple +30% lightness approximation: average with white.
+  const lightenHex = (hex: string) => {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    const mix = (c: number) => Math.round(c + (255 - c) * 0.5);
+    return `#${mix(r).toString(16).padStart(2, "0")}${mix(g).toString(16).padStart(2, "0")}${mix(b).toString(16).padStart(2, "0")}`;
+  };
+  const bodyColor = lightenHex(opts.headerColor);
+  // Skip Shape 5 (root group) — doesn't visibly paint. Patch only
+  // Shape 6 + Shape 7 by walking the FillForegnd occurrences in
+  // document order. Shape 5 is first; we leave it. Shape 6 is second
+  // (body); Shape 7 is third (header).
+  let cellIdx = 0;
+  content = content.replace(
+    /<Cell N='FillForegnd' V='1' F='THEMEVAL\("FillColor",1\)'\/>/g,
+    () => {
+      cellIdx++;
+      if (cellIdx === 2) return `<Cell N='FillForegnd' V='${bodyColor}' F='${hexToRgb(bodyColor)}'/>`;
+      if (cellIdx === 3) return `<Cell N='FillForegnd' V='${opts.headerColor}' F='${hexToRgb(opts.headerColor)}'/>`;
+      return `<Cell N='FillForegnd' V='1' F='THEMEVAL("FillColor",1)'/>`;
+    },
   );
 
   // Phase 3 commit 2 follow-on — substitute "Title" (master placeholder
