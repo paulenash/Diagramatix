@@ -2848,7 +2848,10 @@ export async function exportVisioV3(
               `<Override PartName="/visio/masters/${containerFileName}" ContentType="application/vnd.ms-visio.master+xml"/></Types>`,
             );
 
-            const headerH = 0.5;
+            // Match Diagramatix's POOL_HEADER_W (36 px = 0.375 IN).
+            // CFF Container header thickness is patched to the same
+            // value in cloneCffContainer.
+            const headerH = 0.375;
             const listW = w - headerH;
             const listH = h;
             const list = cloneSwimlaneList(cffSource, {
@@ -2910,16 +2913,23 @@ export async function exportVisioV3(
               }),
             );
 
-            const listCx = cx + headerH / 2;
-            const listCy = cy;
+            // Swimlane List page-shape uses LocPin=(0, H) which means
+            // its `PinX/PinY` cells locate the shape's TOP-LEFT corner
+            // on the page (not its centre). Compute the list's top-left
+            // from the pool's bounding box: shifted right by the header
+            // strip (so the list spans only the body area), at the same
+            // top edge as the pool. Pool cx/cy are the pool's CENTRE in
+            // Visio Y-up coordinates.
+            const listPinX = cx - w / 2 + headerH;     // pool left edge + header thickness
+            const listPinY = cy + h / 2;               // pool top edge (Visio Y-up)
             shapes.push(
               emitSwimlaneListShape({
                 shapeId: listShapeId,
                 uniqueGuid: listGuid,
                 masterIdOut: listMasterId,
                 containerShapeId,
-                cx: listCx,
-                cy: listCy,
+                cx: listPinX,
+                cy: listPinY,
                 w: listW,
                 h: listH,
               }),
