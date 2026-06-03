@@ -2921,7 +2921,7 @@ export async function exportVisioV3(
             // bottom-right when offset by 0) that the correct offset
             // is the midpoint: cy + h/4.
             const listPinX = cx - w / 2 + headerH;     // pool left edge + header thickness
-            const listPinY = cy + h / 4;               // midpoint between pool centre and pool top
+            const listPinY = cy - h / 4;               // midpoint between pool centre and pool bottom
             shapes.push(
               emitSwimlaneListShape({
                 shapeId: listShapeId,
