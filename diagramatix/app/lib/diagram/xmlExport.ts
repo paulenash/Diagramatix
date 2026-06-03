@@ -65,7 +65,9 @@ export function diagramDataXml(dd: DiagramData, ind: string): string {
   // v1.10 round-trip fix: poolFontSize, laneFontSize and database were
   // declared on DiagramData (and in the XSD) in v1.9 but never written
   // out. Emit them now so XML round-trip preserves them.
-  let x = `${ind}<dgx:data${attr("fontSize", dd.fontSize)}${attr("connectorFontSize", dd.connectorFontSize)}${attr("titleFontSize", dd.titleFontSize)}${attr("poolFontSize", dd.poolFontSize)}${attr("laneFontSize", dd.laneFontSize)}${attr("database", dd.database)}>\n`;
+  // v1.17 — processFontSize attribute carries the independent
+  // Context-Diagram "Process Names" font size.
+  let x = `${ind}<dgx:data${attr("fontSize", dd.fontSize)}${attr("connectorFontSize", dd.connectorFontSize)}${attr("titleFontSize", dd.titleFontSize)}${attr("poolFontSize", dd.poolFontSize)}${attr("laneFontSize", dd.laneFontSize)}${attr("processFontSize", dd.processFontSize)}${attr("database", dd.database)}>\n`;
 
   // Elements
   x += `${ind}  <dgx:elements>\n`;
@@ -356,12 +358,15 @@ export function parseDiagramatixXml(xmlText: string): any {
     const titleFontSize = num(dataEl.getAttribute("titleFontSize"));
     const poolFontSize = num(dataEl.getAttribute("poolFontSize"));
     const laneFontSize = num(dataEl.getAttribute("laneFontSize"));
+    // v1.17 — independent Context-Diagram "Process Names" font size.
+    const processFontSize = num(dataEl.getAttribute("processFontSize"));
     const database = dataEl.getAttribute("database");
     if (fontSize !== undefined) data.fontSize = fontSize;
     if (connectorFontSize !== undefined) data.connectorFontSize = connectorFontSize;
     if (titleFontSize !== undefined) data.titleFontSize = titleFontSize;
     if (poolFontSize !== undefined) data.poolFontSize = poolFontSize;
     if (laneFontSize !== undefined) data.laneFontSize = laneFontSize;
+    if (processFontSize !== undefined) data.processFontSize = processFontSize;
     if (database != null && database !== "") data.database = database;
 
     // Elements

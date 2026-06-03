@@ -29,7 +29,7 @@ export const CHAPTERS: HelpChapter[] = [
               domain models and more.
             </p>
             <p className="mt-2 text-xs text-gray-500">
-              This guide covers version <strong>1.15</strong>.
+              This guide covers version <strong>1.17</strong>.
             </p>
             <p className="mt-2">
               After signing in you land on the <strong>Dashboard</strong> —
@@ -209,13 +209,40 @@ export const CHAPTERS: HelpChapter[] = [
                 wrapper, boundary event on a Pool/Lane, connector touching
                 an Event Sub-Process, merge gateway left of its inputs.
               </li>
+              <li>
+                <strong>B14 — Task type vs message-flow matrix</strong>{" "}
+                (v1.17 rewrite). Every Task with a message flow is
+                checked against a matrix of message direction × pool
+                kind (Person / Organisation / IT System). Sending a
+                message to a non-IT pool ⇒ Send Task; receiving from a
+                non-IT pool ⇒ Receive Task; communicating with an IT
+                System pool ⇒ User Task. Manual Tasks cannot carry any
+                message flow to an IT System (B31).
+              </li>
+              <li>
+                <strong>B23 – B27</strong> (v1.17) — boundary Start
+                placement, intermediate-event routing direction and
+                throw/catch typing for boundary-mounted intermediates.
+              </li>
+              <li>
+                <strong>B29 / B30 — Sequence flow clips a node body</strong>{" "}
+                (v1.17). A sequence flow whose path is drawn through its
+                own endpoint body (B29) or grazes a foreign node body
+                (B30) is highlighted on the canvas. Circular events and
+                diamond gateways are exempted because of their natural
+                bounding-box overhang.
+              </li>
             </ul>
             <p className="mt-2">
               Tick the &ldquo;Ignore issue types&rdquo; checkboxes at the
               top of the panel to park categories you&apos;ve already
               triaged; remaining issues stay highlighted across re-scans.
-              Admins can see the full active rule registry at{" "}
-              <strong>Project ▾ → View Scanner Issues Rules</strong>.
+              Admins can browse the full active rule registry — codes
+              B01..B31, severity, description and current trigger
+              wording — at{" "}
+              <strong>Admin &rarr; Scanner Issue Rules</strong>{" "}
+              (or from a project page, <strong>Project ▾ &rarr; View
+              Scanner Issues Rules</strong>).
             </p>
           </>
         ),
@@ -327,11 +354,31 @@ export const CHAPTERS: HelpChapter[] = [
       {
         heading: "Context Diagram",
         body: (
-          <p>
-            Shows a central system and external entities that interact with
-            it. Uses ellipses for the system and rectangles for external
-            entities, connected by bi-directional flows.
-          </p>
+          <>
+            <p>
+              Shows a central system and external entities that interact
+              with it. Uses ellipses for the system and rectangles for
+              external entities, connected by bi-directional flows.
+            </p>
+            <p className="mt-2">
+              Per-Context font controls let you size{" "}
+              <strong>Entity Names</strong>, <strong>Process Names</strong>{" "}
+              and <strong>Flow Labels</strong> independently. The
+              properties header reads <em>Name</em> for entities and
+              processes and <em>Label</em> for flow connectors. The
+              process-name size round-trips via the new{" "}
+              <code>processFontSize</code> attribute (schema 1.17).
+            </p>
+            <p className="mt-2">
+              AI generation enforces a maximum process radius, spreads
+              connector attachment points across an entity&apos;s facing
+              side, and guarantees ≥ 20 px between attachment points on
+              the central process circle. Connector endpoint nudging
+              wraps around the entity corners and travels the full
+              circumference of the process circle, so labelled flows
+              never collide.
+            </p>
+          </>
         ),
       },
       {
@@ -1243,6 +1290,16 @@ export const CHAPTERS: HelpChapter[] = [
               pool sets the task type to <strong>User</strong> regardless
               of direction.
             </li>
+            <li>
+              <strong>Body drag</strong> (v1.17) — select a message flow
+              and grab anywhere on its highlighted line to slide the
+              horizontal middle segment up or down. The old blue
+              midpoint handle has been retired. AI-generated message
+              flows are body-draggable out of the box because the
+              layout engine now writes the four canonical waypoints
+              (centre, source-edge, target-edge, centre) with
+              invisible-leader flags on both ends.
+            </li>
           </ul>
         ),
       },
@@ -1757,7 +1814,7 @@ export const CHAPTERS: HelpChapter[] = [
             </p>
             <p className="mt-2">
               The XSD file is versioned (e.g.{" "}
-              <code className="text-xs bg-gray-100 px-1 rounded">diagramatix-export-v1.13.xsd</code>)
+              <code className="text-xs bg-gray-100 px-1 rounded">diagramatix-export-v1.17.xsd</code>)
               to match the export format version.
             </p>
           </>
@@ -2974,7 +3031,31 @@ export const CHAPTERS: HelpChapter[] = [
                 Actors are vertically positioned <strong>between</strong>{" "}
                 their connected processes to minimise crossing lines.
               </li>
+              <li>
+                <strong>P2.08</strong> — actors / teams / systems on the
+                same side are spaced so labels never collide.
+              </li>
+              <li>
+                <strong>P2.09</strong> — use-case &rarr; use-case
+                associations are stripped. Processes connect only to
+                actors, teams, systems and hourglasses.
+              </li>
+              <li>
+                <strong>P2.10</strong> — an actor group is centred
+                vertically on the midpoint of the boundary it sits next
+                to.
+              </li>
+              <li>
+                <strong>P2.11</strong> — use-case ellipses auto-grow to
+                fit their wrapped label, preserving the original
+                ellipse aspect ratio.
+              </li>
             </ul>
+            <p className="mt-2 text-xs text-gray-600">
+              The hardcoded &ldquo;P-XX-NN&rdquo; process-numbering
+              instruction has been removed from the prompt. Use whatever
+              numbering scheme you describe in your own prompt text.
+            </p>
           </>
         ),
       },
@@ -3276,7 +3357,8 @@ export const CHAPTERS: HelpChapter[] = [
         body: (
           <ol className="list-decimal list-inside space-y-2">
             <li>
-              Go to <strong>File ▾ → Admin</strong> on the Dashboard.
+              Click <strong>Admin</strong> on the Dashboard (leftmost
+              menu item).
             </li>
             <li>
               Click <strong>Generate Diagramatix DDL</strong>.
@@ -3474,11 +3556,24 @@ export const CHAPTERS: HelpChapter[] = [
               to existing text.
             </li>
             <li>
-              <strong>Attach a document</strong> — click <strong>Attach</strong>{" "}
-              to upload a file that describes the diagram. Supported formats:
-              PDF (native document understanding), TXT, MD, CSV, RTF.
-              Max 10MB. The document content is sent to the AI alongside
-              your prompt.
+              <strong>Attach a document or image</strong> — click{" "}
+              <strong>Attach</strong> to upload a file that describes the
+              diagram. Supported formats: PDF (native document
+              understanding), TXT, MD, CSV, RTF, DOC, DOCX,{" "}
+              and (BPMN only) PNG, JPEG, WebP, GIF screenshots.
+              Max 10MB. The content is sent to the AI alongside your
+              prompt.
+            </li>
+            <li>
+              <strong>BPMN image attachments</strong> — upload a screenshot
+              of an existing BPMN diagram and Sonnet reverse-engineers the
+              structural plan from the image: pools, lanes, tasks, gateways,
+              events and connectors are inferred and dropped into the plan
+              tabs ready for you to edit before Apply Layout. You can also
+              attach a flowchart image and Sonnet translates it into BPMN
+              shape (rectangle &rarr; task, diamond &rarr; exclusive
+              gateway, oval &rarr; start/end event, document shape &rarr;
+              data object, cylinder &rarr; data store).
             </li>
           </ul>
         ),
@@ -3531,40 +3626,68 @@ export const CHAPTERS: HelpChapter[] = [
       {
         heading: "AI Rules & Preferences",
         body: (
-          <p>
-            Admins can configure rules that guide AI generation for each
-            diagram type via{" "}
-            <strong>File &rarr; Admin &rarr; AI Rules &amp; Preferences</strong>.
-            Rules are grouped and colour-coded:{" "}
-            <span className="text-green-600 font-medium">green</span> rules
-            are enforced by the AI model,{" "}
-            <span className="text-red-600 font-medium">red</span> rules
-            (under Layout groups) are implemented in the layout engine code.
-          </p>
+          <>
+            <p>
+              Admins can configure rules that guide AI generation for each
+              diagram type. Open the <strong>Admin</strong> button (leftmost
+              menu item on the Dashboard, Project and Diagram screens) and
+              choose <strong>AI Rules &amp; Preferences</strong>. From any
+              diagram you can also jump straight to the rules tab for the
+              current diagram type via the <strong>AI Rules &amp;
+              Preferences &mdash; &lt;Type&gt;</strong> link in the Diagram
+              menu, which deep-links into the editor with the matching
+              category pre-selected.
+            </p>
+            <p className="mt-2">
+              Rules are grouped and colour-coded:{" "}
+              <span className="text-green-600 font-medium">green</span>{" "}
+              rules are sent as part of the AI briefing,{" "}
+              <span className="text-red-600 font-medium">red</span> rules
+              (under Layout groups) are implemented in the layout engine
+              code. Only green rules reach the model.
+            </p>
+          </>
         ),
       },
       {
-        heading: "Create Prompt from Diagram (BPMN, admin only)",
+        heading: "Create Prompt from Diagram (admin only)",
         body: (
           <>
             <p>
-              Admins see a purple <strong>Create Prompt from Diagram</strong>{" "}
-              button in the BPMN AI panel. It reverse-engineers the current
-              canvas into a structured 6-section text prompt that can be
-              reused or fed back to the generator:
+              Admins see a red <strong>Create Prompt from Diagram</strong>{" "}
+              block at the bottom of every AI panel — the BPMN PlanPanel
+              and the one-shot AiPanel used by all other diagram types.
+              The block offers two outputs:
             </p>
-            <ol className="list-decimal list-inside space-y-1 mt-1">
-              <li>Pools, Lanes, and Sublanes (recursive tree)</li>
-              <li>Pool properties — Black-box / White-box, System flag, multiplicity</li>
-              <li>Pool layout (relative positions of every pool pair)</li>
-              <li>Lane contents in left-to-right flow order, with element type and label</li>
-              <li>Edge-mounted (boundary) events and their hosts</li>
-              <li>Connectors grouped by type — Sequence Flows, Message Flows, Associations, &hellip; with <em>Source &rarr; Target</em> and connector label if any. When a connector&rsquo;s exit/entry point sits on a mounted boundary event, the source/target is attributed to the event rather than the host element.</li>
-            </ol>
+            <ul className="list-disc list-inside space-y-1 mt-1">
+              <li>
+                <strong>Technical Description</strong> — a deterministic
+                walker reverse-engineers the canvas into a structured
+                6-section recap. For BPMN that&rsquo;s pools / lanes /
+                sublanes, pool properties (BB/WB, System flag,
+                multiplicity), pair-wise pool layout, lane contents in
+                left-to-right flow order, edge-mounted (boundary) events
+                and their hosts, and connectors grouped by type with{" "}
+                <em>Source &rarr; Target</em> and labels. For other
+                diagram types the recap covers elements, geometry, and
+                connectors in a form that round-trips through the
+                one-shot generator.
+              </li>
+              <li>
+                <strong>Staff Narrative</strong> — Sonnet rewrites the
+                technical description as first-person prose in the voice
+                of someone who actually runs the process. Active voice,
+                named roles and teams, IT systems referred to by their
+                product name, no diagram jargon. The rewrite runs under
+                an editable briefing stored as the{" "}
+                <em>staff-narrative</em> category in the AI Rules editor —
+                tune the voice without code changes.
+              </li>
+            </ul>
             <p className="mt-2">
-              The generated text drops into the prompt textarea so you can
-              edit, save (via the regular Save button), or send straight to
-              the generator with <strong>Plan</strong>.
+              Both outputs drop into the prompt textarea so you can edit,
+              save (via the regular Save button), or send straight to the
+              generator.
             </p>
           </>
         ),

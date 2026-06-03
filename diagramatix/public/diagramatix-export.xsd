@@ -127,6 +127,68 @@
             association connector.
           * data-store-no-association: a Data Store with no
             association connector.
+
+  v1.17 — Independent Context-Diagram "Process Names" font size +
+    behaviour batch (AI Generate rules, BPMN scanner overhaul, image
+    attachments, UI restructure). ONE shape change below:
+      <dgx:data> gains an optional attribute `processFontSize`
+        (xs:decimal). Carries the Context-Diagram process-system
+        label size independently from entity labels (`fontSize`),
+        connector labels (`connectorFontSize`) and title
+        (`titleFontSize`). Default 16 when omitted. Pre-1.17 exports
+        omit the attribute and importers fall back to the default.
+    Behaviour-only changes shipped under the same bump:
+      * Context Diagram AI Generate now code-enforces C3.* (process
+        radius cap, entity-face spread, ≥20 px cluster spacing on the
+        process circle, label stagger). Endpoint nudge wraps around
+        corners and travels the full circumference of circles.
+        Upper-left-quadrant attachment pile-up fixed by wrapping the
+        cluster's procAngle to (-π, π] before the side check.
+      * Per-Context font controls: Entity Names / Process Names /
+        Flow Labels with their own defaults. Properties label header
+        reads "Name" for entities and processes; "Label" for flow
+        connectors.
+      * Process Context AI Generate enforces P2.08 (actor spacing),
+        P2.09 (no use-case → use-case associations), P2.10 (actor
+        groups centred on the boundary midpoint) and P2.11 (use-case
+        ellipses auto-grown to fit the wrapped label while preserving
+        aspect ratio). The hardcoded "P-XX-NN" process-numbering
+        instruction is removed from the prompt.
+      * BPMN scanner rule registry gains stable codes B01..B31. Flat
+        viewer at /dashboard/admin/scanner-rules. B14 rewritten as a
+        per-Task trigger matrix (message direction × pool kind);
+        B28 absorbed into B14; B22 removed; B19 narrowed to
+        INCOMING; B23..B27 added for boundary start / intermediate
+        routing; B29 sequence-clips-own-endpoint and B30
+        sequence-clips-foreign-node added (with circle / diamond
+        body exemptions); B31 manual-task-no-it-system-message
+        added.
+      * BPMN AI Generate accepts image attachments (PNG / JPEG /
+        WebP / GIF). Sonnet vision reverse-engineers the BPMN
+        plan from a diagram screenshot or translates a flowchart.
+        Two-phase pipeline lets the user edit the plan JSON before
+        applying layout.
+      * bpmnLayout's messageBPMN emission now writes 4 waypoints
+        (centre, srcEdge, tgtEdge, centre) and sets
+        sourceInvisibleLeader / targetInvisibleLeader true so
+        AI-generated message flows are body-draggable out of the
+        box. messageBPMN body drag: select the flow and grab
+        anywhere on the highlighted line to slide horizontally; the
+        blue midpoint handle is gone.
+      * "Create Prompt from Diagram" red admin block on every
+        AI-Generate panel (BPMN PlanPanel + non-BPMN AiPanel):
+        Technical Description (deterministic walker) and Staff
+        Narrative (Sonnet rewrite under an editable briefing stored
+        as DiagramRules category "staff-narrative").
+      * AI Plan Formats viewer covers every diagram type via a type
+        selector. Per-diagram-type "AI Rules & Preferences —
+        <Type>" admin link in the Diagram menu opens
+        /dashboard/rules?category=<slug>. Sidebar hides in scoped
+        mode.
+      * Admin link moved from the System / File menu to the leftmost
+        menu item on Dashboard, Project and Diagram screens.
+      * Matrix screensaver toggle moved to the bottom-left.
+      * Notification dropdown wider with two visible lines.
 -->
 
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
@@ -245,6 +307,10 @@
     <!-- schema 1.9 — pool / lane header label sizes (default 12 each) -->
     <xs:attribute name="poolFontSize"      type="xs:decimal" use="optional"/>
     <xs:attribute name="laneFontSize"      type="xs:decimal" use="optional"/>
+    <!-- schema 1.17 — Context-Diagram process-system label size (default 16).
+         Sets the central process name independently from entity labels
+         (fontSize) and flow-connector labels (connectorFontSize). -->
+    <xs:attribute name="processFontSize"   type="xs:decimal" use="optional"/>
     <!-- schema 1.9 — domain diagram database backend: "none" | "postgres" -->
     <xs:attribute name="database"          type="xs:string"  use="optional"/>
   </xs:complexType>

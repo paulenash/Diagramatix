@@ -528,5 +528,93 @@ export interface TemplateData {
  *          - Two new data-artefact rules (warnings): Data Object and
  *            Data Store with no association connector flag a warning
  *            so the modeller wires it up or removes it.
+ *
+ *    1.17 — Independent Context-Diagram "Process Names" font size + a
+ *           large behaviour batch. ONE shape change: a new optional
+ *           attribute `processFontSize` on `<dgx:data>` (default 16
+ *           when omitted). Sets the central process-system's label
+ *           size independently from entity labels / connector labels.
+ *           Pre-1.17 exports omit the attribute; importers fall back
+ *           to the 16-px default.
+ *
+ *           Behaviour-only changes worth noting alongside the bump:
+ *
+ *           Context Diagram (AI Generate):
+ *           - C3.* rules code-enforced in layoutContextDiagram: process
+ *             circle radius capped at +15 % growth, entity-side
+ *             attachment points spread across the primary inward face
+ *             until K>8, process-side cluster spacing ≥ 20 px arc, no
+ *             entity→entity targets, ellipse selection ring on
+ *             circular shapes, endpoint nudge supports continuous
+ *             travel around corners and circles.
+ *           - Upper-left-quadrant entity attachment pile-up fixed by
+ *             wrapping procAngle to (-π, π] before the side check.
+ *           - Per-Context font controls in the diagram config:
+ *             Entity Names (default 14), Process Names (default 16,
+ *             via processFontSize above), Flow Labels (default 12).
+ *           - Properties label header reads "Name" for entities and
+ *             processes; "Label" stays for flow connectors.
+ *
+ *           Process Context (AI Generate):
+ *           - layoutProcessContext drops association connectors
+ *             between two use-case (process) elements (P2.09), spaces
+ *             actors / teams / systems / hourglasses by 30 px + label
+ *             allowance (P2.08), grows each use-case ellipse to fit
+ *             its wrapped label while preserving the default aspect
+ *             ratio (P2.11), and centres each side's actor group on
+ *             the boundary's vertical midpoint (P2.10).
+ *           - Hardcoded "P-XX-NN" numbering prompt instruction
+ *             removed.
+ *
+ *           BPMN scanner rules + AI prompt:
+ *           - Codes B01..B31 assigned. Flat rules viewer at
+ *             /dashboard/admin/scanner-rules.
+ *           - B14 rewritten as a per-Task trigger matrix keyed on
+ *             message direction × pool kind (external entity vs
+ *             IT-system); errors flag forbidden triggers and warnings
+ *             recommend the default. B28 absorbed into B14.
+ *           - B19 (boundary intermediate event incoming) narrowed to
+ *             INCOMING flow only.
+ *           - B22 loop-back-routing removed.
+ *           - B23..B27 added (boundary start / intermediate routing).
+ *           - B28 task-bothmsg-not-send-receive folded into B14.
+ *           - B29 sequence-clips-own-endpoint + B30
+ *             sequence-clips-foreign-node (visible-path interior
+ *             checks; circle/diamond shapes exempted).
+ *           - B31 manual-task-no-it-system-message added.
+ *           - Plan prompt teaches the matrix + Manual-IT prohibition.
+ *
+ *           BPMN AI Generate:
+ *           - Image attachments accepted (PNG / JPEG / WebP / GIF).
+ *             Sonnet vision reverse-engineers BPMN structure or
+ *             translates a flowchart into BPMN. Two-phase plan-then-
+ *             apply-layout pipeline lets the user edit the plan JSON
+ *             before committing.
+ *           - bpmnLayout messageBPMN emission now writes 4 waypoints
+ *             (centre, srcEdge, tgtEdge, centre) + invisible-leader
+ *             flags true so AI-generated message flows are draggable
+ *             out of the box.
+ *
+ *           UI / admin:
+ *           - "Create Prompt from Diagram" red admin block on every
+ *             AI-Generate panel (BPMN PlanPanel + non-BPMN AiPanel):
+ *             Technical Description (deterministic walker) +
+ *             Staff Narrative (Sonnet rewrite under an editable
+ *             briefing stored as DiagramRules category
+ *             "staff-narrative").
+ *           - AI Plan Formats viewer now covers every diagram type
+ *             via a type selector. Per-diagram-type "AI Rules &
+ *             Preferences — <Type>" admin link in the Diagram menu
+ *             opens /dashboard/rules?category=<slug> scoped to that
+ *             diagram type. Sidebar hides in scoped mode.
+ *           - Admin link moved from the System / File menu to the
+ *             leftmost menu item on Dashboard / Project / Diagram.
+ *           - Matrix screensaver toggle moved to the bottom-left.
+ *           - messageBPMN body drag: select a message flow and grab
+ *             anywhere on the highlighted line to slide it
+ *             horizontally; the blue midpoint handle is removed.
+ *           - Connector endpoint nudge wraps around rectangle corners
+ *             and travels the full circumference of circles.
+ *           - Notification dropdown wider with two visible lines.
  */
-export const SCHEMA_VERSION = "1.16";
+export const SCHEMA_VERSION = "1.17";
