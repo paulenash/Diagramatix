@@ -101,111 +101,118 @@ export function cloneCffContainer(
   let content = source.containerContent;
   const escAttr = (s: string) => s.replace(/&/g, "&amp;").replace(/'/g, "&apos;").replace(/</g, "&lt;");
 
-  // Rewrite cached W / H values. The natural master is 6 IN × 4 IN
-  // BUT its cached V values are not uniformly 6 / 4 — many W-derived
-  // cells cache stale V='4' or V='2' (probably leftovers from an
-  // earlier 4×4 reference). Splitting on V= alone hits the wrong
-  // cells. Drive the substitution by F= formula context instead.
+  // Rewrite cached V values for cell + Geometry-row coordinates.
   //
-  // For each (V-old, F-pattern) → V-new substitution, regex-match
-  // the cell and rewrite only the V attribute. The F= formula stays
-  // intact so Visio recomputes after any resize.
-  const patchV = (formulaPattern: string, newV: number) => {
-    const escF = formulaPattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const re = new RegExp(
-      `(<Cell N='[^']+' )V='[^']+'( U='IN' F='${escF}'\\/>)`,
-      "g",
-    );
-    content = content.replace(re, `$1V='${newV}'$2`);
+  // CRITICAL: the master uses three shapes (5 = root group, 6 = body,
+  // 7 = rotated header strip) and formulas like `Width*1` /
+  // `Height*0.5` resolve to DIFFERENT things in each shape's sheet:
+  //
+  //   * Shape 5 / Shape 6: `Width` = pool width (opts.w),
+  //                        `Height` = pool height (opts.h).
+  //   * Shape 7 (rotated 90°): `Width` = pool height (opts.h),
+  //                            `Height` = header thickness (0.375).
+  //
+  // A global split-replace on the formula would corrupt Shape 7
+  // (e.g. patching `F='Width*1'` to opts.w would set its rotated
+  // Width to pool W instead of pool H). Patch each shape's V cells
+  // and Geometry rows in isolation.
+  const HEADER_THICKNESS = 0.375;
+  const patchShape = (
+    id: number,
+    formulaToV: Record<string, number>,
+    geomXVal: number,
+    geomYVal: number,
+  ) => {
+    const re = new RegExp(`(<Shape ID='${id}'[\\s\\S]*?</Shape>)`);
+    content = content.replace(re, (block) => {
+      let s = block;
+      for (const [f, v] of Object.entries(formulaToV)) {
+        const escF = f.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const cellRe = new RegExp(
+          `(<Cell N='[^']+' )V='[^']+'( U='[A-Z]+' F='${escF}'\\/>)`,
+          "g",
+        );
+        s = s.replace(cellRe, `$1V='${v}'$2`);
+      }
+      // Geometry-row X / Y. Cells inside Geometry rows are
+      // `<Cell N='X' V='...' U='IN' F='...'/>`. Rewrite the cached
+      // V for X cells whose F= resolves to the shape's max-X, and
+      // for Y cells whose F= resolves to the shape's max-Y. Leave
+      // X=0 / Y=0 (origin) and negative offsets alone.
+      const geomXRe = /(<Cell N='X' )V='[^']+'( U='IN' F='(?:Width\*1|Width\*1-User\.Inset-User\.InsetX|Geometry1\.X2|Geometry1\.X3)'\/>)/g;
+      s = s.replace(geomXRe, `$1V='${geomXVal}'$2`);
+      const geomYRe = /(<Cell N='Y' )V='[^']+'( U='IN' F='(?:Height\*1|Height\*1-User\.Inset-User\.InsetY|Geometry1\.Y3)'\/>)/g;
+      s = s.replace(geomYRe, `$1V='${geomYVal}'$2`);
+      return s;
+    });
   };
 
-  // Width-derived formulas → opts.w
-  for (const f of [
-    "Width*1",
-    "Width*1-User.Inset-User.InsetX",
-    "Sheet.5!Width*1",
-    "Geometry1.X2",
-  ]) patchV(f, opts.w);
-
-  // Height-derived formulas → opts.h
-  patchV("Height*1", opts.h);
-  patchV("Sheet.5!Height*1", opts.h);
-  patchV("GUARD(IF(OR(User.HSide=1,User.HSide=3),Sheet.5!Height,Sheet.5!Width))", opts.h);
-  for (let i = 1; i < 16; i++) {
-    patchV(`IF(User.CFFVertical,Height*${i}/16,Height*1)`, opts.h);
-  }
-
-  // Width/2 → opts.w/2
-  for (const f of ["Width*0.5", "GUARD(Width*0.5)", "Sheet.5!Width*0.5", "TxtWidth*0.5"]) {
-    patchV(f, opts.w / 2);
-  }
-  for (const i of [0, 1]) {
-    patchV(`IF(User.CFFVertical,Width*${i},Width*8/16)`, opts.w / 2);
-  }
-
-  // Height/2 → opts.h/2
-  for (const f of [
-    "Sheet.5!Height*0.5",
-    "GUARD(IF(User.HeadingPos=2,Sheet.5!Height-Height*0.5,IF(User.HeadingPos=4,Height*0.5,Sheet.5!Height*0.5)))",
-  ]) patchV(f, opts.h / 2);
-
-  // CFF Container header (Shape 7) thickness — natural 0.5 IN but
-  // Diagramatix positions lanes at pool.x + POOL_HEADER_W = 0.375 IN.
-  // Without patching, lanes overlap the visible header by 0.125 IN
-  // (12 px). Same fix as the v1.5 visible-Pool master patch applied
-  // earlier in exportVisioV3.ts, just adapted to this master's cells.
-  //
-  // Cells whose F= references the header's own Height (NOT the
-  // pool Sheet.5!Height) get patched to 0.375. F='Height*0.5' on
-  // Shape 7 (inside the rotated header) → 0.1875. NOTE: this also
-  // patches the Shape 6 (body) Height cells that reference
-  // F='Height*1' on themselves — but Shape 6's Height already got
-  // patched to opts.h above via the patchV("Height*1", opts.h) call,
-  // which uses regex replace and only updates V. So Shape 6's
-  // V='0.5' F='Height*1' (which doesn't exist — its V was 4) is
-  // distinct from Shape 7's V='0.5' F='Height*1' (which DOES exist
-  // and needs 0.375).
-  patchV(
-    "GUARD(IF(Sheet.5!User.visShowTitle,MAX(0.5IN*Sheet.5!DropOnPageScale,Scratch.Y1),0))",
-    0.375,
+  // Shape 5 root group — bare Width / Height + LocPin cells. No
+  // Geometry section visible (rendered as transparent).
+  content = content.replace(
+    /(<Shape ID='5'[\s\S]*?)<Cell N='Width' V='[^']+' U='IN'\/>/,
+    `$1<Cell N='Width' V='${opts.w}' U='IN'/>`,
   );
-  // Also patch the 0.5IN literal inside that formula.
+  content = content.replace(
+    /(<Shape ID='5'[\s\S]*?)<Cell N='Height' V='[^']+' U='IN'\/>/,
+    `$1<Cell N='Height' V='${opts.h}' U='IN'/>`,
+  );
+  patchShape(5, {
+    "Width*0.5": opts.w / 2,
+    "Height*0.5": opts.h / 2,
+  }, opts.w, opts.h);
+
+  // Shape 6 (body) — references Sheet.5 dims.
+  patchShape(6, {
+    "Sheet.5!Width*0.5": opts.w / 2,
+    "Sheet.5!Height*0.5": opts.h / 2,
+    "Sheet.5!Width*1": opts.w,
+    "Sheet.5!Height*1": opts.h,
+    "Width*0.5": opts.w / 2,
+    "Height*0.5": opts.h / 2,
+    "Width*1": opts.w,
+    "Height*1": opts.h,
+    "Width*1-User.Inset-User.InsetX": opts.w,
+    "Height*1-User.Inset-User.InsetY": opts.h,
+  }, opts.w, opts.h);
+
+  // Shape 7 (rotated header) — Width = opts.h (rotated, = pool H),
+  // Height = HEADER_THICKNESS. Geometry traces the strip's rectangle
+  // in the shape's local (pre-rotation) coords: X 0..opts.h,
+  // Y 0..HEADER_THICKNESS.
+  patchShape(7, {
+    // PinX uses HeadingPos branch. HeadingPos=3 (left header) →
+    // Height*0.5 = HEADER_THICKNESS/2.
+    "GUARD(IF(User.HeadingPos=1,Sheet.5!Width-Height*0.5,IF(User.HeadingPos=3,Height*0.5,Sheet.5!Width*0.5)))": HEADER_THICKNESS / 2,
+    // PinY HeadingPos=NONE → Sheet.5!Height*0.5 = opts.h/2.
+    "GUARD(IF(User.HeadingPos=2,Sheet.5!Height-Height*0.5,IF(User.HeadingPos=4,Height*0.5,Sheet.5!Height*0.5)))": opts.h / 2,
+    // Width — HSide=1 (typical) → Sheet.5!Height = opts.h.
+    "GUARD(IF(OR(User.HSide=1,User.HSide=3),Sheet.5!Height,Sheet.5!Width))": opts.h,
+    // Height — visShowTitle=1 → MAX(0.375IN*scale, text). At scale 1
+    // and short text, = 0.375.
+    "GUARD(IF(Sheet.5!User.visShowTitle,MAX(0.5IN*Sheet.5!DropOnPageScale,Scratch.Y1),0))": HEADER_THICKNESS,
+    // LocPin: relative to the shape's own (pre-rotation) dims.
+    "GUARD(Width*0.5)": opts.h / 2,
+    "GUARD(Height*0.5)": HEADER_THICKNESS / 2,
+    // Inside Shape 7, Width = opts.h, Height = HEADER_THICKNESS.
+    "Width*0.5": opts.h / 2,
+    "Height*0.5": HEADER_THICKNESS / 2,
+    "Width*1": opts.h,
+    "Height*1": HEADER_THICKNESS,
+    "Width*1-User.Inset-User.InsetX": opts.h,
+    "Height*1-User.Inset-User.InsetY": HEADER_THICKNESS,
+    "TxtWidth*0.5": opts.h / 2,
+    "TxtHeight*0.5": HEADER_THICKNESS / 2,
+    "Sheet.7!Height": HEADER_THICKNESS,
+    "MAX(TEXTHEIGHT(TheText,TxtWidth),Height)": HEADER_THICKNESS,
+  }, opts.h, HEADER_THICKNESS);
+
+  // Also patch the embedded `0.5IN` literal inside the Shape 7
+  // Height formula so Visio re-evaluates against the right value.
   content = content.replace(
     /MAX\(0\.5IN\*Sheet\.5!DropOnPageScale,Scratch\.Y1\)/g,
-    `MAX(0.375IN*Sheet.5!DropOnPageScale,Scratch.Y1)`,
+    `MAX(${HEADER_THICKNESS}IN*Sheet.5!DropOnPageScale,Scratch.Y1)`,
   );
-  // Other cells derived from header Height = 0.5
-  for (const f of [
-    "Height*1",
-    "Height*1-User.Inset-User.InsetY",
-    "Geometry1.Y3",
-    "Sheet.7!Height",
-  ]) {
-    const re = new RegExp(
-      `(<Cell N='[^']+' )V='0\\.5'( U='IN' F='${f.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}'\\/>)`,
-      "g",
-    );
-    content = content.replace(re, `$1V='0.375'$2`);
-  }
-  // Half-thickness (Height/2 = 0.25 → 0.1875)
-  for (const f of [
-    "Height*0.5",
-    "GUARD(Height*0.5)",
-    "TxtHeight*0.5",
-    "GUARD(IF(User.HeadingPos=1,Sheet.5!Width-Height*0.5,IF(User.HeadingPos=3,Height*0.5,Sheet.5!Width*0.5)))",
-  ]) {
-    const re = new RegExp(
-      `(<Cell N='[^']+' )V='0\\.25'( U='IN' F='${f.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}'\\/>)`,
-      "g",
-    );
-    content = content.replace(re, `$1V='0.1875'$2`);
-  }
-
-  // Bare cells with no F= attr — the Shape 5 root Width/Height.
-  // Pattern: `<Cell N='Width' V='6' U='IN'/>` and `<Cell N='Height' V='4' U='IN'/>`.
-  content = content
-    .replace(/<Cell N='Width' V='[^']+' U='IN'\/>/, `<Cell N='Width' V='${opts.w}' U='IN'/>`)
-    .replace(/<Cell N='Height' V='[^']+' U='IN'\/>/, `<Cell N='Height' V='${opts.h}' U='IN'/>`);
 
   // Body + header fill — the master ships with V='1' F='THEMEVAL("FillColor",1)'
   // on every FillForegnd, which paints whatever the document theme
