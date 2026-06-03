@@ -1613,6 +1613,26 @@ export async function exportVisioV3(
   // Reset nextId so the actual emission loop reuses the same allocations.
   nextId = 100;
 
+  // Phase 3 commit 2 — pre-pass: allocate CFF Container + Swimlane List
+  // shape IDs and GUIDs per pool. The lane emission needs both BEFORE the
+  // owning pool is processed (lanes reference
+  // `Sheet.<containerId>!User.X` and `SwimlaneListGUID=<listGuid>`), and
+  // `data.elements` doesn't guarantee pool-before-lane ordering. Allocate
+  // up front so any lane can look them up by its parentId.
+  const poolToContainerId = new Map<string, number>();
+  const poolToListId = new Map<string, number>();
+  const poolToContainerGuid = new Map<string, string>();
+  const poolToListGuid = new Map<string, string>();
+  if (cffSource) {
+    for (const el of data.elements) {
+      if (el.type !== "pool") continue;
+      poolToContainerId.set(el.id, cffNextShapeId++);
+      poolToListId.set(el.id, cffNextShapeId++);
+      poolToContainerGuid.set(el.id, deterministicGuid(`cff-container-${el.id}`));
+      poolToListGuid.set(el.id, deterministicGuid(`cff-list-${el.id}`));
+    }
+  }
+
   // Helper: generate sub-shapes with F='Inh' for BOTH width AND height scaling
   // MasterShapes 6 (outer rect — the visible body), 7 (border group containing
   // 8,9). MasterShape 6 paints the body fill: it inherits FillStyle='7' from
@@ -2562,23 +2582,104 @@ export async function exportVisioV3(
           // metadata (msvShapeCategories + numLanes) so importVisioV3
           // can identify pool vs lane unambiguously.
           const cffCategoryValue =
-            el.type === "pool" ? "CFF Container" : "Swimlane";
+            el.type === "pool" ? "CFF Container" : "Swimlane;Lane;DoNotContain";
           const numLanesRow =
             el.type === "pool"
               ? `<Row N='numLanes'><Cell N='Value' V='${childLaneIds.length}'/></Row>`
               : "";
+
+          // Phase 3 commit 2 — wire each lane as a proper CFF list member.
+          // Look up the parent pool's CFF Container / Swimlane List shape
+          // IDs + GUIDs from the pre-pass map. Without this wiring, Visio
+          // treats the lane as a free-floating Pool/Lane shape: lanes
+          // don't follow pool resize, "Add Lane" stays greyed, and
+          // round-trip discards the container relationship.
+          //
+          // Behaviour depends on the FULL constellation (categories +
+          // formula refs + GUID + Relationships) — partial wiring leaves
+          // the CFF engine in an inconsistent state and is worse than
+          // none. We only emit ANY of these cells when we have a full
+          // (containerId, listId, listGuid) tuple from the pre-pass; if
+          // the lane has no parentId pool, fall back to plain Phase 1.5
+          // behaviour.
+          const isLaneInCff =
+            el.type === "lane"
+            && el.parentId
+            && poolToContainerId.has(el.parentId)
+            && poolToListId.has(el.parentId)
+            && poolToListGuid.has(el.parentId);
+          let laneCffUserRows = "";
+          let laneRelationshipsCell = "";
+          if (isLaneInCff) {
+            const cid = poolToContainerId.get(el.parentId!)!;
+            const lid = poolToListId.get(el.parentId!)!;
+            const lguid = poolToListGuid.get(el.parentId!)!;
+            // The CFF Container's User section defines visMargins (= 0.25),
+            // visCFFStyle (= 7), visShowPhase (= 0), visShowTitle (= 1),
+            // numLanes (= N) — populated by emitCffContainerShape. All
+            // formulas below resolve at Visio load time against the
+            // container/list page-sheets.
+            const stg1 = 7;       // visCFFStyle
+            const stg2 = 0;       // visShowPhase (no phase support)
+            const stg3 = 1;       // visShowTitle
+            const stg4 = childLaneIds.length; // numLanes is owned by the pool; for lanes this is 0
+            // For lanes we don't know numLanes locally — but the cached
+            // value is recomputed by the formula at load time so a small
+            // bootstrap (1) is fine. Visio overwrites it on first recalc.
+            const laneStg4 = stg4 || 1;
+            const stg5 = "0.2500"; // visMargins formatted
+            const stg6 = 0;        // visRotateLabel
+            const cffSettings =
+              `/stg1=${stg1}, /stg2=${stg2}, /stg3=${stg3}, /stg4=${laneStg4}, /stg5=${stg5}, /stg6=${stg6}`;
+            const cffSettingsF =
+              `"/stg1="&amp;Sheet.${cid}!User.visCFFStyle&amp;"`
+              + `, /stg2="&amp;Sheet.${cid}!User.visShowPhase&amp;"`
+              + `, /stg3="&amp;Sheet.${cid}!User.visShowTitle&amp;"`
+              + `, /stg4="&amp;Sheet.${cid}!User.numLanes&amp;"`
+              + `, /stg5="&amp;FORMATEX(Sheet.${cid}!User.visMargins,"0.0000","","in")&amp;"`
+              + `, /stg6="&amp;Sheet.${lid}!User.visRotateLabel`;
+            laneCffUserRows =
+              // Margin inherited from container
+              `<Row N='msvSDContainerMargin'><Cell N='Value' V='0' F='Sheet.${cid}!User.visMargins'/></Row>` +
+              // visDirection — picks horizontal/vertical lane orientation
+              // off the Swimlane List's msvSDListDirection. With no phase
+              // support, the phase branch falls back to 0.
+              `<Row N='visDirection'><Cell N='Value' V='0' F='IF(Sheet.${lid}!User.msvSDListDirection=0,1,IF(Sheet.${lid}!User.msvSDListDirection=1,0,0))'/></Row>` +
+              `<Row N='RTL'><Cell N='Value' V='0' F='IFERROR(CONTAINERSHEETREF(LISTSHEETREF(),1,"CFF Container")!User.RTL,0)'/></Row>` +
+              `<Row N='visRotateLabel'><Cell N='Value' V='0' F='IFERROR(LISTSHEETREF()!User.VISROTATELABEL,0)'/></Row>` +
+              `<Row N='visCFFStyle'><Cell N='Value' V='7' F='Sheet.${cid}!User.visCFFStyle'/></Row>` +
+              `<Row N='SwimlaneListGUID'><Cell N='Value' V='${lguid}' U='GUID'/></Row>` +
+              `<Row N='visCFFSettings'><Cell N='Value' V='${cffSettings}' U='STR' F='${cffSettingsF}'/></Row>` +
+              `<Row N='BPMNPool'><Cell N='Value' V='0' F='AND(IFERROR(CONTAINERSHEETREF(LISTSHEETREF(),1)!User.NUMLANES,0)=1,NOT(IFERROR(CONTAINERSHEETREF(LISTSHEETREF(),1)!User.VISSHOWTITLE,TRUE)))'/></Row>`;
+            // Relationships drives DEPENDSON between the lane and its
+            // list — Visio uses it to schedule recalc when the list
+            // changes (e.g. on Add Lane).
+            laneRelationshipsCell =
+              `<Cell N='Relationships' V='0' F='SUM(DEPENDSON(5,Sheet.${lid}!SheetRef()),DEPENDSON(1))'/>`;
+          }
 
           // Page-shape additions: visHeadingText (label), container
           // activation (msvSDContainerLocked=1), CFF round-trip metadata
           // (msvShapeCategories + numLanes), plus for pools the Member
           // section listing child lane shape IDs (Visio uses this to
           // know which shapes are list members of the container).
+          //
+          // For lanes the msvSDContainerLocked row is dropped — Visio
+          // treats that cell as the activation flag for CFF containers,
+          // and lanes are MEMBERS not containers. Leaving it set to 1
+          // on lanes confused Visio's CFF engine in early Phase 1.5
+          // experiments. Pools keep it (they activate the container).
+          const containerLockedRow =
+            el.type === "pool"
+              ? `<Row N='msvSDContainerLocked'><Cell N='Value' V='1' U='BOOL'/></Row>`
+              : "";
           const poolUserSection =
             `<Section N='User'>` +
             `<Row N='visHeadingText'><Cell N='Value' V='${esc(poolLabel)}' U='STR' F='Inh'/></Row>` +
-            `<Row N='msvSDContainerLocked'><Cell N='Value' V='1' U='BOOL'/></Row>` +
+            containerLockedRow +
             `<Row N='msvShapeCategories'><Cell N='Value' V='${cffCategoryValue}' U='STR'/></Row>` +
             numLanesRow +
+            laneCffUserRows +
             `</Section>`;
           let memberSection = "";
           if (el.type === "pool" && childLaneIds.length > 0) {
@@ -2605,6 +2706,7 @@ export async function exportVisioV3(
             `<Cell N='Height' V='${h}'/>` +
             `<Cell N='LocPinX' V='${hw}' F='Inh'/>` +
             `<Cell N='LocPinY' V='${hh}' F='Inh'/>` +
+            laneRelationshipsCell +
             poolUserSection +
             propSection +
             elCharSection +
@@ -2625,8 +2727,14 @@ export async function exportVisioV3(
           // The Swimlane List sits over the lane area and is also
           // suppressed.
           if (cffSource && el.type === "pool") {
-            const containerShapeId = cffNextShapeId++;
-            const listShapeId = cffNextShapeId++;
+            // Phase 3 commit 2 — pull the pre-allocated container/list
+            // shape IDs and GUIDs from the pre-pass so lanes (which may
+            // be emitted before their parent pool, depending on
+            // data.elements order) can reference them too.
+            const containerShapeId = poolToContainerId.get(el.id)!;
+            const listShapeId = poolToListId.get(el.id)!;
+            const containerGuid = poolToContainerGuid.get(el.id)!;
+            const listGuid = poolToListGuid.get(el.id)!;
             const containerMasterId = cffNextMasterId++;
             const listMasterId = cffNextMasterId++;
             const containerRId = `rId${nextRId++}`;
@@ -2696,9 +2804,6 @@ export async function exportVisioV3(
             zip.file("visio/masters/masters.xml", mastersXml);
             zip.file("visio/masters/_rels/masters.xml.rels", mastersRels);
             zip.file("[Content_Types].xml", contentTypes);
-
-            const containerGuid = deterministicGuid(`cff-container-${el.id}`);
-            const listGuid = deterministicGuid(`cff-list-${el.id}`);
 
             shapes.push(
               emitCffContainerShape({
