@@ -122,7 +122,11 @@ export function cloneCffContainer(
   // NoShow, so emptying those cells is what actually stops the paint.
   // poolLabel is still set on the page-shape's Property.BpmnName via
   // emitCffContainerShape, so nothing is lost.
-  content = content.replace(/<Text>[^<]*<\/Text>/g, `<Text></Text>`);
+  // Use non-greedy [\s\S]*? — the master's painted text block is
+  // `<Text><pp IX='0'/>Title\r\n</Text>` and contains an inner `<pp/>`
+  // marker. A naive [^<]* pattern would skip the whole block on the
+  // `<` boundary and leave the literal "Title" intact.
+  content = content.replace(/<Text>[\s\S]*?<\/Text>/g, `<Text></Text>`);
   content = content.replace(
     /<Cell N='Value' V='Title' U='STR'/g,
     `<Cell N='Value' V='' U='STR'`,
