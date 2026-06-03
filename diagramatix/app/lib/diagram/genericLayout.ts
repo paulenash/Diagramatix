@@ -239,16 +239,25 @@ export function layoutGenericDiagram(
     const leftOccupied: Array<{ top: number; bottom: number }> = [];
     const rightOccupied: Array<{ top: number; bottom: number }> = [];
 
+    // P2.08 — leave a clear gap between actor icons AND their labels
+    // so two stacked actors never run their labels together. The
+    // stored bounds cover the icon only; labels render ~24 px below it.
+    // We therefore need (label allowance) + (minimum clear gap) of
+    // vertical separation between each actor's icon-bottom and the
+    // next actor's icon-top — and we mirror that horizontally as a
+    // safety margin even though the layout stacks vertically.
+    const ACTOR_LABEL_ALLOWANCE_PX = 24;
+    const ACTOR_CLEAR_GAP_PX = 30;
+    const ACTOR_GAP = ACTOR_LABEL_ALLOWANCE_PX + ACTOR_CLEAR_GAP_PX;
     function findFreeY(occupied: Array<{ top: number; bottom: number }>, idealY: number, height: number): number {
-      const GAP = 15;
       let y = idealY;
       // Push down if overlapping with any existing placement
       let conflict = true;
       while (conflict) {
         conflict = false;
         for (const r of occupied) {
-          if (y < r.bottom + GAP && y + height > r.top - GAP) {
-            y = r.bottom + GAP;
+          if (y < r.bottom + ACTOR_GAP && y + height > r.top - ACTOR_GAP) {
+            y = r.bottom + ACTOR_GAP;
             conflict = true;
           }
         }
@@ -394,6 +403,16 @@ export function layoutGenericDiagram(
     let src = elMap.get(c.sourceId);
     let tgt = elMap.get(c.targetId);
     if (!src || !tgt) continue;
+
+    // P2.09 — Process Context: an association connector between two
+    // process (use-case) elements is not legal. Process Context
+    // associations must run process ↔ actor / team / system. Drop any
+    // such connector silently at layout time so AI-generated diagrams
+    // never emit one.
+    if (diagramType === "process-context"
+        && src.type === "use-case" && tgt.type === "use-case") {
+      continue;
+    }
 
     const connType = c.type ?? defaultConnType[diagramType] ?? "sequence";
     const routing = defaultRouting[diagramType] ?? "rectilinear";

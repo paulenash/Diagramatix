@@ -103,6 +103,8 @@ IMPORTANT rules:
 - If a team or department is mentioned, use "team" type, NOT "actor".
 - If an IT system is mentioned that the process interacts with, use "system" type with the system name.
 - ORDER the elements array so that actors/teams/systems appear in the JSON between the processes they connect to. This helps the layout engine place them optimally to minimise crossing lines.
+- ABSOLUTE: NEVER create a connection whose source AND target are BOTH "use-case" (process) elements. Process-to-process associations are not allowed on this diagram. Every association must run between a process and an actor / team / system / hourglass. Any process-to-process connection will be silently dropped at layout time.
+- ABSOLUTE: leave generous space between actors, teams, systems and hourglasses on the same side of the diagram. Their labels render below the icon, so two of these placed close together will run their labels into each other. Order them so the layout engine can give each at least 30 px of clear space below its label before the next icon begins.
 
 Output format:
 {
