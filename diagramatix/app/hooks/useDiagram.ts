@@ -4184,7 +4184,12 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       //   • both endpoints inside lower → shift waypoints by lowerDy
       //   • anything else (cross-lane, or one endpoint outside the
       //     swapping pair) → recompute via the regular routing pass
-      //     so obstacle avoidance + pool boundary apply.
+      //     so obstacle avoidance + pool boundary apply, then run
+      //     validateConnectorsAgainstObstacles so any path that still
+      //     crosses an element gets re-routed against the new layout
+      //     (Paul: "always re-route if the lane change produces
+      //     connectors that now have to go through elements").
+      const reroutedIds = new Set<string>();
       const connectors = state.connectors.map(conn => {
         const srcInU = upperSet.has(conn.sourceId);
         const tgtInU = upperSet.has(conn.targetId);
@@ -4197,10 +4202,63 @@ function reducer(state: DiagramData, action: Action): DiagramData {
           return { ...conn, waypoints: conn.waypoints.map(p => ({ x: p.x, y: p.y + lowerDy })) };
         }
         // Non-internal: reroute against the post-swap element layout.
-        return recomputeAllConnectors([conn], elements)[0] ?? conn;
+        //
+        // Refinement: if the connector is currently attached to the
+        // OPTIMAL side-pair for its pre-swap geometry (i.e. the user
+        // hasn't manually overridden the attachment to a non-shortest
+        // side), recompute the optimal pair against the POST-swap
+        // geometry and swap the sides accordingly. This makes the
+        // connector follow the shortest route after the lane move.
+        //
+        // If the connector's sides DON'T match the pre-swap optimum
+        // (the user explicitly chose left-to-right when top-to-bottom
+        // would have been shorter, etc.), leave the sides alone — the
+        // user's deliberate choice is preserved.
+        const srcOld = state.elements.find(e => e.id === conn.sourceId);
+        const tgtOld = state.elements.find(e => e.id === conn.targetId);
+        const srcNew = elements.find(e => e.id === conn.sourceId);
+        const tgtNew = elements.find(e => e.id === conn.targetId);
+        let candidate = conn;
+        if (srcOld && tgtOld && srcNew && tgtNew) {
+          const optBefore = safeSidePair(srcOld, tgtOld, state.elements);
+          const wasAtOptimum = conn.sourceSide === optBefore.src && conn.targetSide === optBefore.tgt;
+          if (wasAtOptimum) {
+            const optAfter = safeSidePair(srcNew, tgtNew, elements);
+            if (optAfter.src !== conn.sourceSide || optAfter.tgt !== conn.targetSide) {
+              candidate = {
+                ...conn,
+                sourceSide: optAfter.src,
+                targetSide: optAfter.tgt,
+                // Re-centre the offsets along the new sides — the old
+                // offsetAlong was tied to the previous side which may
+                // be a different axis (e.g. switching top/bottom ↔
+                // left/right rotates the offset's meaning entirely).
+                sourceOffsetAlong: 0.5,
+                targetOffsetAlong: 0.5,
+              };
+            }
+          }
+        }
+        reroutedIds.add(conn.id);
+        return recomputeAllConnectors([candidate], elements)[0] ?? candidate;
       });
 
-      return { ...state, elements, connectors };
+      // Second-pass obstacle validation on the rerouted set. If any
+      // of those connectors still has a segment crossing an element
+      // bounding box (e.g. because keeping the user's chosen sides
+      // forced the path through an obstacle), this pass replans the
+      // route from scratch — mirroring the MOVE_ELEMENT validation
+      // pattern. Internal-only connectors that were merely translated
+      // are skipped: their relative geometry to their endpoints is
+      // unchanged, so they can't have newly crossed an obstacle.
+      const toValidate = connectors.filter(c => reroutedIds.has(c.id));
+      const unchanged  = connectors.filter(c => !reroutedIds.has(c.id));
+      const finalConnectors = [
+        ...validateConnectorsAgainstObstacles(toValidate, elements),
+        ...unchanged,
+      ];
+
+      return { ...state, elements, connectors: finalConnectors };
     }
 
     case "MOVE_ELEMENTS": {
