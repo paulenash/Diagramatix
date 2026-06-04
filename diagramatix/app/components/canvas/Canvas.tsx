@@ -265,6 +265,11 @@ interface Props {
     },
   ) => void;
   onAddSelfTransition?: (elementId: string, side: Side, srcOffset: number, tgtOffset: number, bulge: number) => void;
+  /** Swap a top-level lane with its neighbour in the given direction.
+   *  Wired in Phase 2 to a SWAP_LANES_VERTICAL reducer action. Until
+   *  then the prop is undefined and the lane-header ↑/↓ buttons are
+   *  visible but no-op when clicked. */
+  onSwapLane?: (laneId: string, direction: "up" | "down") => void;
 }
 
 interface EditingLabel {
@@ -474,6 +479,7 @@ export function Canvas({
   onInsertSpace,
   onRemoveSpace,
   onAddSelfTransition,
+  onSwapLane,
 }: Props) {
   const displayMode = displayModeProp ?? "normal";
   const svgRef = useRef<SVGSVGElement>(null);
@@ -4280,7 +4286,23 @@ export function Canvas({
               any part of the lane body (which sits above the pool body)
               moves the whole group. Active-group lanes are skipped here
               and re-rendered in the overlay block at the end. */}
-          {lanes.filter(el => !inActiveGroup(el.id)).map((el) => (
+          {lanes.filter(el => !inActiveGroup(el.id)).map((el) => {
+            // Lane-swap eligibility — only top-level lanes (parent is a
+            // pool) get the ↑/↓ controls in the first cut. Sub-lanes
+            // currently don't (deferred per Paul 2026-06-04).
+            const parentEl = data.elements.find(e => e.id === el.parentId);
+            const isTopLevelLane = parentEl?.type === "pool";
+            let canSwapLaneUp: boolean | undefined;
+            let canSwapLaneDown: boolean | undefined;
+            if (isTopLevelLane && parentEl) {
+              const siblingLanes = lanes
+                .filter(l => l.parentId === parentEl.id)
+                .sort((a, b) => a.y - b.y);
+              const idx = siblingLanes.findIndex(l => l.id === el.id);
+              canSwapLaneUp = idx > 0;
+              canSwapLaneDown = idx >= 0 && idx < siblingLanes.length - 1;
+            }
+            return (
             <SymbolRenderer
               key={el.id}
               element={el}
@@ -4308,8 +4330,12 @@ export function Canvas({
               onGroupMoveEnd={onElementsMoveEnd}
               colorConfig={colorConfig}
               debugMode={debugMode}
+              canSwapLaneUp={canSwapLaneUp}
+              canSwapLaneDown={canSwapLaneDown}
+              onSwapLane={onSwapLane ? (dir) => onSwapLane(el.id, dir) : undefined}
             />
-          ))}
+            );
+          })}
 
           {/* Lane boundary drag handles — shown between adjacent lanes in multi-lane pools */}
           {pools.flatMap((pool) => {

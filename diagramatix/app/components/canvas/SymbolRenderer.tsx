@@ -72,6 +72,14 @@ interface Props {
   inConnectionMode?: boolean;
   /** Debug mode — overlays live poolH/elemH labels on pools and elements. */
   debugMode?: boolean;
+  /** Lane swap controls — set on a selected top-level lane to enable the
+   *  ↑ / ↓ buttons inside the lane header. The Canvas decides whether
+   *  each direction is possible (i.e. whether a sibling lane exists in
+   *  that direction) and passes the booleans through. Sub-lanes don't
+   *  receive these props in the first cut. */
+  canSwapLaneUp?: boolean;
+  canSwapLaneDown?: boolean;
+  onSwapLane?: (direction: "up" | "down") => void;
 }
 
 function ellipseOctagonPoints(cx: number, cy: number, rx: number, ry: number): string {
@@ -1608,6 +1616,9 @@ export function SymbolRenderer({
   onCancelConnectionMode,
   inConnectionMode,
   debugMode,
+  canSwapLaneUp,
+  canSwapLaneDown,
+  onSwapLane,
 }: Props) {
   const fontScale = useContext(FontScaleCtx);
   const processFontSize = useContext(ProcessFontSizeCtx);
@@ -1924,6 +1935,85 @@ export function SymbolRenderer({
       style={(isBoundary || isWhiteBoxPool) ? { cursor: "default" } : undefined}
     >
       <SymbolShape el={element} />
+
+      {/* Lane-swap UI: 4-edge highlight + ↑/↓ arrow buttons on the
+          header strip. Visible only on a selected top-level lane that
+          received `canSwapLaneUp` / `canSwapLaneDown` props from Canvas
+          (Canvas decides eligibility — sub-lanes don't get these). */}
+      {element.type === "lane" && selected && (canSwapLaneUp !== undefined || canSwapLaneDown !== undefined) && (() => {
+        const stored = element.properties?.laneHeaderWidth as number | undefined;
+        const HEADER_W = typeof stored === "number" && stored > 0 ? stored : 36;
+        const BTN_M = 4;                          // margin from header edges
+        const BTN_W = HEADER_W - 2 * BTN_M;
+        const BTN_H = Math.min(28, Math.max(20, element.height * 0.18));
+        // Arrow geometry — triangle pointing up/down inside the button rect.
+        const upX = element.x + BTN_M, upY = element.y + BTN_M;
+        const dnX = element.x + BTN_M, dnY = element.y + element.height - BTN_M - BTN_H;
+        const tri = (cx: number, cy: number, dir: "up" | "down") => {
+          const h = Math.min(10, BTN_H * 0.5);
+          const w = Math.min(BTN_W * 0.5, 12);
+          return dir === "up"
+            ? `${cx},${cy - h / 2} ${cx - w / 2},${cy + h / 2} ${cx + w / 2},${cy + h / 2}`
+            : `${cx},${cy + h / 2} ${cx - w / 2},${cy - h / 2} ${cx + w / 2},${cy - h / 2}`;
+        };
+        const upEnabled = !!canSwapLaneUp;
+        const dnEnabled = !!canSwapLaneDown;
+        const fill = (en: boolean) => en ? "#3b82f6" : "#d1d5db";
+        const bg   = (en: boolean) => en ? "#eff6ff" : "#f3f4f6";
+        return (
+          <g pointerEvents="all">
+            {/* 4-edge highlight — single rect with no fill, heavier stroke. */}
+            <rect
+              x={element.x + 1}
+              y={element.y + 1}
+              width={element.width - 2}
+              height={element.height - 2}
+              fill="none"
+              stroke="#3b82f6"
+              strokeWidth={2.5}
+              pointerEvents="none"
+            />
+            {/* Up arrow button. */}
+            {canSwapLaneUp !== undefined && (
+              <g
+                onMouseDown={(e) => { e.stopPropagation(); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (upEnabled && onSwapLane) onSwapLane("up");
+                }}
+                style={{ cursor: upEnabled ? "pointer" : "not-allowed" }}
+              >
+                <rect x={upX} y={upY} width={BTN_W} height={BTN_H}
+                      fill={bg(upEnabled)} stroke={fill(upEnabled)} strokeWidth={1} rx={3} ry={3} />
+                <polygon
+                  points={tri(upX + BTN_W / 2, upY + BTN_H / 2, "up")}
+                  fill={fill(upEnabled)}
+                  pointerEvents="none"
+                />
+              </g>
+            )}
+            {/* Down arrow button. */}
+            {canSwapLaneDown !== undefined && (
+              <g
+                onMouseDown={(e) => { e.stopPropagation(); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (dnEnabled && onSwapLane) onSwapLane("down");
+                }}
+                style={{ cursor: dnEnabled ? "pointer" : "not-allowed" }}
+              >
+                <rect x={dnX} y={dnY} width={BTN_W} height={BTN_H}
+                      fill={bg(dnEnabled)} stroke={fill(dnEnabled)} strokeWidth={1} rx={3} ry={3} />
+                <polygon
+                  points={tri(dnX + BTN_W / 2, dnY + BTN_H / 2, "down")}
+                  fill={fill(dnEnabled)}
+                  pointerEvents="none"
+                />
+              </g>
+            )}
+          </g>
+        );
+      })()}
 
       {/* Shift-drag escape — pulsing purple halo while the user holds
           Shift through a drag, signalling that the element is free to
