@@ -2496,14 +2496,30 @@ export async function exportVisioV3(
           // Header strip fill — natural master is #c8956a (a generic
           // pool brown). Re-colour per element type so Pools get the
           // darker sidebar brown and Lanes get the lighter lane brown.
-          // The body fill (#e8c4a0 on Shape 6) is left alone — both
-          // pool and lane bodies render against the page background.
           const headerColor = el.type === "lane"
             ? (colorMap["lane"] ?? "#e8c4a0")
             : (colorMap["pool"] ?? "#d4a382");
           poolMasterXml = poolMasterXml
             .split("FillForegnd' V='#c8956a'")
             .join(`FillForegnd' V='${headerColor}'`);
+
+          // Body fill — natural master is #e8c4a0 (a lane-ish tan)
+          // which happens to be IDENTICAL to the default lane
+          // headerColor, so lane bodies and lane headers look the
+          // same colour. Lighten the body so the header is
+          // distinguishable. Mirrors the CFF Container pool body
+          // approach (lightenHex of headerColor).
+          const lightenHex = (hex: string) => {
+            const r = parseInt(hex.slice(1, 3), 16);
+            const g = parseInt(hex.slice(3, 5), 16);
+            const b = parseInt(hex.slice(5, 7), 16);
+            const mix = (c: number) => Math.round(c + (255 - c) * 0.5);
+            return `#${mix(r).toString(16).padStart(2, "0")}${mix(g).toString(16).padStart(2, "0")}${mix(b).toString(16).padStart(2, "0")}`;
+          };
+          const bodyColor = lightenHex(headerColor);
+          poolMasterXml = poolMasterXml
+            .split("FillForegnd' V='#e8c4a0'")
+            .join(`FillForegnd' V='${bodyColor}'`);
 
           // Phase 3 follow-on: Shape 6 (body) of the v1.5 Pool/Lane
           // master ships with `FillForegndTrans V='1' F='THEMEGUARD(
