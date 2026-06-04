@@ -6072,7 +6072,7 @@ export function Canvas({
         const containerW = containerRect?.width ?? window.innerWidth;
         const containerH = containerRect?.height ?? window.innerHeight;
         const POPUP_W = 220;
-        const POPUP_H = 5 * 32 + 36 + 12; // 5 themes + clear + padding
+        const POPUP_H = CHEVRON_THEMES.length * 32 + 36 + 12; // N themes + clear + padding
         const left = Math.min(themePicker.screenX, containerW - POPUP_W - 4);
         const top = Math.min(themePicker.screenY, containerH - POPUP_H - 4);
         return (

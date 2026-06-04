@@ -8,7 +8,16 @@ import { getSymbolDefinition } from "./symbols/definitions";
 import { computeWaypoints } from "./routing";
 import { CHEVRON_THEMES } from "./chevronThemes";
 
-const GARDEN_THEME = CHEVRON_THEMES.find(t => t.name === "Garden")!;
+// Value chain AI rule: when a Value Chain contains collapsed
+// processes, pick a random Colour Theme from the catalogue and apply
+// it across all chevron elements in that generation. Called once per
+// layoutGenericDiagram invocation so all chevrons share the same theme.
+function pickRandomChevronTheme() {
+  return CHEVRON_THEMES[Math.floor(Math.random() * CHEVRON_THEMES.length)];
+}
+
+/* GARDEN_THEME removed — value chain now picks a random theme per
+   generation via pickRandomChevronTheme() above. */
 const CHEVRON_OVERLAP = 10; // 10px overlap for snapped processes
 const CHARS_PER_PX = 0.14; // approximate characters per pixel at 12px font
 
@@ -132,6 +141,15 @@ export function layoutGenericDiagram(
   const isValueChain = diagramType === "value-chain";
   const isProcessContext = diagramType === "process-context";
 
+  // Pick a single random Colour Theme for this generation so every
+  // chevron in the diagram shares one consistent palette. Falls back
+  // to a stable choice when not a value chain (the variable is
+  // unused outside the value-chain branches but kept defined to
+  // simplify the call sites).
+  const chevronTheme = isValueChain
+    ? pickRandomChevronTheme()
+    : CHEVRON_THEMES[0];
+
   // Layout containers first (large, in a row)
   let containerX = START_X;
   let containerY = START_Y;
@@ -253,13 +271,14 @@ export function layoutGenericDiagram(
         const props = buildProperties(ai, diagramType);
         let elW = def.defaultWidth;
 
-        // Value chain: wrap labels and apply Garden theme colour
+        // Value chain: wrap labels and apply the per-generation random
+        // theme colour (see pickRandomChevronTheme above).
         if (isValueChain && (ai.type === "chevron" || ai.type === "chevron-collapsed")) {
           elW = chevronW;
           const textW = elW - 40;
           const wrapped = wrapLabel(label, textW);
           label = wrapped.text;
-          props.fillColor = GARDEN_THEME.colours[gardenIdx % GARDEN_THEME.colours.length];
+          props.fillColor = chevronTheme.colours[gardenIdx % chevronTheme.colours.length];
           gardenIdx++;
         }
 
@@ -433,13 +452,14 @@ export function layoutGenericDiagram(
     const props = buildProperties(ai, diagramType);
     let elW = def.defaultWidth;
 
-    // Value chain: wrap labels and apply Garden theme colour
+    // Value chain: wrap labels and apply the per-generation random
+    // theme colour (same theme as the first branch).
     if (isValueChain && (ai.type === "chevron" || ai.type === "chevron-collapsed")) {
       elW = unplacedChevronW;
       const textW = elW - 40;
       const wrapped = wrapLabel(label, textW);
       label = wrapped.text;
-      props.fillColor = GARDEN_THEME.colours[gardenIdx % GARDEN_THEME.colours.length];
+      props.fillColor = chevronTheme.colours[gardenIdx % chevronTheme.colours.length];
       gardenIdx++;
     }
 
