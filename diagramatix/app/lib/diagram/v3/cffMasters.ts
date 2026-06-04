@@ -460,17 +460,22 @@ export function emitSwimlaneListShape(opts: {
     `<Row IX='0'><Cell N='A' V='0' F='IFERROR(SETF(GetRef(CONTAINERSHEETREF(1)!User.NUMLANES),LISTMEMBERCOUNT()),0)'/></Row>` +
     `</Section>` +
     // Override the master's Geometry section AT THE INSTANCE LEVEL
-    // with NoShow=1. Paul identified ID 60001 (this very page-shape)
-    // as the spurious rectangle in Visio. The master-level NoShow=1
-    // patch in exportVisioV3.ts wasn't enough — Visio's CFF list
-    // engine evidently uses page-shape geometry / inherited bbox to
-    // draw a list outline even when the master's geometry is hidden.
-    // Adding an instance-level Geometry section with NoShow=1 forces
-    // the page-shape itself to also report "do not paint".
+    // with NoShow=1 to suppress the spurious outline Visio's CFF
+    // list engine draws at the shape's bbox. CRITICAL: keep the
+    // geometry PATH (inherited from master via F='Inh') intact —
+    // without a valid geometry path, Visio's CFF engine can't
+    // resolve the list's spatial extent and lane membership /
+    // pool-follows-lane behaviour breaks. So we override the
+    // NoShow/NoFill/NoLine cells but inherit the Row coordinates.
     `<Section N='Geometry' IX='0'>` +
     `<Cell N='NoShow' V='1'/>` +
     `<Cell N='NoFill' V='1'/>` +
     `<Cell N='NoLine' V='1'/>` +
+    `<Row T='MoveTo' IX='1'><Cell N='X' F='Inh'/><Cell N='Y' F='Inh'/></Row>` +
+    `<Row T='LineTo' IX='2'><Cell N='X' F='Inh'/><Cell N='Y' F='Inh'/></Row>` +
+    `<Row T='LineTo' IX='3'><Cell N='X' F='Inh'/><Cell N='Y' F='Inh'/></Row>` +
+    `<Row T='LineTo' IX='4'><Cell N='X' F='Inh'/><Cell N='Y' F='Inh'/></Row>` +
+    `<Row T='LineTo' IX='5'><Cell N='X' F='Inh'/><Cell N='Y' F='Inh'/></Row>` +
     `</Section>` +
     `</Shape>`
   );
