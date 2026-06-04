@@ -248,12 +248,15 @@ export function cloneCffContainer(
     return `RGB(${r},${g},${b})`;
   };
   // Lighten the pool colour for the body so the header stands out.
-  // Simple +30% lightness approximation: average with white.
+  // 75% mix with white — Paul found 50% "too dark"; 75% pushes the
+  // body to a pale cream that contrasts cleanly with the header.
+  // Keep this in sync with the lane body lightenHex in exportVisioV3.ts
+  // so pool body and lane bodies share the same lightness level.
   const lightenHex = (hex: string) => {
     const r = parseInt(hex.slice(1, 3), 16);
     const g = parseInt(hex.slice(3, 5), 16);
     const b = parseInt(hex.slice(5, 7), 16);
-    const mix = (c: number) => Math.round(c + (255 - c) * 0.5);
+    const mix = (c: number) => Math.round(c + (255 - c) * 0.75);
     return `#${mix(r).toString(16).padStart(2, "0")}${mix(g).toString(16).padStart(2, "0")}${mix(b).toString(16).padStart(2, "0")}`;
   };
   const bodyColor = lightenHex(opts.headerColor);
