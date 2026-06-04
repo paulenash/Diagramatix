@@ -2550,6 +2550,16 @@ export async function exportVisioV3(
             /<Cell N='FillForegndTrans' V='1' F='THEMEGUARD\(User\.FillForegndTrans\)'\/>/,
             `<Cell N='FillForegndTrans' V='0' F='GUARD(0%)'/>`,
           );
+
+          // Shape 6's User.FillForegnd row carries a CFF-style-dependent
+          // formula that resolves to THEME("BackgroundColor") when
+          // CFFStyle is in {1,2,3} (default 7→1). Even though the
+          // shape-level FillForegnd is now patched to bodyColor, Visio
+          // can fall back to the User row's resolved value in certain
+          // rendering paths. Hard-guard the User row to bodyColor too.
+          poolMasterXml = poolMasterXml
+            .split(`<Row N='FillForegnd'><Cell N='Value' V='#ffffff' U='COLOR' F='IF(AND(_MOD(User.CFFStyle,6)&gt;0,_MOD(User.CFFStyle,6)&lt;4),THEME("BackgroundColor"),Sheet.5!FillForegnd)'/>`)
+            .join(`<Row N='FillForegnd'><Cell N='Value' V='${bodyColor}' U='COLOR' F='GUARD(RGB(${parseInt(bodyColor.slice(1,3),16)},${parseInt(bodyColor.slice(3,5),16)},${parseInt(bodyColor.slice(5,7),16)}))'/>`);
           poolMasterXml = poolMasterXml.replace(
             /<Cell N='FillBkgndTrans' V='1' F='THEMEGUARD\(User\.FillForegndTrans\)'\/>/,
             `<Cell N='FillBkgndTrans' V='0' F='GUARD(0%)'/>`,
