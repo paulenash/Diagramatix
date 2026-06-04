@@ -4190,47 +4190,67 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       //     (Paul: "always re-route if the lane change produces
       //     connectors that now have to go through elements").
 
-      // Pre-pass: gateway top↔bottom flip. If a gateway has two
-      // outgoing connectors — one exiting via TOP into one swapping
-      // lane and one exiting via BOTTOM into the OTHER swapping lane —
-      // their source-side attachments flip after the swap so the top
-      // exit continues to point at the lane that is now visually above
-      // the gateway and the bottom exit at the lane now below.
-      // Same logic applies for incoming connectors on a merge
-      // gateway (targetSide top ↔ bottom). Offsets reset to 0.5 since
-      // top/bottom and left/right map to different axes.
+      // Pre-pass: gateway top↔bottom flip.
+      //
+      // For each gateway G we examine its TOP and BOTTOM outgoing
+      // connectors (and separately, the TOP / BOTTOM incoming
+      // connectors for the merge-gateway case). A connector "needs to
+      // flip" when its non-gateway endpoint sits in a swap-set that
+      // moves it across the gateway after the swap:
+      //   • top-out → target in UPPER set (will be DOWN after swap)
+      //   • bot-out → target in LOWER set (will be UP after swap)
+      //   • top-in  → source in UPPER set (will be DOWN after swap)
+      //   • bot-in  → source in LOWER set (will be UP after swap)
+      //
+      // Paul: "if there was already a connector connected on that
+      // other connection point, it too must be swapped to where the
+      // other connector used to be connected to. i.e. they must both
+      // swap." So when one connector flips, the partner connector
+      // on the same gateway's other vertical attachment (if it
+      // exists) is forced to swap too, even if it didn't independently
+      // need to.
+      //
+      // Offsets reset to 0.5 since top/bottom and left/right are on
+      // different axes — old offsetAlong values don't translate.
       const gatewayFlipSrc = new Map<string, "top" | "bottom">();
       const gatewayFlipTgt = new Map<string, "top" | "bottom">();
       for (const g of state.elements) {
         if (g.type !== "gateway") continue;
+
+        // OUTGOING (sourceSide top vs bottom)
         const outConns = state.connectors.filter(c => c.sourceId === g.id);
-        const topOut = outConns.find(c => c.sourceSide === "top"
-          && (upperSet.has(c.targetId) || lowerSet.has(c.targetId)));
-        const botOut = outConns.find(c => c.sourceSide === "bottom"
-          && (upperSet.has(c.targetId) || lowerSet.has(c.targetId)));
-        if (topOut && botOut) {
-          const topGoesUpper = upperSet.has(topOut.targetId);
-          const botGoesLower = lowerSet.has(botOut.targetId);
-          // Flip only when top→one-lane and bottom→the-other-lane
-          // (both "natural" and "inverted" arrangements qualify —
-          // the swap re-orders the lanes either way).
-          if ((topGoesUpper && botGoesLower) || (!topGoesUpper && !botGoesLower)) {
-            gatewayFlipSrc.set(topOut.id, "bottom");
-            gatewayFlipSrc.set(botOut.id, "top");
-          }
+        const topOut = outConns.find(c => c.sourceSide === "top");
+        const botOut = outConns.find(c => c.sourceSide === "bottom");
+        const topOutNeedsFlip = !!topOut && upperSet.has(topOut.targetId);
+        const botOutNeedsFlip = !!botOut && lowerSet.has(botOut.targetId);
+        if (topOutNeedsFlip && botOut) {
+          gatewayFlipSrc.set(topOut!.id, "bottom");
+          gatewayFlipSrc.set(botOut.id, "top");
+        } else if (botOutNeedsFlip && topOut) {
+          gatewayFlipSrc.set(botOut!.id, "top");
+          gatewayFlipSrc.set(topOut.id, "bottom");
+        } else if (topOutNeedsFlip) {
+          gatewayFlipSrc.set(topOut!.id, "bottom");
+        } else if (botOutNeedsFlip) {
+          gatewayFlipSrc.set(botOut!.id, "top");
         }
+
+        // INCOMING (targetSide top vs bottom)
         const inConns = state.connectors.filter(c => c.targetId === g.id);
-        const topIn = inConns.find(c => c.targetSide === "top"
-          && (upperSet.has(c.sourceId) || lowerSet.has(c.sourceId)));
-        const botIn = inConns.find(c => c.targetSide === "bottom"
-          && (upperSet.has(c.sourceId) || lowerSet.has(c.sourceId)));
-        if (topIn && botIn) {
-          const topComesUpper = upperSet.has(topIn.sourceId);
-          const botComesLower = lowerSet.has(botIn.sourceId);
-          if ((topComesUpper && botComesLower) || (!topComesUpper && !botComesLower)) {
-            gatewayFlipTgt.set(topIn.id, "bottom");
-            gatewayFlipTgt.set(botIn.id, "top");
-          }
+        const topIn = inConns.find(c => c.targetSide === "top");
+        const botIn = inConns.find(c => c.targetSide === "bottom");
+        const topInNeedsFlip = !!topIn && upperSet.has(topIn.sourceId);
+        const botInNeedsFlip = !!botIn && lowerSet.has(botIn.sourceId);
+        if (topInNeedsFlip && botIn) {
+          gatewayFlipTgt.set(topIn!.id, "bottom");
+          gatewayFlipTgt.set(botIn.id, "top");
+        } else if (botInNeedsFlip && topIn) {
+          gatewayFlipTgt.set(botIn!.id, "top");
+          gatewayFlipTgt.set(topIn.id, "bottom");
+        } else if (topInNeedsFlip) {
+          gatewayFlipTgt.set(topIn!.id, "bottom");
+        } else if (botInNeedsFlip) {
+          gatewayFlipTgt.set(botIn!.id, "top");
         }
       }
 
