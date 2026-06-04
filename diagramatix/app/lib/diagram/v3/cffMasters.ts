@@ -275,18 +275,31 @@ export function cloneCffContainer(
     },
   );
 
-  // Phase 3 final tuning — leave Shape 6 (pool body) at its native
-  // V='1' F='GUARD(100%)' transparency. Paul prefers the native Visio
-  // CFF look: header strip carries the pool colour, body is fully
-  // TRANSPARENT (page background shows through). No transparency
-  // patch needed.
+  // Shape 6 (pool body) ships with `FillForegndTrans V='1' F='GUARD(100%)'`
+  // — 100% transparent, HARD-GUARDED so Visio can't override it. In
+  // the native v1.6 CFF design, the body is structural and a separate
+  // visible Pool/Lane shape paints the body decoration. In Phase 3 we
+  // removed the visible Pool, so the CFF Container's Shape 6 IS the
+  // user-visible pool body. With FillForegndTrans=100% the body paints
+  // as an invisible-fill / visible-border wireframe — the "spurious
+  // pool-sized empty rectangle" Paul saw in (7) and (2).jpg.
   //
-  // Earlier this commit forced FillForegndTrans / FillBkgndTrans to
-  // 0% (opaque) to make the body paint #ead1c1 / lightenHex visibly
-  // — that change has been removed. The shape-level FillForegnd
-  // patch above (Shape 6 + Shape 7) still runs (so headers paint in
-  // the lane/pool colour) but Shape 6's fill is now overridden by
-  // the master's transparency and never visible.
+  // Override transparency on Shape 6 to 0% (opaque) so the body's
+  // FillForegnd (already patched to lightenHex(headerColor)) paints
+  // visibly. Same fix for FillBkgndTrans (used when FillPattern≠1;
+  // belt-and-braces).
+  //
+  // Limit replacement to the FIRST occurrence (= Shape 6's cells).
+  // Other shapes with GUARD(100%) may exist later in the master and
+  // those should stay transparent.
+  content = content.replace(
+    /<Cell N='FillForegndTrans' V='1' F='GUARD\(100%\)'\/>/,
+    `<Cell N='FillForegndTrans' V='0' F='GUARD(0%)'/>`,
+  );
+  content = content.replace(
+    /<Cell N='FillBkgndTrans' V='1' F='GUARD\(100%\)'\/>/,
+    `<Cell N='FillBkgndTrans' V='0' F='GUARD(0%)'/>`,
+  );
 
   // Phase 3 commit 2 follow-on — substitute "Title" (master placeholder
   // text) with the actual pool label. The header sub-shape paints

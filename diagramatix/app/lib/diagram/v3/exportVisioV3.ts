@@ -2551,20 +2551,24 @@ export async function exportVisioV3(
           // via NoShow, Shape 8 (header strip) has no transparency
           // cell (defaults opaque). So a single first-match replace
           // is sufficient and safe.
-          // Phase 3 final tuning — Paul prefers the native Visio CFF
-          // look: header strip carries the colour, body is fully
-          // TRANSPARENT (no colour at all, page background shows
-          // through). Leave the master's `FillForegndTrans V='1'
-          // F='THEMEGUARD(User.FillForegndTrans)'` cell at its
-          // native value (100% transparent) — no patch needed.
-          // Same for FillBkgndTrans. The earlier patches that forced
-          // these to V='0' (opaque) and the User.FillForegnd hard-
-          // guard to bodyColor are now both removed.
-          //
-          // bodyColor is computed above but unused for lane bodies
-          // when transparent. Kept the computation in place because
-          // the shape-level FillForegnd patch still runs (harmless
-          // — overridden by the transparency).
+          poolMasterXml = poolMasterXml.replace(
+            /<Cell N='FillForegndTrans' V='1' F='THEMEGUARD\(User\.FillForegndTrans\)'\/>/,
+            `<Cell N='FillForegndTrans' V='0' F='GUARD(0%)'/>`,
+          );
+
+          // Shape 6's User.FillForegnd row carries a CFF-style-dependent
+          // formula that resolves to THEME("BackgroundColor") when
+          // CFFStyle is in {1,2,3} (default 7→1). Even though the
+          // shape-level FillForegnd is now patched to bodyColor, Visio
+          // can fall back to the User row's resolved value in certain
+          // rendering paths. Hard-guard the User row to bodyColor too.
+          poolMasterXml = poolMasterXml
+            .split(`<Row N='FillForegnd'><Cell N='Value' V='#ffffff' U='COLOR' F='IF(AND(_MOD(User.CFFStyle,6)&gt;0,_MOD(User.CFFStyle,6)&lt;4),THEME("BackgroundColor"),Sheet.5!FillForegnd)'/>`)
+            .join(`<Row N='FillForegnd'><Cell N='Value' V='${bodyColor}' U='COLOR' F='GUARD(RGB(${parseInt(bodyColor.slice(1,3),16)},${parseInt(bodyColor.slice(3,5),16)},${parseInt(bodyColor.slice(5,7),16)}))'/>`);
+          poolMasterXml = poolMasterXml.replace(
+            /<Cell N='FillBkgndTrans' V='1' F='THEMEGUARD\(User\.FillForegndTrans\)'\/>/,
+            `<Cell N='FillBkgndTrans' V='0' F='GUARD(0%)'/>`,
+          );
 
           // Replace the "Function" placeholder text in every location.
           // Use regex with \s* so we catch both `>Function<` and
