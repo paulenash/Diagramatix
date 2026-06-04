@@ -1001,6 +1001,72 @@ export const CHAPTERS: HelpChapter[] = [
         ),
       },
       {
+        heading: "Swap adjacent lanes",
+        body: (
+          <>
+            <p>
+              Select a top-level lane (a direct child of a pool) and you
+              see two new things on the lane:
+            </p>
+            <ul className="list-disc list-inside space-y-1 mt-1">
+              <li>
+                A bright-blue ring tracing all four edges of the lane,
+                in addition to the standard selection highlight, so the
+                lane being acted on is unambiguous.
+              </li>
+              <li>
+                Two large ↑ / ↓ arrow buttons inside the lane&rsquo;s
+                header strip — one at the top, one at the bottom. The
+                arrows turn grey when no neighbour exists in that
+                direction (top-most lane greys ↑; bottom-most lane
+                greys ↓).
+              </li>
+            </ul>
+            <p className="mt-2">
+              <strong>Click ↑</strong> to swap the selected lane with
+              the sibling lane immediately above it; <strong>↓</strong>{" "}
+              swaps with the sibling below.
+            </p>
+            <p className="mt-2">
+              The whole lane travels as a unit — every element inside
+              the lane, every sub-lane (and its contents, recursively),
+              and every connector both of whose endpoints sit inside
+              the swapping lane all translate by the same vertical
+              offset. The two lanes&rsquo; <em>individual heights are
+              preserved</em>; only their Y positions swap so the lane
+              stack remains contiguous. The pool&rsquo;s overall height
+              doesn&rsquo;t change.
+            </p>
+            <p className="mt-2">
+              Connectors that have <em>one</em> endpoint inside a
+              swapping lane and the other outside (or one in each of
+              the two swapping lanes) are re-routed against the new
+              layout. If the connector was previously attached to the
+              shortest side-pair between its two elements, after the
+              swap it&rsquo;s re-attached to the new shortest side-pair
+              automatically — so a connector running bottom-to-top
+              between vertically-stacked elements flips to top-to-bottom
+              when those elements swap order. If you previously
+              overrode the attachment to a deliberately non-shortest
+              side, your choice is preserved unless the new geometry
+              would force the connector through another element, in
+              which case the route is replanned from scratch to avoid
+              the obstacle.
+            </p>
+            <p className="mt-2">
+              The whole swap (lane positions, element shifts, connector
+              re-routes) is a single undo step — <strong>Ctrl + Z</strong>{" "}
+              reverts the entire operation.
+            </p>
+            <p className="mt-2 text-xs text-gray-500">
+              Sub-lane swap (swapping two adjacent sub-lanes within a
+              parent lane) is on the roadmap for a future release. In
+              the current version only top-level lanes get the arrows.
+            </p>
+          </>
+        ),
+      },
+      {
         heading: "Connector endpoints (reattach)",
         body: (
           <ul className="list-disc list-inside space-y-1">
