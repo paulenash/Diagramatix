@@ -89,9 +89,12 @@ interface BubbleHelpRowDraft {
   sortOrder: number;
 }
 
-// Cap for the task/subprocess Name textarea height. 6 lines × ~16px line-box
-// + ~10px vertical padding ≈ 106px. Beyond this the textarea scrolls
-// rather than continuing to grow.
+// Min/max height for the task/subprocess Name textarea.
+//   3 lines × ~16px line-box + ~10px vertical padding ≈ 58px (min — the
+//     editor always presents 3 lines worth of space, even when empty).
+//   6 lines × ~16px + ~10px ≈ 106px (max — beyond this the textarea
+//     scrolls rather than continuing to grow).
+const NAME_TEXTAREA_MIN_PX = 58;
 const NAME_TEXTAREA_MAX_PX = 106;
 
 const TASK_TYPE_OPTIONS: { value: BpmnTaskType; label: string }[] = [
@@ -760,13 +763,17 @@ export function PropertiesPanel({
     if (element) setLabelDraft(element.label);
   }, [element]);
 
-  // Auto-grow the task/subprocess Name textarea. Height = scrollHeight up
-  // to the 6-line cap, after which the textarea scrolls internally.
+  // Auto-grow the task/subprocess Name textarea. Height = clamp(
+  // scrollHeight, 3-line min, 6-line max). Below the min the editor
+  // pads out to 3 visible lines; above the max it scrolls internally.
   useLayoutEffect(() => {
     const ta = nameTextareaRef.current;
     if (!ta) return;
     ta.style.height = "auto";
-    const next = Math.min(ta.scrollHeight, NAME_TEXTAREA_MAX_PX);
+    const next = Math.max(
+      NAME_TEXTAREA_MIN_PX,
+      Math.min(ta.scrollHeight, NAME_TEXTAREA_MAX_PX),
+    );
     ta.style.height = next + "px";
   }, [labelDraft, element?.id]);
 
@@ -1854,7 +1861,10 @@ export function PropertiesPanel({
                   // so the line-count basis here ALREADY matches what
                   // the textarea is rendering.
                   ? Math.max(3, Math.min(6, labelDraft.split("\n").length))
-                  : (element.type === "chevron" || element.type === "chevron-collapsed" ? 3 : 2)
+                  // Other multi-line shapes (gateway, event, data,
+                  // pool/lane, etc.) all start at 3 lines per Paul's
+                  // request — uniform Name editor across the panel.
+                  : 3
               }
               value={
                 // Render embedded newlines with a leading "↵" so the user
@@ -1885,17 +1895,24 @@ export function PropertiesPanel({
               }}
             />
         ) : (
-          <input
-            type="text"
+          // Fallback Name editor for any remaining element type — also
+          // a 3-row auto-expanding textarea so Name behaviour is uniform
+          // across the Properties panel.
+          <textarea
+            key={element.id}
             data-properties-label="true"
+            className="w-full px-1.5 py-1 border border-gray-300 rounded text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-500 resize-y overflow-y-auto"
+            rows={3}
             value={labelDraft}
             onFocus={(e) => e.target.select()}
             onChange={(e) => setLabelDraft(e.target.value)}
             onBlur={() => { if (labelDraft !== element.label) onUpdateLabel(element.id, labelDraft); }}
             onKeyDown={(e) => {
-              if (e.key === "Enter") onUpdateLabel(element.id, labelDraft);
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                onUpdateLabel(element.id, labelDraft);
+              }
             }}
-            className="w-full px-1.5 py-1 border border-gray-300 rounded text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
         )}
       </div>

@@ -3918,14 +3918,24 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       // moved element, skip obstacle validation — their Bezier control points
       // may technically lie inside elements without the visible curve passing
       // through, and rerouting them destroys the user's carefully shaped curves.
-      const curvilinearUnaffected = new Set(
-        connectors
-          .filter(c => c.routingType === "curvilinear" && !affectedIds.has(c.sourceId) && !affectedIds.has(c.targetId))
-          .map(c => c.id)
-      );
-      if (curvilinearUnaffected.size > 0) {
-        const toValidate = connectors.filter(c => !curvilinearUnaffected.has(c.id));
-        const unchanged  = connectors.filter(c => curvilinearUnaffected.has(c.id));
+      //
+      // When the moving element is an Expanded Subprocess, ALSO skip
+      // obstacle validation for any connector not attached to the EP.
+      // Paul's spec: an EP must be movable across sequence connectors
+      // without disrupting them, mirroring the resize/boundary path which
+      // already leaves connectors alone. Without this skip, every connector
+      // whose bbox intersects the EP's new position re-routes mid-drag,
+      // making the EP feel like it "interacts with" connectors as it passes.
+      const isMovingEp = el.type === "subprocess-expanded";
+      const unaffectedSkip = new Set<string>();
+      for (const c of connectors) {
+        const detached = !affectedIds.has(c.sourceId) && !affectedIds.has(c.targetId);
+        if (!detached) continue;
+        if (c.routingType === "curvilinear" || isMovingEp) unaffectedSkip.add(c.id);
+      }
+      if (unaffectedSkip.size > 0) {
+        const toValidate = connectors.filter(c => !unaffectedSkip.has(c.id));
+        const unchanged  = connectors.filter(c => unaffectedSkip.has(c.id));
         connectors = [...validateConnectorsAgainstObstacles(toValidate, elements), ...unchanged];
       } else {
         connectors = validateConnectorsAgainstObstacles(connectors, elements);
