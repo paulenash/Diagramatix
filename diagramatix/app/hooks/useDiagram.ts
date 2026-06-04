@@ -4189,6 +4189,51 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       //     crosses an element gets re-routed against the new layout
       //     (Paul: "always re-route if the lane change produces
       //     connectors that now have to go through elements").
+
+      // Pre-pass: gateway top↔bottom flip. If a gateway has two
+      // outgoing connectors — one exiting via TOP into one swapping
+      // lane and one exiting via BOTTOM into the OTHER swapping lane —
+      // their source-side attachments flip after the swap so the top
+      // exit continues to point at the lane that is now visually above
+      // the gateway and the bottom exit at the lane now below.
+      // Same logic applies for incoming connectors on a merge
+      // gateway (targetSide top ↔ bottom). Offsets reset to 0.5 since
+      // top/bottom and left/right map to different axes.
+      const gatewayFlipSrc = new Map<string, "top" | "bottom">();
+      const gatewayFlipTgt = new Map<string, "top" | "bottom">();
+      for (const g of state.elements) {
+        if (g.type !== "gateway") continue;
+        const outConns = state.connectors.filter(c => c.sourceId === g.id);
+        const topOut = outConns.find(c => c.sourceSide === "top"
+          && (upperSet.has(c.targetId) || lowerSet.has(c.targetId)));
+        const botOut = outConns.find(c => c.sourceSide === "bottom"
+          && (upperSet.has(c.targetId) || lowerSet.has(c.targetId)));
+        if (topOut && botOut) {
+          const topGoesUpper = upperSet.has(topOut.targetId);
+          const botGoesLower = lowerSet.has(botOut.targetId);
+          // Flip only when top→one-lane and bottom→the-other-lane
+          // (both "natural" and "inverted" arrangements qualify —
+          // the swap re-orders the lanes either way).
+          if ((topGoesUpper && botGoesLower) || (!topGoesUpper && !botGoesLower)) {
+            gatewayFlipSrc.set(topOut.id, "bottom");
+            gatewayFlipSrc.set(botOut.id, "top");
+          }
+        }
+        const inConns = state.connectors.filter(c => c.targetId === g.id);
+        const topIn = inConns.find(c => c.targetSide === "top"
+          && (upperSet.has(c.sourceId) || lowerSet.has(c.sourceId)));
+        const botIn = inConns.find(c => c.targetSide === "bottom"
+          && (upperSet.has(c.sourceId) || lowerSet.has(c.sourceId)));
+        if (topIn && botIn) {
+          const topComesUpper = upperSet.has(topIn.sourceId);
+          const botComesLower = lowerSet.has(botIn.sourceId);
+          if ((topComesUpper && botComesLower) || (!topComesUpper && !botComesLower)) {
+            gatewayFlipTgt.set(topIn.id, "bottom");
+            gatewayFlipTgt.set(botIn.id, "top");
+          }
+        }
+      }
+
       const reroutedIds = new Set<string>();
       const connectors = state.connectors.map(conn => {
         const srcInU = upperSet.has(conn.sourceId);
@@ -4214,28 +4259,42 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         // (the user explicitly chose left-to-right when top-to-bottom
         // would have been shorter, etc.), leave the sides alone — the
         // user's deliberate choice is preserved.
-        const srcOld = state.elements.find(e => e.id === conn.sourceId);
-        const tgtOld = state.elements.find(e => e.id === conn.targetId);
-        const srcNew = elements.find(e => e.id === conn.sourceId);
-        const tgtNew = elements.find(e => e.id === conn.targetId);
         let candidate = conn;
-        if (srcOld && tgtOld && srcNew && tgtNew) {
-          const optBefore = safeSidePair(srcOld, tgtOld, state.elements);
-          const wasAtOptimum = conn.sourceSide === optBefore.src && conn.targetSide === optBefore.tgt;
-          if (wasAtOptimum) {
-            const optAfter = safeSidePair(srcNew, tgtNew, elements);
-            if (optAfter.src !== conn.sourceSide || optAfter.tgt !== conn.targetSide) {
-              candidate = {
-                ...conn,
-                sourceSide: optAfter.src,
-                targetSide: optAfter.tgt,
-                // Re-centre the offsets along the new sides — the old
-                // offsetAlong was tied to the previous side which may
-                // be a different axis (e.g. switching top/bottom ↔
-                // left/right rotates the offset's meaning entirely).
-                sourceOffsetAlong: 0.5,
-                targetOffsetAlong: 0.5,
-              };
+        const flipSrc = gatewayFlipSrc.get(conn.id);
+        const flipTgt = gatewayFlipTgt.get(conn.id);
+        if (flipSrc || flipTgt) {
+          // Gateway flip takes precedence over the optimal-side
+          // recompute. The user's intent at a gateway fork/merge is
+          // explicit (each branch occupies a specific side), so
+          // preserve that structure across the swap.
+          candidate = {
+            ...candidate,
+            ...(flipSrc ? { sourceSide: flipSrc, sourceOffsetAlong: 0.5 } : {}),
+            ...(flipTgt ? { targetSide: flipTgt, targetOffsetAlong: 0.5 } : {}),
+          };
+        } else {
+          const srcOld = state.elements.find(e => e.id === conn.sourceId);
+          const tgtOld = state.elements.find(e => e.id === conn.targetId);
+          const srcNew = elements.find(e => e.id === conn.sourceId);
+          const tgtNew = elements.find(e => e.id === conn.targetId);
+          if (srcOld && tgtOld && srcNew && tgtNew) {
+            const optBefore = safeSidePair(srcOld, tgtOld, state.elements);
+            const wasAtOptimum = conn.sourceSide === optBefore.src && conn.targetSide === optBefore.tgt;
+            if (wasAtOptimum) {
+              const optAfter = safeSidePair(srcNew, tgtNew, elements);
+              if (optAfter.src !== conn.sourceSide || optAfter.tgt !== conn.targetSide) {
+                candidate = {
+                  ...conn,
+                  sourceSide: optAfter.src,
+                  targetSide: optAfter.tgt,
+                  // Re-centre the offsets along the new sides — the old
+                  // offsetAlong was tied to the previous side which may
+                  // be a different axis (e.g. switching top/bottom ↔
+                  // left/right rotates the offset's meaning entirely).
+                  sourceOffsetAlong: 0.5,
+                  targetOffsetAlong: 0.5,
+                };
+              }
             }
           }
         }
