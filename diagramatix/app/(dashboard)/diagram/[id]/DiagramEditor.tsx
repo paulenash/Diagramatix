@@ -579,6 +579,7 @@ export function DiagramEditor({
     laneBoundaryMoveEnd,
     moveElements,
     elementsMoveEnd,
+    swapLane,
     undo,
     redo,
     canUndo,
@@ -2784,6 +2785,7 @@ export function DiagramEditor({
           onSelectConnector={setSelectedConnectorId}
           onMoveElements={moveElements}
           onElementsMoveEnd={elementsMoveEnd}
+          onSwapLane={swapLane}
           pendingDragSymbol={pendingDragSymbol}
           pendingArchimateShapeKey={pendingArchimateShapeKey}
           pendingArchimateIconOnly={pendingArchimateIconOnly}

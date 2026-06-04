@@ -240,6 +240,7 @@ type Action =
   | { type: "SET_DATA"; payload: DiagramData }
   | { type: "ADD_ELEMENT"; payload: { symbolType: SymbolType; position: Point; taskType?: BpmnTaskType; eventType?: EventType; id?: string; initial?: { properties?: Record<string, unknown>; width?: number; height?: number; label?: string } } }
   | { type: "MOVE_ELEMENT"; payload: { id: string; x: number; y: number; unconstrained?: boolean } }
+  | { type: "SWAP_LANES_VERTICAL"; payload: { laneId: string; direction: "up" | "down" } }
   | { type: "RESIZE_ELEMENT"; payload: { id: string; x: number; y: number; width: number; height: number; wasWhiteBoxAtResizeStart?: boolean } }
   | { type: "RESIZE_END"; payload: { id: string } }
   | { type: "UPDATE_LABEL"; payload: { id: string; label: string } }
@@ -4120,6 +4121,88 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       return { ...state, elements: updatePoolTypes(elements), connectors };
     }
 
+    case "SWAP_LANES_VERTICAL": {
+      const { laneId, direction } = action.payload;
+      const lane = state.elements.find(e => e.id === laneId);
+      if (!lane || lane.type !== "lane") return state;
+      // Phase 1 of the lane-swap feature only covers top-level lanes
+      // (parent is a pool). Sub-lane swaps are a future iteration.
+      const parent = lane.parentId ? state.elements.find(e => e.id === lane.parentId) : null;
+      if (!parent || parent.type !== "pool") return state;
+      // Find adjacent sibling lane in the chosen direction.
+      const siblings = state.elements
+        .filter(e => e.type === "lane" && e.parentId === parent.id)
+        .sort((a, b) => a.y - b.y);
+      const idx = siblings.findIndex(s => s.id === laneId);
+      if (idx < 0) return state;
+      const otherIdx = direction === "up" ? idx - 1 : idx + 1;
+      if (otherIdx < 0 || otherIdx >= siblings.length) return state;
+      const other = siblings[otherIdx];
+      // Decide which is the upper / lower lane in the swap pair.
+      const upper = idx < otherIdx ? lane : other;   // current top of the pair
+      const lower = idx < otherIdx ? other : lane;   // current bottom of the pair
+      // Heights stay individual; only Y positions swap so the stack
+      // remains contiguous.
+      //   Before: upper at y=y0 height=hU; lower at y=y0+hU height=hL.
+      //   After:  lower at y=y0 height=hL; upper at y=y0+hL height=hU.
+      // Deltas:
+      //   upper Δy = +hL (slides down by the lower's height)
+      //   lower Δy = -hU (slides up by the upper's height)
+      const hU = upper.height;
+      const hL = lower.height;
+      const upperDy = +hL;
+      const lowerDy = -hU;
+
+      // Collect every descendant ID of a lane (recursive — includes
+      // sub-lanes and elements inside sub-lanes).
+      const collectDescendants = (rootId: string): Set<string> => {
+        const out = new Set<string>([rootId]);
+        let added = true;
+        while (added) {
+          added = false;
+          for (const e of state.elements) {
+            if (e.parentId && out.has(e.parentId) && !out.has(e.id)) {
+              out.add(e.id);
+              added = true;
+            }
+          }
+        }
+        return out;
+      };
+      const upperSet = collectDescendants(upper.id);
+      const lowerSet = collectDescendants(lower.id);
+
+      // Translate every element in each set by the corresponding Δy.
+      const elements = state.elements.map(e => {
+        if (upperSet.has(e.id)) return { ...e, y: e.y + upperDy };
+        if (lowerSet.has(e.id)) return { ...e, y: e.y + lowerDy };
+        return e;
+      });
+
+      // Connectors:
+      //   • both endpoints inside upper → shift waypoints by upperDy
+      //   • both endpoints inside lower → shift waypoints by lowerDy
+      //   • anything else (cross-lane, or one endpoint outside the
+      //     swapping pair) → recompute via the regular routing pass
+      //     so obstacle avoidance + pool boundary apply.
+      const connectors = state.connectors.map(conn => {
+        const srcInU = upperSet.has(conn.sourceId);
+        const tgtInU = upperSet.has(conn.targetId);
+        const srcInL = lowerSet.has(conn.sourceId);
+        const tgtInL = lowerSet.has(conn.targetId);
+        if (srcInU && tgtInU) {
+          return { ...conn, waypoints: conn.waypoints.map(p => ({ x: p.x, y: p.y + upperDy })) };
+        }
+        if (srcInL && tgtInL) {
+          return { ...conn, waypoints: conn.waypoints.map(p => ({ x: p.x, y: p.y + lowerDy })) };
+        }
+        // Non-internal: reroute against the post-swap element layout.
+        return recomputeAllConnectors([conn], elements)[0] ?? conn;
+      });
+
+      return { ...state, elements, connectors };
+    }
+
     case "MOVE_ELEMENTS": {
       const { ids, dx, dy } = action.payload;
       if (dx === 0 && dy === 0) return state;
@@ -7362,6 +7445,17 @@ export function useDiagram(initialData: DiagramData) {
     dispatch({ type: "MOVE_ELEMENT", payload: { id, x, y, unconstrained } });
   }, []);
 
+  const swapLane = useCallback((laneId: string, direction: "up" | "down") => {
+    // One-shot action — push the pre-swap snapshot to the undo stack
+    // so the user can revert the entire swap (positions + descendant
+    // shifts + connector reroutes) in one step.
+    pastRef.current.push(snapshotData());
+    futureRef.current = [];
+    setCanUndo(true);
+    setCanRedo(false);
+    dispatch({ type: "SWAP_LANES_VERTICAL", payload: { laneId, direction } });
+  }, []);
+
   const moveElements = useCallback((ids: string[], dx: number, dy: number) => {
     if (!groupDraggingRef.current) {
       groupDraggingRef.current = true;
@@ -7791,6 +7885,7 @@ export function useDiagram(initialData: DiagramData) {
     addElement,
     moveElement,
     moveElements,
+    swapLane,
     elementsMoveEnd,
     resizeElement,
     resizeElementEnd,
