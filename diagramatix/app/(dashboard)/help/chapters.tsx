@@ -237,10 +237,10 @@ export const CHAPTERS: HelpChapter[] = [
               Tick the &ldquo;Ignore issue types&rdquo; checkboxes at the
               top of the panel to park categories you&apos;ve already
               triaged; remaining issues stay highlighted across re-scans.
-              Admins can browse the full active rule registry — codes
-              B01..B31, severity, description and current trigger
+              SuperAdmins can browse the full active rule registry —
+              codes B01..B31, severity, description and current trigger
               wording — at{" "}
-              <strong>Admin &rarr; Scanner Issue Rules</strong>{" "}
+              <strong>SuperAdmin &rarr; Scanner Issue Rules</strong>{" "}
               (or from a project page, <strong>Project ▾ &rarr; View
               Scanner Issues Rules</strong>).
             </p>
@@ -1516,8 +1516,8 @@ export const CHAPTERS: HelpChapter[] = [
               per-topic counters.
             </p>
             <p className="mt-2">
-              Admins (superusers) can edit the cloud text and duration
-              per diagram type from the <strong>Bubble Help</strong>{" "}
+              SuperAdmins can edit the cloud text and duration per
+              diagram type from the <strong>Bubble Help</strong>{" "}
               sub-section in Diagram Properties. Each row has an
               initiating-condition label, an internal topic key,
               multi-line text, and a duration. Saved edits are live
@@ -2037,12 +2037,12 @@ export const CHAPTERS: HelpChapter[] = [
         ),
       },
       {
-        heading: "Admin tools — Built-In Templates transfer",
+        heading: "SuperAdmin tools — Built-In Templates transfer",
         body: (
           <>
             <p>
-              <strong>Admin-only.</strong> Opens at{" "}
-              <strong>Admin → Database</strong>. Two buttons:
+              <strong>SuperAdmin-only.</strong> Opens at{" "}
+              <strong>SuperAdmin → Database</strong>. Two buttons:
             </p>
             <ul className="list-disc list-inside space-y-1 mt-1">
               <li>
@@ -2083,12 +2083,12 @@ export const CHAPTERS: HelpChapter[] = [
         ),
       },
       {
-        heading: "Admin tools — Rules & Prompts transfer",
+        heading: "SuperAdmin tools — Rules & Prompts transfer",
         body: (
           <>
             <p>
-              <strong>Admin-only.</strong> Opens at{" "}
-              <strong>Admin → Database</strong> in the header. Two
+              <strong>SuperAdmin-only.</strong> Opens at{" "}
+              <strong>SuperAdmin → Database</strong> in the header. Two
               buttons:
             </p>
             <ul className="list-disc list-inside space-y-1 mt-1">
@@ -2133,12 +2133,12 @@ export const CHAPTERS: HelpChapter[] = [
         ),
       },
       {
-        heading: "Admin tools — FULL Backup &amp; Selective Restore",
+        heading: "SuperAdmin tools — FULL Backup &amp; Selective Restore",
         body: (
           <>
             <p>
-              <strong>Admin-only.</strong> Also at{" "}
-              <strong>Admin → Database</strong>.
+              <strong>SuperAdmin-only.</strong> Also at{" "}
+              <strong>SuperAdmin → Database</strong>.
             </p>
             <ul className="list-disc list-inside space-y-1 mt-1">
               <li>
@@ -2280,15 +2280,15 @@ export const CHAPTERS: HelpChapter[] = [
         ),
       },
       {
-        heading: "Built-in templates (admin only)",
+        heading: "Built-in templates (SuperAdmin only)",
         body: (
           <p>
-            Administrators can create <strong>built-in templates</strong>{" "}
+            SuperAdmins can create <strong>built-in templates</strong>{" "}
             that are shared with all users. Click{" "}
             <strong>+ Create Built-In Template</strong> (visible only to
-            admins) and enter the admin password when prompted. Built-in
-            templates appear under the &ldquo;Built-In&rdquo; heading in
-            every user&apos;s Templates dropdown.
+            SuperAdmins) and enter the SuperAdmin password when prompted.
+            Built-in templates appear under the &ldquo;Built-In&rdquo;
+            heading in every user&apos;s Templates dropdown.
           </p>
         ),
       },
@@ -3412,7 +3412,7 @@ export const CHAPTERS: HelpChapter[] = [
       {
         body: (
           <p>
-            Administrators can generate the complete Diagramatix
+            SuperAdmins can generate the complete Diagramatix
             relational database schema as a SQL DDL file for any
             supported database type.
           </p>

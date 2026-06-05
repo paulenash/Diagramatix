@@ -88,9 +88,9 @@ export function AiPlanFormatClient() {
         <div className="flex items-center gap-3">
           <button onClick={() => router.push("/dashboard/admin")} className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1">
             <span style={{ fontSize: "1.5em", lineHeight: 1 }}>{"←"}</span>
-            Admin
+            SuperAdmin
           </button>
-          <h1 className="font-semibold text-gray-900">Admin — AI Plan Formats</h1>
+          <h1 className="font-semibold text-gray-900">SuperAdmin — AI Plan Formats</h1>
         </div>
         <button
           onClick={copyText}

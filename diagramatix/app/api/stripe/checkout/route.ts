@@ -129,11 +129,11 @@ export async function POST(req: Request) {
   }
 
   if (!tier.stripePriceId) {
-    // Admin forgot to paste the Price ID in the Subscriptions editor.
-    // Surface a clear message so it's obvious how to fix.
+    // SuperAdmin forgot to paste the Price ID in the Subscriptions
+    // editor. Surface a clear message so it's obvious how to fix.
     return NextResponse.json(
       {
-        error: `Stripe Price ID is not configured for the ${tier.name} tier. An admin needs to set it via Dashboard → Admin → Subscription Prices and Limits.`,
+        error: `Stripe Price ID is not configured for the ${tier.name} tier. A SuperAdmin needs to set it via Dashboard → SuperAdmin → Subscription Prices and Limits.`,
       },
       { status: 503 },
     );

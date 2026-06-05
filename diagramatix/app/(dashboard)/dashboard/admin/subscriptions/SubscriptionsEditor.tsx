@@ -134,7 +134,7 @@ export function SubscriptionsEditor({ initialTiers }: { initialTiers: TierRow[] 
       <header className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-3">
           <a href="/dashboard/admin" className="text-sm text-blue-600 hover:underline">
-            &larr; Admin
+            &larr; SuperAdmin
           </a>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logos/diagramatix-icon.svg" alt="Diagramatix" className="w-7 h-7" />
@@ -163,8 +163,8 @@ export function SubscriptionsEditor({ initialTiers }: { initialTiers: TierRow[] 
           means &ldquo;unlimited&rdquo;. The &ldquo;reset monthly&rdquo;
           checkboxes flip a counter between an anniversary-day monthly window
           and a lifetime counter (Free&apos;s AI / exports / imports run as
-          lifetime totals). Admin users (per <code>SUPERUSER_EMAILS</code>) are
-          never enforced, regardless of these values.
+          lifetime totals). SuperAdmin users (per <code>SUPERUSER_EMAILS</code>)
+          are never enforced, regardless of these values.
         </p>
 
         <div className="bg-white rounded-md border border-gray-200 overflow-x-auto">

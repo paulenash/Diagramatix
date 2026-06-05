@@ -44,9 +44,10 @@ export default async function AdminPage() {
 
   const now = new Date();
 
-  // Serialise dates + map the synthetic "Administration" tier for users
-  // in the SUPERUSER_EMAILS allowlist (those bypass enforcement so their
-  // stored tier — usually Expert from the grandfather seed — is moot).
+  // Serialise dates + map the synthetic "SuperAdmin" tier label for
+  // users in the SUPERUSER_EMAILS allowlist (those bypass enforcement
+  // so their stored tier — usually Expert from the grandfather seed —
+  // is moot).
   const usersForClient = users.map(u => {
     const effectiveId = getEffectiveSubscriptionLevelId(
       {
@@ -83,7 +84,7 @@ export default async function AdminPage() {
       currentDiagramId: u.currentDiagramId,
       currentDiagramName: u.currentDiagramName,
       _count: u._count,
-      subscriptionLabel: isAdmin ? "Administration" : effectiveName,
+      subscriptionLabel: isAdmin ? "SuperAdmin" : effectiveName,
       // New: surfaced to the admin table so the chip can render
       // "Free → Expert · COMP" and show days remaining.
       underlyingLabel: !isAdmin && showUnderlying ? underlyingName : null,

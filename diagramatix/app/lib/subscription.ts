@@ -8,10 +8,10 @@
  * same data through the same library so the UI never disagrees with the
  * enforcer.
  *
- * Tiers come from the SubscriptionLevel table (admin-editable via the
- * Subscription Prices and Limits page). The synthetic "Administration"
- * tier is derived from SUPERUSER_EMAILS — admins always bypass
- * enforcement, regardless of what subscriptionLevelId the row has.
+ * Tiers come from the SubscriptionLevel table (SuperAdmin-editable via
+ * the Subscription Prices and Limits page). The synthetic "SuperAdmin"
+ * tier label is derived from SUPERUSER_EMAILS — SuperAdmins always
+ * bypass enforcement, regardless of what subscriptionLevelId the row has.
  *
  * Counters:
  *  - Lifetime (Free's AI / individual exports / individual imports):
@@ -634,9 +634,12 @@ export async function getUsageSnapshot(
   const admin = isAdminEmail(user.email);
   const tier = user.subscriptionLevel;
 
-  // For admins, surface the synthetic "Administration" tier label.
+  // For SuperAdmins (SUPERUSER_EMAILS), surface a synthetic "SuperAdmin"
+  // tier label so the usage popover and admin table chip read
+  // consistently. They bypass all enforcement so the stored tier (often
+  // Expert from the grandfather seed) is moot.
   const tierDescriptor = admin
-    ? { id: "administration", name: "Administration" }
+    ? { id: "superadmin", name: "SuperAdmin" }
     : { id: tier?.id ?? "none", name: tier?.name ?? "(none)" };
 
   // Trial summary.

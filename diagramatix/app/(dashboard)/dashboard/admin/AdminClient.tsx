@@ -16,7 +16,7 @@ interface UserRow {
   currentDiagramId: string | null;
   currentDiagramName: string | null;
   _count: { projects: number; diagrams: number };
-  /** Display label for the Subscription column — "Administration" for
+  /** Display label for the Subscription column — "SuperAdmin" for
    *  SUPERUSER_EMAILS users, otherwise the EFFECTIVE tier name (comp
    *  wins when active). */
   subscriptionLabel: string;
@@ -146,7 +146,7 @@ export function AdminClient({ users, currentUserId }: Props) {
               "you're inside Diagramatix" cue. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logos/diagramatix-icon.svg" alt="Diagramatix" className="w-7 h-7" />
-          <h1 className="font-semibold text-gray-900">Admin — Registered Users</h1>
+          <h1 className="font-semibold text-gray-900">SuperAdmin — Registered Users</h1>
         </div>
         <div className="flex items-center gap-2">
           <a
@@ -264,7 +264,7 @@ export function AdminClient({ users, currentUserId }: Props) {
                       }`}
                       title={
                         u.isAdmin
-                          ? "Administrator — bypasses all limits"
+                          ? "SuperAdmin — bypasses all limits"
                           : u.compExpiresAt
                             ? `Comp grant active until ${new Date(u.compExpiresAt).toLocaleDateString()}`
                             : "View usage and change tier"

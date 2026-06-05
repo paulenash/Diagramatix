@@ -1259,7 +1259,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
               }`}
               title={
                 usageSnapshot.isAdmin
-                  ? "Administrator — bypasses all limits. Click for usage details."
+                  ? "SuperAdmin — bypasses all limits. Click for usage details."
                   : usageSnapshot.trial.expired
                   ? "Trial expired — click for details and upgrade"
                   : "View subscription usage and limits"
@@ -1339,16 +1339,16 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                 }}
               />
 
-              {/* Admin shortcut — leftmost item in the header menu cluster,
-                  admin-only. Same destination as the entry that used to live
-                  inside the System menu (now removed). */}
+              {/* SuperAdmin shortcut — leftmost item in the header menu
+                  cluster, SuperAdmin-only. Same destination as the entry
+                  that used to live inside the System menu (now removed). */}
               {isSu && (
                 <a
                   href="/dashboard/admin"
                   className="text-xs text-orange-600 hover:text-orange-800 font-medium border border-orange-300 rounded px-2 py-1"
-                  title="Open the Admin dashboard"
+                  title="Open the SuperAdmin dashboard"
                 >
-                  Admin
+                  SuperAdmin
                 </a>
               )}
 
@@ -1680,7 +1680,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                               <button
                                 onClick={(e) => handleHardDeleteProject(p.id, e)}
                                 className="text-gray-400 hover:text-red-700 text-[10px] px-0.5 font-bold"
-                                title="ADMIN: permanently delete project and all diagrams (no archive, not recoverable)"
+                                title="SUPERADMIN: permanently delete project and all diagrams (no archive, not recoverable)"
                               >
                                 {"\u2716++"}
                               </button>

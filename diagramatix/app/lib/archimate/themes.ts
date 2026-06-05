@@ -3,8 +3,8 @@
  *
  * Each category (Business, Motivation, Strategy, Application, etc.) has a
  * default fill colour that matches the ArchiMate 3.1 convention. Users can
- * override these in Diagram Settings per diagram, and admins can change
- * the defaults globally in Admin → ArchiMate Themes.
+ * override these in Diagram Settings per diagram, and SuperAdmins can
+ * change the defaults globally in SuperAdmin → ArchiMate Themes.
  *
  * The renderer picks a shape's fill in this order of precedence:
  *   1. Element's own `properties.fill` (user-set on that specific shape)
