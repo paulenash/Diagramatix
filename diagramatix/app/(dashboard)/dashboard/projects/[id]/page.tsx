@@ -4,7 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { ProjectDetailClient } from "./ProjectDetailClient";
 import { getEffectiveUserId, isImpersonating, getImpersonationMode, isSuperuser } from "@/app/lib/superuser";
-import { tryGetCurrentOrgId } from "@/app/lib/auth/orgContext";
+import { tryGetCurrentOrgId, getProjectAccess } from "@/app/lib/auth/orgContext";
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -41,16 +41,26 @@ export default async function ProjectPage({ params }: Props) {
   // (set from --build-arg GIT_COMMIT_COUNT in the Dockerfile).
   const commitCount = parseInt(process.env.NEXT_PUBLIC_COMMIT_COUNT ?? "0", 10) || 0;
 
+  // Access resolution mirrors the diagram editor page (Slice 6):
+  //   • Project owner — finds the project the normal way.
+  //   • Share recipient — getProjectAccess passes; we fetch by id alone.
+  //   • SuperAdmin / OrgAdmin silent elevation (Slice 7c) — same path.
+  // The "other projects" list still scopes to the caller-owned set so
+  // the move-to-other-project picker doesn't show projects they merely
+  // share into.
+  const access = await getProjectAccess(effectiveUserId, id);
   const [project, otherProjects] = await Promise.all([
-    prisma.project.findFirst({
-      where: { id, userId: effectiveUserId, orgId },
-      include: {
-        diagrams: {
-          orderBy: { updatedAt: "desc" },
-          select: { id: true, name: true, type: true, createdAt: true, updatedAt: true, data: true },
-        },
-      },
-    }),
+    access
+      ? prisma.project.findUnique({
+          where: { id },
+          include: {
+            diagrams: {
+              orderBy: { updatedAt: "desc" },
+              select: { id: true, name: true, type: true, createdAt: true, updatedAt: true, data: true },
+            },
+          },
+        })
+      : Promise.resolve(null),
     prisma.project.findMany({
       where: { userId: effectiveUserId, orgId, id: { not: id } },
       select: { id: true, name: true },
@@ -58,11 +68,11 @@ export default async function ProjectPage({ params }: Props) {
   ]);
 
   // Project might not match because: (a) doesn't exist, (b) belongs to
-  // another user, (c) project's orgId differs from the user's current
-  // org context (common after a Full Restore where row IDs preserve but
-  // org membership changes). Redirect rather than notFound() to dodge
-  // a Next.js 16 _not-found chunk-loading bug that produces a 404 on
-  // the resource itself.
+  // another user the caller has no access to, (c) project's orgId
+  // differs from the user's current org context (common after a Full
+  // Restore where row IDs preserve but org membership changes).
+  // Redirect rather than notFound() to dodge a Next.js 16 _not-found
+  // chunk-loading bug that produces a 404 on the resource itself.
   if (!project) redirect("/dashboard");
 
   // If impersonating, fetch the target user's info for the banner
