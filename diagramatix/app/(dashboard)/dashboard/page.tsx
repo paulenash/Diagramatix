@@ -67,18 +67,23 @@ export default async function DashboardPage() {
   });
 
   const [projects, unorganized, org, membership] = await Promise.all([
-    // Owned-or-shared, mirroring the Slice 3 API route. Each row carries
-    // owner identity (for the "by …" line on shared tiles) and the
-    // caller's share role (empty array when caller is owner) so the
-    // tile renders without an N+1. orgId stays a strict filter — cross-
-    // org shares only surface once the recipient switches into the
-    // project's Org context.
+    // Owned-or-shared, mirroring the Slice 3 API route. Each row
+    // carries owner identity (for the "by …" line on shared tiles) and
+    // the caller's share role (empty array when caller is owner) so
+    // the tile renders without an N+1.
+    //
+    // orgId scopes ONLY the owned-branch. Shared projects surface
+    // regardless of which Org they live in — the recipient was given
+    // explicit access, so refusing to list it would be confusing.
+    // (Every Diagramatix user gets their own Org by default, so a
+    // strict org filter on shares would mean shared projects vanish
+    // for the recipient unless they switch into the sender's Org —
+    // which is exactly what Paul reported.)
     prisma.project.findMany({
       where: {
-        orgId,
         name: { not: ARCHIVE_PROJECT_NAME },
         OR: [
-          { userId: effectiveUserId },
+          { userId: effectiveUserId, orgId },
           { shares: { some: { userId: effectiveUserId } } },
         ],
       },

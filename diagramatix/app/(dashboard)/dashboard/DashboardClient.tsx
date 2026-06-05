@@ -1354,20 +1354,24 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
               )}
 
               {/* Org-level shortcuts — visible to OrgOwner / OrgAdmin
-                  only. SuperAdmins reach the same pages via the chip
-                  above, so we don't render a second copy for them. */}
+                  only. SuperAdmins reach the same pages via the
+                  SuperAdmin chip above, so we don't render a second
+                  copy for them. Neutral gray styling (not the orange
+                  used for SuperAdmin-only chips) — these aren't
+                  destructive/platform-level controls; OrgAdmin is a
+                  normal user role with extra reach inside their Org. */}
               {!isSu && (orgRole === "Owner" || orgRole === "Admin") && (
                 <>
                   <a
                     href="/dashboard/admin/org-settings"
-                    className="text-xs text-orange-600 hover:text-orange-800 font-medium border border-orange-300 rounded px-2 py-1"
+                    className="text-xs font-medium rounded px-2 py-1 border text-gray-600 border-gray-300 hover:bg-gray-50"
                     title="Org-level settings for this org"
                   >
                     Org Settings
                   </a>
                   <a
                     href="/dashboard/admin/sharing"
-                    className="text-xs text-orange-600 hover:text-orange-800 font-medium border border-orange-300 rounded px-2 py-1"
+                    className="text-xs font-medium rounded px-2 py-1 border text-gray-600 border-gray-300 hover:bg-gray-50"
                     title="See and manage every shared project in this Org"
                   >
                     Project Sharing
@@ -1874,7 +1878,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
               {shareListOpen && (
                 <div className="mt-1 space-y-1">
                   {shareListLoading && (
-                    <p className="text-[10px] text-gray-400 italic">Loading\u2026</p>
+                    <p className="text-[10px] text-gray-400 italic">Loading{"\u2026"}</p>
                   )}
                   {shareListError && (
                     <p className="text-[10px] text-red-600">{shareListError}</p>
@@ -1900,7 +1904,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                   onClick={() => setShareDialogOpen(true)}
                   className="w-full mt-2 px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50 text-gray-700"
                 >
-                  Manage Sharing\u2026
+                  Manage Sharing{"\u2026"}
                 </button>
               )}
             </div>

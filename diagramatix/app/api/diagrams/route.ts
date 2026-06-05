@@ -34,18 +34,20 @@ export async function GET() {
 
   // Surface any diagram the caller can reach via one of three paths:
   //   • they created it (userId === caller),
-  //   • they're the assigned Diagram Owner (the per-diagram accountability
-  //     field introduced with sharing — they may not have created it but
-  //     they are responsible for it), or
+  //   • they're the assigned Diagram Owner (the per-diagram
+  //     accountability field introduced with sharing — they may not
+  //     have created it but they are responsible for it), or
   //   • the diagram lives in a project shared with them.
-  // orgId stays a strict filter so cross-org shares only appear once the
-  // caller switches into the project's Org context — same rule as the
-  // /api/projects GET list.
+  //
+  // orgId scopes ONLY the "created it" branch. Diagram-owner and
+  // project-share rows surface regardless of which Org they live in,
+  // mirroring the same rule as the /api/projects GET list (a
+  // cross-org share that the recipient explicitly received shouldn't
+  // vanish just because they're in a different Org by default).
   const diagrams = await prisma.diagram.findMany({
     where: {
-      orgId,
       OR: [
-        { userId },
+        { userId, orgId },
         { diagramOwnerId: userId },
         { project: { shares: { some: { userId } } } },
       ],
