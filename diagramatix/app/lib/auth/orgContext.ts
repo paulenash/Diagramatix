@@ -28,32 +28,14 @@ interface SessionLike {
   user?: { id?: string; email?: string | null };
 }
 
-/** Roles allowed to perform write operations on org content */
-export type OrgRole =
-  | "Owner"
-  | "Admin"
-  | "RiskOwner"
-  | "ProcessOwner"
-  | "ControlOwner"
-  | "InternalAudit"
-  | "BoardObserver"
-  | "Viewer";
-
-/** Roles that can mutate diagrams / projects (i.e. not read-only) */
-export const WRITE_ROLES: OrgRole[] = [
-  "Owner",
-  "Admin",
-  "RiskOwner",
-  "ProcessOwner",
-  "ControlOwner",
-];
-
-/** Roles that have read-only access — useful for guarding admin actions */
-export const READ_ONLY_ROLES: OrgRole[] = [
-  "InternalAudit",
-  "BoardObserver",
-  "Viewer",
-];
+// OrgRole type + the WRITE_ROLES / READ_ONLY_ROLES role-sets live in a
+// client-safe file (no DB imports) so client components can read them
+// directly. Re-exported here so server-side callers keep their existing
+// import surface untouched.
+export type { OrgRole } from "@/app/lib/auth/orgRoleType";
+export { WRITE_ROLES, READ_ONLY_ROLES } from "@/app/lib/auth/orgRoleType";
+// Type-only import for use inside this file.
+import type { OrgRole } from "@/app/lib/auth/orgRoleType";
 
 /**
  * Resolve the active org for the current session.

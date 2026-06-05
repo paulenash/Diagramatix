@@ -182,9 +182,10 @@ function DiagramCard({
 }
 
 export function DashboardClient({ projects: initialProjects, unorganized: initialUnorganized, userName, userEmail, orgName, orgRole, version, readOnly, viewingAsName, viewingAsEmail, impersonationMode, isSuperuser: isSu, usageSnapshot, showTierPicker, tierCards }: Props) {
-  // Owner / Admin can use the destructive hard-delete path. Read-only
-  // (impersonation) sessions are always denied — the server enforces
-  // the same rule independently.
+  // Owner / OrgAdmin can use the destructive hard-delete path (the
+  // Prisma enum value is still "Admin" — the relabel to "OrgAdmin" is
+  // UI-only). Read-only impersonation sessions are always denied; the
+  // server enforces the same rule independently.
   const canHardDelete = !readOnly && (orgRole === "Owner" || orgRole === "Admin");
   const router = useRouter();
   const [projects, setProjects] = useState(initialProjects);

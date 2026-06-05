@@ -26,6 +26,18 @@ export default async function AdminPage() {
         subscriptionEndsAt: true,
         compTierLevelId: true,
         compTierExpiresAt: true,
+        // Surface the user's primary OrgMember row (oldest membership
+        // wins, mirroring getCurrentOrgId's fallback) so the SuperAdmin
+        // table can show + edit the OrgRole inline.
+        orgMembers: {
+          orderBy: { createdAt: "asc" },
+          take: 1,
+          select: {
+            orgId: true,
+            role: true,
+            org: { select: { name: true } },
+          },
+        },
         _count: {
           select: {
             projects: true,
@@ -75,6 +87,7 @@ export default async function AdminPage() {
     const underlyingName = tierNameById.get(underlyingId) ?? "—";
     const showUnderlying = compActive && underlyingName !== effectiveName;
     const isAdmin = SUPERUSER_EMAILS.has(u.email);
+    const primaryOrg = u.orgMembers[0] ?? null;
     return {
       id: u.id,
       email: u.email,
@@ -92,6 +105,12 @@ export default async function AdminPage() {
         ? u.compTierExpiresAt.toISOString()
         : null,
       isAdmin,
+      // Primary OrgMember (oldest membership). Null only when the user
+      // somehow has no OrgMember row — should be impossible after the
+      // Phase 0 backfill but the UI handles it gracefully.
+      primaryOrg: primaryOrg
+        ? { orgId: primaryOrg.orgId, role: primaryOrg.role, orgName: primaryOrg.org.name }
+        : null,
     };
   });
 
