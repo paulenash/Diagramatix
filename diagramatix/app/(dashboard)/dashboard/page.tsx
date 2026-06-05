@@ -67,13 +67,40 @@ export default async function DashboardPage() {
   });
 
   const [projects, unorganized, org, membership] = await Promise.all([
+    // Owned-or-shared, mirroring the Slice 3 API route. Each row carries
+    // owner identity (for the "by …" line on shared tiles) and the
+    // caller's share role (empty array when caller is owner) so the
+    // tile renders without an N+1. orgId stays a strict filter — cross-
+    // org shares only surface once the recipient switches into the
+    // project's Org context.
     prisma.project.findMany({
-      where: { userId: effectiveUserId, orgId, name: { not: ARCHIVE_PROJECT_NAME } },
+      where: {
+        orgId,
+        name: { not: ARCHIVE_PROJECT_NAME },
+        OR: [
+          { userId: effectiveUserId },
+          { shares: { some: { userId: effectiveUserId } } },
+        ],
+      },
       orderBy: { updatedAt: "desc" },
-      include: { _count: { select: { diagrams: true } } },
+      include: {
+        _count: { select: { diagrams: true, shares: true } },
+        user: { select: { id: true, name: true, email: true } },
+        shares: { where: { userId: effectiveUserId }, select: { role: true } },
+      },
     }),
+    // Unorganised diagrams: owned by the caller OR assigned to them as
+    // the diagram owner-of-record (project-share doesn't apply here —
+    // these have no project).
     prisma.diagram.findMany({
-      where: { userId: effectiveUserId, orgId, projectId: null },
+      where: {
+        orgId,
+        projectId: null,
+        OR: [
+          { userId: effectiveUserId },
+          { diagramOwnerId: effectiveUserId },
+        ],
+      },
       orderBy: { updatedAt: "desc" },
       select: { id: true, name: true, type: true, createdAt: true, updatedAt: true },
     }),

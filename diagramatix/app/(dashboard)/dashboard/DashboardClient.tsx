@@ -11,6 +11,7 @@ import { UsagePopover } from "@/app/components/UsagePopover";
 import { NotificationsBell } from "@/app/components/NotificationsBell";
 import { TierPicker, type TierCard } from "@/app/components/TierPicker";
 import { ReviewsSection } from "./ReviewsSection";
+import { ProjectShareDialog } from "./ProjectShareDialog";
 
 interface DiagramSummary {
   id: string;
@@ -27,7 +28,32 @@ interface ProjectSummary {
   ownerName?: string;
   createdAt: Date;
   updatedAt: Date;
-  _count: { diagrams: number };
+  /** Server-side diagrams + shares count. shares may be 0 (not shared). */
+  _count: { diagrams: number; shares?: number };
+  /** Project owner identity. Surfaced on shared tiles as "by name · email". */
+  user?: { id: string; name: string | null; email: string };
+  /**
+   * The caller's ProjectShare row for this project, filtered server-side
+   * to the active user. Empty array when the caller is the project owner;
+   * otherwise contains exactly one row.
+   */
+  shares?: { role: "VIEW" | "EDIT" }[];
+}
+
+/**
+ * Effective project role for the current viewer. "owner" means the caller
+ * owns the project; "edit" / "view" mean they were granted access via a
+ * ProjectShare row. Drives tile styling + per-tile action visibility.
+ *
+ * The server filters `shares` to the caller's row only, so emptiness is
+ * the owner signal — no extra userId comparison needed.
+ */
+type ProjectRole = "owner" | "edit" | "view";
+function deriveProjectRole(p: ProjectSummary): ProjectRole {
+  const share = p.shares?.[0]?.role;
+  if (share === "EDIT") return "edit";
+  if (share === "VIEW") return "view";
+  return "owner";
 }
 
 interface Props {
@@ -199,6 +225,49 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
   const [editOwner, setEditOwner] = useState("");
 
   const selectedProject = selectedProjectId ? projects.find(p => p.id === selectedProjectId) : null;
+  const selectedRole: ProjectRole | null = selectedProject ? deriveProjectRole(selectedProject) : null;
+
+  // Lazy share-list state for the sidebar's collapsible "Shared with" row.
+  // Keyed by projectId — opening the row for the first time fetches the
+  // list once and caches it for the rest of the session. Switching to a
+  // different project resets the open state (the user expects each
+  // project's row to start collapsed).
+  interface ShareRow {
+    id: string;
+    role: "VIEW" | "EDIT";
+    user: { id: string; name: string | null; email: string };
+  }
+  const [shareListOpen, setShareListOpen] = useState(false);
+  const [shareListByProject, setShareListByProject] = useState<Record<string, ShareRow[]>>({});
+  const [shareListLoading, setShareListLoading] = useState(false);
+  const [shareListError, setShareListError] = useState("");
+  // Whether the share-management dialog is open for the current selection.
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+
+  // Refetch share list — used after the dialog closes (we don't know
+  // exactly what changed, so just re-pull the source of truth) and on
+  // first open.
+  async function loadShares(projectId: string) {
+    setShareListLoading(true);
+    setShareListError("");
+    try {
+      const res = await fetch(`/api/projects/${projectId}/shares`);
+      if (!res.ok) throw new Error((await res.text()) || res.statusText);
+      const rows = (await res.json()) as ShareRow[];
+      setShareListByProject(prev => ({ ...prev, [projectId]: rows }));
+    } catch (err) {
+      setShareListError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setShareListLoading(false);
+    }
+  }
+
+  // Reset share-list open state when selection changes — otherwise opening
+  // project A then switching to B would inherit A's open/closed state.
+  useEffect(() => {
+    setShareListOpen(false);
+    setShareListError("");
+  }, [selectedProjectId]);
 
   function saveProjectProps(projectId: string, fields: Record<string, string>) {
     fetch(`/api/projects/${projectId}`, {
@@ -1526,7 +1595,18 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-              {projects.map((p) => (
+              {projects.map((p) => {
+                // Shared tiles render with an amber tint (not a different
+                // shape \u2014 same rounded card, same border thickness, same
+                // text sizes). The amber-50/300/700 family matches other
+                // "different ownership" surfaces in the app (impersonation
+                // banner) so the visual cue is familiar at a glance.
+                const role = deriveProjectRole(p);
+                const isShared = role !== "owner";
+                const ownerLine = isShared && p.user
+                  ? `by ${(p.user.name ?? "").trim() || p.user.email} \u00B7 ${p.user.email}`
+                  : "";
+                return (
                 <div
                   key={p.id}
                   onClick={() => {
@@ -1545,9 +1625,15 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                       setDropTargetProjectId(null);
                     }
                   }}
-                  className={`bg-white border rounded px-3 py-2 hover:shadow-sm cursor-pointer group transition-all select-none ${
+                  className={`border rounded px-3 py-2 hover:shadow-sm cursor-pointer group transition-all select-none ${
                     dropTargetProjectId === p.id ? "border-blue-500 ring-2 ring-blue-300 bg-blue-50" :
-                    selectedProjectId === p.id ? "border-blue-500 ring-1 ring-blue-300" : "border-gray-200 hover:border-blue-300"
+                    selectedProjectId === p.id
+                      ? isShared
+                        ? "bg-amber-50 border-amber-500 ring-1 ring-amber-300"
+                        : "bg-white border-blue-500 ring-1 ring-blue-300"
+                      : isShared
+                        ? "bg-amber-50 border-amber-300 hover:border-amber-400"
+                        : "bg-white border-gray-200 hover:border-blue-300"
                   }`}
                 >
                   <div className="flex items-center justify-between group/row">
@@ -1572,28 +1658,34 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                         >
                           {"\u29C9"}
                         </button>
-                        <button
-                          onClick={(e) => handleDeleteProject(p.id, e)}
-                          className="text-gray-400 hover:text-red-500 text-[10px] px-0.5"
-                          title="Delete project (move diagrams to Unorganised)"
-                        >
-                          {"\u2715"}
-                        </button>
-                        <button
-                          onClick={(e) => handleDeleteProjectCascade(p.id, e)}
-                          className="text-gray-400 hover:text-red-600 text-[10px] px-0.5 font-semibold"
-                          title="Delete project AND all its diagrams (diagrams archived)"
-                        >
-                          {"\u2716+"}
-                        </button>
-                        {canHardDelete && (
-                          <button
-                            onClick={(e) => handleHardDeleteProject(p.id, e)}
-                            className="text-gray-400 hover:text-red-700 text-[10px] px-0.5 font-bold"
-                            title="ADMIN: permanently delete project and all diagrams (no archive, not recoverable)"
-                          >
-                            {"\u2716++"}
-                          </button>
+                        {/* Owner-only destructive actions. Editors/viewers
+                            of a shared project see only the clone button. */}
+                        {!isShared && (
+                          <>
+                            <button
+                              onClick={(e) => handleDeleteProject(p.id, e)}
+                              className="text-gray-400 hover:text-red-500 text-[10px] px-0.5"
+                              title="Delete project (move diagrams to Unorganised)"
+                            >
+                              {"\u2715"}
+                            </button>
+                            <button
+                              onClick={(e) => handleDeleteProjectCascade(p.id, e)}
+                              className="text-gray-400 hover:text-red-600 text-[10px] px-0.5 font-semibold"
+                              title="Delete project AND all its diagrams (diagrams archived)"
+                            >
+                              {"\u2716+"}
+                            </button>
+                            {canHardDelete && (
+                              <button
+                                onClick={(e) => handleHardDeleteProject(p.id, e)}
+                                className="text-gray-400 hover:text-red-700 text-[10px] px-0.5 font-bold"
+                                title="ADMIN: permanently delete project and all diagrams (no archive, not recoverable)"
+                              >
+                                {"\u2716++"}
+                              </button>
+                            )}
+                          </>
                         )}
                       </div>
                     )}
@@ -1604,8 +1696,17 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                     </span>
                     <span className="text-[10px] text-gray-400">{new Date(p.updatedAt).toLocaleDateString()}</span>
                   </div>
+                  {isShared && (
+                    <div
+                      className="text-[10px] text-amber-700 mt-0.5 truncate"
+                      title={ownerLine}
+                    >
+                      {ownerLine}
+                    </div>
+                  )}
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </section>
@@ -1659,34 +1760,63 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
               <label className="text-[10px] text-gray-500">Name</label>
               <p className="text-xs font-medium text-gray-800">{selectedProject.name}</p>
             </div>
+            {/* Project Owner (registered user). For shared tiles the
+                viewer sees the project owner's identity here \u2014 clearly
+                separate from the free-text "Owner" label below, which
+                is just a display string. */}
+            {selectedProject.user && (
+              <div>
+                <label className="text-[10px] text-gray-500">Project Owner</label>
+                <p className="text-xs text-gray-800 truncate" title={selectedProject.user.email}>
+                  {(selectedProject.user.name ?? "").trim() || selectedProject.user.email}
+                </p>
+                <p className="text-[10px] text-gray-500 truncate">{selectedProject.user.email}</p>
+              </div>
+            )}
             <div>
               <label className="text-[10px] text-gray-500">Description</label>
-              <textarea
-                className="w-full text-[10px] border border-gray-300 rounded px-1.5 py-0.5 resize-y"
-                rows={3}
-                value={editDesc}
-                onChange={e => setEditDesc(e.target.value)}
-                onBlur={() => {
-                  saveProjectProps(selectedProject.id, { description: editDesc });
-                  setProjects(prev => prev.map(p => p.id === selectedProject.id ? { ...p, description: editDesc } : p));
-                }}
-                onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); (e.target as HTMLTextAreaElement).blur(); } }}
-                placeholder="Project description..."
-              />
-              <p className="text-[9px] text-gray-400">Shift+Enter for new line</p>
+              {selectedRole === "owner" ? (
+                <>
+                  <textarea
+                    className="w-full text-[10px] border border-gray-300 rounded px-1.5 py-0.5 resize-y"
+                    rows={3}
+                    value={editDesc}
+                    onChange={e => setEditDesc(e.target.value)}
+                    onBlur={() => {
+                      saveProjectProps(selectedProject.id, { description: editDesc });
+                      setProjects(prev => prev.map(p => p.id === selectedProject.id ? { ...p, description: editDesc } : p));
+                    }}
+                    onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); (e.target as HTMLTextAreaElement).blur(); } }}
+                    placeholder="Project description..."
+                  />
+                  <p className="text-[9px] text-gray-400">Shift+Enter for new line</p>
+                </>
+              ) : (
+                // Non-owners see description read-only \u2014 matches the rule
+                // that name/description/typography are owner-only writes.
+                <p className="text-[10px] text-gray-700 whitespace-pre-line">
+                  {selectedProject.description?.trim() || <span className="text-gray-400 italic">(no description)</span>}
+                </p>
+              )}
             </div>
             <div>
-              <label className="text-[10px] text-gray-500">Owner</label>
-              <input type="text"
-                className="w-full text-[10px] border border-gray-300 rounded px-1.5 py-0.5"
-                value={editOwner}
-                onChange={e => setEditOwner(e.target.value)}
-                onBlur={() => {
-                  saveProjectProps(selectedProject.id, { ownerName: editOwner });
-                  setProjects(prev => prev.map(p => p.id === selectedProject.id ? { ...p, ownerName: editOwner } : p));
-                }}
-                onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
-              />
+              <label className="text-[10px] text-gray-500">Owner Label</label>
+              {selectedRole === "owner" ? (
+                <input type="text"
+                  className="w-full text-[10px] border border-gray-300 rounded px-1.5 py-0.5"
+                  value={editOwner}
+                  onChange={e => setEditOwner(e.target.value)}
+                  onBlur={() => {
+                    saveProjectProps(selectedProject.id, { ownerName: editOwner });
+                    setProjects(prev => prev.map(p => p.id === selectedProject.id ? { ...p, ownerName: editOwner } : p));
+                  }}
+                  onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                />
+              ) : (
+                <p className="text-[10px] text-gray-700">
+                  {selectedProject.ownerName?.trim() || <span className="text-gray-400 italic">(unset)</span>}
+                </p>
+              )}
             </div>
             <div>
               <label className="text-[10px] text-gray-500">Diagrams</label>
@@ -1696,6 +1826,62 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
               <label className="text-[10px] text-gray-500">Last Updated</label>
               <p className="text-[10px] text-gray-500">{new Date(selectedProject.updatedAt).toLocaleString()}</p>
             </div>
+
+            {/* Sharing section \u2014 collapsible "Shared with N" row + the
+                owner's Manage Sharing button. Editors and viewers can
+                still see the list (transparency about who else is in
+                the room); only the owner sees Manage. */}
+            <div className="border-t border-gray-100 pt-2 mt-1">
+              <button
+                onClick={() => {
+                  const next = !shareListOpen;
+                  setShareListOpen(next);
+                  if (next && !shareListByProject[selectedProject.id]) {
+                    loadShares(selectedProject.id);
+                  }
+                }}
+                className="w-full flex items-center justify-between text-[10px] text-gray-500 hover:text-gray-700"
+                title="Show the list of users this project is shared with"
+              >
+                <span className="font-semibold uppercase tracking-wide">
+                  Shared with {selectedProject._count.shares ?? 0}
+                </span>
+                <span className="text-gray-400">{shareListOpen ? "\u25be" : "\u25b8"}</span>
+              </button>
+              {shareListOpen && (
+                <div className="mt-1 space-y-1">
+                  {shareListLoading && (
+                    <p className="text-[10px] text-gray-400 italic">Loading\u2026</p>
+                  )}
+                  {shareListError && (
+                    <p className="text-[10px] text-red-600">{shareListError}</p>
+                  )}
+                  {!shareListLoading && !shareListError && (
+                    (shareListByProject[selectedProject.id] ?? []).length === 0 ? (
+                      <p className="text-[10px] text-gray-400 italic">Not shared with anyone.</p>
+                    ) : (
+                      (shareListByProject[selectedProject.id] ?? []).map(s => (
+                        <div key={s.id} className="text-[10px] text-gray-700 flex items-center justify-between gap-1">
+                          <span className="truncate" title={s.user.email}>
+                            {(s.user.name ?? "").trim() || s.user.email}
+                          </span>
+                          <span className="text-[9px] text-gray-500 shrink-0">{s.role === "EDIT" ? "Edit" : "View"}</span>
+                        </div>
+                      ))
+                    )
+                  )}
+                </div>
+              )}
+              {selectedRole === "owner" && !readOnly && (
+                <button
+                  onClick={() => setShareDialogOpen(true)}
+                  className="w-full mt-2 px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50 text-gray-700"
+                >
+                  Manage Sharing\u2026
+                </button>
+              )}
+            </div>
+
             <button
               onClick={() => router.push(`/dashboard/projects/${selectedProject.id}`)}
               className="w-full px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
@@ -1704,6 +1890,28 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
             </button>
           </div>
         </div>
+      )}
+
+      {/* Project Share dialog (owner-only \u2014 gated by the Manage Sharing
+          button above and re-checked server-side on every action). */}
+      {selectedProject && shareDialogOpen && (
+        <ProjectShareDialog
+          projectId={selectedProject.id}
+          projectName={selectedProject.name}
+          ownerUserId={selectedProject.user?.id ?? null}
+          onClose={() => {
+            setShareDialogOpen(false);
+            // Re-pull the share list and the count so the sidebar and
+            // tile reflect any add/remove/role-change made in the dialog.
+            loadShares(selectedProject.id);
+            fetch(`/api/projects`)
+              .then(r => r.ok ? r.json() : null)
+              .then((rows: ProjectSummary[] | null) => {
+                if (rows) setProjects(rows);
+              })
+              .catch(() => {});
+          }}
+        />
       )}
 
       {/* Import name dialog */}
