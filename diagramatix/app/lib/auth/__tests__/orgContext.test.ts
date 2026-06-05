@@ -18,10 +18,22 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 // so any variables it references must be declared via vi.hoisted — otherwise
 // the factory runs before the const initialisers and throws.
 
-const { findUniqueProject, findFirstOrgMember, findUniqueDiagram } = vi.hoisted(() => ({
+const {
+  findUniqueProject,
+  findFirstOrgMember,
+  findUniqueDiagram,
+  findUniqueUser,
+  SUPER_EMAILS,
+} = vi.hoisted(() => ({
   findUniqueProject: vi.fn(),
   findFirstOrgMember: vi.fn(),
   findUniqueDiagram: vi.fn(),
+  findUniqueUser: vi.fn(),
+  // Mirror the production allowlist exactly so the elevation tests can
+  // pick specific emails (super@x and non-super@x). Hoisted alongside
+  // the mock fns because vi.mock factories run before any top-level
+  // const initialisers.
+  SUPER_EMAILS: ["super@example.com", "other-super@example.com"],
 }));
 
 vi.mock("@/app/lib/db", () => ({
@@ -29,6 +41,7 @@ vi.mock("@/app/lib/db", () => ({
     project: { findUnique: findUniqueProject },
     orgMember: { findFirst: findFirstOrgMember },
     diagram: { findUnique: findUniqueDiagram },
+    user: { findUnique: findUniqueUser },
   },
 }));
 
@@ -37,6 +50,7 @@ vi.mock("@/app/lib/superuser", () => ({
   // through directly via session.user.id so each test sets its own caller.
   getEffectiveUserId: (session: { user?: { id?: string } } | null) =>
     session?.user?.id ?? null,
+  SUPERUSER_EMAILS: new Set(SUPER_EMAILS),
 }));
 
 // Imported after the mocks so the module under test picks them up.
@@ -54,7 +68,37 @@ beforeEach(() => {
   findUniqueProject.mockReset();
   findFirstOrgMember.mockReset();
   findUniqueDiagram.mockReset();
+  findUniqueUser.mockReset();
+  // Default: the elevation check finds no SuperAdmin email and no
+  // OrgAdmin/OrgOwner row. Tests that exercise elevation override
+  // these explicitly.
+  findUniqueUser.mockResolvedValue({ email: "regular@example.com" });
 });
+
+/**
+ * `findFirstOrgMember` is consulted by TWO different code paths inside
+ * orgContext, so tests that care about one of them need to disambiguate:
+ *
+ *   • Elevation lookup — `where.role: { in: ["Admin","Owner"] }`. Used
+ *     by `isAdminElevatedForOrg` to decide whether the caller silently
+ *     gets implicit owner access.
+ *   • Cross-org gate — bare `{ userId, orgId }`. Used when a share
+ *     recipient may be in a different Org than the project.
+ *
+ * This helper produces a mock implementation that routes by inspecting
+ * whether the `where.role` filter is set, so each test can describe both
+ * outcomes independently.
+ */
+function mockOrgMember(opts: {
+  elevation?: { id: string } | null;
+  crossOrgGate?: { id: string } | null;
+}) {
+  type FindFirstArgs = { where?: { role?: unknown } } | undefined;
+  findFirstOrgMember.mockImplementation(async (args: FindFirstArgs) => {
+    if (args?.where?.role !== undefined) return opts.elevation ?? null;
+    return opts.crossOrgGate ?? null;
+  });
+}
 
 // ── getProjectAccess ──────────────────────────────────────────────────────
 
@@ -99,7 +143,9 @@ describe("getProjectAccess", () => {
       org: { allowCrossOrgSharing: false },
       shares: [{ role: "VIEW" }],
     });
-    findFirstOrgMember.mockResolvedValue({ id: "mem-1" });
+    // Caller is a plain Org member (cross-org gate passes) but NOT
+    // OrgAdmin/OrgOwner, so the share role still wins.
+    mockOrgMember({ elevation: null, crossOrgGate: { id: "mem-1" } });
     const access = await getProjectAccess("user-1", "proj-X");
     expect(access).toEqual({
       role: "view",
@@ -115,7 +161,7 @@ describe("getProjectAccess", () => {
       org: { allowCrossOrgSharing: false },
       shares: [{ role: "EDIT" }],
     });
-    findFirstOrgMember.mockResolvedValue({ id: "mem-1" });
+    mockOrgMember({ elevation: null, crossOrgGate: { id: "mem-1" } });
     const access = await getProjectAccess("user-1", "proj-X");
     expect(access?.role).toBe("edit");
   });
@@ -144,9 +190,104 @@ describe("getProjectAccess", () => {
     });
     const access = await getProjectAccess("user-1", "proj-X");
     expect(access?.role).toBe("edit");
-    // When the gate is open, the implementation must skip the OrgMember
-    // lookup — that's the whole point of the flag.
+    // When the gate is open, the implementation must skip the cross-org
+    // OrgMember lookup. The elevation lookup (with the role filter) is
+    // allowed to run as part of Slice 7c — that's a separate probe.
+    const crossOrgGateCalls = findFirstOrgMember.mock.calls.filter(
+      ([args]) => !(args && args.where && args.where.role !== undefined),
+    );
+    expect(crossOrgGateCalls).toHaveLength(0);
+  });
+
+  // ── Silent admin elevation (Slice 7c) ────────────────────────────────
+
+  it("grants implicit owner to a SuperAdmin caller for ANY project, no share required", async () => {
+    findUniqueProject.mockResolvedValue({
+      userId: "user-owner",
+      orgId: "org-A",
+      org: { allowCrossOrgSharing: false },
+      shares: [], // no share row
+    });
+    // Caller email is in the SuperAdmin allowlist.
+    findUniqueUser.mockResolvedValue({ email: "super@example.com" });
+    const access = await getProjectAccess("super-user-id", "proj-X");
+    expect(access).toEqual({
+      role: "owner",
+      projectOrgId: "org-A",
+      ownerUserId: "user-owner",
+    });
+  });
+
+  it("grants implicit owner to an OrgAdmin in the project's Org", async () => {
+    findUniqueProject.mockResolvedValue({
+      userId: "user-owner",
+      orgId: "org-A",
+      org: { allowCrossOrgSharing: false },
+      shares: [],
+    });
+    mockOrgMember({ elevation: { id: "mem-admin" }, crossOrgGate: null });
+    const access = await getProjectAccess("orgadmin-user", "proj-X");
+    expect(access?.role).toBe("owner");
+  });
+
+  it("grants implicit owner to an OrgOwner in the project's Org", async () => {
+    // The elevation probe filters by role: { in: ['Admin','Owner'] }, so
+    // a match indicates *either* role. We don't disambiguate here on
+    // purpose — the role-set is what counts.
+    findUniqueProject.mockResolvedValue({
+      userId: "user-owner",
+      orgId: "org-A",
+      org: { allowCrossOrgSharing: false },
+      shares: [],
+    });
+    mockOrgMember({ elevation: { id: "mem-owner" }, crossOrgGate: null });
+    const access = await getProjectAccess("orgowner-user", "proj-X");
+    expect(access?.role).toBe("owner");
+  });
+
+  it("does NOT grant implicit owner when the caller is OrgAdmin in a DIFFERENT Org", async () => {
+    // The elevation lookup filters by (userId, projectOrgId, role IN
+    // [...]). When the caller's OrgAdmin role is in some other Org, the
+    // lookup returns null — exactly the same as having no role at all.
+    findUniqueProject.mockResolvedValue({
+      userId: "user-owner",
+      orgId: "org-A",
+      org: { allowCrossOrgSharing: false },
+      shares: [], // no share row either
+    });
+    mockOrgMember({ elevation: null, crossOrgGate: null });
+    expect(await getProjectAccess("user-1", "proj-X")).toBeNull();
+  });
+
+  it("elevation overrides a lower share role (caller has VIEW share AND is OrgAdmin)", async () => {
+    // The contract is "owner everywhere, silently". A view-share that
+    // happens to overlap with an OrgAdmin membership must NOT cap the
+    // resolved role at view.
+    findUniqueProject.mockResolvedValue({
+      userId: "user-owner",
+      orgId: "org-A",
+      org: { allowCrossOrgSharing: false },
+      shares: [{ role: "VIEW" }],
+    });
+    mockOrgMember({ elevation: { id: "mem-admin" }, crossOrgGate: null });
+    const access = await getProjectAccess("orgadmin-user", "proj-X");
+    expect(access?.role).toBe("owner");
+  });
+
+  it("does NOT consult the elevation probe when caller is the project owner", async () => {
+    // Project-owner fast-path must not pay the cost of an elevation
+    // lookup. Asserts both the role result AND that no OrgMember
+    // queries fired.
+    findUniqueProject.mockResolvedValue({
+      userId: "user-1",
+      orgId: "org-A",
+      org: { allowCrossOrgSharing: false },
+      shares: [],
+    });
+    const access = await getProjectAccess("user-1", "proj-X");
+    expect(access?.role).toBe("owner");
     expect(findFirstOrgMember).not.toHaveBeenCalled();
+    expect(findUniqueUser).not.toHaveBeenCalled();
   });
 });
 
@@ -262,7 +403,40 @@ describe("getDiagramAccess", () => {
       projectId: null,
       diagramOwnerId: null,
     });
+    // No elevation either — caller is a plain user, not in any admin
+    // path for diag's Org.
+    mockOrgMember({ elevation: null, crossOrgGate: null });
     expect(await getDiagramAccess("user-1", "diag-1")).toBeNull();
+  });
+
+  it("grants implicit owner to SuperAdmin on an orphan diagram", async () => {
+    // SuperAdmin can reach legacy pre-Slice-1 orphans for support.
+    findUniqueDiagram.mockResolvedValue({
+      id: "diag-1",
+      userId: "user-other",
+      orgId: "org-A",
+      projectId: null,
+      diagramOwnerId: null,
+    });
+    findUniqueUser.mockResolvedValue({ email: "super@example.com" });
+    const access = await getDiagramAccess("super-user-id", "diag-1");
+    expect(access?.role).toBe("owner");
+    expect(access?.projectAccess).toBeNull();
+  });
+
+  it("grants implicit owner to OrgAdmin on an orphan diagram in their Org", async () => {
+    // Orphan elevation scopes by the diagram's orgId — same rule as
+    // project elevation scopes by project.orgId.
+    findUniqueDiagram.mockResolvedValue({
+      id: "diag-1",
+      userId: "user-other",
+      orgId: "org-A",
+      projectId: null,
+      diagramOwnerId: null,
+    });
+    mockOrgMember({ elevation: { id: "mem-admin" }, crossOrgGate: null });
+    const access = await getDiagramAccess("orgadmin-user", "diag-1");
+    expect(access?.role).toBe("owner");
   });
 
   it("delegates to getProjectAccess when the diagram has a project (edit share)", async () => {

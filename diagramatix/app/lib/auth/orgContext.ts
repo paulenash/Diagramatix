@@ -15,7 +15,7 @@
 
 // Server-only module — must never be imported from client components.
 import { prisma } from "@/app/lib/db";
-import { getEffectiveUserId } from "@/app/lib/superuser";
+import { getEffectiveUserId, SUPERUSER_EMAILS } from "@/app/lib/superuser";
 
 export const ORG_COOKIE = "dgx_org";
 
@@ -197,6 +197,45 @@ const PROJECT_ROLE_RANK: Record<ProjectAccessRole, number> = {
 };
 
 /**
+ * "Silent" admin elevation: does this user implicitly count as an owner
+ * for projects/diagrams in `orgId`?
+ *
+ * Two paths grant elevation:
+ *
+ *   1. SuperAdmin — caller's email is in SUPERUSER_EMAILS. Cross-org by
+ *      definition: SuperAdmins act everywhere.
+ *   2. OrgAdmin / OrgOwner — caller has OrgMember.role of "Admin" or
+ *      "Owner" in the project's Org. (The Prisma enum value "Admin" is
+ *      surfaced as "OrgAdmin" in the UI per Slice 7b.)
+ *
+ * "Silent" is the contract: an elevated caller passes every guard as if
+ * they were the project owner, but no ProjectShare row is ever written
+ * for them and they never appear in any share list. The share UI only
+ * shows real recipients.
+ *
+ * Returns `true` if either path applies. The two probe queries run in
+ * parallel so this adds at most one round-trip to the access check.
+ */
+async function isAdminElevatedForOrg(
+  userId: string,
+  projectOrgId: string,
+): Promise<boolean> {
+  const [user, member] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true },
+    }),
+    prisma.orgMember.findFirst({
+      where: { userId, orgId: projectOrgId, role: { in: ["Admin", "Owner"] } },
+      select: { id: true },
+    }),
+  ]);
+  if (user && SUPERUSER_EMAILS.has(user.email)) return true;
+  if (member) return true;
+  return false;
+}
+
+/**
  * Resolve a user's effective role on a project. Returns `null` if the user
  * has no access (not owner, no share row, or the cross-org gate is closed
  * for an inter-Org share).
@@ -223,12 +262,24 @@ export async function getProjectAccess(
   });
   if (!project) return null;
 
-  // Owner always wins; no cross-org check needed (it's the owner's own org).
+  // Owner always wins; no cross-org check needed (it's the owner's own
+  // org). Skip the elevation probe entirely — the project owner doesn't
+  // need it and we'd otherwise burn two extra queries per call.
   if (project.userId === userId) {
     return { role: "owner", projectOrgId: project.orgId, ownerUserId: project.userId };
   }
 
-  // Non-owner — must have a ProjectShare row.
+  // Silent admin elevation. SuperAdmin (everywhere) and OrgAdmin /
+  // OrgOwner (in the project's Org) act as implicit owners — passes
+  // every owner-gated guard, but no ProjectShare row exists for them
+  // so they don't appear in any share list. Checked before share-row
+  // resolution so an OrgAdmin who's also a VIEW share recipient is
+  // still treated as an owner.
+  if (await isAdminElevatedForOrg(userId, project.orgId)) {
+    return { role: "owner", projectOrgId: project.orgId, ownerUserId: project.userId };
+  }
+
+  // Non-owner, non-elevated — must have a ProjectShare row.
   const share = project.shares[0];
   if (!share) return null;
 
@@ -336,9 +387,18 @@ export async function getDiagramAccess(
     return { diagram, role: projectAccess.role, projectAccess };
   }
 
-  // Legacy orphan — only the original creator has access. No project
-  // sharing applies; the diagram has no project to be shared.
+  // Legacy orphan — original creator passes immediately.
   if (diagram.userId === userId) {
+    return { diagram, role: "owner", projectAccess: null };
+  }
+
+  // Silent elevation on orphan diagrams: SuperAdmin (everywhere) and
+  // OrgAdmin/OrgOwner (in the diagram's Org) get implicit owner. Same
+  // contract as the project path — no share row, no visible footprint.
+  // Without this an OrgAdmin trying to support a user's pre-Slice-1
+  // orphan diagram would be denied even though they have full project-
+  // path access to everything else in the Org.
+  if (await isAdminElevatedForOrg(userId, diagram.orgId)) {
     return { diagram, role: "owner", projectAccess: null };
   }
   return null;
