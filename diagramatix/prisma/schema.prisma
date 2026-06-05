@@ -35,11 +35,29 @@ enum OrgRole {
   Viewer // read-only access to diagrams and registers
 }
 
+// Project sharing — a Project owner can grant another registered user
+// either VIEW or EDIT access to a Project they own (see ProjectShare
+// below). VIEW = read diagrams; EDIT = read + mutate diagram content
+// (data / colour / displayMode / name) but NOT delete the project,
+// delete diagrams, or change the share list. Destructive + share-
+// management actions stay owner-only.
+enum ProjectShareRole {
+  VIEW
+  EDIT
+}
+
 model Org {
   id         String        @id @default(cuid())
   name       String
   entityType OrgEntityType @default(Other)
   createdAt  DateTime      @default(now())
+
+  // Per-org admin setting (managed by Org Owner/Admin via /dashboard/admin).
+  // When false, project sharing is restricted to users in the same Org as
+  // the project owner. When true, the owner can share with any registered
+  // user. Defaults to false so cross-tenant data stays contained until an
+  // org admin explicitly opts in.
+  allowCrossOrgSharing Boolean @default(false)
 
   members             OrgMember[]
   projects            Project[]
@@ -157,6 +175,9 @@ model User {
   // Phase 2 — Send for Review back-relations.
   diagramReviewsRequested       DiagramReview[]            @relation("DiagramReviewRequester")
   diagramReviewerEntries        DiagramReviewer[]          @relation("DiagramReviewerUser")
+  // Project-sharing back-relations.
+  projectShares                 ProjectShare[]             @relation("ProjectShareRecipient")
+  diagramsOwned                 Diagram[]                  @relation("DiagramOwner")
 }
 
 model Project {
@@ -173,10 +194,32 @@ model Project {
   orgId       String
   org         Org       @relation(fields: [orgId], references: [id], onDelete: Restrict)
   diagrams    Diagram[]
+  // Users this project is shared with, plus their role (VIEW / EDIT).
+  shares      ProjectShare[]
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
   @@index([orgId])
+}
+
+// One row per (project, user) pair the owner has shared the project with.
+// Owners never appear here — their ownership is on Project.userId. Recipients
+// have either VIEW or EDIT permission. Deleting the Project or the User
+// cascades to the share rows.
+model ProjectShare {
+  id        String           @id @default(cuid())
+  projectId String
+  project   Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User             @relation("ProjectShareRecipient", fields: [userId], references: [id], onDelete: Cascade)
+  role      ProjectShareRole
+  createdAt DateTime         @default(now())
+  // Owner who added this share. Plain string (no FK) so the audit
+  // breadcrumb survives if the granting owner is later deleted.
+  createdBy String?
+
+  @@unique([projectId, userId])
+  @@index([userId])
 }
 
 model Diagram {
@@ -194,12 +237,22 @@ model Diagram {
   // application layer. Required after Phase 0 backfill.
   orgId       String
   org         Org              @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  // Per-diagram accountability label. Defaults to the project owner at
+  // creation; mutable by the project owner only (editors and viewers see
+  // it read-only). Distinct from the free-text Process Owner inside the
+  // DiagramData. SetNull on user delete preserves diagram history with
+  // an empty owner slot. Nullable so the field can be added to existing
+  // rows without a destructive migration (backfilled by
+  // scripts/backfill-project-sharing.ts).
+  diagramOwnerId String?
+  diagramOwner   User?         @relation("DiagramOwner", fields: [diagramOwnerId], references: [id], onDelete: SetNull)
   history     DiagramHistory[]
   reviews     DiagramReview[]
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
 
   @@index([orgId])
+  @@index([diagramOwnerId])
 }
 
 model DiagramHistory {
