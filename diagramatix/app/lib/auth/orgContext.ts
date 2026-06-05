@@ -180,3 +180,119 @@ export class OrgContextError extends Error {
     this.name = "OrgContextError";
   }
 }
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * Project sharing — access resolution
+ *
+ * Every project/diagram API route checks the caller's relationship to the
+ * target project. Today that meant `project.userId === session.user.id`.
+ * With sharing, a non-owner caller may have either VIEW or EDIT access via
+ * a `ProjectShare` row, plus a per-Org gate (`Org.allowCrossOrgSharing`)
+ * controlling whether the recipient may even be in a different Org than
+ * the project's owner.
+ *
+ * `getProjectAccess` resolves the caller's effective role in one query.
+ * `requireProjectAccess` wraps it to throw an OrgContextError(403) when
+ * the caller doesn't meet the minimum role.
+ * ────────────────────────────────────────────────────────────────────── */
+
+/** Effective project role for a user. Owner > Edit > View > null (no access). */
+export type ProjectAccessRole = "owner" | "edit" | "view";
+
+export interface ProjectAccess {
+  role: ProjectAccessRole;
+  /** Org the Project belongs to (not necessarily the caller's active org). */
+  projectOrgId: string;
+  /** UserId of the project owner (i.e. Project.userId). */
+  ownerUserId: string;
+}
+
+/** Numeric rank so we can compare role tiers. Higher = more privileged. */
+const PROJECT_ROLE_RANK: Record<ProjectAccessRole, number> = {
+  view: 1,
+  edit: 2,
+  owner: 3,
+};
+
+/**
+ * Resolve a user's effective role on a project. Returns `null` if the user
+ * has no access (not owner, no share row, or the cross-org gate is closed
+ * for an inter-Org share).
+ *
+ * Single Prisma query — fetches the project + the caller's share row (if
+ * any) + the project's Org's `allowCrossOrgSharing` flag in one join.
+ */
+export async function getProjectAccess(
+  userId: string,
+  projectId: string,
+): Promise<ProjectAccess | null> {
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: {
+      userId: true,
+      orgId: true,
+      org: { select: { allowCrossOrgSharing: true } },
+      shares: {
+        where: { userId },
+        select: { role: true },
+        take: 1,
+      },
+    },
+  });
+  if (!project) return null;
+
+  // Owner always wins; no cross-org check needed (it's the owner's own org).
+  if (project.userId === userId) {
+    return { role: "owner", projectOrgId: project.orgId, ownerUserId: project.userId };
+  }
+
+  // Non-owner — must have a ProjectShare row.
+  const share = project.shares[0];
+  if (!share) return null;
+
+  // Cross-org gate: if the share recipient is not a member of the
+  // project's Org, the project's Org must have allowCrossOrgSharing on.
+  if (!project.org.allowCrossOrgSharing) {
+    const membership = await prisma.orgMember.findFirst({
+      where: { userId, orgId: project.orgId },
+      select: { id: true },
+    });
+    if (!membership) return null;
+  }
+
+  const role: ProjectAccessRole = share.role === "EDIT" ? "edit" : "view";
+  return { role, projectOrgId: project.orgId, ownerUserId: project.userId };
+}
+
+/**
+ * Resolve the caller's project access AND assert it meets `minRole`.
+ * Throws OrgContextError(401) if not signed in, (404) if the project
+ * doesn't exist, (403) if the caller has no access or insufficient role.
+ *
+ * Use from API route handlers — the existing OrgContextError handler in
+ * each route turns this into the appropriate HTTP status.
+ */
+export async function requireProjectAccess(
+  session: SessionLike | null,
+  cookieStore: CookieStore,
+  projectId: string,
+  minRole: ProjectAccessRole,
+): Promise<ProjectAccess> {
+  const userId = getEffectiveUserId(session, cookieStore);
+  if (!userId) throw new OrgContextError("Not signed in", 401);
+
+  const access = await getProjectAccess(userId, projectId);
+  if (!access) {
+    // Distinguish "doesn't exist" from "no access" by checking project
+    // existence separately. We avoid leaking whether a project id is
+    // valid to someone with no access — return 403 for both.
+    throw new OrgContextError("No access to this project", 403);
+  }
+  if (PROJECT_ROLE_RANK[access.role] < PROJECT_ROLE_RANK[minRole]) {
+    throw new OrgContextError(
+      `Project role ${access.role} cannot perform this action (requires ${minRole})`,
+      403,
+    );
+  }
+  return access;
+}

@@ -1,11 +1,20 @@
+import path from "node:path";
 import { defineConfig } from "vitest/config";
 
-// Layout / diagram-structure tests only. These exercise the pure BPMN layout
-// engine and the diagram invariant checker — no React, no Next, no DB — so
-// they run in a plain node environment in well under a second.
+// Pure server-side library tests: BPMN layout engine, diagram invariant
+// checker, and auth helpers (with a mocked Prisma client). Each suite runs
+// in plain node — no React, no Next runtime, no real DB.
 export default defineConfig({
+  resolve: {
+    alias: {
+      "@": path.resolve(__dirname, "."),
+    },
+  },
   test: {
-    include: ["app/lib/diagram/**/*.test.ts"],
+    include: [
+      "app/lib/diagram/**/*.test.ts",
+      "app/lib/auth/**/*.test.ts",
+    ],
     environment: "node",
   },
 });
