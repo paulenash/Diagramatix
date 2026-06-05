@@ -2,20 +2,15 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
-import { getEffectiveUserId, isReadOnlyImpersonation } from "@/app/lib/superuser";
+import { isReadOnlyImpersonation } from "@/app/lib/superuser";
 import { isAssignedReviewer } from "@/app/lib/reviewProjects";
 import {
-  getCurrentOrgId,
-  requireRole,
-  WRITE_ROLES,
+  requireDiagramAccess,
+  requireProjectAccess,
   OrgContextError,
 } from "@/app/lib/auth/orgContext";
 
 type Params = { params: Promise<{ id: string }> };
-
-async function getAuthorizedDiagram(id: string, userId: string, orgId: string) {
-  return prisma.diagram.findFirst({ where: { id, userId, orgId } });
-}
 
 async function checkImpersonating(session: Parameters<typeof isReadOnlyImpersonation>[0]) {
   try {
@@ -31,30 +26,40 @@ export async function GET(_req: Request, { params }: Params) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let userId = session.user.id;
-  try { userId = getEffectiveUserId(session, await cookies()); } catch { /* fallback */ }
+  const { id } = await params;
 
-  let orgId: string;
+  // View access satisfies GET. requireDiagramAccess handles:
+  //   • shared-project access (view/edit/owner all qualify),
+  //   • the legacy orphan-diagram path (caller is the original userId), and
+  //   • the cross-org gate.
+  // Reviewer access is the one path it doesn't cover — assigned reviewers
+  // may read a diagram they have no project access to.
+  let allowed = false;
   try {
-    orgId = await getCurrentOrgId(session, await cookies());
+    await requireDiagramAccess(session, await cookies(), id, "view");
+    allowed = true;
   } catch (err) {
     if (err instanceof OrgContextError) {
-      return NextResponse.json({ error: err.message }, { status: err.status });
+      if (err.status === 404) {
+        return NextResponse.json({ error: err.message }, { status: 404 });
+      }
+      if (err.status === 403 && (await isAssignedReviewer(session.user.id, id))) {
+        allowed = true;
+      } else {
+        return NextResponse.json({ error: err.message }, { status: err.status });
+      }
+    } else {
+      throw err;
     }
-    throw err;
+  }
+  if (!allowed) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const { id } = await params;
-  let diagram = await getAuthorizedDiagram(id, userId, orgId);
-  // Review Mode (Phase 3): assigned reviewers may read a diagram they
-  // don't own.
-  if (!diagram && await isAssignedReviewer(session.user.id, id)) {
-    diagram = await prisma.diagram.findUnique({ where: { id } });
-  }
+  const diagram = await prisma.diagram.findUnique({ where: { id } });
   if (!diagram) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-
   return NextResponse.json(diagram);
 }
 
@@ -68,52 +73,83 @@ export async function PUT(req: Request, { params }: Params) {
     return NextResponse.json({ error: "Read-only: viewing another user" }, { status: 403 });
   }
 
-  let orgId: string;
+  const { id } = await params;
+  const body = await req.json();
+  const { data } = body;
+
+  // Three write paths converge here, in order of precedence:
+  //   1. Reviewer save — assigned reviewers can write `data` only
+  //      (comments round-trip through diagram JSON). They can't rename,
+  //      re-project, restyle, or reassign owner.
+  //   2. Editor share — `data`, `name`, `colorConfig`, `displayMode`. NOT
+  //      `projectId` (a move means changing access scope, owner-only) or
+  //      `diagramOwnerId` (accountability change, owner-only).
+  //   3. Project owner — everything.
+  // Determine which path applies, then validate the body against it.
+  let role: "owner" | "edit" | "view" | "reviewer" | null = null;
+  let existing: { projectId: string | null; userId: string; orgId: string } | null = null;
   try {
-    ({ orgId } = await requireRole(session, await cookies(), WRITE_ROLES));
+    const access = await requireDiagramAccess(session, await cookies(), id, "edit");
+    role = access.role === "owner" ? "owner" : "edit";
+    existing = access.diagram;
   } catch (err) {
     if (err instanceof OrgContextError) {
-      return NextResponse.json({ error: err.message }, { status: err.status });
+      if (err.status === 404) {
+        return NextResponse.json({ error: err.message }, { status: 404 });
+      }
+      // Try the reviewer path before giving up. Same access model we had
+      // before sharing landed — kept untouched.
+      if (err.status === 403 && (await isAssignedReviewer(session.user.id, id))) {
+        existing = await prisma.diagram.findUnique({
+          where: { id },
+          select: { projectId: true, userId: true, orgId: true },
+        });
+        role = existing ? "reviewer" : null;
+      } else {
+        return NextResponse.json({ error: err.message }, { status: err.status });
+      }
+    } else {
+      throw err;
     }
-    throw err;
   }
-
-  const { id } = await params;
-  let existing = await getAuthorizedDiagram(id, session.user.id, orgId);
-
-  // Review Mode (Phase 3): an assigned reviewer may save to a diagram
-  // they don't own. Their write is restricted to the `data` field below
-  // (comments round-trip through the diagram JSON) — they can't rename,
-  // re-project, or restyle the owner's diagram.
-  let reviewerAccess = false;
-  if (!existing && await isAssignedReviewer(session.user.id, id)) {
-    existing = await prisma.diagram.findUnique({ where: { id } });
-    reviewerAccess = !!existing;
-  }
-  if (!existing) {
+  if (!role || !existing) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const body = await req.json();
-  const { data } = body;
-  // Owner-only mutable fields — ignored for reviewer saves.
+  // Per-role write whitelist. Strip everything the caller isn't allowed
+  // to set BEFORE building the Prisma update — defence-in-depth even if
+  // the client misbehaves.
+  const reviewerAccess = role === "reviewer";
+  const isOwner = role === "owner";
   const name = reviewerAccess ? undefined : body.name;
-  const projectId = reviewerAccess ? undefined : body.projectId;
+  const projectId = isOwner ? body.projectId : undefined;
+  const diagramOwnerId = isOwner ? body.diagramOwnerId : undefined;
   const colorConfig = reviewerAccess ? undefined : body.colorConfig;
   const displayMode = reviewerAccess ? undefined : body.displayMode;
 
-  // Validate project ownership AND org match if non-null projectId supplied
+  // If the owner is moving the diagram into another project, verify they
+  // also own that target project — otherwise a malicious or buggy client
+  // could "park" a diagram inside someone else's project.
   if (projectId !== undefined && projectId !== null) {
-    const project = await prisma.project.findFirst({
-      where: { id: projectId, userId: session.user.id, orgId },
-    });
-    if (!project) {
-      return NextResponse.json({ error: "Project not found" }, { status: 404 });
+    try {
+      await requireProjectAccess(session, await cookies(), projectId, "owner");
+    } catch (err) {
+      if (err instanceof OrgContextError) {
+        return NextResponse.json({ error: err.message }, { status: err.status === 403 ? 403 : 404 });
+      }
+      throw err;
     }
   }
 
   try {
-    if (name !== undefined || data !== undefined || projectId !== undefined || colorConfig !== undefined || displayMode !== undefined) {
+    if (
+      name !== undefined ||
+      data !== undefined ||
+      projectId !== undefined ||
+      diagramOwnerId !== undefined ||
+      colorConfig !== undefined ||
+      displayMode !== undefined
+    ) {
       await prisma.diagram.update({
         where: { id },
         data: {
@@ -123,6 +159,7 @@ export async function PUT(req: Request, { params }: Params) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           ...(colorConfig !== undefined && { colorConfig: colorConfig as any }),
           ...(projectId !== undefined && { projectId }),
+          ...(diagramOwnerId !== undefined && { diagramOwnerId }),
           ...(displayMode !== undefined && { displayMode }),
         },
       });
@@ -175,20 +212,17 @@ export async function DELETE(_req: Request, { params }: Params) {
     return NextResponse.json({ error: "Read-only: viewing another user" }, { status: 403 });
   }
 
-  let orgId: string;
+  const { id } = await params;
+  // Owner-only. Editor share-users cannot delete diagrams — that's a
+  // hard rule of the share model: shares are about safe collaboration,
+  // destructive actions stay with the project owner.
   try {
-    ({ orgId } = await requireRole(session, await cookies(), WRITE_ROLES));
+    await requireDiagramAccess(session, await cookies(), id, "owner");
   } catch (err) {
     if (err instanceof OrgContextError) {
       return NextResponse.json({ error: err.message }, { status: err.status });
     }
     throw err;
-  }
-
-  const { id } = await params;
-  const existing = await getAuthorizedDiagram(id, session.user.id, orgId);
-  if (!existing) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
   await prisma.diagram.delete({ where: { id } });

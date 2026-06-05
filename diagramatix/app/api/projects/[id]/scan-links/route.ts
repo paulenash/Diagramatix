@@ -2,12 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma, pgPool } from "@/app/lib/db";
-import {
-  getCurrentOrgId,
-  requireRole,
-  WRITE_ROLES,
-  OrgContextError,
-} from "@/app/lib/auth/orgContext";
+import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -112,20 +107,17 @@ export async function GET(_req: Request, { params }: Params) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  const { id } = await params;
   let orgId: string;
   try {
-    orgId = await getCurrentOrgId(session, await cookies());
+    // Edit-or-owner — scan-link is a project-wide diagnostic that the user
+    // typically follows up with edits, so the floor matches the POST below.
+    const access = await requireProjectAccess(session, await cookies(), id, "edit");
+    orgId = access.projectOrgId;
   } catch (err) {
     if (err instanceof OrgContextError) return NextResponse.json({ error: err.message }, { status: err.status });
     throw err;
   }
-
-  const { id } = await params;
-  const project = await prisma.project.findFirst({
-    where: { id, userId: session.user.id, orgId },
-    select: { id: true },
-  });
-  if (!project) return NextResponse.json({ error: "Project not found" }, { status: 404 });
 
   // Pull all BPMN diagrams in the project. type === "bpmn" is the only
   // value used in production for BPMN; the scan is scoped accordingly.
@@ -282,20 +274,15 @@ export async function POST(req: Request, { params }: Params) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  const { id: projectId } = await params;
   let orgId: string;
   try {
-    ({ orgId } = await requireRole(session, await cookies(), WRITE_ROLES));
+    const access = await requireProjectAccess(session, await cookies(), projectId, "edit");
+    orgId = access.projectOrgId;
   } catch (err) {
     if (err instanceof OrgContextError) return NextResponse.json({ error: err.message }, { status: err.status });
     throw err;
   }
-
-  const { id: projectId } = await params;
-  const project = await prisma.project.findFirst({
-    where: { id: projectId, userId: session.user.id, orgId },
-    select: { id: true },
-  });
-  if (!project) return NextResponse.json({ error: "Project not found" }, { status: 404 });
 
   const body = (await req.json().catch(() => ({}))) as ApplyBody;
   const adds = Array.isArray(body.adds) ? body.adds : [];

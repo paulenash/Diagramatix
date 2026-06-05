@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { getEffectiveUserId } from "@/app/lib/superuser";
-import { getCurrentOrgId, OrgContextError } from "@/app/lib/auth/orgContext";
+import { requireDiagramAccess, OrgContextError } from "@/app/lib/auth/orgContext";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -12,30 +12,39 @@ export async function GET(_req: Request, { params }: Params) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  let userId = session.user.id;
-  try { userId = getEffectiveUserId(session, await cookies()); } catch { /* ignore */ }
-
-  let orgId: string;
-  try { orgId = await getCurrentOrgId(session, await cookies()); }
-  catch (err) {
-    if (err instanceof OrgContextError) return NextResponse.json({ error: err.message }, { status: err.status });
-    throw err;
-  }
-
   const { id } = await params;
-
-  // Verify diagram access — normal path (owner, current org)
-  let diagram = await prisma.diagram.findFirst({ where: { id, userId, orgId } });
-  if (!diagram) {
-    // Archived-diagram path: allow access if the original owner was this user
-    const archived = await prisma.diagram.findUnique({ where: { id } });
-    if (archived) {
-      const data = (archived.data as Record<string, unknown>) ?? {};
-      const meta = (data._archive as Record<string, unknown>) ?? {};
-      if (meta._archivedFromUserId === userId) diagram = archived;
+  // History is reachable by any access role (owner/edit/view): a viewer
+  // can see what's changed. Archived-diagram path remains as a fallback
+  // for diagrams that were archived out of the active view.
+  let allowed = false;
+  try {
+    await requireDiagramAccess(session, await cookies(), id, "view");
+    allowed = true;
+  } catch (err) {
+    if (err instanceof OrgContextError) {
+      if (err.status === 404 || err.status === 403) {
+        // Archive fallback: an archived diagram returns 403 from the new
+        // helper (no project access, owner-side links via projectId may
+        // be dropped). If it was originally owned by the caller, allow.
+        let userId = session.user.id;
+        try { userId = getEffectiveUserId(session, await cookies()); } catch { /* ignore */ }
+        const archived = await prisma.diagram.findUnique({ where: { id } });
+        if (archived) {
+          const data = (archived.data as Record<string, unknown>) ?? {};
+          const meta = (data._archive as Record<string, unknown>) ?? {};
+          if (meta._archivedFromUserId === userId) allowed = true;
+        }
+        if (!allowed) {
+          return NextResponse.json({ error: err.message }, { status: err.status });
+        }
+      } else {
+        return NextResponse.json({ error: err.message }, { status: err.status });
+      }
+    } else {
+      throw err;
     }
   }
-  if (!diagram) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!allowed) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const history = await prisma.diagramHistory.findMany({
     where: { diagramId: id },

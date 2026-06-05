@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { archiveDiagram } from "@/app/lib/archive";
-import { requireRole, WRITE_ROLES, OrgContextError } from "@/app/lib/auth/orgContext";
+import { requireDiagramAccess, OrgContextError } from "@/app/lib/auth/orgContext";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -14,9 +14,11 @@ export async function POST(_req: Request, { params }: Params) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let orgId: string;
+  const { id } = await params;
+  // Owner-only — archive is a destructive (recoverable, but still removes
+  // the diagram from active view) action. Editors can't archive.
   try {
-    ({ orgId } = await requireRole(session, await cookies(), WRITE_ROLES));
+    await requireDiagramAccess(session, await cookies(), id, "owner");
   } catch (err) {
     if (err instanceof OrgContextError) {
       return NextResponse.json({ error: err.message }, { status: err.status });
@@ -24,11 +26,8 @@ export async function POST(_req: Request, { params }: Params) {
     throw err;
   }
 
-  const { id } = await params;
-
-  // Verify ownership AND org match
-  const diagram = await prisma.diagram.findFirst({
-    where: { id, userId: session.user.id, orgId },
+  const diagram = await prisma.diagram.findUnique({
+    where: { id },
     include: { project: { select: { name: true } } },
   });
   if (!diagram) {

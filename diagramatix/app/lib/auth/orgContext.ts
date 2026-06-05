@@ -296,3 +296,104 @@ export async function requireProjectAccess(
   }
   return access;
 }
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * Diagram access — wraps project access plus the legacy orphan-diagram path.
+ *
+ * Most diagrams now live inside a Project, so a caller's access to a diagram
+ * is whatever their project access is. A small number of historical diagrams
+ * have `projectId IS NULL` (legacy orphans) — for those, the only person
+ * with access is the diagram's original owner. The wrapper folds both into
+ * one helper so each /api/diagrams route is a tight one-call guard.
+ * ────────────────────────────────────────────────────────────────────── */
+
+/** Minimal shape returned alongside the resolved role. */
+interface DiagramHandle {
+  id: string;
+  userId: string;
+  orgId: string;
+  projectId: string | null;
+  diagramOwnerId: string | null;
+}
+
+export interface DiagramAccess {
+  diagram: DiagramHandle;
+  /** Resolved role — `owner` for legacy orphan diagrams owned by the caller. */
+  role: ProjectAccessRole;
+  /**
+   * Project access record if the diagram is in a project; null for legacy
+   * orphans. Routes that need to know the project owner read it from here.
+   */
+  projectAccess: ProjectAccess | null;
+}
+
+/**
+ * Resolve a user's effective role on a diagram. Returns null when the
+ * diagram doesn't exist, the caller has no project access, or it's a
+ * legacy orphan owned by someone else.
+ */
+export async function getDiagramAccess(
+  userId: string,
+  diagramId: string,
+): Promise<DiagramAccess | null> {
+  const diagram = await prisma.diagram.findUnique({
+    where: { id: diagramId },
+    select: {
+      id: true,
+      userId: true,
+      orgId: true,
+      projectId: true,
+      diagramOwnerId: true,
+    },
+  });
+  if (!diagram) return null;
+
+  if (diagram.projectId) {
+    const projectAccess = await getProjectAccess(userId, diagram.projectId);
+    if (!projectAccess) return null;
+    return { diagram, role: projectAccess.role, projectAccess };
+  }
+
+  // Legacy orphan — only the original creator has access. No project
+  // sharing applies; the diagram has no project to be shared.
+  if (diagram.userId === userId) {
+    return { diagram, role: "owner", projectAccess: null };
+  }
+  return null;
+}
+
+/**
+ * Resolve diagram access AND assert it meets `minRole`. 401 if not signed
+ * in, 404 if the diagram doesn't exist, 403 otherwise. The "doesn't exist"
+ * vs "no access" distinction is deliberately kept here — diagram ids are
+ * UUID-style cuids so leaking existence is harmless, and the 404 lets the
+ * UI distinguish a deleted diagram from a permission downgrade.
+ */
+export async function requireDiagramAccess(
+  session: SessionLike | null,
+  cookieStore: CookieStore,
+  diagramId: string,
+  minRole: ProjectAccessRole,
+): Promise<DiagramAccess> {
+  const userId = getEffectiveUserId(session, cookieStore);
+  if (!userId) throw new OrgContextError("Not signed in", 401);
+
+  // Fast-path 404: probe existence so the caller can tell apart "deleted"
+  // from "you lost permission". getDiagramAccess returns null for both,
+  // which would otherwise collapse to a single 403.
+  const exists = await prisma.diagram.findUnique({
+    where: { id: diagramId },
+    select: { id: true },
+  });
+  if (!exists) throw new OrgContextError("Not found", 404);
+
+  const access = await getDiagramAccess(userId, diagramId);
+  if (!access) throw new OrgContextError("No access to this diagram", 403);
+  if (PROJECT_ROLE_RANK[access.role] < PROJECT_ROLE_RANK[minRole]) {
+    throw new OrgContextError(
+      `Diagram role ${access.role} cannot perform this action (requires ${minRole})`,
+      403,
+    );
+  }
+  return access;
+}

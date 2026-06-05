@@ -3,7 +3,12 @@ import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { isReadOnlyImpersonation } from "@/app/lib/superuser";
-import { requireRole, WRITE_ROLES, OrgContextError } from "@/app/lib/auth/orgContext";
+import {
+  requireRole,
+  requireProjectAccess,
+  WRITE_ROLES,
+  OrgContextError,
+} from "@/app/lib/auth/orgContext";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -22,6 +27,23 @@ export async function POST(_req: Request, { params }: Params) {
     // proceed normally
   }
 
+  // Clone has two access checks:
+  //   • caller must be able to read the source project (any role — owner,
+  //     edit, or view all qualify; a viewer is allowed to copy what they
+  //     can see into their own workspace).
+  //   • caller must be allowed to create projects in their active Org —
+  //     the clone becomes a new project owned by them, scoped to THEIR
+  //     active Org, not the source's. That's why requireRole stays.
+  const { id } = await params;
+  try {
+    await requireProjectAccess(session, await cookies(), id, "view");
+  } catch (err) {
+    if (err instanceof OrgContextError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+    throw err;
+  }
+
   let orgId: string;
   try {
     ({ orgId } = await requireRole(session, await cookies(), WRITE_ROLES));
@@ -32,9 +54,8 @@ export async function POST(_req: Request, { params }: Params) {
     throw err;
   }
 
-  const { id } = await params;
-  const source = await prisma.project.findFirst({
-    where: { id, userId: session.user.id, orgId },
+  const source = await prisma.project.findUnique({
+    where: { id },
     include: { diagrams: true },
   });
 
@@ -65,6 +86,10 @@ export async function POST(_req: Request, { params }: Params) {
         colorConfig: diagram.colorConfig as any,
         displayMode: diagram.displayMode,
         userId: session.user.id,
+        // The cloned project's owner is the caller, so the diagram-owner
+        // default for every cloned diagram is the caller too — the
+        // accountability label resets at clone time.
+        diagramOwnerId: session.user.id,
         orgId,
         projectId: newProject.id,
       },

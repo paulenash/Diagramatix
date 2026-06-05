@@ -18,15 +18,17 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 // so any variables it references must be declared via vi.hoisted — otherwise
 // the factory runs before the const initialisers and throws.
 
-const { findUniqueProject, findFirstOrgMember } = vi.hoisted(() => ({
+const { findUniqueProject, findFirstOrgMember, findUniqueDiagram } = vi.hoisted(() => ({
   findUniqueProject: vi.fn(),
   findFirstOrgMember: vi.fn(),
+  findUniqueDiagram: vi.fn(),
 }));
 
 vi.mock("@/app/lib/db", () => ({
   prisma: {
     project: { findUnique: findUniqueProject },
     orgMember: { findFirst: findFirstOrgMember },
+    diagram: { findUnique: findUniqueDiagram },
   },
 }));
 
@@ -41,6 +43,8 @@ vi.mock("@/app/lib/superuser", () => ({
 import {
   getProjectAccess,
   requireProjectAccess,
+  getDiagramAccess,
+  requireDiagramAccess,
   OrgContextError,
 } from "../orgContext";
 
@@ -49,6 +53,7 @@ const emptyCookies = { get: () => undefined };
 beforeEach(() => {
   findUniqueProject.mockReset();
   findFirstOrgMember.mockReset();
+  findUniqueDiagram.mockReset();
 });
 
 // ── getProjectAccess ──────────────────────────────────────────────────────
@@ -219,5 +224,164 @@ describe("requireProjectAccess", () => {
       "owner",
     );
     expect(access.role).toBe("owner");
+  });
+});
+
+// ── getDiagramAccess / requireDiagramAccess ───────────────────────────────
+//
+// The diagram helpers wrap project access plus the legacy orphan-diagram
+// path (projectId === null). The wrapper is the only thing the diagram API
+// routes touch, so these tests pin the two branches it has to deal with.
+
+describe("getDiagramAccess", () => {
+  it("returns null when the diagram does not exist", async () => {
+    findUniqueDiagram.mockResolvedValue(null);
+    expect(await getDiagramAccess("user-1", "missing")).toBeNull();
+  });
+
+  it("returns owner role for a legacy orphan diagram owned by the caller", async () => {
+    findUniqueDiagram.mockResolvedValue({
+      id: "diag-1",
+      userId: "user-1",
+      orgId: "org-A",
+      projectId: null,
+      diagramOwnerId: null,
+    });
+    const access = await getDiagramAccess("user-1", "diag-1");
+    expect(access?.role).toBe("owner");
+    expect(access?.projectAccess).toBeNull();
+    // Orphan path must NOT call getProjectAccess (no project to query).
+    expect(findUniqueProject).not.toHaveBeenCalled();
+  });
+
+  it("returns null for a legacy orphan diagram not owned by the caller", async () => {
+    findUniqueDiagram.mockResolvedValue({
+      id: "diag-1",
+      userId: "user-other",
+      orgId: "org-A",
+      projectId: null,
+      diagramOwnerId: null,
+    });
+    expect(await getDiagramAccess("user-1", "diag-1")).toBeNull();
+  });
+
+  it("delegates to getProjectAccess when the diagram has a project (edit share)", async () => {
+    findUniqueDiagram.mockResolvedValue({
+      id: "diag-1",
+      userId: "user-owner",
+      orgId: "org-A",
+      projectId: "proj-X",
+      diagramOwnerId: "user-owner",
+    });
+    findUniqueProject.mockResolvedValue({
+      userId: "user-owner",
+      orgId: "org-A",
+      org: { allowCrossOrgSharing: true },
+      shares: [{ role: "EDIT" }],
+    });
+    const access = await getDiagramAccess("user-1", "diag-1");
+    expect(access?.role).toBe("edit");
+    expect(access?.projectAccess?.role).toBe("edit");
+    expect(access?.projectAccess?.ownerUserId).toBe("user-owner");
+  });
+
+  it("returns null when the diagram is in a project the caller has no access to", async () => {
+    findUniqueDiagram.mockResolvedValue({
+      id: "diag-1",
+      userId: "user-owner",
+      orgId: "org-A",
+      projectId: "proj-X",
+      diagramOwnerId: "user-owner",
+    });
+    findUniqueProject.mockResolvedValue({
+      userId: "user-owner",
+      orgId: "org-A",
+      org: { allowCrossOrgSharing: true },
+      shares: [], // no share row for user-1
+    });
+    expect(await getDiagramAccess("user-1", "diag-1")).toBeNull();
+  });
+});
+
+describe("requireDiagramAccess", () => {
+  const sessionFor = (id: string | null) =>
+    (id ? { user: { id } } : null) as Parameters<typeof requireDiagramAccess>[0];
+
+  it("throws 401 when there is no session", async () => {
+    await expect(
+      requireDiagramAccess(sessionFor(null), emptyCookies, "diag-1", "view"),
+    ).rejects.toMatchObject({ status: 401 });
+  });
+
+  it("throws 404 when the diagram does not exist", async () => {
+    findUniqueDiagram.mockResolvedValue(null);
+    await expect(
+      requireDiagramAccess(sessionFor("user-1"), emptyCookies, "diag-1", "view"),
+    ).rejects.toMatchObject({ status: 404 });
+  });
+
+  it("throws 403 when the diagram exists but the caller has no access", async () => {
+    // First findUnique (existence probe) returns truthy; second
+    // (getDiagramAccess) sees an orphan owned by someone else.
+    findUniqueDiagram
+      .mockResolvedValueOnce({ id: "diag-1" })
+      .mockResolvedValueOnce({
+        id: "diag-1",
+        userId: "user-other",
+        orgId: "org-A",
+        projectId: null,
+        diagramOwnerId: null,
+      });
+    await expect(
+      requireDiagramAccess(sessionFor("user-1"), emptyCookies, "diag-1", "view"),
+    ).rejects.toMatchObject({ status: 403 });
+  });
+
+  it("throws 403 when the caller has view but the route requires edit", async () => {
+    findUniqueDiagram
+      .mockResolvedValueOnce({ id: "diag-1" })
+      .mockResolvedValueOnce({
+        id: "diag-1",
+        userId: "user-owner",
+        orgId: "org-A",
+        projectId: "proj-X",
+        diagramOwnerId: "user-owner",
+      });
+    findUniqueProject.mockResolvedValue({
+      userId: "user-owner",
+      orgId: "org-A",
+      org: { allowCrossOrgSharing: true },
+      shares: [{ role: "VIEW" }],
+    });
+    await expect(
+      requireDiagramAccess(sessionFor("user-1"), emptyCookies, "diag-1", "edit"),
+    ).rejects.toBeInstanceOf(OrgContextError);
+  });
+
+  it("returns the diagram + project access record when minRole is met", async () => {
+    findUniqueDiagram
+      .mockResolvedValueOnce({ id: "diag-1" })
+      .mockResolvedValueOnce({
+        id: "diag-1",
+        userId: "user-owner",
+        orgId: "org-A",
+        projectId: "proj-X",
+        diagramOwnerId: "user-owner",
+      });
+    findUniqueProject.mockResolvedValue({
+      userId: "user-owner",
+      orgId: "org-A",
+      org: { allowCrossOrgSharing: true },
+      shares: [{ role: "EDIT" }],
+    });
+    const access = await requireDiagramAccess(
+      sessionFor("user-1"),
+      emptyCookies,
+      "diag-1",
+      "edit",
+    );
+    expect(access.role).toBe("edit");
+    expect(access.diagram.projectId).toBe("proj-X");
+    expect(access.projectAccess?.ownerUserId).toBe("user-owner");
   });
 });

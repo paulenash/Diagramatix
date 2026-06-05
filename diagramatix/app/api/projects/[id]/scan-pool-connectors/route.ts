@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
-import { getCurrentOrgId, OrgContextError } from "@/app/lib/auth/orgContext";
+import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext";
 import { checkDiagram, RULES, type DiagramLike } from "@/app/lib/diagram/checks/diagramChecks";
 
 type Params = { params: Promise<{ id: string }> };
@@ -89,22 +89,19 @@ export async function GET(_req: Request, { params }: Params) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const { id } = await params;
   let orgId: string;
   try {
-    orgId = await getCurrentOrgId(session, await cookies());
+    // Edit-or-owner. The scan is a precursor to fixing things; we don't
+    // expose it to viewers.
+    const access = await requireProjectAccess(session, await cookies(), id, "edit");
+    orgId = access.projectOrgId;
   } catch (err) {
     if (err instanceof OrgContextError) {
       return NextResponse.json({ error: err.message }, { status: err.status });
     }
     throw err;
   }
-
-  const { id } = await params;
-  const project = await prisma.project.findFirst({
-    where: { id, userId: session.user.id, orgId },
-    select: { id: true },
-  });
-  if (!project) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const diagrams = await prisma.diagram.findMany({
     where: { projectId: id, orgId },

@@ -5,18 +5,14 @@ import { prisma } from "@/app/lib/db";
 import { getEffectiveUserId, isReadOnlyImpersonation } from "@/app/lib/superuser";
 import { archiveDiagram } from "@/app/lib/archive";
 import {
-  getCurrentOrgId,
   requireRole,
+  requireProjectAccess,
   WRITE_ROLES,
   OrgContextError,
   type OrgRole,
 } from "@/app/lib/auth/orgContext";
 
 type Params = { params: Promise<{ id: string }> };
-
-async function getAuthorizedProject(id: string, userId: string, orgId: string) {
-  return prisma.project.findFirst({ where: { id, userId, orgId } });
-}
 
 /** Safely check if impersonating — returns false if cookies() fails */
 async function checkImpersonating(session: Parameters<typeof isReadOnlyImpersonation>[0]) {
@@ -33,12 +29,12 @@ export async function GET(_req: Request, { params }: Params) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let userId = session.user.id;
-  try { userId = getEffectiveUserId(session, await cookies()); } catch { /* fallback */ }
+  const { id } = await params;
 
-  let orgId: string;
+  // requireProjectAccess collapses owner-or-shared into a single check.
+  // 'view' is the floor — owners and editors satisfy it too.
   try {
-    orgId = await getCurrentOrgId(session, await cookies());
+    await requireProjectAccess(session, await cookies(), id, "view");
   } catch (err) {
     if (err instanceof OrgContextError) {
       return NextResponse.json({ error: err.message }, { status: err.status });
@@ -46,9 +42,8 @@ export async function GET(_req: Request, { params }: Params) {
     throw err;
   }
 
-  const { id } = await params;
-  const project = await prisma.project.findFirst({
-    where: { id, userId, orgId },
+  const project = await prisma.project.findUnique({
+    where: { id },
     include: {
       diagrams: {
         orderBy: { updatedAt: "desc" },
@@ -74,9 +69,12 @@ export async function PUT(req: Request, { params }: Params) {
     return NextResponse.json({ error: "Read-only: viewing another user" }, { status: 403 });
   }
 
-  let orgId: string;
+  const { id } = await params;
+  // Owner-only — project name/description/typography are owner-level
+  // changes. Editor-level project-share users get write access to the
+  // diagrams inside the project, not the project's own properties.
   try {
-    ({ orgId } = await requireRole(session, await cookies(), WRITE_ROLES));
+    await requireProjectAccess(session, await cookies(), id, "owner");
   } catch (err) {
     if (err instanceof OrgContextError) {
       return NextResponse.json({ error: err.message }, { status: err.status });
@@ -84,8 +82,7 @@ export async function PUT(req: Request, { params }: Params) {
     throw err;
   }
 
-  const { id } = await params;
-  const existing = await getAuthorizedProject(id, session.user.id, orgId);
+  const existing = await prisma.project.findUnique({ where: { id } });
   if (!existing) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
@@ -149,13 +146,14 @@ export async function DELETE(req: Request, { params }: Params) {
   const cascade = searchParams.get("cascade");
   const hardDelete = searchParams.get("hardDelete") === "true";
 
-  // Hard-delete requires the strictest role gate — Owner or Admin only.
-  // Anything else (cascade=archive or default orphan-on-delete) keeps the
-  // existing WRITE_ROLES gate.
-  const allowedRoles: OrgRole[] = hardDelete ? ["Owner", "Admin"] : WRITE_ROLES;
-  let orgId: string;
+  const { id } = await params;
+  // Project owner only. Editor-share users explicitly cannot delete the
+  // project or its diagrams (that's the headline guarantee of the share
+  // model).
+  let projectOrgId: string;
   try {
-    ({ orgId } = await requireRole(session, await cookies(), allowedRoles));
+    const access = await requireProjectAccess(session, await cookies(), id, "owner");
+    projectOrgId = access.projectOrgId;
   } catch (err) {
     if (err instanceof OrgContextError) {
       return NextResponse.json({ error: err.message }, { status: err.status });
@@ -163,11 +161,26 @@ export async function DELETE(req: Request, { params }: Params) {
     throw err;
   }
 
-  const { id } = await params;
-  const existing = await getAuthorizedProject(id, session.user.id, orgId);
+  // Hard-delete still needs an org-level admin gate on top of project
+  // ownership — destructive purge of every diagram is a privileged action
+  // we do not want regular project owners to accidentally trigger.
+  if (hardDelete) {
+    const allowedRoles: OrgRole[] = ["Owner", "Admin"];
+    try {
+      await requireRole(session, await cookies(), allowedRoles);
+    } catch (err) {
+      if (err instanceof OrgContextError) {
+        return NextResponse.json({ error: err.message }, { status: err.status });
+      }
+      throw err;
+    }
+  }
+
+  const existing = await prisma.project.findUnique({ where: { id } });
   if (!existing) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
+  const orgId = projectOrgId;
 
   // ?hardDelete=true → admin-only destructive path. Permanently deletes
   // every diagram in the project (NOT archived — gone forever) and then

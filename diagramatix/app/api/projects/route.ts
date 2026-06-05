@@ -31,10 +31,33 @@ export async function GET() {
     throw err;
   }
 
+  // Returns every project the caller can see in their active Org:
+  //   • projects they own (Project.userId === userId), or
+  //   • projects shared to them via ProjectShare.
+  // orgId stays a strict filter — cross-org shared projects only surface
+  // once the caller switches into the project owner's Org context. The
+  // alternative (union across orgs) bypasses the org switcher's mental
+  // model and would surface projects in lists that the user doesn't
+  // expect to see.
+  //
+  // Each row carries enough metadata for the dashboard tile to render
+  // without an N+1: owner identity (for the "by …" line on shared tiles)
+  // and the caller's own share row (empty array when caller is owner).
   const projects = await prisma.project.findMany({
-    where: { userId, orgId, name: { not: ARCHIVE_PROJECT_NAME } },
+    where: {
+      orgId,
+      name: { not: ARCHIVE_PROJECT_NAME },
+      OR: [
+        { userId },
+        { shares: { some: { userId } } },
+      ],
+    },
     orderBy: { updatedAt: "desc" },
-    include: { _count: { select: { diagrams: true } } },
+    include: {
+      _count: { select: { diagrams: true, shares: true } },
+      user: { select: { id: true, name: true, email: true } },
+      shares: { where: { userId }, select: { role: true } },
+    },
   });
 
   return NextResponse.json(projects);
