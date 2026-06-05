@@ -74,6 +74,17 @@ interface Props {
    *  client-side ADD gate compares (current node count + 1) against
    *  this value and shows a toast when blocked. */
   elementCountLimit?: number | null;
+  /** Current Diagram Owner (hard FK to a registered user). The project
+   *  owner by default; reassignable per-diagram by the project owner.
+   *  Null for legacy diagrams whose backfill didn't catch them and for
+   *  legacy orphan diagrams with no project. */
+  initialDiagramOwner?: { id: string; name: string | null; email: string } | null;
+  /** Pool of users the Diagram Owner picker offers. Project owner plus
+   *  every user the project is shared with. Empty for legacy orphans. */
+  diagramOwnerCandidates?: { id: string; name: string | null; email: string }[];
+  /** Whether the picker is editable. True only when the caller is the
+   *  project owner. Server still re-checks every PUT regardless. */
+  canEditDiagramOwner?: boolean;
 }
 
 function useAutoSave(
@@ -309,6 +320,9 @@ export function DiagramEditor({
   impersonationMode,
   version,
   elementCountLimit,
+  initialDiagramOwner,
+  diagramOwnerCandidates = [],
+  canEditDiagramOwner = false,
 }: Props) {
   const router = useRouter();
 
@@ -321,6 +335,39 @@ export function DiagramEditor({
       return raw ? JSON.parse(raw) : [];
     } catch { return []; }
   }
+
+  // Current Diagram Owner. Held client-side so a successful PATCH
+  // updates the PropertiesPanel display immediately, no reload. Server
+  // is the source of truth — re-pulled if a fetch goes stale (e.g. the
+  // user is removed from the project and the field gets cleared).
+  const [diagramOwner, setDiagramOwnerState] = useState<
+    { id: string; name: string | null; email: string } | null
+  >(initialDiagramOwner ?? null);
+  // Optimistic save: replace state, PATCH, roll back if the server
+  // rejects. The PUT route on /api/diagrams/[id] enforces the project-
+  // owner-only rule itself (Slice 3) — we never trust canEditDiagramOwner
+  // alone, but it does decide whether the picker is rendered at all.
+  const [diagramOwnerError, setDiagramOwnerError] = useState<string | null>(null);
+  const setDiagramOwner = useCallback(async (userId: string | null) => {
+    if (!canEditDiagramOwner) return;
+    const target = userId
+      ? diagramOwnerCandidates.find(c => c.id === userId) ?? null
+      : null;
+    const previous = diagramOwner;
+    setDiagramOwnerState(target);
+    setDiagramOwnerError(null);
+    try {
+      const res = await fetch(`/api/diagrams/${diagramId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ diagramOwnerId: userId }),
+      });
+      if (!res.ok) throw new Error((await res.text()) || res.statusText);
+    } catch (err) {
+      setDiagramOwnerState(previous);
+      setDiagramOwnerError(err instanceof Error ? err.message : String(err));
+    }
+  }, [diagramId, canEditDiagramOwner, diagramOwnerCandidates, diagramOwner]);
 
   // The parent diagram (top of stack) — if we got here via drill-down
   const [parentDiagram, setParentDiagram] = useState<{ id: string; name: string } | null>(null);
@@ -2869,6 +2916,11 @@ export function DiagramEditor({
             onUpdateDiagramTitle={updateDiagramTitle}
             processOwner={data.processOwner}
             onSetProcessOwner={setProcessOwner}
+            diagramOwner={diagramOwner}
+            diagramOwnerCandidates={diagramOwnerCandidates}
+            canEditDiagramOwner={canEditDiagramOwner}
+            diagramOwnerError={diagramOwnerError}
+            onSetDiagramOwner={setDiagramOwner}
             isAdmin={isAdmin}
             onBubbleHelpsChanged={() => setBubbleHelpRefreshToken(t => t + 1)}
             createdAt={createdAt}

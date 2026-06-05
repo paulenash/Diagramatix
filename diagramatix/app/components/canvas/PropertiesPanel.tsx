@@ -71,6 +71,25 @@ interface Props {
    *  sub-section. Both name + email are optional free-text. */
   processOwner?: { name?: string; email?: string };
   onSetProcessOwner?: (owner: { name?: string; email?: string }) => void;
+  /** Current Diagram Owner (hard FK to a registered user). Displayed
+   *  in a new sub-section directly above Process Owner. Null means the
+   *  diagram has no owner-of-record set (legacy diagram or orphan). */
+  diagramOwner?: { id: string; name: string | null; email: string } | null;
+  /** Candidates for the Diagram Owner picker. Project owner + every
+   *  registered user the project is shared with. Empty for diagrams
+   *  with no project. */
+  diagramOwnerCandidates?: { id: string; name: string | null; email: string }[];
+  /** Whether the caller can change the Diagram Owner. True only for
+   *  the project owner. When false the sub-section renders the current
+   *  owner statically (no select). */
+  canEditDiagramOwner?: boolean;
+  /** Optional error string surfaced when a Diagram Owner save fails
+   *  (e.g. server-side permission denied after an optimistic update).
+   *  Rendered as a small red note under the picker. */
+  diagramOwnerError?: string | null;
+  /** Called when the Diagram Owner picker selection changes. Receives
+   *  the chosen userId or null to clear the assignment. */
+  onSetDiagramOwner?: (userId: string | null) => void;
   /** True when the signed-in user is a superuser. Gates the
    *  admin-only Bubble Help editor sub-section. */
   isAdmin?: boolean;
@@ -651,6 +670,11 @@ export function PropertiesPanel({
   forceCollapseTitle,
   processOwner,
   onSetProcessOwner,
+  diagramOwner,
+  diagramOwnerCandidates,
+  canEditDiagramOwner,
+  diagramOwnerError,
+  onSetDiagramOwner,
   isAdmin,
   onBubbleHelpsChanged,
 }: Props) {
@@ -668,6 +692,7 @@ export function PropertiesPanel({
   // bubble-help admin section closed (it's verbose).
   const [titleSubOpen, setTitleSubOpen] = useState(true);
   const [databaseSubOpen, setDatabaseSubOpen] = useState(true);
+  const [diagramOwnerSubOpen, setDiagramOwnerSubOpen] = useState(true);
   const [processOwnerSubOpen, setProcessOwnerSubOpen] = useState(true);
   const [bubbleHelpSubOpen, setBubbleHelpSubOpen] = useState(false);
 
@@ -950,6 +975,69 @@ export function PropertiesPanel({
               </select>
             </div>
           )}
+        </>)}
+
+        {/* Diagram Owner sub-section \u2014 hard FK to a registered user,
+            sits directly above Process Owner. The display vs picker
+            split mirrors how the dashboard sidebar handles non-owner
+            access: editors and viewers see the name+email statically;
+            only the project owner gets the picker. The candidates are
+            the project owner + every share recipient.
+
+            The sub-section renders even when there's no candidate pool
+            or no current owner \u2014 that way the field is discoverable for
+            project owners on freshly-created legacy diagrams (they can
+            still see "(none)" and pick from the empty list to confirm
+            the unset state isn't a bug). */}
+        {(diagramOwner || canEditDiagramOwner || (diagramOwnerCandidates?.length ?? 0) > 0) && (<>
+          <SubHeader
+            label="Diagram Owner"
+            open={diagramOwnerSubOpen}
+            onToggle={() => setDiagramOwnerSubOpen(o => !o)}
+          />
+          {diagramOwnerSubOpen && (<>
+            {canEditDiagramOwner && onSetDiagramOwner ? (<>
+              <InlineField label="Owner">
+                <select
+                  className="w-full text-[9px] border border-gray-300 rounded px-1 py-0 bg-white"
+                  value={diagramOwner?.id ?? ""}
+                  onChange={(e) => onSetDiagramOwner(e.target.value || null)}
+                >
+                  <option value="">(none)</option>
+                  {(diagramOwnerCandidates ?? []).map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {(u.name ?? "").trim() || u.email}
+                    </option>
+                  ))}
+                </select>
+              </InlineField>
+              {diagramOwner?.email && (
+                <InlineField label="Email">
+                  <span className="text-[9px] text-gray-600 truncate" title={diagramOwner.email}>
+                    {diagramOwner.email}
+                  </span>
+                </InlineField>
+              )}
+              {diagramOwnerError && (
+                <p className="text-[9px] text-red-600 px-1 mt-0.5">{diagramOwnerError}</p>
+              )}
+            </>) : (<>
+              <InlineField label="Name">
+                <span className="text-[9px] text-gray-700 truncate" title={diagramOwner?.email ?? ""}>
+                  {diagramOwner
+                    ? ((diagramOwner.name ?? "").trim() || diagramOwner.email)
+                    : <span className="text-gray-400 italic">(none)</span>}
+                </span>
+              </InlineField>
+              {diagramOwner?.email && (
+                <InlineField label="Email">
+                  <span className="text-[9px] text-gray-600 truncate" title={diagramOwner.email}>
+                    {diagramOwner.email}
+                  </span>
+                </InlineField>
+              )}
+            </>)}
+          </>)}
         </>)}
 
         {/* Process Owner sub-section \u2014 every diagram type. */}
