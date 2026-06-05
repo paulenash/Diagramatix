@@ -237,6 +237,12 @@ export function AdminClient({ users: initialUsers, currentUserId }: Props) {
           >
             AI Plan Formats
           </a>
+          <a
+            href="/dashboard/admin/org-settings"
+            className="text-xs text-orange-600 hover:text-orange-800 font-medium border border-orange-300 rounded px-2 py-1"
+          >
+            Org Settings
+          </a>
           {/* Scanner Issues Rules moved to the BPMN Diagram menu so the
               catalog lives next to "Scan Diagram for Issues". The route
               still exists; admins reach it from any BPMN diagram. */}

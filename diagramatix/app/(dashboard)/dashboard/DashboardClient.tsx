@@ -1353,6 +1353,20 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                 </a>
               )}
 
+              {/* Org Settings — visible to OrgOwner / OrgAdmin only
+                  (the SuperAdmin chip above reaches the same page via
+                  /dashboard/admin/org-settings, so SuperAdmins don't
+                  need a second entry point here). */}
+              {!isSu && (orgRole === "Owner" || orgRole === "Admin") && (
+                <a
+                  href="/dashboard/admin/org-settings"
+                  className="text-xs text-orange-600 hover:text-orange-800 font-medium border border-orange-300 rounded px-2 py-1"
+                  title="Org-level settings for this org"
+                >
+                  Org Settings
+                </a>
+              )}
+
               {/* Collaboration Groups — opens the Groups dashboard page */}
               <button
                 onClick={() => router.push("/dashboard/groups")}
