@@ -15,7 +15,7 @@
 
 // Server-only module — must never be imported from client components.
 import { prisma } from "@/app/lib/db";
-import { getEffectiveUserId, SUPERUSER_EMAILS } from "@/app/lib/superuser";
+import { getEffectiveUserId, SUPERUSER_EMAILS, isSuperuser } from "@/app/lib/superuser";
 
 export const ORG_COOKIE = "dgx_org";
 
@@ -111,6 +111,37 @@ export async function requireRole(
     );
   }
   return { orgId, userId, role: member.role as OrgRole };
+}
+
+/**
+ * Gate a route at the "elevated-for-this-Org" tier. Either:
+ *   • the caller is a SuperAdmin (allowed everywhere), or
+ *   • the caller holds OrgRole.Owner or OrgRole.Admin in `targetOrgId`.
+ *
+ * Throws OrgContextError(401) when there's no session, (403) otherwise.
+ * Used by the Org-management routes (settings PUT for name/entityType,
+ * admins POST/DELETE, admin-candidates GET) to share one gate
+ * across both roles while keeping the "SuperAdmin precedes OrgAdmin"
+ * rule explicit at the call site.
+ */
+export async function requireOrgAdminFor(
+  session: SessionLike | null,
+  cookieStore: CookieStore,
+  targetOrgId: string,
+): Promise<{ userId: string; isSuperAdmin: boolean }> {
+  const userId = getEffectiveUserId(session, cookieStore);
+  if (!userId) throw new OrgContextError("Not signed in", 401);
+
+  if (isSuperuser(session)) return { userId, isSuperAdmin: true };
+
+  const member = await prisma.orgMember.findFirst({
+    where: { userId, orgId: targetOrgId },
+    select: { role: true },
+  });
+  if (!member || (member.role !== "Owner" && member.role !== "Admin")) {
+    throw new OrgContextError("Not an OrgAdmin for this org", 403);
+  }
+  return { userId, isSuperAdmin: false };
 }
 
 /**

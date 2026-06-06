@@ -51,6 +51,11 @@ vi.mock("@/app/lib/superuser", () => ({
   getEffectiveUserId: (session: { user?: { id?: string } } | null) =>
     session?.user?.id ?? null,
   SUPERUSER_EMAILS: new Set(SUPER_EMAILS),
+  // requireOrgAdminFor consults isSuperuser. Same SUPERUSER_EMAILS
+  // semantics — Set lookup on session.user.email — but we expose it
+  // here as a function so the production import keeps working.
+  isSuperuser: (session: { user?: { email?: string | null } } | null) =>
+    !!session?.user?.email && new Set(SUPER_EMAILS).has(session.user.email),
 }));
 
 // Imported after the mocks so the module under test picks them up.
@@ -59,6 +64,7 @@ import {
   requireProjectAccess,
   getDiagramAccess,
   requireDiagramAccess,
+  requireOrgAdminFor,
   OrgContextError,
 } from "../orgContext";
 
@@ -557,5 +563,75 @@ describe("requireDiagramAccess", () => {
     expect(access.role).toBe("edit");
     expect(access.diagram.projectId).toBe("proj-X");
     expect(access.projectAccess?.ownerUserId).toBe("user-owner");
+  });
+});
+
+// ── requireOrgAdminFor ───────────────────────────────────────────────────
+//
+// The gate shared by the new Org-management routes (settings PUT for
+// name + entityType, admins POST/DELETE, admin-candidates GET). Pins
+// the SuperAdmin-precedes-OrgAdmin rule + the "Owner OR Admin only"
+// allowlist in place.
+
+describe("requireOrgAdminFor", () => {
+  const sessionFor = (id: string | null, email?: string) =>
+    (id ? { user: { id, email: email ?? "regular@example.com" } } : null) as
+      Parameters<typeof requireOrgAdminFor>[0];
+
+  it("throws 401 when there is no session", async () => {
+    await expect(
+      requireOrgAdminFor(sessionFor(null), emptyCookies, "org-A"),
+    ).rejects.toMatchObject({ status: 401 });
+  });
+
+  it("returns isSuperAdmin=true for a SuperAdmin caller without consulting OrgMember", async () => {
+    // The SuperAdmin path bypasses the OrgMember lookup — that's the
+    // precedence rule.
+    const result = await requireOrgAdminFor(
+      sessionFor("super-user-id", "super@example.com"),
+      emptyCookies,
+      "org-A",
+    );
+    expect(result).toEqual({ userId: "super-user-id", isSuperAdmin: true });
+    expect(findFirstOrgMember).not.toHaveBeenCalled();
+  });
+
+  it("returns isSuperAdmin=false for an OrgRole.Owner in the target Org", async () => {
+    findFirstOrgMember.mockResolvedValue({ role: "Owner" });
+    const result = await requireOrgAdminFor(
+      sessionFor("user-1"),
+      emptyCookies,
+      "org-A",
+    );
+    expect(result).toEqual({ userId: "user-1", isSuperAdmin: false });
+  });
+
+  it("returns isSuperAdmin=false for an OrgRole.Admin in the target Org", async () => {
+    findFirstOrgMember.mockResolvedValue({ role: "Admin" });
+    const result = await requireOrgAdminFor(
+      sessionFor("user-1"),
+      emptyCookies,
+      "org-A",
+    );
+    expect(result.isSuperAdmin).toBe(false);
+  });
+
+  it("throws 403 when caller is in the target Org but not Owner/Admin", async () => {
+    // A Viewer / ProcessOwner / etc. should never pass this gate. The
+    // route table for Org admin actions is the load-bearing piece;
+    // this test pins that "OrgMember is not enough" rule in place.
+    findFirstOrgMember.mockResolvedValue({ role: "Viewer" });
+    await expect(
+      requireOrgAdminFor(sessionFor("user-1"), emptyCookies, "org-A"),
+    ).rejects.toMatchObject({ status: 403 });
+  });
+
+  it("throws 403 when caller has no OrgMember row for the target Org", async () => {
+    // OrgAdmin in some OTHER Org → no row matches the (userId,
+    // targetOrgId) lookup → reject. Wrong-Org isolation is the point.
+    findFirstOrgMember.mockResolvedValue(null);
+    await expect(
+      requireOrgAdminFor(sessionFor("user-1"), emptyCookies, "org-A"),
+    ).rejects.toMatchObject({ status: 403 });
   });
 });

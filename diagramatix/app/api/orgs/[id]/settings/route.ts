@@ -8,6 +8,7 @@ import {
   getCurrentOrgId,
   OrgContextError,
 } from "@/app/lib/auth/orgContext";
+import { OrgEntityType } from "@/app/generated/prisma/enums";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -67,10 +68,8 @@ async function gate(
 /**
  * GET /api/orgs/[id]/settings
  *
- * Returns the editable org-level toggles. Currently just
- * `allowCrossOrgSharing`, which gates whether project owners in this Org
- * can share projects with users outside the Org. More toggles will live
- * here as we add them.
+ * Returns every editable Org-level field plus the headline counts used
+ * by the Org Info card on the settings page.
  *
  * Gated by SuperAdmin OR (active-org match + Owner/OrgAdmin role).
  */
@@ -82,21 +81,42 @@ export async function GET(_req: Request, { params }: Params) {
 
   const org = await prisma.org.findUnique({
     where: { id },
-    select: { id: true, name: true, allowCrossOrgSharing: true },
+    select: {
+      id: true,
+      name: true,
+      entityType: true,
+      allowCrossOrgSharing: true,
+      createdAt: true,
+      _count: { select: { members: true, projects: true, diagrams: true } },
+    },
   });
   if (!org) return NextResponse.json({ error: "Org not found" }, { status: 404 });
   return NextResponse.json(org);
 }
 
+const VALID_ENTITY_TYPES: ReadonlySet<OrgEntityType> = new Set([
+  OrgEntityType.ADI,
+  OrgEntityType.Insurer,
+  OrgEntityType.LifeInsurer,
+  OrgEntityType.HealthInsurer,
+  OrgEntityType.RSE,
+  OrgEntityType.Other,
+]);
+
 /**
  * PUT /api/orgs/[id]/settings
  *
- * Body: { allowCrossOrgSharing?: boolean }
+ * Body: { allowCrossOrgSharing?: boolean, name?: string, entityType?: OrgEntityType }
  *
- * Gated by SuperAdmin OR (active-org match + Owner/OrgAdmin role).
+ * `allowCrossOrgSharing` is editable by SuperAdmin OR OrgOwner/OrgAdmin.
+ *
+ * `name` and `entityType` are tenant-identity edits — SuperAdmin only.
+ * OrgAdmins reading the doc might assume they own the Org name; they
+ * don't. The gate keeps that explicit.
+ *
  * Read-only impersonation is blocked. Unspecified fields are left
- * untouched — this is a PATCH-shaped PUT matching how the admin UI
- * partials send a single toggle at a time.
+ * untouched — PATCH-shaped PUT matching how the page sends a single
+ * field at a time.
  */
 export async function PUT(req: Request, { params }: Params) {
   const session = await auth();
@@ -113,12 +133,41 @@ export async function PUT(req: Request, { params }: Params) {
 
   const body = (await req.json().catch(() => ({}))) as {
     allowCrossOrgSharing?: unknown;
+    name?: unknown;
+    entityType?: unknown;
   };
 
-  const updates: { allowCrossOrgSharing?: boolean } = {};
+  const updates: { allowCrossOrgSharing?: boolean; name?: string; entityType?: OrgEntityType } = {};
   if (typeof body.allowCrossOrgSharing === "boolean") {
     updates.allowCrossOrgSharing = body.allowCrossOrgSharing;
   }
+
+  // SuperAdmin-only fields. Done with a separate isSuperuser check
+  // rather than another gate() call because gate() conflates
+  // SuperAdmin and OrgAdmin into one allow, which would let OrgAdmin
+  // rename the tenant — the exact gap we're closing.
+  const su = isSuperuser(session);
+  if (body.name !== undefined) {
+    if (!su) {
+      return NextResponse.json({ error: "Only a SuperAdmin can rename an Org" }, { status: 403 });
+    }
+    const name = typeof body.name === "string" ? body.name.trim() : "";
+    if (!name) {
+      return NextResponse.json({ error: "Org name must be a non-empty string" }, { status: 400 });
+    }
+    updates.name = name;
+  }
+  if (body.entityType !== undefined) {
+    if (!su) {
+      return NextResponse.json({ error: "Only a SuperAdmin can change Org entity type" }, { status: 403 });
+    }
+    const et = body.entityType as OrgEntityType;
+    if (!VALID_ENTITY_TYPES.has(et)) {
+      return NextResponse.json({ error: "entityType must be a valid OrgEntityType" }, { status: 400 });
+    }
+    updates.entityType = et;
+  }
+
   if (Object.keys(updates).length === 0) {
     return NextResponse.json({ error: "No supported fields supplied" }, { status: 400 });
   }
@@ -126,7 +175,14 @@ export async function PUT(req: Request, { params }: Params) {
   const updated = await prisma.org.update({
     where: { id },
     data: updates,
-    select: { id: true, name: true, allowCrossOrgSharing: true },
+    select: {
+      id: true,
+      name: true,
+      entityType: true,
+      allowCrossOrgSharing: true,
+      createdAt: true,
+      _count: { select: { members: true, projects: true, diagrams: true } },
+    },
   });
   return NextResponse.json(updated);
 }

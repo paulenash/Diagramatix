@@ -75,6 +75,11 @@ model OrgMember {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   role      OrgRole
   createdAt DateTime @default(now())
+  // Actor's userId at the moment this membership was created or
+  // promoted. Optional + no FK so the audit hint survives if the
+  // actor is later deleted. NULL on pre-feature rows. Mirrors the
+  // ProjectShare.createdBy pattern.
+  createdBy String?
 
   @@unique([orgId, userId])
   @@index([userId])
