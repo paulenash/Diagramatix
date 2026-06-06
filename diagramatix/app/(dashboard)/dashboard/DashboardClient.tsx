@@ -1361,22 +1361,21 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
               {/* Org-level shortcuts — visible to OrgOwner / OrgAdmin
                   only. SuperAdmins reach the same pages via the
                   SuperAdmin chip above, so we don't render a second
-                  copy for them. Neutral gray styling (not the orange
-                  used for SuperAdmin-only chips) — these aren't
-                  destructive/platform-level controls; OrgAdmin is a
-                  normal user role with extra reach inside their Org. */}
+                  copy for them. Orange styling matches the SuperAdmin
+                  chip pattern — both are elevated roles and should
+                  read as such across the app. */}
               {!isSu && (orgRole === "Owner" || orgRole === "Admin") && (
                 <>
                   <a
                     href="/dashboard/admin/org-settings"
-                    className="text-xs font-medium rounded px-2 py-1 border text-gray-600 border-gray-300 hover:bg-gray-50"
+                    className="text-xs text-orange-600 hover:text-orange-800 font-medium border border-orange-300 rounded px-2 py-1"
                     title="Org-level settings for this org"
                   >
                     Org Settings
                   </a>
                   <a
                     href="/dashboard/admin/sharing"
-                    className="text-xs font-medium rounded px-2 py-1 border text-gray-600 border-gray-300 hover:bg-gray-50"
+                    className="text-xs text-orange-600 hover:text-orange-800 font-medium border border-orange-300 rounded px-2 py-1"
                     title="See and manage every shared project in this Org"
                   >
                     Project Sharing
