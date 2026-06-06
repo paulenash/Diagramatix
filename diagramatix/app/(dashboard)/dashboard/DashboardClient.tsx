@@ -1827,7 +1827,9 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
               )}
             </div>
             <div>
-              <label className="text-[10px] text-gray-500">Owner Label</label>
+              <label className="text-[10px] text-gray-500" title="Free-text owner name written into project exports (.diag-project XML, full account .diag backup). Independent of the Project Owner above.">
+                Export Owner Name
+              </label>
               {selectedRole === "owner" ? (
                 <input type="text"
                   className="w-full text-[10px] border border-gray-300 rounded px-1.5 py-0.5"
@@ -1844,6 +1846,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                   {selectedProject.ownerName?.trim() || <span className="text-gray-400 italic">(unset)</span>}
                 </p>
               )}
+              <p className="text-[9px] text-gray-400 mt-0.5">Shown in exports.</p>
             </div>
             <div>
               <label className="text-[10px] text-gray-500">Diagrams</label>

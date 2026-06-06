@@ -1980,7 +1980,7 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
             </h1>
           )}
           {projectOwner && (
-            <span className="text-[10px] text-gray-400">Owner: <strong className="text-gray-600">{projectOwner}</strong></span>
+            <span className="text-[10px] text-gray-400" title="Free-text owner name written into project exports. Independent of the registered Project Owner.">Export Owner: <strong className="text-gray-600">{projectOwner}</strong></span>
           )}
           {version ? <span className="text-[10px] text-gray-400">v{SCHEMA_VERSION}.{version}</span> : null}
           {/* Admin shortcut — leftmost item in the header menu cluster,
