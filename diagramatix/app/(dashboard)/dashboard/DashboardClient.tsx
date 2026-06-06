@@ -244,6 +244,11 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
   const [shareListError, setShareListError] = useState("");
   // Whether the share-management dialog is open for the current selection.
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  // Per-tile "Shared" dropdown — which project tile, if any, has its
+  // recipient-list popover open. Shares the same loadShares() cache as
+  // the sidebar so opening one doesn't refetch what the other already
+  // pulled.
+  const [tileShareDropdownProjectId, setTileShareDropdownProjectId] = useState<string | null>(null);
 
   // Refetch share list — used after the dialog closes (we don't know
   // exactly what changed, so just re-pull the source of truth) and on
@@ -1623,16 +1628,24 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
               {projects.map((p) => {
-                // Shared tiles render with an amber tint (not a different
-                // shape \u2014 same rounded card, same border thickness, same
-                // text sizes). The amber-50/300/700 family matches other
-                // "different ownership" surfaces in the app (impersonation
-                // banner) so the visual cue is familiar at a glance.
+                // Tile state taxonomy:
+                //   \u2022 isShared      \u2014 the caller is a recipient (not the
+                //     owner). Drives the "by owner" line + hides the
+                //     owner-only destructive buttons.
+                //   \u2022 isBeingShared \u2014 the project has at least one
+                //     ProjectShare row. Drives the purple boundary +
+                //     "Shared" dropdown. True for owners actively
+                //     sharing out AND for recipients (since they're
+                //     in the count).
                 const role = deriveProjectRole(p);
                 const isShared = role !== "owner";
+                const shareCount = p._count.shares ?? 0;
+                const isBeingShared = shareCount > 0 || isShared;
                 const ownerLine = isShared && p.user
                   ? `by ${(p.user.name ?? "").trim() || p.user.email} \u00B7 ${p.user.email}`
                   : "";
+                const tileSharedListOpen = tileShareDropdownProjectId === p.id;
+                const tileSharedList = shareListByProject[p.id];
                 return (
                 <div
                   key={p.id}
@@ -1652,14 +1665,14 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                       setDropTargetProjectId(null);
                     }
                   }}
-                  className={`border rounded px-3 py-2 hover:shadow-sm cursor-pointer group transition-all select-none ${
+                  className={`relative border rounded px-3 py-2 hover:shadow-sm cursor-pointer group transition-all select-none ${
                     dropTargetProjectId === p.id ? "border-blue-500 ring-2 ring-blue-300 bg-blue-50" :
                     selectedProjectId === p.id
-                      ? isShared
-                        ? "bg-amber-50 border-amber-500 ring-1 ring-amber-300"
+                      ? isBeingShared
+                        ? "bg-purple-50 border-purple-500 ring-1 ring-purple-300"
                         : "bg-white border-blue-500 ring-1 ring-blue-300"
-                      : isShared
-                        ? "bg-amber-50 border-amber-300 hover:border-amber-400"
+                      : isBeingShared
+                        ? "bg-purple-50 border-purple-300 hover:border-purple-400"
                         : "bg-white border-gray-200 hover:border-blue-300"
                   }`}
                 >
@@ -1725,10 +1738,55 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                   </div>
                   {isShared && (
                     <div
-                      className="text-[10px] text-amber-700 mt-0.5 truncate"
+                      className="text-[10px] text-purple-700 mt-0.5 truncate"
                       title={ownerLine}
                     >
                       {ownerLine}
+                    </div>
+                  )}
+                  {/* Bottom-right "Shared" button — only on tiles with
+                      at least one share row. Click to drop a small
+                      popover listing the recipient names. Uses the
+                      same loadShares cache as the sidebar so reopening
+                      a tile after viewing the sidebar list is free. */}
+                  {isBeingShared && shareCount > 0 && (
+                    <div className="flex justify-end mt-1 relative">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (tileSharedListOpen) {
+                            setTileShareDropdownProjectId(null);
+                            return;
+                          }
+                          setTileShareDropdownProjectId(p.id);
+                          if (!tileSharedList) loadShares(p.id);
+                        }}
+                        className="text-[10px] font-medium px-1.5 py-0.5 border border-purple-300 rounded text-purple-700 hover:bg-purple-100"
+                        title="Show users this project is shared with"
+                      >
+                        Shared ({shareCount}) {tileSharedListOpen ? "▾" : "▸"}
+                      </button>
+                      {tileSharedListOpen && (
+                        <div
+                          onClick={(e) => e.stopPropagation()}
+                          className="absolute right-0 top-full mt-1 z-30 bg-white border border-purple-300 rounded shadow-md min-w-[140px] max-w-[220px] py-1 px-2"
+                        >
+                          {!tileSharedList ? (
+                            <p className="text-[10px] text-gray-400 italic">Loading…</p>
+                          ) : tileSharedList.length === 0 ? (
+                            <p className="text-[10px] text-gray-400 italic">No recipients.</p>
+                          ) : (
+                            tileSharedList.map(s => (
+                              <div key={s.id} className="text-[10px] text-gray-700 flex items-center justify-between gap-1">
+                                <span className="truncate" title={s.user.email}>
+                                  {(s.user.name ?? "").trim() || s.user.email}
+                                </span>
+                                <span className="text-[9px] text-gray-500 shrink-0">{s.role === "EDIT" ? "E" : "V"}</span>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1890,19 +1948,21 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
               {selectedRole === "owner" && !readOnly && (
                 <button
                   onClick={() => setShareDialogOpen(true)}
-                  className="w-full mt-2 px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50 text-gray-700"
+                  className={
+                    "w-full mt-2 px-2 py-1 text-xs border rounded " +
+                    ((selectedProject._count.shares ?? 0) > 0
+                      ? "border-purple-400 bg-purple-50 hover:bg-purple-100 text-purple-700"
+                      : "border-gray-300 hover:bg-gray-50 text-gray-700")
+                  }
                 >
                   Manage Sharing{"\u2026"}
                 </button>
               )}
             </div>
 
-            <button
-              onClick={() => router.push(`/dashboard/projects/${selectedProject.id}`)}
-              className="w-full px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
-            >
-              Open Project
-            </button>
+            {/* Open Project button removed 2026-06-06 \u2014 double-click the
+                tile to open. The button was duplicating the tile
+                interaction without adding new affordance. */}
           </div>
         </div>
       )}

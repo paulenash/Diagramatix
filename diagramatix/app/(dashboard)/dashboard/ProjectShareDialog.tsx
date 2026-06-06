@@ -61,6 +61,10 @@ export function ProjectShareDialog({ projectId, projectName, ownerUserId, onClos
   const [busyUserId, setBusyUserId] = useState<string | null>(null);
   const [alert, setAlert] = useState<{ title: string; message: string } | null>(null);
   const [confirmRemove, setConfirmRemove] = useState<ShareRow | null>(null);
+  // Confirm for the bulk Stop Sharing action. Separate state slot from
+  // confirmRemove so the two confirms never collide.
+  const [confirmStopSharing, setConfirmStopSharing] = useState(false);
+  const [stopSharingBusy, setStopSharingBusy] = useState(false);
 
   // ── Initial shares fetch ───────────────────────────────────────────
   useEffect(() => {
@@ -192,6 +196,26 @@ export function ProjectShareDialog({ projectId, projectName, ownerUserId, onClos
     }
   }, [projectId, shares]);
 
+  /** Bulk-remove every share at once. Optimistic — empty the list,
+   *  call the bulk DELETE endpoint, restore on failure. */
+  const stopSharing = useCallback(async () => {
+    setConfirmStopSharing(false);
+    setStopSharingBusy(true);
+    const snapshot = shares;
+    setShares([]);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/shares`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error((await res.text()) || res.statusText);
+    } catch (err) {
+      setShares(snapshot);
+      setAlert({ title: "Could not stop sharing", message: err instanceof Error ? err.message : String(err) });
+    } finally {
+      setStopSharingBusy(false);
+    }
+  }, [projectId, shares]);
+
   // ── Render ────────────────────────────────────────────────────────
 
   // IDs already shared — used to hide duplicates from the candidate list
@@ -317,7 +341,22 @@ export function ProjectShareDialog({ projectId, projectName, ownerUserId, onClos
           </div>
 
           {/* Footer */}
-          <div className="flex justify-end gap-2 px-6 py-3 border-t border-gray-100 shrink-0">
+          <div className="flex justify-between gap-2 px-6 py-3 border-t border-gray-100 shrink-0">
+            {/* Left side: Stop Sharing — destructive, removes every
+                share row in one call. Hidden when there's nothing to
+                stop (no share rows). */}
+            {shares && shares.length > 0 ? (
+              <button
+                onClick={() => setConfirmStopSharing(true)}
+                disabled={stopSharingBusy}
+                className="px-3 py-1.5 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded disabled:opacity-50"
+                title="Remove every share on this project"
+              >
+                Stop Sharing
+              </button>
+            ) : (
+              <span />
+            )}
             <button
               onClick={onClose}
               className="px-3 py-1.5 text-xs font-medium text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
@@ -336,6 +375,17 @@ export function ProjectShareDialog({ projectId, projectName, ownerUserId, onClos
           destructive
           onConfirm={() => removeShare(confirmRemove)}
           onCancel={() => setConfirmRemove(null)}
+        />
+      )}
+
+      {confirmStopSharing && (
+        <ConfirmDialog
+          title="Stop sharing this project?"
+          message={`Remove every share on "${projectName}" (${shares?.length ?? 0} recipient${(shares?.length ?? 0) === 1 ? "" : "s"}). Everyone will lose access immediately. You can re-share later if needed.`}
+          confirmLabel="Stop Sharing"
+          destructive
+          onConfirm={() => stopSharing()}
+          onCancel={() => setConfirmStopSharing(false)}
         />
       )}
 

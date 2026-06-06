@@ -43,6 +43,44 @@ export async function GET(_req: Request, { params }: Params) {
 }
 
 /**
+ * DELETE /api/projects/[id]/shares
+ *
+ * Owner-only. Removes EVERY ProjectShare row for the project in one
+ * transaction — the "Stop Sharing" action from the ProjectShareDialog.
+ * Idempotent: returns 200 + { removed: 0 } when there's nothing to
+ * remove, never a 404.
+ *
+ * Per-share removal still goes via DELETE /shares/[userId]. This
+ * endpoint exists so the Stop Sharing button doesn't need to issue N
+ * parallel deletes.
+ */
+export async function DELETE(_req: Request, { params }: Params) {
+  const session = await auth();
+  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  try {
+    if (isReadOnlyImpersonation(session, await cookies())) {
+      return NextResponse.json({ error: "Read-only: viewing another user" }, { status: 403 });
+    }
+  } catch { /* cookies() may fail */ }
+
+  const { id } = await params;
+  try {
+    await requireProjectAccess(session, await cookies(), id, "owner");
+  } catch (err) {
+    if (err instanceof OrgContextError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+    throw err;
+  }
+
+  const result = await prisma.projectShare.deleteMany({
+    where: { projectId: id },
+  });
+  return NextResponse.json({ removed: result.count });
+}
+
+/**
  * POST /api/projects/[id]/shares
  *
  * Body: { userIdOrEmail: string, role: "VIEW" | "EDIT" }
