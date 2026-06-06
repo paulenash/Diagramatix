@@ -204,7 +204,7 @@ export function AdminSharingClient({
                           </button>
                           <a
                             href={`/dashboard/projects/${r.id}`}
-                            className="text-xs text-blue-600 hover:text-blue-800 font-medium border border-blue-300 rounded px-2 py-1 hover:bg-blue-50"
+                            className="text-xs text-orange-600 hover:text-orange-800 font-medium border border-orange-300 rounded px-2 py-1 hover:bg-orange-50"
                             title="Open as a silent member with full edit access"
                           >
                             Open
