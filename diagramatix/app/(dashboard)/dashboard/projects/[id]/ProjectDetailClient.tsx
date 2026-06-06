@@ -1979,9 +1979,9 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
               {projectName}
             </h1>
           )}
-          {projectOwner && (
-            <span className="text-[10px] text-gray-400" title="Free-text owner name written into project exports. Independent of the registered Project Owner.">Export Owner: <strong className="text-gray-600">{projectOwner}</strong></span>
-          )}
+          {/* Export Owner display hidden 2026-06-06 — kept off the
+              project header to match the sidebar. Value still lives on
+              project.ownerName and round-trips through exports. */}
           {version ? <span className="text-[10px] text-gray-400">v{SCHEMA_VERSION}.{version}</span> : null}
           {/* Admin shortcut — leftmost item in the header menu cluster,
               admin-only. Mirrors the Dashboard placement. */}

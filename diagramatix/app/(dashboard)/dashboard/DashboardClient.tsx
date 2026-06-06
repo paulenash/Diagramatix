@@ -1826,28 +1826,13 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                 </p>
               )}
             </div>
-            <div>
-              <label className="text-[10px] text-gray-500" title="Free-text owner name written into project exports (.diag-project XML, full account .diag backup). Independent of the Project Owner above.">
-                Export Owner Name
-              </label>
-              {selectedRole === "owner" ? (
-                <input type="text"
-                  className="w-full text-[10px] border border-gray-300 rounded px-1.5 py-0.5"
-                  value={editOwner}
-                  onChange={e => setEditOwner(e.target.value)}
-                  onBlur={() => {
-                    saveProjectProps(selectedProject.id, { ownerName: editOwner });
-                    setProjects(prev => prev.map(p => p.id === selectedProject.id ? { ...p, ownerName: editOwner } : p));
-                  }}
-                  onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
-                />
-              ) : (
-                <p className="text-[10px] text-gray-700">
-                  {selectedProject.ownerName?.trim() || <span className="text-gray-400 italic">(unset)</span>}
-                </p>
-              )}
-              <p className="text-[9px] text-gray-400 mt-0.5">Shown in exports.</p>
-            </div>
+            {/* Export Owner Name field hidden 2026-06-06 — the registered
+                Project Owner field above already shows who owns the
+                project. The free-text string still lives on Project.ownerName,
+                still round-trips through .diag-project XML exports and full
+                .diag account backups, but no longer clutters the sidebar.
+                Re-introduce here if a use case for a different export-only
+                name appears. */}
             <div>
               <label className="text-[10px] text-gray-500">Diagrams</label>
               <p className="text-xs text-gray-700">{selectedProject._count.diagrams}</p>
