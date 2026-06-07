@@ -4683,47 +4683,44 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         target?.type === "pool" &&
         ((target.properties?.poolType as string | undefined) ?? "black-box") !== "white-box";
       if (isPoolBlackBox && target) {
-        type Side = "top" | "right" | "bottom" | "left";
+        // messageBPMN routing reality (see app/lib/diagram/routing.ts
+        // ~line 1067-1095 and Canvas.tsx ~line 1241-1273):
+        //   • sourceSide / targetSide are ALWAYS "top" or "bottom" —
+        //     the routing forces a vertical connector for any message
+        //     between two non-event elements.
+        //   • sourceOffsetAlong is interpreted as the X-AXIS fraction
+        //     along the SOURCE's width: rendered X = source.x +
+        //     source.width * sourceOffsetAlong, then clamped to BOTH
+        //     source AND target horizontal bounds.
+        //   • targetOffsetAlong is IGNORED for messageBPMN (the route
+        //     uses the same shared X at both ends).
+        //
+        // To stop drift we must preserve TWO things across a resize:
+        //   (A) the endpoint's WORLD Y for top/bottom-attached endpoints
+        //       — bidirectionally pin top/bottom boundary, AND
+        //   (B) the connector's shared WORLD X — by recomputing the
+        //       source's offsetAlong AND clamping the drag so the X
+        //       can't be pushed outside the new horizontal bounds.
+        const BPMN_EVENT_TYPES = new Set([
+          "start-event", "intermediate-event", "end-event",
+        ]);
         const messages = state.connectors.filter(c =>
           c.type === "messageBPMN" && (c.sourceId === id || c.targetId === id),
         );
-        // Snapshot endpoint world positions BEFORE the resize commits.
-        const endpoints: { connId: string; isSource: boolean; side: Side; worldY: number }[] = [];
-        for (const c of messages) {
-          if (c.sourceId === id) {
-            const side = c.sourceSide as Side;
-            const oa = c.sourceOffsetAlong ?? 0.5;
-            const worldY = (side === "top") ? target.y
-              : (side === "bottom") ? target.y + target.height
-              : target.y + oa * target.height;
-            endpoints.push({ connId: c.id, isSource: true, side, worldY });
-          }
-          if (c.targetId === id) {
-            const side = c.targetSide as Side;
-            const oa = c.targetOffsetAlong ?? 0.5;
-            const worldY = (side === "top") ? target.y
-              : (side === "bottom") ? target.y + target.height
-              : target.y + oa * target.height;
-            endpoints.push({ connId: c.id, isSource: false, side, worldY });
-          }
-        }
 
-        // Step 1 — BIDIRECTIONAL pin for TOP / BOTTOM endpoints.
-        // A top endpoint sits AT pool.y. If the top boundary moves in
-        // EITHER direction (down OR up), the endpoint slides along it.
-        // So whenever a top endpoint exists, the top boundary is pinned
-        // to its original position. Same for bottom. This is more
-        // restrictive than the original "shrink-only clamp" but it's
-        // the only way to genuinely keep the endpoint stationary —
-        // growing the pool from a side that has an attached endpoint
-        // would otherwise drag the endpoint outward. User detaches the
-        // message first if they truly need to resize that edge.
-        const hasTopEndpoint = endpoints.some(e => e.side === "top");
-        const hasBottomEndpoint = endpoints.some(e => e.side === "bottom");
+        // (A) — TOP / BOTTOM bidirectional pin. Either side dragged in
+        // ANY direction would slide the endpoint, so pin to original
+        // position when any endpoint is attached there.
+        const hasTopEndpoint = messages.some(c =>
+          (c.sourceId === id && c.sourceSide === "top") ||
+          (c.targetId === id && c.targetSide === "top"),
+        );
+        const hasBottomEndpoint = messages.some(c =>
+          (c.sourceId === id && c.sourceSide === "bottom") ||
+          (c.targetId === id && c.targetSide === "bottom"),
+        );
         const oldBottom = target.y + target.height;
         if (hasTopEndpoint && newY !== target.y) {
-          // Adjust height by the same delta so the bottom stays where
-          // it was (unless a separate bottom clamp moves it).
           newH = newH + (newY - target.y);
           newY = target.y;
         }
@@ -4733,27 +4730,74 @@ function reducer(state: DiagramData, action: Action): DiagramData {
             newH = oldBottom - newY;
           }
         }
-        // Re-clamp against label minimum after the message clamp. If
-        // pinning top + bottom drove newH below the label minimum, the
-        // label clamp would then push back — that's accepted; the user's
-        // pool is now both label-minimum tall AND has its boundaries
-        // forced where the messages need them.
         newH = Math.max(newH, labelMinH);
 
-        // Step 2: for LEFT/RIGHT-side endpoints, recompute the
-        // offsetAlong so the world Y matches the snapshot. If the new
-        // pool no longer reaches that Y (extreme shrink past the
-        // endpoint), clamp to [0,1] so the endpoint snaps to the
-        // nearest corner instead of vanishing off-pool.
-        for (const ep of endpoints) {
-          if (ep.side !== "left" && ep.side !== "right") continue;
-          if (newH <= 0) continue;
-          const rawOffset = (ep.worldY - newY) / newH;
+        // (B) — Per-message rendered-X snapshot. Compute the X that
+        // recomputeAllConnectors would have rendered for each
+        // attached message under the OLD pool geometry. Then:
+        //   • Clamp the new X / new width so newX <= renderedX and
+        //     newX + newW >= renderedX (so the message stays inside
+        //     this pool's horizontal range).
+        //   • If THIS pool is the source, update sourceOffsetAlong so
+        //     the new pool.x + pool.width * offset = renderedX.
+        const elementsById = new Map(state.elements.map(e => [e.id, e]));
+        const renderedXs: { connId: string; renderedX: number; isSource: boolean }[] = [];
+        for (const c of messages) {
+          const src = elementsById.get(c.sourceId);
+          const tgt = elementsById.get(c.targetId);
+          if (!src || !tgt) continue;
+          const srcIsEvent = BPMN_EVENT_TYPES.has(src.type);
+          const tgtIsEvent = tgt.type === "start-event" || tgt.type === "intermediate-event";
+          let x: number;
+          if (tgtIsEvent) {
+            x = tgt.x + tgt.width / 2;
+          } else if (srcIsEvent) {
+            x = src.x + src.width / 2;
+          } else {
+            const rawOffset = c.sourceOffsetAlong ?? 0.5;
+            const rawX = src.x + src.width * rawOffset;
+            x = Math.max(src.x, Math.min(src.x + src.width, rawX));
+            x = Math.max(tgt.x, Math.min(tgt.x + tgt.width, x));
+          }
+          renderedXs.push({ connId: c.id, renderedX: x, isSource: c.sourceId === id });
+        }
+
+        // Clamp newX / newW so every rendered X stays inside [newX, newX+newW].
+        // The clamps are independent: the left edge can pin against the
+        // leftmost X, the right edge against the rightmost.
+        for (const r of renderedXs) {
+          if (newX > r.renderedX) {
+            // Left edge dragged past the connector X — pin it there.
+            const right = newX + newW;
+            newX = r.renderedX;
+            newW = right - newX;
+          }
+          if (newX + newW < r.renderedX) {
+            // Right edge dragged past the connector X — pin it there.
+            newW = r.renderedX - newX;
+          }
+        }
+        if (newW < 1) newW = 1;
+
+        // If THIS pool is the SOURCE of a message between two
+        // non-event elements, push sourceOffsetAlong so the rendered X
+        // (which depends on src.x + src.width * offset) stays at the
+        // snapshot. Updates are queued; applied below after the lane
+        // logic (which does nothing for black-box pools anyway).
+        for (const r of renderedXs) {
+          if (!r.isSource) continue;
+          const conn = messages.find(c => c.id === r.connId);
+          if (!conn) continue;
+          const tgt = elementsById.get(conn.targetId);
+          if (!tgt) continue;
+          const tgtIsEvent = tgt.type === "start-event" || tgt.type === "intermediate-event";
+          const srcIsEvent = BPMN_EVENT_TYPES.has(target.type);
+          // X is dictated by the event side in these cases — offsetAlong is unused.
+          if (tgtIsEvent || srcIsEvent) continue;
+          if (newW <= 0) continue;
+          const rawOffset = (r.renderedX - newX) / newW;
           const clamped = Math.max(0, Math.min(1, rawOffset));
-          const prev = offsetUpdates.get(ep.connId) ?? {};
-          if (ep.isSource) prev.sourceOffsetAlong = clamped;
-          else prev.targetOffsetAlong = clamped;
-          offsetUpdates.set(ep.connId, prev);
+          offsetUpdates.set(r.connId, { sourceOffsetAlong: clamped });
         }
       }
 
