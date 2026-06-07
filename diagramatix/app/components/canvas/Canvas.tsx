@@ -487,6 +487,16 @@ export function Canvas({
   const [pan, setPan] = useState<Point>({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const baseZoomRef = useRef<number | null>(null); // the "100%" reference zoom
+  // Live refs for pan + zoom. Window-bound mouse handlers (connector
+  // drag, auto-scroll rAF loop) need to read the CURRENT pan/zoom each
+  // tick rather than the values captured in their closure on drag-start
+  // — otherwise auto-scroll changes pan but the drag's mousemove keeps
+  // computing world coords from the original pan, drifting the rubber-
+  // band line off the cursor and breaking drop-target detection.
+  const panRef = useRef(pan);
+  const zoomRef = useRef(zoom);
+  useEffect(() => { panRef.current = pan; }, [pan]);
+  useEffect(() => { zoomRef.current = zoom; }, [zoom]);
   // Initialise baseZoomRef on mount so the zoom-slider percent display
   // works even when the fit-to-content effect below bails (e.g. empty
   // diagram, SVG not yet measured). Without this, `base ?? zoom` ALWAYS
@@ -1079,13 +1089,28 @@ export function Canvas({
     };
     setDraggingConnector(drag);
 
+    // Compute world position from ev directly via panRef/zoomRef so the
+    // handlers see the CURRENT pan/zoom even after the auto-scroll
+    // (Correction #7) shifts pan mid-drag. Reading the closure-captured
+    // clientToWorld would use the stale pan from drag-start and the
+    // rubber-band line would slide off the cursor.
+    const liveClientToWorld = (clientX: number, clientY: number): Point => {
+      const svg = svgRef.current;
+      if (!svg) return { x: 0, y: 0 };
+      const r = svg.getBoundingClientRect();
+      return {
+        x: (clientX - r.left - panRef.current.x) / zoomRef.current,
+        y: (clientY - r.top  - panRef.current.y) / zoomRef.current,
+      };
+    };
+
     function onMouseMove(ev: MouseEvent) {
-      const pos = clientToWorld(ev.clientX, ev.clientY);
+      const pos = liveClientToWorld(ev.clientX, ev.clientY);
       setDraggingConnector((prev) => prev ? { ...prev, currentPos: pos } : null);
     }
 
     function onMouseUp(ev: MouseEvent) {
-      const pos = clientToWorld(ev.clientX, ev.clientY);
+      const pos = liveClientToWorld(ev.clientX, ev.clientY);
       // Check if released over the source element's bounding box.
       const srcEl = data.elements.find((e) => e.id === elementId);
       if (
@@ -3358,11 +3383,9 @@ export function Canvas({
   // The rubber-band's `currentPos` (a world coordinate) is recomputed
   // against the new pan so the line endpoint visually stays under the
   // cursor — without this the line would lag the pan by one mouse event.
+  // panRef + zoomRef live at the top of the component (next to svgRef)
+  // so the connector-drag handlers can read them too.
   const lastConnDragClientRef = useRef<{ x: number; y: number } | null>(null);
-  const panRef = useRef(pan);
-  const zoomRef = useRef(zoom);
-  useEffect(() => { panRef.current = pan; }, [pan]);
-  useEffect(() => { zoomRef.current = zoom; }, [zoom]);
   useEffect(() => {
     if (!isDraggingConnector) {
       lastConnDragClientRef.current = null;
