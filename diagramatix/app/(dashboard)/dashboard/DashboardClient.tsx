@@ -1627,20 +1627,26 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
               {projects.map((p) => {
-                // Tile state taxonomy:
-                //   \u2022 isShared      \u2014 the caller is a recipient (not the
-                //     owner). Drives the "by owner" line + hides the
-                //     owner-only destructive buttons.
-                //   \u2022 isBeingShared \u2014 the project has at least one
-                //     ProjectShare row. Drives the purple boundary +
-                //     "Shared" dropdown. True for owners actively
-                //     sharing out AND for recipients (since they're
-                //     in the count).
+                // Tile state taxonomy \u2014 two distinct shared states, two
+                // distinct colour schemes:
+                //   \u2022 isSharedToMe \u2014 the caller is a recipient. Pale
+                //     amber tile; "by owner" line; no Shared dropdown
+                //     (irrelevant to a recipient who isn't sharing it
+                //     to anyone else).
+                //   \u2022 isSharedOut  \u2014 caller is the owner AND has at
+                //     least one ProjectShare row. Purple tile; Shared
+                //     dropdown listing the recipients (this is the
+                //     owner's affordance for "see who I shared with").
+                //   \u2022 neither      \u2014 plain white tile.
+                // The split was introduced 2026-06-07 from Paul's
+                // testing notes \u2014 earlier purple-for-everything looked
+                // wrong on the recipient side and the dropdown made no
+                // sense there.
                 const role = deriveProjectRole(p);
-                const isShared = role !== "owner";
+                const isSharedToMe = role !== "owner";
                 const shareCount = p._count.shares ?? 0;
-                const isBeingShared = shareCount > 0 || isShared;
-                const ownerLine = isShared && p.user
+                const isSharedOut = !isSharedToMe && shareCount > 0;
+                const ownerLine = isSharedToMe && p.user
                   ? `by ${(p.user.name ?? "").trim() || p.user.email} \u00B7 ${p.user.email}`
                   : "";
                 const tileSharedListOpen = tileShareDropdownProjectId === p.id;
@@ -1667,12 +1673,16 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                   className={`relative border rounded px-3 py-2 hover:shadow-sm cursor-pointer group transition-all select-none ${
                     dropTargetProjectId === p.id ? "border-blue-500 ring-2 ring-blue-300 bg-blue-50" :
                     selectedProjectId === p.id
-                      ? isBeingShared
-                        ? "bg-purple-50 border-purple-500 ring-1 ring-purple-300"
-                        : "bg-white border-blue-500 ring-1 ring-blue-300"
-                      : isBeingShared
-                        ? "bg-purple-50 border-purple-300 hover:border-purple-400"
-                        : "bg-white border-gray-200 hover:border-blue-300"
+                      ? isSharedToMe
+                        ? "bg-amber-50 border-amber-500 ring-1 ring-amber-300"
+                        : isSharedOut
+                          ? "bg-purple-50 border-purple-500 ring-1 ring-purple-300"
+                          : "bg-white border-blue-500 ring-1 ring-blue-300"
+                      : isSharedToMe
+                        ? "bg-amber-50 border-amber-300 hover:border-amber-400"
+                        : isSharedOut
+                          ? "bg-purple-50 border-purple-300 hover:border-purple-400"
+                          : "bg-white border-gray-200 hover:border-blue-300"
                   }`}
                 >
                   <div className="flex items-center justify-between group/row">
@@ -1699,7 +1709,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                         </button>
                         {/* Owner-only destructive actions. Editors/viewers
                             of a shared project see only the clone button. */}
-                        {!isShared && (
+                        {!isSharedToMe && (
                           <>
                             <button
                               onClick={(e) => handleDeleteProject(p.id, e)}
@@ -1735,20 +1745,22 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                     </span>
                     <span className="text-[10px] text-gray-400">{new Date(p.updatedAt).toLocaleDateString()}</span>
                   </div>
-                  {isShared && (
+                  {isSharedToMe && (
                     <div
-                      className="text-[10px] text-purple-700 mt-0.5 truncate"
+                      className="text-[10px] text-amber-700 mt-0.5 truncate"
                       title={ownerLine}
                     >
                       {ownerLine}
                     </div>
                   )}
-                  {/* Bottom-right "Shared" button — only on tiles with
-                      at least one share row. Click to drop a small
-                      popover listing the recipient names. Uses the
-                      same loadShares cache as the sidebar so reopening
-                      a tile after viewing the sidebar list is free. */}
-                  {isBeingShared && shareCount > 0 && (
+                  {/* Bottom-right "Shared" button — OWNER-ONLY surface
+                      listing the recipients they've shared with. Hidden
+                      on recipient tiles where the dropdown would just
+                      show "everyone else who has access" — not useful
+                      to a viewer/editor and confusing alongside the
+                      amber styling. Removed for recipients 2026-06-07
+                      per Paul's testing feedback. */}
+                  {isSharedOut && (
                     <div className="flex justify-end mt-1 relative">
                       <button
                         onClick={(e) => {
