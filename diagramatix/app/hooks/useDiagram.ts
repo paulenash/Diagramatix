@@ -4675,7 +4675,14 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       // would need a different rebalancing story, and the user
       // explicitly scoped this fix to black-box pools.
       const offsetUpdates = new Map<string, { sourceOffsetAlong?: number; targetOffsetAlong?: number }>();
-      if (target?.type === "pool" && !state.elements.some(e => e.parentId === id)) {
+      // Detect black-box using the same poolType property the renderer +
+      // updatePoolTypes use. The previous "no children" check missed
+      // pools with stray descendants and pools where the renderer had
+      // already flagged poolType = black-box on its own.
+      const isPoolBlackBox =
+        target?.type === "pool" &&
+        ((target.properties?.poolType as string | undefined) ?? "black-box") !== "white-box";
+      if (isPoolBlackBox && target) {
         type Side = "top" | "right" | "bottom" | "left";
         const messages = state.connectors.filter(c =>
           c.type === "messageBPMN" && (c.sourceId === id || c.targetId === id),
@@ -4701,26 +4708,36 @@ function reducer(state: DiagramData, action: Action): DiagramData {
           }
         }
 
-        // Step 1: clamp top/bottom drag so TOP/BOTTOM-side endpoints
-        // stay at their original world Y. A TOP endpoint is at
-        // worldY == pool.y, so newY may only move UP from pool.y (i.e.
-        // newY <= pool.y) — moving DOWN would carry the endpoint along.
-        // BOTTOM endpoint is at pool.y + pool.height, so the bottom may
-        // only move DOWN. Both edges can still GROW the pool freely.
+        // Step 1 — BIDIRECTIONAL pin for TOP / BOTTOM endpoints.
+        // A top endpoint sits AT pool.y. If the top boundary moves in
+        // EITHER direction (down OR up), the endpoint slides along it.
+        // So whenever a top endpoint exists, the top boundary is pinned
+        // to its original position. Same for bottom. This is more
+        // restrictive than the original "shrink-only clamp" but it's
+        // the only way to genuinely keep the endpoint stationary —
+        // growing the pool from a side that has an attached endpoint
+        // would otherwise drag the endpoint outward. User detaches the
+        // message first if they truly need to resize that edge.
         const hasTopEndpoint = endpoints.some(e => e.side === "top");
         const hasBottomEndpoint = endpoints.some(e => e.side === "bottom");
-        if (hasTopEndpoint && newY > target.y) {
-          newH = newH - (newY - target.y);
+        const oldBottom = target.y + target.height;
+        if (hasTopEndpoint && newY !== target.y) {
+          // Adjust height by the same delta so the bottom stays where
+          // it was (unless a separate bottom clamp moves it).
+          newH = newH + (newY - target.y);
           newY = target.y;
         }
         if (hasBottomEndpoint) {
           const newBottom = newY + newH;
-          const oldBottom = target.y + target.height;
-          if (newBottom < oldBottom) {
+          if (newBottom !== oldBottom) {
             newH = oldBottom - newY;
           }
         }
-        // Re-clamp against label minimum after the message clamp.
+        // Re-clamp against label minimum after the message clamp. If
+        // pinning top + bottom drove newH below the label minimum, the
+        // label clamp would then push back — that's accepted; the user's
+        // pool is now both label-minimum tall AND has its boundaries
+        // forced where the messages need them.
         newH = Math.max(newH, labelMinH);
 
         // Step 2: for LEFT/RIGHT-side endpoints, recompute the
