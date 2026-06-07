@@ -128,7 +128,17 @@ export async function GET(_req: Request, { params }: Params) {
     const hangingMessages: HangingMessageIssue[] = [];
     const structuralIssues: StructuralIssue[] = [];
 
-    for (const v of checkDiagram({ elements: data.elements ?? [], connectors: data.connectors ?? [] })) {
+    for (const v of checkDiagram({
+      elements: data.elements ?? [],
+      connectors: data.connectors ?? [],
+      // Pass per-diagram font sizes so the B32 header-overrun rule can
+      // estimate text width against the rotated header strip. Other
+      // rules ignore them. The local DiagramLike here is a route-private
+      // type that doesn't carry the font fields, so we cast through
+      // unknown to read them from the Prisma JSON payload.
+      poolFontSize: (data as unknown as { poolFontSize?: number }).poolFontSize,
+      laneFontSize: (data as unknown as { laneFontSize?: number }).laneFontSize,
+    })) {
       switch (RULE_CATEGORY.get(v.rule)) {
         case "pool-lane-connector": badConnectors.push(v.data as unknown as ConnectorIssue); break;
         case "duplicate-name": duplicateNames.push(v.data as unknown as DuplicateNameIssue); break;

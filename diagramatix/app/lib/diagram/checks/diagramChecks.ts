@@ -25,6 +25,11 @@ import type { DiagramElement, Connector } from "../types";
 export interface DiagramLike {
   elements: DiagramElement[];
   connectors: Connector[];
+  /** Optional per-diagram font sizes for the pool/lane header labels.
+   *  The label-overrun check (B32) uses them to estimate text width;
+   *  every other rule ignores them. Defaults: poolFontSize 12, laneFontSize 12. */
+  poolFontSize?: number;
+  laneFontSize?: number;
 }
 
 export type Severity = "error" | "warning";
@@ -1340,6 +1345,91 @@ export function checkHangingMessage(d: DiagramLike): Violation[] {
   return out;
 }
 
+/**
+ * B32 — Pool / Lane label must fit within the header region.
+ *
+ * Pool and Lane labels render rotated -90° inside a vertical header strip
+ * on the left edge of the container. Two ways to overflow:
+ *
+ *   1. **Along the rotation axis** — the longest line's pixel width
+ *      exceeds the container's height. The user sees the label clipped
+ *      at the top/bottom of the header strip.
+ *
+ *   2. **Perpendicular to the rotation axis** — the line count × line
+ *      height exceeds the header strip's width. The label spills out
+ *      to the right and is overlapped by the pool body.
+ *
+ * Heuristic matches the geometry used by `poolMetrics` / `laneMetrics`
+ * in useDiagram.ts (font size × 0.6 per char, 1.18 × font size per line,
+ * 20px padding along the rotation axis). The rule fires when EITHER
+ * axis overruns. Severity warning — the label is still readable, just
+ * cramped or partially clipped, and the auto-resize on rename
+ * (Correction #3) will usually fix it on the next text edit.
+ */
+export function checkPoolHeaderLabelOverrun(d: DiagramLike): Violation[] {
+  const poolFs = d.poolFontSize ?? 12;
+  const laneFs = d.laneFontSize ?? 12;
+  const out: Violation[] = [];
+  for (const el of d.elements) {
+    if (el.type !== "pool" && el.type !== "lane") continue;
+    const raw = (el.label ?? "").trim();
+    if (!raw) continue;
+
+    const fs = el.type === "pool" ? poolFs : laneFs;
+    const lines = raw.split(/\r?\n/);
+    const longestLineChars = Math.max(1, ...lines.map((l) => l.length));
+
+    // 1. Rotation-axis overrun: the longest line's pixel width must
+    //    fit within the container height (minus 20px padding total).
+    const lineWidthPx = Math.ceil(longestLineChars * fs * 0.6);
+    const availableAlongRotation = Math.floor(el.height) - 20;
+
+    // 2. Perpendicular overrun: stacked line height must fit within
+    //    the header strip's width (`poolHeaderWidth` property; default
+    //    36 for pools, 22 for lanes, matching the renderer).
+    const headerWidth =
+      (el.properties?.poolHeaderWidth as number | undefined) ??
+      (el.type === "pool" ? 36 : 22);
+    const stackedHeightPx = Math.ceil(lines.length * fs * 1.18 + 8);
+
+    const rotationOverrun = lineWidthPx > availableAlongRotation;
+    const widthOverrun = stackedHeightPx > headerWidth;
+    if (!rotationOverrun && !widthOverrun) continue;
+
+    const reasons: string[] = [];
+    if (rotationOverrun) {
+      reasons.push(
+        `text width ~${lineWidthPx}px exceeds the header's ${availableAlongRotation}px run along the ${el.type === "pool" ? "pool" : "lane"} height`,
+      );
+    }
+    if (widthOverrun) {
+      reasons.push(
+        `${lines.length} stacked line${lines.length === 1 ? "" : "s"} (~${stackedHeightPx}px) exceeds the ${headerWidth}px header width`,
+      );
+    }
+
+    const containerName = el.type === "pool" ? "Pool" : "Lane";
+    out.push({
+      rule: "pool-header-overrun",
+      severity: "warning",
+      ids: [el.id],
+      message: `${containerName} "${raw.replace(/\n/g, " ⏎ ")}" header label overflow: ${reasons.join("; ")}.`,
+      data: {
+        elementId: el.id,
+        elementType: el.type,
+        label: raw,
+        lineWidthPx,
+        availableAlongRotation,
+        stackedHeightPx,
+        headerWidth,
+        rotationOverrun,
+        widthOverrun,
+      },
+    });
+  }
+  return out;
+}
+
 // ── Registry ─────────────────────────────────────────────────────────────────
 
 export const RULES: Rule[] = [
@@ -1603,6 +1693,15 @@ export const RULES: Rule[] = [
     severity: "error",
     category: "bpmn-structure",
     check: checkManualTaskNoITSystemMessage,
+  },
+  {
+    code: "B32",
+    id: "pool-header-overrun",
+    title: "Pool / Lane label overflows the header region",
+    description: "A Pool or Lane name is too long for the rotated header strip that holds it — either the longest line's text exceeds the container's height along the rotation axis, or the stacked lines exceed the header width. Pair this rule with the auto-resize-on-rename behaviour, which usually fixes the geometry the moment the label is re-edited.",
+    severity: "warning",
+    category: "bpmn-structure",
+    check: checkPoolHeaderLabelOverrun,
   },
 ];
 
