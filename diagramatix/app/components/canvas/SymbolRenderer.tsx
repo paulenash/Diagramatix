@@ -1707,6 +1707,35 @@ export function SymbolRenderer({
       }
       e.stopPropagation();
       if (selected) { onSelect(); return; }                        // header re-click — deselect, no drag
+    } else if (element.type === "pool") {
+      // Black-box pool: clicks on (or within ±10 px of) any edge
+      // belong to the edge resize hit-zone. Without this branch the
+      // mousedown ALSO starts a MOVE drag because the edge zone
+      // deliberately doesn't stopPropagation (so a plain click still
+      // selects). Net effect: dragging the bottom edge moves the
+      // pool body instead of resizing it. Skip the MOVE drag for
+      // edge-zone clicks; only select. Multi-selected groups still
+      // body-drag from anywhere.
+      if (!(multiSelected && onGroupMove) && svgToWorld) {
+        const wp = svgToWorld(e.clientX, e.clientY);
+        if (wp) {
+          const TOL = 10;
+          const px = wp.x, py = wp.y;
+          const inX = px >= element.x - TOL && px <= element.x + element.width + TOL;
+          const inY = py >= element.y - TOL && py <= element.y + element.height + TOL;
+          const onRight  = Math.abs(px - (element.x + element.width)) <= TOL;
+          const onTop    = Math.abs(py - element.y) <= TOL;
+          const onBottom = Math.abs(py - (element.y + element.height)) <= TOL;
+          // Pools never resize their left edge — no onLeft case.
+          if (inX && inY && (onRight || onTop || onBottom)) {
+            e.stopPropagation();
+            if (selected) onSelect();
+            else onSelect(e);
+            return;
+          }
+        }
+      }
+      e.stopPropagation();
     } else {
       e.stopPropagation();
     }
