@@ -1,12 +1,10 @@
 /**
- * One-shot patch — add R7.05 to the existing BPMN default rule set.
+ * One-shot patch — bring the BPMN default rule set in line with Paul's
+ * manual local edits (2026-06-07):
+ *   • Add R7.05 (Shift-Enter on word boundaries) if missing.
+ *   • Remove R7.04 (the older, vaguer rule R7.05 supersedes) if present.
  *
- * The canonical source of truth for fresh installs is
- * `scripts/seed-diagram-rules.cjs`, which already contains R7.05.
- * Existing deployments already have a DiagramRules row with
- * `isDefault: true` for `category: "bpmn"`, so this script appends
- * R7.05 to that row's `rules` field — idempotent (skipped if the
- * row already contains "R7.05:").
+ * Idempotent: re-running after the patch has applied is a no-op.
  *
  * Run locally first to test:
  *   export PATH="$PATH:/c/Program Files/nodejs"
@@ -50,45 +48,45 @@ async function main() {
     process.exit(1);
   }
 
-  if (row.rules.includes("R7.05:")) {
-    console.log("[patch-add-r7-05] R7.05 already present — nothing to do.");
-    return;
+  let updated = row.rules;
+  const actions: string[] = [];
+
+  // Strip the old R7.04 line if it's still present, plus any trailing
+  // newline that would otherwise leave a blank line. The match looks
+  // for the entire R7.04 entry — start of line through the next
+  // newline (or end of string).
+  const r704Re = /^R7\.04:[^\n]*\n?/m;
+  if (r704Re.test(updated)) {
+    updated = updated.replace(r704Re, "");
+    actions.push("removed R7.04");
   }
 
-  // Insert R7.05 right after the R7.04 line.
-  const r704Match = row.rules.match(/^R7\.04:.*$/m);
-  if (!r704Match) {
-    // R7.04 not found — append at the end of Group 7. Find "## Group 8"
-    // header and insert R7.05 right before it. If even that's missing,
-    // append at the end of the whole rules string.
-    let updated: string;
-    const groupEightIdx = row.rules.indexOf("## Group 8");
+  // Add R7.05 if it isn't there yet. Insert right before the "## Group
+  // 8" header so it lands at the end of Group 7; if that header isn't
+  // present, append at the end of the rules string.
+  if (!updated.includes("R7.05:")) {
+    const groupEightIdx = updated.indexOf("## Group 8");
     if (groupEightIdx > 0) {
       updated =
-        row.rules.slice(0, groupEightIdx).trimEnd() +
+        updated.slice(0, groupEightIdx).trimEnd() +
         "\n" + R7_05_TEXT +
-        "\n\n" + row.rules.slice(groupEightIdx);
+        "\n\n" + updated.slice(groupEightIdx);
     } else {
-      updated = row.rules.trimEnd() + "\n" + R7_05_TEXT;
+      updated = updated.trimEnd() + "\n" + R7_05_TEXT;
     }
-    await prisma.diagramRules.update({
-      where: { id: row.id },
-      data: { rules: updated },
-    });
-    console.log("[patch-add-r7-05] R7.04 not found — appended R7.05 at the end of Group 7.");
-    return;
+    actions.push("added R7.05");
   }
 
-  const r704Line = r704Match[0];
-  const r704EndIdx = (r704Match.index ?? 0) + r704Line.length;
-  const updated =
-    row.rules.slice(0, r704EndIdx) + "\n" + R7_05_TEXT + row.rules.slice(r704EndIdx);
+  if (actions.length === 0) {
+    console.log("[patch-add-r7-05] already in sync — nothing to do.");
+    return;
+  }
 
   await prisma.diagramRules.update({
     where: { id: row.id },
     data: { rules: updated },
   });
-  console.log("[patch-add-r7-05] R7.05 added after R7.04.");
+  console.log(`[patch-add-r7-05] ${actions.join(", ")}.`);
 }
 
 main()
