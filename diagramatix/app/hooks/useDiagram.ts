@@ -221,14 +221,17 @@ function adjustMsgLabelOffset(
   const newTgtY = newWaypoints[newTgtIdx]?.y ?? 0;
   const dxSrc = newSrcX - oldSrcX;
   const dySrc = newSrcY - oldSrcY;
-  if (dxSrc === 0 && dySrc === 0) return {};
   // labelOffsetX/Y are stored relative to the connector midpoint, so
   // shift them by (sourceDelta − midpointDelta) to keep the label's
-  // world position pinned to the source attachment.
+  // world position pinned to the source attachment. Even when the
+  // source didn't move (dxSrc === dySrc === 0), the TARGET may have
+  // moved — that shifts the midpoint, and without a compensating
+  // adjustment the label appears to drift toward the midpoint shift.
   const oldMidX = (oldSrcX + oldTgtX) / 2;
   const oldMidY = (oldSrcY + oldTgtY) / 2;
   const newMidX = (newSrcX + newTgtX) / 2;
   const newMidY = (newSrcY + newTgtY) / 2;
+  if (oldMidX === newMidX && oldMidY === newMidY && dxSrc === 0 && dySrc === 0) return {};
   const labelOX = conn.labelOffsetX ?? 0;
   const labelOY = conn.labelOffsetY ?? 0;
   const newLabelOX = (oldMidX + labelOX + dxSrc) - newMidX;
