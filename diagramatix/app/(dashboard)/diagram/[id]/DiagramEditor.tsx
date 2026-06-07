@@ -905,6 +905,13 @@ export function DiagramEditor({
   // Per-diagram "Scan for Issues" (BPMN only) — runs the shared rule registry
   // on the live diagram client-side; null = modal closed.
   const [diagramScan, setDiagramScan] = useState<Violation[] | null>(null);
+  // Position + drag state for the Diagram Issues popup. The popup is
+  // draggable so the user can move it aside to inspect canvas elements
+  // sitting behind it while reading the violation list — a hard
+  // requirement from 2026-06-07 testing. Position is in viewport
+  // coordinates (window.innerWidth / window.innerHeight space).
+  const [diagramScanPos, setDiagramScanPos] = useState<{ x: number; y: number } | null>(null);
+  const [diagramScanDrag, setDiagramScanDrag] = useState<{ ox: number; oy: number } | null>(null);
   // Collapsible state for the Errors / Warnings sections inside the dialog.
   const [scanErrorsOpen, setScanErrorsOpen] = useState(true);
   const [scanWarningsOpen, setScanWarningsOpen] = useState(true);
@@ -974,7 +981,47 @@ export function DiagramEditor({
       setReviewIssues({ violations: diagramScan, accepted: new Set(), cursor: 0 });
     }
     setDiagramScan(null);
+    setDiagramScanPos(null); // re-centre next time the popup opens
   }, [diagramScan]);
+
+  // Position the Diagram Issues popup near the top-left of the canvas
+  // when it first opens. Top-aligned (not centred) so it doesn't cover
+  // the elements the user is investigating — and from there it's
+  // freely draggable via the header. Cleared by closeDiagramScan.
+  useEffect(() => {
+    if (diagramScan !== null && diagramScanPos === null) {
+      const POPUP_WIDTH = 576; // matches max-w-xl
+      const x = Math.max(16, window.innerWidth / 2 - POPUP_WIDTH / 2);
+      const y = 80; // below the editor's top toolbar
+      setDiagramScanPos({ x, y });
+    }
+  }, [diagramScan, diagramScanPos]);
+
+  // Global mousemove / mouseup listeners while a drag is active. The
+  // drag-start handler lives on the popup header in the JSX below;
+  // these effects own the movement + release.
+  useEffect(() => {
+    if (!diagramScanDrag || !diagramScanPos) return;
+    const POPUP_WIDTH = 576;
+    const HEADER_VISIBLE_MIN = 80; // always leave at least this much header visible on-screen
+    const onMove = (e: MouseEvent) => {
+      const rawX = e.clientX - diagramScanDrag.ox;
+      const rawY = e.clientY - diagramScanDrag.oy;
+      const x = Math.max(
+        -(POPUP_WIDTH - HEADER_VISIBLE_MIN),
+        Math.min(window.innerWidth - HEADER_VISIBLE_MIN, rawX),
+      );
+      const y = Math.max(0, Math.min(window.innerHeight - HEADER_VISIBLE_MIN, rawY));
+      setDiagramScanPos({ x, y });
+    };
+    const onUp = () => setDiagramScanDrag(null);
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+  }, [diagramScanDrag, diagramScanPos]);
 
   const reviewNext = useCallback(() => {
     setReviewIssues((r) => {
@@ -3120,10 +3167,36 @@ export function DiagramEditor({
             </ul>
           );
           return (
-            <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-              <div className="bg-white rounded-lg shadow-xl w-full max-w-xl max-h-[80vh] flex flex-col">
-                {/* Pinned header — Close is always visible while the list scrolls. */}
-                <div className="px-6 py-4 border-b border-gray-200 flex items-start justify-between shrink-0">
+            <div
+              className="fixed bg-white rounded-lg shadow-xl flex flex-col z-50 border border-gray-200"
+              style={{
+                left: diagramScanPos?.x ?? 0,
+                top: diagramScanPos?.y ?? 0,
+                width: 576,
+                maxHeight: "80vh",
+                // Hide the popup until the position effect runs so it
+                // doesn't flash at (0,0) on the very first open.
+                visibility: diagramScanPos ? "visible" : "hidden",
+              }}
+            >
+                {/* Pinned header — Close is always visible while the list
+                    scrolls. Also acts as the DRAG HANDLE: mousedown
+                    anywhere on the header (except on a button) starts a
+                    drag that lets the user slide the popup aside to
+                    inspect canvas elements behind it. */}
+                <div
+                  onMouseDown={(e) => {
+                    if ((e.target as HTMLElement).closest("button")) return;
+                    if (!diagramScanPos) return;
+                    e.preventDefault();
+                    setDiagramScanDrag({
+                      ox: e.clientX - diagramScanPos.x,
+                      oy: e.clientY - diagramScanPos.y,
+                    });
+                  }}
+                  className="px-6 py-4 border-b border-gray-200 flex items-start justify-between shrink-0 cursor-move select-none"
+                  title="Drag to move — click Close to dismiss"
+                >
                   <div>
                     <h2 className="text-lg font-semibold text-gray-900">Diagram Issues</h2>
                     {diagramScan.length > 0 ? (
@@ -3184,7 +3257,6 @@ export function DiagramEditor({
                     </>
                   )}
                 </div>
-              </div>
             </div>
           );
         })()}
