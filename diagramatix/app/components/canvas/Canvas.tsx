@@ -3346,6 +3346,82 @@ export function Canvas({
   const isDraggingConnector = draggingConnector !== null;
   const isDraggingEndpoint = draggingEndpoint !== null;
 
+  // ── Correction #7 (2026-06-07) ──────────────────────────────────────────
+  // Auto-scroll the canvas while the user is drawing a connector and their
+  // cursor approaches the viewport edge. The connector's rubber-band line
+  // already follows the cursor; without auto-scroll the user can't reach
+  // any target that isn't already visible in the current pan.
+  //
+  // While a connector drag is active, an rAF loop reads the latest client
+  // mouse position, compares against the SVG's bounding rect, and shifts
+  // `pan` proportionally to how far past the threshold the cursor sits.
+  // The rubber-band's `currentPos` (a world coordinate) is recomputed
+  // against the new pan so the line endpoint visually stays under the
+  // cursor — without this the line would lag the pan by one mouse event.
+  const lastConnDragClientRef = useRef<{ x: number; y: number } | null>(null);
+  const panRef = useRef(pan);
+  const zoomRef = useRef(zoom);
+  useEffect(() => { panRef.current = pan; }, [pan]);
+  useEffect(() => { zoomRef.current = zoom; }, [zoom]);
+  useEffect(() => {
+    if (!isDraggingConnector) {
+      lastConnDragClientRef.current = null;
+      return;
+    }
+    const EDGE_MARGIN = 60;       // px from edge that starts triggering scroll
+    const MAX_SPEED   = 12;       // max pan delta per frame
+    const onMove = (ev: MouseEvent) => {
+      lastConnDragClientRef.current = { x: ev.clientX, y: ev.clientY };
+    };
+    window.addEventListener("mousemove", onMove);
+
+    let rafId = 0;
+    const tick = () => {
+      rafId = requestAnimationFrame(tick);
+      const mouse = lastConnDragClientRef.current;
+      const svg = svgRef.current;
+      if (!mouse || !svg) return;
+      const rect = svg.getBoundingClientRect();
+
+      const leftDist   = mouse.x - rect.left;
+      const rightDist  = rect.right - mouse.x;
+      const topDist    = mouse.y - rect.top;
+      const bottomDist = rect.bottom - mouse.y;
+
+      let dx = 0, dy = 0;
+      if (leftDist < EDGE_MARGIN) {
+        // Cursor near left edge — shift pan RIGHT so world content slides
+        // right under the cursor, exposing what was off-screen left.
+        const intensity = Math.max(0, Math.min(1, (EDGE_MARGIN - leftDist) / EDGE_MARGIN));
+        dx = intensity * MAX_SPEED;
+      } else if (rightDist < EDGE_MARGIN) {
+        const intensity = Math.max(0, Math.min(1, (EDGE_MARGIN - rightDist) / EDGE_MARGIN));
+        dx = -intensity * MAX_SPEED;
+      }
+      if (topDist < EDGE_MARGIN) {
+        const intensity = Math.max(0, Math.min(1, (EDGE_MARGIN - topDist) / EDGE_MARGIN));
+        dy = intensity * MAX_SPEED;
+      } else if (bottomDist < EDGE_MARGIN) {
+        const intensity = Math.max(0, Math.min(1, (EDGE_MARGIN - bottomDist) / EDGE_MARGIN));
+        dy = -intensity * MAX_SPEED;
+      }
+
+      if (dx === 0 && dy === 0) return;
+      const newPanX = panRef.current.x + dx;
+      const newPanY = panRef.current.y + dy;
+      const newWorldX = (mouse.x - rect.left - newPanX) / zoomRef.current;
+      const newWorldY = (mouse.y - rect.top  - newPanY) / zoomRef.current;
+      setPan({ x: newPanX, y: newPanY });
+      setDraggingConnector(prev => prev ? { ...prev, currentPos: { x: newWorldX, y: newWorldY } } : null);
+    };
+    rafId = requestAnimationFrame(tick);
+
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      cancelAnimationFrame(rafId);
+    };
+  }, [isDraggingConnector]);
+
   // Render pools first (deepest), then other containers, then lanes, then regular elements
   const pools = data.elements.filter((el) => el.type === "pool");
   const lanes = data.elements.filter((el) => el.type === "lane")
