@@ -2475,16 +2475,31 @@ function resizePoolForLabel(
   if (!pool || pool.type !== "pool") return { elements: baseElements, connectors: baseConnectors };
 
   const oldHeaderW = getPoolHeaderWidth(pool);
-  // Grow-only: never shrink a pool from a label edit. The user has chosen
-  // the pool's dimensions deliberately; an auto-shrink on rename can
-  // displace contained shapes and is rarely what's wanted. We only enlarge
-  // when the new label genuinely needs more room.
-  const deltaW = Math.max(0, headerWidth - oldHeaderW);
-  const effectiveHeaderWidth = oldHeaderW + deltaW;
   const lanes = baseElements.filter(e => e.type === "lane" && e.parentId === poolId);
   const hasLanes = lanes.length > 0;
 
+  // Black-box vs white-box decides shrink-on-rename. A black-box pool has
+  // NO direct children at all (no lanes, no flow elements) — the label is
+  // literally the only thing inside, so the pool can shrink-to-fit
+  // without displacing anything. A white-box pool has at least one child;
+  // auto-shrinking on rename would displace contained shapes and is
+  // explicitly not what the user wants.
+  //
+  // Per Paul's 2026-06-07 testing feedback:
+  //   • Black-box: BOTH grow AND shrink to fit the label (with the small
+  //     padding baked into poolMetrics: 20 px along the rotation axis,
+  //     header width sized for the line count).
+  //   • White-box: grow-only, same as before this change.
+  const isBlackBox = !baseElements.some(e => e.parentId === poolId);
+
+  // Header-width delta. Black-box pools accept either direction; white-box
+  // pools only grow.
+  const rawDeltaW = headerWidth - oldHeaderW;
+  const deltaW = isBlackBox ? rawDeltaW : Math.max(0, rawDeltaW);
+  const effectiveHeaderWidth = oldHeaderW + deltaW;
+
   // Build descendant set (lanes + their children + boundary events) for the shift.
+  // Empty for a black-box pool — no children to displace.
   const descendantIds = new Set<string>();
   function collect(parentId: string) {
     for (const e of baseElements) {
@@ -2496,11 +2511,19 @@ function resizePoolForLabel(
   }
   collect(poolId);
 
-  // Step 1: pool height. GROW-only — if the new label needs more vertical
-  // room, expand the pool (or its last lane) to fit; otherwise leave the
-  // pool's height alone so the user's chosen size persists.
+  // Step 1: pool height.
+  //   • Black-box: set height directly to the label-fit minimum (which
+  //     already includes 20 px padding from poolMetrics). This is the
+  //     shrink-to-fit case Paul asked for.
+  //   • White-box without lanes: grow-only (unchanged).
+  //   • White-box with lanes: grow-only via the last-lane absorption
+  //     (unchanged) so existing lane dimensions stay stable.
   let elements = baseElements;
-  if (!hasLanes) {
+  if (isBlackBox) {
+    if (pool.height !== minHeight) {
+      elements = elements.map(e => e.id === poolId ? { ...e, height: minHeight } : e);
+    }
+  } else if (!hasLanes) {
     if (pool.height < minHeight) {
       elements = elements.map(e => e.id === poolId ? { ...e, height: minHeight } : e);
     }
@@ -2522,11 +2545,12 @@ function resizePoolForLabel(
     }
   }
 
-  // Step 2: header width. GROW-only — if the new label needs a wider
-  // header strip, widen it and shift descendants right by deltaW so
-  // existing children stay anchored to the body, not the header. We
-  // never shrink the header width on rename.
-  if (deltaW > 0) {
+  // Step 2: header width.
+  //   • Black-box: shrink + grow freely (no children to shift).
+  //   • White-box: grow-only; when the header widens by deltaW we shift
+  //     every descendant right by the same delta so existing children
+  //     stay anchored to the body, not the header.
+  if (deltaW !== 0) {
     elements = elements.map(e => {
       if (e.id === poolId) {
         return { ...e, properties: { ...e.properties, poolHeaderWidth: effectiveHeaderWidth } };
