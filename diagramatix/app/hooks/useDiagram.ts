@@ -187,11 +187,22 @@ function preserveLabelWorldPos(
   };
 }
 
+/**
+ * messageBPMN labels are anchored to the SOURCE attachment point.
+ * The label moves rigidly with whichever delta the source endpoint
+ * has across this operation: when the source's pool moves or its
+ * source-side boundary moves, the label moves with it; when only the
+ * target side moves, the label stays put. This matches Paul's rule
+ * (Scenario 4, 2026-06-07): "labels remain fixed with respect to
+ * their source attachment points." Both X and Y are anchored; for a
+ * pure-vertical messageBPMN connector this also keeps the label on
+ * the line, since both endpoints share the same X.
+ */
 function adjustMsgLabelOffset(
   conn: Connector,
   oldWaypoints: Point[],
   newWaypoints: Point[]
-): { labelOffsetY?: number } {
+): { labelOffsetX?: number; labelOffsetY?: number } {
   if (conn.type !== "messageBPMN") return {};
   if (oldWaypoints.length < 2 || newWaypoints.length < 2) return {};
   const oldSrcIdx = conn.sourceInvisibleLeader ? 1 : 0;
@@ -200,40 +211,32 @@ function adjustMsgLabelOffset(
   // NEW waypoints use 1 / length-2 regardless of the OLD format.
   const newSrcIdx = 1;
   const newTgtIdx = newWaypoints.length - 2;
+  const oldSrcX = oldWaypoints[oldSrcIdx].x;
   const oldSrcY = oldWaypoints[oldSrcIdx].y;
+  const oldTgtX = oldWaypoints[oldTgtIdx].x;
   const oldTgtY = oldWaypoints[oldTgtIdx].y;
+  const newSrcX = newWaypoints[newSrcIdx]?.x ?? 0;
   const newSrcY = newWaypoints[newSrcIdx]?.y ?? 0;
+  const newTgtX = newWaypoints[newTgtIdx]?.x ?? 0;
   const newTgtY = newWaypoints[newTgtIdx]?.y ?? 0;
+  const dxSrc = newSrcX - oldSrcX;
+  const dySrc = newSrcY - oldSrcY;
+  if (dxSrc === 0 && dySrc === 0) return {};
+  // labelOffsetX/Y are stored relative to the connector midpoint, so
+  // shift them by (sourceDelta − midpointDelta) to keep the label's
+  // world position pinned to the source attachment.
+  const oldMidX = (oldSrcX + oldTgtX) / 2;
   const oldMidY = (oldSrcY + oldTgtY) / 2;
+  const newMidX = (newSrcX + newTgtX) / 2;
   const newMidY = (newSrcY + newTgtY) / 2;
-  if (oldSrcY === newSrcY && oldTgtY === newTgtY) return {};
-
-  // Label height from the text content (match ConnectorRenderer's line height).
-  const LINE_H = 14;
-  const lineCount = ((conn.label ?? "").split("\n").length) || 1;
-  const halfLabelH = (lineCount * LINE_H) / 2;
-
+  const labelOX = conn.labelOffsetX ?? 0;
   const labelOY = conn.labelOffsetY ?? 0;
-  const oldLabelTopY = oldMidY + labelOY;
-  const oldLabelCentreY = oldLabelTopY + halfLabelH;
-
-  // Which endpoint was the label closer to? (Compare to the CENTRE, so the
-  // detection lines up with the user's visual judgement of proximity.)
-  const distToSrc = Math.abs(oldLabelCentreY - oldSrcY);
-  const distToTgt = Math.abs(oldLabelCentreY - oldTgtY);
-  const [nearestOldY, nearestNewY] = distToSrc <= distToTgt
-    ? [oldSrcY, newSrcY]
-    : [oldTgtY, newTgtY];
-
-  // Preserve signed distance from the nearest endpoint — no flip detection.
-  const relativeOffset = oldLabelCentreY - nearestOldY;
-  const newLabelCentreY = nearestNewY + relativeOffset;
-  const newLabelTopY = newLabelCentreY - halfLabelH;
-  const result = newLabelTopY - newMidY;
+  const newLabelOX = (oldMidX + labelOX + dxSrc) - newMidX;
+  const newLabelOY = (oldMidY + labelOY + dySrc) - newMidY;
   if (typeof window !== "undefined" && (window as unknown as { __DIAGRAMATIX_TRACE?: boolean }).__DIAGRAMATIX_TRACE) {
-    console.log(`[TRACE adjustMsgLabelOffset] conn=${conn.id} label="${conn.label}" nearest=${distToSrc <= distToTgt ? "src" : "tgt"} nearestOldY=${nearestOldY} nearestNewY=${nearestNewY} oldLblCentre=${oldLabelCentreY.toFixed(1)} → newLblCentre=${newLabelCentreY.toFixed(1)} RESULT labelOffsetY=${result.toFixed(1)}`);
+    console.log(`[TRACE adjustMsgLabelOffset] conn=${conn.id} label="${conn.label}" dxSrc=${dxSrc.toFixed(1)} dySrc=${dySrc.toFixed(1)} → labelOffset=(${newLabelOX.toFixed(1)}, ${newLabelOY.toFixed(1)})`);
   }
-  return { labelOffsetY: result };
+  return { labelOffsetX: newLabelOX, labelOffsetY: newLabelOY };
 }
 
 type Action =
@@ -4659,148 +4662,6 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         : 0;
       let newH = Math.max(rawNewH, labelMinH);
 
-      // ── Correction #1 (2026-06-07) ─────────────────────────────────
-      // Black-box pool top/bottom resize must NOT drag message-flow
-      // endpoints along the moving boundary. Strategy:
-      //   • TOP-side and BOTTOM-side messages on this pool — clamp the
-      //     dragged boundary so it can never cross the endpoint's world
-      //     position. The boundary effectively stops at the message.
-      //   • LEFT-side and RIGHT-side messages — recompute their
-      //     offsetAlong against the new pool dimensions so the endpoint
-      //     stays at the same WORLD Y as before. Without this, the
-      //     fractional offset multiplied by the new pool height gives
-      //     a different world Y and the endpoint slides up or down.
-      //
-      // White-box pools are NOT affected — their lanes + flow elements
-      // would need a different rebalancing story, and the user
-      // explicitly scoped this fix to black-box pools.
-      const offsetUpdates = new Map<string, { sourceOffsetAlong?: number; targetOffsetAlong?: number }>();
-      // Detect black-box using the same poolType property the renderer +
-      // updatePoolTypes use. The previous "no children" check missed
-      // pools with stray descendants and pools where the renderer had
-      // already flagged poolType = black-box on its own.
-      const isPoolBlackBox =
-        target?.type === "pool" &&
-        ((target.properties?.poolType as string | undefined) ?? "black-box") !== "white-box";
-      if (isPoolBlackBox && target) {
-        // messageBPMN routing reality (see app/lib/diagram/routing.ts
-        // ~line 1067-1095 and Canvas.tsx ~line 1241-1273):
-        //   • sourceSide / targetSide are ALWAYS "top" or "bottom" —
-        //     the routing forces a vertical connector for any message
-        //     between two non-event elements.
-        //   • sourceOffsetAlong is interpreted as the X-AXIS fraction
-        //     along the SOURCE's width: rendered X = source.x +
-        //     source.width * sourceOffsetAlong, then clamped to BOTH
-        //     source AND target horizontal bounds.
-        //   • targetOffsetAlong is IGNORED for messageBPMN (the route
-        //     uses the same shared X at both ends).
-        //
-        // To stop drift we must preserve TWO things across a resize:
-        //   (A) the endpoint's WORLD Y for top/bottom-attached endpoints
-        //       — bidirectionally pin top/bottom boundary, AND
-        //   (B) the connector's shared WORLD X — by recomputing the
-        //       source's offsetAlong AND clamping the drag so the X
-        //       can't be pushed outside the new horizontal bounds.
-        const BPMN_EVENT_TYPES = new Set([
-          "start-event", "intermediate-event", "end-event",
-        ]);
-        const messages = state.connectors.filter(c =>
-          c.type === "messageBPMN" && (c.sourceId === id || c.targetId === id),
-        );
-
-        // (A) — TOP / BOTTOM bidirectional pin. Either side dragged in
-        // ANY direction would slide the endpoint, so pin to original
-        // position when any endpoint is attached there.
-        const hasTopEndpoint = messages.some(c =>
-          (c.sourceId === id && c.sourceSide === "top") ||
-          (c.targetId === id && c.targetSide === "top"),
-        );
-        const hasBottomEndpoint = messages.some(c =>
-          (c.sourceId === id && c.sourceSide === "bottom") ||
-          (c.targetId === id && c.targetSide === "bottom"),
-        );
-        const oldBottom = target.y + target.height;
-        if (hasTopEndpoint && newY !== target.y) {
-          newH = newH + (newY - target.y);
-          newY = target.y;
-        }
-        if (hasBottomEndpoint) {
-          const newBottom = newY + newH;
-          if (newBottom !== oldBottom) {
-            newH = oldBottom - newY;
-          }
-        }
-        newH = Math.max(newH, labelMinH);
-
-        // (B) — Per-message rendered-X snapshot. Compute the X that
-        // recomputeAllConnectors would have rendered for each
-        // attached message under the OLD pool geometry. Then:
-        //   • Clamp the new X / new width so newX <= renderedX and
-        //     newX + newW >= renderedX (so the message stays inside
-        //     this pool's horizontal range).
-        //   • If THIS pool is the source, update sourceOffsetAlong so
-        //     the new pool.x + pool.width * offset = renderedX.
-        const elementsById = new Map(state.elements.map(e => [e.id, e]));
-        const renderedXs: { connId: string; renderedX: number; isSource: boolean }[] = [];
-        for (const c of messages) {
-          const src = elementsById.get(c.sourceId);
-          const tgt = elementsById.get(c.targetId);
-          if (!src || !tgt) continue;
-          const srcIsEvent = BPMN_EVENT_TYPES.has(src.type);
-          const tgtIsEvent = tgt.type === "start-event" || tgt.type === "intermediate-event";
-          let x: number;
-          if (tgtIsEvent) {
-            x = tgt.x + tgt.width / 2;
-          } else if (srcIsEvent) {
-            x = src.x + src.width / 2;
-          } else {
-            const rawOffset = c.sourceOffsetAlong ?? 0.5;
-            const rawX = src.x + src.width * rawOffset;
-            x = Math.max(src.x, Math.min(src.x + src.width, rawX));
-            x = Math.max(tgt.x, Math.min(tgt.x + tgt.width, x));
-          }
-          renderedXs.push({ connId: c.id, renderedX: x, isSource: c.sourceId === id });
-        }
-
-        // Clamp newX / newW so every rendered X stays inside [newX, newX+newW].
-        // The clamps are independent: the left edge can pin against the
-        // leftmost X, the right edge against the rightmost.
-        for (const r of renderedXs) {
-          if (newX > r.renderedX) {
-            // Left edge dragged past the connector X — pin it there.
-            const right = newX + newW;
-            newX = r.renderedX;
-            newW = right - newX;
-          }
-          if (newX + newW < r.renderedX) {
-            // Right edge dragged past the connector X — pin it there.
-            newW = r.renderedX - newX;
-          }
-        }
-        if (newW < 1) newW = 1;
-
-        // If THIS pool is the SOURCE of a message between two
-        // non-event elements, push sourceOffsetAlong so the rendered X
-        // (which depends on src.x + src.width * offset) stays at the
-        // snapshot. Updates are queued; applied below after the lane
-        // logic (which does nothing for black-box pools anyway).
-        for (const r of renderedXs) {
-          if (!r.isSource) continue;
-          const conn = messages.find(c => c.id === r.connId);
-          if (!conn) continue;
-          const tgt = elementsById.get(conn.targetId);
-          if (!tgt) continue;
-          const tgtIsEvent = tgt.type === "start-event" || tgt.type === "intermediate-event";
-          const srcIsEvent = BPMN_EVENT_TYPES.has(target.type);
-          // X is dictated by the event side in these cases — offsetAlong is unused.
-          if (tgtIsEvent || srcIsEvent) continue;
-          if (newW <= 0) continue;
-          const rawOffset = (r.renderedX - newX) / newW;
-          const clamped = Math.max(0, Math.min(1, rawOffset));
-          offsetUpdates.set(r.connId, { sourceOffsetAlong: clamped });
-        }
-      }
-
       if (target?.type === "pool") {
         // Use the pool's DYNAMIC header width (the rotated label strip
         // on the left), not a hardcoded 30. Default is 36 but multi-line
@@ -4927,36 +4788,20 @@ function reducer(state: DiagramData, action: Action): DiagramData {
           const r = applyPoolBoundaryShift(elements, connectors, id, dLeft, dRight);
           elements = r.elements; connectors = r.connectors;
         }
-        // Correction #1 — apply the world-Y preservation offsets for
-        // LEFT/RIGHT-side message endpoints on a black-box pool BEFORE
-        // recomputeAllConnectors runs, so the route uses the new
-        // offsetAlong and the endpoint lands at the same world Y.
-        if (offsetUpdates.size > 0) {
-          connectors = connectors.map(c => {
-            const u = offsetUpdates.get(c.id);
-            if (!u) return c;
-            return { ...c, ...u };
-          });
-        }
-        // Recompute routes AND keep connector labels anchored. A bare
-        // recomputeAllConnectors moves each label's anchor (the midpoint
-        // of its visible waypoints) while leaving labelOffsetX/Y fixed,
-        // so labels drift — most visibly the message-flow labels between
-        // pools — every time a pool boundary moves. Use
-        // preserveLabelWorldPos for EVERY connector type here, including
-        // messageBPMN. The earlier adjustMsgLabelOffset strategy
-        // preserves "distance to nearest endpoint" which produces wild
-        // jumps when only one endpoint moves (exactly the top/bottom
-        // pool-resize case): the nearest endpoint sometimes flips
-        // between old and new, swinging the label by a large delta.
-        // preserveLabelWorldPos uses an anchor-midpoint delta, which
-        // tracks symmetrically regardless of which endpoint moved.
-        // (Correction #1 follow-up, 2026-06-07.)
+        // Recompute routes AND keep connector labels anchored.
+        // For messageBPMN, anchor the label to the SOURCE attachment
+        // point (Paul's rule, Scenario 4): the label moves rigidly
+        // with whatever delta the source endpoint took, regardless of
+        // what the target did. For every other connector type, use
+        // preserveLabelWorldPos so the label stays at its world
+        // position across the recompute.
         const origById = new Map(state.connectors.map(c => [c.id, c]));
         connectors = recomputeAllConnectors(connectors, elements).map(conn => {
           const orig = origById.get(conn.id);
           if (!orig) return conn;
-          const labelAdj = preserveLabelWorldPos(orig, conn.waypoints);
+          const labelAdj = conn.type === "messageBPMN"
+            ? adjustMsgLabelOffset(orig, orig.waypoints, conn.waypoints)
+            : preserveLabelWorldPos(orig, conn.waypoints);
           return Object.keys(labelAdj).length > 0 ? { ...conn, ...labelAdj } : conn;
         });
         // Pool may have just grown to cover existing flow elements or
