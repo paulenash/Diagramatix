@@ -4789,20 +4789,6 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         // preserveLabelWorldPos so the label stays at its world
         // position across the recompute.
         const origById = new Map(state.connectors.map(c => [c.id, c]));
-        const debugResize = typeof window !== "undefined" &&
-          (window as unknown as { __DIAG_RESIZE_TRACE?: boolean }).__DIAG_RESIZE_TRACE === true;
-        if (debugResize) {
-          const oldPool = target;
-          const newPool = elements.find(e => e.id === id);
-          console.log(`[RESIZE pool=${id}] payload x=${action.payload.x} y=${action.payload.y} w=${action.payload.width} h=${action.payload.height}`);
-          console.log(`  old: x=${oldPool?.x} y=${oldPool?.y} w=${oldPool?.width} h=${oldPool?.height}`);
-          console.log(`  new: x=${newPool?.x} y=${newPool?.y} w=${newPool?.width} h=${newPool?.height}`);
-          for (const c of connectors) {
-            if (c.type !== "messageBPMN") continue;
-            if (c.sourceId !== id && c.targetId !== id) continue;
-            console.log(`  PRE  msg ${c.id} src=${c.sourceId}@${c.sourceSide} tgt=${c.targetId}@${c.targetSide} srcOA=${c.sourceOffsetAlong} wp[1]=${JSON.stringify(c.waypoints[1])} wp[2]=${JSON.stringify(c.waypoints[2])} labelOY=${c.labelOffsetY}`);
-          }
-        }
         connectors = recomputeAllConnectors(connectors, elements).map(conn => {
           const orig = origById.get(conn.id);
           if (!orig) return conn;
@@ -4811,13 +4797,6 @@ function reducer(state: DiagramData, action: Action): DiagramData {
             : preserveLabelWorldPos(orig, conn.waypoints);
           return Object.keys(labelAdj).length > 0 ? { ...conn, ...labelAdj } : conn;
         });
-        if (debugResize) {
-          for (const c of connectors) {
-            if (c.type !== "messageBPMN") continue;
-            if (c.sourceId !== id && c.targetId !== id) continue;
-            console.log(`  POST msg ${c.id} srcOA=${c.sourceOffsetAlong} wp[1]=${JSON.stringify(c.waypoints[1])} wp[2]=${JSON.stringify(c.waypoints[2])} labelOY=${c.labelOffsetY}`);
-          }
-        }
         // Pool may have just grown to cover existing flow elements or
         // shrunk past its last one — re-evaluate white-box / black-box.
         return { ...state, elements: updatePoolTypes(elements), connectors };
