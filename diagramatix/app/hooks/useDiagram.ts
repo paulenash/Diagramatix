@@ -4881,17 +4881,21 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         // recomputeAllConnectors moves each label's anchor (the midpoint
         // of its visible waypoints) while leaving labelOffsetX/Y fixed,
         // so labels drift — most visibly the message-flow labels between
-        // pools — every time a pool boundary moves. Mirror the
-        // MOVE_ELEMENT pattern: adjustMsgLabelOffset for messageBPMN,
-        // preserveLabelWorldPos for the rest, comparing each connector's
-        // pre-resize waypoints (orig) to the freshly routed ones.
+        // pools — every time a pool boundary moves. Use
+        // preserveLabelWorldPos for EVERY connector type here, including
+        // messageBPMN. The earlier adjustMsgLabelOffset strategy
+        // preserves "distance to nearest endpoint" which produces wild
+        // jumps when only one endpoint moves (exactly the top/bottom
+        // pool-resize case): the nearest endpoint sometimes flips
+        // between old and new, swinging the label by a large delta.
+        // preserveLabelWorldPos uses an anchor-midpoint delta, which
+        // tracks symmetrically regardless of which endpoint moved.
+        // (Correction #1 follow-up, 2026-06-07.)
         const origById = new Map(state.connectors.map(c => [c.id, c]));
         connectors = recomputeAllConnectors(connectors, elements).map(conn => {
           const orig = origById.get(conn.id);
           if (!orig) return conn;
-          const labelAdj = conn.type === "messageBPMN"
-            ? adjustMsgLabelOffset(orig, orig.waypoints, conn.waypoints)
-            : preserveLabelWorldPos(orig, conn.waypoints);
+          const labelAdj = preserveLabelWorldPos(orig, conn.waypoints);
           return Object.keys(labelAdj).length > 0 ? { ...conn, ...labelAdj } : conn;
         });
         // Pool may have just grown to cover existing flow elements or
