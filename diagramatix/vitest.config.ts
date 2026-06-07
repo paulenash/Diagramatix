@@ -37,6 +37,8 @@ export default defineConfig({
     // pipeline green during the brief gap between deleting the old
     // suite and adding the new one.
     passWithNoTests: true,
+    // Bootstrap test DB schema once before any test file is loaded.
+    globalSetup: ["./tests/_setup/globalSetup.ts"],
     // Per-suite DB bootstrap (db push + truncate) can take a few seconds
     // — give each file 60s default before vitest's per-test 5s timeout
     // intrudes on legitimately slow flows like the share-roundtrip case.
