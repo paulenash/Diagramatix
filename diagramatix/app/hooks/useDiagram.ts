@@ -3651,24 +3651,23 @@ function reducer(state: DiagramData, action: Action): DiagramData {
           const wp = messageBpmnWaypoints(source, target,
             updated.sourceSide, updated.targetSide, newSrcOffset);
 
-          // Label handling — anchor to the MOVING POOL'S attachment so the
-          // label's distance from the pool edge is preserved every dispatch.
-          // `isSrc` tells us which waypoint is on the moving pool.
+          // Label handling — ALWAYS anchor to the SOURCE attachment of
+          // the connector, regardless of which pool is moving (Paul's
+          // rule, Scenario 4). When the source pool moves, the source
+          // endpoint moves and the label moves with it. When the target
+          // pool moves, the source endpoint doesn't move and the label
+          // stays put. The previous "anchor to the moving pool" logic
+          // dragged the label with the moving target.
           //
-          //   oldOff  = oldLabel − oldAttach(moving pool)       [signed]
-          //   non-flip:  newLabel = newAttach + oldOff          (move with pool)
-          //   flip:      newLabel = newAttach − oldOff          (mirror across attachment)
+          //   oldOff  = oldLabel − oldSrc       [signed, in BOTH axes]
+          //   non-flip:  newLabel = newSrc + oldOff
+          //   flip:      newLabel = newSrc − oldOffY (mirror Y, keep X)
           //
-          // Because the anchor is always on the moving pool, oldOff stays
-          // constant across pre-flip dispatches — no drift. At the flip
-          // dispatch, mirroring puts the label the same distance from the
-          // (new-side) attachment as it was from the (old-side) attachment,
-          // which places it in the gap between the pool and its partner on
-          // the new side.
-          //
-          // This formulation does not use `moveH` at all: the attachment Y
-          // already carries the pool's displacement.
-          let labelAdj: { labelOffsetY?: number } = {};
+          // Flip case (sides cross when one pool passes the other
+          // vertically) mirrors the label across the source attachment
+          // so it lands in the new gap between the two pools rather
+          // than ending up on the wrong side of the connector.
+          let labelAdj: { labelOffsetX?: number; labelOffsetY?: number } = {};
           if (conn.labelOffsetY != null) {
             const oldSrcIdx = conn.sourceInvisibleLeader ? 1 : 0;
             const oldTgtIdx = conn.targetInvisibleLeader ? conn.waypoints.length - 2 : conn.waypoints.length - 1;
@@ -3684,40 +3683,31 @@ function reducer(state: DiagramData, action: Action): DiagramData {
             const oldMidX = (oldSrcX + oldTgtX) / 2;
             const oldLabelCentreX = oldMidX + labelOX;
             const oldLabelCentreY = oldMidY + conn.labelOffsetY + halfLabelH;
-            // messageBpmnWaypoints always returns 4 points with both invisible leaders.
             const newSrcX = wp.waypoints[1].x;
             const newSrcY = wp.waypoints[1].y;
             const newTgtX = wp.waypoints[2].x;
             const newTgtY = wp.waypoints[2].y;
             const newMidX = (newSrcX + newTgtX) / 2;
             const newMidY = (newSrcY + newTgtY) / 2;
-            const oldAttachX = isSrc ? oldSrcX : oldTgtX;
-            const oldAttachY = isSrc ? oldSrcY : oldTgtY;
-            const newAttachX = isSrc ? newSrcX : newTgtX;
-            const newAttachY = isSrc ? newSrcY : newTgtY;
-            const oldOffsetX = oldLabelCentreX - oldAttachX;
-            const oldOffsetY = oldLabelCentreY - oldAttachY;
+            const oldOffsetX = oldLabelCentreX - oldSrcX;
+            const oldOffsetY = oldLabelCentreY - oldSrcY;
+            const newLabelCentreX = newSrcX + oldOffsetX;
             const newLabelCentreY = sidesFlipped
-              ? newAttachY - oldOffsetY
-              : newAttachY + oldOffsetY;
-            const newLabelCentreX = oldLabelCentreX; // label x is unchanged by a Y-only pool move
-            const newOffsetX = newLabelCentreX - newAttachX;
-            const newOffsetY = newLabelCentreY - newAttachY;
+              ? newSrcY - oldOffsetY
+              : newSrcY + oldOffsetY;
             const newLabelTopY = newLabelCentreY - halfLabelH;
-            labelAdj = { labelOffsetY: newLabelTopY - newMidY };
+            labelAdj = {
+              labelOffsetX: newLabelCentreX - newMidX,
+              labelOffsetY: newLabelTopY - newMidY,
+            };
             const connName = conn.label ? conn.label.replace(/\s+/g, " ").trim() : conn.id;
             if (traceA2) console.log(`[TRACE A2-label] "${connName}" isSrc=${isSrc} flipped=${sidesFlipped}`
               + ` oldSrc=(${oldSrcX.toFixed(0)}, ${oldSrcY.toFixed(0)})`
-              + ` oldTgt=(${oldTgtX.toFixed(0)}, ${oldTgtY.toFixed(0)})`
               + ` newSrc=(${newSrcX.toFixed(0)}, ${newSrcY.toFixed(0)})`
-              + ` newTgt=(${newTgtX.toFixed(0)}, ${newTgtY.toFixed(0)})`
               + ` oldLabel=(${oldLabelCentreX.toFixed(0)}, ${oldLabelCentreY.toFixed(0)})`
               + ` newLabel=(${newLabelCentreX.toFixed(0)}, ${newLabelCentreY.toFixed(0)})`
-              + ` oldAttach=(${oldAttachX.toFixed(0)}, ${oldAttachY.toFixed(0)})`
-              + ` newAttach=(${newAttachX.toFixed(0)}, ${newAttachY.toFixed(0)})`
-              + ` oldOff-from-attach=(${oldOffsetX.toFixed(0)}, ${oldOffsetY.toFixed(0)})`
-              + ` newOff-from-attach=(${newOffsetX.toFixed(0)}, ${newOffsetY.toFixed(0)})`
-              + ` → offsetY=${labelAdj.labelOffsetY?.toFixed(1)}`);
+              + ` oldOff-from-src=(${oldOffsetX.toFixed(0)}, ${oldOffsetY.toFixed(0)})`
+              + ` → offset=(${labelAdj.labelOffsetX?.toFixed(1)}, ${labelAdj.labelOffsetY?.toFixed(1)})`);
           }
 
           return { ...updated, waypoints: wp.waypoints,
