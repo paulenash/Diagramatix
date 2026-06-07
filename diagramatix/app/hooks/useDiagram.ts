@@ -4657,7 +4657,88 @@ function reducer(state: DiagramData, action: Action): DiagramData {
       const labelMinH = target && (target.type === "pool" || target.type === "lane")
         ? minHeightForContainer(target, state.elements, poolFs, laneFs)
         : 0;
-      const newH = Math.max(rawNewH, labelMinH);
+      let newH = Math.max(rawNewH, labelMinH);
+
+      // ── Correction #1 (2026-06-07) ─────────────────────────────────
+      // Black-box pool top/bottom resize must NOT drag message-flow
+      // endpoints along the moving boundary. Strategy:
+      //   • TOP-side and BOTTOM-side messages on this pool — clamp the
+      //     dragged boundary so it can never cross the endpoint's world
+      //     position. The boundary effectively stops at the message.
+      //   • LEFT-side and RIGHT-side messages — recompute their
+      //     offsetAlong against the new pool dimensions so the endpoint
+      //     stays at the same WORLD Y as before. Without this, the
+      //     fractional offset multiplied by the new pool height gives
+      //     a different world Y and the endpoint slides up or down.
+      //
+      // White-box pools are NOT affected — their lanes + flow elements
+      // would need a different rebalancing story, and the user
+      // explicitly scoped this fix to black-box pools.
+      const offsetUpdates = new Map<string, { sourceOffsetAlong?: number; targetOffsetAlong?: number }>();
+      if (target?.type === "pool" && !state.elements.some(e => e.parentId === id)) {
+        type Side = "top" | "right" | "bottom" | "left";
+        const messages = state.connectors.filter(c =>
+          c.type === "messageBPMN" && (c.sourceId === id || c.targetId === id),
+        );
+        // Snapshot endpoint world positions BEFORE the resize commits.
+        const endpoints: { connId: string; isSource: boolean; side: Side; worldY: number }[] = [];
+        for (const c of messages) {
+          if (c.sourceId === id) {
+            const side = c.sourceSide as Side;
+            const oa = c.sourceOffsetAlong ?? 0.5;
+            const worldY = (side === "top") ? target.y
+              : (side === "bottom") ? target.y + target.height
+              : target.y + oa * target.height;
+            endpoints.push({ connId: c.id, isSource: true, side, worldY });
+          }
+          if (c.targetId === id) {
+            const side = c.targetSide as Side;
+            const oa = c.targetOffsetAlong ?? 0.5;
+            const worldY = (side === "top") ? target.y
+              : (side === "bottom") ? target.y + target.height
+              : target.y + oa * target.height;
+            endpoints.push({ connId: c.id, isSource: false, side, worldY });
+          }
+        }
+
+        // Step 1: clamp top/bottom drag so TOP/BOTTOM-side endpoints
+        // stay at their original world Y. A TOP endpoint is at
+        // worldY == pool.y, so newY may only move UP from pool.y (i.e.
+        // newY <= pool.y) — moving DOWN would carry the endpoint along.
+        // BOTTOM endpoint is at pool.y + pool.height, so the bottom may
+        // only move DOWN. Both edges can still GROW the pool freely.
+        const hasTopEndpoint = endpoints.some(e => e.side === "top");
+        const hasBottomEndpoint = endpoints.some(e => e.side === "bottom");
+        if (hasTopEndpoint && newY > target.y) {
+          newH = newH - (newY - target.y);
+          newY = target.y;
+        }
+        if (hasBottomEndpoint) {
+          const newBottom = newY + newH;
+          const oldBottom = target.y + target.height;
+          if (newBottom < oldBottom) {
+            newH = oldBottom - newY;
+          }
+        }
+        // Re-clamp against label minimum after the message clamp.
+        newH = Math.max(newH, labelMinH);
+
+        // Step 2: for LEFT/RIGHT-side endpoints, recompute the
+        // offsetAlong so the world Y matches the snapshot. If the new
+        // pool no longer reaches that Y (extreme shrink past the
+        // endpoint), clamp to [0,1] so the endpoint snaps to the
+        // nearest corner instead of vanishing off-pool.
+        for (const ep of endpoints) {
+          if (ep.side !== "left" && ep.side !== "right") continue;
+          if (newH <= 0) continue;
+          const rawOffset = (ep.worldY - newY) / newH;
+          const clamped = Math.max(0, Math.min(1, rawOffset));
+          const prev = offsetUpdates.get(ep.connId) ?? {};
+          if (ep.isSource) prev.sourceOffsetAlong = clamped;
+          else prev.targetOffsetAlong = clamped;
+          offsetUpdates.set(ep.connId, prev);
+        }
+      }
 
       if (target?.type === "pool") {
         // Use the pool's DYNAMIC header width (the rotated label strip
@@ -4784,6 +4865,17 @@ function reducer(state: DiagramData, action: Action): DiagramData {
         if (wasWhiteBox && (dLeft !== 0 || dRight !== 0)) {
           const r = applyPoolBoundaryShift(elements, connectors, id, dLeft, dRight);
           elements = r.elements; connectors = r.connectors;
+        }
+        // Correction #1 — apply the world-Y preservation offsets for
+        // LEFT/RIGHT-side message endpoints on a black-box pool BEFORE
+        // recomputeAllConnectors runs, so the route uses the new
+        // offsetAlong and the endpoint lands at the same world Y.
+        if (offsetUpdates.size > 0) {
+          connectors = connectors.map(c => {
+            const u = offsetUpdates.get(c.id);
+            if (!u) return c;
+            return { ...c, ...u };
+          });
         }
         // Recompute routes AND keep connector labels anchored. A bare
         // recomputeAllConnectors moves each label's anchor (the midpoint
