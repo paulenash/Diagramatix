@@ -190,28 +190,42 @@ function preserveLabelWorldPos(
 /**
  * Pick which end of a messageBPMN connector its label should be
  * anchored to during a route recompute. Paul's rules:
- *   • Default — anchor to SOURCE (Scenario 4, 2026-06-07).
- *   • Only deviate for ELEMENT → black-box-POOL messages
- *     (2026-06-09): anchor to TARGET in that one case, so a label
- *     stays pinned to the black-box pool while the user moves the
- *     source element around inside its white-box pool.
- *   • Pool-to-pool messages of any kind stay SOURCE-anchored (Paul
- *     explicitly noted these are already correct). A pool on the
- *     source side disables the swap regardless of what the target is.
+ *   • Source is a Pool (any kind) — anchor to SOURCE. Covers
+ *     pool→pool (Paul's "pool-to-pool is fine" rule, preserved) and
+ *     pool→element.
+ *   • Source is an Element AND target is a black-box Pool — anchor
+ *     to TARGET (2026-06-09 rule). The black-box pool is the stable
+ *     end while the user moves the source element around its
+ *     white-box pool.
+ *   • Source is an Element AND target is an Element (typical cross-
+ *     pool element-to-element message between two white-box pools)
+ *     — anchor to whichever endpoint is CLOSEST to the label's
+ *     current world position (2026-06-09 follow-up). Caller passes
+ *     the label position + endpoint positions; if omitted, defaults
+ *     to SOURCE-anchored so older call sites don't change behaviour.
+ *   • Anything else falls back to SOURCE.
  */
 function pickMsgLabelAnchorEnd(
   srcEl: DiagramElement | undefined,
   tgtEl: DiagramElement | undefined,
+  labelPos?: Point,
+  oldSrcPt?: Point,
+  oldTgtPt?: Point,
 ): "source" | "target" {
   if (!srcEl || !tgtEl) return "source";
-  // Source is a pool of any kind → keep source-anchored. This covers
-  // pool→pool (preserving the existing rule) and pool→element.
   if (srcEl.type === "pool") return "source";
-  // Source is an element. Anchor to target only when target is a
-  // black-box pool.
   const tgtIsBBPool = tgtEl.type === "pool"
     && ((tgtEl.properties?.poolType as string | undefined) ?? "black-box") !== "white-box";
-  return tgtIsBBPool ? "target" : "source";
+  if (tgtIsBBPool) return "target";
+  // Source is an element, target is an element (or a white-box pool
+  // which has flow elements inside). Use the "closest attachment"
+  // rule when we have the geometry to compare; otherwise default.
+  if (labelPos && oldSrcPt && oldTgtPt) {
+    const dSrc = (labelPos.x - oldSrcPt.x) ** 2 + (labelPos.y - oldSrcPt.y) ** 2;
+    const dTgt = (labelPos.x - oldTgtPt.x) ** 2 + (labelPos.y - oldTgtPt.y) ** 2;
+    return dSrc <= dTgt ? "source" : "target";
+  }
+  return "source";
 }
 
 /**
@@ -251,9 +265,6 @@ function adjustMsgLabelOffset(
   const newSrcY = newWaypoints[newSrcIdx]?.y ?? 0;
   const newTgtX = newWaypoints[newTgtIdx]?.x ?? 0;
   const newTgtY = newWaypoints[newTgtIdx]?.y ?? 0;
-  const anchorEnd = pickMsgLabelAnchorEnd(source, target);
-  const dxAnchor = anchorEnd === "source" ? newSrcX - oldSrcX : newTgtX - oldTgtX;
-  const dyAnchor = anchorEnd === "source" ? newSrcY - oldSrcY : newTgtY - oldTgtY;
   // labelOffsetX/Y are stored relative to the connector midpoint, so
   // shift them by (anchorDelta − midpointDelta) to keep the label's
   // world position pinned to the chosen anchor. Even when the anchor
@@ -263,11 +274,20 @@ function adjustMsgLabelOffset(
   const oldMidY = (oldSrcY + oldTgtY) / 2;
   const newMidX = (newSrcX + newTgtX) / 2;
   const newMidY = (newSrcY + newTgtY) / 2;
+  // Label's current world position — needed for the closest-endpoint
+  // rule on element→element messageBPMNs.
+  const labelOX0 = conn.labelOffsetX ?? 0;
+  const labelOY0 = conn.labelOffsetY ?? 0;
+  const labelPos: Point = { x: oldMidX + labelOX0, y: oldMidY + labelOY0 };
+  const anchorEnd = pickMsgLabelAnchorEnd(
+    source, target, labelPos,
+    { x: oldSrcX, y: oldSrcY }, { x: oldTgtX, y: oldTgtY },
+  );
+  const dxAnchor = anchorEnd === "source" ? newSrcX - oldSrcX : newTgtX - oldTgtX;
+  const dyAnchor = anchorEnd === "source" ? newSrcY - oldSrcY : newTgtY - oldTgtY;
   if (oldMidX === newMidX && oldMidY === newMidY && dxAnchor === 0 && dyAnchor === 0) return {};
-  const labelOX = conn.labelOffsetX ?? 0;
-  const labelOY = conn.labelOffsetY ?? 0;
-  const newLabelOX = (oldMidX + labelOX + dxAnchor) - newMidX;
-  const newLabelOY = (oldMidY + labelOY + dyAnchor) - newMidY;
+  const newLabelOX = (oldMidX + labelOX0 + dxAnchor) - newMidX;
+  const newLabelOY = (oldMidY + labelOY0 + dyAnchor) - newMidY;
   if (typeof window !== "undefined" && (window as unknown as { __DIAGRAMATIX_TRACE?: boolean }).__DIAGRAMATIX_TRACE) {
     console.log(`[TRACE adjustMsgLabelOffset] conn=${conn.id} label="${conn.label}" anchor=${anchorEnd} dx=${dxAnchor.toFixed(1)} dy=${dyAnchor.toFixed(1)} → labelOffset=(${newLabelOX.toFixed(1)}, ${newLabelOY.toFixed(1)})`);
   }
@@ -3846,7 +3866,11 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
             const newTgtY = wp.waypoints[2].y;
             const newMidX = (newSrcX + newTgtX) / 2;
             const newMidY = (newSrcY + newTgtY) / 2;
-            const anchorEnd = pickMsgLabelAnchorEnd(source, target);
+            const anchorEnd = pickMsgLabelAnchorEnd(
+              source, target,
+              { x: oldLabelCentreX, y: oldLabelCentreY },
+              { x: oldSrcX, y: oldSrcY }, { x: oldTgtX, y: oldTgtY },
+            );
             const oldAnchorX = anchorEnd === "source" ? oldSrcX : oldTgtX;
             const oldAnchorY = anchorEnd === "source" ? oldSrcY : oldTgtY;
             const newAnchorX = anchorEnd === "source" ? newSrcX : newTgtX;
