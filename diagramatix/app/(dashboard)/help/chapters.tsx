@@ -2037,6 +2037,7 @@ export const CHAPTERS: HelpChapter[] = [
       },
       {
         heading: "SuperAdmin tools — Built-In Templates transfer",
+        adminOnly: true,
         body: (
           <>
             <p>
@@ -2083,6 +2084,7 @@ export const CHAPTERS: HelpChapter[] = [
       },
       {
         heading: "SuperAdmin tools — Rules & Prompts transfer",
+        adminOnly: true,
         body: (
           <>
             <p>
@@ -2133,6 +2135,7 @@ export const CHAPTERS: HelpChapter[] = [
       },
       {
         heading: "SuperAdmin tools — FULL Backup &amp; Selective Restore",
+        adminOnly: true,
         body: (
           <>
             <p>
@@ -2280,6 +2283,7 @@ export const CHAPTERS: HelpChapter[] = [
       },
       {
         heading: "Built-in templates (SuperAdmin only)",
+        adminOnly: true,
         body: (
           <p>
             SuperAdmins can create <strong>built-in templates</strong>{" "}
@@ -3457,76 +3461,49 @@ export const CHAPTERS: HelpChapter[] = [
 
   /* ──────────────────────────────────────────────── 26b ── */
   {
-    slug: "admin-roles",
-    title: "SuperAdmin & OrgAdmin",
-    adminOnly: true,
+    slug: "org-admin",
+    title: "OrgAdmin",
     sections: [
       {
         body: (
           <>
             <p>
-              Diagramatix has two elevated roles. Each gets its own
-              colour and entry point so the privilege level reads at
-              a glance.
+              An <strong className="text-orange-700">OrgAdmin</strong>{" "}
+              is the admin for a single Organisation (Org Owner or Org
+              Admin role). OrgAdmin chips, buttons and menu items
+              across Diagramatix are coloured <strong>orange</strong>{" "}
+              so you can spot them at a glance.
             </p>
-            <ul className="list-disc list-inside space-y-1 mt-2">
-              <li>
-                <strong className="text-red-700">SuperAdmin</strong>{" "}
-                (red chips / buttons) — platform-level admin. Sees and
-                manages every Org, every user, every project.
-              </li>
-              <li>
-                <strong className="text-orange-700">OrgAdmin</strong>{" "}
-                (orange chips / buttons) — admin scoped to a single
-                Org (Org Owner or Org Admin role). Manages users,
-                shared projects and Org settings for that Org only.
-              </li>
-              <li>
-                Normal users see neither set of options. Role gates are
-                enforced both client-side (controls hidden) and
-                server-side (API rejects).
-              </li>
-            </ul>
+            <p className="mt-2">
+              OrgAdmins manage users, shared projects and Org settings
+              for their own Org. They cannot reach across Orgs — that
+              is reserved for SuperAdmin.
+            </p>
           </>
         ),
       },
       {
-        heading: "SuperAdmin entry point",
-        body: (
-          <p>
-            The red <strong>SuperAdmin</strong> chip on the Dashboard
-            header opens the Registered Users page. From there a row
-            of red links across the header reaches every SuperAdmin
-            sub-page (AI Rules &amp; Preferences, Database Access,
-            System Archive, Subscription Prices and Limits, Features
-            Catalog, Groups, AI Plan Formats, Org Settings, Project
-            Sharing, BPMN Scanner Rules, Bubble Help).
-          </p>
-        ),
-      },
-      {
-        heading: "OrgAdmin entry point",
+        heading: "OrgAdmin menu",
         body: (
           <>
             <p>
               The orange <strong>OrgAdmin</strong> chip on the Dashboard
-              opens a single menu page at{" "}
+              opens the OrgAdmin menu at{" "}
               <code>/dashboard/org-admin</code> with three options:
             </p>
             <ul className="list-disc list-inside space-y-1 mt-2">
               <li>
-                <strong>Registered Users</strong> — the users in your
-                Org, with View / Edit (impersonate) actions only. No
-                Delete (SuperAdmin only).
+                <strong>Registered Users</strong> — every user in your
+                Org with View / Edit actions for support purposes.
               </li>
               <li>
-                <strong>Org Settings</strong> — cross-Org sharing toggle
-                and the OrgAdmins list for your Org. Org Name and
-                Danger Zone are SuperAdmin-only.
+                <strong>Org Settings</strong> — cross-Org sharing
+                toggle and the list of OrgAdmins for your Org. Add or
+                demote OrgAdmins via the candidate search.
               </li>
               <li>
                 <strong>Project Sharing</strong> — every shared project
-                in your Org with the editors / viewers on each row.
+                in your Org with the editors and viewers on each row.
               </li>
             </ul>
             <p className="mt-2">
@@ -3539,31 +3516,39 @@ export const CHAPTERS: HelpChapter[] = [
       {
         heading: "Registered Users table",
         body: (
-          <ul className="list-disc list-inside space-y-1">
-            <li>
-              Sortable columns: <strong>Name</strong>,{" "}
-              <strong>Email Address</strong>, <strong>Status</strong>,{" "}
-              <strong>Subscription</strong>, <strong>Registered</strong>.
-              Click the header to sort, click again to flip direction.
-            </li>
-            <li>
-              Filter row below the headers — substring match per
-              column, case-insensitive. Filters compose.
-            </li>
-            <li>
-              Subscription pill shows a purple <em>Nd</em> suffix when
-              the user is inside a trial window (most visibly Free,
-              seeded with 30 days).
-            </li>
-            <li>
-              Org Role column is display-only here. Change a user&apos;s
-              Org Role from <strong>Org Settings → OrgAdmins</strong>.
-            </li>
-          </ul>
+          <>
+            <p>
+              The OrgAdmin&apos;s Registered Users page lists every user
+              in their Org. Header reads &quot;Registered Users — Your
+              Org&quot;. Standard table affordances:
+            </p>
+            <ul className="list-disc list-inside space-y-1 mt-2">
+              <li>
+                Sortable columns: <strong>Name</strong>,{" "}
+                <strong>Email Address</strong>, <strong>Status</strong>,{" "}
+                <strong>Subscription</strong>,{" "}
+                <strong>Registered</strong>. Click the header to sort,
+                click again to flip direction.
+              </li>
+              <li>
+                Filter row below the headers — substring match per
+                column, case-insensitive. Filters compose.
+              </li>
+              <li>
+                Subscription pill shows a purple <em>Nd</em> suffix when
+                the user is inside a trial window (Free seeded with 30
+                days).
+              </li>
+              <li>
+                Org Role column is display-only here. Change a user&apos;s
+                Org Role from <strong>Org Settings → OrgAdmins</strong>.
+              </li>
+            </ul>
+          </>
         ),
       },
       {
-        heading: "Project tile context menu",
+        heading: "Project tile right-click menu",
         body: (
           <>
             <p>
@@ -3578,24 +3563,97 @@ export const CHAPTERS: HelpChapter[] = [
               </li>
               <li>
                 <strong>x — Delete project (diagrams → Unorganised)</strong>{" "}
-                — visible to the project Owner, OrgAdmin, or SuperAdmin.
-                Diagrams survive as orphans you can re-organise later.
+                — visible to the project Owner or an OrgAdmin. Diagrams
+                survive as orphans you can re-organise later.
               </li>
               <li>
-                <strong className="text-orange-700">x+ — Delete project (diagrams → Archive)</strong>{" "}
+                <strong className="text-orange-700">
+                  x+ — Delete project (diagrams → Archive)
+                </strong>{" "}
                 — OrgAdmin only. Diagrams move to the system Archive
                 where they remain recoverable.
-              </li>
-              <li>
-                <strong className="text-red-700">x++ — Hard delete: project + all diagrams</strong>{" "}
-                — SuperAdmin only, and SuperAdmin must own the project.
-                Cannot be undone.
               </li>
             </ul>
             <p className="mt-2">
               The left-click of any tile still opens the project; the
               clone (⧉) icon stays inline. Everything else moved to
               this menu in v1.18.
+            </p>
+          </>
+        ),
+      },
+    ],
+  },
+
+  /* ──────────────────────────────────────────────── 26c ── */
+  {
+    slug: "admin-roles",
+    title: "SuperAdmin",
+    adminOnly: true,
+    sections: [
+      {
+        body: (
+          <>
+            <p>
+              A <strong className="text-red-700">SuperAdmin</strong> is
+              a platform-level admin. SuperAdmin chips, buttons and
+              menu items across Diagramatix are coloured{" "}
+              <strong>red</strong> so the privilege reads at a glance.
+            </p>
+            <p className="mt-2">
+              SuperAdmins see and manage every Org, every user, every
+              project. Normal users and OrgAdmins never see SuperAdmin
+              controls; gates are enforced both client-side (controls
+              hidden) and server-side (API rejects).
+            </p>
+          </>
+        ),
+      },
+      {
+        heading: "SuperAdmin entry point",
+        body: (
+          <p>
+            The red <strong>SuperAdmin</strong> chip on the Dashboard
+            header opens the Registered Users page (every user across
+            every Org). A row of red links across the header reaches
+            every SuperAdmin sub-page: AI Rules &amp; Preferences,
+            Database Access, Generate DDL, System Archive, Subscription
+            Prices and Limits, Features Catalog, Groups, AI Plan
+            Formats, Org Settings, Project Sharing, BPMN Scanner Rules,
+            and Bubble Help.
+          </p>
+        ),
+      },
+      {
+        heading: "Hard-delete tier on project tiles",
+        body: (
+          <>
+            <p>
+              The project-tile right-click menu shows an extra third
+              tier for SuperAdmins on projects they OWN:
+            </p>
+            <p className="mt-2">
+              <strong className="text-red-700">
+                x++ — Hard delete: project + all diagrams
+              </strong>{" "}
+              — SuperAdmin only AND the SuperAdmin must own the
+              project. Permanently removes the project row and every
+              diagram inside it from the database. Cannot be undone.
+            </p>
+          </>
+        ),
+      },
+      {
+        heading: "Org-wide management",
+        body: (
+          <>
+            <p>
+              SuperAdmin&apos;s Registered Users page covers every Org;
+              the Org Settings page exposes an Org picker (top of
+              page), a &quot;+ New Org&quot; button, and the Danger Zone
+              with Delete Org. SuperAdmin can delete any non-last Org
+              regardless of subscription tier; the cascade removes
+              every member, project and diagram.
             </p>
           </>
         ),

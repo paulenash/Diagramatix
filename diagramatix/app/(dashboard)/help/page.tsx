@@ -61,7 +61,7 @@ export default async function HelpPage({
         </nav>
 
         <main className="bg-white border border-gray-200 rounded-lg p-6">
-          <HelpViewer chapter={current} />
+          <HelpViewer chapter={current} isAdmin={isAdmin} />
         </main>
       </div>
     </div>
