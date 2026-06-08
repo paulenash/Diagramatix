@@ -1384,6 +1384,13 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
               {!isSu && (orgRole === "Owner" || orgRole === "Admin") && (
                 <>
                   <a
+                    href="/dashboard/admin?from=/dashboard"
+                    className="text-xs text-orange-600 hover:text-orange-800 font-medium border border-orange-300 rounded px-2 py-1"
+                    title="Registered users in your Org"
+                  >
+                    Registered Users
+                  </a>
+                  <a
                     href="/dashboard/admin/org-settings"
                     className="text-xs text-orange-600 hover:text-orange-800 font-medium border border-orange-300 rounded px-2 py-1"
                     title="Org-level settings for this org"

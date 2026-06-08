@@ -47,6 +47,15 @@ interface Props {
   /** Build commit count baked in via NEXT_PUBLIC_COMMIT_COUNT. Shown
    *  in the page header as `v{SCHEMA_VERSION}.{commitCount}`. */
   commitCount: number;
+  /** True when the caller is a SuperAdmin (SUPERUSER_EMAILS). False
+   *  for an OrgAdmin viewing the scoped Org-only list. Drives:
+   *  the SuperAdmin nav links cluster, the Delete user button, and
+   *  the header title ("Registered Users" vs "Registered Users —
+   *  Acme"). */
+  isSuperAdmin: boolean;
+  /** OrgAdmin only — display name of their active Org, appended to
+   *  the page title so the scope is obvious. Null for SuperAdmin. */
+  activeOrgName: string | null;
 }
 
 // Users with activity in the last 5 minutes are treated as "online" — the
@@ -72,7 +81,7 @@ function presence(lastSeenAt: string | null, isYou: boolean): { online: boolean;
   return { online: false, label: `${days} d ago` };
 }
 
-export function AdminClient({ users: initialUsers, currentUserId, commitCount }: Props) {
+export function AdminClient({ users: initialUsers, currentUserId, commitCount, isSuperAdmin, activeOrgName }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
   // `?from=<url>` lets the SuperAdmin page return the user to wherever
@@ -244,78 +253,87 @@ export function AdminClient({ users: initialUsers, currentUserId, commitCount }:
               "you're inside Diagramatix" cue. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logos/diagramatix-icon.svg" alt="Diagramatix" className="w-7 h-7" />
-          <h1 className="font-semibold text-gray-900">Registered Users</h1>
+          <h1 className="font-semibold text-gray-900">
+            {isSuperAdmin ? "Registered Users" : `Registered Users — ${activeOrgName ?? "Your Org"}`}
+          </h1>
           <span className="text-[10px] text-gray-400">v{SCHEMA_VERSION}.{commitCount}</span>
         </div>
         <div className="flex items-center gap-2">
-          <a
-            href="/dashboard/rules"
-            className="text-xs text-red-700 hover:text-red-800 font-medium border border-red-300 rounded px-2 py-1 hover:bg-red-50"
-          >
-            AI Rules &amp; Preferences
-          </a>
-          <a
-            href="/dashboard/admin/database"
-            className="text-xs text-red-700 hover:text-red-800 font-medium border border-red-300 rounded px-2 py-1 hover:bg-red-50"
-          >
-            Database Access
-          </a>
-          <GenerateDdlButton />
-          <a
-            href="/dashboard/admin/archive"
-            className="text-xs text-red-700 hover:text-red-800 font-medium border border-red-300 rounded px-2 py-1 hover:bg-red-50"
-          >
-            System Archive
-          </a>
-          <a
-            href="/dashboard/admin/subscriptions"
-            className="text-xs text-red-700 hover:text-red-800 font-medium border border-red-300 rounded px-2 py-1 hover:bg-red-50"
-          >
-            Subscription Prices and Limits
-          </a>
-          <a
-            href="/dashboard/admin/features"
-            className="text-xs text-red-700 hover:text-red-800 font-medium border border-red-300 rounded px-2 py-1 hover:bg-red-50"
-          >
-            Features Catalog
-          </a>
-          <a
-            href="/dashboard/admin/groups"
-            className="text-xs text-red-700 hover:text-red-800 font-medium border border-red-300 rounded px-2 py-1 hover:bg-red-50"
-          >
-            Groups
-          </a>
-          <a
-            href="/dashboard/admin/ai-plan-format"
-            className="text-xs text-red-700 hover:text-red-800 font-medium border border-red-300 rounded px-2 py-1 hover:bg-red-50"
-          >
-            AI Plan Formats
-          </a>
-          <a
-            href="/dashboard/admin/org-settings"
-            className="text-xs text-red-700 hover:text-red-800 font-medium border border-red-300 rounded px-2 py-1 hover:bg-red-50"
-          >
-            Org Settings
-          </a>
-          <a
-            href="/dashboard/admin/sharing"
-            className="text-xs text-red-700 hover:text-red-800 font-medium border border-red-300 rounded px-2 py-1 hover:bg-red-50"
-          >
-            Project Sharing
-          </a>
-          <a
-            href="/dashboard/admin/scanner-rules"
-            className="text-xs text-red-700 hover:text-red-800 font-medium border border-red-300 rounded px-2 py-1 hover:bg-red-50"
-          >
-            BPMN Scanner Rules
-          </a>
-          <a
-            href="/dashboard/admin/bubble-help"
-            className="text-xs text-red-700 hover:text-red-800 font-medium border border-red-300 rounded px-2 py-1 hover:bg-red-50"
-          >
-            Bubble Help
-          </a>
-          <AdminNotificationsButton />
+          {/* SuperAdmin-only nav cluster. OrgAdmin viewing the scoped
+              Org-only list doesn't see these — they access Org Settings
+              and Project Sharing via dashboard chips. */}
+          {isSuperAdmin && (
+            <>
+              <a
+                href="/dashboard/rules"
+                className="text-xs text-red-700 hover:text-red-800 font-medium border border-red-300 rounded px-2 py-1 hover:bg-red-50"
+              >
+                AI Rules &amp; Preferences
+              </a>
+              <a
+                href="/dashboard/admin/database"
+                className="text-xs text-red-700 hover:text-red-800 font-medium border border-red-300 rounded px-2 py-1 hover:bg-red-50"
+              >
+                Database Access
+              </a>
+              <GenerateDdlButton />
+              <a
+                href="/dashboard/admin/archive"
+                className="text-xs text-red-700 hover:text-red-800 font-medium border border-red-300 rounded px-2 py-1 hover:bg-red-50"
+              >
+                System Archive
+              </a>
+              <a
+                href="/dashboard/admin/subscriptions"
+                className="text-xs text-red-700 hover:text-red-800 font-medium border border-red-300 rounded px-2 py-1 hover:bg-red-50"
+              >
+                Subscription Prices and Limits
+              </a>
+              <a
+                href="/dashboard/admin/features"
+                className="text-xs text-red-700 hover:text-red-800 font-medium border border-red-300 rounded px-2 py-1 hover:bg-red-50"
+              >
+                Features Catalog
+              </a>
+              <a
+                href="/dashboard/admin/groups"
+                className="text-xs text-red-700 hover:text-red-800 font-medium border border-red-300 rounded px-2 py-1 hover:bg-red-50"
+              >
+                Groups
+              </a>
+              <a
+                href="/dashboard/admin/ai-plan-format"
+                className="text-xs text-red-700 hover:text-red-800 font-medium border border-red-300 rounded px-2 py-1 hover:bg-red-50"
+              >
+                AI Plan Formats
+              </a>
+              <a
+                href="/dashboard/admin/org-settings"
+                className="text-xs text-red-700 hover:text-red-800 font-medium border border-red-300 rounded px-2 py-1 hover:bg-red-50"
+              >
+                Org Settings
+              </a>
+              <a
+                href="/dashboard/admin/sharing"
+                className="text-xs text-red-700 hover:text-red-800 font-medium border border-red-300 rounded px-2 py-1 hover:bg-red-50"
+              >
+                Project Sharing
+              </a>
+              <a
+                href="/dashboard/admin/scanner-rules"
+                className="text-xs text-red-700 hover:text-red-800 font-medium border border-red-300 rounded px-2 py-1 hover:bg-red-50"
+              >
+                BPMN Scanner Rules
+              </a>
+              <a
+                href="/dashboard/admin/bubble-help"
+                className="text-xs text-red-700 hover:text-red-800 font-medium border border-red-300 rounded px-2 py-1 hover:bg-red-50"
+              >
+                Bubble Help
+              </a>
+              <AdminNotificationsButton />
+            </>
+          )}
         </div>
       </header>
 
@@ -522,7 +540,10 @@ export function AdminClient({ users: initialUsers, currentUserId, commitCount }:
                         >
                           Edit
                         </button>
-                        {!u.isAdmin && (
+                        {/* Delete is SuperAdmin only. OrgAdmin gets View
+                            + Edit but cannot purge users — that's a
+                            platform-level action. */}
+                        {isSuperAdmin && !u.isAdmin && (
                           <button
                             onClick={() => setDeleteStage1({
                               userId: u.id,

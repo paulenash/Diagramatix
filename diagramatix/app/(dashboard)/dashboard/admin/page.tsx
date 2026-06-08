@@ -1,17 +1,45 @@
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { isSuperuser, SUPERUSER_EMAILS } from "@/app/lib/superuser";
+import { getCurrentOrgId } from "@/app/lib/auth/orgContext";
 import { getEffectiveSubscriptionLevelId } from "@/app/lib/subscription";
 import { AdminClient } from "./AdminClient";
 
 export default async function AdminPage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
-  if (!isSuperuser(session)) redirect("/dashboard");
+  const su = isSuperuser(session);
+
+  // OrgAdmin access (Paul's 2026-06-08 item 8): non-SuperAdmin Org
+  // owners + admins can see this page filtered to their active Org,
+  // with View / Edit only (no Delete, no SuperAdmin nav). Anyone else
+  // bounces back to /dashboard.
+  const cookieStore = await cookies();
+  const activeOrgId = await getCurrentOrgId(session, cookieStore);
+  let activeOrgName: string | null = null;
+  if (!su) {
+    const callerMembership = await prisma.orgMember.findFirst({
+      where: { userId: session.user.id, orgId: activeOrgId },
+      select: { role: true, org: { select: { name: true } } },
+    });
+    const isOrgAdmin =
+      callerMembership?.role === "Owner" || callerMembership?.role === "Admin";
+    if (!isOrgAdmin) redirect("/dashboard");
+    activeOrgName = callerMembership?.org.name ?? null;
+  }
+
+  // User scope: SuperAdmin sees everyone; OrgAdmin sees only members
+  // of their active Org. We push the filter into the WHERE clause so
+  // counts and the table both reflect the scoped list.
+  const userWhere = su
+    ? undefined
+    : { orgMembers: { some: { orgId: activeOrgId } } };
 
   const [users, allTiers] = await Promise.all([
     prisma.user.findMany({
+      where: userWhere,
       orderBy: { createdAt: "desc" },
       select: {
         id: true,
@@ -136,5 +164,13 @@ export default async function AdminPage() {
   });
 
   const commitCount = parseInt(process.env.NEXT_PUBLIC_COMMIT_COUNT ?? "0", 10) || 0;
-  return <AdminClient users={usersForClient} currentUserId={session.user.id} commitCount={commitCount} />;
+  return (
+    <AdminClient
+      users={usersForClient}
+      currentUserId={session.user.id}
+      commitCount={commitCount}
+      isSuperAdmin={su}
+      activeOrgName={activeOrgName}
+    />
+  );
 }

@@ -3,13 +3,15 @@ import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { isSuperuser, IMPERSONATE_COOKIE, IMPERSONATE_MODE_COOKIE } from "@/app/lib/superuser";
+import { getCurrentOrgId } from "@/app/lib/auth/orgContext";
 
 /** POST — start impersonating a user */
 export async function POST(req: Request) {
   const session = await auth();
-  if (!session?.user?.id || !isSuperuser(session)) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const su = isSuperuser(session);
 
   const { userId, mode } = (await req.json()) as { userId?: string; mode?: string };
   if (!userId) {
@@ -24,6 +26,30 @@ export async function POST(req: Request) {
   });
   if (!target) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
+  }
+
+  // Non-SuperAdmin path (Paul's 2026-06-08 item 8): an OrgAdmin
+  // (Owner/Admin in their active Org) can impersonate, but ONLY
+  // users who are members of that same Org. SuperAdmin bypasses
+  // the org check entirely.
+  if (!su) {
+    const cookieStore = await cookies();
+    const activeOrgId = await getCurrentOrgId(session, cookieStore);
+    const callerMembership = await prisma.orgMember.findFirst({
+      where: { userId: session.user.id, orgId: activeOrgId },
+      select: { role: true },
+    });
+    const isOrgAdmin = callerMembership?.role === "Owner" || callerMembership?.role === "Admin";
+    if (!isOrgAdmin) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    const targetIsInOrg = await prisma.orgMember.findFirst({
+      where: { userId, orgId: activeOrgId },
+      select: { id: true },
+    });
+    if (!targetIsInOrg) {
+      return NextResponse.json({ error: "Target user is not in your Org" }, { status: 403 });
+    }
   }
 
   const cookieStore = await cookies();
