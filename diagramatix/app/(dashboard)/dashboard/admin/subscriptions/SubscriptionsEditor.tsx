@@ -92,6 +92,9 @@ const ROWS: LimitRow[] = [
 export function SubscriptionsEditor({ initialTiers }: { initialTiers: TierRow[] }) {
   const router = useRouter();
   const [tiers, setTiers] = useState<TierRow[]>(initialTiers);
+  // Snapshot of what's persisted server-side. Used for dirty detection
+  // + Cancel revert.
+  const [savedSnapshot, setSavedSnapshot] = useState<TierRow[]>(initialTiers);
   const [saving, setSaving] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -102,6 +105,14 @@ export function SubscriptionsEditor({ initialTiers }: { initialTiers: TierRow[] 
     setErrorMessage(null);
     setTiers((prev) => prev.map((t) => (t.id === tierId ? { ...t, ...updates } : t)));
   }
+
+  function cancel() {
+    setTiers(savedSnapshot);
+    setStatusMessage(null);
+    setErrorMessage(null);
+  }
+
+  const isDirty = JSON.stringify(tiers) !== JSON.stringify(savedSnapshot);
 
   async function save() {
     setSaving(true);
@@ -119,6 +130,7 @@ export function SubscriptionsEditor({ initialTiers }: { initialTiers: TierRow[] 
         return;
       }
       setStatusMessage("Saved.");
+      setSavedSnapshot(tiers);
       // Refresh so SSR-fetched data downstream (admin Subscription column,
       // user popovers) picks up the new limits on next navigation.
       router.refresh();
@@ -149,9 +161,18 @@ export function SubscriptionsEditor({ initialTiers }: { initialTiers: TierRow[] 
             <span className="text-xs text-red-700">{errorMessage}</span>
           )}
           <button
+            onClick={cancel}
+            disabled={saving || !isDirty}
+            className="px-3 py-1.5 border border-gray-300 text-gray-700 text-xs font-medium rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            title={isDirty ? "Discard unsaved changes" : "No changes to cancel"}
+          >
+            Cancel
+          </button>
+          <button
             onClick={save}
-            disabled={saving}
-            className="px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-md hover:bg-blue-700 disabled:opacity-50"
+            disabled={saving || !isDirty}
+            className="px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-md hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+            title={isDirty ? "Save changes" : "No changes to save"}
           >
             {saving ? "Saving..." : "Save"}
           </button>

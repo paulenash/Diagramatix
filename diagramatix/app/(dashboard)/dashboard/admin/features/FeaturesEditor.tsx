@@ -215,15 +215,16 @@ export function FeaturesEditor({ initial }: { initial: FeatureRow[] }) {
           {error && <span className="text-xs text-red-700">{error}</span>}
           <button
             onClick={save}
-            disabled={busy}
-            className="px-3 py-1.5 border border-gray-300 text-gray-700 text-xs font-medium rounded-md hover:bg-gray-50 disabled:opacity-50"
+            disabled={busy || dirtyCount === 0}
+            className="px-3 py-1.5 border border-gray-300 text-gray-700 text-xs font-medium rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            title={dirtyCount === 0 ? "No draft changes to save" : "Save draft changes"}
           >
             {saving ? "Saving…" : "Save drafts"}
           </button>
           <button
             onClick={publish}
             disabled={busy || dirtyCount === 0}
-            className="px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-md hover:bg-blue-700 disabled:opacity-50"
+            className="px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-md hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
             title="Save then copy drafts → published snapshot. The public /features page reads only the published snapshot."
           >
             {publishing ? "Publishing…" : "Publish all"}

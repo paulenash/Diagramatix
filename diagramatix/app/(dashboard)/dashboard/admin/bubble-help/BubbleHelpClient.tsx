@@ -104,6 +104,14 @@ export function BubbleHelpClient() {
     setStatus(null);
   }
 
+  // Dirty-flag: Save + Cancel only enable when the in-memory rows
+  // differ from the last persisted snapshot. JSON.stringify is fine
+  // here — the row count is small (a few rows per diagram type).
+  const isDirty = (() => {
+    if (rows === null || savedSnapshot === null) return false;
+    return JSON.stringify(rows) !== JSON.stringify(savedSnapshot);
+  })();
+
   function update(index: number, patch: Partial<BubbleHelpRow>) {
     setRows(prev => prev ? prev.map((r, i) => i === index ? { ...r, ...patch } : r) : prev);
   }
@@ -275,17 +283,17 @@ export function BubbleHelpClient() {
                 <div className="flex-1" />
                 <button
                   onClick={cancel}
-                  disabled={saving}
-                  className="text-xs text-gray-700 border border-gray-300 hover:bg-gray-50 rounded px-3 py-1 disabled:opacity-50"
-                  title="Discard unsaved changes and collapse the editor"
+                  disabled={saving || !isDirty}
+                  className="text-xs text-gray-700 border border-gray-300 hover:bg-gray-50 rounded px-3 py-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                  title={isDirty ? "Discard unsaved changes and collapse the editor" : "No changes to cancel"}
                 >
                   Cancel
                 </button>
                 <button
                   onClick={save}
-                  disabled={saving}
-                  className="text-xs text-white bg-blue-600 hover:bg-blue-700 rounded px-3 py-1 disabled:opacity-50"
-                  title="Save changes and collapse the editor"
+                  disabled={saving || !isDirty}
+                  className="text-xs text-white bg-blue-600 hover:bg-blue-700 rounded px-3 py-1 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                  title={isDirty ? "Save changes and collapse the editor" : "No changes to save"}
                 >
                   {saving ? "Saving…" : "Save"}
                 </button>

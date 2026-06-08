@@ -52,11 +52,6 @@ interface Props {
   /** Used to spot the caller in the admins list so we can warn before
    *  they demote themselves. */
   callerUserId: string;
-  /** Count of members in this Org still on a paid tier. Drives the
-   *  Danger Zone "Delete Org" button — only enabled when this is zero
-   *  so a paid Org can't be accidentally nuked while users are still
-   *  billed. Server independently re-checks. */
-  nonFreeMemberCount: number;
 }
 
 /**
@@ -70,7 +65,7 @@ interface Props {
  * per the role-elevated-orange feedback memory. Destructive actions
  * stay red.
  */
-export function OrgSettingsClient({ isSuperAdmin, org, admins, orgList, callerUserId, nonFreeMemberCount }: Props) {
+export function OrgSettingsClient({ isSuperAdmin, org, admins, orgList, callerUserId }: Props) {
   const router = useRouter();
 
   // Org Info card edit state. Initialised from props; reset whenever
@@ -454,21 +449,11 @@ export function OrgSettingsClient({ isSuperAdmin, org, admins, orgList, callerUs
                     {" "}{org.memberCount} members,{" "}{org.projectCount} projects, and
                     {" "}{org.diagramCount} diagrams. Cannot be undone.
                   </p>
-                  {nonFreeMemberCount > 0 && (
-                    <p className="text-xs text-red-700 mt-2 font-medium">
-                      Blocked: {nonFreeMemberCount} member{nonFreeMemberCount === 1 ? "" : "s"} still on a paid tier. Move them to Free before deleting this Org.
-                    </p>
-                  )}
                 </div>
                 <button
                   onClick={() => setConfirmDeleteOrg(true)}
-                  disabled={nonFreeMemberCount > 0}
-                  className="text-xs font-medium px-3 py-1.5 bg-red-600 text-white rounded hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
-                  title={
-                    nonFreeMemberCount > 0
-                      ? `Cannot delete: ${nonFreeMemberCount} member${nonFreeMemberCount === 1 ? "" : "s"} on a paid tier.`
-                      : "Permanently delete this Org and all its data"
-                  }
+                  className="text-xs font-medium px-3 py-1.5 bg-red-600 text-white rounded hover:bg-red-700"
+                  title="Permanently delete this Org and all its data"
                 >
                   Delete Org
                 </button>

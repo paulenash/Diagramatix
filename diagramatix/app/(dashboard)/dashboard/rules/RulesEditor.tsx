@@ -554,14 +554,30 @@ export function RulesEditor({ isAdmin: _isAdmin }: { isAdmin: boolean }) {
                 <input type="checkbox" checked={showPreview} onChange={e => setShowPreview(e.target.checked)} className="w-3 h-3" />
                 Preview
               </label>
-              <button onClick={handleReset} disabled={saving}
-                className="px-3 py-1 text-xs text-gray-700 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50">
-                Reset
-              </button>
-              <button onClick={handleSave} disabled={saving}
-                className="px-3 py-1 text-xs text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50">
-                {saving ? "Saving…" : "Save Rules"}
-              </button>
+              {(() => {
+                const lastSaved = ruleSets.find(r => r.category === activeCategory)?.rules ?? "";
+                const isDirty = editText !== lastSaved;
+                return (
+                  <>
+                    <button
+                      onClick={handleReset}
+                      disabled={saving || !isDirty}
+                      className="px-3 py-1 text-xs text-gray-700 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                      title={isDirty ? "Reset to last saved" : "No changes to reset"}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleSave}
+                      disabled={saving || !isDirty}
+                      className="px-3 py-1 text-xs text-white bg-blue-600 rounded hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                      title={isDirty ? "Save changes" : "No changes to save"}
+                    >
+                      {saving ? "Saving…" : "Save Rules"}
+                    </button>
+                  </>
+                );
+              })()}
             </div>
           </div>
 

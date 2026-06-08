@@ -40,28 +40,11 @@ export async function DELETE(_req: Request, { params }: Params) {
     );
   }
 
-  // Paid-subscriber guard (Paul's 2026-06-08 rule): SuperAdmin can only
-  // delete an Org when every member is on the Free tier. Any active
-  // paid subscription must be cancelled first so we don't accidentally
-  // strand Stripe rows or paid users.
-  const nonFreeCount = await prisma.user.count({
-    where: {
-      orgMembers: { some: { orgId: id } },
-      // Paid = subscriptionLevelId in {introductory, professional,
-      // expert}. NULL and "free" both count as Free for this check
-      // (Paul's 2026-06-08 clarification). Enumerate the paid tiers
-      // explicitly so an unseeded user (NULL) isn't treated as paid.
-      subscriptionLevelId: { in: ["introductory", "professional", "expert"] },
-    },
-  });
-  if (nonFreeCount > 0) {
-    return NextResponse.json(
-      {
-        error: `Cannot delete: ${nonFreeCount} member${nonFreeCount === 1 ? "" : "s"} still on a paid tier. Move them to Free first.`,
-      },
-      { status: 400 },
-    );
-  }
+  // Paid-subscriber guard was removed 2026-06-09 — SuperAdmin can
+  // delete any Org regardless of subscription tier. The earlier rule
+  // over-constrained legitimate cleanup of stale tenants. The
+  // last-Org check above remains; the cascade still removes every
+  // member, project, and diagram.
 
   // Cascade does the heavy lifting via the schema relations.
   await prisma.org.delete({ where: { id } });

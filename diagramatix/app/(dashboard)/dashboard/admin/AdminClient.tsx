@@ -355,18 +355,18 @@ export function AdminClient({ users: initialUsers, currentUserId, commitCount, i
                   Email Address <span className="text-[9px] text-gray-400">{sortIcon("email")}</span>
                 </button>
               </th>
-              <th className="px-3 py-3" style={{ width: "6%" }}>
+              <th className="px-3 py-3" style={{ width: "9%" }}>
                 <button onClick={() => toggleSort("status")} className="inline-flex items-center gap-1 hover:text-gray-700">
                   Status <span className="text-[9px] text-gray-400">{sortIcon("status")}</span>
                 </button>
               </th>
-              <th className="px-3 py-3" style={{ width: "9%" }}>Working on</th>
-              <th className="px-3 py-3" style={{ width: "15%" }}>
+              <th className="px-3 py-3" style={{ width: "8%" }}>Working on</th>
+              <th className="px-3 py-3" style={{ width: "14%" }}>
                 <button onClick={() => toggleSort("subscription")} className="inline-flex items-center gap-1 hover:text-gray-700">
                   Subscription <span className="text-[9px] text-gray-400">{sortIcon("subscription")}</span>
                 </button>
               </th>
-              <th className="px-3 py-3" style={{ width: "9%" }} title="OrgRole inside the user's primary Org">Org Role</th>
+              <th className="px-3 py-3" style={{ width: "8%" }} title="OrgRole inside the user's primary Org">Org Role</th>
               <th className="px-3 py-3 text-center" style={{ width: "7%" }}>Projects</th>
               <th className="px-3 py-3 text-center" style={{ width: "7%" }}>Diagrams</th>
               <th className="px-3 py-3" style={{ width: "8%" }}>
