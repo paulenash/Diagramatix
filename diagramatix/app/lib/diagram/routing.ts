@@ -388,11 +388,14 @@ function buildOrthogonalPath(
     leftX   = Math.max(leftX, cLeft);
   }
 
-  const candidates: { path: Point[]; len: number }[] = [
-    { path: [start, { x: start.x, y: bottomY }, { x: end.x, y: bottomY }, end], len: 0 },
-    { path: [start, { x: start.x, y: topY }, { x: end.x, y: topY }, end], len: 0 },
-    { path: [start, { x: rightX, y: start.y }, { x: rightX, y: end.y }, end], len: 0 },
-    { path: [start, { x: leftX, y: start.y }, { x: leftX, y: end.y }, end], len: 0 },
+  // Index meaning is needed for both the directional ("forward") test
+  // and the per-candidate trace output below.
+  const SOUTH = 0, NORTH = 1, EAST = 2, WEST = 3;
+  const candidates: { path: Point[]; len: number; idx: number }[] = [
+    { path: [start, { x: start.x, y: bottomY }, { x: end.x, y: bottomY }, end], len: 0, idx: SOUTH },
+    { path: [start, { x: start.x, y: topY }, { x: end.x, y: topY }, end], len: 0, idx: NORTH },
+    { path: [start, { x: rightX, y: start.y }, { x: rightX, y: end.y }, end], len: 0, idx: EAST },
+    { path: [start, { x: leftX, y: start.y }, { x: leftX, y: end.y }, end], len: 0, idx: WEST },
   ];
   // Compute total segment length for each candidate
   for (const c of candidates) {
@@ -402,11 +405,35 @@ function buildOrthogonalPath(
     }
     c.len = len;
   }
-  // Sort by length — prefer shortest path
-  candidates.sort((a, b) => a.len - b.len);
+  // Directional split: a candidate is "forward" if its detour line sits
+  // on the destination side of the start. WEST when destination is east,
+  // NORTH when destination is south, etc. are "backward" — they make
+  // the route jog away from the target before circling back, producing
+  // visible kinks even when the lengths look comparable. Try every
+  // forward candidate (sorted by length) before any backward one, so the
+  // kinky detour only wins when no forward detour can clear the obstacles.
+  const goingEast = end.x >= start.x;
+  const goingSouth = end.y >= start.y;
+  function isForward(idx: number): boolean {
+    if (idx === SOUTH) return goingSouth;
+    if (idx === NORTH) return !goingSouth;
+    if (idx === EAST)  return goingEast;
+    if (idx === WEST)  return !goingEast;
+    return true;
+  }
+  const forward  = candidates.filter(c => isForward(c.idx)).sort((a, b) => a.len - b.len);
+  const backward = candidates.filter(c => !isForward(c.idx)).sort((a, b) => a.len - b.len);
+  const ordered = [...forward, ...backward];
 
-  for (const c of candidates) {
-    if (!pathHitsObstacles(c.path, obstacles)) return c.path;
+  if (trace) {
+    const label = (i: number) => i === SOUTH ? "S" : i === NORTH ? "N" : i === EAST ? "E" : "W";
+    console.log(`[MARGIN candidates] forward=${forward.map(c => `${label(c.idx)}(${c.len.toFixed(0)})`).join(",")} backward=${backward.map(c => `${label(c.idx)}(${c.len.toFixed(0)})`).join(",")} goingE=${goingEast} goingS=${goingSouth}`);
+  }
+
+  for (const c of ordered) {
+    const hit = pathHitsObstacles(c.path, obstacles);
+    if (trace) console.log(`[MARGIN try ${c.idx === SOUTH ? "S" : c.idx === NORTH ? "N" : c.idx === EAST ? "E" : "W"}] len=${c.len.toFixed(0)} hit=${hit} path=${JSON.stringify(c.path)}`);
+    if (!hit) return c.path;
   }
 
   // Last resort: route far enough outside all obstacles. When containment
@@ -419,7 +446,7 @@ function buildOrthogonalPath(
     if (!pathHitsObstacles(farPath, obstacles)) return farPath;
   }
 
-  return candidates[0].path;
+  return ordered[0].path;
 }
 
 const PERP_OFFSET = 24;
