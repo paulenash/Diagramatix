@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { IMPLEMENTED_BUBBLE_TOPICS } from "@/app/lib/bubbleHelpTopics";
 import type { DiagramType } from "@/app/lib/diagram/types";
 
@@ -27,6 +27,9 @@ const DIAGRAM_TYPES: { value: DiagramType; label: string }[] = [
 
 export function BubbleHelpClient() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const rawFrom = searchParams.get("from");
+  const backHref = rawFrom && rawFrom.startsWith("/") ? rawFrom : "/dashboard/admin";
   const [diagramType, setDiagramType] = useState<DiagramType>("bpmn");
   const [rows, setRows] = useState<BubbleHelpRow[] | null>(null);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
@@ -110,11 +113,12 @@ export function BubbleHelpClient() {
       <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <button
-            onClick={() => router.push("/dashboard/admin")}
+            onClick={() => router.push(backHref)}
             className="text-gray-500 hover:text-gray-700 text-sm flex items-center gap-1"
+            title={`Return to ${backHref}`}
           >
             <span style={{ fontSize: "1.75em", lineHeight: 1 }}>{"←"}</span>
-            SuperAdmin
+            {backHref === "/dashboard/admin" ? "SuperAdmin" : "Back"}
           </button>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logos/diagramatix-icon.svg" alt="Diagramatix" className="w-7 h-7" />

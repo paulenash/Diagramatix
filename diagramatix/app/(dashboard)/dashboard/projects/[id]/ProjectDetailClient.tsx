@@ -1983,15 +1983,17 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
               project header to match the sidebar. Value still lives on
               project.ownerName and round-trips through exports. */}
           {version ? <span className="text-[10px] text-gray-400">v{SCHEMA_VERSION}.{version}</span> : null}
-          {/* Admin shortcut — leftmost item in the header menu cluster,
-              admin-only. Mirrors the Dashboard placement. */}
+          {/* SuperAdmin shortcut — leftmost item in the header menu
+              cluster, SuperAdmin-only. `?from=` carries this project's
+              URL so the admin's Back link returns here. Mirrors the
+              Dashboard placement. */}
           {isAdmin && (
             <a
-              href="/dashboard/admin"
-              className="text-xs text-orange-600 hover:text-orange-800 font-medium border border-orange-300 rounded px-2 py-1"
-              title="Open the Admin dashboard"
+              href={`/dashboard/admin?from=${encodeURIComponent(typeof window !== "undefined" ? window.location.pathname + window.location.search : `/dashboard/projects/${project.id}`)}`}
+              className="text-xs text-red-700 hover:text-red-800 font-medium border border-red-300 rounded px-2 py-1 hover:bg-red-50"
+              title="Open the SuperAdmin dashboard"
             >
-              Admin
+              SuperAdmin
             </a>
           )}
           {!readOnly && (

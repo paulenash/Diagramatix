@@ -4,7 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertDialog } from "@/app/components/AlertDialog";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
-import { ORG_ENTITY_TYPE_LABELS, ORG_ENTITY_TYPE_OPTIONS } from "@/app/lib/auth/orgEntityTypeLabels";
+// Entity Type surface removed 2026-06-08 — Org schema still carries the
+// field for forward-compat but it's no longer presented in the UI.
 import { ORG_ROLE_LABELS } from "@/app/lib/auth/orgRoleLabels";
 import type { OrgEntityType } from "@/app/generated/prisma/enums";
 
@@ -51,6 +52,11 @@ interface Props {
   /** Used to spot the caller in the admins list so we can warn before
    *  they demote themselves. */
   callerUserId: string;
+  /** Count of members in this Org still on a paid tier. Drives the
+   *  Danger Zone "Delete Org" button — only enabled when this is zero
+   *  so a paid Org can't be accidentally nuked while users are still
+   *  billed. Server independently re-checks. */
+  nonFreeMemberCount: number;
 }
 
 /**
@@ -64,19 +70,19 @@ interface Props {
  * per the role-elevated-orange feedback memory. Destructive actions
  * stay red.
  */
-export function OrgSettingsClient({ isSuperAdmin, org, admins, orgList, callerUserId }: Props) {
+export function OrgSettingsClient({ isSuperAdmin, org, admins, orgList, callerUserId, nonFreeMemberCount }: Props) {
   const router = useRouter();
 
   // Org Info card edit state. Initialised from props; reset whenever
-  // the parent fetches a different Org (page navigation).
+  // the parent fetches a different Org (page navigation). Entity Type
+  // surface removed 2026-06-08; the field still exists in the schema
+  // (default "Other") for forward-compat with any future use case.
   const [name, setName] = useState(org.name);
-  const [entityType, setEntityType] = useState<OrgEntityType>(org.entityType);
   const [allowCrossOrg, setAllowCrossOrg] = useState(org.allowCrossOrgSharing);
   useEffect(() => {
     setName(org.name);
-    setEntityType(org.entityType);
     setAllowCrossOrg(org.allowCrossOrgSharing);
-  }, [org.id, org.name, org.entityType, org.allowCrossOrgSharing]);
+  }, [org.id, org.name, org.allowCrossOrgSharing]);
 
   const [saving, setSaving] = useState(false);
   const [savedMessage, setSavedMessage] = useState<string | null>(null);
@@ -289,29 +295,6 @@ export function OrgSettingsClient({ isSuperAdmin, org, admins, orgList, callerUs
                 </div>
               </div>
 
-              <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs font-medium text-gray-700">Entity Type</p>
-                  {isSuperAdmin ? (
-                    <select
-                      value={entityType}
-                      onChange={(e) => {
-                        const next = e.target.value as OrgEntityType;
-                        setEntityType(next);
-                        saveField({ entityType: next });
-                      }}
-                      className="mt-1 w-full text-sm border border-gray-300 rounded px-2 py-1 bg-white"
-                    >
-                      {ORG_ENTITY_TYPE_OPTIONS.map((t) => (
-                        <option key={t} value={t}>{ORG_ENTITY_TYPE_LABELS[t]}</option>
-                      ))}
-                    </select>
-                  ) : (
-                    <p className="text-sm text-gray-800 mt-1">{ORG_ENTITY_TYPE_LABELS[org.entityType]}</p>
-                  )}
-                </div>
-              </div>
-
               <div className="grid grid-cols-3 gap-4 text-xs text-gray-600 pt-2 border-t border-gray-100">
                 <div>
                   <p className="text-[10px] text-gray-500 uppercase tracking-wide">Members</p>
@@ -470,10 +453,21 @@ export function OrgSettingsClient({ isSuperAdmin, org, admins, orgList, callerUs
                     {" "}{org.memberCount} members,{" "}{org.projectCount} projects, and
                     {" "}{org.diagramCount} diagrams. Cannot be undone.
                   </p>
+                  {nonFreeMemberCount > 0 && (
+                    <p className="text-xs text-red-700 mt-2 font-medium">
+                      Blocked: {nonFreeMemberCount} member{nonFreeMemberCount === 1 ? "" : "s"} still on a paid tier. Move them to Free before deleting this Org.
+                    </p>
+                  )}
                 </div>
                 <button
                   onClick={() => setConfirmDeleteOrg(true)}
-                  className="text-xs font-medium px-3 py-1.5 bg-red-600 text-white rounded hover:bg-red-700"
+                  disabled={nonFreeMemberCount > 0}
+                  className="text-xs font-medium px-3 py-1.5 bg-red-600 text-white rounded hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                  title={
+                    nonFreeMemberCount > 0
+                      ? `Cannot delete: ${nonFreeMemberCount} member${nonFreeMemberCount === 1 ? "" : "s"} on a paid tier.`
+                      : "Permanently delete this Org and all its data"
+                  }
                 >
                   Delete Org
                 </button>
@@ -541,7 +535,6 @@ function NewOrgModal({
   onError: (message: string) => void;
 }) {
   const [name, setName] = useState("");
-  const [entityType, setEntityType] = useState<OrgEntityType>("Other");
   const [initialOwnerEmail, setInitialOwnerEmail] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -554,7 +547,9 @@ function NewOrgModal({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: name.trim(),
-          entityType,
+          // entityType defaults to "Other" server-side — surface
+          // removed from the UI per Paul's 2026-06-08 simplification.
+          entityType: "Other",
           initialOwnerEmail: initialOwnerEmail.trim(),
         }),
       });
@@ -589,18 +584,6 @@ function NewOrgModal({
               placeholder="Acme Insurance"
               className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-orange-500"
             />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Entity Type</label>
-            <select
-              value={entityType}
-              onChange={(e) => setEntityType(e.target.value as OrgEntityType)}
-              className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded bg-white"
-            >
-              {ORG_ENTITY_TYPE_OPTIONS.map((t) => (
-                <option key={t} value={t}>{ORG_ENTITY_TYPE_LABELS[t]}</option>
-              ))}
-            </select>
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">Initial Owner Email</label>

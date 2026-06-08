@@ -61,8 +61,10 @@ export default async function OrgSettingsPage({
   }
 
   // Parallel fetch: selected Org detail, selected Org's OrgAdmins,
-  // and (SuperAdmin only) the full Org list for the picker.
-  const [orgRow, adminsRow, orgListRow] = await Promise.all([
+  // (SuperAdmin only) the full Org list for the picker, and the count
+  // of members in this Org still on a paid tier — the Danger Zone
+  // Delete Org button disables until this count is zero.
+  const [orgRow, adminsRow, orgListRow, nonFreeCount] = await Promise.all([
     prisma.org.findUnique({
       where: { id: selectedOrgId },
       select: {
@@ -96,6 +98,12 @@ export default async function OrgSettingsPage({
           orderBy: { name: "asc" },
         })
       : Promise.resolve(null),
+    prisma.user.count({
+      where: {
+        orgMembers: { some: { orgId: selectedOrgId } },
+        NOT: { subscriptionLevelId: "free" },
+      },
+    }),
   ]);
 
   if (!orgRow) redirect("/dashboard");
@@ -135,6 +143,7 @@ export default async function OrgSettingsPage({
       admins={admins}
       orgList={orgList}
       callerUserId={session.user.id}
+      nonFreeMemberCount={nonFreeCount}
     />
   );
 }

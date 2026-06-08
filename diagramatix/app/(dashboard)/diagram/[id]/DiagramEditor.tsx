@@ -1886,15 +1886,17 @@ export function DiagramEditor({
 
         <div className="flex-1" />
 
-        {/* Admin shortcut — leftmost item in the header menu cluster,
-            admin-only. Mirrors the Dashboard / Project placement. */}
+        {/* SuperAdmin shortcut — leftmost item in the header menu cluster,
+            SuperAdmin-only. `?from=` lets the SuperAdmin page return the
+            user to this diagram on Back. Mirrors the Dashboard / Project
+            placement. */}
         {isAdmin && (
           <a
-            href="/dashboard/admin"
-            className="text-[11px] text-orange-600 hover:text-orange-800 font-medium border border-orange-300 rounded px-2 py-0.5"
-            title="Open the Admin dashboard"
+            href={`/dashboard/admin?from=${encodeURIComponent(typeof window !== "undefined" ? window.location.pathname + window.location.search : `/dashboard/diagram/${diagramId}`)}`}
+            className="text-[11px] text-red-700 hover:text-red-800 font-medium border border-red-300 rounded px-2 py-0.5 hover:bg-red-50"
+            title="Open the SuperAdmin dashboard"
           >
-            Admin
+            SuperAdmin
           </a>
         )}
 

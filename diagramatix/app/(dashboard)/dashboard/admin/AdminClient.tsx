@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 import { AlertDialog } from "@/app/components/AlertDialog";
 import { UsagePopover } from "@/app/components/UsagePopover";
@@ -66,6 +66,20 @@ function presence(lastSeenAt: string | null, isYou: boolean): { online: boolean;
 
 export function AdminClient({ users: initialUsers, currentUserId }: Props) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  // `?from=<url>` lets the SuperAdmin page return the user to wherever
+  // they were when they clicked the SuperAdmin chip (dashboard, a
+  // project, or a specific diagram). Falls back to /dashboard when
+  // the param is absent or unsafe.
+  const rawFrom = searchParams.get("from");
+  const backHref = rawFrom && rawFrom.startsWith("/") ? rawFrom : "/dashboard";
+  const backLabel = backHref === "/dashboard"
+    ? "Dashboard"
+    : backHref.startsWith("/dashboard/projects")
+      ? "Project"
+      : backHref.startsWith("/dashboard/diagram") || backHref.startsWith("/diagram")
+        ? "Diagram"
+        : "Back";
   // Local user list. Owned client-side so an inline OrgRole change
   // updates the row immediately without a full router.refresh()
   // round-trip. The page-level data still wins on the next navigation.
@@ -181,11 +195,12 @@ export function AdminClient({ users: initialUsers, currentUserId }: Props) {
       <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <button
-            onClick={() => router.push("/dashboard")}
+            onClick={() => router.push(backHref)}
             className="text-gray-500 hover:text-gray-700 text-sm flex items-center gap-1"
+            title={`Return to ${backHref}`}
           >
             <span style={{ fontSize: "1.75em", lineHeight: 1 }}>{"\u2190"}</span>
-            Dashboard
+            {backLabel}
           </button>
           {/* Brand icon: sits just right of the back link as a permanent
               "you're inside Diagramatix" cue. */}
@@ -273,16 +288,16 @@ export function AdminClient({ users: initialUsers, currentUserId }: Props) {
         <table className="w-full bg-white rounded-lg border border-gray-200 overflow-hidden table-fixed">
           <thead>
             <tr className="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              <th className="px-4 py-3" style={{ width: "13%" }}>Name</th>
-              <th className="px-4 py-3" style={{ width: "15%" }}>Email</th>
-              <th className="px-4 py-3" style={{ width: "10%" }}>Status</th>
-              <th className="px-4 py-3" style={{ width: "16%" }}>Working on</th>
-              <th className="px-4 py-3" style={{ width: "10%" }}>Subscription</th>
-              <th className="px-4 py-3" style={{ width: "10%" }} title="OrgRole inside the user's primary Org">Org Role</th>
-              <th className="px-4 py-3 text-center" style={{ width: "6%" }}>Projects</th>
-              <th className="px-4 py-3 text-center" style={{ width: "6%" }}>Diagrams</th>
+              <th className="px-4 py-3" style={{ width: "12%" }}>Name</th>
+              <th className="px-4 py-3" style={{ width: "14%" }}>Email</th>
+              <th className="px-4 py-3" style={{ width: "8%" }}>Status</th>
+              <th className="px-4 py-3" style={{ width: "13%" }}>Working on</th>
+              <th className="px-4 py-3" style={{ width: "14%" }}>Subscription</th>
+              <th className="px-4 py-3" style={{ width: "8%" }} title="OrgRole inside the user's primary Org">Org Role</th>
+              <th className="px-4 py-3 text-center" style={{ width: "5%" }}>Projects</th>
+              <th className="px-4 py-3 text-center" style={{ width: "5%" }}>Diagrams</th>
               <th className="px-4 py-3" style={{ width: "7%" }}>Registered</th>
-              <th className="px-4 py-3" style={{ width: "7%" }}></th>
+              <th className="px-4 py-3" style={{ width: "14%" }}></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">

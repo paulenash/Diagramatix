@@ -1367,7 +1367,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                   that used to live inside the System menu (now removed). */}
               {isSu && (
                 <a
-                  href="/dashboard/admin"
+                  href="/dashboard/admin?from=/dashboard"
                   className="text-xs text-red-700 hover:text-red-800 font-medium border border-red-300 rounded px-2 py-1 hover:bg-red-50"
                   title="Open the SuperAdmin dashboard"
                 >
@@ -2860,7 +2860,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
         const stopBubble = (e: React.MouseEvent) => e.stopPropagation();
         return (
           <div
-            className="fixed z-50 min-w-[260px] bg-white border border-gray-200 rounded shadow-lg py-1 text-xs"
+            className="fixed z-50 w-max bg-white border border-gray-200 rounded shadow-lg py-1 text-xs"
             style={{ left: tileContextMenu.x, top: tileContextMenu.y }}
             onClick={stopBubble}
             onContextMenu={(e) => e.preventDefault()}

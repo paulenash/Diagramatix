@@ -16,12 +16,19 @@ import type { OrgRole } from "@/app/lib/auth/orgRoleType";
 export const ORG_ROLE_LABELS: Record<OrgRole, string> = {
   Owner: "Owner",
   Admin: "OrgAdmin",
+  // Specialty GRC roles retained in the schema for forward-compat
+  // (no migration), but no longer surfaced in the SuperAdmin user
+  // table. If a row still has one of these values we render the raw
+  // label via displayOrgRole.
   RiskOwner: "Risk Owner",
   ProcessOwner: "Process Owner",
   ControlOwner: "Control Owner",
   InternalAudit: "Internal Audit",
   BoardObserver: "Board Observer",
-  Viewer: "Viewer",
+  // Renamed display: the Viewer enum value is what we now show as
+  // "Normal" — every user defaults here unless explicitly elevated
+  // to OrgAdmin or Owner.
+  Viewer: "Normal",
 };
 
 /** Display label for an OrgRole. Falls back to the raw string when the
@@ -32,15 +39,18 @@ export function displayOrgRole(role: OrgRole | string | null | undefined): strin
   return ORG_ROLE_LABELS[role as OrgRole] ?? role;
 }
 
-/** Order matters in the UI dropdown — Owner first, then OrgAdmin, then
- *  the role-specific writers, then the read-only roles. */
+/** SuperAdmin user-table dropdown options. Simplified 2026-06-08 to
+ *  the two roles the SuperAdmin actually needs to flip between:
+ *  OrgAdmin (Admin enum value) and Normal (Viewer enum value). The
+ *  specialty GRC roles are dropped from the dropdown — users who
+ *  already have one display their existing role via displayOrgRole
+ *  but can only be reassigned to OrgAdmin or Normal from here. Owner
+ *  is also dropped because Owner is set at Org creation and managed
+ *  via the Org Settings page, not from the user table.
+ *
+ *  Order: OrgAdmin first (the elevation target), Normal second
+ *  (the default / demotion target). */
 export const ORG_ROLE_DROPDOWN_ORDER: OrgRole[] = [
-  "Owner",
   "Admin",
-  "RiskOwner",
-  "ProcessOwner",
-  "ControlOwner",
-  "InternalAudit",
-  "BoardObserver",
   "Viewer",
 ];
