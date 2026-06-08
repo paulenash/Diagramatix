@@ -150,13 +150,15 @@ export function BubbleHelpClient() {
             <span className="underline">
               {backHref === "/dashboard/admin"
                 ? "SuperAdmin"
-                : backHref === "/dashboard"
-                  ? "Dashboard"
-                  : backHref.startsWith("/dashboard/projects")
-                    ? "Project"
-                    : backHref.startsWith("/dashboard/diagram") || backHref.startsWith("/diagram")
-                      ? "Diagram"
-                      : "Back"}
+                : backHref === "/dashboard/org-admin"
+                  ? "OrgAdmin"
+                  : backHref === "/dashboard"
+                    ? "Dashboard"
+                    : backHref.startsWith("/dashboard/projects")
+                      ? "Project"
+                      : backHref.startsWith("/dashboard/diagram") || backHref.startsWith("/diagram")
+                        ? "Diagram"
+                        : "Back"}
             </span>
           </button>
           {/* eslint-disable-next-line @next/next/no-img-element */}

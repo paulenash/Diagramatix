@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ProjectShareDialog } from "@/app/(dashboard)/dashboard/ProjectShareDialog";
 
 export interface SharedProjectRow {
@@ -61,13 +61,25 @@ export function AdminSharingClient({
   currentOrgFilter,
 }: Props) {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   // Currently-open share dialog. We render exactly one at a time so
   // the optimistic-state churn stays scoped.
   const [dialogRow, setDialogRow] = useState<SharedProjectRow | null>(null);
 
-  const backHref = isSuperAdmin ? "/dashboard/admin" : "/dashboard";
-  const backLabel = isSuperAdmin ? "SuperAdmin" : "Dashboard";
+  // ?from=<url> overrides the default back destination so the user
+  // returns to where they came from.
+  const fromParam = searchParams.get("from");
+  const safeFrom = fromParam && fromParam.startsWith("/") ? fromParam : null;
+  const backHref = safeFrom
+    ?? (isSuperAdmin ? "/dashboard/admin" : "/dashboard/org-admin");
+  const backLabel = backHref === "/dashboard/admin"
+    ? "SuperAdmin"
+    : backHref === "/dashboard/org-admin"
+      ? "OrgAdmin"
+      : backHref === "/dashboard"
+        ? "Dashboard"
+        : "Back";
 
   // Change the ?orgId filter — SuperAdmin only. Triggers a server
   // round-trip via router.push so the list reflects the new scope.

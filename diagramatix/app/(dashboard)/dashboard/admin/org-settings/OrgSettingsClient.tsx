@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { AlertDialog } from "@/app/components/AlertDialog";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 // Entity Type surface removed 2026-06-08 — Org schema still carries the
@@ -67,6 +67,7 @@ interface Props {
  */
 export function OrgSettingsClient({ isSuperAdmin, org, admins, orgList, callerUserId }: Props) {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   // Org Info card edit state. Initialised from props; reset whenever
   // the parent fetches a different Org (page navigation). Entity Type
@@ -216,8 +217,20 @@ export function OrgSettingsClient({ isSuperAdmin, org, admins, orgList, callerUs
 
   // ── Render ──────────────────────────────────────────────────────────
 
-  const backHref = isSuperAdmin ? "/dashboard/admin" : "/dashboard";
-  const backLabel = isSuperAdmin ? "SuperAdmin" : "Dashboard";
+  // ?from=<url> overrides the default back destination so the user
+  // returns to the page they came from (typically /dashboard/admin for
+  // SuperAdmin or /dashboard/org-admin for OrgAdmin).
+  const fromParam = searchParams.get("from");
+  const safeFrom = fromParam && fromParam.startsWith("/") ? fromParam : null;
+  const backHref = safeFrom
+    ?? (isSuperAdmin ? "/dashboard/admin" : "/dashboard/org-admin");
+  const backLabel = backHref === "/dashboard/admin"
+    ? "SuperAdmin"
+    : backHref === "/dashboard/org-admin"
+      ? "OrgAdmin"
+      : backHref === "/dashboard"
+        ? "Dashboard"
+        : "Back";
   const sharedAdminIds = new Set(adminList.map((a) => a.userId));
 
   return (

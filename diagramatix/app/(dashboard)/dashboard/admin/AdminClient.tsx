@@ -92,11 +92,13 @@ export function AdminClient({ users: initialUsers, currentUserId, commitCount, i
   const backHref = rawFrom && rawFrom.startsWith("/") ? rawFrom : "/dashboard";
   const backLabel = backHref === "/dashboard"
     ? "Dashboard"
-    : backHref.startsWith("/dashboard/projects")
-      ? "Project"
-      : backHref.startsWith("/dashboard/diagram") || backHref.startsWith("/diagram")
-        ? "Diagram"
-        : "Back";
+    : backHref === "/dashboard/org-admin"
+      ? "OrgAdmin"
+      : backHref.startsWith("/dashboard/projects")
+        ? "Project"
+        : backHref.startsWith("/dashboard/diagram") || backHref.startsWith("/diagram")
+          ? "Diagram"
+          : "Back";
   // Org Role is display-only in this table (Paul's 2026-06-08 rule);
   // role changes happen on the Org Settings page via the OrgAdmins
   // roster. The user list is owned via state so future row-level edits
