@@ -2942,7 +2942,14 @@ function tracePerActionRouteDiff(
     }
     if (!same) changed.push(id);
   }
-  if (changed.length === 0) return;
+  // Heartbeat: log even when nothing changed so the user knows the
+  // trace is wired. Keeps the body short and silent unless connectors
+  // actually moved.
+  const totalSeq = afterById.size;
+  if (changed.length === 0) {
+    console.log(`[ROUTE action=${actionType}] 0 of ${totalSeq} sequence connector(s) re-routed`);
+    return;
+  }
   // Build a lookup of containing pool for any element (walks parentId
   // up to a pool). Used both to label connectors and to spot escapes.
   const elById = new Map(after.elements.map(e => [e.id, e]));
