@@ -29,7 +29,7 @@ export const CHAPTERS: HelpChapter[] = [
               domain models and more.
             </p>
             <p className="mt-2 text-xs text-gray-500">
-              This guide covers version <strong>1.17</strong>.
+              This guide covers version <strong>1.18</strong>.
             </p>
             <p className="mt-2">
               After signing in you land on the <strong>Dashboard</strong> —
@@ -240,9 +240,9 @@ export const CHAPTERS: HelpChapter[] = [
               SuperAdmins can browse the full active rule registry —
               codes B01..B31, severity, description and current trigger
               wording — at{" "}
-              <strong>SuperAdmin &rarr; Scanner Issue Rules</strong>{" "}
-              (or from a project page, <strong>Project ▾ &rarr; View
-              Scanner Issues Rules</strong>).
+              <strong>SuperAdmin &rarr; BPMN Scanner Rules</strong>.
+              (The per-diagram shortcut was removed in v1.18 — the
+              SuperAdmin nav is now the single entry point.)
             </p>
           </>
         ),
@@ -1482,12 +1482,9 @@ export const CHAPTERS: HelpChapter[] = [
                 of the person accountable for the process. Round-trips
                 via XML export.
               </li>
-              <li>
-                <strong>Bubble Help</strong> (admins only) — manages the
-                help-cloud text shown when users click elements / canvas
-                / pool &amp; lane headers. See &ldquo;Bubble Help&rdquo;
-                below.
-              </li>
+              {/* Bubble Help editor moved to its own SuperAdmin page
+                  in v1.18 — no longer surfaced here on the Diagram
+                  Properties panel. */}
             </ul>
           </>
         ),
@@ -1516,12 +1513,14 @@ export const CHAPTERS: HelpChapter[] = [
               per-topic counters.
             </p>
             <p className="mt-2">
-              SuperAdmins can edit the cloud text and duration per
-              diagram type from the <strong>Bubble Help</strong>{" "}
-              sub-section in Diagram Properties. Each row has an
-              initiating-condition label, an internal topic key,
-              multi-line text, and a duration. Saved edits are live
-              for everyone on next page load.
+              SuperAdmins edit the cloud text and duration per
+              diagram type at{" "}
+              <strong>SuperAdmin → Bubble Help</strong> (moved out of
+              the Diagram Properties panel in v1.18). Pick a diagram
+              type from the dropdown, expand a row to edit, then
+              Save / Cancel at the bottom. Save persists changes and
+              collapses the editor; Cancel discards. Both buttons stay
+              disabled until you actually change something.
             </p>
           </>
         ),
@@ -3423,8 +3422,8 @@ export const CHAPTERS: HelpChapter[] = [
         body: (
           <ol className="list-decimal list-inside space-y-2">
             <li>
-              Click <strong>Admin</strong> on the Dashboard (leftmost
-              menu item).
+              Click <strong>SuperAdmin</strong> on the Dashboard
+              (leftmost menu item, red chip).
             </li>
             <li>
               Click <strong>Generate Diagramatix DDL</strong>.
@@ -3435,7 +3434,8 @@ export const CHAPTERS: HelpChapter[] = [
             </li>
             <li>
               Click <strong>Download</strong> — the DDL file is saved
-              with dialect-appropriate syntax.
+              with dialect-appropriate syntax. The header comment
+              carries the current schema version.
             </li>
           </ol>
         ),
@@ -3450,6 +3450,154 @@ export const CHAPTERS: HelpChapter[] = [
             <li>No JSON columns — fully normalised relational schema</li>
             <li>Schema version number in header comment</li>
           </ul>
+        ),
+      },
+    ],
+  },
+
+  /* ──────────────────────────────────────────────── 26b ── */
+  {
+    slug: "admin-roles",
+    title: "SuperAdmin & OrgAdmin",
+    adminOnly: true,
+    sections: [
+      {
+        body: (
+          <>
+            <p>
+              Diagramatix has two elevated roles. Each gets its own
+              colour and entry point so the privilege level reads at
+              a glance.
+            </p>
+            <ul className="list-disc list-inside space-y-1 mt-2">
+              <li>
+                <strong className="text-red-700">SuperAdmin</strong>{" "}
+                (red chips / buttons) — platform-level admin. Sees and
+                manages every Org, every user, every project.
+              </li>
+              <li>
+                <strong className="text-orange-700">OrgAdmin</strong>{" "}
+                (orange chips / buttons) — admin scoped to a single
+                Org (Org Owner or Org Admin role). Manages users,
+                shared projects and Org settings for that Org only.
+              </li>
+              <li>
+                Normal users see neither set of options. Role gates are
+                enforced both client-side (controls hidden) and
+                server-side (API rejects).
+              </li>
+            </ul>
+          </>
+        ),
+      },
+      {
+        heading: "SuperAdmin entry point",
+        body: (
+          <p>
+            The red <strong>SuperAdmin</strong> chip on the Dashboard
+            header opens the Registered Users page. From there a row
+            of red links across the header reaches every SuperAdmin
+            sub-page (AI Rules &amp; Preferences, Database Access,
+            System Archive, Subscription Prices and Limits, Features
+            Catalog, Groups, AI Plan Formats, Org Settings, Project
+            Sharing, BPMN Scanner Rules, Bubble Help).
+          </p>
+        ),
+      },
+      {
+        heading: "OrgAdmin entry point",
+        body: (
+          <>
+            <p>
+              The orange <strong>OrgAdmin</strong> chip on the Dashboard
+              opens a single menu page at{" "}
+              <code>/dashboard/org-admin</code> with three options:
+            </p>
+            <ul className="list-disc list-inside space-y-1 mt-2">
+              <li>
+                <strong>Registered Users</strong> — the users in your
+                Org, with View / Edit (impersonate) actions only. No
+                Delete (SuperAdmin only).
+              </li>
+              <li>
+                <strong>Org Settings</strong> — cross-Org sharing toggle
+                and the OrgAdmins list for your Org. Org Name and
+                Danger Zone are SuperAdmin-only.
+              </li>
+              <li>
+                <strong>Project Sharing</strong> — every shared project
+                in your Org with the editors / viewers on each row.
+              </li>
+            </ul>
+            <p className="mt-2">
+              Each sub-page back link reads &quot;← OrgAdmin&quot; so a
+              single click returns you to the menu.
+            </p>
+          </>
+        ),
+      },
+      {
+        heading: "Registered Users table",
+        body: (
+          <ul className="list-disc list-inside space-y-1">
+            <li>
+              Sortable columns: <strong>Name</strong>,{" "}
+              <strong>Email Address</strong>, <strong>Status</strong>,{" "}
+              <strong>Subscription</strong>, <strong>Registered</strong>.
+              Click the header to sort, click again to flip direction.
+            </li>
+            <li>
+              Filter row below the headers — substring match per
+              column, case-insensitive. Filters compose.
+            </li>
+            <li>
+              Subscription pill shows a purple <em>Nd</em> suffix when
+              the user is inside a trial window (most visibly Free,
+              seeded with 30 days).
+            </li>
+            <li>
+              Org Role column is display-only here. Change a user&apos;s
+              Org Role from <strong>Org Settings → OrgAdmins</strong>.
+            </li>
+          </ul>
+        ),
+      },
+      {
+        heading: "Project tile context menu",
+        body: (
+          <>
+            <p>
+              Right-click any project tile on the Dashboard to open
+              the destructive-action menu. The visible options depend
+              on your role:
+            </p>
+            <ul className="list-disc list-inside space-y-1 mt-2">
+              <li>
+                <strong>Open</strong> / <strong>Clone project</strong> —
+                always available.
+              </li>
+              <li>
+                <strong>x — Delete project (diagrams → Unorganised)</strong>{" "}
+                — visible to the project Owner, OrgAdmin, or SuperAdmin.
+                Diagrams survive as orphans you can re-organise later.
+              </li>
+              <li>
+                <strong className="text-orange-700">x+ — Delete project (diagrams → Archive)</strong>{" "}
+                — OrgAdmin only. Diagrams move to the system Archive
+                where they remain recoverable.
+              </li>
+              <li>
+                <strong className="text-red-700">x++ — Hard delete: project + all diagrams</strong>{" "}
+                — SuperAdmin only, and SuperAdmin must own the project.
+                Cannot be undone.
+              </li>
+            </ul>
+            <p className="mt-2">
+              The left-click of any tile still opens the project; the
+              clone (⧉) icon stays inline. Everything else moved to
+              this menu in v1.18.
+            </p>
+          </>
         ),
       },
     ],
@@ -3695,8 +3843,9 @@ export const CHAPTERS: HelpChapter[] = [
           <>
             <p>
               Admins can configure rules that guide AI generation for each
-              diagram type. Open the <strong>Admin</strong> button (leftmost
-              menu item on the Dashboard, Project and Diagram screens) and
+              diagram type. Open the <strong>SuperAdmin</strong> button
+              (leftmost red menu item on the Dashboard, Project and
+              Diagram screens) and
               choose <strong>AI Rules &amp; Preferences</strong>. From any
               diagram you can also jump straight to the rules tab for the
               current diagram type via the <strong>AI Rules &amp;

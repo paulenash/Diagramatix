@@ -617,4 +617,4 @@ export interface TemplateData {
  *             and travels the full circumference of circles.
  *           - Notification dropdown wider with two visible lines.
  */
-export const SCHEMA_VERSION = "1.17";
+export const SCHEMA_VERSION = "1.18";

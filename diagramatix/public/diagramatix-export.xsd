@@ -189,6 +189,70 @@
         menu item on Dashboard, Project and Diagram screens.
       * Matrix screensaver toggle moved to the bottom-left.
       * Notification dropdown wider with two visible lines.
+
+  v1.18 — SuperAdmin / OrgAdmin reorg + messageBPMN label rule + Project
+    tile right-click menu. No schema shape change — all-behavioural.
+      * messageBPMN labels now anchor to the SOURCE attachment point
+        (Paul's rule, Scenario 4). When the source pool moves or its
+        source-side boundary moves the label moves rigidly with the
+        source endpoint; when only the target side moves the label
+        stays put. Replaces the earlier nearest-endpoint heuristic
+        across MOVE_ELEMENT, MOVE_ELEMENTS and RESIZE_ELEMENT paths.
+      * Black-box pool bottom-edge engagement fixed — a click on the
+        boundary of a black-box pool now starts a RESIZE on the first
+        attempt instead of needing a prior body-drag to "wake up" the
+        resize tracker.
+      * Project tile destructive actions moved to a right-click
+        context menu with three tiers: x (delete project, diagrams
+        → Unorganised; Owner/OrgAdmin/SuperAdmin), x+ (delete
+        project, diagrams → Archive; OrgAdmin only), x++ (hard delete
+        project + every diagram; SuperAdmin AND project Owner only).
+        Inline icon buttons collapse to just clone (⧉).
+      * Role colours: SuperAdmin entry points + actions are now RED;
+        OrgAdmin remains orange. Updated across every chip, header
+        and admin nav link.
+      * SuperAdmin admin pages renamed from "Admin —" to plain
+        "Registered Users" (vSCHEMA.COMMIT version tag); per-page back
+        link styled as a blue hyperlink with the destination word
+        underlined, dynamic label (Dashboard / SuperAdmin / OrgAdmin
+        / Project / Diagram) honouring `?from=` everywhere.
+      * Bubble Help editor migrated from the right-side Diagram
+        Properties panel to /dashboard/admin/bubble-help with its
+        own diagram-type dropdown and Save+Cancel both disabled
+        until the row list diverges from the last persisted snapshot.
+      * BPMN Scanner Rules link moved from the BPMN diagram menu to
+        the SuperAdmin nav, renamed "BPMN Scanner Rules". Per-
+        diagram-type "AI Rules & Preferences — BPMN Process"
+        shortcut removed from the diagram menu entirely.
+      * Registered Users table: sortable + filterable per column
+        (Name, Email Address, Status, Subscription, Registered);
+        Subscription pill shows trial days remaining for Free; Org
+        Role column collapsed to display-only (role flips happen
+        on the Org Settings page).
+      * OrgAdmin landing page at /dashboard/org-admin replaces the
+        three-chip cluster on the dashboard header with a single
+        "OrgAdmin" chip that opens a menu of three cards
+        (Registered Users, Org Settings, Project Sharing). Each
+        card carries `?from=/dashboard/org-admin` so the back link
+        on the destination page reads "← OrgAdmin".
+      * Entity Type removed from the Org Settings UI (schema field
+        retained with default "Other" for forward-compat). Org
+        Settings Danger Zone Delete Org no longer guards on
+        subscription tier — SuperAdmin can delete any non-last Org.
+      * New BPMN scan rule B32 — Pool / Lane labels must fit within
+        the rotated header region. New AI generate rule R7.05 —
+        black-box pool names use Shift-Enter on word boundaries so
+        the rotated header stays compact.
+      * Connector-drag auto-scrolls the canvas when the cursor
+        approaches a viewport edge mid-creation; rubber-band line
+        stays attached to the cursor across pan updates by reading
+        the pan/zoom refs each tick.
+      * Diagram Issues popup is now draggable; canvas is visible
+        behind it instead of overlay-dimmed.
+      * Save / Cancel pattern made dirty-aware across editors:
+        Bubble Help, Subscriptions, Features Catalog, Rules Editor.
+        Save and Cancel both disable until in-memory state diverges
+        from the last persisted snapshot; re-disable after save.
 -->
 
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
