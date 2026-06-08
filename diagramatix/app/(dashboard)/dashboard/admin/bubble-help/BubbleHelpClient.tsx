@@ -32,6 +32,9 @@ export function BubbleHelpClient() {
   const backHref = rawFrom && rawFrom.startsWith("/") ? rawFrom : "/dashboard/admin";
   const [diagramType, setDiagramType] = useState<DiagramType>("bpmn");
   const [rows, setRows] = useState<BubbleHelpRow[] | null>(null);
+  // Snapshot of what's persisted server-side. Cancel restores the row
+  // list to this state and collapses any expanded editor.
+  const [savedSnapshot, setSavedSnapshot] = useState<BubbleHelpRow[] | null>(null);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -40,14 +43,17 @@ export function BubbleHelpClient() {
   // Refetch whenever diagramType changes.
   useEffect(() => {
     setRows(null);
+    setSavedSnapshot(null);
     setEditingIndex(null);
     fetch(`/api/bubble-helps?diagramType=${encodeURIComponent(diagramType)}`)
       .then(r => r.ok ? r.json() : { rows: [] })
       .then((data: { rows?: BubbleHelpRow[] }) => {
         const list = Array.isArray(data.rows) ? data.rows : [];
-        setRows(list.map((r, i) => ({ ...r, sortOrder: r.sortOrder ?? i })));
+        const normalised = list.map((r, i) => ({ ...r, sortOrder: r.sortOrder ?? i }));
+        setRows(normalised);
+        setSavedSnapshot(normalised);
       })
-      .catch(() => setRows([]));
+      .catch(() => { setRows([]); setSavedSnapshot([]); });
   }, [diagramType]);
 
   async function save() {
@@ -73,7 +79,12 @@ export function BubbleHelpClient() {
         throw new Error(body.error ?? `Save failed (${res.status})`);
       }
       const json = await res.json();
-      setRows(json.rows ?? []);
+      const persisted = (json.rows ?? []) as BubbleHelpRow[];
+      setRows(persisted);
+      setSavedSnapshot(persisted);
+      // Collapse the expanded row after a successful save (Paul's
+      // 2026-06-08 rule). The user is dropped back to the list view.
+      setEditingIndex(null);
       setStatus("Saved");
       setTimeout(() => setStatus(null), 2000);
     } catch (err) {
@@ -81,6 +92,16 @@ export function BubbleHelpClient() {
     } finally {
       setSaving(false);
     }
+  }
+
+  function cancel() {
+    // Revert in-memory rows to the last persisted snapshot and collapse
+    // the expanded editor. Mirrors the post-Save UX but throws away
+    // unsaved edits.
+    if (savedSnapshot) setRows(savedSnapshot);
+    setEditingIndex(null);
+    setError(null);
+    setStatus(null);
   }
 
   function update(index: number, patch: Partial<BubbleHelpRow>) {
@@ -249,10 +270,20 @@ export function BubbleHelpClient() {
                 >
                   + Add help
                 </button>
+                <div className="flex-1" />
+                <button
+                  onClick={cancel}
+                  disabled={saving}
+                  className="text-xs text-gray-700 border border-gray-300 hover:bg-gray-50 rounded px-3 py-1 disabled:opacity-50"
+                  title="Discard unsaved changes and collapse the editor"
+                >
+                  Cancel
+                </button>
                 <button
                   onClick={save}
                   disabled={saving}
                   className="text-xs text-white bg-blue-600 hover:bg-blue-700 rounded px-3 py-1 disabled:opacity-50"
+                  title="Save changes and collapse the editor"
                 >
                   {saving ? "Saving…" : "Save"}
                 </button>

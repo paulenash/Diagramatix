@@ -22,7 +22,8 @@ export default async function AdminPage() {
         currentDiagramId: true,
         currentDiagramName: true,
         subscriptionLevelId: true,
-        subscriptionLevel: { select: { id: true, name: true } },
+        subscriptionAssignedAt: true,
+        subscriptionLevel: { select: { id: true, name: true, trialDays: true } },
         subscriptionEndsAt: true,
         compTierLevelId: true,
         compTierExpiresAt: true,
@@ -49,10 +50,11 @@ export default async function AdminPage() {
     // Fetch every tier once so we can look up names for grace-period
     // downgrades + comp grants without N+1 queries per user.
     prisma.subscriptionLevel.findMany({
-      select: { id: true, name: true },
+      select: { id: true, name: true, trialDays: true },
     }),
   ]);
   const tierNameById = new Map(allTiers.map(t => [t.id, t.name]));
+  const trialDaysById = new Map(allTiers.map(t => [t.id, t.trialDays]));
 
   const now = new Date();
 
@@ -88,6 +90,21 @@ export default async function AdminPage() {
     const showUnderlying = compActive && underlyingName !== effectiveName;
     const isAdmin = SUPERUSER_EMAILS.has(u.email);
     const primaryOrg = u.orgMembers[0] ?? null;
+    // Trial-days remaining for any tier with a trialDays window — most
+    // visibly Free (seeded with 30 days), but tier admins may add a
+    // trial to any tier. Null when the user has no assignment date,
+    // when the tier has no trial, or when the trial window is already
+    // expired. We pass the integer days the UI should render in
+    // purple next to the tier label.
+    const effectiveTrialDays = trialDaysById.get(effectiveId) ?? null;
+    let freeDaysLeft: number | null = null;
+    if (effectiveTrialDays !== null && u.subscriptionAssignedAt) {
+      const expiry = new Date(
+        u.subscriptionAssignedAt.getTime() + effectiveTrialDays * 24 * 60 * 60 * 1000,
+      );
+      const days = Math.ceil((expiry.getTime() - now.getTime()) / 86_400_000);
+      if (days > 0) freeDaysLeft = days;
+    }
     return {
       id: u.id,
       email: u.email,
@@ -104,6 +121,10 @@ export default async function AdminPage() {
       compExpiresAt: !isAdmin && compActive && u.compTierExpiresAt
         ? u.compTierExpiresAt.toISOString()
         : null,
+      /** Whole-days remaining on the effective tier's trial window.
+       *  Rendered as a purple pill next to the tier name. Null when
+       *  the tier has no trial or the trial has already expired. */
+      trialDaysLeft: !isAdmin ? freeDaysLeft : null,
       isAdmin,
       // Primary OrgMember (oldest membership). Null only when the user
       // somehow has no OrgMember row — should be impossible after the

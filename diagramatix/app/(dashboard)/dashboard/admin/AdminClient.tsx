@@ -29,6 +29,11 @@ interface UserRow {
   underlyingLabel: string | null;
   /** ISO timestamp when the active comp lapses. Null when no comp. */
   compExpiresAt: string | null;
+  /** Whole days remaining on the effective tier's trial window
+   *  (mostly Free, which is seeded with 30 days). Null when no trial
+   *  applies or it's already expired. Rendered in purple beside the
+   *  tier label. */
+  trialDaysLeft: number | null;
   isAdmin: boolean;
   /** Primary OrgMember row (oldest membership) — the row the OrgRole
    *  column edits. Null only if the user has no Org membership at all
@@ -329,6 +334,14 @@ export function AdminClient({ users: initialUsers, currentUserId, commitCount }:
                         </>
                       )}
                       <span>{u.subscriptionLabel}</span>
+                      {u.trialDaysLeft !== null && (
+                        <span
+                          className="text-[9px] uppercase tracking-wide px-1 py-0.5 rounded bg-purple-100 text-purple-700 font-medium"
+                          title="Days remaining on this tier's trial window"
+                        >
+                          {u.trialDaysLeft}d
+                        </span>
+                      )}
                       {u.compExpiresAt && (
                         <span className="text-[9px] uppercase tracking-wide px-1 py-0.5 rounded bg-purple-200 text-purple-800 font-medium">
                           comp{" "}
