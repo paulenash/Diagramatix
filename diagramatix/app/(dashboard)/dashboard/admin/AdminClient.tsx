@@ -93,6 +93,70 @@ export function AdminClient({ users: initialUsers, currentUserId, commitCount }:
   // roster. The user list is owned via state so future row-level edits
   // (impersonation, comp grants etc.) can update in-place.
   const users = initialUsers;
+
+  // Sort + filter (Paul's item 3 — added 2026-06-08).
+  // Sortable columns: name, email, status (by last-seen recency),
+  // subscription (alpha by label), registered (by createdAt).
+  // Filter columns mirror the sortable ones — substring match against
+  // the rendered label (case-insensitive) for everything; status uses
+  // the same "p.label" text so typing "online" finds online users.
+  type SortKey = "name" | "email" | "status" | "subscription" | "registered";
+  const [sortBy, setSortBy] = useState<SortKey | null>("registered");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const [filters, setFilters] = useState({
+    name: "", email: "", status: "", subscription: "", registered: "",
+  });
+  function toggleSort(key: SortKey) {
+    if (sortBy === key) {
+      setSortDir(d => d === "asc" ? "desc" : "asc");
+    } else {
+      setSortBy(key);
+      setSortDir(key === "registered" ? "desc" : "asc");
+    }
+  }
+  // Pre-compute sortable + filterable strings per user so the sort &
+  // filter logic stays cheap on every keystroke.
+  const enriched = users.map(u => {
+    const p = presence(u.lastSeenAt, u.id === currentUserId);
+    const lastSeenMs = u.id === currentUserId
+      ? Date.now()
+      : u.lastSeenAt ? new Date(u.lastSeenAt).getTime() : 0;
+    return { u, p, lastSeenMs };
+  });
+  const filteredSorted = enriched
+    .filter(({ u, p }) => {
+      const f = filters;
+      if (f.name && !(u.name ?? "").toLowerCase().includes(f.name.toLowerCase())) return false;
+      if (f.email && !u.email.toLowerCase().includes(f.email.toLowerCase())) return false;
+      if (f.status && !p.label.toLowerCase().includes(f.status.toLowerCase())) return false;
+      if (f.subscription && !u.subscriptionLabel.toLowerCase().includes(f.subscription.toLowerCase())) return false;
+      if (f.registered && !new Date(u.createdAt).toLocaleDateString().toLowerCase().includes(f.registered.toLowerCase())) return false;
+      return true;
+    })
+    .sort((a, b) => {
+      if (!sortBy) return 0;
+      const dir = sortDir === "asc" ? 1 : -1;
+      switch (sortBy) {
+        case "name":
+          return ((a.u.name ?? "").toLowerCase().localeCompare((b.u.name ?? "").toLowerCase())) * dir;
+        case "email":
+          return a.u.email.toLowerCase().localeCompare(b.u.email.toLowerCase()) * dir;
+        case "status":
+          // More recent first when asc=desc → desc=most recent. Stick to
+          // "asc=oldest signin first" so the user gets the intuitive flip.
+          return (a.lastSeenMs - b.lastSeenMs) * dir;
+        case "subscription":
+          return a.u.subscriptionLabel.localeCompare(b.u.subscriptionLabel) * dir;
+        case "registered":
+          return (new Date(a.u.createdAt).getTime() - new Date(b.u.createdAt).getTime()) * dir;
+        default:
+          return 0;
+      }
+    });
+  function sortIcon(key: SortKey): string {
+    if (sortBy !== key) return "↕";
+    return sortDir === "asc" ? "▲" : "▼";
+  }
   // Pending Edit confirmation. When the admin clicks "Edit" on a row
   // we surface a Diagramatix-styled ConfirmDialog rather than the
   // browser's native confirm() (which the user found jarring).
@@ -263,22 +327,87 @@ export function AdminClient({ users: initialUsers, currentUserId, commitCount }:
         <table className="w-full bg-white rounded-lg border border-gray-200 overflow-hidden table-fixed">
           <thead>
             <tr className="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              <th className="px-3 py-3" style={{ width: "11%" }}>Name</th>
-              <th className="px-3 py-3" style={{ width: "16%" }}>Email Address</th>
-              <th className="px-3 py-3" style={{ width: "6%" }}>Status</th>
+              <th className="px-3 py-3" style={{ width: "11%" }}>
+                <button onClick={() => toggleSort("name")} className="inline-flex items-center gap-1 hover:text-gray-700">
+                  Name <span className="text-[9px] text-gray-400">{sortIcon("name")}</span>
+                </button>
+              </th>
+              <th className="px-3 py-3" style={{ width: "16%" }}>
+                <button onClick={() => toggleSort("email")} className="inline-flex items-center gap-1 hover:text-gray-700">
+                  Email Address <span className="text-[9px] text-gray-400">{sortIcon("email")}</span>
+                </button>
+              </th>
+              <th className="px-3 py-3" style={{ width: "6%" }}>
+                <button onClick={() => toggleSort("status")} className="inline-flex items-center gap-1 hover:text-gray-700">
+                  Status <span className="text-[9px] text-gray-400">{sortIcon("status")}</span>
+                </button>
+              </th>
               <th className="px-3 py-3" style={{ width: "9%" }}>Working on</th>
-              <th className="px-3 py-3" style={{ width: "15%" }}>Subscription</th>
+              <th className="px-3 py-3" style={{ width: "15%" }}>
+                <button onClick={() => toggleSort("subscription")} className="inline-flex items-center gap-1 hover:text-gray-700">
+                  Subscription <span className="text-[9px] text-gray-400">{sortIcon("subscription")}</span>
+                </button>
+              </th>
               <th className="px-3 py-3" style={{ width: "9%" }} title="OrgRole inside the user's primary Org">Org Role</th>
               <th className="px-3 py-3 text-center" style={{ width: "7%" }}>Projects</th>
               <th className="px-3 py-3 text-center" style={{ width: "7%" }}>Diagrams</th>
-              <th className="px-3 py-3" style={{ width: "8%" }}>Registered</th>
+              <th className="px-3 py-3" style={{ width: "8%" }}>
+                <button onClick={() => toggleSort("registered")} className="inline-flex items-center gap-1 hover:text-gray-700">
+                  Registered <span className="text-[9px] text-gray-400">{sortIcon("registered")}</span>
+                </button>
+              </th>
               <th className="px-3 py-3" style={{ width: "12%" }}></th>
+            </tr>
+            {/* Filter row — substring match per filterable column. */}
+            <tr className="bg-gray-50 border-t border-gray-200">
+              <th className="px-2 pb-2 pt-0">
+                <input
+                  type="text" value={filters.name}
+                  onChange={(e) => setFilters(f => ({ ...f, name: e.target.value }))}
+                  placeholder="Filter…"
+                  className="w-full text-xs border border-gray-300 rounded px-1.5 py-0.5 bg-white"
+                />
+              </th>
+              <th className="px-2 pb-2 pt-0">
+                <input
+                  type="text" value={filters.email}
+                  onChange={(e) => setFilters(f => ({ ...f, email: e.target.value }))}
+                  placeholder="Filter…"
+                  className="w-full text-xs border border-gray-300 rounded px-1.5 py-0.5 bg-white"
+                />
+              </th>
+              <th className="px-2 pb-2 pt-0">
+                <input
+                  type="text" value={filters.status}
+                  onChange={(e) => setFilters(f => ({ ...f, status: e.target.value }))}
+                  placeholder="Filter…"
+                  className="w-full text-xs border border-gray-300 rounded px-1.5 py-0.5 bg-white"
+                />
+              </th>
+              <th />
+              <th className="px-2 pb-2 pt-0">
+                <input
+                  type="text" value={filters.subscription}
+                  onChange={(e) => setFilters(f => ({ ...f, subscription: e.target.value }))}
+                  placeholder="Filter…"
+                  className="w-full text-xs border border-gray-300 rounded px-1.5 py-0.5 bg-white"
+                />
+              </th>
+              <th /><th /><th />
+              <th className="px-2 pb-2 pt-0">
+                <input
+                  type="text" value={filters.registered}
+                  onChange={(e) => setFilters(f => ({ ...f, registered: e.target.value }))}
+                  placeholder="Filter…"
+                  className="w-full text-xs border border-gray-300 rounded px-1.5 py-0.5 bg-white"
+                />
+              </th>
+              <th />
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {users.map((u) => {
+            {filteredSorted.map(({ u, p }) => {
               const isYou = u.id === currentUserId;
-              const p = presence(u.lastSeenAt, isYou);
               // Only surface "Working on" when the user is currently online
               // — currentDiagramId can otherwise linger from a previous session.
               const workingOn = p.online && u.currentDiagramId && u.currentDiagramName
@@ -417,7 +546,11 @@ export function AdminClient({ users: initialUsers, currentUserId, commitCount }:
           </tbody>
         </table>
         <p className="text-xs text-gray-400 mt-4">
-          {users.length} registered user(s) — {users.filter(u => presence(u.lastSeenAt, u.id === currentUserId).online).length} online
+          {filteredSorted.length === users.length
+            ? `${users.length} registered user(s)`
+            : `${filteredSorted.length} of ${users.length} registered user(s) match the filters`}
+          {" — "}
+          {users.filter(u => presence(u.lastSeenAt, u.id === currentUserId).online).length} online
         </p>
       </div>
 
