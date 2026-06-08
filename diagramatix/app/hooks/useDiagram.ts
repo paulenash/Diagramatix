@@ -188,20 +188,52 @@ function preserveLabelWorldPos(
 }
 
 /**
- * messageBPMN labels are anchored to the SOURCE attachment point.
- * The label moves rigidly with whichever delta the source endpoint
- * has across this operation: when the source's pool moves or its
- * source-side boundary moves, the label moves with it; when only the
- * target side moves, the label stays put. This matches Paul's rule
- * (Scenario 4, 2026-06-07): "labels remain fixed with respect to
- * their source attachment points." Both X and Y are anchored; for a
- * pure-vertical messageBPMN connector this also keeps the label on
- * the line, since both endpoints share the same X.
+ * Pick which end of a messageBPMN connector its label should be
+ * anchored to during a route recompute. Paul's rules:
+ *   • Default — anchor to SOURCE (Scenario 4, 2026-06-07).
+ *   • Only deviate for ELEMENT → black-box-POOL messages
+ *     (2026-06-09): anchor to TARGET in that one case, so a label
+ *     stays pinned to the black-box pool while the user moves the
+ *     source element around inside its white-box pool.
+ *   • Pool-to-pool messages of any kind stay SOURCE-anchored (Paul
+ *     explicitly noted these are already correct). A pool on the
+ *     source side disables the swap regardless of what the target is.
+ */
+function pickMsgLabelAnchorEnd(
+  srcEl: DiagramElement | undefined,
+  tgtEl: DiagramElement | undefined,
+): "source" | "target" {
+  if (!srcEl || !tgtEl) return "source";
+  // Source is a pool of any kind → keep source-anchored. This covers
+  // pool→pool (preserving the existing rule) and pool→element.
+  if (srcEl.type === "pool") return "source";
+  // Source is an element. Anchor to target only when target is a
+  // black-box pool.
+  const tgtIsBBPool = tgtEl.type === "pool"
+    && ((tgtEl.properties?.poolType as string | undefined) ?? "black-box") !== "white-box";
+  return tgtIsBBPool ? "target" : "source";
+}
+
+/**
+ * messageBPMN labels anchor to whichever endpoint the
+ * `pickMsgLabelAnchorEnd` rule selects (source by default, target when
+ * the target is a black-box pool and the source isn't). The label moves
+ * rigidly with that endpoint's delta — when its pool/host moves or
+ * its boundary edge moves, the label moves with it; when only the
+ * OTHER endpoint moves, the label stays put. Both X and Y are
+ * anchored; for a pure-vertical messageBPMN connector this also
+ * keeps the label on the line, since both endpoints share the same X.
+ *
+ * The optional `source` + `target` element params let the helper see
+ * which end is a black-box pool. Without them, the helper defaults to
+ * SOURCE-anchored (the pre-2026-06-09 behaviour).
  */
 function adjustMsgLabelOffset(
   conn: Connector,
   oldWaypoints: Point[],
-  newWaypoints: Point[]
+  newWaypoints: Point[],
+  source?: DiagramElement,
+  target?: DiagramElement,
 ): { labelOffsetX?: number; labelOffsetY?: number } {
   if (conn.type !== "messageBPMN") return {};
   if (oldWaypoints.length < 2 || newWaypoints.length < 2) return {};
@@ -219,25 +251,25 @@ function adjustMsgLabelOffset(
   const newSrcY = newWaypoints[newSrcIdx]?.y ?? 0;
   const newTgtX = newWaypoints[newTgtIdx]?.x ?? 0;
   const newTgtY = newWaypoints[newTgtIdx]?.y ?? 0;
-  const dxSrc = newSrcX - oldSrcX;
-  const dySrc = newSrcY - oldSrcY;
+  const anchorEnd = pickMsgLabelAnchorEnd(source, target);
+  const dxAnchor = anchorEnd === "source" ? newSrcX - oldSrcX : newTgtX - oldTgtX;
+  const dyAnchor = anchorEnd === "source" ? newSrcY - oldSrcY : newTgtY - oldTgtY;
   // labelOffsetX/Y are stored relative to the connector midpoint, so
-  // shift them by (sourceDelta − midpointDelta) to keep the label's
-  // world position pinned to the source attachment. Even when the
-  // source didn't move (dxSrc === dySrc === 0), the TARGET may have
-  // moved — that shifts the midpoint, and without a compensating
-  // adjustment the label appears to drift toward the midpoint shift.
+  // shift them by (anchorDelta − midpointDelta) to keep the label's
+  // world position pinned to the chosen anchor. Even when the anchor
+  // didn't move, the OTHER end may have — that shifts the midpoint,
+  // and without a compensating adjustment the label drifts.
   const oldMidX = (oldSrcX + oldTgtX) / 2;
   const oldMidY = (oldSrcY + oldTgtY) / 2;
   const newMidX = (newSrcX + newTgtX) / 2;
   const newMidY = (newSrcY + newTgtY) / 2;
-  if (oldMidX === newMidX && oldMidY === newMidY && dxSrc === 0 && dySrc === 0) return {};
+  if (oldMidX === newMidX && oldMidY === newMidY && dxAnchor === 0 && dyAnchor === 0) return {};
   const labelOX = conn.labelOffsetX ?? 0;
   const labelOY = conn.labelOffsetY ?? 0;
-  const newLabelOX = (oldMidX + labelOX + dxSrc) - newMidX;
-  const newLabelOY = (oldMidY + labelOY + dySrc) - newMidY;
+  const newLabelOX = (oldMidX + labelOX + dxAnchor) - newMidX;
+  const newLabelOY = (oldMidY + labelOY + dyAnchor) - newMidY;
   if (typeof window !== "undefined" && (window as unknown as { __DIAGRAMATIX_TRACE?: boolean }).__DIAGRAMATIX_TRACE) {
-    console.log(`[TRACE adjustMsgLabelOffset] conn=${conn.id} label="${conn.label}" dxSrc=${dxSrc.toFixed(1)} dySrc=${dySrc.toFixed(1)} → labelOffset=(${newLabelOX.toFixed(1)}, ${newLabelOY.toFixed(1)})`);
+    console.log(`[TRACE adjustMsgLabelOffset] conn=${conn.id} label="${conn.label}" anchor=${anchorEnd} dx=${dxAnchor.toFixed(1)} dy=${dyAnchor.toFixed(1)} → labelOffset=(${newLabelOX.toFixed(1)}, ${newLabelOY.toFixed(1)})`);
   }
   return { labelOffsetX: newLabelOX, labelOffsetY: newLabelOY };
 }
@@ -3785,22 +3817,13 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
           const wp = messageBpmnWaypoints(source, target,
             updated.sourceSide, updated.targetSide, newSrcOffset);
 
-          // Label handling — ALWAYS anchor to the SOURCE attachment of
-          // the connector, regardless of which pool is moving (Paul's
-          // rule, Scenario 4). When the source pool moves, the source
-          // endpoint moves and the label moves with it. When the target
-          // pool moves, the source endpoint doesn't move and the label
-          // stays put. The previous "anchor to the moving pool" logic
-          // dragged the label with the moving target.
-          //
-          //   oldOff  = oldLabel − oldSrc       [signed, in BOTH axes]
-          //   non-flip:  newLabel = newSrc + oldOff
-          //   flip:      newLabel = newSrc − oldOffY (mirror Y, keep X)
-          //
-          // Flip case (sides cross when one pool passes the other
-          // vertically) mirrors the label across the source attachment
-          // so it lands in the new gap between the two pools rather
-          // than ending up on the wrong side of the connector.
+          // Label handling — anchor by the same rule as
+          // `pickMsgLabelAnchorEnd`: default to SOURCE, except for
+          // ELEMENT → black-box-POOL messages where TARGET wins
+          // (Paul's 2026-06-09 follow-up). On a sides-flip we mirror
+          // the offset across the anchor attachment so the label
+          // lands in the new gap between the two pools rather than
+          // ending up on the wrong side of the connector.
           let labelAdj: { labelOffsetX?: number; labelOffsetY?: number } = {};
           if (conn.labelOffsetY != null) {
             const oldSrcIdx = conn.sourceInvisibleLeader ? 1 : 0;
@@ -3823,12 +3846,17 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
             const newTgtY = wp.waypoints[2].y;
             const newMidX = (newSrcX + newTgtX) / 2;
             const newMidY = (newSrcY + newTgtY) / 2;
-            const oldOffsetX = oldLabelCentreX - oldSrcX;
-            const oldOffsetY = oldLabelCentreY - oldSrcY;
-            const newLabelCentreX = newSrcX + oldOffsetX;
+            const anchorEnd = pickMsgLabelAnchorEnd(source, target);
+            const oldAnchorX = anchorEnd === "source" ? oldSrcX : oldTgtX;
+            const oldAnchorY = anchorEnd === "source" ? oldSrcY : oldTgtY;
+            const newAnchorX = anchorEnd === "source" ? newSrcX : newTgtX;
+            const newAnchorY = anchorEnd === "source" ? newSrcY : newTgtY;
+            const oldOffsetX = oldLabelCentreX - oldAnchorX;
+            const oldOffsetY = oldLabelCentreY - oldAnchorY;
+            const newLabelCentreX = newAnchorX + oldOffsetX;
             const newLabelCentreY = sidesFlipped
-              ? newSrcY - oldOffsetY
-              : newSrcY + oldOffsetY;
+              ? newAnchorY - oldOffsetY
+              : newAnchorY + oldOffsetY;
             const newLabelTopY = newLabelCentreY - halfLabelH;
             labelAdj = {
               labelOffsetX: newLabelCentreX - newMidX,
@@ -3840,7 +3868,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
               + ` newSrc=(${newSrcX.toFixed(0)}, ${newSrcY.toFixed(0)})`
               + ` oldLabel=(${oldLabelCentreX.toFixed(0)}, ${oldLabelCentreY.toFixed(0)})`
               + ` newLabel=(${newLabelCentreX.toFixed(0)}, ${newLabelCentreY.toFixed(0)})`
-              + ` oldOff-from-src=(${oldOffsetX.toFixed(0)}, ${oldOffsetY.toFixed(0)})`
+              + ` anchor=${anchorEnd} oldOff-from-anchor=(${oldOffsetX.toFixed(0)}, ${oldOffsetY.toFixed(0)})`
               + ` → offset=(${labelAdj.labelOffsetX?.toFixed(1)}, ${labelAdj.labelOffsetY?.toFixed(1)})`);
           }
 
@@ -4053,7 +4081,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
               const newSharedX = priorX + dx;
               const newSrcOffset = source.width > 0 ? (newSharedX - source.x) / source.width : 0.5;
               const wp = messageBpmnWaypoints(source, target, conn.sourceSide, conn.targetSide, newSrcOffset);
-              const labelAdj = adjustMsgLabelOffset(conn, conn.waypoints, wp.waypoints);
+              const labelAdj = adjustMsgLabelOffset(conn, conn.waypoints, wp.waypoints, source, target);
               return { ...conn, sourceOffsetAlong: newSrcOffset, waypoints: wp.waypoints,
                 sourceInvisibleLeader: wp.sourceInvisibleLeader, targetInvisibleLeader: wp.targetInvisibleLeader, ...labelAdj };
             }
@@ -4062,7 +4090,11 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
           if (trace && (conn.type === "messageBPMN" || conn.type === "associationBPMN")) {
             console.log(`  recomputed ${conn.type} ${conn.id} src=${recomputed.sourceId}(${recomputed.sourceSide}@${recomputed.sourceOffsetAlong}) tgt=${recomputed.targetId}(${recomputed.targetSide}@${recomputed.targetOffsetAlong}) wp=${JSON.stringify(recomputed.waypoints)}`);
           }
-          const labelAdj = adjustMsgLabelOffset(conn, conn.waypoints, recomputed.waypoints);
+          const labelAdj = adjustMsgLabelOffset(
+            conn, conn.waypoints, recomputed.waypoints,
+            elements.find(e => e.id === conn.sourceId),
+            elements.find(e => e.id === conn.targetId),
+          );
           return Object.keys(labelAdj).length > 0 ? { ...recomputed, ...labelAdj } : recomputed;
         }
         return conn;
@@ -4542,7 +4574,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
             const newSharedX = priorX + dx;
             const newSrcOffset = source.width > 0 ? (newSharedX - source.x) / source.width : 0.5;
             const wp = messageBpmnWaypoints(source, target, conn.sourceSide, conn.targetSide, newSrcOffset);
-            const labelAdj = adjustMsgLabelOffset(conn, conn.waypoints, wp.waypoints);
+            const labelAdj = adjustMsgLabelOffset(conn, conn.waypoints, wp.waypoints, source, target);
             return { ...conn, sourceOffsetAlong: newSrcOffset, waypoints: wp.waypoints,
               sourceInvisibleLeader: wp.sourceInvisibleLeader, targetInvisibleLeader: wp.targetInvisibleLeader, ...labelAdj };
           }
@@ -4948,7 +4980,11 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
           const orig = origById.get(conn.id);
           if (!orig) return recomputed;
           const labelAdj = recomputed.type === "messageBPMN"
-            ? adjustMsgLabelOffset(orig, orig.waypoints, recomputed.waypoints)
+            ? adjustMsgLabelOffset(
+                orig, orig.waypoints, recomputed.waypoints,
+                elements.find(e => e.id === recomputed.sourceId),
+                elements.find(e => e.id === recomputed.targetId),
+              )
             : preserveLabelWorldPos(orig, recomputed.waypoints);
           return Object.keys(labelAdj).length > 0 ? { ...recomputed, ...labelAdj } : recomputed;
         });
@@ -6102,7 +6138,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
             : computeWaypoints(source, target, state.elements,
                 updated.sourceSide, updated.targetSide, updated.routingType,
                 updated.sourceOffsetAlong ?? 0.5, updated.targetOffsetAlong ?? 0.5);
-        const labelAdj = adjustMsgLabelOffset(conn, conn.waypoints, waypoints);
+        const labelAdj = adjustMsgLabelOffset(conn, conn.waypoints, waypoints, source, target);
         return { ...updated, waypoints, sourceInvisibleLeader, targetInvisibleLeader, ...labelAdj };
       });
       // Skip obstacle validation for messageBPMN — they cross pools and don't interact with obstacles
@@ -6591,7 +6627,11 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       const connectors = recomputed.map((conn, i) => {
         const old = state.connectors[i];
         if (!old || old.id !== conn.id) return conn;
-        const labelAdj = adjustMsgLabelOffset(old, old.waypoints, conn.waypoints);
+        const labelAdj = adjustMsgLabelOffset(
+          old, old.waypoints, conn.waypoints,
+          finalElements.find(e => e.id === conn.sourceId),
+          finalElements.find(e => e.id === conn.targetId),
+        );
         return Object.keys(labelAdj).length > 0 ? { ...conn, ...labelAdj } : conn;
       });
 
