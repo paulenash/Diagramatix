@@ -6,8 +6,8 @@ import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 import { AlertDialog } from "@/app/components/AlertDialog";
 import { UsagePopover } from "@/app/components/UsagePopover";
 import { AdminNotificationsButton } from "@/app/components/AdminNotificationsButton";
-import { ORG_ROLE_DROPDOWN_ORDER, ORG_ROLE_LABELS } from "@/app/lib/auth/orgRoleLabels";
-import type { OrgRole } from "@/app/lib/auth/orgRoleType";
+import { displayOrgRole } from "@/app/lib/auth/orgRoleLabels";
+import { SCHEMA_VERSION } from "@/app/lib/diagram/types";
 
 interface UserRow {
   id: string;
@@ -39,6 +39,9 @@ interface UserRow {
 interface Props {
   users: UserRow[];
   currentUserId: string;
+  /** Build commit count baked in via NEXT_PUBLIC_COMMIT_COUNT. Shown
+   *  in the page header as `v{SCHEMA_VERSION}.{commitCount}`. */
+  commitCount: number;
 }
 
 // Users with activity in the last 5 minutes are treated as "online" — the
@@ -64,7 +67,7 @@ function presence(lastSeenAt: string | null, isYou: boolean): { online: boolean;
   return { online: false, label: `${days} d ago` };
 }
 
-export function AdminClient({ users: initialUsers, currentUserId }: Props) {
+export function AdminClient({ users: initialUsers, currentUserId, commitCount }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
   // `?from=<url>` lets the SuperAdmin page return the user to wherever
@@ -80,45 +83,11 @@ export function AdminClient({ users: initialUsers, currentUserId }: Props) {
       : backHref.startsWith("/dashboard/diagram") || backHref.startsWith("/diagram")
         ? "Diagram"
         : "Back";
-  // Local user list. Owned client-side so an inline OrgRole change
-  // updates the row immediately without a full router.refresh()
-  // round-trip. The page-level data still wins on the next navigation.
-  const [users, setUsers] = useState(initialUsers);
-  // Tracks which (userId, orgId) pairs have an in-flight role save +
-  // any per-row error to surface inline. Keyed by userId — at most one
-  // primary OrgMember per user is editable here.
-  const [orgRoleSavingUserId, setOrgRoleSavingUserId] = useState<string | null>(null);
-  const [orgRoleErrorByUserId, setOrgRoleErrorByUserId] = useState<Record<string, string>>({});
-
-  async function changeOrgRole(user: UserRow, role: OrgRole) {
-    if (!user.primaryOrg || user.primaryOrg.role === role) return;
-    const previous = user.primaryOrg.role;
-    // Optimistic update.
-    setUsers(prev => prev.map(u => u.id === user.id && u.primaryOrg
-      ? { ...u, primaryOrg: { ...u.primaryOrg, role } }
-      : u));
-    setOrgRoleSavingUserId(user.id);
-    setOrgRoleErrorByUserId(prev => { const next = { ...prev }; delete next[user.id]; return next; });
-    try {
-      const res = await fetch(`/api/admin/users/${user.id}/org-role`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orgId: user.primaryOrg.orgId, role }),
-      });
-      if (!res.ok) throw new Error((await res.text()) || res.statusText);
-    } catch (err) {
-      // Roll back + surface the error inline next to the select.
-      setUsers(prev => prev.map(u => u.id === user.id && u.primaryOrg
-        ? { ...u, primaryOrg: { ...u.primaryOrg, role: previous } }
-        : u));
-      setOrgRoleErrorByUserId(prev => ({
-        ...prev,
-        [user.id]: err instanceof Error ? err.message : String(err),
-      }));
-    } finally {
-      setOrgRoleSavingUserId(null);
-    }
-  }
+  // Org Role is display-only in this table (Paul's 2026-06-08 rule);
+  // role changes happen on the Org Settings page via the OrgAdmins
+  // roster. The user list is owned via state so future row-level edits
+  // (impersonation, comp grants etc.) can update in-place.
+  const users = initialUsers;
   // Pending Edit confirmation. When the admin clicks "Edit" on a row
   // we surface a Diagramatix-styled ConfirmDialog rather than the
   // browser's native confirm() (which the user found jarring).
@@ -196,7 +165,7 @@ export function AdminClient({ users: initialUsers, currentUserId }: Props) {
         <div className="flex items-center gap-3">
           <button
             onClick={() => router.push(backHref)}
-            className="text-gray-500 hover:text-gray-700 text-sm flex items-center gap-1"
+            className="text-blue-600 hover:text-blue-800 underline text-sm flex items-center gap-1"
             title={`Return to ${backHref}`}
           >
             <span style={{ fontSize: "1.75em", lineHeight: 1 }}>{"\u2190"}</span>
@@ -206,7 +175,8 @@ export function AdminClient({ users: initialUsers, currentUserId }: Props) {
               "you're inside Diagramatix" cue. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logos/diagramatix-icon.svg" alt="Diagramatix" className="w-7 h-7" />
-          <h1 className="font-semibold text-gray-900">SuperAdmin — Registered Users</h1>
+          <h1 className="font-semibold text-gray-900">Registered Users</h1>
+          <span className="text-[10px] text-gray-400">v{SCHEMA_VERSION}.{commitCount}</span>
         </div>
         <div className="flex items-center gap-2">
           <a
@@ -284,20 +254,20 @@ export function AdminClient({ users: initialUsers, currentUserId }: Props) {
           on columns have room to breathe. Per-column min-widths declared
           on the <th> stops the smaller numeric / date columns from
           starving the text-heavy ones. */}
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="max-w-screen-2xl mx-auto px-6 py-8">
         <table className="w-full bg-white rounded-lg border border-gray-200 overflow-hidden table-fixed">
           <thead>
             <tr className="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              <th className="px-4 py-3" style={{ width: "12%" }}>Name</th>
-              <th className="px-4 py-3" style={{ width: "14%" }}>Email</th>
-              <th className="px-4 py-3" style={{ width: "8%" }}>Status</th>
-              <th className="px-4 py-3" style={{ width: "13%" }}>Working on</th>
-              <th className="px-4 py-3" style={{ width: "14%" }}>Subscription</th>
-              <th className="px-4 py-3" style={{ width: "8%" }} title="OrgRole inside the user's primary Org">Org Role</th>
-              <th className="px-4 py-3 text-center" style={{ width: "5%" }}>Projects</th>
-              <th className="px-4 py-3 text-center" style={{ width: "5%" }}>Diagrams</th>
-              <th className="px-4 py-3" style={{ width: "7%" }}>Registered</th>
-              <th className="px-4 py-3" style={{ width: "14%" }}></th>
+              <th className="px-3 py-3" style={{ width: "11%" }}>Name</th>
+              <th className="px-3 py-3" style={{ width: "16%" }}>Email Address</th>
+              <th className="px-3 py-3" style={{ width: "6%" }}>Status</th>
+              <th className="px-3 py-3" style={{ width: "9%" }}>Working on</th>
+              <th className="px-3 py-3" style={{ width: "15%" }}>Subscription</th>
+              <th className="px-3 py-3" style={{ width: "9%" }} title="OrgRole inside the user's primary Org">Org Role</th>
+              <th className="px-3 py-3 text-center" style={{ width: "7%" }}>Projects</th>
+              <th className="px-3 py-3 text-center" style={{ width: "7%" }}>Diagrams</th>
+              <th className="px-3 py-3" style={{ width: "8%" }}>Registered</th>
+              <th className="px-3 py-3" style={{ width: "12%" }}></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -374,31 +344,14 @@ export function AdminClient({ users: initialUsers, currentUserId }: Props) {
                       )}
                     </button>
                   </td>
-                  {/* OrgRole cell — inline editable. Surfaces the
-                      user's role in their primary Org, displayed with
-                      the "OrgAdmin" label (the OrgRole.Admin enum
-                      value). Errors render inline under the select so
-                      the SuperAdmin doesn't lose context. */}
-                  <td className="px-4 py-3 text-xs">
+                  {/* OrgRole cell — display only (Paul's 2026-06-08
+                      rule). Role changes happen on the Org Settings
+                      page via the OrgAdmins roster, not here. */}
+                  <td className="px-3 py-3 text-xs text-gray-700">
                     {u.primaryOrg ? (
-                      <>
-                        <select
-                          value={u.primaryOrg.role}
-                          disabled={orgRoleSavingUserId === u.id}
-                          onChange={(e) => changeOrgRole(u, e.target.value as OrgRole)}
-                          className="text-xs border border-gray-300 rounded px-1.5 py-1 bg-white w-full disabled:opacity-50"
-                          title={`Primary Org: ${u.primaryOrg.orgName}`}
-                        >
-                          {ORG_ROLE_DROPDOWN_ORDER.map((r) => (
-                            <option key={r} value={r}>{ORG_ROLE_LABELS[r]}</option>
-                          ))}
-                        </select>
-                        {orgRoleErrorByUserId[u.id] && (
-                          <p className="text-[10px] text-red-600 mt-0.5 truncate" title={orgRoleErrorByUserId[u.id]}>
-                            {orgRoleErrorByUserId[u.id]}
-                          </p>
-                        )}
-                      </>
+                      <span title={`Primary Org: ${u.primaryOrg.orgName}`}>
+                        {displayOrgRole(u.primaryOrg.role)}
+                      </span>
                     ) : (
                       <span className="text-gray-300">—</span>
                     )}

@@ -114,5 +114,6 @@ export default async function AdminPage() {
     };
   });
 
-  return <AdminClient users={usersForClient} currentUserId={session.user.id} />;
+  const commitCount = parseInt(process.env.NEXT_PUBLIC_COMMIT_COUNT ?? "0", 10) || 0;
+  return <AdminClient users={usersForClient} currentUserId={session.user.id} commitCount={commitCount} />;
 }
