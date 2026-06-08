@@ -196,62 +196,71 @@ export function AdminClient({ users: initialUsers, currentUserId }: Props) {
         <div className="flex items-center gap-2">
           <a
             href="/dashboard/rules"
-            className="text-xs text-orange-600 hover:text-orange-800 font-medium border border-orange-300 rounded px-2 py-1"
+            className="text-xs text-red-700 hover:text-red-800 font-medium border border-red-300 rounded px-2 py-1 hover:bg-red-50"
           >
             AI Rules &amp; Preferences
           </a>
           <a
             href="/dashboard/admin/database"
-            className="text-xs text-orange-600 hover:text-orange-800 font-medium border border-orange-300 rounded px-2 py-1"
+            className="text-xs text-red-700 hover:text-red-800 font-medium border border-red-300 rounded px-2 py-1 hover:bg-red-50"
           >
             Database Access
           </a>
           <GenerateDdlButton />
           <a
             href="/dashboard/admin/archive"
-            className="text-xs text-orange-600 hover:text-orange-800 font-medium border border-orange-300 rounded px-2 py-1"
+            className="text-xs text-red-700 hover:text-red-800 font-medium border border-red-300 rounded px-2 py-1 hover:bg-red-50"
           >
             System Archive
           </a>
           <a
             href="/dashboard/admin/subscriptions"
-            className="text-xs text-orange-600 hover:text-orange-800 font-medium border border-orange-300 rounded px-2 py-1"
+            className="text-xs text-red-700 hover:text-red-800 font-medium border border-red-300 rounded px-2 py-1 hover:bg-red-50"
           >
             Subscription Prices and Limits
           </a>
           <a
             href="/dashboard/admin/features"
-            className="text-xs text-orange-600 hover:text-orange-800 font-medium border border-orange-300 rounded px-2 py-1"
+            className="text-xs text-red-700 hover:text-red-800 font-medium border border-red-300 rounded px-2 py-1 hover:bg-red-50"
           >
             Features Catalog
           </a>
           <a
             href="/dashboard/admin/groups"
-            className="text-xs text-orange-600 hover:text-orange-800 font-medium border border-orange-300 rounded px-2 py-1"
+            className="text-xs text-red-700 hover:text-red-800 font-medium border border-red-300 rounded px-2 py-1 hover:bg-red-50"
           >
             Groups
           </a>
           <a
             href="/dashboard/admin/ai-plan-format"
-            className="text-xs text-orange-600 hover:text-orange-800 font-medium border border-orange-300 rounded px-2 py-1"
+            className="text-xs text-red-700 hover:text-red-800 font-medium border border-red-300 rounded px-2 py-1 hover:bg-red-50"
           >
             AI Plan Formats
           </a>
           <a
             href="/dashboard/admin/org-settings"
-            className="text-xs text-orange-600 hover:text-orange-800 font-medium border border-orange-300 rounded px-2 py-1"
+            className="text-xs text-red-700 hover:text-red-800 font-medium border border-red-300 rounded px-2 py-1 hover:bg-red-50"
           >
             Org Settings
           </a>
           <a
             href="/dashboard/admin/sharing"
-            className="text-xs text-orange-600 hover:text-orange-800 font-medium border border-orange-300 rounded px-2 py-1"
+            className="text-xs text-red-700 hover:text-red-800 font-medium border border-red-300 rounded px-2 py-1 hover:bg-red-50"
           >
             Project Sharing
           </a>
-          {/* Scanner Issues Rules moved to the BPMN Diagram menu so the
-              catalog lives next to "Scan Diagram for Issues". The route
-              still exists; admins reach it from any BPMN diagram. */}
+          <a
+            href="/dashboard/admin/scanner-rules"
+            className="text-xs text-red-700 hover:text-red-800 font-medium border border-red-300 rounded px-2 py-1 hover:bg-red-50"
+          >
+            BPMN Scanner Rules
+          </a>
+          <a
+            href="/dashboard/admin/bubble-help"
+            className="text-xs text-red-700 hover:text-red-800 font-medium border border-red-300 rounded px-2 py-1 hover:bg-red-50"
+          >
+            Bubble Help
+          </a>
           <AdminNotificationsButton />
         </div>
       </header>
@@ -391,7 +400,7 @@ export function AdminClient({ users: initialUsers, currentUserId }: Props) {
                       <div className="inline-flex gap-1">
                         <button
                           onClick={() => handleViewAs(u.id, "view", diagramHref)}
-                          className="text-xs text-orange-600 hover:text-orange-800 font-medium border border-orange-300 rounded px-2 py-1 hover:bg-orange-50"
+                          className="text-xs text-red-700 hover:text-red-800 font-medium border border-red-300 rounded px-2 py-1 hover:bg-red-50 hover:bg-orange-50"
                           title={workingOn ? `View "${workingOn.name}" (read-only)` : "View this user's dashboard (read-only)"}
                         >
                           View
@@ -583,7 +592,7 @@ function GenerateDdlButton() {
   return (
     <div className="relative">
       <button onClick={() => setOpen(!open)}
-        className="text-xs text-orange-600 hover:text-orange-800 font-medium border border-orange-300 rounded px-2 py-1">
+        className="text-xs text-red-700 hover:text-red-800 font-medium border border-red-300 rounded px-2 py-1 hover:bg-red-50">
         Generate Diagramatix DDL
       </button>
       {open && (

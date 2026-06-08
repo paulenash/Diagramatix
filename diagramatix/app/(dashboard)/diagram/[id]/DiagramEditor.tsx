@@ -2724,60 +2724,8 @@ export function DiagramEditor({
                     >
                       Scan Diagram for Issues
                     </button>
-                    {/* Admin-only: jump to the catalog of every rule the
-                        scanner runs. Lives here on the BPMN Diagram menu
-                        rather than buried under Admin so admins can flick
-                        between the diagram and the rule list. Rendered
-                        red so admins can spot it instantly among the
-                        regular gray menu items. */}
-                    {isAdmin && (
-                      <a
-                        href="/dashboard/admin/scanner-rules"
-                        target="_blank"
-                        rel="noopener"
-                        className="w-full block text-left px-3 py-2 text-xs text-red-600 hover:bg-gray-50 font-medium"
-                        title="Open the full BPMN scanner rule catalog."
-                        onClick={() => setClearMenuOpen(false)}
-                      >
-                        Scanner Issues Rules
-                      </a>
-                    )}
                   </>
                 )}
-                {/* Admin-only: open the AI Rules & Preferences editor
-                    SCOPED to this diagram's type. The full editor is
-                    still reachable from the main Admin menu; this
-                    shortcut hides every other category tab so the admin
-                    can focus on the diagram they're looking at. */}
-                {isAdmin && (() => {
-                  const RULE_TYPE_LABELS: Record<string, string> = {
-                    bpmn: "BPMN Process",
-                    "state-machine": "State Machine",
-                    "value-chain": "Value Chain",
-                    domain: "Domain Model",
-                    context: "Context Diagram",
-                    "process-context": "Process Context",
-                  };
-                  // basic is a legacy alias for context.
-                  const ruleCategory = diagramType === "basic" ? "context" : diagramType;
-                  const label = RULE_TYPE_LABELS[ruleCategory];
-                  if (!label) return null;
-                  return (
-                    <>
-                      <div className="border-t border-gray-100" />
-                      <a
-                        href={`/dashboard/rules?category=${encodeURIComponent(ruleCategory)}`}
-                        target="_blank"
-                        rel="noopener"
-                        className="w-full block text-left px-3 py-2 text-xs text-red-600 hover:bg-gray-50 font-medium"
-                        title={`Open AI Rules & Preferences scoped to ${label}.`}
-                        onClick={() => setClearMenuOpen(false)}
-                      >
-                        AI Rules &amp; Preferences &mdash; {label}
-                      </a>
-                    </>
-                  );
-                })()}
               </div>
             )}
           </div>
