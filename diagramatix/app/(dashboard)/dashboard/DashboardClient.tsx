@@ -186,7 +186,10 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
   // Prisma enum value is still "Admin" — the relabel to "OrgAdmin" is
   // UI-only). Read-only impersonation sessions are always denied; the
   // server enforces the same rule independently.
-  const canHardDelete = !readOnly && (orgRole === "Owner" || orgRole === "Admin");
+  // Hard delete (x++) is SuperAdmin-only AND only on projects the
+  // SuperAdmin owns (per Paul's spec 2026-06-08). Server independently
+  // enforces both checks.
+  const canHardDelete = !readOnly && !!isSu;
   const router = useRouter();
   const [projects, setProjects] = useState(initialProjects);
   const [unorganized, setUnorganized] = useState(initialUnorganized);
@@ -249,6 +252,20 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
   // the sidebar so opening one doesn't refetch what the other already
   // pulled.
   const [tileShareDropdownProjectId, setTileShareDropdownProjectId] = useState<string | null>(null);
+
+  // Right-click context menu for a project tile. `projectId` is the
+  // tile that owns the open menu; `x/y` are viewport pixel positions
+  // for absolute placement.
+  const [tileContextMenu, setTileContextMenu] = useState<{ projectId: string; x: number; y: number } | null>(null);
+  useEffect(() => {
+    if (!tileContextMenu) return;
+    const close = () => setTileContextMenu(null);
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") close(); };
+    window.addEventListener("click", close);
+    window.addEventListener("keydown", onKey);
+    return () => { window.removeEventListener("click", close); window.removeEventListener("keydown", onKey); };
+  }, [tileContextMenu]);
+  const isOrgAdmin = !readOnly && (orgRole === "Owner" || orgRole === "Admin");
 
   // Refetch share list — used after the dialog closes (we don't know
   // exactly what changed, so just re-pull the source of truth) and on
@@ -1660,6 +1677,14 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                     setEditOwner(p.ownerName ?? "");
                   }}
                   onDoubleClick={(e) => { e.preventDefault(); router.push(`/dashboard/projects/${p.id}`); }}
+                  onContextMenu={(e) => {
+                    if (readOnly) return;
+                    e.preventDefault();
+                    setSelectedProjectId(p.id);
+                    setEditDesc(p.description ?? "");
+                    setEditOwner(p.ownerName ?? "");
+                    setTileContextMenu({ projectId: p.id, x: e.clientX, y: e.clientY });
+                  }}
                   onDragOver={(e) => { if (dragDiagramId) { e.preventDefault(); setDropTargetProjectId(p.id); } }}
                   onDragLeave={() => { if (dropTargetProjectId === p.id) setDropTargetProjectId(null); }}
                   onDrop={(e) => {
@@ -1707,35 +1732,8 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                         >
                           {"\u29C9"}
                         </button>
-                        {/* Owner-only destructive actions. Editors/viewers
-                            of a shared project see only the clone button. */}
-                        {!isSharedToMe && (
-                          <>
-                            <button
-                              onClick={(e) => handleDeleteProject(p.id, e)}
-                              className="text-gray-400 hover:text-red-500 text-[10px] px-0.5"
-                              title="Delete project (move diagrams to Unorganised)"
-                            >
-                              {"\u2715"}
-                            </button>
-                            <button
-                              onClick={(e) => handleDeleteProjectCascade(p.id, e)}
-                              className="text-gray-400 hover:text-red-600 text-[10px] px-0.5 font-semibold"
-                              title="Delete project AND all its diagrams (diagrams archived)"
-                            >
-                              {"\u2716+"}
-                            </button>
-                            {canHardDelete && (
-                              <button
-                                onClick={(e) => handleHardDeleteProject(p.id, e)}
-                                className="text-gray-400 hover:text-red-700 text-[10px] px-0.5 font-bold"
-                                title="SUPERADMIN: permanently delete project and all diagrams (no archive, not recoverable)"
-                              >
-                                {"\u2716++"}
-                              </button>
-                            )}
-                          </>
-                        )}
+                        {/* Destructive actions moved to the right-click
+                            context menu (item 6, 2026-06-08). */}
                       </div>
                     )}
                   </div>
@@ -2844,6 +2842,80 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
           onCancel={() => setConfirmDialog(null)}
         />
       )}
+
+      {tileContextMenu && (() => {
+        const p = projects.find(pp => pp.id === tileContextMenu.projectId);
+        if (!p) return null;
+        const role = deriveProjectRole(p);
+        const isOwnerOfThis = role === "owner";
+        // Tier visibility per Paul's 2026-06-08 spec:
+        //   x  : project Owner OR OrgAdmin OR SuperAdmin
+        //   x+ : OrgAdmin (any project in the Org)
+        //   x++: SuperAdmin AND project Owner
+        const canSee_x      = isOwnerOfThis || isOrgAdmin || !!isSu;
+        const canSee_xPlus  = isOrgAdmin;
+        const canSee_xPlus2 = !!isSu && isOwnerOfThis;
+        const close = () => setTileContextMenu(null);
+        // Stop click from bubbling to the window-level close listener.
+        const stopBubble = (e: React.MouseEvent) => e.stopPropagation();
+        return (
+          <div
+            className="fixed z-50 min-w-[260px] bg-white border border-gray-200 rounded shadow-lg py-1 text-xs"
+            style={{ left: tileContextMenu.x, top: tileContextMenu.y }}
+            onClick={stopBubble}
+            onContextMenu={(e) => e.preventDefault()}
+          >
+            <div className="px-3 py-1 text-[10px] uppercase tracking-wide text-gray-400 border-b border-gray-100 truncate" title={p.name}>
+              {p.name}
+            </div>
+            <button
+              onClick={() => { close(); router.push(`/dashboard/projects/${p.id}`); }}
+              className="w-full text-left px-3 py-1.5 hover:bg-gray-50 text-gray-700"
+            >
+              Open
+            </button>
+            <button
+              onClick={(e) => { close(); handleCloneProject(p.id, e); }}
+              className="w-full text-left px-3 py-1.5 hover:bg-gray-50 text-gray-700"
+            >
+              Clone project
+            </button>
+            {(canSee_x || canSee_xPlus || canSee_xPlus2) && (
+              <div className="border-t border-gray-100 my-0.5" />
+            )}
+            {canSee_x && (
+              <button
+                onClick={(e) => { close(); handleDeleteProject(p.id, e); }}
+                className="w-full text-left px-3 py-1.5 hover:bg-gray-50 text-gray-700"
+                title="Delete project. Diagrams move to Unorganised Diagrams."
+              >
+                <span className="font-mono mr-2">x</span>
+                Delete project (diagrams → Unorganised)
+              </button>
+            )}
+            {canSee_xPlus && (
+              <button
+                onClick={(e) => { close(); handleDeleteProjectCascade(p.id, e); }}
+                className="w-full text-left px-3 py-1.5 hover:bg-orange-50 text-orange-700"
+                title="OrgAdmin: delete project. Diagrams move to system Archive."
+              >
+                <span className="font-mono mr-2">x+</span>
+                Delete project (diagrams → Archive)
+              </button>
+            )}
+            {canSee_xPlus2 && (
+              <button
+                onClick={(e) => { close(); handleHardDeleteProject(p.id, e); }}
+                className="w-full text-left px-3 py-1.5 hover:bg-red-50 text-red-700"
+                title="SuperAdmin: hard-delete the project AND every diagram in it. Cannot be undone."
+              >
+                <span className="font-mono mr-2">x++</span>
+                Hard delete: project + all diagrams
+              </button>
+            )}
+          </div>
+        );
+      })()}
 
       {showUsagePopover && usageSnapshot && (
         <UsagePopover

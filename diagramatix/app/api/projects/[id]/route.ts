@@ -2,12 +2,11 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
-import { getEffectiveUserId, isReadOnlyImpersonation } from "@/app/lib/superuser";
+import { getEffectiveUserId, isReadOnlyImpersonation, isSuperuser } from "@/app/lib/superuser";
 import { archiveDiagram } from "@/app/lib/archive";
 import {
   requireRole,
   requireProjectAccess,
-  WRITE_ROLES,
   OrgContextError,
   type OrgRole,
 } from "@/app/lib/auth/orgContext";
@@ -145,26 +144,50 @@ export async function DELETE(req: Request, { params }: Params) {
   const { searchParams } = new URL(req.url);
   const cascade = searchParams.get("cascade");
   const hardDelete = searchParams.get("hardDelete") === "true";
+  const su = isSuperuser(session);
 
   const { id } = await params;
-  // Project owner only. Editor-share users explicitly cannot delete the
-  // project or its diagrams (that's the headline guarantee of the share
-  // model).
+
+  // Three-tier delete model (Paul's spec, 2026-06-08):
+  //   x   — default — diagrams → Unorganised. Allowed for project Owner
+  //         OR OrgAdmin (Owner/Admin in the project's Org) OR SuperAdmin.
+  //   x+  — ?cascade=archive — diagrams → system Archive. OrgAdmin only.
+  //   x++ — ?hardDelete=true — hard delete project + every diagram.
+  //         SuperAdmin AND project Owner only.
+  //
+  // requireProjectAccess gives us the project's orgId + the caller's
+  // resolved project role. We then layer the tier-specific role checks
+  // on top. Editor-share users still cannot delete via any tier — the
+  // floor of "view" only confirms they belong somewhere, the tier
+  // gates do the real authorisation.
   let projectOrgId: string;
+  let projectRole: "owner" | "edit" | "view";
   try {
-    const access = await requireProjectAccess(session, await cookies(), id, "owner");
+    const access = await requireProjectAccess(session, await cookies(), id, "view");
     projectOrgId = access.projectOrgId;
+    projectRole = access.role;
   } catch (err) {
     if (err instanceof OrgContextError) {
       return NextResponse.json({ error: err.message }, { status: err.status });
     }
     throw err;
   }
+  const isProjectOwner = projectRole === "owner";
 
-  // Hard-delete still needs an org-level admin gate on top of project
-  // ownership — destructive purge of every diagram is a privileged action
-  // we do not want regular project owners to accidentally trigger.
   if (hardDelete) {
+    // x++ — SuperAdmin AND project Owner. The SuperAdmin must own the
+    // project they're nuking; we deliberately don't let SuperAdmin
+    // hard-delete OTHER people's projects from this surface.
+    if (!su || !isProjectOwner) {
+      return NextResponse.json(
+        { error: "Hard delete requires SuperAdmin who owns the project" },
+        { status: 403 },
+      );
+    }
+  } else if (cascade === "archive") {
+    // x+ — OrgAdmin (any project in the Org). SuperAdmin who isn't also
+    // an OrgAdmin does not see this option in the UI; the server check
+    // mirrors that.
     const allowedRoles: OrgRole[] = ["Owner", "Admin"];
     try {
       await requireRole(session, await cookies(), allowedRoles);
@@ -173,6 +196,19 @@ export async function DELETE(req: Request, { params }: Params) {
         return NextResponse.json({ error: err.message }, { status: err.status });
       }
       throw err;
+    }
+  } else {
+    // x — project Owner OR OrgAdmin OR SuperAdmin.
+    if (!isProjectOwner && !su) {
+      const allowedRoles: OrgRole[] = ["Owner", "Admin"];
+      try {
+        await requireRole(session, await cookies(), allowedRoles);
+      } catch (err) {
+        if (err instanceof OrgContextError) {
+          return NextResponse.json({ error: err.message }, { status: err.status });
+        }
+        throw err;
+      }
     }
   }
 
