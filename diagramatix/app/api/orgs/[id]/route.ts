@@ -47,12 +47,11 @@ export async function DELETE(_req: Request, { params }: Params) {
   const nonFreeCount = await prisma.user.count({
     where: {
       orgMembers: { some: { orgId: id } },
-      // subscriptionLevelId is "free" for free-tier users; anything
-      // else (introductory / professional / expert) is paid. NULL is
-      // treated as not-yet-assigned and counted as paid to be safe —
-      // an unassigned membership in a paid Org should block delete
-      // until reconciled.
-      NOT: { subscriptionLevelId: "free" },
+      // Paid = subscriptionLevelId in {introductory, professional,
+      // expert}. NULL and "free" both count as Free for this check
+      // (Paul's 2026-06-08 clarification). Enumerate the paid tiers
+      // explicitly so an unseeded user (NULL) isn't treated as paid.
+      subscriptionLevelId: { in: ["introductory", "professional", "expert"] },
     },
   });
   if (nonFreeCount > 0) {

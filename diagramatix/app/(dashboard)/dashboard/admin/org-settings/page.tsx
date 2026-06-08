@@ -101,7 +101,9 @@ export default async function OrgSettingsPage({
     prisma.user.count({
       where: {
         orgMembers: { some: { orgId: selectedOrgId } },
-        NOT: { subscriptionLevelId: "free" },
+        // Paid = anything in {introductory, professional, expert}.
+        // NULL and "free" both count as Free here.
+        subscriptionLevelId: { in: ["introductory", "professional", "expert"] },
       },
     }),
   ]);
