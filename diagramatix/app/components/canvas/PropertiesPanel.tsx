@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useLayoutEffect, useRef, Fragment } from "react";
-import { IMPLEMENTED_BUBBLE_TOPICS } from "@/app/lib/bubbleHelpTopics";
 import type {
   BpmnTaskType,
   FlowType,
@@ -90,22 +89,11 @@ interface Props {
   /** Called when the Diagram Owner picker selection changes. Receives
    *  the chosen userId or null to clear the assignment. */
   onSetDiagramOwner?: (userId: string | null) => void;
-  /** True when the signed-in user is a superuser. Gates the
-   *  admin-only Bubble Help editor sub-section. */
+  /** True when the signed-in user is a superuser. Reserved for any
+   *  future role-gated controls inside the Diagram Properties panel
+   *  (none today — the Bubble Help editor moved to
+   *  /dashboard/admin/bubble-help). */
   isAdmin?: boolean;
-  /** Fired after the admin saves a new Bubble Help set, so Canvas
-   *  can re-fetch /api/bubble-helps and pick up changes without a
-   *  page reload. */
-  onBubbleHelpsChanged?: () => void;
-}
-
-interface BubbleHelpRowDraft {
-  id?: string;
-  topicKey: string;
-  conditionLabel: string;
-  text: string;
-  durationMs: number;
-  sortOrder: number;
 }
 
 // Min/max height for the task/subprocess Name textarea.
@@ -675,8 +663,7 @@ export function PropertiesPanel({
   canEditDiagramOwner,
   diagramOwnerError,
   onSetDiagramOwner,
-  isAdmin,
-  onBubbleHelpsChanged,
+  isAdmin: _isAdmin,
 }: Props) {
   const [labelDraft, setLabelDraft] = useState("");
   // Auto-grow textarea ref for task/subprocess Name editing — height
@@ -694,92 +681,7 @@ export function PropertiesPanel({
   const [databaseSubOpen, setDatabaseSubOpen] = useState(true);
   const [diagramOwnerSubOpen, setDiagramOwnerSubOpen] = useState(true);
   const [processOwnerSubOpen, setProcessOwnerSubOpen] = useState(true);
-  const [bubbleHelpSubOpen, setBubbleHelpSubOpen] = useState(false);
 
-  // Admin Bubble Help editor state. Hydrated on demand when the
-  // sub-section opens; tracks dirty draft + save state. The editor
-  // uses a list-then-detail UX: clicking a row expands ONLY that
-  // row's fields; clicking again (or another row) collapses.
-  const [bubbleHelpDraft, setBubbleHelpDraft] = useState<BubbleHelpRowDraft[] | null>(null);
-  const [bubbleHelpEditingIndex, setBubbleHelpEditingIndex] = useState<number | null>(null);
-  const [bubbleHelpSaving, setBubbleHelpSaving] = useState(false);
-  const [bubbleHelpError, setBubbleHelpError] = useState<string | null>(null);
-  const [bubbleHelpStatus, setBubbleHelpStatus] = useState<string | null>(null);
-  useEffect(() => {
-    if (!isAdmin || !bubbleHelpSubOpen || !diagramType) return;
-    if (bubbleHelpDraft !== null) return; // already loaded
-    fetch(`/api/bubble-helps?diagramType=${encodeURIComponent(diagramType)}`)
-      .then(r => r.ok ? r.json() : { rows: [] })
-      .then((data: { rows?: BubbleHelpRowDraft[] }) => {
-        const rows = Array.isArray(data.rows) ? data.rows : [];
-        setBubbleHelpDraft(rows.map((r, i) => ({ ...r, sortOrder: r.sortOrder ?? i })));
-      })
-      .catch(() => setBubbleHelpDraft([]));
-  }, [isAdmin, bubbleHelpSubOpen, diagramType, bubbleHelpDraft]);
-
-  async function saveBubbleHelps() {
-    if (!diagramType || !bubbleHelpDraft) return;
-    setBubbleHelpSaving(true);
-    setBubbleHelpError(null);
-    setBubbleHelpStatus(null);
-    try {
-      const res = await fetch("/api/bubble-helps", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          diagramType,
-          rows: bubbleHelpDraft.map((r, i) => ({
-            topicKey: r.topicKey.trim(),
-            conditionLabel: r.conditionLabel,
-            text: r.text,
-            durationMs: r.durationMs,
-            sortOrder: i * 10,
-          })),
-        }),
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.error ?? `Save failed (${res.status})`);
-      }
-      const json = await res.json();
-      setBubbleHelpDraft(json.rows ?? []);
-      setBubbleHelpStatus("Saved");
-      onBubbleHelpsChanged?.();
-      setTimeout(() => setBubbleHelpStatus(null), 2000);
-    } catch (err) {
-      setBubbleHelpError(err instanceof Error ? err.message : "Save failed");
-    } finally {
-      setBubbleHelpSaving(false);
-    }
-  }
-
-  function bubbleHelpUpdateRow(index: number, patch: Partial<BubbleHelpRowDraft>) {
-    setBubbleHelpDraft(prev => {
-      if (!prev) return prev;
-      const next = [...prev];
-      next[index] = { ...next[index], ...patch };
-      return next;
-    });
-  }
-  function bubbleHelpAddRow() {
-    setBubbleHelpDraft(prev => [
-      ...(prev ?? []),
-      { topicKey: "", conditionLabel: "", text: "", durationMs: 10_000, sortOrder: (prev?.length ?? 0) * 10 },
-    ]);
-  }
-  function bubbleHelpDeleteRow(index: number) {
-    setBubbleHelpDraft(prev => prev ? prev.filter((_, i) => i !== index) : prev);
-  }
-  function bubbleHelpMoveRow(index: number, dir: -1 | 1) {
-    setBubbleHelpDraft(prev => {
-      if (!prev) return prev;
-      const j = index + dir;
-      if (j < 0 || j >= prev.length) return prev;
-      const next = [...prev];
-      [next[index], next[j]] = [next[j], next[index]];
-      return next;
-    });
-  }
 
   // Confirm-and-delete modal for switching black-box (with messages) → white-box.
   const [poolTypeConfirm, setPoolTypeConfirm] = useState<null | { poolId: string; messageIds: string[] }>(null);
@@ -1059,118 +961,6 @@ export function PropertiesPanel({
           </>)}
         </>)}
 
-        {/* Bubble Help sub-section \u2014 admin (superuser) only. Section
-            header in red to match other admin-only controls. List of
-            rows; click a row to expand and edit. Rows whose topicKey
-            isn't yet referenced by code render their identifier in
-            orange so the admin knows it's staged but not wired. */}
-        {isAdmin && diagramType && (<>
-          <button
-            onClick={() => setBubbleHelpSubOpen(o => !o)}
-            className="w-full flex items-center justify-between mt-1 mb-0.5"
-          >
-            <span className="text-[9px] italic font-semibold text-red-600">Bubble Help</span>
-            <span className="text-red-400 text-[9px]">{bubbleHelpSubOpen ? "\u25be" : "\u25b8"}</span>
-          </button>
-          {bubbleHelpSubOpen && (
-            <div className="mb-1">
-              {bubbleHelpDraft === null ? (
-                <p className="text-[9px] text-gray-400 italic">Loading\u2026</p>
-              ) : (
-                <div className="space-y-1">
-                  {bubbleHelpDraft.length === 0 && (
-                    <p className="text-[9px] text-gray-400 italic">No bubble helps configured for this diagram type yet.</p>
-                  )}
-                  {bubbleHelpDraft.map((row, i) => {
-                    const expanded = bubbleHelpEditingIndex === i;
-                    const isImplemented = IMPLEMENTED_BUBBLE_TOPICS.has(row.topicKey.trim());
-                    const rowColor = isImplemented ? "text-gray-700" : "text-orange-600";
-                    return (
-                      <div key={row.id ?? `new-${i}`} className="border border-gray-200 rounded bg-gray-50">
-                        {/* Compact row header \u2014 always visible. Click to expand. */}
-                        <button
-                          onClick={() => setBubbleHelpEditingIndex(expanded ? null : i)}
-                          className="w-full flex items-center gap-1 px-1 py-0.5 text-left hover:bg-gray-100"
-                        >
-                          <span className="text-gray-400 text-[9px]">{expanded ? "\u25be" : "\u25b8"}</span>
-                          <span className={`text-[9px] truncate flex-1 ${rowColor}`}>
-                            {row.conditionLabel || <em className="text-gray-400">(no trigger label)</em>}
-                            <span className="text-gray-400">{" \u00b7 "}</span>
-                            <span className="font-mono">{row.topicKey || <em>(no topic)</em>}</span>
-                          </span>
-                          {!isImplemented && row.topicKey.trim() && (
-                            <span className="text-[8px] uppercase text-orange-600">not wired</span>
-                          )}
-                        </button>
-                        {/* Expanded editor. */}
-                        {expanded && (
-                          <div className="px-1 pb-1 space-y-0.5 border-t border-gray-200 pt-1">
-                            <div className="flex items-center gap-0.5">
-                              <button onClick={() => bubbleHelpMoveRow(i, -1)} disabled={i === 0}
-                                className="text-[9px] text-gray-500 hover:text-gray-800 disabled:opacity-30 px-0.5">{"\u2191"}</button>
-                              <button onClick={() => bubbleHelpMoveRow(i, 1)} disabled={i === bubbleHelpDraft.length - 1}
-                                className="text-[9px] text-gray-500 hover:text-gray-800 disabled:opacity-30 px-0.5">{"\u2193"}</button>
-                              <button onClick={() => {
-                                bubbleHelpDeleteRow(i);
-                                setBubbleHelpEditingIndex(null);
-                              }} className="ml-auto text-[9px] text-red-600 hover:text-red-800 px-1">{"\u2715"} delete</button>
-                            </div>
-                            <InlineField label="Trigger">
-                              <input type="text" className="w-full text-[9px] border border-gray-300 rounded px-1 py-0"
-                                value={row.conditionLabel}
-                                placeholder="e.g. Click on an Element"
-                                onChange={(e) => bubbleHelpUpdateRow(i, { conditionLabel: e.target.value })} />
-                            </InlineField>
-                            <InlineField label="Topic">
-                              <input type="text"
-                                className={`w-full text-[9px] font-mono border border-gray-300 rounded px-1 py-0 ${isImplemented ? "" : "text-orange-600"}`}
-                                value={row.topicKey}
-                                placeholder="e.g. create-connector"
-                                onChange={(e) => bubbleHelpUpdateRow(i, { topicKey: e.target.value })} />
-                            </InlineField>
-                            <div>
-                              <label className="text-[9px] text-gray-500 block">Text (Enter / Shift-Enter = newline)</label>
-                              <textarea
-                                className="w-full text-[10px] border border-gray-300 rounded px-1 py-0.5 font-mono leading-snug"
-                                rows={6}
-                                value={row.text}
-                                onChange={(e) => bubbleHelpUpdateRow(i, { text: e.target.value })}
-                              />
-                            </div>
-                            <InlineField label="Duration (s)">
-                              <input type="number" min={0.5} max={60} step={0.5}
-                                className="w-16 text-[9px] border border-gray-300 rounded px-1 py-0"
-                                value={(row.durationMs / 1000).toFixed(1)}
-                                onChange={(e) => {
-                                  const s = parseFloat(e.target.value);
-                                  if (!isNaN(s)) bubbleHelpUpdateRow(i, { durationMs: Math.round(s * 1000) });
-                                }} />
-                            </InlineField>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                  <div className="flex items-center gap-1 mt-1">
-                    <button onClick={() => {
-                      bubbleHelpAddRow();
-                      setBubbleHelpEditingIndex(bubbleHelpDraft.length);
-                    }}
-                      className="text-[9px] text-blue-600 hover:text-blue-800 border border-dashed border-blue-300 rounded px-1.5 py-0.5">
-                      + Add help
-                    </button>
-                    <button onClick={saveBubbleHelps} disabled={bubbleHelpSaving}
-                      className="text-[9px] text-white bg-blue-600 hover:bg-blue-700 rounded px-1.5 py-0.5 disabled:opacity-50">
-                      {bubbleHelpSaving ? "Saving\u2026" : "Save"}
-                    </button>
-                    {bubbleHelpStatus && <span className="text-[9px] text-green-600">{bubbleHelpStatus}</span>}
-                    {bubbleHelpError && <span className="text-[9px] text-red-600">{bubbleHelpError}</span>}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </>)}
       </div>
     );
   }

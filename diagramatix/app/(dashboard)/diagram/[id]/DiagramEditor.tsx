@@ -822,10 +822,6 @@ export function DiagramEditor({
 
   // Template state (BPMN only)
   const isAdmin = userEmail?.toLowerCase() === "paul@nashcc.com.au";
-  // Bubble Help editor in PropertiesPanel calls onBubbleHelpsChanged
-  // after a save; bumping this token causes Canvas to re-fetch
-  // /api/bubble-helps and pick up the admin's changes immediately.
-  const [bubbleHelpRefreshToken, setBubbleHelpRefreshToken] = useState(0);
   type TemplateRow = { id: string; name: string; group: string | null };
   const [userTemplates, setUserTemplates] = useState<TemplateRow[]>([]);
   const [builtInTemplates, setBuiltInTemplates] = useState<TemplateRow[]>([]);
@@ -2831,7 +2827,6 @@ export function DiagramEditor({
           pendingDragSymbol={pendingDragSymbol}
           pendingArchimateShapeKey={pendingArchimateShapeKey}
           pendingArchimateIconOnly={pendingArchimateIconOnly}
-          bubbleHelpRefreshToken={bubbleHelpRefreshToken}
           defaultDirectionType={defaultDirectionType}
           defaultRoutingType={defaultRoutingType}
           onUpdateProperties={updateProperties}
@@ -2917,7 +2912,6 @@ export function DiagramEditor({
             diagramOwnerError={diagramOwnerError}
             onSetDiagramOwner={setDiagramOwner}
             isAdmin={isAdmin}
-            onBubbleHelpsChanged={() => setBubbleHelpRefreshToken(t => t + 1)}
             createdAt={createdAt}
             updatedAt={effectiveUpdatedAt}
             siblingDiagrams={siblingDiagrams}
