@@ -2950,6 +2950,11 @@ function tracePerActionRouteDiff(
     console.log(`[ROUTE action=${actionType}] 0 of ${totalSeq} sequence connector(s) re-routed`);
     return;
   }
+  // Also dump the FULL waypoint sequence for each changed connector
+  // when the verbose flag is on. Helps when the symptom is a big
+  // jump in interior waypoints (segment shoots to a wall etc.) and
+  // the compact (first…last) summary isn't enough.
+  const verbose = !!(window as unknown as { __DIAG_ROUTE_TRACE_VERBOSE?: boolean }).__DIAG_ROUTE_TRACE_VERBOSE;
   // Build a lookup of containing pool for any element (walks parentId
   // up to a pool). Used both to label connectors and to spot escapes.
   const elById = new Map(after.elements.map(e => [e.id, e]));
@@ -3000,6 +3005,10 @@ function tracePerActionRouteDiff(
     console.log(
       `  ${id.slice(0, 6)} src=${aft.sourceId.slice(0, 6)} tgt=${aft.targetId.slice(0, 6)} ${srcPoolStr}→${tgtPoolStr} wp=${oldWp.length}→${newWp.length} ${oldEnds} → ${newEnds}${escapes}`,
     );
+    if (verbose) {
+      console.log(`    old: [${oldWp.map(p => `(${p.x.toFixed(0)},${p.y.toFixed(0)})`).join(",")}]`);
+      console.log(`    new: [${newWp.map(p => `(${p.x.toFixed(0)},${p.y.toFixed(0)})`).join(",")}]`);
+    }
   }
 }
 
