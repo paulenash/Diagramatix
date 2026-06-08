@@ -1891,13 +1891,20 @@ export function DiagramEditor({
             user to this diagram on Back. Mirrors the Dashboard / Project
             placement. */}
         {isAdmin && (
-          <a
-            href={`/dashboard/admin?from=${encodeURIComponent(typeof window !== "undefined" ? window.location.pathname + window.location.search : `/dashboard/diagram/${diagramId}`)}`}
+          <button
+            type="button"
+            onClick={async () => {
+              const from = typeof window !== "undefined"
+                ? window.location.pathname + window.location.search
+                : `/dashboard/diagram/${diagramId}`;
+              if ((await confirmSaveBeforeLeave()) === "cancel") return;
+              router.push(`/dashboard/admin?from=${encodeURIComponent(from)}`);
+            }}
             className="text-[11px] text-red-700 hover:text-red-800 font-medium border border-red-300 rounded px-2 py-0.5 hover:bg-red-50"
             title="Open the SuperAdmin dashboard"
           >
             SuperAdmin
-          </a>
+          </button>
         )}
 
         {!readOnly && (
