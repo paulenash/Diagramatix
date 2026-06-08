@@ -2904,10 +2904,108 @@ function autoResizeUmlElement(el: DiagramElement): DiagramElement {
   return { ...el, width: newWidth, height: newHeight };
 }
 
+/**
+ * Per-action route trace, gated on window.__DIAG_ROUTE_TRACE = true.
+ *
+ * Purpose (Paul's 2026-06-09 smoke-test feedback): identify which
+ * dispatched actions are triggering UNNECESSARY sequence-connector
+ * re-routes, and surface any case where a re-route puts waypoints
+ * OUTSIDE the source pool's white-box rect (the "escapes the pool"
+ * symptom).
+ *
+ * Logs nothing when the flag is off. When on, prints one block per
+ * action that actually changed a sequence connector's waypoints —
+ * unchanged connectors stay silent so the console isn't drowned.
+ */
+function tracePerActionRouteDiff(
+  before: DiagramData,
+  after: DiagramData,
+  actionType: string,
+): void {
+  if (typeof window === "undefined") return;
+  const flag = (window as unknown as { __DIAG_ROUTE_TRACE?: boolean }).__DIAG_ROUTE_TRACE;
+  if (!flag) return;
+  const beforeById = new Map(before.connectors.filter(c => c.type === "sequence").map(c => [c.id, c]));
+  const afterById  = new Map(after.connectors .filter(c => c.type === "sequence").map(c => [c.id, c]));
+  const changed: string[] = [];
+  for (const [id, aft] of afterById) {
+    const bef = beforeById.get(id);
+    if (!bef) continue;
+    const oldWp = bef.waypoints;
+    const newWp = aft.waypoints;
+    if (oldWp.length !== newWp.length) { changed.push(id); continue; }
+    let same = true;
+    for (let i = 0; i < oldWp.length; i++) {
+      if (Math.abs(oldWp[i].x - newWp[i].x) > 0.5 || Math.abs(oldWp[i].y - newWp[i].y) > 0.5) {
+        same = false; break;
+      }
+    }
+    if (!same) changed.push(id);
+  }
+  if (changed.length === 0) return;
+  // Build a lookup of containing pool for any element (walks parentId
+  // up to a pool). Used both to label connectors and to spot escapes.
+  const elById = new Map(after.elements.map(e => [e.id, e]));
+  function findContainingPool(elId: string): { id: string; x: number; y: number; w: number; h: number; type: string } | null {
+    let cur = elById.get(elId);
+    for (let i = 0; i < 10 && cur; i++) {
+      if (cur.type === "pool") {
+        return { id: cur.id, x: cur.x, y: cur.y, w: cur.width, h: cur.height, type: (cur.properties?.poolType as string | undefined) ?? "black-box" };
+      }
+      if (!cur.parentId) return null;
+      cur = elById.get(cur.parentId);
+    }
+    return null;
+  }
+  console.log(`[ROUTE action=${actionType}] ${changed.length} sequence connector(s) re-routed`);
+  for (const id of changed) {
+    const bef = beforeById.get(id)!;
+    const aft = afterById .get(id)!;
+    const srcPool = findContainingPool(aft.sourceId);
+    const tgtPool = findContainingPool(aft.targetId);
+    const srcPoolStr = srcPool ? `pool=${srcPool.id.slice(0, 6)}/${srcPool.type}` : "no-pool";
+    const tgtPoolStr = tgtPool ? `pool=${tgtPool.id.slice(0, 6)}/${tgtPool.type}` : "no-pool";
+    const oldWp = bef.waypoints;
+    const newWp = aft.waypoints;
+    const oldEnds = `(${oldWp[0]?.x.toFixed(0)},${oldWp[0]?.y.toFixed(0)})…(${oldWp[oldWp.length - 1]?.x.toFixed(0)},${oldWp[oldWp.length - 1]?.y.toFixed(0)})`;
+    const newEnds = `(${newWp[0]?.x.toFixed(0)},${newWp[0]?.y.toFixed(0)})…(${newWp[newWp.length - 1]?.x.toFixed(0)},${newWp[newWp.length - 1]?.y.toFixed(0)})`;
+    // Escape check: when src + tgt are BOTH inside the same white-box
+    // pool, any new waypoint outside that pool's rect is suspicious.
+    let escapes = "";
+    if (srcPool && tgtPool && srcPool.id === tgtPool.id && srcPool.type === "white-box") {
+      const PAD = 1; // small tolerance for floating-point edge cases
+      const outOfBounds = newWp.some(pt =>
+        pt.x < srcPool.x - PAD ||
+        pt.x > srcPool.x + srcPool.w + PAD ||
+        pt.y < srcPool.y - PAD ||
+        pt.y > srcPool.y + srcPool.h + PAD,
+      );
+      if (outOfBounds) {
+        const offending = newWp.filter(pt =>
+          pt.x < srcPool.x - PAD ||
+          pt.x > srcPool.x + srcPool.w + PAD ||
+          pt.y < srcPool.y - PAD ||
+          pt.y > srcPool.y + srcPool.h + PAD,
+        );
+        escapes = ` !! ESCAPES pool rect=(${srcPool.x.toFixed(0)},${srcPool.y.toFixed(0)},${(srcPool.x + srcPool.w).toFixed(0)},${(srcPool.y + srcPool.h).toFixed(0)}) outside=[${offending.map(p => `(${p.x.toFixed(0)},${p.y.toFixed(0)})`).join(",")}]`;
+      }
+    }
+    console.log(
+      `  ${id.slice(0, 6)} src=${aft.sourceId.slice(0, 6)} tgt=${aft.targetId.slice(0, 6)} ${srcPoolStr}→${tgtPoolStr} wp=${oldWp.length}→${newWp.length} ${oldEnds} → ${newEnds}${escapes}`,
+    );
+  }
+}
+
 function reducer(state: DiagramData, action: Action): DiagramData {
   if (typeof window !== "undefined" && (window as unknown as { __DIAGRAMATIX_TRACE?: boolean }).__DIAGRAMATIX_TRACE) {
     console.log(`[TRACE reducer] action=${action.type}`);
   }
+  const newState = reducerImpl(state, action);
+  tracePerActionRouteDiff(state, newState, action.type);
+  return newState;
+}
+
+function reducerImpl(state: DiagramData, action: Action): DiagramData {
   switch (action.type) {
     case "SET_DATA":
       // Saved width/height is preserved verbatim — imported diagrams keep
