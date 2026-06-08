@@ -513,10 +513,10 @@ export function DatabaseClient() {
         <div className="flex items-center gap-3">
           <button
             onClick={() => router.push("/dashboard/admin")}
-            className="text-gray-500 hover:text-gray-700 text-sm flex items-center gap-1"
+            className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1"
           >
             <span style={{ fontSize: "1.75em", lineHeight: 1 }}>{"\u2190"}</span>
-            SuperAdmin
+            <span className="underline">SuperAdmin</span>
           </button>
           {/* Brand icon: matches placement on every other admin sub-screen. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}

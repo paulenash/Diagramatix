@@ -1866,10 +1866,10 @@ export function DiagramEditor({
       <header className={`h-9 border-b border-gray-200 flex items-center px-2 gap-2 flex-shrink-0 ${isImpersonating ? "bg-orange-50" : ""}`}>
         <button
           onClick={handleBackToProject}
-          className="text-gray-500 hover:text-gray-700 text-xs flex items-center gap-1"
+          className="text-blue-600 hover:text-blue-800 text-xs flex items-center gap-1"
         >
           <span style={{ fontSize: "1.75em", lineHeight: 1 }}>{"\u2190"}</span>
-          {projectId ? "Project" : "Dashboard"}
+          <span className="underline">{projectId ? "Project" : "Dashboard"}</span>
         </button>
         {/* Brand icon: sits just right of the back link as a permanent
             "you're inside Diagramatix" cue. h-5 keeps it inside the h-9 bar. */}

@@ -243,11 +243,11 @@ export function AdminClient({ users: initialUsers, currentUserId, commitCount, i
         <div className="flex items-center gap-3">
           <button
             onClick={() => router.push(backHref)}
-            className="text-blue-600 hover:text-blue-800 underline text-sm flex items-center gap-1"
+            className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1"
             title={`Return to ${backHref}`}
           >
             <span style={{ fontSize: "1.75em", lineHeight: 1 }}>{"\u2190"}</span>
-            {backLabel}
+            <span className="underline">{backLabel}</span>
           </button>
           {/* Brand icon: sits just right of the back link as a permanent
               "you're inside Diagramatix" cue. */}

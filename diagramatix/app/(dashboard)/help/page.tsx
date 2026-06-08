@@ -28,9 +28,9 @@ export default async function HelpPage({
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Link href="/dashboard" className="text-sm text-blue-600 hover:underline flex items-center gap-1">
+          <Link href="/dashboard" className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1">
             <span style={{ fontSize: "1.75em", lineHeight: 1 }}>{"←"}</span>
-            Dashboard
+            <span className="underline">Dashboard</span>
           </Link>
           <h1 className="text-lg font-semibold text-gray-900">User Guide</h1>
         </div>

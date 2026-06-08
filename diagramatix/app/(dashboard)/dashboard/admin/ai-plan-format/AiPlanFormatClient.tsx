@@ -86,9 +86,9 @@ export function AiPlanFormatClient() {
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <button onClick={() => router.push("/dashboard/admin")} className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1">
+          <button onClick={() => router.push("/dashboard/admin")} className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1">
             <span style={{ fontSize: "1.5em", lineHeight: 1 }}>{"←"}</span>
-            SuperAdmin
+            <span className="underline">SuperAdmin</span>
           </button>
           <h1 className="font-semibold text-gray-900">SuperAdmin — AI Plan Formats</h1>
         </div>
