@@ -709,11 +709,12 @@ export function computeWaypoints(
   const tgtEdge = sidePoint(target, targetSide, targetOffsetAlong);
   // Sequence-flow obstacle set: only BPMN flow-node-like shapes act as
   // obstacles. Edge-mounted (boundary) events are intentionally NOT obstacles
-  // so connectors can still attach to them.
+  // so connectors can still attach to them. Data Objects and Data Stores
+  // are NOT obstacles (Paul's 2026-06-10 rule) — sequence flow ignores
+  // them; they may visually overlap a route without forcing a detour.
   const SEQ_OBSTACLE_TYPES = new Set<string>([
     "task", "subprocess", "subprocess-expanded",
     "start-event", "intermediate-event", "end-event",
-    "data-object", "data-store",
   ]);
   // Walk the ancestor chain so an EP that contains the source/target at
   // ANY depth (not only as a direct parent) is excluded from obstacles.
@@ -730,10 +731,20 @@ export function computeWaypoints(
   }
   const srcAncestors = ancestorsOf(source.id);
   const tgtAncestors = ancestorsOf(target.id);
-  // Innermost EP that contains BOTH endpoints — used as the route's
-  // containment box so internal-obstacle avoidance never pushes the
-  // path outside the EP boundary (user rule). If neither endpoint is
-  // inside any common EP, no containment is applied.
+  // Innermost containing rectangle that holds BOTH endpoints — used as
+  // the route's containment box so internal-obstacle avoidance never
+  // pushes the path outside the boundary. Resolution order:
+  //   1. Innermost Expanded Subprocess that contains both ends (user
+  //      rule: an EP is a containment box for any sequence flow that
+  //      starts AND ends inside it).
+  //   2. White-box pool that contains both ends — Paul's 2026-06-10
+  //      rule. Without this, an obstacle-avoidance detour could
+  //      teleport a sequence connector above or below the pool.
+  //      Black-box pools are NOT used here because they have no
+  //      internal flow elements and so can never host a sequence
+  //      flow with both endpoints inside them.
+  // If neither applies (cross-pool flow, or no shared container), no
+  // containment is applied.
   let containmentBounds: Bounds | undefined = undefined;
   {
     const commonEPs: DiagramElement[] = [];
@@ -747,6 +758,21 @@ export function computeWaypoints(
         a.width * a.height <= b.width * b.height ? a : b,
       );
       containmentBounds = getBounds(innermost);
+    } else {
+      // Fall back to a shared white-box pool. Walk ancestors looking
+      // for a pool that's in BOTH src and tgt ancestor sets — that's
+      // necessarily the same pool. White-box only: black-box pools
+      // never contain flow elements, so this branch only matters for
+      // cases like SmokeTest1 / Diagram Margin test.
+      for (const ancId of srcAncestors) {
+        if (!tgtAncestors.has(ancId)) continue;
+        const anc = allElements.find((e) => e.id === ancId);
+        if (anc?.type !== "pool") continue;
+        const poolType = (anc.properties?.poolType as string | undefined) ?? "black-box";
+        if (poolType !== "white-box") continue;
+        containmentBounds = getBounds(anc);
+        break;
+      }
     }
   }
   // Pool bounds — passed to buildOrthogonalPath as a "near boundary"
