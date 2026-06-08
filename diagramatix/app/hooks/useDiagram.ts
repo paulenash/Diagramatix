@@ -4922,14 +4922,35 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         // what the target did. For every other connector type, use
         // preserveLabelWorldPos so the label stays at its world
         // position across the recompute.
+        // Only recompute connectors whose source OR target element
+        // actually changed position or size. A pool resize that moves
+        // only a lane / sublane / the pool's own edges shouldn't drag
+        // unrelated connectors through a fresh route computation
+        // (Paul's 2026-06-10 Issue 1). The previous unconditional
+        // recompute touched every connector and was producing visible
+        // route changes on connectors whose endpoints hadn't moved.
+        const changedIds = new Set<string>();
+        const oldById = new Map(state.elements.map(e => [e.id, e]));
+        for (const newEl of elements) {
+          const oldEl = oldById.get(newEl.id);
+          if (!oldEl) { changedIds.add(newEl.id); continue; }
+          if (oldEl.x !== newEl.x || oldEl.y !== newEl.y
+              || oldEl.width !== newEl.width || oldEl.height !== newEl.height) {
+            changedIds.add(newEl.id);
+          }
+        }
         const origById = new Map(state.connectors.map(c => [c.id, c]));
-        connectors = recomputeAllConnectors(connectors, elements).map(conn => {
+        connectors = connectors.map(conn => {
+          if (!changedIds.has(conn.sourceId) && !changedIds.has(conn.targetId)) {
+            return conn;
+          }
+          const recomputed = recomputeAllConnectors([conn], elements)[0] ?? conn;
           const orig = origById.get(conn.id);
-          if (!orig) return conn;
-          const labelAdj = conn.type === "messageBPMN"
-            ? adjustMsgLabelOffset(orig, orig.waypoints, conn.waypoints)
-            : preserveLabelWorldPos(orig, conn.waypoints);
-          return Object.keys(labelAdj).length > 0 ? { ...conn, ...labelAdj } : conn;
+          if (!orig) return recomputed;
+          const labelAdj = recomputed.type === "messageBPMN"
+            ? adjustMsgLabelOffset(orig, orig.waypoints, recomputed.waypoints)
+            : preserveLabelWorldPos(orig, recomputed.waypoints);
+          return Object.keys(labelAdj).length > 0 ? { ...recomputed, ...labelAdj } : recomputed;
         });
         // Pool may have just grown to cover existing flow elements or
         // shrunk past its last one — re-evaluate white-box / black-box.
