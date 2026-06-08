@@ -2975,8 +2975,8 @@ function tracePerActionRouteDiff(
     const aft = afterById .get(id)!;
     const srcPool = findContainingPool(aft.sourceId);
     const tgtPool = findContainingPool(aft.targetId);
-    const srcPoolStr = srcPool ? `pool=${srcPool.id.slice(0, 6)}/${srcPool.type}` : "no-pool";
-    const tgtPoolStr = tgtPool ? `pool=${tgtPool.id.slice(0, 6)}/${tgtPool.type}` : "no-pool";
+    const srcPoolStr = srcPool ? `pool=${srcPool.id.slice(0, 6)}/${srcPool.type}/rect(${srcPool.x.toFixed(0)},${srcPool.y.toFixed(0)},${(srcPool.x + srcPool.w).toFixed(0)},${(srcPool.y + srcPool.h).toFixed(0)})` : "no-pool";
+    const tgtPoolStr = tgtPool ? `pool=${tgtPool.id.slice(0, 6)}/${tgtPool.type}/rect(${tgtPool.x.toFixed(0)},${tgtPool.y.toFixed(0)},${(tgtPool.x + tgtPool.w).toFixed(0)},${(tgtPool.y + tgtPool.h).toFixed(0)})` : "no-pool";
     const oldWp = bef.waypoints;
     const newWp = aft.waypoints;
     const oldEnds = `(${oldWp[0]?.x.toFixed(0)},${oldWp[0]?.y.toFixed(0)})…(${oldWp[oldWp.length - 1]?.x.toFixed(0)},${oldWp[oldWp.length - 1]?.y.toFixed(0)})`;
@@ -3008,6 +3008,26 @@ function tracePerActionRouteDiff(
     if (verbose) {
       console.log(`    old: [${oldWp.map(p => `(${p.x.toFixed(0)},${p.y.toFixed(0)})`).join(",")}]`);
       console.log(`    new: [${newWp.map(p => `(${p.x.toFixed(0)},${p.y.toFixed(0)})`).join(",")}]`);
+      // When src + tgt are inside the SAME white-box pool, dump the
+      // obstacles + tasks the routing engine likely considered so we
+      // can see WHY the path landed where it did. Filter to elements
+      // whose horizontal span overlaps the connector's X range —
+      // those are the obstacles in the strip.
+      if (srcPool && tgtPool && srcPool.id === tgtPool.id && srcPool.type === "white-box") {
+        const xs = newWp.map(p => p.x);
+        const xMin = Math.min(...xs);
+        const xMax = Math.max(...xs);
+        const candidates = after.elements.filter(el => {
+          if (el.id === aft.sourceId || el.id === aft.targetId) return false;
+          if (el.type !== "task" && el.type !== "subprocess" && el.type !== "subprocess-expanded"
+              && el.type !== "start-event" && el.type !== "intermediate-event" && el.type !== "end-event") return false;
+          return el.x < xMax && el.x + el.width > xMin;
+        });
+        const obsList = candidates.map(el =>
+          `${el.type}/${el.id.slice(0, 6)}@(${el.x.toFixed(0)},${el.y.toFixed(0)},${(el.x + el.width).toFixed(0)},${(el.y + el.height).toFixed(0)})`,
+        );
+        console.log(`    obstacles in X strip [${xMin.toFixed(0)},${xMax.toFixed(0)}]: ${obsList.length === 0 ? "(none)" : obsList.join(", ")}`);
+      }
     }
   }
 }
