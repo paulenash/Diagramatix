@@ -799,6 +799,23 @@ export function computeWaypoints(
       // as obstacles, so a sequence connector between two outside elements
       // routes around the EP instead of through it.
       if (el.type === "subprocess-expanded" && (srcAncestors.has(el.id) || tgtAncestors.has(el.id))) return false;
+      // Paul's 2026-06-10 Test 4 rule: when the route has a containment
+      // box (a shared EP or white-box pool), tasks / events OUTSIDE that
+      // box don't affect the routing inside it. A task in the pool ABOVE
+      // or BELOW this pool was incorrectly forcing detours that landed
+      // against the pool wall. The obstacle is only relevant if at least
+      // part of it sits inside the containment rect — otherwise the
+      // route can never collide with it.
+      if (containmentBounds) {
+        const cRight  = containmentBounds.x + containmentBounds.width;
+        const cBottom = containmentBounds.y + containmentBounds.height;
+        const elRight  = el.x + el.width;
+        const elBottom = el.y + el.height;
+        const intersects =
+          el.x < cRight && elRight > containmentBounds.x &&
+          el.y < cBottom && elBottom > containmentBounds.y;
+        if (!intersects) return false;
+      }
       return true;
     })
     .map(getBounds);
