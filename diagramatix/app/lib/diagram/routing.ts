@@ -1403,15 +1403,21 @@ export function recomputeAllConnectors(
         // source / target body, and overrides with `pickBoundaryEventSide`
         // for boundary-event endpoints (issues 2 + 8).
         const { src: newSrcSide, tgt: newTgtSide } = safeSidePair(source, target, elements);
+        // Preserve the user-chosen offset along any side that ends up
+        // unchanged. Without this, every drag step that trips this
+        // fallback snaps the visible attachment point back to the
+        // edge midpoint — even when the side itself wasn't the issue.
+        const newSrcOffset = newSrcSide === conn.sourceSide ? (conn.sourceOffsetAlong ?? 0.5) : 0.5;
+        const newTgtOffset = newTgtSide === conn.targetSide ? (conn.targetOffsetAlong ?? 0.5) : 0.5;
         const result2 = computeWaypoints(
           source, target, elements,
-          newSrcSide, newTgtSide, conn.routingType, 0.5, 0.5,
+          newSrcSide, newTgtSide, conn.routingType, newSrcOffset, newTgtOffset,
         );
         return { ...conn, waypoints: result2.waypoints,
           sourceInvisibleLeader: result2.sourceInvisibleLeader,
           targetInvisibleLeader: result2.targetInvisibleLeader,
           sourceSide: newSrcSide, targetSide: newTgtSide,
-          sourceOffsetAlong: 0.5, targetOffsetAlong: 0.5,
+          sourceOffsetAlong: newSrcOffset, targetOffsetAlong: newTgtOffset,
           associationNameOffset: undefined,
           sourceRoleOffset: undefined, sourceMultOffset: undefined,
           sourceConstraintOffset: undefined, sourceUniqueOffset: undefined,
@@ -1443,12 +1449,16 @@ export function recomputeAllConnectors(
       // Recalculate with optimal facing sides — boundary-event-aware and
       // self-avoidant via `safeSidePair`.
       const { src: reSrcSide, tgt: reTgtSide } = safeSidePair(source, target, elements);
-      const result3 = computeWaypoints(source, target, elements, reSrcSide, reTgtSide, conn.routingType, 0.5, 0.5);
+      // Same offset-preservation as the exit/approach fallback above:
+      // only re-centre the attachment when the side actually changes.
+      const reSrcOffset = reSrcSide === conn.sourceSide ? (conn.sourceOffsetAlong ?? 0.5) : 0.5;
+      const reTgtOffset = reTgtSide === conn.targetSide ? (conn.targetOffsetAlong ?? 0.5) : 0.5;
+      const result3 = computeWaypoints(source, target, elements, reSrcSide, reTgtSide, conn.routingType, reSrcOffset, reTgtOffset);
       return { ...conn, waypoints: result3.waypoints,
         sourceInvisibleLeader: result3.sourceInvisibleLeader,
         targetInvisibleLeader: result3.targetInvisibleLeader,
         sourceSide: reSrcSide, targetSide: reTgtSide,
-        sourceOffsetAlong: 0.5, targetOffsetAlong: 0.5,
+        sourceOffsetAlong: reSrcOffset, targetOffsetAlong: reTgtOffset,
         associationNameOffset: undefined,
         sourceRoleOffset: undefined, sourceMultOffset: undefined,
         sourceConstraintOffset: undefined, sourceUniqueOffset: undefined,
