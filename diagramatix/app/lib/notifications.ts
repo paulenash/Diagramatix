@@ -20,7 +20,11 @@ export type NotificationType =
   | "diagram-review-requested"   // → each assigned reviewer when owner sends
   | "diagram-review-submitted"   // → requester when a reviewer submits
   | "diagram-review-approved"    // → requester when a reviewer approves
-  | "diagram-review-declined";   // → requester when a reviewer declines to review
+  | "diagram-review-declined"    // → requester when a reviewer declines to review
+  // BPMN lifecycle (publish bundles + feedback + review cadence).
+  | "bundle-published"           // → each audience member when owner publishes a bundle
+  | "feedback-received"          // → diagram owner when a business user files feedback
+  | "review-due";                // → diagram owner from the daily cron when nextReviewDate is past
 
 export interface NotificationPayload {
   // group-invite / group-invite-accepted / group-invite-declined /
@@ -39,6 +43,14 @@ export interface NotificationPayload {
   diagramName?: string;
   objective?: string;
   dueDate?: string;   // ISO
+  // BPMN lifecycle — bundle-published / feedback-received / review-due.
+  bundleId?: string;
+  bundleName?: string;
+  rootDiagramId?: string;       // bundle-published: which root the audience lands on first (if single)
+  feedbackId?: string;          // feedback-received: the new DiagramFeedback row id
+  publishedVersionId?: string;  // review-due: the version that's now overdue
+  versionNumber?: number;       // review-due / bundle-published
+  nextReviewDate?: string;      // review-due (ISO)
 }
 
 export async function createNotification(

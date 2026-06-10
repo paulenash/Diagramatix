@@ -29,6 +29,9 @@ import { InfoDialog } from "@/app/components/InfoDialog";
 import { AiPanel } from "./AiPanel";
 import { PlanPanel } from "./PlanPanel";
 import { SendForReviewDialog } from "./SendForReviewDialog";
+import { PublishVersionDialog } from "./PublishVersionDialog";
+import { PublishBundleDialog } from "./PublishBundleDialog";
+import { SupportRequestDialog } from "./SupportRequestDialog";
 import { AlertDialog } from "@/app/components/AlertDialog";
 import { DiagramatixThrobber } from "@/app/components/DiagramatixThrobber";
 import { checkDiagram, rulesMetadata, type Violation } from "@/app/lib/diagram/checks/diagramChecks";
@@ -85,6 +88,20 @@ interface Props {
   /** Whether the picker is editable. True only when the caller is the
    *  project owner. Server still re-checks every PUT regardless. */
   canEditDiagramOwner?: boolean;
+  /** Current user's id, for the "am I the diagram owner?" check that
+   *  gates the publish button. */
+  currentUserId?: string;
+  /** Persisted lifecycle state — drives the header pill and the
+   *  visibility of the publish-version button. */
+  initialLifecycle?: "DRAFT" | "PUBLISHED" | "ARCHIVED";
+  /** Latest non-superseded PublishedVersion, if any. Drives the
+   *  "Published v3 · 2026-12-10" pill. */
+  initialCurrentPublishedVersion?: { versionNumber: number; publishedAt: string } | null;
+  /** Pre-fills the PublishVersionDialog's "next review" cadence input. */
+  initialReviewCadenceMonths?: number | null;
+  /** Pre-fills the PublishVersionDialog's "next review" date input
+   *  (ISO yyyy-mm-dd, or null). */
+  initialNextReviewDate?: string | null;
 }
 
 function useAutoSave(
@@ -323,6 +340,11 @@ export function DiagramEditor({
   initialDiagramOwner,
   diagramOwnerCandidates = [],
   canEditDiagramOwner = false,
+  currentUserId,
+  initialLifecycle = "DRAFT",
+  initialCurrentPublishedVersion = null,
+  initialReviewCadenceMonths = null,
+  initialNextReviewDate = null,
 }: Props) {
   const router = useRouter();
 
@@ -487,6 +509,22 @@ export function DiagramEditor({
   // when the user clicks a button. Replaces the window.confirm pattern that
   // never actually saved reliably.
   const [unsavedDialog, setUnsavedDialog] = useState<null | { resolve: (choice: "save" | "discard" | "cancel") => void }>(null);
+
+  // BPMN lifecycle (Phase 1 of the publish plan). Mirrors the persisted
+  // Diagram.lifecycle + currentPublishedVersion. Local state so the
+  // header pill updates immediately after a successful publish without a
+  // full router refresh. `isDiagramOwner` gates the publish button —
+  // even project owners can't publish unless they're also the diagram
+  // owner (CPS 230 accountability rule, server-enforced too).
+  const isDiagramOwner = !!(currentUserId && initialDiagramOwner?.id === currentUserId);
+  const [lifecycle, setLifecycle] = useState<"DRAFT" | "PUBLISHED" | "ARCHIVED">(initialLifecycle);
+  const [currentPublishedVersion, setCurrentPublishedVersion] = useState<
+    { versionNumber: number; publishedAt: string } | null
+  >(initialCurrentPublishedVersion);
+  const [showPublishDialog, setShowPublishDialog] = useState(false);
+  const [showPublishBundleDialog, setShowPublishBundleDialog] = useState(false);
+  const [showSupportDialog, setShowSupportDialog] = useState(false);
+  const [supportSentToast, setSupportSentToast] = useState(false);
 
   // Save As dialog — clone the current diagram (data + colour/display config)
   // into the same project under a new name, then navigate to it.
@@ -1907,6 +1945,73 @@ export function DiagramEditor({
           </button>
         )}
 
+        {/* Lifecycle pill — DRAFT / Published vN · date / Archived. Visible
+            to all roles (even read-only viewers should know what state the
+            diagram is in). Anchored before the Save button so it sits in
+            the same visual cluster as other status indicators. */}
+        {lifecycle === "PUBLISHED" && currentPublishedVersion && (
+          <span
+            className="text-[11px] text-blue-700 border border-blue-300 bg-blue-50 rounded px-2 py-0.5 font-medium"
+            title={`Last published ${new Date(currentPublishedVersion.publishedAt).toLocaleString()}`}
+          >
+            Published v{currentPublishedVersion.versionNumber}
+            <span className="text-blue-500/70 ml-1 font-normal">
+              · {new Date(currentPublishedVersion.publishedAt).toLocaleDateString()}
+            </span>
+          </span>
+        )}
+        {lifecycle === "DRAFT" && (
+          <span
+            className="text-[11px] text-gray-600 border border-gray-300 bg-gray-50 rounded px-2 py-0.5 font-medium"
+            title="Never published"
+          >
+            Draft
+          </span>
+        )}
+        {lifecycle === "ARCHIVED" && (
+          <span
+            className="text-[11px] text-gray-500 border border-gray-300 bg-gray-100 rounded px-2 py-0.5 font-medium"
+            title="Archived — hidden from business users"
+          >
+            Archived
+          </span>
+        )}
+
+        {/* Publish version button — visible only to the Diagram Owner.
+            Disabled while there are unsaved changes so the snapshot
+            always captures saved-to-server content. */}
+        {!readOnly && isDiagramOwner && (
+          <button
+            onClick={async () => {
+              if (saveStatus === "unsaved") {
+                await saveNowRef.current();
+              }
+              setShowPublishDialog(true);
+            }}
+            title={
+              saveStatus === "unsaved"
+                ? "Save first; the publish button will then capture the saved snapshot"
+                : "Publish a new immutable version of this diagram"
+            }
+            className="px-2 py-0.5 text-[11px] font-medium text-blue-700 border border-blue-300 rounded hover:bg-blue-50"
+          >
+            Publish v{(currentPublishedVersion?.versionNumber ?? 0) + 1}…
+          </button>
+        )}
+
+        {/* Publish bundle button — visible only to Diagram Owner once
+            the diagram has at least one PublishedVersion. Pre-condition:
+            you can only bundle a diagram you've actually published. */}
+        {!readOnly && isDiagramOwner && lifecycle === "PUBLISHED" && projectId && (
+          <button
+            onClick={() => setShowPublishBundleDialog(true)}
+            title="Publish this diagram (and its linked descendants) to business users"
+            className="px-2 py-0.5 text-[11px] font-medium text-purple-700 border border-purple-300 rounded hover:bg-purple-50"
+          >
+            Publish bundle…
+          </button>
+        )}
+
         {!readOnly && (
           <>
             <button
@@ -2745,6 +2850,18 @@ export function DiagramEditor({
         >
           User Guide
         </a>
+
+        {/* "Get help" — sends a screenshot + JSON of this diagram to
+            support@diagramatix.com.au with the user's message. Available
+            to anyone with view access on the diagram. */}
+        <button
+          type="button"
+          onClick={() => setShowSupportDialog(true)}
+          title="Send this diagram to support with a question"
+          className="text-[11px] text-gray-600 border border-gray-300 rounded px-2 py-0.5 hover:bg-gray-50 hover:text-blue-600"
+        >
+          Get help
+        </button>
       </header>
 
       {/* Main editor area */}
@@ -3363,6 +3480,53 @@ export function DiagramEditor({
             apply();
           }}
         />
+      )}
+
+      {showPublishDialog && (
+        <PublishVersionDialog
+          diagramId={diagramId}
+          nextVersionNumber={(currentPublishedVersion?.versionNumber ?? 0) + 1}
+          initialReviewCadenceMonths={initialReviewCadenceMonths}
+          initialNextReviewDate={initialNextReviewDate}
+          onClose={() => setShowPublishDialog(false)}
+          onPublished={({ versionNumber, publishedAt }) => {
+            setLifecycle("PUBLISHED");
+            setCurrentPublishedVersion({ versionNumber, publishedAt });
+            setShowPublishDialog(false);
+          }}
+        />
+      )}
+
+      {showPublishBundleDialog && projectId && (
+        <PublishBundleDialog
+          diagramId={diagramId}
+          diagramName={diagramName}
+          projectId={projectId}
+          onClose={() => setShowPublishBundleDialog(false)}
+          onPublished={() => {
+            setShowPublishBundleDialog(false);
+          }}
+        />
+      )}
+
+      {showSupportDialog && (
+        <SupportRequestDialog
+          diagramId={diagramId}
+          diagramName={diagramName}
+          getSvgEl={() => document.querySelector<SVGSVGElement>("svg[data-canvas]")}
+          onClose={() => setShowSupportDialog(false)}
+          onSent={() => {
+            setShowSupportDialog(false);
+            setSupportSentToast(true);
+            setTimeout(() => setSupportSentToast(false), 4000);
+          }}
+        />
+      )}
+
+      {supportSentToast && (
+        <div className="fixed bottom-6 right-6 bg-green-600 text-white text-sm font-medium rounded shadow-lg px-4 py-2 z-50">
+          Sent to support — they&apos;ll reply by email.
+        </div>
       )}
 
       {showSaveAs && (

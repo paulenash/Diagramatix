@@ -11,6 +11,7 @@ import { UsagePopover } from "@/app/components/UsagePopover";
 import { NotificationsBell } from "@/app/components/NotificationsBell";
 import { TierPicker, type TierCard } from "@/app/components/TierPicker";
 import { ReviewsSection } from "./ReviewsSection";
+import { PublishedSection } from "./PublishedSection";
 import { ProjectShareDialog } from "./ProjectShareDialog";
 
 interface DiagramSummary {
@@ -1605,6 +1606,11 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
         {/* Send-for-Review collections (Phase 2) — pinned above projects.
             Renders nothing when the user has no reviews either way. */}
         <ReviewsSection />
+
+        {/* Published-by-me section: per-diagram versions + bundles. Pinned
+            above Projects so owners see release state at a glance. Renders
+            nothing for users who haven't touched the publish flow. */}
+        <PublishedSection />
 
         {/* Projects section */}
         <section>

@@ -46,6 +46,26 @@ enum ProjectShareRole {
   EDIT
 }
 
+// BPMN lifecycle (publish + review cadence). Persisted on Diagram.
+// DRAFT     = never published; has no PublishedVersion rows.
+// PUBLISHED = at least one PublishedVersion exists; currentPublishedVersionId points at the latest.
+// ARCHIVED  = owner-marked; hidden from business users via bundle access checks.
+// IN_REVIEW and REVIEW_DUE are NOT stored — they're derived badges on top of
+// the persisted state (any open DiagramReview row, nextReviewDate <= today).
+enum DiagramLifecycle {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+// Status of a single piece of business-user feedback against a published version.
+enum FeedbackStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+  DISMISSED
+}
+
 model Org {
   id         String        @id @default(cuid())
   name       String
@@ -183,6 +203,14 @@ model User {
   // Project-sharing back-relations.
   projectShares                 ProjectShare[]             @relation("ProjectShareRecipient")
   diagramsOwned                 Diagram[]                  @relation("DiagramOwner")
+  // BPMN lifecycle (Phase 1) back-relations.
+  publishedVersionsAuthored     PublishedVersion[]         @relation("PublishedVersionAuthor")
+  diagramFeedbackAuthored       DiagramFeedback[]          @relation("DiagramFeedbackAuthor")
+  diagramFeedbackResolved       DiagramFeedback[]          @relation("DiagramFeedbackResolver")
+  // BPMN lifecycle (Phase 2) back-relations.
+  publicationBundlesAuthored    PublicationBundle[]        @relation("PublicationBundleAuthor")
+  publicationBundleAudience     PublicationBundleAudience[] @relation("PublicationBundleAudienceMember")
+  publicationBundleGrantsMade   PublicationBundleAudience[] @relation("PublicationBundleAudienceAdder")
 }
 
 model Project {
@@ -201,6 +229,8 @@ model Project {
   diagrams    Diagram[]
   // Users this project is shared with, plus their role (VIEW / EDIT).
   shares      ProjectShare[]
+  // BPMN lifecycle (Phase 2) — bundles published from this project.
+  bundles     PublicationBundle[]
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
@@ -253,11 +283,33 @@ model Diagram {
   diagramOwner   User?         @relation("DiagramOwner", fields: [diagramOwnerId], references: [id], onDelete: SetNull)
   history     DiagramHistory[]
   reviews     DiagramReview[]
+  // ── BPMN lifecycle (publish + review cadence) ────────────────────────
+  // `lifecycle` is the persisted state machine; see DiagramLifecycle enum.
+  // `currentPublishedVersionId` points at the latest non-superseded
+  // PublishedVersion. Nullable because DRAFT diagrams have none.
+  // `nextReviewDate` is owner-set at publish; the cron uses it to fire
+  // a `review-due` notification. `reviewCadenceMonths` is convenience —
+  // the publish dialog can compute nextReviewDate from this.
+  // `lastReviewDueNotifiedAt` is the cron-idempotency guard so re-runs
+  // don't spam the owner.
+  lifecycle                     DiagramLifecycle    @default(DRAFT)
+  currentPublishedVersionId     String?             @unique
+  currentPublishedVersion       PublishedVersion?   @relation("DiagramCurrentVersion", fields: [currentPublishedVersionId], references: [id], onDelete: SetNull)
+  publishedVersions             PublishedVersion[]  @relation("DiagramAllVersions")
+  feedback                      DiagramFeedback[]
+  // BPMN lifecycle (Phase 2) — every bundle this diagram is a member of
+  // (as a root or pulled in via link closure). Used by the access check
+  // and the stale-closure detector.
+  bundleMemberships             PublicationBundleDiagram[]
+  nextReviewDate                DateTime?
+  reviewCadenceMonths           Int?
+  lastReviewDueNotifiedAt       DateTime?
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
 
   @@index([orgId])
   @@index([diagramOwnerId])
+  @@index([lifecycle])
 }
 
 model DiagramHistory {
@@ -269,6 +321,154 @@ model DiagramHistory {
   createdAt DateTime @default(now())
 
   @@index([diagramId, createdAt])
+}
+
+// Immutable per-diagram version snapshot. Created by POST /api/diagrams/[id]/publish.
+// Carries no audience — audiences live on PublicationBundle (added in
+// Phase 2 of the lifecycle plan). Business users see the latest non-
+// superseded version of any diagram they have bundle-granted access to.
+model PublishedVersion {
+  id            String   @id @default(cuid())
+  diagramId     String
+  diagram       Diagram  @relation("DiagramAllVersions", fields: [diagramId], references: [id], onDelete: Cascade)
+  // Version number per diagram: 1, 2, 3… Auto-incremented by the publish handler.
+  versionNumber Int
+  publishedAt   DateTime @default(now())
+  publishedById String
+  publishedBy   User     @relation("PublishedVersionAuthor", fields: [publishedById], references: [id], onDelete: Restrict)
+  // Frozen snapshot — mirrors the DiagramHistory columns. Treat as
+  // immutable once written.
+  name          String
+  type          String
+  data          Json
+  colorConfig   Json
+  displayMode   String
+  // Owner-supplied notes for this release. Optional.
+  releaseNotes  String?
+  // When the next version replaces this one, supersededAt is stamped so
+  // we can render "v2 (superseded 2026-12-10)" in the version history.
+  // Null on the current version.
+  supersededAt  DateTime?
+  // Snapshot of the nextReviewDate that was in effect at publish time.
+  // Kept for audit even after the live Diagram.nextReviewDate moves.
+  nextReviewDateAtPublish DateTime?
+  // Back-relation for Diagram.currentPublishedVersionId pointing here.
+  currentForDiagram Diagram? @relation("DiagramCurrentVersion")
+  // Feedback filed against this specific version.
+  feedback      DiagramFeedback[]
+
+  @@unique([diagramId, versionNumber])
+  @@index([diagramId, publishedAt(sort: Desc)])
+}
+
+// Business-user feedback on a published version. Separate from the formal
+// review-comment system (DiagramReview/DiagramReviewer) — reviewers are
+// internal designers, feedback authors are end-users of the published
+// process. Anchored to the version the user was viewing so resolution
+// notes against an old version remain meaningful.
+//
+// `bundleId` (added in Phase 2) records which bundle the user came in
+// through. Not present yet because PublicationBundle is added later in
+// the same plan.
+model DiagramFeedback {
+  id                  String           @id @default(cuid())
+  diagramId           String
+  diagram             Diagram          @relation(fields: [diagramId], references: [id], onDelete: Cascade)
+  publishedVersionId  String
+  publishedVersion    PublishedVersion @relation(fields: [publishedVersionId], references: [id], onDelete: Cascade)
+  // Bundle the author came in through, when known. Useful for the
+  // owner's FeedbackPanel ("filed via 'Q4 Operations release'") and
+  // for the cross-bundle audience union when several bundles lead to
+  // the same diagram. Nullable for legacy / direct-link entries.
+  bundleId            String?
+  bundle              PublicationBundle? @relation(fields: [bundleId], references: [id], onDelete: SetNull)
+  authorId            String
+  author              User             @relation("DiagramFeedbackAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  body                String
+  // Optional pin to a specific element in the published version's data.
+  // The viewer's "attach to element" mode records the element id; the
+  // owner's FeedbackPanel uses it to jump to that element on the canvas.
+  attachedElementId   String?
+  status              FeedbackStatus   @default(OPEN)
+  resolvedAt          DateTime?
+  resolvedById        String?
+  resolvedBy          User?            @relation("DiagramFeedbackResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
+  resolutionNote      String?
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+
+  @@index([diagramId, status])
+  @@index([publishedVersionId])
+  @@index([authorId])
+}
+
+// A "publish to business users" event. Covers one or more root
+// diagrams plus the forward link closure reachable from each via
+// element.properties.linkedDiagramId. All members must live in the same
+// Project — cross-project bundles aren't supported (see the BPMN
+// lifecycle plan for the rationale). Audiences are explicit; users with
+// no audience grant via any active bundle have no business-user access.
+//
+// Bundles do NOT auto-supersede each other. Multiple active bundles can
+// overlap in members and audience; access is additive. Owner explicitly
+// archives a bundle (sets supersededAt) to revoke its grants.
+model PublicationBundle {
+  id              String                  @id @default(cuid())
+  name            String
+  projectId       String
+  project         Project                 @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  publishedAt     DateTime                @default(now())
+  publishedById   String
+  publishedBy     User                    @relation("PublicationBundleAuthor", fields: [publishedById], references: [id], onDelete: Restrict)
+  releaseNotes    String?
+  nextReviewDate  DateTime?
+  // Idempotency guard for the review-due cron — see Diagram.lastReviewDueNotifiedAt.
+  lastReviewDueNotifiedAt DateTime?
+  // Owner archives a bundle to revoke audience grants. Once stamped the
+  // access check ignores it. Distinct from per-PublishedVersion supersedure.
+  supersededAt    DateTime?
+  diagrams        PublicationBundleDiagram[]
+  audience        PublicationBundleAudience[]
+  feedback        DiagramFeedback[]
+
+  @@index([projectId])
+  @@index([publishedById])
+  @@index([supersededAt])
+}
+
+// One row per diagram included in a bundle at publish time. `isRoot`
+// flags the diagrams the owner explicitly picked as starting points
+// (vs. those pulled in via link traversal). The set is frozen at
+// publish — to expand it the owner uses the stale-closure flow to
+// recompute closure in place (no new bundle row).
+model PublicationBundleDiagram {
+  id          String            @id @default(cuid())
+  bundleId    String
+  bundle      PublicationBundle @relation(fields: [bundleId], references: [id], onDelete: Cascade)
+  diagramId   String
+  diagram     Diagram           @relation(fields: [diagramId], references: [id], onDelete: Cascade)
+  isRoot      Boolean           @default(false)
+  addedAt     DateTime          @default(now())
+
+  @@unique([bundleId, diagramId])
+  @@index([diagramId])
+}
+
+// Per-user audience grant. A business user accessing any diagram in
+// the bundle's member set goes through this row. Unique constraint
+// prevents double-grants.
+model PublicationBundleAudience {
+  id          String            @id @default(cuid())
+  bundleId    String
+  bundle      PublicationBundle @relation(fields: [bundleId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User              @relation("PublicationBundleAudienceMember", fields: [userId], references: [id], onDelete: Cascade)
+  addedAt     DateTime          @default(now())
+  addedById   String
+  addedBy     User              @relation("PublicationBundleAudienceAdder", fields: [addedById], references: [id], onDelete: Restrict)
+
+  @@unique([bundleId, userId])
+  @@index([userId])
 }
 
 model DiagramTemplate {

@@ -194,6 +194,28 @@ export default async function DiagramPage({ params, searchParams }: Props) {
     }
   }
 
+  // BPMN lifecycle props (Phase 1 of the publish/bundles plan). The
+  // editor renders a lifecycle pill ("DRAFT" / "Published v3 · 2026-12-10")
+  // in its header and gates the "Publish version…" button on whether the
+  // caller IS the Diagram Owner — even project owners can't publish
+  // unless they're also the diagram owner (CPS 230 accountability).
+  let currentPublishedVersionSummary: { versionNumber: number; publishedAt: string } | null = null;
+  if (diagram.currentPublishedVersionId) {
+    const cur = await prisma.publishedVersion.findUnique({
+      where: { id: diagram.currentPublishedVersionId },
+      select: { versionNumber: true, publishedAt: true },
+    });
+    if (cur) {
+      currentPublishedVersionSummary = {
+        versionNumber: cur.versionNumber,
+        publishedAt: cur.publishedAt.toISOString(),
+      };
+    }
+  }
+  const initialNextReviewDateIso = diagram.nextReviewDate
+    ? diagram.nextReviewDate.toISOString().slice(0, 10)
+    : null;
+
   return (
     <DiagramEditor
         diagramId={diagram.id}
@@ -215,6 +237,11 @@ export default async function DiagramPage({ params, searchParams }: Props) {
         initialDiagramOwner={diagramOwner}
         diagramOwnerCandidates={diagramOwnerCandidates}
         canEditDiagramOwner={isProjectOwner}
+        currentUserId={session.user.id}
+        initialLifecycle={diagram.lifecycle}
+        initialCurrentPublishedVersion={currentPublishedVersionSummary}
+        initialReviewCadenceMonths={diagram.reviewCadenceMonths}
+        initialNextReviewDate={initialNextReviewDateIso}
       />
   );
 }
