@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/app/lib/db";
+import { promotePendingAudienceMemberships } from "@/app/lib/bundleInvites";
 
 export async function POST(req: Request) {
   const body = await req.json();
@@ -50,6 +51,15 @@ export async function POST(req: Request) {
     });
     return user;
   });
+
+  // Promote any pending bundle invitations for this email — if someone
+  // was invited to a bundle while their account didn't exist, this is
+  // the moment we wire them up. Best-effort; sign-in retries on failure.
+  try {
+    await promotePendingAudienceMemberships(result.id, result.email);
+  } catch (err) {
+    console.error("[register] bundle invite promotion error:", err);
+  }
 
   return NextResponse.json(result, { status: 201 });
 }

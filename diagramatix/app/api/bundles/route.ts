@@ -2,8 +2,18 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { walkForwardClosure } from "@/app/lib/diagram/linkClosure";
+
+// RFC-lite email shape check — good enough to reject obvious typos in the
+// invite path. Real validation happens when Microsoft actually delivers
+// (or doesn't) the invitation email.
+function isValidEmail(s: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
+}
+
 import { createNotifications } from "@/app/lib/notifications";
 import { getProjectAccess } from "@/app/lib/auth/orgContext";
+import { normaliseEmail } from "@/app/lib/bundleInvites";
+import { sendBundleInvitationEmail } from "@/app/lib/email";
 
 // POST /api/bundles
 //
@@ -45,6 +55,18 @@ export async function POST(req: Request) {
     : [];
   const audienceUserIds: string[] = Array.isArray(body.audienceUserIds)
     ? Array.from(new Set(body.audienceUserIds.filter((x: unknown): x is string => typeof x === "string" && x.length > 0)))
+    : [];
+  // Emails for "invite by email" — typed in the audience picker for
+  // people who don't yet have an account. Stored as PendingBundleAudience
+  // rows; promoted to real audience grants when the invitee registers or
+  // signs in for the first time.
+  const inviteEmails: string[] = Array.isArray(body.inviteEmails)
+    ? Array.from(new Set(
+        body.inviteEmails
+          .filter((x: unknown): x is string => typeof x === "string" && x.length > 0)
+          .map((x: string) => normaliseEmail(x))
+          .filter(isValidEmail),
+      ))
     : [];
   const releaseNotes: string | undefined = typeof body.releaseNotes === "string" && body.releaseNotes.trim().length > 0
     ? body.releaseNotes.trim()
@@ -155,6 +177,35 @@ export async function POST(req: Request) {
     }
   }
 
+  // Resolve invite emails: any email that already belongs to an
+  // existing User gets folded into audienceUserIds (so the user gets
+  // immediate access, no email round-trip needed). Emails with no
+  // matching user become PendingBundleAudience rows + an invitation
+  // email. This handles the common "invitee already has an account but
+  // the inviter didn't realise" case gracefully.
+  const inviterContext = {
+    name: session.user.name ?? null,
+    email: session.user.email ?? "(unknown)",
+  };
+  const audienceUserIdSet = new Set(audienceUserIds);
+  const inviteEmailsToSend: string[] = [];
+  if (inviteEmails.length > 0) {
+    const existingByEmail = await prisma.user.findMany({
+      where: { email: { in: inviteEmails } },
+      select: { id: true, email: true },
+    });
+    const matched = new Map(existingByEmail.map(u => [normaliseEmail(u.email), u.id]));
+    for (const email of inviteEmails) {
+      const existingUserId = matched.get(email);
+      if (existingUserId) {
+        audienceUserIdSet.add(existingUserId);
+      } else {
+        inviteEmailsToSend.push(email);
+      }
+    }
+  }
+  const finalAudienceUserIds = Array.from(audienceUserIdSet);
+
   const rootSet = new Set(rootDiagramIds);
 
   try {
@@ -177,12 +228,21 @@ export async function POST(req: Request) {
           })),
         });
       }
-      if (audienceUserIds.length > 0) {
+      if (finalAudienceUserIds.length > 0) {
         await tx.publicationBundleAudience.createMany({
-          data: audienceUserIds.map(userId => ({
+          data: finalAudienceUserIds.map(userId => ({
             bundleId: created.id,
             userId,
             addedById: callerId,
+          })),
+        });
+      }
+      if (inviteEmailsToSend.length > 0) {
+        await tx.pendingBundleAudience.createMany({
+          data: inviteEmailsToSend.map(email => ({
+            bundleId: created.id,
+            email,
+            invitedById: callerId,
           })),
         });
       }
@@ -192,9 +252,9 @@ export async function POST(req: Request) {
     // Fire in-app notifications. Email is wired in Phase 6 of the plan
     // (cron + email infrastructure) — for now, in-app only.
     const singleRoot = rootDiagramIds.length === 1 ? rootDiagramIds[0] : undefined;
-    if (audienceUserIds.length > 0) {
+    if (finalAudienceUserIds.length > 0) {
       await createNotifications(
-        audienceUserIds.map(userId => ({
+        finalAudienceUserIds.map(userId => ({
           userId,
           type: "bundle-published" as const,
           payload: {
@@ -207,10 +267,29 @@ export async function POST(req: Request) {
       );
     }
 
+    // Send invitation emails to anyone who didn't have an account yet.
+    // Best-effort — failures don't roll back the bundle creation.
+    const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
+    const registerUrl = `${baseUrl}/register`;
+    for (const email of inviteEmailsToSend) {
+      try {
+        await sendBundleInvitationEmail({
+          toEmail: email,
+          inviterName: inviterContext.name,
+          inviterEmail: inviterContext.email,
+          bundleName: name,
+          registerUrl,
+        });
+      } catch (err) {
+        console.error("[POST /api/bundles] invite email failed for", email, err instanceof Error ? err.message : err);
+      }
+    }
+
     return NextResponse.json({
       bundleId: bundle.id,
       memberCount: allIds.size,
-      audienceCount: audienceUserIds.length,
+      audienceCount: finalAudienceUserIds.length,
+      inviteCount: inviteEmailsToSend.length,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

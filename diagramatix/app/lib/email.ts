@@ -119,6 +119,56 @@ export async function sendSupportDiagramEmail(input: SupportEmailInput): Promise
   }
 }
 
+// Sent when a bundle owner invites someone who doesn't yet have a
+// Diagramatix account. The invitee follows the registration link, and
+// the auth-side hook automatically promotes their PendingBundleAudience
+// row(s) into real audience grants on first sign-in.
+export interface BundleInviteEmailInput {
+  toEmail: string;
+  inviterName: string | null;
+  inviterEmail: string;
+  bundleName: string;
+  registerUrl: string;
+}
+
+export async function sendBundleInvitationEmail(input: BundleInviteEmailInput): Promise<void> {
+  const transport = smtpTransport();
+  const inviterDisplay = input.inviterName ? `${input.inviterName} (${input.inviterEmail})` : input.inviterEmail;
+  const html = `
+    <p>${escapeHtml(inviterDisplay)} has invited you to view a published process on Diagramatix.</p>
+    <p style="font-family:Arial,sans-serif;font-size:14px;margin:14px 0;">
+      <strong>${escapeHtml(input.bundleName)}</strong>
+    </p>
+    <p>
+      <a href="${input.registerUrl}" style="display:inline-block;padding:10px 18px;background:#2563eb;color:#ffffff;text-decoration:none;border-radius:4px;font-family:Arial,sans-serif;font-size:13px;">
+        Create your account
+      </a>
+    </p>
+    <p style="font-family:Arial,sans-serif;font-size:12px;color:#666;">
+      Once you've signed up with this email address you'll be automatically taken to the published process.
+      The link doesn't expire, and you can also paste it into your browser if the button above doesn't work:
+      <br/><br/>${escapeHtml(input.registerUrl)}
+    </p>
+  `;
+  if (transport) {
+    await transport.sendMail({
+      from: defaultFrom(),
+      to: input.toEmail,
+      replyTo: input.inviterEmail,
+      subject: `${input.inviterName ?? input.inviterEmail} invited you to view "${input.bundleName}"`,
+      html,
+    });
+  } else {
+    console.log("\n========================================");
+    console.log("[BUNDLE INVITE]");
+    console.log(`To:        ${input.toEmail}`);
+    console.log(`Inviter:   ${inviterDisplay}`);
+    console.log(`Bundle:    ${input.bundleName}`);
+    console.log(`Register:  ${input.registerUrl}`);
+    console.log("========================================\n");
+  }
+}
+
 function safeFileName(s: string): string {
   return s.replace(/[^a-z0-9-_]+/gi, "_").slice(0, 60) || "diagram";
 }

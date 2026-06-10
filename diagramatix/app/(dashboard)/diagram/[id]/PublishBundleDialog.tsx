@@ -137,6 +137,7 @@ export function PublishBundleDialog({
 
   // ── Audience picker (debounced search) ───────────────────────────
   const [audience, setAudience] = useState<AudienceCandidate[]>([]);
+  const [invites, setInvites] = useState<string[]>([]);  // emails for not-yet-registered users
   const [query, setQuery] = useState("");
   const [candidates, setCandidates] = useState<AudienceCandidate[]>([]);
   const candAbortRef = useRef<AbortController | null>(null);
@@ -158,6 +159,17 @@ export function PublishBundleDialog({
     }, 250);
     return () => clearTimeout(t);
   }, [projectId, query, audience]);
+
+  // Detect when the user has typed a complete email that doesn't match
+  // any existing user. The audience-candidates endpoint already returns
+  // an empty list in that case; we just need to check the query shape.
+  const queryLooksLikeEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(query.trim());
+  const queryNormalised = query.trim().toLowerCase();
+  const queryAlreadyInvited = invites.includes(queryNormalised) || audience.some(a => a.email.toLowerCase() === queryNormalised);
+  const showInviteOption =
+    queryLooksLikeEmail
+    && candidates.length === 0
+    && !queryAlreadyInvited;
 
   // ── Release notes + next review ──────────────────────────────────
   const [releaseNotes, setReleaseNotes] = useState("");
@@ -216,7 +228,7 @@ export function PublishBundleDialog({
     !!preview &&
     preview.summary.draftCount === 0 &&
     rootIds.length > 0 &&
-    audience.length > 0 &&
+    (audience.length + invites.length) > 0 &&
     name.trim().length > 0 &&
     (preview.summary.crossProjectLinkCount === 0 || acceptCrossProject) &&
     !submitting;
@@ -234,6 +246,7 @@ export function PublishBundleDialog({
           projectId,
           rootDiagramIds: rootIds,
           audienceUserIds: audience.map(a => a.id),
+          inviteEmails: invites,
           releaseNotes: releaseNotes.trim() || undefined,
           nextReviewDate: reviewMode !== "none" ? reviewDate || null : null,
           acceptCrossProjectWarnings: acceptCrossProject,
@@ -390,10 +403,20 @@ export function PublishBundleDialog({
             </div>
           )}
 
-          {/* Audience */}
+          {/* Audience — existing registered users + invite-by-email entries.
+              Audience grants give immediate access. Invites become Pending-
+              BundleAudience rows, get an email, and auto-promote on first
+              sign-in / registration. */}
           <div>
-            <div className="text-xs font-medium text-gray-700 mb-1">Audience ({audience.length})</div>
-            {audience.length > 0 && (
+            <div className="text-xs font-medium text-gray-700 mb-1">
+              Audience ({audience.length + invites.length})
+              {invites.length > 0 && (
+                <span className="text-gray-500 font-normal ml-1">
+                  · {invites.length} invitation{invites.length === 1 ? "" : "s"} pending
+                </span>
+              )}
+            </div>
+            {(audience.length > 0 || invites.length > 0) && (
               <div className="border border-gray-200 rounded mb-2">
                 {audience.map(a => (
                   <div key={a.id} className="flex items-center gap-2 px-2 py-1 text-xs border-b border-gray-100 last:border-b-0">
@@ -407,16 +430,31 @@ export function PublishBundleDialog({
                     </button>
                   </div>
                 ))}
+                {invites.map(email => (
+                  <div key={`invite:${email}`} className="flex items-center gap-2 px-2 py-1 text-xs border-b border-gray-100 last:border-b-0 bg-blue-50/40">
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 font-medium shrink-0">
+                      INVITE
+                    </span>
+                    <span className="flex-1 truncate text-gray-800">{email}</span>
+                    <button
+                      onClick={() => setInvites(prev => prev.filter(x => x !== email))}
+                      className="text-gray-600 hover:text-red-600 text-sm"
+                      title="Remove"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
               </div>
             )}
             <input
               type="text"
               value={query}
               onChange={e => setQuery(e.target.value)}
-              placeholder="Search by name or email…"
+              placeholder="Search by name or email, or type a new email to invite…"
               className="w-full border border-gray-300 rounded px-2 py-1 text-xs"
             />
-            {candidates.length > 0 && (
+            {(candidates.length > 0 || showInviteOption) && (
               <div className="border border-gray-200 rounded mt-1 max-h-32 overflow-y-auto">
                 {candidates.map(c => (
                   <button
@@ -431,6 +469,21 @@ export function PublishBundleDialog({
                     {c.name ?? c.email} <span className="text-gray-700">{c.email}</span>
                   </button>
                 ))}
+                {showInviteOption && (
+                  <button
+                    onClick={() => {
+                      setInvites(prev => [...prev, queryNormalised]);
+                      setQuery("");
+                      setCandidates([]);
+                    }}
+                    className="block w-full text-left px-2 py-1 text-xs hover:bg-blue-100 bg-blue-50 border-b border-gray-100 last:border-b-0"
+                  >
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-200 text-blue-900 font-medium mr-2">
+                      INVITE
+                    </span>
+                    {queryNormalised} <span className="text-gray-700">— no existing account; they&apos;ll get an email</span>
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -502,7 +555,7 @@ export function PublishBundleDialog({
             autoFocus
             className="px-3 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded disabled:opacity-40"
           >
-            {submitting ? "Publishing…" : `Publish bundle (${preview?.summary.totalMembers ?? 0} diagrams → ${audience.length} users)`}
+            {submitting ? "Publishing…" : `Publish bundle (${preview?.summary.totalMembers ?? 0} diagrams → ${audience.length + invites.length} users)`}
           </button>
         </div>
       </div>

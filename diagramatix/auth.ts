@@ -110,6 +110,19 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           return false;
         }
       }
+      // Promote any pending bundle invitations addressed to this email.
+      // Idempotent — when there are no pending rows it's a no-op. Lazy-
+      // imported so the auth module doesn't pull bundleInvites at boot.
+      if (user.id && user.email) {
+        try {
+          const { promotePendingAudienceMemberships } = await import("@/app/lib/bundleInvites");
+          await promotePendingAudienceMemberships(user.id, user.email);
+        } catch (err) {
+          // Don't block sign-in if invitation promotion fails — the user
+          // can still reach the dashboard, and the next sign-in will retry.
+          console.error("[auth] bundle invite promotion error:", err);
+        }
+      }
       return true;
     },
     async jwt({ token, user, account }) {

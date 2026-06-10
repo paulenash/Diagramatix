@@ -211,6 +211,7 @@ model User {
   publicationBundlesAuthored    PublicationBundle[]        @relation("PublicationBundleAuthor")
   publicationBundleAudience     PublicationBundleAudience[] @relation("PublicationBundleAudienceMember")
   publicationBundleGrantsMade   PublicationBundleAudience[] @relation("PublicationBundleAudienceAdder")
+  pendingBundleInvitesSent      PendingBundleAudience[]    @relation("PendingBundleAudienceInviter")
 }
 
 model Project {
@@ -429,6 +430,7 @@ model PublicationBundle {
   supersededAt    DateTime?
   diagrams        PublicationBundleDiagram[]
   audience        PublicationBundleAudience[]
+  pendingAudience PendingBundleAudience[]
   feedback        DiagramFeedback[]
 
   @@index([projectId])
@@ -469,6 +471,30 @@ model PublicationBundleAudience {
 
   @@unique([bundleId, userId])
   @@index([userId])
+}
+
+// Invite-by-email audience entry. Created when the bundle creator
+// invites someone who isn't a registered Diagramatix user yet. The
+// invitee gets an email; once they register (or sign in for the first
+// time with the matching address) the registration / auth hook promotes
+// the pending row into a real PublicationBundleAudience row and deletes
+// this one.
+//
+// Email is stored normalised lowercase so the promotion lookup matches
+// regardless of how the inviter typed it. Unique on (bundleId, email)
+// stops duplicate invites; the email index lets the promotion hook
+// scan in O(log n) when a user signs in.
+model PendingBundleAudience {
+  id          String            @id @default(cuid())
+  bundleId    String
+  bundle      PublicationBundle @relation(fields: [bundleId], references: [id], onDelete: Cascade)
+  email       String
+  invitedAt   DateTime          @default(now())
+  invitedById String
+  invitedBy   User              @relation("PendingBundleAudienceInviter", fields: [invitedById], references: [id], onDelete: Restrict)
+
+  @@unique([bundleId, email])
+  @@index([email])
 }
 
 model DiagramTemplate {
