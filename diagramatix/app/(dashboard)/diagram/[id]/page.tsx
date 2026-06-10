@@ -37,6 +37,15 @@ export default async function DiagramPage({ params, searchParams }: Props) {
   // owned by the caller all pass. Project-shared users now reach the
   // editor — that's the headline shift for this feature.
   const diagramAccess = await getDiagramAccess(effectiveUserId, id);
+
+  // Business-user grants (via PublicationBundleAudience) belong to the
+  // published-viewer route. Redirect them out of the editor entirely;
+  // the editor's chrome doesn't apply to a read-only consumer view.
+  if (diagramAccess?.role === "business-user") {
+    const bundleParam = diagramAccess.bundleId ? `?bundle=${diagramAccess.bundleId}` : "";
+    redirect(`/processes/${id}${bundleParam}`);
+  }
+
   let diagram = diagramAccess
     ? await prisma.diagram.findUnique({ where: { id } })
     : null;

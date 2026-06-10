@@ -380,15 +380,27 @@ interface DiagramHandle {
   diagramOwnerId: string | null;
 }
 
+/** Diagram-level role. Wider than ProjectAccessRole because the
+ *  business-user grant (via PublicationBundleAudience) is not a project
+ *  share — it's a per-bundle grant on a published version. */
+export type DiagramAccessRole = ProjectAccessRole | "business-user";
+
 export interface DiagramAccess {
   diagram: DiagramHandle;
   /** Resolved role — `owner` for legacy orphan diagrams owned by the caller. */
-  role: ProjectAccessRole;
+  role: DiagramAccessRole;
   /**
    * Project access record if the diagram is in a project; null for legacy
-   * orphans. Routes that need to know the project owner read it from here.
+   * orphans and business-user grants. Routes that need to know the
+   * project owner read it from here.
    */
   projectAccess: ProjectAccess | null;
+  /**
+   * For `business-user` role: the active bundle whose audience grant
+   * resolved this access. Useful for the viewer's "back to bundle"
+   * breadcrumb. Undefined for project-based roles.
+   */
+  bundleId?: string;
 }
 
 /**
@@ -414,24 +426,52 @@ export async function getDiagramAccess(
 
   if (diagram.projectId) {
     const projectAccess = await getProjectAccess(userId, diagram.projectId);
-    if (!projectAccess) return null;
-    return { diagram, role: projectAccess.role, projectAccess };
+    if (projectAccess) {
+      return { diagram, role: projectAccess.role, projectAccess };
+    }
+    // Project path denied — fall through to the bundle-audience check
+    // before giving up. A business user who isn't a project sharee can
+    // still reach the diagram via a published bundle they're in.
+  } else {
+    // Legacy orphan — original creator passes immediately.
+    if (diagram.userId === userId) {
+      return { diagram, role: "owner", projectAccess: null };
+    }
+
+    // Silent elevation on orphan diagrams: SuperAdmin (everywhere) and
+    // OrgAdmin/OrgOwner (in the diagram's Org) get implicit owner. Same
+    // contract as the project path — no share row, no visible footprint.
+    // Without this an OrgAdmin trying to support a user's pre-Slice-1
+    // orphan diagram would be denied even though they have full project-
+    // path access to everything else in the Org.
+    if (await isAdminElevatedForOrg(userId, diagram.orgId)) {
+      return { diagram, role: "owner", projectAccess: null };
+    }
   }
 
-  // Legacy orphan — original creator passes immediately.
-  if (diagram.userId === userId) {
-    return { diagram, role: "owner", projectAccess: null };
+  // Business-user grant via PublicationBundleAudience. The user is in
+  // some active (non-superseded) bundle whose closure includes this
+  // diagram. First match wins — we don't need to enumerate every
+  // grant, just confirm one exists.
+  const bundleGrant = await prisma.publicationBundleAudience.findFirst({
+    where: {
+      userId,
+      bundle: {
+        supersededAt: null,
+        diagrams: { some: { diagramId } },
+      },
+    },
+    select: { bundleId: true },
+  });
+  if (bundleGrant) {
+    return {
+      diagram,
+      role: "business-user",
+      projectAccess: null,
+      bundleId: bundleGrant.bundleId,
+    };
   }
 
-  // Silent elevation on orphan diagrams: SuperAdmin (everywhere) and
-  // OrgAdmin/OrgOwner (in the diagram's Org) get implicit owner. Same
-  // contract as the project path — no share row, no visible footprint.
-  // Without this an OrgAdmin trying to support a user's pre-Slice-1
-  // orphan diagram would be denied even though they have full project-
-  // path access to everything else in the Org.
-  if (await isAdminElevatedForOrg(userId, diagram.orgId)) {
-    return { diagram, role: "owner", projectAccess: null };
-  }
   return null;
 }
 
@@ -462,6 +502,13 @@ export async function requireDiagramAccess(
 
   const access = await getDiagramAccess(userId, diagramId);
   if (!access) throw new OrgContextError("No access to this diagram", 403);
+  // Business-user grants are for the published-viewer route only — they
+  // can never satisfy an editor-style minRole. Editor routes that called
+  // through here should redirect their callers to /processes/[id], not
+  // bend the gate to admit them.
+  if (access.role === "business-user") {
+    throw new OrgContextError("Business-user access goes through /processes/[id]", 403);
+  }
   if (PROJECT_ROLE_RANK[access.role] < PROJECT_ROLE_RANK[minRole]) {
     throw new OrgContextError(
       `Diagram role ${access.role} cannot perform this action (requires ${minRole})`,

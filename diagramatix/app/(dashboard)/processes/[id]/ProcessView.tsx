@@ -1,0 +1,223 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { Canvas } from "@/app/components/canvas/Canvas";
+import type { DiagramData, DiagramType } from "@/app/lib/diagram/types";
+import type { SymbolColorConfig } from "@/app/lib/diagram/colors";
+import type { DisplayMode } from "@/app/lib/diagram/displayMode";
+
+// View-stack key — deliberately separate from the editor's
+// `dgx_drill_stack` so the two stacks can't pollute each other if a
+// single user has both an editor session and a viewer session open.
+const VIEW_STACK_KEY = "dgx_view_stack";
+
+interface VersionSummary {
+  versionNumber: number;
+  publishedAt: string;
+  releaseNotes: string | null;
+  publishedBy: { id: string; name: string | null; email: string };
+}
+
+interface OwnerSummary {
+  id: string;
+  name: string | null;
+  email: string;
+}
+
+interface Props {
+  diagramId: string;
+  diagramName: string;
+  diagramType: DiagramType;
+  data: DiagramData;
+  colorConfig: SymbolColorConfig;
+  displayMode: DisplayMode;
+  version: VersionSummary;
+  diagramOwner: OwnerSummary | null;
+  processOwnerLabel: { name?: string; email?: string } | null;
+  /** Bundle scoping the view-stack and the "Back to bundle" affordance.
+   *  Null when the user reached the viewer directly (no bundle ancestor),
+   *  e.g. an owner previewing their own published diagram. */
+  bundleId: string | null;
+}
+
+/**
+ * Read-only viewer for a published diagram. Reuses the editor's Canvas
+ * with readOnly=true and every mutation handler stubbed to a no-op —
+ * the visual rendering matches the editor exactly, but the viewer
+ * exposes no editing affordances of its own.
+ *
+ * Link traversal: clicking a subprocess / chevron-collapsed element with
+ * a linkedDiagramId pushes the current diagram onto sessionStorage and
+ * navigates to /processes/[targetId]. Back pops and returns.
+ */
+export function ProcessView({
+  diagramId,
+  diagramName,
+  diagramType,
+  data,
+  colorConfig,
+  displayMode,
+  version,
+  diagramOwner,
+  processOwnerLabel,
+  bundleId,
+}: Props) {
+  const router = useRouter();
+
+  const [stackDepth, setStackDepth] = useState(0);
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(VIEW_STACK_KEY);
+      const arr = raw ? JSON.parse(raw) : [];
+      setStackDepth(Array.isArray(arr) ? arr.length : 0);
+    } catch {
+      setStackDepth(0);
+    }
+  }, [diagramId]);
+
+  // Drill-in: business user clicked an element's link icon. Push the
+  // current viewer page onto the stack and navigate to the target. We
+  // verify access by letting the target page run its own getDiagramAccess
+  // — if the user lacks a grant on the target diagram, that page will
+  // bounce them back to the dashboard with no extra noise here.
+  const handleDrillIntoSubprocess = useCallback(
+    (targetDiagramId: string) => {
+      try {
+        const raw = sessionStorage.getItem(VIEW_STACK_KEY);
+        const arr = raw ? JSON.parse(raw) : [];
+        const next = Array.isArray(arr) ? arr.slice() : [];
+        next.push({ id: diagramId, name: diagramName, bundleId });
+        sessionStorage.setItem(VIEW_STACK_KEY, JSON.stringify(next));
+      } catch { /* swallow — link still works without the stack */ }
+      const bundleParam = bundleId ? `?bundle=${encodeURIComponent(bundleId)}` : "";
+      router.push(`/processes/${targetDiagramId}${bundleParam}`);
+    },
+    [diagramId, diagramName, bundleId, router],
+  );
+
+  // Drill-back: pop the stack and navigate. When the stack is empty AND
+  // we have a bundle context, go to the bundle index instead so the
+  // user lands somewhere meaningful rather than the dashboard.
+  const handleDrillBack = useCallback(() => {
+    try {
+      const raw = sessionStorage.getItem(VIEW_STACK_KEY);
+      const arr = raw ? JSON.parse(raw) : [];
+      if (Array.isArray(arr) && arr.length > 0) {
+        const prev = arr[arr.length - 1];
+        const next = arr.slice(0, -1);
+        sessionStorage.setItem(VIEW_STACK_KEY, JSON.stringify(next));
+        const bundleParam = prev?.bundleId ? `?bundle=${encodeURIComponent(prev.bundleId)}` : "";
+        router.push(`/processes/${prev.id}${bundleParam}`);
+        return;
+      }
+    } catch { /* fall through to bundle / dashboard */ }
+    if (bundleId) {
+      router.push(`/processes/bundle/${bundleId}`);
+    } else {
+      router.push("/dashboard");
+    }
+  }, [bundleId, router]);
+
+  const ownerLabel = diagramOwner
+    ? diagramOwner.name ?? diagramOwner.email
+    : "—";
+  const processOwnerDisplay = processOwnerLabel?.name ?? processOwnerLabel?.email ?? null;
+
+  // Canvas was built for the editor — it needs a forest of mutation
+  // handlers. In the viewer they're all no-ops; readOnly=true on the
+  // Canvas already disables interaction via pointer-events:none, but we
+  // pass the handlers anyway to keep TypeScript happy.
+  const noop = () => {};
+  // Canvas's getViewportCenterRef expects a () => Point; the editor
+  // hooks it to "where would a newly-added element land?", but the
+  // viewer never adds anything. Return a sentinel zero — it's never
+  // read because the add path is gated by readOnly.
+  const viewportCenterStub = () => ({ x: 0, y: 0 });
+
+  return (
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      {/* Title bar — slim, no editor chrome. */}
+      <header className="bg-white border-b border-gray-200 px-4 py-2 flex items-center gap-3 text-xs">
+        {(stackDepth > 0 || bundleId) && (
+          <button
+            onClick={handleDrillBack}
+            className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-50 text-gray-700"
+            title={stackDepth > 0 ? "Back to previous process" : "Back to bundle"}
+          >
+            ← Back
+          </button>
+        )}
+        <Link
+          href="/dashboard"
+          className="text-blue-600 hover:text-blue-800"
+        >
+          Dashboard
+        </Link>
+        <div className="h-4 border-l border-gray-300" />
+        <div className="flex-1 flex items-center gap-3 min-w-0">
+          <h1 className="text-sm font-semibold text-gray-900 truncate">{diagramName}</h1>
+          <span
+            className="text-[11px] px-1.5 py-0.5 rounded border text-blue-700 border-blue-300 bg-blue-50 font-medium shrink-0"
+            title={`Published ${new Date(version.publishedAt).toLocaleString()} by ${version.publishedBy.name ?? version.publishedBy.email}`}
+          >
+            v{version.versionNumber}
+            <span className="text-blue-500/80 font-normal ml-1">
+              · {new Date(version.publishedAt).toLocaleDateString()}
+            </span>
+          </span>
+          {processOwnerDisplay && (
+            <span className="text-[11px] text-gray-700 truncate" title="Process Owner (label)">
+              <span className="text-gray-500">Process Owner:</span> {processOwnerDisplay}
+            </span>
+          )}
+          <span className="text-[11px] text-gray-700 truncate" title="Diagram Owner (accountable user)">
+            <span className="text-gray-500">Diagram Owner:</span> {ownerLabel}
+          </span>
+        </div>
+        <button
+          type="button"
+          disabled
+          className="text-[11px] text-gray-400 border border-gray-200 rounded px-2 py-0.5 cursor-not-allowed"
+          title="Feedback to the diagram owner — coming in the next phase"
+        >
+          Feedback
+        </button>
+      </header>
+
+      {/* Canvas — readOnly + drill traversal. All mutation handlers are
+          no-ops. The Canvas's own pan+zoom logic stays active so the
+          user can scroll and zoom freely. */}
+      <main className="flex-1 relative">
+        <Canvas
+          data={data}
+          diagramType={diagramType}
+          readOnly
+          colorConfig={colorConfig}
+          displayMode={displayMode}
+          diagramName={diagramName}
+          onDrillIntoSubprocess={handleDrillIntoSubprocess}
+          onDrillBack={stackDepth > 0 || bundleId ? handleDrillBack : undefined}
+          parentDiagramName={undefined}
+          onAddElement={noop}
+          onMoveElement={noop}
+          onResizeElement={noop}
+          onUpdateLabel={noop}
+          onDeleteElement={noop}
+          onAddConnector={noop}
+          onDeleteConnector={noop}
+          onUpdateConnectorEndpoint={noop}
+          selectedElementIds={new Set()}
+          selectedConnectorId={null}
+          onSetSelectedElements={noop}
+          onSelectConnector={noop}
+          pendingDragSymbol={null}
+          defaultDirectionType="directed"
+          defaultRoutingType="rectilinear"
+          getViewportCenterRef={{ current: viewportCenterStub }}
+        />
+      </main>
+    </div>
+  );
+}

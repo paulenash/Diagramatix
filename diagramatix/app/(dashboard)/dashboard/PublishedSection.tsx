@@ -223,19 +223,19 @@ export function PublishedSection() {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {receivedBundles.map(b => (
-              <div
+              <button
                 key={b.id}
-                className="bg-white border border-blue-200 rounded-lg p-3"
-                title="View link will be active once the business-user viewer ships (Phase 3)"
+                onClick={() => router.push(`/processes/bundle/${b.id}`)}
+                className="text-left bg-white border border-blue-200 rounded-lg p-3 hover:border-blue-400 hover:shadow transition"
               >
                 <div className="text-sm font-medium text-gray-900 truncate">{b.name}</div>
-                <div className="mt-2 flex items-center gap-3 text-[10px] text-gray-600">
+                <div className="mt-2 flex items-center gap-3 text-[10px] text-gray-700">
                   <span>{b._count.diagrams} diagram{b._count.diagrams === 1 ? "" : "s"}</span>
                 </div>
-                <div className="mt-1 text-[10px] text-gray-500">
+                <div className="mt-1 text-[10px] text-gray-700">
                   Added {dateLabel(b.addedAt)}
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         </div>
