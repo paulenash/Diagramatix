@@ -344,11 +344,11 @@ export function PublishBundleDialog({
                     key={m.diagramId}
                     className="flex items-center gap-2 px-2 py-1.5 text-xs border-b border-gray-100 last:border-b-0"
                   >
-                    <span className="flex-1 truncate">
+                    <span className="flex-1 truncate text-gray-800">
                       {m.isRoot && <span className="text-blue-600 font-medium mr-1">root</span>}
                       {m.name}
                     </span>
-                    <span className="text-[10px] text-gray-500 uppercase">{m.type}</span>
+                    <span className="text-[10px] text-gray-700 uppercase font-medium">{m.type}</span>
                     {m.readyToBundle && m.currentVersion ? (
                       <span className="text-[10px] px-1.5 py-0.5 rounded border text-blue-700 border-blue-300 bg-blue-50">
                         v{m.currentVersion.versionNumber}
