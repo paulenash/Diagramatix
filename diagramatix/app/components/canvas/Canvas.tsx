@@ -246,6 +246,13 @@ interface Props {
   debugMode?: boolean;
   onUpdateConnectorFields?: (id: string, fields: Partial<import("@/app/lib/diagram/types").Connector>) => void;
   getViewportCenterRef?: React.MutableRefObject<(() => Point) | null>;
+  /** Imperative trigger for the toolbar "Space" button. The parent calls
+   *  these to start an insert / remove-space gesture without the user
+   *  having to Ctrl+click the canvas. startInsert places one green marker
+   *  at the viewport centre (then the user Shift+drags it); startRemove
+   *  places the two red markers (then the user repositions + presses
+   *  Enter). Populated by Canvas, called by DiagramEditor. */
+  spaceActionRef?: React.MutableRefObject<{ startInsert: () => void; startRemove: () => void } | null>;
   diagramName?: string;
   createdAt?: string;
   updatedAt?: string;
@@ -467,6 +474,7 @@ export function Canvas({
   debugMode,
   onUpdateConnectorFields,
   getViewportCenterRef,
+  spaceActionRef,
   diagramName,
   createdAt,
   updatedAt,
@@ -1003,6 +1011,11 @@ export function Canvas({
   const [spaceMarker, setSpaceMarker] = useState<Point | null>(null);
   const [spaceMarkerPlacing, setSpaceMarkerPlacing] = useState(false);
   const [secondSpaceMarker, setSecondSpaceMarker] = useState<Point | null>(null);
+  // Tracks whether the current space gesture was started from the toolbar
+  // "Space" button (vs. an ad-hoc Ctrl+click). When button-initiated, a
+  // single Escape clears the whole gesture (the user's expected "exit");
+  // Ctrl+click gestures keep the older step-by-step Escape cascade.
+  const [spaceMode, setSpaceMode] = useState<"insert" | "remove" | null>(null);
   const [removalConfirm, setRemovalConfirm] = useState<{
     zone: { x: number; y: number; width: number; height: number };
     toDelete: RsRef[];
@@ -1020,6 +1033,37 @@ export function Canvas({
         x: (-pan.x + rect.width / 2) / zoom,
         y: (-pan.y + rect.height / 2) / zoom,
       };
+    };
+  }
+
+  // Expose the Space-button imperative API. Reassigned every render so the
+  // closures capture current pan/zoom. startInsert drops one green marker
+  // at the viewport centre (INSERT mode); startRemove drops the two red
+  // markers a fixed distance apart around the centre (REMOVE mode).
+  if (spaceActionRef) {
+    const centre = (): Point => {
+      const rect = svgRef.current?.getBoundingClientRect();
+      if (!rect) return { x: 0, y: 0 };
+      return { x: (-pan.x + rect.width / 2) / zoom, y: (-pan.y + rect.height / 2) / zoom };
+    };
+    spaceActionRef.current = {
+      startInsert: () => {
+        const c = centre();
+        setSpaceMarker(c);
+        setSecondSpaceMarker(null);
+        setSpaceMarkerPlacing(false);
+        setSpaceMode("insert");
+      },
+      startRemove: () => {
+        const c = centre();
+        // Initial remove-zone half-extent in world units — a comfortable
+        // box the user can resize by dragging either marker.
+        const off = 80;
+        setSpaceMarker({ x: c.x - off, y: c.y - off });
+        setSecondSpaceMarker({ x: c.x + off, y: c.y + off });
+        setSpaceMarkerPlacing(false);
+        setSpaceMode("remove");
+      },
     };
   }
 
@@ -1884,6 +1928,9 @@ export function Canvas({
     //                                 (drag updates it in real time)
     if (e.ctrlKey && onInsertSpace) {
       const worldPt = clientToWorld(e.clientX, e.clientY);
+      // Ad-hoc Ctrl+click gesture — not button-initiated, so clear any
+      // stale button mode and fall back to the step-by-step Escape cascade.
+      setSpaceMode(null);
       const placingSecond = spaceMarker !== null;
       if (placingSecond) {
         setSecondSpaceMarker(worldPt);
@@ -3285,6 +3332,18 @@ export function Canvas({
         setRemovalConfirm(null);
         return;
       }
+      // Toolbar-button gestures exit completely on the first Escape —
+      // that's the user's expected "back to normal canvas". Clears both
+      // markers in one press regardless of insert/remove.
+      if (spaceMode) {
+        setSpaceMarker(null);
+        setSecondSpaceMarker(null);
+        setSpaceMarkerPlacing(false);
+        setSpaceMode(null);
+        return;
+      }
+      // Ctrl+click gestures keep the step-by-step cascade: drop the 2nd
+      // marker first, then the 1st.
       if (secondSpaceMarker) {
         setSecondSpaceMarker(null);
         return;
@@ -6455,6 +6514,7 @@ export function Canvas({
             setRemovalConfirm(null);
             setSpaceMarker(null);
             setSecondSpaceMarker(null);
+            setSpaceMode(null);
             if (onRemoveSpace) {
               onRemoveSpace(z, {
                 preserveIds: Array.from(sel.preserve),

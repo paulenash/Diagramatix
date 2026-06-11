@@ -123,7 +123,7 @@ function DiagramCard({
       draggable
       onDragStart={(e) => { e.dataTransfer.setData("text/plain", diagram.id); onDragStart?.(); }}
       onDragEnd={() => onDragEnd?.()}
-      onClick={() => router.push(`/diagram/${diagram.id}`)}
+      onClick={() => router.push(`/diagram/${diagram.id}?from=/dashboard`)}
       className="bg-white border border-gray-200 rounded px-3 py-2 hover:border-blue-300 hover:shadow-sm cursor-pointer group transition-all relative"
     >
       <div className="flex items-center justify-between">

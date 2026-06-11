@@ -124,7 +124,7 @@ export function PublishedSection() {
             {diagrams.map(d => (
               <button
                 key={d.id}
-                onClick={() => router.push(`/diagram/${d.id}`)}
+                onClick={() => router.push(`/diagram/${d.id}?from=/dashboard`)}
                 className="text-left bg-white border border-gray-200 rounded-lg p-3 hover:border-blue-400 hover:shadow transition"
               >
                 <div className="flex items-start justify-between gap-2">

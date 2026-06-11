@@ -91,6 +91,11 @@ interface Props {
   /** Current user's id, for the "am I the diagram owner?" check that
    *  gates the publish button. */
   currentUserId?: string;
+  /** Optional back-link override (from `?from=`). When set, the header's
+   *  back button returns here instead of the project/dashboard derived
+   *  from `projectId`. Used so diagrams opened from the dashboard's
+   *  Published / Unorganised sections return to the dashboard. */
+  backFromHref?: string | null;
   /** Persisted lifecycle state — drives the header pill and the
    *  visibility of the publish-version button. */
   initialLifecycle?: "DRAFT" | "PUBLISHED" | "ARCHIVED";
@@ -341,6 +346,7 @@ export function DiagramEditor({
   diagramOwnerCandidates = [],
   canEditDiagramOwner = false,
   currentUserId,
+  backFromHref = null,
   initialLifecycle = "DRAFT",
   initialCurrentPublishedVersion = null,
   initialReviewCadenceMonths = null,
@@ -594,17 +600,31 @@ export function DiagramEditor({
     }
   }, [router, projectId]);
 
+  // Back-link target + label. `?from=` (backFromHref) wins when present —
+  // that's how a diagram opened from the dashboard's Published / Unorganised
+  // sections returns to the dashboard rather than to the project it lives
+  // in. Otherwise: project if the diagram has one, else dashboard.
+  const backHref = backFromHref ?? (projectId ? `/dashboard/projects/${projectId}` : "/dashboard");
+  const backLabel = backHref === "/dashboard"
+    ? "Dashboard"
+    : backHref.startsWith("/dashboard/projects")
+      ? "Project"
+      : backHref.startsWith("/dashboard")
+        ? "Dashboard"
+        : "Back";
+
   const handleBackToProject = useCallback(async () => {
     if ((await confirmSaveBeforeLeave()) === "cancel") return;
     sessionStorage.removeItem(STACK_KEY);
-    // Always navigate directly to the project (or dashboard if no project).
-    // Previously this fell through to router.back() which walked browser
-    // history one diagram at a time — when the user had clicked through
-    // several diagrams via the prev/next folder traversal, "Back to
-    // Project" would step through each visited diagram instead of
-    // jumping straight to the project screen.
-    router.push(projectId ? `/dashboard/projects/${projectId}` : "/dashboard");
-  }, [router, projectId]);
+    // Navigate to the resolved back target. `?from=` overrides the
+    // project/dashboard default so dashboard-opened diagrams return to
+    // the dashboard. Previously this fell through to router.back() which
+    // walked browser history one diagram at a time — when the user had
+    // clicked through several diagrams via the prev/next folder traversal,
+    // "Back" would step through each visited diagram instead of jumping
+    // straight to the target screen.
+    router.push(backHref);
+  }, [router, backHref]);
 
   const {
     data,
@@ -889,6 +909,10 @@ export function DiagramEditor({
   const [showTemplateNameModal, setShowTemplateNameModal] = useState(false);
   const [pendingTemplateData, setPendingTemplateData] = useState<TemplateData | null>(null);
   const getViewportCenterRef = useRef<(() => Point) | null>(null);
+  // Imperative handle for the "Space" toolbar button — Canvas populates
+  // this with startInsert / startRemove (places the markers at the
+  // viewport centre). See Canvas spaceActionRef.
+  const spaceActionRef = useRef<{ startInsert: () => void; startRemove: () => void } | null>(null);
   const templateDropdownRef = useRef<HTMLDivElement>(null);
 
   // Alignment dropdown state
@@ -897,6 +921,13 @@ export function DiagramEditor({
   // Resize dropdown state
   const [resizeDropdownOpen, setResizeDropdownOpen] = useState(false);
   const resizeDropdownRef = useRef<HTMLDivElement>(null);
+  // Publish dropdown state — consolidates lifecycle status + Publish
+  // version + Publish bundle under one B&W trigger.
+  const [publishDropdownOpen, setPublishDropdownOpen] = useState(false);
+  const publishDropdownRef = useRef<HTMLDivElement>(null);
+  // Space dropdown state — Insert Space / Remove Space (BPMN + state-machine).
+  const [spaceDropdownOpen, setSpaceDropdownOpen] = useState(false);
+  const spaceDropdownRef = useRef<HTMLDivElement>(null);
 
   // File menu state (Export, Import, PDF scale popover)
   const [fileMenuOpen, setFileMenuOpen] = useState(false);
@@ -1190,6 +1221,30 @@ export function DiagramEditor({
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, [alignDropdownOpen]);
+
+  // Close publish dropdown on outside click
+  useEffect(() => {
+    if (!publishDropdownOpen) return;
+    function handleClick(e: MouseEvent) {
+      if (publishDropdownRef.current && !publishDropdownRef.current.contains(e.target as Node)) {
+        setPublishDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [publishDropdownOpen]);
+
+  // Close space dropdown on outside click
+  useEffect(() => {
+    if (!spaceDropdownOpen) return;
+    function handleClick(e: MouseEvent) {
+      if (spaceDropdownRef.current && !spaceDropdownRef.current.contains(e.target as Node)) {
+        setSpaceDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [spaceDropdownOpen]);
 
   // Close resize dropdown on outside click
   useEffect(() => {
@@ -1907,7 +1962,7 @@ export function DiagramEditor({
           className="text-blue-600 hover:text-blue-800 text-xs flex items-center gap-1"
         >
           <span style={{ fontSize: "1.75em", lineHeight: 1 }}>{"\u2190"}</span>
-          <span className="underline">{projectId ? "Project" : "Dashboard"}</span>
+          <span className="underline">{backLabel}</span>
         </button>
         {/* Brand icon: sits just right of the back link as a permanent
             "you're inside Diagramatix" cue. h-5 keeps it inside the h-9 bar. */}
@@ -1945,71 +2000,111 @@ export function DiagramEditor({
           </button>
         )}
 
-        {/* Lifecycle pill — DRAFT / Published vN · date / Archived. Visible
-            to all roles (even read-only viewers should know what state the
-            diagram is in). Anchored before the Save button so it sits in
-            the same visual cluster as other status indicators. */}
-        {lifecycle === "PUBLISHED" && currentPublishedVersion && (
-          <span
-            className="text-[11px] text-blue-700 border border-blue-300 bg-blue-50 rounded px-2 py-0.5 font-medium"
-            title={`Last published ${new Date(currentPublishedVersion.publishedAt).toLocaleString()}`}
-          >
-            Published v{currentPublishedVersion.versionNumber}
-            <span className="text-blue-500/70 ml-1 font-normal">
-              · {new Date(currentPublishedVersion.publishedAt).toLocaleDateString()}
-            </span>
-          </span>
-        )}
-        {lifecycle === "DRAFT" && (
-          <span
-            className="text-[11px] text-gray-600 border border-gray-300 bg-gray-50 rounded px-2 py-0.5 font-medium"
-            title="Never published"
-          >
-            Draft
-          </span>
-        )}
-        {lifecycle === "ARCHIVED" && (
-          <span
-            className="text-[11px] text-gray-500 border border-gray-300 bg-gray-100 rounded px-2 py-0.5 font-medium"
-            title="Archived — hidden from business users"
-          >
-            Archived
-          </span>
+        {/* Lifecycle status pill — shown to anyone who is NOT the diagram
+            owner (read-only viewers, editors, non-owner project members).
+            They can't publish, but should still see the diagram's state.
+            Owners get the full Publish dropdown below instead. */}
+        {(readOnly || !isDiagramOwner) && (
+          <>
+            {lifecycle === "PUBLISHED" && currentPublishedVersion && (
+              <span
+                className="text-[11px] text-blue-700 border border-blue-300 bg-blue-50 rounded px-2 py-0.5 font-medium"
+                title={`Last published ${new Date(currentPublishedVersion.publishedAt).toLocaleString()}`}
+              >
+                Published v{currentPublishedVersion.versionNumber}
+                <span className="text-blue-500/70 ml-1 font-normal">
+                  · {new Date(currentPublishedVersion.publishedAt).toLocaleDateString()}
+                </span>
+              </span>
+            )}
+            {lifecycle === "DRAFT" && (
+              <span className="text-[11px] text-gray-600 border border-gray-300 bg-gray-50 rounded px-2 py-0.5 font-medium" title="Never published">
+                Draft
+              </span>
+            )}
+            {lifecycle === "ARCHIVED" && (
+              <span className="text-[11px] text-gray-500 border border-gray-300 bg-gray-100 rounded px-2 py-0.5 font-medium" title="Archived — hidden from business users">
+                Archived
+              </span>
+            )}
+          </>
         )}
 
-        {/* Publish version button — visible only to the Diagram Owner.
-            Disabled while there are unsaved changes so the snapshot
-            always captures saved-to-server content. */}
+        {/* Publish dropdown — owner-only. A single black-and-white trigger
+            that consolidates the lifecycle status + Publish version +
+            Publish bundle. The dropdown items keep their colours (blue
+            version, purple bundle); the bundle item is disabled until the
+            diagram has been published at least once. */}
         {!readOnly && isDiagramOwner && (
-          <button
-            onClick={async () => {
-              if (saveStatus === "unsaved") {
-                await saveNowRef.current();
-              }
-              setShowPublishDialog(true);
-            }}
-            title={
-              saveStatus === "unsaved"
-                ? "Save first; the publish button will then capture the saved snapshot"
-                : "Publish a new immutable version of this diagram"
-            }
-            className="px-2 py-0.5 text-[11px] font-medium text-blue-700 border border-blue-300 rounded hover:bg-blue-50"
-          >
-            Publish v{(currentPublishedVersion?.versionNumber ?? 0) + 1}…
-          </button>
-        )}
-
-        {/* Publish bundle button — visible only to Diagram Owner once
-            the diagram has at least one PublishedVersion. Pre-condition:
-            you can only bundle a diagram you've actually published. */}
-        {!readOnly && isDiagramOwner && lifecycle === "PUBLISHED" && projectId && (
-          <button
-            onClick={() => setShowPublishBundleDialog(true)}
-            title="Publish this diagram (and its linked descendants) to business users"
-            className="px-2 py-0.5 text-[11px] font-medium text-purple-700 border border-purple-300 rounded hover:bg-purple-50"
-          >
-            Publish bundle…
-          </button>
+          <div className="relative" ref={publishDropdownRef}>
+            <button
+              onClick={() => setPublishDropdownOpen(prev => !prev)}
+              className="px-2 py-0.5 text-[11px] font-medium text-gray-800 border border-gray-400 rounded hover:bg-gray-50"
+              title="Publish this diagram or a bundle"
+            >
+              Publish ▾
+            </button>
+            {publishDropdownOpen && (
+              <div className="absolute right-0 top-full mt-1 w-60 bg-white border border-gray-200 rounded shadow-lg z-50">
+                {/* Status header — current lifecycle state, keeps colours. */}
+                <div className="px-3 py-2 border-b border-gray-100 text-[11px]">
+                  {lifecycle === "PUBLISHED" && currentPublishedVersion ? (
+                    <span className="text-blue-700 font-medium">
+                      Published v{currentPublishedVersion.versionNumber}
+                      <span className="text-blue-500/70 font-normal ml-1">
+                        · {new Date(currentPublishedVersion.publishedAt).toLocaleDateString()}
+                      </span>
+                    </span>
+                  ) : lifecycle === "ARCHIVED" ? (
+                    <span className="text-gray-500 font-medium">Archived</span>
+                  ) : (
+                    <span className="text-gray-600 font-medium">Draft — not yet published</span>
+                  )}
+                </div>
+                {/* Publish version */}
+                <button
+                  onClick={async () => {
+                    setPublishDropdownOpen(false);
+                    if (saveStatus === "unsaved") {
+                      await saveNowRef.current();
+                    }
+                    setShowPublishDialog(true);
+                  }}
+                  title={
+                    saveStatus === "unsaved"
+                      ? "Saves first, then captures the saved snapshot"
+                      : "Publish a new immutable version of this diagram"
+                  }
+                  className="w-full text-left px-3 py-2 text-xs text-blue-700 hover:bg-blue-50 font-medium"
+                >
+                  Publish v{(currentPublishedVersion?.versionNumber ?? 0) + 1}…
+                </button>
+                {/* Publish bundle — disabled until published at least once. */}
+                <button
+                  onClick={() => {
+                    if (lifecycle !== "PUBLISHED" || !projectId) return;
+                    setPublishDropdownOpen(false);
+                    setShowPublishBundleDialog(true);
+                  }}
+                  disabled={lifecycle !== "PUBLISHED" || !projectId}
+                  title={
+                    lifecycle !== "PUBLISHED"
+                      ? "Publish a version first before bundling to business users"
+                      : !projectId
+                        ? "Move this diagram into a project before bundling"
+                        : "Publish this diagram (and its linked descendants) to business users"
+                  }
+                  className={`w-full text-left px-3 py-2 text-xs font-medium ${
+                    lifecycle === "PUBLISHED" && projectId
+                      ? "text-purple-700 hover:bg-purple-50"
+                      : "text-gray-400 cursor-not-allowed"
+                  }`}
+                >
+                  Publish bundle…
+                </button>
+              </div>
+            )}
+          </div>
         )}
 
         {!readOnly && (
@@ -2017,16 +2112,16 @@ export function DiagramEditor({
             <button
               onClick={saveNow}
               disabled={saveStatus !== "unsaved"}
-              title="Save (Ctrl+S)"
-              className={`px-2 py-0.5 text-[11px] font-medium rounded border ${
+              title={saveStatus === "unsaved" ? "Unsaved changes — click to save (Ctrl+S)" : "Save (Ctrl+S)"}
+              className={`w-24 text-center px-2 py-0.5 text-[11px] font-medium rounded border ${
                 saveStatus === "unsaved"
                   ? "bg-orange-500 text-white border-orange-500 hover:bg-orange-600"
                   : saveStatus === "saving"
                     ? "bg-yellow-50 text-yellow-700 border-yellow-300"
-                    : "bg-green-50 text-green-600 border-green-200"
+                    : "bg-green-50 text-green-700 border-green-300"
               }`}
             >
-              {saveStatus === "saving" ? "Saving\u2026" : saveStatus === "saved" ? "\u2713 Saved" : "\u25CF Unsaved — Click to Save"}
+              {saveStatus === "saving" ? "Saving\u2026" : saveStatus === "saved" ? "\u2713 Saved" : "\u25CF Unsaved"}
             </button>
 
             {/* Prev / next folder-mate navigation. Roughly 2x the size of
@@ -2088,6 +2183,46 @@ export function DiagramEditor({
                 </svg>
               </button>
             </div>
+
+            {/* Space tools — BPMN + state-machine only. Insert Space drops
+                one green marker at the viewport centre (then Shift+drag to
+                push elements apart); Remove Space drops the two red markers
+                (reposition, then Enter to collapse the highlighted band).
+                Escape exits the gesture. */}
+            {(diagramType === "bpmn" || diagramType === "state-machine") && (
+              <div className="relative" ref={spaceDropdownRef}>
+                <button
+                  onClick={() => setSpaceDropdownOpen(prev => !prev)}
+                  className="px-2 py-0.5 text-[11px] text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
+                  title="Insert or remove space on the canvas"
+                >
+                  Space ▾
+                </button>
+                {spaceDropdownOpen && (
+                  <div className="absolute right-0 top-full mt-1 w-64 bg-white border border-gray-200 rounded shadow-lg z-50">
+                    <button
+                      onClick={() => { setSpaceDropdownOpen(false); spaceActionRef.current?.startInsert(); }}
+                      className="w-full text-left px-3 py-2 text-xs text-green-700 hover:bg-green-50 font-medium"
+                    >
+                      Insert Space
+                      <span className="block text-[10px] text-gray-500 font-normal mt-0.5">
+                        Move the green marker, then Shift+drag to insert.
+                      </span>
+                    </button>
+                    <div className="border-t border-gray-100" />
+                    <button
+                      onClick={() => { setSpaceDropdownOpen(false); spaceActionRef.current?.startRemove(); }}
+                      className="w-full text-left px-3 py-2 text-xs text-red-700 hover:bg-red-50 font-medium"
+                    >
+                      Remove Space
+                      <span className="block text-[10px] text-gray-500 font-normal mt-0.5">
+                        Move the red markers, then Enter to remove. Esc cancels.
+                      </span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </>
         )}
 
@@ -2973,6 +3108,7 @@ export function DiagramEditor({
           displayMode={displayMode}
           debugMode={debugMode}
           getViewportCenterRef={getViewportCenterRef}
+          spaceActionRef={spaceActionRef}
           diagramName={diagramName}
           createdAt={createdAt}
           updatedAt={effectiveUpdatedAt}

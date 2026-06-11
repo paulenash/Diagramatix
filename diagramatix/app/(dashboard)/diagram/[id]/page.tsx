@@ -11,7 +11,7 @@ import { getEffectiveUserId, isImpersonating, getImpersonationMode, SUPERUSER_EM
 import { tryGetCurrentOrgId, getDiagramAccess } from "@/app/lib/auth/orgContext";
 import { isAssignedReviewer } from "@/app/lib/reviewProjects";
 
-type Props = { params: Promise<{ id: string }>; searchParams: Promise<{ review?: string }> };
+type Props = { params: Promise<{ id: string }>; searchParams: Promise<{ review?: string; from?: string }> };
 
 export default async function DiagramPage({ params, searchParams }: Props) {
   const session = await auth();
@@ -28,7 +28,14 @@ export default async function DiagramPage({ params, searchParams }: Props) {
   }
 
   const { id } = await params;
-  const { review: reviewParam } = await searchParams;
+  const { review: reviewParam, from: fromParam } = await searchParams;
+
+  // `?from=` lets the caller override the back-link target. A diagram in a
+  // project normally returns to its project; but when it's opened from the
+  // dashboard (Published-by-me or Unorganised sections) we want Back to
+  // return to the dashboard, not surface the project the diagram happens
+  // to live in. Only same-origin absolute paths are honoured.
+  const backFromHref = fromParam && fromParam.startsWith("/") ? fromParam : null;
 
   const orgId = await tryGetCurrentOrgId(session, cookieStore);
   if (!orgId) redirect("/dashboard");
@@ -247,6 +254,7 @@ export default async function DiagramPage({ params, searchParams }: Props) {
         diagramOwnerCandidates={diagramOwnerCandidates}
         canEditDiagramOwner={isProjectOwner}
         currentUserId={session.user.id}
+        backFromHref={backFromHref}
         initialLifecycle={diagram.lifecycle}
         initialCurrentPublishedVersion={currentPublishedVersionSummary}
         initialReviewCadenceMonths={diagram.reviewCadenceMonths}
