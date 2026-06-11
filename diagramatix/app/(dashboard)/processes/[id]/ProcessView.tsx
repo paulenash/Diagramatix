@@ -187,9 +187,9 @@ export function ProcessView({
   const viewportCenterStub = () => ({ x: 0, y: 0 });
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="h-screen bg-gray-50 flex flex-col overflow-hidden">
       {/* Title bar — slim, no editor chrome. */}
-      <header className="bg-white border-b border-gray-200 px-4 py-2 flex items-center gap-3 text-xs">
+      <header className="bg-white border-b border-gray-200 px-4 py-2 flex items-center gap-3 text-xs flex-shrink-0">
         {(stackDepth > 0 || bundleId) && (
           <button
             onClick={handleDrillBack}
@@ -239,7 +239,7 @@ export function ProcessView({
       {/* Pick-mode banner — shown while the user is choosing an element
           to attach feedback to. */}
       {pickMode && (
-        <div className="bg-blue-600 text-white text-xs px-4 py-1.5 flex items-center justify-between">
+        <div className="bg-blue-600 text-white text-xs px-4 py-1.5 flex items-center justify-between flex-shrink-0">
           <span>Click an element on the canvas to attach your feedback to it.</span>
           <button
             onClick={() => { setPickMode(false); setFeedbackOpen(true); }}
@@ -253,7 +253,7 @@ export function ProcessView({
       {/* Canvas — readOnly + drill traversal. All mutation handlers are
           no-ops. The Canvas's own pan+zoom logic stays active so the
           user can scroll and zoom freely. */}
-      <main className="flex-1 relative">
+      <main className="flex-1 relative overflow-hidden min-h-0">
         <Canvas
           data={data}
           diagramType={diagramType}
