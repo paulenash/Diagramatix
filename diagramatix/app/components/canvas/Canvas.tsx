@@ -729,6 +729,9 @@ export function Canvas({
   // for the click point. The bubble's bottom-left lands above/right
   // of that point; BubbleHelp itself flips below if there's no room.
   const showBubbleHelp = useCallback((topicKey: string, worldX: number, worldY: number) => {
+    // Never show help clouds in the read-only published viewer — selecting
+    // an element there (e.g. clicking a feedback item) must not pop a cloud.
+    if (readOnly) return;
     if (!bubbleHelpEnabled) return;
     const row = bubbleHelpMap.get(topicKey);
     if (!row || !row.text.trim()) return;
@@ -736,7 +739,7 @@ export function Canvas({
     if (bubbleHelpTimerRef.current) clearTimeout(bubbleHelpTimerRef.current);
     setBubbleHelpAnchor({ x: worldX, y: worldY, text: row.text });
     bubbleHelpTimerRef.current = setTimeout(() => setBubbleHelpAnchor(null), row.durationMs);
-  }, [bubbleHelpEnabled, bubbleHelpMap]);
+  }, [readOnly, bubbleHelpEnabled, bubbleHelpMap]);
   // Canvas-background trigger uses the same function — the
   // background-click path already had world coords.
   const showBubbleHelpAtPoint = showBubbleHelp;
