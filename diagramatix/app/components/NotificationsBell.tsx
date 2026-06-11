@@ -145,6 +145,18 @@ export function NotificationsBell({
           onClick: () => { markRead(r.id); setOpen(false); if (p.diagramId) window.location.href = `/diagram/${p.diagramId}`; },
         };
       }
+      case "feedback-received": {
+        const diagramName = p.diagramName ?? "your diagram";
+        return {
+          label: `${fromName} left feedback on "${diagramName}"`,
+          sublabel: "Click to open the diagram and view the feedback",
+          onClick: () => {
+            markRead(r.id);
+            setOpen(false);
+            if (p.diagramId) window.location.href = `/diagram/${p.diagramId}?feedback=1`;
+          },
+        };
+      }
       default:
         return { label: r.type };
     }

@@ -11,7 +11,7 @@ import { getEffectiveUserId, isImpersonating, getImpersonationMode, SUPERUSER_EM
 import { tryGetCurrentOrgId, getDiagramAccess } from "@/app/lib/auth/orgContext";
 import { isAssignedReviewer } from "@/app/lib/reviewProjects";
 
-type Props = { params: Promise<{ id: string }>; searchParams: Promise<{ review?: string; from?: string }> };
+type Props = { params: Promise<{ id: string }>; searchParams: Promise<{ review?: string; from?: string; feedback?: string }> };
 
 export default async function DiagramPage({ params, searchParams }: Props) {
   const session = await auth();
@@ -28,7 +28,10 @@ export default async function DiagramPage({ params, searchParams }: Props) {
   }
 
   const { id } = await params;
-  const { review: reviewParam, from: fromParam } = await searchParams;
+  const { review: reviewParam, from: fromParam, feedback: feedbackParam } = await searchParams;
+  // `?feedback=1` (from a feedback-received notification) auto-opens the
+  // owner's FeedbackPanel on load.
+  const openFeedbackPanel = feedbackParam === "1";
 
   // `?from=` lets the caller override the back-link target. A diagram in a
   // project normally returns to its project; but when it's opened from the
@@ -255,6 +258,7 @@ export default async function DiagramPage({ params, searchParams }: Props) {
         canEditDiagramOwner={isProjectOwner}
         currentUserId={session.user.id}
         backFromHref={backFromHref}
+        openFeedbackPanel={openFeedbackPanel}
         initialLifecycle={diagram.lifecycle}
         initialCurrentPublishedVersion={currentPublishedVersionSummary}
         initialReviewCadenceMonths={diagram.reviewCadenceMonths}

@@ -97,6 +97,9 @@ interface Props {
    *  from `projectId`. Used so diagrams opened from the dashboard's
    *  Published / Unorganised sections return to the dashboard. */
   backFromHref?: string | null;
+  /** When true (from `?feedback=1`, e.g. a feedback-received notification),
+   *  the FeedbackPanel opens automatically on load. */
+  openFeedbackPanel?: boolean;
   /** Persisted lifecycle state — drives the header pill and the
    *  visibility of the publish-version button. */
   initialLifecycle?: "DRAFT" | "PUBLISHED" | "ARCHIVED";
@@ -348,6 +351,7 @@ export function DiagramEditor({
   canEditDiagramOwner = false,
   currentUserId,
   backFromHref = null,
+  openFeedbackPanel = false,
   initialLifecycle = "DRAFT",
   initialCurrentPublishedVersion = null,
   initialReviewCadenceMonths = null,
@@ -533,8 +537,9 @@ export function DiagramEditor({
   const [showSupportDialog, setShowSupportDialog] = useState(false);
   const [supportSentToast, setSupportSentToast] = useState(false);
   // Feedback panel (owner-only) — lists business-user feedback on this
-  // published diagram and lets the owner triage it.
-  const [showFeedbackPanel, setShowFeedbackPanel] = useState(false);
+  // published diagram and lets the owner triage it. Opens automatically
+  // when arrived via a feedback-received notification (?feedback=1).
+  const [showFeedbackPanel, setShowFeedbackPanel] = useState(openFeedbackPanel);
 
   // Save As dialog — clone the current diagram (data + colour/display config)
   // into the same project under a new name, then navigate to it.
