@@ -32,6 +32,7 @@ import { SendForReviewDialog } from "./SendForReviewDialog";
 import { PublishVersionDialog } from "./PublishVersionDialog";
 import { PublishBundleDialog } from "./PublishBundleDialog";
 import { SupportRequestDialog } from "./SupportRequestDialog";
+import { FeedbackPanel } from "./FeedbackPanel";
 import { AlertDialog } from "@/app/components/AlertDialog";
 import { DiagramatixThrobber } from "@/app/components/DiagramatixThrobber";
 import { checkDiagram, rulesMetadata, type Violation } from "@/app/lib/diagram/checks/diagramChecks";
@@ -531,6 +532,9 @@ export function DiagramEditor({
   const [showPublishBundleDialog, setShowPublishBundleDialog] = useState(false);
   const [showSupportDialog, setShowSupportDialog] = useState(false);
   const [supportSentToast, setSupportSentToast] = useState(false);
+  // Feedback panel (owner-only) — lists business-user feedback on this
+  // published diagram and lets the owner triage it.
+  const [showFeedbackPanel, setShowFeedbackPanel] = useState(false);
 
   // Save As dialog — clone the current diagram (data + colour/display config)
   // into the same project under a new name, then navigate to it.
@@ -2107,6 +2111,18 @@ export function DiagramEditor({
           </div>
         )}
 
+        {/* Feedback button — owner-only, once published. Opens the
+            FeedbackPanel listing business-user feedback on this diagram. */}
+        {!readOnly && isDiagramOwner && lifecycle === "PUBLISHED" && (
+          <button
+            onClick={() => setShowFeedbackPanel(prev => !prev)}
+            title="View business-user feedback on this published diagram"
+            className="px-2 py-0.5 text-[11px] font-medium text-gray-800 border border-gray-400 rounded hover:bg-gray-50"
+          >
+            Feedback
+          </button>
+        )}
+
         {!readOnly && (
           <>
             <button
@@ -3663,6 +3679,17 @@ export function DiagramEditor({
         <div className="fixed bottom-6 right-6 bg-green-600 text-white text-sm font-medium rounded shadow-lg px-4 py-2 z-50">
           Sent to support — they&apos;ll reply by email.
         </div>
+      )}
+
+      {showFeedbackPanel && (
+        <FeedbackPanel
+          diagramId={diagramId}
+          onFocusElement={(elementId) => {
+            // Select the pinned element so it highlights on the canvas.
+            setSelectedElementIds(new Set([elementId]));
+          }}
+          onClose={() => setShowFeedbackPanel(false)}
+        />
       )}
 
       {showSaveAs && (

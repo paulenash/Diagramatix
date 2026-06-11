@@ -253,6 +253,13 @@ interface Props {
    *  places the two red markers (then the user repositions + presses
    *  Enter). Populated by Canvas, called by DiagramEditor. */
   spaceActionRef?: React.MutableRefObject<{ startInsert: () => void; startRemove: () => void } | null>;
+  /** Click-to-attach mode for the published viewer's feedback flow. When
+   *  true, a transparent overlay captures the next canvas click, hit-tests
+   *  it against the elements, and reports the topmost match via
+   *  onPickElement (then the parent turns the mode off). Works even on a
+   *  readOnly canvas — the overlay sets its own pointer-events. */
+  pickElementMode?: boolean;
+  onPickElement?: (elementId: string, label: string) => void;
   diagramName?: string;
   createdAt?: string;
   updatedAt?: string;
@@ -475,6 +482,8 @@ export function Canvas({
   onUpdateConnectorFields,
   getViewportCenterRef,
   spaceActionRef,
+  pickElementMode,
+  onPickElement,
   diagramName,
   createdAt,
   updatedAt,
@@ -5633,6 +5642,39 @@ export function Canvas({
                 strokeWidth={1 / zoom}
                 strokeDasharray={`${4 / zoom} ${4 / zoom}`}
                 style={{ pointerEvents: "none" }}
+              />
+            );
+          })()}
+
+          {/* Pick-element overlay (published-viewer feedback). A huge
+              transparent rect on top of the content captures the next
+              click, converts it to world coords, and hit-tests against
+              the elements (topmost / last-drawn wins) so the user can
+              attach feedback to a specific element. Sets its own
+              pointer-events so it works on a readOnly canvas. */}
+          {pickElementMode && (() => {
+            const extent = 100000;
+            return (
+              <rect
+                x={-extent} y={-extent} width={extent * 2} height={extent * 2}
+                fill="transparent"
+                style={{ pointerEvents: "all", cursor: "crosshair" }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const wp = clientToWorld(e.clientX, e.clientY);
+                  // Search last-to-first so the topmost (most recently
+                  // drawn) element containing the point wins — typically
+                  // the small child sitting on top of a pool/lane.
+                  let hit: typeof data.elements[number] | undefined;
+                  for (let i = data.elements.length - 1; i >= 0; i--) {
+                    const el = data.elements[i];
+                    if (wp.x >= el.x && wp.x <= el.x + el.width && wp.y >= el.y && wp.y <= el.y + el.height) {
+                      hit = el;
+                      break;
+                    }
+                  }
+                  if (hit) onPickElement?.(hit.id, hit.label ?? "");
+                }}
               />
             );
           })()}

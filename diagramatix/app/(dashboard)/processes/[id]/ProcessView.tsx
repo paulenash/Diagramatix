@@ -7,6 +7,7 @@ import { Canvas } from "@/app/components/canvas/Canvas";
 import type { DiagramData, DiagramType } from "@/app/lib/diagram/types";
 import type { SymbolColorConfig } from "@/app/lib/diagram/colors";
 import type { DisplayMode } from "@/app/lib/diagram/displayMode";
+import { FeedbackDialog } from "./FeedbackDialog";
 
 // View-stack key — deliberately separate from the editor's
 // `dgx_drill_stack` so the two stacks can't pollute each other if a
@@ -125,6 +126,55 @@ export function ProcessView({
     : "—";
   const processOwnerDisplay = processOwnerLabel?.name ?? processOwnerLabel?.email ?? null;
 
+  // ── Feedback flow ─────────────────────────────────────────────────
+  // `feedbackOpen` shows the dialog. `pickMode` arms the canvas overlay
+  // and hides the dialog so the user can click an element; the picked
+  // element comes back via onPickElement and the dialog reopens.
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [pickMode, setPickMode] = useState(false);
+  const [attachedElement, setAttachedElement] = useState<{ id: string; label: string } | null>(null);
+  const [feedbackBody, setFeedbackBody] = useState("");
+  const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
+  const [feedbackError, setFeedbackError] = useState<string | null>(null);
+  const [feedbackSentToast, setFeedbackSentToast] = useState(false);
+
+  const handlePickElement = useCallback((elementId: string, label: string) => {
+    setAttachedElement({ id: elementId, label });
+    setPickMode(false);
+    setFeedbackOpen(true);
+  }, []);
+
+  async function submitFeedback() {
+    if (feedbackSubmitting || !feedbackBody.trim()) return;
+    setFeedbackSubmitting(true);
+    setFeedbackError(null);
+    try {
+      const res = await fetch(`/api/diagrams/${diagramId}/feedback`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          body: feedbackBody.trim(),
+          attachedElementId: attachedElement?.id ?? null,
+          bundleId,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: res.statusText }));
+        setFeedbackError(err.error ?? `Failed (${res.status})`);
+        return;
+      }
+      setFeedbackOpen(false);
+      setFeedbackBody("");
+      setAttachedElement(null);
+      setFeedbackSentToast(true);
+      setTimeout(() => setFeedbackSentToast(false), 4000);
+    } catch (err) {
+      setFeedbackError(err instanceof Error ? err.message : "Network error");
+    } finally {
+      setFeedbackSubmitting(false);
+    }
+  }
+
   // Canvas was built for the editor — it needs a forest of mutation
   // handlers. In the viewer they're all no-ops; readOnly=true on the
   // Canvas already disables interaction via pointer-events:none, but we
@@ -178,13 +228,27 @@ export function ProcessView({
         </div>
         <button
           type="button"
-          disabled
-          className="text-[11px] text-gray-400 border border-gray-200 rounded px-2 py-0.5 cursor-not-allowed"
-          title="Feedback to the diagram owner — coming in the next phase"
+          onClick={() => { setFeedbackError(null); setFeedbackOpen(true); }}
+          className="text-[11px] text-blue-700 border border-blue-300 rounded px-2 py-0.5 hover:bg-blue-50 font-medium"
+          title="Send feedback to the diagram owner"
         >
           Feedback
         </button>
       </header>
+
+      {/* Pick-mode banner — shown while the user is choosing an element
+          to attach feedback to. */}
+      {pickMode && (
+        <div className="bg-blue-600 text-white text-xs px-4 py-1.5 flex items-center justify-between">
+          <span>Click an element on the canvas to attach your feedback to it.</span>
+          <button
+            onClick={() => { setPickMode(false); setFeedbackOpen(true); }}
+            className="underline hover:no-underline"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
 
       {/* Canvas — readOnly + drill traversal. All mutation handlers are
           no-ops. The Canvas's own pan+zoom logic stays active so the
@@ -216,8 +280,33 @@ export function ProcessView({
           defaultDirectionType="directed"
           defaultRoutingType="rectilinear"
           getViewportCenterRef={{ current: viewportCenterStub }}
+          pickElementMode={pickMode}
+          onPickElement={handlePickElement}
         />
       </main>
+
+      {feedbackOpen && !pickMode && (
+        <FeedbackDialog
+          diagramId={diagramId}
+          diagramName={diagramName}
+          bundleId={bundleId}
+          attachedElement={attachedElement}
+          body={feedbackBody}
+          onBodyChange={setFeedbackBody}
+          submitting={feedbackSubmitting}
+          error={feedbackError}
+          onStartPick={() => { setFeedbackOpen(false); setPickMode(true); }}
+          onClearAttached={() => setAttachedElement(null)}
+          onSubmit={submitFeedback}
+          onClose={() => setFeedbackOpen(false)}
+        />
+      )}
+
+      {feedbackSentToast && (
+        <div className="fixed bottom-6 right-6 bg-green-600 text-white text-sm font-medium rounded shadow-lg px-4 py-2 z-50">
+          Feedback sent — thank you.
+        </div>
+      )}
     </div>
   );
 }
