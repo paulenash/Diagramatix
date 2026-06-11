@@ -78,17 +78,22 @@ export async function POST(req: Request, { params }: Params) {
   return NextResponse.json({ ok: true, feedbackId: created.id });
 }
 
-// GET /api/diagrams/[id]/feedback — list all feedback on the diagram.
+// GET /api/diagrams/[id]/feedback — list feedback on the diagram.
 //
-// Owner-only (diagramOwnerId === caller). Returns every feedback row,
-// newest first, with author identity + the version + bundle it came
-// through, for the editor's FeedbackPanel.
-export async function GET(_req: Request, { params }: Params) {
+// Two modes:
+//   • Default (owner): the diagram owner sees ALL feedback, for the
+//     editor's FeedbackPanel.
+//   • ?mine=1 (any author): a business user sees only the feedback they
+//     themselves filed, for the live list in the published viewer.
+//
+// Returns rows newest-first with author identity + version + bundle.
+export async function GET(req: Request, { params }: Params) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const { id } = await params;
+  const mine = new URL(req.url).searchParams.get("mine") === "1";
 
   const diagram = await prisma.diagram.findUnique({
     where: { id },
@@ -97,12 +102,17 @@ export async function GET(_req: Request, { params }: Params) {
   if (!diagram) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  if (diagram.diagramOwnerId !== session.user.id) {
-    return NextResponse.json({ error: "Only the Diagram Owner can view feedback" }, { status: 403 });
+
+  // Owner sees all; ?mine=1 scopes to the caller's own feedback (any
+  // author may read their own). A non-owner without ?mine=1 is rejected.
+  if (!mine && diagram.diagramOwnerId !== session.user.id) {
+    return NextResponse.json({ error: "Only the Diagram Owner can view all feedback" }, { status: 403 });
   }
 
   const feedback = await prisma.diagramFeedback.findMany({
-    where: { diagramId: id },
+    where: mine
+      ? { diagramId: id, authorId: session.user.id }
+      : { diagramId: id },
     select: {
       id: true,
       body: true,

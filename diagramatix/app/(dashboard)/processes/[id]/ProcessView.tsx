@@ -138,6 +138,32 @@ export function ProcessView({
   const [feedbackError, setFeedbackError] = useState<string | null>(null);
   const [feedbackSentToast, setFeedbackSentToast] = useState(false);
 
+  // The user's own previously-submitted feedback on this diagram, shown
+  // in a collapsible list on the right. Clicking an item highlights the
+  // attached element on the canvas.
+  type MyFeedback = { id: string; body: string; attachedElementId: string | null; createdAt: string };
+  const [myFeedback, setMyFeedback] = useState<MyFeedback[]>([]);
+  const [feedbackListOpen, setFeedbackListOpen] = useState(true);
+  // Highlight on the canvas — set when the user clicks a feedback item
+  // with a pinned element. Drives the Canvas selectedElementIds.
+  const [highlightedIds, setHighlightedIds] = useState<Set<string>>(new Set());
+
+  const fetchMyFeedback = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/diagrams/${diagramId}/feedback?mine=1`);
+      if (res.ok) {
+        const j = await res.json();
+        setMyFeedback(j.feedback ?? []);
+      }
+    } catch { /* silent — the list just stays as-is */ }
+  }, [diagramId]);
+
+  useEffect(() => { fetchMyFeedback(); }, [fetchMyFeedback]);
+
+  // Map element id → label for the feedback list (the API stores the id;
+  // the label is resolved from the published version's data we already have).
+  const elementLabelById = new Map(data.elements.map(el => [el.id, el.label ?? ""]));
+
   const handlePickElement = useCallback((elementId: string, label: string) => {
     setAttachedElement({ id: elementId, label });
     setPickMode(false);
@@ -167,6 +193,8 @@ export function ProcessView({
       setFeedbackBody("");
       setAttachedElement(null);
       setFeedbackSentToast(true);
+      setFeedbackListOpen(true);
+      fetchMyFeedback();
       setTimeout(() => setFeedbackSentToast(false), 4000);
     } catch (err) {
       setFeedbackError(err instanceof Error ? err.message : "Network error");
@@ -272,7 +300,7 @@ export function ProcessView({
           onAddConnector={noop}
           onDeleteConnector={noop}
           onUpdateConnectorEndpoint={noop}
-          selectedElementIds={new Set()}
+          selectedElementIds={highlightedIds}
           selectedConnectorId={null}
           onSetSelectedElements={noop}
           onSelectConnector={noop}
@@ -283,6 +311,69 @@ export function ProcessView({
           pickElementMode={pickMode}
           onPickElement={handlePickElement}
         />
+
+        {/* My-feedback list — collapsible column on the right. Shows the
+            feedback this user has filed on this diagram; clicking an item
+            highlights its pinned element on the canvas. Only rendered once
+            the user has at least one piece of feedback. */}
+        {myFeedback.length > 0 && (
+          feedbackListOpen ? (
+            <aside className="w-72 flex-shrink-0 border-l border-gray-200 bg-white flex flex-col overflow-hidden">
+              <div className="px-3 py-2 border-b border-gray-100 flex items-center justify-between">
+                <span className="text-xs font-semibold text-gray-900">
+                  My feedback ({myFeedback.length})
+                </span>
+                <button
+                  onClick={() => setFeedbackListOpen(false)}
+                  className="text-gray-500 hover:text-gray-800 text-xs"
+                  title="Collapse"
+                >
+                  ›
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-2 space-y-2">
+                {myFeedback.map(f => {
+                  const label = f.attachedElementId ? (elementLabelById.get(f.attachedElementId) ?? "") : "";
+                  const isHighlighted = !!f.attachedElementId && highlightedIds.has(f.attachedElementId);
+                  return (
+                    <button
+                      key={f.id}
+                      onClick={() => {
+                        if (f.attachedElementId) {
+                          setHighlightedIds(new Set([f.attachedElementId]));
+                        } else {
+                          setHighlightedIds(new Set());
+                        }
+                      }}
+                      className={`block w-full text-left border rounded p-2 transition-colors ${
+                        isHighlighted ? "border-blue-400 bg-blue-50" : "border-gray-200 hover:bg-gray-50"
+                      }`}
+                    >
+                      {f.attachedElementId ? (
+                        <span className="text-[10px] font-medium text-blue-700 block truncate mb-0.5">
+                          ▸ {label || "(unnamed element)"}
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-gray-400 block mb-0.5">No element attached</span>
+                      )}
+                      <span className="text-xs text-gray-800 block whitespace-pre-wrap break-words">{f.body}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </aside>
+          ) : (
+            <button
+              onClick={() => setFeedbackListOpen(true)}
+              className="w-8 flex-shrink-0 border-l border-gray-200 bg-white hover:bg-gray-50 flex items-center justify-center"
+              title={`Show my feedback (${myFeedback.length})`}
+            >
+              <span className="text-[10px] text-gray-600 [writing-mode:vertical-rl] rotate-180 tracking-wide">
+                Feedback ({myFeedback.length})
+              </span>
+            </button>
+          )
+        )}
       </main>
 
       {feedbackOpen && !pickMode && (

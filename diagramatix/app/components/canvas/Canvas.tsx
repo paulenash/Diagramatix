@@ -6439,7 +6439,9 @@ export function Canvas({
       })()}
 
       {/* Auto-connect 3-state cyclic toggle (off → to-only → on → off).
-          Persists across reloads via localStorage. */}
+          Persists across reloads via localStorage. Editing-only — hidden
+          in the read-only published viewer. */}
+      {!readOnly && (
       <button
         onClick={() => setAutoConnectMode((m) => m === "off" ? "to-only" : m === "to-only" ? "on" : "off")}
         className={`absolute bottom-2 right-2 flex items-center gap-1 rounded-full px-2 py-1 shadow-sm backdrop-blur-sm z-30 select-none border text-[11px] font-medium transition-colors ${
@@ -6473,11 +6475,14 @@ export function Canvas({
         </svg>
         Auto-connect: {autoConnectMode === "on" ? "ON" : autoConnectMode === "to-only" ? "TO ONLY" : "OFF"}
       </button>
+      )}
 
       {/* Bubble-help master toggle. ON = show the "Click and Drag to
           create a connector" cloud each time an element is single-
           selected (auto-dismiss after 10 s or next mousedown). OFF =
-          never show. Persists across reloads. */}
+          never show. Persists across reloads. Editing-only — hidden in
+          the read-only published viewer. */}
+      {!readOnly && (
       <button
         onClick={toggleBubbleHelp}
         style={{ right: "calc(0.5rem + 156px + 6px)" }}
@@ -6507,6 +6512,7 @@ export function Canvas({
         </svg>
         Bubble help: {bubbleHelpEnabled ? "ON" : "OFF"}
       </button>
+      )}
 
       {pendingArchiConn && (
         <ArchimateConnectorPicker
