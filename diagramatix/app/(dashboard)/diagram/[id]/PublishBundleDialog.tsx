@@ -318,7 +318,7 @@ export function PublishBundleDialog({
                         );
                       }}
                     />
-                    <span className="flex-1 truncate">{d.name}</span>
+                    <span className="flex-1 truncate text-gray-800">{d.name}</span>
                     <span className="text-[10px] text-gray-700 uppercase font-medium">{d.type}</span>
                     <span className={`text-[10px] px-1.5 py-0.5 rounded border ${
                       d.lifecycle === "PUBLISHED"
@@ -420,7 +420,7 @@ export function PublishBundleDialog({
               <div className="border border-gray-200 rounded mb-2">
                 {audience.map(a => (
                   <div key={a.id} className="flex items-center gap-2 px-2 py-1 text-xs border-b border-gray-100 last:border-b-0">
-                    <span className="flex-1 truncate">{a.name ?? a.email} <span className="text-gray-700">{a.email}</span></span>
+                    <span className="flex-1 truncate text-gray-800">{a.name ?? a.email} <span className="text-gray-600">{a.email}</span></span>
                     <button
                       onClick={() => setAudience(prev => prev.filter(x => x.id !== a.id))}
                       className="text-gray-600 hover:text-red-600 text-sm"
@@ -464,9 +464,9 @@ export function PublishBundleDialog({
                       setQuery("");
                       setCandidates([]);
                     }}
-                    className="block w-full text-left px-2 py-1 text-xs hover:bg-blue-50 border-b border-gray-100 last:border-b-0"
+                    className="block w-full text-left px-2 py-1 text-xs text-gray-800 hover:bg-blue-50 border-b border-gray-100 last:border-b-0"
                   >
-                    {c.name ?? c.email} <span className="text-gray-700">{c.email}</span>
+                    {c.name ?? c.email} <span className="text-gray-600">{c.email}</span>
                   </button>
                 ))}
                 {showInviteOption && (
@@ -476,12 +476,12 @@ export function PublishBundleDialog({
                       setQuery("");
                       setCandidates([]);
                     }}
-                    className="block w-full text-left px-2 py-1 text-xs hover:bg-blue-100 bg-blue-50 border-b border-gray-100 last:border-b-0"
+                    className="block w-full text-left px-2 py-1 text-xs text-gray-800 hover:bg-blue-100 bg-blue-50 border-b border-gray-100 last:border-b-0"
                   >
                     <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-200 text-blue-900 font-medium mr-2">
                       INVITE
                     </span>
-                    {queryNormalised} <span className="text-gray-700">— no existing account; they&apos;ll get an email</span>
+                    {queryNormalised} <span className="text-gray-600">— no existing account; they&apos;ll get an email</span>
                   </button>
                 )}
               </div>
@@ -500,7 +500,7 @@ export function PublishBundleDialog({
           </div>
           <div>
             <div className="text-xs font-medium text-gray-700 mb-1">Next review</div>
-            <div className="flex items-center gap-3 text-xs mb-2">
+            <div className="flex items-center gap-3 text-xs text-gray-800 mb-2">
               <label className="flex items-center gap-1">
                 <input type="radio" checked={reviewMode === "cadence"} onChange={() => setReviewMode("cadence")} />
                 <span>Cadence</span>
@@ -515,7 +515,7 @@ export function PublishBundleDialog({
               </label>
             </div>
             {reviewMode === "cadence" && (
-              <div className="flex items-center gap-2 text-xs">
+              <div className="flex items-center gap-2 text-xs text-gray-800">
                 <span>Every</span>
                 <input
                   type="number" min={1} max={120}
@@ -527,7 +527,7 @@ export function PublishBundleDialog({
               </div>
             )}
             {reviewMode === "date" && (
-              <div className="flex items-center gap-2 text-xs">
+              <div className="flex items-center gap-2 text-xs text-gray-800">
                 <span>Next review on</span>
                 <input type="date" value={reviewDate} onChange={e => setReviewDate(e.target.value)} className="border border-gray-300 rounded px-2 py-1" />
               </div>
