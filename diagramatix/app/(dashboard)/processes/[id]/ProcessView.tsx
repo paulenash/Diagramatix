@@ -253,7 +253,7 @@ export function ProcessView({
       {/* Canvas — readOnly + drill traversal. All mutation handlers are
           no-ops. The Canvas's own pan+zoom logic stays active so the
           user can scroll and zoom freely. */}
-      <main className="flex-1 relative overflow-hidden min-h-0">
+      <main className="flex flex-1 overflow-hidden min-h-0">
         <Canvas
           data={data}
           diagramType={diagramType}
