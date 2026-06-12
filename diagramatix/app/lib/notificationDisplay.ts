@@ -44,6 +44,21 @@ export const NOTIFICATION_CATEGORY: Record<string, string> = {
   "review-due": "Review Due",
 };
 
+// Per-category colour for the type chip — mirrors the colour-coding used
+// for Collaboration Group / review status pills so the list scans by hue.
+export const CATEGORY_CHIP_STYLE: Record<string, string> = {
+  "Collaboration Group": "bg-indigo-100 text-indigo-800",
+  "Diagram Review": "bg-purple-100 text-purple-800",
+  "Publishing": "bg-green-100 text-green-800",
+  "Publish Feedback": "bg-amber-100 text-amber-800",
+  "Review Due": "bg-red-100 text-red-800",
+  "Other": "bg-gray-200 text-gray-700",
+};
+
+export function categoryChipStyle(type: string): string {
+  return CATEGORY_CHIP_STYLE[categoryLabel(type)] ?? CATEGORY_CHIP_STYLE.Other;
+}
+
 export function typeLabel(type: string): string {
   return NOTIFICATION_TYPE_LABEL[type] ?? type;
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { signOut } from "next-auth/react";
 import type { DiagramType } from "@/app/lib/diagram/types";
 import { SCHEMA_VERSION } from "@/app/lib/diagram/types";
@@ -13,6 +13,7 @@ import { TierPicker, type TierCard } from "@/app/components/TierPicker";
 import { ReviewsSection } from "./ReviewsSection";
 import { PublishedSection } from "./PublishedSection";
 import { ProjectShareDialog } from "./ProjectShareDialog";
+import { NotificationsClient } from "../notifications/NotificationsClient";
 
 interface DiagramSummary {
   id: string;
@@ -60,6 +61,7 @@ function deriveProjectRole(p: ProjectSummary): ProjectRole {
 interface Props {
   projects: ProjectSummary[];
   unorganized: DiagramSummary[];
+  currentUserId: string;
   userName: string;
   userEmail?: string;
   orgName?: string;
@@ -182,7 +184,7 @@ function DiagramCard({
   );
 }
 
-export function DashboardClient({ projects: initialProjects, unorganized: initialUnorganized, userName, userEmail, orgName, orgRole, version, readOnly, viewingAsName, viewingAsEmail, impersonationMode, isSuperuser: isSu, usageSnapshot, showTierPicker, tierCards }: Props) {
+export function DashboardClient({ projects: initialProjects, unorganized: initialUnorganized, currentUserId, userName, userEmail, orgName, orgRole, version, readOnly, viewingAsName, viewingAsEmail, impersonationMode, isSuperuser: isSu, usageSnapshot, showTierPicker, tierCards }: Props) {
   // Owner / OrgAdmin can use the destructive hard-delete path (the
   // Prisma enum value is still "Admin" — the relabel to "OrgAdmin" is
   // UI-only). Read-only impersonation sessions are always denied; the
@@ -192,6 +194,20 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
   // enforces both checks.
   const canHardDelete = !readOnly && !!isSu;
   const router = useRouter();
+  const searchParams = useSearchParams();
+  // Notifications modal — opened by the bell or by returning from a
+  // diagram with ?notifications=1. Renders over the dashboard so the
+  // dashboard shows behind it, shaded. Always the user's OWN feed (the
+  // all-Org / all-users views live behind the admin menus).
+  const [showNotifications, setShowNotifications] = useState(searchParams.get("notifications") === "1");
+  const notifVisited = searchParams.get("visited");
+  function closeNotifications() {
+    setShowNotifications(false);
+    // Strip the ?notifications / ?visited params without a full reload.
+    if (searchParams.get("notifications") || searchParams.get("visited")) {
+      router.replace("/dashboard");
+    }
+  }
   const [projects, setProjects] = useState(initialProjects);
   const [unorganized, setUnorganized] = useState(initialUnorganized);
   const [showUsagePopover, setShowUsagePopover] = useState(false);
@@ -1401,10 +1417,9 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                 Groups
               </button>
 
-              {/* In-app notifications */}
-              <NotificationsBell onNavigateToGroups={(groupId) => {
-                router.push(groupId ? `/dashboard/groups?group=${groupId}` : "/dashboard/groups");
-              }} />
+              {/* In-app notifications — opens the panel as a modal over
+                  the dashboard (dashboard shows behind, shaded). */}
+              <NotificationsBell onOpen={() => setShowNotifications(true)} />
 
               {/* Unified File menu */}
               <div className="relative" ref={fileMenuRef}>
@@ -2925,6 +2940,22 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
         <TierPicker
           tiers={tierCards}
           onDismiss={() => setTierPickerOpen(false)}
+        />
+      )}
+
+      {showNotifications && (
+        <NotificationsClient
+          currentUserId={currentUserId}
+          currentUserName={userName}
+          currentUserEmail={userEmail ?? ""}
+          initialAsUserId={currentUserId}
+          adminScope={null}
+          backHref="/dashboard"
+          visitedDiagramId={notifVisited}
+          overlay
+          onContinue={closeNotifications}
+          selfPath="/dashboard"
+          selfExtraParam="notifications=1"
         />
       )}
     </div>

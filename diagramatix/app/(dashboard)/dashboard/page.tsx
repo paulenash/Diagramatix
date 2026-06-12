@@ -44,6 +44,7 @@ export default async function DashboardPage() {
     // dashboard rather than crashing.
     return (
       <DashboardClient
+        currentUserId={session.user.id}
         projects={[]}
         unorganized={[]}
         userName={session.user.name ?? "User"}
@@ -175,6 +176,7 @@ export default async function DashboardPage() {
 
   return (
     <DashboardClient
+      currentUserId={session.user.id}
       projects={projects}
       unorganized={unorganized}
       userName={currentUser?.name ?? session.user.name ?? "User"}

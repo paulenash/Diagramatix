@@ -50,6 +50,7 @@ export default async function NotificationsPage({ searchParams }: Props) {
       adminScope={adminScope}
       backHref={backHref}
       visitedDiagramId={visited ?? null}
+      overlay={false}
     />
   );
 }

@@ -1,24 +1,22 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 
 /**
  * In-app notification bell. Polls /api/notifications?unread=1 on a
  * 60-second interval for the unread count and renders a bell button with
- * a badge. Clicking opens the full "Notifications & Feedback" screen at
- * /notifications (which lists every notification with filters + diagram
- * links). The inline popover was replaced by that full page so the user
- * can navigate to a diagram and return.
+ * a badge. Clicking calls `onOpen` — the dashboard opens the full
+ * "Notifications & Feedback" panel as a modal over itself (so the
+ * dashboard shows behind it, shaded). The bell always opens the user's
+ * OWN feed; the all-Org / all-users views live behind the admin menus.
  */
 const POLL_INTERVAL_MS = 60_000;
 
-export function NotificationsBell(_props: {
-  // Retained for backwards compat with the dashboard header that still
-  // passes it; navigation now goes through the /notifications page.
-  onNavigateToGroups?: (groupId?: string) => void;
+export function NotificationsBell({
+  onOpen,
+}: {
+  onOpen: () => void;
 }) {
-  const router = useRouter();
   const [unreadCount, setUnreadCount] = useState(0);
 
   const fetchUnread = useCallback(async () => {
@@ -38,7 +36,7 @@ export function NotificationsBell(_props: {
 
   return (
     <button
-      onClick={() => router.push("/notifications")}
+      onClick={onOpen}
       className="relative flex items-center justify-center w-8 h-8 text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded"
       title={unreadCount === 0 ? "Notifications" : `${unreadCount} unread notification${unreadCount === 1 ? "" : "s"}`}
       aria-label="Notifications"

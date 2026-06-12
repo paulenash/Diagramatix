@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   typeLabel,
   categoryLabel,
+  categoryChipStyle,
   ALL_CATEGORIES,
   daysAgo,
   diagramHrefForNotification,
@@ -42,6 +43,19 @@ interface Props {
   adminScope: "all" | "org" | null;
   backHref: string;
   visitedDiagramId: string | null;
+  /** true → render as a modal overlay (bg-black/20) over the page behind
+   *  it (the dashboard); false → render as a standalone light page (the
+   *  /notifications route, which has nothing behind it). Default true. */
+  overlay?: boolean;
+  /** When provided (modal mode), Continue calls this instead of navigating. */
+  onContinue?: () => void;
+  /** Path that re-opens THIS view, used to build a diagram link's `?from=`
+   *  so the back-link returns here. e.g. "/dashboard" for the dashboard
+   *  modal, "/notifications" for the route. */
+  selfPath?: string;
+  /** Extra query param appended to selfPath to re-open the view (e.g.
+   *  "notifications=1" for the dashboard modal). */
+  selfExtraParam?: string;
 }
 
 export function NotificationsClient({
@@ -50,6 +64,10 @@ export function NotificationsClient({
   adminScope,
   backHref,
   visitedDiagramId,
+  overlay = true,
+  onContinue,
+  selfPath = "/notifications",
+  selfExtraParam,
 }: Props) {
   const router = useRouter();
 
@@ -112,10 +130,16 @@ export function NotificationsClient({
 
   function notificationsBackHref(diagramId: string): string {
     const params = new URLSearchParams();
+    if (selfExtraParam) {
+      const [k, v] = selfExtraParam.split("=");
+      params.set(k, v ?? "1");
+    }
     params.set("visited", diagramId);
     if (!isOwnFeed) params.set("asUserId", asUserId);
-    return `/notifications?${params.toString()}`;
+    return `${selfPath}?${params.toString()}`;
   }
+
+  const continueAction = () => { if (onContinue) onContinue(); else router.push(backHref); };
 
   const orgs = useMemo(() => {
     const m = new Map<string, string>();
@@ -158,7 +182,11 @@ export function NotificationsClient({
         : "Notifications";
 
   return (
-    <div className="fixed inset-0 bg-black/20 flex items-start justify-center z-50 p-4">
+    <div className={
+      overlay
+        ? "fixed inset-0 bg-black/20 flex items-start justify-center z-50 p-4"
+        : "min-h-screen bg-gray-100 flex items-start justify-center p-4"
+    }>
       <div className="bg-white rounded-lg shadow-xl w-full max-w-6xl max-h-[92vh] flex flex-col">
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-200 shrink-0 flex items-center justify-between gap-3">
@@ -173,7 +201,7 @@ export function NotificationsClient({
               </button>
             )}
             <button
-              onClick={() => router.push(backHref)}
+              onClick={continueAction}
               className="px-3 py-1.5 text-xs font-medium text-white rounded bg-blue-600 hover:bg-blue-700"
             >
               Continue
@@ -302,7 +330,7 @@ export function NotificationsClient({
                     <td className="px-3 py-2 align-top">
                       <div className="flex items-center gap-1.5 flex-wrap">
                         {unread && <span className="text-[8px] uppercase tracking-wide bg-blue-600 text-white rounded px-1 py-0.5 font-semibold">new</span>}
-                        <span className="text-[9px] uppercase tracking-wide bg-gray-200 text-gray-700 rounded px-1 py-0.5 font-medium">
+                        <span className={`text-[9px] uppercase tracking-wide rounded px-1 py-0.5 font-medium ${categoryChipStyle(r.type)}`}>
                           {categoryLabel(r.type)}
                         </span>
                       </div>
