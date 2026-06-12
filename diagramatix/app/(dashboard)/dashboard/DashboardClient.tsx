@@ -1270,7 +1270,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
   const isImpersonating = !!impersonationMode;
 
   return (
-    <div className={`h-screen flex flex-col overflow-hidden ${isImpersonating ? "bg-orange-50" : "bg-gray-50"}`}>
+    <div className={`h-screen flex flex-col overflow-hidden ${isImpersonating ? "bg-orange-50" : "dgx-dashboard-bg"}`}>
       {isImpersonating && viewingAsName !== undefined && viewingAsEmail !== undefined && (
         <ImpersonationBanner viewingAsName={viewingAsName ?? ""} viewingAsEmail={viewingAsEmail ?? ""} mode={impersonationMode} />
       )}
