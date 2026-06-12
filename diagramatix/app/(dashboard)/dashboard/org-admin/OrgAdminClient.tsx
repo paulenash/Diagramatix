@@ -33,6 +33,12 @@ const CARDS: MenuCard[] = [
     description:
       "Inspect any Org member's notification feed — reviews, publishing, feedback. Filter by user.",
   },
+  {
+    href: "/dashboard/org-admin/backup",
+    title: "Backup & Restore",
+    description:
+      "Download a backup of your whole Org, or selectively restore an Org member's projects / diagrams.",
+  },
 ];
 
 /**
