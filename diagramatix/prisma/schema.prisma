@@ -335,8 +335,11 @@ model PublishedVersion {
   // Version number per diagram: 1, 2, 3… Auto-incremented by the publish handler.
   versionNumber Int
   publishedAt   DateTime @default(now())
-  publishedById String
-  publishedBy   User     @relation("PublishedVersionAuthor", fields: [publishedById], references: [id], onDelete: Restrict)
+  // Nullable + SetNull so deleting the author doesn't 500 the delete on
+  // an FK Restrict (audit DATA-01). The version snapshot is immutable and
+  // outlives its author; a null here just means "author account removed".
+  publishedById String?
+  publishedBy   User?    @relation("PublishedVersionAuthor", fields: [publishedById], references: [id], onDelete: SetNull)
   // Frozen snapshot — mirrors the DiagramHistory columns. Treat as
   // immutable once written.
   name          String
@@ -419,8 +422,10 @@ model PublicationBundle {
   projectId       String
   project         Project                 @relation(fields: [projectId], references: [id], onDelete: Cascade)
   publishedAt     DateTime                @default(now())
-  publishedById   String
-  publishedBy     User                    @relation("PublicationBundleAuthor", fields: [publishedById], references: [id], onDelete: Restrict)
+  // Nullable + SetNull (audit DATA-01) — a bundle outlives the account
+  // that published it. Ownership checks treat null as "not you".
+  publishedById   String?
+  publishedBy     User?                   @relation("PublicationBundleAuthor", fields: [publishedById], references: [id], onDelete: SetNull)
   releaseNotes    String?
   nextReviewDate  DateTime?
   // Idempotency guard for the review-due cron — see Diagram.lastReviewDueNotifiedAt.
@@ -466,8 +471,10 @@ model PublicationBundleAudience {
   userId      String
   user        User              @relation("PublicationBundleAudienceMember", fields: [userId], references: [id], onDelete: Cascade)
   addedAt     DateTime          @default(now())
-  addedById   String
-  addedBy     User              @relation("PublicationBundleAudienceAdder", fields: [addedById], references: [id], onDelete: Restrict)
+  // Nullable + SetNull (audit DATA-01) — attribution of who granted the
+  // access; the grant itself survives the granting admin's deletion.
+  addedById   String?
+  addedBy     User?             @relation("PublicationBundleAudienceAdder", fields: [addedById], references: [id], onDelete: SetNull)
 
   @@unique([bundleId, userId])
   @@index([userId])
@@ -490,8 +497,10 @@ model PendingBundleAudience {
   bundle      PublicationBundle @relation(fields: [bundleId], references: [id], onDelete: Cascade)
   email       String
   invitedAt   DateTime          @default(now())
-  invitedById String
-  invitedBy   User              @relation("PendingBundleAudienceInviter", fields: [invitedById], references: [id], onDelete: Restrict)
+  // Nullable + SetNull (audit DATA-01) — attribution of who sent the
+  // invite; the pending invite survives the inviter's deletion.
+  invitedById String?
+  invitedBy   User?             @relation("PendingBundleAudienceInviter", fields: [invitedById], references: [id], onDelete: SetNull)
 
   @@unique([bundleId, email])
   @@index([email])

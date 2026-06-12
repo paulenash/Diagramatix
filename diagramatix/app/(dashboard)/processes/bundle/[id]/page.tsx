@@ -61,7 +61,9 @@ export default async function BundleIndexPage({ params }: Props) {
   // members away — their grants are revoked.
   if (bundle.supersededAt && !isOwner) redirect("/dashboard");
 
-  const publisherDisplay = bundle.publishedBy.name ?? bundle.publishedBy.email;
+  // publishedBy is null when the publishing account was deleted (author FK
+  // is SetNull — audit DATA-01).
+  const publisherDisplay = bundle.publishedBy?.name ?? bundle.publishedBy?.email ?? "a former member";
 
   return (
     <div className="min-h-screen bg-gray-50">

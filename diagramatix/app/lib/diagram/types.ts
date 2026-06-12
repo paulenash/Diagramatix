@@ -616,5 +616,14 @@ export interface TemplateData {
  *           - Connector endpoint nudge wraps around rectangle corners
  *             and travels the full circumference of circles.
  *           - Notification dropdown wider with two visible lines.
+ *   1.19    - Audit Stage-2 Critical fixes: (DATA-01) author/attribution
+ *             FKs (PublishedVersion/PublicationBundle/…Audience/Pending…)
+ *             switched from Restrict to nullable + SetNull so publishing
+ *             users can be deleted. (DATA-02) full backup now captures and
+ *             restores ALL models (was 11/26) so a wipe-restore no longer
+ *             silently deletes publish/bundle/share/review/notification
+ *             data. (DATA-03) wipe-restore breaks the Diagram↔
+ *             PublishedVersion cycle (insert with null pointer, re-link
+ *             after) instead of aborting on the FK.
  */
-export const SCHEMA_VERSION = "1.18";
+export const SCHEMA_VERSION = "1.19";

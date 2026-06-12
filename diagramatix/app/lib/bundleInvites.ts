@@ -68,7 +68,7 @@ export async function promotePendingAudienceMemberships(
       await createNotification(userId, "bundle-published", {
         bundleId: row.bundleId,
         bundleName: row.bundle.name,
-        fromUserId: row.invitedById,
+        fromUserId: row.invitedById ?? undefined,
       });
       promoted++;
       if (!firstBundleId) firstBundleId = row.bundleId;

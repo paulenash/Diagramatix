@@ -18,7 +18,9 @@ interface VersionSummary {
   versionNumber: number;
   publishedAt: string;
   releaseNotes: string | null;
-  publishedBy: { id: string; name: string | null; email: string };
+  // Null when the publishing account has since been deleted (author FK is
+  // SetNull — audit DATA-01).
+  publishedBy: { id: string; name: string | null; email: string } | null;
 }
 
 interface OwnerSummary {
@@ -238,7 +240,7 @@ export function ProcessView({
           <h1 className="text-sm font-semibold text-gray-900 truncate">{diagramName}</h1>
           <span
             className="text-[11px] px-1.5 py-0.5 rounded border text-blue-700 border-blue-300 bg-blue-50 font-medium shrink-0"
-            title={`Published ${new Date(version.publishedAt).toLocaleString()} by ${version.publishedBy.name ?? version.publishedBy.email}`}
+            title={`Published ${new Date(version.publishedAt).toLocaleString()}${version.publishedBy ? ` by ${version.publishedBy.name ?? version.publishedBy.email}` : ""}`}
           >
             v{version.versionNumber}
             <span className="text-blue-500/80 font-normal ml-1">

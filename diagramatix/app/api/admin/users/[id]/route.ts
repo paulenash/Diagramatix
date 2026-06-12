@@ -14,6 +14,14 @@
  *   - DiagramRules (User onDelete: Cascade for the optional FK)
  *   - UsageCounter (User onDelete: Cascade)
  *
+ * Author attribution (SetNull, audit DATA-01 fix — schema v1.19):
+ *   - PublishedVersion.publishedById, PublicationBundle.publishedById,
+ *     PublicationBundleAudience.addedById, PendingBundleAudience.invitedById
+ *     were onDelete: Restrict, which made any user who had ever published
+ *     a version or bundle undeletable (the delete 500'd on the FK). They
+ *     are now nullable + SetNull, so the published artifact survives with
+ *     a null author and the delete succeeds.
+ *
  * NOT deleted:
  *   - Org rows. If the deleted user was the sole member of an Org, the
  *     Org persists as an orphan. Acceptable for the test-cycle use

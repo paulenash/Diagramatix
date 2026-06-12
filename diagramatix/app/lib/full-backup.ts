@@ -39,6 +39,17 @@ const FULL_BACKUP_ENTRY = "full-backup.json";
 /** Order in which tables must be inserted on restore (parents before
  *  children). The same order is used by the build path to lay rows out
  *  predictably in the JSON for human inspection. */
+// NOTE (audit DATA-02): this list MUST cover every model in the schema.
+// `restoreFullBackupWipe` TRUNCATEs the whole database; any model present
+// in the schema but missing here would be cascade-deleted on restore and
+// never re-inserted — silent data loss. When you add a model to
+// schema.prisma, add it here (and to the build/restore/date-field maps
+// below) in dependency order. A round-trip test guards this.
+//
+// The Diagram↔PublishedVersion relation is cyclic (Diagram.
+// currentPublishedVersionId → PublishedVersion, PublishedVersion.diagramId
+// → Diagram). Diagram is inserted first with a NULL pointer; the pointer
+// is re-linked after PublishedVersion rows land (see restoreFullBackupWipe).
 export const FULL_BACKUP_TABLE_ORDER = [
   "Org",
   // SubscriptionLevel must restore BEFORE User — User.subscriptionLevelId
@@ -50,11 +61,26 @@ export const FULL_BACKUP_TABLE_ORDER = [
   "UsageCounter",
   "OrgMember",
   "Project",
+  "ProjectShare",
   "Diagram",
   "DiagramHistory",
+  "PublishedVersion",
+  "PublicationBundle",
+  "PublicationBundleDiagram",
+  "PublicationBundleAudience",
+  "PendingBundleAudience",
+  "DiagramFeedback",
   "DiagramTemplate",
   "Prompt",
   "DiagramRules",
+  "Feature",
+  "BubbleHelp",
+  "Notification",
+  "CollaborationGroup",
+  "CollaborationGroupMember",
+  "DiagramReview",
+  "DiagramReviewer",
+  "OwnershipTransfer",
 ] as const;
 
 export interface FullBackupPayload {
@@ -81,11 +107,26 @@ export interface FullBackupPayload {
     UsageCounter: unknown[];
     OrgMember: unknown[];
     Project: unknown[];
+    ProjectShare: unknown[];
     Diagram: unknown[];
     DiagramHistory: unknown[];
+    PublishedVersion: unknown[];
+    PublicationBundle: unknown[];
+    PublicationBundleDiagram: unknown[];
+    PublicationBundleAudience: unknown[];
+    PendingBundleAudience: unknown[];
+    DiagramFeedback: unknown[];
     DiagramTemplate: unknown[];
     Prompt: unknown[];
     DiagramRules: unknown[];
+    Feature: unknown[];
+    BubbleHelp: unknown[];
+    Notification: unknown[];
+    CollaborationGroup: unknown[];
+    CollaborationGroupMember: unknown[];
+    DiagramReview: unknown[];
+    DiagramReviewer: unknown[];
+    OwnershipTransfer: unknown[];
   };
 }
 
@@ -102,7 +143,11 @@ export async function buildFullBackup(
   // diagrams) easily fits in RAM.
   const [
     orgs, subscriptionLevels, users, usageCounters, orgMembers,
-    projects, diagrams, history, templates, prompts, rules,
+    projects, projectShares, diagrams, history,
+    publishedVersions, bundles, bundleDiagrams, bundleAudience, pendingAudience,
+    feedback, templates, prompts, rules,
+    features, bubbleHelps, notifications,
+    collabGroups, collabMembers, reviews, reviewers, transfers,
   ] = await Promise.all([
     prisma.org.findMany({ orderBy: { createdAt: "asc" } }),
     prisma.subscriptionLevel.findMany({ orderBy: { sortOrder: "asc" } }),
@@ -110,11 +155,26 @@ export async function buildFullBackup(
     prisma.usageCounter.findMany({ orderBy: { updatedAt: "asc" } }),
     prisma.orgMember.findMany({ orderBy: { createdAt: "asc" } }),
     prisma.project.findMany({ orderBy: { createdAt: "asc" } }),
+    prisma.projectShare.findMany({ orderBy: { createdAt: "asc" } }),
     prisma.diagram.findMany({ orderBy: { createdAt: "asc" } }),
     prisma.diagramHistory.findMany({ orderBy: { createdAt: "asc" } }),
+    prisma.publishedVersion.findMany({ orderBy: { publishedAt: "asc" } }),
+    prisma.publicationBundle.findMany({ orderBy: { publishedAt: "asc" } }),
+    prisma.publicationBundleDiagram.findMany({ orderBy: { addedAt: "asc" } }),
+    prisma.publicationBundleAudience.findMany({ orderBy: { addedAt: "asc" } }),
+    prisma.pendingBundleAudience.findMany({ orderBy: { invitedAt: "asc" } }),
+    prisma.diagramFeedback.findMany({ orderBy: { createdAt: "asc" } }),
     prisma.diagramTemplate.findMany({ orderBy: { createdAt: "asc" } }),
     prisma.prompt.findMany({ orderBy: { createdAt: "asc" } }),
     prisma.diagramRules.findMany({ orderBy: { createdAt: "asc" } }),
+    prisma.feature.findMany({ orderBy: { createdAt: "asc" } }),
+    prisma.bubbleHelp.findMany({ orderBy: { createdAt: "asc" } }),
+    prisma.notification.findMany({ orderBy: { createdAt: "asc" } }),
+    prisma.collaborationGroup.findMany({ orderBy: { createdAt: "asc" } }),
+    prisma.collaborationGroupMember.findMany({ orderBy: { invitedAt: "asc" } }),
+    prisma.diagramReview.findMany({ orderBy: { createdAt: "asc" } }),
+    prisma.diagramReviewer.findMany({ orderBy: { id: "asc" } }),
+    prisma.ownershipTransfer.findMany({ orderBy: { createdAt: "asc" } }),
   ]);
 
   // Replace Date objects with ISO strings so the JSON serialiser doesn't
@@ -143,11 +203,26 @@ export async function buildFullBackup(
       UsageCounter: usageCounters.length,
       OrgMember: orgMembers.length,
       Project: projects.length,
+      ProjectShare: projectShares.length,
       Diagram: diagrams.length,
       DiagramHistory: history.length,
+      PublishedVersion: publishedVersions.length,
+      PublicationBundle: bundles.length,
+      PublicationBundleDiagram: bundleDiagrams.length,
+      PublicationBundleAudience: bundleAudience.length,
+      PendingBundleAudience: pendingAudience.length,
+      DiagramFeedback: feedback.length,
       DiagramTemplate: templates.length,
       Prompt: prompts.length,
       DiagramRules: rules.length,
+      Feature: features.length,
+      BubbleHelp: bubbleHelps.length,
+      Notification: notifications.length,
+      CollaborationGroup: collabGroups.length,
+      CollaborationGroupMember: collabMembers.length,
+      DiagramReview: reviews.length,
+      DiagramReviewer: reviewers.length,
+      OwnershipTransfer: transfers.length,
     },
     tables: {
       Org: serialise(orgs as Record<string, unknown>[]),
@@ -156,11 +231,26 @@ export async function buildFullBackup(
       UsageCounter: serialise(usageCounters as Record<string, unknown>[]),
       OrgMember: serialise(orgMembers as Record<string, unknown>[]),
       Project: serialise(projects as Record<string, unknown>[]),
+      ProjectShare: serialise(projectShares as Record<string, unknown>[]),
       Diagram: serialise(diagrams as Record<string, unknown>[]),
       DiagramHistory: serialise(history as Record<string, unknown>[]),
+      PublishedVersion: serialise(publishedVersions as Record<string, unknown>[]),
+      PublicationBundle: serialise(bundles as Record<string, unknown>[]),
+      PublicationBundleDiagram: serialise(bundleDiagrams as Record<string, unknown>[]),
+      PublicationBundleAudience: serialise(bundleAudience as Record<string, unknown>[]),
+      PendingBundleAudience: serialise(pendingAudience as Record<string, unknown>[]),
+      DiagramFeedback: serialise(feedback as Record<string, unknown>[]),
       DiagramTemplate: serialise(templates as Record<string, unknown>[]),
       Prompt: serialise(prompts as Record<string, unknown>[]),
       DiagramRules: serialise(rules as Record<string, unknown>[]),
+      Feature: serialise(features as Record<string, unknown>[]),
+      BubbleHelp: serialise(bubbleHelps as Record<string, unknown>[]),
+      Notification: serialise(notifications as Record<string, unknown>[]),
+      CollaborationGroup: serialise(collabGroups as Record<string, unknown>[]),
+      CollaborationGroupMember: serialise(collabMembers as Record<string, unknown>[]),
+      DiagramReview: serialise(reviews as Record<string, unknown>[]),
+      DiagramReviewer: serialise(reviewers as Record<string, unknown>[]),
+      OwnershipTransfer: serialise(transfers as Record<string, unknown>[]),
     },
   };
 
@@ -213,15 +303,33 @@ export interface FullRestoreResult {
 const DATE_FIELDS_BY_MODEL: Record<string, string[]> = {
   Org:               ["createdAt"],
   SubscriptionLevel: ["createdAt", "updatedAt"],
-  User:              ["resetTokenExpiry", "createdAt", "lastSeenAt", "subscriptionAssignedAt"],
+  User:              ["resetTokenExpiry", "createdAt", "lastSeenAt", "subscriptionAssignedAt", "currentPeriodEnd", "subscriptionEndsAt", "compTierExpiresAt", "compTierGrantedAt"],
   UsageCounter:      ["updatedAt"],
   OrgMember:         ["createdAt"],
   Project:           ["createdAt", "updatedAt"],
-  Diagram:           ["createdAt", "updatedAt"],
+  ProjectShare:      ["createdAt"],
+  // nextReviewDate / lastReviewDueNotifiedAt were previously NOT converted,
+  // so a published diagram's restore passed ISO strings to a DateTime
+  // column and threw — part of why the wipe restore aborted (audit DATA-03).
+  Diagram:           ["createdAt", "updatedAt", "nextReviewDate", "lastReviewDueNotifiedAt"],
   DiagramHistory:    ["createdAt"],
+  PublishedVersion:  ["publishedAt", "supersededAt", "nextReviewDateAtPublish"],
+  PublicationBundle: ["publishedAt", "nextReviewDate", "lastReviewDueNotifiedAt", "supersededAt"],
+  PublicationBundleDiagram:  ["addedAt"],
+  PublicationBundleAudience: ["addedAt"],
+  PendingBundleAudience:     ["invitedAt"],
+  DiagramFeedback:   ["resolvedAt", "createdAt", "updatedAt"],
   DiagramTemplate:   ["createdAt", "updatedAt"],
   Prompt:            ["planUpdatedAt", "createdAt", "updatedAt"],
   DiagramRules:      ["createdAt", "updatedAt"],
+  Feature:           ["publishedAt", "createdAt", "updatedAt"],
+  BubbleHelp:        ["createdAt", "updatedAt"],
+  Notification:      ["readAt", "createdAt"],
+  CollaborationGroup:       ["createdAt", "updatedAt"],
+  CollaborationGroupMember: ["invitedAt", "joinedAt"],
+  DiagramReview:     ["dueDate", "createdAt", "updatedAt"],
+  DiagramReviewer:   ["lastActivityAt"],
+  OwnershipTransfer: ["createdAt", "resolvedAt"],
 };
 
 function convertDates(model: string, row: Record<string, unknown>): Record<string, unknown> {
@@ -256,19 +364,60 @@ export async function restoreFullBackupWipe(
   log.push(`Schema version ${payload.schemaVersion} (app ${payload.appVersion})`);
   log.push(`Counts in backup: ${JSON.stringify(payload.counts)}`);
 
+  // ── Guard (audit DATA-02) ────────────────────────────────────────────
+  // A wipe restore TRUNCATEs the ENTIRE schema (CASCADE). If this backup
+  // predates a model that now exists AND that live table holds rows, the
+  // cascade would delete those rows with nothing in the payload to
+  // re-insert — silent data loss. Refuse rather than destroy. (Current
+  // backups carry every model, so this only trips on older/partial files.)
+  const payloadModels = new Set(Object.keys(payload.tables ?? {}));
+  const missingModels = FULL_BACKUP_TABLE_ORDER.filter((m) => !payloadModels.has(m));
+  if (missingModels.length > 0) {
+    const liveNonEmpty: string[] = [];
+    for (const m of missingModels) {
+      // Model names come from our own constant, never user input — safe to
+      // interpolate into the identifier.
+      const rows = await prisma.$queryRawUnsafe<{ c: bigint }[]>(
+        `SELECT COUNT(*)::bigint AS c FROM "${m}"`,
+      );
+      if (Number(rows[0]?.c ?? 0) > 0) liveNonEmpty.push(m);
+    }
+    if (liveNonEmpty.length > 0) {
+      throw new Error(
+        `Refusing wipe restore: this backup predates ${liveNonEmpty.length} ` +
+        `model(s) that currently hold live data (${liveNonEmpty.join(", ")}). ` +
+        `A wipe restore would permanently delete those rows with nothing to ` +
+        `re-insert. Export a fresh full backup (schema ${SCHEMA_VERSION}) and ` +
+        `restore that, or use additive-selective restore instead.`,
+      );
+    }
+    log.push(`Note: backup omits ${missingModels.length} newer model(s); all empty live — safe to proceed.`);
+  }
+
   await prisma.$transaction(async (tx) => {
-    // TRUNCATE every table in reverse dependency order. CASCADE handles
-    // residual references, but the explicit order avoids relying solely
-    // on cascades and is easier to reason about if a model is added
-    // later. `RESTART IDENTITY` is harmless here (all PKs are cuids).
+    // TRUNCATE every table. CASCADE + RESTART IDENTITY; all PKs are cuids
+    // so identity restart is harmless. The list is the full model set in
+    // reverse dependency order (children before parents) so we never rely
+    // solely on cascade. Keep in sync with FULL_BACKUP_TABLE_ORDER.
     await tx.$executeRawUnsafe(
       'TRUNCATE TABLE ' +
-      '"DiagramRules", "Prompt", "DiagramTemplate", "DiagramHistory", ' +
-      '"Diagram", "Project", "OrgMember", "UsageCounter", "User", ' +
-      '"SubscriptionLevel", "Org" ' +
+      '"OwnershipTransfer", "DiagramReviewer", "DiagramReview", ' +
+      '"CollaborationGroupMember", "CollaborationGroup", "Notification", ' +
+      '"BubbleHelp", "Feature", "DiagramRules", "Prompt", "DiagramTemplate", ' +
+      '"DiagramFeedback", "PendingBundleAudience", "PublicationBundleAudience", ' +
+      '"PublicationBundleDiagram", "PublicationBundle", "PublishedVersion", ' +
+      '"DiagramHistory", "Diagram", "ProjectShare", "Project", "OrgMember", ' +
+      '"UsageCounter", "User", "SubscriptionLevel", "Org" ' +
       'RESTART IDENTITY CASCADE',
     );
     log.push("Truncated all tables");
+
+    // The Diagram↔PublishedVersion FK is cyclic (audit DATA-03): a
+    // published Diagram carries currentPublishedVersionId pointing at a
+    // PublishedVersion that itself points back at the Diagram. Insert the
+    // Diagram with a NULL pointer first; collect the intended pointers and
+    // re-link them after PublishedVersion rows have landed.
+    const versionPointers: { id: string; versionId: string }[] = [];
 
     // Re-insert in forward dependency order. Per-model dispatch is
     // verbose but type-safe at runtime (Prisma's createMany rejects
@@ -281,7 +430,14 @@ export async function restoreFullBackupWipe(
         inserted[model] = 0;
         continue;
       }
-      const data = rows.map((r) => convertDates(model, r as Record<string, unknown>));
+      let data = rows.map((r) => convertDates(model, r as Record<string, unknown>));
+      if (model === "Diagram") {
+        data = data.map((d) => {
+          const v = d.currentPublishedVersionId;
+          if (v) versionPointers.push({ id: String(d.id), versionId: String(v) });
+          return { ...d, currentPublishedVersionId: null };
+        });
+      }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const anyData = data as any[];
       switch (model) {
@@ -291,14 +447,41 @@ export async function restoreFullBackupWipe(
         case "UsageCounter":      await tx.usageCounter.createMany({ data: anyData }); break;
         case "OrgMember":         await tx.orgMember.createMany({ data: anyData }); break;
         case "Project":           await tx.project.createMany({ data: anyData }); break;
+        case "ProjectShare":      await tx.projectShare.createMany({ data: anyData }); break;
         case "Diagram":           await tx.diagram.createMany({ data: anyData }); break;
         case "DiagramHistory":    await tx.diagramHistory.createMany({ data: anyData }); break;
+        case "PublishedVersion":  await tx.publishedVersion.createMany({ data: anyData }); break;
+        case "PublicationBundle": await tx.publicationBundle.createMany({ data: anyData }); break;
+        case "PublicationBundleDiagram":  await tx.publicationBundleDiagram.createMany({ data: anyData }); break;
+        case "PublicationBundleAudience": await tx.publicationBundleAudience.createMany({ data: anyData }); break;
+        case "PendingBundleAudience":     await tx.pendingBundleAudience.createMany({ data: anyData }); break;
+        case "DiagramFeedback":   await tx.diagramFeedback.createMany({ data: anyData }); break;
         case "DiagramTemplate":   await tx.diagramTemplate.createMany({ data: anyData }); break;
         case "Prompt":            await tx.prompt.createMany({ data: anyData }); break;
         case "DiagramRules":      await tx.diagramRules.createMany({ data: anyData }); break;
+        case "Feature":           await tx.feature.createMany({ data: anyData }); break;
+        case "BubbleHelp":        await tx.bubbleHelp.createMany({ data: anyData }); break;
+        case "Notification":      await tx.notification.createMany({ data: anyData }); break;
+        case "CollaborationGroup":       await tx.collaborationGroup.createMany({ data: anyData }); break;
+        case "CollaborationGroupMember": await tx.collaborationGroupMember.createMany({ data: anyData }); break;
+        case "DiagramReview":     await tx.diagramReview.createMany({ data: anyData }); break;
+        case "DiagramReviewer":   await tx.diagramReviewer.createMany({ data: anyData }); break;
+        case "OwnershipTransfer": await tx.ownershipTransfer.createMany({ data: anyData }); break;
       }
       inserted[model] = rows.length;
       log.push(`  ${model}: ${rows.length} row(s) inserted`);
+    }
+
+    // Re-link the cyclic Diagram→PublishedVersion pointer now that the
+    // PublishedVersion rows exist (audit DATA-03).
+    for (const p of versionPointers) {
+      await tx.diagram.update({
+        where: { id: p.id },
+        data: { currentPublishedVersionId: p.versionId },
+      });
+    }
+    if (versionPointers.length > 0) {
+      log.push(`  Diagram: re-linked ${versionPointers.length} currentPublishedVersion pointer(s)`);
     }
   });
 
@@ -667,6 +850,13 @@ export async function restoreFullBackupAdditive(
           orgId: orgIdMap.get(String(d.orgId))!,
           userId: userIdMap.get(String(d.userId))!,
           projectId,
+          // Additive restore does not carry PublishedVersion rows, so a
+          // published diagram's pointer would dangle and fail the FK
+          // (audit DATA-03). Drop it and the diagramOwner pointer (the
+          // owner may not be in the selected subtree); the diagram lands
+          // as an editable copy without published lineage.
+          currentPublishedVersionId: null,
+          diagramOwnerId: null,
         } as any,
       });
       inserted.Diagram = (inserted.Diagram ?? 0) + 1;

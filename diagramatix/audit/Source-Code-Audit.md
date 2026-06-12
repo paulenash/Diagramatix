@@ -52,9 +52,9 @@
 | SEC-16 | Low | Secrets | Password reset token stored in plaintext at rest | Open |
 | SEC-17 | Low | Impersonation | Impersonation identity/mode in unsigned, non-httpOnly cookies | Open |
 | SEC-18 | Low | Correctness | OrgAdmin impersonation is a server-side no-op (misleading UI) | Open |
-| DATA-01 | Critical | Schema/FK | User delete throws (Restrict FK) for anyone who ever published — undeletable | Open |
-| DATA-02 | Critical | Backup | Full-backup wipe-restore TRUNCATEs ~15 tables it never re-inserts → permanent loss | Open |
-| DATA-03 | Critical | Backup | Wipe-restore re-inserts `Diagram.currentPublishedVersionId` but never backs up `PublishedVersion` → FK abort | Open |
+| DATA-01 | Critical | Schema/FK | User delete throws (Restrict FK) for anyone who ever published — undeletable | ✅ Fixed v1.19 |
+| DATA-02 | Critical | Backup | Full-backup wipe-restore TRUNCATEs ~15 tables it never re-inserts → permanent loss | ✅ Fixed v1.19 |
+| DATA-03 | Critical | Backup | Wipe-restore re-inserts `Diagram.currentPublishedVersionId` but never backs up `PublishedVersion` → FK abort | ✅ Fixed v1.19 |
 | DATA-04 | High | Races | Stripe webhook has no event-ordering guard → stale event resurrects canceled subs | Open |
 | DATA-05 | High | Races | `archiveDiagram` read-modify-writes `data` across two pools → lost update clobbers saves | Open |
 | DATA-06 | High | Transactions | `restoreUserBackup` runs dozens of writes with no transaction → partial restore | Open |
@@ -226,11 +226,15 @@ The 32-byte token is written unhashed to `User.resetToken` and looked up by dire
 **Method:** 5 finder lenses (transaction boundaries, race conditions, FK/cascade hazards, restore id-remap, JSON-write + email integrity) → 47 raw findings → 33 after dedupe → each adversarially verified by 2 independent skeptics. **24 surviving findings after consolidating cross-lens duplicates** (8 outright refuted). Four are marked *Needs manual confirmation* (the two skeptics split). The Prisma-7 raw-pg JSON-write pattern and intentional `as any` casts were excluded as project convention; the SEC-03 org-backup secrets leak was excluded to avoid double-counting.
 
 > The headline risk this stage surfaced is **the full-backup "disaster recovery" path is itself a disaster**: the wipe-restore truncates ~15 tables it never re-inserts (DATA-02) and aborts outright on any published diagram (DATA-03). A real production DB cannot currently be restored from its own full backup. These should be treated as fix-before-relying-on-backups.
+>
+> **Update — all three Critical findings (DATA-01, DATA-02, DATA-03) were fixed in schema v1.19** (commit follows). The fix was verified with a real round-trip of the dev DB (197 diagrams, 345 history rows, 6 published versions, 3 bundles, 7 notifications): all 26 tables now capture + restore with zero count drift, and the 5 published-diagram pointers re-link without the FK abort. See each finding below for the fix detail.
 
 ### Critical
 
 #### DATA-01 — User delete throws (Restrict FK) for anyone who ever published — and orphans can't be removed
 **`app/api/admin/users/[id]/route.ts:97`** (schema FKs at `prisma/schema.prisma:339, 423, 470, 494`)
+
+> **✅ Fixed in v1.19.** All four author/attribution FKs (`PublishedVersion.publishedById`, `PublicationBundle.publishedById`, `PublicationBundleAudience.addedById`, `PendingBundleAudience.invitedById`) are now nullable with `onDelete: SetNull` (verified in the DB catalog: all four report `delete_rule = SET NULL`). The published artifact survives the author's deletion with a null author slot; the delete no longer 500s. Ownership checks (`bundle.publishedById === userId`) and the `ProcessView`/bundle-page reads were updated to treat null as "former member".
 
 `prisma.user.delete()` relies on cascade, but four `User` relations are `onDelete: Restrict`, not `Cascade`: `PublishedVersion.publishedById`, `PublicationBundle.publishedById`, `PublicationBundleAudience.addedById`, `PendingBundleAudience.invitedById`. Postgres aborts the DELETE on any Restrict FK, so **any user who has ever published a version or bundle (i.e. essentially every active designer) cannot be deleted at all** — the endpoint 500s with an FK violation. The route's cascade doc lists only the Cascade relations and is unaware of the Restrict ones, and the UI offers no way to reassign `publishedById` first.
 
@@ -239,12 +243,16 @@ The 32-byte token is written unhashed to `User.resetToken` and looked up by dire
 #### DATA-02 — Full-backup wipe-restore TRUNCATEs ~15 tables it never re-inserts → permanent data loss
 **`app/lib/full-backup.ts:42`**
 
+> **✅ Fixed in v1.19.** `buildFullBackup` and the restore now capture and re-insert **all 26 models** (was 11) — `FULL_BACKUP_TABLE_ORDER`, the payload `tables` type, the build `findMany`/counts/tables block, `DATE_FIELDS_BY_MODEL`, and the restore dispatch were all extended (ProjectShare, PublishedVersion, PublicationBundle/Diagram/Audience, PendingBundleAudience, DiagramFeedback, Feature, BubbleHelp, Notification, CollaborationGroup/Member, DiagramReview/Reviewer, OwnershipTransfer). A pre-TRUNCATE guard additionally refuses a wipe restore when an older/partial backup omits a model that holds live data, so a stale file can never silently nuke newer tables. Round-trip verified: the 7 notifications, 3 bundles, 9 bundle-diagrams, 3 audience grants, and 1 ownership-transfer row that previously vanished now restore with zero count drift.
+
 `FULL_BACKUP_TABLE_ORDER` and `buildFullBackup` capture only 11 models (Org, SubscriptionLevel, User, UsageCounter, OrgMember, Project, Diagram, DiagramHistory, DiagramTemplate, Prompt, DiagramRules). But `restoreFullBackupWipe()` runs `TRUNCATE ... RESTART IDENTITY CASCADE`, and CASCADE physically deletes every dependent row — including all rows of models never captured: `PublishedVersion`, `DiagramFeedback`, `PublicationBundle(/Diagram/Audience)`, `PendingBundleAudience`, `ProjectShare`, `Notification`, `CollaborationGroup(/Member)`, `DiagramReview(/Reviewer)`, `OwnershipTransfer`, `Feature`, `BubbleHelp`. The restore loop re-inserts only the 11 captured tables, so after a "DR" wipe-and-reload every published version, bundle/audience grant, share, review, feedback, notification, and feature/bubble-help row is **gone forever** — and it all commits in one transaction, so it "succeeds" silently.
 
 **Suggested fix:** either extend the backup to capture and re-insert *all* models (correct for a true DR tool), or refuse to TRUNCATE tables not represented in the backup. At minimum, before TRUNCATE assert the live DB has zero rows in the uncaptured tables and abort with a clear error otherwise, so a partial backup can never nuke live publish/bundle/review data.
 
 #### DATA-03 — Wipe-restore re-inserts `Diagram.currentPublishedVersionId` but never backs up `PublishedVersion` → FK abort
 **`app/lib/full-backup.ts:294`** (insert) / **`:259`** (transaction)
+
+> **✅ Fixed in v1.19.** Two parts: (1) `PublishedVersion` is now captured/restored (DATA-02), and (2) the cyclic `Diagram↔PublishedVersion` FK is broken explicitly — diagrams insert with `currentPublishedVersionId = null`, the intended pointers are collected, and they are re-linked with `tx.diagram.update` after the `PublishedVersion` rows land. Also fixed a contributing bug: `Diagram.nextReviewDate` and `lastReviewDueNotifiedAt` were missing from `DATE_FIELDS_BY_MODEL`, so a published diagram passed ISO strings to a `DateTime` column. The additive-restore path strips the pointer too (it never carries versions). Round-trip verified: 5 published-diagram pointers re-linked, before=5/after=5, no FK abort.
 
 `Diagram.currentPublishedVersionId` is a non-null-when-published FK to `PublishedVersion`. `PublishedVersion` is neither truncated, captured, nor restored. On wipe restore, `diagram.createMany()` inserts diagrams carrying a populated `currentPublishedVersionId` that no longer exists post-TRUNCATE → FK violation. Because the whole restore is one transaction, **a single published diagram rolls back the entire restore** — a real production DB can never be loaded from its own full backup. (Confirmed by two lenses — restore-remap and fk-cascade — as the same defect.)
 
