@@ -803,7 +803,7 @@ export function DatabaseClient() {
 
       {/* JSON Viewer/Editor Modal */}
       {jsonEditor && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 flex flex-col max-h-[80vh]">
             <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200">
               <div>
@@ -907,7 +907,7 @@ export function DatabaseClient() {
             onto the live row to avoid unique-email collisions. */}
       {showRestoreModal && (
         <div
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+          className="fixed inset-0 bg-black/20 flex items-center justify-center z-50"
           onClick={restoreRunning ? undefined : () => setShowRestoreModal(false)}
         >
           <div

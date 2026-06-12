@@ -640,7 +640,7 @@ export function AdminClient({ users: initialUsers, currentUserId, commitCount, i
       {/* Delete user — stage 2: type-email confirm */}
       {deleteStage2 && (
         <div
-          className="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
+          className="fixed inset-0 bg-black/20 flex items-center justify-center z-50"
           onClick={(e) => {
             if (e.target === e.currentTarget && !deleting) setDeleteStage2(null);
           }}

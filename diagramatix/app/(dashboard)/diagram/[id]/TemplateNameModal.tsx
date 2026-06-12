@@ -45,7 +45,7 @@ export function TemplateNameModal({ onSave, onClose, initialName, initialGroup, 
 
   return (
     <div
-      className="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
+      className="fixed inset-0 bg-black/20 flex items-center justify-center z-50"
       onClick={saving ? undefined : onClose}
     >
       <div

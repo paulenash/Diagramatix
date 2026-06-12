@@ -5,19 +5,21 @@ import { prisma } from "@/app/lib/db";
 import { isSuperuser } from "@/app/lib/superuser";
 import { tryGetCurrentOrgId } from "@/app/lib/auth/orgContext";
 
-// GET /api/notifications/list?asUserId=<id>
+// Sentinel asUserId meaning "every user I'm allowed to inspect".
+const ALL = "__all__";
+
+// GET /api/notifications/list?asUserId=<id|__all__>
 //
 // Enriched notification feed for the full Notifications page. Each row
-// carries the recipient, the sender (name+email — resolved from the
-// payload, falling back to a User join), and the diagram (id+name —
-// from the payload, falling back to a Diagram join) so every type that
-// references a diagram renders an explicit hyperlink.
+// carries the recipient (+ their Org), the sender (name+email), and the
+// diagram (id+name) so every diagram-bearing type renders a hyperlink.
 //
-// Access:
-//   • No asUserId, or asUserId === caller → the caller's own feed.
-//   • asUserId !== caller → allowed only if the caller is a SuperAdmin
-//     (any user) or an OrgAdmin/Owner of the target user's active Org
-//     (a user in their Org).
+// asUserId:
+//   • omitted / === caller → the caller's own feed.
+//   • a specific userId → that user's feed (SuperAdmin any; OrgAdmin only
+//     users in their active Org).
+//   • "__all__" → every notification the caller may inspect (SuperAdmin:
+//     all users; OrgAdmin: all members of their active Org).
 export async function GET(req: Request) {
   const session = await auth();
   if (!session?.user?.id) {
@@ -26,53 +28,74 @@ export async function GET(req: Request) {
   const callerId = session.user.id;
   const asUserId = new URL(req.url).searchParams.get("asUserId") ?? callerId;
 
-  // Authorise cross-user access.
-  if (asUserId !== callerId) {
-    const su = isSuperuser(session);
-    if (!su) {
-      // OrgAdmin path: the caller must be Owner/Admin of an Org the
-      // target user belongs to.
-      const cookieStore = await cookies();
-      const callerOrgId = await tryGetCurrentOrgId(session, cookieStore);
-      if (!callerOrgId) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-      }
-      const callerMembership = await prisma.orgMember.findFirst({
+  const su = isSuperuser(session);
+
+  // Resolve the OrgAdmin's org once if we'll need it for gating.
+  let callerOrgId: string | null = null;
+  let callerIsOrgAdmin = false;
+  if (!su && (asUserId !== callerId)) {
+    const cookieStore = await cookies();
+    callerOrgId = await tryGetCurrentOrgId(session, cookieStore);
+    if (callerOrgId) {
+      const m = await prisma.orgMember.findFirst({
         where: { userId: callerId, orgId: callerOrgId, role: { in: ["Owner", "Admin"] } },
         select: { id: true },
       });
-      if (!callerMembership) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-      }
-      const targetMembership = await prisma.orgMember.findFirst({
-        where: { userId: asUserId, orgId: callerOrgId },
-        select: { id: true },
-      });
-      if (!targetMembership) {
-        return NextResponse.json({ error: "User is not in your Org" }, { status: 403 });
-      }
+      callerIsOrgAdmin = !!m;
     }
   }
 
-  // Cap at 500 — plenty for the current user base and keeps the page snappy.
+  // Build the recipient filter (which users' notifications to return).
+  let userWhere: { userId?: string | { in: string[] } };
+  if (asUserId === callerId) {
+    userWhere = { userId: callerId };
+  } else if (asUserId === ALL) {
+    if (su) {
+      userWhere = {}; // all users
+    } else if (callerIsOrgAdmin && callerOrgId) {
+      const members = await prisma.orgMember.findMany({
+        where: { orgId: callerOrgId },
+        select: { userId: true },
+      });
+      userWhere = { userId: { in: members.map(m => m.userId) } };
+    } else {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+  } else {
+    // A specific other user.
+    if (su) {
+      userWhere = { userId: asUserId };
+    } else if (callerIsOrgAdmin && callerOrgId) {
+      const target = await prisma.orgMember.findFirst({
+        where: { userId: asUserId, orgId: callerOrgId },
+        select: { id: true },
+      });
+      if (!target) return NextResponse.json({ error: "User is not in your Org" }, { status: 403 });
+      userWhere = { userId: asUserId };
+    } else {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+  }
+
   const rows = await prisma.notification.findMany({
-    where: { userId: asUserId },
+    where: userWhere,
     orderBy: { createdAt: "desc" },
     take: 500,
     include: { user: { select: { id: true, name: true, email: true } } },
   });
 
-  // Resolve senders + diagrams referenced in payloads in one round-trip each,
-  // so old rows missing fromUserName / diagramName still render fully.
+  // Resolve senders, diagrams, and recipient orgs referenced by the rows.
   const senderIds = new Set<string>();
   const diagramIds = new Set<string>();
+  const recipientIds = new Set<string>();
   for (const r of rows) {
+    recipientIds.add(r.userId);
     const p = r.payload as { fromUserId?: string; diagramId?: string; rootDiagramId?: string } | null;
     if (p?.fromUserId) senderIds.add(p.fromUserId);
     if (p?.diagramId) diagramIds.add(p.diagramId);
     else if (p?.rootDiagramId) diagramIds.add(p.rootDiagramId);
   }
-  const [senders, diagrams] = await Promise.all([
+  const [senders, diagrams, memberships] = await Promise.all([
     senderIds.size === 0 ? [] : prisma.user.findMany({
       where: { id: { in: Array.from(senderIds) } },
       select: { id: true, name: true, email: true },
@@ -81,9 +104,18 @@ export async function GET(req: Request) {
       where: { id: { in: Array.from(diagramIds) } },
       select: { id: true, name: true },
     }),
+    recipientIds.size === 0 ? [] : prisma.orgMember.findMany({
+      where: { userId: { in: Array.from(recipientIds) } },
+      select: { userId: true, orgId: true, org: { select: { name: true } } },
+    }),
   ]);
   const senderById = new Map(senders.map(s => [s.id, s]));
   const diagramById = new Map(diagrams.map(d => [d.id, d]));
+  // First membership per user is good enough for the display column.
+  const orgByUser = new Map<string, { id: string; name: string }>();
+  for (const m of memberships) {
+    if (!orgByUser.has(m.userId)) orgByUser.set(m.userId, { id: m.orgId, name: m.org.name });
+  }
 
   return NextResponse.json({
     rows: rows.map(r => {
@@ -97,7 +129,6 @@ export async function GET(req: Request) {
         reviewId?: string;
         groupName?: string;
         bundleName?: string;
-        feedbackId?: string;
       };
       const senderRow = p.fromUserId ? senderById.get(p.fromUserId) ?? null : null;
       const sender = senderRow
@@ -108,9 +139,7 @@ export async function GET(req: Request) {
 
       const dgId = p.diagramId ?? p.rootDiagramId ?? null;
       const dgRow = dgId ? diagramById.get(dgId) ?? null : null;
-      const diagram = dgId
-        ? { id: dgId, name: dgRow?.name ?? p.diagramName ?? "(diagram)" }
-        : null;
+      const diagram = dgId ? { id: dgId, name: dgRow?.name ?? p.diagramName ?? "(diagram)" } : null;
 
       return {
         id: r.id,
@@ -118,6 +147,7 @@ export async function GET(req: Request) {
         createdAt: r.createdAt.toISOString(),
         readAt: r.readAt ? r.readAt.toISOString() : null,
         recipient: { id: r.user.id, name: r.user.name, email: r.user.email },
+        recipientOrg: orgByUser.get(r.userId) ?? null,
         sender,
         diagram,
         reviewId: p.reviewId ?? null,

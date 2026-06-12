@@ -2381,7 +2381,7 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
 
       {/* Export progress modal */}
       {exporting && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md flex flex-col max-h-[70vh]">
             <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200">
               <h2 className="text-sm font-semibold text-gray-900">
@@ -2423,7 +2423,7 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
           backdrop click is swallowed). */}
       {visioImportStatus && (
         <div
-          className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60]"
+          className="fixed inset-0 bg-black/20 flex items-center justify-center z-[60]"
           onClick={(e) => e.stopPropagation()}
         >
           <div
@@ -2538,7 +2538,7 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
 
       {/* Import progress modal */}
       {(importing || importLog.length > 0) && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md flex flex-col max-h-[70vh]">
             <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200">
               <h2 className="text-sm font-semibold text-gray-900">
@@ -2644,7 +2644,7 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
 
       {/* New Diagram dialog */}
       {showNewDiagram && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">New Diagram</h2>
 
@@ -2720,7 +2720,7 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
             3. Pools with exactly one Lane
           Clickable diagram rows open the editor in a new tab. */}
       {(scanResult || scanError) && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-2xl">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-lg font-semibold text-gray-900">
@@ -3055,7 +3055,7 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
       )}
 
       {showImportVisioDialog && importVisioFile && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg">
             <h2 className="text-lg font-semibold text-gray-900 mb-2">Import Visio Diagrams</h2>
             <p className="text-xs text-gray-600 mb-4 truncate">
@@ -3197,7 +3197,7 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
           .slice(0, 5);
         const more = ids.length - names.length;
         return (
-          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
               <h2 className="text-lg font-semibold text-gray-900 mb-3">
                 Delete {ids.length} diagram{ids.length === 1 ? "" : "s"}?
@@ -3234,7 +3234,7 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
           root + every folder in the tree are listed; clicking one
           reassigns the diagramFolderMap for every selected diagram. */}
       {showBulkMoveDialog && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
             <h2 className="text-lg font-semibold text-gray-900 mb-3">
               Move {selectedDiagramIds.size} diagram{selectedDiagramIds.size === 1 ? "" : "s"} to folder

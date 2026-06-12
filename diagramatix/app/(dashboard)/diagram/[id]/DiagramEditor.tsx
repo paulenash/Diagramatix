@@ -3700,7 +3700,7 @@ export function DiagramEditor({
       )}
 
       {showSaveAs && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-sm">
             <div className="px-5 pt-4 pb-2">
               <h2 className="text-base font-semibold text-gray-900">Save As</h2>
@@ -3745,7 +3745,7 @@ export function DiagramEditor({
 
       {/* Admin: pick the source list to EXPORT (User vs Built-In). */}
       {templateExportPrompt && isAdmin && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-sm">
             <div className="px-5 pt-4 pb-2">
               <h2 className="text-base font-semibold text-gray-900">Export Templates</h2>
@@ -3789,7 +3789,7 @@ export function DiagramEditor({
 
       {/* Admin: pick the destination list to IMPORT into. */}
       {templateImportFile && isAdmin && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-sm">
             <div className="px-5 pt-4 pb-2">
               <h2 className="text-base font-semibold text-gray-900">Import Templates</h2>
@@ -3874,7 +3874,7 @@ export function DiagramEditor({
 
       {visioImportStatus && (
         <div
-          className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60]"
+          className="fixed inset-0 bg-black/20 flex items-center justify-center z-[60]"
           onClick={(e) => e.stopPropagation()}
         >
           <div
@@ -3988,7 +3988,7 @@ export function DiagramEditor({
       )}
 
       {unsavedDialog && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-sm">
             <div className="px-5 pt-4 pb-2">
               <h2 className="text-base font-semibold text-gray-900">Unsaved changes</h2>

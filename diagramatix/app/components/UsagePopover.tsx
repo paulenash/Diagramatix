@@ -163,7 +163,7 @@ export function UsagePopover({
 
   return (
     <div
-      className="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
+      className="fixed inset-0 bg-black/20 flex items-center justify-center z-50"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -325,7 +325,7 @@ export function UsagePopover({
           without affecting the popover behind. */}
       {showCompModal && (
         <div
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]"
+          className="fixed inset-0 bg-black/20 flex items-center justify-center z-[60]"
           onClick={(e) => { if (e.target === e.currentTarget) setShowCompModal(false); }}
         >
           <div className="bg-white rounded-lg shadow-xl p-5 w-full max-w-sm">

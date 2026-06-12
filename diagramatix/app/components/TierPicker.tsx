@@ -131,7 +131,7 @@ export function TierPicker({
   }, [submitting]);
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-start justify-center z-50 overflow-auto p-6">
+    <div className="fixed inset-0 bg-black/20 flex items-start justify-center z-50 overflow-auto p-6">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-5xl my-auto">
         <div className="px-6 py-5 border-b border-gray-100">
           <h2 className="text-lg font-semibold text-gray-900">

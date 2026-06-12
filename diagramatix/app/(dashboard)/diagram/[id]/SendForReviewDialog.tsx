@@ -152,7 +152,7 @@ export function SendForReviewDialog({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
+    <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50 px-4">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[85vh] flex flex-col">
         <div className="px-5 py-3 border-b border-gray-200">
           <h3 className="text-sm font-semibold text-gray-900">Send for Review</h3>

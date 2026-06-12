@@ -1997,7 +1997,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
 
       {/* Import name dialog */}
       {showImportNameDialog && pendingImportData && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-sm p-5">
             <h2 className="text-sm font-semibold text-gray-900 mb-3">Import Project</h2>
             <p className="text-[10px] text-gray-500 mb-1">
@@ -2021,7 +2021,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
 
       {/* Import progress modal */}
       {importing && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md flex flex-col max-h-[70vh]">
             <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200">
               <h2 className="text-sm font-semibold text-gray-900">
@@ -2076,7 +2076,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
 
       {/* Restore progress dialog */}
       {(restoring || restoreLog.length > 0) && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md flex flex-col max-h-[70vh]">
             <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200">
               <h2 className="text-sm font-semibold text-gray-900">
@@ -2124,7 +2124,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
 
       {/* DDL Import dialog */}
       {showDdlImport && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md flex flex-col max-h-[80vh]">
             <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200">
               <h2 className="text-sm font-semibold text-gray-900">
@@ -2219,7 +2219,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
 
       {/* Account settings modal */}
       {showAccount && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-sm">
             <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200">
               <h2 className="text-sm font-semibold text-gray-900">Account Settings</h2>
@@ -2321,7 +2321,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
       {/* Visio Bulk Import dialog (dashboard-level → always creates a
           new project for the imported diagrams). */}
       {showVisioImportDialog && visioImportFile && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg">
             <h2 className="text-lg font-semibold text-gray-900 mb-2">Import Visio Diagrams</h2>
             <p className="text-xs text-gray-600 mb-4 truncate">
@@ -2423,7 +2423,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
           new project for the imported diagrams). Opens FIRST, then hosts
           a drag-and-drop zone + multi-file picker fallback. */}
       {showBpmnImportDialog && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col">
             <div className="p-6 pb-2 shrink-0">
               <h2 className="text-lg font-semibold text-gray-900 mb-2">Import BPMN Diagrams</h2>
@@ -2582,7 +2582,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
 
       {/* Edit Zoom dialog */}
       {showEditZoom && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm">
             <h2 className="text-lg font-semibold text-gray-900 mb-2">Edit Zoom</h2>
             <p className="text-xs text-gray-500 mb-4">
@@ -2637,7 +2637,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
 
       {/* Matrix Screensaver dialog */}
       {showMatrixConfig && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm">
             <h2 className="text-lg font-semibold text-gray-900 mb-2">Matrix Screensaver</h2>
             <p className="text-xs text-gray-500 mb-4">
@@ -2681,7 +2681,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
 
       {/* Initial Zoom dialog */}
       {showInitialZoom && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm">
             <h2 className="text-lg font-semibold text-gray-900 mb-2">Initial Zoom</h2>
             <p className="text-xs text-gray-500 mb-4">
@@ -2724,7 +2724,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
 
       {/* New Project dialog */}
       {showNewProject && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">New Project</h2>
             <div className="mb-4">
@@ -2762,7 +2762,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
 
       {/* New Diagram dialog (unorganized) */}
       {showNewDiagram && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">New Diagram</h2>
 
