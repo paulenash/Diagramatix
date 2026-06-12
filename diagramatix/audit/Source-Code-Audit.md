@@ -21,7 +21,7 @@
 | # | Stage | Status |
 |---|---|---|
 | 1 | Security & Access Control | ✅ Done — 18 findings (7 High, 7 Medium, 4 Low) |
-| 2 | Data Integrity & Server Libs | Pending |
+| 2 | Data Integrity & Server Libs | ✅ Done — 24 findings (3 Critical, 13 High, 7 Medium, 1 Low) |
 | 3 | Diagram Engine Core | Pending |
 | 4 | Canvas & Renderers | Pending |
 | 5 | Dashboard & Page Clients | Pending |
@@ -52,6 +52,30 @@
 | SEC-16 | Low | Secrets | Password reset token stored in plaintext at rest | Open |
 | SEC-17 | Low | Impersonation | Impersonation identity/mode in unsigned, non-httpOnly cookies | Open |
 | SEC-18 | Low | Correctness | OrgAdmin impersonation is a server-side no-op (misleading UI) | Open |
+| DATA-01 | Critical | Schema/FK | User delete throws (Restrict FK) for anyone who ever published — undeletable | Open |
+| DATA-02 | Critical | Backup | Full-backup wipe-restore TRUNCATEs ~15 tables it never re-inserts → permanent loss | Open |
+| DATA-03 | Critical | Backup | Wipe-restore re-inserts `Diagram.currentPublishedVersionId` but never backs up `PublishedVersion` → FK abort | Open |
+| DATA-04 | High | Races | Stripe webhook has no event-ordering guard → stale event resurrects canceled subs | Open |
+| DATA-05 | High | Races | `archiveDiagram` read-modify-writes `data` across two pools → lost update clobbers saves | Open |
+| DATA-06 | High | Transactions | `restoreUserBackup` runs dozens of writes with no transaction → partial restore | Open |
+| DATA-07 | High | Transactions | Backup phase-2 JSON writes outside the row creates → crash leaves dangling links | Open |
+| DATA-08 | High | Restore | Subprocess link remap only walks `properties.linkedDiagramId` → misses other refs | Needs manual confirmation |
+| DATA-09 | High | Transactions | Bundle-invite promotion catch-all deletes the pending row on *any* error | Open |
+| DATA-10 | High | Email | Invite email Subject built from unescaped inviter/bundle name → header injection | Needs manual confirmation |
+| DATA-11 | High | Restore | Additive full-restore matches users by bare email → re-parents data onto wrong live user | Open |
+| DATA-12 | High | Restore | Additive restore mints a project id without inserting the project → dangling FK abort | Open |
+| DATA-13 | High | Restore | Org restore silently adds matched live users to the target org as Viewer (cross-tenant) | Open |
+| DATA-14 | High | Backup | Org backup pulls rules by member `userId` → drops org/admin-default rules (`userId` null) | Needs manual confirmation |
+| DATA-15 | High | Races | `checkLimit`/`recordUsage` TOCTOU lets concurrent requests exceed hard caps | Open |
+| DATA-16 | High | Schema/FK | Project delete `SetNull`s `projectId` but leaves PUBLISHED diagrams as invisible orphans | Open |
+| DATA-17 | Medium | Races | Monthly counter reset on renewal races concurrent usage / nukes unrelated counters | Open |
+| DATA-18 | Medium | Multi-tenant | `restoreDiagram` trusts archived `userId`, never re-validates org membership | Open |
+| DATA-19 | Medium | Backup | Per-user backup captures cross-org prompts but restore dedups them into one org → loss | Open |
+| DATA-20 | Medium | Email | `sendMail` failures unhandled → DB may record an invite/notification as delivered | Needs manual confirmation |
+| DATA-21 | Medium | Restore | `shortCuid()` (Math.random + Date.now) can collide mid-restore → duplicate-PK abort/mis-parent | Open |
+| DATA-22 | Medium | Transactions | `restoreRulesPrefsBundle` upserts in a bare loop, no transaction → partial merge | Open |
+| DATA-23 | Medium | Restore | Rules upsert keyed only by `id` violates `@@unique([category,userId,orgId])` → abort | Open |
+| DATA-24 | Low | Architecture | Two independent connection pools (Prisma adapter + raw `pgPool`) can't share a transaction | Open |
 
 ---
 
@@ -193,5 +217,190 @@ The 32-byte token is written unhashed to `User.resetToken` and looked up by dire
 `getViewAsUserId` returns null unless `isSuperuser(session)`, but `impersonate/route.ts` lets an OrgAdmin set the impersonation cookies for an in-org target. For a non-superuser those cookies are ignored by every server helper — fail-closed (no cross-tenant exposure today), but a correctness gap and a latent escalation if `getViewAsUserId` is ever broadened to honour OrgAdmins (the only gate would then be the one-time org check on a long-lived, client-writable cookie). Note: OrgAdmin "support edits" actually land via the separate silent-elevation path (`isAdminElevatedForOrg`), and because `isReadOnlyImpersonation` never engages for them, their "View" mode is not actually read-only.
 
 **Suggested fix:** make it explicit — either remove the OrgAdmin branch from the impersonate POST (return "not supported"), or implement it properly by extending `getViewAsUserId` to re-verify on every request that the caller is Owner/Admin of an org the target belongs to.
+
+---
+
+## Stage 2 — Data Integrity & Server Libs
+
+**Scope:** `app/lib/` data layer — `backup.ts`, `full-backup.ts`, `org-backup.ts`, `rules-prefs-backup.ts`, `bundleInvites.ts`, `notifications.ts`, `notificationDisplay.ts`, `email.ts`, `subscription.ts`, `subscription-route.ts`, `stripe.ts`, `archive.ts`, `reviewProjects.ts`, `db.ts` — plus `prisma/schema.prisma`.
+**Method:** 5 finder lenses (transaction boundaries, race conditions, FK/cascade hazards, restore id-remap, JSON-write + email integrity) → 47 raw findings → 33 after dedupe → each adversarially verified by 2 independent skeptics. **24 surviving findings after consolidating cross-lens duplicates** (8 outright refuted). Four are marked *Needs manual confirmation* (the two skeptics split). The Prisma-7 raw-pg JSON-write pattern and intentional `as any` casts were excluded as project convention; the SEC-03 org-backup secrets leak was excluded to avoid double-counting.
+
+> The headline risk this stage surfaced is **the full-backup "disaster recovery" path is itself a disaster**: the wipe-restore truncates ~15 tables it never re-inserts (DATA-02) and aborts outright on any published diagram (DATA-03). A real production DB cannot currently be restored from its own full backup. These should be treated as fix-before-relying-on-backups.
+
+### Critical
+
+#### DATA-01 — User delete throws (Restrict FK) for anyone who ever published — and orphans can't be removed
+**`app/api/admin/users/[id]/route.ts:97`** (schema FKs at `prisma/schema.prisma:339, 423, 470, 494`)
+
+`prisma.user.delete()` relies on cascade, but four `User` relations are `onDelete: Restrict`, not `Cascade`: `PublishedVersion.publishedById`, `PublicationBundle.publishedById`, `PublicationBundleAudience.addedById`, `PendingBundleAudience.invitedById`. Postgres aborts the DELETE on any Restrict FK, so **any user who has ever published a version or bundle (i.e. essentially every active designer) cannot be deleted at all** — the endpoint 500s with an FK violation. The route's cascade doc lists only the Cascade relations and is unaware of the Restrict ones, and the UI offers no way to reassign `publishedById` first.
+
+**Suggested fix:** decide the intended semantics. If published artifacts should survive author deletion, make these author FKs nullable with `onDelete: SetNull` (mirroring `DiagramFeedback.resolvedById`); if they should die with the user, switch to `onDelete: Cascade`. Then `db push` and update the route doc. Until then, pre-reassign/null those columns in the delete path, or catch the FK error and return a 409 explaining why.
+
+#### DATA-02 — Full-backup wipe-restore TRUNCATEs ~15 tables it never re-inserts → permanent data loss
+**`app/lib/full-backup.ts:42`**
+
+`FULL_BACKUP_TABLE_ORDER` and `buildFullBackup` capture only 11 models (Org, SubscriptionLevel, User, UsageCounter, OrgMember, Project, Diagram, DiagramHistory, DiagramTemplate, Prompt, DiagramRules). But `restoreFullBackupWipe()` runs `TRUNCATE ... RESTART IDENTITY CASCADE`, and CASCADE physically deletes every dependent row — including all rows of models never captured: `PublishedVersion`, `DiagramFeedback`, `PublicationBundle(/Diagram/Audience)`, `PendingBundleAudience`, `ProjectShare`, `Notification`, `CollaborationGroup(/Member)`, `DiagramReview(/Reviewer)`, `OwnershipTransfer`, `Feature`, `BubbleHelp`. The restore loop re-inserts only the 11 captured tables, so after a "DR" wipe-and-reload every published version, bundle/audience grant, share, review, feedback, notification, and feature/bubble-help row is **gone forever** — and it all commits in one transaction, so it "succeeds" silently.
+
+**Suggested fix:** either extend the backup to capture and re-insert *all* models (correct for a true DR tool), or refuse to TRUNCATE tables not represented in the backup. At minimum, before TRUNCATE assert the live DB has zero rows in the uncaptured tables and abort with a clear error otherwise, so a partial backup can never nuke live publish/bundle/review data.
+
+#### DATA-03 — Wipe-restore re-inserts `Diagram.currentPublishedVersionId` but never backs up `PublishedVersion` → FK abort
+**`app/lib/full-backup.ts:294`** (insert) / **`:259`** (transaction)
+
+`Diagram.currentPublishedVersionId` is a non-null-when-published FK to `PublishedVersion`. `PublishedVersion` is neither truncated, captured, nor restored. On wipe restore, `diagram.createMany()` inserts diagrams carrying a populated `currentPublishedVersionId` that no longer exists post-TRUNCATE → FK violation. Because the whole restore is one transaction, **a single published diagram rolls back the entire restore** — a real production DB can never be loaded from its own full backup. (Confirmed by two lenses — restore-remap and fk-cascade — as the same defect.)
+
+**Suggested fix:** the org-backup path already does this right (`org-backup.ts:279-283`): null out FKs that reference un-backed-up tables before insert (map `Diagram` rows to `currentPublishedVersionId = null`). Alternatively include `PublishedVersion` in the backup graph and insert it before patching the pointer (two-pass). Add a round-trip test using a published diagram.
+
+### High
+
+#### DATA-04 — Stripe webhook has no event-ordering guard → stale event resurrects canceled subscriptions
+**`app/api/stripe/webhook/route.ts:147`** (apply at `:318`)
+
+Stripe doesn't guarantee delivery order and retries interleave. `handleSubscriptionUpdated` / `applySubscriptionToUser` unconditionally overwrite `subscriptionLevelId` / `stripeSubscriptionStatus` / `subscriptionEndsAt` from whatever event is in hand. If `customer.subscription.deleted` is processed first and a stale `customer.subscription.updated` arrives afterward, the user is set back to `active` with `subscriptionEndsAt = null` — **re-granting a paid tier to someone who canceled** (and likewise a downgrade can overwrite a later upgrade). The "idempotent upsert" note addresses duplicates, not ordering.
+
+**Suggested fix:** persist a monotonic marker (e.g. `User.stripeEventTs`) and skip writes when `event.created` is older; or re-retrieve the live subscription from Stripe inside the handler and apply that canonical state instead of the event payload.
+
+#### DATA-05 — `archiveDiagram` read-modify-writes `data` across two pools → lost update clobbers concurrent saves
+**`app/lib/archive.ts:80`** (read) → **`:103`** (write); same shape in `restoreDiagram` `:111-146`
+
+`archiveDiagram` reads `diagram.data` via Prisma, mutates it in JS to inject the `_archive` blob, then writes the whole blob back via the **separate `pgPool` connection** — no row lock, no transaction spanning read and write, two different pools. A concurrent editor auto-save between the read and the write is silently overwritten (last-writer-wins on the entire JSON column). The reverse race leaves a diagram in the archive project with the user's freshly-saved content but no `_archive` metadata, so it can never be restored. (Found by both the transactions and races lenses; root cause is the two-pool design in DATA-24.)
+
+**Suggested fix:** merge in the database with one statement — `UPDATE "Diagram" SET data = jsonb_set(data,'{_archive}',$1::jsonb), "userId"=$2, "projectId"=$3, "updatedAt"=NOW() WHERE id=$4` (restore uses `data - '_archive'`). If the JS merge must stay, do `SELECT ... FOR UPDATE` + UPDATE in one transaction on a single connection.
+
+#### DATA-06 — `restoreUserBackup` runs dozens of writes with no transaction → partial restore
+**`app/lib/backup.ts:276`**
+
+The entire restore (project/diagram/unfiled-diagram/template/prompt creates, then two phase-2 raw-SQL passes) is a sequence of independent `prisma.create` / `$executeRawUnsafe` calls with **no surrounding `$transaction`**. Any mid-way throw (oversized JSON, connection drop, constraint error, aborted request) leaves every already-created row committed — a half-restored set with no clean undo. Re-running doubles the rows that landed (only prompts dedup; projects/diagrams/templates are purely additive and already suffixed " (restored)").
+
+**Suggested fix:** wrap the whole body through both phase-2 passes in a single `prisma.$transaction(async (tx) => {...})`, routing every create and `$executeRawUnsafe` through `tx` (Prisma 7 interactive transactions expose `$executeRawUnsafe` on the tx client, so the raw JSON writes roll back together). Raise the tx timeout for large backups.
+
+#### DATA-07 — Backup phase-2 JSON writes happen after all rows commit → crash leaves blank config + dangling links
+**`app/lib/backup.ts:389`**
+
+Projects are created in phase 1 with no `colorConfig`/`folderTree` (default `{}`); diagrams keep their original `data` with **old** `linkedDiagramId` values. The real `colorConfig`, remapped `folderTree`, and remapped subprocess `linkedDiagramId` are written only in the phase-2 raw-SQL loops. With no transaction binding the phases, a server kill/redeploy between them permanently leaves projects with blank config + empty folder tree and every restored subprocess link pointing at backup-era ids that don't exist in this org — a "successful-looking" restore with corrupted cross-references.
+
+**Suggested fix:** fold phase 2 into the same transaction as phase 1 (DATA-06). Better, build the remapped `folderTree`/`colorConfig`/`data` *before* the create and write each row's final JSON in one statement, eliminating the separate-pass window.
+
+#### DATA-08 — Subprocess link remap only walks `properties.linkedDiagramId` → misses other reference shapes *(Needs manual confirmation)*
+**`app/lib/backup.ts:405`**
+
+User restore mints new diagram ids and rewrites cross-diagram references by walking `data.elements[].properties.linkedDiagramId` only. Any diagram-id reference stored elsewhere in the JSON (on a connector, a different property key, or nested groups) is left pointing at the old id and dangles after restore. The doc comment promises subprocess links "can be rewritten", but the walk is shallow and key-specific. *(Skeptics split: the impact depends on whether any reference shape other than `properties.linkedDiagramId` actually exists in the schema — verify against `app/lib/diagram/types.ts`.)*
+
+**Suggested fix:** enumerate every field that can hold a diagram id from `types.ts` (element `linkedDiagramId` plus any on connectors/groups) and remap all of them, or do a generic deep-walk rewriting any string equal to a known old diagram id. Add a test with a subprocess link on a connector.
+
+#### DATA-09 — Bundle-invite promotion catch-all deletes the pending row on *any* error
+**`app/lib/bundleInvites.ts:75`** (and the post-commit notification at `:68`)
+
+In `promotePendingAudienceMemberships` the grant + pending-row delete run inside a `$transaction` (good), but the per-row `catch` treats **every** error as a benign unique-constraint collision and unconditionally deletes the `PendingBundleAudience` row. A transient error (connection blip, deadlock, statement timeout) during promotion therefore destroys the invite permanently: no grant now, and no future sign-in can ever re-promote it — the invitee is silently locked out. Separately, `createNotification` runs after the transaction commits and isn't independently guarded, so a notification failure re-enters the same catch. (Both bundleInvites findings are the same root bug.)
+
+**Suggested fix:** only delete the pending row when the error is a real unique violation (`err.code === 'P2002'`); for any other error, log and leave the row in place so the next sign-in retries. Move `createNotification` into its own try/catch.
+
+#### DATA-10 — Invite email Subject built from unescaped inviter/bundle name → header injection *(Needs manual confirmation)*
+**`app/lib/email.ts:158`** (same shape in `sendSupportDiagramEmail` `:106`)
+
+The Subject is `` `${inviterName ?? inviterEmail} invited you to view "${bundleName}"` ``. `inviterName` and `bundleName` are user-controlled and unsanitised. A CR/LF embedded in either could inject extra SMTP headers (Bcc smuggling / spoofing). `escapeHtml` protects only HTML bodies, not headers. *(Skeptics split: nodemailer generally rejects newlines in header values, so exploitability depends on transport/version — but relying on that is fragile.)*
+
+**Suggested fix:** strip CR/LF/control chars from any user value used in a header — `headerSafe(s) => s.replace(/[\r\n\t]+/g,' ').slice(0,200)` — applied to `inviterName`, `bundleName`, `subject`, `diagramName`. Validate `replyTo` addresses before use.
+
+#### DATA-11 — Additive full-restore matches users by bare email → re-parents data onto the wrong live user
+**`app/lib/full-backup.ts:570`**
+
+`restoreFullBackupAdditive` looks up live users by email alone and, on any match, attaches all the backup user's projects/diagrams/prompts to that live row — under a brand-new org owned by the unrelated live user. There's no confirmation the matched live user is the intended target. Restoring org A's backup into a DB where the same email belongs to a different account context silently re-homes data onto the wrong person.
+
+**Suggested fix:** surface email matches to the admin for explicit confirmation (dry-run match list) before re-parenting, or key on email + a stable external identifier with per-user opt-in. At minimum, log each reused email with the live user id for auditability and document the global-email-identity assumption.
+
+#### DATA-12 — Additive restore mints a project id without inserting the project → dangling FK abort
+**`app/lib/full-backup.ts:661`**
+
+A selected diagram's `projectId` is remapped via `projectIdMap.get(...)`, and `projectIdMap` is populated for every id in `projectSet` — but the Projects insert loop only creates rows that actually exist in `payload.tables.Project`. If the backup is internally inconsistent (diagram references a project filtered out by `scopePayloadToOrg` or an export bug), the map still returns a freshly-minted cuid while no Project row is inserted, so the diagram points at a project id that never existed → FK violation aborts the transaction.
+
+**Suggested fix:** only add to `projectSet` / allocate `projectIdMap` entries for project ids that resolve to a real row (`if (d.projectId && projectsById.has(String(d.projectId)))`), so a missing project cleanly falls back to `projectId = null`.
+
+#### DATA-13 — Org restore silently adds matched live users to the target org as Viewer (cross-tenant)
+**`app/lib/org-backup.ts:248`**
+
+`restoreOrgBackupAdditive` maps every backup user to a live user by email, then force-adds an `OrgMember(role: Viewer)` into `targetOrgId` for every mapped user. Because matching is by email across the whole live DB, an unrelated live user (same email, different org) can be added to the OrgAdmin's org without consent — cross-tenant membership injection. An OrgAdmin restoring a diagram owned by `alice@x.com` silently makes the live alice a Viewer of their org.
+
+**Suggested fix:** only auto-add `OrgMember` rows for users newly created during this restore. For users matched to an existing live row, require they already belong to `targetOrgId`; otherwise skip the data or surface a warning rather than silently granting membership.
+
+#### DATA-14 — Org backup pulls rules by member `userId` → drops org/admin-default rules *(Needs manual confirmation)*
+**`app/lib/org-backup.ts:83`**
+
+`buildOrgBackup` queries `DiagramRules` with `where: { userId: { in: memberUserIds } }`, but `DiagramRules.userId` is nullable — system/admin default rules have `userId = NULL` and are excluded by the `in` filter (and again by `scopePayloadToOrg`, where `has('null')` is false). The backup that claims to carry the org's AI rules silently omits the org-level defaults members actually use; a restore leaves the org with no rules. *(Skeptics split on whether org/admin defaults are in scope for an org-level backup — confirm intended semantics.)*
+
+**Suggested fix:** scope `DiagramRules` by `orgId` (the org dimension of the `@@unique([category,userId,orgId])` key) rather than `userId` alone, handling `NULL userId` explicitly so default rule sets round-trip.
+
+#### DATA-15 — `checkLimit`/`recordUsage` TOCTOU lets concurrent requests exceed hard caps
+**`app/lib/subscription.ts:523`**
+
+`checkLimit` reads usage and compares to the limit, then the route does the work and calls `recordUsage` afterward — two separate awaits. Two concurrent requests both read `current = limit-1`, both pass, both proceed. For point-in-time metrics (projects, diagrams-per-type, archimate totals) it's worse: there's no counter — the gate `count`s rows and the route then creates one, so N parallel create-project requests all see `count < max` and all create. A Free user can exceed every cap by firing parallel requests.
+
+**Suggested fix:** for event metrics, increment the `UsageCounter` atomically first, then check the returned count and refund if over. For point-in-time metrics, enforce in the same transaction as the create (`SELECT ... FOR UPDATE` on a per-user lock row, or a DB-level cap constraint). At minimum serialize per-user create paths.
+
+#### DATA-16 — Project delete `SetNull`s `projectId` but leaves PUBLISHED diagrams as invisible orphans
+**`prisma/schema.prisma:270`**
+
+`Project→Diagram` is `onDelete: SetNull` on `projectId`, while `PublicationBundle.project` is `onDelete: Cascade`. Deleting a Project hard-deletes its bundles (and `PublicationBundleDiagram` rows) but only nulls the diagrams' `projectId` — leaving published, audience-granted diagrams suddenly unfiled, with no bundle membership and no way for business users to reach them, yet still `lifecycle = PUBLISHED` with a live `currentPublishedVersionId`. They become invisible orphans rather than being archived or re-homed.
+
+**Suggested fix:** on the project-delete path, before deleting, archive/re-home child diagrams or reset their lifecycle to DRAFT and clear `currentPublishedVersionId` + bundle memberships; or block project deletion while it still has PUBLISHED diagrams or active bundles.
+
+### Medium
+
+#### DATA-17 — Monthly counter reset on renewal races concurrent usage / nukes unrelated counters
+**`app/api/stripe/webhook/route.ts:236`**
+
+`handleInvoicePaymentSucceeded` `deleteMany`s all non-`all-time` `UsageCounter` rows for the user to reset monthly metrics. This is unsynchronized with `recordUsage` — a metered action at the same moment can lose a consumed unit, and the delete is keyed only on `periodKey != 'all-time'`, so it also wipes counters for unrelated billing anchors (e.g. always-monthly `bulk_*`).
+
+**Suggested fix:** scope the delete to the specific period that just renewed (compute the prior `periodKey`), run it in a transaction, or rely on the period key rolling forward naturally (next period simply has no row yet, so an explicit delete may be unnecessary).
+
+#### DATA-18 — `restoreDiagram` trusts archived `userId`, never re-validates org membership
+**`app/lib/archive.ts:120`**
+
+`restoreDiagram` restores ownership to `_archivedFromUserId` and verifies the user/project rows exist, but never checks the user is still a member of the diagram's `orgId`, nor that the target project's `orgId` matches. A diagram restored to a user who has since left the org ends up owned by a non-member — violating the multi-tenant boundary `orgId` is meant to enforce. The `folderId` from `diagramFolderMap` is likewise trusted even if the folder was since removed.
+
+**Suggested fix:** re-derive `orgId` from the target project (or current membership) on restore and verify the user is an `OrgMember` of it before proceeding; validate the restored `folderId` still exists.
+
+#### DATA-19 — Per-user backup captures cross-org prompts but restore dedups them into one org → silent loss
+**`app/lib/backup.ts:159`**
+
+`buildUserBackup` pulls every `Prompt` the user owns across all orgs (no `orgId` filter); `restoreUserBackup` re-creates them all into the single current org, dedup-keyed on `name|diagramType`. A user owning same-named prompts in two source orgs loses the second on restore. The backup carries no per-prompt `orgId` to disambiguate.
+
+**Suggested fix:** restrict the backup to the org being backed up, or carry `orgId` per prompt and dedup per `(orgId, name, diagramType)`.
+
+#### DATA-20 — `sendMail` failures unhandled → DB may record an invite/notification as delivered *(Needs manual confirmation)*
+**`app/lib/email.ts:68`**
+
+`sendBundleInvitationEmail` / `sendSupportDiagramEmail` `await transport.sendMail(...)` with no try/catch and no status return. If the calling route writes the `PendingBundleAudience` row and then the SMTP send rejects, a pending invite exists that was never emailed, with no retry path; a route that ignores the rejection reports success to the inviter. *(Skeptics split: depends on each caller's write/send ordering — verify at the call sites.)*
+
+**Suggested fix:** have the send helpers surface a clear outcome and order the DB write vs. send (or add a compensating step / `unsent` flag) so a send failure never leaves the DB claiming delivery. Don't swallow the rejection.
+
+#### DATA-21 — `shortCuid()` (Math.random + Date.now) can collide mid-restore → duplicate-PK abort / mis-parent
+**`app/lib/full-backup.ts:499`** and **`app/lib/org-backup.ts:59`**
+
+`shortCuid()` = `'c' + Date.now().toString(36) + 8 random base36 chars`, used to mint ids for every remapped Org/Project/Diagram/OrgMember/History/Template/Prompt in additive restores. Rows minted in the same millisecond share the time component, so entropy is effectively only 8 random chars; a birthday-paradox collision within one batch produces a duplicate-PK insert that aborts the whole transaction (or, if two child rows collide, a wrong re-parent). The helper is also copy-pasted across two files. (Three findings across the two files consolidated.)
+
+**Suggested fix:** use the same collision-resistant generator Prisma uses for `@default(cuid())` (`createId` from `@paralleldrive/cuid2`) and dedupe the helper into one shared module.
+
+#### DATA-22 — `restoreRulesPrefsBundle` upserts in a bare loop, no transaction → partial merge
+**`app/lib/rules-prefs-backup.ts:126`**
+
+The rules and prompts loops issue per-row find+update/create with no enclosing `$transaction`. A mid-batch failure (a JSON `planJson` cast rejected, a connection drop) leaves some rows merged and others not, and the function throws with no result object, so the caller can't tell how far it got. Idempotent on re-run, but a robustness gap for a cross-environment migration tool.
+
+**Suggested fix:** wrap both loops in one interactive `$transaction` (all-or-nothing), or catch per-row errors into `skippedReasons` and continue so the function always returns a complete result.
+
+#### DATA-23 — Rules upsert keyed only by `id` violates `@@unique([category,userId,orgId])` → abort
+**`app/lib/rules-prefs-backup.ts:142`**
+
+`restoreRulesPrefsBundle` upserts `DiagramRules` by `id` only. When migrating local-dev rules into prod (the stated use case), a prod row may already exist with the same `(category, userId, orgId)` tuple but a different `id`; the incoming row has no id match, takes the create branch, and Prisma throws a unique-constraint violation. System-wide rules (`userId`/`orgId` null) are especially prone since only one per category can exist.
+
+**Suggested fix:** before create, look up by `{ category, userId, orgId }` and update that row (keeping its id) if found; only insert when neither id nor the composite key matches. Or use `prisma.diagramRules.upsert` with the composite unique where-clause.
+
+### Low
+
+#### DATA-24 — Two independent connection pools can't share a transaction
+**`app/lib/db.ts:24`**
+
+`prisma` uses a `PrismaPg` adapter pool (max 10) and `pgPool` is a *second* independent `pg.Pool` (max 5) over the same `DATABASE_URL`. Any path mixing a Prisma write with a `pgPool` write operates on two connections that cannot participate in one transaction — the structural root of DATA-05, and a limiter on making the backup/restore JSON writes atomic. It also doubles the connection budget against the DB.
+
+**Suggested fix:** prefer `prisma.$executeRaw(Unsafe)` for raw SQL so it shares the adapter pool and can run inside `prisma.$transaction` (as `backup.ts` phase 2 already does). Reserve the standalone `pgPool` for genuinely standalone reads; where a raw write + model write must be atomic, run both via `tx.$executeRaw` / `tx.*` inside one transaction.
 
 ---
