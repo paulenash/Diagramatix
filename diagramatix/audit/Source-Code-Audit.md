@@ -22,7 +22,7 @@
 |---|---|---|
 | 1 | Security & Access Control | ✅ Done — 18 findings (7 High, 7 Medium, 4 Low) |
 | 2 | Data Integrity & Server Libs | ✅ Done — 24 findings (3 Critical, 13 High, 7 Medium, 1 Low) |
-| 3 | Diagram Engine Core | Pending |
+| 3 | Diagram Engine Core | ✅ Done — 13 findings (1 Critical, 2 High, 5 Medium, 5 Low) |
 | 4 | Canvas & Renderers | Pending |
 | 5 | Dashboard & Page Clients | Pending |
 | 6 | Import/Export & Interop | Pending |
@@ -76,6 +76,19 @@
 | DATA-22 | Medium | Transactions | `restoreRulesPrefsBundle` upserts in a bare loop, no transaction → partial merge | Open |
 | DATA-23 | Medium | Restore | Rules upsert keyed only by `id` violates `@@unique([category,userId,orgId])` → abort | Open |
 | DATA-24 | Low | Architecture | Two independent connection pools (Prisma adapter + raw `pgPool`) can't share a transaction | Open |
+| ENG-01 | Critical | Undo/redo | Undo/redo wipes title, fonts, database, processOwner, parentDiagramIds → auto-saved data loss | Open |
+| ENG-02 | High | Reducer | `DELETE_ELEMENT` leaves dangling connectors on the deleted host's boundary events | Open |
+| ENG-03 | High | Undo/redo | Title/font/database setters mutate persisted state but don't invalidate the redo stack | Open |
+| ENG-04 | Medium | Reducer | `collectCascadeLanes` recurses with no visited guard → stack overflow on cyclic lane chain | Open |
+| ENG-05 | Medium | Space tools | `REMOVE_SPACE` leaves corner elements un-shifted in cross (both-axis) zones | Open |
+| ENG-06 | Medium | Undo/redo | Interleaved second drag overwrites the pre-drag snapshot → first action lost from history | Open |
+| ENG-07 | Medium | Geometry | `offsetAlongFromPoint`/`getOffsetAlong` divide by element w/h with no zero-guard → NaN offset | Open |
+| ENG-08 | Medium | Routing | Containment clamp can invert detour lines → route crosses through obstacle | Needs manual confirmation |
+| ENG-09 | Low | Mutation | `SWAP_LANES_VERTICAL` reorders the connectors array → silent draw-order change | Open |
+| ENG-10 | Low | Undo/redo | `swapLane` bypasses the 100-entry history cap | Open |
+| ENG-11 | Low | Space tools | `INSERT_SPACE` pushes a history snapshot every mouse-move frame of a shift-drag | Open |
+| ENG-12 | Low | Performance | `ancestorsOf` does a linear `find()` per hop → O(n²) obstacle setup per recompute | Open |
+| ENG-13 | Low | Mutation | `consolidateWaypoints` returns its input array by reference for short paths (aliasing trap) | Open |
 
 ---
 
@@ -412,3 +425,112 @@ The rules and prompts loops issue per-row find+update/create with no enclosing `
 **Suggested fix:** prefer `prisma.$executeRaw(Unsafe)` for raw SQL so it shares the adapter pool and can run inside `prisma.$transaction` (as `backup.ts` phase 2 already does). Reserve the standalone `pgPool` for genuinely standalone reads; where a raw write + model write must be atomic, run both via `tx.$executeRaw` / `tx.*` inside one transaction.
 
 ---
+
+## Stage 3 — Diagram Engine Core
+
+**Scope:** `app/hooks/useDiagram.ts` (~8,380-line `useReducer` state), `app/lib/diagram/routing.ts`, `bpmnLayout.ts`, `genericLayout.ts`, `linkClosure.ts`, `checks/diagramChecks.ts`, `checks/loadExport.ts`, `textMetrics.ts`.
+**Method:** 5 finder lenses (reducer invariants, undo/redo consistency, state-mutation purity, geometry NaN/÷0, unbounded loops + INSERT/REMOVE_SPACE) → 25 raw findings → 23 after dedupe → each adversarially verified by 2 skeptics reading the real code (finders Grep'd + read targeted ranges given the file size). **13 confirmed, 10 refuted.** ENG-08 is *Needs manual confirmation*.
+
+> The standout is **ENG-01**: undo/redo silently drops every diagram field except elements/connectors — and because the editor auto-saves the whole `data` blob, one Ctrl+Z after setting a title or font **permanently writes the loss to the database**. The link-closure cycle guard the lens specifically probed (`walkForwardClosure`) came back clean — it was not flagged.
+
+### Critical
+
+#### ENG-01 — Undo/redo wipes title, fonts, database, processOwner & parentDiagramIds (persisted data loss)
+**`app/hooks/useDiagram.ts:8244`** (redo at `:8253`)
+
+Undo snapshots store only `{ elements, connectors }`. `undo()`/`redo()` dispatch `SET_DATA` with `{ ...snap, viewport }`, and the `SET_DATA` reducer replaces the **whole** state object verbatim (`:3102`). Every other `DiagramData` field — `title`, all six font-size fields, `database`, `parentDiagramIds`, `processOwner` — is therefore set to `undefined` on any undo/redo. Because title and font changes do **not** push history, the repro is brutal: set a title (or change a font), move any element, press Ctrl+Z — the move is undone *and the title/fonts vanish*. `DiagramEditor` then auto-saves the whole `data` object, so the wipe is persisted permanently, not a transient glitch. `cancelLabelEdit` already does it right (`:7907` spreads `...dataRef.current`), proving the intended pattern.
+
+**Suggested fix:** preserve non-snapshotted fields in both `undo()`/`redo()` — `dispatch({ type: "SET_DATA", payload: { ...dataRef.current, elements: snap.elements, connectors: snap.connectors } })` — or widen the snapshot to capture the full `DiagramData` (minus viewport).
+
+### High
+
+#### ENG-02 — `DELETE_ELEMENT` leaves dangling connectors on the deleted host's boundary events
+**`app/hooks/useDiagram.ts:5749`**
+
+When a boundary host (task/subprocess/EP) is deleted, its boundary-event children are removed as elements (`:5440`), but the connector cleanup (`:5749-5751`) only drops connectors touching the host's **own** id — not connectors referencing the removed boundary-event children. Boundary events legitimately carry connectors (event-to-event `associationBPMN`, sequence in/out of edge-mounted start/end/intermediate events). Repro: mount an intermediate event on a task, draw a connector to it, delete the task → the event vanishes but its connector survives pointing at a missing id. `recomputeAllConnectors` no-ops on the missing endpoint, so the orphan persists with stale waypoints, renders as a stray line, is saved/exported, and trips `checkReferentialIntegrity` as a hard error. The sibling `REMOVE_SPACE` already does this correctly (`:6744`/`:6915`), confirming the oversight.
+
+**Suggested fix:** build `const removedIds = new Set([id]); for (const e of state.elements) if (e.boundaryHostId === id) removedIds.add(e.id);` and filter connectors with `!removedIds.has(c.sourceId) && !removedIds.has(c.targetId)`. Apply the same set to the pool/lane cascade filter at `:5405-5407`.
+
+#### ENG-03 — Title/font/database setters mutate persisted state but don't invalidate the redo stack
+**`app/hooks/useDiagram.ts:8295`**
+
+`updateDiagramTitle`, the six `setFontSize`-family setters, `setDatabase`, and `setViewport` only dispatch — they never call `pushHistory` and never clear `futureRef` (the only place the redo branch is reset). Repro: move an element → Ctrl+Z (redo now armed) → edit the title → Ctrl+Y: redo is still enabled and replays the stale post-move snapshot, which (per ENG-01) also clobbers the title you just set. A new edit after an undo must invalidate the redo branch.
+
+**Suggested fix:** route these setters through `pushHistory(snapshotData())` (preferred for title/fonts/database — users expect to undo them), or at minimum add `futureRef.current = []; setCanRedo(false);` to each. A shared `commitEdit()` helper would prevent the whole class of omission.
+
+### Medium
+
+#### ENG-04 — `collectCascadeLanes` recurses with no visited guard → stack overflow on a cyclic lane chain
+**`app/hooks/useDiagram.ts:5420`**
+
+The inner `collectCascadeLanes(parentId)` adds matching lanes and recurses into each child id but never checks whether an id was already visited. A lane whose `parentId` chain forms a cycle (corrupt import, hand-edited JSON, or an upstream bug) makes deleting a lane recurse unboundedly and overflow the stack, crashing the editor with no recovery. The other recursive walker in the same handler (`walk`, `:5369`) *does* guard with `!containerIds.has(e.id)` — the protection is simply missing here.
+
+**Suggested fix:** track visited ids and skip already-seen lanes before recursing, mirroring `walk`.
+
+#### ENG-05 — `REMOVE_SPACE` leaves corner elements un-shifted in cross (both-axis) zones
+**`app/hooks/useDiagram.ts:6831`**
+
+`REMOVE_SPACE` builds a cross-shaped zone (vertical strip + horizontal strip). `partialOverlap()` is true if an element overlaps *either* strip, and the non-structural branch leaves any such element untouched. An element cleanly to the right of the vertical strip but whose y-range crosses the horizontal band is left in place even though it should slide left by `zone.width` — so on a diagonal Remove-Space it stays put while neighbours slide under it, producing overlaps.
+
+**Suggested fix:** evaluate overlap per-axis (`ovV`, `ovH` separately); skip the X-shift only when the element straddles the vertical strip, and the Y-shift only when it straddles the horizontal strip.
+
+#### ENG-06 — Interleaved second drag overwrites the pre-drag snapshot → first action lost from history
+**`app/hooks/useDiagram.ts:7816`**
+
+Coalesced drags key their snapshot on `draggingRef`: `if (draggingRef.current !== id) { draggingRef.current = id; preMoveRef.current = snapshotData(); }`. If a new drag for a different id begins before the prior `elementMoveEnd` fires (rapid pointer-capture loss, swallowed mouseup), `preMoveRef` is overwritten with a snapshot already containing the first move. When the second drag ends, only its pre-snapshot is pushed; the first change becomes un-undoable and one Ctrl+Z reverts both. Same hazard for resize and waypoint drags.
+
+**Suggested fix:** flush the pending snapshot when a new coalesced drag starts while a different id is still open (`if (draggingRef.current && draggingRef.current !== id && preMoveRef.current) pushHistory(preMoveRef.current);`), and guarantee `elementMoveEnd`/`resizeElementEnd` fire on `pointercancel`/`blur`/`lostpointercapture`, not only `mouseup`.
+
+#### ENG-07 — `offsetAlongFromPoint`/`getOffsetAlong` divide by element w/h with no zero-guard → NaN offset
+**`app/lib/diagram/routing.ts:48`** (and `:95`)
+
+Both compute `(pt.x - el.x) / el.width` (or `/ el.height`) with no guard against a zero dimension (unlike `getClosestSideOfElement` at `:88`, which uses `|| 1`). A zero-width/height element (e.g. from import) yields `NaN`/`±Infinity`, which is persisted as `conn.sourceOffsetAlong`/`targetOffsetAlong`, then fed to `sidePoint()` → `el.x + el.width*NaN = NaN`. The connector's stored attachment becomes permanently NaN and silently fails to render even after the element is fixed.
+
+**Suggested fix:** divide by a guarded extent and clamp: `Math.max(0, Math.min(1, (pt.x - el.x) / (el.width || 1)))`, mirroring `getClosestSideOfElement`.
+
+#### ENG-08 — Containment clamp can invert detour lines → route crosses through obstacle *(Needs manual confirmation)*
+**`app/lib/diagram/routing.ts:379`**
+
+`buildOrthogonalPath` clamps the four detour lines into the containment box. When a tall obstacle nearly fills a small Expanded Subprocess, the clamp can pin `bottomY` above the obstacle's real bottom edge (and `topY` below its top), so all four candidate paths run *through* the obstacle; `pathHitsObstacles` rejects them all and the function falls through to `return ordered[0].path` — a path that visibly slices across the obstacle. No crash; wrong route until the user moves a shape. *(Skeptics split on how often the clamp actually collapses a candidate onto the blocker vs. the far-path fallback saving it — verify with a small-EP/large-obstacle repro.)*
+
+**Suggested fix:** after clamping, re-validate that a clamped line still clears the obstacle; drop candidates whose clamp collapsed them onto/through the blocker so a genuinely-clear (or far-path) candidate is chosen. Guard the degenerate `cBottom < cTop` case.
+
+### Low
+
+#### ENG-09 — `SWAP_LANES_VERTICAL` reorders the connectors array → silent draw-order change
+**`app/hooks/useDiagram.ts:4545`**
+
+Returns `[...validated, ...unchanged]` — a new array (not a purity violation), but it hoists rerouted connectors to the front and pushes untouched ones to the back. Draw order for overlapping connectors (and any order-sensitive export consumer) silently changes on each lane swap: a message connector that was on top can drop underneath.
+
+**Suggested fix:** preserve original order by mapping a `Map` of validated connectors over the original array: `connectors.map(c => vmap.get(c.id) ?? c)`.
+
+#### ENG-10 — `swapLane` bypasses the 100-entry history cap
+**`app/hooks/useDiagram.ts:7827`**
+
+`pushHistory` enforces the cap by shifting when length > 100, but `swapLane` pushes directly via `pastRef.current.push(...)` and never trims — the only history path not subject to the bound.
+
+**Suggested fix:** replace the inline push/clear block with a single `pushHistory(snapshotData())` call, matching every other one-shot action.
+
+#### ENG-11 — `INSERT_SPACE` pushes a history snapshot every mouse-move frame of a shift-drag
+**`app/hooks/useDiagram.ts:8189`**
+
+`insertSpace()` calls `pushHistory()` before each dispatch, and `Canvas` fires `onInsertSpace` on every mousemove during a shift-drag — so one gesture pushes dozens-to-hundreds of full-diagram snapshots and re-runs `recomputeAllConnectors` + `validateConnectorsAgainstObstacles` per frame. Undo becomes per-pixel and large diagrams stutter.
+
+**Suggested fix:** coalesce — snapshot once on drag start, dispatch deltas without `pushHistory` during the drag (or accumulate dx/dy and dispatch one `INSERT_SPACE` on mouseup).
+
+#### ENG-12 — `ancestorsOf` does a linear `find()` per hop → O(n²) obstacle setup per recompute
+**`app/lib/diagram/routing.ts:750`**
+
+`ancestorsOf` walks the parent chain with `allElements.find(...)` on every hop, and `computeWaypoints` runs per connector inside `recomputeAllConnectors` (every move/space frame). On deep pool/lane/EP hierarchies this is O(connectors × elements × depth) per frame.
+
+**Suggested fix:** hoist an `id → element` `Map` once (or pass the `elementMap` `recomputeAllConnectors` already builds) and use `map.get(parentId)`.
+
+#### ENG-13 — `consolidateWaypoints` returns its input array by reference for short paths (aliasing trap)
+**`app/lib/diagram/routing.ts:1116`**
+
+Returns the same `wps` reference when `wps.length <= 4` instead of a fresh array (the `> 4` branch returns a new one). Nothing breaks today because the dispatcher passes a fresh array, but any future caller passing an array it also retains would alias two connectors' `.waypoints` onto one array — a later in-place edit of one would corrupt the other and the undo snapshots that captured them shallowly.
+
+**Suggested fix:** always return a fresh array — `if (wps.length <= 4) return wps.slice();`.
+
+---
+
