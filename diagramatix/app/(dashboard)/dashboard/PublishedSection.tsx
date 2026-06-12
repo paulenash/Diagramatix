@@ -137,7 +137,7 @@ export function PublishedSection() {
   return (
     <>
     {(diagrams.length > 0 || createdBundles.length > 0) && (
-    <CollapsibleSection title="Published by me">
+    <CollapsibleSection title="Published by me" count={diagrams.length + createdBundles.length}>
 
       {/* Diagrams */}
       {diagrams.length > 0 && (
@@ -245,7 +245,7 @@ export function PublishedSection() {
 
     {/* Published to me — bundles + root processes I'm in the audience of */}
     {receivedBundles.length > 0 && (
-      <CollapsibleSection title="Published to me">
+      <CollapsibleSection title="Published to me" count={receivedBundles.length + sharedRoots.length}>
 
         {/* Bundles shared with me */}
         <div className="mb-4">
