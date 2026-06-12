@@ -4415,7 +4415,7 @@ export function Canvas({
                   // Gateway shape double-click never opens the label editor —
                   // the label rect has its own dblclick handler for that.
                   if (el.type === "gateway") return;
-                  const linkedId = (el.type === "subprocess" || el.type === "submachine" || el.type === "chevron-collapsed") ? el.properties.linkedDiagramId as string | undefined : undefined;
+                  const linkedId = (el.type === "subprocess" || el.type === "submachine" || el.type === "chevron-collapsed" || el.type === "use-case") ? el.properties.linkedDiagramId as string | undefined : undefined;
                   if (linkedId && onDrillIntoSubprocess) {
                     onDrillIntoSubprocess(linkedId);
                   } else {
@@ -4902,7 +4902,7 @@ export function Canvas({
                 // Gateway shape double-click never opens the label editor —
                 // the label rect has its own dblclick handler for that.
                 if (el.type === "gateway") return;
-                const linkedId = (el.type === "subprocess" || el.type === "submachine" || el.type === "chevron-collapsed") ? el.properties.linkedDiagramId as string | undefined : undefined;
+                const linkedId = (el.type === "subprocess" || el.type === "submachine" || el.type === "chevron-collapsed" || el.type === "use-case") ? el.properties.linkedDiagramId as string | undefined : undefined;
                 if (linkedId && onDrillIntoSubprocess) {
                   onDrillIntoSubprocess(linkedId);
                 } else {

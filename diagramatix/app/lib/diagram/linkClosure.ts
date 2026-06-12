@@ -8,11 +8,14 @@ import type { PrismaClient } from "@/app/generated/prisma/client";
 // • subprocess / subprocess-expanded — BPMN drill-into-child-process.
 // • submachine                       — State-machine drill-into-sub-machine.
 // • chevron-collapsed                — Value-chain drill-into-detailed-process.
+// • use-case                         — Process Context central process
+//                                      drill-into-detailed BPMN.
 export const LINK_BEARING_ELEMENT_TYPES: ReadonlySet<string> = new Set([
   "subprocess",
   "subprocess-expanded",
   "submachine",
   "chevron-collapsed",
+  "use-case",
 ]);
 
 // Lightweight element shape used by the link-extraction helper. Mirrors

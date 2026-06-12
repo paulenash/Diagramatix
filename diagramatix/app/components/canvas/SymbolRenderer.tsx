@@ -2230,6 +2230,33 @@ export function SymbolRenderer({
         );
       })()}
 
+      {/* Process Context central process (use-case) drill-through — a blue
+          drill badge at the bottom of the ellipse plus a hit area, so the
+          link is visible and clickable even in the read-only viewer. */}
+      {element.type === "use-case" && (element.properties.linkedDiagramId as string | undefined) && (() => {
+        const mw = 14, mh = 14;
+        const pmx = element.x + element.width / 2 - mw / 2;
+        const pmy = element.y + element.height - mh - 6;
+        return (
+          <g>
+            <rect x={pmx} y={pmy} width={mw} height={mh} rx={2}
+              fill="#eff6ff" stroke="#2563eb" strokeWidth={1} style={{ pointerEvents: "none" }} />
+            <path
+              d={`M ${pmx + 7} ${pmy + 3.5} L ${pmx + 7} ${pmy + 9} M ${pmx + 4.5} ${pmy + 6.5} L ${pmx + 7} ${pmy + 9} L ${pmx + 9.5} ${pmy + 6.5}`}
+              stroke="#2563eb" strokeWidth={1.3} fill="none" strokeLinecap="round" strokeLinejoin="round"
+              style={{ pointerEvents: "none" }}
+            />
+            <rect
+              x={pmx - 2} y={pmy - 2} width={mw + 4} height={mh + 4}
+              fill="transparent" stroke="none"
+              style={{ cursor: "pointer", pointerEvents: "all" }}
+              onMouseDown={(e) => e.stopPropagation()}
+              onDoubleClick={(e) => { e.stopPropagation(); onDoubleClick(); }}
+            />
+          </g>
+        );
+      })()}
+
       {/* Drill-back icon on start events when this diagram was navigated to from a subprocess/substate */}
       {(element.type === "start-event" || element.type === "initial-state") && onDrillBack && !element.boundaryHostId && (
         <g
