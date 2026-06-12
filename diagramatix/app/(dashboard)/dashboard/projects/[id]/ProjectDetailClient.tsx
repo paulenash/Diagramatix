@@ -3433,7 +3433,7 @@ function DiagramCard({
                 <hr className="my-1 border-gray-100" />
                 <button
                   onClick={() => { onMove(diagram.id, null); setShowMove(false); }}
-                  className="block w-full text-left px-3 py-1 text-xs text-gray-500 hover:bg-gray-50 italic">Unorganised</button>
+                  className="block w-full text-left px-3 py-1 text-xs text-gray-500 hover:bg-gray-50 italic">Sandpit</button>
               </div>
             )}
           </div>

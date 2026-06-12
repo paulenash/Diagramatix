@@ -77,7 +77,7 @@ export const CHAPTERS: HelpChapter[] = [
           <p>
             Projects are the top-level containers for your diagrams.
             Every diagram belongs to a project (or sits in the
-            &ldquo;Unorganised&rdquo; section on the dashboard).
+            &ldquo;Sandpit&rdquo; section on the dashboard).
           </p>
         ),
       },
@@ -3562,7 +3562,7 @@ export const CHAPTERS: HelpChapter[] = [
                 always available.
               </li>
               <li>
-                <strong>x — Delete project (diagrams → Unorganised)</strong>{" "}
+                <strong>x — Delete project (diagrams → Sandpit)</strong>{" "}
                 — visible to the project Owner or an OrgAdmin. Diagrams
                 survive as orphans you can re-organise later.
               </li>

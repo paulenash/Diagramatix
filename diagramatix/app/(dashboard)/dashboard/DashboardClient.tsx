@@ -1102,7 +1102,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
     const proj = projects.find(p => p.id === id);
     setConfirmDialog({
       title: "Delete Project",
-      message: `Are you sure you want to delete "${proj?.name ?? "this project"}"? Its diagrams will be moved to Unorganised.`,
+      message: `Are you sure you want to delete "${proj?.name ?? "this project"}"? Its diagrams will be moved to the Sandpit.`,
       onConfirm: async () => {
         setConfirmDialog(null);
         // Fetch the project's diagrams before deleting so we can add them to unorganised
@@ -1269,12 +1269,12 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
   const isImpersonating = !!impersonationMode;
 
   return (
-    <div className={`min-h-screen ${isImpersonating ? "bg-orange-50" : "bg-gray-50"}`}>
+    <div className={`h-screen flex flex-col overflow-hidden ${isImpersonating ? "bg-orange-50" : "bg-gray-50"}`}>
       {isImpersonating && viewingAsName !== undefined && viewingAsEmail !== undefined && (
         <ImpersonationBanner viewingAsName={viewingAsName ?? ""} viewingAsEmail={viewingAsEmail ?? ""} mode={impersonationMode} />
       )}
-      {/* Header */}
-      <header className={`${isImpersonating ? "bg-orange-50" : "bg-white"} border-b border-gray-200 px-6 py-4 flex items-center justify-between`}>
+      {/* Header — fixed top panel; everything below scrolls. */}
+      <header className={`shrink-0 ${isImpersonating ? "bg-orange-50" : "bg-white"} border-b border-gray-200 px-6 py-4 flex items-center justify-between`}>
         <div className="flex items-center gap-3">
           {/* Brand wordmark (public/logos/diagramatix-logo.svg, 500x120 viewBox).
               Replaces the previous icon + "Diagramatix" span pair so the
@@ -1617,7 +1617,8 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-6 py-6 space-y-6">
+      <main className="flex-1 overflow-y-auto min-h-0">
+       <div className="max-w-5xl mx-auto px-6 py-6 space-y-6">
         {/* Send-for-Review collections (Phase 2) — pinned above projects.
             Renders nothing when the user has no reviews either way. */}
         <ReviewsSection />
@@ -1821,7 +1822,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
         {(unorganized.length > 0 || true) && (
           <section>
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-semibold text-gray-900">Unorganised Diagrams</h2>
+              <h2 className="text-sm font-semibold text-gray-900">Sandpit</h2>
               <button
                 onClick={() => setShowNewDiagram(true)}
                 className="px-3 py-1.5 bg-white border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 text-xs font-medium"
@@ -1832,7 +1833,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
 
             {unorganized.length === 0 ? (
               <div className="text-center py-8 bg-white rounded-lg border border-gray-200 border-dashed">
-                <p className="text-gray-400 text-sm">No unorganised diagrams</p>
+                <p className="text-gray-400 text-sm">The Sandpit is empty</p>
               </div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
@@ -1851,6 +1852,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
             )}
           </section>
         )}
+       </div>
       </main>
 
       {/* Project Properties Panel */}
@@ -2899,10 +2901,10 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
               <button
                 onClick={(e) => { close(); handleDeleteProject(p.id, e); }}
                 className="w-full text-left px-3 py-1.5 hover:bg-gray-50 text-gray-700"
-                title="Delete project. Diagrams move to Unorganised Diagrams."
+                title="Delete project. Diagrams move to the Sandpit."
               >
                 <span className="font-mono mr-2">x</span>
-                Delete project (diagrams → Unorganised)
+                Delete project (diagrams → Sandpit)
               </button>
             )}
             {canSee_xPlus && (

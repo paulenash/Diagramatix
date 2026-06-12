@@ -110,6 +110,9 @@ export function AdminClient({ users: initialUsers, currentUserId, commitCount, i
   // Filter columns mirror the sortable ones — substring match against
   // the rendered label (case-insensitive) for everything; status uses
   // the same "p.label" text so typing "online" finds online users.
+  // Registered Users table is a tile on the SuperAdmin landing — hidden
+  // until the tile is clicked. OrgAdmins (scoped list) always see it.
+  const [showUsers, setShowUsers] = useState(!isSuperAdmin);
   type SortKey = "name" | "email" | "status" | "subscription" | "registered";
   const [sortBy, setSortBy] = useState<SortKey | null>("registered");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
@@ -255,7 +258,7 @@ export function AdminClient({ users: initialUsers, currentUserId, commitCount, i
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logos/diagramatix-icon.svg" alt="Diagramatix" className="w-7 h-7" />
           <h1 className="font-semibold text-gray-900">
-            {isSuperAdmin ? "Registered Users" : `Registered Users — ${activeOrgName ?? "Your Org"}`}
+            {isSuperAdmin ? "SuperAdmin" : `Registered Users — ${activeOrgName ?? "Your Org"}`}
           </h1>
           <span className="text-[10px] text-gray-400">v{SCHEMA_VERSION}.{commitCount}</span>
         </div>
@@ -267,7 +270,8 @@ export function AdminClient({ users: initialUsers, currentUserId, commitCount, i
           on the <th> stops the smaller numeric / date columns from
           starving the text-heavy ones. */}
       <div className="max-w-screen-2xl mx-auto px-6 py-8">
-        {isSuperAdmin && <SuperAdminToolsGrid />}
+        {isSuperAdmin && <SuperAdminToolsGrid onShowUsers={() => setShowUsers(true)} />}
+        {showUsers && (
         <table className="w-full bg-white rounded-lg border border-gray-200 overflow-hidden table-fixed">
           <thead>
             <tr className="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -492,6 +496,8 @@ export function AdminClient({ users: initialUsers, currentUserId, commitCount, i
             })}
           </tbody>
         </table>
+        )}
+        {showUsers && (
         <p className="text-xs text-gray-400 mt-4">
           {filteredSorted.length === users.length
             ? `${users.length} registered user(s)`
@@ -499,6 +505,7 @@ export function AdminClient({ users: initialUsers, currentUserId, commitCount, i
           {" — "}
           {users.filter(u => presence(u.lastSeenAt, u.id === currentUserId).online).length} online
         </p>
+        )}
       </div>
 
       {editConfirm && (
@@ -698,9 +705,11 @@ interface AdminTile {
   description: string;
   href?: string;     // navigation tiles
   ddl?: boolean;     // the special "Generate DDL" tile renders GenerateDdlButton
+  users?: boolean;   // the "Registered Users" tile reveals the user table
 }
 
 const ADMIN_TILES: AdminTile[] = [
+  { id: "users", title: "Registered Users", description: "Every registered user — status, subscription, current diagram.", users: true },
   { id: "ai-rules", title: "AI Rules & Preferences", description: "Geometric + style rules that steer AI BPMN generation.", href: "/dashboard/rules" },
   { id: "database", title: "Database Access", description: "Inspect the live database and run maintenance queries.", href: "/dashboard/admin/database" },
   { id: "ddl", title: "Generate Diagramatix DDL", description: "Download the schema as PostgreSQL / MySQL / SQL Server DDL.", ddl: true },
@@ -718,7 +727,7 @@ const ADMIN_TILES: AdminTile[] = [
 
 const TILE_ORDER_KEY = "dgx.superadmin.tileOrder";
 
-function SuperAdminToolsGrid() {
+function SuperAdminToolsGrid({ onShowUsers }: { onShowUsers: () => void }) {
   const router = useRouter();
   const [order, setOrder] = useState<string[]>(ADMIN_TILES.map(t => t.id));
   const [draggingId, setDraggingId] = useState<string | null>(null);
@@ -768,9 +777,9 @@ function SuperAdminToolsGrid() {
               onDragStart={() => setDraggingId(t.id)}
               onDragOver={e => e.preventDefault()}
               onDrop={() => onDrop(t.id)}
-              onClick={() => { if (t.href) router.push(t.href); }}
+              onClick={() => { if (t.users) onShowUsers(); else if (t.href) router.push(t.href); }}
               className={`relative bg-white border border-red-300 rounded-md p-4 transition-colors ${
-                t.href ? "cursor-pointer hover:bg-red-50 hover:border-red-400" : ""
+                t.href || t.users ? "cursor-pointer hover:bg-red-50 hover:border-red-400" : ""
               } ${draggingId === t.id ? "opacity-50" : ""}`}
             >
               <div className="flex items-start justify-between gap-2">

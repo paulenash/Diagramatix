@@ -60,7 +60,7 @@ function buildTree(diagrams: ArchivedDiagram[]): UserBucket[] {
     if (!project) {
       project = {
         projectId: projectKey,
-        projectName: d.originalProjectName ?? "Unorganised",
+        projectName: d.originalProjectName ?? "Sandpit",
         folders: [],
       };
       user.projects.push(project);
@@ -153,8 +153,8 @@ export function ArchiveClient() {
       message:
         `Restore "${diag?.name ?? "this diagram"}" to ${diag?.originalUserEmail ?? "the original user"}?` +
         (diag?.originalProjectName
-          ? ` It will be placed back in "${diag.originalProjectName}" if the project still exists, otherwise it will appear in Unorganised.`
-          : " It will appear in the user's Unorganised diagrams."),
+          ? ` It will be placed back in "${diag.originalProjectName}" if the project still exists, otherwise it will appear in the Sandpit.`
+          : " It will appear in the user's Sandpit."),
       confirmLabel: "Restore",
       onConfirm: async () => {
         setConfirmDialog(null);

@@ -80,7 +80,7 @@ export function DeletedDiagramsClient() {
       const userEmail = d.originalUserEmail ?? "(unknown user)";
       userEmails.set(userKey, userEmail);
       const projKey = d.originalProjectId ?? UNORGANISED_PROJECT_KEY;
-      const projName = d.originalProjectName ?? "Unorganised";
+      const projName = d.originalProjectName ?? "Sandpit";
       projectNames.set(`${userKey}/${projKey}`, projName);
       const folderKey = d.originalFolderId ?? ROOT_FOLDER_KEY;
       const folderName = d.originalFolderName ?? "(no folder)";
@@ -114,7 +114,7 @@ export function DeletedDiagramsClient() {
         folders.sort((a, b) => a.name.localeCompare(b.name));
         projects.push({
           key: `${userKey}/${projKey}`,
-          name: projectNames.get(`${userKey}/${projKey}`) ?? "Unorganised",
+          name: projectNames.get(`${userKey}/${projKey}`) ?? "Sandpit",
           folders,
           count: projCount,
         });

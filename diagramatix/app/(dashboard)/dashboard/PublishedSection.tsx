@@ -111,6 +111,8 @@ export function PublishedSection() {
   }
 
   return (
+    <>
+    {(diagrams.length > 0 || createdBundles.length > 0) && (
     <section>
       <h2 className="text-base font-semibold text-gray-900 mb-3">Published by me</h2>
 
@@ -215,8 +217,13 @@ export function PublishedSection() {
         </div>
       )}
 
-      {/* Bundles I'm in the audience of (received) */}
-      {receivedBundles.length > 0 && (
+    </section>
+    )}
+
+    {/* Published to me — bundles I'm in the audience of */}
+    {receivedBundles.length > 0 && (
+      <section>
+        <h2 className="text-base font-semibold text-gray-900 mb-3">Published to me</h2>
         <div>
           <div className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-2">
             Published processes shared with me ({receivedBundles.length})
@@ -239,7 +246,8 @@ export function PublishedSection() {
             ))}
           </div>
         </div>
-      )}
+      </section>
+    )}
 
       {archiveTarget && (
         <ConfirmDialog
@@ -252,6 +260,6 @@ export function PublishedSection() {
           onCancel={() => setArchiveTarget(null)}
         />
       )}
-    </section>
+    </>
   );
 }
