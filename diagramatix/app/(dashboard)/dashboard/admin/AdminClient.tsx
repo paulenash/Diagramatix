@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 import { AlertDialog } from "@/app/components/AlertDialog";
 import { UsagePopover } from "@/app/components/UsagePopover";
-import { AdminNotificationsButton } from "@/app/components/AdminNotificationsButton";
 import { displayOrgRole } from "@/app/lib/auth/orgRoleLabels";
 import { SCHEMA_VERSION } from "@/app/lib/diagram/types";
 
@@ -333,7 +332,12 @@ export function AdminClient({ users: initialUsers, currentUserId, commitCount, i
               >
                 Bubble Help
               </a>
-              <AdminNotificationsButton />
+              <a
+                href="/notifications?from=/dashboard/admin"
+                className="text-xs text-red-700 hover:text-red-800 font-medium border border-red-300 rounded px-2 py-1 hover:bg-red-50"
+              >
+                Notifications &amp; Feedback
+              </a>
             </>
           )}
         </div>

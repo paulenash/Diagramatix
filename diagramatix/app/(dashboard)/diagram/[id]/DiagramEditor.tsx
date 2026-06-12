@@ -616,11 +616,13 @@ export function DiagramEditor({
   const backHref = backFromHref ?? (projectId ? `/dashboard/projects/${projectId}` : "/dashboard");
   const backLabel = backHref === "/dashboard"
     ? "Dashboard"
-    : backHref.startsWith("/dashboard/projects")
-      ? "Project"
-      : backHref.startsWith("/dashboard")
-        ? "Dashboard"
-        : "Back";
+    : backHref.startsWith("/notifications")
+      ? "Notifications"
+      : backHref.startsWith("/dashboard/projects")
+        ? "Project"
+        : backHref.startsWith("/dashboard")
+          ? "Dashboard"
+          : "Back";
 
   const handleBackToProject = useCallback(async () => {
     if ((await confirmSaveBeforeLeave()) === "cancel") return;

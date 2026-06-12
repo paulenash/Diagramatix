@@ -27,6 +27,12 @@ const CARDS: MenuCard[] = [
     description:
       "See every shared project in your Org plus the editors / viewers on each.",
   },
+  {
+    href: "/notifications?from=/dashboard/org-admin",
+    title: "Notifications & Feedback",
+    description:
+      "Inspect any Org member's notification feed — reviews, publishing, feedback. Filter by user.",
+  },
 ];
 
 /**
