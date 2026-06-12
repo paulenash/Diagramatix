@@ -58,7 +58,7 @@ export function NotificationsClient({
   const [audience, setAudience] = useState<AudienceUser[]>([]);
   const [orgFilter, setOrgFilter] = useState<string>(""); // SuperAdmin org narrowing
 
-  // Content filters
+  // Column filters (aligned above their columns)
   const [categoryFilter, setCategoryFilter] = useState("");
   const [nameFilter, setNameFilter] = useState("");
   const [emailFilter, setEmailFilter] = useState("");
@@ -94,26 +94,27 @@ export function NotificationsClient({
       .catch(() => { /* silent */ });
   }, [adminScope]);
 
+  const isOwnFeed = asUserId === currentUserId;
+
   async function markRead(id: string) {
     setRows(prev => prev?.map(r => r.id === id ? { ...r, readAt: r.readAt ?? new Date().toISOString() } : r) ?? prev);
     try { await fetch(`/api/notifications/${id}/read`, { method: "POST" }); } catch { /* best-effort */ }
   }
   async function markAllRead() {
-    if (asUserId !== currentUserId) return; // only your own feed
+    if (!isOwnFeed) return; // only your own feed
     setRows(prev => prev?.map(r => ({ ...r, readAt: r.readAt ?? new Date().toISOString() })) ?? prev);
     try { await fetch(`/api/notifications/mark-all-read`, { method: "POST" }); } catch { /* best-effort */ }
   }
 
-  // The back href a diagram link should carry so "← Notifications" returns
-  // here with the row highlighted (and the same admin target preserved).
+  // Back href a diagram link carries so "← Notifications" returns here
+  // (with the same admin target preserved and the row highlighted).
   function notificationsBackHref(diagramId: string): string {
     const params = new URLSearchParams();
     params.set("visited", diagramId);
-    if (asUserId !== currentUserId) params.set("asUserId", asUserId);
+    if (!isOwnFeed) params.set("asUserId", asUserId);
     return `/notifications?${params.toString()}`;
   }
 
-  // Distinct orgs for the SuperAdmin org dropdown.
   const orgs = useMemo(() => {
     const m = new Map<string, string>();
     for (const u of audience) if (u.orgId && u.orgName) m.set(u.orgId, u.orgName);
@@ -132,44 +133,34 @@ export function NotificationsClient({
     const d = diagramFilter.trim().toLowerCase();
     return rows.filter(r => {
       if (categoryFilter && categoryLabel(r.type) !== categoryFilter) return false;
-      if (n) {
-        const hay = `${r.sender?.name ?? ""} ${r.recipient.name ?? ""}`.toLowerCase();
-        if (!hay.includes(n)) return false;
-      }
-      if (e) {
-        const hay = `${r.sender?.email ?? ""} ${r.recipient.email}`.toLowerCase();
-        if (!hay.includes(e)) return false;
-      }
-      if (d) {
-        if (!(r.diagram?.name ?? "").toLowerCase().includes(d)) return false;
-      }
+      if (n && !(r.sender?.name ?? "").toLowerCase().includes(n)) return false;
+      if (e && !(r.sender?.email ?? "").toLowerCase().includes(e)) return false;
+      if (d && !(r.diagram?.name ?? "").toLowerCase().includes(d)) return false;
       return true;
     });
   }, [rows, categoryFilter, nameFilter, emailFilter, diagramFilter]);
 
-  const viewingOther = asUserId !== currentUserId;
+  const unreadCount = (rows ?? []).filter(r => !r.readAt).length;
   const viewedUser = audience.find(u => u.id === asUserId);
+  const anyFilter = !!(categoryFilter || nameFilter || emailFilter || diagramFilter);
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-5xl max-h-[92vh] flex flex-col">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-6xl max-h-[92vh] flex flex-col">
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-200 shrink-0 flex items-center justify-between gap-3">
           <div>
             <h2 className="text-base font-semibold text-gray-900">Notifications &amp; Feedback</h2>
             <p className="text-xs text-gray-600 mt-0.5">
-              {viewingOther && viewedUser
+              {!isOwnFeed && viewedUser
                 ? `Viewing ${viewedUser.name ?? viewedUser.email}'s notifications`
                 : "Your notifications, newest first"}
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            {asUserId === currentUserId && (
-              <button
-                onClick={markAllRead}
-                className="text-xs text-blue-600 hover:underline"
-              >
-                Mark all read
+          <div className="flex items-center gap-3">
+            {isOwnFeed && unreadCount > 0 && (
+              <button onClick={markAllRead} className="text-xs text-blue-600 hover:underline">
+                Mark all {unreadCount} read
               </button>
             )}
             <button
@@ -181,163 +172,186 @@ export function NotificationsClient({
           </div>
         </div>
 
-        {/* Filters */}
-        <div className="px-6 py-3 border-b border-gray-100 shrink-0 flex flex-wrap items-center gap-2">
-          {/* Admin: org + user pickers */}
-          {adminScope === "all" && (
-            <select
-              value={orgFilter}
-              onChange={e => { setOrgFilter(e.target.value); }}
-              className="text-xs border border-gray-300 rounded px-2 py-1 bg-white text-gray-800"
-              title="Filter by Org"
-            >
-              <option value="">All Orgs</option>
-              {orgs.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
-            </select>
-          )}
-          {adminScope && (
+        {/* Admin pickers (only for OrgAdmin / SuperAdmin) */}
+        {adminScope && (
+          <div className="px-6 py-2 border-b border-gray-100 shrink-0 flex flex-wrap items-center gap-2 bg-gray-50">
+            {adminScope === "all" && (
+              <select
+                value={orgFilter}
+                onChange={e => setOrgFilter(e.target.value)}
+                className="text-xs border border-gray-300 rounded px-2 py-1 bg-white text-gray-800"
+                title="Filter the user list by Org"
+              >
+                <option value="">All Orgs</option>
+                {orgs.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+              </select>
+            )}
             <select
               value={asUserId}
               onChange={e => setAsUserId(e.target.value)}
-              className="text-xs border border-gray-300 rounded px-2 py-1 bg-white text-gray-800 max-w-[16rem]"
+              className="text-xs border border-gray-300 rounded px-2 py-1 bg-white text-gray-800 max-w-[22rem]"
               title="View a user's notifications"
             >
               <option value={currentUserId}>My notifications</option>
               {audienceForPicker.map(u => (
-                <option key={u.id} value={u.id}>
-                  {(u.name ?? u.email)} ({u.email})
-                </option>
+                <option key={u.id} value={u.id}>{(u.name ?? u.email)} ({u.email})</option>
               ))}
             </select>
-          )}
+          </div>
+        )}
 
-          {/* Content filters */}
-          <select
-            value={categoryFilter}
-            onChange={e => setCategoryFilter(e.target.value)}
-            className="text-xs border border-gray-300 rounded px-2 py-1 bg-white text-gray-800"
-            title="Filter by type"
-          >
-            <option value="">All types</option>
-            {ALL_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
-          <input
-            value={nameFilter}
-            onChange={e => setNameFilter(e.target.value)}
-            placeholder="Name…"
-            className="text-xs border border-gray-300 rounded px-2 py-1 w-28"
-          />
-          <input
-            value={emailFilter}
-            onChange={e => setEmailFilter(e.target.value)}
-            placeholder="Email…"
-            className="text-xs border border-gray-300 rounded px-2 py-1 w-36"
-          />
-          <input
-            value={diagramFilter}
-            onChange={e => setDiagramFilter(e.target.value)}
-            placeholder="Diagram…"
-            className="text-xs border border-gray-300 rounded px-2 py-1 w-32"
-          />
-          {(categoryFilter || nameFilter || emailFilter || diagramFilter) && (
-            <button
-              onClick={() => { setCategoryFilter(""); setNameFilter(""); setEmailFilter(""); setDiagramFilter(""); }}
-              className="text-[11px] text-gray-500 hover:text-gray-800 underline"
-            >
-              Clear
-            </button>
-          )}
-        </div>
-
-        {/* Body */}
+        {/* Body — columnar table; filters sit in the header row, aligned
+            above the column each one filters. */}
         <div className="flex-1 overflow-y-auto min-h-0">
-          {rows === null && !error && (
-            <p className="p-6 text-xs text-gray-400 italic">Loading…</p>
-          )}
-          {error && <p className="p-6 text-xs text-red-700">{error}</p>}
-          {rows && filtered.length === 0 && !error && (
-            <p className="p-6 text-xs text-gray-400 italic">No notifications match the current filters.</p>
-          )}
-          {filtered.length > 0 && (
-            <ul className="divide-y divide-gray-100">
+          <table className="w-full table-fixed text-xs">
+            <colgroup>
+              <col style={{ width: "24%" }} />
+              <col style={{ width: "17%" }} />
+              <col style={{ width: "22%" }} />
+              <col style={{ width: "21%" }} />
+              <col style={{ width: "16%" }} />
+            </colgroup>
+            <thead className="sticky top-0 bg-gray-50 z-10">
+              {/* Column titles */}
+              <tr className="text-left text-[10px] font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
+                <th className="px-3 pt-2">Type</th>
+                <th className="px-3 pt-2">Sender Name</th>
+                <th className="px-3 pt-2">Sender Email</th>
+                <th className="px-3 pt-2">Diagram</th>
+                <th className="px-3 pt-2 text-right">When</th>
+              </tr>
+              {/* Filter inputs, aligned under each column title */}
+              <tr className="border-b border-gray-200">
+                <th className="px-3 pb-2 pt-1 font-normal">
+                  <select
+                    value={categoryFilter}
+                    onChange={e => setCategoryFilter(e.target.value)}
+                    className="w-full text-xs border border-gray-300 rounded px-1.5 py-1 bg-white text-gray-800"
+                  >
+                    <option value="">All types</option>
+                    {ALL_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </th>
+                <th className="px-3 pb-2 pt-1 font-normal">
+                  <input
+                    value={nameFilter}
+                    onChange={e => setNameFilter(e.target.value)}
+                    placeholder="Filter…"
+                    className="w-full text-xs border border-gray-300 rounded px-1.5 py-1"
+                  />
+                </th>
+                <th className="px-3 pb-2 pt-1 font-normal">
+                  <input
+                    value={emailFilter}
+                    onChange={e => setEmailFilter(e.target.value)}
+                    placeholder="Filter…"
+                    className="w-full text-xs border border-gray-300 rounded px-1.5 py-1"
+                  />
+                </th>
+                <th className="px-3 pb-2 pt-1 font-normal">
+                  <input
+                    value={diagramFilter}
+                    onChange={e => setDiagramFilter(e.target.value)}
+                    placeholder="Filter…"
+                    className="w-full text-xs border border-gray-300 rounded px-1.5 py-1"
+                  />
+                </th>
+                <th className="px-3 pb-2 pt-1 text-right font-normal">
+                  {anyFilter && (
+                    <button
+                      onClick={() => { setCategoryFilter(""); setNameFilter(""); setEmailFilter(""); setDiagramFilter(""); }}
+                      className="text-[11px] text-gray-500 hover:text-gray-800 underline"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {rows === null && !error && (
+                <tr><td colSpan={5} className="px-6 py-6 text-gray-400 italic">Loading…</td></tr>
+              )}
+              {error && (
+                <tr><td colSpan={5} className="px-6 py-6 text-red-700">{error}</td></tr>
+              )}
+              {rows && filtered.length === 0 && !error && (
+                <tr><td colSpan={5} className="px-6 py-6 text-gray-400 italic">No notifications match the current filters.</td></tr>
+              )}
               {filtered.map(r => {
                 const dgHref = r.diagram
                   ? diagramHrefForNotification(r.type, r.diagram.id, r.reviewId, notificationsBackHref(r.diagram.id))
                   : null;
                 const isVisited = !!visitedDiagramId && r.diagram?.id === visitedDiagramId;
+                const unread = !r.readAt;
                 return (
-                  <li
+                  <tr
                     key={r.id}
-                    className={`px-6 py-3 ${isVisited ? "bg-blue-50" : r.readAt ? "" : "bg-blue-50/30"}`}
+                    className={isVisited ? "bg-blue-100" : unread ? "bg-blue-50" : "hover:bg-gray-50"}
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-[10px] uppercase tracking-wide bg-gray-100 text-gray-700 rounded px-1.5 py-0.5 font-medium">
-                            {categoryLabel(r.type)}
-                          </span>
-                          <span className="text-xs font-medium text-gray-900">{typeLabel(r.type)}</span>
-                          {!r.readAt && (
-                            <span className="text-[9px] uppercase tracking-wide bg-blue-100 text-blue-700 rounded px-1.5 py-0.5">new</span>
-                          )}
-                        </div>
-                        <div className="text-xs text-gray-700 mt-1">
-                          {r.sender && (
-                            <>
-                              From <span className="font-medium">{r.sender.name ?? r.sender.email}</span>
-                              <span className="text-gray-500"> &lt;{r.sender.email}&gt;</span>
-                            </>
-                          )}
-                          {r.groupName && <span className="text-gray-500"> · {r.groupName}</span>}
-                          {r.bundleName && <span className="text-gray-500"> · {r.bundleName}</span>}
-                        </div>
-                        {r.diagram && (
-                          <div className="text-xs mt-1">
-                            Diagram:{" "}
-                            {dgHref ? (
-                              <button
-                                onClick={() => { markRead(r.id); router.push(dgHref); }}
-                                className="text-blue-700 hover:underline font-medium"
-                              >
-                                {r.diagram.name}
-                              </button>
-                            ) : (
-                              <span className="text-gray-800 font-medium">{r.diagram.name}</span>
-                            )}
-                          </div>
-                        )}
+                    {/* Type */}
+                    <td className="px-3 py-2 align-top">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {unread && <span className="text-[8px] uppercase tracking-wide bg-blue-600 text-white rounded px-1 py-0.5 font-semibold">new</span>}
+                        <span className="text-[9px] uppercase tracking-wide bg-gray-200 text-gray-700 rounded px-1 py-0.5 font-medium">
+                          {categoryLabel(r.type)}
+                        </span>
                       </div>
-                      <div className="text-right shrink-0">
-                        <div className="text-[11px] text-gray-700">{new Date(r.createdAt).toLocaleString()}</div>
-                        <div className="text-[10px] text-gray-400">{daysAgo(r.createdAt)}</div>
-                        {asUserId === currentUserId && !r.readAt && (
+                      <div className="text-gray-900 font-medium mt-1">{typeLabel(r.type)}</div>
+                      {(r.groupName || r.bundleName) && (
+                        <div className="text-[10px] text-gray-500 mt-0.5 truncate">
+                          {r.groupName ?? r.bundleName}
+                        </div>
+                      )}
+                    </td>
+                    {/* Sender Name */}
+                    <td className="px-3 py-2 align-top text-gray-800 truncate" title={r.sender?.name ?? ""}>
+                      {r.sender?.name ?? <span className="text-gray-400">—</span>}
+                    </td>
+                    {/* Sender Email */}
+                    <td className="px-3 py-2 align-top text-gray-700 truncate" title={r.sender?.email ?? ""}>
+                      {r.sender?.email ?? <span className="text-gray-400">—</span>}
+                    </td>
+                    {/* Diagram */}
+                    <td className="px-3 py-2 align-top truncate">
+                      {r.diagram ? (
+                        dgHref ? (
                           <button
-                            onClick={() => markRead(r.id)}
-                            className="text-[10px] text-blue-600 hover:underline mt-1"
+                            onClick={() => { markRead(r.id); router.push(dgHref); }}
+                            className="text-blue-700 hover:underline font-medium truncate max-w-full text-left"
+                            title={r.diagram.name}
                           >
-                            Mark read
+                            {r.diagram.name}
                           </button>
-                        )}
-                      </div>
-                    </div>
-                  </li>
+                        ) : (
+                          <span className="text-gray-800 font-medium">{r.diagram.name}</span>
+                        )
+                      ) : (
+                        <span className="text-gray-400">—</span>
+                      )}
+                    </td>
+                    {/* When */}
+                    <td className="px-3 py-2 align-top text-right whitespace-nowrap">
+                      <div className="text-[11px] text-gray-700">{new Date(r.createdAt).toLocaleString()}</div>
+                      <div className="text-[10px] text-gray-400">{daysAgo(r.createdAt)}</div>
+                      {isOwnFeed && unread && (
+                        <button onClick={() => markRead(r.id)} className="text-[10px] text-blue-600 hover:underline mt-0.5">
+                          Mark read
+                        </button>
+                      )}
+                    </td>
+                  </tr>
                 );
               })}
-            </ul>
-          )}
+            </tbody>
+          </table>
         </div>
 
-        {/* Footer */}
-        <div className="px-6 py-3 border-t border-gray-200 shrink-0 flex items-center justify-between">
+        {/* Footer — count only (Continue moved to the header). */}
+        <div className="px-6 py-2.5 border-t border-gray-200 shrink-0">
           <span className="text-[11px] text-gray-500">
-            {rows ? `${filtered.length} of ${rows.length} shown` : ""}
+            {rows ? `${filtered.length} of ${rows.length} shown${unreadCount > 0 ? ` · ${unreadCount} unread` : ""}` : ""}
           </span>
-          <button
-            onClick={() => router.push(backHref)}
-            className="px-3 py-1.5 text-xs font-medium text-white rounded bg-blue-600 hover:bg-blue-700"
-          >
-            Continue
-          </button>
         </div>
       </div>
     </div>
