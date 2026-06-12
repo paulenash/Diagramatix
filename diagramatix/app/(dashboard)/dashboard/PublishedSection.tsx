@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
+import { CollapsibleSection } from "./CollapsibleSection";
 
 /**
  * Dashboard "Published by me" surface. Two collections:
@@ -136,8 +137,7 @@ export function PublishedSection() {
   return (
     <>
     {(diagrams.length > 0 || createdBundles.length > 0) && (
-    <section>
-      <h2 className="text-base font-semibold text-gray-900 mb-3">Published by me</h2>
+    <CollapsibleSection title="Published by me">
 
       {/* Diagrams */}
       {diagrams.length > 0 && (
@@ -240,13 +240,12 @@ export function PublishedSection() {
         </div>
       )}
 
-    </section>
+    </CollapsibleSection>
     )}
 
     {/* Published to me — bundles + root processes I'm in the audience of */}
     {receivedBundles.length > 0 && (
-      <section>
-        <h2 className="text-base font-semibold text-gray-900 mb-3">Published to me</h2>
+      <CollapsibleSection title="Published to me">
 
         {/* Bundles shared with me */}
         <div className="mb-4">
@@ -304,7 +303,7 @@ export function PublishedSection() {
             </div>
           </div>
         )}
-      </section>
+      </CollapsibleSection>
     )}
 
       {archiveTarget && (

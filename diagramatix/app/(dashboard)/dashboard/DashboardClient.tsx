@@ -12,6 +12,7 @@ import { NotificationsBell } from "@/app/components/NotificationsBell";
 import { TierPicker, type TierCard } from "@/app/components/TierPicker";
 import { ReviewsSection } from "./ReviewsSection";
 import { PublishedSection } from "./PublishedSection";
+import { CollapsibleSection } from "./CollapsibleSection";
 import { ProjectShareDialog } from "./ProjectShareDialog";
 import { NotificationsClient } from "../notifications/NotificationsClient";
 
@@ -1623,24 +1624,19 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
             Renders nothing when the user has no reviews either way. */}
         <ReviewsSection />
 
-        {/* Published-by-me section: per-diagram versions + bundles. Pinned
-            above Projects so owners see release state at a glance. Renders
-            nothing for users who haven't touched the publish flow. */}
-        <PublishedSection />
-
-        {/* Projects section */}
-        <section>
-          <div className="flex items-center justify-between mb-3">
-            <h1 className="text-lg font-semibold text-gray-900">Projects</h1>
-            {!readOnly && (
-              <button
-                onClick={() => setShowNewProject(true)}
-                className="px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-xs font-medium"
-              >
-                + New Project
-              </button>
-            )}
-          </div>
+        {/* Projects — collapsible, first below Reviews. */}
+        <CollapsibleSection
+          title="Projects"
+          count={projects.length}
+          action={!readOnly ? (
+            <button
+              onClick={() => setShowNewProject(true)}
+              className="px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-xs font-medium"
+            >
+              + New Project
+            </button>
+          ) : undefined}
+        >
 
           {projects.length === 0 ? (
             <div className="text-center py-12 bg-white rounded-lg border border-gray-200">
@@ -1816,42 +1812,47 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
               })}
             </div>
           )}
-        </section>
+        </CollapsibleSection>
 
-        {/* Unorganized diagrams section */}
-        {(unorganized.length > 0 || true) && (
-          <section>
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-semibold text-gray-900">Sandpit</h2>
-              <button
-                onClick={() => setShowNewDiagram(true)}
-                className="px-3 py-1.5 bg-white border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 text-xs font-medium"
-              >
-                + New Diagram
-              </button>
+        {/* Published by me / Published to me — each renders only when it has
+            content (handled inside PublishedSection) and is collapsible. */}
+        <PublishedSection />
+
+        {/* Sandpit — collapsible; collapsed by default when empty, but the
+            New Diagram button stays inline with the label either way. */}
+        <CollapsibleSection
+          title="Sandpit"
+          count={unorganized.length}
+          defaultOpen={unorganized.length > 0}
+          action={
+            <button
+              onClick={() => setShowNewDiagram(true)}
+              className="px-3 py-1.5 bg-white border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 text-xs font-medium"
+            >
+              + New Diagram
+            </button>
+          }
+        >
+          {unorganized.length === 0 ? (
+            <div className="text-center py-8 bg-white rounded-lg border border-gray-200 border-dashed">
+              <p className="text-gray-400 text-sm">The Sandpit is empty</p>
             </div>
-
-            {unorganized.length === 0 ? (
-              <div className="text-center py-8 bg-white rounded-lg border border-gray-200 border-dashed">
-                <p className="text-gray-400 text-sm">The Sandpit is empty</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-                {unorganized.map((d) => (
-                  <DiagramCard
-                    key={d.id}
-                    diagram={d}
-                    projects={projects}
-                    onDelete={handleDeleteDiagram}
-                    onMove={handleMoveDiagram}
-                    onDragStart={() => setDragDiagramId(d.id)}
-                    onDragEnd={() => { setDragDiagramId(null); setDropTargetProjectId(null); }}
-                  />
-                ))}
-              </div>
-            )}
-          </section>
-        )}
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+              {unorganized.map((d) => (
+                <DiagramCard
+                  key={d.id}
+                  diagram={d}
+                  projects={projects}
+                  onDelete={handleDeleteDiagram}
+                  onMove={handleMoveDiagram}
+                  onDragStart={() => setDragDiagramId(d.id)}
+                  onDragEnd={() => { setDragDiagramId(null); setDropTargetProjectId(null); }}
+                />
+              ))}
+            </div>
+          )}
+        </CollapsibleSection>
        </div>
       </main>
 
