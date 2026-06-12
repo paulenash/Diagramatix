@@ -28,6 +28,14 @@ interface PublishedDiagram {
   bundleCount: number;
 }
 
+interface BundleRoot {
+  id: string;
+  name: string;
+  type: string;
+  versionNumber: number | null;
+  publishedAt: string | null;
+}
+
 interface BundleSummary {
   id: string;
   name: string;
@@ -38,9 +46,11 @@ interface BundleSummary {
   _count: { diagrams: number; audience: number };
 }
 
+type ReceivedBundle = BundleSummary & { addedAt: string; roots: BundleRoot[] };
+
 interface BundlesPayload {
   created: BundleSummary[];
-  received: (BundleSummary & { addedAt: string })[];
+  received: ReceivedBundle[];
 }
 
 function dateLabel(iso: string | null): string {
@@ -88,6 +98,19 @@ export function PublishedSection() {
   if (diagrams === null || bundles === null) return null;
   const createdBundles = bundles.created;
   const receivedBundles = bundles.received;
+
+  // Deduped root processes across all received bundles — the entry-point
+  // diagrams shared with me. First bundle containing a given root wins for
+  // the navigation context (?bundle=).
+  const sharedRoots: (BundleRoot & { bundleId: string })[] = [];
+  const seenRoot = new Set<string>();
+  for (const b of receivedBundles) {
+    for (const r of b.roots ?? []) {
+      if (seenRoot.has(r.id)) continue;
+      seenRoot.add(r.id);
+      sharedRoots.push({ ...r, bundleId: b.id });
+    }
+  }
 
   // If you've published nothing and you're not in any audience either,
   // skip the section entirely so the dashboard doesn't carry empty
@@ -220,13 +243,15 @@ export function PublishedSection() {
     </section>
     )}
 
-    {/* Published to me — bundles I'm in the audience of */}
+    {/* Published to me — bundles + root processes I'm in the audience of */}
     {receivedBundles.length > 0 && (
       <section>
         <h2 className="text-base font-semibold text-gray-900 mb-3">Published to me</h2>
-        <div>
+
+        {/* Bundles shared with me */}
+        <div className="mb-4">
           <div className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-2">
-            Published processes shared with me ({receivedBundles.length})
+            Bundles shared with me ({receivedBundles.length})
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {receivedBundles.map(b => (
@@ -246,6 +271,39 @@ export function PublishedSection() {
             ))}
           </div>
         </div>
+
+        {/* Diagrams (root processes) shared with me */}
+        {sharedRoots.length > 0 && (
+          <div>
+            <div className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-2">
+              Diagrams shared with me ({sharedRoots.length})
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {sharedRoots.map(r => (
+                <button
+                  key={r.id}
+                  onClick={() => router.push(`/processes/${r.id}?bundle=${r.bundleId}`)}
+                  className="text-left bg-white border border-blue-200 rounded-lg p-3 hover:border-blue-400 hover:shadow transition"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="text-sm font-medium text-gray-900 truncate flex-1">{r.name}</div>
+                    <span className="text-[10px] text-gray-500 uppercase shrink-0">{r.type}</span>
+                  </div>
+                  <div className="mt-2 flex items-center gap-2">
+                    {r.versionNumber != null && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded border text-blue-700 border-blue-300 bg-blue-50 font-medium">
+                        v{r.versionNumber}
+                      </span>
+                    )}
+                    {r.publishedAt && (
+                      <span className="text-[10px] text-gray-500">Published {dateLabel(r.publishedAt)}</span>
+                    )}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </section>
     )}
 

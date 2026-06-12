@@ -340,6 +340,21 @@ export async function GET() {
             supersededAt: true,
             nextReviewDate: true,
             _count: { select: { diagrams: true, audience: true } },
+            // Root processes — the entry-point diagrams the audience
+            // navigates from. Drives the "Diagrams shared with me" list.
+            diagrams: {
+              where: { isRoot: true },
+              select: {
+                diagram: {
+                  select: {
+                    id: true,
+                    name: true,
+                    type: true,
+                    currentPublishedVersion: { select: { versionNumber: true, publishedAt: true } },
+                  },
+                },
+              },
+            },
           },
         },
       },
@@ -349,6 +364,19 @@ export async function GET() {
 
   return NextResponse.json({
     created,
-    received: audienceRows.map(r => ({ ...r.bundle, addedAt: r.addedAt })),
+    received: audienceRows.map(r => {
+      const { diagrams, ...rest } = r.bundle;
+      return {
+        ...rest,
+        addedAt: r.addedAt,
+        roots: diagrams.map(d => ({
+          id: d.diagram.id,
+          name: d.diagram.name,
+          type: d.diagram.type,
+          versionNumber: d.diagram.currentPublishedVersion?.versionNumber ?? null,
+          publishedAt: d.diagram.currentPublishedVersion?.publishedAt?.toISOString() ?? null,
+        })),
+      };
+    }),
   });
 }
