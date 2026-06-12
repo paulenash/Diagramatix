@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 import { AlertDialog } from "@/app/components/AlertDialog";
@@ -259,88 +259,7 @@ export function AdminClient({ users: initialUsers, currentUserId, commitCount, i
           </h1>
           <span className="text-[10px] text-gray-400">v{SCHEMA_VERSION}.{commitCount}</span>
         </div>
-        <div className="flex items-center gap-2">
-          {/* SuperAdmin-only nav cluster. OrgAdmin viewing the scoped
-              Org-only list doesn't see these — they access Org Settings
-              and Project Sharing via dashboard chips. */}
-          {isSuperAdmin && (
-            <>
-              <a
-                href="/dashboard/rules"
-                className="text-xs text-red-700 hover:text-red-800 font-medium border border-red-300 rounded px-2 py-1 hover:bg-red-50"
-              >
-                AI Rules &amp; Preferences
-              </a>
-              <a
-                href="/dashboard/admin/database"
-                className="text-xs text-red-700 hover:text-red-800 font-medium border border-red-300 rounded px-2 py-1 hover:bg-red-50"
-              >
-                Database Access
-              </a>
-              <GenerateDdlButton />
-              <a
-                href="/dashboard/admin/archive"
-                className="text-xs text-red-700 hover:text-red-800 font-medium border border-red-300 rounded px-2 py-1 hover:bg-red-50"
-              >
-                System Archive
-              </a>
-              <a
-                href="/dashboard/admin/subscriptions"
-                className="text-xs text-red-700 hover:text-red-800 font-medium border border-red-300 rounded px-2 py-1 hover:bg-red-50"
-              >
-                Subscription Prices and Limits
-              </a>
-              <a
-                href="/dashboard/admin/features"
-                className="text-xs text-red-700 hover:text-red-800 font-medium border border-red-300 rounded px-2 py-1 hover:bg-red-50"
-              >
-                Features Catalog
-              </a>
-              <a
-                href="/dashboard/admin/groups"
-                className="text-xs text-red-700 hover:text-red-800 font-medium border border-red-300 rounded px-2 py-1 hover:bg-red-50"
-              >
-                Groups
-              </a>
-              <a
-                href="/dashboard/admin/ai-plan-format"
-                className="text-xs text-red-700 hover:text-red-800 font-medium border border-red-300 rounded px-2 py-1 hover:bg-red-50"
-              >
-                AI Plan Formats
-              </a>
-              <a
-                href="/dashboard/admin/org-settings"
-                className="text-xs text-red-700 hover:text-red-800 font-medium border border-red-300 rounded px-2 py-1 hover:bg-red-50"
-              >
-                Org Settings
-              </a>
-              <a
-                href="/dashboard/admin/sharing"
-                className="text-xs text-red-700 hover:text-red-800 font-medium border border-red-300 rounded px-2 py-1 hover:bg-red-50"
-              >
-                Project Sharing
-              </a>
-              <a
-                href="/dashboard/admin/scanner-rules"
-                className="text-xs text-red-700 hover:text-red-800 font-medium border border-red-300 rounded px-2 py-1 hover:bg-red-50"
-              >
-                BPMN Scanner Rules
-              </a>
-              <a
-                href="/dashboard/admin/bubble-help"
-                className="text-xs text-red-700 hover:text-red-800 font-medium border border-red-300 rounded px-2 py-1 hover:bg-red-50"
-              >
-                Bubble Help
-              </a>
-              <a
-                href="/notifications?from=/dashboard/admin"
-                className="text-xs text-red-700 hover:text-red-800 font-medium border border-red-300 rounded px-2 py-1 hover:bg-red-50"
-              >
-                Notifications &amp; Feedback
-              </a>
-            </>
-          )}
-        </div>
+        <div className="flex items-center gap-2" />
       </header>
 
       {/* Widened container (was max-w-4xl) so the Name / Status / Working
@@ -348,6 +267,7 @@ export function AdminClient({ users: initialUsers, currentUserId, commitCount, i
           on the <th> stops the smaller numeric / date columns from
           starving the text-heavy ones. */}
       <div className="max-w-screen-2xl mx-auto px-6 py-8">
+        {isSuperAdmin && <SuperAdminToolsGrid />}
         <table className="w-full bg-white rounded-lg border border-gray-200 overflow-hidden table-fixed">
           <thead>
             <tr className="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -764,5 +684,109 @@ function GenerateDdlButton() {
         />
       )}
     </div>
+  );
+}
+
+// ── SuperAdmin tools tile grid ──────────────────────────────────────────
+// Card layout mirroring the OrgAdmin landing menu, but red-themed and
+// drag-reorderable. The chosen order persists per-browser in localStorage
+// so each SuperAdmin can arrange the tiles to taste.
+
+interface AdminTile {
+  id: string;
+  title: string;
+  description: string;
+  href?: string;     // navigation tiles
+  ddl?: boolean;     // the special "Generate DDL" tile renders GenerateDdlButton
+}
+
+const ADMIN_TILES: AdminTile[] = [
+  { id: "ai-rules", title: "AI Rules & Preferences", description: "Geometric + style rules that steer AI BPMN generation.", href: "/dashboard/rules" },
+  { id: "database", title: "Database Access", description: "Inspect the live database and run maintenance queries.", href: "/dashboard/admin/database" },
+  { id: "ddl", title: "Generate Diagramatix DDL", description: "Download the schema as PostgreSQL / MySQL / SQL Server DDL.", ddl: true },
+  { id: "archive", title: "System Archive", description: "Archived projects and diagrams across the system.", href: "/dashboard/admin/archive" },
+  { id: "subscriptions", title: "Subscription Prices & Limits", description: "Tier pricing and per-tier feature limits.", href: "/dashboard/admin/subscriptions" },
+  { id: "features", title: "Features Catalog", description: "Edit the public feature catalog (draft / publish).", href: "/dashboard/admin/features" },
+  { id: "groups", title: "Groups", description: "Every Collaboration Group in the system.", href: "/dashboard/admin/groups" },
+  { id: "ai-plan", title: "AI Plan Formats", description: "Saved AI two-phase plan format templates.", href: "/dashboard/admin/ai-plan-format" },
+  { id: "org-settings", title: "Org Settings", description: "Manage Orgs, OrgAdmins, and cross-Org sharing.", href: "/dashboard/admin/org-settings" },
+  { id: "sharing", title: "Project Sharing", description: "Every shared project plus its editors / viewers.", href: "/dashboard/admin/sharing" },
+  { id: "scanner-rules", title: "BPMN Scanner Rules", description: "Rules used by the diagram issue scanner.", href: "/dashboard/admin/scanner-rules" },
+  { id: "bubble-help", title: "Bubble Help", description: "The contextual help-cloud topics shown in the editor.", href: "/dashboard/admin/bubble-help" },
+  { id: "notifications", title: "Notifications & Feedback", description: "Inspect any user's notification feed — filter by Org & User.", href: "/notifications?from=/dashboard/admin" },
+];
+
+const TILE_ORDER_KEY = "dgx.superadmin.tileOrder";
+
+function SuperAdminToolsGrid() {
+  const router = useRouter();
+  const [order, setOrder] = useState<string[]>(ADMIN_TILES.map(t => t.id));
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+
+  // Load the saved order on mount; merge so newly-added tiles always
+  // appear (appended) and removed ids are dropped.
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(TILE_ORDER_KEY);
+      const saved: string[] = raw ? JSON.parse(raw) : [];
+      const known = new Set(ADMIN_TILES.map(t => t.id));
+      const merged = saved.filter(id => known.has(id));
+      for (const t of ADMIN_TILES) if (!merged.includes(t.id)) merged.push(t.id);
+      setOrder(merged);
+    } catch { /* default order */ }
+  }, []);
+
+  function persist(next: string[]) {
+    setOrder(next);
+    try { localStorage.setItem(TILE_ORDER_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+  }
+
+  function onDrop(targetId: string) {
+    if (!draggingId || draggingId === targetId) { setDraggingId(null); return; }
+    const next = order.filter(id => id !== draggingId);
+    const idx = next.indexOf(targetId);
+    next.splice(idx, 0, draggingId);
+    persist(next);
+    setDraggingId(null);
+  }
+
+  const tileById = new Map(ADMIN_TILES.map(t => [t.id, t]));
+  const tiles = order.map(id => tileById.get(id)).filter((t): t is AdminTile => !!t);
+
+  return (
+    <section className="mb-8">
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-sm font-semibold text-gray-900">SuperAdmin Tools</h2>
+        <span className="text-[11px] text-gray-400">Drag tiles to reorder</span>
+      </div>
+      <div className="max-h-[55vh] overflow-y-auto pr-1">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+          {tiles.map(t => (
+            <div
+              key={t.id}
+              draggable
+              onDragStart={() => setDraggingId(t.id)}
+              onDragOver={e => e.preventDefault()}
+              onDrop={() => onDrop(t.id)}
+              onClick={() => { if (t.href) router.push(t.href); }}
+              className={`relative bg-white border border-red-300 rounded-md p-4 transition-colors ${
+                t.href ? "cursor-pointer hover:bg-red-50 hover:border-red-400" : ""
+              } ${draggingId === t.id ? "opacity-50" : ""}`}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <h3 className="text-sm font-semibold text-red-700">{t.title}</h3>
+                <span className="text-gray-300 select-none cursor-grab" title="Drag to reorder">⠿</span>
+              </div>
+              <p className="text-xs text-gray-600 mt-1.5 leading-snug">{t.description}</p>
+              {t.ddl && (
+                <div className="mt-2" onClick={e => e.stopPropagation()}>
+                  <GenerateDdlButton />
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
   );
 }
