@@ -22,7 +22,7 @@
 |---|---|---|
 | 1 | Security & Access Control | ✅ Done — 18 findings (7 High, 7 Medium, 4 Low) |
 | 2 | Data Integrity & Server Libs | ✅ Done — 24 findings (3 Critical, 13 High, 7 Medium, 1 Low) |
-| 3 | Diagram Engine Core | ✅ Done — 13 findings (1 Critical, 2 High, 5 Medium, 5 Low) |
+| 3 | Diagram Engine Core | ✅ Done — 13 findings (1 Critical, 2 High, 5 Medium, 5 Low); Critical + both High fixed v1.20 |
 | 4 | Canvas & Renderers | Pending |
 | 5 | Dashboard & Page Clients | Pending |
 | 6 | Import/Export & Interop | Pending |
@@ -76,9 +76,9 @@
 | DATA-22 | Medium | Transactions | `restoreRulesPrefsBundle` upserts in a bare loop, no transaction → partial merge | Open |
 | DATA-23 | Medium | Restore | Rules upsert keyed only by `id` violates `@@unique([category,userId,orgId])` → abort | Open |
 | DATA-24 | Low | Architecture | Two independent connection pools (Prisma adapter + raw `pgPool`) can't share a transaction | Open |
-| ENG-01 | Critical | Undo/redo | Undo/redo wipes title, fonts, database, processOwner, parentDiagramIds → auto-saved data loss | Open |
-| ENG-02 | High | Reducer | `DELETE_ELEMENT` leaves dangling connectors on the deleted host's boundary events | Open |
-| ENG-03 | High | Undo/redo | Title/font/database setters mutate persisted state but don't invalidate the redo stack | Open |
+| ENG-01 | Critical | Undo/redo | Undo/redo wipes title, fonts, database, processOwner, parentDiagramIds → auto-saved data loss | ✅ Fixed v1.20 |
+| ENG-02 | High | Reducer | `DELETE_ELEMENT` leaves dangling connectors on the deleted host's boundary events | ✅ Fixed v1.20 |
+| ENG-03 | High | Undo/redo | Title/font/database setters mutate persisted state but don't invalidate the redo stack | ✅ Fixed v1.20 |
 | ENG-04 | Medium | Reducer | `collectCascadeLanes` recurses with no visited guard → stack overflow on cyclic lane chain | Open |
 | ENG-05 | Medium | Space tools | `REMOVE_SPACE` leaves corner elements un-shifted in cross (both-axis) zones | Open |
 | ENG-06 | Medium | Undo/redo | Interleaved second drag overwrites the pre-drag snapshot → first action lost from history | Open |
@@ -432,11 +432,15 @@ The rules and prompts loops issue per-row find+update/create with no enclosing `
 **Method:** 5 finder lenses (reducer invariants, undo/redo consistency, state-mutation purity, geometry NaN/÷0, unbounded loops + INSERT/REMOVE_SPACE) → 25 raw findings → 23 after dedupe → each adversarially verified by 2 skeptics reading the real code (finders Grep'd + read targeted ranges given the file size). **13 confirmed, 10 refuted.** ENG-08 is *Needs manual confirmation*.
 
 > The standout is **ENG-01**: undo/redo silently drops every diagram field except elements/connectors — and because the editor auto-saves the whole `data` blob, one Ctrl+Z after setting a title or font **permanently writes the loss to the database**. The link-closure cycle guard the lens specifically probed (`walkForwardClosure`) came back clean — it was not flagged.
+>
+> **Update — the Critical and both High findings (ENG-01, ENG-02, ENG-03) were fixed in v1.20** (commit follows). All three were surgical, mirror existing correct patterns in the same file, and the production build is green. See each finding below for the fix detail. The remaining Medium/Low items are open.
 
 ### Critical
 
 #### ENG-01 — Undo/redo wipes title, fonts, database, processOwner & parentDiagramIds (persisted data loss)
 **`app/hooks/useDiagram.ts:8244`** (redo at `:8253`)
+
+> **✅ Fixed in v1.20.** `undo()` and `redo()` now dispatch `SET_DATA` with `{ ...dataRef.current, elements: snap.elements, connectors: snap.connectors }`, so the non-snapshotted fields (title, all font sizes, database, processOwner, parentDiagramIds, displayMode) are preserved from live state instead of being replaced with `undefined`. Undoing a geometry change no longer touches diagram metadata.
 
 Undo snapshots store only `{ elements, connectors }`. `undo()`/`redo()` dispatch `SET_DATA` with `{ ...snap, viewport }`, and the `SET_DATA` reducer replaces the **whole** state object verbatim (`:3102`). Every other `DiagramData` field — `title`, all six font-size fields, `database`, `parentDiagramIds`, `processOwner` — is therefore set to `undefined` on any undo/redo. Because title and font changes do **not** push history, the repro is brutal: set a title (or change a font), move any element, press Ctrl+Z — the move is undone *and the title/fonts vanish*. `DiagramEditor` then auto-saves the whole `data` object, so the wipe is persisted permanently, not a transient glitch. `cancelLabelEdit` already does it right (`:7907` spreads `...dataRef.current`), proving the intended pattern.
 
@@ -447,12 +451,16 @@ Undo snapshots store only `{ elements, connectors }`. `undo()`/`redo()` dispatch
 #### ENG-02 — `DELETE_ELEMENT` leaves dangling connectors on the deleted host's boundary events
 **`app/hooks/useDiagram.ts:5749`**
 
+> **✅ Fixed in v1.20.** Before filtering connectors, `DELETE_ELEMENT` now builds a `removedElementIds` set of the host id plus every element with `boundaryHostId === id`, and drops any connector whose source or target is in that set — mirroring the `REMOVE_SPACE` handler. The pool/lane cascade path (`:5405`) was given the same treatment for completeness. No more orphaned connectors after deleting a boundary host.
+
 When a boundary host (task/subprocess/EP) is deleted, its boundary-event children are removed as elements (`:5440`), but the connector cleanup (`:5749-5751`) only drops connectors touching the host's **own** id — not connectors referencing the removed boundary-event children. Boundary events legitimately carry connectors (event-to-event `associationBPMN`, sequence in/out of edge-mounted start/end/intermediate events). Repro: mount an intermediate event on a task, draw a connector to it, delete the task → the event vanishes but its connector survives pointing at a missing id. `recomputeAllConnectors` no-ops on the missing endpoint, so the orphan persists with stale waypoints, renders as a stray line, is saved/exported, and trips `checkReferentialIntegrity` as a hard error. The sibling `REMOVE_SPACE` already does this correctly (`:6744`/`:6915`), confirming the oversight.
 
 **Suggested fix:** build `const removedIds = new Set([id]); for (const e of state.elements) if (e.boundaryHostId === id) removedIds.add(e.id);` and filter connectors with `!removedIds.has(c.sourceId) && !removedIds.has(c.targetId)`. Apply the same set to the pool/lane cascade filter at `:5405-5407`.
 
 #### ENG-03 — Title/font/database setters mutate persisted state but don't invalidate the redo stack
 **`app/hooks/useDiagram.ts:8295`**
+
+> **✅ Fixed in v1.20.** Added an `invalidateRedo()` helper (clears `futureRef` + `setCanRedo(false)`) and call it from the eight non-history setters (`updateDiagramTitle`, the six font setters, `setDatabase`). A content edit after an undo now kills the stale redo branch, so Ctrl+Y can't replay diverged geometry. Viewport pans are deliberately excluded. (`setProcessOwner` already pushed history, so it was already covered.) Combined with ENG-01, even an accidental redo no longer wipes metadata.
 
 `updateDiagramTitle`, the six `setFontSize`-family setters, `setDatabase`, and `setViewport` only dispatch — they never call `pushHistory` and never clear `futureRef` (the only place the redo branch is reset). Repro: move an element → Ctrl+Z (redo now armed) → edit the title → Ctrl+Y: redo is still enabled and replays the stale post-move snapshot, which (per ENG-01) also clobbers the title you just set. A new edit after an undo must invalidate the redo branch.
 

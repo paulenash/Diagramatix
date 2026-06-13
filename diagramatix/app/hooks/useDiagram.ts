@@ -5391,19 +5391,24 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         }
 
         if (useCascade) {
+          // Element ids actually removed by this cascade: the containers
+          // themselves plus any boundary-event children mounted on them.
+          const removedIds = new Set<string>(containerIds);
+          for (const e of state.elements) {
+            if (e.boundaryHostId && containerIds.has(e.boundaryHostId)) removedIds.add(e.id);
+          }
           const elements = state.elements
-            .filter((e) => !containerIds.has(e.id))
-            .filter((e) => !e.boundaryHostId || !containerIds.has(e.boundaryHostId))
+            .filter((e) => !removedIds.has(e.id))
             .map((e) =>
               e.parentId && containerIds.has(e.parentId)
                 ? { ...e, parentId: undefined }
                 : e,
             );
           // Drop any connector whose endpoints referenced one of the
-          // deleted containers (rare — connectors usually go between
-          // tasks/events that survive).
+          // deleted containers or their boundary children (rare —
+          // connectors usually go between tasks/events that survive).
           const connectors = state.connectors.filter(
-            (c) => !containerIds.has(c.sourceId) && !containerIds.has(c.targetId),
+            (c) => !removedIds.has(c.sourceId) && !removedIds.has(c.targetId),
           );
           return { ...state, elements, connectors };
         }
@@ -5746,8 +5751,17 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         }
       }
 
+      // Drop connectors touching the deleted element OR any of its
+      // boundary-event children (removed from `elements` at the filter
+      // above). Without the boundary-child ids these connectors would
+      // survive as dangling references — a stray line that fails the
+      // referential-integrity check and is saved/exported (audit ENG-02).
+      const removedElementIds = new Set<string>([id]);
+      for (const e of state.elements) {
+        if (e.boundaryHostId === id) removedElementIds.add(e.id);
+      }
       let connectors = state.connectors.filter(
-        (c) => c.sourceId !== id && c.targetId !== id
+        (c) => !removedElementIds.has(c.sourceId) && !removedElementIds.has(c.targetId)
       );
       if (bridgeConnector) connectors = [...connectors, bridgeConnector];
       // Lane deletion does NOT move any element under the new
@@ -7795,6 +7809,19 @@ export function useDiagram(initialData: DiagramData) {
     setCanUndo(true);
     setCanRedo(false);
   }
+
+  // Some edits (title, font sizes, database) intentionally don't push an
+  // undo snapshot, but they ARE content changes — so when they happen
+  // after an undo they must kill the now-stale redo branch. Otherwise
+  // Ctrl+Y replays geometry from a future the user has diverged from
+  // (audit ENG-03). Viewport pans are deliberately NOT routed through
+  // here — a pan shouldn't discard the redo stack.
+  function invalidateRedo() {
+    if (futureRef.current.length > 0) {
+      futureRef.current = [];
+      setCanRedo(false);
+    }
+  }
   // ────────────────────────────────────────────────────────────────────────────
 
   const addElement = useCallback(
@@ -8237,11 +8264,16 @@ export function useDiagram(initialData: DiagramData) {
     }
   }, []);
 
+  // Snapshots carry only { elements, connectors }. Spread the LIVE data
+  // first so the fields that are never snapshotted — title, all font
+  // sizes, database, processOwner, parentDiagramIds, displayMode — survive
+  // an undo/redo instead of being wiped to undefined and then persisted by
+  // the editor's whole-`data` auto-save (audit ENG-01).
   const undo = useCallback(() => {
     if (pastRef.current.length === 0) return;
     const snap = pastRef.current.pop()!;
     futureRef.current.push(snapshotData());
-    dispatch({ type: "SET_DATA", payload: { ...snap, viewport: dataRef.current.viewport } });
+    dispatch({ type: "SET_DATA", payload: { ...dataRef.current, elements: snap.elements, connectors: snap.connectors } });
     setCanUndo(pastRef.current.length > 0);
     setCanRedo(true);
   }, []);
@@ -8250,7 +8282,7 @@ export function useDiagram(initialData: DiagramData) {
     if (futureRef.current.length === 0) return;
     const snap = futureRef.current.pop()!;
     pastRef.current.push(snapshotData());
-    dispatch({ type: "SET_DATA", payload: { ...snap, viewport: dataRef.current.viewport } });
+    dispatch({ type: "SET_DATA", payload: { ...dataRef.current, elements: snap.elements, connectors: snap.connectors } });
     setCanRedo(futureRef.current.length > 0);
     setCanUndo(true);
   }, []);
@@ -8292,41 +8324,49 @@ export function useDiagram(initialData: DiagramData) {
     ),
     updateDiagramTitle: useCallback(
       (title: DiagramTitle) => {
+        invalidateRedo();
         dispatch({ type: "UPDATE_DIAGRAM_TITLE", payload: title });
       }, []
     ),
     setFontSize: useCallback(
       (size: number) => {
+        invalidateRedo();
         dispatch({ type: "SET_FONT_SIZE", payload: size });
       }, []
     ),
     setConnectorFontSize: useCallback(
       (size: number) => {
+        invalidateRedo();
         dispatch({ type: "SET_CONNECTOR_FONT_SIZE", payload: size });
       }, []
     ),
     setTitleFontSize: useCallback(
       (size: number) => {
+        invalidateRedo();
         dispatch({ type: "SET_TITLE_FONT_SIZE", payload: size });
       }, []
     ),
     setPoolFontSize: useCallback(
       (size: number) => {
+        invalidateRedo();
         dispatch({ type: "SET_POOL_FONT_SIZE", payload: size });
       }, []
     ),
     setLaneFontSize: useCallback(
       (size: number) => {
+        invalidateRedo();
         dispatch({ type: "SET_LANE_FONT_SIZE", payload: size });
       }, []
     ),
     setProcessFontSize: useCallback(
       (size: number) => {
+        invalidateRedo();
         dispatch({ type: "SET_PROCESS_FONT_SIZE", payload: size });
       }, []
     ),
     setDatabase: useCallback(
       (db: string) => {
+        invalidateRedo();
         dispatch({ type: "SET_DATABASE", payload: db });
       }, []
     ),

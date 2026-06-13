@@ -625,5 +625,12 @@ export interface TemplateData {
  *             data. (DATA-03) wipe-restore breaks the Diagram↔
  *             PublishedVersion cycle (insert with null pointer, re-link
  *             after) instead of aborting on the FK.
+ *   1.20    - Audit Stage-3 engine fixes: (ENG-01) undo/redo now spread
+ *             the live data so title/fonts/database/processOwner/
+ *             parentDiagramIds survive instead of being wiped + auto-saved
+ *             away. (ENG-02) DELETE_ELEMENT now drops connectors attached
+ *             to the deleted host's boundary-event children (no dangling
+ *             connectors). (ENG-03) title/font/database setters clear the
+ *             stale redo branch so Ctrl+Y can't replay diverged geometry.
  */
-export const SCHEMA_VERSION = "1.19";
+export const SCHEMA_VERSION = "1.20";
