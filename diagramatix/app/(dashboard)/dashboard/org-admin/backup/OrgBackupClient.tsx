@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { BackupProgressModal } from "@/app/components/BackupProgressModal";
 
 // Tree shapes (mirror InspectTree from app/lib/full-backup.ts — only the
 // fields this UI renders).
@@ -28,6 +29,7 @@ export function OrgBackupClient({ orgName }: { orgName: string }) {
   const [tree, setTree] = useState<Tree | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [backupModal, setBackupModal] = useState<{ url: string; title: string } | null>(null);
   const [resultLog, setResultLog] = useState<string[] | null>(null);
 
   // Selected ids.
@@ -102,12 +104,12 @@ export function OrgBackupClient({ orgName }: { orgName: string }) {
             Downloads a <code>.diag-full</code> file containing your whole Org — every member&apos;s projects,
             diagrams, history, templates and prompts. Treat the file as sensitive.
           </p>
-          <a
-            href="/api/org-admin/backup"
+          <button
+            onClick={() => setBackupModal({ url: "/api/org-admin/backup?stream=1", title: "Backing up your Org…" })}
             className="inline-block px-3 py-1.5 text-xs font-medium text-white bg-orange-600 hover:bg-orange-700 rounded"
           >
             Download Org backup
-          </a>
+          </button>
         </section>
 
         {/* Restore */}
@@ -217,6 +219,14 @@ export function OrgBackupClient({ orgName }: { orgName: string }) {
           )}
         </section>
       </main>
+
+      {backupModal && (
+        <BackupProgressModal
+          url={backupModal.url}
+          title={backupModal.title}
+          onClose={() => setBackupModal(null)}
+        />
+      )}
     </div>
   );
 }

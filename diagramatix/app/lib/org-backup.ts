@@ -24,6 +24,7 @@ import {
   type FullBackupPayload,
   type FullRestoreResult,
   type AdditiveSelection,
+  type BackupProgressFn,
 } from "./full-backup";
 
 const FULL_BACKUP_ENTRY = "full-backup.json";
@@ -66,24 +67,35 @@ export async function buildOrgBackup(
   orgId: string,
   exportedBy: string,
   appVersion: string,
+  onProgress?: BackupProgressFn,
 ): Promise<Uint8Array> {
   const org = await prisma.org.findUnique({ where: { id: orgId } });
   if (!org) throw new Error("Org not found");
+  onProgress?.("Org", 1);
 
+  // Sequential (not Promise.all) so onProgress can report each section as
+  // it lands for the live progress stream.
   const orgMembers = await prisma.orgMember.findMany({ where: { orgId } });
+  onProgress?.("OrgMember", orgMembers.length);
   const memberUserIds = Array.from(new Set(orgMembers.map(m => m.userId)));
 
-  const [users, usageCounters, projects, diagrams, templates, prompts, rules] = await Promise.all([
-    prisma.user.findMany({ where: { id: { in: memberUserIds } }, orderBy: { createdAt: "asc" } }),
-    prisma.usageCounter.findMany({ where: { userId: { in: memberUserIds } } }),
-    prisma.project.findMany({ where: { orgId }, orderBy: { createdAt: "asc" } }),
-    prisma.diagram.findMany({ where: { orgId }, orderBy: { createdAt: "asc" } }),
-    prisma.diagramTemplate.findMany({ where: { userId: { in: memberUserIds } } }),
-    prisma.prompt.findMany({ where: { orgId } }),
-    prisma.diagramRules.findMany({ where: { userId: { in: memberUserIds } } }),
-  ]);
+  const users = await prisma.user.findMany({ where: { id: { in: memberUserIds } }, orderBy: { createdAt: "asc" } });
+  onProgress?.("User", users.length);
+  const usageCounters = await prisma.usageCounter.findMany({ where: { userId: { in: memberUserIds } } });
+  onProgress?.("UsageCounter", usageCounters.length);
+  const projects = await prisma.project.findMany({ where: { orgId }, orderBy: { createdAt: "asc" } });
+  onProgress?.("Project", projects.length);
+  const diagrams = await prisma.diagram.findMany({ where: { orgId }, orderBy: { createdAt: "asc" } });
+  onProgress?.("Diagram", diagrams.length);
   const diagramIds = diagrams.map(d => d.id);
   const history = await prisma.diagramHistory.findMany({ where: { diagramId: { in: diagramIds } } });
+  onProgress?.("DiagramHistory", history.length);
+  const templates = await prisma.diagramTemplate.findMany({ where: { userId: { in: memberUserIds } } });
+  onProgress?.("DiagramTemplate", templates.length);
+  const prompts = await prisma.prompt.findMany({ where: { orgId } });
+  onProgress?.("Prompt", prompts.length);
+  const rules = await prisma.diagramRules.findMany({ where: { userId: { in: memberUserIds } } });
+  onProgress?.("DiagramRules", rules.length);
 
   const toIso = (row: Record<string, unknown>): Record<string, unknown> => {
     const out: Record<string, unknown> = {};
@@ -163,6 +175,7 @@ export async function buildOrgBackup(
     },
   };
 
+  onProgress?.("Compressing", 0);
   const zip = new JSZip();
   zip.file(FULL_BACKUP_ENTRY, JSON.stringify(payload, null, 2));
   return await zip.generateAsync({ type: "uint8array", compression: "DEFLATE", compressionOptions: { level: 6 } });

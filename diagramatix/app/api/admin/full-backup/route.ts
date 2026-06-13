@@ -26,6 +26,7 @@ import {
   inspectFullBackup,
   type AdditiveSelection,
 } from "@/app/lib/full-backup";
+import { streamBackup } from "@/app/lib/backupStream";
 import { SCHEMA_VERSION } from "@/app/lib/diagram/types";
 
 function appVersion(): string {
@@ -35,25 +36,29 @@ function appVersion(): string {
   return `${SCHEMA_VERSION}.${commitCount}`;
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   const session = await auth();
   if (!session?.user?.id || !isSuperuser(session)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
+  const admin = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { email: true },
+  });
+  const exportedBy = admin?.email ?? "unknown-admin";
+  const safeEmail = exportedBy.replace(/[^a-zA-Z0-9_.-]+/g, "_");
+  const today = new Date().toISOString().slice(0, 10);
+  const version = appVersion();
+  const filename = `Diagramatix-FULL-backup-${safeEmail}-v${version}-${today}.diag-full`;
+
+  // ?stream=1 → live NDJSON progress; plain GET returns the raw zip fallback.
+  if (new URL(req.url).searchParams.get("stream") === "1") {
+    return streamBackup((onProgress) => buildFullBackup(exportedBy, version, onProgress), filename);
+  }
+
   try {
-    const admin = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: { email: true },
-    });
-    const exportedBy = admin?.email ?? "unknown-admin";
-    const bytes = await buildFullBackup(exportedBy, appVersion());
-
-    const safeEmail = exportedBy.replace(/[^a-zA-Z0-9_.-]+/g, "_");
-    const today = new Date().toISOString().slice(0, 10);
-    const version = appVersion();
-    const filename = `Diagramatix-FULL-backup-${safeEmail}-v${version}-${today}.diag-full`;
-
+    const bytes = await buildFullBackup(exportedBy, version);
     return new NextResponse(bytes as BodyInit, {
       headers: {
         "Content-Type": "application/zip",

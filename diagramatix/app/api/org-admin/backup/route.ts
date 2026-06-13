@@ -25,6 +25,7 @@ import { isSuperuser } from "@/app/lib/superuser";
 import { tryGetCurrentOrgId } from "@/app/lib/auth/orgContext";
 import { parseFullBackup, inspectFullBackup, type AdditiveSelection } from "@/app/lib/full-backup";
 import { buildOrgBackup, scopePayloadToOrg, restoreOrgBackupAdditive } from "@/app/lib/org-backup";
+import { streamBackup } from "@/app/lib/backupStream";
 import { SCHEMA_VERSION } from "@/app/lib/diagram/types";
 
 function appVersion(): string {
@@ -50,17 +51,24 @@ async function requireOrgAdminOrg(session: Session | null): Promise<{ orgId: str
   return { orgId, email: u?.email ?? "unknown" };
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   const session = await auth();
   const ctx = await requireOrgAdminOrg(session);
   if (!ctx) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
+  const version = appVersion();
+  const org = await prisma.org.findUnique({ where: { id: ctx.orgId }, select: { name: true } });
+  const safeOrg = (org?.name ?? "Org").replace(/[^a-zA-Z0-9_.-]+/g, "_");
+  const today = new Date().toISOString().slice(0, 10);
+  const filename = `Diagramatix-Org-backup-${safeOrg}-v${version}-${today}.diag-full`;
+
+  // ?stream=1 → live NDJSON progress; plain GET returns the raw zip fallback.
+  if (new URL(req.url).searchParams.get("stream") === "1") {
+    return streamBackup((onProgress) => buildOrgBackup(ctx.orgId, ctx.email, version, onProgress), filename);
+  }
+
   try {
-    const bytes = await buildOrgBackup(ctx.orgId, ctx.email, appVersion());
-    const org = await prisma.org.findUnique({ where: { id: ctx.orgId }, select: { name: true } });
-    const safeOrg = (org?.name ?? "Org").replace(/[^a-zA-Z0-9_.-]+/g, "_");
-    const today = new Date().toISOString().slice(0, 10);
-    const filename = `Diagramatix-Org-backup-${safeOrg}-v${appVersion()}-${today}.diag-full`;
+    const bytes = await buildOrgBackup(ctx.orgId, ctx.email, version);
     return new NextResponse(bytes as BodyInit, {
       headers: {
         "Content-Type": "application/zip",

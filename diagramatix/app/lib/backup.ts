@@ -30,6 +30,7 @@ import JSZip from "jszip";
 import { prisma } from "./db";
 import { ARCHIVE_PROJECT_NAME } from "./archive";
 import { SCHEMA_VERSION } from "./diagram/types";
+import { type BackupProgressFn } from "./full-backup";
 
 const BACKUP_KIND = "diagramatix-user-backup";
 const BACKUP_ENTRY = "backup.json";
@@ -108,6 +109,7 @@ export interface BackupPayload {
 export async function buildUserBackup(
   userId: string,
   appVersion: string,
+  onProgress?: BackupProgressFn,
 ): Promise<Uint8Array> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -121,10 +123,12 @@ export async function buildUserBackup(
     where: { userId, name: { not: ARCHIVE_PROJECT_NAME } },
     orderBy: { createdAt: "asc" },
   });
+  onProgress?.("Projects", projectsRaw.length);
   const allDiagrams = await prisma.diagram.findMany({
     where: { userId },
     orderBy: { createdAt: "asc" },
   });
+  onProgress?.("Diagrams", allDiagrams.length);
 
   const projectIdSet = new Set(projectsRaw.map((p) => p.id));
   const projects: BackupProject[] = projectsRaw.map((p) => ({
@@ -151,6 +155,7 @@ export async function buildUserBackup(
     where: { userId, templateType: "user" },
     orderBy: { createdAt: "asc" },
   });
+  onProgress?.("Templates", userTemplates.length);
 
   // Prompts: scoped per (userId, orgId). We back up every prompt this
   // user owns, across every org they're a member of, so the data is
@@ -160,6 +165,7 @@ export async function buildUserBackup(
     where: { userId },
     orderBy: { createdAt: "asc" },
   });
+  onProgress?.("Prompts", userPromptsRaw.length);
 
   const payload: BackupPayload = {
     schemaVersion: SCHEMA_VERSION,
@@ -189,6 +195,7 @@ export async function buildUserBackup(
     })),
   };
 
+  onProgress?.("Compressing", 0);
   const zip = new JSZip();
   zip.file(BACKUP_ENTRY, JSON.stringify(payload, null, 2));
   return await zip.generateAsync({

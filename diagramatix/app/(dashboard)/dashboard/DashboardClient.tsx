@@ -18,6 +18,7 @@ import { NotificationsClient } from "../notifications/NotificationsClient";
 import { DiagramTypeBadge } from "@/app/components/DiagramTypeBadge";
 import { useDiagramTypeStyles } from "@/app/hooks/useDiagramTypeStyles";
 import { lightenHex } from "@/app/lib/diagram/diagramTypeStyles";
+import { BackupProgressModal } from "@/app/components/BackupProgressModal";
 
 interface DiagramSummary {
   id: string;
@@ -735,6 +736,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
 
   // Backup / Restore
   const [backingUp, setBackingUp] = useState(false);
+  const [backupModal, setBackupModal] = useState<{ url: string; title: string } | null>(null);
   const [restoring, setRestoring] = useState(false);
   const [restoreLog, setRestoreLog] = useState<string[]>([]);
   const [restoreResult, setRestoreResult] = useState<"success" | "failed" | null>(null);
@@ -752,33 +754,11 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
     return () => document.removeEventListener("mousedown", handleClick);
   }, [fileMenuOpen]);
 
-  async function handleBackupDownload() {
+  function handleBackupDownload() {
+    // Live progress + report via the streaming endpoint (the modal reads
+    // NDJSON, shows each section, then downloads + reports).
     setBackingUp(true);
-    try {
-      const resp = await fetch("/api/backup");
-      if (!resp.ok) {
-        const msg = await resp.text();
-        alert(`Backup failed: ${msg || resp.statusText}`);
-        return;
-      }
-      const blob = await resp.blob();
-      // Filename comes from Content-Disposition (best-effort parse)
-      const cd = resp.headers.get("Content-Disposition") ?? "";
-      const m = cd.match(/filename="([^"]+)"/);
-      const filename = m?.[1] ?? `Diagramatix-backup-${new Date().toISOString().slice(0, 10)}.diag`; // server provides versioned name
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-    } catch (err) {
-      alert(`Backup failed: ${err instanceof Error ? err.message : String(err)}`);
-    } finally {
-      setBackingUp(false);
-    }
+    setBackupModal({ url: "/api/backup?stream=1", title: "Backing up your data…" });
   }
 
   async function handleDdlImport() {
@@ -2958,6 +2938,14 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
           onContinue={closeNotifications}
           selfPath="/dashboard"
           selfExtraParam="notifications=1"
+        />
+      )}
+
+      {backupModal && (
+        <BackupProgressModal
+          url={backupModal.url}
+          title={backupModal.title}
+          onClose={() => { setBackupModal(null); setBackingUp(false); }}
         />
       )}
     </div>

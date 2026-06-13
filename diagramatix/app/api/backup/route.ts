@@ -5,6 +5,7 @@ import { prisma } from "@/app/lib/db";
 import { isImpersonating, getEffectiveUserId } from "@/app/lib/superuser";
 import { getCurrentOrgId, requireRole, WRITE_ROLES, OrgContextError } from "@/app/lib/auth/orgContext";
 import { buildUserBackup, restoreUserBackup } from "@/app/lib/backup";
+import { streamBackup } from "@/app/lib/backupStream";
 import { SCHEMA_VERSION } from "@/app/lib/diagram/types";
 
 /**
@@ -25,7 +26,7 @@ function appVersion(): string {
   return `${SCHEMA_VERSION}.${commitCount}`;
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -35,16 +36,21 @@ export async function GET() {
   let userId = session.user.id;
   try { userId = getEffectiveUserId(session, await cookies()); } catch {}
 
+  // Filename: Diagramatix-backup-<email>-<version>-<YYYY-MM-DD>.diag
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
+  const safeEmail = (user?.email ?? "user").replace(/[^a-zA-Z0-9_.-]+/g, "_");
+  const today = new Date().toISOString().slice(0, 10);
+  const version = appVersion();
+  const filename = `Diagramatix-backup-${safeEmail}-v${version}-${today}.diag`;
+
+  // ?stream=1 → live NDJSON progress (used by the progress modal). Plain GET
+  // still returns the raw zip blob as a fallback / direct download.
+  if (new URL(req.url).searchParams.get("stream") === "1") {
+    return streamBackup((onProgress) => buildUserBackup(userId, version, onProgress), filename);
+  }
+
   try {
-    const bytes = await buildUserBackup(userId, appVersion());
-
-    // Build filename: Diagramatix-backup-<email>-<version>-<YYYY-MM-DD>.diag
-    const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
-    const safeEmail = (user?.email ?? "user").replace(/[^a-zA-Z0-9_.-]+/g, "_");
-    const today = new Date().toISOString().slice(0, 10);
-    const version = appVersion();
-    const filename = `Diagramatix-backup-${safeEmail}-v${version}-${today}.diag`;
-
+    const bytes = await buildUserBackup(userId, version);
     return new NextResponse(bytes as any, {
       headers: {
         "Content-Type": "application/zip",

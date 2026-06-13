@@ -132,54 +132,21 @@ export interface FullBackupPayload {
   };
 }
 
+/** Per-section progress callback for the streaming backup endpoints. Fired
+ *  once per table as it's fetched (and once for the final compression step
+ *  with count 0). */
+export type BackupProgressFn = (label: string, count: number) => void;
+
 /** Build a full system backup. Caller is responsible for authorisation
  *  (superuser only) and for setting an appropriate filename / Content-
- *  Disposition on the response. */
+ *  Disposition on the response. `onProgress` (optional) is fired per table
+ *  so the request can stream live progress — tables are therefore fetched
+ *  sequentially in dependency order rather than in parallel. */
 export async function buildFullBackup(
   exportedBy: string,
   appVersion: string,
+  onProgress?: BackupProgressFn,
 ): Promise<Uint8Array> {
-  // Pull every row from every relevant model. We deliberately don't
-  // chunk — full backups are an admin disaster-recovery tool, not a hot
-  // path, and the dataset size at the pilot scale (<50 users, <500
-  // diagrams) easily fits in RAM.
-  const [
-    orgs, subscriptionLevels, users, usageCounters, orgMembers,
-    projects, projectShares, diagrams, history,
-    publishedVersions, bundles, bundleDiagrams, bundleAudience, pendingAudience,
-    feedback, templates, prompts, rules,
-    features, bubbleHelps, diagramTypeStyles, notifications,
-    collabGroups, collabMembers, reviews, reviewers, transfers,
-  ] = await Promise.all([
-    prisma.org.findMany({ orderBy: { createdAt: "asc" } }),
-    prisma.subscriptionLevel.findMany({ orderBy: { sortOrder: "asc" } }),
-    prisma.user.findMany({ orderBy: { createdAt: "asc" } }),
-    prisma.usageCounter.findMany({ orderBy: { updatedAt: "asc" } }),
-    prisma.orgMember.findMany({ orderBy: { createdAt: "asc" } }),
-    prisma.project.findMany({ orderBy: { createdAt: "asc" } }),
-    prisma.projectShare.findMany({ orderBy: { createdAt: "asc" } }),
-    prisma.diagram.findMany({ orderBy: { createdAt: "asc" } }),
-    prisma.diagramHistory.findMany({ orderBy: { createdAt: "asc" } }),
-    prisma.publishedVersion.findMany({ orderBy: { publishedAt: "asc" } }),
-    prisma.publicationBundle.findMany({ orderBy: { publishedAt: "asc" } }),
-    prisma.publicationBundleDiagram.findMany({ orderBy: { addedAt: "asc" } }),
-    prisma.publicationBundleAudience.findMany({ orderBy: { addedAt: "asc" } }),
-    prisma.pendingBundleAudience.findMany({ orderBy: { invitedAt: "asc" } }),
-    prisma.diagramFeedback.findMany({ orderBy: { createdAt: "asc" } }),
-    prisma.diagramTemplate.findMany({ orderBy: { createdAt: "asc" } }),
-    prisma.prompt.findMany({ orderBy: { createdAt: "asc" } }),
-    prisma.diagramRules.findMany({ orderBy: { createdAt: "asc" } }),
-    prisma.feature.findMany({ orderBy: { createdAt: "asc" } }),
-    prisma.bubbleHelp.findMany({ orderBy: { createdAt: "asc" } }),
-    prisma.diagramTypeStyle.findMany({ orderBy: { sortOrder: "asc" } }),
-    prisma.notification.findMany({ orderBy: { createdAt: "asc" } }),
-    prisma.collaborationGroup.findMany({ orderBy: { createdAt: "asc" } }),
-    prisma.collaborationGroupMember.findMany({ orderBy: { invitedAt: "asc" } }),
-    prisma.diagramReview.findMany({ orderBy: { createdAt: "asc" } }),
-    prisma.diagramReviewer.findMany({ orderBy: { id: "asc" } }),
-    prisma.ownershipTransfer.findMany({ orderBy: { createdAt: "asc" } }),
-  ]);
-
   // Replace Date objects with ISO strings so the JSON serialiser doesn't
   // need to know about Prisma's runtime types. Json columns are already
   // plain objects/strings via Prisma's deserialisation.
@@ -192,6 +159,48 @@ export async function buildFullBackup(
   }
   const serialise = (rows: Record<string, unknown>[]) => rows.map(toIso);
 
+  // [model, fetcher] in dependency order — MUST match FULL_BACKUP_TABLE_ORDER
+  // and the tables-block keys. Fetched sequentially so onProgress can report
+  // each table as it lands (dataset is small at pilot scale).
+  const fetchers: Array<[string, () => Promise<unknown[]>]> = [
+    ["Org", () => prisma.org.findMany({ orderBy: { createdAt: "asc" } })],
+    ["SubscriptionLevel", () => prisma.subscriptionLevel.findMany({ orderBy: { sortOrder: "asc" } })],
+    ["User", () => prisma.user.findMany({ orderBy: { createdAt: "asc" } })],
+    ["UsageCounter", () => prisma.usageCounter.findMany({ orderBy: { updatedAt: "asc" } })],
+    ["OrgMember", () => prisma.orgMember.findMany({ orderBy: { createdAt: "asc" } })],
+    ["Project", () => prisma.project.findMany({ orderBy: { createdAt: "asc" } })],
+    ["ProjectShare", () => prisma.projectShare.findMany({ orderBy: { createdAt: "asc" } })],
+    ["Diagram", () => prisma.diagram.findMany({ orderBy: { createdAt: "asc" } })],
+    ["DiagramHistory", () => prisma.diagramHistory.findMany({ orderBy: { createdAt: "asc" } })],
+    ["PublishedVersion", () => prisma.publishedVersion.findMany({ orderBy: { publishedAt: "asc" } })],
+    ["PublicationBundle", () => prisma.publicationBundle.findMany({ orderBy: { publishedAt: "asc" } })],
+    ["PublicationBundleDiagram", () => prisma.publicationBundleDiagram.findMany({ orderBy: { addedAt: "asc" } })],
+    ["PublicationBundleAudience", () => prisma.publicationBundleAudience.findMany({ orderBy: { addedAt: "asc" } })],
+    ["PendingBundleAudience", () => prisma.pendingBundleAudience.findMany({ orderBy: { invitedAt: "asc" } })],
+    ["DiagramFeedback", () => prisma.diagramFeedback.findMany({ orderBy: { createdAt: "asc" } })],
+    ["DiagramTemplate", () => prisma.diagramTemplate.findMany({ orderBy: { createdAt: "asc" } })],
+    ["Prompt", () => prisma.prompt.findMany({ orderBy: { createdAt: "asc" } })],
+    ["DiagramRules", () => prisma.diagramRules.findMany({ orderBy: { createdAt: "asc" } })],
+    ["Feature", () => prisma.feature.findMany({ orderBy: { createdAt: "asc" } })],
+    ["BubbleHelp", () => prisma.bubbleHelp.findMany({ orderBy: { createdAt: "asc" } })],
+    ["DiagramTypeStyle", () => prisma.diagramTypeStyle.findMany({ orderBy: { sortOrder: "asc" } })],
+    ["Notification", () => prisma.notification.findMany({ orderBy: { createdAt: "asc" } })],
+    ["CollaborationGroup", () => prisma.collaborationGroup.findMany({ orderBy: { createdAt: "asc" } })],
+    ["CollaborationGroupMember", () => prisma.collaborationGroupMember.findMany({ orderBy: { invitedAt: "asc" } })],
+    ["DiagramReview", () => prisma.diagramReview.findMany({ orderBy: { createdAt: "asc" } })],
+    ["DiagramReviewer", () => prisma.diagramReviewer.findMany({ orderBy: { id: "asc" } })],
+    ["OwnershipTransfer", () => prisma.ownershipTransfer.findMany({ orderBy: { createdAt: "asc" } })],
+  ];
+
+  const counts: Record<string, number> = {};
+  const tables: Record<string, unknown[]> = {};
+  for (const [label, fn] of fetchers) {
+    const rows = (await fn()) as Record<string, unknown>[];
+    counts[label] = rows.length;
+    tables[label] = serialise(rows);
+    onProgress?.(label, rows.length);
+  }
+
   const payload: FullBackupPayload = {
     schemaVersion: SCHEMA_VERSION,
     appVersion,
@@ -199,66 +208,11 @@ export async function buildFullBackup(
     kind: FULL_BACKUP_KIND,
     exportedBy,
     tableOrder: FULL_BACKUP_TABLE_ORDER,
-    counts: {
-      Org: orgs.length,
-      SubscriptionLevel: subscriptionLevels.length,
-      User: users.length,
-      UsageCounter: usageCounters.length,
-      OrgMember: orgMembers.length,
-      Project: projects.length,
-      ProjectShare: projectShares.length,
-      Diagram: diagrams.length,
-      DiagramHistory: history.length,
-      PublishedVersion: publishedVersions.length,
-      PublicationBundle: bundles.length,
-      PublicationBundleDiagram: bundleDiagrams.length,
-      PublicationBundleAudience: bundleAudience.length,
-      PendingBundleAudience: pendingAudience.length,
-      DiagramFeedback: feedback.length,
-      DiagramTemplate: templates.length,
-      Prompt: prompts.length,
-      DiagramRules: rules.length,
-      Feature: features.length,
-      BubbleHelp: bubbleHelps.length,
-      DiagramTypeStyle: diagramTypeStyles.length,
-      Notification: notifications.length,
-      CollaborationGroup: collabGroups.length,
-      CollaborationGroupMember: collabMembers.length,
-      DiagramReview: reviews.length,
-      DiagramReviewer: reviewers.length,
-      OwnershipTransfer: transfers.length,
-    },
-    tables: {
-      Org: serialise(orgs as Record<string, unknown>[]),
-      SubscriptionLevel: serialise(subscriptionLevels as Record<string, unknown>[]),
-      User: serialise(users as Record<string, unknown>[]),
-      UsageCounter: serialise(usageCounters as Record<string, unknown>[]),
-      OrgMember: serialise(orgMembers as Record<string, unknown>[]),
-      Project: serialise(projects as Record<string, unknown>[]),
-      ProjectShare: serialise(projectShares as Record<string, unknown>[]),
-      Diagram: serialise(diagrams as Record<string, unknown>[]),
-      DiagramHistory: serialise(history as Record<string, unknown>[]),
-      PublishedVersion: serialise(publishedVersions as Record<string, unknown>[]),
-      PublicationBundle: serialise(bundles as Record<string, unknown>[]),
-      PublicationBundleDiagram: serialise(bundleDiagrams as Record<string, unknown>[]),
-      PublicationBundleAudience: serialise(bundleAudience as Record<string, unknown>[]),
-      PendingBundleAudience: serialise(pendingAudience as Record<string, unknown>[]),
-      DiagramFeedback: serialise(feedback as Record<string, unknown>[]),
-      DiagramTemplate: serialise(templates as Record<string, unknown>[]),
-      Prompt: serialise(prompts as Record<string, unknown>[]),
-      DiagramRules: serialise(rules as Record<string, unknown>[]),
-      Feature: serialise(features as Record<string, unknown>[]),
-      BubbleHelp: serialise(bubbleHelps as Record<string, unknown>[]),
-      DiagramTypeStyle: serialise(diagramTypeStyles as Record<string, unknown>[]),
-      Notification: serialise(notifications as Record<string, unknown>[]),
-      CollaborationGroup: serialise(collabGroups as Record<string, unknown>[]),
-      CollaborationGroupMember: serialise(collabMembers as Record<string, unknown>[]),
-      DiagramReview: serialise(reviews as Record<string, unknown>[]),
-      DiagramReviewer: serialise(reviewers as Record<string, unknown>[]),
-      OwnershipTransfer: serialise(transfers as Record<string, unknown>[]),
-    },
+    counts,
+    tables: tables as unknown as FullBackupPayload["tables"],
   };
 
+  onProgress?.("Compressing", 0);
   const zip = new JSZip();
   zip.file(FULL_BACKUP_ENTRY, JSON.stringify(payload, null, 2));
   return await zip.generateAsync({
