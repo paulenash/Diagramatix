@@ -128,95 +128,107 @@ export async function restoreRulesPrefsBundle(
   const userIds = new Set(existingUsers.map((u) => u.id));
   const orgIds = new Set(existingOrgs.map((o) => o.id));
 
-  // ── DiagramRules ────────────────────────────────────────────────────────
-  for (const r of bundle.rules) {
-    // FK check: userId/orgId may be null (system-wide rule); if set,
-    // both must exist on target.
-    if (r.userId !== null && !userIds.has(r.userId)) {
-      result.rules.skipped++;
-      result.rules.skippedReasons.push(`rule ${r.id} (${r.category}): user ${r.userId} not found`);
-      continue;
+  // Wrap the whole merge in one interactive transaction so a mid-batch
+  // failure rolls back cleanly rather than leaving a half-merged set
+  // (audit DATA-22).
+  await prisma.$transaction(async (tx) => {
+    // ── DiagramRules ──────────────────────────────────────────────────────
+    for (const r of bundle.rules) {
+      // FK check: userId/orgId may be null (system-wide rule); if set,
+      // both must exist on target.
+      if (r.userId !== null && !userIds.has(r.userId)) {
+        result.rules.skipped++;
+        result.rules.skippedReasons.push(`rule ${r.id} (${r.category}): user ${r.userId} not found`);
+        continue;
+      }
+      if (r.orgId !== null && !orgIds.has(r.orgId)) {
+        result.rules.skipped++;
+        result.rules.skippedReasons.push(`rule ${r.id} (${r.category}): org ${r.orgId} not found`);
+        continue;
+      }
+      // Match by id OR by the natural key (category,userId,orgId) — a target
+      // row with the same tuple but a different id would otherwise hit the
+      // @@unique constraint and abort the import (audit DATA-23).
+      const existing =
+        (await tx.diagramRules.findUnique({ where: { id: r.id } })) ??
+        (await tx.diagramRules.findFirst({
+          where: { category: r.category, userId: r.userId, orgId: r.orgId },
+        }));
+      if (existing) {
+        await tx.diagramRules.update({
+          where: { id: existing.id },
+          data: {
+            category: r.category,
+            rules: r.rules,
+            isDefault: r.isDefault,
+            userId: r.userId,
+            orgId: r.orgId,
+          },
+        });
+        result.rules.updated++;
+      } else {
+        await tx.diagramRules.create({
+          data: {
+            id: r.id,
+            category: r.category,
+            rules: r.rules,
+            isDefault: r.isDefault,
+            userId: r.userId,
+            orgId: r.orgId,
+          },
+        });
+        result.rules.inserted++;
+      }
     }
-    if (r.orgId !== null && !orgIds.has(r.orgId)) {
-      result.rules.skipped++;
-      result.rules.skippedReasons.push(`rule ${r.id} (${r.category}): org ${r.orgId} not found`);
-      continue;
-    }
-    const existing = await prisma.diagramRules.findUnique({ where: { id: r.id } });
-    if (existing) {
-      await prisma.diagramRules.update({
-        where: { id: r.id },
-        data: {
-          category: r.category,
-          rules: r.rules,
-          isDefault: r.isDefault,
-          userId: r.userId,
-          orgId: r.orgId,
-        },
-      });
-      result.rules.updated++;
-    } else {
-      await prisma.diagramRules.create({
-        data: {
-          id: r.id,
-          category: r.category,
-          rules: r.rules,
-          isDefault: r.isDefault,
-          userId: r.userId,
-          orgId: r.orgId,
-        },
-      });
-      result.rules.inserted++;
-    }
-  }
 
-  // ── Prompts ─────────────────────────────────────────────────────────────
-  for (const p of bundle.prompts) {
-    if (!userIds.has(p.userId)) {
-      result.prompts.skipped++;
-      result.prompts.skippedReasons.push(`prompt ${p.id} (${p.name}): user ${p.userId} not found`);
-      continue;
+    // ── Prompts ───────────────────────────────────────────────────────────
+    for (const p of bundle.prompts) {
+      if (!userIds.has(p.userId)) {
+        result.prompts.skipped++;
+        result.prompts.skippedReasons.push(`prompt ${p.id} (${p.name}): user ${p.userId} not found`);
+        continue;
+      }
+      if (!orgIds.has(p.orgId)) {
+        result.prompts.skipped++;
+        result.prompts.skippedReasons.push(`prompt ${p.id} (${p.name}): org ${p.orgId} not found`);
+        continue;
+      }
+      const existing = await tx.prompt.findUnique({ where: { id: p.id } });
+      // Prisma 7's typed update doesn't include JSON fields in the schema
+      // graph — JSON has to be cast (project convention). `planJson` may
+      // legitimately be null; both casts handle that.
+      const planJsonCast = p.planJson as never;
+      if (existing) {
+        await tx.prompt.update({
+          where: { id: p.id },
+          data: {
+            name: p.name,
+            text: p.text,
+            diagramType: p.diagramType,
+            userId: p.userId,
+            orgId: p.orgId,
+            planJson: planJsonCast,
+            planUpdatedAt: p.planUpdatedAt ? new Date(p.planUpdatedAt) : null,
+          },
+        });
+        result.prompts.updated++;
+      } else {
+        await tx.prompt.create({
+          data: {
+            id: p.id,
+            name: p.name,
+            text: p.text,
+            diagramType: p.diagramType,
+            userId: p.userId,
+            orgId: p.orgId,
+            planJson: planJsonCast,
+            planUpdatedAt: p.planUpdatedAt ? new Date(p.planUpdatedAt) : null,
+          },
+        });
+        result.prompts.inserted++;
+      }
     }
-    if (!orgIds.has(p.orgId)) {
-      result.prompts.skipped++;
-      result.prompts.skippedReasons.push(`prompt ${p.id} (${p.name}): org ${p.orgId} not found`);
-      continue;
-    }
-    const existing = await prisma.prompt.findUnique({ where: { id: p.id } });
-    // Prisma 7's typed update doesn't include JSON fields in the schema
-    // graph — JSON has to be cast (project convention). `planJson` may
-    // legitimately be null; both casts handle that.
-    const planJsonCast = p.planJson as never;
-    if (existing) {
-      await prisma.prompt.update({
-        where: { id: p.id },
-        data: {
-          name: p.name,
-          text: p.text,
-          diagramType: p.diagramType,
-          userId: p.userId,
-          orgId: p.orgId,
-          planJson: planJsonCast,
-          planUpdatedAt: p.planUpdatedAt ? new Date(p.planUpdatedAt) : null,
-        },
-      });
-      result.prompts.updated++;
-    } else {
-      await prisma.prompt.create({
-        data: {
-          id: p.id,
-          name: p.name,
-          text: p.text,
-          diagramType: p.diagramType,
-          userId: p.userId,
-          orgId: p.orgId,
-          planJson: planJsonCast,
-          planUpdatedAt: p.planUpdatedAt ? new Date(p.planUpdatedAt) : null,
-        },
-      });
-      result.prompts.inserted++;
-    }
-  }
+  });
 
   return result;
 }
