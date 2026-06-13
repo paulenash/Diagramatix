@@ -6,6 +6,7 @@ import { isImpersonating, getEffectiveUserId } from "@/app/lib/superuser";
 import { getCurrentOrgId, requireRole, WRITE_ROLES, OrgContextError } from "@/app/lib/auth/orgContext";
 import { buildUserBackup, restoreUserBackup } from "@/app/lib/backup";
 import { streamBackup } from "@/app/lib/backupStream";
+import { previewUserBackup } from "@/app/lib/backupPreview";
 import { SCHEMA_VERSION } from "@/app/lib/diagram/types";
 
 /**
@@ -35,6 +36,11 @@ export async function GET(req: Request) {
   // Honour superuser impersonation: backup of the *viewed* user
   let userId = session.user.id;
   try { userId = getEffectiveUserId(session, await cookies()); } catch {}
+
+  // ?preview=1 → pre-flight counts (no file build).
+  if (new URL(req.url).searchParams.get("preview") === "1") {
+    return NextResponse.json(await previewUserBackup(userId));
+  }
 
   // Filename: Diagramatix-backup-<email>-<version>-<YYYY-MM-DD>.diag
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });

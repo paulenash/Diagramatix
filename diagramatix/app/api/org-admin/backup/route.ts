@@ -26,6 +26,7 @@ import { tryGetCurrentOrgId } from "@/app/lib/auth/orgContext";
 import { parseFullBackup, inspectFullBackup, type AdditiveSelection } from "@/app/lib/full-backup";
 import { buildOrgBackup, scopePayloadToOrg, restoreOrgBackupAdditive } from "@/app/lib/org-backup";
 import { streamBackup } from "@/app/lib/backupStream";
+import { previewOrgBackup } from "@/app/lib/backupPreview";
 import { SCHEMA_VERSION } from "@/app/lib/diagram/types";
 
 function appVersion(): string {
@@ -56,6 +57,13 @@ export async function GET(req: Request) {
   const ctx = await requireOrgAdminOrg(session);
   if (!ctx) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
+  const url = new URL(req.url);
+
+  // ?preview=1 → per-member counts for the selection UI.
+  if (url.searchParams.get("preview") === "1") {
+    return NextResponse.json(await previewOrgBackup(ctx.orgId));
+  }
+
   const version = appVersion();
   const org = await prisma.org.findUnique({ where: { id: ctx.orgId }, select: { name: true } });
   const safeOrg = (org?.name ?? "Org").replace(/[^a-zA-Z0-9_.-]+/g, "_");
@@ -63,8 +71,14 @@ export async function GET(req: Request) {
   const filename = `Diagramatix-Org-backup-${safeOrg}-v${version}-${today}.diag-full`;
 
   // ?stream=1 → live NDJSON progress; plain GET returns the raw zip fallback.
-  if (new URL(req.url).searchParams.get("stream") === "1") {
-    return streamBackup((onProgress) => buildOrgBackup(ctx.orgId, ctx.email, version, onProgress), filename);
+  // userIds (CSV) optionally narrows the backup to selected members.
+  if (url.searchParams.get("stream") === "1") {
+    const userIdsParam = url.searchParams.get("userIds");
+    const userIds = userIdsParam ? userIdsParam.split(",").filter(Boolean) : undefined;
+    return streamBackup(
+      (onProgress) => buildOrgBackup(ctx.orgId, ctx.email, version, onProgress, { userIds }),
+      filename,
+    );
   }
 
   try {

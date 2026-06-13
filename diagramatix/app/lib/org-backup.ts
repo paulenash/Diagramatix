@@ -63,19 +63,31 @@ function shortCuid(): string {
 /** Build an Org-scoped backup zip for one Org. The payload shape matches
  *  FullBackupPayload (so inspectFullBackup works); only this Org's rows
  *  are included. */
+export interface OrgBackupOptions {
+  /** Restrict to a subset of the Org's members. Empty/undefined = all. */
+  userIds?: string[];
+  /** Include system-wide config tables (SubscriptionLevel / Feature /
+   *  BubbleHelp / DiagramTypeStyle) so the file restores standalone. Used
+   *  by the SuperAdmin scoped backup; false for OrgAdmin backups. */
+  includeSystemConfig?: boolean;
+}
+
 export async function buildOrgBackup(
   orgId: string,
   exportedBy: string,
   appVersion: string,
   onProgress?: BackupProgressFn,
+  opts?: OrgBackupOptions,
 ): Promise<Uint8Array> {
   const org = await prisma.org.findUnique({ where: { id: orgId } });
   if (!org) throw new Error("Org not found");
   onProgress?.("Org", 1);
 
-  // Sequential (not Promise.all) so onProgress can report each section as
-  // it lands for the live progress stream.
-  const orgMembers = await prisma.orgMember.findMany({ where: { orgId } });
+  // Members — optionally narrowed to a selected subset of users. Sequential
+  // (not Promise.all) so onProgress can report each section as it lands.
+  const allMembers = await prisma.orgMember.findMany({ where: { orgId } });
+  const selected = opts?.userIds && opts.userIds.length > 0 ? new Set(opts.userIds) : null;
+  const orgMembers = selected ? allMembers.filter(m => selected.has(m.userId)) : allMembers;
   onProgress?.("OrgMember", orgMembers.length);
   const memberUserIds = Array.from(new Set(orgMembers.map(m => m.userId)));
 
@@ -83,19 +95,32 @@ export async function buildOrgBackup(
   onProgress?.("User", users.length);
   const usageCounters = await prisma.usageCounter.findMany({ where: { userId: { in: memberUserIds } } });
   onProgress?.("UsageCounter", usageCounters.length);
-  const projects = await prisma.project.findMany({ where: { orgId }, orderBy: { createdAt: "asc" } });
+  const projects = await prisma.project.findMany({ where: { orgId, userId: { in: memberUserIds } }, orderBy: { createdAt: "asc" } });
   onProgress?.("Project", projects.length);
-  const diagrams = await prisma.diagram.findMany({ where: { orgId }, orderBy: { createdAt: "asc" } });
+  const diagrams = await prisma.diagram.findMany({ where: { orgId, userId: { in: memberUserIds } }, orderBy: { createdAt: "asc" } });
   onProgress?.("Diagram", diagrams.length);
   const diagramIds = diagrams.map(d => d.id);
   const history = await prisma.diagramHistory.findMany({ where: { diagramId: { in: diagramIds } } });
   onProgress?.("DiagramHistory", history.length);
   const templates = await prisma.diagramTemplate.findMany({ where: { userId: { in: memberUserIds } } });
   onProgress?.("DiagramTemplate", templates.length);
-  const prompts = await prisma.prompt.findMany({ where: { orgId } });
+  const prompts = await prisma.prompt.findMany({ where: { orgId, userId: { in: memberUserIds } } });
   onProgress?.("Prompt", prompts.length);
   const rules = await prisma.diagramRules.findMany({ where: { userId: { in: memberUserIds } } });
   onProgress?.("DiagramRules", rules.length);
+
+  // System config — only when a SuperAdmin requests a self-contained scoped
+  // backup. OrgAdmin backups leave these empty (they restore into a system
+  // that already has its tiers/config).
+  const cfg = opts?.includeSystemConfig === true;
+  const subscriptionLevels = cfg ? await prisma.subscriptionLevel.findMany({ orderBy: { sortOrder: "asc" } }) : [];
+  if (cfg) onProgress?.("SubscriptionLevel", subscriptionLevels.length);
+  const features = cfg ? await prisma.feature.findMany({ orderBy: { createdAt: "asc" } }) : [];
+  if (cfg) onProgress?.("Feature", features.length);
+  const bubbleHelps = cfg ? await prisma.bubbleHelp.findMany({ orderBy: { createdAt: "asc" } }) : [];
+  if (cfg) onProgress?.("BubbleHelp", bubbleHelps.length);
+  const diagramTypeStyles = cfg ? await prisma.diagramTypeStyle.findMany({ orderBy: { sortOrder: "asc" } }) : [];
+  if (cfg) onProgress?.("DiagramTypeStyle", diagramTypeStyles.length);
 
   const toIso = (row: Record<string, unknown>): Record<string, unknown> => {
     const out: Record<string, unknown> = {};
@@ -117,7 +142,7 @@ export async function buildOrgBackup(
     // empty arrays to satisfy the shared FullBackupPayload shape.
     counts: {
       Org: 1,
-      SubscriptionLevel: 0,
+      SubscriptionLevel: subscriptionLevels.length,
       User: users.length,
       UsageCounter: usageCounters.length,
       OrgMember: orgMembers.length,
@@ -134,9 +159,9 @@ export async function buildOrgBackup(
       DiagramTemplate: templates.length,
       Prompt: prompts.length,
       DiagramRules: rules.length,
-      Feature: 0,
-      BubbleHelp: 0,
-      DiagramTypeStyle: 0,
+      Feature: features.length,
+      BubbleHelp: bubbleHelps.length,
+      DiagramTypeStyle: diagramTypeStyles.length,
       Notification: 0,
       CollaborationGroup: 0,
       CollaborationGroupMember: 0,
@@ -146,7 +171,7 @@ export async function buildOrgBackup(
     },
     tables: {
       Org: serialise([org] as Record<string, unknown>[]),
-      SubscriptionLevel: [], // org backups don't carry the system tier table
+      SubscriptionLevel: serialise(subscriptionLevels as Record<string, unknown>[]),
       User: serialise(users as Record<string, unknown>[]),
       UsageCounter: serialise(usageCounters as Record<string, unknown>[]),
       OrgMember: serialise(orgMembers as Record<string, unknown>[]),
@@ -163,9 +188,9 @@ export async function buildOrgBackup(
       DiagramTemplate: serialise(templates as Record<string, unknown>[]),
       Prompt: serialise(prompts as Record<string, unknown>[]),
       DiagramRules: serialise(rules as Record<string, unknown>[]),
-      Feature: [],
-      BubbleHelp: [],
-      DiagramTypeStyle: [],
+      Feature: serialise(features as Record<string, unknown>[]),
+      BubbleHelp: serialise(bubbleHelps as Record<string, unknown>[]),
+      DiagramTypeStyle: serialise(diagramTypeStyles as Record<string, unknown>[]),
       Notification: [],
       CollaborationGroup: [],
       CollaborationGroupMember: [],

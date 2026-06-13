@@ -29,7 +29,7 @@ export function OrgBackupClient({ orgName }: { orgName: string }) {
   const [tree, setTree] = useState<Tree | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [backupModal, setBackupModal] = useState<{ url: string; title: string } | null>(null);
+  const [backupModal, setBackupModal] = useState<{ url: string; title: string; previewUrl?: string } | null>(null);
   const [resultLog, setResultLog] = useState<string[] | null>(null);
 
   // Selected ids.
@@ -105,7 +105,7 @@ export function OrgBackupClient({ orgName }: { orgName: string }) {
             diagrams, history, templates and prompts. Treat the file as sensitive.
           </p>
           <button
-            onClick={() => setBackupModal({ url: "/api/org-admin/backup?stream=1", title: "Backing up your Org…" })}
+            onClick={() => setBackupModal({ url: "/api/org-admin/backup?stream=1", previewUrl: "/api/org-admin/backup?preview=1", title: "Back up your Org" })}
             className="inline-block px-3 py-1.5 text-xs font-medium text-white bg-orange-600 hover:bg-orange-700 rounded"
           >
             Download Org backup
@@ -223,6 +223,7 @@ export function OrgBackupClient({ orgName }: { orgName: string }) {
       {backupModal && (
         <BackupProgressModal
           url={backupModal.url}
+          previewUrl={backupModal.previewUrl}
           title={backupModal.title}
           onClose={() => setBackupModal(null)}
         />

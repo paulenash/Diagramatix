@@ -27,6 +27,8 @@ import {
   type AdditiveSelection,
 } from "@/app/lib/full-backup";
 import { streamBackup } from "@/app/lib/backupStream";
+import { previewFullBackup } from "@/app/lib/backupPreview";
+import { buildOrgBackup } from "@/app/lib/org-backup";
 import { SCHEMA_VERSION } from "@/app/lib/diagram/types";
 
 function appVersion(): string {
@@ -42,6 +44,13 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
+  const url = new URL(req.url);
+
+  // ?preview=1 → orgs→members tree + totals for the selection UI.
+  if (url.searchParams.get("preview") === "1") {
+    return NextResponse.json(await previewFullBackup());
+  }
+
   const admin = await prisma.user.findUnique({
     where: { id: session.user.id },
     select: { email: true },
@@ -50,12 +59,29 @@ export async function GET(req: Request) {
   const safeEmail = exportedBy.replace(/[^a-zA-Z0-9_.-]+/g, "_");
   const today = new Date().toISOString().slice(0, 10);
   const version = appVersion();
-  const filename = `Diagramatix-FULL-backup-${safeEmail}-v${version}-${today}.diag-full`;
 
   // ?stream=1 → live NDJSON progress; plain GET returns the raw zip fallback.
-  if (new URL(req.url).searchParams.get("stream") === "1") {
+  // Optional scope: orgId (+ userIds CSV) → a self-contained SCOPED backup
+  // (that org's selected users' data + system config), reusing the org
+  // builder. No orgId → the whole system (every table, every org).
+  if (url.searchParams.get("stream") === "1") {
+    const orgId = url.searchParams.get("orgId");
+    if (orgId) {
+      const org = await prisma.org.findUnique({ where: { id: orgId }, select: { name: true } });
+      const safeOrg = (org?.name ?? "Org").replace(/[^a-zA-Z0-9_.-]+/g, "_");
+      const userIdsParam = url.searchParams.get("userIds");
+      const userIds = userIdsParam ? userIdsParam.split(",").filter(Boolean) : undefined;
+      const scopedName = `Diagramatix-scoped-backup-${safeOrg}-v${version}-${today}.diag-full`;
+      return streamBackup(
+        (onProgress) => buildOrgBackup(orgId, exportedBy, version, onProgress, { userIds, includeSystemConfig: true }),
+        scopedName,
+      );
+    }
+    const filename = `Diagramatix-FULL-backup-${safeEmail}-v${version}-${today}.diag-full`;
     return streamBackup((onProgress) => buildFullBackup(exportedBy, version, onProgress), filename);
   }
+
+  const filename = `Diagramatix-FULL-backup-${safeEmail}-v${version}-${today}.diag-full`;
 
   try {
     const bytes = await buildFullBackup(exportedBy, version);

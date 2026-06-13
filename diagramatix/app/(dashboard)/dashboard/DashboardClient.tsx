@@ -736,7 +736,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
 
   // Backup / Restore
   const [backingUp, setBackingUp] = useState(false);
-  const [backupModal, setBackupModal] = useState<{ url: string; title: string } | null>(null);
+  const [backupModal, setBackupModal] = useState<{ url: string; title: string; previewUrl?: string } | null>(null);
   const [restoring, setRestoring] = useState(false);
   const [restoreLog, setRestoreLog] = useState<string[]>([]);
   const [restoreResult, setRestoreResult] = useState<"success" | "failed" | null>(null);
@@ -758,7 +758,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
     // Live progress + report via the streaming endpoint (the modal reads
     // NDJSON, shows each section, then downloads + reports).
     setBackingUp(true);
-    setBackupModal({ url: "/api/backup?stream=1", title: "Backing up your data…" });
+    setBackupModal({ url: "/api/backup?stream=1", previewUrl: "/api/backup?preview=1", title: "Back up your data" });
   }
 
   async function handleDdlImport() {
@@ -2944,6 +2944,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
       {backupModal && (
         <BackupProgressModal
           url={backupModal.url}
+          previewUrl={backupModal.previewUrl}
           title={backupModal.title}
           onClose={() => { setBackupModal(null); setBackingUp(false); }}
         />

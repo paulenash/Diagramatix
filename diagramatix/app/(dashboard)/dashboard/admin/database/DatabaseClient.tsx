@@ -47,7 +47,7 @@ export function DatabaseClient() {
   const router = useRouter();
   const [schemaData, setSchemaData] = useState<SchemaData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [backupModal, setBackupModal] = useState<{ url: string; title: string; noun?: string } | null>(null);
+  const [backupModal, setBackupModal] = useState<{ url: string; title: string; noun?: string; previewUrl?: string } | null>(null);
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
   const [sql, setSql] = useState("");
   const [queryResult, setQueryResult] = useState<QueryResult | null>(null);
@@ -532,7 +532,7 @@ export function DatabaseClient() {
               as a credential. Restore (wipe / additive) lands in a
               follow-up phase. */}
           <button
-            onClick={() => setBackupModal({ url: "/api/admin/full-backup?stream=1", title: "Full system backup\u2026" })}
+            onClick={() => setBackupModal({ url: "/api/admin/full-backup?stream=1", previewUrl: "/api/admin/full-backup?preview=1", title: "System backup" })}
             className="text-xs text-white bg-red-600 hover:bg-red-700 rounded px-2.5 py-1"
             title="Download a full system snapshot (every row, every table \u2014 sensitive)"
           >
@@ -1266,6 +1266,7 @@ export function DatabaseClient() {
       {backupModal && (
         <BackupProgressModal
           url={backupModal.url}
+          previewUrl={backupModal.previewUrl}
           title={backupModal.title}
           noun={backupModal.noun}
           onClose={() => setBackupModal(null)}
