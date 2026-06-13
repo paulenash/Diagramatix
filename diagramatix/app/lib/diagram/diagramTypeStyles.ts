@@ -36,13 +36,13 @@ export interface DiagramTypeStyle {
  * deliberately NOT a separately-editable row.
  */
 export const DEFAULT_DIAGRAM_TYPE_STYLES: DiagramTypeStyle[] = [
-  { typeKey: "context",         label: "Context",         code: "CO", bgColor: "#ccfbf1", textColor: "#0f766e", sortOrder: 0 }, // teal
-  { typeKey: "process-context", label: "Process Context", code: "PC", bgColor: "#e0f2fe", textColor: "#0369a1", sortOrder: 1 }, // sky
-  { typeKey: "state-machine",   label: "State Machine",   code: "SM", bgColor: "#ffe4e6", textColor: "#be123c", sortOrder: 2 }, // rose
-  { typeKey: "bpmn",            label: "BPMN",            code: "BP", bgColor: "#dbeafe", textColor: "#1d4ed8", sortOrder: 3 }, // blue
-  { typeKey: "domain",          label: "Domain",          code: "DM", bgColor: "#d1fae5", textColor: "#047857", sortOrder: 4 }, // emerald
-  { typeKey: "value-chain",     label: "Value Chain",     code: "VC", bgColor: "#ffedd5", textColor: "#c2410c", sortOrder: 5 }, // orange
-  { typeKey: "archimate",       label: "Archimate",       code: "AM", bgColor: "#fce7f3", textColor: "#be185c", sortOrder: 6 }, // pink
+  { typeKey: "context",         label: "Context",         code: "CO", bgColor: "#ccfbf1", textColor: "#093e3a", sortOrder: 0 },
+  { typeKey: "process-context", label: "Process Context", code: "PC", bgColor: "#e1feea", textColor: "#748b04", sortOrder: 1 },
+  { typeKey: "state-machine",   label: "State Machine",   code: "SM", bgColor: "#efe6e7", textColor: "#bf6612", sortOrder: 2 },
+  { typeKey: "bpmn",            label: "BPMN",            code: "BP", bgColor: "#dcfefc", textColor: "#19a455", sortOrder: 3 },
+  { typeKey: "domain",          label: "Domain",          code: "DM", bgColor: "#d1fae5", textColor: "#047857", sortOrder: 4 },
+  { typeKey: "value-chain",     label: "Value Chain",     code: "VC", bgColor: "#ffedd5", textColor: "#c2410c", sortOrder: 5 },
+  { typeKey: "archimate",       label: "Archimate",       code: "AM", bgColor: "#fce7f3", textColor: "#be185c", sortOrder: 6 },
 ];
 
 /** Canonical editable keys (excludes the `basic` alias). */
