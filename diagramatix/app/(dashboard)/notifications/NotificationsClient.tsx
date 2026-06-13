@@ -185,7 +185,7 @@ export function NotificationsClient({
     <div className={
       overlay
         ? "fixed inset-0 bg-black/20 flex items-start justify-center z-50 p-4"
-        : "min-h-screen bg-gray-100 flex items-start justify-center p-4"
+        : "min-h-screen dgx-dashboard-bg flex items-start justify-center p-4"
     }>
       <div className="bg-white rounded-lg shadow-xl w-full max-w-6xl max-h-[92vh] flex flex-col">
         {/* Header */}

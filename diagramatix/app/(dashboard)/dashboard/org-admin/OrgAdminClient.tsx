@@ -49,7 +49,7 @@ export function OrgAdminClient({ orgName }: { orgName: string }) {
   const router = useRouter();
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen dgx-dashboard-bg">
       <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center gap-3">
         <button
           onClick={() => router.push("/dashboard")}

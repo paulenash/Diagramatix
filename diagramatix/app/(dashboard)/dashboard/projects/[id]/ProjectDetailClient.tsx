@@ -1925,7 +1925,7 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
   const isImpersonating = !!impersonationMode;
 
   return (
-    <div className={`min-h-screen ${isImpersonating ? "bg-orange-50" : "bg-gray-50"} flex flex-col`}>
+    <div className={`min-h-screen ${isImpersonating ? "bg-orange-50" : "dgx-dashboard-bg"} flex flex-col`}>
       {isImpersonating && viewingAsName !== undefined && viewingAsEmail !== undefined && (
         <ImpersonationBanner viewingAsName={viewingAsName ?? ""} viewingAsEmail={viewingAsEmail ?? ""} mode={impersonationMode} />
       )}

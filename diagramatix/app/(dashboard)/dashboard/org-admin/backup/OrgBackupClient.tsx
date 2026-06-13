@@ -85,7 +85,7 @@ export function OrgBackupClient({ orgName }: { orgName: string }) {
   const selectedCount = diagramIds.size + projectIds.size + templateIds.size;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen dgx-dashboard-bg">
       <header className="bg-white border-b border-gray-200 px-6 py-3 flex items-center gap-3">
         <button onClick={() => router.push("/dashboard/org-admin")} className="text-sm text-orange-600 hover:text-orange-800">
           ← OrgAdmin
