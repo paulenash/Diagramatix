@@ -26,8 +26,8 @@ export function DiagramTypeBadge({ type, showLabel = false, className = "", titl
   return (
     <span className={`inline-flex items-center gap-1 align-middle ${className}`} title={title ?? s.label}>
       <span
-        className="inline-flex items-center justify-center rounded text-[9px] font-bold leading-none px-1 py-0.5 min-w-[18px]"
-        style={{ backgroundColor: s.bgColor, color: s.textColor }}
+        className="inline-flex items-center justify-center rounded text-[7px] font-bold leading-none px-1 py-0.5 min-w-[18px] border"
+        style={{ backgroundColor: s.bgColor, color: s.textColor, borderColor: s.textColor }}
       >
         {s.code}
       </span>
