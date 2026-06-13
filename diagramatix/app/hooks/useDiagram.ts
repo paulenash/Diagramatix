@@ -5098,6 +5098,44 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       // mid-drag and so never trigger the white-box L/R lockstep
       // cascade as a side effect of adoption.
       const { id } = action.payload;
+      const resizedEl = state.elements.find(e => e.id === id);
+
+      // EP envelopment: when an Expanded Subprocess is resized to enclose
+      // another EP (or any adoptable element), adopt each newly-enclosed
+      // element into the SMALLEST enclosing EP — at drag-release, not lazily
+      // on the next interaction with the inner element. This makes the
+      // depth-based colour cascade (each nested EP lighter than its parent,
+      // through any number of levels) update the instant the envelopment
+      // finishes, since the cascade is driven off the parentId chain.
+      if (resizedEl?.type === "subprocess-expanded") {
+        const elements = state.elements.map(el => {
+          if (el.id === id) return el;
+          if (!containerAccepts("subprocess-expanded", el.type)) return el;
+          const cx = el.x + el.width / 2;
+          const cy = el.y + el.height / 2;
+          const insideThis =
+            cx >= resizedEl.x && cx <= resizedEl.x + resizedEl.width &&
+            cy >= resizedEl.y && cy <= resizedEl.y + resizedEl.height;
+          if (!insideThis) return el;
+          // Pick the smallest EP whose rect encloses this element's centre.
+          // For a directly-enveloped EP that is the resized EP; for a deeper
+          // grandchild it stays with its own (smaller) parent EP, so the
+          // chain — grandchild → child → resized EP — is preserved.
+          const newParent = state.elements
+            .filter(b =>
+              b.type === "subprocess-expanded" &&
+              b.id !== el.id &&
+              containerAccepts(b.type, el.type) &&
+              !wouldCreateCycle(state.elements, el.id, b.id) &&
+              cx >= b.x && cx <= b.x + b.width &&
+              cy >= b.y && cy <= b.y + b.height)
+            .sort((a, b) => a.width * a.height - b.width * b.height)[0];
+          if (!newParent || newParent.id === el.parentId) return el;
+          return { ...el, parentId: newParent.id };
+        });
+        return { ...state, elements: updatePoolTypes(elements) };
+      }
+
       const pool = state.elements.find(e => e.id === id);
       if (!pool || pool.type !== "pool") return state;
       const poolDescendantIds = getAllDescendantIds(state.elements, id);
