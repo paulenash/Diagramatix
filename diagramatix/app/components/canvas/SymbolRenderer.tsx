@@ -2411,7 +2411,7 @@ export function SymbolRenderer({
               </text>
             )}
             {isEditingGatewayLabel && (
-              <foreignObject x={hitRectX} y={hitRectY} width={labelWidth} height={Math.max(totalLabelH, 28)}>
+              <foreignObject x={hitRectX - 4} y={hitRectY - 4} width={labelWidth + 8} height={Math.max(totalLabelH, 28) + 8}>
                 <textarea
                   autoFocus
                   onFocus={(e) => { const t = e.target; setTimeout(() => t.select(), 0); }}
@@ -2445,8 +2445,12 @@ export function SymbolRenderer({
                     }
                   }}
                   style={{
-                    width: "100%", height: "100%", fontSize: 11, fontFamily: "inherit",
-                    resize: "none", border: "none", outline: "none",
+                    // Inset the textarea 4px inside the padded foreignObject so
+                    // the full border is visible (not clipped) — item 3.
+                    width: "calc(100% - 8px)", height: "calc(100% - 8px)", margin: 4,
+                    fontSize: 11, fontFamily: "inherit",
+                    resize: "none", border: "1.5px solid #2563eb", borderRadius: 3,
+                    outline: "none",
                     background: "white", padding: "1px 2px",
                     textAlign: "center", lineHeight: "14px", boxSizing: "border-box",
                   }}

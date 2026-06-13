@@ -1933,6 +1933,45 @@ export function PropertiesPanel({
             </>
           )}
 
+          {(element.type === "data-object" || element.type === "data-store") && (
+            <>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Link</label>
+                <div className="flex items-center gap-1">
+                  <input
+                    type="url"
+                    className="flex-1 min-w-0 px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    placeholder="https://… (URL to the document)"
+                    value={(element.properties.link as string) ?? ""}
+                    onChange={(e) => onUpdateProperties(element.id, { link: e.target.value })}
+                  />
+                  {((element.properties.link as string) ?? "").startsWith("http") && (
+                    <a
+                      href={element.properties.link as string}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:underline text-xs shrink-0"
+                      title="Open the linked document in a new tab"
+                    >
+                      Open ↗
+                    </a>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Filename</label>
+                <input
+                  type="text"
+                  className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  placeholder="e.g. Q4-operations-report.pdf"
+                  value={(element.properties.filename as string) ?? ""}
+                  onChange={(e) => onUpdateProperties(element.id, { filename: e.target.value })}
+                />
+              </div>
+            </>
+          )}
+
           {(element.type === "data-object" ||
             (element.type === "pool" &&
               ((element.properties.poolType as string | undefined) ?? "black-box") === "black-box")) && (

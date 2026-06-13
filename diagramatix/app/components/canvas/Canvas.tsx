@@ -579,6 +579,11 @@ export function Canvas({
     worldWidth: number,
     scope: "element" | "connector" | "external",
   ): { focusZoom: number; focusPan: Point } | null {
+    // Editing an external label (events / gateways / data objects) should
+    // not leave the shape selected behind the editor (item 2). The inline
+    // editor's open state is local to SymbolRenderer, so dropping the
+    // selection here doesn't close it.
+    if (scope === "external") onSetSelectedElements(new Set());
     // Edit-zoom can be disabled entirely via the Active checkbox in
     // Dashboard → File → Zoom → Edit Zoom (localStorage key
     // `editZoomActive` — missing or "true" = on, "false" = off).
@@ -6174,7 +6179,21 @@ export function Canvas({
           <textarea
             autoFocus
             value={editingLabel.value}
-            onFocus={(e) => { const t = e.target; setTimeout(() => t.select(), 0); }}
+            onFocus={(e) => {
+              const t = e.target;
+              setTimeout(() => {
+                // Review comments carry a fixed "Name\nEmail\n---\n" header;
+                // select only the comment body so editing doesn't highlight
+                // (and risk clobbering) the reviewer identity (item 6).
+                if (editingEl?.type === "review-comment") {
+                  const sep = t.value.indexOf("---\n");
+                  const start = sep >= 0 ? sep + 4 : 0;
+                  t.setSelectionRange(start, t.value.length);
+                } else {
+                  t.select();
+                }
+              }, 0);
+            }}
             onChange={commonChange as React.ChangeEventHandler<HTMLTextAreaElement>}
             onBlur={commitLabel}
             onKeyDown={(e) => {

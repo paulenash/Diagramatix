@@ -361,7 +361,9 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
   }
 
   const hasLabel = label.trim().length > 0;
-  if (!hasLabel && !isEditing && connector.labelAnchor !== "source") return null;
+  // Show the (empty) label box when the connector is SELECTED so the user
+  // can see where to click to add a label (item 4).
+  if (!hasLabel && !isEditing && !selected && connector.labelAnchor !== "source") return null;
 
   function handleLabelMouseDown(e: React.MouseEvent) {
     if (!svgToWorld || !onUpdateLabel) return;
@@ -416,8 +418,9 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
 
   return (
     <g>
-      {/* Dotted tether: only show while dragging the label */}
-      {!isEditing && isDraggingLabel && (() => {
+      {/* Dotted tether: while dragging the label, or whenever the connector
+          is selected (item 5) so the label-to-line link is always clear. */}
+      {!isEditing && (isDraggingLabel || selected) && (() => {
         // Compute intersection of tether line with label box boundary
         const boxL = lCx - effectiveLWidth / 2 - 3;
         const boxR = lCx + effectiveLWidth / 2 + 3;
@@ -470,8 +473,11 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
         const editLines = editValue.split('\n');
         const editMeasured = Math.max(80, ...editLines.map(l => l.length * avgCharWidth + 20));
         const editH = Math.max(28, editLines.length * lineH + 8);
+        // Pad the foreignObject 4px on every side so the textarea's full
+        // border sits inside the clip box — otherwise the bottom/side edges
+        // get clipped and only the top boundary shows (item 3).
         return (
-        <foreignObject x={lCx - editMeasured / 2 - 3} y={lTy} width={editMeasured + 6} height={editH}>
+        <foreignObject x={lCx - editMeasured / 2 - 7} y={lTy - 4} width={editMeasured + 14} height={editH + 8}>
           <textarea
             autoFocus
             value={editValue}
@@ -483,9 +489,11 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
               if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); commitEdit(editValue); }
             }}
             style={{
-              width: "100%", height: "100%",
+              width: "calc(100% - 8px)", height: "calc(100% - 8px)",
+              margin: 4,
               fontSize, fontFamily: "inherit",
-              resize: "none", border: "none", outline: "none",
+              resize: "none", border: "1.5px solid #2563eb", borderRadius: 3,
+              outline: "none",
               background: "white", padding: "1px 2px",
               textAlign: "center", lineHeight: "14px",
               boxSizing: "border-box",
