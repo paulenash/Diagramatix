@@ -3028,8 +3028,123 @@ export function Canvas({
   //
   // Returns true if the group-connect was performed (so the caller skips its
   // default double-click behaviour).
+  // Multi-select "diamond" auto-connect (Paul's 2026-06-13 spec). When the
+  // selection forms a decision → stacked activities → merge layout and the
+  // user double-clicks ANY selected item, wire the whole split/merge at once:
+  //   • each activity ABOVE the gateway band attaches to that gateway's TOP
+  //     vertex, one OVERLAPPING the band to the inside face (decision RIGHT /
+  //     merge LEFT), and one BELOW to the BOTTOM vertex;
+  //   • activities take the connector on their LEFT (in) / RIGHT (out);
+  //   • both gateways are centred vertically on the activities, roles are set
+  //     (decision / merge), pre-existing connectors among the group are
+  //     cleared, and the selection is dropped.
+  // Fallback: with only a LEFT gateway (no merge) it does the decision →
+  // activities split alone (no centre/deselect), mirroring the existing
+  // merge-only group-connect. A single RIGHT gateway is left to that handler.
+  // Returns true when it handled the double-click.
+  function tryDiamondConnect(clicked: DiagramElement): boolean {
+    if (diagramType !== "bpmn") return false;
+
+    // Prefer the fresh pre-click capture (a click before the double-click
+    // collapses a multi-selection to one). Don't consume it unless we fire.
+    let sel: Set<string> = selectedElementIds;
+    const cap = groupConnectPrevSelectionRef.current;
+    if (cap && Date.now() < cap.expiresAt && cap.ids.size >= 3 && cap.ids.has(clicked.id)) {
+      sel = cap.ids;
+    }
+    if (sel.size < 3 || !sel.has(clicked.id)) return false;
+
+    const ACTIVITY = new Set(["task", "subprocess", "subprocess-expanded"]);
+    const chosen = data.elements.filter((e) => sel.has(e.id));
+    const gateways = chosen.filter((e) => e.type === "gateway");
+    const activities = chosen.filter((e) => ACTIVITY.has(e.type));
+    if (activities.length < 2) return false;
+    if (gateways.length < 1 || gateways.length > 2) return false;
+    // Keep the gesture predictable — only gateways + activities in the group.
+    if (gateways.length + activities.length !== chosen.length) return false;
+
+    const actMinX = Math.min(...activities.map((a) => a.x));
+    const actMaxX = Math.max(...activities.map((a) => a.x + a.width));
+    const actTop = Math.min(...activities.map((a) => a.y));
+    const actBottom = Math.max(...activities.map((a) => a.y + a.height));
+    const actCenterY = (actTop + actBottom) / 2;
+
+    // Decision = a gateway strictly LEFT of every activity; merge = strictly RIGHT.
+    const decision = gateways.find((g) => g.x + g.width <= actMinX) ?? null;
+    const merge = gateways.find((g) => g.x >= actMaxX) ?? null;
+    const fullDiamond = !!decision && !!merge;
+    const decisionOnly = !!decision && !merge && gateways.length === 1;
+    if (!fullDiamond && !decisionOnly) return false;
+
+    // Committed — consume the capture so it can't bleed into a later dblclick.
+    groupConnectPrevSelectionRef.current = null;
+
+    // Gateway side for an activity, given the gateway's band at the Y it will
+    // occupy (centred for a full diamond, current for decision-only).
+    const sideFor = (gwTopY: number, gwH: number, act: DiagramElement, inside: Side): Side => {
+      if (act.y + act.height <= gwTopY) return "top";
+      if (act.y >= gwTopY + gwH) return "bottom";
+      return inside;
+    };
+
+    const decY = fullDiamond ? actCenterY - decision!.height / 2 : (decision ? decision.y : 0);
+    const mrgY = merge ? actCenterY - merge.height / 2 : 0;
+    const decAt = decision ? { ...decision, y: decY } : null;
+    const mrgAt = merge ? { ...merge, y: mrgY } : null;
+
+    type Plan = { from: string; to: string; fromSide: Side; toSide: Side; flashFrom: Point; flashTo: Point };
+    const plans: Plan[] = [];
+    for (const act of activities) {
+      if (decision && decAt) {
+        const s = sideFor(decY, decision.height, act, "right");
+        plans.push({ from: decision.id, to: act.id, fromSide: s, toSide: "left",
+          flashFrom: sideMidpoint(decAt, s), flashTo: sideMidpoint(act, "left") });
+      }
+      if (merge && mrgAt) {
+        const s = sideFor(mrgY, merge.height, act, "left");
+        plans.push({ from: act.id, to: merge.id, fromSide: "right", toSide: s,
+          flashFrom: sideMidpoint(act, "right"), flashTo: sideMidpoint(mrgAt, s) });
+      }
+    }
+
+    const groupIds = new Set<string>(
+      [...activities.map((a) => a.id), decision?.id, merge?.id].filter(Boolean) as string[],
+    );
+    const existing = data.connectors.filter((c) => groupIds.has(c.sourceId) && groupIds.has(c.targetId));
+    const deletedFlash = existing.map((c) => ({
+      from: c.waypoints[0] ?? { x: 0, y: 0 },
+      to: c.waypoints[c.waypoints.length - 1] ?? { x: 0, y: 0 },
+    }));
+
+    setGroupFlash({ deleted: deletedFlash, created: plans.map((p) => ({ from: p.flashFrom, to: p.flashTo })), visible: true });
+    let cycle = 0;
+    const tick = () => {
+      cycle++;
+      if (cycle >= 6) {
+        setGroupFlash(null);
+        if (fullDiamond) {
+          onMoveElement(decision!.id, decision!.x, decY);
+          onMoveElement(merge!.id, merge!.x, mrgY);
+        }
+        for (const c of existing) onDeleteConnector(c.id);
+        for (const p of plans) {
+          onAddConnector(p.from, p.to, "sequence", defaultDirectionType, defaultRoutingType, p.fromSide, p.toSide, 0.5, 0.5);
+        }
+        if (decision) onUpdateProperties?.(decision.id, { gatewayRole: "decision" });
+        if (merge) onUpdateProperties?.(merge.id, { gatewayRole: "merge" });
+        if (fullDiamond) onSetSelectedElements(new Set());
+        return;
+      }
+      setGroupFlash((prev) => (prev ? { ...prev, visible: !prev.visible } : null));
+      setTimeout(tick, 150);
+    };
+    setTimeout(tick, 150);
+    return true;
+  }
+
   function tryGroupConnectToGateway(targetEl: DiagramElement): boolean {
     if (diagramType !== "bpmn") return false;
+    if (tryDiamondConnect(targetEl)) return true;
     if (targetEl.type !== "gateway") return false;
 
     // Resolve the effective selection: prefer the captured pre-click set if
@@ -3127,6 +3242,10 @@ export function Canvas({
   }
 
   function startEditingLabel(el: DiagramElement) {
+    // Double-clicking a selected item that forms a diamond split/merge wires
+    // it instead of opening the label editor (covers task double-clicks that
+    // reach the label path rather than tryGroupConnectToGateway).
+    if (tryDiamondConnect(el)) return;
     // Snapshot history once at edit start (for task/subprocess this is used
     // by updateLabelLive per-keystroke without polluting the undo stack).
     onBeginLabelEdit?.(el.id);
