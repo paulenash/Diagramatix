@@ -3132,7 +3132,14 @@ export function Canvas({
           onAddConnector(p.from, p.to, "sequence", defaultDirectionType, defaultRoutingType, p.fromSide, p.toSide, 0.5, 0.5);
         }
         if (decision) onUpdateProperties?.(decision.id, { gatewayRole: "decision" });
-        if (merge) onUpdateProperties?.(merge.id, { gatewayRole: "merge" });
+        if (merge) {
+          // Match the merge's marker to the decision/split gateway's marker
+          // (exclusive ×, parallel +, inclusive ○ …) when there is one.
+          onUpdateProperties?.(merge.id, {
+            gatewayRole: "merge",
+            ...(decision ? { gatewayType: decision.properties.gatewayType } : {}),
+          });
+        }
         if (fullDiamond) onSetSelectedElements(new Set());
         return;
       }
