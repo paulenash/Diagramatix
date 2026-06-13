@@ -3431,7 +3431,7 @@ function DiagramCard({
           <span>{"\u00B7"}</span>
           <span>{new Date(diagram.updatedAt).toLocaleDateString()}</span>
         </div>
-        <div className="ml-auto w-14 h-8 opacity-[0.55] group-hover:opacity-[0.85] transition-opacity pointer-events-none shrink-0">
+        <div className="ml-auto w-14 h-8 opacity-90 group-hover:opacity-100 transition-opacity pointer-events-none shrink-0">
           <DiagramThumbnail data={(diagram.data ?? { elements: [], connectors: [] }) as DiagramData} colorConfig={colorConfig} />
         </div>
       </div>

@@ -4,6 +4,9 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 import { CollapsibleSection } from "./CollapsibleSection";
+import { DiagramTypeBadge } from "@/app/components/DiagramTypeBadge";
+import { useDiagramTypeStyles } from "@/app/hooks/useDiagramTypeStyles";
+import { lightenHex } from "@/app/lib/diagram/diagramTypeStyles";
 
 /**
  * Dashboard "Published by me" surface. Two collections:
@@ -70,6 +73,7 @@ function reviewDueClass(iso: string | null): string {
 
 export function PublishedSection() {
   const router = useRouter();
+  const getTypeStyle = useDiagramTypeStyles();
   const [diagrams, setDiagrams] = useState<PublishedDiagram[] | null>(null);
   const [bundles, setBundles] = useState<BundlesPayload | null>(null);
   const [archiveTarget, setArchiveTarget] = useState<BundleSummary | null>(null);
@@ -150,7 +154,8 @@ export function PublishedSection() {
               <button
                 key={d.id}
                 onClick={() => router.push(`/diagram/${d.id}?from=/dashboard`)}
-                className="text-left bg-white border border-gray-200 rounded-lg p-3 hover:border-blue-400 hover:shadow transition"
+                style={{ backgroundColor: lightenHex(getTypeStyle(d.type).bgColor, 0.5) }}
+                className="text-left border border-gray-200 rounded-lg p-3 hover:border-blue-400 hover:shadow transition"
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
@@ -161,7 +166,7 @@ export function PublishedSection() {
                       </div>
                     )}
                   </div>
-                  <span className="text-[10px] text-gray-500 uppercase shrink-0">{d.type}</span>
+                  <DiagramTypeBadge type={d.type} showLabel showCode={false} className="shrink-0" />
                 </div>
                 <div className="mt-2 flex items-center gap-2 flex-wrap">
                   {d.currentVersion && (
@@ -282,11 +287,12 @@ export function PublishedSection() {
                 <button
                   key={r.id}
                   onClick={() => router.push(`/processes/${r.id}?bundle=${r.bundleId}`)}
-                  className="text-left bg-white border border-blue-200 rounded-lg p-3 hover:border-blue-400 hover:shadow transition"
+                  style={{ backgroundColor: lightenHex(getTypeStyle(r.type).bgColor, 0.5) }}
+                  className="text-left border border-blue-200 rounded-lg p-3 hover:border-blue-400 hover:shadow transition"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="text-sm font-medium text-gray-900 truncate flex-1">{r.name}</div>
-                    <span className="text-[10px] text-gray-500 uppercase shrink-0">{r.type}</span>
+                    <DiagramTypeBadge type={r.type} showLabel showCode={false} className="shrink-0" />
                   </div>
                   <div className="mt-2 flex items-center gap-2">
                     {r.versionNumber != null && (

@@ -16,6 +16,8 @@ import { CollapsibleSection } from "./CollapsibleSection";
 import { ProjectShareDialog } from "./ProjectShareDialog";
 import { NotificationsClient } from "../notifications/NotificationsClient";
 import { DiagramTypeBadge } from "@/app/components/DiagramTypeBadge";
+import { useDiagramTypeStyles } from "@/app/hooks/useDiagramTypeStyles";
+import { lightenHex } from "@/app/lib/diagram/diagramTypeStyles";
 
 interface DiagramSummary {
   id: string;
@@ -113,6 +115,9 @@ function DiagramCard({
 }) {
   const router = useRouter();
   const [showMove, setShowMove] = useState(false);
+  // Colour-code the tile with a soft tint of the diagram-type colour.
+  const typeStyle = useDiagramTypeStyles()(diagram.type);
+  const tileTint = lightenHex(typeStyle.bgColor, 0.5);
 
   return (
     <div
@@ -120,7 +125,8 @@ function DiagramCard({
       onDragStart={(e) => { e.dataTransfer.setData("text/plain", diagram.id); onDragStart?.(); }}
       onDragEnd={() => onDragEnd?.()}
       onClick={() => router.push(`/diagram/${diagram.id}?from=/dashboard`)}
-      className="bg-white border border-gray-200 rounded px-3 py-2 hover:border-blue-300 hover:shadow-sm cursor-pointer group transition-all relative"
+      style={{ backgroundColor: tileTint }}
+      className="border border-gray-200 rounded px-3 py-2 hover:border-blue-300 hover:shadow-sm cursor-pointer group transition-all relative"
     >
       <div className="flex items-center justify-between">
         <div className="w-8 h-8 bg-blue-50 rounded flex items-center justify-center shrink-0">
@@ -170,7 +176,7 @@ function DiagramCard({
       <div className="mt-1">
         <h3 className="font-medium text-gray-900 text-xs truncate">{diagram.name}</h3>
         <div className="flex items-center gap-2 mt-0.5">
-          <DiagramTypeBadge type={diagram.type} showLabel />
+          <DiagramTypeBadge type={diagram.type} showLabel showCode={false} />
           <span className="text-[10px] text-gray-400">{new Date(diagram.updatedAt).toLocaleDateString()}</span>
         </div>
       </div>
