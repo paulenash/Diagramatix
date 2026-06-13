@@ -3093,20 +3093,29 @@ export function Canvas({
     const decAt = decision ? { ...decision, y: decY } : null;
     const mrgAt = merge ? { ...merge, y: mrgY } : null;
 
-    type Plan = { from: string; to: string; fromSide: Side; toSide: Side; flashFrom: Point; flashTo: Point };
+    // Number the branches top-to-bottom so the option labels read in order.
+    activities.sort((a, b) => a.y - b.y);
+    // A "decision" marker branches on a condition — anything NOT parallel
+    // (always-all) or event-based. Those get auto-numbered option labels on
+    // the outgoing branches (Paul's 2026-06-13 rule).
+    const decGwType = decision?.properties.gatewayType;
+    const labelBranches = !!decision && decGwType !== "parallel" && decGwType !== "event-based";
+
+    type Plan = { from: string; to: string; fromSide: Side; toSide: Side; flashFrom: Point; flashTo: Point; label?: string };
     const plans: Plan[] = [];
-    for (const act of activities) {
+    activities.forEach((act, i) => {
       if (decision && decAt) {
         const s = sideFor(decY, decision.height, act, "right");
         plans.push({ from: decision.id, to: act.id, fromSide: s, toSide: "left",
-          flashFrom: sideMidpoint(decAt, s), flashTo: sideMidpoint(act, "left") });
+          flashFrom: sideMidpoint(decAt, s), flashTo: sideMidpoint(act, "left"),
+          label: labelBranches ? `option${i + 1}` : undefined });
       }
       if (merge && mrgAt) {
         const s = sideFor(mrgY, merge.height, act, "left");
         plans.push({ from: act.id, to: merge.id, fromSide: "right", toSide: s,
           flashFrom: sideMidpoint(act, "right"), flashTo: sideMidpoint(mrgAt, s) });
       }
-    }
+    });
 
     const groupIds = new Set<string>(
       [...activities.map((a) => a.id), decision?.id, merge?.id].filter(Boolean) as string[],
@@ -3129,7 +3138,7 @@ export function Canvas({
         }
         for (const c of existing) onDeleteConnector(c.id);
         for (const p of plans) {
-          onAddConnector(p.from, p.to, "sequence", defaultDirectionType, defaultRoutingType, p.fromSide, p.toSide, 0.5, 0.5);
+          onAddConnector(p.from, p.to, "sequence", defaultDirectionType, defaultRoutingType, p.fromSide, p.toSide, 0.5, 0.5, undefined, p.label);
         }
         if (decision) onUpdateProperties?.(decision.id, { gatewayRole: "decision" });
         if (merge) {

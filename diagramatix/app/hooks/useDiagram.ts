@@ -5938,11 +5938,28 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         && (gwType === "none" || gwType === "exclusive" || gwType === "inclusive");
       const isDecisionGatewayOutgoing = (connectorType === "sequence" || connectorType === "transition") && isDecisionGateway;
 
-      // R3.07: per-side label placement for decision-gateway outgoing connectors.
-      // Mirrors bpmnLayout.ts. Label is empty at creation, so estimated width
-      // collapses to the renderer's 30px minimum.
+      // Decision-gateway outgoing label placement (Paul's 2026-06-13 rule):
+      // 40% of the way along the OUTGOING segment, offset to the right of it.
+      // The label is source-anchored (renderer anchors at the first visible
+      // waypoint = the gateway edge), so these offsets are relative to that
+      // edge point. Falls back to the old per-side offsets if the geometry is
+      // degenerate.
       const decisionLabelOffsets: { x: number; y: number } | null = isDecisionGatewayOutgoing
         ? (() => {
+            // First visible point = the gateway edge (skip the invisible
+            // centre→edge leader); the next is the first corner.
+            const ai = sourceInvisibleLeader ? 1 : 0;
+            const a = waypoints[ai];
+            const b = waypoints[ai + 1];
+            if (a && b && (Math.abs(b.x - a.x) > 1 || Math.abs(b.y - a.y) > 1)) {
+              const dx = b.x - a.x, dy = b.y - a.y;
+              let ox = dx * 0.4, oy = dy * 0.4;
+              // "To the right of the segment": a vertical segment gets a
+              // screen-right nudge; a horizontal one drops just below.
+              if (Math.abs(dx) <= Math.abs(dy)) ox += 18;
+              else oy += 14;
+              return { x: ox, y: oy };
+            }
             const estLabelW = 30;
             const lineH = 14;
             switch (sourceSide) {
