@@ -32,7 +32,7 @@ export function CollapsibleSection({
           onClick={() => setOpen(o => !o)}
           className="flex items-center gap-1.5 text-left group"
         >
-          <span className="text-gray-400 text-xs w-3 group-hover:text-gray-600">{open ? "▾" : "▸"}</span>
+          <span className="text-gray-400 text-lg leading-none w-4 group-hover:text-gray-600">{open ? "▾" : "▸"}</span>
           <h2 className="text-base font-semibold text-gray-900">
             {title}
             {typeof count === "number" && <span className="text-gray-400 font-normal ml-1">({count})</span>}

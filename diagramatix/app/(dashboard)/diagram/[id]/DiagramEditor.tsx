@@ -1992,7 +1992,7 @@ export function DiagramEditor({
 
         <div className="flex items-center gap-1.5">
           <span className="font-semibold text-gray-900 text-xs">{diagramName}</span>
-          <DiagramTypeBadge type={diagramType} showLabel />
+          <DiagramTypeBadge type={diagramType} showLabel showCode={false} />
           {version ? <span className="text-[10px] text-gray-400">v{SCHEMA_VERSION}.{version}</span> : null}
         </div>
 

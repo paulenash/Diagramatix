@@ -10,6 +10,8 @@ import { LinkScanDialog } from "./LinkScanDialog";
 import { ImpersonationBanner } from "@/app/components/ImpersonationBanner";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 import { DiagramTypeBadge } from "@/app/components/DiagramTypeBadge";
+import { useDiagramTypeStyles } from "@/app/hooks/useDiagramTypeStyles";
+import { lightenHex } from "@/app/lib/diagram/diagramTypeStyles";
 
 // --- Folder tree types ---
 interface FolderNode {
@@ -327,17 +329,6 @@ interface Props {
   impersonationMode?: "view" | "edit";
   isAdmin?: boolean;
 }
-
-const DIAGRAM_TYPE_LABELS: Record<string, string> = {
-  context: "Context",
-  basic: "Context",  // legacy alias
-  "process-context": "Process Context",
-  "state-machine": "State Machine",
-  bpmn: "BPMN",
-  domain: "Domain",
-  "value-chain": "Value Chain",
-  archimate: "ArchiMate",
-};
 
 const DIAGRAM_TYPES: { value: DiagramType; label: string; description: string }[] = [
   { value: "context", label: "Context", description: "External entities, processes, and data flows" },
@@ -3374,6 +3365,9 @@ function DiagramCard({
   colorConfig?: SymbolColorConfig;
 }) {
   const [showMove, setShowMove] = useState(false);
+  // Colour-code the tile with a soft tint of the diagram-type colour.
+  const typeStyle = useDiagramTypeStyles()(diagram.type);
+  const tileTint = lightenHex(typeStyle.bgColor, 0.5);
 
   return (
     <div
@@ -3381,7 +3375,8 @@ function DiagramCard({
         shiftKey: e.shiftKey, ctrlKey: e.ctrlKey, metaKey: e.metaKey,
       })}
       title={diagram.name}
-      className={`bg-white rounded-md px-2 py-1.5 hover:shadow-sm cursor-pointer group transition-all relative ${
+      style={{ backgroundColor: tileTint }}
+      className={`rounded-md px-2 py-1.5 hover:shadow-sm cursor-pointer group transition-all relative ${
         selected
           ? "border-2 border-blue-500 ring-2 ring-blue-200"
           : "border border-gray-200 hover:border-blue-300"
@@ -3432,7 +3427,7 @@ function DiagramCard({
       {/* Row 2: Type/date on left, thumbnail on right */}
       <div className="flex items-start mt-0.5">
         <div className="flex items-center gap-1.5 text-[9px] text-gray-400 pt-0.5">
-          <span>{DIAGRAM_TYPE_LABELS[diagram.type] ?? diagram.type}</span>
+          <DiagramTypeBadge type={diagram.type} showLabel showCode={false} />
           <span>{"\u00B7"}</span>
           <span>{new Date(diagram.updatedAt).toLocaleDateString()}</span>
         </div>
