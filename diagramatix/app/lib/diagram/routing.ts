@@ -950,6 +950,39 @@ export function computeWaypoints(
     } else {
       midPath = buildOrthogonalPath(exitPt, approachPt, obstaclesForDetour, containmentBounds, poolBounds);
     }
+  } else if (
+    exitOutward && approachOutward &&
+    effectiveSrcSide === effectiveTgtSide &&
+    (effectiveSrcSide === "top" || effectiveSrcSide === "bottom")
+  ) {
+    // Same vertical side (top↔top or bottom↔bottom) — e.g. a decision and a
+    // merge gateway connected top-to-top. Route a clean "staple": both stubs
+    // exit the same way, run out to the EXTREME common Y (above both for
+    // top, below both for bottom), traverse, and drop back. Without this the
+    // pair fell through to the generic detour router, which routes AROUND the
+    // target body and produces the overshoot-and-return "kinked connector".
+    // Falls back to obstacle-avoidance only if the staple would cross one.
+    const commonY = effectiveSrcSide === "top"
+      ? Math.min(exitPt.y, approachPt.y)
+      : Math.max(exitPt.y, approachPt.y);
+    const staple = [exitPt, { x: exitPt.x, y: commonY }, { x: approachPt.x, y: commonY }, approachPt];
+    midPath = pathHitsObstacles(staple, obstacles, L_SHAPE_CLEARANCE)
+      ? buildOrthogonalPath(exitPt, approachPt, obstaclesForDetour, containmentBounds, poolBounds)
+      : staple;
+  } else if (
+    exitOutward && approachOutward &&
+    effectiveSrcSide === effectiveTgtSide &&
+    (effectiveSrcSide === "left" || effectiveSrcSide === "right")
+  ) {
+    // Same horizontal side (left↔left or right↔right): staple out to the
+    // extreme common X, traverse, come back. Same rationale as above.
+    const commonX = effectiveSrcSide === "left"
+      ? Math.min(exitPt.x, approachPt.x)
+      : Math.max(exitPt.x, approachPt.x);
+    const staple = [exitPt, { x: commonX, y: exitPt.y }, { x: commonX, y: approachPt.y }, approachPt];
+    midPath = pathHitsObstacles(staple, obstacles, L_SHAPE_CLEARANCE)
+      ? buildOrthogonalPath(exitPt, approachPt, obstaclesForDetour, containmentBounds, poolBounds)
+      : staple;
   } else {
     // Perpendicular sides (e.g., right→top, bottom→left, etc.)
     // Try L-shape paths that maintain perpendicularity at both ends
