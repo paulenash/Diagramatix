@@ -278,11 +278,21 @@ export async function restoreUserBackup(
 
   let projectsRestored = 0;
   let diagramsRestored = 0;
+  let unfiledDiagramsRestored = 0;
+  let templatesRestored = 0;
+  let promptsRestored = 0;
+  let promptsSkipped = 0;
 
+  // The whole additive restore runs in ONE interactive transaction so a
+  // mid-way failure rolls back to the pre-restore state instead of leaving
+  // a half-restored set (audit DATA-06). Every write below MUST go through
+  // `tx`, never the module `prisma` client, or it would escape the rollback.
+  // Timeout/maxWait are raised because a large backup is many writes.
+  await prisma.$transaction(async (tx) => {
   // ── Projects ────────────────────────────────────────────────────────────
   for (const proj of payload.projects ?? []) {
     log.push(`Importing project: ${proj.name}`);
-    const newProj = await prisma.project.create({
+    const newProj = await tx.project.create({
       data: {
         name: `${proj.name} (restored)`,
         description: proj.description ?? "",
@@ -298,7 +308,7 @@ export async function restoreUserBackup(
 
     // Diagrams in this project
     for (const diag of proj.diagrams ?? []) {
-      const newDiag = await prisma.diagram.create({
+      const newDiag = await tx.diagram.create({
         data: {
           name: diag.name,
           type: diag.type ?? "context",
@@ -318,9 +328,8 @@ export async function restoreUserBackup(
   }
 
   // ── Unfiled diagrams ───────────────────────────────────────────────────
-  let unfiledDiagramsRestored = 0;
   for (const diag of payload.unfiledDiagrams ?? []) {
-    const newDiag = await prisma.diagram.create({
+    const newDiag = await tx.diagram.create({
       data: {
         name: diag.name,
         type: diag.type ?? "context",
@@ -338,13 +347,12 @@ export async function restoreUserBackup(
   }
 
   // ── User templates ─────────────────────────────────────────────────────
-  let templatesRestored = 0;
   for (const tpl of payload.userTemplates ?? []) {
     // Preserve the template's group on restore. Older backups (pre-1.11)
     // omit the field; treat that as ungrouped (null).
     const incomingGroup = typeof tpl.group === "string" ? tpl.group.trim() : "";
     const groupValue: string | null = incomingGroup.length > 0 ? incomingGroup : null;
-    await prisma.diagramTemplate.create({
+    await tx.diagramTemplate.create({
       data: {
         name: tpl.name,
         diagramType: tpl.diagramType ?? "bpmn",
@@ -361,10 +369,8 @@ export async function restoreUserBackup(
   // ── AI Prompts ─────────────────────────────────────────────────────────
   // Restored into the user's CURRENT org. Dedup by (name + diagramType) in
   // that org so re-running a restore doesn't pile up "Foo (1)", "Foo (2)".
-  let promptsRestored = 0;
-  let promptsSkipped = 0;
   if (Array.isArray(payload.userPrompts) && payload.userPrompts.length > 0) {
-    const existing = await prisma.prompt.findMany({
+    const existing = await tx.prompt.findMany({
       where: { userId, orgId },
       select: { name: true, diagramType: true },
     });
@@ -372,7 +378,7 @@ export async function restoreUserBackup(
     for (const pr of payload.userPrompts) {
       const key = `${pr.name}|${pr.diagramType ?? "bpmn"}`;
       if (existingKeys.has(key)) { promptsSkipped++; continue; }
-      await prisma.prompt.create({
+      await tx.prompt.create({
         data: {
           name: pr.name,
           text: pr.text,
@@ -400,7 +406,7 @@ export async function restoreUserBackup(
     const newProjId = oldToNewProjectId.get(proj.id);
     if (!newProjId) continue;
     const remappedTree = remapFolderTree(proj.folderTree, oldToNewDiagramId);
-    await prisma.$executeRawUnsafe(
+    await tx.$executeRawUnsafe(
       'UPDATE "Project" SET "colorConfig" = $1::jsonb, "folderTree" = $2::jsonb WHERE id = $3',
       JSON.stringify(proj.colorConfig ?? {}),
       JSON.stringify(remappedTree ?? {}),
@@ -425,13 +431,14 @@ export async function restoreUserBackup(
       }
     }
     if (dirty) {
-      await prisma.$executeRawUnsafe(
+      await tx.$executeRawUnsafe(
         'UPDATE "Diagram" SET "data" = $1::jsonb, "updatedAt" = NOW() WHERE id = $2',
         JSON.stringify(data),
         newDiagId,
       );
     }
   }
+  }, { timeout: 120_000, maxWait: 15_000 });
 
   log.push(
     `✔ Restore complete: ${projectsRestored} project(s), ${diagramsRestored} diagram(s) ` +
