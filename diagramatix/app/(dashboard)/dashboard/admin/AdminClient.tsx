@@ -246,19 +246,26 @@ export function AdminClient({ users: initialUsers, currentUserId, commitCount, i
       <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <button
-            onClick={() => router.push(backHref)}
+            onClick={() => {
+              // SuperAdmin viewing Registered Users backs out to the
+              // SuperAdmin tile grid (its own screen); else to the referrer.
+              if (isSuperAdmin && showUsers) setShowUsers(false);
+              else router.push(backHref);
+            }}
             className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1"
-            title={`Return to ${backHref}`}
+            title={isSuperAdmin && showUsers ? "Return to SuperAdmin" : `Return to ${backHref}`}
           >
             <span style={{ fontSize: "1.75em", lineHeight: 1 }}>{"\u2190"}</span>
-            <span className="underline">{backLabel}</span>
+            <span className="underline">{isSuperAdmin && showUsers ? "SuperAdmin" : backLabel}</span>
           </button>
           {/* Brand icon: sits just right of the back link as a permanent
               "you're inside Diagramatix" cue. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logos/diagramatix-icon.svg" alt="Diagramatix" className="w-7 h-7" />
           <h1 className="font-semibold text-gray-900">
-            {isSuperAdmin ? "SuperAdmin" : `Registered Users — ${activeOrgName ?? "Your Org"}`}
+            {isSuperAdmin
+              ? (showUsers ? "Registered Users" : "SuperAdmin")
+              : `Registered Users — ${activeOrgName ?? "Your Org"}`}
           </h1>
           <span className="text-[10px] text-gray-400">v{SCHEMA_VERSION}.{commitCount}</span>
         </div>
@@ -270,7 +277,7 @@ export function AdminClient({ users: initialUsers, currentUserId, commitCount, i
           on the <th> stops the smaller numeric / date columns from
           starving the text-heavy ones. */}
       <div className="max-w-screen-2xl mx-auto px-6 py-8">
-        {isSuperAdmin && <SuperAdminToolsGrid onShowUsers={() => setShowUsers(true)} />}
+        {isSuperAdmin && !showUsers && <SuperAdminToolsGrid onShowUsers={() => setShowUsers(true)} />}
         {showUsers && (
         <table className="w-full bg-white rounded-lg border border-gray-200 overflow-hidden table-fixed">
           <thead>
@@ -723,6 +730,7 @@ const ADMIN_TILES: AdminTile[] = [
   { id: "scanner-rules", title: "BPMN Scanner Rules", description: "Rules used by the diagram issue scanner.", href: "/dashboard/admin/scanner-rules" },
   { id: "bubble-help", title: "Bubble Help", description: "The contextual help-cloud topics shown in the editor.", href: "/dashboard/admin/bubble-help" },
   { id: "diagram-types", title: "Diagram Types", description: "The 2-character codes and pastel colours shown per diagram type.", href: "/dashboard/admin/diagram-types?from=/dashboard/admin" },
+  { id: "prompts", title: "AI Prompt Maintenance", description: "Maintain your own saved AI generation prompts.", href: "/dashboard/prompts?from=/dashboard/admin" },
   { id: "notifications", title: "Notifications & Feedback", description: "Inspect any user's notification feed — filter by Org & User.", href: "/notifications?from=/dashboard/admin" },
 ];
 

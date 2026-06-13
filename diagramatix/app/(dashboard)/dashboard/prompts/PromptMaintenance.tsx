@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 
 interface Prompt {
   id: string;
@@ -22,6 +23,18 @@ const DIAGRAM_TYPES: { value: string; label: string }[] = [
 ];
 
 export function PromptMaintenance() {
+  // Back link honours ?from= so this same UI serves the user dashboard,
+  // the OrgAdmin area, and the SuperAdmin area (each admin maintains their
+  // own private prompt list). Reject protocol-relative URLs (audit SEC-15).
+  const searchParams = useSearchParams();
+  const rawFrom = searchParams.get("from");
+  const backHref = rawFrom && rawFrom.startsWith("/") && !rawFrom.startsWith("//") ? rawFrom : "/dashboard";
+  const backLabel = backHref === "/dashboard/admin"
+    ? "SuperAdmin"
+    : backHref === "/dashboard/org-admin"
+      ? "OrgAdmin"
+      : "Dashboard";
+
   const [prompts, setPrompts] = useState<Prompt[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeType, setActiveType] = useState("bpmn");
@@ -119,9 +132,9 @@ export function PromptMaintenance() {
     <div className="min-h-screen dgx-dashboard-bg flex flex-col">
       <header className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Link href="/dashboard" className="text-sm text-blue-600 hover:text-blue-800 inline-flex items-center gap-1">
+          <Link href={backHref} className="text-sm text-blue-600 hover:text-blue-800 inline-flex items-center gap-1">
             <span>&larr;</span>
-            <span className="underline">Dashboard</span>
+            <span className="underline">{backLabel}</span>
           </Link>
           <h1 className="text-lg font-semibold text-gray-900">AI Prompt Maintenance</h1>
         </div>

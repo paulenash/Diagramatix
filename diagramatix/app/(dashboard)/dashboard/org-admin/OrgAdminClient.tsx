@@ -39,6 +39,12 @@ const CARDS: MenuCard[] = [
     description:
       "Download a backup of your whole Org, or selectively restore an Org member's projects / diagrams.",
   },
+  {
+    href: "/dashboard/prompts?from=/dashboard/org-admin",
+    title: "AI Prompt Maintenance",
+    description:
+      "Maintain your own saved AI generation prompts.",
+  },
 ];
 
 /**
