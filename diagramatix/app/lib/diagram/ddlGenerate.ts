@@ -48,7 +48,7 @@ const T = {
 const refs: RefTable[] = [
   { name: "ref_org_entity_type", values: ["ADI","Insurer","LifeInsurer","HealthInsurer","RSE","Other"] },
   { name: "ref_org_role", values: ["Owner","Admin","RiskOwner","ProcessOwner","ControlOwner","InternalAudit","BoardObserver","Viewer"] },
-  { name: "ref_diagram_type", values: ["context","basic","process-context","state-machine","bpmn","domain","value-chain"] },
+  { name: "ref_diagram_type", values: ["context","basic","process-context","state-machine","bpmn","domain","value-chain","archimate"] },
   { name: "ref_symbol_type", values: ["task","gateway","start-event","intermediate-event","end-event","use-case","actor","team","state","initial-state","final-state","pool","lane","subprocess","subprocess-expanded","system-boundary","system-boundary-body","hourglass","composite-state","composite-state-body","system","data-object","data-store","group","text-annotation","external-entity","process-system","uml-class","uml-enumeration","sublane","fork-join","submachine","chevron","chevron-collapsed","process-group","archimate-shape","review-comment"] },
   { name: "ref_bpmn_task_type", values: ["none","user","service","script","send","receive","manual","business-rule"] },
   { name: "ref_gateway_type", values: ["none","exclusive","inclusive","parallel","event-based"] },

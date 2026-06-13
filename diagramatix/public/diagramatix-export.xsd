@@ -253,6 +253,27 @@
         Bubble Help, Subscriptions, Features Catalog, Rules Editor.
         Save and Cancel both disable until in-memory state diverges
         from the last persisted snapshot; re-disable after save.
+
+  v1.19 — Audit Stage-2 data-integrity fixes. No schema shape change.
+    Backend/restore only: author-attribution FKs made nullable + SET NULL;
+    full backup now captures + restores every model; wipe-restore breaks
+    the Diagram↔PublishedVersion FK cycle. None of these touch the
+    diagram/project export shape.
+
+  v1.20 — Audit Stage-3 engine fixes. No schema shape change. Undo/redo
+    now preserves title/fonts/database/processOwner/parentDiagramIds (so a
+    round-tripped export is unaffected by an undo); DELETE_ELEMENT cleans up
+    connectors on a removed host's boundary events; property setters clear
+    the stale redo branch. All behavioural.
+
+  v1.21 — Diagram-type identity + backup preview/streaming + restore
+    hardening. No schema shape change. Per-type 2-char codes + pastel
+    colours live in the admin-managed DiagramTypeStyle table (NOT embedded
+    in an export); backups gain a pre-flight preview, member/Org selection
+    and live streaming progress; user + rules/prompts restores are now
+    transactional. The schemaVersion attribute is bumped to 1.21 so
+    importers and the User Guide reflect the new feature window even though
+    no project-XML field changed.
 -->
 
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"

@@ -632,5 +632,15 @@ export interface TemplateData {
  *             to the deleted host's boundary-event children (no dangling
  *             connectors). (ENG-03) title/font/database setters clear the
  *             stale redo branch so Ctrl+Y can't replay diverged geometry.
+ *   1.21    - Diagram-type identity (per-type 2-char codes + pastel colours,
+ *             SuperAdmin-editable DiagramTypeStyle table) + colour-coded
+ *             dashboard/project tiles + connected-nodes background on all
+ *             non-editor screens. Backups: pre-flight preview with stats +
+ *             member/Org selection, live per-section streaming progress and
+ *             an end report for all five backup/export flows. Restore
+ *             hardening: user .diag restore and rules/prompts import are now
+ *             transactional (audit DATA-06/22) with natural-key rule upsert
+ *             (DATA-23). No change to the diagram XML export shape (XSD
+ *             structure unchanged since 1.17 — version bump only).
  */
-export const SCHEMA_VERSION = "1.20";
+export const SCHEMA_VERSION = "1.21";

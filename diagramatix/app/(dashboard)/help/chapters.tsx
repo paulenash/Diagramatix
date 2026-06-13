@@ -320,9 +320,31 @@ export const CHAPTERS: HelpChapter[] = [
       {
         body: (
           <p>
-            Diagramatix supports six diagram types. Each type has its own
-            symbol palette and connector rules.
+            Diagramatix supports several diagram types — Context, Process
+            Context, State Machine, BPMN, Domain, Value Chain and ArchiMate.
+            Each type has its own symbol palette and connector rules.
           </p>
+        ),
+      },
+      {
+        heading: "Colour identity",
+        body: (
+          <>
+            <p>
+              Every diagram type has a <strong>2-character code</strong> and a
+              contrasting pastel colour — e.g. <strong>BP</strong> for BPMN,{" "}
+              <strong>CO</strong> for Context, <strong>SM</strong> for State
+              Machine. You&apos;ll see the code as a small badge in the project
+              navigation tree, and the colour highlights the type name on
+              dashboard/project tiles and in the editor&apos;s top bar (which is
+              also tinted to match).
+            </p>
+            <p className="mt-2">
+              <strong>SuperAdmins</strong> can change any code or colour at{" "}
+              <strong>SuperAdmin → Diagram Types</strong>; the change flows
+              everywhere the type is shown.
+            </p>
+          </>
         ),
       },
       {
@@ -2004,6 +2026,46 @@ export const CHAPTERS: HelpChapter[] = [
         ),
       },
       {
+        heading: "Preview, live progress & report",
+        body: (
+          <>
+            <p>
+              Before anything is written, a dialog shows a{" "}
+              <strong>pre-flight preview</strong> — a table of exactly what
+              will be backed up (projects, diagrams, templates, prompts) with
+              live counts. Click <strong>Proceed with Backup</strong> to start,
+              or <strong>Cancel</strong>.
+            </p>
+            <p className="mt-2">
+              While it runs, each section ticks off in real time. When it
+              finishes you get a <strong>statistical report</strong> (rows per
+              section, total rows, and file size) and the file downloads
+              automatically.
+            </p>
+          </>
+        ),
+      },
+      {
+        heading: "Choosing what to back up (OrgAdmin / SuperAdmin)",
+        adminOnly: true,
+        body: (
+          <ul className="list-disc list-inside space-y-1">
+            <li>
+              <strong>OrgAdmin</strong> — the preview lists every member of
+              your Org (all ticked by default); untick anyone you want to
+              exclude before proceeding.
+            </li>
+            <li>
+              <strong>SuperAdmin</strong> — pick <em>All Orgs</em> for a full
+              system backup, or scope to a single Org and choose which of its
+              users to include. A scoped backup also carries the system config
+              (tiers, features, bubble-help, diagram-type styles) so it can be
+              restored into a fresh system on its own.
+            </li>
+          </ul>
+        ),
+      },
+      {
         heading: "Restoring a backup",
         body: (
           <>
@@ -2019,7 +2081,10 @@ export const CHAPTERS: HelpChapter[] = [
             <p className="mt-2">
               Restore is <strong>additive</strong> — it never overwrites or
               deletes your existing content. Every restored project and
-              diagram gets a new ID.
+              diagram gets a new ID. It is also{" "}
+              <strong>all-or-nothing</strong>: the whole restore runs in a
+              single database transaction, so if anything fails partway it
+              rolls back completely rather than leaving a half-restored set.
             </p>
           </>
         ),

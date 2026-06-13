@@ -206,6 +206,28 @@ const FEATURES: Array<{ name: string; summary: string; details: string }> = [
       "- Owner controls: filter comments by reviewer, re-submit for a fresh approval round, and finish the review when done",
     ].join("\n"),
   },
+  {
+    name: "Diagram-Type Colour Identity",
+    summary: "Every diagram type gets a 2-character code and a distinct pastel colour, so you can tell process types apart at a glance.",
+    details: [
+      "- 2-character badges (BP, CO, PC, SM, DM, VC, AM) in the project navigation tree",
+      "- Colour-coded diagram tiles on the dashboard and project screens — for every user, including business viewers",
+      "- The editor's top bar is tinted to the diagram type, with the type name highlighted in its colour",
+      "- Consistent type chips everywhere a diagram type is shown",
+      "- SuperAdmin-editable: change any code or colour and it flows across the whole app",
+    ].join("\n"),
+  },
+  {
+    name: "Guided Backups with Live Progress",
+    summary: "See exactly what will be backed up, choose who to include, and watch it happen — with a report at the end.",
+    details: [
+      "- Pre-flight preview: a stats table of everything that will be captured before you commit",
+      "- OrgAdmins pick which members to back up; SuperAdmins scope to All Orgs or a single Org's selected users",
+      "- Live per-section progress streamed as the backup is built, then a statistical report (rows per section, total, file size)",
+      "- The same guided experience across user, Org, full-system, AI Rules & Prompts, and built-in template exports",
+      "- Restores are additive and fully transactional — all-or-nothing, never a half-restored set",
+    ].join("\n"),
+  },
 ];
 
 async function main() {
