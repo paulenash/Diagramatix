@@ -47,7 +47,7 @@ export function DatabaseClient() {
   const router = useRouter();
   const [schemaData, setSchemaData] = useState<SchemaData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [backupModal, setBackupModal] = useState<{ url: string; title: string } | null>(null);
+  const [backupModal, setBackupModal] = useState<{ url: string; title: string; noun?: string } | null>(null);
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
   const [sql, setSql] = useState("");
   const [queryResult, setQueryResult] = useState<QueryResult | null>(null);
@@ -556,14 +556,13 @@ export function DatabaseClient() {
               by id; never deletes rows on the target. Treats user/org
               FKs gracefully \u2014 references that don't exist on the target
               are skipped with a per-row reason in the status output. */}
-          <a
-            href="/api/admin/rules-prefs"
-            download
+          <button
+            onClick={() => setBackupModal({ url: "/api/admin/rules-prefs?stream=1", title: "Exporting Rules & Prompts…", noun: "Export" })}
             className="text-xs text-white bg-blue-600 hover:bg-blue-700 rounded px-2.5 py-1"
             title="Download AI Rules + Prompts as a .diag-rules file"
           >
             Rules &amp; Prompts &darr;
-          </a>
+          </button>
           <button
             onClick={() => {
               setRulesImportStatus(null);
@@ -589,14 +588,13 @@ export function DatabaseClient() {
           {/* Built-In Templates transfer \u2014 admin-managed templates that
               are shared across all users. Same migration use case as
               Rules & Prompts: keep local-dev and prod web in sync. */}
-          <a
-            href="/api/templates/export?type=builtin"
-            download
+          <button
+            onClick={() => setBackupModal({ url: "/api/templates/export?type=builtin&stream=1", title: "Exporting Built-In Templates…", noun: "Export" })}
             className="text-xs text-white bg-emerald-600 hover:bg-emerald-700 rounded px-2.5 py-1"
             title="Download built-in templates as a .diag_tems file"
           >
             Built-In Templates &darr;
-          </a>
+          </button>
           <button
             onClick={() => {
               setRulesImportStatus(null);
@@ -1269,6 +1267,7 @@ export function DatabaseClient() {
         <BackupProgressModal
           url={backupModal.url}
           title={backupModal.title}
+          noun={backupModal.noun}
           onClose={() => setBackupModal(null)}
         />
       )}

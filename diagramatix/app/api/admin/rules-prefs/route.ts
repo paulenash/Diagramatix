@@ -24,19 +24,34 @@ import {
   restoreRulesPrefsBundle,
   type RulesPrefsBundle,
 } from "@/app/lib/rules-prefs-backup";
+import { streamBackup } from "@/app/lib/backupStream";
 
-export async function GET() {
+export async function GET(req: Request) {
   const session = await auth();
   if (!session?.user?.id || !isSuperuser(session)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+  const email = session.user.email ?? "(unknown)";
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const filename = `${stamp}.diag-rules`;
+
+  // ?stream=1 → live NDJSON progress + report; plain GET returns the JSON.
+  if (new URL(req.url).searchParams.get("stream") === "1") {
+    return streamBackup(
+      async (onProgress) => {
+        const bundle = await buildRulesPrefsBundle(email, onProgress);
+        return new TextEncoder().encode(JSON.stringify(bundle, null, 2));
+      },
+      filename,
+    );
+  }
+
   try {
-    const bundle = await buildRulesPrefsBundle(session.user.email ?? "(unknown)");
-    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const bundle = await buildRulesPrefsBundle(email);
     return new NextResponse(JSON.stringify(bundle, null, 2), {
       headers: {
         "Content-Type": "application/json",
-        "Content-Disposition": `attachment; filename="${stamp}.diag-rules"`,
+        "Content-Disposition": `attachment; filename="${filename}"`,
       },
     });
   } catch (err) {

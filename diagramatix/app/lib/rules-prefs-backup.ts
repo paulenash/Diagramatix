@@ -21,6 +21,7 @@
  * payloads are tiny (a few hundred rows max).
  */
 import { prisma } from "@/app/lib/db";
+import { type BackupProgressFn } from "@/app/lib/full-backup";
 
 export interface RulesPrefsBundle {
   schemaVersion: "1.0";
@@ -54,11 +55,15 @@ export interface RulesPrefsBundle {
   }>;
 }
 
-export async function buildRulesPrefsBundle(exportedByEmail: string): Promise<RulesPrefsBundle> {
-  const [rules, prompts] = await Promise.all([
-    prisma.diagramRules.findMany(),
-    prisma.prompt.findMany(),
-  ]);
+export async function buildRulesPrefsBundle(
+  exportedByEmail: string,
+  onProgress?: BackupProgressFn,
+): Promise<RulesPrefsBundle> {
+  // Sequential so the streaming export can report each section live.
+  const rules = await prisma.diagramRules.findMany();
+  onProgress?.("Rules", rules.length);
+  const prompts = await prisma.prompt.findMany();
+  onProgress?.("Prompts", prompts.length);
   return {
     schemaVersion: "1.0",
     exportedAt: new Date().toISOString(),

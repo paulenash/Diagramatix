@@ -13,6 +13,7 @@ import { auth } from "@/auth";
 import { pgPool } from "@/app/lib/db";
 import { isSuperuser } from "@/app/lib/superuser";
 import { SCHEMA_VERSION } from "@/app/lib/diagram/types";
+import { streamBackup } from "@/app/lib/backupStream";
 
 export async function GET(req: Request) {
   const session = await auth();
@@ -27,7 +28,12 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  try {
+  const userId = session.user.id;
+  const dateStr = new Date().toISOString().slice(0, 10);
+  const filename = `diagramatix-templates-${type}-${dateStr}.diag_tems`;
+  const progressLabel = type === "builtin" ? "Built-in Templates" : "Templates";
+
+  async function buildPayloadBytes(onProgress?: (label: string, count: number) => void): Promise<Uint8Array> {
     const result = type === "builtin"
       ? await pgPool.query(
           `SELECT name, "diagramType", "group", data
@@ -40,8 +46,9 @@ export async function GET(req: Request) {
              FROM "DiagramTemplate"
             WHERE "templateType" = 'user' AND "userId" = $1
             ORDER BY COALESCE("group", '~'), "createdAt" ASC`,
-          [session.user.id]
+          [userId]
         );
+    onProgress?.(progressLabel, result.rows.length);
 
     const payload = {
       schemaVersion: SCHEMA_VERSION,
@@ -60,11 +67,17 @@ export async function GET(req: Request) {
         }),
       ),
     };
+    return new TextEncoder().encode(JSON.stringify(payload, null, 2));
+  }
 
-    const dateStr = new Date().toISOString().slice(0, 10);
-    const filename = `diagramatix-templates-${type}-${dateStr}.diag_tems`;
+  // ?stream=1 → live NDJSON progress + report; plain GET returns the JSON.
+  if (searchParams.get("stream") === "1") {
+    return streamBackup((onProgress) => buildPayloadBytes(onProgress), filename);
+  }
 
-    return new NextResponse(JSON.stringify(payload, null, 2), {
+  try {
+    const bytes = await buildPayloadBytes();
+    return new NextResponse(bytes as BodyInit, {
       headers: {
         "Content-Type": "application/json",
         "Content-Disposition": `attachment; filename="${filename}"`,

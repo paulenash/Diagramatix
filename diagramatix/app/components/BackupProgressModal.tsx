@@ -29,7 +29,7 @@ function triggerDownload(b64: string, filename: string) {
   const bin = atob(b64);
   const bytes = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-  const blob = new Blob([bytes as BlobPart], { type: "application/zip" });
+  const blob = new Blob([bytes as BlobPart], { type: "application/octet-stream" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -43,10 +43,13 @@ function triggerDownload(b64: string, filename: string) {
 export function BackupProgressModal({
   url,
   title,
+  noun = "Backup",
   onClose,
 }: {
   url: string;
   title: string;
+  /** Noun used in the done/fail headers, e.g. "Backup" or "Export". */
+  noun?: string;
   onClose: () => void;
 }) {
   const [items, setItems] = useState<ProgressItem[]>([]);
@@ -108,7 +111,7 @@ export function BackupProgressModal({
       <div className="bg-white rounded-lg shadow-xl w-full max-w-md flex flex-col max-h-[80vh]">
         <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200">
           <h2 className="text-sm font-semibold text-gray-900">
-            {phase === "done" ? "✔ Backup complete" : phase === "error" ? "✘ Backup failed" : title}
+            {phase === "done" ? `✔ ${noun} complete` : phase === "error" ? `✘ ${noun} failed` : title}
           </h2>
           {(phase === "done" || phase === "error") && (
             <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-lg leading-none">
