@@ -5954,9 +5954,11 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
             if (a && b && (Math.abs(b.x - a.x) > 1 || Math.abs(b.y - a.y) > 1)) {
               const dx = b.x - a.x, dy = b.y - a.y;
               let ox = dx * 0.4, oy = dy * 0.4;
-              // "To the right of the segment": a vertical segment gets a
-              // screen-right nudge; a horizontal one drops just below.
-              if (Math.abs(dx) <= Math.abs(dy)) ox += 18;
+              // "To the right of the segment": a vertical segment puts the
+              // label box's LEFT edge 20px clear of the line (the box is
+              // centre-anchored, width 60 → +20 gap + 30 half-width); a
+              // horizontal one drops just below.
+              if (Math.abs(dx) <= Math.abs(dy)) ox += 20 + 30;
               else oy += 14;
               return { x: ox, y: oy };
             }
