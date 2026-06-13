@@ -5946,6 +5946,14 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       // degenerate.
       const decisionLabelOffsets: { x: number; y: number } | null = isDecisionGatewayOutgoing
         ? (() => {
+            // The label box is centre-anchored, so to leave a clear GAP
+            // between the box edge and the connector line we must push the
+            // CENTRE out by GAP + half the box width. Use a generous
+            // half-width so even a 60px "optionN" box clears comfortably.
+            const HALF_LABEL = 33;
+            const GAP = 20;
+            const RIGHT_OF_VERTICAL = GAP + HALF_LABEL; // centre this far right
+            const BELOW_HORIZONTAL = GAP;               // box top this far down
             // First visible point = the gateway edge (skip the invisible
             // centre→edge leader); the next is the first corner.
             const ai = sourceInvisibleLeader ? 1 : 0;
@@ -5953,23 +5961,20 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
             const b = waypoints[ai + 1];
             if (a && b && (Math.abs(b.x - a.x) > 1 || Math.abs(b.y - a.y) > 1)) {
               const dx = b.x - a.x, dy = b.y - a.y;
-              let ox = dx * 0.4, oy = dy * 0.4;
-              // "To the right of the segment": a vertical segment puts the
-              // label box's LEFT edge 20px clear of the line (the box is
-              // centre-anchored, width 60 → +20 gap + 30 half-width); a
-              // horizontal one drops just below.
-              if (Math.abs(dx) <= Math.abs(dy)) ox += 20 + 30;
-              else oy += 14;
-              return { x: ox, y: oy };
+              if (Math.abs(dx) <= Math.abs(dy)) {
+                // Vertical segment → label sits clear to the RIGHT, 40% along.
+                return { x: RIGHT_OF_VERTICAL, y: dy * 0.4 };
+              }
+              // Horizontal segment → label sits clear BELOW, 40% along.
+              return { x: dx * 0.4, y: BELOW_HORIZONTAL };
             }
-            const estLabelW = 30;
-            const lineH = 14;
+            // Degenerate geometry — fall back per source side, still clear.
             switch (sourceSide) {
-              case "top":    return { x: 6 + estLabelW / 2, y: -10 - lineH };
-              case "bottom": return { x: 6 + estLabelW / 2, y: 10 };
-              case "right":  return { x: 3 + estLabelW / 2, y: 2 };
-              case "left":   return { x: -60 - 8,           y: -6 };
-              default:       return { x: 8,                 y: -20 };
+              case "top":    return { x: RIGHT_OF_VERTICAL, y: -28 };
+              case "bottom": return { x: RIGHT_OF_VERTICAL, y: 12 };
+              case "right":  return { x: 36,                y: BELOW_HORIZONTAL };
+              case "left":   return { x: -RIGHT_OF_VERTICAL, y: -28 };
+              default:       return { x: RIGHT_OF_VERTICAL, y: -20 };
             }
           })()
         : null;

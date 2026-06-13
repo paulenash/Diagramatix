@@ -3741,7 +3741,18 @@ export function Canvas({
       return d;
     }
     for (const el of eps) getDepth(el, new Set());
-    return [...eps].sort((a, b) => (depthMap.get(a.id) ?? 0) - (depthMap.get(b.id) ?? 0));
+    // Paint order: larger EPs first (behind), smaller ones last (on top).
+    // A nested child always fits inside its parent, so area-descending also
+    // satisfies the parent-behind-child rule; but it ALSO handles the case
+    // where one EP is resized to merely envelop another it doesn't own —
+    // without this the bigger EP's fill paints over and hides the inner one
+    // even though there's no parent link. Depth breaks exact-area ties.
+    return [...eps].sort((a, b) => {
+      const areaA = a.width * a.height;
+      const areaB = b.width * b.height;
+      if (Math.abs(areaA - areaB) > 1) return areaB - areaA;
+      return (depthMap.get(a.id) ?? 0) - (depthMap.get(b.id) ?? 0);
+    });
   })();
   const groupElements = data.elements.filter((el) => el.type === "group");
 
