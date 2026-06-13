@@ -1355,9 +1355,10 @@ export function DiagramEditor({
       targetSide: Side,
       sourceOffsetAlong?: number,
       targetOffsetAlong?: number,
-      force?: boolean
+      force?: boolean,
+      initialLabel?: string
     ) => {
-      addConnector(sourceId, targetId, type, directionType, routingType, sourceSide, targetSide, sourceOffsetAlong, targetOffsetAlong, force);
+      addConnector(sourceId, targetId, type, directionType, routingType, sourceSide, targetSide, sourceOffsetAlong, targetOffsetAlong, force, initialLabel);
     },
     [addConnector]
   );

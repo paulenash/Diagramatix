@@ -3103,7 +3103,9 @@ export function Canvas({
     // A "decision" marker branches on a condition — anything NOT parallel
     // (always-all) or event-based. Those get auto-numbered option labels on
     // the outgoing branches (Paul's 2026-06-13 rule).
-    const decGwType = decision?.properties.gatewayType;
+    // gatewayType is a TOP-LEVEL field on the element (hoisted out of
+    // properties by the reducer), so read it there — not from properties.
+    const decGwType = decision?.gatewayType;
     const labelBranches = !!decision && decGwType !== "parallel" && decGwType !== "event-based";
 
     type Plan = { from: string; to: string; fromSide: Side; toSide: Side; flashFrom: Point; flashTo: Point; label?: string };
@@ -3151,7 +3153,7 @@ export function Canvas({
           // (exclusive ×, parallel +, inclusive ○ …) when there is one.
           onUpdateProperties?.(merge.id, {
             gatewayRole: "merge",
-            ...(decision ? { gatewayType: decision.properties.gatewayType } : {}),
+            ...(decision ? { gatewayType: decision.gatewayType } : {}),
           });
         }
         if (fullDiamond) onSetSelectedElements(new Set());
