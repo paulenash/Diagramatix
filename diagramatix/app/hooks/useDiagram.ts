@@ -3512,8 +3512,8 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         const count = state.elements.filter((e) => e.type === "process-system").length;
         label = `Process ${count + 1}`;
       } else if (action.payload.symbolType === "gateway") {
-        // Exclusive/Inclusive get "Test?", Parallel/Event-based get no label
-        label = "Test?";
+        // Exclusive/Inclusive get "Decision?", Parallel/Event-based get no label
+        label = "Decision?";
       }
       // Pools: place header near the drop point instead of centring the full width
       const isPool = action.payload.symbolType === "pool";
@@ -5240,7 +5240,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
           if (gt === "parallel" || gt === "event-based") {
             updatedLabel = "";
           } else if ((gt === "exclusive" || gt === "inclusive" || gt === "none") && !el.label) {
-            updatedLabel = "Test?";
+            updatedLabel = "Decision?";
           }
         }
         return {
@@ -7132,7 +7132,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       const def = getSymbolDefinition(symbolType);
       let label = def.label;
       if (symbolType === "gateway") {
-        label = "Test?";
+        label = "Decision?";
       } else if (symbolType === "intermediate-event") {
         const count = state.elements.filter(e => e.type === "intermediate-event").length;
         label = `Event ${count + 1}`;

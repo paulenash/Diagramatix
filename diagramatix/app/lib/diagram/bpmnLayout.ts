@@ -1236,12 +1236,12 @@ export function layoutBpmnDiagram(
     if (isDecisionGateway(el)) {
       const t = (el.properties.gatewayType as string | undefined) ?? el.gatewayType ?? "exclusive";
       // R6.23: an EXCLUSIVE decision gateway without a label gets a default
-      // "Test?" so the diagram asks a clear question at the branch point.
+      // "Decision?" so the diagram asks a clear question at the branch point.
       // Event-based gateways (R6.18) are NOT questions — they route to
       // whichever enumerated event fires first — so they stay unlabelled;
       // the pentagon marker is self-explanatory. Parallel / inclusive
       // gateways aren't questions either, so the default is exclusive-only.
-      if ((t === "exclusive" || t === "none") && (!el.label || !el.label.trim())) el.label = "Test?";
+      if ((t === "exclusive" || t === "none") && (!el.label || !el.label.trim())) el.label = "Decision?";
       if (t === "exclusive" || t === "none") {
         el.properties = { ...el.properties, gatewayType: "none", gatewayRole: "decision", ...decisionLabelPlacement };
         el.gatewayType = "none";
