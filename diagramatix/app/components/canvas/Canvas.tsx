@@ -3074,7 +3074,8 @@ export function Canvas({
     const merge = gateways.find((g) => g.x >= actMaxX) ?? null;
     const fullDiamond = !!decision && !!merge;
     const decisionOnly = !!decision && !merge && gateways.length === 1;
-    if (!fullDiamond && !decisionOnly) return false;
+    const mergeOnly = !!merge && !decision && gateways.length === 1;
+    if (!fullDiamond && !decisionOnly && !mergeOnly) return false;
 
     // Committed — consume the capture so it can't bleed into a later dblclick.
     groupConnectPrevSelectionRef.current = null;
@@ -3088,7 +3089,7 @@ export function Canvas({
     };
 
     const decY = fullDiamond ? actCenterY - decision!.height / 2 : (decision ? decision.y : 0);
-    const mrgY = merge ? actCenterY - merge.height / 2 : 0;
+    const mrgY = fullDiamond ? actCenterY - merge!.height / 2 : (merge ? merge.y : 0);
     const decAt = decision ? { ...decision, y: decY } : null;
     const mrgAt = merge ? { ...merge, y: mrgY } : null;
 
