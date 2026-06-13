@@ -15,6 +15,7 @@ import { PublishedSection } from "./PublishedSection";
 import { CollapsibleSection } from "./CollapsibleSection";
 import { ProjectShareDialog } from "./ProjectShareDialog";
 import { NotificationsClient } from "../notifications/NotificationsClient";
+import { DiagramTypeBadge } from "@/app/components/DiagramTypeBadge";
 
 interface DiagramSummary {
   id: string;
@@ -86,14 +87,6 @@ interface Props {
   tierCards?: TierCard[];
 }
 
-const DIAGRAM_TYPE_LABELS: Record<string, string> = {
-  context: "Context",
-  basic: "Context",  // legacy alias
-  "process-context": "Process Context",
-  "state-machine": "State Machine",
-  bpmn: "BPMN",
-  domain: "Domain",
-};
 
 const DIAGRAM_TYPES: { value: DiagramType; label: string; description: string }[] = [
   { value: "context", label: "Context", description: "External entities, processes, and data flows" },
@@ -177,7 +170,7 @@ function DiagramCard({
       <div className="mt-1">
         <h3 className="font-medium text-gray-900 text-xs truncate">{diagram.name}</h3>
         <div className="flex items-center gap-2 mt-0.5">
-          <span className="text-[10px] text-gray-500">{DIAGRAM_TYPE_LABELS[diagram.type] ?? diagram.type}</span>
+          <DiagramTypeBadge type={diagram.type} showLabel />
           <span className="text-[10px] text-gray-400">{new Date(diagram.updatedAt).toLocaleDateString()}</span>
         </div>
       </div>

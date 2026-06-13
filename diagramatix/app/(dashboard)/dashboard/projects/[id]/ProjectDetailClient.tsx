@@ -9,6 +9,7 @@ import { DiagramMaintenanceModal, type FontConfig } from "./DiagramMaintenanceMo
 import { LinkScanDialog } from "./LinkScanDialog";
 import { ImpersonationBanner } from "@/app/components/ImpersonationBanner";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
+import { DiagramTypeBadge } from "@/app/components/DiagramTypeBadge";
 
 // --- Folder tree types ---
 interface FolderNode {
@@ -1669,18 +1670,6 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
     });
   }
 
-  // Diagram type icon markers
-  function DiagramTypeMarker({ type }: { type: string }) {
-    switch (type) {
-      case "bpmn": return <text x={9} y={11} fontSize={5} fill="#92400e" textAnchor="middle" fontWeight="bold">B</text>;
-      case "context": case "basic": return <text x={9} y={11} fontSize={5} fill="#92400e" textAnchor="middle" fontWeight="bold">C</text>;
-      case "process-context": return <text x={9} y={11} fontSize={5} fill="#92400e" textAnchor="middle" fontWeight="bold">PC</text>;
-      case "state-machine": return <text x={9} y={11} fontSize={5} fill="#92400e" textAnchor="middle" fontWeight="bold">SM</text>;
-      case "domain": return <text x={9} y={11} fontSize={5} fill="#92400e" textAnchor="middle" fontWeight="bold">D</text>;
-      default: return null;
-    }
-  }
-
   // Render folder tree recursively
   // Check if a folder contains any diagrams or subfolders (recursively)
   function folderHasContent(folderId: string): boolean {
@@ -1897,10 +1886,7 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
                 onDoubleClick={() => handleOpenDiagram(d.id)}
               >
                 <span className="w-3" />
-                <svg width={14} height={14} viewBox="0 0 18 16" fill="none">
-                  <rect x={1} y={1} width={16} height={14} rx={2} fill="#fef9c3" stroke="#d97706" strokeWidth={0.7} />
-                  <DiagramTypeMarker type={d.type} />
-                </svg>
+                <DiagramTypeBadge type={d.type} className="shrink-0" />
                 {editingId === d.id ? (
                   <input autoFocus type="text" value={editingName}
                     onChange={e => setEditingName(e.target.value)}

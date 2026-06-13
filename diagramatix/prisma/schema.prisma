@@ -684,6 +684,24 @@ model BubbleHelp {
   @@index([diagramType])
 }
 
+// Admin-editable per-diagram-type visual identity: a 2-character badge
+// code + a pastel colour pair (background/text). Drives the project
+// nav-tree badge, the editor top bar tint + type pill, and the
+// diagram-type chips across the app. One row per diagram type; SuperAdmin
+// maintains them at /dashboard/admin/diagram-types. Static defaults live
+// in app/lib/diagram/diagramTypeStyles.ts and are used when a row is
+// absent, so the table is purely an override layer.
+model DiagramTypeStyle {
+  id        String   @id @default(cuid())
+  typeKey   String   @unique // "bpmn" | "context" | "process-context" | …
+  code      String   // 2-char badge code, e.g. "BP"
+  bgColor   String   // pastel background hex, e.g. "#dbeafe"
+  textColor String   // foreground hex, e.g. "#1d4ed8"
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 // ────────────────────────────────────────────────────────────────────────────
 // Collaboration Groups + in-app Notifications (Phase 1 of the Collaboration
 // Groups feature). Phase 2 adds DiagramReview / DiagramReviewer; Phase 3

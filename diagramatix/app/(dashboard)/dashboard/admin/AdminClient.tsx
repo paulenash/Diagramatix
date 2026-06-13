@@ -722,6 +722,7 @@ const ADMIN_TILES: AdminTile[] = [
   { id: "sharing", title: "Project Sharing", description: "Every shared project plus its editors / viewers.", href: "/dashboard/admin/sharing" },
   { id: "scanner-rules", title: "BPMN Scanner Rules", description: "Rules used by the diagram issue scanner.", href: "/dashboard/admin/scanner-rules" },
   { id: "bubble-help", title: "Bubble Help", description: "The contextual help-cloud topics shown in the editor.", href: "/dashboard/admin/bubble-help" },
+  { id: "diagram-types", title: "Diagram Types", description: "The 2-character codes and pastel colours shown per diagram type.", href: "/dashboard/admin/diagram-types?from=/dashboard/admin" },
   { id: "notifications", title: "Notifications & Feedback", description: "Inspect any user's notification feed — filter by Org & User.", href: "/notifications?from=/dashboard/admin" },
 ];
 

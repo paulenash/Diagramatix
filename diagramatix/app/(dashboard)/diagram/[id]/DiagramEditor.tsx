@@ -26,6 +26,9 @@ import { captureTemplate, instantiateTemplate } from "@/app/lib/diagram/template
 import { ImpersonationBanner } from "@/app/components/ImpersonationBanner";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 import { InfoDialog } from "@/app/components/InfoDialog";
+import { DiagramTypeBadge } from "@/app/components/DiagramTypeBadge";
+import { useDiagramTypeStyles } from "@/app/hooks/useDiagramTypeStyles";
+import { lightenHex } from "@/app/lib/diagram/diagramTypeStyles";
 import { AiPanel } from "./AiPanel";
 import { PlanPanel } from "./PlanPanel";
 import { SendForReviewDialog } from "./SendForReviewDialog";
@@ -1948,6 +1951,12 @@ export function DiagramEditor({
   // to their own account from inside a diagram.
   const isImpersonating = !!impersonationMode;
 
+  // Diagram-type colour (audit-adjacent feature): tint the top bar with a
+  // lighter shade of the type's colour, and highlight the type pill. The
+  // impersonation orange always wins over the tint.
+  const typeStyle = useDiagramTypeStyles()(diagramType);
+  const headerTint = isImpersonating ? undefined : lightenHex(typeStyle.bgColor, 0.55);
+
   return (
     <div className={`flex flex-col h-screen ${isImpersonating ? "bg-orange-50" : "bg-white"}`}>
       {isImpersonating && viewingAsName !== undefined && viewingAsEmail !== undefined && (
@@ -1965,7 +1974,10 @@ export function DiagramEditor({
         </div>
       )}
       {/* Top bar */}
-      <header className={`h-9 border-b border-gray-200 flex items-center px-2 gap-2 flex-shrink-0 ${isImpersonating ? "bg-orange-50" : ""}`}>
+      <header
+        className={`h-9 border-b border-gray-200 flex items-center px-2 gap-2 flex-shrink-0 ${isImpersonating ? "bg-orange-50" : ""}`}
+        style={headerTint ? { backgroundColor: headerTint } : undefined}
+      >
         <button
           onClick={handleBackToProject}
           className="text-blue-600 hover:text-blue-800 text-xs flex items-center gap-1"
@@ -1980,9 +1992,7 @@ export function DiagramEditor({
 
         <div className="flex items-center gap-1.5">
           <span className="font-semibold text-gray-900 text-xs">{diagramName}</span>
-          <span className="text-[10px] text-gray-400 px-1 py-0 bg-gray-100 rounded">
-            {diagramType}
-          </span>
+          <DiagramTypeBadge type={diagramType} showLabel />
           {version ? <span className="text-[10px] text-gray-400">v{SCHEMA_VERSION}.{version}</span> : null}
         </div>
 

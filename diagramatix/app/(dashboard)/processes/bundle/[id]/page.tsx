@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
+import { DiagramTypeBadge } from "@/app/components/DiagramTypeBadge";
 
 // /processes/bundle/[id] — landing page for a Publication Bundle.
 // Shows the roots as tiles; clicking one opens the per-diagram viewer
@@ -108,7 +109,7 @@ export default async function BundleIndexPage({ params }: Props) {
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="text-sm font-medium text-gray-900 truncate flex-1">{d.diagram.name}</div>
-                <span className="text-[10px] text-gray-700 uppercase font-medium shrink-0">{d.diagram.type}</span>
+                <DiagramTypeBadge type={d.diagram.type} className="shrink-0" />
               </div>
               {d.diagram.currentPublishedVersion && (
                 <div className="mt-2 flex items-center gap-2">

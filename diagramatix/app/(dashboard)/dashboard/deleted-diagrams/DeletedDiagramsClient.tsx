@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
+import { DiagramTypeBadge } from "@/app/components/DiagramTypeBadge";
 
 interface DeletedDiagram {
   id: string;
@@ -17,15 +18,6 @@ interface DeletedDiagram {
   originalFolderName: string | null;
 }
 
-const TYPE_LABELS: Record<string, string> = {
-  context: "Context",
-  basic: "Context",
-  "process-context": "Process Context",
-  "state-machine": "State Machine",
-  bpmn: "BPMN",
-  domain: "Domain",
-  "value-chain": "Value Chain",
-};
 
 function formatDate(iso: string): string {
   const d = new Date(iso);
@@ -318,9 +310,9 @@ export function DeletedDiagramsClient() {
                                 <div key={d.id} className="flex items-center gap-2 px-3 py-1 border-t border-gray-50 pl-10">
                                   <div className="flex-1 min-w-0">
                                     <p className="text-xs text-gray-900 truncate" title={d.name}>{d.name}</p>
-                                    <p className="text-[10px] text-gray-400">
-                                      <span className="px-1 py-0.5 bg-gray-100 rounded mr-1">{TYPE_LABELS[d.type] ?? d.type}</span>
-                                      Deleted {formatDate(d.archivedAt)}
+                                    <p className="text-[10px] text-gray-400 flex items-center gap-1">
+                                      <DiagramTypeBadge type={d.type} showLabel />
+                                      <span>Deleted {formatDate(d.archivedAt)}</span>
                                     </p>
                                   </div>
                                   <button

@@ -75,6 +75,7 @@ export const FULL_BACKUP_TABLE_ORDER = [
   "DiagramRules",
   "Feature",
   "BubbleHelp",
+  "DiagramTypeStyle",
   "Notification",
   "CollaborationGroup",
   "CollaborationGroupMember",
@@ -121,6 +122,7 @@ export interface FullBackupPayload {
     DiagramRules: unknown[];
     Feature: unknown[];
     BubbleHelp: unknown[];
+    DiagramTypeStyle: unknown[];
     Notification: unknown[];
     CollaborationGroup: unknown[];
     CollaborationGroupMember: unknown[];
@@ -146,7 +148,7 @@ export async function buildFullBackup(
     projects, projectShares, diagrams, history,
     publishedVersions, bundles, bundleDiagrams, bundleAudience, pendingAudience,
     feedback, templates, prompts, rules,
-    features, bubbleHelps, notifications,
+    features, bubbleHelps, diagramTypeStyles, notifications,
     collabGroups, collabMembers, reviews, reviewers, transfers,
   ] = await Promise.all([
     prisma.org.findMany({ orderBy: { createdAt: "asc" } }),
@@ -169,6 +171,7 @@ export async function buildFullBackup(
     prisma.diagramRules.findMany({ orderBy: { createdAt: "asc" } }),
     prisma.feature.findMany({ orderBy: { createdAt: "asc" } }),
     prisma.bubbleHelp.findMany({ orderBy: { createdAt: "asc" } }),
+    prisma.diagramTypeStyle.findMany({ orderBy: { sortOrder: "asc" } }),
     prisma.notification.findMany({ orderBy: { createdAt: "asc" } }),
     prisma.collaborationGroup.findMany({ orderBy: { createdAt: "asc" } }),
     prisma.collaborationGroupMember.findMany({ orderBy: { invitedAt: "asc" } }),
@@ -217,6 +220,7 @@ export async function buildFullBackup(
       DiagramRules: rules.length,
       Feature: features.length,
       BubbleHelp: bubbleHelps.length,
+      DiagramTypeStyle: diagramTypeStyles.length,
       Notification: notifications.length,
       CollaborationGroup: collabGroups.length,
       CollaborationGroupMember: collabMembers.length,
@@ -245,6 +249,7 @@ export async function buildFullBackup(
       DiagramRules: serialise(rules as Record<string, unknown>[]),
       Feature: serialise(features as Record<string, unknown>[]),
       BubbleHelp: serialise(bubbleHelps as Record<string, unknown>[]),
+      DiagramTypeStyle: serialise(diagramTypeStyles as Record<string, unknown>[]),
       Notification: serialise(notifications as Record<string, unknown>[]),
       CollaborationGroup: serialise(collabGroups as Record<string, unknown>[]),
       CollaborationGroupMember: serialise(collabMembers as Record<string, unknown>[]),
@@ -324,6 +329,7 @@ const DATE_FIELDS_BY_MODEL: Record<string, string[]> = {
   DiagramRules:      ["createdAt", "updatedAt"],
   Feature:           ["publishedAt", "createdAt", "updatedAt"],
   BubbleHelp:        ["createdAt", "updatedAt"],
+  DiagramTypeStyle:  ["createdAt", "updatedAt"],
   Notification:      ["readAt", "createdAt"],
   CollaborationGroup:       ["createdAt", "updatedAt"],
   CollaborationGroupMember: ["invitedAt", "joinedAt"],
@@ -403,7 +409,7 @@ export async function restoreFullBackupWipe(
       'TRUNCATE TABLE ' +
       '"OwnershipTransfer", "DiagramReviewer", "DiagramReview", ' +
       '"CollaborationGroupMember", "CollaborationGroup", "Notification", ' +
-      '"BubbleHelp", "Feature", "DiagramRules", "Prompt", "DiagramTemplate", ' +
+      '"DiagramTypeStyle", "BubbleHelp", "Feature", "DiagramRules", "Prompt", "DiagramTemplate", ' +
       '"DiagramFeedback", "PendingBundleAudience", "PublicationBundleAudience", ' +
       '"PublicationBundleDiagram", "PublicationBundle", "PublishedVersion", ' +
       '"DiagramHistory", "Diagram", "ProjectShare", "Project", "OrgMember", ' +
@@ -461,6 +467,7 @@ export async function restoreFullBackupWipe(
         case "DiagramRules":      await tx.diagramRules.createMany({ data: anyData }); break;
         case "Feature":           await tx.feature.createMany({ data: anyData }); break;
         case "BubbleHelp":        await tx.bubbleHelp.createMany({ data: anyData }); break;
+        case "DiagramTypeStyle":  await tx.diagramTypeStyle.createMany({ data: anyData }); break;
         case "Notification":      await tx.notification.createMany({ data: anyData }); break;
         case "CollaborationGroup":       await tx.collaborationGroup.createMany({ data: anyData }); break;
         case "CollaborationGroupMember": await tx.collaborationGroupMember.createMany({ data: anyData }); break;

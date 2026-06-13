@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { DiagramTypeBadge } from "@/app/components/DiagramTypeBadge";
 
 // ──────────────────────────────────────────────────────────────────────
 // API response shapes (kept local — keeps this dialog self-contained).
@@ -319,7 +320,7 @@ export function PublishBundleDialog({
                       }}
                     />
                     <span className="flex-1 truncate text-gray-800">{d.name}</span>
-                    <span className="text-[10px] text-gray-700 uppercase font-medium">{d.type}</span>
+                    <DiagramTypeBadge type={d.type} />
                     <span className={`text-[10px] px-1.5 py-0.5 rounded border ${
                       d.lifecycle === "PUBLISHED"
                         ? "text-blue-700 border-blue-300 bg-blue-50"
@@ -348,7 +349,7 @@ export function PublishBundleDialog({
                       {m.isRoot && <span className="text-blue-600 font-medium mr-1">root</span>}
                       {m.name}
                     </span>
-                    <span className="text-[10px] text-gray-700 uppercase font-medium">{m.type}</span>
+                    <DiagramTypeBadge type={m.type} />
                     {m.readyToBundle && m.currentVersion ? (
                       <span className="text-[10px] px-1.5 py-0.5 rounded border text-blue-700 border-blue-300 bg-blue-50">
                         v{m.currentVersion.versionNumber}
