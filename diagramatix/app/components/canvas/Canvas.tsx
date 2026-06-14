@@ -3063,15 +3063,32 @@ export function Canvas({
     const chosen = data.elements.filter((e) => sel.has(e.id));
     const gateways = chosen.filter((e) => e.type === "gateway");
     const activities = chosen.filter((e) => ACTIVITY.has(e.type));
-    if (activities.length < 2) return false;
+    const events = chosen.filter((e) => e.type === "intermediate-event");
     if (gateways.length < 1 || gateways.length > 2) return false;
-    // Keep the gesture predictable — only gateways + activities in the group.
-    if (gateways.length + activities.length !== chosen.length) return false;
 
-    const actMinX = Math.min(...activities.map((a) => a.x));
-    const actMaxX = Math.max(...activities.map((a) => a.x + a.width));
-    const actTop = Math.min(...activities.map((a) => a.y));
-    const actBottom = Math.max(...activities.map((a) => a.y + a.height));
+    // Pick the fan-out target set, requiring the selection to be ONLY
+    // gateways + that one target type:
+    //   • normal mode → activities (task / subprocess / EP)
+    //   • event-based → intermediate events (an event-based gateway fans out
+    //     to a deferred choice of catching events). The event-based marker on
+    //     the SOURCE gateway is verified once the decision gateway is known.
+    let targets: DiagramElement[];
+    let eventBasedMode = false;
+    if (activities.length >= 2 && events.length === 0
+        && gateways.length + activities.length === chosen.length) {
+      targets = activities;
+    } else if (events.length >= 2 && activities.length === 0
+        && gateways.length + events.length === chosen.length) {
+      targets = events;
+      eventBasedMode = true;
+    } else {
+      return false;
+    }
+
+    const actMinX = Math.min(...targets.map((a) => a.x));
+    const actMaxX = Math.max(...targets.map((a) => a.x + a.width));
+    const actTop = Math.min(...targets.map((a) => a.y));
+    const actBottom = Math.max(...targets.map((a) => a.y + a.height));
     const actCenterY = (actTop + actBottom) / 2;
 
     // Decision = a gateway strictly LEFT of every activity; merge = strictly RIGHT.
@@ -3081,9 +3098,33 @@ export function Canvas({
     const decisionOnly = !!decision && !merge && gateways.length === 1;
     const mergeOnly = !!merge && !decision && gateways.length === 1;
     if (!fullDiamond && !decisionOnly && !mergeOnly) return false;
+    // Event-based fan-out requires the SOURCE gateway (the decision, sitting
+    // left of the events) to carry the event-based marker.
+    if (eventBasedMode && (!decision || decision.gatewayType !== "event-based")) return false;
 
     // Committed — consume the capture so it can't bleed into a later dblclick.
     groupConnectPrevSelectionRef.current = null;
+
+    // Event-based fan-out needs a Timer branch as the deferred-choice
+    // timeout. If none of the selected events is a timer (e.g. they are all
+    // receive/message events), synthesise a timer intermediate event below
+    // the lowest one and fan out to it as well.
+    if (eventBasedMode && decision && !targets.some((e) => e.eventType === "timer")) {
+      const bottom = targets.reduce((a, b) => (a.y + a.height >= b.y + b.height ? a : b));
+      const tw = bottom.width, th = bottom.height;
+      const tx = bottom.x;
+      const ty = bottom.y + th + 36;
+      const timerId = nanoid();
+      onAddElement(
+        "intermediate-event",
+        { x: tx + tw / 2, y: ty + th / 2 },
+        undefined,
+        "timer",
+        timerId,
+        { width: tw, height: th, label: "Timer" },
+      );
+      targets = [...targets, { ...bottom, id: timerId, x: tx, y: ty, width: tw, height: th, eventType: "timer", label: "Timer" }];
+    }
 
     // Gateway side for an activity, given the gateway's band at the Y it will
     // occupy (centred for a full diamond, current for decision-only).
@@ -3099,7 +3140,7 @@ export function Canvas({
     const mrgAt = merge ? { ...merge, y: mrgY } : null;
 
     // Number the branches top-to-bottom so the option labels read in order.
-    activities.sort((a, b) => a.y - b.y);
+    targets.sort((a, b) => a.y - b.y);
     // Always CREATE and place an optionN label on every decision branch,
     // regardless of the gateway's marker. Whether the label is DISPLAYED is
     // decided dynamically at render time from the gateway's current marker
@@ -3109,7 +3150,7 @@ export function Canvas({
 
     type Plan = { from: string; to: string; fromSide: Side; toSide: Side; flashFrom: Point; flashTo: Point; label?: string };
     const plans: Plan[] = [];
-    activities.forEach((act, i) => {
+    targets.forEach((act, i) => {
       if (decision && decAt) {
         const s = sideFor(decY, decision.height, act, "right");
         plans.push({ from: decision.id, to: act.id, fromSide: s, toSide: "left",
@@ -3124,7 +3165,7 @@ export function Canvas({
     });
 
     const groupIds = new Set<string>(
-      [...activities.map((a) => a.id), decision?.id, merge?.id].filter(Boolean) as string[],
+      [...targets.map((a) => a.id), decision?.id, merge?.id].filter(Boolean) as string[],
     );
     const existing = data.connectors.filter((c) => groupIds.has(c.sourceId) && groupIds.has(c.targetId));
     const deletedFlash = existing.map((c) => ({
