@@ -1519,6 +1519,7 @@ function applyEPBoundaryChange(
     for (const e of elements) {
       if (e.parentId !== epId) continue;
       if (DATA_ELEMENT_TYPES.has(e.type)) continue;
+      if (e.boundaryHostId === epId) continue;  // edge events sit ON the rim, not "content"
       hasKid = true;
       if (e.x < kMinX) kMinX = e.x;
       if (e.y < kMinY) kMinY = e.y;
@@ -1976,8 +1977,14 @@ function ensureContainersEncloseChildren(
     // EXCEPT artifacts (data-object / data-store / text-annotation),
     // which the user has marked inert: an artifact placed near or past
     // an EP edge must not force the EP to grow.
+    // Also exclude the EP's OWN edge-mounted boundary events. A boundary
+    // event sits ON the edge, so its outer half + PAD always projects PAST
+    // the edge; counting it here grows the EP, the re-snap pushes it back
+    // onto the new edge, it projects past again → unbounded runaway growth.
+    // (Only triggers when an edge event's parentId is the EP itself, which
+    // the "boundary events excluded via parentId" assumption misses.)
     const kids = e.type === "subprocess-expanded"
-      ? allKids.filter((c) => !DATA_ELEMENT_TYPES.has(c.type))
+      ? allKids.filter((c) => !DATA_ELEMENT_TYPES.has(c.type) && c.boundaryHostId !== e.id)
       : allKids.filter((c) => c.type === "lane" || c.type === "sublane");
     if (kids.length === 0) continue;
     // PAD=0 for lane/sublane children — they fill their pool/lane by
