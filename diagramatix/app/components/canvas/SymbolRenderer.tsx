@@ -1,12 +1,52 @@
 "use client";
 
-import { useState, createContext, useContext } from "react";
+import { useState, createContext, useContext, useRef, useLayoutEffect } from "react";
 import type { BpmnTaskType, GatewayType, EventType, DiagramElement, Point, Side, SymbolType } from "@/app/lib/diagram/types";
 import { type SymbolColorConfig, resolveColor } from "@/app/lib/diagram/colors";
 import { DisplayModeCtx, FontScaleCtx, PoolFontSizeCtx, LaneFontSizeCtx, ProcessFontSizeCtx, ValueChainFontSizeCtx, DescriptionFontSizeCtx, sketchyFilter } from "@/app/lib/diagram/displayMode";
 import { wrapText } from "@/app/lib/diagram/textMetrics";
 import { readableTextOn } from "@/app/lib/diagram/chevronThemes";
+import { isRichText, sanitizeRichText, plainToHtml } from "@/app/lib/diagram/richText";
 import { ArchimateShape } from "./ArchimateShape";
+
+/**
+ * Rich-text Process description box: renders sanitised HTML via a
+ * foreignObject and self-measures its content height so the box and border
+ * always fit. Display-only — editing happens in the Properties panel.
+ */
+function RichDescriptionBox({
+  x, y, width, html, fontSize, onSelect,
+}: {
+  x: number; y: number; width: number; html: string; fontSize: number;
+  onSelect: (e?: React.MouseEvent) => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [h, setH] = useState(28);
+  useLayoutEffect(() => {
+    if (ref.current) setH(Math.max(22, Math.ceil(ref.current.scrollHeight)));
+  }, [html, width, fontSize]);
+  return (
+    <g>
+      <rect x={x} y={y} width={width} height={h}
+        rx={3} fill="white" stroke="#d1d5db" strokeWidth={0.5}
+        style={{ cursor: "pointer" }}
+        onMouseDown={(e) => { e.stopPropagation(); onSelect(e); }}
+      />
+      <foreignObject x={x} y={y} width={width} height={h} style={{ pointerEvents: "none" }}>
+        <div
+          ref={ref}
+          className="dgx-rich-desc"
+          style={{
+            width, boxSizing: "border-box", padding: "3px 5px",
+            fontSize, lineHeight: 1.3, color: "#4b5563",
+            fontFamily: "inherit", wordBreak: "break-word",
+          }}
+          dangerouslySetInnerHTML={{ __html: html }}
+        />
+      </foreignObject>
+    </g>
+  );
+}
 
 /** React context carrying the active project colour config.  Shape components
  *  read from it; when undefined, resolveColor falls back to defaults. */
@@ -2129,92 +2169,15 @@ export function SymbolRenderer({
         const descY = element.y + element.height + 4;
         const notch = Math.min(20, element.width * 0.15);
         const descW = element.width - notch; // left corner to right end of bottom side
-        const descX = element.x;
-        const PAD = 4;
-        // Configurable Process description font (default 14); already
-        // display-mode-scaled by its provider.
-        const FONT_SIZE = descriptionFontSize;
-        const LINE_H = Math.round(FONT_SIZE * 1.3);
-        const CHAR_W = FONT_SIZE * 0.48; // approximate average char width for sans-serif
-        const maxChars = Math.floor((descW - PAD * 2) / CHAR_W);
-
-        // Word-wrap: split on explicit newlines, then wrap each paragraph
-        function wrapText(text: string): string[] {
-          const result: string[] = [];
-          for (const paragraph of text.split("\n")) {
-            if (!paragraph) { result.push(""); continue; }
-            const words = paragraph.split(/\s+/);
-            let line = "";
-            for (const word of words) {
-              const test = line ? line + " " + word : word;
-              if (test.length > maxChars && line) {
-                result.push(line);
-                line = word;
-              } else {
-                line = test;
-              }
-            }
-            if (line) result.push(line);
-          }
-          return result.length ? result : [""];
-        }
-
-        const wrappedLines = wrapText(desc);
-        const descH = wrappedLines.length * LINE_H + PAD * 2;
-
+        const html = desc
+          ? (isRichText(desc) ? sanitizeRichText(desc) : plainToHtml(desc))
+          : `<span style="color:#9ca3af">(description)</span>`;
         return (
-          <g>
-            <rect x={descX} y={descY} width={descW} height={descH}
-              rx={3} fill="white" stroke="#d1d5db" strokeWidth={0.5}
-              style={{ pointerEvents: "all", cursor: "text" }}
-              onDoubleClick={(e) => {
-                e.stopPropagation();
-                onUpdateProperties?.(element.id, { _editingDescription: true });
-              }}
-            />
-            {!(element.properties._editingDescription) ? (
-              <text fontSize={FONT_SIZE} fill="#4b5563"
-                style={{ userSelect: "none", pointerEvents: "none" }}>
-                {wrappedLines.map((line, i) => (
-                  <tspan key={i} x={descX + PAD} y={descY + PAD + LINE_H * 0.85 + i * LINE_H}>
-                    {line || "\u00A0"}
-                  </tspan>
-                ))}
-              </text>
-            ) : (
-              <foreignObject x={descX} y={descY} width={descW} height={Math.max(descH, LINE_H * 3 + PAD * 2)}>
-                <textarea
-                  autoFocus
-                  defaultValue={desc}
-                  onFocus={(e) => { const t = e.target; setTimeout(() => t.select(), 0); }}
-                  onBlur={(e) => {
-                    onUpdateProperties?.(element.id, {
-                      description: e.target.value || undefined,
-                      _editingDescription: undefined,
-                    });
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Escape") {
-                      onUpdateProperties?.(element.id, { _editingDescription: undefined });
-                    }
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      (e.target as HTMLTextAreaElement).blur();
-                    }
-                  }}
-                  onMouseDown={(e) => e.stopPropagation()}
-                  style={{
-                    width: "100%", height: "100%",
-                    fontSize: FONT_SIZE, fontFamily: "inherit", lineHeight: LINE_H + "px",
-                    resize: "none", border: "none", outline: "1px solid #93c5fd",
-                    background: "white", padding: PAD + "px",
-                    boxSizing: "border-box", overflow: "hidden",
-                    wordWrap: "break-word", whiteSpace: "pre-wrap",
-                  }}
-                />
-              </foreignObject>
-            )}
-          </g>
+          <RichDescriptionBox
+            x={element.x} y={descY} width={descW}
+            html={html} fontSize={descriptionFontSize}
+            onSelect={onSelect}
+          />
         );
       })()}
 

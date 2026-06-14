@@ -48,3 +48,15 @@ input, textarea, select {
   background-repeat: repeat;
   background-size: 180px 180px;
 }
+
+/* Rich-text Process descriptions (Value Chain). Tailwind preflight strips
+ * list markers; restore them for the editor and the rendered box, plus
+ * basic formatting tags. */
+.dgx-rich-edit ul, .dgx-rich-desc ul { list-style: disc;    padding-left: 18px; margin: 2px 0; }
+.dgx-rich-edit ol, .dgx-rich-desc ol { list-style: decimal; padding-left: 20px; margin: 2px 0; }
+.dgx-rich-edit li, .dgx-rich-desc li { margin: 0; }
+.dgx-rich-edit p,  .dgx-rich-desc p  { margin: 0 0 2px; }
+.dgx-rich-edit b, .dgx-rich-edit strong, .dgx-rich-desc b, .dgx-rich-desc strong { font-weight: 700; }
+.dgx-rich-edit u, .dgx-rich-desc u { text-decoration: underline; }
+.dgx-rich-edit i, .dgx-rich-edit em, .dgx-rich-desc i, .dgx-rich-desc em { font-style: italic; }
+.dgx-rich-edit:empty::before { content: "Add a description…"; color: #9ca3af; }
