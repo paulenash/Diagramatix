@@ -1112,6 +1112,11 @@ export function checkTaskTypeForMessages(d: DiagramLike): Violation[] {
       });
       continue;
     }
+    // R4a: a Service or Script task driving an OUTGOING message to a
+    // black-box pool is a legitimate automated send (e.g. a service task
+    // calling an IT system, a script task pushing to an external entity) —
+    // never warn about its trigger.
+    if (hasOut && (e.taskType === "service" || e.taskType === "script")) continue;
     if (actual === dflt || alsoAllowed.has(actual)) continue;
     out.push({
       rule: "task-type-for-messages",
@@ -1377,53 +1382,36 @@ export function checkPoolHeaderLabelOverrun(d: DiagramLike): Violation[] {
 
     const fs = el.type === "pool" ? poolFs : laneFs;
     const lines = raw.split(/\r?\n/);
-    const longestLineChars = Math.max(1, ...lines.map((l) => l.length));
+    const lineH = fs * 1.18;
 
-    // 1. Rotation-axis overrun: the longest line's pixel width must
-    //    fit within the container height (minus 20px padding total).
-    const lineWidthPx = Math.ceil(longestLineChars * fs * 0.6);
-    const availableAlongRotation = Math.floor(el.height) - 20;
-
-    // 2. Perpendicular overrun: stacked line height must fit within
-    //    the header strip's width (`poolHeaderWidth` property; default
-    //    36 for pools, 22 for lanes, matching the renderer).
+    // B32 correction: the renderer does NOT wrap the header label — it stacks
+    // the label's EXPLICIT lines across the header strip's WIDTH and runs each
+    // line along the container's (tall) height. The previous "along-the-
+    // rotation text width vs container height" estimate (char × 0.6) produced
+    // false positives for names that visibly fit, so it has been dropped.
+    //
+    // The strip auto-widens on rename to hold the lines, so the only genuine
+    // overflow left is a header that is too NARROW for the current line count
+    // (typically an import or a hand-shrunk header). Flag only that.
     const headerWidth =
       (el.properties?.poolHeaderWidth as number | undefined) ??
       (el.type === "pool" ? 36 : 22);
-    const stackedHeightPx = Math.ceil(lines.length * fs * 1.18 + 8);
-
-    const rotationOverrun = lineWidthPx > availableAlongRotation;
-    const widthOverrun = stackedHeightPx > headerWidth;
-    if (!rotationOverrun && !widthOverrun) continue;
-
-    const reasons: string[] = [];
-    if (rotationOverrun) {
-      reasons.push(
-        `text width ~${lineWidthPx}px exceeds the header's ${availableAlongRotation}px run along the ${el.type === "pool" ? "pool" : "lane"} height`,
-      );
-    }
-    if (widthOverrun) {
-      reasons.push(
-        `${lines.length} stacked line${lines.length === 1 ? "" : "s"} (~${stackedHeightPx}px) exceeds the ${headerWidth}px header width`,
-      );
-    }
+    const linesThatFit = Math.max(1, Math.floor(headerWidth / lineH));
+    if (lines.length <= linesThatFit) continue;
 
     const containerName = el.type === "pool" ? "Pool" : "Lane";
     out.push({
       rule: "pool-header-overrun",
       severity: "warning",
       ids: [el.id],
-      message: `${containerName} "${raw.replace(/\n/g, " ⏎ ")}" header label overflow: ${reasons.join("; ")}.`,
+      message: `${containerName} "${raw.replace(/\n/g, " ⏎ ")}" header label overflow: ${lines.length} stacked lines exceed the ${headerWidth}px header strip (which holds ~${linesThatFit}). Re-edit the name to auto-fit the header.`,
       data: {
         elementId: el.id,
         elementType: el.type,
         label: raw,
-        lineWidthPx,
-        availableAlongRotation,
-        stackedHeightPx,
+        lineCount: lines.length,
+        linesThatFit,
         headerWidth,
-        rotationOverrun,
-        widthOverrun,
       },
     });
   }
@@ -1698,7 +1686,7 @@ export const RULES: Rule[] = [
     code: "B32",
     id: "pool-header-overrun",
     title: "Pool / Lane label overflows the header region",
-    description: "A Pool or Lane name is too long for the rotated header strip that holds it — either the longest line's text exceeds the container's height along the rotation axis, or the stacked lines exceed the header width. Pair this rule with the auto-resize-on-rename behaviour, which usually fixes the geometry the moment the label is re-edited.",
+    description: "A Pool or Lane name has more stacked lines than its header strip is wide enough to hold. The header auto-widens on rename, so this usually only fires for imported or hand-shrunk headers; re-editing the name fixes the geometry. (Names that simply run a long way along the container's height are NOT flagged — the strip is sized for that.)",
     severity: "warning",
     category: "bpmn-structure",
     check: checkPoolHeaderLabelOverrun,

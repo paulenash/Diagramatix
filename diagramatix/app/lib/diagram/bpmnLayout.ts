@@ -2051,8 +2051,6 @@ export function layoutBpmnDiagram(
           else if (srcIsBlackBox && tgtIsBlackBox) { bbpId = srcPool.id; bbpEdgeY = srcPoolEdgeY; otherEdgeY = tgtPoolEdgeY; }
           if (bbpId) {
             const direction = otherEdgeY >= bbpEdgeY ? 1 : -1;
-            const labelCentreY = bbpEdgeY + 50 * direction;
-            labelOffsetY = labelCentreY - midY - 7;
             const RIGHT = 45;
             const LEFT = -45;
             const Y_BAND = 24;
@@ -2070,6 +2068,15 @@ export function layoutBpmnDiagram(
                 w: pc.labelWidth ?? 80,
               };
             });
+            // R05.05: stagger this label's vertical position so message
+            // labels on the same Black-Box Pool edge don't stack at one Y and
+            // overlap. Every already-placed label whose centre falls within
+            // the base Y band pushes this one a step further from the edge.
+            const baseCentreY = bbpEdgeY + 50 * direction;
+            const STAGGER_STEP = 18;
+            const nearby = placedOnBbp.filter(l => Math.abs(l.cy - baseCentreY) <= Y_BAND).length;
+            const labelCentreY = baseCentreY + nearby * STAGGER_STEP * direction;
+            labelOffsetY = labelCentreY - midY - 7;
             const overlapsAt = (testCx: number) => {
               for (const l of placedOnBbp) {
                 if (Math.abs(l.cy - labelCentreY) > Y_BAND) continue;
