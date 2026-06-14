@@ -51,6 +51,23 @@ function wrapLabel(label: string, maxWidth: number): { text: string; lines: numb
   return { text: result.join("\n"), lines: result.length, fits };
 }
 
+/**
+ * V1.06 (Value Chain, code-enforced): when a process label begins with a
+ * process number — one or two alphabetic characters followed by digits,
+ * optionally with dotted sub-levels (e.g. "V01", "A1", "AA12", "V01.02",
+ * "AA12.3.4") — put that number on its OWN first line and wrap the remaining
+ * process name beneath it. Falls back to plain wrapping when there's no
+ * leading process number.
+ */
+const PROCESS_NUMBER_RE = /^([A-Za-z]{1,2}\d+(?:\.\d+)*)\s+(\S.*)$/;
+
+function wrapChevronLabel(label: string, maxWidth: number): { text: string; lines: number; fits: boolean } {
+  const m = PROCESS_NUMBER_RE.exec(label.trim());
+  if (!m) return wrapLabel(label, maxWidth);
+  const name = wrapLabel(m[2], maxWidth);
+  return { text: `${m[1]}\n${name.text}`, lines: name.lines + 1, fits: name.fits };
+}
+
 const GRID_GAP_X = 60;
 const GRID_GAP_Y = 40;
 const START_X = 100;
@@ -257,7 +274,7 @@ export function layoutGenericDiagram(
         for (const ai of children) {
           if (ai.type === "chevron" || ai.type === "chevron-collapsed") {
             const rawLabel = ai.label ?? ai.name ?? ai.type;
-            const wrapped = wrapLabel(rawLabel, textW);
+            const wrapped = wrapChevronLabel(rawLabel, textW);
             if (!wrapped.fits || wrapped.lines > 3) needsWider = true;
           }
         }
@@ -276,7 +293,8 @@ export function layoutGenericDiagram(
         if (isValueChain && (ai.type === "chevron" || ai.type === "chevron-collapsed")) {
           elW = chevronW;
           const textW = elW - 40;
-          const wrapped = wrapLabel(label, textW);
+          // V1.06: split a leading process number onto its own line.
+          const wrapped = wrapChevronLabel(label, textW);
           label = wrapped.text;
           props.fillColor = chevronTheme.colours[gardenIdx % chevronTheme.colours.length];
           gardenIdx++;
