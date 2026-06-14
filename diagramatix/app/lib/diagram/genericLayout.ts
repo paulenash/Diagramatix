@@ -68,6 +68,15 @@ function wrapChevronLabel(label: string, maxWidth: number): { text: string; line
   return { text: `${m[1]}\n${name.text}`, lines: name.lines + 1, fits: name.fits };
 }
 
+/** Lighten a hex colour toward white by `frac` (0 = unchanged, 1 = white). */
+function lightenHex(hex: string, frac: number): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  const ch = (v: number) => Math.round(v + (255 - v) * frac).toString(16).padStart(2, "0");
+  return `#${ch(r)}${ch(g)}${ch(b)}`;
+}
+
 const GRID_GAP_X = 60;
 const GRID_GAP_Y = 40;
 const START_X = 100;
@@ -282,6 +291,7 @@ export function layoutGenericDiagram(
       }
 
       let cx = container.x + 30;
+      let firstChevronColour: string | undefined;
       for (const ai of children) {
         const def = getSymbolDefinition(ai.type as DiagramElement["type"]);
         let label = ai.label ?? ai.name ?? ai.type;
@@ -296,7 +306,9 @@ export function layoutGenericDiagram(
           // V1.06: split a leading process number onto its own line.
           const wrapped = wrapChevronLabel(label, textW);
           label = wrapped.text;
-          props.fillColor = chevronTheme.colours[gardenIdx % chevronTheme.colours.length];
+          const colour = chevronTheme.colours[gardenIdx % chevronTheme.colours.length];
+          props.fillColor = colour;
+          if (firstChevronColour === undefined) firstChevronColour = colour;
           gardenIdx++;
         }
 
@@ -315,6 +327,12 @@ export function layoutGenericDiagram(
         } else {
           cx += elW + GRID_GAP_X;
         }
+      }
+      // Colour-sync the Value Chain element (container) to its inner
+      // processes' theme — a pale tint of the first process's shade, matching
+      // the snap-time reapplyThemeToGroup container tint.
+      if (isValueChain && firstChevronColour) {
+        container.properties = { ...container.properties, fillColor: lightenHex(firstChevronColour, 0.6) };
       }
       // Resize container to fit children
       if (children.length > 0) {
