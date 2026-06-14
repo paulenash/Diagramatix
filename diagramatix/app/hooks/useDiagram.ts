@@ -5148,12 +5148,33 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
           }
         }
         const origById = new Map(state.connectors.map(c => [c.id, c]));
+        const newPoolForMsg = elements.find(e => e.id === id);
         connectors = connectors.map(conn => {
           if (!changedIds.has(conn.sourceId) && !changedIds.has(conn.targetId)) {
             return conn;
           }
-          const recomputed = recomputeAllConnectors([conn], elements)[0] ?? conn;
-          const orig = origById.get(conn.id);
+          // messageBPMN attachments ON the resized pool stay FIXED in world
+          // space — dragging a pool edge must NOT drag a message endpoint
+          // along the edge with it (Paul: messages FROM the pool followed
+          // the right boundary). recomputeAllConnectors derives the pool-side
+          // x as pool.x + pool.width*offset, so re-derive the offset from the
+          // connector's CURRENT world attachment x against the NEW geometry.
+          let working = conn;
+          const orig0 = origById.get(conn.id);
+          if (conn.type === "messageBPMN" && newPoolForMsg && newPoolForMsg.width > 0 &&
+              (conn.sourceId === id || conn.targetId === id) && orig0) {
+            // Vertical message → waypoints share one x; the pool-side
+            // attachment x is that shared world x (fallback: old offset).
+            const fallback = target.x + target.width *
+              (conn.sourceId === id ? (conn.sourceOffsetAlong ?? 0.5) : (conn.targetOffsetAlong ?? 0.5));
+            const worldX = orig0.waypoints[1]?.x ?? orig0.waypoints[0]?.x ?? fallback;
+            const f = Math.max(0.02, Math.min(0.98, (worldX - newPoolForMsg.x) / newPoolForMsg.width));
+            working = conn.sourceId === id
+              ? { ...working, sourceOffsetAlong: f }
+              : { ...working, targetOffsetAlong: f };
+          }
+          const recomputed = recomputeAllConnectors([working], elements)[0] ?? working;
+          const orig = orig0;
           if (!orig) return recomputed;
           const labelAdj = recomputed.type === "messageBPMN"
             ? adjustMsgLabelOffset(
