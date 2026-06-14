@@ -18,6 +18,7 @@ import { BW_SYMBOL_COLORS, DEFAULT_SYMBOL_COLORS, type SymbolColorConfig } from 
 import type { DisplayMode } from "@/app/lib/diagram/displayMode";
 import { DiagramColorModal } from "./DiagramColorModal";
 import { TemplateNameModal } from "./TemplateNameModal";
+import { TemplateThumbnail } from "./TemplateThumbnail";
 import { useDiagram, nanoid } from "@/app/hooks/useDiagram";
 import { Canvas } from "@/app/components/canvas/Canvas";
 import { Palette } from "@/app/components/canvas/Palette";
@@ -2346,7 +2347,7 @@ export function DiagramEditor({
               Templates {"\u25BE"}
             </button>
             {templateDropdownOpen && (
-              <div className="absolute right-0 top-full mt-1 w-56 bg-white border border-gray-200 rounded shadow-lg z-50 max-h-80 overflow-y-auto">
+              <div className="absolute right-0 top-full mt-1 w-80 bg-white border border-gray-200 rounded shadow-lg z-50 max-h-96 overflow-y-auto">
                 {/* Create actions */}
                 <button
                   onClick={() => { setTemplateMode("capturing"); setTemplateDropdownOpen(false); }}
@@ -2395,9 +2396,11 @@ export function DiagramEditor({
                           <button
                             onClick={() => !isDeleting && handleApplyTemplate(t.id)}
                             disabled={isDeleting}
-                            className={`flex-1 text-left ${indent ? "pl-6 pr-3" : "px-3"} py-1.5 text-xs text-gray-700 ${isDeleting ? "line-through text-gray-400" : ""}`}
+                            className={`flex items-center gap-2 flex-1 min-w-0 text-left ${indent ? "pl-6 pr-2" : "px-2"} py-1.5 text-xs text-gray-700 ${isDeleting ? "line-through text-gray-400" : ""}`}
+                            title={`Apply template: ${t.name}`}
                           >
-                            {t.name}{isDeleting ? " (deleting\u2026)" : ""}
+                            <TemplateThumbnail templateId={t.id} />
+                            <span className="flex-1 min-w-0 truncate">{t.name}{isDeleting ? " (deleting\u2026)" : ""}</span>
                           </button>
                           {canEdit && !isDeleting && (
                             <>
