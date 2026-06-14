@@ -5970,11 +5970,16 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         ? state.connectors.filter((c) => c.type === "flow").length
         : 0;
 
-      // Decision gateway outgoing sequence connectors get a source-anchored label
-      const gwType = source.gatewayType ?? "exclusive";
-      const isDecisionGateway = source.type === "gateway"
-        && (gwType === "none" || gwType === "exclusive" || gwType === "inclusive");
-      const isDecisionGatewayOutgoing = (connectorType === "sequence" || connectorType === "transition") && isDecisionGateway;
+      // Gateway-outgoing sequence/transition connectors carry their label
+      // source-anchored and offset 40%-along-the-branch. This PLACEMENT now
+      // applies to EVERY gateway marker (not just none/exclusive/inclusive)
+      // so the optionN labels created by group-connect are positioned
+      // correctly even on a Parallel/Event-based gateway; whether the label
+      // is DISPLAYED is decided dynamically at render time from the live
+      // marker (see ConnectorRenderer's gateway-marker label gate).
+      const isDecisionGatewayOutgoing =
+        (connectorType === "sequence" || connectorType === "transition")
+        && source.type === "gateway";
 
       // Decision-gateway outgoing label placement (Paul's 2026-06-13 rule):
       // 40% of the way along the OUTGOING segment, offset to the right of it.

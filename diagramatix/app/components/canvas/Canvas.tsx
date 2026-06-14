@@ -3100,13 +3100,12 @@ export function Canvas({
 
     // Number the branches top-to-bottom so the option labels read in order.
     activities.sort((a, b) => a.y - b.y);
-    // A "decision" marker branches on a condition — anything NOT parallel
-    // (always-all) or event-based. Those get auto-numbered option labels on
-    // the outgoing branches (Paul's 2026-06-13 rule).
-    // gatewayType is a TOP-LEVEL field on the element (hoisted out of
-    // properties by the reducer), so read it there — not from properties.
-    const decGwType = decision?.gatewayType;
-    const labelBranches = !!decision && decGwType !== "parallel" && decGwType !== "event-based";
+    // Always CREATE and place an optionN label on every decision branch,
+    // regardless of the gateway's marker. Whether the label is DISPLAYED is
+    // decided dynamically at render time from the gateway's current marker
+    // (shown for None / Exclusive / Inclusive, hidden for Parallel /
+    // Event-based) — so flipping the marker later reveals or hides the
+    // already-placed labels without recreating them.
 
     type Plan = { from: string; to: string; fromSide: Side; toSide: Side; flashFrom: Point; flashTo: Point; label?: string };
     const plans: Plan[] = [];
@@ -3115,7 +3114,7 @@ export function Canvas({
         const s = sideFor(decY, decision.height, act, "right");
         plans.push({ from: decision.id, to: act.id, fromSide: s, toSide: "left",
           flashFrom: sideMidpoint(decAt, s), flashTo: sideMidpoint(act, "left"),
-          label: labelBranches ? `option${i + 1}` : undefined });
+          label: `option${i + 1}` });
       }
       if (merge && mrgAt) {
         const s = sideFor(mrgY, merge.height, act, "left");
@@ -3999,6 +3998,21 @@ export function Canvas({
   // Detect connectors whose path passes through elements (obstacle violations) — domain diagrams only
   const obstacleViolationConnIds = new Set<string>();
   const obstacleViolationElementIds = new Set<string>();
+  // Gateway branch labels (labelAnchor "source") are SUPPRESSED — not
+  // deleted — while their source gateway's marker is Parallel or
+  // Event-based, since those markers carry no branch conditions. Computed
+  // every render so flipping the marker back to None/Exclusive/Inclusive
+  // re-reveals the stored optionN labels exactly where they were placed.
+  const hiddenBranchLabelConnIds = new Set<string>();
+  {
+    const gwMarker = new Map<string, string>();
+    for (const e of data.elements) if (e.type === "gateway") gwMarker.set(e.id, e.gatewayType ?? "exclusive");
+    for (const c of data.connectors) {
+      if (c.labelAnchor !== "source") continue;
+      const m = gwMarker.get(c.sourceId);
+      if (m === "parallel" || m === "event-based") hiddenBranchLabelConnIds.add(c.id);
+    }
+  }
   function segCrossesRect(p1: Point, p2: Point, r: { x: number; y: number; w: number; h: number }): boolean {
     const left = r.x, right = r.x + r.w, top = r.y, bottom = r.y + r.h;
     if (Math.abs(p1.y - p2.y) < 1) {
@@ -4826,6 +4840,7 @@ export function Canvas({
                 misaligned={obstacleViolationConnIds.has(conn.id)}
                 onUpdateEndOffset={handleUpdateEndOffset}
                 showBottleneck={showBottleneck}
+                hideLabel={hiddenBranchLabelConnIds.has(conn.id)}
                 onLabelFocusEditStart={(cx, cy, w) => enterFocusModeAt(cx, cy, w, "connector")}
                 onLabelFocusEditEnd={exitFocusMode}
               />
@@ -5452,6 +5467,7 @@ export function Canvas({
                 targetPoolHeight={tgtPoolH}
                 sourceIsPool={srcIsPool}
                 targetIsPool={tgtIsPool}
+                hideLabel={hiddenBranchLabelConnIds.has(conn.id)}
                 onLabelFocusEditStart={(cx, cy, w) => enterFocusModeAt(cx, cy, w, "connector")}
                 onLabelFocusEditEnd={exitFocusMode}
               />
@@ -5495,6 +5511,7 @@ export function Canvas({
                 misaligned={obstacleViolationConnIds.has(conn.id)}
                 onUpdateEndOffset={handleUpdateEndOffset}
                 showBottleneck={showBottleneck}
+                hideLabel={hiddenBranchLabelConnIds.has(conn.id)}
                 onLabelFocusEditStart={(cx, cy, w) => enterFocusModeAt(cx, cy, w, "connector")}
                 onLabelFocusEditEnd={exitFocusMode}
               />

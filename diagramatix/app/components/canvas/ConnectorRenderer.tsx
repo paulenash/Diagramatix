@@ -40,6 +40,10 @@ interface Props {
    *  current zoom level (no snap). */
   onLabelFocusEditStart?: (centerX: number, centerY: number, worldWidth: number) => void;
   onLabelFocusEditEnd?: () => void;
+  /** Suppress the floating label entirely (source gateway marker is
+   *  parallel / event-based). Re-evaluated each render so it reappears when
+   *  the marker changes. */
+  hideLabel?: boolean;
 }
 
 // Line segment intersection: returns the parameter t along segment (a1→a2) where it crosses (b1→b2), or null
@@ -300,9 +304,13 @@ interface InteractionLabelProps {
   onUpdateLabel?: (label: string, offsetX: number, offsetY: number, width: number) => void;
   onLabelFocusEditStart?: (centerX: number, centerY: number, worldWidth: number) => void;
   onLabelFocusEditEnd?: () => void;
+  // When the source gateway's CURRENT marker is parallel / event-based the
+  // branch label is suppressed entirely (still stored, just not drawn), so
+  // flipping the marker back reveals it. Evaluated per render by Canvas.
+  hideLabel?: boolean;
 }
 
-function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, onUpdateLabel, onLabelFocusEditStart, onLabelFocusEditEnd }: InteractionLabelProps) {
+function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, onUpdateLabel, onLabelFocusEditStart, onLabelFocusEditEnd, hideLabel }: InteractionLabelProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState("");
   const [isLabelFocused, setIsLabelFocused] = useState(false);
@@ -310,6 +318,10 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
   const fontScale = useContext(ConnectorFontScaleCtx);
 
   if (visibleWaypoints.length < 2) return null;
+  // Marker-driven suppression: a parallel / event-based gateway has no
+  // branch conditions, so its outgoing labels are hidden — but only while
+  // the editor isn't open, so an in-progress edit isn't yanked away.
+  if (hideLabel && !isEditing) return null;
 
   let anchor: Point;
   if (connector.labelAnchor === "source") {
@@ -506,7 +518,7 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
   );
 }
 
-export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, onUpdateWaypoints, onWaypointsDragEnd, onUpdateLabel, onUpdateCurveHandles, misaligned, otherConnectorWaypoints, debugMode, onUpdateEndOffset, showBottleneck, sourceBounds, targetBounds, sourcePoolHeight, targetPoolHeight, sourceIsPool, targetIsPool, onLabelFocusEditStart, onLabelFocusEditEnd }: Props) {
+export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, onUpdateWaypoints, onWaypointsDragEnd, onUpdateLabel, onUpdateCurveHandles, misaligned, otherConnectorWaypoints, debugMode, onUpdateEndOffset, showBottleneck, sourceBounds, targetBounds, sourcePoolHeight, targetPoolHeight, sourceIsPool, targetIsPool, onLabelFocusEditStart, onLabelFocusEditEnd, hideLabel }: Props) {
   const displayMode = useContext(DisplayModeCtx);
   const connFontScale = useContext(ConnectorFontScaleCtx);
   const [draggingEndLabel, setDraggingEndLabel] = useState<string | null>(null);
@@ -909,6 +921,7 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
           onUpdateLabel={onUpdateLabel}
           onLabelFocusEditStart={onLabelFocusEditStart}
           onLabelFocusEditEnd={onLabelFocusEditEnd}
+          hideLabel={hideLabel}
         />
       )}
 
