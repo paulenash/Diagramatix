@@ -6563,7 +6563,7 @@ export function Canvas({
         const containerRect = svgRef.current?.parentElement?.getBoundingClientRect();
         const containerW = containerRect?.width ?? window.innerWidth;
         const containerH = containerRect?.height ?? window.innerHeight;
-        const POPUP_W = 248;
+        const POPUP_W = 268;
         const POPUP_H = CHEVRON_THEMES.length * 32 + 36 + 12; // N themes + clear + padding
         const left = Math.min(themePicker.screenX, containerW - POPUP_W - 4);
         const top = Math.min(themePicker.screenY, containerH - POPUP_H - 4);

@@ -3,27 +3,34 @@ export interface ChevronTheme {
   colours: readonly string[];
 }
 
-// Source palettes (light → dark). Per Paul's update: the darker tail
-// (shades 8–10) reads too heavy in a value chain, so only the first
-// SOURCE_CAP (7) shades are used, and that lighter range is REDISTRIBUTED
-// across SHADE_COUNT (12) evenly-spaced shades. Edit a source palette here;
-// the published 12-shade themes regenerate automatically below.
+// Each theme is now a single-hue ramp — 9 control shades of ONE underlying
+// colour (light → dark), redistributed across SHADE_COUNT (12) evenly
+// spaced shades. The ramp continues into the dark end of the hue (no longer
+// capped); chevron labels switch to white text where a shade is too dark
+// for black to read (see SymbolRenderer's chevron contrast check).
 const THEME_SOURCES: { name: string; colours: string[] }[] = [
-  { name: "Sunrise",  colours: ["#fef3c7", "#fde68a", "#fdba74", "#fca5a5", "#f9a8d4", "#d8b4fe", "#a5b4fc", "#93c5fd", "#67e8f9", "#99f6e4"] },
-  { name: "Ocean",    colours: ["#cffafe", "#a5f3fc", "#7dd3fc", "#93c5fd", "#a5b4fc", "#c4b5fd", "#d8b4fe", "#f0abfc", "#fda4af", "#fecaca"] },
-  { name: "Garden",   colours: ["#d9f99d", "#bef264", "#a3e635", "#86efac", "#6ee7b7", "#5eead4", "#67e8f9", "#7dd3fc", "#a5b4fc", "#c4b5fd"] },
-  { name: "Berry",    colours: ["#fce7f3", "#fbcfe8", "#f9a8d4", "#f0abfc", "#d8b4fe", "#c4b5fd", "#a5b4fc", "#93c5fd", "#7dd3fc", "#67e8f9"] },
-  { name: "Earth",    colours: ["#fef9c3", "#fde68a", "#fcd34d", "#fdba74", "#fed7aa", "#fecaca", "#e5e7eb", "#d1d5db", "#a8a29e", "#d6d3d1"] },
-  { name: "Autumn",   colours: ["#fef3c7", "#fde68a", "#fcd34d", "#fbbf24", "#f59e0b", "#d97706", "#b45309", "#92400e", "#7c2d12", "#451a03"] },
-  { name: "Twilight", colours: ["#e0e7ff", "#c7d2fe", "#a5b4fc", "#818cf8", "#6366f1", "#4f46e5", "#4338ca", "#3730a3", "#312e81", "#1e1b4b"] },
-  { name: "Coral",    colours: ["#fff1f2", "#ffe4e6", "#fecdd3", "#fda4af", "#fb7185", "#f43f5e", "#e11d48", "#be123c", "#9f1239", "#881337"] },
-  { name: "Mint",     colours: ["#ecfdf5", "#d1fae5", "#a7f3d0", "#6ee7b7", "#34d399", "#10b981", "#059669", "#047857", "#065f46", "#064e3b"] },
-  { name: "Slate",    colours: ["#f8fafc", "#f1f5f9", "#e2e8f0", "#cbd5e1", "#94a3b8", "#64748b", "#475569", "#334155", "#1e293b", "#0f172a"] },
+  // Amber
+  { name: "Sunrise",  colours: ["#fffbeb", "#fef3c7", "#fde68a", "#fcd34d", "#fbbf24", "#f59e0b", "#d97706", "#b45309", "#92400e"] },
+  // Sky / blue
+  { name: "Ocean",    colours: ["#f0f9ff", "#e0f2fe", "#bae6fd", "#7dd3fc", "#38bdf8", "#0ea5e9", "#0284c7", "#0369a1", "#075985"] },
+  // Green
+  { name: "Garden",   colours: ["#f0fdf4", "#dcfce7", "#bbf7d0", "#86efac", "#4ade80", "#22c55e", "#16a34a", "#15803d", "#166534"] },
+  // Fuchsia / berry
+  { name: "Berry",    colours: ["#fdf4ff", "#fae8ff", "#f5d0fe", "#f0abfc", "#e879f9", "#d946ef", "#c026d3", "#a21caf", "#86198f"] },
+  // Warm tan → brown
+  { name: "Earth",    colours: ["#faf4ea", "#f0e2c8", "#e1c79c", "#cda870", "#b58a4c", "#966c34", "#745222", "#533a17", "#3a280f"] },
+  // Orange
+  { name: "Autumn",   colours: ["#fff7ed", "#ffedd5", "#fed7aa", "#fdba74", "#fb923c", "#f97316", "#ea580c", "#c2410c", "#9a3412"] },
+  // Indigo
+  { name: "Twilight", colours: ["#eef2ff", "#e0e7ff", "#c7d2fe", "#a5b4fc", "#818cf8", "#6366f1", "#4f46e5", "#4338ca", "#3730a3"] },
+  // Rose
+  { name: "Coral",    colours: ["#fff1f2", "#ffe4e6", "#fecdd3", "#fda4af", "#fb7185", "#f43f5e", "#e11d48", "#be123c", "#9f1239"] },
+  // Emerald
+  { name: "Mint",     colours: ["#ecfdf5", "#d1fae5", "#a7f3d0", "#6ee7b7", "#34d399", "#10b981", "#059669", "#047857", "#065f46"] },
+  // Slate
+  { name: "Slate",    colours: ["#f8fafc", "#f1f5f9", "#e2e8f0", "#cbd5e1", "#94a3b8", "#64748b", "#475569", "#334155", "#1e293b"] },
 ];
 
-// Use shades 1..SOURCE_CAP only (cap out the too-dark tail), then resample
-// that range to SHADE_COUNT evenly-spaced shades.
-const SOURCE_CAP = 7;
 const SHADE_COUNT = 12;
 
 function hexToRgb(hex: string): [number, number, number] {
@@ -57,7 +64,19 @@ function redistribute(source: string[], count: number): string[] {
   return out;
 }
 
+// Returns "#ffffff" or "#1f2937" — whichever reads better on `hex`. Used by
+// the chevron renderer so dark theme shades get white labels. Uses the
+// WCAG relative-luminance threshold (~0.5 on the perceptual curve).
+export function readableTextOn(hex: string): string {
+  const [r, g, b] = hexToRgb(hex).map((v) => {
+    const s = v / 255;
+    return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+  });
+  const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  return lum < 0.42 ? "#ffffff" : "#1f2937";
+}
+
 export const CHEVRON_THEMES: readonly ChevronTheme[] = THEME_SOURCES.map((t) => ({
   name: t.name,
-  colours: redistribute(t.colours.slice(0, SOURCE_CAP), SHADE_COUNT),
+  colours: redistribute(t.colours, SHADE_COUNT),
 }));

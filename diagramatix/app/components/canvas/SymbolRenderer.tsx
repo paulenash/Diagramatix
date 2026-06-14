@@ -5,6 +5,7 @@ import type { BpmnTaskType, GatewayType, EventType, DiagramElement, Point, Side,
 import { type SymbolColorConfig, resolveColor } from "@/app/lib/diagram/colors";
 import { DisplayModeCtx, FontScaleCtx, PoolFontSizeCtx, LaneFontSizeCtx, ProcessFontSizeCtx, sketchyFilter } from "@/app/lib/diagram/displayMode";
 import { wrapText } from "@/app/lib/diagram/textMetrics";
+import { readableTextOn } from "@/app/lib/diagram/chevronThemes";
 import { ArchimateShape } from "./ArchimateShape";
 
 /** React context carrying the active project colour config.  Shape components
@@ -2566,6 +2567,11 @@ export function SymbolRenderer({
       ) && !(element.type === 'gateway' && (element.properties.gatewayRole as string | undefined) === 'merge') && (() => {
         const isChevron = element.type === 'chevron' || element.type === 'chevron-collapsed';
         const isArchi = element.type === 'archimate-shape';
+        // Chevrons can carry a dark theme shade — pick white vs near-black
+        // text by luminance so the label stays readable. Other types keep the
+        // standard near-black.
+        const chevronFill = isChevron ? (element.properties.fillColor as string | undefined) : undefined;
+        const labelFill = chevronFill ? readableTextOn(chevronFill) : "#111827";
         const labelLines = element.label.split('\n');
         const fSize = fs(isActorOrTeam ? 11 : 12);
         const lineH = fSize * 1.3;
@@ -2583,7 +2589,7 @@ export function SymbolRenderer({
             topY = labelInfo.y - ((labelLines.length - 1) * lineH) / 2;
           }
           return (
-            <text textAnchor="middle" fontSize={fSize} fill="#111827"
+            <text textAnchor="middle" fontSize={fSize} fill={labelFill}
               dominantBaseline={isArchi ? labelInfo.baseline : undefined}
               style={{ userSelect: "none", pointerEvents: "none" }}>
               {labelLines.map((line, i) => (
@@ -2599,7 +2605,7 @@ export function SymbolRenderer({
             textAnchor="middle"
             dominantBaseline={labelInfo.baseline}
             fontSize={fSize}
-            fill="#111827"
+            fill={labelFill}
             style={{ userSelect: "none", pointerEvents: "none" }}
           >
             {element.label}
