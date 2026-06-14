@@ -1970,6 +1970,19 @@ export function SymbolRenderer({
     );
   }
 
+  // Shared shape-body double-click. Opens the external-label editor for
+  // label-bearing types (unless multi-selected, where the gateway
+  // group-connect gesture must win), otherwise defers to onDoubleClick.
+  // Used by the connection-point hit overlays too — those sit ON TOP of a
+  // SELECTED element and would otherwise swallow the dblclick straight to
+  // the parent's no-op handler, which is why double-click never reached
+  // the outer <g> interception once the element was selected.
+  function handleShapeBodyDblClick(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (hasExternalLabel && !multiSelected) { beginExternalLabelEdit(); return; }
+    onDoubleClick();
+  }
+
   // Return-link elements are no longer rendered.
   if (isHiddenReturnLink) return null;
 
@@ -2922,7 +2935,7 @@ export function SymbolRenderer({
         return (
           <polygon points={pts} fill="transparent" stroke="none"
             style={{ cursor: "crosshair" }}
-            onDoubleClick={(e) => { e.stopPropagation(); onDoubleClick(); }}
+            onDoubleClick={handleShapeBodyDblClick}
             onMouseDown={handler}
           />
         );
@@ -2933,7 +2946,7 @@ export function SymbolRenderer({
           width={element.width} height={element.height}
           fill="transparent" stroke="none"
           style={{ cursor: "crosshair" }}
-          onDoubleClick={(e) => { e.stopPropagation(); onDoubleClick(); }}
+          onDoubleClick={handleShapeBodyDblClick}
           onMouseDown={(e) => {
             e.stopPropagation();
             const worldPt = svgToWorld
