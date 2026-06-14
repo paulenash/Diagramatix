@@ -1830,7 +1830,19 @@ export function DiagramEditor({
   // (See the CONVERT_EP_TO_SUBPROCESS reducer for the canvas-side surgery.)
   const [epCollapseBusyId, setEpCollapseBusyId] = useState<string | null>(null);
   const [epCollapseMsg, setEpCollapseMsg] = useState<string | null>(null);
-  async function handleCollapseEpToSubprocess(epId: string) {
+  // EP held pending the "create a new diagram?" confirmation.
+  const [epCollapseConfirmId, setEpCollapseConfirmId] = useState<string | null>(null);
+
+  // Right-click action target: gate on a confirm dialog before doing the
+  // collapse (which creates a brand-new linked diagram on the server).
+  function requestCollapseEpToSubprocess(epId: string) {
+    if (epCollapseBusyId) return;
+    const ep = data.elements.find((e) => e.id === epId);
+    if (!ep || ep.type !== "subprocess-expanded") return;
+    setEpCollapseConfirmId(epId);
+  }
+
+  async function doCollapseEpToSubprocess(epId: string) {
     if (epCollapseBusyId) return;
     const ep = data.elements.find((e) => e.id === epId);
     if (!ep || ep.type !== "subprocess-expanded") return;
@@ -3206,7 +3218,7 @@ export function DiagramEditor({
           defaultRoutingType={defaultRoutingType}
           onUpdateProperties={updateProperties}
           onUpdatePropertiesBatch={updatePropertiesBatch}
-          onCollapseEpToSubprocess={handleCollapseEpToSubprocess}
+          onCollapseEpToSubprocess={requestCollapseEpToSubprocess}
           onUpdateConnectorWaypoints={updateConnectorWaypoints}
           onUpdateConnectorLabel={updateConnectorLabel}
           onSplitConnector={splitConnector}
@@ -3388,6 +3400,22 @@ export function DiagramEditor({
             message={reviewActionMsg}
             tone="info"
             onClose={() => setReviewActionMsg(null)}
+          />
+        )}
+
+        {epCollapseConfirmId && (
+          <ConfirmDialog
+            title="Collapse to Subprocess"
+            message={"The contents of this Expanded Subprocess will be moved into a new linked diagram.\n\nDo you want to continue and create a new diagram?"}
+            confirmLabel="Continue"
+            cancelLabel="Cancel"
+            destructive={false}
+            onConfirm={() => {
+              const id = epCollapseConfirmId;
+              setEpCollapseConfirmId(null);
+              if (id) void doCollapseEpToSubprocess(id);
+            }}
+            onCancel={() => setEpCollapseConfirmId(null)}
           />
         )}
 
