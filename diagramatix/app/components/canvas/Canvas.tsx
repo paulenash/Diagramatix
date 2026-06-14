@@ -641,6 +641,49 @@ export function Canvas({
       setFocusModeRestore(null);
     }
   }
+
+  // Pool-move boundary alignment. While dragging a pool horizontally, snap
+  // its LEFT (or RIGHT) edge to another pool's left/right edge so pool
+  // boundaries line up — the move-time analogue of the resize L/R lockstep.
+  // Returns the snapped x plus a poolBoundaryGuide payload (the same dashed
+  // line + markers used by the resize guide). `null` guide → nothing nearby.
+  function computePoolMoveSnap(
+    movingPool: DiagramElement,
+    x: number,
+  ): { x: number; guide: typeof poolBoundaryGuide } {
+    const SHOW = 16 / zoom; // world px: show the guide when this close
+    const SNAP = 8 / zoom;  // world px: snap the edge when this close
+    const w = movingPool.width;
+    const liveLeft = x;
+    const liveRight = x + w;
+    const otherPools = data.elements.filter((p) => p.type === "pool" && p.id !== movingPool.id);
+    if (otherPools.length === 0) return { x, guide: null };
+    let bestLeft: { d: number; target: number } | null = null;
+    let bestRight: { d: number; target: number } | null = null;
+    for (const p of otherPools) {
+      const dL = Math.abs(liveLeft - p.x);
+      if (!bestLeft || dL < bestLeft.d) bestLeft = { d: dL, target: p.x };
+      const pR = p.x + p.width;
+      const dR = Math.abs(liveRight - pR);
+      if (!bestRight || dR < bestRight.d) bestRight = { d: dR, target: pR };
+    }
+    const useLeft = (bestLeft?.d ?? Infinity) <= (bestRight?.d ?? Infinity);
+    const chosen = useLeft ? bestLeft! : bestRight!;
+    if (chosen.d > SHOW) return { x, guide: null };
+    const side: "left" | "right" = useLeft ? "left" : "right";
+    let snappedX = x;
+    if (chosen.d <= SNAP) snappedX = useLeft ? chosen.target : chosen.target - w;
+    const movingEdge = useLeft ? snappedX : snappedX + w;
+    const others = data.elements
+      .filter((p) => p.type === "pool")
+      .map((p) => ({
+        id: p.id,
+        x: p.id === movingPool.id ? movingEdge : side === "left" ? p.x : p.x + p.width,
+        midY: p.y + p.height / 2,
+        isMoving: p.id === movingPool.id,
+      }));
+    return { x: snappedX, guide: { side, currentX: movingEdge, others } };
+  }
   const [draggingConnector, setDraggingConnector] = useState<DraggingConnector | null>(null);
   const [draggingEndpoint, setDraggingEndpoint] = useState<DraggingEndpoint | null>(null);
   const [pendingDrop, setPendingDrop] = useState<PendingDrop | null>(null);
@@ -4620,7 +4663,19 @@ export function Canvas({
                   }
                   onSelectConnector(null);
                 }}
-                onMove={(x, y, uc) => { setDraggingElementId(el.id); onMoveElement(el.id, x, y, uc); }}
+                onMove={(x, y, uc) => {
+                  setDraggingElementId(el.id);
+                  // Pool boundary alignment: snap the dragged pool's edge to
+                  // other pools' edges (unless Shift = unconstrained).
+                  if (el.type === "pool" && !uc) {
+                    const snap = computePoolMoveSnap(el, x);
+                    setPoolBoundaryGuide(snap.guide);
+                    onMoveElement(el.id, snap.x, y, uc);
+                  } else {
+                    if (el.type === "pool") setPoolBoundaryGuide(null);
+                    onMoveElement(el.id, x, y, uc);
+                  }
+                }}
                 onDoubleClick={() => {
                   if (tryGroupConnectToGateway(el)) return;
                   // Gateway shape double-click never opens the label editor —
@@ -4645,7 +4700,7 @@ export function Canvas({
                 onUpdateLabel={onUpdateLabel}
                 onLabelFocusEditStart={(cx, cy, w) => enterFocusModeAt(cx, cy, w, "external")}
                 onLabelFocusEditEnd={exitFocusMode}
-                onMoveEnd={() => { setDraggingElementId(null); onElementMoveEnd?.(el.id); }}
+                onMoveEnd={() => { setDraggingElementId(null); if (el.type === "pool") setPoolBoundaryGuide(null); onElementMoveEnd?.(el.id); }}
                 multiSelected={selectedElementIds.size > 1 && selectedElementIds.has(el.id)}
                 onGroupMove={onMoveElements ? (dx, dy) => onMoveElements([...selectedElementIds], dx / zoom, dy / zoom) : undefined}
                 onGroupMoveEnd={onElementsMoveEnd}
