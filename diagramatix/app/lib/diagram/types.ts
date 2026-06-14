@@ -226,6 +226,8 @@ export interface DiagramData {
   poolFontSize?: number; // pool header labels font size in px (default 12)
   laneFontSize?: number; // lane header labels font size in px (default 12)
   processFontSize?: number; // process-system label font size — Context Diagram only (default 16)
+  valueChainFontSize?: number; // Value Chain element (process-group) name font size — Value Chain only (default 16)
+  descriptionFontSize?: number; // Process description box font size — Value Chain only (default 14)
   database?: string; // domain diagram database type: "none" | "postgres" (default "none")
   /** Diagram-level list of all parent diagrams that currently link TO
    *  this diagram (managed by the project-wide "Scan Diagrams for Links"

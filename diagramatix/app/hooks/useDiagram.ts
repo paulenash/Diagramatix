@@ -360,6 +360,8 @@ type Action =
   | { type: "SET_POOL_FONT_SIZE"; payload: number }
   | { type: "SET_LANE_FONT_SIZE"; payload: number }
   | { type: "SET_PROCESS_FONT_SIZE"; payload: number }
+  | { type: "SET_VALUE_CHAIN_FONT_SIZE"; payload: number }
+  | { type: "SET_DESCRIPTION_FONT_SIZE"; payload: number }
   | { type: "SET_DATABASE"; payload: string }
   | { type: "SET_PROCESS_OWNER"; payload: { name?: string; email?: string } }
   | { type: "CORRECT_ALL_CONNECTORS" }
@@ -6738,6 +6740,12 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
     case "SET_PROCESS_FONT_SIZE":
       return { ...state, processFontSize: action.payload };
 
+    case "SET_VALUE_CHAIN_FONT_SIZE":
+      return { ...state, valueChainFontSize: action.payload };
+
+    case "SET_DESCRIPTION_FONT_SIZE":
+      return { ...state, descriptionFontSize: action.payload };
+
     case "SET_POOL_FONT_SIZE": {
       // Recompute every pool's (minHeight, headerWidth) for the new
       // font size so the rotated label still fits and the header
@@ -8613,6 +8621,18 @@ export function useDiagram(initialData: DiagramData) {
       (size: number) => {
         invalidateRedo();
         dispatch({ type: "SET_PROCESS_FONT_SIZE", payload: size });
+      }, []
+    ),
+    setValueChainFontSize: useCallback(
+      (size: number) => {
+        invalidateRedo();
+        dispatch({ type: "SET_VALUE_CHAIN_FONT_SIZE", payload: size });
+      }, []
+    ),
+    setDescriptionFontSize: useCallback(
+      (size: number) => {
+        invalidateRedo();
+        dispatch({ type: "SET_DESCRIPTION_FONT_SIZE", payload: size });
       }, []
     ),
     setDatabase: useCallback(

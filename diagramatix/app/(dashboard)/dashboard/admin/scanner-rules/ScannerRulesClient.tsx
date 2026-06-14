@@ -30,8 +30,8 @@ export function ScannerRulesClient({ rules }: { rules: RuleMeta[] }) {
   const warningCount = sorted.filter((r) => r.severity === "warning").length;
 
   return (
-    <div className="min-h-screen dgx-dashboard-bg flex flex-col">
-      <header className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between">
+    <div className="h-screen dgx-dashboard-bg flex flex-col overflow-hidden">
+      <header className="shrink-0 bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Link href="/dashboard/admin" className="text-sm text-blue-600 hover:text-blue-800 inline-flex items-center gap-1">
             <span>&larr;</span>
@@ -51,8 +51,8 @@ export function ScannerRulesClient({ rules }: { rules: RuleMeta[] }) {
         </div>
       </header>
 
-      <main className="flex-1 p-4 max-w-5xl w-full mx-auto">
-        <div className="flex items-center justify-between mb-3">
+      <main className="flex-1 min-h-0 flex flex-col p-4 max-w-5xl w-full mx-auto">
+        <div className="shrink-0 flex items-center justify-between mb-3">
           <h2 className="text-sm font-semibold text-gray-900">
             All BPMN rules
             <span className="ml-2 text-xs text-gray-400 font-normal">
@@ -61,7 +61,7 @@ export function ScannerRulesClient({ rules }: { rules: RuleMeta[] }) {
             </span>
           </h2>
         </div>
-        <ul className="space-y-2">
+        <ul className="space-y-2 flex-1 min-h-0 overflow-y-auto pr-1">
           {sorted.map((r) => (
             <li key={r.id} className="border border-gray-200 rounded px-3 py-2 bg-white">
               <div className="flex items-center gap-2">

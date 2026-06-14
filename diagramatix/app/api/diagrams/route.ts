@@ -154,7 +154,7 @@ export async function POST(req: Request) {
   // the caller already provided values. Per-diagram overrides win; project
   // defaults fill the gaps.
   const baseData = (data ?? EMPTY_DIAGRAM) as Record<string, unknown>;
-  const FONT_KEYS = ["fontSize", "connectorFontSize", "titleFontSize", "poolFontSize", "laneFontSize"] as const;
+  const FONT_KEYS = ["fontSize", "connectorFontSize", "titleFontSize", "poolFontSize", "laneFontSize", "processFontSize", "valueChainFontSize", "descriptionFontSize"] as const;
   const seededData: Record<string, unknown> = { ...baseData };
   if (projectFontConfig) {
     for (const k of FONT_KEYS) {

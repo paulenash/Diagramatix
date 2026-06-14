@@ -24,7 +24,7 @@ import { ElementContextMenu } from "./ElementContextMenu";
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
 import { PaletteSymbolPreview } from "./Palette";
 import { CHEVRON_THEMES, chevronReadingOrder } from "@/app/lib/diagram/chevronThemes";
-import { DisplayModeCtx, FontScaleCtx, ConnectorFontScaleCtx, TitleFontSizeCtx, PoolFontSizeCtx, LaneFontSizeCtx, ProcessFontSizeCtx, SketchyFilter } from "@/app/lib/diagram/displayMode";
+import { DisplayModeCtx, FontScaleCtx, ConnectorFontScaleCtx, TitleFontSizeCtx, PoolFontSizeCtx, LaneFontSizeCtx, ProcessFontSizeCtx, ValueChainFontSizeCtx, DescriptionFontSizeCtx, SketchyFilter } from "@/app/lib/diagram/displayMode";
 import { ConnectorRenderer } from "./ConnectorRenderer";
 import { findShapeByKey as findArchimateShapeByKey } from "@/app/lib/archimate/catalogue";
 import { RemoveSpaceDialog, type RsRef, type RsSelection } from "@/app/components/RemoveSpaceDialog";
@@ -4273,6 +4273,8 @@ export function Canvas({
       <TitleFontSizeCtx.Provider value={data.titleFontSize ?? 14}>
       <PoolFontSizeCtx.Provider value={(data.poolFontSize ?? 12) * (displayMode === "hand-drawn" ? 1.3 : 1)}>
       <LaneFontSizeCtx.Provider value={(data.laneFontSize ?? 12) * (displayMode === "hand-drawn" ? 1.3 : 1)}>
+      <ValueChainFontSizeCtx.Provider value={(data.valueChainFontSize ?? 16) * (displayMode === "hand-drawn" ? 1.3 : 1)}>
+      <DescriptionFontSizeCtx.Provider value={(data.descriptionFontSize ?? 14) * (displayMode === "hand-drawn" ? 1.3 : 1)}>
       <ProcessFontSizeCtx.Provider value={(data.processFontSize ?? 16) * (displayMode === "hand-drawn" ? 1.3 : 1)}>
       <SublaneIdsCtx.Provider value={sublaneIds}>
       <ProcessGroupDepthCtx.Provider value={processGroupDepthMap}>
@@ -6199,6 +6201,8 @@ export function Canvas({
       </ProcessGroupDepthCtx.Provider>
       </SublaneIdsCtx.Provider>
       </ProcessFontSizeCtx.Provider>
+      </DescriptionFontSizeCtx.Provider>
+      </ValueChainFontSizeCtx.Provider>
       </LaneFontSizeCtx.Provider>
       </PoolFontSizeCtx.Provider>
       </TitleFontSizeCtx.Provider>

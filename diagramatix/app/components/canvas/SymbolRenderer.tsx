@@ -3,7 +3,7 @@
 import { useState, createContext, useContext } from "react";
 import type { BpmnTaskType, GatewayType, EventType, DiagramElement, Point, Side, SymbolType } from "@/app/lib/diagram/types";
 import { type SymbolColorConfig, resolveColor } from "@/app/lib/diagram/colors";
-import { DisplayModeCtx, FontScaleCtx, PoolFontSizeCtx, LaneFontSizeCtx, ProcessFontSizeCtx, sketchyFilter } from "@/app/lib/diagram/displayMode";
+import { DisplayModeCtx, FontScaleCtx, PoolFontSizeCtx, LaneFontSizeCtx, ProcessFontSizeCtx, ValueChainFontSizeCtx, DescriptionFontSizeCtx, sketchyFilter } from "@/app/lib/diagram/displayMode";
 import { wrapText } from "@/app/lib/diagram/textMetrics";
 import { readableTextOn } from "@/app/lib/diagram/chevronThemes";
 import { ArchimateShape } from "./ArchimateShape";
@@ -1623,6 +1623,8 @@ export function SymbolRenderer({
 }: Props) {
   const fontScale = useContext(FontScaleCtx);
   const processFontSize = useContext(ProcessFontSizeCtx);
+  const valueChainFontSize = useContext(ValueChainFontSizeCtx);
+  const descriptionFontSize = useContext(DescriptionFontSizeCtx);
   const fs = (base: number) => Math.round(base * fontScale * 10) / 10;
   const [isEditingGatewayLabel, setIsEditingGatewayLabel] = useState(false);
   const [editGatewayLabelValue, setEditGatewayLabelValue] = useState("");
@@ -2129,9 +2131,11 @@ export function SymbolRenderer({
         const descW = element.width - notch; // left corner to right end of bottom side
         const descX = element.x;
         const PAD = 4;
-        const FONT_SIZE = 10;
-        const LINE_H = 13;
-        const CHAR_W = FONT_SIZE * 0.48; // approximate average char width for sans-serif at 10px
+        // Configurable Process description font (default 14); already
+        // display-mode-scaled by its provider.
+        const FONT_SIZE = descriptionFontSize;
+        const LINE_H = Math.round(FONT_SIZE * 1.3);
+        const CHAR_W = FONT_SIZE * 0.48; // approximate average char width for sans-serif
         const maxChars = Math.floor((descW - PAD * 2) / CHAR_W);
 
         // Word-wrap: split on explicit newlines, then wrap each paragraph
@@ -2573,7 +2577,9 @@ export function SymbolRenderer({
         const chevronFill = isChevron ? (element.properties.fillColor as string | undefined) : undefined;
         const labelFill = chevronFill ? readableTextOn(chevronFill) : "#111827";
         const labelLines = element.label.split('\n');
-        const fSize = fs(isActorOrTeam ? 11 : 12);
+        // The Value Chain element (process-group) name has its own configurable
+        // font size (default 16); already display-mode-scaled by its provider.
+        const fSize = element.type === 'process-group' ? valueChainFontSize : fs(isActorOrTeam ? 11 : 12);
         const lineH = fSize * 1.3;
         if ((isChevron || isArchi) && labelLines.length > 1) {
           // For ArchiMate the labelInfo anchor is either the centre of

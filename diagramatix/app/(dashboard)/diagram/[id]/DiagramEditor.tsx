@@ -685,6 +685,8 @@ export function DiagramEditor({
     setPoolFontSize,
     setLaneFontSize,
     setProcessFontSize,
+    setValueChainFontSize,
+    setDescriptionFontSize,
     setDatabase,
     setProcessOwner,
     elementMoveEnd,
@@ -4208,6 +4210,10 @@ export function DiagramEditor({
           onLaneFontSizeChange={setLaneFontSize}
           processFontSize={data.processFontSize}
           onProcessFontSizeChange={setProcessFontSize}
+          valueChainFontSize={data.valueChainFontSize}
+          onValueChainFontSizeChange={setValueChainFontSize}
+          descriptionFontSize={data.descriptionFontSize}
+          onDescriptionFontSizeChange={setDescriptionFontSize}
           onClose={() => setShowDiagramMaintenance(false)}
           onSaved={(config) => {
             setDiagramColorConfig(config);

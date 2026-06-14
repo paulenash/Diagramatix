@@ -13,6 +13,8 @@ export const TitleFontSizeCtx = createContext<number>(14);      // title absolut
 export const PoolFontSizeCtx = createContext<number>(12);       // pool header absolute px
 export const LaneFontSizeCtx = createContext<number>(12);       // lane header absolute px
 export const ProcessFontSizeCtx = createContext<number>(16);    // Context-diagram process-system label absolute px
+export const ValueChainFontSizeCtx = createContext<number>(16); // Value Chain element (process-group) name absolute px
+export const DescriptionFontSizeCtx = createContext<number>(14);// Process description box absolute px
 
 /** SVG filter component — render inside <svg> to define the sketchy filter */
 export function SketchyFilter() {

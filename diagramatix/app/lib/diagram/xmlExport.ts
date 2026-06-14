@@ -67,7 +67,7 @@ export function diagramDataXml(dd: DiagramData, ind: string): string {
   // out. Emit them now so XML round-trip preserves them.
   // v1.17 — processFontSize attribute carries the independent
   // Context-Diagram "Process Names" font size.
-  let x = `${ind}<dgx:data${attr("fontSize", dd.fontSize)}${attr("connectorFontSize", dd.connectorFontSize)}${attr("titleFontSize", dd.titleFontSize)}${attr("poolFontSize", dd.poolFontSize)}${attr("laneFontSize", dd.laneFontSize)}${attr("processFontSize", dd.processFontSize)}${attr("database", dd.database)}>\n`;
+  let x = `${ind}<dgx:data${attr("fontSize", dd.fontSize)}${attr("connectorFontSize", dd.connectorFontSize)}${attr("titleFontSize", dd.titleFontSize)}${attr("poolFontSize", dd.poolFontSize)}${attr("laneFontSize", dd.laneFontSize)}${attr("processFontSize", dd.processFontSize)}${attr("valueChainFontSize", dd.valueChainFontSize)}${attr("descriptionFontSize", dd.descriptionFontSize)}${attr("database", dd.database)}>\n`;
 
   // Elements
   x += `${ind}  <dgx:elements>\n`;
@@ -360,6 +360,8 @@ export function parseDiagramatixXml(xmlText: string): any {
     const laneFontSize = num(dataEl.getAttribute("laneFontSize"));
     // v1.17 — independent Context-Diagram "Process Names" font size.
     const processFontSize = num(dataEl.getAttribute("processFontSize"));
+    const valueChainFontSize = num(dataEl.getAttribute("valueChainFontSize"));
+    const descriptionFontSize = num(dataEl.getAttribute("descriptionFontSize"));
     const database = dataEl.getAttribute("database");
     if (fontSize !== undefined) data.fontSize = fontSize;
     if (connectorFontSize !== undefined) data.connectorFontSize = connectorFontSize;
@@ -367,6 +369,8 @@ export function parseDiagramatixXml(xmlText: string): any {
     if (poolFontSize !== undefined) data.poolFontSize = poolFontSize;
     if (laneFontSize !== undefined) data.laneFontSize = laneFontSize;
     if (processFontSize !== undefined) data.processFontSize = processFontSize;
+    if (valueChainFontSize !== undefined) data.valueChainFontSize = valueChainFontSize;
+    if (descriptionFontSize !== undefined) data.descriptionFontSize = descriptionFontSize;
     if (database != null && database !== "") data.database = database;
 
     // Elements

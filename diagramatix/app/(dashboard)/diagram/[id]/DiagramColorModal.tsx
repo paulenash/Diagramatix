@@ -37,6 +37,12 @@ interface Props {
    *  (central circle) label font size. */
   processFontSize?: number;
   onProcessFontSizeChange?: (size: number) => void;
+  /** Value-Chain only — Value Chain element (process-group) name + Process
+   *  description box font sizes. */
+  valueChainFontSize?: number;
+  onValueChainFontSizeChange?: (size: number) => void;
+  descriptionFontSize?: number;
+  onDescriptionFontSizeChange?: (size: number) => void;
   onClose: () => void;
   onSaved: (config: SymbolColorConfig, settings?: {
     displayMode?: DisplayMode;
@@ -46,6 +52,8 @@ interface Props {
     poolFontSize?: number;
     laneFontSize?: number;
     processFontSize?: number;
+    valueChainFontSize?: number;
+    descriptionFontSize?: number;
   }) => void;
 }
 
@@ -75,6 +83,10 @@ export function DiagramColorModal({
   onLaneFontSizeChange,
   processFontSize,
   onProcessFontSizeChange,
+  valueChainFontSize,
+  onValueChainFontSizeChange,
+  descriptionFontSize,
+  onDescriptionFontSizeChange,
   onClose,
   onSaved,
 }: Props) {
@@ -95,6 +107,8 @@ export function DiagramColorModal({
   const [workingPoolFontSize, setWorkingPoolFontSize] = useState(poolFontSize ?? 12);
   const [workingLaneFontSize, setWorkingLaneFontSize] = useState(laneFontSize ?? 12);
   const [workingProcessFontSize, setWorkingProcessFontSize] = useState(processFontSize ?? defaultProcessFontSize);
+  const [workingValueChainFontSize, setWorkingValueChainFontSize] = useState(valueChainFontSize ?? 16);
+  const [workingDescriptionFontSize, setWorkingDescriptionFontSize] = useState(descriptionFontSize ?? 14);
   // saving/saveError no longer needed — save happens in background after modal closes
 
   const symbols: SymbolType[] = COLOR_PALETTE_BY_DIAGRAM_TYPE[diagramType];
@@ -120,6 +134,8 @@ export function DiagramColorModal({
     if (onPoolFontSizeChange) onPoolFontSizeChange(workingPoolFontSize);
     if (onLaneFontSizeChange) onLaneFontSizeChange(workingLaneFontSize);
     if (onProcessFontSizeChange) onProcessFontSizeChange(workingProcessFontSize);
+    if (onValueChainFontSizeChange) onValueChainFontSizeChange(workingValueChainFontSize);
+    if (onDescriptionFontSizeChange) onDescriptionFontSizeChange(workingDescriptionFontSize);
     onSaved(workingColors);
     onClose();
 
@@ -233,6 +249,8 @@ export function DiagramColorModal({
                 { label: "Title",      value: workingTitleFontSize,     setValue: setWorkingTitleFontSize,     default: 14, min: 8,  max: 30, enabled: !!onTitleFontSizeChange },
                 { label: "Pools",      value: workingPoolFontSize,      setValue: setWorkingPoolFontSize,      default: 12, min: 6,  max: 24, enabled: !!onPoolFontSizeChange && diagramType === "bpmn" },
                 { label: "Lanes",      value: workingLaneFontSize,      setValue: setWorkingLaneFontSize,      default: 12, min: 6,  max: 24, enabled: !!onLaneFontSizeChange && diagramType === "bpmn" },
+                { label: "Value Chain Name", value: workingValueChainFontSize,  setValue: setWorkingValueChainFontSize,  default: 16, min: 8, max: 36, enabled: !!onValueChainFontSizeChange && diagramType === "value-chain" },
+                { label: "Description",      value: workingDescriptionFontSize, setValue: setWorkingDescriptionFontSize, default: 14, min: 6, max: 30, enabled: !!onDescriptionFontSizeChange && diagramType === "value-chain" },
               ];
           const visible = controls.filter(c => c.enabled);
           if (visible.length === 0) return null;
