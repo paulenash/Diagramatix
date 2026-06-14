@@ -333,6 +333,7 @@ type Action =
   | { type: "UPDATE_CONNECTOR_TYPE"; payload: { id: string; connectorType: ConnectorType } }
   | { type: "CONVERT_TASK_SUBPROCESS"; payload: { id: string } }
   | { type: "CONVERT_PROCESS_COLLAPSED"; payload: { id: string } }
+  | { type: "CONVERT_EP_TO_SUBPROCESS"; payload: { id: string; linkedDiagramId: string | null } }
   | { type: "CONVERT_EVENT_TYPE"; payload: { id: string; newEventType: "start-event" | "intermediate-event" | "end-event" } }
   | { type: "ADD_SELF_TRANSITION"; payload: {
       elementId: string;
@@ -4662,6 +4663,86 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       return { ...state, elements };
     }
 
+    case "CONVERT_EP_TO_SUBPROCESS": {
+      // Collapse an Expanded Subprocess (EP) to a collapsed Subprocess whose
+      // interior has been moved into a linked sub-diagram (created by the
+      // caller — its id arrives as linkedDiagramId).
+      //   • Interior children (and boundary events on them) are REMOVED here
+      //     — they now live in the sub-diagram.
+      //   • Boundary events mounted on the EP edge: Start/End are dropped
+      //     (a collapsed subprocess has no interface events), Intermediate
+      //     ones are kept and re-snapped to the smaller box.
+      //   • Connectors that crossed into removed interior/boundary elements
+      //     re-attach to the collapsed subprocess; purely-interior ones are
+      //     dropped (they moved). EP markers (subprocessType / repeatType)
+      //     are preserved.
+      const { id, linkedDiagramId } = action.payload;
+      const ep = state.elements.find(e => e.id === id);
+      if (!ep || ep.type !== "subprocess-expanded") return state;
+
+      const desc = getAllDescendantIds(state.elements, id);
+      const byId = new Map(state.elements.map(e => [e.id, e]));
+      const isEpBoundaryStartEnd = (eid: string) => {
+        const e = byId.get(eid);
+        return !!e && e.boundaryHostId === id && (e.type === "start-event" || e.type === "end-event");
+      };
+      const isEpBoundaryIntermediate = (eid: string) => {
+        const e = byId.get(eid);
+        return !!e && e.boundaryHostId === id && e.type === "intermediate-event";
+      };
+      // Anything moved out of this canvas: interior children + the dropped
+      // edge Start/End events. (Kept edge Intermediate events are excluded.)
+      const removed = new Set<string>(
+        [...desc].filter(d => !isEpBoundaryIntermediate(d)),
+      );
+      // Endpoints that, when a connector touches them, should re-point to the
+      // collapsed subprocess: the interior children and the dropped edge
+      // Start/End events (i.e. everything removed).
+      const reattach = removed;
+
+      const { w: W, h: H } = getDefaultSize("subprocess");
+      const newX = ep.x + ep.width / 2 - W / 2;
+      const newY = ep.y + ep.height / 2 - H / 2;
+      const newRect = { x: newX, y: newY, width: W, height: H };
+
+      const elements = state.elements
+        .filter(e => !removed.has(e.id))
+        .map(e => {
+          if (e.id === id) {
+            const props = { ...e.properties };
+            if (linkedDiagramId) props.linkedDiagramId = linkedDiagramId;
+            return {
+              ...e,
+              type: "subprocess" as SymbolType,
+              x: newX, y: newY, width: W, height: H,
+              // Keep EP markers (subprocessType / repeatType live on props /
+              // the element); just shed the expanded container type.
+              properties: props,
+            };
+          }
+          // Re-snap kept edge Intermediate (boundary) events onto the new box.
+          if (isEpBoundaryIntermediate(e.id)) {
+            const centre = { x: e.x + e.width / 2, y: e.y + e.height / 2 };
+            const pt = nearestPointOnRectBoundary(newRect, centre);
+            return { ...e, x: pt.x - e.width / 2, y: pt.y - e.height / 2 };
+          }
+          return e;
+        });
+
+      let connectors = state.connectors
+        // Purely-interior connectors moved to the sub-diagram.
+        .filter(c => !(reattach.has(c.sourceId) && reattach.has(c.targetId)))
+        .map(c => {
+          const src = reattach.has(c.sourceId) ? id : c.sourceId;
+          const tgt = reattach.has(c.targetId) ? id : c.targetId;
+          return src === c.sourceId && tgt === c.targetId ? c : { ...c, sourceId: src, targetId: tgt };
+        })
+        // A re-point that collapsed both ends onto the subprocess is a no-op.
+        .filter(c => c.sourceId !== c.targetId);
+      connectors = recomputeAllConnectors(connectors, elements);
+      return { ...state, elements, connectors };
+    }
+
     case "CONVERT_EVENT_TYPE": {
       const { id, newEventType } = action.payload;
       const el = state.elements.find(e => e.id === id);
@@ -8450,6 +8531,10 @@ export function useDiagram(initialData: DiagramData) {
     convertProcessCollapsed: useCallback((id: string) => {
       pushHistory(snapshotData());
       dispatch({ type: "CONVERT_PROCESS_COLLAPSED", payload: { id } });
+    }, []),
+    convertEpToSubprocess: useCallback((id: string, linkedDiagramId: string | null) => {
+      pushHistory(snapshotData());
+      dispatch({ type: "CONVERT_EP_TO_SUBPROCESS", payload: { id, linkedDiagramId } });
     }, []),
     convertEventType: useCallback((id: string, newEventType: "start-event" | "intermediate-event" | "end-event") => {
       pushHistory(snapshotData());

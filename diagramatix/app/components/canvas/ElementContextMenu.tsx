@@ -170,11 +170,13 @@ export interface ElementContextMenuProps {
   top: number;
   width?: number;
   onSelect: (propKey: string, value: string) => void;
+  /** One-off actions (not property picks) e.g. "collapse-ep". */
+  onAction?: (action: string) => void;
   onClose: () => void;
 }
 
 export function ElementContextMenu({
-  el, kind, left, top, width = 160, onSelect, onClose,
+  el, kind, left, top, width = 160, onSelect, onAction, onClose,
 }: ElementContextMenuProps) {
   const sections = useMemo(() => sectionsFor(kind, el), [kind, el]);
   // Flat list of selectable items across all sections — headers excluded.
@@ -251,6 +253,27 @@ export function ElementContextMenu({
           })}
         </div>
       ))}
+
+      {/* One-off actions. Expanded Subprocess (EP) → collapse into a linked
+          sub-diagram. Mouse-only (not part of ↑/↓ flat nav). */}
+      {el.type === "subprocess-expanded" && onAction && (
+        <div>
+          {sections.length > 0 && <div className="border-t border-gray-100 my-0.5" />}
+          <div className="px-3 py-0.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wide select-none">
+            Actions
+          </div>
+          <button
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onAction("collapse-ep");
+            }}
+            className="text-left w-full px-3 py-0.5 text-sm text-blue-700 hover:bg-blue-50"
+          >
+            Collapse to Subprocess…
+          </button>
+        </div>
+      )}
     </div>
   );
 }

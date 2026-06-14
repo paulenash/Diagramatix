@@ -226,6 +226,7 @@ interface Props {
   defaultRoutingType: RoutingType;
   onUpdateProperties?: (id: string, props: Record<string, unknown>) => void;
   onUpdatePropertiesBatch?: (updates: Array<{ id: string; properties: Record<string, unknown> }>) => void;
+  onCollapseEpToSubprocess?: (id: string) => void;
   onUpdateConnectorWaypoints?: (id: string, waypoints: Point[]) => void;
   onUpdateConnectorLabel?: (id: string, label?: string, offsetX?: number, offsetY?: number, width?: number) => void;
   onSplitConnector?: (symbolType: SymbolType, position: Point, connectorId: string, taskType?: BpmnTaskType, eventType?: EventType) => void;
@@ -464,6 +465,7 @@ export function Canvas({
   defaultRoutingType,
   onUpdateProperties,
   onUpdatePropertiesBatch,
+  onCollapseEpToSubprocess,
   onUpdateConnectorWaypoints,
   onUpdateConnectorLabel,
   onSplitConnector,
@@ -6484,6 +6486,12 @@ export function Canvas({
             onSelect={(propKey, value) => {
               onUpdateProperties?.(el.id, { [propKey]: value });
               setElementContextMenu(null);
+            }}
+            onAction={(action) => {
+              setElementContextMenu(null);
+              if (action === "collapse-ep" && el.type === "subprocess-expanded") {
+                onCollapseEpToSubprocess?.(el.id);
+              }
             }}
             onClose={() => setElementContextMenu(null)}
           />

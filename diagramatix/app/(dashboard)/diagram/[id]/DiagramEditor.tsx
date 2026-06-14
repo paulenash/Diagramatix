@@ -679,6 +679,7 @@ export function DiagramEditor({
     flipForkJoin,
     convertTaskSubprocess,
     convertProcessCollapsed,
+    convertEpToSubprocess,
     convertEventType,
     addSelfTransition,
     splitConnector,
@@ -1819,6 +1820,84 @@ export function DiagramEditor({
       setSelectedConnectorId(null);
     } catch (err) {
       console.error("Failed to apply template:", err);
+    }
+  }
+
+  // Collapse an Expanded Subprocess (EP) into a collapsed Subprocess whose
+  // interior is moved into a NEW linked BPMN diagram (drill-down). Boundary
+  // Start/End events on the EP edge are dropped, boundary Intermediate ones
+  // kept; EP markers are preserved; crossing connectors re-attach to the box.
+  // (See the CONVERT_EP_TO_SUBPROCESS reducer for the canvas-side surgery.)
+  const [epCollapseBusyId, setEpCollapseBusyId] = useState<string | null>(null);
+  const [epCollapseMsg, setEpCollapseMsg] = useState<string | null>(null);
+  async function handleCollapseEpToSubprocess(epId: string) {
+    if (epCollapseBusyId) return;
+    const ep = data.elements.find((e) => e.id === epId);
+    if (!ep || ep.type !== "subprocess-expanded") return;
+
+    // Mirror the reducer's partition so the sub-diagram payload matches what
+    // the canvas removes: everything under the EP EXCEPT boundary
+    // Intermediate events (which stay on the collapsed box).
+    const desc = new Set<string>();
+    {
+      const queue = [epId];
+      while (queue.length) {
+        const cur = queue.shift()!;
+        for (const e of data.elements) {
+          if ((e.parentId === cur || e.boundaryHostId === cur) && !desc.has(e.id)) {
+            desc.add(e.id);
+            queue.push(e.id);
+          }
+        }
+      }
+    }
+    const byId = new Map(data.elements.map((e) => [e.id, e]));
+    const moved = new Set<string>(
+      [...desc].filter((d) => {
+        const e = byId.get(d);
+        return !(e && e.boundaryHostId === epId && e.type === "intermediate-event");
+      }),
+    );
+
+    setEpCollapseBusyId(epId);
+    try {
+      let linkedId: string | null = null;
+      if (moved.size > 0) {
+        // Capture the moved interior as a self-contained, origin-normalised
+        // diagram payload (same helper the template feature uses).
+        const captured = captureTemplate(data.elements, data.connectors, moved);
+        const subData = {
+          ...data,
+          elements: captured.elements,
+          connectors: captured.connectors,
+          viewport: { x: 0, y: 0, zoom: 1 },
+        };
+        const name = (ep.label && ep.label.trim()) || "Subprocess";
+        const res = await fetch("/api/diagrams", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name,
+            type: "bpmn",
+            projectId: projectId ?? undefined,
+            data: subData,
+            colorConfig: diagramColorConfig,
+            displayMode,
+          }),
+        });
+        if (!res.ok) {
+          const txt = await res.text().catch(() => "");
+          setEpCollapseMsg(`Could not create the linked sub-diagram (${res.status}). ${txt}`.trim());
+          return;
+        }
+        const created = await res.json();
+        linkedId = created?.id ?? null;
+      }
+      convertEpToSubprocess(epId, linkedId);
+    } catch (err) {
+      setEpCollapseMsg(`Collapse failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setEpCollapseBusyId(null);
     }
   }
 
@@ -3127,6 +3206,7 @@ export function DiagramEditor({
           defaultRoutingType={defaultRoutingType}
           onUpdateProperties={updateProperties}
           onUpdatePropertiesBatch={updatePropertiesBatch}
+          onCollapseEpToSubprocess={handleCollapseEpToSubprocess}
           onUpdateConnectorWaypoints={updateConnectorWaypoints}
           onUpdateConnectorLabel={updateConnectorLabel}
           onSplitConnector={splitConnector}
@@ -3308,6 +3388,15 @@ export function DiagramEditor({
             message={reviewActionMsg}
             tone="info"
             onClose={() => setReviewActionMsg(null)}
+          />
+        )}
+
+        {epCollapseMsg && (
+          <AlertDialog
+            title="Collapse Subprocess"
+            message={epCollapseMsg}
+            tone="error"
+            onClose={() => setEpCollapseMsg(null)}
           />
         )}
 
