@@ -1693,6 +1693,28 @@ function applyEPBoundaryChange(
     });
   }
 
+  // Diagnostic: edge-mounted-event re-snap trace (window.__DIAG_EP_MOVE).
+  // Shows the EP rect delta, which sides moved, and where each boundary
+  // event landed after step 6 (frac re-snap) + 6b (perimeter clamp).
+  if (typeof window !== "undefined" && (window as unknown as { __DIAG_EP_MOVE?: boolean }).__DIAG_EP_MOVE === true) {
+    const epF = updatedEls.find((e) => e.id === epId);
+    const evIn = elements.filter((e) => e.boundaryHostId === epId);
+    const evOut = updatedEls.filter((e) => e.boundaryHostId === epId);
+    const evById = new Map(evIn.map((e) => [e.id, e]));
+    const evLines = evOut.map((e) => {
+      const b = evById.get(e.id);
+      const from = b ? `(${(b.x + b.width / 2).toFixed(0)},${(b.y + b.height / 2).toFixed(0)})` : "(new)";
+      return `    ev#${e.id.slice(0, 6)} ${e.type} ${from}→(${(e.x + e.width / 2).toFixed(0)},${(e.y + e.height / 2).toFixed(0)})`;
+    });
+    console.log(
+      `[EP-MOVE/applyEPBoundaryChange] EP#${epId.slice(0, 6)} ` +
+      `rect (${oldRect.x.toFixed(0)},${oldRect.y.toFixed(0)},${oldRect.width.toFixed(0)},${oldRect.height.toFixed(0)})` +
+      `→(${epF ? `${epF.x.toFixed(0)},${epF.y.toFixed(0)},${epF.width.toFixed(0)},${epF.height.toFixed(0)}` : "?"}) ` +
+      `moving={${[...movingSides].join(",")}} growT/B/L/R=${growTop.toFixed(0)}/${growBottom.toFixed(0)}/${growLeft.toFixed(0)}/${growRight.toFixed(0)}` +
+      (evLines.length ? `\n${evLines.join("\n")}` : " (no edge events)"),
+    );
+  }
+
   // 7. Recompute connectors anchored to the EP, its boundary events,
   //    or any element that was just shifted. Cheap pass: recompute any
   //    connector whose source or target id is in the EP's anchor set
@@ -3732,6 +3754,19 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       const el = state.elements.find((e) => e.id === id);
       if (!el) return state;
 
+      // Diagnostic trace for the "wild behaviour when moving an activity
+      // inside an EP" report. Enable with `window.__DIAG_EP_MOVE = true`.
+      // Snapshots every element's rect up-front; the matching diff is logged
+      // just before the main-path return (line ~"return updatePoolTypes"),
+      // but ONLY when the cascade touched more than the moved element — so
+      // ordinary frames stay silent and a runaway cascade stands out.
+      const epMoveTrace =
+        typeof window !== "undefined" &&
+        (window as unknown as { __DIAG_EP_MOVE?: boolean }).__DIAG_EP_MOVE === true;
+      const epTraceSnap = epMoveTrace
+        ? new Map(state.elements.map((e) => [e.id, { x: e.x, y: e.y, w: e.width, h: e.height, t: e.type }]))
+        : null;
+
       // CASE A: Moving a boundary event — constrain centre to host boundary
       if (el.boundaryHostId) {
         const host = state.elements.find((e) => e.id === el.boundaryHostId);
@@ -4326,6 +4361,35 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
             if (!changedElIds.has(conn.sourceId) && !changedElIds.has(conn.targetId)) return conn;
             return recomputeAllConnectors([conn], elements)[0] ?? conn;
           });
+        }
+      }
+
+      if (epMoveTrace && epTraceSnap) {
+        const moved = el; // for clarity
+        const lines: string[] = [];
+        const present = new Set<string>();
+        for (const e of elements) {
+          present.add(e.id);
+          const b = epTraceSnap.get(e.id);
+          if (!b) { lines.push(`  +NEW   ${e.type}#${e.id.slice(0, 6)} @(${e.x.toFixed(0)},${e.y.toFixed(0)} ${e.width.toFixed(0)}x${e.height.toFixed(0)})`); continue; }
+          if (b.x !== e.x || b.y !== e.y || b.w !== e.width || b.h !== e.height) {
+            const bnd = e.boundaryHostId ? ` host=${e.boundaryHostId.slice(0, 6)}` : "";
+            const self = e.id === id ? " <-MOVED" : "";
+            lines.push(`  ${e.type}#${e.id.slice(0, 6)}${bnd}: x ${b.x.toFixed(0)}→${e.x.toFixed(0)}  y ${b.y.toFixed(0)}→${e.y.toFixed(0)}  w ${b.w.toFixed(0)}→${e.width.toFixed(0)}  h ${b.h.toFixed(0)}→${e.height.toFixed(0)}${self}`);
+          }
+        }
+        for (const [bid, b] of epTraceSnap) if (!present.has(bid)) lines.push(`  -GONE  ${b.t}#${bid.slice(0, 6)}`);
+        // Only shout when the move rippled beyond the dragged element — that
+        // is the "wild behaviour" signature (cascade / runaway growth).
+        if (lines.length > 1) {
+          const epParentId = moved.parentId && !unconstrained
+            ? (elements.find((e) => e.id === moved.parentId && e.type === "subprocess-expanded")?.id ?? null)
+            : null;
+          console.log(
+            `[EP-MOVE] ${moved.type}#${id.slice(0, 6)} → (${x.toFixed(0)},${y.toFixed(0)})` +
+            ` epParent=${epParentId ? epParentId.slice(0, 6) : "none"} epGrown=${epGrown}` +
+            ` unconstrained=${!!unconstrained} | ${lines.length} elements changed:\n${lines.join("\n")}`,
+          );
         }
       }
 
