@@ -120,7 +120,7 @@ interface Props {
 function useAutoSave(
   diagramId: string,
   data: DiagramData,
-  _delay = 1500,
+  delay = 1500,
   disabled = false
 ) {
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "unsaved">("saved");
@@ -153,6 +153,18 @@ function useAutoSave(
       setSaveStatus("unsaved");
     }
   }, [data, diagramId]);
+
+  // Debounced auto-save. Without this the diagram only persists when a
+  // navigation hook explicitly calls saveNow(); a change followed by leaving
+  // via any other path (e.g. setting a chevron's linked-diagram id, then
+  // browsing away) was silently lost. Force-saves on navigation still win;
+  // this timer no-ops when there's nothing new to write.
+  useEffect(() => {
+    if (disabled) return;
+    if (JSON.stringify(data) === lastSaved.current) return;
+    const t = setTimeout(() => { void saveNow(); }, delay);
+    return () => clearTimeout(t);
+  }, [data, disabled, delay, saveNow]);
 
   return { saveStatus, lastSavedAt, saveNow };
 }

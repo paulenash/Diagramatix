@@ -107,6 +107,32 @@ The customer provides order details, purchase orders, delivery instructions, con
 **Information flow between process and IT systems.**
 The process creates or updates customer master data, sales orders, inventory reservations, shipment records, delivery confirmations, invoices, receivables, payment records, and financial postings. IT systems provide pricing, credit status, inventory availability, order status, invoice status, payment status, and reporting information.
 
+**Value Chain diagram prompt.**
+
+```text
+Value Chain V01 - Order to Cash (O2C)
+Lay out a single left-to-right sequence of high-level process stages
+(chevrons), one chevron per stage, in this order:
+
+V01.01. Receive Order
+V01.02. Validate Customer / Order
+V01.03. Check Credit & Pricing
+V01.04. Confirm Availability
+V01.05. Fulfil Goods or Services
+V01.06. Deliver to Customer
+V01.07. Issue Invoice
+V01.08. Receive Payment
+V01.09. Reconcile Payment
+V01.10. Manage Disputes & Deductions
+V01.11. Close Order
+
+This is the customer-facing, revenue-generating end-to-end process: a
+customer order flows through fulfilment, delivery, invoicing, and
+payment collection. The main external participant is the Customer
+(Buyer); the process is triggered when the customer places an order,
+accepts a quote, signs a contract, or starts a recurring purchase.
+```
+
 ## V02 — Procure to Pay
 
 **Teams and roles involved.**
