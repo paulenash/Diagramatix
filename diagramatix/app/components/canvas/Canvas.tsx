@@ -6563,7 +6563,7 @@ export function Canvas({
         const containerRect = svgRef.current?.parentElement?.getBoundingClientRect();
         const containerW = containerRect?.width ?? window.innerWidth;
         const containerH = containerRect?.height ?? window.innerHeight;
-        const POPUP_W = 220;
+        const POPUP_W = 248;
         const POPUP_H = CHEVRON_THEMES.length * 32 + 36 + 12; // N themes + clear + padding
         const left = Math.min(themePicker.screenX, containerW - POPUP_W - 4);
         const top = Math.min(themePicker.screenY, containerH - POPUP_H - 4);
@@ -6596,7 +6596,7 @@ export function Canvas({
                 <div className="flex gap-0.5">
                   {theme.colours.map((c, i) => (
                     <div key={i}
-                      className={`w-4 h-4 rounded-sm border ${i < selectedChevrons.length ? "border-gray-400" : "border-gray-200 opacity-40"}`}
+                      className={`w-3 h-3 rounded-sm border ${i < selectedChevrons.length ? "border-gray-400" : "border-gray-200 opacity-40"}`}
                       style={{ backgroundColor: c }}
                     />
                   ))}
