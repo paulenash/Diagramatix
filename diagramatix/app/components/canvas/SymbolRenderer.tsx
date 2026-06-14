@@ -1938,6 +1938,38 @@ export function SymbolRenderer({
     (element.type === "start-event" || element.type === "end-event");
   const showLabel = element.type !== "initial-state" && element.type !== "final-state" && element.type !== "fork-join" && !isBoundaryStartOrEnd;
 
+  // Events / gateways / data objects render a SEPARATE external label below
+  // the shape, edited inline via the isEditingGatewayLabel foreignObject.
+  // Double-clicking the shape BODY (not just the label) should open that
+  // editor too. Mirrors the label rect's own dblclick handler below.
+  const hasExternalLabel =
+    showLabel && (
+      element.type === "start-event" ||
+      element.type === "end-event" ||
+      element.type === "intermediate-event" ||
+      element.type === "gateway" ||
+      element.type === "data-object" ||
+      element.type === "data-store"
+    ) && !(element.type === "gateway" && (element.properties.gatewayRole as string | undefined) === "merge");
+
+  function beginExternalLabelEdit() {
+    const labelOffsetX = (element.properties.labelOffsetX as number) ?? 0;
+    const labelOffsetY = (element.properties.labelOffsetY as number) ?? 7;
+    const labelWidth   = (element.properties.labelWidth   as number) ?? 80;
+    const labelCenterX = element.x + element.width / 2 + labelOffsetX;
+    const labelTopY    = element.y + element.height + labelOffsetY;
+    const totalLabelH  = wrapText(element.label, labelWidth).length * 14;
+    setEditGatewayLabelValue(element.label);
+    setIsEditingGatewayLabel(true);
+    // The focus-zoom hook (scope "external") also DESELECTS the shape, so it
+    // isn't left highlighted behind the editor.
+    onLabelFocusEditStart?.(
+      labelCenterX,
+      labelTopY + Math.max(totalLabelH, 16) / 2,
+      labelWidth,
+    );
+  }
+
   // Return-link elements are no longer rendered.
   if (isHiddenReturnLink) return null;
 
@@ -1954,6 +1986,12 @@ export function SymbolRenderer({
           const world = svgToWorld(e.clientX, e.clientY);
           if (world.x > element.x + 36) return;
         }
+        // Events / gateways / data objects: double-clicking the shape body
+        // opens the element's external-label editor (zoom + edit) and the
+        // focus hook deselects the shape. When this shape is part of a
+        // multi-selection we fall through to onDoubleClick so the gateway
+        // group-connect (diamond) gesture still fires instead.
+        if (hasExternalLabel && !multiSelected) { beginExternalLabelEdit(); return; }
         onDoubleClick();
       }}
       // Cursor scheme (G05): grabbable elements get .dgx-grab so the
