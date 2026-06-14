@@ -23,7 +23,7 @@ import { SymbolRenderer, SublaneIdsCtx, ProcessGroupDepthCtx, LaneDepthCtx, Data
 import { ElementContextMenu } from "./ElementContextMenu";
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
 import { PaletteSymbolPreview } from "./Palette";
-import { CHEVRON_THEMES } from "@/app/lib/diagram/chevronThemes";
+import { CHEVRON_THEMES, chevronReadingOrder } from "@/app/lib/diagram/chevronThemes";
 import { DisplayModeCtx, FontScaleCtx, ConnectorFontScaleCtx, TitleFontSizeCtx, PoolFontSizeCtx, LaneFontSizeCtx, ProcessFontSizeCtx, SketchyFilter } from "@/app/lib/diagram/displayMode";
 import { ConnectorRenderer } from "./ConnectorRenderer";
 import { findShapeByKey as findArchimateShapeByKey } from "@/app/lib/archimate/catalogue";
@@ -6556,9 +6556,11 @@ export function Canvas({
       {/* Process colour theme picker popup */}
       {themePicker && onUpdatePropertiesBatch && (() => {
         const CHEVRON_SET = new Set(["chevron", "chevron-collapsed"]);
-        const selectedChevrons = data.elements
-          .filter(el => selectedElementIds.has(el.id) && CHEVRON_SET.has(el.type))
-          .sort((a, b) => a.x - b.x || a.y - b.y);
+        // Reading order (top-left → right → down → right) so a Value Chain
+        // split across two rows themes as one continuous ramp.
+        const selectedChevrons = chevronReadingOrder(
+          data.elements.filter(el => selectedElementIds.has(el.id) && CHEVRON_SET.has(el.type)),
+        );
         if (selectedChevrons.length < 2) { setThemePicker(null); return null; }
         const containerRect = svgRef.current?.parentElement?.getBoundingClientRect();
         const containerW = containerRect?.width ?? window.innerWidth;

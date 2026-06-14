@@ -80,3 +80,28 @@ export const CHEVRON_THEMES: readonly ChevronTheme[] = THEME_SOURCES.map((t) => 
   name: t.name,
   colours: redistribute(t.colours, SHADE_COUNT),
 }));
+
+/**
+ * Order chevrons (Processes / Collapsed Processes) for theming in READING
+ * order: top row left→right, then down to the next row, left→right, and so
+ * on — "top-left, then down and to the right". Buckets elements into rows by
+ * vertical-centre proximity (within ~60% of the element height), so a Value
+ * Chain split across two rows is themed as ONE continuous ramp regardless of
+ * how the processes are split apart or combined.
+ */
+export function chevronReadingOrder<T extends { x: number; y: number; height: number }>(
+  chevrons: T[],
+): T[] {
+  const sorted = [...chevrons].sort((a, b) => (a.y + a.height / 2) - (b.y + b.height / 2));
+  const rows: { cy: number; items: T[] }[] = [];
+  for (const c of sorted) {
+    const cy = c.y + c.height / 2;
+    const last = rows[rows.length - 1];
+    if (last && Math.abs(last.cy - cy) <= c.height * 0.6) {
+      last.items.push(c);
+    } else {
+      rows.push({ cy, items: [c] });
+    }
+  }
+  return rows.flatMap((r) => r.items.sort((a, b) => a.x - b.x));
+}

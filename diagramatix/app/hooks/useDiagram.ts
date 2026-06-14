@@ -21,7 +21,7 @@ import type {
 } from "@/app/lib/diagram/types";
 import { computeWaypoints, recomputeAllConnectors, consolidateWaypoints, rectifyWaypoints, constrainControlPoint, safeSidePair } from "@/app/lib/diagram/routing";
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
-import { CHEVRON_THEMES } from "@/app/lib/diagram/chevronThemes";
+import { CHEVRON_THEMES, chevronReadingOrder } from "@/app/lib/diagram/chevronThemes";
 import { autoSizeForType, getDefaultSize, wrapText, type AutosizeType } from "@/app/lib/diagram/textMetrics";
 
 /** Compute the autosize-driven dimensions for a task or subprocess based on
@@ -445,6 +445,17 @@ function findSnappedGroup(elements: DiagramElement[], seedId: string): DiagramEl
   const seed = elements.find(e => e.id === seedId);
   if (!seed || !CHEVRON_SNAP_TYPES.has(seed.type)) return [];
   const chevrons = elements.filter(e => CHEVRON_SNAP_TYPES.has(e.type));
+  // When the chevron lives inside a Value Chain element (process-group), the
+  // WHOLE container's chevrons are one theme group — even split across rows —
+  // so splitting apart / recombining the processes keeps the same group and
+  // ramp. Ordered in reading order (top-left → right → down → right).
+  if (seed.parentId) {
+    const parent = elements.find(e => e.id === seed.parentId && e.type === "process-group");
+    if (parent) {
+      const members = chevrons.filter(c => c.parentId === parent.id);
+      return members.length >= 2 ? chevronReadingOrder(members) : [];
+    }
+  }
   const group = new Set<string>([seedId]);
   const queue = [seed];
   while (queue.length) {
@@ -468,8 +479,8 @@ function findSnappedGroup(elements: DiagramElement[], seedId: string): DiagramEl
     }
   }
   if (group.size < 2) return [];
-  // Sort left-to-right
-  return chevrons.filter(e => group.has(e.id)).sort((a, b) => a.x - b.x);
+  // Reading order (handles a wrapped chain even without a parent container).
+  return chevronReadingOrder(chevrons.filter(e => group.has(e.id)));
 }
 
 /**
