@@ -558,6 +558,25 @@ model DiagramRules {
   @@unique([category, userId, orgId]) // one set of rules per category per user per org
 }
 
+// BPMN Scanner rule registry — SuperAdmin-managed lifecycle layered over the
+// code-defined checks in diagramChecks.ts. A row here either OVERRIDES a code
+// rule (same `code`) or is a brand-new proposed rule. Rows are never hard-
+// deleted (status -> "retired") so a retired rule's number is never reused.
+//   status: "proposed"       — new/changed, not yet implemented in code ([PROPOSED])
+//           "live"           — implemented in code
+//           "pending-delete" — flagged for removal, awaiting code removal ([PENDING])
+//           "retired"        — removal confirmed; kept only to reserve its number
+model ScannerRule {
+  code        String   @id // "B33"
+  title       String
+  description String
+  severity    String   @default("warning") // "error" | "warning"
+  category    String   @default("custom")
+  status      String   @default("proposed")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
 // ────────────────────────────────────────────────────────────────────────────
 // Subscriptions — four real tiers (Free / Introductory / Professional /
 // Expert) plus a derived "Administration" view for SUPERUSER_EMAILS users
