@@ -872,7 +872,6 @@ export function Canvas({
     screenX: number; screenY: number;
   } | null>(null);
   const [focusedEndpoint, setFocusedEndpoint] = useState<"source" | "target" | null>(null);
-  const [msgMarkerFocused, setMsgMarkerFocused] = useState(false);
   // Pool vertical-boundary alignment guide. Active during a left/right
   // resize of a pool. Shows a dotted vertical line at the moving
   // boundary's current X plus a marker at every other pool's same-side
@@ -1028,7 +1027,7 @@ export function Canvas({
 
   // Reset picker offset when a new pending drop appears
   useEffect(() => { setPickerOffset({ x: 0, y: 0 }); }, [pendingDrop]);
-  useEffect(() => { setFocusedEndpoint(null); setMsgMarkerFocused(false); }, [selectedConnectorId]);
+  useEffect(() => { setFocusedEndpoint(null); }, [selectedConnectorId]);
 
   // Dismiss connector choice popup on click outside
   useEffect(() => {
@@ -1618,28 +1617,29 @@ export function Canvas({
         //     or End event — both must sit in a white-box pool and not be
         //     boundary-mounted.
         // In all cases, the target must not be the fixed end itself.
+        // Validity is role-based, NOT tied to what the moving end currently
+        // sits on — so an endpoint on an event (or pool, or task) can be
+        // re-attached to ANY legal participant: a black-box pool, a
+        // task/subprocess in a white-box pool, or a role-appropriate event in
+        // a white-box pool.
         const RECEIVE_EVENTS: Set<SymbolType> = new Set(["start-event", "intermediate-event"]);
         const SEND_EVENTS:    Set<SymbolType> = new Set(["intermediate-event", "end-event"]);
         const fixedId   = endpoint === "source" ? conn!.targetId : conn!.sourceId;
         const fixedEl   = data.elements.find(e => e.id === fixedId);
-        const movingEl  = data.elements.find(e => e.id === fromId);
-        const movingIsPool    = movingEl?.type === "pool";
-        const movingIsTaskSub = !!movingEl && MSG_TASKSUB_TYPES.has(movingEl.type);
         const validEvents = endpoint === "target" ? RECEIVE_EVENTS : SEND_EVENTS;
         const targetEl  = findDropTarget(pos, fromId);
         let valid = false;
         if (targetEl && targetEl.id !== fixedId && targetEl.id !== fromId) {
-          if (movingIsPool && targetEl.type === "pool") {
+          if (targetEl.type === "pool") {
             const ptype = (targetEl.properties.poolType as string | undefined) ?? "black-box";
             if (ptype === "black-box") valid = true;
-          } else if (movingIsTaskSub && MSG_TASKSUB_TYPES.has(targetEl.type)) {
+          } else if (MSG_TASKSUB_TYPES.has(targetEl.type)) {
             const tPoolId = getElementPoolId(targetEl, data.elements);
             const tPool   = tPoolId ? data.elements.find(p => p.id === tPoolId) : null;
             if (((tPool?.properties.poolType as string | undefined) ?? "black-box") === "white-box") {
               valid = true;
             }
-          }
-          if (!valid && validEvents.has(targetEl.type) && !targetEl.boundaryHostId) {
+          } else if (validEvents.has(targetEl.type) && !targetEl.boundaryHostId) {
             const tPoolId = getElementPoolId(targetEl, data.elements);
             const tPool   = tPoolId ? data.elements.find(p => p.id === tPoolId) : null;
             if (((tPool?.properties.poolType as string | undefined) ?? "black-box") === "white-box") {
@@ -1751,52 +1751,6 @@ export function Canvas({
       window.removeEventListener("mousemove", onMouseMove);
       window.removeEventListener("mouseup", onMouseUp);
       onLaneBoundaryMoveEnd?.();
-    }
-
-    window.addEventListener("mousemove", onMouseMove);
-    window.addEventListener("mouseup", onMouseUp);
-  }
-
-  function handleMessageBpmnDrag(connectorId: string, startX: number, e: React.MouseEvent) {
-    e.stopPropagation();
-    const conn = data.connectors.find((c) => c.id === connectorId);
-    if (!conn) return;
-    const sourceEl = data.elements.find((el) => el.id === conn.sourceId);
-    const targetEl = data.elements.find((el) => el.id === conn.targetId);
-    if (!sourceEl || !targetEl) return;
-
-    const startClientX = e.clientX;
-
-    function buildWaypoints(rawX: number): Point[] {
-      // Clamp to both element boundaries — connector must remain vertical (single shared x)
-      let x = Math.max(sourceEl!.x, Math.min(sourceEl!.x + sourceEl!.width, rawX));
-      x = Math.max(targetEl!.x, Math.min(targetEl!.x + targetEl!.width, x));
-      const srcEdge: Point = conn!.sourceSide === "bottom"
-        ? { x, y: sourceEl!.y + sourceEl!.height } : { x, y: sourceEl!.y };
-      const tgtEdge: Point = conn!.targetSide === "top"
-        ? { x, y: targetEl!.y } : { x, y: targetEl!.y + targetEl!.height };
-      return [
-        { x: sourceEl!.x + sourceEl!.width / 2, y: sourceEl!.y + sourceEl!.height / 2 },
-        srcEdge, tgtEdge,
-        { x: targetEl!.x + targetEl!.width / 2, y: targetEl!.y + targetEl!.height / 2 },
-      ];
-    }
-
-    function onMouseMove(ev: MouseEvent) {
-      const dx = (ev.clientX - startClientX) / zoom;
-      onUpdateConnectorWaypoints?.(connectorId, buildWaypoints(startX + dx));
-    }
-
-    function onMouseUp(ev: MouseEvent) {
-      const dx = (ev.clientX - startClientX) / zoom;
-      const rawX = startX + dx;
-      // Clamp to overlap of both elements to keep vertical
-      let x = Math.max(sourceEl!.x, Math.min(sourceEl!.x + sourceEl!.width, rawX));
-      x = Math.max(targetEl!.x, Math.min(targetEl!.x + targetEl!.width, x));
-      const srcOffset = sourceEl!.width > 0 ? (x - sourceEl!.x) / sourceEl!.width : 0.5;
-      onUpdateConnectorEndpoint(connectorId, "source", conn!.sourceId, conn!.sourceSide, srcOffset);
-      window.removeEventListener("mousemove", onMouseMove);
-      window.removeEventListener("mouseup", onMouseUp);
     }
 
     window.addEventListener("mousemove", onMouseMove);
@@ -4284,8 +4238,6 @@ export function Canvas({
   const epDragMovingEl = epDragMovingId
     ? data.elements.find(e => e.id === epDragMovingId) ?? null
     : null;
-  const epDragMovingIsPool = isMessageBpmnEndpointDrag && epDragMovingEl?.type === "pool";
-  const epDragMovingIsTaskSub = isMessageBpmnEndpointDrag && epDragMovingEl ? MSG_TASKSUB_TYPES.has(epDragMovingEl.type) : false;
   // Which event types are valid for the end being dragged.
   const epDragMsgEventTypes: Set<SymbolType> | null = isMessageBpmnEndpointDrag && draggingEndpoint
     ? (draggingEndpoint.endpoint === "target" ? MSG_RECEIVE_EVENT_TYPES : MSG_SEND_EVENT_TYPES)
@@ -4605,7 +4557,7 @@ export function Canvas({
                 !draggingFromEdgeMountedStartEvent &&
                 !draggingFromEdgeMountedIntermediateReceiveEvent) // receive can only target subprocess children
               ||
-              (isMessageBpmnEndpointDrag && epDragMovingIsPool &&
+              (isMessageBpmnEndpointDrag &&
                 el.type === "pool" &&
                 el.id !== epDragMovingEl?.id &&       // not the pool currently connected
                 el.id !== epDragFixedEl?.id &&        // not the fixed end itself (if it's a pool)
@@ -5102,9 +5054,9 @@ export function Canvas({
                   if (elPoolIsWhiteBox) elIsMsgTarget = true;
                 }
               }
-            } else if (isMessageBpmnEndpointDrag && epDragMovingIsTaskSub) {
-              // User rule: a task/subprocess endpoint can only move to another
-              // task/subprocess inside any white-box pool. No restriction on
+            } else if (isMessageBpmnEndpointDrag) {
+              // Any message endpoint (on a pool, task or event) may re-attach to
+              // a task/subprocess inside any white-box pool. No restriction on
               // the fixed end's pool — the message may land inside the same
               // or a different white-box pool.
               if (MSG_TASKSUB_TYPES.has(el.type)
@@ -5671,53 +5623,8 @@ export function Canvas({
             );
           })()}
 
-          {/* messageBPMN drag handle — drag left/right along pool boundaries (hidden for event endpoints) */}
-          {selectedConnector?.type === "messageBPMN" && selectedConnector.waypoints.length === 4 && (() => {
-            const BPMN_EVENT_TYPES = new Set(["start-event", "intermediate-event", "end-event"]);
-            const msgSrcEl = data.elements.find((e) => e.id === selectedConnector.sourceId);
-            const msgTgtEl = data.elements.find((e) => e.id === selectedConnector.targetId);
-            if ((msgSrcEl && BPMN_EVENT_TYPES.has(msgSrcEl.type)) || (msgTgtEl && BPMN_EVENT_TYPES.has(msgTgtEl.type))) return null;
-            const wp = selectedConnector.waypoints;
-            const x = wp[1].x;
-            const midY = (wp[1].y + wp[2].y) / 2;
-            return (
-              <g data-interactive>
-                <line x1={x} y1={wp[1].y} x2={x} y2={wp[2].y}
-                  stroke="#2563eb" strokeWidth={8} strokeOpacity={0.15}
-                  style={{ cursor: "ew-resize" }}
-                  onMouseDown={(e) => handleMessageBpmnDrag(selectedConnectorId!, x, e)}
-                />
-                <circle cx={x} cy={midY} r={7}
-                  fill={msgMarkerFocused ? "#f59e0b" : "#2563eb"} fillOpacity={msgMarkerFocused ? 0.5 : 0.25}
-                  stroke={msgMarkerFocused ? "#d97706" : "#2563eb"} strokeWidth={1.5}
-                  style={{ cursor: "ew-resize" }}
-                  onMouseDown={(e) => {
-                    e.stopPropagation();
-                    const startCX = e.clientX;
-                    let dragged = false;
-                    function onMove(ev: MouseEvent) {
-                      if (Math.abs(ev.clientX - startCX) > 3) {
-                        dragged = true;
-                        window.removeEventListener("mousemove", onMove);
-                        window.removeEventListener("mouseup", onUp);
-                        handleMessageBpmnDrag(selectedConnectorId!, x, e);
-                      }
-                    }
-                    function onUp() {
-                      window.removeEventListener("mousemove", onMove);
-                      window.removeEventListener("mouseup", onUp);
-                      if (!dragged) {
-                        // Click without drag: toggle orange focused state for arrow key nudging
-                        setMsgMarkerFocused(prev => !prev);
-                      }
-                    }
-                    window.addEventListener("mousemove", onMove);
-                    window.addEventListener("mouseup", onUp);
-                  }}
-                />
-              </g>
-            );
-          })()}
+          {/* messageBPMN move handle removed — the whole connector can be
+              grabbed anywhere along its length to slide it. */}
 
           {/* Connector endpoint handles when a connector is selected.
               For messageBPMN: endpoints can be rewired to other pools

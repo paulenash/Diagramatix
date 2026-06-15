@@ -2149,7 +2149,15 @@ export function layoutBpmnDiagram(
             const LINE_H = 14;             // single-line label height
             const W = 80;                  // label width
             const HALF = LINE_H / 2;       // the half-line vertical step
-            const gapCentreY = (bbpEdgeY + otherEdgeY) / 2;
+            // Anchor the label to the Black-Box Pool's GAP-FACING edge, half a
+            // pool-gap into the gap — NOT to the midpoint between the two pool
+            // edges. The other endpoint's pool may be far away (another pool
+            // between them, or shifted by re-sizing), in which case a midpoint
+            // lands inside an intervening pool. Anchoring to the BBP edge keeps
+            // the label in the adjacent gap regardless. Mirrors the runtime
+            // re-anchor in computeMsgBpmnLabelOffsets.
+            const gapDir = otherEdgeY >= bbpEdgeY ? 1 : -1;
+            const baseCentreY = bbpEdgeY + (POOL_GAP / 2) * gapDir;
             // Horizontally centred on the connector.
             labelOffsetX = 0;
             // Count labels already placed on this pool whose connector sits
@@ -2160,7 +2168,12 @@ export function layoutBpmnDiagram(
             // tier 0 → -HALF, 1 → +HALF, 2 → -LINE_H, 3 → +LINE_H, …
             const dir = xClose % 2 === 0 ? -1 : 1;
             const mag = (Math.floor(xClose / 2) + 1) * HALF;
-            const cy = gapCentreY + dir * mag;
+            // Keep the (staggered) label fully inside the adjacent gap so it
+            // can never drift into either pool.
+            const edgeNear = bbpEdgeY + HALF * gapDir;
+            const edgeFar  = bbpEdgeY + (POOL_GAP - HALF) * gapDir;
+            const lo = Math.min(edgeNear, edgeFar), hi = Math.max(edgeNear, edgeFar);
+            const cy = Math.max(lo, Math.min(hi, baseCentreY + dir * mag));
             labelOffsetY = cy - midY - 7;
             msgLabelTrack.push({ bbpId, cx: midX, cy, w: W });
           } else {
