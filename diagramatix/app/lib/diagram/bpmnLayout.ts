@@ -8,6 +8,32 @@ import { getSymbolDefinition } from "./symbols/definitions";
 import { computeWaypoints } from "./routing";
 import { autoSizeForType, type AutosizeType } from "./textMetrics";
 
+/** Word-wrap a black-box pool name into multiple lines, then size the pool
+ *  FROM the wrapped result: the rotated label runs along the pool HEIGHT, so
+ *  the height comes from the LONGEST wrapped line, and the header strip width
+ *  from the line COUNT. Matches poolMetrics (fontSize 12) so the load-time
+ *  recompute agrees. Without this the height was computed from the full
+ *  single-line name and the black-box pool came out far too tall. */
+function wrapPoolName(name: string): { label: string; height: number; headerWidth: number } {
+  const MAX_CHARS = 18; // target line length — keeps the pool a sensible height
+  const words = name.split(/\s+/).filter(Boolean);
+  const lines: string[] = [];
+  let cur = "";
+  for (const w of words) {
+    const test = cur ? cur + " " + w : w;
+    if (test.length > MAX_CHARS && cur) { lines.push(cur); cur = w; }
+    else cur = test;
+  }
+  if (cur) lines.push(cur);
+  if (lines.length === 0) lines.push(name);
+  const longest = Math.max(1, ...lines.map((l) => l.length));
+  const charPx = 12 * 0.6;   // poolMetrics charPxWidth
+  const lineH = 12 * 1.18;   // poolMetrics lineH
+  const height = Math.max(BLACK_BOX_H, Math.ceil(longest * charPx + 20));
+  const headerWidth = Math.max(36, Math.ceil(lines.length * lineH + 8));
+  return { label: lines.join("\n"), height, headerWidth };
+}
+
 /** Auto-size a task / subprocess to fit its label; other types keep their
  *  default. Tasks that overflow the catalogue width are the ones whose names
  *  spilled outside the box. */
@@ -442,14 +468,16 @@ export function layoutBpmnDiagram(
   const poolWidth = POOL_HEADER_W + contentWidth + LANE_PAD_X + TASK_W;
 
   for (const bbp of topBlackBoxes) {
-    // R6.01: black-box pool height = horizontal text width (rotated vertical) + buffer
-    const textW = bbp.label.length * 7 + 20; // ~7px per char at 12px font + 20px buffer each side
-    const bbH = Math.max(BLACK_BOX_H, textW);
+    // R6.01: black-box pool height = rotated multi-line text length. Wrap the
+    // name FIRST, then size from the wrapped result (longest line → height,
+    // line count → header strip width).
+    const wrapped = wrapPoolName(bbp.label);
+    const bbH = wrapped.height;
     elements.push({
       id: bbp.id, type: "pool" as DiagramElement["type"],
       x: START_X, y: curY, width: poolWidth, height: bbH,
-      label: bbp.label,
-      properties: { poolType: "black-box", isSystem: false },
+      label: wrapped.label,
+      properties: { poolType: "black-box", isSystem: false, poolHeaderWidth: wrapped.headerWidth },
     });
     curY += bbH + POOL_GAP;
   }
@@ -624,13 +652,13 @@ export function layoutBpmnDiagram(
 
   // ── Layout bottom black-box pools (systems) ──
   for (const bbp of bottomBlackBoxes) {
-    const textW = bbp.label.length * 7 + 20;
-    const bbH = Math.max(BLACK_BOX_H, textW);
+    const wrapped = wrapPoolName(bbp.label);
+    const bbH = wrapped.height;
     elements.push({
       id: bbp.id, type: "pool" as DiagramElement["type"],
       x: START_X, y: curY, width: poolWidth, height: bbH,
-      label: bbp.label,
-      properties: { poolType: "black-box", isSystem: true },
+      label: wrapped.label,
+      properties: { poolType: "black-box", isSystem: true, poolHeaderWidth: wrapped.headerWidth },
     });
     curY += bbH + POOL_GAP;
   }

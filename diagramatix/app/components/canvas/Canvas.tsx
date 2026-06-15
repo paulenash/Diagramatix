@@ -4109,7 +4109,11 @@ export function Canvas({
   const assocHighlightElIds = new Set<string>();
   const assocActiveElIds = new Set<string>();
   let assocActive = false;
-  if (diagramType === "process-context" && selectedElementIds.size >= 1) {
+  // While the user is drawing a new connector, suspend the grey-out so every
+  // element is a visible drop target. Once the connector completes,
+  // draggingConnector clears and this recomputes from data.connectors — so the
+  // newly connected element is automatically folded into the highlight.
+  if (diagramType === "process-context" && selectedElementIds.size >= 1 && !draggingConnector) {
     for (const c of data.connectors) {
       const srcSel = selectedElementIds.has(c.sourceId);
       const tgtSel = selectedElementIds.has(c.targetId);
