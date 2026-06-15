@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { listSites, searchSites, listDrives, listDriveRoot, listFolder, getItem, getMyDrive, listMyDriveRoot, listMyDriveFolder } from "@/app/lib/sharepoint";
+import { listSites, searchSites, listDrives, listDriveRoot, listFolder, getItem, getMyDrive, listMyDriveRoot, listMyDriveFolder, getPreviewUrl } from "@/app/lib/sharepoint";
 
 function getMsToken(session: any): string | null {
   return session?.msAccessToken ?? null;
@@ -75,6 +75,14 @@ export async function GET(request: Request) {
           ? await listMyDriveFolder(token, itemId)
           : await listMyDriveRoot(token);
         return NextResponse.json(items);
+      }
+
+      case "preview": {
+        const driveId = searchParams.get("driveId");
+        const itemId = searchParams.get("itemId");
+        if (!driveId || !itemId) return NextResponse.json({ error: "driveId and itemId required" }, { status: 400 });
+        const url = await getPreviewUrl(token, driveId, itemId);
+        return NextResponse.json({ url });
       }
 
       default:

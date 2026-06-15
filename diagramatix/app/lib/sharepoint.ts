@@ -2,7 +2,7 @@
  * Microsoft Graph API utility for SharePoint / OneDrive file operations.
  * All functions require a valid Microsoft access token from the user's session.
  */
-import { Client } from "@microsoft/microsoft-graph-client";
+import { Client, ResponseType } from "@microsoft/microsoft-graph-client";
 
 function getClient(accessToken: string): Client {
   return Client.init({
@@ -145,4 +145,54 @@ export async function uploadFile(
   return await client.api(`/drives/${driveId}/root:${path}:/content`)
     .header("Content-Type", "application/json")
     .put(content);
+}
+
+/**
+ * Upload (create or overwrite) a file INTO a folder addressed by its item id —
+ * or the drive root when folderItemId is null. Accepts binary (Buffer) so
+ * Visio .vsdx exports upload correctly, as well as text (XML/XSD/JSON).
+ * Simple PUT — fine for diagram files (< 4 MB Graph single-shot limit).
+ */
+export async function uploadToFolder(
+  accessToken: string,
+  driveId: string,
+  folderItemId: string | null,
+  fileName: string,
+  content: Buffer | string,
+  contentType: string,
+): Promise<DriveItem> {
+  const client = getClient(accessToken);
+  const enc = encodeURIComponent(fileName);
+  const target = folderItemId
+    ? `/drives/${driveId}/items/${folderItemId}:/${enc}:/content`
+    : `/drives/${driveId}/root:/${enc}:/content`;
+  return await client.api(target).header("Content-Type", contentType).put(content);
+}
+
+/** Download raw file bytes (for binary diagram files like .vsdx). */
+export async function downloadFileBytes(
+  accessToken: string,
+  driveId: string,
+  itemId: string,
+): Promise<Buffer> {
+  const client = getClient(accessToken);
+  const buf = await client.api(`/drives/${driveId}/items/${itemId}/content`)
+    .responseType(ResponseType.ARRAYBUFFER)
+    .get();
+  return Buffer.from(buf as ArrayBuffer);
+}
+
+/**
+ * Get a short-lived embeddable preview URL for a file (Graph /preview action).
+ * Returned `getUrl` can be set as an <iframe src> to preview Office/PDF files
+ * inside Diagramatix without leaving the app.
+ */
+export async function getPreviewUrl(
+  accessToken: string,
+  driveId: string,
+  itemId: string,
+): Promise<string | null> {
+  const client = getClient(accessToken);
+  const resp = await client.api(`/drives/${driveId}/items/${itemId}/preview`).post({});
+  return resp?.getUrl ?? null;
 }
