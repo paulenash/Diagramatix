@@ -2056,44 +2056,29 @@ export function layoutBpmnDiagram(
           else if (tgtIsBlackBox && !srcIsBlackBox) { bbpId = tgtPool.id; bbpEdgeY = tgtPoolEdgeY; otherEdgeY = srcPoolEdgeY; }
           else if (srcIsBlackBox && tgtIsBlackBox) { bbpId = srcPool.id; bbpEdgeY = srcPoolEdgeY; otherEdgeY = tgtPoolEdgeY; }
           if (bbpId) {
-            const direction = otherEdgeY >= bbpEdgeY ? 1 : -1;
-            const RIGHT = 45;
-            const LEFT = -45;
-            const Y_BAND = 24;
-            // Labels already placed on THIS pool (tracked locally — the
-            // connectors' waypoints aren't computed yet at this stage).
-            const placedOnBbp = msgLabelTrack.filter(l => l.bbpId === bbpId);
-            // R05.05: stagger this label's vertical position so message
-            // labels on the same Black-Box Pool edge don't stack at one Y and
-            // overlap. Every already-placed label whose centre falls within
-            // the running band pushes this one a step further from the edge.
-            const baseCentreY = bbpEdgeY + 50 * direction;
-            const STAGGER_STEP = 18;
-            const xOverlap = (cx: number, l: { cx: number; w: number }) => {
-              const aL = cx - 80 / 2, aR = cx + 80 / 2;
-              const bL = l.cx - l.w / 2, bR = l.cx + l.w / 2;
-              return !(aR < bL || bR < aL);
-            };
-            const overlapsAt = (testCx: number, cy: number) =>
-              placedOnBbp.some(l => Math.abs(l.cy - cy) <= Y_BAND && xOverlap(testCx, l));
-            const rightCx = midX + RIGHT;
-            const leftCx = midX + LEFT;
-            // Walk this label outward from the pool edge in STAGGER_STEP
-            // increments until BOTH the right and (failing that) the left
-            // placement are clear of every label already on this pool — so
-            // only genuinely-overlapping labels move, and they move just
-            // enough to separate.
-            let labelCentreY = baseCentreY;
-            let chosenCx = rightCx;
-            for (let guard = 0; guard < 40; guard++) {
-              if (!overlapsAt(rightCx, labelCentreY)) { chosenCx = rightCx; break; }
-              if (!overlapsAt(leftCx, labelCentreY)) { chosenCx = leftCx; break; }
-              labelCentreY += STAGGER_STEP * direction;
-            }
-            labelOffsetY = labelCentreY - midY - 7;
-            labelOffsetX = chosenCx - midX;
-            // Record this placement for subsequent labels on the same pool.
-            msgLabelTrack.push({ bbpId, cx: chosenCx, cy: labelCentreY, w: 80 });
+            // R05.05: a message label sits in the GAP between the two pools,
+            // CENTRED horizontally on its own (vertical) message connector —
+            // never shoved off to the side. Where neighbouring connectors are
+            // close enough that the labels would overlap, the label's text is
+            // offset vertically in HALF-line-height steps (alternating above /
+            // below the gap centre) so they interleave instead of stacking.
+            const LINE_H = 14;             // single-line label height
+            const W = 80;                  // label width
+            const HALF = LINE_H / 2;       // the half-line vertical step
+            const gapCentreY = (bbpEdgeY + otherEdgeY) / 2;
+            // Horizontally centred on the connector.
+            labelOffsetX = 0;
+            // Count labels already placed on this pool whose connector sits
+            // within a label width of this one — only those can overlap.
+            const xClose = msgLabelTrack.filter(l =>
+              l.bbpId === bbpId && Math.abs(l.cx - midX) < W
+            ).length;
+            // tier 0 → -HALF, 1 → +HALF, 2 → -LINE_H, 3 → +LINE_H, …
+            const dir = xClose % 2 === 0 ? -1 : 1;
+            const mag = (Math.floor(xClose / 2) + 1) * HALF;
+            const cy = gapCentreY + dir * mag;
+            labelOffsetY = cy - midY - 7;
+            msgLabelTrack.push({ bbpId, cx: midX, cy, w: W });
           } else {
             // Both white-box — legacy gap-centre placement
             const gapCentreY = (srcPoolEdgeY + tgtPoolEdgeY) / 2;
