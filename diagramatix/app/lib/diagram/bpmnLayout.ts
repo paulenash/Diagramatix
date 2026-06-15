@@ -379,6 +379,43 @@ export function layoutBpmnDiagram(
     }
     queue.push(...next);
   }
+  // Boundary-event flow targets. A boundary event (boundaryHost set) is not a
+  // flow node, so the BFS above never traverses its outgoing edge — leaving
+  // its target (e.g. a timer-boundary "Send reminder" task) UNRANKED, to be
+  // dumped into the far-right "unvisited" bucket below (≈ colMap.size columns
+  // out) with the pool stretched to match. Instead, rank each such target one
+  // column right of the boundary event's HOST and relax its forward-only
+  // downstream, so the excursion sits right next to the host.
+  {
+    const hostOf = new Map<string, string>();
+    for (const el of aiElements) {
+      if (el.boundaryHost) hostOf.set(el.id, el.boundaryHost);
+    }
+    let bq: { id: string; col: number }[] = [];
+    for (const c of aiConnections) {
+      if (c.type === "message") continue;
+      const host = hostOf.get(c.sourceId);
+      if (host === undefined) continue; // not a boundary-event flow
+      bq.push({ id: c.targetId, col: (colMap.get(host) ?? 0) + 1 });
+    }
+    for (let pass = 0; pass < colPassCap && bq.length > 0; pass++) {
+      const next: typeof bq = [];
+      while (bq.length > 0) {
+        const { id, col } = bq.shift()!;
+        const existing = colMap.get(id) ?? -1;
+        if (col <= existing) continue;
+        colMap.set(id, col);
+        for (const c of (outgoing.get(id) ?? [])) {
+          if (backEdges.has(`${id}->${c.targetId}`)) continue;
+          const tcol = colMap.get(c.targetId);
+          if (tcol !== undefined && tcol <= col) continue; // upstream / loop-back — never bump it
+          next.push({ id: c.targetId, col: col + 1 });
+        }
+      }
+      bq = next;
+    }
+  }
+
   // Unvisited elements
   for (const el of flowElements) {
     if (!colMap.has(el.id)) colMap.set(el.id, colMap.size);
