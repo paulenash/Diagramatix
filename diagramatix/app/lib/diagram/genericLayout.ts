@@ -306,8 +306,9 @@ export function layoutGenericDiagram(
         container.height = Math.max(container.height, cursorY - container.y + 20);
       }
     } else {
-      // Value chains and other diagram types: horizontal row
-      const cy = container.y + 40;
+      // Value chains and other diagram types: horizontal row(s).
+      const chevronH = getSymbolDefinition("chevron").defaultHeight;
+      const cyRow1 = container.y + 40;
 
       // For value chains, pre-wrap labels and determine if width expansion is needed
       let chevronW = getSymbolDefinition("chevron").defaultWidth;
@@ -324,17 +325,48 @@ export function layoutGenericDiagram(
         if (needsWider) chevronW = Math.min(220, chevronW + 60);
       }
 
+      // V1.08: a Value Chain with MORE THAN 6 processes wraps into two rows —
+      // 1-6 on top; 7+ underneath, shifted one chevron width right — and the
+      // container bottom sits half a chevron height below the lower row's
+      // descriptions.
+      const ROW_SPLIT = 6;
+      const chevronCount = children.filter(
+        (c) => c.type === "chevron" || c.type === "chevron-collapsed",
+      ).length;
+      const wrap = isValueChain && chevronCount > ROW_SPLIT;
+      const INTER_ROW_GAP = Math.round(chevronH * 0.5);
+      // Estimate a chevron description's rendered height (it self-measures at
+      // render; this estimate sizes the container to leave the V1.08 gap).
+      const estDescH = (props: Record<string, unknown>): number => {
+        const html = String(props.description ?? "");
+        if (!html) return 0;
+        const items = (html.match(/<li/g) ?? []).length || 1;
+        return items * 22 + 12 + 4; // ~22px/item + ul padding + 4px chevron gap
+      };
+
       let cx = container.x + 30;
+      let cy = cyRow1;
       let firstChevronColour: string | undefined;
+      let chevronIdx = 0;
+      let row1DescH = 0;
+      let row2DescH = 0;
+      let maxRight = cx;
       for (const ai of children) {
         const def = getSymbolDefinition(ai.type as DiagramElement["type"]);
         let label = ai.label ?? ai.name ?? ai.type;
         const props = buildProperties(ai, diagramType);
         let elW = def.defaultWidth;
+        const isChev = isValueChain && (ai.type === "chevron" || ai.type === "chevron-collapsed");
 
         // Value chain: wrap labels and apply the per-generation random
         // theme colour (see pickRandomChevronTheme above).
-        if (isValueChain && (ai.type === "chevron" || ai.type === "chevron-collapsed")) {
+        if (isChev) {
+          // V1.08: drop to the second row (shifted right one chevron width)
+          // once the first six are placed.
+          if (wrap && chevronIdx === ROW_SPLIT) {
+            cy = cyRow1 + chevronH + row1DescH + INTER_ROW_GAP;
+            cx = container.x + 30 + chevronW;
+          }
           elW = chevronW;
           const textW = elW - 40;
           // V1.06: split a leading process number onto its own line.
@@ -356,11 +388,16 @@ export function layoutGenericDiagram(
         placed.add(ai.id);
 
         // Value chain: snap processes with 10px overlap; others: use gap
-        if (isValueChain && (ai.type === "chevron" || ai.type === "chevron-collapsed")) {
+        if (isChev) {
+          const dh = estDescH(props);
+          if (!wrap || chevronIdx < ROW_SPLIT) row1DescH = Math.max(row1DescH, dh);
+          else row2DescH = Math.max(row2DescH, dh);
+          chevronIdx++;
           cx += elW - CHEVRON_OVERLAP;
         } else {
           cx += elW + GRID_GAP_X;
         }
+        maxRight = Math.max(maxRight, cx);
       }
       // Colour-sync the Value Chain element (container) to its inner
       // processes' theme — a pale tint of the first process's shade, matching
@@ -368,9 +405,17 @@ export function layoutGenericDiagram(
       if (isValueChain && firstChevronColour) {
         container.properties = { ...container.properties, fillColor: lightenHex(firstChevronColour, 0.6) };
       }
-      // Resize container to fit children
+      // Resize container to fit children.
       if (children.length > 0) {
-        container.width = Math.max(container.width, cx - container.x + 30);
+        if (isValueChain) {
+          container.width = maxRight - container.x + 30;
+          // Bottom = lower row's chevron bottom + its descriptions + half a
+          // chevron height (V1.08). cy is the last row's y after the loop.
+          const lastRowBottom = cy + chevronH + (wrap ? row2DescH : row1DescH);
+          container.height = Math.max(container.height, lastRowBottom + Math.round(chevronH / 2) - container.y);
+        } else {
+          container.width = Math.max(container.width, cx - container.x + 30);
+        }
       }
     }
   }
