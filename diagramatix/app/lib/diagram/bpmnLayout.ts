@@ -1782,6 +1782,12 @@ export function layoutBpmnDiagram(
   // "task → data" stays as a write (arrow into the data element) and
   // "data → task" stays as a read (arrow out of the data element).
   const DATA_ASSOC_TYPES = new Set(["data-store", "data-object", "text-annotation"]);
+  // R05.05: track each message label we place (centre x/y + width, keyed by
+  // the black-box pool it sits on) so the next label on the same pool edge
+  // can be staggered/flipped to avoid overlap. The connectors built here get
+  // their waypoints in a LATER pass, so the previous overlap check (which
+  // read pc.waypoints) never fired — we track placements ourselves instead.
+  const msgLabelTrack: { bbpId: string; cx: number; cy: number; w: number }[] = [];
   for (const c of finalConnections) {
     const src = elMap.get(c.sourceId);
     const tgt = elMap.get(c.targetId);
@@ -2054,41 +2060,40 @@ export function layoutBpmnDiagram(
             const RIGHT = 45;
             const LEFT = -45;
             const Y_BAND = 24;
-            const placedOnBbp = connectors.filter(pc =>
-              pc.type === "messageBPMN" &&
-              typeof pc.label === "string" && pc.label.trim().length > 0 &&
-              (pc.sourceId === bbpId || pc.targetId === bbpId) &&
-              pc.waypoints.length >= 4
-            ).map(pc => {
-              const cAnchorX = (pc.waypoints[1].x + pc.waypoints[pc.waypoints.length - 2].x) / 2;
-              const cAnchorY = (pc.waypoints[1].y + pc.waypoints[pc.waypoints.length - 2].y) / 2;
-              return {
-                cx: cAnchorX + (pc.labelOffsetX ?? 0),
-                cy: cAnchorY + (pc.labelOffsetY ?? 0) + 7,
-                w: pc.labelWidth ?? 80,
-              };
-            });
+            // Labels already placed on THIS pool (tracked locally — the
+            // connectors' waypoints aren't computed yet at this stage).
+            const placedOnBbp = msgLabelTrack.filter(l => l.bbpId === bbpId);
             // R05.05: stagger this label's vertical position so message
             // labels on the same Black-Box Pool edge don't stack at one Y and
             // overlap. Every already-placed label whose centre falls within
-            // the base Y band pushes this one a step further from the edge.
+            // the running band pushes this one a step further from the edge.
             const baseCentreY = bbpEdgeY + 50 * direction;
             const STAGGER_STEP = 18;
-            const nearby = placedOnBbp.filter(l => Math.abs(l.cy - baseCentreY) <= Y_BAND).length;
-            const labelCentreY = baseCentreY + nearby * STAGGER_STEP * direction;
-            labelOffsetY = labelCentreY - midY - 7;
-            const overlapsAt = (testCx: number) => {
-              for (const l of placedOnBbp) {
-                if (Math.abs(l.cy - labelCentreY) > Y_BAND) continue;
-                const aL = testCx - 80 / 2, aR = testCx + 80 / 2;
-                const bL = l.cx - l.w / 2, bR = l.cx + l.w / 2;
-                if (!(aR < bL || bR < aL)) return true;
-              }
-              return false;
+            const xOverlap = (cx: number, l: { cx: number; w: number }) => {
+              const aL = cx - 80 / 2, aR = cx + 80 / 2;
+              const bL = l.cx - l.w / 2, bR = l.cx + l.w / 2;
+              return !(aR < bL || bR < aL);
             };
+            const overlapsAt = (testCx: number, cy: number) =>
+              placedOnBbp.some(l => Math.abs(l.cy - cy) <= Y_BAND && xOverlap(testCx, l));
             const rightCx = midX + RIGHT;
             const leftCx = midX + LEFT;
-            labelOffsetX = (overlapsAt(rightCx) && !overlapsAt(leftCx)) ? LEFT : RIGHT;
+            // Walk this label outward from the pool edge in STAGGER_STEP
+            // increments until BOTH the right and (failing that) the left
+            // placement are clear of every label already on this pool — so
+            // only genuinely-overlapping labels move, and they move just
+            // enough to separate.
+            let labelCentreY = baseCentreY;
+            let chosenCx = rightCx;
+            for (let guard = 0; guard < 40; guard++) {
+              if (!overlapsAt(rightCx, labelCentreY)) { chosenCx = rightCx; break; }
+              if (!overlapsAt(leftCx, labelCentreY)) { chosenCx = leftCx; break; }
+              labelCentreY += STAGGER_STEP * direction;
+            }
+            labelOffsetY = labelCentreY - midY - 7;
+            labelOffsetX = chosenCx - midX;
+            // Record this placement for subsequent labels on the same pool.
+            msgLabelTrack.push({ bbpId, cx: chosenCx, cy: labelCentreY, w: 80 });
           } else {
             // Both white-box — legacy gap-centre placement
             const gapCentreY = (srcPoolEdgeY + tgtPoolEdgeY) / 2;
