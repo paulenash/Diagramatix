@@ -28,7 +28,11 @@ export default async function ScannerRulesPage() {
   for (const r of codeRules) {
     used.add(r.code);
     const o = dbByCode.get(r.code);
-    if (o && o.status !== "retired") {
+    // A confirmed-removal (retired) override hides the rule from the list even
+    // though the code check still exists — the registry reflects the admin's
+    // intent; the dev removes the code separately.
+    if (o?.status === "retired") continue;
+    if (o) {
       merged.push({
         code: o.code, title: o.title, description: o.description,
         severity: sev(o.severity), category: o.category,
