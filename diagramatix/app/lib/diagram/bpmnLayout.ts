@@ -6,6 +6,17 @@
 import type { DiagramData, DiagramElement, Connector, Point } from "./types";
 import { getSymbolDefinition } from "./symbols/definitions";
 import { computeWaypoints } from "./routing";
+import { autoSizeForType, type AutosizeType } from "./textMetrics";
+
+/** Auto-size a task / subprocess to fit its label; other types keep their
+ *  default. Tasks that overflow the catalogue width are the ones whose names
+ *  spilled outside the box. */
+function autoElementSize(type: string, label: string, taskType: string | undefined, def: { defaultWidth: number; defaultHeight: number }): { w: number; h: number } {
+  if (type === "task" || type === "subprocess") {
+    return autoSizeForType(type as AutosizeType, label ?? "", 12, !!taskType && taskType !== "none");
+  }
+  return { w: def.defaultWidth, h: def.defaultHeight };
+}
 
 // Phase-trace writer: stderr only — no file I/O to avoid Windows file-lock
 // contention when many phase() calls fire from a single request.
@@ -523,15 +534,19 @@ export function layoutBpmnDiagram(
         for (let i = 0; i < n; i++) {
           const el = list[i];
           const def = getSymbolDefinition(el.type as DiagramElement["type"]);
-          const elX = START_X + POOL_HEADER_W + LANE_PAD_X + col * COL_SPACING;
+          const sz = autoElementSize(el.type, el.label ?? "", el.taskType as string | undefined, def);
+          // Keep the element CENTRE on the column so auto-sized tasks stay
+          // aligned with their neighbours either side.
+          const colCentreX = START_X + POOL_HEADER_W + LANE_PAD_X + col * COL_SPACING + def.defaultWidth / 2;
+          const elX = colCentreX - sz.w / 2;
           const stackSpacing = def.defaultHeight + 30;
           const stackOffset = n <= 2
             ? (i - (n - 1) / 2) * stackSpacing
             : (i - 1) * stackSpacing;
-          const elY = poolStartY + totalLaneH / 2 - def.defaultHeight / 2 + stackOffset;
+          const elY = poolStartY + totalLaneH / 2 - sz.h / 2 + stackOffset;
           elements.push({
             id: el.id, type: el.type as DiagramElement["type"],
-            x: elX, y: elY, width: def.defaultWidth, height: def.defaultHeight,
+            x: elX, y: elY, width: sz.w, height: sz.h,
             label: el.label, properties: buildProps(el), parentId: pool.id,
             ...(el.taskType ? { taskType: el.taskType as DiagramElement["taskType"] } : {}),
             ...(el.gatewayType ? { gatewayType: el.gatewayType as DiagramElement["gatewayType"] } : {}),
@@ -572,7 +587,11 @@ export function layoutBpmnDiagram(
           for (let i = 0; i < n; i++) {
             const el = list[i];
             const def = getSymbolDefinition(el.type as DiagramElement["type"]);
-            const elX = START_X + POOL_HEADER_W + LANE_PAD_X + col * COL_SPACING;
+            const sz = autoElementSize(el.type, el.label ?? "", el.taskType as string | undefined, def);
+            // Keep the element CENTRE on the column so auto-sized tasks stay
+            // aligned with their neighbours either side.
+            const colCentreX = START_X + POOL_HEADER_W + LANE_PAD_X + col * COL_SPACING + def.defaultWidth / 2;
+            const elX = colCentreX - sz.w / 2;
             const stackSpacing = def.defaultHeight + 30;
             // R3.10 (Y stacking): for n ≥ 3, stack asymmetrically to mirror
             // decision-gateway exit placement — index 0 above, index 1
@@ -581,11 +600,11 @@ export function layoutBpmnDiagram(
             const stackOffset = n <= 2
               ? (i - (n - 1) / 2) * stackSpacing
               : (i - 1) * stackSpacing;
-            const elY = laneY + laneH / 2 - def.defaultHeight / 2 + stackOffset;
+            const elY = laneY + laneH / 2 - sz.h / 2 + stackOffset;
 
             elements.push({
               id: el.id, type: el.type as DiagramElement["type"],
-              x: elX, y: elY, width: def.defaultWidth, height: def.defaultHeight,
+              x: elX, y: elY, width: sz.w, height: sz.h,
               label: el.label,
               properties: buildProps(el),
               parentId: lane.id,

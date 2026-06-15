@@ -1779,6 +1779,32 @@ export function SymbolRenderer({
         }
       }
       e.stopPropagation();
+    } else if (element.type === "process-group") {
+      // Value Chain element: clicks on (or within ±10px of) ANY of the four
+      // edges belong to the edge resize hit-zone. Skip the MOVE drag for edge
+      // clicks so dragging an edge resizes instead of moving (the hit-zone
+      // doesn't stopPropagation, so a plain click still selects). Multi-
+      // selected groups still body-drag from anywhere.
+      if (!(multiSelected && onGroupMove) && svgToWorld) {
+        const wp = svgToWorld(e.clientX, e.clientY);
+        if (wp) {
+          const TOL = 10;
+          const px = wp.x, py = wp.y;
+          const inX = px >= element.x - TOL && px <= element.x + element.width + TOL;
+          const inY = py >= element.y - TOL && py <= element.y + element.height + TOL;
+          const onLeft   = Math.abs(px - element.x) <= TOL;
+          const onRight  = Math.abs(px - (element.x + element.width)) <= TOL;
+          const onTop    = Math.abs(py - element.y) <= TOL;
+          const onBottom = Math.abs(py - (element.y + element.height)) <= TOL;
+          if (inX && inY && (onLeft || onRight || onTop || onBottom)) {
+            e.stopPropagation();
+            if (selected) onSelect();
+            else onSelect(e);
+            return;
+          }
+        }
+      }
+      e.stopPropagation();
     } else {
       e.stopPropagation();
     }
@@ -2718,7 +2744,7 @@ export function SymbolRenderer({
           is active. EPs reuse the same pool mechanic per user spec
           ("Pools have to move their boundaries to Expanded Subprocesses"),
           giving consistent edge-hover-resize UX across both. */}
-      {(element.type === "pool" || element.type === "subprocess-expanded") && onResizeDragStart && (() => {
+      {(element.type === "pool" || element.type === "subprocess-expanded" || element.type === "process-group") && onResizeDragStart && (() => {
         const HANDLE_W = 10;
         const horizontalGripLen = Math.min(40, element.height * 0.5); // E/W grips
         const verticalGripLen   = Math.min(40, element.width  * 0.5); // N/S grips

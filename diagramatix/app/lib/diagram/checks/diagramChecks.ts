@@ -1529,15 +1529,9 @@ export const RULES: Rule[] = [
     category: "bpmn-structure",
     check: checkActivityHasOutgoing,
   },
-  {
-    code: "B13",
-    id: "connector-bends",
-    title: "Connector takes too many bends",
-    description: "A sequence connector has 4 or more direction changes — usually a sign of cramped routing or a misplaced element. Flagged as a warning; the connector itself is highlighted orange on the canvas during Review Mode.",
-    severity: "warning",
-    category: "bpmn-structure",
-    check: checkConnectorBendiness,
-  },
+  // B13 "Connector takes too many bends" (checkConnectorBendiness) removed
+  // per user request — too noisy. The check function is retained but no
+  // longer registered, so it never fires; B13 stays retired (not reused).
   {
     code: "B14",
     id: "task-type-for-messages",
