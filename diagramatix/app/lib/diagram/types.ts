@@ -644,5 +644,12 @@ export interface TemplateData {
  *             transactional (audit DATA-06/22) with natural-key rule upsert
  *             (DATA-23). No change to the diagram XML export shape (XSD
  *             structure unchanged since 1.17 — version bump only).
+ *   1.22    - SharePoint file linking: Data Object / Data Store elements may
+ *             carry a `properties.sharepointLink` object
+ *             { driveId, itemId, name, webUrl } pointing at a SharePoint /
+ *             OneDrive file (set via the editor's "Link SharePoint file…"
+ *             button; previewed in-app). Round-trips through the existing
+ *             flexible PropertiesType — no XSD structure change, documented
+ *             there + version bump.
  */
-export const SCHEMA_VERSION = "1.21";
+export const SCHEMA_VERSION = "1.22";

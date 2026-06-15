@@ -39,6 +39,7 @@ import { SupportRequestDialog } from "./SupportRequestDialog";
 import { FeedbackPanel } from "./FeedbackPanel";
 import { AlertDialog } from "@/app/components/AlertDialog";
 import { SharePointPicker } from "@/app/components/SharePointPicker";
+import { SharePointPreview } from "@/app/components/SharePointPreview";
 import { DiagramatixThrobber } from "@/app/components/DiagramatixThrobber";
 import { checkDiagram, rulesMetadata, type Violation } from "@/app/lib/diagram/checks/diagramChecks";
 import { HistoryPanel } from "./HistoryPanel";
@@ -975,6 +976,10 @@ export function DiagramEditor({
   const [spPicker, setSpPicker] = useState<null | "save" | "open">(null);
   const [spBusy, setSpBusy] = useState(false);
   const [spMessage, setSpMessage] = useState<{ title: string; body: string; tone: "info" | "error" } | null>(null);
+  // Linking a SharePoint file to a Data Object / Store: the element being
+  // linked (picker opens in file mode), and the file currently being previewed.
+  const [spLinkElId, setSpLinkElId] = useState<string | null>(null);
+  const [spPreview, setSpPreview] = useState<{ driveId: string; itemId: string; name: string; webUrl?: string } | null>(null);
   // Admin-only: prompt the admin to pick the destination list when
   // exporting or importing templates. Non-admins skip the prompt.
   const [templateExportPrompt, setTemplateExportPrompt] = useState(false);
@@ -3382,6 +3387,8 @@ export function DiagramEditor({
             multiSelectionCount={selectedElementIds.size}
             onUpdateLabel={updateLabel}
             onUpdateProperties={updateProperties}
+            onLinkSharePointFile={(id) => setSpLinkElId(id)}
+            onPreviewSharePointFile={(link) => setSpPreview(link)}
             onSetEventBoundary={(id, hostId) => {
               setEventBoundary(id, hostId);
               // After detaching, clear the selection so the next click
@@ -3566,6 +3573,35 @@ export function DiagramEditor({
               if (mode === "save") void handleSaveToSharePoint(sel);
               else void handleOpenFromSharePoint(sel);
             }}
+          />
+        )}
+
+        {/* SharePoint file-link picker (Data Object / Store) */}
+        {spLinkElId && (
+          <SharePointPicker
+            mode="file"
+            title="Link a SharePoint file"
+            confirmLabel="Link"
+            onCancel={() => setSpLinkElId(null)}
+            onPick={(sel) => {
+              const elId = spLinkElId;
+              setSpLinkElId(null);
+              if (!elId || !sel.itemId) return;
+              const link = { driveId: sel.driveId, itemId: sel.itemId, name: sel.name, webUrl: sel.webUrl };
+              updateProperties(elId, { sharepointLink: link });
+              setSpPreview(link);
+            }}
+          />
+        )}
+
+        {/* Embedded preview of a linked SharePoint file */}
+        {spPreview && (
+          <SharePointPreview
+            driveId={spPreview.driveId}
+            itemId={spPreview.itemId}
+            name={spPreview.name}
+            webUrl={spPreview.webUrl}
+            onClose={() => setSpPreview(null)}
           />
         )}
         {spBusy && (

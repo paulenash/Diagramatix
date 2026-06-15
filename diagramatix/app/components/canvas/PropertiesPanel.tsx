@@ -24,6 +24,10 @@ interface Props {
   diagramType?: DiagramType;
   onUpdateLabel: (id: string, label: string) => void;
   onUpdateProperties: (id: string, props: Record<string, unknown>) => void;
+  /** Open the SharePoint picker to link a file to this Data Object / Store. */
+  onLinkSharePointFile?: (elementId: string) => void;
+  /** Open the embedded preview for an already-linked SharePoint file. */
+  onPreviewSharePointFile?: (link: { driveId: string; itemId: string; name: string; webUrl?: string }) => void;
   onSetEventBoundary?: (id: string, hostId: string | null) => void;
   onDeleteElement: (id: string) => void;
   onDeleteConnector: (id: string) => void;
@@ -621,6 +625,8 @@ export function PropertiesPanel({
   diagramType,
   onUpdateLabel,
   onUpdateProperties,
+  onLinkSharePointFile,
+  onPreviewSharePointFile,
   onSetEventBoundary,
   onDeleteElement,
   onDeleteConnector,
@@ -1969,6 +1975,54 @@ export function PropertiesPanel({
                   value={(element.properties.filename as string) ?? ""}
                   onChange={(e) => onUpdateProperties(element.id, { filename: e.target.value })}
                 />
+              </div>
+
+              {/* SharePoint file — structured link with embedded preview. */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">SharePoint file</label>
+                {(() => {
+                  const sp = element.properties.sharepointLink as
+                    | { driveId: string; itemId: string; name: string; webUrl?: string }
+                    | undefined;
+                  if (sp && sp.itemId) {
+                    return (
+                      <div className="flex flex-col gap-1.5">
+                        <div className="flex items-center gap-1.5 px-2 py-1.5 border border-gray-200 rounded bg-gray-50">
+                          <span aria-hidden>📄</span>
+                          <span className="flex-1 min-w-0 truncate text-xs text-gray-800" title={sp.name}>{sp.name}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => onPreviewSharePointFile?.(sp)}
+                            className="px-2 py-1 text-xs font-medium text-white bg-blue-600 rounded hover:bg-blue-700"
+                          >
+                            Preview
+                          </button>
+                          <button
+                            onClick={() => onLinkSharePointFile?.(element.id)}
+                            className="px-2 py-1 text-xs font-medium text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
+                          >
+                            Change…
+                          </button>
+                          <button
+                            onClick={() => onUpdateProperties(element.id, { sharepointLink: undefined })}
+                            className="px-2 py-1 text-xs font-medium text-red-700 border border-gray-300 rounded hover:bg-red-50"
+                          >
+                            Unlink
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  }
+                  return (
+                    <button
+                      onClick={() => onLinkSharePointFile?.(element.id)}
+                      className="w-full px-2 py-1.5 text-xs font-medium text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
+                    >
+                      Link SharePoint file…
+                    </button>
+                  );
+                })()}
               </div>
             </>
           )}

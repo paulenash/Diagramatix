@@ -675,6 +675,11 @@
       multiplicity     : "single" | "collection"  — data object/store
       role             : "input" | "output" | "none" — data object I/O marker
       state            : string    — data object state badge
+      link             : string    — data object/store free-text document URL
+      filename         : string    — data object/store document filename
+      sharepointLink   : object    — data object/store linked SharePoint/OneDrive file (schema 1.22).
+                                     JSON-encoded { driveId, itemId, name, webUrl }; set via the
+                                     editor "Link SharePoint file…" button, previewed in-app.
       linkedDiagramId  : string    — collapsed subprocess / submachine / collapsed process drill-down link
 
     Value-chain element properties (chevron = Process, chevron-collapsed = Collapsed Process,

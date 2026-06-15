@@ -489,6 +489,23 @@ function IntermediateEventShape({ el }: { el: DiagramElement }) {
   );
 }
 
+/** Small corner badge marking a Data Object / Store that has a linked
+ *  SharePoint file. Purely a visual indicator — preview opens from the
+ *  Properties panel. */
+function SharePointLinkBadge({ x, y }: { x: number; y: number }) {
+  return (
+    <g pointerEvents="none">
+      <rect x={x - 7} y={y - 7} width={14} height={14} rx={3} fill="#2563eb" />
+      {/* chain-link glyph */}
+      <g stroke="white" strokeWidth={1.4} fill="none" strokeLinecap="round">
+        <path d={`M ${x - 3} ${y + 1} l 2 -2`} />
+        <path d={`M ${x + 1} ${y + 3} a 2.4 2.4 0 0 1 0 -3.4 l 1.4 -1.4`} />
+        <path d={`M ${x - 1} ${y - 3} a 2.4 2.4 0 0 1 0 3.4 l -1.4 1.4`} />
+      </g>
+    </g>
+  );
+}
+
 function DataObjectShape({ el }: { el: DiagramElement }) {
   const fold = Math.round(el.width * 0.28);
   const { x, y, width: w, height: h } = el;
@@ -546,6 +563,7 @@ function DataObjectShape({ el }: { el: DiagramElement }) {
           <line x1={cx + lineGap} y1={ly1} x2={cx + lineGap} y2={ly2} />
         </g>
       )}
+      {!!el.properties.sharepointLink && <SharePointLinkBadge x={x + w - 9} y={y + h - 9} />}
     </g>
   );
 }
@@ -582,6 +600,7 @@ function DataStoreShape({ el }: { el: DiagramElement }) {
           <line x1={mcx + mLineGap} y1={mly1} x2={mcx + mLineGap} y2={mly2} />
         </g>
       )}
+      {!!el.properties.sharepointLink && <SharePointLinkBadge x={x + w - 9} y={y + h - 9} />}
     </g>
   );
 }
