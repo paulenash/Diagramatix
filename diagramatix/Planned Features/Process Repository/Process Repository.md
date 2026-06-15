@@ -133,6 +133,57 @@ payment collection. The main external participant is the Customer
 accepts a quote, signs a contract, or starts a recurring purchase.
 ```
 
+**Context diagram prompt.**
+
+```text
+Context Diagram: V01 — Order to Cash (O2C).
+
+1. Central system (process-system)
+A single central process/system ellipse named "Order Processing Company"
+representing the whole organisation that runs the Order to Cash process. It is
+the system in context: everything inside it — sales, order processing,
+fulfilment, billing, finance and the supporting IT systems (OMS, CRM/ERP, WMS,
+TMS, billing and general ledger) — is treated as one black box.
+
+2. External entities (external-entity)
+The parties OUTSIDE the company that exchange information with it, one rectangle
+each:
+- Customer
+- Freight Carrier
+- Payment Gateway
+- Bank
+
+3. Layout
+"Order Processing Company" sits in the centre. The Customer sits to the LEFT
+(the demand side). Freight Carrier, Payment Gateway and Bank sit to the RIGHT
+(the fulfilment and settlement side). Every external entity connects directly
+to the central system with labelled information flows; entities never connect
+to one another.
+
+4. Information flows (each a labelled connector between an external entity and
+   the central system; show both directions where information flows both ways)
+- Customer → Order Processing Company: order / purchase order, delivery
+  instructions, contact details, payment details, dispute & return requests.
+- Order Processing Company → Customer: quote, order confirmation, availability
+  update, shipment notification, invoice, statement, payment receipt, credit
+  note, service update.
+- Order Processing Company → Freight Carrier: shipment booking & consignment
+  details.
+- Freight Carrier → Order Processing Company: proof of delivery & tracking
+  updates.
+- Order Processing Company → Payment Gateway: payment authorisation request.
+- Payment Gateway → Order Processing Company: payment confirmation & settlement
+  advice.
+- Bank → Order Processing Company: bank statement & cleared funds.
+- Order Processing Company → Bank: deposit & remittance details.
+
+This Context Diagram frames the Order Processing Company as a single system in
+context: the Customer initiates the Order to Cash process, the Freight Carrier
+delivers the goods, and the Payment Gateway and Bank settle payment. The four
+external entities are exactly the external actors of the Process Context diagram
+below, so the two views stay consistent.
+```
+
 **Process Context diagram prompt.**
 
 ```text
