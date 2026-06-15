@@ -77,6 +77,40 @@ function lightenHex(hex: string, frac: number): string {
   return `#${ch(r)}${ch(g)}${ch(b)}`;
 }
 
+function escapeHtmlText(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+/**
+ * V1.07 (Value Chain, code-enforced): format a generated Subprocess
+ * description as a bullet-point action list, each item led by a CAPITALISED,
+ * BOLDED first verb. Produces the rich-text HTML the description box renders.
+ * Splits on line breaks / existing bullets, or on sentence boundaries for a
+ * prose blob; strips any HTML the model may have emitted first.
+ */
+function formatActionList(raw: string): string {
+  const text = raw.replace(/<[^>]+>/g, " ").replace(/\s+\n/g, "\n").trim();
+  if (!text) return "";
+  const hasBreaks = /[\n\r]/.test(text) || /(^|\n)\s*[-*•]/.test(text);
+  const items = (hasBreaks ? text.split(/\r?\n/) : text.split(/(?<=[.;])\s+/))
+    .map((s) =>
+      s.trim()
+        .replace(/^[-*•]\s*/, "")      // leading bullet
+        .replace(/^\d+[.)]\s*/, "")          // leading "1." / "1)"
+        .replace(/[.;]\s*$/, "")              // trailing . / ;
+        .trim(),
+    )
+    .filter(Boolean);
+  if (items.length === 0) return "";
+  const lis = items.map((item) => {
+    const m = /^(\S+)([\s\S]*)$/.exec(item);
+    if (!m) return `<li>${escapeHtmlText(item)}</li>`;
+    const verb = m[1].charAt(0).toUpperCase() + m[1].slice(1);
+    return `<li><b>${escapeHtmlText(verb)}</b>${escapeHtmlText(m[2])}</li>`;
+  });
+  return `<ul>${lis.join("")}</ul>`;
+}
+
 const GRID_GAP_X = 60;
 const GRID_GAP_Y = 40;
 const START_X = 100;
@@ -629,10 +663,14 @@ export function layoutGenericDiagram(
 function buildProperties(ai: Record<string, unknown>, diagramType: string): Record<string, unknown> {
   const props: Record<string, unknown> = {};
 
-  // Value chain process description
+  // Value chain process description — V1.07: format as a bolded-verb action
+  // list (rich-text HTML the description box renders).
   if ((ai.type === "chevron" || ai.type === "chevron-collapsed") && ai.description) {
-    props.description = ai.description;
-    props.showDescription = true;
+    const formatted = formatActionList(String(ai.description));
+    if (formatted) {
+      props.description = formatted;
+      props.showDescription = true;
+    }
   }
 
   // UML class attributes
