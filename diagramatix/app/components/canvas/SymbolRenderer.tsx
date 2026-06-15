@@ -77,6 +77,12 @@ interface Props {
   isAssocBpmnTarget?: boolean;
   isErrorTarget?: boolean;
   isElementDragTarget?: boolean;
+  /** Process-Context association highlight: this element is connected to the
+   *  selected element — draw a solid green boundary. */
+  isAssociationHighlight?: boolean;
+  /** Process-Context: dim this element because it's NOT part of the current
+   *  selection's associations (the Process Group boundary is never faded). */
+  isFaded?: boolean;
   onSelect: (e?: React.MouseEvent) => void;
   onMove: (x: number, y: number, unconstrained?: boolean) => void;
   onDoubleClick: () => void;
@@ -1634,6 +1640,8 @@ export function SymbolRenderer({
   isAssocBpmnTarget,
   isErrorTarget,
   isElementDragTarget,
+  isAssociationHighlight,
+  isFaded,
   onSelect,
   onMove,
   onDoubleClick,
@@ -2059,6 +2067,7 @@ export function SymbolRenderer({
     <SymbolColorCtx.Provider value={colorConfig}>
     <ShowValueDisplayCtx.Provider value={!!showValueDisplay}>
     <g
+      opacity={isFaded ? 0.2 : undefined}
       onMouseDown={handleMouseDown}
       onDoubleClick={(e) => {
         e.stopPropagation();
@@ -2624,6 +2633,26 @@ export function SymbolRenderer({
             width={element.width + 6} height={element.height + 6}
             fill="none" stroke="#2563eb" strokeWidth={1.5}
             strokeDasharray="4 2" rx={4}
+            style={{ pointerEvents: "none" }}
+          />
+        )
+      )}
+      {/* Process-Context association highlight — solid green boundary on
+          elements connected to the selected element (not the selected one
+          itself, which keeps its blue outline). */}
+      {isAssociationHighlight && !selected && (
+        (element.type === "process-system" || element.type === "use-case") ? (
+          <ellipse
+            cx={element.x + element.width / 2} cy={element.y + element.height / 2}
+            rx={element.width / 2 + 3} ry={element.height / 2 + 3}
+            fill="none" stroke="#16a34a" strokeWidth={2.5}
+            style={{ pointerEvents: "none" }}
+          />
+        ) : (
+          <rect
+            x={element.x - 3} y={element.y - 3}
+            width={element.width + 6} height={element.height + 6}
+            fill="none" stroke="#16a34a" strokeWidth={2.5} rx={4}
             style={{ pointerEvents: "none" }}
           />
         )

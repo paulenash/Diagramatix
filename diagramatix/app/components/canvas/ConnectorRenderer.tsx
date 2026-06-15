@@ -21,6 +21,12 @@ interface Props {
   debugMode?: boolean;
   onUpdateEndOffset?: (connectorId: string, field: string, offset: Point) => void;
   showBottleneck?: boolean;
+  /** Process-Context association highlight: draw this connector green +
+   *  thicker because one of its endpoints is the selected element. */
+  highlight?: boolean;
+  /** Process-Context: dim this connector — not part of the selection's
+   *  associations. */
+  faded?: boolean;
   /** Source/target element bounds — used to mask out the click hit area for
    *  associationBPMN connectors so a click inside an endpoint element selects
    *  the element rather than the connector. */
@@ -518,7 +524,7 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
   );
 }
 
-export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, onUpdateWaypoints, onWaypointsDragEnd, onUpdateLabel, onUpdateCurveHandles, misaligned, otherConnectorWaypoints, debugMode, onUpdateEndOffset, showBottleneck, sourceBounds, targetBounds, sourcePoolHeight, targetPoolHeight, sourceIsPool, targetIsPool, onLabelFocusEditStart, onLabelFocusEditEnd, hideLabel }: Props) {
+export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, onUpdateWaypoints, onWaypointsDragEnd, onUpdateLabel, onUpdateCurveHandles, misaligned, otherConnectorWaypoints, debugMode, onUpdateEndOffset, showBottleneck, sourceBounds, targetBounds, sourcePoolHeight, targetPoolHeight, sourceIsPool, targetIsPool, onLabelFocusEditStart, onLabelFocusEditEnd, hideLabel, highlight, faded }: Props) {
   const displayMode = useContext(DisplayModeCtx);
   const connFontScale = useContext(ConnectorFontScaleCtx);
   const [draggingEndLabel, setDraggingEndLabel] = useState<string | null>(null);
@@ -548,6 +554,7 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
   const isReviewLink = connector.type === "review-comment-link";
   const isBottleneck = connector.type === "sequence" && !!connector.bottleneck && !!showBottleneck;
   const strokeColor = selected ? "#2563eb"
+    : highlight ? "#16a34a"   // Process-Context association highlight (green)
     : misaligned ? "#dc2626"
     : isBottleneck ? "#9333ea"
     : isMessageBPMN ? "#b0b7c3"
@@ -739,7 +746,7 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
   }
 
   return (
-    <>
+    <g opacity={faded ? 0.2 : undefined}>
       {isMessageBPMN ? (
         <defs>
           <UnfilledTriangleMarker id={`msg-end-${connector.id}`}   color={strokeColor} />
@@ -829,7 +836,7 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
         d={visibleD}
         fill="none"
         stroke={strokeColor}
-        strokeWidth={isAssocBPMN ? (selected ? 2.5 : 2) : (selected ? 2 : 1.5)}
+        strokeWidth={highlight && !selected ? 2.5 : isAssocBPMN ? (selected ? 2.5 : 2) : (selected ? 2 : 1.5)}
         strokeDasharray={isMessageBPMN ? "10 5" : isAssocBPMN ? "0.5 3" : isReviewLink ? "4 3" : (isMessage ? "6 3" : undefined)}
         strokeLinecap={isAssocBPMN ? "round" : undefined}
         markerStart={(displayMode === "hand-drawn" && !isMessageBPMN) ? undefined :
@@ -1404,6 +1411,6 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
           </g>
         );
       })()}
-    </>
+    </g>
   );
 }

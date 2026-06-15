@@ -4099,6 +4099,37 @@ export function Canvas({
       if (m === "parallel" || m === "event-based") hiddenBranchLabelConnIds.add(c.id);
     }
   }
+
+  // Process-Context association highlight: when an element (or a GROUP) is
+  // selected, its association connectors and the elements at the other end
+  // light up green, and every OTHER element/connector is greyed out — except
+  // the Process Group boundary, which always stays visible. Lets you see what
+  // a given Actor / Team / System / Process (or selected group) connects to.
+  const assocHighlightConnIds = new Set<string>();
+  const assocHighlightElIds = new Set<string>();
+  const assocActiveElIds = new Set<string>();
+  let assocActive = false;
+  if (diagramType === "process-context" && selectedElementIds.size >= 1) {
+    for (const c of data.connectors) {
+      const srcSel = selectedElementIds.has(c.sourceId);
+      const tgtSel = selectedElementIds.has(c.targetId);
+      if (srcSel || tgtSel) {
+        assocHighlightConnIds.add(c.id);
+        if (!srcSel) assocHighlightElIds.add(c.sourceId);
+        if (!tgtSel) assocHighlightElIds.add(c.targetId);
+      }
+    }
+    assocActive = assocHighlightConnIds.size > 0;
+    if (assocActive) {
+      for (const id of selectedElementIds) assocActiveElIds.add(id);
+      for (const id of assocHighlightElIds) assocActiveElIds.add(id);
+    }
+  }
+  const ASSOC_KEEP_VISIBLE = new Set(["system-boundary", "system-boundary-body"]);
+  const isAssocFadedEl = (el: DiagramElement) =>
+    assocActive && !assocActiveElIds.has(el.id) && !ASSOC_KEEP_VISIBLE.has(el.type);
+  const isAssocFadedConn = (c: Connector) =>
+    assocActive && !assocHighlightConnIds.has(c.id);
   function segCrossesRect(p1: Point, p2: Point, r: { x: number; y: number; w: number; h: number }): boolean {
     const left = r.x, right = r.x + r.w, top = r.y, bottom = r.y + r.h;
     if (Math.abs(p1.y - p2.y) < 1) {
@@ -4611,6 +4642,8 @@ export function Canvas({
                 key={el.id}
                 element={el}
                 selected={selectedElementIds.has(el.id)}
+                isAssociationHighlight={assocHighlightElIds.has(el.id)}
+                isFaded={isAssocFadedEl(el)}
                 isDropTarget={isSubExpDropTarget || isCompositeDropTarget}
                 isDisallowedTarget={false}
                 isMessageBpmnTarget={isMsgTarget}
@@ -4745,6 +4778,8 @@ export function Canvas({
               key={el.id}
               element={el}
               selected={selectedElementIds.has(el.id)}
+              isAssociationHighlight={assocHighlightElIds.has(el.id)}
+                isFaded={isAssocFadedEl(el)}
               isDropTarget={false}
               onSelect={(ev) => {
                 onSetSelectedElements(new Set([el.id]));
@@ -4852,6 +4887,8 @@ export function Canvas({
                 key={el.id}
                 element={el}
                 selected={selectedElementIds.has(el.id)}
+                isAssociationHighlight={assocHighlightElIds.has(el.id)}
+                isFaded={isAssocFadedEl(el)}
                 isDropTarget={isSubExpDropTarget}
                 isDisallowedTarget={false}
                 isAssocBpmnTarget={isSubExpAssocTarget}
@@ -4941,6 +4978,8 @@ export function Canvas({
                 onUpdateEndOffset={handleUpdateEndOffset}
                 showBottleneck={showBottleneck}
                 hideLabel={hiddenBranchLabelConnIds.has(conn.id)}
+                highlight={assocHighlightConnIds.has(conn.id)}
+                faded={isAssocFadedConn(conn)}
                 onLabelFocusEditStart={(cx, cy, w) => enterFocusModeAt(cx, cy, w, "connector")}
                 onLabelFocusEditEnd={exitFocusMode}
               />
@@ -5135,6 +5174,8 @@ export function Canvas({
               key={el.id}
               element={el}
               selected={selectedElementIds.has(el.id)}
+              isAssociationHighlight={assocHighlightElIds.has(el.id)}
+                isFaded={isAssocFadedEl(el)}
               isDropTarget={elIsDropTarget}
               isMessageBpmnTarget={elIsMsgTarget}
               isAssocBpmnTarget={elIsAssocTarget}
@@ -5331,6 +5372,8 @@ export function Canvas({
                 key={el.id}
                 element={el}
                 selected={selectedElementIds.has(el.id)}
+                isAssociationHighlight={assocHighlightElIds.has(el.id)}
+                isFaded={isAssocFadedEl(el)}
                 isDropTarget={elIsDropTarget}
                 isDisallowedTarget={false}
                 isMessageBpmnTarget={elIsMsgTarget}
@@ -5404,6 +5447,8 @@ export function Canvas({
               key={el.id}
               element={el}
               selected={selectedElementIds.has(el.id)}
+              isAssociationHighlight={assocHighlightElIds.has(el.id)}
+                isFaded={isAssocFadedEl(el)}
               isDropTarget={false}
               isDisallowedTarget={false}
               onSelect={(ev) => {
@@ -5568,6 +5613,8 @@ export function Canvas({
                 sourceIsPool={srcIsPool}
                 targetIsPool={tgtIsPool}
                 hideLabel={hiddenBranchLabelConnIds.has(conn.id)}
+                highlight={assocHighlightConnIds.has(conn.id)}
+                faded={isAssocFadedConn(conn)}
                 onLabelFocusEditStart={(cx, cy, w) => enterFocusModeAt(cx, cy, w, "connector")}
                 onLabelFocusEditEnd={exitFocusMode}
               />
@@ -5612,6 +5659,8 @@ export function Canvas({
                 onUpdateEndOffset={handleUpdateEndOffset}
                 showBottleneck={showBottleneck}
                 hideLabel={hiddenBranchLabelConnIds.has(conn.id)}
+                highlight={assocHighlightConnIds.has(conn.id)}
+                faded={isAssocFadedConn(conn)}
                 onLabelFocusEditStart={(cx, cy, w) => enterFocusModeAt(cx, cy, w, "connector")}
                 onLabelFocusEditEnd={exitFocusMode}
               />
