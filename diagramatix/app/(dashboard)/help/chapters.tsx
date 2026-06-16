@@ -1992,6 +1992,83 @@ export const CHAPTERS: HelpChapter[] = [
           </p>
         ),
       },
+      {
+        heading: "Connecting Microsoft (SharePoint / OneDrive)",
+        body: (
+          <>
+            <p>
+              Diagramatix can save and open files directly in{" "}
+              <strong>SharePoint</strong> and <strong>OneDrive</strong>, and
+              link Data Objects to documents stored there. To use these,
+              sign in with your Microsoft account: on the{" "}
+              <strong>Sign in</strong> page choose{" "}
+              <strong>Sign in with Microsoft</strong>, or — if you signed in
+              with email and password — the SharePoint picker will prompt you
+              to <strong>Connect Microsoft</strong> the first time you open it.
+            </p>
+            <p className="mt-2 text-gray-600">
+              Your administrator must enable the Microsoft connection for your
+              organisation before these options will work.
+            </p>
+          </>
+        ),
+      },
+      {
+        heading: "Save to SharePoint",
+        body: (
+          <>
+            <p>
+              In the diagram editor,{" "}
+              <strong>File ▾ → Export ▸ SharePoint…</strong> opens a picker to
+              browse your SharePoint sites, document libraries and OneDrive.
+              Choose a folder and click <strong>Save here</strong>.
+            </p>
+            <p className="mt-2">
+              Diagramatix uploads the diagram&apos;s data files into that
+              folder: the <strong>XML</strong>, its matching{" "}
+              <strong>XSD</strong> schema, and the native{" "}
+              <strong>JSON</strong> — plus a Visio{" "}
+              <code className="text-xs bg-gray-100 px-1 rounded">.vsdx</code>{" "}
+              for BPMN diagrams.
+            </p>
+          </>
+        ),
+      },
+      {
+        heading: "Open from SharePoint",
+        body: (
+          <p>
+            <strong>File ▾ → Import ▸ SharePoint…</strong> lets you pick a{" "}
+            <code className="text-xs bg-gray-100 px-1 rounded">.json</code>,{" "}
+            <code className="text-xs bg-gray-100 px-1 rounded">.xml</code>,{" "}
+            <code className="text-xs bg-gray-100 px-1 rounded">.vsdx</code> or{" "}
+            <code className="text-xs bg-gray-100 px-1 rounded">.bpmn</code>{" "}
+            file from SharePoint or OneDrive and load it into Diagramatix —
+            the same import behaviour as the matching local file formats.
+          </p>
+        ),
+      },
+      {
+        heading: "Link a Data Object to a SharePoint file",
+        body: (
+          <>
+            <p>
+              Select a <strong>Data Object</strong> or{" "}
+              <strong>Data Store</strong>, and in the Properties panel&apos;s{" "}
+              <strong>SharePoint file</strong> section click{" "}
+              <strong>Link SharePoint file…</strong> to pick a document. A small
+              link badge appears on the shape to show it&apos;s linked.
+            </p>
+            <p className="mt-2">
+              Click <strong>Preview</strong> to view the document embedded
+              inside Diagramatix, <strong>Change…</strong> to point at a
+              different file, or <strong>Unlink</strong> to remove the link.
+              The link travels with the diagram and survives XML / JSON export
+              and import.
+            </p>
+          </>
+        ),
+      },
     ],
   },
 

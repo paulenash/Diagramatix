@@ -228,6 +228,18 @@ const FEATURES: Array<{ name: string; summary: string; details: string }> = [
       "- Restores are additive and fully transactional — all-or-nothing, never a half-restored set",
     ].join("\n"),
   },
+  {
+    name: "SharePoint & OneDrive Integration",
+    summary: "Sign in with Microsoft, save and open diagrams in SharePoint or OneDrive, and link Data Objects to live documents.",
+    details: [
+      "- Sign in with your Microsoft (Entra) account alongside email / password",
+      "- Save a diagram's data files — XML + matching XSD + JSON (and Visio .vsdx for BPMN) — straight into a SharePoint or OneDrive folder",
+      "- Open those files back from SharePoint / OneDrive into Diagramatix",
+      "- Browse your SharePoint sites, document libraries and OneDrive with a built-in file picker",
+      "- Link a Data Object or Data Store to a SharePoint / OneDrive file",
+      "- Preview the linked file embedded in the editor, with a link badge on the shape",
+    ].join("\n"),
+  },
 ];
 
 async function main() {
