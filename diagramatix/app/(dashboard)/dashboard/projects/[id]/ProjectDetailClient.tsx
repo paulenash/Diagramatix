@@ -8,6 +8,7 @@ import { resolveColor, DEFAULT_SYMBOL_COLORS, type SymbolColorConfig } from "@/a
 import { DiagramMaintenanceModal, type FontConfig } from "./DiagramMaintenanceModal";
 import { LinkScanDialog } from "./LinkScanDialog";
 import { ImpersonationBanner } from "@/app/components/ImpersonationBanner";
+import { SharePointPicker } from "@/app/components/SharePointPicker";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 import { DiagramTypeBadge } from "@/app/components/DiagramTypeBadge";
 import { useDiagramTypeStyles } from "@/app/hooks/useDiagramTypeStyles";
@@ -574,6 +575,11 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
   const importXmlInputRef = useRef<HTMLInputElement>(null);
   const importVisioInputRef = useRef<HTMLInputElement>(null);
   const importBpmnInputRef = useRef<HTMLInputElement>(null);
+  // SharePoint: which project format is being exported (drives the folder
+  // picker), whether the import file-picker is open, and a brief busy flag.
+  const [spExportFormat, setSpExportFormat] = useState<null | "json" | "xml">(null);
+  const [spImportOpen, setSpImportOpen] = useState(false);
+  const [spBusy, setSpBusy] = useState(false);
   // Import-progress modal state (mirrors the dashboard's import flow).
   const [importing, setImporting] = useState(false);
   const [importLog, setImportLog] = useState<string[]>([]);
@@ -896,7 +902,47 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
     }).catch(() => {});
   }
 
-  async function handleExportProject(format: ExportFormat = "json") {
+  // Open a project export file from SharePoint and import it as a new project.
+  async function handleOpenProjectFromSharePoint(sel: { driveId: string; itemId: string | null; name: string }) {
+    if (!sel.itemId) return;
+    setSpBusy(true);
+    try {
+      const r = await fetch(`/api/sharepoint/download?driveId=${encodeURIComponent(sel.driveId)}&itemId=${encodeURIComponent(sel.itemId)}`);
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error ?? "Download failed");
+      const blob = await r.blob();
+      const file = new File([blob], sel.name);
+      const fmt: "json" | "xml" = sel.name.toLowerCase().endsWith(".xml") ? "xml" : "json";
+      setSpBusy(false);
+      await handleImportFile(file, fmt);
+    } catch (err) {
+      setSpBusy(false);
+      setImporting(true);
+      setImportLog([`✘ SharePoint open failed: ${err instanceof Error ? err.message : String(err)}`]);
+      setImportResult("failed");
+    }
+  }
+
+  // Upload a file into a SharePoint / OneDrive folder (binary-safe).
+  async function spUpload(
+    sel: { driveId: string; itemId: string | null },
+    filename: string, contentType: string, body: Blob | string,
+  ) {
+    const fd = new FormData();
+    fd.append("driveId", sel.driveId);
+    if (sel.itemId) fd.append("folderItemId", sel.itemId);
+    fd.append("filename", filename);
+    fd.append("contentType", contentType);
+    const blob = body instanceof Blob ? body : new Blob([body], { type: contentType });
+    fd.append("file", blob, filename);
+    const r = await fetch("/api/sharepoint/upload", { method: "POST", body: fd });
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error ?? `Upload of ${filename} failed`);
+  }
+
+  async function handleExportProject(
+    format: ExportFormat = "json",
+    destination: "local" | "sharepoint" = "local",
+    sel?: { driveId: string; itemId: string | null; name: string },
+  ) {
     setExporting(true);
     setExportLog([]);
     setExportResult(null);
@@ -963,25 +1009,42 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
         : JSON.stringify(exportData, null, 2);
 
       const blob = new Blob([content], { type: mimeType });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${projectName}.diagramatix.${fileExt}`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-
+      const fileName = `${projectName}.diagramatix.${fileExt}`.replace(/[\\/:*?"<>|]/g, "_");
       const sizeKb = Math.round(blob.size / 1024);
-      log(`\u2714 Export complete! File: ${projectName}.diagramatix.${fileExt} (${sizeKb} KB)`);
-      log(`   ${diagramsWithData.length} diagram(s), ${folderCount} folder(s)`);
 
-      // For XML exports, also download the matching XSD schema so the .xml
-      // can be validated by external tools.
-      if (isXml) {
-        const { downloadMatchingXsd } = await import("@/app/lib/diagram/xmlExport");
-        const xsdAppVersion = await downloadMatchingXsd(SCHEMA_VERSION);
-        log(`\u2714 XSD schema downloaded (diagramatix-export-v${xsdAppVersion}.xsd)`);
+      if (destination === "sharepoint" && sel) {
+        log(`Uploading to SharePoint folder "${sel.name}"\u2026`);
+        await spUpload(sel, fileName, mimeType, blob);
+        log(`\u2714 Uploaded ${fileName} (${sizeKb} KB)`);
+        // For XML, upload the matching XSD alongside so the .xml validates.
+        if (isXml) {
+          const xsdResp = await fetch("/api/schema");
+          if (xsdResp.ok) {
+            const xsdText = await xsdResp.text();
+            const m = xsdText.match(/Generated by Diagramatix ([\d.]+)/);
+            const ver = m ? m[1] : SCHEMA_VERSION;
+            await spUpload(sel, `diagramatix-export-v${ver}.xsd`, "application/xml", xsdText);
+            log(`\u2714 XSD schema uploaded (diagramatix-export-v${ver}.xsd)`);
+          }
+        }
+        log(`   ${diagramsWithData.length} diagram(s), ${folderCount} folder(s)`);
+      } else {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        log(`\u2714 Export complete! File: ${fileName} (${sizeKb} KB)`);
+        log(`   ${diagramsWithData.length} diagram(s), ${folderCount} folder(s)`);
+        // For XML exports, also download the matching XSD schema.
+        if (isXml) {
+          const { downloadMatchingXsd } = await import("@/app/lib/diagram/xmlExport");
+          const xsdAppVersion = await downloadMatchingXsd(SCHEMA_VERSION);
+          log(`\u2714 XSD schema downloaded (diagramatix-export-v${xsdAppVersion}.xsd)`);
+        }
       }
 
       setExportResult("success");
@@ -2140,6 +2203,21 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
                           >
                             Visio Stencil
                           </a>
+                          <div className="border-t border-gray-100 my-1" />
+                          <button
+                            className={itemCls}
+                            onClick={() => { setShowFileMenu(false); setSpExportFormat("json"); }}
+                            title="Save the project JSON straight into a SharePoint or OneDrive folder"
+                          >
+                            JSON → SharePoint
+                          </button>
+                          <button
+                            className={itemCls}
+                            onClick={() => { setShowFileMenu(false); setSpExportFormat("xml"); }}
+                            title="Save the project XML + XSD straight into a SharePoint or OneDrive folder"
+                          >
+                            XML &amp; XSD → SharePoint
+                          </button>
                         </div>
                       </div>
 
@@ -2184,6 +2262,14 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
                             title="Import an OMG BPMN 2.0 .bpmn file (Signavio / Camunda / bpmn.io export) as a new diagram"
                           >
                             {visioImportInProgress ? "BPMN (importing…)" : "BPMN"}
+                          </button>
+                          <div className="border-t border-gray-100 my-1" />
+                          <button
+                            className={itemCls}
+                            onClick={() => { setShowFileMenu(false); setSpImportOpen(true); }}
+                            title="Open a project export (.json / .xml) from SharePoint or OneDrive and import it as a new project"
+                          >
+                            SharePoint…
                           </button>
                         </div>
                       </div>
@@ -2355,6 +2441,30 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
           )}
         </main>
       </div>
+
+      {/* SharePoint folder picker (project export) / file picker (project import) */}
+      {(spExportFormat || spImportOpen) && (
+        <SharePointPicker
+          mode={spExportFormat ? "folder" : "file"}
+          title={spExportFormat ? `Save project ${spExportFormat.toUpperCase()} to SharePoint` : "Open a project file from SharePoint"}
+          confirmLabel={spExportFormat ? "Save here" : "Open"}
+          fileExtensions={spImportOpen ? [".json", ".xml"] : undefined}
+          onCancel={() => { setSpExportFormat(null); setSpImportOpen(false); }}
+          onPick={(sel) => {
+            const fmt = spExportFormat;
+            const importing = spImportOpen;
+            setSpExportFormat(null);
+            setSpImportOpen(false);
+            if (fmt) void handleExportProject(fmt, "sharepoint", sel);
+            else if (importing) void handleOpenProjectFromSharePoint(sel);
+          }}
+        />
+      )}
+      {spBusy && (
+        <div className="fixed inset-0 bg-black/10 flex items-center justify-center z-[60]">
+          <div className="bg-white rounded-lg shadow-xl px-5 py-4 text-xs text-gray-700">Working with SharePoint…</div>
+        </div>
+      )}
 
       {/* Export progress modal */}
       {exporting && (
