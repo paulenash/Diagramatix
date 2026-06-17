@@ -6,6 +6,7 @@ import { signOut } from "next-auth/react";
 import type { DiagramType } from "@/app/lib/diagram/types";
 import { SCHEMA_VERSION } from "@/app/lib/diagram/types";
 import { ImpersonationBanner } from "@/app/components/ImpersonationBanner";
+import { SharePointPicker } from "@/app/components/SharePointPicker";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 import { UsagePopover } from "@/app/components/UsagePopover";
 import { NotificationsBell } from "@/app/components/NotificationsBell";
@@ -186,7 +187,7 @@ function DiagramCard({
   );
 }
 
-export function DashboardClient({ projects: initialProjects, unorganized: initialUnorganized, currentUserId, userName, userEmail, orgName, orgRole, version, readOnly, viewingAsName, viewingAsEmail, impersonationMode, isSuperuser: isSu, usageSnapshot, showTierPicker, tierCards }: Props) {
+export function DashboardClient({ projects: initialProjects, unorganized: initialUnorganized, currentUserId, userName, userEmail, orgName, orgRole, version, readOnly, viewingAsName, viewingAsEmail, impersonationMode, isSuperuser: isSu, hasMicrosoft, usageSnapshot, showTierPicker, tierCards }: Props) {
   // Owner / OrgAdmin can use the destructive hard-delete path (the
   // Prisma enum value is still "Admin" — the relabel to "OrgAdmin" is
   // UI-only). Read-only impersonation sessions are always denied; the
@@ -353,6 +354,47 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
   const [fileMenuOpen, setFileMenuOpen] = useState(false);
   const [importFormat, setImportFormat] = useState<"json" | "xml">("json");
   const fileMenuRef = useRef<HTMLDivElement>(null);
+  // System-menu Import cascade: open + chosen Local/SharePoint dest.
+  const [impOpen, setImpOpen] = useState(false);
+  const [impDest, setImpDest] = useState<null | "local" | "sharepoint">(null);
+  // Import-from-SharePoint: which format the user chose (filters the picker).
+  const [spImportFmt, setSpImportFmt] = useState<null | "json" | "xml" | "visio" | "bpmn" | "ddl">(null);
+  const [spBusy, setSpBusy] = useState(false);
+  const closeSys = () => { setFileMenuOpen(false); setImpOpen(false); setImpDest(null); };
+  useEffect(() => { if (!fileMenuOpen) { setImpOpen(false); setImpDest(null); } }, [fileMenuOpen]);
+  // Esc steps back one level (format → Local/SharePoint → Import → close menu).
+  useEffect(() => {
+    if (!fileMenuOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault(); e.stopPropagation();
+      if (impDest) setImpDest(null);
+      else if (impOpen) setImpOpen(false);
+      else setFileMenuOpen(false);
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [fileMenuOpen, impOpen, impDest]);
+  // Download a chosen file from SharePoint and run the matching import flow.
+  async function handleSpImport(fmt: "json" | "xml" | "visio" | "bpmn" | "ddl", sel: { driveId: string; itemId: string | null; name: string }) {
+    if (!sel.itemId) return;
+    setSpBusy(true);
+    try {
+      const r = await fetch(`/api/sharepoint/download?driveId=${encodeURIComponent(sel.driveId)}&itemId=${encodeURIComponent(sel.itemId)}`);
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error ?? "Download failed");
+      const blob = await r.blob();
+      const file = new File([blob], sel.name);
+      setSpBusy(false);
+      if (fmt === "json" || fmt === "xml") { setImportFormat(fmt); handleFileSelected(file); }
+      else if (fmt === "visio") { setVisioImportError(""); await handleVisioFileSelected(file); }
+      else if (fmt === "bpmn") handleBpmnFolderSelected([file], file.name.replace(/\.bpmn$/i, ""));
+      else { setDdlProjectName(""); setDdlDiagramName(""); setDdlDbType("postgres"); setDdlLog([]); setDdlResult(null); setDdlFile(file); setShowDdlImport(true); }
+    } catch (err) {
+      setSpBusy(false);
+      // eslint-disable-next-line no-alert
+      setVisioImportError(`SharePoint open failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
 
   // Visio Bulk Import (always creates a new project at the dashboard level).
   const visioInputRef = useRef<HTMLInputElement>(null);
@@ -1423,68 +1465,60 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                 </button>
                 {fileMenuOpen && !(importing || backingUp || restoring) && (
                   <div className="absolute right-0 top-full mt-1 w-52 bg-white border border-gray-200 rounded shadow-lg z-50">
-                    <button
-                      onClick={() => {
-                        setFileMenuOpen(false);
-                        setImportFormat("json");
-                        if (fileInputRef.current) {
-                          fileInputRef.current.accept = ".json";
-                          fileInputRef.current.click();
-                        }
-                      }}
-                      className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
-                    >
-                      Import JSON
-                    </button>
-                    <button
-                      onClick={() => {
-                        setFileMenuOpen(false);
-                        setImportFormat("xml");
-                        if (fileInputRef.current) {
-                          fileInputRef.current.accept = ".xml";
-                          fileInputRef.current.click();
-                        }
-                      }}
-                      className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
-                    >
-                      Import XML
-                    </button>
-                    <button
-                      onClick={() => {
-                        setFileMenuOpen(false);
-                        setDdlProjectName("");
-                        setDdlDiagramName("");
-                        setDdlFile(null);
-                        setDdlDbType("postgres");
-                        setDdlLog([]);
-                        setDdlResult(null);
-                        setShowDdlImport(true);
-                      }}
-                      className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
-                    >
-                      Import DDL
-                    </button>
-                    <button
-                      onClick={() => {
-                        setFileMenuOpen(false);
-                        setVisioImportError("");
-                        visioInputRef.current?.click();
-                      }}
-                      title="Import one or more pages from a Visio .vsdx file into a new project"
-                      className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
-                    >
-                      Import Visio
-                    </button>
-                    <button
-                      onClick={() => {
-                        setFileMenuOpen(false);
-                        openBpmnImportDialog();
-                      }}
-                      title="Pick a folder of .bpmn files; each file becomes one diagram in a new project named after the folder"
-                      className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
-                    >
-                      Import BPMN
-                    </button>
+                    {/* Import ▸ — all import sources, grouped Local / SharePoint */}
+                    <div className="relative">
+                      <button
+                        onClick={() => { const nx = !impOpen; setImpOpen(nx); setImpDest(nx && !hasMicrosoft ? "local" : null); }}
+                        className={`flex w-full items-center justify-between px-3 py-2 text-xs ${impOpen ? "bg-blue-50 text-blue-700 font-medium" : "text-gray-700 hover:bg-gray-50"}`}
+                      >
+                        <span>Import</span><span className="text-gray-400">▸</span>
+                      </button>
+                      {impOpen && (
+                        <div className="absolute bg-white border border-gray-200 rounded shadow-lg py-1 z-[10001]" style={{ top: "100%", left: -100, minWidth: 150 }}>
+                          {(["local", "sharepoint"] as const).map((dest) => {
+                            const disabled = dest === "sharepoint" && !hasMicrosoft;
+                            return (
+                              <div key={dest} className="relative">
+                                <button
+                                  disabled={disabled}
+                                  onClick={() => { if (!disabled) setImpDest(impDest === dest ? null : dest); }}
+                                  className={`flex w-full items-center justify-between px-3 py-2 text-xs ${disabled ? "text-gray-300 cursor-not-allowed" : impDest === dest ? "bg-blue-50 text-blue-700 font-medium" : "text-gray-700 hover:bg-gray-50"}`}
+                                  title={disabled ? "Sign in with Microsoft to enable SharePoint" : ""}
+                                >
+                                  <span>{dest === "local" ? "Local" : "SharePoint"}</span>
+                                  <span className={disabled ? "text-gray-300" : "text-gray-400"}>▸</span>
+                                </button>
+                                {impDest === dest && !disabled && (
+                                  <div className="absolute bg-white border border-gray-200 rounded shadow-lg py-1 z-[10001]" style={{ top: "100%", left: -100, minWidth: 150 }}>
+                                    {dest === "local" ? (
+                                      <>
+                                        <button onClick={() => { closeSys(); setImportFormat("json"); if (fileInputRef.current) { fileInputRef.current.accept = ".json"; fileInputRef.current.click(); } }} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50">JSON</button>
+                                        <button onClick={() => { closeSys(); setVisioImportError(""); visioInputRef.current?.click(); }} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50" title="Import one or more pages from a Visio .vsdx file into a new project">Visio</button>
+                                        <button onClick={() => { closeSys(); openBpmnImportDialog(); }} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50" title="Pick a folder of .bpmn files; each file becomes one diagram in a new project">BPMN</button>
+                                        <button onClick={() => { closeSys(); setImportFormat("xml"); if (fileInputRef.current) { fileInputRef.current.accept = ".xml"; fileInputRef.current.click(); } }} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50">XML</button>
+                                        {isSu && (
+                                          <button onClick={() => { closeSys(); setDdlProjectName(""); setDdlDiagramName(""); setDdlFile(null); setDdlDbType("postgres"); setDdlLog([]); setDdlResult(null); setShowDdlImport(true); }} className="block w-full text-left px-3 py-2 text-xs text-red-700 hover:bg-red-50" title="SuperAdmin — import a SQL DDL file as a Domain diagram">DDL</button>
+                                        )}
+                                      </>
+                                    ) : (
+                                      <>
+                                        <button onClick={() => { closeSys(); setSpImportFmt("json"); }} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50">JSON</button>
+                                        <button onClick={() => { closeSys(); setSpImportFmt("visio"); }} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50">Visio</button>
+                                        <button onClick={() => { closeSys(); setSpImportFmt("bpmn"); }} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50">BPMN</button>
+                                        <button onClick={() => { closeSys(); setSpImportFmt("xml"); }} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50">XML</button>
+                                        {isSu && (
+                                          <button onClick={() => { closeSys(); setSpImportFmt("ddl"); }} className="block w-full text-left px-3 py-2 text-xs text-red-700 hover:bg-red-50" title="SuperAdmin — import a SQL DDL file from SharePoint">DDL</button>
+                                        )}
+                                      </>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
                     <div className="border-t border-gray-100" />
                     <a
                       href="/dashboard/prompts"
@@ -2117,6 +2151,26 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* SharePoint import file picker (System ▸ Import ▸ SharePoint) */}
+      {spImportFmt && (() => {
+        const ext: Record<"json" | "xml" | "visio" | "bpmn" | "ddl", string[]> = { json: [".json"], xml: [".xml"], visio: [".vsdx"], bpmn: [".bpmn"], ddl: [".sql", ".ddl"] };
+        return (
+          <SharePointPicker
+            mode="file"
+            title={`Open a ${spImportFmt.toUpperCase()} file from SharePoint`}
+            confirmLabel="Open"
+            fileExtensions={ext[spImportFmt]}
+            onCancel={() => setSpImportFmt(null)}
+            onPick={(sel) => { const f = spImportFmt; setSpImportFmt(null); if (f) void handleSpImport(f, sel); }}
+          />
+        );
+      })()}
+      {spBusy && (
+        <div className="fixed inset-0 bg-black/10 flex items-center justify-center z-[60]">
+          <div className="bg-white rounded-lg shadow-xl px-5 py-4 text-xs text-gray-700">Working with SharePoint…</div>
         </div>
       )}
 
