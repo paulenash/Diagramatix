@@ -974,11 +974,12 @@ export function DiagramEditor({
   const importBpmnInputRef = useRef<HTMLInputElement>(null);
   // SharePoint save/open: the picker (null = closed), a busy flag while
   // uploading/downloading, and a result message shown via AlertDialog.
-  const [spPicker, setSpPicker] = useState<null | "open">(null);
+  // Import-from-SharePoint: which format the user chose (filters the picker).
+  const [spOpenFmt, setSpOpenFmt] = useState<null | "json" | "xml" | "visio" | "bpmn">(null);
   // Which diagram format is being saved to SharePoint (drives the folder picker).
   const [spSaveFormat, setSpSaveFormat] = useState<null | "pdf" | "svg" | "json" | "xml" | "visio">(null);
-  // Export submenu: chosen destination (null = still showing the Local/SharePoint choice).
-  const [exportDest, setExportDest] = useState<null | "local" | "sharepoint">(null);
+  // File-menu navigation: chosen destination (Local/SharePoint) under Export/Import.
+  const [menuDest, setMenuDest] = useState<null | "local" | "sharepoint">(null);
   const [spBusy, setSpBusy] = useState(false);
   const [spMessage, setSpMessage] = useState<{ title: string; body: string; tone: "info" | "error" } | null>(null);
   // Linking a SharePoint file to a Data Object / Store: the element being
@@ -987,7 +988,22 @@ export function DiagramEditor({
   const [spPreview, setSpPreview] = useState<{ driveId: string; itemId: string; name: string; webUrl?: string } | null>(null);
   // Reset the Export destination choice whenever the Export submenu closes, so
   // it always reopens at the Local/SharePoint step.
-  useEffect(() => { if (fileSubmenu !== "export") setExportDest(null); }, [fileSubmenu]);
+  useEffect(() => { if (fileSubmenu === null) setMenuDest(null); }, [fileSubmenu]);
+  // Esc steps back one level (format → Local/SharePoint → Export/Import → close).
+  useEffect(() => {
+    if (!fileMenuOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault(); e.stopPropagation();
+      if (menuDest) setMenuDest(null);
+      else if (fileSubmenu) setFileSubmenu(null);
+      else setFileMenuOpen(false);
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [fileMenuOpen, fileSubmenu, menuDest]);
+  // Close the whole File menu and reset its navigation.
+  const closeFm = () => { setFileMenuOpen(false); setFileSubmenu(null); setMenuDest(null); };
   // Admin-only: prompt the admin to pick the destination list when
   // exporting or importing templates. Non-admins skip the prompt.
   const [templateExportPrompt, setTemplateExportPrompt] = useState(false);
@@ -2948,282 +2964,129 @@ export function DiagramEditor({
               </button>
               <div className="border-t border-gray-100" />
 
-              {/* Export ▶ — opens a submenu with all export formats */}
-              <div
-                className="relative"
-                onMouseEnter={() => setFileSubmenu("export")}
-              >
-                <button
-                  onClick={() => setFileSubmenu(fileSubmenu === "export" ? null : "export")}
-                  className="w-full flex items-center justify-between px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
-                >
-                  <span>Export</span>
-                  <span className="text-gray-400">▶</span>
-                </button>
-                {fileSubmenu === "export" && (
-                  <div className="absolute right-full top-0 mr-1 w-44 bg-white border border-gray-200 rounded shadow-lg z-50">
-                    {/* Step 1 — choose the destination, then the format list */}
-                    {exportDest === null && (
-                      <>
+              {(["export", "import"] as const).map((sect) => (
+                <div key={sect} className="relative">
+                  <button
+                    onClick={() => { const nx = fileSubmenu === sect ? null : sect; setFileSubmenu(nx); setMenuDest(null); }}
+                    className={`flex w-full items-center justify-between px-3 py-2 text-xs ${fileSubmenu === sect ? "bg-blue-50 text-blue-700 font-medium" : "text-gray-700 hover:bg-gray-50"}`}
+                  >
+                    <span>{sect === "export" ? "Export" : "Import"}</span>
+                    <span className="text-gray-400">▸</span>
+                  </button>
+                  {fileSubmenu === sect && (
+                    <div className="absolute bg-white border border-gray-200 rounded shadow-lg py-1 z-[10001]" style={{ top: "100%", left: -100, minWidth: 150 }}>
+                      {/* Local */}
+                      <div className="relative">
                         <button
-                          onClick={() => setExportDest("local")}
-                          className="w-full flex items-center justify-between px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                          onClick={() => setMenuDest(menuDest === "local" ? null : "local")}
+                          className={`flex w-full items-center justify-between px-3 py-2 text-xs ${menuDest === "local" ? "bg-blue-50 text-blue-700 font-medium" : "text-gray-700 hover:bg-gray-50"}`}
                         >
-                          <span>Local</span><span className="text-gray-400">▶</span>
+                          <span>Local</span><span className="text-gray-400">▸</span>
                         </button>
-                        <button
-                          onClick={() => setExportDest("sharepoint")}
-                          className="w-full flex items-center justify-between px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
-                          title="Save an export file straight into SharePoint or OneDrive"
-                        >
-                          <span>SharePoint</span><span className="text-gray-400">▶</span>
-                        </button>
-                      </>
-                    )}
-                    {/* Step 2a — SharePoint: pick a format, then a destination folder */}
-                    {exportDest === "sharepoint" && (
-                      <>
-                        <button onClick={() => setExportDest(null)} className="w-full text-left px-3 py-2 text-xs text-gray-500 hover:bg-gray-50">‹ Back</button>
-                        {([["pdf", "PDF"], ["svg", "SVG"], ["json", "JSON"], ["xml", "XML"]] as const).map(([fmt, label]) => (
-                          <button
-                            key={fmt}
-                            onClick={() => { setFileMenuOpen(false); setFileSubmenu(null); setSpSaveFormat(fmt); }}
-                            className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
-                          >
-                            {label}
-                          </button>
-                        ))}
-                        {diagramType === "bpmn" && (
-                          <button
-                            onClick={() => { setFileMenuOpen(false); setFileSubmenu(null); setSpSaveFormat("visio"); }}
-                            className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
-                            title="Save a Visio .vsdx (v1.6 stencil) into SharePoint"
-                          >
-                            Visio (.vsdx)
-                          </button>
-                        )}
-                      </>
-                    )}
-                    {/* Step 2b — Local: the full set of export formats (download) */}
-                    {exportDest === "local" && (
-                      <>
-                        <button onClick={() => setExportDest(null)} className="w-full text-left px-3 py-2 text-xs text-gray-500 hover:bg-gray-50">‹ Back</button>
-                    {/* PDF — opens scale popover */}
-                    <div className="relative">
-                      <button
-                        onClick={() => {
-                          setPendingPdfScale(pdfScale);
-                          setShowPdfScalePopover(true);
-                        }}
-                        className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
-                      >
-                        PDF
-                      </button>
-                      {showPdfScalePopover && (
-                        <div
-                          className="absolute right-full top-0 mr-1 w-36 bg-white border border-gray-300 rounded shadow-lg p-2 z-50"
-                          onMouseDown={(e) => e.stopPropagation()}
-                        >
-                          <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1">PDF Scale</div>
-                          {[100, 75, 50, 25].map((val) => (
-                            <label key={val} className="flex items-center gap-2 py-0.5 text-xs text-gray-700 cursor-pointer">
-                              <input
-                                type="radio"
-                                name="pdfScalePending"
-                                checked={pendingPdfScale === val}
-                                onChange={() => setPendingPdfScale(val)}
-                                className="accent-blue-600"
-                              />
-                              {val}%
-                            </label>
-                          ))}
-                          <div className="flex justify-end gap-1 mt-2">
-                            <button
-                              onClick={() => setShowPdfScalePopover(false)}
-                              className="px-2 py-0.5 text-[10px] text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
-                            >
-                              Cancel
-                            </button>
-                            <button
-                              onClick={() => {
-                                setPdfScale(pendingPdfScale);
-                                setShowPdfScalePopover(false);
-                                setFileMenuOpen(false);
-                                setFileSubmenu(null);
-                                handleExportPdf();
-                              }}
-                              className="px-2 py-0.5 text-[10px] text-white bg-blue-600 rounded hover:bg-blue-700"
-                            >
-                              Confirm
-                            </button>
+                        {menuDest === "local" && (
+                          <div className="absolute bg-white border border-gray-200 rounded shadow-lg py-1 z-[10001]" style={{ top: "100%", left: -100, minWidth: 160 }}>
+                            {sect === "export" ? (
+                              <>
+                                {/* PDF — opens scale popover */}
+                                <div className="relative">
+                                  <button onClick={() => { setPendingPdfScale(pdfScale); setShowPdfScalePopover(true); }} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50">PDF</button>
+                                  {showPdfScalePopover && (
+                                    <div className="absolute right-full top-0 mr-1 w-36 bg-white border border-gray-300 rounded shadow-lg p-2 z-[10002]" onMouseDown={(e) => e.stopPropagation()}>
+                                      <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1">PDF Scale</div>
+                                      {[100, 75, 50, 25].map((val) => (
+                                        <label key={val} className="flex items-center gap-2 py-0.5 text-xs text-gray-700 cursor-pointer">
+                                          <input type="radio" name="pdfScalePending" checked={pendingPdfScale === val} onChange={() => setPendingPdfScale(val)} className="accent-blue-600" />
+                                          {val}%
+                                        </label>
+                                      ))}
+                                      <div className="flex justify-end gap-1 mt-2">
+                                        <button onClick={() => setShowPdfScalePopover(false)} className="px-2 py-0.5 text-[10px] text-gray-700 border border-gray-300 rounded hover:bg-gray-50">Cancel</button>
+                                        <button onClick={() => { setPdfScale(pendingPdfScale); setShowPdfScalePopover(false); closeFm(); handleExportPdf(); }} className="px-2 py-0.5 text-[10px] text-white bg-blue-600 rounded hover:bg-blue-700">Confirm</button>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                                <button onClick={() => { handleExport(); closeFm(); }} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50">SVG</button>
+                                <button onClick={() => { handleExportJson(); closeFm(); }} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50" title="Download diagram as a single-diagram JSON file">JSON</button>
+                                {diagramType === "bpmn" && (
+                                  <button onClick={() => { handleExportXml(); closeFm(); }} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50" title="Download diagram XML and the matching XSD schema">XML</button>
+                                )}
+                                {diagramType === "bpmn" && (
+                                  <>
+                                    <button onClick={() => { closeFm(); const a = document.createElement("a"); a.href = `/api/export/visio-v3?diagramId=${diagramId}&profile=v1.6`; a.rel = "noopener"; a.click(); }} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50" title="Export using the Diagramatix v1.6 stencil — recipient needs the v1.6 stencil installed in Visio.">Visio (for stencil v1.6)</button>
+                                    {isAdmin && (
+                                      <button onClick={() => { closeFm(); const a = document.createElement("a"); a.href = `/api/export/visio-v3?diagramId=${diagramId}&profile=bpmn-m`; a.rel = "noopener"; a.click(); }} className="block w-full text-left px-3 py-2 text-xs text-red-700 hover:bg-red-50" title="Admin only — BPMN_M export needs further work before general release.">Visio (for stencil BPMN_M)</button>
+                                    )}
+                                    <a href="/BPMN%20Diagramatix%20Shapes%20v1.6.vssx" download onClick={closeFm} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50" title="Download the BPMN Diagramatix v1.6 stencil (.vssx) to use in Visio">Visio Stencil</a>
+                                  </>
+                                )}
+                                {(diagramType === "bpmn" || diagramType === "archimate") && (
+                                  <button disabled={diagramType === "archimate"} onClick={() => { if (isAdmin) { setTemplateExportPrompt(true); } else { handleExportTemplates("user"); closeFm(); } }} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent" title={diagramType === "archimate" ? "ArchiMate templates aren't available yet" : "Export your templates as a .diag_tems file"}>Templates</button>
+                                )}
+                              </>
+                            ) : (
+                              <>
+                                <button onClick={() => { closeFm(); importJsonInputRef.current?.click(); }} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50" title="Replace the current diagram contents with the first diagram in a JSON file">JSON</button>
+                                {diagramType === "bpmn" && (
+                                  <button onClick={() => { closeFm(); importXmlInputRef.current?.click(); }} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50" title="Replace the current diagram contents with the first diagram in an XML file">XML</button>
+                                )}
+                                {(diagramType === "bpmn" || diagramType === "archimate") && (
+                                  <button disabled={diagramType === "archimate"} onClick={() => { closeFm(); importTemplatesInputRef.current?.click(); }} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent" title={diagramType === "archimate" ? "ArchiMate templates aren't available yet" : "Import templates from a .diag_tems file"}>Templates</button>
+                                )}
+                                {diagramType === "bpmn" && (
+                                  <>
+                                    <button onClick={() => { closeFm(); importVisioInputRef.current?.click(); }} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50" title="Import a Visio BPMN .vsdx file as a new diagram">Visio</button>
+                                    <button onClick={() => { closeFm(); importBpmnInputRef.current?.click(); }} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50" title="Import an OMG BPMN 2.0 .bpmn file as a new diagram">BPMN</button>
+                                  </>
+                                )}
+                              </>
+                            )}
                           </div>
-                        </div>
-                      )}
-                    </div>
-                    {/* Visio export — two flavours (BPMN only). The user can
-                        target either the Diagramatix v1.6 stencil (best for
-                        recipients who install the Diagramatix stencil and
-                        want to re-import back into Diagramatix) or the
-                        Microsoft BPMN_M format (best for recipients who only
-                        have Visio's built-in BPMN stencil). v1.6 supersedes
-                        v1.5 with fresh master GUIDs that don't collide with
-                        v1.4 in Visio's stencil resolver. v1.5 stays callable
-                        via direct URL for legacy / debug use. */}
-                    {diagramType === "bpmn" && (
-                      <>
-                        <button
-                          onClick={() => {
-                            setFileMenuOpen(false);
-                            setFileSubmenu(null);
-                            const a = document.createElement("a");
-                            a.href = `/api/export/visio-v3?diagramId=${diagramId}&profile=v1.6`;
-                            a.rel = "noopener";
-                            a.click();
-                          }}
-                          className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
-                          title="Export using the Diagramatix v1.6 stencil — recipient needs the v1.6 stencil installed in Visio to re-author cleanly. v1.6 fixes a GUID collision with v1.4 that caused shape resolution issues in v1.5."
-                        >
-                          Visio (for stencil v1.6)
-                        </button>
-                        {isAdmin && (
-                          <button
-                            onClick={() => {
-                              setFileMenuOpen(false);
-                              setFileSubmenu(null);
-                              const a = document.createElement("a");
-                              a.href = `/api/export/visio-v3?diagramId=${diagramId}&profile=bpmn-m`;
-                              a.rel = "noopener";
-                              a.click();
-                            }}
-                            className="w-full text-left px-3 py-2 text-xs text-red-700 hover:bg-red-50"
-                            title="Admin only — BPMN_M export needs further work before general release."
-                          >
-                            Visio (for stencil BPMN_M)
-                          </button>
                         )}
-                      </>
-                    )}
-                    {/* Visio Stencil download (BPMN only) — install in Visio
-                        to author BPMN diagrams natively that import cleanly.
-                        Points at the v1.6 stencil to match the default
-                        Visio export profile above. */}
-                    {diagramType === "bpmn" && (
-                      <a
-                        href="/BPMN%20Diagramatix%20Shapes%20v1.6.vssx"
-                        download
-                        onClick={() => { setFileMenuOpen(false); setFileSubmenu(null); }}
-                        className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
-                        title="Download the BPMN Diagramatix v1.6 stencil (.vssx) to use in Visio"
-                      >
-                        Visio Stencil
-                      </a>
-                    )}
-                    {/* SVG */}
-                    <button
-                      onClick={() => { handleExport(); setFileMenuOpen(false); setFileSubmenu(null); }}
-                      className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
-                    >
-                      SVG
-                    </button>
-                    {/* JSON */}
-                    <button
-                      onClick={() => { handleExportJson(); setFileMenuOpen(false); setFileSubmenu(null); }}
-                      className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
-                      title="Download diagram as a single-diagram JSON file"
-                    >
-                      JSON
-                    </button>
-                    {/* XML */}
-                    <button
-                      onClick={() => { handleExportXml(); setFileMenuOpen(false); setFileSubmenu(null); }}
-                      className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
-                      title="Download diagram XML and the matching XSD schema"
-                    >
-                      XML
-                    </button>
-                    {/* Templates — non-admin exports User templates directly;
-                        admin opens a User-vs-Built-In picker. */}
-                    <button
-                      onClick={() => {
-                        if (isAdmin) {
-                          setTemplateExportPrompt(true);
-                        } else {
-                          handleExportTemplates("user");
-                          setFileMenuOpen(false);
-                          setFileSubmenu(null);
-                        }
-                      }}
-                      className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
-                      title="Export your templates as a .diag_tems file"
-                    >
-                      Templates
-                    </button>
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Import ▶ — submenu with import sources */}
-              <div
-                className="relative"
-                onMouseEnter={() => setFileSubmenu("import")}
-              >
-                <button
-                  onClick={() => setFileSubmenu(fileSubmenu === "import" ? null : "import")}
-                  className="w-full flex items-center justify-between px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
-                >
-                  <span>Import</span>
-                  <span className="text-gray-400">▶</span>
-                </button>
-                {fileSubmenu === "import" && (
-                  <div className="absolute right-full top-0 mr-1 w-44 bg-white border border-gray-200 rounded shadow-lg z-50">
-                    <button
-                      onClick={() => { setFileMenuOpen(false); setFileSubmenu(null); importJsonInputRef.current?.click(); }}
-                      className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
-                      title="Replace the current diagram contents with the first diagram in a JSON file"
-                    >
-                      JSON
-                    </button>
-                    <button
-                      onClick={() => { setFileMenuOpen(false); setFileSubmenu(null); importXmlInputRef.current?.click(); }}
-                      className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
-                      title="Replace the current diagram contents with the first diagram in an XML file"
-                    >
-                      XML
-                    </button>
-                    <button
-                      onClick={() => { setFileMenuOpen(false); setFileSubmenu(null); importTemplatesInputRef.current?.click(); }}
-                      className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
-                      title="Import templates from a .diag_tems file"
-                    >
-                      Templates
-                    </button>
-                    <button
-                      onClick={() => { setFileMenuOpen(false); setFileSubmenu(null); importVisioInputRef.current?.click(); }}
-                      className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
-                      title="Import a Visio BPMN .vsdx file as a new diagram"
-                    >
-                      Visio
-                    </button>
-                    <button
-                      onClick={() => { setFileMenuOpen(false); setFileSubmenu(null); importBpmnInputRef.current?.click(); }}
-                      className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
-                      title="Import an OMG BPMN 2.0 .bpmn file (Signavio / Camunda / bpmn.io export) as a new diagram"
-                    >
-                      BPMN
-                    </button>
-                    {/* Open from SharePoint — .json / .xml / .vsdx / .bpmn */}
-                    <button
-                      onClick={() => { setFileMenuOpen(false); setFileSubmenu(null); setSpPicker("open"); }}
-                      className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
-                      title="Open a Diagramatix file (.json, .xml, .vsdx, .bpmn) from SharePoint or OneDrive"
-                    >
-                      SharePoint…
-                    </button>
-                  </div>
-                )}
-              </div>
+                      </div>
+                      {/* SharePoint */}
+                      <div className="relative">
+                        <button
+                          onClick={() => setMenuDest(menuDest === "sharepoint" ? null : "sharepoint")}
+                          className={`flex w-full items-center justify-between px-3 py-2 text-xs ${menuDest === "sharepoint" ? "bg-blue-50 text-blue-700 font-medium" : "text-gray-700 hover:bg-gray-50"}`}
+                        >
+                          <span>SharePoint</span><span className="text-gray-400">▸</span>
+                        </button>
+                        {menuDest === "sharepoint" && (
+                          <div className="absolute bg-white border border-gray-200 rounded shadow-lg py-1 z-[10001]" style={{ top: "100%", left: -100, minWidth: 160 }}>
+                            {sect === "export" ? (
+                              <>
+                                <button onClick={() => { closeFm(); setSpSaveFormat("pdf"); }} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50">PDF</button>
+                                <button onClick={() => { closeFm(); setSpSaveFormat("svg"); }} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50">SVG</button>
+                                <button onClick={() => { closeFm(); setSpSaveFormat("json"); }} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50">JSON</button>
+                                {diagramType === "bpmn" && (
+                                  <button onClick={() => { closeFm(); setSpSaveFormat("xml"); }} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50">XML</button>
+                                )}
+                                {diagramType === "bpmn" && (
+                                  <button onClick={() => { closeFm(); setSpSaveFormat("visio"); }} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50" title="Save a Visio .vsdx (v1.6 stencil) into SharePoint">Visio (.vsdx)</button>
+                                )}
+                              </>
+                            ) : (
+                              <>
+                                <button onClick={() => { closeFm(); setSpOpenFmt("json"); }} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50">JSON</button>
+                                {diagramType === "bpmn" && (
+                                  <button onClick={() => { closeFm(); setSpOpenFmt("xml"); }} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50">XML</button>
+                                )}
+                                {diagramType === "bpmn" && (
+                                  <>
+                                    <button onClick={() => { closeFm(); setSpOpenFmt("visio"); }} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50">Visio</button>
+                                    <button onClick={() => { closeFm(); setSpOpenFmt("bpmn"); }} className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50">BPMN</button>
+                                  </>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
           )}
         </div>
@@ -3630,23 +3493,26 @@ export function DiagramEditor({
         )}
 
         {/* SharePoint Save (one format → folder) / Open (file → import) picker */}
-        {(spPicker === "open" || spSaveFormat) && (
-          <SharePointPicker
-            mode={spSaveFormat ? "folder" : "file"}
-            title={spSaveFormat ? `Save ${spSaveFormat.toUpperCase()} to SharePoint` : "Open diagram from SharePoint"}
-            confirmLabel={spSaveFormat ? "Save here" : "Open"}
-            fileExtensions={spPicker === "open" ? [".json", ".xml", ".vsdx", ".bpmn"] : undefined}
-            onCancel={() => { setSpPicker(null); setSpSaveFormat(null); }}
-            onPick={(sel) => {
-              const fmt = spSaveFormat;
-              const open = spPicker === "open";
-              setSpPicker(null);
-              setSpSaveFormat(null);
-              if (fmt) void saveFormatToSharePoint(fmt, sel);
-              else if (open) void handleOpenFromSharePoint(sel);
-            }}
-          />
-        )}
+        {(spOpenFmt || spSaveFormat) && (() => {
+          const ext: Record<"json" | "xml" | "visio" | "bpmn", string> = { json: ".json", xml: ".xml", visio: ".vsdx", bpmn: ".bpmn" };
+          return (
+            <SharePointPicker
+              mode={spSaveFormat ? "folder" : "file"}
+              title={spSaveFormat ? `Save ${spSaveFormat.toUpperCase()} to SharePoint` : `Open a ${spOpenFmt?.toUpperCase()} file from SharePoint`}
+              confirmLabel={spSaveFormat ? "Save here" : "Open"}
+              fileExtensions={spOpenFmt ? [ext[spOpenFmt]] : undefined}
+              onCancel={() => { setSpOpenFmt(null); setSpSaveFormat(null); }}
+              onPick={(sel) => {
+                const fmt = spSaveFormat;
+                const open = spOpenFmt;
+                setSpOpenFmt(null);
+                setSpSaveFormat(null);
+                if (fmt) void saveFormatToSharePoint(fmt, sel);
+                else if (open) void handleOpenFromSharePoint(sel);
+              }}
+            />
+          );
+        })()}
 
         {/* SharePoint file-link picker (Data Object / Store) */}
         {spLinkElId && (

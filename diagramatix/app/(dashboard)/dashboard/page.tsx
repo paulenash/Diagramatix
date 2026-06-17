@@ -54,6 +54,7 @@ export default async function DashboardPage() {
         viewingAsName=""
         viewingAsEmail=""
         isSuperuser={isSuperuser(session)}
+        hasMicrosoft={!!(session as unknown as { hasMicrosoft?: boolean }).hasMicrosoft}
         usageSnapshot={null}
         showTierPicker={false}
         tierCards={[]}
@@ -189,6 +190,7 @@ export default async function DashboardPage() {
       viewingAsEmail={viewingAsEmail}
       impersonationMode={impersonationMode}
       isSuperuser={isSuperuser(session)}
+      hasMicrosoft={!!(session as unknown as { hasMicrosoft?: boolean }).hasMicrosoft}
       usageSnapshot={usageSnapshot}
       showTierPicker={showTierPicker}
       tierCards={tierCards}

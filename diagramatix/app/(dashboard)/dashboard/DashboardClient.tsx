@@ -79,6 +79,7 @@ interface Props {
   viewingAsEmail?: string;
   impersonationMode?: "view" | "edit";
   isSuperuser?: boolean;
+  hasMicrosoft?: boolean;
   /** Subscription snapshot for the effective user. Null when the user
    *  has no tier (legacy) or hasn't yet been seeded. Drives the
    *  subscription chip + popover. */
