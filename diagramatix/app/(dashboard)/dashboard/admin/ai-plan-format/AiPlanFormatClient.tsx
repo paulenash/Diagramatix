@@ -37,6 +37,7 @@ const TYPE_LABELS: Record<string, string> = {
   domain: "Domain Model",
   context: "Context Diagram",
   "process-context": "Process Context",
+  archimate: "ArchiMate",
 };
 
 export function AiPlanFormatClient() {

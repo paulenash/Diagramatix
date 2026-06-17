@@ -302,6 +302,100 @@ are the `System = true` black-box pools.
 - **Teams:** Customer Service (V01.01, V01.02, V01.10); Order Processing (V01.01, V01.02, V01.04, V01.11); Sales / Pricing (V01.03); Credit Control (V01.03); Planning / Inventory (V01.04); Warehouse / Operations (V01.05); Quality Assurance (V01.05); Logistics / Dispatch (V01.06); Billing (V01.07); Accounts Receivable (V01.08–V01.10); Finance (V01.07–V01.11).
 - **IT systems:** Order Management System / OMS (V01.01, V01.11); Customer Master Data System / CRM/ERP (V01.02); ERP / Credit System (V01.03); Inventory / Warehouse System / WMS (V01.04, V01.05); Transport Management System / TMS (V01.06); Billing / ERP System (V01.07); Payment Gateway / Bank (V01.08); ERP / General Ledger System (V01.09, V01.11); Case / Ticketing System (V01.10).
 
+**ArchiMate diagram prompt.**
+
+A single high-level ArchiMate view of the Order to Cash service area. It shows
+the **Actors**, **Services**, **Processes**, **Interfaces** and **Applications**
+that provide the Product Ordering Service and the related customer-facing
+services across the eleven V01 processes. Each Business Process is a drill-down
+anchor: link it to the matching V01.nn BPMN diagram and its marker turns green.
+
+```text
+ArchiMate: V01 — Order to Cash — Service & Application Landscape (high level).
+
+Purpose: show how the organisation provides the Product Ordering Service and
+the related services to the Customer across the eleven V01 Order to Cash
+processes, and the applications that support them. Lay it out in three
+horizontal bands, top to bottom — BUSINESS SERVICES → BUSINESS PROCESSES →
+APPLICATIONS — with the Customer on the far left and the delivery/settlement
+actors on the far right. Read top-to-bottom as service → process → application
+(ArchiMate service realisation).
+
+1. Business Actors (Business Actor)
+- Customer — the external party the services are provided to (far left, the
+  recipient of every service).
+- Freight Carrier, Payment Gateway, Bank — external actors that take part in
+  delivery and settlement (far right).
+
+2. Interfaces
+- Business Interface "Customer Portal / Order Channel" — the channel the
+  Customer uses to place orders, track delivery, receive invoices and pay.
+  The Customer ACCESSES this interface; the interface SERVES the business
+  services below.
+- Application Interfaces (optional, only the few the Customer Portal calls):
+  "Ordering API" on the OMS, "Payments API" on the Payment Gateway.
+
+3. Business Services (Business Service) — the customer-facing services
+   provided, top band, left-to-right in customer-journey order:
+- Product Ordering Service — take, validate, price and confirm the order.
+- Order Fulfilment & Delivery Service — pick, pack and deliver the goods.
+- Invoicing & Billing Service — issue invoices and statements.
+- Payment & Settlement Service — collect and reconcile payment.
+- Dispute & Returns Service — handle disputes, deductions and returns.
+- Order Closure Service — finalise and close the order.
+
+4. Business Processes (Business Process) — the eleven V01 processes, middle
+   band in V01.01 → V01.11 order. Each REALISES the business service shown and
+   is the link anchor to its BPMN diagram:
+- V01.01 Receive Order              -> realises Product Ordering Service
+- V01.02 Validate Customer / Order  -> realises Product Ordering Service
+- V01.03 Check Credit & Pricing     -> realises Product Ordering Service
+- V01.04 Confirm Availability       -> realises Product Ordering Service
+- V01.05 Fulfil Goods or Services   -> realises Order Fulfilment & Delivery Service
+- V01.06 Deliver to Customer        -> realises Order Fulfilment & Delivery Service
+- V01.07 Issue Invoice              -> realises Invoicing & Billing Service
+- V01.08 Receive Payment            -> realises Payment & Settlement Service
+- V01.09 Reconcile Payment          -> realises Payment & Settlement Service
+- V01.10 Manage Disputes & Deductions -> realises Dispute & Returns Service
+- V01.11 Close Order                -> realises Order Closure Service
+
+5. Applications (Application Component) — the IT systems that support the
+   processes, bottom band:
+- Order Management System (OMS)
+- Customer Master Data System (CRM/ERP)
+- ERP / Credit System
+- Inventory / Warehouse System (WMS)
+- Transport Management System (TMS)
+- Billing / ERP System
+- Payment Gateway / Bank Interface
+- ERP / General Ledger System
+- Case / Ticketing System
+
+6. Relationships
+- Customer -accesses-> Customer Portal / Order Channel.
+- Customer Portal / Order Channel -serving-> each Business Service.
+- Each Business Process -realisation-> its Business Service (section 4).
+- Each Business Process -served by-> its supporting Application Component
+  (serving, application -> process):
+    V01.01 <- OMS;                 V01.02 <- Customer Master Data (CRM/ERP);
+    V01.03 <- ERP / Credit System; V01.04 <- Inventory / Warehouse (WMS);
+    V01.05 <- Inventory / Warehouse (WMS); V01.06 <- Transport Management (TMS);
+    V01.07 <- Billing / ERP;       V01.08 <- Payment Gateway / Bank;
+    V01.09 <- ERP / General Ledger; V01.10 <- Case / Ticketing;
+    V01.11 <- OMS + ERP / General Ledger.
+- Freight Carrier -serving-> V01.06 Deliver to Customer.
+- Payment Gateway and Bank -serving-> V01.08 Receive Payment and
+  V01.09 Reconcile Payment.
+
+7. Intent
+The Product Ordering Service sits top-left as the headline service. The eleven
+Business Processes form the backbone in V01.01 -> V01.11 order so the reader can
+trace the customer journey and drill from any process straight into its detailed
+BPMN model. This one ArchiMate view therefore links to all eleven V01 BPMN
+process diagrams. The mapping of process -> actors/teams/applications is the
+Process <-> Actors / Teams / IT Systems matrix above.
+```
+
 ### V01.01 — Receive Order
 
 **BPMN diagram prompt.**

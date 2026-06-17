@@ -190,6 +190,11 @@ export function layoutGenericDiagram(
     return layoutContextDiagram(aiElements, aiConnections);
   }
 
+  // ArchiMate: layered-band layout
+  if (diagramType === "archimate") {
+    return layoutArchimateDiagram(aiElements, aiConnections);
+  }
+
   const elements: DiagramElement[] = [];
   const connectors: Connector[] = [];
 
@@ -700,6 +705,145 @@ export function layoutGenericDiagram(
     connectors: computed,
     viewport: { x: 0, y: 0, zoom: 0.7 },
     fontSize: 12,
+    connectorFontSize: 10,
+  };
+}
+
+// ── ArchiMate layered-band layout ───────────────────────────────────
+// elementType → catalogue shapeKey (+ whether it is an icon-only shape)
+const ARCHI_SHAPE: Record<string, { key: string; iconOnly: boolean }> = {
+  "business-actor":            { key: "business-business-actor-box",            iconOnly: false },
+  "business-role":             { key: "business-business-role-icon",            iconOnly: true  },
+  "business-interface":        { key: "business-business-interface-icon",       iconOnly: true  },
+  "business-collaboration":    { key: "business-business-collaboration-box",    iconOnly: false },
+  "business-service":          { key: "business-business-service-box",          iconOnly: false },
+  "business-process":          { key: "business-business-process-box",          iconOnly: false },
+  "business-function":         { key: "business-business-function-box",         iconOnly: false },
+  "business-interaction":      { key: "business-business-interaction-box",      iconOnly: false },
+  "business-event":            { key: "business-business-event-box",            iconOnly: false },
+  "product":                   { key: "business-product-icon",                  iconOnly: true  },
+  "application-component":     { key: "application-application-component-box",     iconOnly: false },
+  "application-service":       { key: "application-application-service-icon",      iconOnly: true  },
+  "application-interface":     { key: "application-application-interface-box",     iconOnly: false },
+  "application-collaboration": { key: "application-application-collaboration-box", iconOnly: false },
+  "data-object":               { key: "application-data-object-icon",              iconOnly: true  },
+};
+
+// elementType → vertical band (0 = top). Business active-structure on top,
+// then business services, business behaviour, application services/interfaces,
+// then application components / data at the bottom.
+const ARCHI_BAND: Record<string, number> = {
+  "business-actor": 0, "business-role": 0, "business-interface": 0, "business-collaboration": 0,
+  "business-service": 1,
+  "business-process": 2, "business-function": 2, "business-interaction": 2, "business-event": 2, "product": 2,
+  "application-service": 3, "application-interface": 3,
+  "application-component": 4, "application-collaboration": 4, "data-object": 4,
+};
+
+// relationship name → archi-* connector type
+const ARCHI_REL: Record<string, string> = {
+  composition: "archi-composition", aggregation: "archi-aggregation", assignment: "archi-assignment",
+  realisation: "archi-realisation", realization: "archi-realisation",
+  serving: "archi-serving", access: "archi-access", influence: "archi-influence",
+  association: "archi-association", triggering: "archi-triggering", flow: "archi-flow",
+  specialisation: "archi-specialisation", specialization: "archi-specialisation",
+};
+
+function layoutArchimateDiagram(
+  aiElements: NonNullable<AiParsed["elements"]>,
+  aiConnections: NonNullable<AiParsed["connections"]>,
+): DiagramData {
+  const BAND_GAP_Y = 70;   // vertical gap between bands
+  const EL_GAP_X = 50;     // horizontal gap between elements in a band
+  const BOX_W = 150, BOX_H = 56;
+  const ICON_W = 72, ICON_H = 72;
+  const NUM_BANDS = 5;
+
+  type Placed = { ai: NonNullable<AiParsed["elements"]>[number]; shapeKey: string; iconOnly: boolean; w: number; h: number };
+  const bands: Placed[][] = Array.from({ length: NUM_BANDS }, () => []);
+  for (const ai of aiElements) {
+    const spec = ARCHI_SHAPE[ai.type];
+    if (!spec) continue; // unknown element type — skip
+    const band = ARCHI_BAND[ai.type] ?? 2;
+    bands[band].push({
+      ai, shapeKey: spec.key, iconOnly: spec.iconOnly,
+      w: spec.iconOnly ? ICON_W : BOX_W,
+      h: spec.iconOnly ? ICON_H : BOX_H,
+    });
+  }
+
+  const bandWidth = (b: Placed[]) =>
+    b.reduce((sum, e) => sum + e.w, 0) + Math.max(0, b.length - 1) * EL_GAP_X;
+  const maxBandW = Math.max(1, ...bands.map(bandWidth));
+
+  const elements: DiagramElement[] = [];
+  let y = START_Y;
+  for (const band of bands) {
+    if (band.length === 0) continue;
+    const rowH = Math.max(...band.map(e => e.h));
+    let x = START_X + (maxBandW - bandWidth(band)) / 2;
+    for (const e of band) {
+      elements.push({
+        id: e.ai.id,
+        type: "archimate-shape",
+        x, y: y + (rowH - e.h) / 2,
+        width: e.w, height: e.h,
+        label: e.ai.label ?? e.ai.name ?? "",
+        properties: e.iconOnly
+          ? { shapeKey: e.shapeKey, archimateIconOnly: true }
+          : { shapeKey: e.shapeKey },
+      });
+      x += e.w + EL_GAP_X;
+    }
+    y += rowH + BAND_GAP_Y;
+  }
+
+  // Connectors: map relationship → archi-* type, attach on nearest facing sides.
+  const elMap = new Map(elements.map(e => [e.id, e]));
+  const connectors: Connector[] = [];
+  for (const c of aiConnections) {
+    const src = elMap.get(c.sourceId);
+    const tgt = elMap.get(c.targetId);
+    if (!src || !tgt) continue;
+    const connType = ARCHI_REL[(c.type ?? "").toLowerCase()] ?? "archi-association";
+    const srcCx = src.x + src.width / 2, tgtCx = tgt.x + tgt.width / 2;
+    const srcCy = src.y + src.height / 2, tgtCy = tgt.y + tgt.height / 2;
+    let srcSide: string, tgtSide: string;
+    if (Math.abs(tgtCy - srcCy) > Math.abs(tgtCx - srcCx)) {
+      srcSide = tgtCy > srcCy ? "bottom" : "top";
+      tgtSide = tgtCy > srcCy ? "top" : "bottom";
+    } else {
+      srcSide = tgtCx > srcCx ? "right" : "left";
+      tgtSide = tgtCx > srcCx ? "left" : "right";
+    }
+    connectors.push({
+      id: `conn-${src.id}-${tgt.id}`,
+      sourceId: src.id, targetId: tgt.id,
+      sourceSide: srcSide as Connector["sourceSide"],
+      targetSide: tgtSide as Connector["targetSide"],
+      type: connType as Connector["type"],
+      directionType: "directed" as Connector["directionType"],
+      routingType: "rectilinear" as Connector["routingType"],
+      sourceInvisibleLeader: false, targetInvisibleLeader: false,
+      waypoints: [] as Point[],
+      label: c.label ?? "",
+    } as Connector);
+  }
+
+  const computed = connectors.map(conn => {
+    const src = elMap.get(conn.sourceId), tgt = elMap.get(conn.targetId);
+    if (!src || !tgt) return conn;
+    try {
+      const r = computeWaypoints(src, tgt, elements, conn.sourceSide, conn.targetSide, conn.routingType, 0.5, 0.5);
+      return { ...conn, waypoints: r.waypoints, sourceInvisibleLeader: r.sourceInvisibleLeader, targetInvisibleLeader: r.targetInvisibleLeader };
+    } catch { return conn; }
+  });
+
+  return {
+    elements,
+    connectors: computed,
+    viewport: { x: 0, y: 0, zoom: 0.7 },
+    fontSize: 14,
     connectorFontSize: 10,
   };
 }

@@ -20,6 +20,7 @@ const DIAGRAM_TYPES: { value: string; label: string }[] = [
   { value: "domain", label: "Domain Model" },
   { value: "context", label: "Context Diagram" },
   { value: "process-context", label: "Process Context" },
+  { value: "archimate", label: "ArchiMate" },
 ];
 
 export function PromptMaintenance() {

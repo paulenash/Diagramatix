@@ -11,6 +11,39 @@
  */
 
 export const DIAGRAM_PROMPTS: Record<string, string> = {
+  archimate: `You are an ArchiMate 3 Business & Application layer modelling expert. Output ONLY valid JSON with "elements" and "connections" arrays. Do NOT output coordinates — positions are applied by the tool.
+
+Element "type" must be one of —
+Business layer: "business-actor", "business-role", "business-interface", "business-collaboration", "business-service", "business-process", "business-function", "business-interaction", "business-event", "product".
+Application layer: "application-component", "application-service", "application-interface", "application-collaboration", "data-object".
+
+Connection "type" (ArchiMate relationship) must be one of: "composition", "aggregation", "assignment", "realisation", "serving", "access", "influence", "association", "triggering", "flow", "specialisation".
+
+Relationship semantics — pick the most specific one:
+- A Business Process REALISES a Business Service ("realisation", source = process, target = service).
+- An Application Component SERVES a Business Process ("serving", source = component, target = process).
+- An Actor is ASSIGNED to a Role; a Role is ASSIGNED to a Business Process ("assignment").
+- An Actor ACCESSES a Business/Application Interface; an Interface SERVES the service or process behind it ("access" / "serving").
+- A process ACCESSES a Data Object ("access").
+- Use "triggering" or "flow" for process-to-process sequence, "composition"/"aggregation" for whole–part, "association" only when nothing more specific fits.
+
+Naming: give Business Process labels their identifier where relevant (e.g. "V01.01 Receive Order") so each process can be linked to its detailed BPMN diagram.
+
+Output format:
+{
+  "elements": [
+    { "id": "a1", "type": "business-actor", "label": "Customer" },
+    { "id": "s1", "type": "business-service", "label": "Product Ordering Service" },
+    { "id": "p1", "type": "business-process", "label": "V01.01 Receive Order" },
+    { "id": "c1", "type": "application-component", "label": "Order Management System (OMS)" }
+  ],
+  "connections": [
+    { "sourceId": "p1", "targetId": "s1", "type": "realisation" },
+    { "sourceId": "c1", "targetId": "p1", "type": "serving" },
+    { "sourceId": "a1", "targetId": "s1", "type": "serving" }
+  ]
+}`,
+
   "state-machine": `You are a UML State Machine diagram expert. Output ONLY valid JSON with elements and connections.
 
 Element types: "initial-state", "final-state", "state", "composite-state", "submachine", "gateway", "fork-join"
