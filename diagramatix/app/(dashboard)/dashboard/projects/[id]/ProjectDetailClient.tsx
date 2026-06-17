@@ -329,6 +329,7 @@ interface Props {
   viewingAsEmail?: string;
   impersonationMode?: "view" | "edit";
   isAdmin?: boolean;
+  hasMicrosoft?: boolean;
 }
 
 const DIAGRAM_TYPES: { value: DiagramType; label: string; description: string }[] = [
@@ -341,7 +342,7 @@ const DIAGRAM_TYPES: { value: DiagramType; label: string; description: string }[
   { value: "archimate", label: "ArchiMate", description: "Enterprise architecture using the ArchiMate 3.1 standard (Business, Motivation, Strategy, Application layers)" },
 ];
 
-export function ProjectDetailClient({ project, otherProjects, version, readOnly, viewingAsName, viewingAsEmail, impersonationMode, isAdmin }: Props) {
+export function ProjectDetailClient({ project, otherProjects, version, readOnly, viewingAsName, viewingAsEmail, impersonationMode, isAdmin, hasMicrosoft }: Props) {
   const router = useRouter();
   const [diagrams, setDiagrams] = useState(project.diagrams);
   const [projectName, setProjectName] = useState(project.name);
@@ -380,6 +381,24 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
   const [exportResult, setExportResult] = useState<"success" | "failed" | null>(null);
   // Renamed: this menu now also handles imports, so it's a generic File menu.
   const [showFileMenu, setShowFileMenu] = useState(false);
+  // File menu navigation: chosen section (Export/Import) and destination
+  // (Local/SharePoint). Reset whenever the menu closes.
+  const [menuSection, setMenuSection] = useState<null | "export" | "import">(null);
+  const [menuDest, setMenuDest] = useState<null | "local" | "sharepoint">(null);
+  useEffect(() => { if (!showFileMenu) { setMenuSection(null); setMenuDest(null); } }, [showFileMenu]);
+  // Esc steps back one level (format → Local/SharePoint → Export/Import → close).
+  useEffect(() => {
+    if (!showFileMenu) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault(); e.stopPropagation();
+      if (menuDest) setMenuDest(null);
+      else if (menuSection) setMenuSection(null);
+      else setShowFileMenu(false);
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [showFileMenu, menuSection, menuDest]);
   const fileMenuRef = useRef<HTMLDivElement>(null);
   // "Project ▾" dropdown: groups Project Configuration + Scan together.
   const [showProjectMenu, setShowProjectMenu] = useState(false);
@@ -577,8 +596,8 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
   const importBpmnInputRef = useRef<HTMLInputElement>(null);
   // SharePoint: which project format is being exported (drives the folder
   // picker), whether the import file-picker is open, and a brief busy flag.
-  const [spExportFormat, setSpExportFormat] = useState<null | "json" | "xml">(null);
-  const [spImportOpen, setSpImportOpen] = useState(false);
+  const [spExportFormat, setSpExportFormat] = useState<null | "json" | "xml" | "visio">(null);
+  const [spImportFmt, setSpImportFmt] = useState<null | "json" | "xml" | "visio" | "bpmn">(null);
   const [spBusy, setSpBusy] = useState(false);
   // Import-progress modal state (mirrors the dashboard's import flow).
   const [importing, setImporting] = useState(false);
@@ -903,7 +922,9 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
   }
 
   // Open a project export file from SharePoint and import it as a new project.
-  async function handleOpenProjectFromSharePoint(sel: { driveId: string; itemId: string | null; name: string }) {
+  // Open a file from SharePoint and import it by the chosen format:
+  // json/xml → new project; visio → bulk Visio dialog; bpmn → BPMN import.
+  async function handleImportFromSharePoint(fmt: "json" | "xml" | "visio" | "bpmn", sel: { driveId: string; itemId: string | null; name: string }) {
     if (!sel.itemId) return;
     setSpBusy(true);
     try {
@@ -911,14 +932,35 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
       if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error ?? "Download failed");
       const blob = await r.blob();
       const file = new File([blob], sel.name);
-      const fmt: "json" | "xml" = sel.name.toLowerCase().endsWith(".xml") ? "xml" : "json";
       setSpBusy(false);
-      await handleImportFile(file, fmt);
+      if (fmt === "json" || fmt === "xml") await handleImportFile(file, fmt);
+      else if (fmt === "visio") await handleImportVisioFile(file);
+      else await handleImportBpmnFile(file);
     } catch (err) {
       setSpBusy(false);
       setImporting(true);
       setImportLog([`✘ SharePoint open failed: ${err instanceof Error ? err.message : String(err)}`]);
       setImportResult("failed");
+    }
+  }
+
+  // Export the project's bulk Visio (.vsdx) straight into a SharePoint folder.
+  async function handleExportVisioToSharePoint(sel: { driveId: string; itemId: string | null; name: string }) {
+    setExporting(true); setExportLog([]); setExportResult(null);
+    const log = (m: string) => setExportLog(p => [...p, m]);
+    try {
+      log("Generating Visio (.vsdx)…");
+      const vr = await fetch(`/api/export/visio-v3/bulk?projectId=${encodeURIComponent(project.id)}&profile=v1.6`);
+      if (!vr.ok) throw new Error("Visio export failed");
+      const blob = await vr.blob();
+      const fileName = `${projectName}.diagramatix.vsdx`.replace(/[\\/:*?"<>|]/g, "_");
+      log(`Uploading to SharePoint folder "${sel.name}"…`);
+      await spUpload(sel, fileName, "application/vnd.ms-visio.drawing", blob);
+      log(`✔ Uploaded ${fileName} (${Math.round(blob.size / 1024)} KB)`);
+      setExportResult("success");
+    } catch (err) {
+      log(`✘ ${err instanceof Error ? err.message : String(err)}`);
+      setExportResult("failed");
     }
   }
 
@@ -2142,6 +2184,23 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
                 </button>
                 {showFileMenu && (() => {
                   const itemCls = "block w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100";
+                  const rowCls = "flex w-full items-center justify-between px-3 py-1.5 text-xs";
+                  const chosenCls = "bg-blue-50 text-blue-700 font-medium";
+                  const normalCls = "text-gray-700 hover:bg-gray-100";
+                  // Each next level sits just under the chosen row, shifted 100px
+                  // left (the menu hugs the right margin).
+                  const flyCls = "absolute bg-white border border-gray-200 rounded-md shadow-lg py-1 z-[10001]";
+                  const flyStyle = { top: "100%", left: -100, minWidth: 130 };
+                  const hasBpmn = diagrams.some(d => d.type === "bpmn");
+                  const close = () => setShowFileMenu(false);
+                  // When SharePoint is unavailable, Local is the only choice — so
+                  // opening a section auto-selects Local and shows its formats.
+                  const pick = (s: "export" | "import") => {
+                    const next = menuSection === s ? null : s;
+                    setMenuSection(next);
+                    setMenuDest(next && !hasMicrosoft ? "local" : null);
+                  };
+                  const pickDest = (d: "local" | "sharepoint") => setMenuDest(menuDest === d ? null : d);
                   return (
                     <div
                       className="fixed bg-white border border-gray-200 rounded-md shadow-lg py-1"
@@ -2153,126 +2212,92 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
                         left: fileMenuRef.current
                           ? fileMenuRef.current.getBoundingClientRect().left
                           : 0,
-                        minWidth: 170,
+                        minWidth: 110,
                       }}
                     >
-                      {/* Export ◂ submenu (hover to expand, opens to LEFT) */}
-                      <div className="group/export relative">
-                        <div className="flex items-center justify-between px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100 cursor-default">
-                          <span className="text-gray-400">{"◂"}</span>
-                          <span>Export</span>
+                      {(["export", "import"] as const).map((sect) => (
+                        <div key={sect} className="relative">
+                          <button
+                            onClick={() => pick(sect)}
+                            className={`${rowCls} ${menuSection === sect ? chosenCls : normalCls}`}
+                          >
+                            <span>{sect === "export" ? "Export" : "Import"}</span>
+                            <span className="text-gray-400">▸</span>
+                          </button>
+                          {menuSection === sect && (
+                            <div className={flyCls} style={flyStyle}>
+                              {/* Local */}
+                              <div className="relative">
+                                <button onClick={() => pickDest("local")} className={`${rowCls} ${menuDest === "local" ? chosenCls : normalCls}`}>
+                                  <span>Local</span><span className="text-gray-400">▸</span>
+                                </button>
+                                {menuDest === "local" && (
+                                  <div className={flyCls} style={flyStyle}>
+                                    {sect === "export" ? (
+                                      <>
+                                        <button className={itemCls} onClick={() => { close(); handleExportProject("json"); }}>JSON</button>
+                                        <button className={itemCls} onClick={() => { close(); handleExportProject("xml"); }}>XML &amp; XSD</button>
+                                        <button
+                                          className={`${itemCls} disabled:opacity-50 disabled:cursor-not-allowed`}
+                                          disabled={!hasBpmn}
+                                          onClick={() => { close(); window.location.href = `/api/export/visio-v3/bulk?projectId=${encodeURIComponent(project.id)}&profile=v1.6`; }}
+                                          title={hasBpmn ? "Export all BPMN diagrams as one multi-page Visio (.vsdx)" : "No BPMN diagrams in this project"}
+                                        >
+                                          Visio (.vsdx) — all BPMN
+                                        </button>
+                                        <a className={itemCls} href="/BPMN%20Diagramatix%20Shapes%20v1.6.vssx" download onClick={close} title="Download the BPMN Diagramatix Shapes v1.6 stencil (.vssx)">Visio Stencil</a>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <button className={itemCls} onClick={() => { close(); importJsonInputRef.current?.click(); }}>JSON</button>
+                                        <button className={itemCls} onClick={() => { close(); importXmlInputRef.current?.click(); }}>XML</button>
+                                        <button className={`${itemCls} disabled:opacity-50`} disabled={visioImportInProgress} onClick={() => { close(); setImportVisioError(""); importVisioInputRef.current?.click(); }} title="Import one or more pages from a Visio .vsdx file as separate diagrams">{visioImportInProgress ? "Visio (importing…)" : "Visio"}</button>
+                                        <button className={`${itemCls} disabled:opacity-50`} disabled={visioImportInProgress} onClick={() => { close(); importBpmnInputRef.current?.click(); }} title="Import an OMG BPMN 2.0 .bpmn file as a new diagram">{visioImportInProgress ? "BPMN (importing…)" : "BPMN"}</button>
+                                      </>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                              {/* SharePoint (greyed out when Microsoft isn't connected this session) */}
+                              <div className="relative">
+                                <button
+                                  disabled={!hasMicrosoft}
+                                  onClick={() => { if (hasMicrosoft) pickDest("sharepoint"); }}
+                                  className={`${rowCls} ${!hasMicrosoft ? "text-gray-300 cursor-not-allowed" : menuDest === "sharepoint" ? chosenCls : normalCls}`}
+                                  title={hasMicrosoft ? "" : "Sign in with Microsoft to enable SharePoint"}
+                                >
+                                  <span>SharePoint</span><span className={hasMicrosoft ? "text-gray-400" : "text-gray-300"}>▸</span>
+                                </button>
+                                {menuDest === "sharepoint" && hasMicrosoft && (
+                                  <div className={flyCls} style={flyStyle}>
+                                    {sect === "export" ? (
+                                      <>
+                                        <button className={itemCls} onClick={() => { close(); setSpExportFormat("json"); }}>JSON</button>
+                                        <button className={itemCls} onClick={() => { close(); setSpExportFormat("xml"); }}>XML &amp; XSD</button>
+                                        <button
+                                          className={`${itemCls} disabled:opacity-50 disabled:cursor-not-allowed`}
+                                          disabled={!hasBpmn}
+                                          onClick={() => { close(); setSpExportFormat("visio"); }}
+                                          title={hasBpmn ? "Save the project Visio .vsdx into SharePoint" : "No BPMN diagrams in this project"}
+                                        >
+                                          Visio (.vsdx) — all BPMN
+                                        </button>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <button className={itemCls} onClick={() => { close(); setSpImportFmt("json"); }}>JSON</button>
+                                        <button className={itemCls} onClick={() => { close(); setSpImportFmt("xml"); }}>XML</button>
+                                        <button className={itemCls} onClick={() => { close(); setSpImportFmt("visio"); }}>Visio (.vsdx)</button>
+                                        <button className={itemCls} onClick={() => { close(); setSpImportFmt("bpmn"); }}>BPMN</button>
+                                      </>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
                         </div>
-                        <div className="hidden group-hover/export:block absolute right-full top-0 -mt-1 mr-px bg-white border border-gray-200 rounded-md shadow-lg py-1" style={{ minWidth: 170 }}>
-                          <button
-                            className={itemCls}
-                            onClick={() => { setShowFileMenu(false); handleExportProject("json"); }}
-                          >
-                            JSON
-                          </button>
-                          <button
-                            className={itemCls}
-                            onClick={() => { setShowFileMenu(false); handleExportProject("xml"); }}
-                          >
-                            XML &amp; XSD
-                          </button>
-                          {(() => {
-                            const hasBpmn = diagrams.some(d => d.type === "bpmn");
-                            return (
-                              <button
-                                className={`${itemCls} disabled:opacity-50 disabled:cursor-not-allowed`}
-                                disabled={!hasBpmn}
-                                onClick={() => {
-                                  setShowFileMenu(false);
-                                  window.location.href =
-                                    `/api/export/visio-v3/bulk?projectId=${encodeURIComponent(project.id)}&profile=v1.6`;
-                                }}
-                                title={hasBpmn
-                                  ? "Export all BPMN diagrams in this project as one multi-page Visio (.vsdx) file using the v1.6 stencil"
-                                  : "No BPMN diagrams in this project"}
-                              >
-                                Visio (.vsdx) — all BPMN
-                              </button>
-                            );
-                          })()}
-                          <a
-                            href="/BPMN%20Diagramatix%20Shapes%20v1.6.vssx"
-                            download
-                            onClick={() => setShowFileMenu(false)}
-                            className={itemCls}
-                            title="Download the BPMN Diagramatix Shapes v1.6 stencil (.vssx) to use in Visio"
-                          >
-                            Visio Stencil
-                          </a>
-                          <div className="border-t border-gray-100 my-1" />
-                          <button
-                            className={itemCls}
-                            onClick={() => { setShowFileMenu(false); setSpExportFormat("json"); }}
-                            title="Save the project JSON straight into a SharePoint or OneDrive folder"
-                          >
-                            JSON → SharePoint
-                          </button>
-                          <button
-                            className={itemCls}
-                            onClick={() => { setShowFileMenu(false); setSpExportFormat("xml"); }}
-                            title="Save the project XML + XSD straight into a SharePoint or OneDrive folder"
-                          >
-                            XML &amp; XSD → SharePoint
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Import ◂ submenu (hover to expand, opens to LEFT) */}
-                      <div className="group/import relative">
-                        <div className="flex items-center justify-between px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100 cursor-default">
-                          <span className="text-gray-400">{"◂"}</span>
-                          <span>Import</span>
-                        </div>
-                        <div className="hidden group-hover/import:block absolute right-full top-0 -mt-1 mr-px bg-white border border-gray-200 rounded-md shadow-lg py-1" style={{ minWidth: 170 }}>
-                          <button
-                            className={itemCls}
-                            onClick={() => { setShowFileMenu(false); importJsonInputRef.current?.click(); }}
-                          >
-                            JSON
-                          </button>
-                          <button
-                            className={itemCls}
-                            onClick={() => { setShowFileMenu(false); importXmlInputRef.current?.click(); }}
-                          >
-                            XML
-                          </button>
-                          <button
-                            className={`${itemCls} disabled:opacity-50`}
-                            disabled={visioImportInProgress}
-                            onClick={() => {
-                              setShowFileMenu(false);
-                              setImportVisioError("");
-                              importVisioInputRef.current?.click();
-                            }}
-                            title="Import one or more pages from a Visio .vsdx file as separate diagrams"
-                          >
-                            {visioImportInProgress ? "Visio (importing…)" : "Visio"}
-                          </button>
-                          <button
-                            className={`${itemCls} disabled:opacity-50`}
-                            disabled={visioImportInProgress}
-                            onClick={() => {
-                              setShowFileMenu(false);
-                              importBpmnInputRef.current?.click();
-                            }}
-                            title="Import an OMG BPMN 2.0 .bpmn file (Signavio / Camunda / bpmn.io export) as a new diagram"
-                          >
-                            {visioImportInProgress ? "BPMN (importing…)" : "BPMN"}
-                          </button>
-                          <div className="border-t border-gray-100 my-1" />
-                          <button
-                            className={itemCls}
-                            onClick={() => { setShowFileMenu(false); setSpImportOpen(true); }}
-                            title="Open a project export (.json / .xml) from SharePoint or OneDrive and import it as a new project"
-                          >
-                            SharePoint…
-                          </button>
-                        </div>
-                      </div>
+                      ))}
                     </div>
                   );
                 })()}
@@ -2443,23 +2468,31 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
       </div>
 
       {/* SharePoint folder picker (project export) / file picker (project import) */}
-      {(spExportFormat || spImportOpen) && (
-        <SharePointPicker
-          mode={spExportFormat ? "folder" : "file"}
-          title={spExportFormat ? `Save project ${spExportFormat.toUpperCase()} to SharePoint` : "Open a project file from SharePoint"}
-          confirmLabel={spExportFormat ? "Save here" : "Open"}
-          fileExtensions={spImportOpen ? [".json", ".xml"] : undefined}
-          onCancel={() => { setSpExportFormat(null); setSpImportOpen(false); }}
-          onPick={(sel) => {
-            const fmt = spExportFormat;
-            const importing = spImportOpen;
-            setSpExportFormat(null);
-            setSpImportOpen(false);
-            if (fmt) void handleExportProject(fmt, "sharepoint", sel);
-            else if (importing) void handleOpenProjectFromSharePoint(sel);
-          }}
-        />
-      )}
+      {(spExportFormat || spImportFmt) && (() => {
+        const importExt: Record<"json" | "xml" | "visio" | "bpmn", string> = { json: ".json", xml: ".xml", visio: ".vsdx", bpmn: ".bpmn" };
+        return (
+          <SharePointPicker
+            mode={spExportFormat ? "folder" : "file"}
+            title={
+              spExportFormat
+                ? `Save project ${spExportFormat === "visio" ? "Visio" : spExportFormat.toUpperCase()} to SharePoint`
+                : `Open a ${spImportFmt === "visio" ? "Visio (.vsdx)" : spImportFmt === "bpmn" ? "BPMN (.bpmn)" : spImportFmt?.toUpperCase()} file from SharePoint`
+            }
+            confirmLabel={spExportFormat ? "Save here" : "Open"}
+            fileExtensions={spImportFmt ? [importExt[spImportFmt]] : undefined}
+            onCancel={() => { setSpExportFormat(null); setSpImportFmt(null); }}
+            onPick={(sel) => {
+              const fmt = spExportFormat;
+              const imp = spImportFmt;
+              setSpExportFormat(null);
+              setSpImportFmt(null);
+              if (fmt === "visio") void handleExportVisioToSharePoint(sel);
+              else if (fmt) void handleExportProject(fmt, "sharepoint", sel);
+              else if (imp) void handleImportFromSharePoint(imp, sel);
+            }}
+          />
+        );
+      })()}
       {spBusy && (
         <div className="fixed inset-0 bg-black/10 flex items-center justify-center z-[60]">
           <div className="bg-white rounded-lg shadow-xl px-5 py-4 text-xs text-gray-700">Working with SharePoint…</div>

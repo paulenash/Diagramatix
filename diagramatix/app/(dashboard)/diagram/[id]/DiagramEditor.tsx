@@ -2300,7 +2300,7 @@ export function DiagramEditor({
               Publish ▾
             </button>
             {publishDropdownOpen && (
-              <div className="absolute right-0 top-full mt-1 w-60 bg-white border border-gray-200 rounded shadow-lg z-50">
+              <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded shadow-lg z-50">
                 {/* Status header — current lifecycle state, keeps colours. */}
                 <div className="px-3 py-2 border-b border-gray-100 text-[11px]">
                   {lifecycle === "PUBLISHED" && currentPublishedVersion ? (

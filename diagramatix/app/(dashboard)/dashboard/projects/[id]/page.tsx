@@ -99,6 +99,7 @@ export default async function ProjectPage({ params }: Props) {
       viewingAsEmail={viewingAsEmail}
       impersonationMode={impersonationMode}
       isAdmin={isSuperuser(session)}
+      hasMicrosoft={!!(session as unknown as { hasMicrosoft?: boolean }).hasMicrosoft}
     />
   );
 }
