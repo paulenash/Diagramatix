@@ -613,6 +613,11 @@ export function DiagramEditor({
     const stack = getDrillStack();
     stack.push({ id: diagramId, name: diagramName });
     sessionStorage.setItem(STACK_KEY, JSON.stringify(stack));
+    // Invalidate the client Router Cache before leaving. Without this, a link
+    // just set on THIS diagram (e.g. an ArchiMate Business Process → BPMN
+    // link) is saved to the DB but the stale cached RSC payload is re-served
+    // when the user drills back — the link/green marker appears to vanish.
+    router.refresh();
     router.push(`/diagram/${linkedDiagramId}`);
   }, [router, diagramId, diagramName]);
 

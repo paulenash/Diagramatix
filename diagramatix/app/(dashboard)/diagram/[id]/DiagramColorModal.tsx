@@ -98,7 +98,8 @@ export function DiagramColorModal({
   });
   const [workingDisplayMode, setWorkingDisplayMode] = useState<DisplayMode>(displayMode);
   // Context-Diagram defaults: Entity Names 14 / Process Names 16 / Flow Labels 12.
-  const defaultElementFontSize = isContext ? 14 : 12;
+  // ArchiMate element names also default to 14.
+  const defaultElementFontSize = (isContext || diagramType === "archimate") ? 14 : 12;
   const defaultConnectorFontSize = isContext ? 12 : 10;
   const defaultProcessFontSize = 16;
   const [workingFontSize, setWorkingFontSize] = useState(fontSize ?? defaultElementFontSize);

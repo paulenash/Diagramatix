@@ -10,12 +10,15 @@ import type { PrismaClient } from "@/app/generated/prisma/client";
 // • chevron-collapsed                — Value-chain drill-into-detailed-process.
 // • use-case                         — Process Context central process
 //                                      drill-into-detailed BPMN.
+// • archimate-shape                  — ArchiMate Business Process drill-into
+//                                      the linked BPMN diagram.
 export const LINK_BEARING_ELEMENT_TYPES: ReadonlySet<string> = new Set([
   "subprocess",
   "subprocess-expanded",
   "submachine",
   "chevron-collapsed",
   "use-case",
+  "archimate-shape",
 ]);
 
 // Lightweight element shape used by the link-extraction helper. Mirrors

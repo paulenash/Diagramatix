@@ -236,13 +236,19 @@ export function ArchimateConnectorRenderer({
         {style.endMarker && renderMarker(style.endMarker, endMarkerId, style.strokeColor)}
       </defs>
 
-      {/* wider transparent hit area */}
+      {/* Wider transparent hit area — any click within ~9px of the line
+          selects the connector. onMouseDown stopPropagation prevents the
+          Canvas background mousedown handler from running (it installs a
+          window-level mouseup that clears the selection), so the click
+          reliably lands on the connector — same approach as BPMN. */}
       <path
         d={visibleD}
         fill="none"
         stroke="transparent"
-        strokeWidth={12}
+        strokeWidth={18}
+        strokeLinecap="round"
         style={{ cursor: "pointer" }}
+        onMouseDown={(e) => { e.stopPropagation(); }}
         onClick={(e) => { e.stopPropagation(); onSelect(); }}
       />
 
@@ -260,8 +266,12 @@ export function ArchimateConnectorRenderer({
         />
       </g>
 
-      {/* interior segment drag handles for rectilinear */}
-      {draggableSegments.map((segIdx) => {
+      {/* Interior segment drag handles for rectilinear — ONLY when selected.
+          Rendered unconditionally these transparent 10px-wide handles sit on
+          top of the hit area and swallow the selection click (they have no
+          onClick→onSelect), making the connector feel unselectable and its
+          endpoints immovable. BPMN gates these the same way. */}
+      {selected && draggableSegments.map((segIdx) => {
         const p1 = visibleWaypoints[segIdx];
         const p2 = visibleWaypoints[segIdx + 1];
         const isHoriz = Math.abs(p1.y - p2.y) < 1;

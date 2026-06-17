@@ -2023,6 +2023,10 @@ export function SymbolRenderer({
 
   const archimateDepthMap = useContext(ArchimateDepthCtx);
   const labelInfo = getLabelPos(element, archimateDepthMap.get(element.id) ?? 0);
+  // Business Actor (icon-only) uses a MOVABLE external label with a tether,
+  // like events / gateways / data objects.
+  const isArchiActorIcon = element.type === "archimate-shape" && !!element.properties?.archimateIconOnly &&
+    typeof element.properties?.shapeKey === "string" && (element.properties.shapeKey as string).includes("actor");
   const isActorOrTeam = element.type === "actor" || element.type === "team" || element.type === "system";
   const isBoundary = element.type === "system-boundary";  // excluded from connection overlay
   const isPoolLane = element.type === "pool" || element.type === "lane";
@@ -2045,7 +2049,8 @@ export function SymbolRenderer({
       element.type === "intermediate-event" ||
       element.type === "gateway" ||
       element.type === "data-object" ||
-      element.type === "data-store"
+      element.type === "data-store" ||
+      isArchiActorIcon
     ) && !(element.type === "gateway" && (element.properties.gatewayRole as string | undefined) === "merge");
 
   function beginExternalLabelEdit() {
@@ -2350,7 +2355,8 @@ export function SymbolRenderer({
         element.type === 'intermediate-event' ||
         element.type === 'gateway'            ||
         element.type === 'data-object'        ||
-        element.type === 'data-store'
+        element.type === 'data-store'         ||
+        isArchiActorIcon
       ) && !(element.type === 'gateway' && (element.properties.gatewayRole as string | undefined) === 'merge') ? (() => {
         const labelOffsetX = (element.properties.labelOffsetX as number) ?? 0;
         const labelOffsetY = (element.properties.labelOffsetY as number) ?? 7;

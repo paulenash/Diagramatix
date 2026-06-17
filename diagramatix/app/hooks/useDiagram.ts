@@ -2830,9 +2830,13 @@ function validateConnectorsAgainstObstacles(connectors: Connector[], elements: D
   for (let pass = 0; pass < 3; pass++) {
     let anyChanged = false;
     result = result.map(conn => {
-      // Message and association connectors ignore obstacle avoidance — they
-      // always render on top and keep their waypoints unchanged when elements move.
-      if (conn.type === "messageBPMN" || conn.type === "associationBPMN") {
+      // Message, association AND all ArchiMate connectors ignore obstacle
+      // avoidance — they always render on top and keep their waypoints
+      // unchanged when elements move. Without the archi- exemption, this pass
+      // re-routed every archi connector (they touch their source/target
+      // boundary so connectorHitsAnyElement is true) and RESET its endpoint
+      // offset to 0.5 — making endpoints snap to centre and refuse to move.
+      if (conn.type === "messageBPMN" || conn.type === "associationBPMN" || conn.type.startsWith("archi-")) {
         if (typeof window !== "undefined" && (window as unknown as { __DIAGRAMATIX_TRACE?: boolean }).__DIAGRAMATIX_TRACE) {
           console.log(`[TRACE validateObstacles] skipping ${conn.type} ${conn.id} srcSide=${conn.sourceSide} tgtSide=${conn.targetSide} wpCount=${conn.waypoints.length}`);
         }

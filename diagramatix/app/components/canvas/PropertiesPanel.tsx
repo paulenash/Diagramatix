@@ -2150,6 +2150,48 @@ export function PropertiesPanel({
         );
       })()}
 
+      {element.type === "archimate-shape" && siblingDiagrams &&
+        typeof element.properties.shapeKey === "string" &&
+        (element.properties.shapeKey as string).includes("business-process") && (() => {
+        const bpmnSiblings = siblingDiagrams.filter(d => d.type === "bpmn");
+        if (bpmnSiblings.length === 0) return null;
+        return (
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1">Linked BPMN Process</label>
+          {(() => {
+            const linkedId = element.properties.linkedDiagramId as string | undefined;
+            const linkedExists = linkedId ? bpmnSiblings.some(d => d.id === linkedId) : true;
+            return (
+              <>
+                <select
+                  value={linkedId ?? ""}
+                  onChange={(e) => onUpdateProperties(element.id, {
+                    linkedDiagramId: e.target.value || null,
+                  })}
+                  className="w-full text-xs border border-gray-300 rounded px-2 py-1.5 bg-white text-gray-700 cursor-pointer"
+                  onMouseDown={(e) => { e.stopPropagation(); }}
+                  onClick={(e) => { e.stopPropagation(); (e.target as HTMLSelectElement).focus(); }}
+                >
+                  <option value="">None</option>
+                  {bpmnSiblings.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name}
+                    </option>
+                  ))}
+                </select>
+                {linkedId && !linkedExists && (
+                  <p className="text-[10px] text-red-500 mt-1">Linked diagram not found — it may have been deleted</p>
+                )}
+                {linkedId && linkedExists && (
+                  <p className="text-[10px] text-gray-400 mt-1">Marker is green when linked — double-click to drill into the BPMN process</p>
+                )}
+              </>
+            );
+          })()}
+        </div>
+        );
+      })()}
+
       {element.type === "submachine" && siblingDiagrams && (() => {
         const smSiblings = siblingDiagrams.filter(d => d.type === "state-machine");
         return (

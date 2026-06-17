@@ -100,11 +100,18 @@ export function ArchimateShape({ el }: { el: DiagramElement }) {
   const depthMap = useContext(ArchimateDepthCtx);
   const depth = depthMap.get(el.id) ?? 0;
   if (depth > 0) {
-    fill = lightenHex(fill, Math.min(0.80, depth * 0.25));
+    // ~38% lighter per level (was 25% — too subtle at 2 levels), capped at
+    // 85% toward white so even a single nesting reads clearly.
+    fill = lightenHex(fill, Math.min(0.85, depth * 0.38));
   }
 
   const iconOnly = !!el.properties?.archimateIconOnly;
   const drawIcon = entry.iconType ? ICON_DRAWERS[entry.iconType] : undefined;
+
+  // A Business Process linked to a BPMN diagram in the same project shows a
+  // green corner glyph — mirrors the green marker on a linked BPMN subprocess.
+  const hasLink = !!(el.properties?.linkedDiagramId as string | undefined);
+  const glyphColour = hasLink ? "#16a34a" : iconColour;
 
   if (iconOnly && drawIcon) {
     // Icon-only rendering: the icon IS the shape. Fill the element bounds
@@ -165,7 +172,7 @@ export function ArchimateShape({ el }: { el: DiagramElement }) {
   return (
     <g>
       <path d={d} fill={fill} stroke={stroke} strokeWidth={STROKE_WIDTH} />
-      {drawIcon ? drawIcon({ cx: iconCx, cy: iconCy, size: iconBoxSize, colour: iconColour }) : null}
+      {drawIcon ? drawIcon({ cx: iconCx, cy: iconCy, size: iconBoxSize, colour: glyphColour }) : null}
     </g>
   );
 }

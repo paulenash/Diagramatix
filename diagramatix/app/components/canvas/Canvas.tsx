@@ -1168,12 +1168,18 @@ export function Canvas({
     // Prefer non-container elements (child states) over composite-state containers so that
     // dropping onto a state inside a composite returns the child state, not the composite.
     // But only prefer children that actually contain the drop point (not just within margin).
-    const directHit = matches.find(el =>
+    // When several eligible elements directly contain the point (e.g. a nested ArchiMate
+    // shape inside an ArchiMate container — both are `archimate-shape`), the INNERMOST
+    // (smallest area) wins, so the connector targets the contained element, not its
+    // container. Array order would otherwise pick the container (added first).
+    const directHits = matches.filter(el =>
       el.type !== "composite-state" && el.type !== "pool" && el.type !== "subprocess-expanded" &&
       pos.x >= el.x && pos.x <= el.x + el.width &&
       pos.y >= el.y && pos.y <= el.y + el.height
     );
-    if (directHit) return directHit;
+    if (directHits.length > 0) {
+      return directHits.sort((a, b) => (a.width * a.height) - (b.width * b.height))[0];
+    }
     // No child directly under cursor — prefer non-container within margin, then container
     const nonContainer = matches.find(el => el.type !== "composite-state" && el.type !== "pool" && el.type !== "subprocess-expanded" && el.type !== "process-group");
     if (nonContainer) return nonContainer;
@@ -1474,13 +1480,28 @@ export function Canvas({
           } else if (diagramType === "archimate") {
             // Defer to the picker — the user chooses the relationship type
             // from a popup. Do NOT create the connector yet.
+            // Attach at the boundary point on each element NEAREST the other
+            // element (toward its centre), not the side-midpoint the user
+            // happened to grab/release at — this gives clean, natural
+            // ArchiMate connections instead of always meeting the middle of a
+            // side. Endpoints stay draggable + nudgeable for manual override.
+            let archiSrcSide = seqSourceSide, archiTgtSide = seqTargetSide;
+            let archiSrcOffset = seqSourceOffsetAlong, archiTgtOffset = seqTargetOffsetAlong;
+            if (sourceEl) {
+              const srcCenter = { x: sourceEl.x + sourceEl.width / 2, y: sourceEl.y + sourceEl.height / 2 };
+              const tgtCenter = { x: targetEl.x + targetEl.width / 2, y: targetEl.y + targetEl.height / 2 };
+              const sBound = pointToBoundaryOffset(tgtCenter, sourceEl);
+              const tBound = pointToBoundaryOffset(srcCenter, targetEl);
+              archiSrcSide = sBound.side; archiSrcOffset = sBound.offsetAlong;
+              archiTgtSide = tBound.side; archiTgtOffset = tBound.offsetAlong;
+            }
             setPendingArchiConn({
               sourceId: elementId,
               targetId: targetEl.id,
-              sourceSide: seqSourceSide,
-              targetSide: seqTargetSide,
-              sourceOffset: seqSourceOffsetAlong,
-              targetOffset: seqTargetOffsetAlong,
+              sourceSide: archiSrcSide,
+              targetSide: archiTgtSide,
+              sourceOffset: archiSrcOffset,
+              targetOffset: archiTgtOffset,
               screenX: ev.clientX,
               screenY: ev.clientY,
             });
@@ -4255,7 +4276,7 @@ export function Canvas({
           12 px, Process Names 16 px. Other diagram types keep the old
           12/10/14 defaults. */}
       <DisplayModeCtx.Provider value={displayMode}>
-      <FontScaleCtx.Provider value={((data.fontSize ?? ((diagramType === "context" || diagramType === "basic") ? 14 : 12)) / 12) * (displayMode === "hand-drawn" ? 1.3 : 1)}>
+      <FontScaleCtx.Provider value={((data.fontSize ?? ((diagramType === "context" || diagramType === "basic" || diagramType === "archimate") ? 14 : 12)) / 12) * (displayMode === "hand-drawn" ? 1.3 : 1)}>
       <ConnectorFontScaleCtx.Provider value={((data.connectorFontSize ?? ((diagramType === "context" || diagramType === "basic") ? 12 : 10)) / 10) * (displayMode === "hand-drawn" ? 1.3 : 1)}>
       <TitleFontSizeCtx.Provider value={data.titleFontSize ?? 14}>
       <PoolFontSizeCtx.Provider value={(data.poolFontSize ?? 12) * (displayMode === "hand-drawn" ? 1.3 : 1)}>
@@ -4672,7 +4693,7 @@ export function Canvas({
                   // Gateway shape double-click never opens the label editor —
                   // the label rect has its own dblclick handler for that.
                   if (el.type === "gateway") return;
-                  const linkedId = (el.type === "subprocess" || el.type === "submachine" || el.type === "chevron-collapsed" || el.type === "use-case") ? el.properties.linkedDiagramId as string | undefined : undefined;
+                  const linkedId = (el.type === "subprocess" || el.type === "submachine" || el.type === "chevron-collapsed" || el.type === "use-case" || el.type === "archimate-shape") ? el.properties.linkedDiagramId as string | undefined : undefined;
                   if (linkedId && onDrillIntoSubprocess) {
                     onDrillIntoSubprocess(linkedId);
                   } else {
@@ -4902,7 +4923,10 @@ export function Canvas({
 
           {/* Regular connectors — rendered behind elements (skip selected, rendered on top later) */}
           {(() => {
-            const regularConns = data.connectors.filter(c => c.type !== "associationBPMN" && c.type !== "messageBPMN");
+            // In ArchiMate diagrams EVERY connector renders on top of all
+            // elements (handled by the on-top pass below), so exclude them
+            // all here. Elsewhere only associationBPMN/messageBPMN are on top.
+            const regularConns = data.connectors.filter(c => c.type !== "associationBPMN" && c.type !== "messageBPMN" && !(c.type.startsWith("archi-") || diagramType === "archimate"));
             const humpEligible = regularConns.filter(c => c.type === "sequence" || c.type === "association" || c.type === "uml-association");
             return regularConns.filter(c => c.id !== selectedConnectorId).map((conn) => (
               <ConnectorRenderer
@@ -5168,7 +5192,7 @@ export function Canvas({
                 // Gateway shape double-click never opens the label editor —
                 // the label rect has its own dblclick handler for that.
                 if (el.type === "gateway") return;
-                const linkedId = (el.type === "subprocess" || el.type === "submachine" || el.type === "chevron-collapsed" || el.type === "use-case") ? el.properties.linkedDiagramId as string | undefined : undefined;
+                const linkedId = (el.type === "subprocess" || el.type === "submachine" || el.type === "chevron-collapsed" || el.type === "use-case" || el.type === "archimate-shape") ? el.properties.linkedDiagramId as string | undefined : undefined;
                 if (linkedId && onDrillIntoSubprocess) {
                   onDrillIntoSubprocess(linkedId);
                 } else {
@@ -5577,9 +5601,36 @@ export function Canvas({
             );
           })}
 
+          {/* ArchiMate connectors — ALL of them render on top of every element
+              so a relationship is never hidden by a container shape. Covers
+              every archi-* relationship type plus any connector that lives in
+              an ArchiMate diagram. (associationBPMN/messageBPMN keep their own
+              pass above, so they're excluded here to avoid double-rendering.) */}
+          {data.connectors.filter(c => (c.type.startsWith("archi-") || diagramType === "archimate") && c.type !== "associationBPMN" && c.type !== "messageBPMN").map((conn) => (
+            <ConnectorRenderer
+              key={`archi-${conn.id}`}
+              connector={conn}
+              selected={conn.id === selectedConnectorId}
+              onSelect={() => { onSelectConnector(conn.id); onSetSelectedElements(new Set()); }}
+              svgToWorld={clientToWorld}
+              onUpdateWaypoints={onUpdateConnectorWaypoints}
+              onWaypointsDragEnd={onConnectorWaypointDragEnd ? () => onConnectorWaypointDragEnd(conn.id) : undefined}
+              onUpdateLabel={onUpdateConnectorLabel ? (label, ox, oy, w) => onUpdateConnectorLabel(conn.id, label, ox, oy, w) : undefined}
+              onUpdateCurveHandles={onUpdateCurveHandles}
+              debugMode={debugMode}
+              misaligned={obstacleViolationConnIds.has(conn.id)}
+              onUpdateEndOffset={handleUpdateEndOffset}
+              hideLabel={hiddenBranchLabelConnIds.has(conn.id)}
+              highlight={assocHighlightConnIds.has(conn.id)}
+              faded={isAssocFadedConn(conn)}
+              onLabelFocusEditStart={(cx, cy, w) => enterFocusModeAt(cx, cy, w, "connector")}
+              onLabelFocusEditEnd={exitFocusMode}
+            />
+          ))}
+
           {/* Selected regular connector — rendered on top of all elements */}
           {selectedConnectorId && (() => {
-            const conn = data.connectors.find(c => c.id === selectedConnectorId && c.type !== "associationBPMN" && c.type !== "messageBPMN");
+            const conn = data.connectors.find(c => c.id === selectedConnectorId && c.type !== "associationBPMN" && c.type !== "messageBPMN" && !(c.type.startsWith("archi-") || diagramType === "archimate"));
             if (!conn) return null;
             const allHumpConns = data.connectors.filter(c => c.type === "sequence" || c.type === "association" || c.type === "uml-association");
             const connIdx = allHumpConns.findIndex(c => c.id === conn.id);
