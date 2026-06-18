@@ -27,7 +27,7 @@ export async function POST(req: Request) {
 
   // Action: "list" — return all categories with default rules
   if (action === "list") {
-    const categories = ["general", "bpmn", "state-machine", "value-chain", "domain", "context", "process-context", "archimate", "staff-narrative"];
+    const categories = ["general", "bpmn", "state-machine", "value-chain", "domain", "context", "process-context", "archimate", "flowchart", "staff-narrative"];
     const result = [];
 
     for (const cat of categories) {

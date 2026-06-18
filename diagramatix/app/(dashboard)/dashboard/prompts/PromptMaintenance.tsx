@@ -21,6 +21,7 @@ const DIAGRAM_TYPES: { value: string; label: string }[] = [
   { value: "context", label: "Context Diagram" },
   { value: "process-context", label: "Process Context" },
   { value: "archimate", label: "ArchiMate" },
+  { value: "flowchart", label: "Standard Flowchart" },
 ];
 
 export function PromptMaintenance() {

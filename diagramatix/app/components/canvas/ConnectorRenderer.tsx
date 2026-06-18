@@ -329,8 +329,12 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
   // the editor isn't open, so an in-progress edit isn't yanked away.
   if (hideLabel && !isEditing) return null;
 
+  // Flowlines (and any explicitly source-anchored connector) carry their
+  // label near the SOURCE endpoint, offset to the side so it doesn't sit on
+  // the line — ideal for a decision's Yes/No branch labels.
+  const isSourceAnchored = connector.labelAnchor === "source" || connector.type === "flowline";
   let anchor: Point;
-  if (connector.labelAnchor === "source") {
+  if (isSourceAnchored) {
     // Anchor near the source end of the connector
     anchor = visibleWaypoints[0];
   } else if (visibleWaypoints.length === 4) {
@@ -343,8 +347,10 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
     const pN = visibleWaypoints[visibleWaypoints.length - 1];
     anchor = { x: (p0.x + pN.x) / 2, y: (p0.y + pN.y) / 2 };
   }
-  const offsetX = connector.labelOffsetX ?? 0;
-  const offsetY = connector.labelOffsetY ?? -30;
+  // Default the flowline label to sit just beside the source endpoint
+  // (down-right of the exit), clear of the connector line; still draggable.
+  const offsetX = connector.labelOffsetX ?? (connector.type === "flowline" ? 18 : 0);
+  const offsetY = connector.labelOffsetY ?? (connector.type === "flowline" ? 16 : -30);
   const lWidth  = connector.labelWidth ?? 80;
   const label   = connector.label ?? "";
   // Auto-size: measure text width from actual content
@@ -381,7 +387,7 @@ function InteractionLabel({ connector, selected, visibleWaypoints, svgToWorld, o
   const hasLabel = label.trim().length > 0;
   // Show the (empty) label box when the connector is SELECTED so the user
   // can see where to click to add a label (item 4).
-  if (!hasLabel && !isEditing && !selected && connector.labelAnchor !== "source") return null;
+  if (!hasLabel && !isEditing && !selected && !isSourceAnchored) return null;
 
   function handleLabelMouseDown(e: React.MouseEvent) {
     if (!svgToWorld || !onUpdateLabel) return;
@@ -921,7 +927,8 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
 
       {/* Floating connector label */}
       {(connector.type === "transition" || connector.type === "flow" || connector.type === "messageBPMN"
-        || ((connector.type === "sequence" || connector.type === "flowline") && connector.label !== undefined)) && (
+        || connector.type === "flowline"
+        || (connector.type === "sequence" && connector.label !== undefined)) && (
         <InteractionLabel
           connector={connector}
           selected={selected}

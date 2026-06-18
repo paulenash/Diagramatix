@@ -850,6 +850,9 @@ export function DiagramEditor({
   const [aiPanelGenerating, setAiPanelGenerating] = useState(false);
   const [aiPanelNarrativeGenerating, setAiPanelNarrativeGenerating] = useState(false);
   const [showPlanPanel, setShowPlanPanel] = useState(false);
+  // BPMN and Standard Flowchart both use the 2-phase Plan panel (plan → edit →
+  // apply deterministic layout). Other types use the legacy one-shot AI panel.
+  const usesPlanPanel = diagramType === "bpmn" || diagramType === "flowchart";
   const [showSendReview, setShowSendReview] = useState(false);
   const [reviewSentMsg, setReviewSentMsg] = useState<string | null>(null);
 
@@ -2864,7 +2867,7 @@ export function DiagramEditor({
         {!readOnly && diagramType !== "basic" && (
           <button
             onClick={() => {
-              if (diagramType === "bpmn") {
+              if (usesPlanPanel) {
                 setShowPlanPanel(prev => !prev);
                 if (!showPlanPanel) { setShowAiPanel(false); setShowHistoryPanel(false); }
               } else {
@@ -2873,11 +2876,11 @@ export function DiagramEditor({
               }
             }}
             className={`px-2 py-0.5 text-[11px] rounded border ${
-              (diagramType === "bpmn" ? showPlanPanel : showAiPanel)
+              (usesPlanPanel ? showPlanPanel : showAiPanel)
                 ? "text-blue-700 border-blue-400 bg-blue-50"
                 : "text-gray-700 border-gray-300 hover:bg-gray-50"
             }`}
-            title={diagramType === "bpmn" ? "Two-phase AI generation: plan first, then apply layout" : "Generate a diagram from a natural-language description"}
+            title={usesPlanPanel ? "Two-phase AI generation: plan first, then apply layout" : "Generate a diagram from a natural-language description"}
           >
             AI Generate
           </button>

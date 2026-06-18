@@ -38,6 +38,7 @@ const TYPE_LABELS: Record<string, string> = {
   context: "Context Diagram",
   "process-context": "Process Context",
   archimate: "ArchiMate",
+  flowchart: "Standard Flowchart",
 };
 
 export function AiPlanFormatClient() {

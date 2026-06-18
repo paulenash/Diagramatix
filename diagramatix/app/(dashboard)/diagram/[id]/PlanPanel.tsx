@@ -67,8 +67,13 @@ export function PlanPanel({
   onBusyChange,
 }: Props) {
   const [prompt, setPrompt] = useState("");
+  // Flowcharts use their own 2-phase endpoints + a deterministic top-down
+  // layout. The structured Pools/Elements/Connectors tabs are BPMN-plan
+  // shaped, so flowcharts edit the plan via the generic Raw JSON tab.
+  const isFlowchart = diagramType === "flowchart";
+  const apiBase = isFlowchart ? "/api/ai/flowchart" : "/api/ai/bpmn";
   const { plan, setPlan, updateElement, deleteElement, updateConnection, deleteConnection, moveElementRelativeTo, asJson } = usePlanState();
-  const [activeTab, setActiveTab] = useState<Tab>("pools");
+  const [activeTab, setActiveTab] = useState<Tab>(isFlowchart ? "json" : "pools");
   const [busy, setBusy] = useState<"plan" | "apply" | "save" | "load" | "narrative" | null>(null);
   // Propagate busy transitions up so DiagramEditor can overlay a wait
   // indicator on the canvas.
@@ -425,7 +430,7 @@ export function PlanPanel({
     setIssues(null);
     setStatus("Requesting plan from Sonnet (15–30 s)…");
     try {
-      const res = await fetch("/api/ai/bpmn/plan", {
+      const res = await fetch(`${apiBase}/plan`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt: prompt.trim(), attachment: attachment ?? undefined }),
@@ -446,7 +451,7 @@ export function PlanPanel({
     } finally {
       setBusy(null);
     }
-  }, [prompt, setPlan, attachment]);
+  }, [prompt, setPlan, attachment, apiBase]);
 
   const callPlan = useCallback(async () => {
     if (!prompt.trim() || busy) return;
@@ -522,7 +527,7 @@ export function PlanPanel({
         : undefined;
       const promptLabel = (savedName?.trim().length ? savedName.trim() : prompt.trim().slice(0, 100))
         || undefined;
-      const res = await fetch("/api/ai/bpmn/apply-layout", {
+      const res = await fetch(`${apiBase}/apply-layout`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ plan, promptLabel }),
@@ -540,15 +545,19 @@ export function PlanPanel({
         return;
       }
       onApplyDiagram(json.diagramData);
-      const poolCount = plan.elements.filter(e => e.type === "pool").length;
-      setStatus(`Applied: ${poolCount} pool${poolCount === 1 ? "" : "s"}, ${json.elementCount} elements, ${json.connectionCount} connections`);
+      if (isFlowchart) {
+        setStatus(`Applied: ${json.elementCount} elements, ${json.connectionCount} flowlines`);
+      } else {
+        const poolCount = plan.elements.filter(e => e.type === "pool").length;
+        setStatus(`Applied: ${poolCount} pool${poolCount === 1 ? "" : "s"}, ${json.elementCount} elements, ${json.connectionCount} connections`);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Network error");
       setStatus(null);
     } finally {
       setBusy(null);
     }
-  }, [plan, hasPlan, busy, onApplyDiagram, activeTab, jsonDraft, asJson, commitJson]);
+  }, [plan, hasPlan, busy, onApplyDiagram, activeTab, jsonDraft, asJson, commitJson, apiBase, isFlowchart]);
 
   return (
     <div className="w-96 border-l border-gray-200 bg-white flex flex-col shrink-0 overflow-hidden">
@@ -851,12 +860,14 @@ export function PlanPanel({
         {/* Tabs header (always visible) with expand/collapse chevron */}
         <div className="shrink-0 flex items-end border-b border-gray-200 text-[10px] -mb-px">
           <div className="flex flex-1">
-            {([
-              { id: "pools",      label: "Pools / Lanes" },
-              { id: "elements",   label: "Elements" },
-              { id: "connectors", label: "Connectors" },
-              { id: "json",       label: "Raw JSON" },
-            ] as const).map(t => (
+            {((isFlowchart
+              ? [{ id: "json", label: "Plan JSON" }]
+              : [
+                  { id: "pools",      label: "Pools / Lanes" },
+                  { id: "elements",   label: "Elements" },
+                  { id: "connectors", label: "Connectors" },
+                  { id: "json",       label: "Raw JSON" },
+                ]) as { id: Tab; label: string }[]).map(t => (
               <button
                 key={t.id}
                 onClick={() => { setActiveTab(t.id); setTabsExpanded(true); }}
