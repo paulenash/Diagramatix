@@ -17,6 +17,25 @@ import type {
   UmlOperation,
 } from "@/app/lib/diagram/types";
 import { RichTextEditor } from "./RichTextEditor";
+import { getCachedCatalogue, findShapeByKey, type ArchimateShapeEntry } from "@/app/lib/archimate/catalogue";
+
+// ArchiMate relationship metadata — maps the archi-* connector type to its
+// human name and ArchiMate relationship group (shown in the Properties panel).
+type ArchiRelGroup = "Structural" | "Dependency" | "Other";
+const ARCHI_GROUPS: ArchiRelGroup[] = ["Structural", "Dependency", "Other"];
+const ARCHI_REL_META: Record<string, { type: string; group: ArchiRelGroup }> = {
+  "archi-composition":    { type: "Composition",    group: "Structural" },
+  "archi-aggregation":    { type: "Aggregation",    group: "Structural" },
+  "archi-assignment":     { type: "Assignment",     group: "Structural" },
+  "archi-realisation":    { type: "Realisation",    group: "Structural" },
+  "archi-serving":        { type: "Serving",        group: "Dependency" },
+  "archi-access":         { type: "Access",         group: "Dependency" },
+  "archi-influence":      { type: "Influence",      group: "Dependency" },
+  "archi-association":    { type: "Association",     group: "Dependency" },
+  "archi-triggering":     { type: "Triggering",     group: "Other" },
+  "archi-flow":           { type: "Flow",           group: "Other" },
+  "archi-specialisation": { type: "Specialisation", group: "Other" },
+};
 
 interface Props {
   element: DiagramElement | null;
@@ -1004,7 +1023,7 @@ export function PropertiesPanel({
         <SectionHeader label="Connector" open={connectorOpen} onToggle={() => setConnectorOpen(!connectorOpen)} />
         {connectorOpen && <div className="space-y-1.5">
         <div>
-          <p className="text-xs text-gray-600">Type: {connector.type}</p>
+          <p className="text-xs text-gray-600">Type: {ARCHI_REL_META[connector.type]?.type ?? connector.type}</p>
           {debugMode && (
             <div className="mt-1 space-y-0.5 select-text">
               <input readOnly className="text-xs text-gray-400 font-mono bg-transparent border-none outline-none w-full p-0" value={`ID: ${connector.id}`} />
@@ -1018,6 +1037,41 @@ export function PropertiesPanel({
             </div>
           )}
         </div>
+        {connector.type.startsWith("archi-") && onUpdateConnectorType && (() => {
+          const meta = ARCHI_REL_META[connector.type];
+          const group: ArchiRelGroup = meta?.group ?? "Other";
+          const typesInGroup = Object.entries(ARCHI_REL_META).filter(([, m]) => m.group === group);
+          const stop = { onMouseDown: (e: React.MouseEvent) => e.stopPropagation() };
+          return (
+            <div className="space-y-1.5">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Relationship Group</label>
+                <select
+                  value={group}
+                  onChange={(e) => {
+                    const first = Object.entries(ARCHI_REL_META).find(([, m]) => m.group === e.target.value);
+                    if (first) onUpdateConnectorType(connector.id, first[0] as ConnectorType);
+                  }}
+                  className="w-full text-xs border border-gray-300 rounded px-2 py-1.5 bg-white text-gray-700 cursor-pointer"
+                  {...stop}
+                >
+                  {ARCHI_GROUPS.map(g => <option key={g} value={g}>{g}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Relationship Type</label>
+                <select
+                  value={connector.type}
+                  onChange={(e) => onUpdateConnectorType(connector.id, e.target.value as ConnectorType)}
+                  className="w-full text-xs border border-gray-300 rounded px-2 py-1.5 bg-white text-gray-700 cursor-pointer"
+                  {...stop}
+                >
+                  {typesInGroup.map(([key, m]) => <option key={key} value={key}>{m.type}</option>)}
+                </select>
+              </div>
+            </div>
+          );
+        })()}
         {(() => {
           // Check if connector is between a Class and an Enumeration
           const srcEl = allElements?.find(e => e.id === connector.sourceId);
@@ -2147,6 +2201,70 @@ export function PropertiesPanel({
             );
           })()}
         </div>
+        );
+      })()}
+
+      {element.type === "archimate-shape" && typeof element.properties.shapeKey === "string" && (() => {
+        const shapeKey = element.properties.shapeKey as string;
+        const cat = getCachedCatalogue();
+        const entry = findShapeByKey(shapeKey);
+        const stop = { onMouseDown: (e: React.MouseEvent) => e.stopPropagation() };
+        if (!cat || !entry) {
+          // Catalogue not loaded yet — show the raw key so the panel still informs.
+          return <div><p className="text-xs text-gray-600">Type: {shapeKey}</p></div>;
+        }
+        const layer = cat.categories.find(c => c.id === entry.category);
+        // Build the Type list the SAME way the ArchiMate palette does
+        // (Palette.tsx): one entry per concept name (box preferred), with a
+        // separate "(icon)" entry ONLY for the three concepts that surface a
+        // compact icon form. Keeps the dropdown identical to the palette.
+        const ICON_AS_SEPARATE = new Set(["Business Actor", "Business Service", "Business Event"]);
+        const byName = new Map<string, { primary: ArchimateShapeEntry; iconCounterpart?: ArchimateShapeEntry }>();
+        for (const s of layer?.shapes ?? []) {
+          const ex = byName.get(s.name);
+          if (!ex) byName.set(s.name, { primary: s });
+          else if (ex.primary.variant === "icon" && s.variant === "box") byName.set(s.name, { primary: s, iconCounterpart: ex.primary });
+          else if (ex.primary.variant === "box" && s.variant === "icon") byName.set(s.name, { primary: ex.primary, iconCounterpart: s });
+        }
+        const typeItems: { key: string; label: string; iconOnly: boolean }[] = [];
+        for (const [name, pair] of byName) {
+          typeItems.push({ key: pair.primary.key, label: name, iconOnly: false });
+          if (pair.iconCounterpart && ICON_AS_SEPARATE.has(name)) {
+            typeItems.push({ key: pair.iconCounterpart.key, label: `${name} (icon)`, iconOnly: true });
+          }
+        }
+        return (
+          <>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Layer</label>
+              <select
+                value={entry.category}
+                onChange={(e) => {
+                  const first = cat.categories.find(c => c.id === e.target.value)?.shapes.find(s => s.variant === "box")
+                    ?? cat.categories.find(c => c.id === e.target.value)?.shapes[0];
+                  if (first) onUpdateProperties(element.id, { shapeKey: first.key, archimateIconOnly: false });
+                }}
+                className="w-full text-xs border border-gray-300 rounded px-2 py-1.5 bg-white text-gray-700 cursor-pointer"
+                {...stop}
+              >
+                {cat.categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Type</label>
+              <select
+                value={shapeKey}
+                onChange={(e) => {
+                  const it = typeItems.find(i => i.key === e.target.value);
+                  onUpdateProperties(element.id, { shapeKey: e.target.value, archimateIconOnly: it?.iconOnly ?? false });
+                }}
+                className="w-full text-xs border border-gray-300 rounded px-2 py-1.5 bg-white text-gray-700 cursor-pointer"
+                {...stop}
+              >
+                {typeItems.map(it => <option key={it.key} value={it.key}>{it.label}</option>)}
+              </select>
+            </div>
+          </>
         );
       })()}
 

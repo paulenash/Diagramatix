@@ -536,15 +536,17 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
   // can evolve without cross-contamination.
   if (isArchimateConnectorType(connector.type)) {
     return (
-      <ArchimateConnectorRenderer
-        connector={connector}
-        selected={selected}
-        onSelect={onSelect}
-        svgToWorld={svgToWorld}
-        onUpdateWaypoints={onUpdateWaypoints}
-        onWaypointsDragEnd={onWaypointsDragEnd}
-        onUpdateLabel={onUpdateLabel}
-      />
+      <g opacity={faded ? 0.2 : undefined}>
+        <ArchimateConnectorRenderer
+          connector={connector}
+          selected={selected}
+          onSelect={onSelect}
+          svgToWorld={svgToWorld}
+          onUpdateWaypoints={onUpdateWaypoints}
+          onWaypointsDragEnd={onWaypointsDragEnd}
+          onUpdateLabel={onUpdateLabel}
+        />
+      </g>
     );
   }
 

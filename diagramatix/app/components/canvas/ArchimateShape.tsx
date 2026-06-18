@@ -150,9 +150,18 @@ export function ArchimateShape({ el }: { el: DiagramElement }) {
       } else {
         bg = `M ${el.x} ${el.y} L ${el.x + el.width} ${el.y} L ${el.x + el.width} ${el.y + el.height} L ${el.x} ${el.y + el.height} Z`;
       }
+      // Service & Event ARE their own glyph shape. Every other icon-only type
+      // (interface, role, product, data-object, application-service, …) draws a
+      // plain rectangle, so overlay its ArchiMate glyph in the top-right corner
+      // — otherwise it renders as a blank box.
+      const cornerGlyph = entry.iconType !== "service" && entry.iconType !== "event";
+      const glyphSize = 22.5;
+      const gx = el.x + el.width - glyphSize / 2 - 6;
+      const gy = el.y + glyphSize / 2 + 6;
       return (
         <g>
           <path d={bg} fill={fill} stroke={stroke} strokeWidth={STROKE_WIDTH} strokeLinejoin="round" />
+          {cornerGlyph && drawIcon ? drawIcon({ cx: gx, cy: gy, size: glyphSize, colour: glyphColour }) : null}
         </g>
       );
     }

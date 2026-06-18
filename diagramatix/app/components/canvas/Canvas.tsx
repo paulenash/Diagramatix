@@ -1847,7 +1847,7 @@ export function Canvas({
         || elType === "subprocess-expanded" || elType === "state"
         || elType === "submachine" || elType === "composite-state"
         || elType === "chevron" || elType === "chevron-collapsed" || elType === "process-group"
-        || (elType === "archimate-shape" && !(el!.properties?.archimateIconOnly));
+        || elType === "archimate-shape"; // all ArchiMate shapes resize freely (incl. icon-only)
       if (!isContainer && !freeResize && ar > 0) {
         if (handle.includes("e") || handle.includes("w")) {
           // Width is primary — derive height to preserve aspect ratio
@@ -4088,7 +4088,7 @@ export function Canvas({
   // element is a visible drop target. Once the connector completes,
   // draggingConnector clears and this recomputes from data.connectors — so the
   // newly connected element is automatically folded into the highlight.
-  if (diagramType === "process-context" && selectedElementIds.size >= 1 && !draggingConnector) {
+  if ((diagramType === "process-context" || diagramType === "archimate") && selectedElementIds.size >= 1 && !draggingConnector) {
     for (const c of data.connectors) {
       const srcSel = selectedElementIds.has(c.sourceId);
       const tgtSel = selectedElementIds.has(c.targetId);

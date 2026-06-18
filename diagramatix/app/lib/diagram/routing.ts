@@ -742,6 +742,10 @@ export function computeWaypoints(
   const SEQ_OBSTACLE_TYPES = new Set<string>([
     "task", "subprocess", "subprocess-expanded",
     "start-event", "intermediate-event", "end-event",
+    // ArchiMate elements are obstacles for archi-* relationship routing so
+    // connectors route AROUND elements (rule A4.07). Only present in
+    // archimate diagrams, so this never affects BPMN sequence routing.
+    "archimate-shape",
   ]);
   // Walk the ancestor chain so an EP that contains the source/target at
   // ANY depth (not only as a direct parent) is excluded from obstacles.
@@ -826,6 +830,9 @@ export function computeWaypoints(
       // as obstacles, so a sequence connector between two outside elements
       // routes around the EP instead of through it.
       if (el.type === "subprocess-expanded" && (srcAncestors.has(el.id) || tgtAncestors.has(el.id))) return false;
+      // An ArchiMate container that holds the source or target is not an
+      // obstacle — the connector must enter it to reach the contained element.
+      if (el.type === "archimate-shape" && (srcAncestors.has(el.id) || tgtAncestors.has(el.id))) return false;
       // Paul's 2026-06-10 Test 4 rule: when the route has a containment
       // box (a shared EP or white-box pool), tasks / events OUTSIDE that
       // box don't affect the routing inside it. A task in the pool ABOVE
@@ -928,9 +935,14 @@ export function computeWaypoints(
     const exitTowardApproach = goesRight ? exitPt.x <= approachPt.x : exitPt.x >= approachPt.x;
     if (exitTowardApproach) {
       const midX = (exitPt.x + approachPt.x) / 2;
-      midPath = Math.abs(exitPt.y - approachPt.y) < 1
+      const simple = Math.abs(exitPt.y - approachPt.y) < 1
         ? [exitPt, approachPt]
         : [exitPt, { x: midX, y: exitPt.y }, { x: midX, y: approachPt.y }, approachPt];
+      // P2 / A4.07: the simple Z-path skips obstacle checks — fall back to the
+      // detour router if it would cross an element (with clearance).
+      midPath = pathHitsObstacles([effectiveSrcEdge, ...simple, effectiveTgtEdge], obstacles, L_SHAPE_CLEARANCE)
+        ? buildOrthogonalPath(exitPt, approachPt, obstaclesForDetour, containmentBounds, poolBounds)
+        : simple;
     } else {
       midPath = buildOrthogonalPath(exitPt, approachPt, obstaclesForDetour, containmentBounds, poolBounds);
     }
@@ -944,9 +956,13 @@ export function computeWaypoints(
     const exitTowardApproach = goesDown ? exitPt.y <= approachPt.y : exitPt.y >= approachPt.y;
     if (exitTowardApproach) {
       const midY = (exitPt.y + approachPt.y) / 2;
-      midPath = Math.abs(exitPt.x - approachPt.x) < 1
+      const simple = Math.abs(exitPt.x - approachPt.x) < 1
         ? [exitPt, approachPt]
         : [exitPt, { x: exitPt.x, y: midY }, { x: approachPt.x, y: midY }, approachPt];
+      // P2 / A4.07: obstacle-guard the simple Z-path (see above).
+      midPath = pathHitsObstacles([effectiveSrcEdge, ...simple, effectiveTgtEdge], obstacles, L_SHAPE_CLEARANCE)
+        ? buildOrthogonalPath(exitPt, approachPt, obstaclesForDetour, containmentBounds, poolBounds)
+        : simple;
     } else {
       midPath = buildOrthogonalPath(exitPt, approachPt, obstaclesForDetour, containmentBounds, poolBounds);
     }

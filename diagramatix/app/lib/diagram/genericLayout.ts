@@ -753,54 +753,138 @@ function layoutArchimateDiagram(
   aiElements: NonNullable<AiParsed["elements"]>,
   aiConnections: NonNullable<AiParsed["connections"]>,
 ): DiagramData {
-  const BAND_GAP_Y = 70;   // vertical gap between bands
-  const EL_GAP_X = 50;     // horizontal gap between elements in a band
-  const BOX_W = 150, BOX_H = 56;
-  const ICON_W = 72, ICON_H = 72;
+  const BAND_GAP_Y = 80;   // vertical gap between bands
+  const EL_GAP_X = 40;     // horizontal gap between elements in a band
   const NUM_BANDS = 5;
 
-  type Placed = { ai: NonNullable<AiParsed["elements"]>[number]; shapeKey: string; iconOnly: boolean; w: number; h: number };
+  // A4.08: split a leading element code (e.g. "V01.01") onto its own top
+  // line. Pattern: 1–3 letters, 1–2 digits, a separator (.,:;-), 1–2 digits.
+  const LEADING_CODE = /^([A-Za-z]{1,3}\d{1,2}[.,:;-]\d{1,2})\s+(.+)$/;
+  function formatLabel(raw: string): string {
+    const s = (raw ?? "").trim();
+    const m = LEADING_CODE.exec(s);
+    return m ? `${m[1]}\n${m[2]}` : s;
+  }
+
+  // Box size from the (already line-split) label so the text fits — caps the
+  // width so long names wrap to extra lines, and honours explicit \n breaks
+  // (e.g. the A4.08 number line). The glyph sits in the top-right corner, so
+  // there is no fixed square footprint.
+  const PX_PER_CHAR = 8; // ~14px font
+  function boxSize(label: string): { w: number; h: number } {
+    const segments = (label || "").split("\n");
+    const longest = Math.max(4, ...segments.map(s => s.length));
+    const w = Math.min(220, Math.max(140, longest * PX_PER_CHAR + 24));
+    const charsPerLine = Math.max(8, Math.floor((w - 20) / PX_PER_CHAR));
+    let lines = 0;
+    for (const s of segments) lines += Math.max(1, Math.ceil(Math.max(1, s.length) / charsPerLine));
+    lines = Math.min(4, Math.max(1, lines));
+    return { w, h: Math.max(56, lines * 20 + 20) };
+  }
+
+  type Placed = { ai: NonNullable<AiParsed["elements"]>[number]; shapeKey: string; iconOnly: boolean; label: string; w: number; h: number; cx: number };
   const bands: Placed[][] = Array.from({ length: NUM_BANDS }, () => []);
+  const byId = new Map<string, Placed>();
   for (const ai of aiElements) {
     const spec = ARCHI_SHAPE[ai.type];
     if (!spec) continue; // unknown element type — skip
-    const band = ARCHI_BAND[ai.type] ?? 2;
-    bands[band].push({
-      ai, shapeKey: spec.key, iconOnly: spec.iconOnly,
-      w: spec.iconOnly ? ICON_W : BOX_W,
-      h: spec.iconOnly ? ICON_H : BOX_H,
-    });
+    const label = formatLabel(ai.label ?? ai.name ?? "");
+    const sz = boxSize(label);
+    const p: Placed = { ai, shapeKey: spec.key, iconOnly: spec.iconOnly, label, w: sz.w, h: sz.h, cx: 0 };
+    bands[ARCHI_BAND[ai.type] ?? 2].push(p);
+    byId.set(ai.id, p);
   }
 
-  const bandWidth = (b: Placed[]) =>
-    b.reduce((sum, e) => sum + e.w, 0) + Math.max(0, b.length - 1) * EL_GAP_X;
-  const maxBandW = Math.max(1, ...bands.map(bandWidth));
+  // Undirected adjacency for barycentre positioning + crossing reduction.
+  const adj = new Map<string, string[]>();
+  const link = (a: string, b: string) => { const l = adj.get(a); if (l) l.push(b); else adj.set(a, [b]); };
+  for (const c of aiConnections) {
+    if (!byId.has(c.sourceId) || !byId.has(c.targetId)) continue;
+    link(c.sourceId, c.targetId); link(c.targetId, c.sourceId);
+  }
+
+  // Anchor on the busiest band (prefer the behaviour band 2 = processes):
+  // lay it out left-to-right in model order (the customer-journey order).
+  const placedIds = new Set<string>();
+  const placeSequential = (band: Placed[]) => {
+    let x = 0;
+    for (const p of band) { p.cx = x + p.w / 2; x += p.w + EL_GAP_X; placedIds.add(p.ai.id); }
+  };
+  // Every other band: each element wants the average X of its already-placed
+  // neighbours (barycentre = alignment). Sort by that desired X (= crossing
+  // reduction), then sweep left-to-right pushing apart to remove overlap.
+  const placeBarycentre = (band: Placed[]) => {
+    const items = band.map((p, i) => {
+      const nbrs = (adj.get(p.ai.id) ?? [])
+        .map(id => byId.get(id))
+        .filter((n): n is Placed => !!n && placedIds.has(n.ai.id));
+      const desired = nbrs.length ? nbrs.reduce((s, n) => s + n.cx, 0) / nbrs.length : null;
+      return { p, i, desired };
+    });
+    const known = items.filter(it => it.desired != null);
+    const fallback = known.length ? known.reduce((s, it) => s + (it.desired as number), 0) / known.length : 0;
+    for (const it of items) if (it.desired == null) it.desired = fallback + it.i * 0.01;
+    items.sort((a, b) => (a.desired! - b.desired!) || (a.i - b.i));
+    let prevRight = -Infinity;
+    const ordered: Placed[] = [];
+    for (const it of items) {
+      let x = (it.desired as number) - it.p.w / 2;
+      if (x < prevRight + EL_GAP_X) x = prevRight + EL_GAP_X;
+      it.p.cx = x + it.p.w / 2;
+      prevRight = x + it.p.w;
+      placedIds.add(it.p.ai.id);
+      ordered.push(it.p);
+    }
+    band.splice(0, band.length, ...ordered); // keep band in placement order
+  };
+
+  let anchorIdx = 2;
+  for (let i = 0; i < NUM_BANDS; i++) if (bands[i].length > bands[anchorIdx].length) anchorIdx = i;
+  if (bands[anchorIdx].length === 0) anchorIdx = bands.findIndex(b => b.length > 0);
+  if (anchorIdx >= 0) {
+    placeSequential(bands[anchorIdx]);
+    const order = [0, 1, 2, 3, 4]
+      .filter(i => i !== anchorIdx && bands[i].length)
+      .sort((a, b) => Math.abs(a - anchorIdx) - Math.abs(b - anchorIdx));
+    for (const bi of order) placeBarycentre(bands[bi]);
+  }
+
+  // Normalise so the leftmost element sits at START_X.
+  let minLeft = Infinity;
+  for (const b of bands) for (const p of b) minLeft = Math.min(minLeft, p.cx - p.w / 2);
+  const shift = START_X - (Number.isFinite(minLeft) ? minLeft : 0);
 
   const elements: DiagramElement[] = [];
   let y = START_Y;
   for (const band of bands) {
     if (band.length === 0) continue;
     const rowH = Math.max(...band.map(e => e.h));
-    let x = START_X + (maxBandW - bandWidth(band)) / 2;
     for (const e of band) {
       elements.push({
         id: e.ai.id,
         type: "archimate-shape",
-        x, y: y + (rowH - e.h) / 2,
+        x: e.cx - e.w / 2 + shift,
+        y: y + (rowH - e.h) / 2,
         width: e.w, height: e.h,
-        label: e.ai.label ?? e.ai.name ?? "",
+        label: e.label,
         properties: e.iconOnly
           ? { shapeKey: e.shapeKey, archimateIconOnly: true }
           : { shapeKey: e.shapeKey },
       });
-      x += e.w + EL_GAP_X;
     }
     y += rowH + BAND_GAP_Y;
   }
 
-  // Connectors: map relationship → archi-* type, attach on nearest facing sides.
+  // Connectors. Pass 1: pick the facing side for each end. Pass 2: where
+  // several connectors share one element side, spread their attachment points
+  // evenly along that side (offset 1/(n+1) … n/(n+1)) instead of all stacking
+  // at the centre — sorted by the opposite endpoint's position to also reduce
+  // crossings (rule A4.04 / attachment-point separation).
   const elMap = new Map(elements.map(e => [e.id, e]));
-  const connectors: Connector[] = [];
+  type Side = "top" | "bottom" | "left" | "right";
+  type Pre = { c: typeof aiConnections[number]; src: DiagramElement; tgt: DiagramElement;
+    connType: string; srcSide: Side; tgtSide: Side; srcOffset: number; tgtOffset: number };
+  const prelim: Pre[] = [];
   for (const c of aiConnections) {
     const src = elMap.get(c.sourceId);
     const tgt = elMap.get(c.targetId);
@@ -808,7 +892,7 @@ function layoutArchimateDiagram(
     const connType = ARCHI_REL[(c.type ?? "").toLowerCase()] ?? "archi-association";
     const srcCx = src.x + src.width / 2, tgtCx = tgt.x + tgt.width / 2;
     const srcCy = src.y + src.height / 2, tgtCy = tgt.y + tgt.height / 2;
-    let srcSide: string, tgtSide: string;
+    let srcSide: Side, tgtSide: Side;
     if (Math.abs(tgtCy - srcCy) > Math.abs(tgtCx - srcCx)) {
       srcSide = tgtCy > srcCy ? "bottom" : "top";
       tgtSide = tgtCy > srcCy ? "top" : "bottom";
@@ -816,25 +900,51 @@ function layoutArchimateDiagram(
       srcSide = tgtCx > srcCx ? "right" : "left";
       tgtSide = tgtCx > srcCx ? "left" : "right";
     }
-    connectors.push({
-      id: `conn-${src.id}-${tgt.id}`,
-      sourceId: src.id, targetId: tgt.id,
-      sourceSide: srcSide as Connector["sourceSide"],
-      targetSide: tgtSide as Connector["targetSide"],
-      type: connType as Connector["type"],
-      directionType: "directed" as Connector["directionType"],
-      routingType: "rectilinear" as Connector["routingType"],
-      sourceInvisibleLeader: false, targetInvisibleLeader: false,
-      waypoints: [] as Point[],
-      label: c.label ?? "",
-    } as Connector);
+    prelim.push({ c, src, tgt, connType, srcSide, tgtSide, srcOffset: 0.5, tgtOffset: 0.5 });
   }
+  // Group endpoints by element|side and spread offsets.
+  const groups = new Map<string, { p: Pre; end: "src" | "tgt" }[]>();
+  const push = (key: string, v: { p: Pre; end: "src" | "tgt" }) => {
+    const l = groups.get(key); if (l) l.push(v); else groups.set(key, [v]);
+  };
+  for (const p of prelim) {
+    push(`${p.src.id}|${p.srcSide}`, { p, end: "src" });
+    push(`${p.tgt.id}|${p.tgtSide}`, { p, end: "tgt" });
+  }
+  for (const [key, list] of groups) {
+    if (list.length <= 1) continue;
+    const side = key.split("|")[1];
+    const horiz = side === "top" || side === "bottom";
+    list.sort((a, b) => {
+      const ao = a.end === "src" ? a.p.tgt : a.p.src;
+      const bo = b.end === "src" ? b.p.tgt : b.p.src;
+      return horiz ? (ao.x - bo.x) : (ao.y - bo.y);
+    });
+    list.forEach((item, i) => {
+      const off = (i + 1) / (list.length + 1);
+      if (item.end === "src") item.p.srcOffset = off; else item.p.tgtOffset = off;
+    });
+  }
+  const connectors: Connector[] = prelim.map(p => ({
+    id: `conn-${p.src.id}-${p.tgt.id}`,
+    sourceId: p.src.id, targetId: p.tgt.id,
+    sourceSide: p.srcSide as Connector["sourceSide"],
+    targetSide: p.tgtSide as Connector["targetSide"],
+    type: p.connType as Connector["type"],
+    directionType: "directed" as Connector["directionType"],
+    routingType: "rectilinear" as Connector["routingType"],
+    sourceInvisibleLeader: false, targetInvisibleLeader: false,
+    waypoints: [] as Point[],
+    label: p.c.label ?? "",
+    sourceOffsetAlong: p.srcOffset,
+    targetOffsetAlong: p.tgtOffset,
+  } as Connector));
 
   const computed = connectors.map(conn => {
     const src = elMap.get(conn.sourceId), tgt = elMap.get(conn.targetId);
     if (!src || !tgt) return conn;
     try {
-      const r = computeWaypoints(src, tgt, elements, conn.sourceSide, conn.targetSide, conn.routingType, 0.5, 0.5);
+      const r = computeWaypoints(src, tgt, elements, conn.sourceSide, conn.targetSide, conn.routingType, conn.sourceOffsetAlong ?? 0.5, conn.targetOffsetAlong ?? 0.5);
       return { ...conn, waypoints: r.waypoints, sourceInvisibleLeader: r.sourceInvisibleLeader, targetInvisibleLeader: r.targetInvisibleLeader };
     } catch { return conn; }
   });
