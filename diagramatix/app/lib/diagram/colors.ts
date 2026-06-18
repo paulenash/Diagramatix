@@ -52,6 +52,13 @@ export const DEFAULT_SYMBOL_COLORS: Record<SymbolType, string> = {
   "archimate-shape":     "#ffffff",
   // Review (Phase 3) — pink note accent / link colour.
   "review-comment":      "#ec4899",
+  // Standard Flowchart — strictly monochrome (white fill, black stroke).
+  "flowchart-terminator": "#ffffff", "flowchart-process": "#ffffff", "flowchart-decision": "#ffffff",
+  "flowchart-io": "#ffffff", "flowchart-document": "#ffffff", "flowchart-multidoc": "#ffffff",
+  "flowchart-predefined": "#ffffff", "flowchart-preparation": "#ffffff", "flowchart-manual-input": "#ffffff",
+  "flowchart-manual-op": "#ffffff", "flowchart-display": "#ffffff", "flowchart-delay": "#ffffff",
+  "flowchart-database": "#ffffff", "flowchart-onpage": "#ffffff", "flowchart-offpage": "#ffffff",
+  "flowchart-merge": "#ffffff",
 };
 
 /** Black & white colour scheme: fills → white, lines/strokes → black. */
@@ -98,6 +105,12 @@ export const BW_SYMBOL_COLORS: Record<SymbolType, string> = {
   "uml-enumeration":     "#ffffff",
   "archimate-shape":     "#ffffff",
   "review-comment":      "#000000",
+  "flowchart-terminator": "#ffffff", "flowchart-process": "#ffffff", "flowchart-decision": "#ffffff",
+  "flowchart-io": "#ffffff", "flowchart-document": "#ffffff", "flowchart-multidoc": "#ffffff",
+  "flowchart-predefined": "#ffffff", "flowchart-preparation": "#ffffff", "flowchart-manual-input": "#ffffff",
+  "flowchart-manual-op": "#ffffff", "flowchart-display": "#ffffff", "flowchart-delay": "#ffffff",
+  "flowchart-database": "#ffffff", "flowchart-onpage": "#ffffff", "flowchart-offpage": "#ffffff",
+  "flowchart-merge": "#ffffff",
 };
 
 /** Return the effective colour for a symbol type, preferring the project config over defaults. */

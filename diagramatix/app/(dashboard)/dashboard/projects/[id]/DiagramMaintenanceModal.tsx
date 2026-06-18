@@ -54,6 +54,7 @@ const TABS: { type: DiagramType; label: string }[] = [
   { type: "state-machine",   label: "State Machine" },
   { type: "context",           label: "Context" },
   { type: "domain",            label: "Domain" },
+  { type: "flowchart",         label: "Standard Flowchart" },
 ];
 
 type Section = "colours" | "typography";

@@ -600,7 +600,7 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
     }
     // Crossing humps for sequence and association connectors
     if (otherConnectorWaypoints && otherConnectorWaypoints.length > 0
-        && (connector.type === "sequence" || connector.type === "association" || connector.type === "uml-association")
+        && (connector.type === "sequence" || connector.type === "flowline" || connector.type === "association" || connector.type === "uml-association")
         && (connector.routingType === "rectilinear" || connector.routingType === "direct")) {
       const humpPath = pathWithHumps(visibleWaypoints, otherConnectorWaypoints);
       if (humpPath) return humpPath;
@@ -921,7 +921,7 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
 
       {/* Floating connector label */}
       {(connector.type === "transition" || connector.type === "flow" || connector.type === "messageBPMN"
-        || (connector.type === "sequence" && connector.label !== undefined)) && (
+        || ((connector.type === "sequence" || connector.type === "flowline") && connector.label !== undefined)) && (
         <InteractionLabel
           connector={connector}
           selected={selected}

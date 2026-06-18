@@ -293,6 +293,108 @@ export function PaletteSymbolPreview({ type, colorConfig }: { type: SymbolType; 
           <line x1={9} y1={18} x2={28} y2={18} stroke="#ec4899" strokeWidth={1} />
         </svg>
       );
+    // ── Standard Flowchart (monochrome) ──
+    case "flowchart-terminator":
+      return (
+        <svg width={36} height={16} viewBox="0 0 48 22">
+          <rect x={2} y={2} width={44} height={18} rx={9} ry={9} fill="#fff" stroke="#111" strokeWidth={1.6} />
+        </svg>
+      );
+    case "flowchart-process":
+      return (
+        <svg width={36} height={21} viewBox="0 0 48 28">
+          <rect x={2} y={2} width={44} height={24} fill="#fff" stroke="#111" strokeWidth={1.6} />
+        </svg>
+      );
+    case "flowchart-decision":
+      return (
+        <svg width={30} height={22} viewBox="0 0 40 28">
+          <polygon points="20,2 38,14 20,26 2,14" fill="#fff" stroke="#111" strokeWidth={1.6} />
+        </svg>
+      );
+    case "flowchart-io":
+      return (
+        <svg width={36} height={21} viewBox="0 0 48 28">
+          <polygon points="11,2 46,2 37,26 2,26" fill="#fff" stroke="#111" strokeWidth={1.6} />
+        </svg>
+      );
+    case "flowchart-document":
+      return (
+        <svg width={36} height={21} viewBox="0 0 48 28">
+          <path d="M2 2 L46 2 L46 22 Q35 28 24 22 Q13 16 2 22 Z" fill="#fff" stroke="#111" strokeWidth={1.6} strokeLinejoin="round" />
+        </svg>
+      );
+    case "flowchart-multidoc":
+      return (
+        <svg width={36} height={23} viewBox="0 0 48 30">
+          <path d="M8 8 L46 8 L46 24 Q36 29 27 24 Q18 20 8 24 Z" fill="#fff" stroke="#111" strokeWidth={1.4} strokeLinejoin="round" />
+          <path d="M5 5 L43 5 L43 21 Q33 26 24 21 Q15 17 5 21 Z" fill="#fff" stroke="#111" strokeWidth={1.4} strokeLinejoin="round" />
+          <path d="M2 2 L40 2 L40 18 Q30 23 21 18 Q12 14 2 18 Z" fill="#fff" stroke="#111" strokeWidth={1.4} strokeLinejoin="round" />
+        </svg>
+      );
+    case "flowchart-predefined":
+      return (
+        <svg width={36} height={21} viewBox="0 0 48 28">
+          <rect x={2} y={2} width={44} height={24} fill="#fff" stroke="#111" strokeWidth={1.6} />
+          <line x1={8} y1={2} x2={8} y2={26} stroke="#111" strokeWidth={1.4} />
+          <line x1={40} y1={2} x2={40} y2={26} stroke="#111" strokeWidth={1.4} />
+        </svg>
+      );
+    case "flowchart-preparation":
+      return (
+        <svg width={36} height={21} viewBox="0 0 48 28">
+          <polygon points="11,2 37,2 46,14 37,26 11,26 2,14" fill="#fff" stroke="#111" strokeWidth={1.6} strokeLinejoin="round" />
+        </svg>
+      );
+    case "flowchart-manual-input":
+      return (
+        <svg width={36} height={21} viewBox="0 0 48 28">
+          <polygon points="2,8 46,2 46,26 2,26" fill="#fff" stroke="#111" strokeWidth={1.6} strokeLinejoin="round" />
+        </svg>
+      );
+    case "flowchart-manual-op":
+      return (
+        <svg width={36} height={21} viewBox="0 0 48 28">
+          <polygon points="2,2 46,2 39,26 9,26" fill="#fff" stroke="#111" strokeWidth={1.6} strokeLinejoin="round" />
+        </svg>
+      );
+    case "flowchart-display":
+      return (
+        <svg width={36} height={21} viewBox="0 0 48 28">
+          <path d="M9 2 L38 2 C46 2 46 26 38 26 L9 26 Q2 14 9 2 Z" fill="#fff" stroke="#111" strokeWidth={1.6} strokeLinejoin="round" />
+        </svg>
+      );
+    case "flowchart-delay":
+      return (
+        <svg width={36} height={21} viewBox="0 0 48 28">
+          <path d="M2 2 L34 2 A12 12 0 0 1 34 26 L2 26 Z" fill="#fff" stroke="#111" strokeWidth={1.6} strokeLinejoin="round" />
+        </svg>
+      );
+    case "flowchart-database":
+      return (
+        <svg width={24} height={24} viewBox="0 0 32 32">
+          <path d="M3 6 L3 26 A13 4 0 0 0 29 26 L29 6" fill="#fff" stroke="#111" strokeWidth={1.6} />
+          <ellipse cx={16} cy={6} rx={13} ry={4} fill="#fff" stroke="#111" strokeWidth={1.6} />
+        </svg>
+      );
+    case "flowchart-onpage":
+      return (
+        <svg width={22} height={22} viewBox="0 0 28 28">
+          <circle cx={14} cy={14} r={12} fill="#fff" stroke="#111" strokeWidth={1.6} />
+        </svg>
+      );
+    case "flowchart-offpage":
+      return (
+        <svg width={26} height={24} viewBox="0 0 32 28">
+          <polygon points="2,2 30,2 30,17 16,26 2,17" fill="#fff" stroke="#111" strokeWidth={1.6} strokeLinejoin="round" />
+        </svg>
+      );
+    case "flowchart-merge":
+      return (
+        <svg width={26} height={22} viewBox="0 0 32 26">
+          <polygon points="2,2 30,2 16,24" fill="#fff" stroke="#111" strokeWidth={1.6} strokeLinejoin="round" />
+        </svg>
+      );
     default:
       return (
         <svg width={36} height={21} viewBox="0 0 48 28">

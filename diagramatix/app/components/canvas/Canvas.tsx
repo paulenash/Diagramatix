@@ -107,6 +107,30 @@ function computeUseCaseSize(label: string, currentW: number): { w: number; h: nu
   return { w, h };
 }
 
+/**
+ * Aspect-locked decision-diamond sizing. The largest axis-aligned rectangle
+ * inscribed in a diamond of (w,h) is (w/2 × h/2), so the label must fit inside
+ * that half-size box. Grows the diamond uniformly (keeping the base w:h ratio)
+ * until the wrapped label fits the inscribed rect. baseW/baseH default to the
+ * Decision symbol's default 120×80.
+ */
+function computeDecisionSize(label: string, baseW = 120, baseH = 80): { w: number; h: number } {
+  const aspect = baseW / baseH;
+  const lineH = 14, fontSize = 12;
+  let w = baseW;
+  for (let i = 0; i < 60; i++) {
+    const innerW = w * 0.5;
+    const lines = wrapText(label || "", innerW, fontSize);
+    const h = w / aspect;
+    const textH = lines.length * lineH;
+    const maxLineChars = lines.reduce((m, l) => Math.max(m, l.length), 1);
+    const maxLineW = maxLineChars * fontSize * 0.55;
+    if (textH + 8 <= h * 0.5 && maxLineW <= innerW) break;
+    w += 8;
+  }
+  return { w: Math.round(w), h: Math.round(w / aspect) };
+}
+
 const INTERMEDIATE_EVENT_TYPE_OPTIONS: { value: EventType; label: string }[] = [
   { value: "none",         label: "None" },
   { value: "message",      label: "Message" },
@@ -1449,6 +1473,8 @@ export function Canvas({
               sourceEl?.type === "text-annotation" || targetEl.type === "text-annotation";
             connType = "associationBPMN"; connRouting = "direct";
             connDirection = isAnnotationConn ? "non-directed" : "open-directed";
+          } else if (diagramType === "flowchart") {
+            connType = "flowline"; connRouting = defaultRoutingType; connDirection = defaultDirectionType;
           } else if (diagramType === "domain") {
             connType = "uml-association"; connRouting = defaultRoutingType; connDirection = "non-directed";
           } else if ((diagramType === "context" || diagramType === "basic") && defaultRoutingType === "curvilinear") {
@@ -3445,6 +3471,15 @@ export function Canvas({
       const { w, h } = computeUseCaseSize(editingLabel.value, el.width);
       if (w !== el.width || h !== el.height) {
         onResizeElement(el.id, el.x, el.y, w, h);
+      }
+    }
+    // Decision diamond: grow (aspect-locked) so the label fits the inscribed rect,
+    // keeping the diamond centred on its current centre.
+    if (el && el.type === 'flowchart-decision') {
+      const { w, h } = computeDecisionSize(editingLabel.value);
+      if (w !== el.width || h !== el.height) {
+        const cx = el.x + el.width / 2, cy = el.y + el.height / 2;
+        onResizeElement(el.id, Math.round(cx - w / 2), Math.round(cy - h / 2), w, h);
       }
     }
     // Auto-resize text-annotation height to fit wrapped text

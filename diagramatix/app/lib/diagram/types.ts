@@ -1,4 +1,4 @@
-export type DiagramType = "context" | "basic" | "process-context" | "state-machine" | "bpmn" | "domain" | "value-chain" | "archimate";
+export type DiagramType = "context" | "basic" | "process-context" | "state-machine" | "bpmn" | "domain" | "value-chain" | "archimate" | "flowchart";
 
 export type SymbolType =
   | "task"
@@ -37,7 +37,24 @@ export type SymbolType =
   | "chevron-collapsed"
   | "process-group"
   | "archimate-shape"
-  | "review-comment";
+  | "review-comment"
+  // Standard Flowchart (monochrome ISO symbols)
+  | "flowchart-terminator"
+  | "flowchart-process"
+  | "flowchart-decision"
+  | "flowchart-io"
+  | "flowchart-document"
+  | "flowchart-multidoc"
+  | "flowchart-predefined"
+  | "flowchart-preparation"
+  | "flowchart-manual-input"
+  | "flowchart-manual-op"
+  | "flowchart-display"
+  | "flowchart-delay"
+  | "flowchart-database"
+  | "flowchart-onpage"
+  | "flowchart-offpage"
+  | "flowchart-merge";
 
 export type BpmnTaskType =
   | "none"
@@ -80,7 +97,7 @@ export type ArchimateConnectorType =
 
 export type ConnectorType =
   | "sequence" | "message" | "association" | "transition"
-  | "associationBPMN" | "messageBPMN" | "flow"
+  | "associationBPMN" | "messageBPMN" | "flow" | "flowline"
   | "uml-association" | "uml-aggregation" | "uml-composition" | "uml-generalisation"
   | "review-comment-link"
   | ArchimateConnectorType;

@@ -341,6 +341,7 @@ const DIAGRAM_TYPES: { value: DiagramType; label: string; description: string }[
   { value: "domain", label: "Domain", description: "UML class diagrams with classes, enumerations, and relationships" },
   { value: "value-chain", label: "Value Chain", description: "Process-based value chain diagrams with value chain containers" },
   { value: "archimate", label: "ArchiMate", description: "Enterprise architecture using the ArchiMate 3.1 standard (Business, Motivation, Strategy, Application layers)" },
+  { value: "flowchart", label: "Standard Flowchart", description: "Classic black-and-white flowchart with terminators, processes, decisions, and flowlines" },
 ];
 
 export function ProjectDetailClient({ project, otherProjects, version, readOnly, viewingAsName, viewingAsEmail, impersonationMode, isAdmin, hasMicrosoft }: Props) {

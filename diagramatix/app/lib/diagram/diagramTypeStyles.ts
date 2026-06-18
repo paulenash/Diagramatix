@@ -43,6 +43,7 @@ export const DEFAULT_DIAGRAM_TYPE_STYLES: DiagramTypeStyle[] = [
   { typeKey: "domain",          label: "Domain",          code: "DM", bgColor: "#d1fae5", textColor: "#047857", sortOrder: 4 },
   { typeKey: "value-chain",     label: "Value Chain",     code: "VC", bgColor: "#ffedd5", textColor: "#c2410c", sortOrder: 5 },
   { typeKey: "archimate",       label: "Archimate",       code: "AM", bgColor: "#fce7f3", textColor: "#be185c", sortOrder: 6 },
+  { typeKey: "flowchart",       label: "Standard Flowchart", code: "FC", bgColor: "#f3f4f6", textColor: "#333333", sortOrder: 7 },
 ];
 
 /** Canonical editable keys (excludes the `basic` alias). */

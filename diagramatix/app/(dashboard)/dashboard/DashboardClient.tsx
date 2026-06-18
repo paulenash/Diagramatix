@@ -99,6 +99,7 @@ const DIAGRAM_TYPES: { value: DiagramType; label: string; description: string }[
   { value: "state-machine", label: "State Machine", description: "States and transitions for entity lifecycle" },
   { value: "bpmn", label: "BPMN", description: "Full Business Process Model and Notation" },
   { value: "domain", label: "Domain", description: "UML class diagrams with classes, enumerations, and relationships" },
+  { value: "flowchart", label: "Standard Flowchart", description: "Classic black-and-white flowchart with terminators, processes, decisions, and flowlines" },
 ];
 
 function DiagramCard({

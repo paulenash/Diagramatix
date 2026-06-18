@@ -609,6 +609,7 @@ export function layoutGenericDiagram(
     domain: "uml-association",
     context: "flow",
     "process-context": "association",
+    flowchart: "flowline",
   };
   const defaultRouting: Record<string, string> = {
     "state-machine": "curvilinear",

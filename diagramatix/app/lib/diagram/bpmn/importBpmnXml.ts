@@ -445,6 +445,22 @@ const FALLBACK_SIZE: Record<SymbolType, { w: number; h: number }> = {
   "process-group":      { w: 400, h: 200 },
   "archimate-shape":    { w: 120, h: 60 },
   "review-comment":     { w: 160, h: 80 },
+  "flowchart-terminator":   { w: 120, h: 50 },
+  "flowchart-process":      { w: 140, h: 60 },
+  "flowchart-decision":     { w: 120, h: 80 },
+  "flowchart-io":           { w: 140, h: 60 },
+  "flowchart-document":     { w: 130, h: 70 },
+  "flowchart-multidoc":     { w: 130, h: 76 },
+  "flowchart-predefined":   { w: 140, h: 60 },
+  "flowchart-preparation":  { w: 140, h: 60 },
+  "flowchart-manual-input": { w: 140, h: 60 },
+  "flowchart-manual-op":    { w: 140, h: 60 },
+  "flowchart-display":      { w: 140, h: 60 },
+  "flowchart-delay":        { w: 130, h: 60 },
+  "flowchart-database":     { w: 90,  h: 80 },
+  "flowchart-onpage":       { w: 44,  h: 44 },
+  "flowchart-offpage":      { w: 60,  h: 56 },
+  "flowchart-merge":        { w: 70,  h: 56 },
 };
 
 interface BuiltElement {

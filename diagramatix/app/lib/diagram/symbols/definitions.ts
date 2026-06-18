@@ -268,6 +268,23 @@ export const ALL_SYMBOLS: SymbolDefinition[] = [
     defaultHeight: 80,
     description: "A reviewer's comment note (Phase 3) — pink sticky linked to the element it concerns",
   },
+  // ── Standard Flowchart (monochrome ISO 5807 symbols) ──
+  { type: "flowchart-terminator",   label: "Terminator",         defaultWidth: 120, defaultHeight: 50, description: "Start or end of a process (stadium)" },
+  { type: "flowchart-process",      label: "Process",            defaultWidth: 140, defaultHeight: 60, description: "A task, action, operation or calculation (rectangle)" },
+  { type: "flowchart-decision",     label: "Decision",           defaultWidth: 120, defaultHeight: 80, description: "A branching question or test (diamond)" },
+  { type: "flowchart-io",           label: "Input / Output",     defaultWidth: 140, defaultHeight: 60, description: "Data entering or leaving (parallelogram)" },
+  { type: "flowchart-document",     label: "Document",           defaultWidth: 130, defaultHeight: 70, description: "A document produced or used (wavy bottom)" },
+  { type: "flowchart-multidoc",     label: "Multiple Documents", defaultWidth: 130, defaultHeight: 76, description: "Several documents or a document pack" },
+  { type: "flowchart-predefined",   label: "Predefined Process", defaultWidth: 140, defaultHeight: 60, description: "A named process defined elsewhere (double-bar rectangle)" },
+  { type: "flowchart-preparation",  label: "Preparation",        defaultWidth: 140, defaultHeight: 60, description: "Setup or initialisation (hexagon)" },
+  { type: "flowchart-manual-input", label: "Manual Input",       defaultWidth: 140, defaultHeight: 60, description: "Data keyed or entered manually (sloped-top)" },
+  { type: "flowchart-manual-op",    label: "Manual Operation",   defaultWidth: 140, defaultHeight: 60, description: "Work performed by a person (inverted trapezoid)" },
+  { type: "flowchart-display",      label: "Display",            defaultWidth: 140, defaultHeight: 60, description: "Information shown on a screen (curved)" },
+  { type: "flowchart-delay",        label: "Delay / Wait",       defaultWidth: 130, defaultHeight: 60, description: "A waiting period or deliberate delay (D-shape)" },
+  { type: "flowchart-database",     label: "Database",           defaultWidth: 90,  defaultHeight: 80, description: "Structured electronic data store (cylinder)" },
+  { type: "flowchart-onpage",       label: "On-page Connector",  defaultWidth: 44,  defaultHeight: 44, description: "Continues flow elsewhere on the same page (circle)" },
+  { type: "flowchart-offpage",      label: "Off-page Connector", defaultWidth: 60,  defaultHeight: 56, description: "Continues flow on another page (pentagon)" },
+  { type: "flowchart-merge",        label: "Merge",              defaultWidth: 70,  defaultHeight: 56, description: "Combines multiple flows into one (down-triangle)" },
 ];
 
 export const PALETTE_BY_DIAGRAM_TYPE: Record<DiagramType, SymbolType[]> = {
@@ -296,6 +313,12 @@ export const PALETTE_BY_DIAGRAM_TYPE: Record<DiagramType, SymbolType[]> = {
   // reading that catalogue rather than this static list, so the registered
   // symbol type is a single generic placeholder.
   archimate: ["archimate-shape"],
+  flowchart: [
+    "flowchart-terminator", "flowchart-process", "flowchart-decision", "flowchart-io",
+    "flowchart-document", "flowchart-multidoc", "flowchart-predefined", "flowchart-preparation",
+    "flowchart-manual-input", "flowchart-manual-op", "flowchart-display", "flowchart-delay",
+    "flowchart-database", "flowchart-onpage", "flowchart-offpage", "flowchart-merge",
+  ],
 };
 
 /** Colour-picker palette — includes body colour entries and lane that aren't in the drag palette. */
@@ -323,6 +346,8 @@ export const COLOR_PALETTE_BY_DIAGRAM_TYPE: Record<DiagramType, SymbolType[]> = 
   domain: ["uml-class", "uml-enumeration"],
   "value-chain": ["chevron", "chevron-collapsed", "process-group"],
   archimate: ["archimate-shape"],
+  // Flowcharts are strictly monochrome — no per-symbol colour customisation.
+  flowchart: [],
 };
 
 export function getSymbolDefinition(type: SymbolType): SymbolDefinition {

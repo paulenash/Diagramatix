@@ -1536,6 +1536,130 @@ function LaneShape({ el, isSublane }: { el: DiagramElement; isSublane?: boolean 
   );
 }
 
+// ── Standard Flowchart shapes (monochrome: white fill, black stroke) ──
+const FC_STROKE = "#111111";
+const FC_SW = 1.6;
+function fcFill(el: DiagramElement, colors: SymbolColorConfig | undefined): string {
+  return (el.properties?.fill as string | undefined) ?? resolveColor(el.type, colors) ?? "#ffffff";
+}
+function FlowchartTerminatorShape({ el }: { el: DiagramElement }) {
+  const colors = useContext(SymbolColorCtx);
+  return <rect x={el.x} y={el.y} width={el.width} height={el.height} rx={el.height / 2} ry={el.height / 2} fill={fcFill(el, colors)} stroke={FC_STROKE} strokeWidth={FC_SW} />;
+}
+function FlowchartProcessShape({ el }: { el: DiagramElement }) {
+  const colors = useContext(SymbolColorCtx);
+  return <rect x={el.x} y={el.y} width={el.width} height={el.height} fill={fcFill(el, colors)} stroke={FC_STROKE} strokeWidth={FC_SW} />;
+}
+function FlowchartDecisionShape({ el }: { el: DiagramElement }) {
+  const colors = useContext(SymbolColorCtx);
+  const { x, y, width: w, height: h } = el;
+  const cx = x + w / 2, cy = y + h / 2;
+  const pts = `${cx},${y} ${x + w},${cy} ${cx},${y + h} ${x},${y + h / 2}`;
+  // Text fits the inscribed rectangle (≈ w/2 × h/2) centred in the diamond.
+  const lines = wrapText(el.label || "", Math.max(20, w * 0.52), 12);
+  const lineH = 14;
+  const startY = cy - ((lines.length - 1) * lineH) / 2;
+  return (
+    <g>
+      <polygon points={pts} fill={fcFill(el, colors)} stroke={FC_STROKE} strokeWidth={FC_SW} />
+      {lines.map((ln, i) => (
+        <text key={i} x={cx} y={startY + i * lineH} textAnchor="middle" dominantBaseline="middle"
+          fontSize={12} fill="#111111" style={{ pointerEvents: "none", userSelect: "none" }}>{ln}</text>
+      ))}
+    </g>
+  );
+}
+function FlowchartIOShape({ el }: { el: DiagramElement }) {
+  const colors = useContext(SymbolColorCtx);
+  const { x, y, width: w, height: h } = el; const s = w * 0.2;
+  return <polygon points={`${x + s},${y} ${x + w},${y} ${x + w - s},${y + h} ${x},${y + h}`} fill={fcFill(el, colors)} stroke={FC_STROKE} strokeWidth={FC_SW} />;
+}
+function FlowchartDocumentShape({ el }: { el: DiagramElement }) {
+  const colors = useContext(SymbolColorCtx);
+  const { x, y, width: w, height: h } = el; const wy = y + h * 0.82;
+  const d = `M ${x} ${y} L ${x + w} ${y} L ${x + w} ${wy} Q ${x + w * 0.75} ${y + h} ${x + w * 0.5} ${wy} Q ${x + w * 0.25} ${y + h * 0.64} ${x} ${wy} Z`;
+  return <path d={d} fill={fcFill(el, colors)} stroke={FC_STROKE} strokeWidth={FC_SW} strokeLinejoin="round" />;
+}
+function FlowchartMultidocShape({ el }: { el: DiagramElement }) {
+  const colors = useContext(SymbolColorCtx);
+  const { x, y, width: w, height: h } = el;
+  const doc = (ox: number, oy: number, dw: number, dh: number) => {
+    const wy = oy + dh * 0.82;
+    return `M ${ox} ${oy} L ${ox + dw} ${oy} L ${ox + dw} ${wy} Q ${ox + dw * 0.75} ${oy + dh} ${ox + dw * 0.5} ${wy} Q ${ox + dw * 0.25} ${oy + dh * 0.64} ${ox} ${wy} Z`;
+  };
+  const dw = w - 10, dh = h - 12;
+  return (
+    <g>
+      <path d={doc(x + 10, y + 12, dw, dh)} fill={fcFill(el, colors)} stroke={FC_STROKE} strokeWidth={FC_SW} strokeLinejoin="round" />
+      <path d={doc(x + 5, y + 6, dw, dh)} fill={fcFill(el, colors)} stroke={FC_STROKE} strokeWidth={FC_SW} strokeLinejoin="round" />
+      <path d={doc(x, y, dw, dh)} fill={fcFill(el, colors)} stroke={FC_STROKE} strokeWidth={FC_SW} strokeLinejoin="round" />
+    </g>
+  );
+}
+function FlowchartPredefinedShape({ el }: { el: DiagramElement }) {
+  const colors = useContext(SymbolColorCtx);
+  const { x, y, width: w, height: h } = el; const b = Math.min(12, w * 0.1);
+  return (
+    <g>
+      <rect x={x} y={y} width={w} height={h} fill={fcFill(el, colors)} stroke={FC_STROKE} strokeWidth={FC_SW} />
+      <line x1={x + b} y1={y} x2={x + b} y2={y + h} stroke={FC_STROKE} strokeWidth={FC_SW} />
+      <line x1={x + w - b} y1={y} x2={x + w - b} y2={y + h} stroke={FC_STROKE} strokeWidth={FC_SW} />
+    </g>
+  );
+}
+function FlowchartPreparationShape({ el }: { el: DiagramElement }) {
+  const colors = useContext(SymbolColorCtx);
+  const { x, y, width: w, height: h } = el; const p = w * 0.18; const cy = y + h / 2;
+  return <polygon points={`${x + p},${y} ${x + w - p},${y} ${x + w},${cy} ${x + w - p},${y + h} ${x + p},${y + h} ${x},${cy}`} fill={fcFill(el, colors)} stroke={FC_STROKE} strokeWidth={FC_SW} strokeLinejoin="round" />;
+}
+function FlowchartManualInputShape({ el }: { el: DiagramElement }) {
+  const colors = useContext(SymbolColorCtx);
+  const { x, y, width: w, height: h } = el;
+  return <polygon points={`${x},${y + h * 0.22} ${x + w},${y} ${x + w},${y + h} ${x},${y + h}`} fill={fcFill(el, colors)} stroke={FC_STROKE} strokeWidth={FC_SW} strokeLinejoin="round" />;
+}
+function FlowchartManualOpShape({ el }: { el: DiagramElement }) {
+  const colors = useContext(SymbolColorCtx);
+  const { x, y, width: w, height: h } = el; const i = w * 0.15;
+  return <polygon points={`${x},${y} ${x + w},${y} ${x + w - i},${y + h} ${x + i},${y + h}`} fill={fcFill(el, colors)} stroke={FC_STROKE} strokeWidth={FC_SW} strokeLinejoin="round" />;
+}
+function FlowchartDisplayShape({ el }: { el: DiagramElement }) {
+  const colors = useContext(SymbolColorCtx);
+  const { x, y, width: w, height: h } = el; const cy = y + h / 2;
+  const d = `M ${x + w * 0.15} ${y} L ${x + w * 0.78} ${y} C ${x + w} ${y} ${x + w} ${y + h} ${x + w * 0.78} ${y + h} L ${x + w * 0.15} ${y + h} Q ${x} ${cy} ${x + w * 0.15} ${y} Z`;
+  return <path d={d} fill={fcFill(el, colors)} stroke={FC_STROKE} strokeWidth={FC_SW} strokeLinejoin="round" />;
+}
+function FlowchartDelayShape({ el }: { el: DiagramElement }) {
+  const colors = useContext(SymbolColorCtx);
+  const { x, y, width: w, height: h } = el; const r = h / 2;
+  const d = `M ${x} ${y} L ${x + w - r} ${y} A ${r} ${r} 0 0 1 ${x + w - r} ${y + h} L ${x} ${y + h} Z`;
+  return <path d={d} fill={fcFill(el, colors)} stroke={FC_STROKE} strokeWidth={FC_SW} strokeLinejoin="round" />;
+}
+function FlowchartDatabaseShape({ el }: { el: DiagramElement }) {
+  const colors = useContext(SymbolColorCtx);
+  const { x, y, width: w, height: h } = el; const ry = Math.min(h * 0.14, 12); const fill = fcFill(el, colors);
+  return (
+    <g>
+      <path d={`M ${x} ${y + ry} L ${x} ${y + h - ry} A ${w / 2} ${ry} 0 0 0 ${x + w} ${y + h - ry} L ${x + w} ${y + ry}`} fill={fill} stroke={FC_STROKE} strokeWidth={FC_SW} />
+      <ellipse cx={x + w / 2} cy={y + ry} rx={w / 2} ry={ry} fill={fill} stroke={FC_STROKE} strokeWidth={FC_SW} />
+    </g>
+  );
+}
+function FlowchartOnPageShape({ el }: { el: DiagramElement }) {
+  const colors = useContext(SymbolColorCtx);
+  const r = Math.min(el.width, el.height) / 2;
+  return <circle cx={el.x + el.width / 2} cy={el.y + el.height / 2} r={r} fill={fcFill(el, colors)} stroke={FC_STROKE} strokeWidth={FC_SW} />;
+}
+function FlowchartOffPageShape({ el }: { el: DiagramElement }) {
+  const colors = useContext(SymbolColorCtx);
+  const { x, y, width: w, height: h } = el; const cx = x + w / 2;
+  return <polygon points={`${x},${y} ${x + w},${y} ${x + w},${y + h * 0.6} ${cx},${y + h} ${x},${y + h * 0.6}`} fill={fcFill(el, colors)} stroke={FC_STROKE} strokeWidth={FC_SW} strokeLinejoin="round" />;
+}
+function FlowchartMergeShape({ el }: { el: DiagramElement }) {
+  const colors = useContext(SymbolColorCtx);
+  const { x, y, width: w, height: h } = el;
+  return <polygon points={`${x},${y} ${x + w},${y} ${x + w / 2},${y + h}`} fill={fcFill(el, colors)} stroke={FC_STROKE} strokeWidth={FC_SW} strokeLinejoin="round" />;
+}
+
 function SymbolShape({ el }: { el: DiagramElement }) {
   const mode = useContext(DisplayModeCtx);
   const sublaneIds = useContext(SublaneIdsCtx);
@@ -1583,6 +1707,23 @@ function SymbolShape({ el }: { el: DiagramElement }) {
       case "external-entity":     return <ExternalEntityShape el={el} />;
       case "process-system":      return <ProcessSystemShape el={el} />;
       case "archimate-shape":     return <ArchimateShape el={el} />;
+      // Standard Flowchart (monochrome)
+      case "flowchart-terminator":   return <FlowchartTerminatorShape el={el} />;
+      case "flowchart-process":      return <FlowchartProcessShape el={el} />;
+      case "flowchart-decision":     return <FlowchartDecisionShape el={el} />;
+      case "flowchart-io":           return <FlowchartIOShape el={el} />;
+      case "flowchart-document":     return <FlowchartDocumentShape el={el} />;
+      case "flowchart-multidoc":     return <FlowchartMultidocShape el={el} />;
+      case "flowchart-predefined":   return <FlowchartPredefinedShape el={el} />;
+      case "flowchart-preparation":  return <FlowchartPreparationShape el={el} />;
+      case "flowchart-manual-input": return <FlowchartManualInputShape el={el} />;
+      case "flowchart-manual-op":    return <FlowchartManualOpShape el={el} />;
+      case "flowchart-display":      return <FlowchartDisplayShape el={el} />;
+      case "flowchart-delay":        return <FlowchartDelayShape el={el} />;
+      case "flowchart-database":     return <FlowchartDatabaseShape el={el} />;
+      case "flowchart-onpage":       return <FlowchartOnPageShape el={el} />;
+      case "flowchart-offpage":      return <FlowchartOffPageShape el={el} />;
+      case "flowchart-merge":        return <FlowchartMergeShape el={el} />;
       default:                  return <TaskShape el={el} />;
     }
   })();
@@ -2036,7 +2177,7 @@ export function SymbolRenderer({
   const canResize = element.type !== "lane"; // all types except lane can be resized
   const isBoundaryStartOrEnd = !!element.boundaryHostId &&
     (element.type === "start-event" || element.type === "end-event");
-  const showLabel = element.type !== "initial-state" && element.type !== "final-state" && element.type !== "fork-join" && !isBoundaryStartOrEnd;
+  const showLabel = element.type !== "initial-state" && element.type !== "final-state" && element.type !== "fork-join" && element.type !== "flowchart-decision" && !isBoundaryStartOrEnd;
 
   // Events / gateways / data objects render a SEPARATE external label below
   // the shape, edited inline via the isEditingGatewayLabel foreignObject.
