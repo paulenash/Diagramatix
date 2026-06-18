@@ -274,6 +274,18 @@
     transactional. The schemaVersion attribute is bumped to 1.21 so
     importers and the User Guide reflect the new feature window even though
     no project-XML field changed.
+
+  v1.22 — SharePoint/OneDrive integration. Data Objects / Data Stores may
+    carry a `sharepointLink` (the linked file's metadata). Additive optional
+    field on data elements; older exports remain valid.
+
+  v1.23 — Entity Lists (governed name sources for BPMN pools/lanes:
+    External Participants, IT Systems, and an Organisation → Org Unit →
+    Team → Role hierarchy, maintained at Org and Project level). No
+    project-XML field changed — pools/lanes still carry a plain label;
+    the names are simply drawn from a project's adopted/created structure.
+    schemaVersion bumped to 1.23 so importers and the User Guide reflect
+    the new feature window (same convention as v1.21).
 -->
 
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"

@@ -4364,4 +4364,74 @@ export const CHAPTERS: HelpChapter[] = [
       },
     ],
   },
+  /* ──────────────────────────────────────────────── Entity Lists ── */
+  {
+    slug: "entity-lists",
+    title: "Entity Lists & Pool/Lane Naming",
+    sections: [
+      {
+        body: (
+          <>
+            <p>
+              <strong>Entity Lists</strong> are governed name sources for BPMN
+              pools and lanes, so the same names are used consistently across
+              every diagram. There are three kinds:
+            </p>
+            <ul className="list-disc list-inside space-y-1 mt-2">
+              <li><strong>External Participants</strong> — the names of non-IT black-box pools.</li>
+              <li><strong>IT Systems</strong> — the names of System (IT) black-box pools.</li>
+              <li><strong>Organisation Structure</strong> — a hierarchy of Organisation → Org Unit → Team → Role, used to name the white-box pool and its lanes/sublanes.</li>
+            </ul>
+          </>
+        ),
+      },
+      {
+        heading: "Org master vs. project copy",
+        body: (
+          <>
+            <p>
+              Each Organisation keeps a <strong>master library</strong> of
+              these lists, maintained at{" "}
+              <code>/dashboard/admin/entity-lists</code> by OrgAdmins and
+              SuperAdmins. A <strong>Project</strong> then{" "}
+              <strong>adopts</strong> one org structure as its own editable{" "}
+              <strong>copy</strong> — so a project can tailor its names without
+              changing the master.
+            </p>
+            <p className="mt-2">
+              Open the <strong>Project Structure</strong> panel (a collapsible
+              row at the top of the diagram-tree column on the project page) to
+              adopt an org structure, or build one directly with{" "}
+              <strong>“+ create empty”</strong>. Pool/lane naming only draws
+              from the project's <em>own</em> copy — the org master alone is not
+              enough.
+            </p>
+          </>
+        ),
+      },
+      {
+        heading: "Naming a pool or lane",
+        body: (
+          <>
+            <p>
+              Once a project has a structure, double-click a{" "}
+              <strong>white-box Pool</strong> name to edit it. The default{" "}
+              <strong>Organisation</strong> name is pre-filled and the whole
+              indented structure is shown:
+            </p>
+            <ul className="list-disc list-inside space-y-1 mt-2">
+              <li>Press <strong>Enter</strong> to accept the default.</li>
+              <li>Start <strong>typing</strong> to filter the list across all levels; use ↑/↓ and Enter, or click, to pick a name.</li>
+              <li>Type a <strong>brand-new name</strong> and you'll be asked where it belongs in the hierarchy — it's then saved to the project structure and used as the name.</li>
+            </ul>
+            <p className="mt-2">
+              <strong>Lanes</strong> use the same hierarchy.{" "}
+              <strong>Black-box pools</strong> draw from the External
+              Participants or IT Systems list depending on the System flag.
+            </p>
+          </>
+        ),
+      },
+    ],
+  },
 ];

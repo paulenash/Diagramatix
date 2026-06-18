@@ -19,6 +19,8 @@ import type {
 } from "@/app/lib/diagram/types";
 import { ArchimateConnectorPicker } from "./ArchimateConnectorPicker";
 import { BubbleHelp } from "./BubbleHelp";
+import { EntityNameInput } from "./EntityNameInput";
+import type { ProjectEntityStructure, EntityNodeLevel, EntityListKind } from "@/app/lib/entityLists/types";
 import { SymbolRenderer, SublaneIdsCtx, ProcessGroupDepthCtx, LaneDepthCtx, DatabaseCtx, ArchimateDepthCtx, type ResizeHandle } from "./SymbolRenderer";
 import { ElementContextMenu } from "./ElementContextMenu";
 import { getSymbolDefinition } from "@/app/lib/diagram/symbols/definitions";
@@ -170,6 +172,8 @@ interface Props {
   onMoveElement: (id: string, x: number, y: number, unconstrained?: boolean) => void;
   onResizeElement: (id: string, x: number, y: number, width: number, height: number) => void;
   onUpdateLabel: (id: string, label: string) => void;
+  entityStructure?: ProjectEntityStructure | null;
+  onAddEntityNode?: (listId: string, input: { name: string; level: EntityNodeLevel; parentId: string | null }) => Promise<boolean>;
   onBeginLabelEdit?: (id: string) => void;
   onUpdateLabelLive?: (id: string, label: string) => void;
   onCancelLabelEdit?: () => void;
@@ -441,6 +445,8 @@ export function Canvas({
   onMoveElement,
   onResizeElement,
   onUpdateLabel,
+  entityStructure,
+  onAddEntityNode,
   onBeginLabelEdit,
   onUpdateLabelLive,
   onCancelLabelEdit,
@@ -6278,6 +6284,44 @@ export function Canvas({
           );
         }
         if (isPoolLane) {
+          // Entity-list autocomplete: white-box pool & lane → Org Structure
+          // (whole indented tree, Organisation default); black-box pool →
+          // External Participants or IT Systems (flat). Falls back to the
+          // plain textarea when the project has no structure loaded.
+          const el = editingEl!;
+          const isBlackBox = el.type === "pool" && el.properties?.poolType === "black-box";
+          const isWhiteBoxPool = el.type === "pool" && !isBlackBox;
+          let kind: EntityListKind;
+          let suggestions: ProjectEntityStructure["orgStructure"] | undefined;
+          let flatLevel: EntityNodeLevel | null = null;
+          let defaultName: string | undefined;
+          if (isBlackBox) {
+            const sys = !!el.properties?.isSystem;
+            kind = sys ? "System" : "Participant";
+            suggestions = sys ? entityStructure?.systems : entityStructure?.participants;
+            flatLevel = sys ? "System" : "Participant";
+          } else {
+            kind = "OrgStructure";
+            suggestions = entityStructure?.orgStructure;
+            defaultName = isWhiteBoxPool ? entityStructure?.orgStructure.find(s => s.level === "Organisation")?.name : undefined;
+          }
+          const listId = entityStructure?.listIds[kind];
+          if (entityStructure && suggestions && listId && onAddEntityNode) {
+            const commitName = (name: string) => { onUpdateLabel(editingLabel.elementId, name); setEditingLabel(null); };
+            return (
+              <EntityNameInput
+                box={{ x: editingLabel.x, y: editingLabel.y, width: Math.max(editingLabel.width, 150), height: editingLabel.height }}
+                fontSizePx={(data.fontSize ?? 12) * 11 / 12 * zoom}
+                suggestions={suggestions}
+                defaultName={defaultName}
+                allowNew
+                flatLevel={flatLevel}
+                onCommit={commitName}
+                onCommitNew={async (name, level, parentId) => { await onAddEntityNode(listId, { name, level, parentId }); commitName(name); }}
+                onCancel={() => setEditingLabel(null)}
+              />
+            );
+          }
           return (
             <textarea
               autoFocus

@@ -85,6 +85,7 @@ model Org {
   prompts             Prompt[]
   diagramRules        DiagramRules[]
   collaborationGroups CollaborationGroup[]
+  entityLists         EntityList[]
 }
 
 model OrgMember {
@@ -232,6 +233,9 @@ model Project {
   shares      ProjectShare[]
   // BPMN lifecycle (Phase 2) — bundles published from this project.
   bundles     PublicationBundle[]
+  // Entity Lists (External Participants, Org Structure, IT Systems) — a
+  // project's own copy, adopted from an org master and edited independently.
+  entityLists EntityList[]
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
@@ -837,4 +841,64 @@ model OwnershipTransfer {
 
   @@index([toUserId, status])
   @@index([groupId, status])
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Entity Lists — governed name sources for BPMN pools/lanes.
+//   • Participant  : flat list of External Participant (non-IT black-box) names
+//   • System       : flat list of IT System (System black-box) names
+//   • OrgStructure : hierarchy Organisation → OrgUnit → Team → Role
+// An Org holds a master library; a Project adopts a COPY it edits independently.
+// ────────────────────────────────────────────────────────────────────────────
+enum EntityListKind {
+  Participant
+  System
+  OrgStructure
+}
+
+enum EntityNodeLevel {
+  Participant
+  System
+  Organisation
+  OrgUnit
+  Team
+  Role
+}
+
+model EntityList {
+  id           String         @id @default(cuid())
+  name         String
+  kind         EntityListKind
+  // Exactly one of orgId / projectId is set.
+  orgId        String?
+  org          Org?           @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  projectId    String?
+  project      Project?       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  // The org master this project copy was cloned from (provenance only).
+  sourceListId String?
+  sourceList   EntityList?    @relation("EntityListClone", fields: [sourceListId], references: [id], onDelete: SetNull)
+  clones       EntityList[]   @relation("EntityListClone")
+  nodes        EntityNode[]
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  @@index([orgId, kind])
+  @@index([projectId, kind])
+}
+
+model EntityNode {
+  id        String          @id @default(cuid())
+  listId    String
+  list      EntityList      @relation(fields: [listId], references: [id], onDelete: Cascade)
+  // null for flat lists and for the top of a hierarchy.
+  parentId  String?
+  parent    EntityNode?     @relation("EntityNodeTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children  EntityNode[]    @relation("EntityNodeTree")
+  name      String
+  level     EntityNodeLevel
+  sortOrder Int             @default(0)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  @@index([listId, parentId, sortOrder])
 }

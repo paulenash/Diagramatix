@@ -652,4 +652,4 @@ export interface TemplateData {
  *             flexible PropertiesType — no XSD structure change, documented
  *             there + version bump.
  */
-export const SCHEMA_VERSION = "1.22";
+export const SCHEMA_VERSION = "1.23";

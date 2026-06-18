@@ -75,6 +75,8 @@ const refs: RefTable[] = [
   { name: "ref_uml_visibility", values: ["+","-","#"] },
   { name: "ref_data_role", values: ["none","input","output"] },
   { name: "ref_data_multiplicity", values: ["single","collection"] },
+  { name: "ref_entity_list_kind", values: ["Participant","System","OrgStructure"] },
+  { name: "ref_entity_node_level", values: ["Participant","System","Organisation","OrgUnit","Team","Role"] },
 ];
 
 // ── Entity tables ───────────────────────────────────────────────────
@@ -264,6 +266,26 @@ const entityTables: Table[] = [
     c("connector_id", T.text, { nn: true, fk: fk("template_connector", "id", "CASCADE") }),
     c("ordinal", T.int, nn), c("x", T.numeric, nn), c("y", T.numeric, nn),
   ], indexes: [{ name: "idx_tmpl_wp_connector", columns: ["connector_id"] }] },
+
+  // Entity Lists — governed name sources for BPMN pools/lanes. A list is
+  // scoped to EITHER an org (master library) OR a project (its own copy).
+  { name: "entity_list", columns: [
+    c("id", T.text, pk), c("name", T.text, nn),
+    c("kind", T.text, { nn: true, ...refFk("ref_entity_list_kind") }),
+    c("org_id", T.text, { fk: fk("org", "id", "CASCADE") }),
+    c("project_id", T.text, { fk: fk("project", "id", "CASCADE") }),
+    c("source_list_id", T.text, { fk: fk("entity_list", "id", "SET NULL") }),
+    c("created_at", T.ts, nn), c("updated_at", T.ts, nn),
+  ], indexes: [{ name: "idx_entity_list_org", columns: ["org_id", "kind"] }, { name: "idx_entity_list_project", columns: ["project_id", "kind"] }] },
+  { name: "entity_node", columns: [
+    c("id", T.text, pk),
+    c("list_id", T.text, { nn: true, fk: fk("entity_list", "id", "CASCADE") }),
+    c("parent_id", T.text, { fk: fk("entity_node", "id", "CASCADE") }),
+    c("name", T.text, nn),
+    c("level", T.text, { nn: true, ...refFk("ref_entity_node_level") }),
+    c("sort_order", T.int, { nn: true, default: { postgres: "0", mysql: "0", mssql: "0" } }),
+    c("created_at", T.ts, nn), c("updated_at", T.ts, nn),
+  ], indexes: [{ name: "idx_entity_node_list", columns: ["list_id", "parent_id", "sort_order"] }] },
 ];
 
 // ── DDL Generator ───────────────────────────────────────────────────

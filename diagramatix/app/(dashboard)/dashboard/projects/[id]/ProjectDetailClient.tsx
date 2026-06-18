@@ -10,6 +10,7 @@ import { LinkScanDialog } from "./LinkScanDialog";
 import { ImpersonationBanner } from "@/app/components/ImpersonationBanner";
 import { SharePointPicker } from "@/app/components/SharePointPicker";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
+import { ProjectStructureSection } from "@/app/components/entityLists/ProjectStructureSection";
 import { DiagramTypeBadge } from "@/app/components/DiagramTypeBadge";
 import { useDiagramTypeStyles } from "@/app/hooks/useDiagramTypeStyles";
 import { lightenHex } from "@/app/lib/diagram/diagramTypeStyles";
@@ -2348,6 +2349,7 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
               <option value="modified-asc">Modified ↑ (oldest first)</option>
             </select>
           </div>
+          <ProjectStructureSection projectId={project.id} canEdit={!readOnly} />
           <div className="overflow-y-auto p-2 flex-1">
             {renderFolder(ROOT_ID, 0)}
           </div>

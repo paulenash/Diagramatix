@@ -31,6 +31,7 @@ import { DiagramTypeBadge } from "@/app/components/DiagramTypeBadge";
 import { useDiagramTypeStyles } from "@/app/hooks/useDiagramTypeStyles";
 import { lightenHex } from "@/app/lib/diagram/diagramTypeStyles";
 import { AiPanel } from "./AiPanel";
+import { toSuggestions, type ProjectEntityStructure, type EntityListDTO, type EntityNodeLevel } from "@/app/lib/entityLists/types";
 import { PlanPanel } from "./PlanPanel";
 import { SendForReviewDialog } from "./SendForReviewDialog";
 import { PublishVersionDialog } from "./PublishVersionDialog";
@@ -455,6 +456,43 @@ export function DiagramEditor({
       })
       .catch(() => {});
   }, [projectId, diagramId]);
+
+  // Project entity structure (External Participants, IT Systems, Org Structure)
+  // — drives pool/lane naming autocomplete. Mirrors the siblingDiagrams fetch.
+  const [entityStructure, setEntityStructure] = useState<ProjectEntityStructure | null>(null);
+  const loadEntityStructure = useCallback(async () => {
+    if (!projectId) return;
+    try {
+      const res = await fetch(`/api/projects/${projectId}/entity-lists`);
+      if (!res.ok) return;
+      const { lists } = (await res.json()) as { lists: EntityListDTO[] };
+      const pick = (kind: EntityListDTO["kind"]) => lists.find(l => l.kind === kind);
+      const p = pick("Participant"), s = pick("System"), o = pick("OrgStructure");
+      setEntityStructure({
+        participants: p ? toSuggestions(p.nodes) : [],
+        systems: s ? toSuggestions(s.nodes) : [],
+        orgStructure: o ? toSuggestions(o.nodes) : [],
+        listIds: { ...(p ? { Participant: p.id } : {}), ...(s ? { System: s.id } : {}), ...(o ? { OrgStructure: o.id } : {}) },
+      });
+    } catch { /* ignore */ }
+  }, [projectId]);
+  useEffect(() => { loadEntityStructure(); }, [loadEntityStructure]);
+
+  // Persist a brand-new pool/lane name into the project structure, then
+  // refresh local suggestions. Returns true on success.
+  const addEntityNode = useCallback(async (
+    listId: string, input: { name: string; level: EntityNodeLevel; parentId: string | null },
+  ): Promise<boolean> => {
+    if (!projectId) return false;
+    try {
+      const res = await fetch(`/api/projects/${projectId}/entity-lists/${listId}/nodes`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input),
+      });
+      if (!res.ok) return false;
+      await loadEntityStructure();
+      return true;
+    } catch { return false; }
+  }, [projectId, loadEntityStructure]);
 
   // Compute prev / next diagram in the SAME folder. Folder identification:
   //   - diagramFolderMap[currentId] → folderId. Missing → project root.
@@ -3254,6 +3292,8 @@ export function DiagramEditor({
           onMoveElement={moveElement}
           onResizeElement={resizeElement}
           onUpdateLabel={updateLabel}
+          entityStructure={entityStructure}
+          onAddEntityNode={addEntityNode}
           onBeginLabelEdit={beginLabelEdit}
           onUpdateLabelLive={updateLabelLive}
           onCancelLabelEdit={cancelLabelEdit}

@@ -45,6 +45,12 @@ const CARDS: MenuCard[] = [
     description:
       "Maintain your own saved AI generation prompts.",
   },
+  {
+    href: "/dashboard/admin/entity-lists?from=/dashboard/org-admin",
+    title: "Entity Lists",
+    description:
+      "Organisation structures, external participants and IT systems used to name BPMN pools and lanes.",
+  },
 ];
 
 /**
