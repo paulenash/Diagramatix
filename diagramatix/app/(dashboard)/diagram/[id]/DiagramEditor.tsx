@@ -755,6 +755,7 @@ export function DiagramEditor({
     addSublane,
     reorderLane,
     moveLaneBoundary,
+    moveVSwimlaneBoundary,
     laneBoundaryMoveEnd,
     moveElements,
     elementsMoveEnd,
@@ -3331,6 +3332,7 @@ export function DiagramEditor({
           onSplitConnector={splitConnector}
           onElementMoveEnd={elementMoveEnd}
           onMoveLaneBoundary={moveLaneBoundary}
+          onMoveVSwimlaneBoundary={moveVSwimlaneBoundary}
           onResizeElementEnd={resizeElementEnd}
           onLaneBoundaryMoveEnd={laneBoundaryMoveEnd}
           onConnectorWaypointDragEnd={connectorWaypointDragEnd}

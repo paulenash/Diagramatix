@@ -264,6 +264,7 @@ interface Props {
   onAddReviewComment?: (worldPos: Point, targetElementId: string | null) => void;
   onElementMoveEnd?: (id: string) => void;
   onMoveLaneBoundary?: (aboveLaneId: string, belowLaneId: string, dy: number) => void;
+  onMoveVSwimlaneBoundary?: (kind: "divider" | "left" | "right" | "bottom", delta: number, leftId?: string, rightId?: string) => void;
   onResizeElementEnd?: (id: string) => void;
   onLaneBoundaryMoveEnd?: () => void;
   onConnectorWaypointDragEnd?: (id: string) => void;
@@ -502,6 +503,7 @@ export function Canvas({
   onAddReviewComment,
   onElementMoveEnd,
   onMoveLaneBoundary,
+  onMoveVSwimlaneBoundary,
   onResizeElementEnd,
   onLaneBoundaryMoveEnd,
   onConnectorWaypointDragEnd,
@@ -1806,6 +1808,32 @@ export function Canvas({
       onLaneBoundaryMoveEnd?.();
     }
 
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+  }
+
+  // Vertical-swimlane boundary drag: dividers (between columns) and the outer
+  // left/right edges use horizontal motion (dx); the shared bottom uses dy.
+  function handleVSwimlaneBoundaryDrag(
+    e: React.MouseEvent,
+    kind: "divider" | "left" | "right" | "bottom",
+    leftId?: string,
+    rightId?: string,
+  ) {
+    e.stopPropagation();
+    let lastClient = kind === "bottom" ? e.clientY : e.clientX;
+
+    function onMouseMove(ev: MouseEvent) {
+      const cur = kind === "bottom" ? ev.clientY : ev.clientX;
+      const delta = (cur - lastClient) / zoom;
+      lastClient = cur;
+      if (delta !== 0) onMoveVSwimlaneBoundary?.(kind, delta, leftId, rightId);
+    }
+    function onMouseUp() {
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+      onLaneBoundaryMoveEnd?.();
+    }
     window.addEventListener("mousemove", onMouseMove);
     window.addEventListener("mouseup", onMouseUp);
   }
@@ -3762,6 +3790,9 @@ export function Canvas({
 
   // Render pools first (deepest), then other containers, then lanes, then regular elements
   const pools = data.elements.filter((el) => el.type === "pool");
+  const vswimlanes = data.elements
+    .filter((el) => el.type === "flowchart-vswimlane")
+    .sort((a, b) => a.x - b.x);
   const lanes = data.elements.filter((el) => el.type === "lane")
     .sort((a, b) => {
       // Parent lanes render before (behind) child lanes
@@ -3961,6 +3992,7 @@ export function Canvas({
                 && el.type !== "subprocess-expanded"
                 && el.type !== "group"
                 && el.type !== "process-group"
+                && el.type !== "flowchart-vswimlane"
                 && !el.boundaryHostId
     );
     function getParentDepth(el: DiagramElement): number {
@@ -4610,7 +4642,7 @@ export function Canvas({
               multi-selection are skipped here and re-rendered in the
               overlay block at the END of this group, so the whole
               moving template stays above the existing diagram. */}
-          {[...pools, ...otherContainers].filter(el => !inActiveGroup(el.id)).map((el) => {
+          {[...pools, ...vswimlanes, ...otherContainers].filter(el => !inActiveGroup(el.id)).map((el) => {
             const isMsgTarget =
               (isDraggingConnector && isBpmnSource &&
                 el.type === "pool" && el.id !== draggingSourcePoolId &&
@@ -4877,6 +4909,46 @@ export function Canvas({
               );
             });
           })}
+
+          {/* Vertical-swimlane boundary handles — shared dividers between
+              columns, the outer left / right edges, and the single shared
+              bottom (drags all columns' height together). */}
+          {vswimlanes.length > 0 && !readOnly && (() => {
+            const band = vswimlanes; // already sorted by x, share y + height
+            const top = band[0].y;
+            const bandH = band[0].height;
+            const leftX = band[0].x;
+            const rightX = band[band.length - 1].x + band[band.length - 1].width;
+            const handles: React.ReactNode[] = [];
+            // Outer left edge
+            handles.push(
+              <rect key="vsl-left" x={leftX - 4} y={top} width={8} height={bandH}
+                fill="transparent" style={{ cursor: "ew-resize" }}
+                onMouseDown={(e) => handleVSwimlaneBoundaryDrag(e, "left")} />
+            );
+            // Outer right edge
+            handles.push(
+              <rect key="vsl-right" x={rightX - 4} y={top} width={8} height={bandH}
+                fill="transparent" style={{ cursor: "ew-resize" }}
+                onMouseDown={(e) => handleVSwimlaneBoundaryDrag(e, "right")} />
+            );
+            // Shared dividers between adjacent columns
+            band.slice(0, -1).forEach((col, i) => {
+              const bx = col.x + col.width;
+              handles.push(
+                <rect key={`vsl-div-${col.id}`} x={bx - 4} y={top} width={8} height={bandH}
+                  fill="transparent" style={{ cursor: "ew-resize" }}
+                  onMouseDown={(e) => handleVSwimlaneBoundaryDrag(e, "divider", col.id, band[i + 1].id)} />
+              );
+            });
+            // Shared bottom (spans whole band)
+            handles.push(
+              <rect key="vsl-bottom" x={leftX} y={top + bandH - 4} width={rightX - leftX} height={8}
+                fill="transparent" style={{ cursor: "ns-resize" }}
+                onMouseDown={(e) => handleVSwimlaneBoundaryDrag(e, "bottom")} />
+            );
+            return <>{handles}</>;
+          })()}
 
           {/* Expanded Subprocesses — rendered AFTER lanes / sublanes so EPs
               sit above the lane background (issue 5). Depth-sorted so a

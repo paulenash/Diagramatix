@@ -379,6 +379,7 @@ type Action =
   | { type: "ADD_LANE"; payload: { poolId: string } }
   | { type: "ADD_SUBLANE"; payload: { laneId: string } }
   | { type: "MOVE_LANE_BOUNDARY"; payload: { aboveLaneId: string; belowLaneId: string; dy: number } }
+  | { type: "MOVE_VSWIMLANE_BOUNDARY"; payload: { kind: "divider" | "left" | "right" | "bottom"; delta: number; leftId?: string; rightId?: string } }
   | { type: "REORDER_LANE"; payload: { laneId: string; direction: "up" | "down" } }
   | { type: "MOVE_ELEMENTS"; payload: { ids: string[]; dx: number; dy: number } }
   | { type: "APPLY_TEMPLATE"; payload: { elements: DiagramElement[]; connectors: Connector[] } }
@@ -399,7 +400,8 @@ function isContainerType(type: SymbolType): boolean {
   return type === "system-boundary" || type === "composite-state"
       || type === "pool" || type === "lane" || type === "subprocess-expanded"
       || type === "process-group"
-      || type === "archimate-shape";
+      || type === "archimate-shape"
+      || type === "flowchart-vswimlane";
 }
 
 const PROCESS_GROUP_CHILDREN = new Set<SymbolType>(["chevron", "chevron-collapsed", "process-group"]);
@@ -412,6 +414,8 @@ function containerAccepts(containerType: SymbolType, childType: SymbolType): boo
   if (containerType === "subprocess-expanded") return BPMN_CONTENT_TYPES.has(childType);
   if (containerType === "process-group") return PROCESS_GROUP_CHILDREN.has(childType);
   if (containerType === "archimate-shape") return childType === "archimate-shape";
+  // A vertical swimlane column holds any flowchart symbol except another column.
+  if (containerType === "flowchart-vswimlane") return childType.startsWith("flowchart-") && childType !== "flowchart-vswimlane";
   return false;
 }
 
@@ -3485,6 +3489,39 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         }
       }
 
+      // ── Vertical swimlane drop intercept ────────────────────────────
+      // The "Swimlane" palette symbol forms a single horizontal band of
+      // columns. The first drop creates a column at the cursor; every later
+      // drop appends a new column flush to the right of the rightmost one,
+      // sharing the band's top (y) and height so they stay the same length.
+      if (action.payload.symbolType === "flowchart-vswimlane") {
+        const vdef = getSymbolDefinition("flowchart-vswimlane");
+        const existing = state.elements
+          .filter((e) => e.type === "flowchart-vswimlane")
+          .sort((a, b) => a.x - b.x);
+        const HEADER_H = 36;
+        if (existing.length === 0) {
+          const w = vdef.defaultWidth, h = vdef.defaultHeight;
+          const col: DiagramElement = {
+            id: action.payload.id ?? nanoid(), type: "flowchart-vswimlane",
+            x: Math.round(action.payload.position.x - w / 2),
+            y: Math.round(action.payload.position.y - h / 2),
+            width: w, height: h, label: "Swimlane 1",
+            properties: { vlaneHeaderHeight: HEADER_H },
+          };
+          return { ...state, elements: [...state.elements, col] };
+        }
+        const last = existing[existing.length - 1];
+        const col: DiagramElement = {
+          id: action.payload.id ?? nanoid(), type: "flowchart-vswimlane",
+          x: last.x + last.width, y: last.y,
+          width: vdef.defaultWidth, height: last.height,
+          label: `Swimlane ${existing.length + 1}`,
+          properties: { vlaneHeaderHeight: (last.properties?.vlaneHeaderHeight as number | undefined) ?? HEADER_H },
+        };
+        return { ...state, elements: [...state.elements, col] };
+      }
+
       const def = getSymbolDefinition(action.payload.symbolType);
       let label = def.label;
       if (action.payload.symbolType === "task") {
@@ -3820,6 +3857,29 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
           if (conn.sourceId !== id && conn.targetId !== id) return conn;
           return recomputeAllConnectors([conn], elements)[0] ?? conn;
         });
+        return { ...state, elements, connectors };
+      }
+
+      // CASE A1b: Moving a vertical swimlane column moves the WHOLE band
+      // (all columns) plus every element parented inside any column, so the
+      // locked band of columns translates as one rigid unit.
+      if (el.type === "flowchart-vswimlane") {
+        const dx = x - el.x, dy = y - el.y;
+        if (dx === 0 && dy === 0) return state;
+        const moveIds = new Set<string>();
+        for (const col of state.elements) {
+          if (col.type !== "flowchart-vswimlane") continue;
+          moveIds.add(col.id);
+          for (const d of getAllDescendantIds(state.elements, col.id)) moveIds.add(d);
+        }
+        const elements = state.elements.map((e) =>
+          moveIds.has(e.id) ? { ...e, x: e.x + dx, y: e.y + dy } : e,
+        );
+        const connectors = state.connectors.map((conn) =>
+          moveIds.has(conn.sourceId) || moveIds.has(conn.targetId)
+            ? (recomputeAllConnectors([conn], elements)[0] ?? conn)
+            : conn,
+        );
         return { ...state, elements, connectors };
       }
 
@@ -7807,6 +7867,56 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       return { ...state, elements, connectors };
     }
 
+    case "MOVE_VSWIMLANE_BOUNDARY": {
+      const { kind, delta, leftId, rightId } = action.payload;
+      const MIN_W = 80;
+      const MIN_BAND_H = 120;
+      const band = state.elements
+        .filter((e) => e.type === "flowchart-vswimlane")
+        .sort((a, b) => a.x - b.x);
+      if (band.length === 0) return state;
+
+      let elements = state.elements;
+      if (kind === "divider" && leftId && rightId) {
+        const left = band.find((e) => e.id === leftId);
+        const right = band.find((e) => e.id === rightId);
+        if (!left || !right) return state;
+        // Redistribute width: left grows, right shrinks and its left edge follows.
+        const d = Math.max(-(left.width - MIN_W), Math.min(right.width - MIN_W, delta));
+        if (d === 0) return state;
+        elements = elements.map((e) => {
+          if (e.id === leftId) return { ...e, width: e.width + d };
+          if (e.id === rightId) return { ...e, x: e.x + d, width: e.width - d };
+          return e;
+        });
+      } else if (kind === "left") {
+        // Drag the band's outer-left edge: first column resizes, others unmoved.
+        const first = band[0];
+        const d = Math.min(first.width - MIN_W, delta);
+        if (d === 0) return state;
+        elements = elements.map((e) =>
+          e.id === first.id ? { ...e, x: e.x + d, width: e.width - d } : e,
+        );
+      } else if (kind === "right") {
+        // Drag the band's outer-right edge: last column resizes.
+        const lastCol = band[band.length - 1];
+        const d = Math.max(-(lastCol.width - MIN_W), delta);
+        if (d === 0) return state;
+        elements = elements.map((e) =>
+          e.id === lastCol.id ? { ...e, width: e.width + d } : e,
+        );
+      } else if (kind === "bottom") {
+        // Drag the shared bottom: ALL columns change height together (top fixed).
+        const newH = Math.max(MIN_BAND_H, band[0].height + delta);
+        if (newH === band[0].height) return state;
+        const bandIds = new Set(band.map((e) => e.id));
+        elements = elements.map((e) =>
+          bandIds.has(e.id) ? { ...e, height: newH } : e,
+        );
+      }
+      return { ...state, elements };
+    }
+
     case "APPLY_TEMPLATE":
       return {
         ...state,
@@ -8520,6 +8630,14 @@ export function useDiagram(initialData: DiagramData) {
     dispatch({ type: "REORDER_LANE", payload: { laneId, direction } });
   }, []);
 
+  const moveVSwimlaneBoundary = useCallback(
+    (kind: "divider" | "left" | "right" | "bottom", delta: number, leftId?: string, rightId?: string) => {
+      if (!preLaneRef.current) preLaneRef.current = snapshotData();
+      dispatch({ type: "MOVE_VSWIMLANE_BOUNDARY", payload: { kind, delta, leftId, rightId } });
+    },
+    []
+  );
+
   const laneBoundaryMoveEnd = useCallback(() => {
     if (preLaneRef.current) {
       pushHistory(preLaneRef.current);
@@ -8689,6 +8807,7 @@ export function useDiagram(initialData: DiagramData) {
     addLane,
     addSublane,
     moveLaneBoundary,
+    moveVSwimlaneBoundary,
     reorderLane,
     laneBoundaryMoveEnd,
     undo,

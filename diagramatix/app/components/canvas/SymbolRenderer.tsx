@@ -1659,6 +1659,34 @@ function FlowchartMergeShape({ el }: { el: DiagramElement }) {
   const { x, y, width: w, height: h } = el;
   return <polygon points={`${x},${y} ${x + w},${y} ${x + w / 2},${y + h}`} fill={fcFill(el, colors)} stroke={FC_STROKE} strokeWidth={FC_SW} strokeLinejoin="round" />;
 }
+/** Vertical swimlane column: white body, black border, a top header strip with
+ *  a horizontal (un-rotated) centred label. Columns snap into a band and share
+ *  one height — that coordination lives in the reducer, not here. */
+export function getVSwimlaneHeaderHeight(el: DiagramElement): number {
+  const stored = el.properties?.vlaneHeaderHeight as number | undefined;
+  return typeof stored === "number" && stored > 0 ? stored : 36;
+}
+function FlowchartVSwimlaneShape({ el }: { el: DiagramElement }) {
+  const colors = useContext(SymbolColorCtx);
+  const { x, y, width: w, height: h } = el;
+  const hh = getVSwimlaneHeaderHeight(el);
+  const fill = fcFill(el, colors);
+  const lines = wrapText(el.label || "", Math.max(20, w - 12), 13);
+  const lineH = 15;
+  const startY = y + hh / 2 - ((lines.length - 1) * lineH) / 2;
+  return (
+    <g>
+      {/* body */}
+      <rect x={x} y={y} width={w} height={h} fill={fill} stroke={FC_STROKE} strokeWidth={FC_SW} />
+      {/* header strip */}
+      <rect x={x} y={y} width={w} height={hh} fill={fill} stroke={FC_STROKE} strokeWidth={FC_SW} />
+      {lines.map((ln, i) => (
+        <text key={i} x={x + w / 2} y={startY + i * lineH} textAnchor="middle" dominantBaseline="middle"
+          fontSize={13} fontWeight="bold" fill="#111111" style={{ pointerEvents: "none", userSelect: "none" }}>{ln}</text>
+      ))}
+    </g>
+  );
+}
 
 function SymbolShape({ el }: { el: DiagramElement }) {
   const mode = useContext(DisplayModeCtx);
@@ -1724,6 +1752,7 @@ function SymbolShape({ el }: { el: DiagramElement }) {
       case "flowchart-onpage":       return <FlowchartOnPageShape el={el} />;
       case "flowchart-offpage":      return <FlowchartOffPageShape el={el} />;
       case "flowchart-merge":        return <FlowchartMergeShape el={el} />;
+      case "flowchart-vswimlane":    return <FlowchartVSwimlaneShape el={el} />;
       default:                  return <TaskShape el={el} />;
     }
   })();
@@ -2174,10 +2203,10 @@ export function SymbolRenderer({
   const isWhiteBoxPool = element.type === "pool" &&
     ((element.properties.poolType as string | undefined) ?? "black-box") === "white-box";
   const isContainer = isBoundary || element.type === "composite-state" || isPoolLane; // gets resize handles
-  const canResize = element.type !== "lane"; // all types except lane can be resized
+  const canResize = element.type !== "lane" && element.type !== "flowchart-vswimlane"; // lanes + vertical swimlanes use custom boundary handles
   const isBoundaryStartOrEnd = !!element.boundaryHostId &&
     (element.type === "start-event" || element.type === "end-event");
-  const showLabel = element.type !== "initial-state" && element.type !== "final-state" && element.type !== "fork-join" && element.type !== "flowchart-decision" && !isBoundaryStartOrEnd;
+  const showLabel = element.type !== "initial-state" && element.type !== "final-state" && element.type !== "fork-join" && element.type !== "flowchart-decision" && element.type !== "flowchart-vswimlane" && !isBoundaryStartOrEnd;
 
   // Events / gateways / data objects render a SEPARATE external label below
   // the shape, edited inline via the isEditingGatewayLabel foreignObject.

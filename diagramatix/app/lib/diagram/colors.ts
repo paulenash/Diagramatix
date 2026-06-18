@@ -58,7 +58,7 @@ export const DEFAULT_SYMBOL_COLORS: Record<SymbolType, string> = {
   "flowchart-predefined": "#ffffff", "flowchart-preparation": "#ffffff", "flowchart-manual-input": "#ffffff",
   "flowchart-manual-op": "#ffffff", "flowchart-display": "#ffffff", "flowchart-delay": "#ffffff",
   "flowchart-database": "#ffffff", "flowchart-onpage": "#ffffff", "flowchart-offpage": "#ffffff",
-  "flowchart-merge": "#ffffff",
+  "flowchart-merge": "#ffffff", "flowchart-vswimlane": "#ffffff",
 };
 
 /** Black & white colour scheme: fills → white, lines/strokes → black. */
@@ -110,7 +110,7 @@ export const BW_SYMBOL_COLORS: Record<SymbolType, string> = {
   "flowchart-predefined": "#ffffff", "flowchart-preparation": "#ffffff", "flowchart-manual-input": "#ffffff",
   "flowchart-manual-op": "#ffffff", "flowchart-display": "#ffffff", "flowchart-delay": "#ffffff",
   "flowchart-database": "#ffffff", "flowchart-onpage": "#ffffff", "flowchart-offpage": "#ffffff",
-  "flowchart-merge": "#ffffff",
+  "flowchart-merge": "#ffffff", "flowchart-vswimlane": "#ffffff",
 };
 
 /** Return the effective colour for a symbol type, preferring the project config over defaults. */

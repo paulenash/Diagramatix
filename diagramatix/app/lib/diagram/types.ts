@@ -54,7 +54,8 @@ export type SymbolType =
   | "flowchart-database"
   | "flowchart-onpage"
   | "flowchart-offpage"
-  | "flowchart-merge";
+  | "flowchart-merge"
+  | "flowchart-vswimlane";
 
 export type BpmnTaskType =
   | "none"
