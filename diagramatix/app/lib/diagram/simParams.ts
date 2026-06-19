@@ -21,6 +21,13 @@ export interface SimAssignment {
   expr?: string;
 }
 
+/** Expanded-subprocess loop behaviour. Standard loop ("Do while…" / "Repeat
+ *  until…") repeats the body; multi-instance ("Repeat for each…") runs N
+ *  instances sequentially or in parallel. */
+export type LoopParams =
+  | { kind: "standard"; iterations?: SimDist; loopBackProb?: number; test?: "while" | "until" }
+  | { kind: "multi"; instances: SimDist; ordering: "sequential" | "parallel"; join?: "all"; };
+
 export interface ElementSimParams {
   // source events (BPSim ControlParameters: InterTriggerTimer / TriggerCount)
   arrival?: SimDist;

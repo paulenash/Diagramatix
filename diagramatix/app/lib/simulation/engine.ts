@@ -25,7 +25,14 @@ type EventType = "GENERATE" | "SERVICE_END" | "RESUME";
 interface Ev { type: EventType; nodeId: string; tokenId?: string }
 
 interface Pending { tokenId: string; nodeId: string; units: number; requestedAt: number }
-interface Token { id: string; enteredAt: number; props: Record<string, Value>; callStack: string[] }
+/** A subprocess scope instance a token is currently inside. `remaining` =
+ *  further body re-runs queued (standard loop / sequential MI); `loopBack` =
+ *  per-pass repeat probability (0..100); `parallel` marks a parallel-MI body
+ *  instance whose completion is counted by the join. */
+interface Frame { sub: string; scopeInst: string; remaining: number; loopBack?: number; parallel?: boolean }
+interface Token { id: string; enteredAt: number; props: Record<string, Value>; callStack: Frame[]; internal?: boolean }
+
+function cloneStack(s: Frame[]): Frame[] { return s.map((f) => ({ ...f })); }
 
 /** A token-movement event for the live replay player (green-token animation). */
 export type TraceEventKind = "spawn" | "enter" | "queue" | "service" | "exit";
@@ -43,10 +50,12 @@ export interface SimState {
   clock: number;
   rngCursor: number;
   nextTokenId: number;
+  nextScopeId: number;
   warmedUp: boolean;
   calendar: { heap: { time: number; seq: number; payload: Ev }[]; seqCounter: number };
   pools: Record<string, PoolState<Pending>>;
   tokens: Record<string, Token>;
+  joinCount: Record<string, number>;
   arrivalsByNode: Record<string, number>;
   acc: { arrived: number; completed: number; flowSum: number; flowCount: number; perNode: Record<string, NodeAcc> };
 }
@@ -58,6 +67,8 @@ export class Engine {
   private tokens = new Map<string, Token>();
   private rng: Rng;
   private nextTokenId = 0;
+  private nextScopeId = 0;
+  private joinCount = new Map<string, number>(); // parallel-MI scope instance → outstanding instances
   private warmedUp: boolean;
   private arrivalsByNode = new Map<string, number>();
   // accumulators
@@ -177,14 +188,93 @@ export class Engine {
     this.emit("enter", token.id, nodeId, viaEdgeId);
     this.applyAssignments(token, node);
     switch (node.kind) {
-      case "sink": return this.completeToken(token);
+      case "sink": return this.onReachEnd(token, node);
       case "delay":
         this.calendar.schedule(this.clock + (node.delay ? sample(node.delay, this.rng) : 0), { type: "RESUME", nodeId, tokenId: token.id });
         return;
       case "task": return this.startOrQueue(token, node);
       case "gateway": return this.routeGateway(token, node);
+      case "subprocess": return this.enterSubprocess(token, node);
       case "source": return this.moveNext(token, node);
     }
+  }
+
+  // ── Subprocess scopes: recurse into the inline body, with loop / MI ──────
+  private enterSubprocess(token: Token, node: SimNode): void {
+    if (!node.bodyStart) return this.moveNext(token, node); // empty body → pass through
+    const loop = node.loop;
+
+    if (loop?.kind === "multi" && loop.ordering === "parallel") {
+      // Spawn N concurrent body instances; the last to finish is the continuation.
+      const n = Math.max(1, Math.round(sample(loop.instances, this.rng)));
+      const scopeInst = `s${this.nextScopeId++}`;
+      this.joinCount.set(scopeInst, n);
+      for (let i = 0; i < n; i++) {
+        const clone: Token = {
+          id: `t${this.nextTokenId++}`, enteredAt: token.enteredAt, props: { ...token.props },
+          callStack: [...cloneStack(token.callStack), { sub: node.id, scopeInst, remaining: 0, parallel: true }],
+          internal: true,
+        };
+        this.tokens.set(clone.id, clone);
+        this.emit("spawn", clone.id, node.id);
+        this.enterNode(clone, node.bodyStart, undefined);
+      }
+      this.tokens.delete(token.id);
+      return;
+    }
+
+    // Standard loop or sequential MI: one token runs the body, possibly repeated.
+    let remaining = 0;
+    let loopBack: number | undefined;
+    if (loop?.kind === "standard") {
+      if (loop.iterations) remaining = Math.max(1, Math.round(sample(loop.iterations, this.rng))) - 1;
+      else loopBack = loop.loopBackProb ?? 0;
+    } else if (loop?.kind === "multi") {
+      remaining = Math.max(1, Math.round(sample(loop.instances, this.rng))) - 1;
+    }
+    token.callStack.push({ sub: node.id, scopeInst: `s${this.nextScopeId++}`, remaining, loopBack });
+    this.enterNode(token, node.bodyStart, undefined);
+  }
+
+  /** A sink: either the end of the current subprocess scope (return to parent,
+   *  loop, or join) or a genuine top-level completion. */
+  private onReachEnd(token: Token, node: SimNode): void {
+    const top = token.callStack[token.callStack.length - 1];
+    if (top && node.scope === top.sub) {
+      if (top.parallel) {
+        const left = (this.joinCount.get(top.scopeInst) ?? 1) - 1;
+        if (left > 0) { this.joinCount.set(top.scopeInst, left); this.completeInternal(token); return; }
+        // Last instance to finish becomes the real continuation token — it
+        // inherits the parent flow (shed the internal-instance flag) so its
+        // eventual completion counts, then carries on from the subprocess.
+        this.joinCount.delete(top.scopeInst);
+        token.callStack.pop();
+        token.internal = token.callStack.some((f) => f.parallel); // still internal only if nested in another parallel scope
+        return this.continueFromSub(token, top.sub);
+      }
+      if (top.remaining > 0) { top.remaining--; return this.reenterBody(token, top.sub); }
+      if (top.loopBack !== undefined && this.rng.next() * 100 < top.loopBack) return this.reenterBody(token, top.sub);
+      token.callStack.pop();
+      return this.continueFromSub(token, top.sub);
+    }
+    this.completeToken(token);
+  }
+
+  private reenterBody(token: Token, subId: string): void {
+    const s = this.nodeById.get(subId);
+    if (s?.bodyStart) this.enterNode(token, s.bodyStart, undefined);
+    else this.continueFromSub(token, subId);
+  }
+
+  private continueFromSub(token: Token, subId: string): void {
+    const s = this.nodeById.get(subId);
+    if (s) this.moveNext(token, s);
+    else this.completeToken(token);
+  }
+
+  private completeInternal(token: Token): void {
+    this.emit("exit", token.id);
+    this.tokens.delete(token.id); // internal MI instance — no top-level stats
   }
 
   private startOrQueue(token: Token, node: SimNode): void {
@@ -242,7 +332,7 @@ export class Engine {
     if (node.gateway === "parallel" && out.length > 1) {
       // Parallel split: a clone per branch (join sync is a later phase).
       for (const e of out) {
-        const clone: Token = { id: `t${this.nextTokenId++}`, enteredAt: token.enteredAt, props: { ...token.props }, callStack: [...token.callStack] };
+        const clone: Token = { id: `t${this.nextTokenId++}`, enteredAt: token.enteredAt, props: { ...token.props }, callStack: cloneStack(token.callStack), internal: token.internal };
         this.tokens.set(clone.id, clone);
         this.enterNode(clone, e.target, e.id);
       }
@@ -272,7 +362,7 @@ export class Engine {
 
   private completeToken(token: Token): void {
     this.emit("exit", token.id);
-    if (this.warmedUp) { this.completed++; this.flowSum += this.clock - token.enteredAt; this.flowCount++; }
+    if (this.warmedUp && !token.internal) { this.completed++; this.flowSum += this.clock - token.enteredAt; this.flowCount++; }
     this.tokens.delete(token.id);
   }
 
@@ -316,17 +406,19 @@ export class Engine {
     const pools: Record<string, PoolState<Pending>> = {};
     for (const [id, p] of this.pools) pools[id] = p.toJSON();
     const tokens: Record<string, Token> = {};
-    for (const [id, t] of this.tokens) tokens[id] = { id: t.id, enteredAt: t.enteredAt, props: { ...t.props }, callStack: [...t.callStack] };
+    for (const [id, t] of this.tokens) tokens[id] = { id: t.id, enteredAt: t.enteredAt, props: { ...t.props }, callStack: cloneStack(t.callStack), internal: t.internal };
     const perNode: Record<string, NodeAcc> = {};
     for (const [id, a] of this.perNode) perNode[id] = { ...a };
     return {
       clock: this.clock,
       rngCursor: this.rng.snapshot(),
       nextTokenId: this.nextTokenId,
+      nextScopeId: this.nextScopeId,
       warmedUp: this.warmedUp,
       calendar: this.calendar.toJSON(),
       pools,
       tokens,
+      joinCount: Object.fromEntries(this.joinCount),
       arrivalsByNode: Object.fromEntries(this.arrivalsByNode),
       acc: { arrived: this.arrived, completed: this.completed, flowSum: this.flowSum, flowCount: this.flowCount, perNode },
     };
@@ -337,10 +429,12 @@ export class Engine {
     e.clock = snap.clock;
     e.rng.restore(snap.rngCursor);
     e.nextTokenId = snap.nextTokenId;
+    e.nextScopeId = snap.nextScopeId ?? 0;
     e.warmedUp = snap.warmedUp;
     e.calendar = EventCalendar.fromJSON<Ev>(snap.calendar);
     e.pools = new Map(Object.entries(snap.pools).map(([id, s]) => [id, ResourcePool.fromJSON<Pending>(s)]));
-    e.tokens = new Map(Object.entries(snap.tokens).map(([id, t]) => [id, { ...t, props: { ...t.props }, callStack: [...t.callStack] }]));
+    e.tokens = new Map(Object.entries(snap.tokens).map(([id, t]) => [id, { ...t, props: { ...t.props }, callStack: cloneStack(t.callStack), internal: t.internal }]));
+    e.joinCount = new Map(Object.entries(snap.joinCount ?? {}));
     e.arrivalsByNode = new Map(Object.entries(snap.arrivalsByNode));
     e.arrived = snap.acc.arrived; e.completed = snap.acc.completed;
     e.flowSum = snap.acc.flowSum; e.flowCount = snap.acc.flowCount;

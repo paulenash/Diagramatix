@@ -9,7 +9,14 @@
 
 import type { SimDist } from "./types";
 
-export type NodeKind = "source" | "task" | "gateway" | "delay" | "sink";
+export type NodeKind = "source" | "task" | "gateway" | "delay" | "sink" | "subprocess";
+
+/** Expanded-subprocess loop behaviour (engine form). Standard loop repeats the
+ *  body (a fixed iteration count, or a per-pass loop-back probability);
+ *  multi-instance runs N body instances sequentially or in parallel. */
+export type LoopSpec =
+  | { kind: "standard"; iterations?: SimDist; loopBackProb?: number }
+  | { kind: "multi"; instances: SimDist; ordering: "sequential" | "parallel" };
 
 /** Set a token property when a token passes through (BPSim PropertyParameters):
  *  value is either a distribution to sample or an expression to evaluate. */
@@ -24,6 +31,12 @@ export interface SimNode {
   label?: string;
   /** Diagram this node came from (for per-diagram roll-up + replay scoping). */
   diagramId?: string;
+  /** The subprocess (EP) this node is the body of — set on body nodes so a
+   *  token can tell when it has reached the end of the current scope. */
+  scope?: string;
+  // subprocess (expanded subprocess body)
+  bodyStart?: string;   // entry node of the inline body
+  loop?: LoopSpec;      // loop / multi-instance wrapping of the body
   // source
   arrival?: SimDist;
   maxArrivals?: number;
