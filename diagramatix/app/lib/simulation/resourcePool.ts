@@ -107,6 +107,13 @@ export class ResourcePool<R = unknown> {
     return granted;
   }
 
+  /** Remove queued requests whose payload matches `pred` (an interrupted token
+   *  that was waiting in line). Granted/in-service holders are unaffected. */
+  cancelWhere(now: number, pred: (payload: R) => boolean): void {
+    this.accrue(now);
+    this.queue = this.queue.filter((q) => !pred(q.payload));
+  }
+
   /** Restart statistics from `now` (used at warm-up end). */
   resetStats(now: number): void {
     this.accrue(now);

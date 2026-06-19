@@ -17,19 +17,19 @@ import { ResourcePool, type PoolState, type QueuedRequest } from "./resourcePool
 import { makeRng, type Rng } from "./rng";
 import { sample } from "./distributions";
 import { compileExpr, type CompiledExpr, type Value } from "./expr";
-import type { SimNetwork, SimNode, SimEdge } from "./model";
+import type { SimNetwork, SimNode, SimEdge, EventSub } from "./model";
 import type { SimRunConfig } from "./types";
 import type { RepStats, NodeStat } from "./statistics";
 
-type EventType = "GENERATE" | "SERVICE_END" | "RESUME";
-interface Ev { type: EventType; nodeId: string; tokenId?: string }
+type EventType = "GENERATE" | "SERVICE_END" | "RESUME" | "EVENT_TRIGGER";
+interface Ev { type: EventType; nodeId: string; tokenId?: string; scopeInst?: string; esubId?: string }
 
 interface Pending { tokenId: string; nodeId: string; units: number; requestedAt: number }
 /** A subprocess scope instance a token is currently inside. `remaining` =
  *  further body re-runs queued (standard loop / sequential MI); `loopBack` =
  *  per-pass repeat probability (0..100); `parallel` marks a parallel-MI body
  *  instance whose completion is counted by the join. */
-interface Frame { sub: string; scopeInst: string; remaining: number; loopBack?: number; parallel?: boolean }
+interface Frame { sub: string; scopeInst: string; remaining: number; loopBack?: number; parallel?: boolean; handler?: boolean; continueFrom?: string }
 interface Token { id: string; enteredAt: number; props: Record<string, Value>; callStack: Frame[]; internal?: boolean }
 
 function cloneStack(s: Frame[]): Frame[] { return s.map((f) => ({ ...f })); }
@@ -56,6 +56,9 @@ export interface SimState {
   pools: Record<string, PoolState<Pending>>;
   tokens: Record<string, Token>;
   joinCount: Record<string, number>;
+  activeScopes: string[];
+  cancelledTokens: string[];
+  inService: Record<string, { teamId: string; units: number }>;
   arrivalsByNode: Record<string, number>;
   acc: { arrived: number; completed: number; flowSum: number; flowCount: number; perNode: Record<string, NodeAcc> };
 }
@@ -69,6 +72,10 @@ export class Engine {
   private nextTokenId = 0;
   private nextScopeId = 0;
   private joinCount = new Map<string, number>(); // parallel-MI scope instance → outstanding instances
+  private activeScopes = new Set<string>();      // scope instances currently running (for event-sub triggers)
+  private cancelledTokens = new Set<string>();   // tokens whose pending events must be ignored (interrupt)
+  private inService = new Map<string, { teamId: string; units: number }>(); // resources a token currently holds
+  private esubById = new Map<string, EventSub>();
   private warmedUp: boolean;
   private arrivalsByNode = new Map<string, number>();
   // accumulators
@@ -103,6 +110,7 @@ export class Engine {
       for (const a of n.assign ?? []) {
         if ("expr" in a.value) this.assignCache.set(`${n.id}:${a.property}`, compileExpr(a.value.expr));
       }
+      for (const es of n.eventSubs ?? []) this.esubById.set(es.id, es);
     }
     for (const t of network.teams) this.pools.set(t.id, new ResourcePool<Pending>(t.capacity, 0));
   }
@@ -152,6 +160,8 @@ export class Engine {
   // ── Event handlers ──────────────────────────────────────────────────────
   private handle(ev: Ev): void {
     if (ev.type === "GENERATE") return this.onGenerate(ev.nodeId);
+    if (ev.type === "EVENT_TRIGGER") return this.onEventTrigger(ev.scopeInst!, ev.esubId!);
+    if (ev.tokenId && this.cancelledTokens.has(ev.tokenId)) return; // token was interrupted
     const token = ev.tokenId ? this.tokens.get(ev.tokenId) : undefined;
     const node = this.nodeById.get(ev.nodeId);
     if (!token || !node) return;
@@ -232,8 +242,81 @@ export class Engine {
     } else if (loop?.kind === "multi") {
       remaining = Math.max(1, Math.round(sample(loop.instances, this.rng))) - 1;
     }
-    token.callStack.push({ sub: node.id, scopeInst: `s${this.nextScopeId++}`, remaining, loopBack });
+    const scopeInst = `s${this.nextScopeId++}`;
+    token.callStack.push({ sub: node.id, scopeInst, remaining, loopBack });
+    this.armEventSubs(node, scopeInst);
     this.enterNode(token, node.bodyStart, undefined);
+  }
+
+  /** Schedule each event subprocess's timer trigger for this scope instance. */
+  private armEventSubs(sub: SimNode, scopeInst: string): void {
+    if (!sub.eventSubs || sub.eventSubs.length === 0) return;
+    this.activeScopes.add(scopeInst);
+    for (const es of sub.eventSubs) {
+      this.calendar.schedule(this.clock + sample(es.trigger, this.rng), { type: "EVENT_TRIGGER", nodeId: sub.id, scopeInst, esubId: es.id });
+    }
+  }
+
+  private onEventTrigger(scopeInst: string, esubId: string): void {
+    if (!this.activeScopes.has(scopeInst)) return; // parent scope already left — event missed
+    const es = this.esubById.get(esubId);
+    if (!es) return;
+
+    if (!es.interrupting) {
+      // Non-interrupting: a handler runs ALONGSIDE the parent (a new token).
+      const handler: Token = {
+        id: `t${this.nextTokenId++}`, enteredAt: this.clock, props: {},
+        callStack: [{ sub: es.id, scopeInst: `s${this.nextScopeId++}`, remaining: 0, handler: true }],
+        internal: true,
+      };
+      this.tokens.set(handler.id, handler);
+      this.emit("spawn", handler.id, es.bodyStart);
+      this.enterNode(handler, es.bodyStart, undefined);
+      return;
+    }
+
+    // Interrupting: cancel the parent scope's in-flight work, then divert to the
+    // handler, which becomes the continuation after the subprocess.
+    this.activeScopes.delete(scopeInst);
+    let lower: Frame[] = [];
+    let parentSub: string | undefined;
+    let captured = false;
+    for (const t of [...this.tokens.values()]) {
+      const idx = t.callStack.findIndex((f) => f.scopeInst === scopeInst);
+      if (idx < 0) continue;
+      if (!captured) { lower = cloneStack(t.callStack.slice(0, idx)); parentSub = t.callStack[idx].sub; captured = true; }
+      this.cancelToken(t.id);
+    }
+    const handler: Token = {
+      id: `t${this.nextTokenId++}`, enteredAt: this.clock, props: {},
+      // continueFrom = the PARENT subprocess, so when the handler body ends the
+      // token resumes the outer flow after the (interrupted) subprocess.
+      callStack: [...lower, { sub: es.id, scopeInst: `s${this.nextScopeId++}`, remaining: 0, handler: true, continueFrom: parentSub }],
+      internal: lower.some((f) => f.parallel),
+    };
+    this.tokens.set(handler.id, handler);
+    this.emit("spawn", handler.id, es.bodyStart);
+    this.enterNode(handler, es.bodyStart, undefined);
+  }
+
+  /** Cancel a token: release/dequeue any resource it holds and ignore its
+   *  future scheduled event. */
+  private cancelToken(tokenId: string): void {
+    const held = this.inService.get(tokenId);
+    if (held) {
+      const pool = this.pools.get(held.teamId);
+      if (pool) for (const p of pool.release(this.clock, held.units)) {
+        const gt = this.tokens.get(p.tokenId), gn = this.nodeById.get(p.nodeId);
+        if (gt && gn) this.startService(gt, gn, this.clock - p.requestedAt);
+      }
+      this.inService.delete(tokenId);
+    } else {
+      // may be queued somewhere — drop its pending request from every pool
+      for (const pool of this.pools.values()) pool.cancelWhere(this.clock, (p) => p.tokenId === tokenId);
+    }
+    this.cancelledTokens.add(tokenId);
+    this.emit("exit", tokenId);
+    this.tokens.delete(tokenId);
   }
 
   /** A sink: either the end of the current subprocess scope (return to parent,
@@ -241,6 +324,16 @@ export class Engine {
   private onReachEnd(token: Token, node: SimNode): void {
     const top = token.callStack[token.callStack.length - 1];
     if (top && node.scope === top.sub) {
+      if (top.handler) {
+        token.callStack.pop();
+        if (top.continueFrom) {
+          // interrupting handler finished → resume the outer flow after the
+          // (interrupted) parent subprocess; it's now a real continuation token.
+          token.internal = token.callStack.some((f) => f.parallel);
+          return this.continueFromSub(token, top.continueFrom);
+        }
+        return this.completeInternal(token); // non-interrupting handler done
+      }
       if (top.parallel) {
         const left = (this.joinCount.get(top.scopeInst) ?? 1) - 1;
         if (left > 0) { this.joinCount.set(top.scopeInst, left); this.completeInternal(token); return; }
@@ -255,6 +348,7 @@ export class Engine {
       if (top.remaining > 0) { top.remaining--; return this.reenterBody(token, top.sub); }
       if (top.loopBack !== undefined && this.rng.next() * 100 < top.loopBack) return this.reenterBody(token, top.sub);
       token.callStack.pop();
+      this.activeScopes.delete(top.scopeInst);
       return this.continueFromSub(token, top.sub);
     }
     this.completeToken(token);
@@ -294,6 +388,7 @@ export class Engine {
 
   private startService(token: Token, node: SimNode, wait: number): void {
     this.emit("service", token.id, node.id);
+    if (node.teamId) this.inService.set(token.id, { teamId: node.teamId, units: node.units ?? 1 });
     if (this.warmedUp) {
       const acc = this.perNode.get(node.id) ?? { count: 0, waitSum: 0 };
       acc.count++; acc.waitSum += wait;
@@ -306,6 +401,7 @@ export class Engine {
   }
 
   private onServiceEnd(token: Token, node: SimNode): void {
+    this.inService.delete(token.id);
     if (node.teamId) {
       const pool = this.pools.get(node.teamId);
       if (pool) {
@@ -419,6 +515,9 @@ export class Engine {
       pools,
       tokens,
       joinCount: Object.fromEntries(this.joinCount),
+      activeScopes: [...this.activeScopes],
+      cancelledTokens: [...this.cancelledTokens],
+      inService: Object.fromEntries(this.inService),
       arrivalsByNode: Object.fromEntries(this.arrivalsByNode),
       acc: { arrived: this.arrived, completed: this.completed, flowSum: this.flowSum, flowCount: this.flowCount, perNode },
     };
@@ -435,6 +534,9 @@ export class Engine {
     e.pools = new Map(Object.entries(snap.pools).map(([id, s]) => [id, ResourcePool.fromJSON<Pending>(s)]));
     e.tokens = new Map(Object.entries(snap.tokens).map(([id, t]) => [id, { ...t, props: { ...t.props }, callStack: cloneStack(t.callStack), internal: t.internal }]));
     e.joinCount = new Map(Object.entries(snap.joinCount ?? {}));
+    e.activeScopes = new Set(snap.activeScopes ?? []);
+    e.cancelledTokens = new Set(snap.cancelledTokens ?? []);
+    e.inService = new Map(Object.entries(snap.inService ?? {}));
     e.arrivalsByNode = new Map(Object.entries(snap.arrivalsByNode));
     e.arrived = snap.acc.arrived; e.completed = snap.acc.completed;
     e.flowSum = snap.acc.flowSum; e.flowCount = snap.acc.flowCount;

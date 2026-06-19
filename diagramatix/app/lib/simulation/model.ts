@@ -18,6 +18,16 @@ export type LoopSpec =
   | { kind: "standard"; iterations?: SimDist; loopBackProb?: number }
   | { kind: "multi"; instances: SimDist; ordering: "sequential" | "parallel" };
 
+/** An Event Subprocess attached to an Expanded Subprocess: fires while the
+ *  parent scope is active. Non-interrupting runs a handler alongside the
+ *  parent; interrupting cancels the parent scope and diverts to the handler. */
+export interface EventSub {
+  id: string;
+  bodyStart: string;     // entry node of the handler body (body nodes scope = id)
+  trigger: SimDist;      // timer: delay from scope entry until the event fires
+  interrupting: boolean;
+}
+
 /** Set a token property when a token passes through (BPSim PropertyParameters):
  *  value is either a distribution to sample or an expression to evaluate. */
 export interface Assignment {
@@ -37,6 +47,7 @@ export interface SimNode {
   // subprocess (expanded subprocess body)
   bodyStart?: string;   // entry node of the inline body
   loop?: LoopSpec;      // loop / multi-instance wrapping of the body
+  eventSubs?: EventSub[]; // event subprocesses that may fire while this scope runs
   // source
   arrival?: SimDist;
   maxArrivals?: number;
