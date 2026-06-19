@@ -17,6 +17,7 @@ import type {
   UmlOperation,
 } from "@/app/lib/diagram/types";
 import { RichTextEditor } from "./RichTextEditor";
+import { SimulationSection } from "./SimulationSection";
 import { getCachedCatalogue, findShapeByKey, type ArchimateShapeEntry } from "@/app/lib/archimate/catalogue";
 
 // ArchiMate relationship metadata — maps the archi-* connector type to its
@@ -2917,6 +2918,7 @@ export function PropertiesPanel({
         </div>
       </div>
     )}
+      <SimulationSection element={element} onUpdateProperties={onUpdateProperties} />
     </div>
   );
 }

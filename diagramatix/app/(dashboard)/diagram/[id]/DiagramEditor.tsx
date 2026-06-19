@@ -25,6 +25,7 @@ import { Palette } from "@/app/components/canvas/Palette";
 import { PropertiesPanel } from "@/app/components/canvas/PropertiesPanel";
 import { captureTemplate, instantiateTemplate } from "@/app/lib/diagram/templates";
 import { ImpersonationBanner } from "@/app/components/ImpersonationBanner";
+import { SimulatorOverlay } from "@/app/components/simulation/SimulatorOverlay";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 import { InfoDialog } from "@/app/components/InfoDialog";
 import { DiagramTypeBadge } from "@/app/components/DiagramTypeBadge";
@@ -850,9 +851,12 @@ export function DiagramEditor({
   const [aiPanelGenerating, setAiPanelGenerating] = useState(false);
   const [aiPanelNarrativeGenerating, setAiPanelNarrativeGenerating] = useState(false);
   const [showPlanPanel, setShowPlanPanel] = useState(false);
+  const [showSimulator, setShowSimulator] = useState(false);
   // BPMN and Standard Flowchart both use the 2-phase Plan panel (plan → edit →
   // apply deterministic layout). Other types use the legacy one-shot AI panel.
   const usesPlanPanel = diagramType === "bpmn" || diagramType === "flowchart";
+  // The Simulator (Matrix-style process simulation) is offered for BPMN.
+  const supportsSimulator = diagramType === "bpmn";
   const [showSendReview, setShowSendReview] = useState(false);
   const [reviewSentMsg, setReviewSentMsg] = useState<string | null>(null);
 
@@ -2885,6 +2889,15 @@ export function DiagramEditor({
             AI Generate
           </button>
         )}
+        {!readOnly && supportsSimulator && (
+          <button
+            onClick={() => setShowSimulator(true)}
+            className="px-2 py-0.5 text-[11px] rounded border border-green-500 text-green-700 bg-black/0 hover:bg-green-50 font-mono tracking-wider"
+            title="Enter the Diagramatix Simulator — event-based process simulation"
+          >
+            ◈ Simulator
+          </button>
+        )}
         {/* Send for Review (Phase 2) — owner sends the diagram to one or
             more Collaboration Groups for feedback. */}
         {!readOnly && (
@@ -3455,6 +3468,10 @@ export function DiagramEditor({
             currentConnectors={data.connectors}
             onNarrativeGeneratingChange={setAiPanelNarrativeGenerating}
           />
+        )}
+
+        {showSimulator && (
+          <SimulatorOverlay diagramName={diagramName} onClose={() => setShowSimulator(false)} />
         )}
 
         {showPlanPanel && (

@@ -1,0 +1,46 @@
+"use client";
+
+/**
+ * The dramatic entry: types "Entering the Diagramatix Simulator…" then plays a
+ * short Matrix digital-rain burst, then hands off to the console. Skippable by
+ * click / any key. The rain component itself handles reduced-motion.
+ */
+
+import { useEffect, useRef, useState } from "react";
+import { MatrixRain } from "./matrix/MatrixRain";
+import { MatrixTypewriter } from "./matrix/MatrixChrome";
+
+export function SimulatorIntro({ onEnter }: { onEnter: () => void }) {
+  const [phase, setPhase] = useState<"typing" | "rain">("typing");
+  const done = useRef(false);
+  const enter = () => { if (!done.current) { done.current = true; onEnter(); } };
+
+  useEffect(() => {
+    const skip = () => enter();
+    window.addEventListener("keydown", skip);
+    return () => window.removeEventListener("keydown", skip);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <div
+      onClick={enter}
+      className="fixed inset-0 z-[60] bg-black overflow-hidden flex items-center justify-center cursor-pointer"
+    >
+      {phase === "rain" && <MatrixRain durationMs={1800} onDone={enter} />}
+      <div className="relative z-10 text-center px-6 pointer-events-none">
+        {phase === "typing" ? (
+          <MatrixTypewriter
+            text="Entering the Diagramatix Simulator…"
+            speedMs={45}
+            onDone={() => setPhase("rain")}
+            className="text-lg sm:text-2xl drop-shadow-[0_0_10px_rgba(74,222,128,0.6)]"
+          />
+        ) : (
+          <span className="font-mono text-green-400/80 text-sm tracking-widest">// initialising engine</span>
+        )}
+        <p className="mt-8 text-[10px] text-green-400/40 font-mono">click or press any key to skip</p>
+      </div>
+    </div>
+  );
+}

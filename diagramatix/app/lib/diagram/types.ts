@@ -216,6 +216,14 @@ export interface Connector {
   arrowAtSource?: boolean; // if true, open-directed arrow is shown at source end instead of target
   // Bottleneck indicator (sequence connectors only)
   bottleneck?: boolean;
+  // ── Simulation (schema 1.24) ──────────────────────────────────────────
+  // For an outgoing edge of a decision gateway: the branch probability
+  // (0..100, BPSim Probability) OR a routing condition expression (BPSim
+  // Condition, e.g. "getProperty('noOfIssues') > 0"). A gateway edge uses one
+  // or the other; an edge may be marked the default/else branch.
+  branchProbability?: number;
+  branchCondition?: string;
+  isDefaultFlow?: boolean;
 }
 
 export interface Viewport {
@@ -669,5 +677,14 @@ export interface TemplateData {
  *             button; previewed in-app). Round-trips through the existing
  *             flexible PropertiesType — no XSD structure change, documented
  *             there + version bump.
+ * 1.24      — BPMN process Simulation: per-element baseline parameters carried
+ *             in `element.properties.sim` (arrival/cycle/wait distributions,
+ *             team + resource units, token property assignments) and decision
+ *             branch routing on the Connector (`branchProbability` /
+ *             `branchCondition` / `isDefaultFlow`). All optional + additive;
+ *             rides the flexible PropertiesType. Simulation parameters
+ *             interchange via BPSim XML (see app/lib/simulation/bpsim/*) — the
+ *             core diagram XML/XSD export is unchanged; the BPSim mapping +
+ *             XSD note land with the BPSim interop slice.
  */
-export const SCHEMA_VERSION = "1.23";
+export const SCHEMA_VERSION = "1.24";
