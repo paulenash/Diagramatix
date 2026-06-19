@@ -1468,7 +1468,15 @@ export function Canvas({
           // Child/boundary event ↔ boundary event on ancestor → always associationBPMN
           const isChildToBoundary = isChildEventToBoundary;
 
-          if (isChildToBoundary) {
+          // Review Comments ALWAYS link via a non-directed review-comment-link,
+          // in every diagram type. Handle this FIRST so we never fall into a
+          // diagram-type-specific branch that diverts (e.g. the ArchiMate
+          // relationship picker, which would open a popup instead of linking)
+          // or that swaps endpoints (the hourglass rule). The reducer also
+          // enforces this, but the ArchiMate branch returns BEFORE reaching it.
+          if (sourceEl?.type === "review-comment" || targetEl.type === "review-comment") {
+            connType = "review-comment-link"; connRouting = "direct"; connDirection = "non-directed";
+          } else if (isChildToBoundary) {
             connType = "associationBPMN"; connRouting = "direct"; connDirection = "open-directed";
           } else if (isDataConn) {
             const isAnnotationConn =

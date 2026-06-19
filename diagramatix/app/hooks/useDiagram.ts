@@ -6084,6 +6084,36 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       const target = state.elements.find((el) => el.id === targetId);
       if (!source || !target) return state;
 
+      // ── Review Comments ────────────────────────────────────────────────
+      // A connector from OR to a Review Comment is ALWAYS a non-directed
+      // review-comment-link, in EVERY diagram type and regardless of the
+      // connector type the caller requested (sequence, association, flowline,
+      // transition, …). Build it directly and skip all the type-specific
+      // validation + element mutations below — none of which apply to a
+      // review link, and some of which would wrongly reject it or mutate the
+      // element it points at (e.g. converting a touched start-event).
+      if (source.type === "review-comment" || target.type === "review-comment") {
+        const rSrcSide = sourceSide ?? "right";
+        const rTgtSide = targetSide ?? "left";
+        const rSrcOff = sourceOffsetAlong ?? 0.5;
+        const rTgtOff = targetOffsetAlong ?? 0.5;
+        const { waypoints, sourceInvisibleLeader, targetInvisibleLeader } =
+          computeWaypoints(source, target, state.elements, rSrcSide, rTgtSide, "direct", rSrcOff, rTgtOff);
+        const reviewConnector: Connector = {
+          id: nanoid(),
+          sourceId, targetId,
+          sourceSide: rSrcSide, targetSide: rTgtSide,
+          sourceOffsetAlong: rSrcOff, targetOffsetAlong: rTgtOff,
+          type: "review-comment-link",
+          directionType: "non-directed",
+          routingType: "direct",
+          sourceInvisibleLeader, targetInvisibleLeader,
+          waypoints,
+          label: initialLabel,
+        };
+        return { ...state, connectors: [...state.connectors, reviewConnector] };
+      }
+
       // Data elements may only use associationBPMN connectors
       const isDataConn = DATA_ELEMENT_TYPES.has(source.type) || DATA_ELEMENT_TYPES.has(target.type);
 
