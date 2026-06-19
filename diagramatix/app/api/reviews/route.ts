@@ -14,9 +14,11 @@
  */
 
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { createNotifications } from "@/app/lib/notifications";
+import { getEffectiveUserId } from "@/app/lib/superuser";
 import {
   getReceivedForReviewDiagrams,
   getSentForReviewDiagrams,
@@ -27,9 +29,11 @@ export async function GET() {
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  // Honour SuperAdmin impersonation: show the impersonated user's review queue.
+  const effectiveUserId = getEffectiveUserId(session, await cookies());
   const [received, sent] = await Promise.all([
-    getReceivedForReviewDiagrams(session.user.id),
-    getSentForReviewDiagrams(session.user.id),
+    getReceivedForReviewDiagrams(effectiveUserId),
+    getSentForReviewDiagrams(effectiveUserId),
   ]);
   return NextResponse.json({ received, sent });
 }

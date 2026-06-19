@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
+import { getEffectiveUserId } from "@/app/lib/superuser";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -21,7 +23,9 @@ export async function GET(_req: Request, { params }: Params) {
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const userId = session.user.id;
+  // Honour SuperAdmin impersonation: owner/audience access is judged from the
+  // impersonated user's perspective so the admin sees what they would see.
+  const userId = getEffectiveUserId(session, await cookies());
   const { id } = await params;
 
   const bundle = await prisma.publicationBundle.findUnique({

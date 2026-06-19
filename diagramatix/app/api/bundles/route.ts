@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { walkForwardClosure } from "@/app/lib/diagram/linkClosure";
+import { getEffectiveUserId } from "@/app/lib/superuser";
 
 // RFC-lite email shape check — good enough to reject obvious typos in the
 // invite path. Real validation happens when Microsoft actually delivers
@@ -311,7 +313,9 @@ export async function GET() {
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const userId = session.user.id;
+  // Honour SuperAdmin impersonation: the "published by me" + "published to me"
+  // buckets must reflect the impersonated user, not the admin.
+  const userId = getEffectiveUserId(session, await cookies());
 
   const [created, audienceRows] = await Promise.all([
     prisma.publicationBundle.findMany({

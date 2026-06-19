@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { getDiagramAccess } from "@/app/lib/auth/orgContext";
+import { getEffectiveUserId } from "@/app/lib/superuser";
 import { ProcessView } from "./ProcessView";
 import type { DiagramData, DiagramType } from "@/app/lib/diagram/types";
 import { EMPTY_DIAGRAM } from "@/app/lib/diagram/types";
@@ -32,7 +34,10 @@ export default async function ProcessPage({ params, searchParams }: Props) {
   const { id } = await params;
   const { bundle: bundleIdParam } = await searchParams;
 
-  const access = await getDiagramAccess(session.user.id, id);
+  // Honour SuperAdmin impersonation: judge access as the impersonated user so
+  // the admin can open exactly the published diagrams that user can.
+  const effectiveUserId = getEffectiveUserId(session, await cookies());
+  const access = await getDiagramAccess(effectiveUserId, id);
   if (!access) redirect("/dashboard");
 
   // Find the latest non-superseded PublishedVersion. If none exists this

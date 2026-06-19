@@ -1,8 +1,10 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { DiagramTypeBadge } from "@/app/components/DiagramTypeBadge";
+import { getEffectiveUserId } from "@/app/lib/superuser";
 
 // /processes/bundle/[id] — landing page for a Publication Bundle.
 // Shows the roots as tiles; clicking one opens the per-diagram viewer
@@ -16,7 +18,9 @@ type Props = { params: Promise<{ id: string }> };
 export default async function BundleIndexPage({ params }: Props) {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
-  const userId = session.user.id;
+  // Honour SuperAdmin impersonation: owner/audience access is judged as the
+  // impersonated user so the admin sees the bundle exactly as that user would.
+  const userId = getEffectiveUserId(session, await cookies());
 
   const { id } = await params;
 

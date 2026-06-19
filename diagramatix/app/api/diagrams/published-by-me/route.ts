@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
+import { getEffectiveUserId } from "@/app/lib/superuser";
 
 // GET /api/diagrams/published-by-me
 //
@@ -17,10 +19,13 @@ export async function GET() {
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  // Honour SuperAdmin impersonation: show the impersonated user's published
+  // diagrams, not the admin's own.
+  const effectiveUserId = getEffectiveUserId(session, await cookies());
 
   const diagrams = await prisma.diagram.findMany({
     where: {
-      diagramOwnerId: session.user.id,
+      diagramOwnerId: effectiveUserId,
       lifecycle: "PUBLISHED",
     },
     select: {
