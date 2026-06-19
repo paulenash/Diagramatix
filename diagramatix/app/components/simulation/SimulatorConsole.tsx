@@ -1,15 +1,22 @@
 "use client";
 
 /**
- * The Matrix-styled Simulator console shell. Phase 1 scaffold — the engine
- * core is online; the Teams / Studies / Scenarios / Run managers land in the
- * later phases. Faint ambient rain behind green-phosphor panels.
+ * The Matrix-styled Simulator console. Home shows the manager panels; the
+ * Run / Replay panel launches the live green-token replay + Operator console
+ * on the current diagram. Teams / Studies / Scenarios managers land in later
+ * phases.
  */
 
+import { useState } from "react";
+import type { DiagramData } from "@/app/lib/diagram/types";
 import { MatrixRain } from "./matrix/MatrixRain";
 import { MatrixButton, MatrixPanel } from "./matrix/MatrixChrome";
+import { ReplayView } from "./replay/ReplayView";
+import { defaultReplayConfig } from "@/app/lib/simulation/replaySource";
 
-export function SimulatorConsole({ diagramName, onClose }: { diagramName?: string; onClose: () => void }) {
+export function SimulatorConsole({ data, diagramName, onClose }: { data: DiagramData; diagramName?: string; onClose: () => void }) {
+  const [mode, setMode] = useState<"home" | "replay">("home");
+
   return (
     <div className="fixed inset-0 z-[60] bg-black text-green-400 font-mono overflow-hidden">
       <div className="absolute inset-0 opacity-15 pointer-events-none">
@@ -20,28 +27,36 @@ export function SimulatorConsole({ diagramName, onClose }: { diagramName?: strin
           <div className="flex items-center gap-3">
             <span className="text-green-300 tracking-[0.3em] text-sm">◈ DIAGRAMATIX SIMULATOR</span>
             {diagramName && <span className="text-green-400/50 text-xs">/ {diagramName}</span>}
+            {mode === "replay" && <button onClick={() => setMode("home")} className="text-green-400/60 text-xs hover:text-green-300">‹ back</button>}
           </div>
           <MatrixButton variant="danger" onClick={onClose}>✕ EXIT</MatrixButton>
         </header>
 
-        <main className="flex-1 overflow-auto p-6 grid gap-4 md:grid-cols-3 content-start">
-          <MatrixPanel title="Teams">
-            <p className="text-xs text-green-400/60">Shared capacity pools — coming online.</p>
-          </MatrixPanel>
-          <MatrixPanel title="Studies & Scenarios">
-            <p className="text-xs text-green-400/60">Portfolios + what-if scenarios — coming online.</p>
-          </MatrixPanel>
-          <MatrixPanel title="Run / Replay">
-            <p className="text-xs text-green-400/60">Live token replay + Operator console — coming online.</p>
-          </MatrixPanel>
-          <MatrixPanel title="Engine status" className="md:col-span-3">
-            <p className="text-xs text-green-400/70 leading-relaxed">
-              Discrete-event core <span className="text-green-300">ONLINE</span> · resumable · M/M/1-verified ·
-              BPSim-aligned. Annotate elements via <span className="text-green-300">Properties → ◈ Simulation</span>,
-              then runs + heat-maps will surface here.
-            </p>
-          </MatrixPanel>
-        </main>
+        {mode === "home" ? (
+          <main className="flex-1 overflow-auto p-6 grid gap-4 md:grid-cols-3 content-start">
+            <MatrixPanel title="Teams">
+              <p className="text-xs text-green-400/60">Shared capacity pools — coming online.</p>
+            </MatrixPanel>
+            <MatrixPanel title="Studies & Scenarios">
+              <p className="text-xs text-green-400/60">Portfolios + what-if scenarios — coming online.</p>
+            </MatrixPanel>
+            <MatrixPanel title="Run / Replay">
+              <p className="text-xs text-green-400/60 mb-3">Watch tokens flow through the process; intervene live.</p>
+              <MatrixButton onClick={() => setMode("replay")}>▶ Launch replay</MatrixButton>
+            </MatrixPanel>
+            <MatrixPanel title="Engine status" className="md:col-span-3">
+              <p className="text-xs text-green-400/70 leading-relaxed">
+                Discrete-event core <span className="text-green-300">ONLINE</span> · resumable · M/M/1-verified ·
+                BPSim-aligned. Annotate elements via <span className="text-green-300">Properties → ◈ Simulation</span>,
+                then launch the replay to watch the flow and fork the timeline.
+              </p>
+            </MatrixPanel>
+          </main>
+        ) : (
+          <main className="flex-1 overflow-hidden p-4">
+            <ReplayView data={data} config={defaultReplayConfig()} onClose={() => setMode("home")} />
+          </main>
+        )}
       </div>
     </div>
   );

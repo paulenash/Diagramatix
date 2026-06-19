@@ -3471,7 +3471,7 @@ export function DiagramEditor({
         )}
 
         {showSimulator && (
-          <SimulatorOverlay diagramName={diagramName} onClose={() => setShowSimulator(false)} />
+          <SimulatorOverlay data={data} diagramName={diagramName} onClose={() => setShowSimulator(false)} />
         )}
 
         {showPlanPanel && (

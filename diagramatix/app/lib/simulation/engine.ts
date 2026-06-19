@@ -27,6 +27,15 @@ interface Ev { type: EventType; nodeId: string; tokenId?: string }
 interface Pending { tokenId: string; nodeId: string; units: number; requestedAt: number }
 interface Token { id: string; enteredAt: number; props: Record<string, Value>; callStack: string[] }
 
+/** A token-movement event for the live replay player (green-token animation). */
+export type TraceEventKind = "spawn" | "enter" | "queue" | "service" | "exit";
+export interface TraceEvent { t: number; tokenId: string; kind: TraceEventKind; nodeId?: string; edgeId?: string }
+
+/** A live Operator intervention applied mid-run (the "reach in" levers). */
+export type Intervention =
+  | { kind: "capacity"; teamId: string; capacity: number }
+  | { kind: "inject"; nodeId: string; count: number };
+
 interface NodeAcc { count: number; waitSum: number }
 
 /** Fully serialisable run state — the snapshot payload. */
@@ -62,9 +71,15 @@ export class Engine {
   private outEdges = new Map<string, SimEdge[]>();
   private condCache = new Map<string, CompiledExpr>();
   private assignCache = new Map<string, CompiledExpr>();
+  // trace (for live replay) — opt-in, off for Monte-Carlo
+  private traceLog: TraceEvent[] = [];
+  private tracing = false;
+  private maxTrace = 200000;
 
-  constructor(private network: SimNetwork, private config: SimRunConfig, rng?: Rng) {
+  constructor(private network: SimNetwork, private config: SimRunConfig, rng?: Rng, opts?: { trace?: boolean; maxTrace?: number }) {
     this.rng = rng ?? makeRng(config.seed);
+    this.tracing = opts?.trace ?? false;
+    if (opts?.maxTrace) this.maxTrace = opts.maxTrace;
     this.warmedUp = config.warmUp <= 0;
     for (const n of network.nodes) this.nodeById.set(n.id, n);
     for (const e of network.edges) {
@@ -143,9 +158,10 @@ export class Engine {
     const token: Token = { id: `t${this.nextTokenId++}`, enteredAt: this.clock, props: this.initProps(), callStack: [] };
     this.tokens.set(token.id, token);
     if (this.warmedUp) this.arrived++;
+    this.emit("spawn", token.id, nodeId);
 
     const out = this.outEdges.get(nodeId);
-    if (out && out.length > 0) this.enterNode(token, out[0].target);
+    if (out && out.length > 0) this.enterNode(token, out[0].target, out[0].id);
     else this.completeToken(token);
 
     // Schedule the next arrival (unless we've hit maxArrivals).
@@ -155,9 +171,10 @@ export class Engine {
     }
   }
 
-  private enterNode(token: Token, nodeId: string): void {
+  private enterNode(token: Token, nodeId: string, viaEdgeId?: string): void {
     const node = this.nodeById.get(nodeId);
     if (!node) return this.completeToken(token);
+    this.emit("enter", token.id, nodeId, viaEdgeId);
     this.applyAssignments(token, node);
     switch (node.kind) {
       case "sink": return this.completeToken(token);
@@ -178,7 +195,7 @@ export class Engine {
         const pending: Pending = { tokenId: token.id, nodeId: node.id, units, requestedAt: this.clock };
         const granted = pool.request(this.clock, units, pending);
         if (granted) this.startService(token, node, 0);
-        // else: queued — service starts on a future release.
+        else this.emit("queue", token.id, node.id); // queued — service starts on a future release
         return;
       }
     }
@@ -186,6 +203,7 @@ export class Engine {
   }
 
   private startService(token: Token, node: SimNode, wait: number): void {
+    this.emit("service", token.id, node.id);
     if (this.warmedUp) {
       const acc = this.perNode.get(node.id) ?? { count: 0, waitSum: 0 };
       acc.count++; acc.waitSum += wait;
@@ -215,7 +233,7 @@ export class Engine {
   private moveNext(token: Token, node: SimNode): void {
     const out = this.outEdges.get(node.id);
     if (!out || out.length === 0) return this.completeToken(token);
-    this.enterNode(token, out[0].target);
+    this.enterNode(token, out[0].target, out[0].id);
   }
 
   private routeGateway(token: Token, node: SimNode): void {
@@ -226,14 +244,14 @@ export class Engine {
       for (const e of out) {
         const clone: Token = { id: `t${this.nextTokenId++}`, enteredAt: token.enteredAt, props: { ...token.props }, callStack: [...token.callStack] };
         this.tokens.set(clone.id, clone);
-        this.enterNode(clone, e.target);
+        this.enterNode(clone, e.target, e.id);
       }
       this.tokens.delete(token.id);
       return;
     }
     // Decision (or pass-through merge): choose exactly one edge.
     const chosen = this.chooseEdge(token, out);
-    this.enterNode(token, chosen.target);
+    this.enterNode(token, chosen.target, chosen.id);
   }
 
   private chooseEdge(token: Token, out: SimEdge[]): SimEdge {
@@ -253,6 +271,7 @@ export class Engine {
   }
 
   private completeToken(token: Token): void {
+    this.emit("exit", token.id);
     if (this.warmedUp) { this.completed++; this.flowSum += this.clock - token.enteredAt; this.flowCount++; }
     this.tokens.delete(token.id);
   }
@@ -327,6 +346,38 @@ export class Engine {
     e.flowSum = snap.acc.flowSum; e.flowCount = snap.acc.flowCount;
     e.perNode = new Map(Object.entries(snap.acc.perNode).map(([id, a]) => [id, { ...a }]));
     return e;
+  }
+
+  // ── Trace (live replay) + Operator interventions ────────────────────────
+  private emit(kind: TraceEventKind, tokenId: string, nodeId?: string, edgeId?: string): void {
+    if (this.tracing && this.traceLog.length < this.maxTrace) {
+      this.traceLog.push({ t: this.clock, tokenId, kind, nodeId, edgeId });
+    }
+  }
+
+  /** The recorded token-movement events (empty unless constructed with trace). */
+  getTrace(): TraceEvent[] { return this.traceLog; }
+  clearTrace(): void { this.traceLog = []; }
+
+  /** Apply a live Operator lever at the current clock — mutates running state,
+   *  then continues deterministically (the basis of "fork the timeline"). */
+  applyIntervention(iv: Intervention): void {
+    if (iv.kind === "capacity") {
+      const pool = this.pools.get(iv.teamId);
+      if (!pool) return;
+      for (const p of pool.setCapacity(this.clock, iv.capacity)) {
+        const t = this.tokens.get(p.tokenId), n = this.nodeById.get(p.nodeId);
+        if (t && n) this.startService(t, n, this.clock - p.requestedAt);
+      }
+    } else if (iv.kind === "inject") {
+      for (let i = 0; i < iv.count; i++) {
+        const token: Token = { id: `t${this.nextTokenId++}`, enteredAt: this.clock, props: this.initProps(), callStack: [] };
+        this.tokens.set(token.id, token);
+        if (this.warmedUp) this.arrived++;
+        this.emit("spawn", token.id, iv.nodeId);
+        this.enterNode(token, iv.nodeId);
+      }
+    }
   }
 
   get now(): number { return this.clock; }
