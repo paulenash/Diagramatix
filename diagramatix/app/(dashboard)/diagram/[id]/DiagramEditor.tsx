@@ -26,6 +26,7 @@ import { PropertiesPanel } from "@/app/components/canvas/PropertiesPanel";
 import { captureTemplate, instantiateTemplate } from "@/app/lib/diagram/templates";
 import { ImpersonationBanner } from "@/app/components/ImpersonationBanner";
 import { SimulatorOverlay } from "@/app/components/simulation/SimulatorOverlay";
+import { autofillSimulation } from "@/app/lib/simulation/autofill";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 import { InfoDialog } from "@/app/components/InfoDialog";
 import { DiagramTypeBadge } from "@/app/components/DiagramTypeBadge";
@@ -3471,7 +3472,16 @@ export function DiagramEditor({
         )}
 
         {showSimulator && (
-          <SimulatorOverlay data={data} diagramName={diagramName} onClose={() => setShowSimulator(false)} />
+          <SimulatorOverlay
+            data={data}
+            diagramName={diagramName}
+            onClose={() => setShowSimulator(false)}
+            onFillTestData={() => {
+              const { data: filled, filled: count } = autofillSimulation(data);
+              setData(filled);
+              return count;
+            }}
+          />
         )}
 
         {showPlanPanel && (

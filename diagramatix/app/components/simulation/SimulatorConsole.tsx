@@ -14,8 +14,11 @@ import { MatrixButton, MatrixPanel } from "./matrix/MatrixChrome";
 import { ReplayView } from "./replay/ReplayView";
 import { defaultReplayConfig } from "@/app/lib/simulation/replaySource";
 
-export function SimulatorConsole({ data, diagramName, onClose }: { data: DiagramData; diagramName?: string; onClose: () => void }) {
+export function SimulatorConsole({ data, diagramName, onClose, onFillTestData }: {
+  data: DiagramData; diagramName?: string; onClose: () => void; onFillTestData?: () => number;
+}) {
   const [mode, setMode] = useState<"home" | "replay">("home");
+  const [fillMsg, setFillMsg] = useState<string | null>(null);
 
   return (
     <div className="fixed inset-0 z-[60] bg-black text-green-400 font-mono overflow-hidden">
@@ -44,6 +47,20 @@ export function SimulatorConsole({ data, diagramName, onClose }: { data: Diagram
               <p className="text-xs text-green-400/60 mb-3">Watch tokens flow through the process; intervene live.</p>
               <MatrixButton onClick={() => setMode("replay")}>▶ Launch replay</MatrixButton>
             </MatrixPanel>
+            {onFillTestData && (
+              <MatrixPanel title="Test data" className="md:col-span-3">
+                <p className="text-xs text-green-400/60 mb-3">
+                  Populate any MISSING simulation values (arrival rates, cycle times, lane teams,
+                  decision branch %) so a partially-modelled process can be run. Existing values are kept.
+                </p>
+                <div className="flex items-center gap-3">
+                  <MatrixButton onClick={() => { const n = onFillTestData(); setFillMsg(`Filled ${n} attribute(s).`); }}>
+                    ⚙ Fill missing simulation data
+                  </MatrixButton>
+                  {fillMsg && <span className="text-green-300 text-xs">{fillMsg}</span>}
+                </div>
+              </MatrixPanel>
+            )}
             <MatrixPanel title="Engine status" className="md:col-span-3">
               <p className="text-xs text-green-400/70 leading-relaxed">
                 Discrete-event core <span className="text-green-300">ONLINE</span> · resumable · M/M/1-verified ·
