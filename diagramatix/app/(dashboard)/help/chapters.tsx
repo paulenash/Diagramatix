@@ -4434,4 +4434,128 @@ export const CHAPTERS: HelpChapter[] = [
       },
     ],
   },
+
+  /* ──────────────────────────────────────────────── Simulation ── */
+  {
+    slug: "simulation",
+    title: "Simulating Processes",
+    sections: [
+      {
+        body: (
+          <>
+            <p>
+              The <strong>Simulator</strong> runs your BPMN process as an{" "}
+              <strong>event-based (discrete-event) simulation</strong>: work
+              items (tokens) flow through the process over a simulated clock,
+              tasks compete for limited <strong>team capacity</strong>, queues
+              form, and <strong>wait times emerge</strong> from the contention.
+              It answers &ldquo;can this team cope with this workload, and where
+              are the bottlenecks?&rdquo;
+            </p>
+            <p className="mt-2">
+              Open it from the editor toolbar with the{" "}
+              <strong>◈ Simulator</strong> button (available on BPMN diagrams).
+              A short Matrix-style intro leads into the Simulator console.
+            </p>
+          </>
+        ),
+      },
+      {
+        heading: "Setup checklist — what every simulation needs",
+        body: (
+          <>
+            <p>A valid simulation needs values in three areas:</p>
+            <p className="mt-2 font-semibold">1 · Process (per element)</p>
+            <ul className="list-disc list-inside space-y-1 mt-1">
+              <li><strong>Start events</strong> — an <strong>inter-arrival time</strong> distribution (how often work enters), and optionally a max-arrivals cap.</li>
+              <li><strong>Tasks / sub-processes</strong> — a <strong>cycle (processing) time</strong> distribution; the <strong>team</strong> it uses and <strong>units required</strong>; optionally setup/wait time.</li>
+              <li><strong>Decision gateways</strong> — for each outgoing branch, a <strong>probability</strong> (the percentages must total 100) <em>or</em> a <strong>condition</strong>; mark one branch as the default.</li>
+              <li><strong>Delays / timer events</strong> — a <strong>delay</strong> distribution.</li>
+              <li><strong>End events</strong> — nothing required.</li>
+            </ul>
+            <p className="mt-2 font-semibold">2 · Entities (teams / resources)</p>
+            <ul className="list-disc list-inside space-y-1 mt-1">
+              <li>A <strong>team name</strong> and a <strong>capacity</strong> (how many people can work in parallel) — capacity is what makes queues form. Optionally cost and a working calendar.</li>
+            </ul>
+            <p className="mt-2 font-semibold">3 · Environment (run settings)</p>
+            <ul className="list-disc list-inside space-y-1 mt-1">
+              <li>A <strong>time unit</strong> (minutes / hours / days) that all durations are read in, a <strong>run length (horizon)</strong>, the number of <strong>replications</strong>, and a <strong>random seed</strong>. Optionally a warm-up period.</li>
+            </ul>
+          </>
+        ),
+      },
+      {
+        heading: "Step by step",
+        body: (
+          <ol className="list-decimal list-inside space-y-1">
+            <li>Open or draw a <strong>BPMN diagram</strong> (start event → tasks → gateways → end event).</li>
+            <li>Select an element. In the right-hand <strong>Properties</strong> panel, open the <strong>◈ Simulation</strong> section.</li>
+            <li>For each <strong>start event</strong>, set the <strong>inter-arrival time</strong>.</li>
+            <li>For each <strong>task</strong>, set the <strong>cycle time</strong>, the <strong>team</strong> id (e.g. <em>analysts</em>) and <strong>units required</strong>.</li>
+            <li>For each <strong>decision</strong>, set the outgoing branch <strong>percentages</strong> so they total 100 (or use conditions).</li>
+            <li>Decide each team&rsquo;s <strong>capacity</strong> (the shared Team library arrives in a later release; for now teams default to capacity 1).</li>
+            <li>Click <strong>◈ Simulator</strong>, then <strong>Run / Replay → Launch replay</strong>.</li>
+            <li>Watch the <strong>green tokens</strong> flow; tokens stacking at a task reveal a <strong>bottleneck</strong>. The clock is bottom-right.</li>
+          </ol>
+        ),
+      },
+      {
+        heading: "Watching the run & intervening (the Operator)",
+        body: (
+          <>
+            <p>
+              In the replay, use <strong>Play / Pause</strong>, the{" "}
+              <strong>speed</strong> slider (the slowed-down clock) and the{" "}
+              <strong>scrub bar</strong> to move through time.
+            </p>
+            <p className="mt-2">
+              As the <strong>Operator</strong> you can <strong>reach in and
+              change the world</strong>: at the current instant, add{" "}
+              <strong>capacity</strong> to a team or <strong>inject a surge</strong>{" "}
+              of work, and the run <strong>&ldquo;forks the timeline&rdquo;</strong>{" "}
+              — it re-runs from that moment with your change, so you can watch a
+              backlog clear (or build). Forks are deterministic: the same
+              change and seed always produce the same outcome.
+            </p>
+          </>
+        ),
+      },
+      {
+        heading: "Quickly testing a partial model — auto-fill",
+        body: (
+          <>
+            <p>
+              To try a process before you&rsquo;ve entered every number, open
+              the Simulator and use{" "}
+              <strong>⚙ Fill missing simulation data</strong>. It populates only
+              the values that are <strong>missing</strong> — source arrivals,
+              task cycle times, a team per swim-lane, and decision branch
+              percentages — and <strong>never overwrites</strong> anything you
+              entered. It reports how many attributes it filled.
+            </p>
+          </>
+        ),
+      },
+      {
+        heading: "Multiple processes & BPSim",
+        body: (
+          <>
+            <p>
+              When you simulate a <strong>set of related processes</strong>, give
+              the same <strong>team id</strong> to tasks across diagrams that
+              draw on the same people — they then share one capacity pool, so the
+              simulation shows whether that team is overloaded <em>across all</em>{" "}
+              the work. Keep one consistent time unit across the set, and make
+              sure sub-process links are in place so the whole chain is included.
+            </p>
+            <p className="mt-2">
+              The simulation parameters follow the industry{" "}
+              <strong>BPSim</strong> standard, so models can be exchanged with
+              other BPSim-compatible tools.
+            </p>
+          </>
+        ),
+      },
+    ],
+  },
 ];
