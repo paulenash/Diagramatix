@@ -9,11 +9,31 @@
 
 import { useState } from "react";
 import type { DiagramElement } from "@/app/lib/diagram/types";
-import { getSimParams, simPatch, type ElementSimParams } from "@/app/lib/diagram/simParams";
+import { getSimParams, simPatch, defaultDist, type ElementSimParams, type LoopParams, type SimDist } from "@/app/lib/diagram/simParams";
 import { DistributionInput } from "./DistributionInput";
 
 const SOURCE_TYPES = new Set(["start-event", "intermediate-event"]);
 const TASK_TYPES = new Set(["task", "subprocess", "subprocess-expanded"]);
+
+type LoopKind = "none" | "standard" | "mi-sequential" | "mi-parallel";
+function loopKindOf(loop?: LoopParams): LoopKind {
+  if (!loop) return "none";
+  if (loop.kind === "standard") return "standard";
+  return loop.ordering === "parallel" ? "mi-parallel" : "mi-sequential";
+}
+function loopDist(loop?: LoopParams): SimDist {
+  if (loop?.kind === "standard") return loop.iterations ?? { kind: "fixed", value: 2 };
+  if (loop?.kind === "multi") return loop.instances ?? { kind: "fixed", value: 3 };
+  return { kind: "fixed", value: 2 };
+}
+function makeLoop(kind: LoopKind, dist: SimDist): LoopParams | undefined {
+  switch (kind) {
+    case "none": return undefined;
+    case "standard": return { kind: "standard", iterations: dist };
+    case "mi-sequential": return { kind: "multi", instances: dist, ordering: "sequential" };
+    case "mi-parallel": return { kind: "multi", instances: dist, ordering: "parallel" };
+  }
+}
 
 export function SimulationSection({
   element,
@@ -26,9 +46,11 @@ export function SimulationSection({
   const sim = getSimParams(element);
   const patch = (p: Partial<ElementSimParams>) => onUpdateProperties(element.id, simPatch(element, p));
 
+  const isEP = element.type === "subprocess-expanded";
+  const isEventEP = isEP && element.properties?.subprocessType === "event";
   const isSource = SOURCE_TYPES.has(element.type);
-  const isTask = TASK_TYPES.has(element.type);
-  const applicable = isSource || isTask;
+  const isTask = TASK_TYPES.has(element.type) && !isEventEP; // event subs use their own controls
+  const applicable = isSource || isTask || isEventEP;
 
   return (
     <div className="border-t border-gray-200">
@@ -94,6 +116,47 @@ export function SimulationSection({
                   />
                 </Field>
               </div>
+            </>
+          )}
+
+          {isEP && !isEventEP && (
+            <Field label="Loop / multi-instance">
+              <div className="flex flex-col gap-1">
+                <select
+                  className="w-full px-1.5 py-0.5 text-[11px] border border-gray-300 rounded"
+                  value={loopKindOf(sim.loop)}
+                  onChange={(e) => patch({ loop: makeLoop(e.target.value as LoopKind, loopDist(sim.loop)) })}
+                >
+                  <option value="none">None (run body once)</option>
+                  <option value="standard">Standard loop (Do while…)</option>
+                  <option value="mi-sequential">Multi-instance — sequential</option>
+                  <option value="mi-parallel">Multi-instance — parallel</option>
+                </select>
+                {sim.loop && (
+                  <div>
+                    <span className="text-[10px] text-gray-500">
+                      {sim.loop.kind === "standard" ? "Iterations" : "Instance count"}
+                    </span>
+                    <DistributionInput
+                      value={loopDist(sim.loop)}
+                      onChange={(dist) => patch({ loop: makeLoop(loopKindOf(sim.loop), dist) })}
+                    />
+                  </div>
+                )}
+              </div>
+            </Field>
+          )}
+
+          {isEventEP && (
+            <>
+              <Field label="Event trigger (delay after scope starts)">
+                <DistributionInput value={sim.eventTrigger ?? defaultDist()} onChange={(eventTrigger) => patch({ eventTrigger })} />
+              </Field>
+              <p className="text-[10px] text-gray-400">
+                {element.properties?.interruptionType === "non-interrupting"
+                  ? "Non-interrupting: handler runs alongside the parent."
+                  : "Interrupting: cancels the parent scope and diverts to the handler."}
+              </p>
             </>
           )}
         </div>

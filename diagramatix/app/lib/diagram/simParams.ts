@@ -40,6 +40,10 @@ export interface ElementSimParams {
   resourceUnits?: number;
   // delay / timer
   delay?: SimDist;
+  // expanded subprocess loop / multi-instance
+  loop?: LoopParams;
+  // event subprocess: how long after the parent scope starts its trigger fires
+  eventTrigger?: SimDist;
   // token property assignments (BPSim PropertyParameters)
   assign?: SimAssignment[];
   // subprocess: simulate the linked/inline body, or use a black-box summary
