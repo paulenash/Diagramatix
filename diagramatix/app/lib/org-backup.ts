@@ -18,9 +18,9 @@
 import JSZip from "jszip";
 import { prisma } from "./db";
 import { SCHEMA_VERSION } from "./diagram/types";
+import { getBackupSchema, reviveDates } from "./backupSchema";
 import {
   FULL_BACKUP_KIND,
-  FULL_BACKUP_TABLE_ORDER,
   type FullBackupPayload,
   type FullRestoreResult,
   type AdditiveSelection,
@@ -29,31 +29,11 @@ import {
 
 const FULL_BACKUP_ENTRY = "full-backup.json";
 
-// Date columns per model that must round-trip ISO-string → Date on restore.
-// Mirrors DATE_FIELDS_BY_MODEL in full-backup.ts (kept local to avoid
-// widening that module's export surface).
-const DATE_FIELDS_BY_MODEL: Record<string, string[]> = {
-  Org:               ["createdAt"],
-  User:              ["resetTokenExpiry", "createdAt", "lastSeenAt", "subscriptionAssignedAt"],
-  UsageCounter:      ["updatedAt"],
-  OrgMember:         ["createdAt"],
-  Project:           ["createdAt", "updatedAt"],
-  Diagram:           ["createdAt", "updatedAt"],
-  DiagramHistory:    ["createdAt"],
-  DiagramTemplate:   ["createdAt", "updatedAt"],
-  Prompt:            ["planUpdatedAt", "createdAt", "updatedAt"],
-  DiagramRules:      ["createdAt", "updatedAt"],
-};
-
+// Timestamp columns to revive on restore come from the live catalog (so a new
+// Date column is handled automatically). Primed at the start of the restore.
+let _timestampColumns: Record<string, string[]> = {};
 function convertDates(model: string, row: Record<string, unknown>): Record<string, unknown> {
-  const fields = DATE_FIELDS_BY_MODEL[model];
-  if (!fields) return row;
-  const out: Record<string, unknown> = { ...row };
-  for (const f of fields) {
-    const v = out[f];
-    if (typeof v === "string") out[f] = new Date(v);
-  }
-  return out;
+  return reviveDates(model, row, _timestampColumns);
 }
 
 function shortCuid(): string {
@@ -108,6 +88,17 @@ export async function buildOrgBackup(
   onProgress?.("Prompt", prompts.length);
   const rules = await prisma.diagramRules.findMany({ where: { userId: { in: memberUserIds } } });
   onProgress?.("DiagramRules", rules.length);
+  // Entity Lists: this org's masters (orgId) + the per-project copies for the
+  // org's projects (projectId), plus their nodes.
+  const projectIdsForEntities = projects.map(p => p.id);
+  const entityLists = await prisma.entityList.findMany({
+    where: { OR: [{ orgId }, { projectId: { in: projectIdsForEntities } }] },
+  });
+  onProgress?.("EntityList", entityLists.length);
+  const entityNodes = entityLists.length > 0
+    ? await prisma.entityNode.findMany({ where: { listId: { in: entityLists.map(l => l.id) } } })
+    : [];
+  onProgress?.("EntityNode", entityNodes.length);
 
   // System config — only when a SuperAdmin requests a self-contained scoped
   // backup. OrgAdmin backups leave these empty (they restore into a system
@@ -135,7 +126,7 @@ export async function buildOrgBackup(
     exportedAt: new Date().toISOString(),
     kind: FULL_BACKUP_KIND,
     exportedBy,
-    tableOrder: FULL_BACKUP_TABLE_ORDER,
+    tableOrder: (await getBackupSchema()).insertOrder,
     // Org backups are a SUBSET of a full backup and are restored only via
     // the additive path (never wipe), so the publish/bundle/review/etc.
     // tables are intentionally empty here. They must still be present as
@@ -168,6 +159,8 @@ export async function buildOrgBackup(
       DiagramReview: 0,
       DiagramReviewer: 0,
       OwnershipTransfer: 0,
+      EntityList: entityLists.length,
+      EntityNode: entityNodes.length,
     },
     tables: {
       Org: serialise([org] as Record<string, unknown>[]),
@@ -197,6 +190,8 @@ export async function buildOrgBackup(
       DiagramReview: [],
       DiagramReviewer: [],
       OwnershipTransfer: [],
+      EntityList: serialise(entityLists as Record<string, unknown>[]),
+      EntityNode: serialise(entityNodes as Record<string, unknown>[]),
     },
   };
 
@@ -218,6 +213,14 @@ export function scopePayloadToOrg(payload: FullBackupPayload, orgId: string): Fu
   const projectIds = new Set(projects.map(p => String(p.id)));
   const diagrams = (payload.tables.Diagram as AnyRow[]).filter(d => String(d.orgId) === orgId);
   const diagramIds = new Set(diagrams.map(d => String(d.id)));
+  // Entity lists: org masters + the org's project copies; nodes follow lists.
+  const entityLists = ((payload.tables.EntityList as AnyRow[] | undefined) ?? []).filter(
+    l => String(l.orgId ?? "") === orgId || (l.projectId != null && projectIds.has(String(l.projectId))),
+  );
+  const entityListIds = new Set(entityLists.map(l => String(l.id)));
+  const entityNodes = ((payload.tables.EntityNode as AnyRow[] | undefined) ?? []).filter(
+    n => entityListIds.has(String(n.listId)),
+  );
   return {
     ...payload,
     tables: {
@@ -248,6 +251,8 @@ export function scopePayloadToOrg(payload: FullBackupPayload, orgId: string): Fu
       DiagramReview: [],
       DiagramReviewer: [],
       OwnershipTransfer: [],
+      EntityList: entityLists,
+      EntityNode: entityNodes,
     },
     // unused fields below kept from the original
     counts: {
@@ -277,6 +282,7 @@ export async function restoreOrgBackupAdditive(
   const inserted: Record<string, number> = {};
   log.push(`Org backup created ${payload.exportedAt} by ${payload.exportedBy}`);
   log.push("Restore mode: additive (into existing Org)");
+  _timestampColumns = (await getBackupSchema()).timestampColumns;
 
   const projectSet = new Set<string>(selection.projectIds);
   const diagramSet = new Set<string>(selection.diagramIds);
@@ -392,6 +398,48 @@ export async function restoreOrgBackupAdditive(
           data: { ...convertDates("DiagramTemplate", t), id: shortCuid(), userId: userIdMap.get(ownerId)! } as any,
         });
         inserted.DiagramTemplate = (inserted.DiagramTemplate ?? 0) + 1;
+      }
+      // Project-scoped Entity Lists for restored projects (the per-project
+      // copies that drive pool/lane naming). Org masters are NOT recreated —
+      // they live in the target org already. Provenance (sourceListId) is
+      // dropped so there's no dangling FK; node trees are re-id'd, with
+      // parentId remapped (a single createMany resolves the self-references).
+      const allLists = (payload.tables.EntityList as AnyRow[] | undefined) ?? [];
+      const allNodes = (payload.tables.EntityNode as AnyRow[] | undefined) ?? [];
+      const nodesByList = new Map<string, AnyRow[]>();
+      for (const n of allNodes) {
+        const k = String(n.listId);
+        (nodesByList.get(k) ?? nodesByList.set(k, []).get(k)!).push(n);
+      }
+      for (const l of allLists) {
+        const oldProjectId = l.projectId != null ? String(l.projectId) : null;
+        if (!oldProjectId || !projectSet.has(oldProjectId)) continue; // only restored project copies
+        const newListId = shortCuid();
+        await tx.entityList.create({
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          data: {
+            ...convertDates("EntityList", l),
+            id: newListId,
+            orgId: null,
+            projectId: projectIdMap.get(oldProjectId)!,
+            sourceListId: null,
+          } as any,
+        });
+        inserted.EntityList = (inserted.EntityList ?? 0) + 1;
+        const nodes = nodesByList.get(String(l.id)) ?? [];
+        if (nodes.length > 0) {
+          const nodeIdMap = new Map<string, string>();
+          for (const n of nodes) nodeIdMap.set(String(n.id), shortCuid());
+          const data = nodes.map((n) => ({
+            ...convertDates("EntityNode", n),
+            id: nodeIdMap.get(String(n.id))!,
+            listId: newListId,
+            parentId: n.parentId != null ? nodeIdMap.get(String(n.parentId)) ?? null : null,
+          }));
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          await tx.entityNode.createMany({ data: data as any[] });
+          inserted.EntityNode = (inserted.EntityNode ?? 0) + nodes.length;
+        }
       }
     });
   } catch (err) {

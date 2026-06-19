@@ -50,6 +50,21 @@ interface BackupDiagram {
   updatedAt: string;
 }
 
+/** A node in a project's Entity List, with its original id preserved as a
+ *  temp id so the parent/child tree can be re-linked after restore. */
+interface BackupEntityNode {
+  tmpId: string;
+  parentTmpId: string | null;
+  name: string;
+  level: string;
+  sortOrder: number;
+}
+interface BackupEntityList {
+  name: string;
+  kind: string;
+  nodes: BackupEntityNode[];
+}
+
 interface BackupProject {
   id: string;
   name: string;
@@ -60,6 +75,9 @@ interface BackupProject {
   createdAt: string;
   updatedAt: string;
   diagrams: BackupDiagram[];
+  // Per-project Entity Lists (drive pool/lane naming). Optional so older
+  // backup files still parse.
+  entityLists?: BackupEntityList[];
 }
 
 interface BackupTemplate {
@@ -130,6 +148,34 @@ export async function buildUserBackup(
   });
   onProgress?.("Diagrams", allDiagrams.length);
 
+  // Per-project Entity Lists + their node trees (one query each, grouped).
+  const projectIds = projectsRaw.map((p) => p.id);
+  const entityLists = projectIds.length > 0
+    ? await prisma.entityList.findMany({ where: { projectId: { in: projectIds } } })
+    : [];
+  const entityNodes = entityLists.length > 0
+    ? await prisma.entityNode.findMany({ where: { listId: { in: entityLists.map((l) => l.id) } }, orderBy: { sortOrder: "asc" } })
+    : [];
+  onProgress?.("Entity Lists", entityLists.length);
+  const nodesByList = new Map<string, typeof entityNodes>();
+  for (const n of entityNodes) (nodesByList.get(n.listId) ?? nodesByList.set(n.listId, []).get(n.listId)!).push(n);
+  const listsByProject = new Map<string, BackupEntityList[]>();
+  for (const l of entityLists) {
+    if (!l.projectId) continue;
+    const bl: BackupEntityList = {
+      name: l.name,
+      kind: String(l.kind),
+      nodes: (nodesByList.get(l.id) ?? []).map((n) => ({
+        tmpId: n.id,
+        parentTmpId: n.parentId ?? null,
+        name: n.name,
+        level: String(n.level),
+        sortOrder: n.sortOrder,
+      })),
+    };
+    (listsByProject.get(l.projectId) ?? listsByProject.set(l.projectId, []).get(l.projectId)!).push(bl);
+  }
+
   const projectIdSet = new Set(projectsRaw.map((p) => p.id));
   const projects: BackupProject[] = projectsRaw.map((p) => ({
     id: p.id,
@@ -143,6 +189,7 @@ export async function buildUserBackup(
     diagrams: allDiagrams
       .filter((d) => d.projectId === p.id)
       .map((d) => diagramToBackup(d)),
+    entityLists: listsByProject.get(p.id) ?? [],
   }));
 
   // Unfiled diagrams: not assigned to any (live) project
@@ -205,6 +252,12 @@ export async function buildUserBackup(
   });
 }
 
+/** A unique-enough id for pre-allocating EntityNode ids so a node tree's
+ *  parentId references can be re-linked within a single createMany. */
+function cuidish(): string {
+  return "c" + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function diagramToBackup(d: any): BackupDiagram {
   return {
@@ -230,6 +283,7 @@ export interface RestoreResult {
   templatesRestored: number;
   promptsRestored: number;
   promptsSkipped: number;
+  entityListsRestored: number;
   log: string[];
 }
 
@@ -282,6 +336,7 @@ export async function restoreUserBackup(
   let templatesRestored = 0;
   let promptsRestored = 0;
   let promptsSkipped = 0;
+  let entityListsRestored = 0;
 
   // The whole additive restore runs in ONE interactive transaction so a
   // mid-way failure rolls back to the pre-restore state instead of leaving
@@ -324,6 +379,31 @@ export async function restoreUserBackup(
       });
       oldToNewDiagramId.set(diag.id, newDiag.id);
       diagramsRestored++;
+    }
+
+    // Per-project Entity Lists — recreate with fresh ids; re-link each node
+    // tree via its temp ids (one createMany resolves the self-references).
+    for (const el of proj.entityLists ?? []) {
+      const newList = await tx.entityList.create({
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        data: { name: el.name, kind: el.kind as any, projectId: newProj.id },
+      });
+      if (el.nodes && el.nodes.length > 0) {
+        const nodeIdMap = new Map<string, string>();
+        for (const n of el.nodes) nodeIdMap.set(n.tmpId, cuidish());
+        await tx.entityNode.createMany({
+          data: el.nodes.map((n) => ({
+            id: nodeIdMap.get(n.tmpId)!,
+            listId: newList.id,
+            parentId: n.parentTmpId ? nodeIdMap.get(n.parentTmpId) ?? null : null,
+            name: n.name,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            level: n.level as any,
+            sortOrder: n.sortOrder,
+          })),
+        });
+      }
+      entityListsRestored++;
     }
   }
 
@@ -444,7 +524,8 @@ export async function restoreUserBackup(
     `✔ Restore complete: ${projectsRestored} project(s), ${diagramsRestored} diagram(s) ` +
       `in projects, ${unfiledDiagramsRestored} unfiled diagram(s), ${templatesRestored} template(s), ` +
       `${promptsRestored} prompt(s)` +
-      (promptsSkipped > 0 ? ` (${promptsSkipped} skipped as duplicates)` : ""),
+      (promptsSkipped > 0 ? ` (${promptsSkipped} skipped as duplicates)` : "") +
+      (entityListsRestored > 0 ? `, ${entityListsRestored} entity list(s)` : ""),
   );
 
   return {
@@ -454,6 +535,7 @@ export async function restoreUserBackup(
     templatesRestored,
     promptsRestored,
     promptsSkipped,
+    entityListsRestored,
     log,
   };
 }
