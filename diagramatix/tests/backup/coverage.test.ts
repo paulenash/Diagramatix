@@ -44,6 +44,8 @@ const SCOPED_OMITTED = new Set<string>([
   // whole simulation is a deliberate follow-up.
   "SimulationTeam", "SimulationStudy", "SimulationStudyRoot",
   "SimulationScenario", "SimulationRun",
+  // Global example catalog (not org/project-scoped, like Feature).
+  "SimulationExample",
 ]);
 
 describe("backup coverage", () => {

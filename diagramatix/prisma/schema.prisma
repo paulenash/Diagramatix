@@ -216,6 +216,8 @@ model User {
   pendingBundleInvitesSent      PendingBundleAudience[]    @relation("PendingBundleAudienceInviter")
   // Simulator (Phase 4) — studies this user created.
   simulationStudiesCreated      SimulationStudy[]          @relation("SimulationStudyAuthor")
+  // Simulator (Phase 6) — example catalog entries this user authored.
+  simulationExamplesCreated     SimulationExample[]        @relation("SimulationExampleAuthor")
 }
 
 model Project {
@@ -991,6 +993,30 @@ model SimulationScenario {
   updatedAt  DateTime        @updatedAt
 
   @@index([studyId])
+}
+
+// An editable, extensible catalog entry: a worked example simulation a
+// simulation master can adopt into their own project to learn from. A global
+// catalog (not org/project-scoped) mirroring the Feature catalog — admins
+// CRUD entries, `published` gates visibility, `package` (JSON) holds the
+// portable bundle (annotated diagrams + team library + study + scenarios).
+// A seed populates the starter set; admins author more by capturing a project.
+model SimulationExample {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  title       String
+  concept     String   @default("")    // one-line tagline (the lesson)
+  description String   @default("")     // markdown walkthrough
+  difficulty  String   @default("core") // intro | core | advanced
+  sortOrder   Int      @default(0)
+  published   Boolean  @default(false)
+  package     Json     @default("{}")
+  createdById String?
+  createdBy   User?    @relation("SimulationExampleAuthor", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([published, sortOrder])
 }
 
 // One execution of a scenario — run history for comparison. Snapshots the
