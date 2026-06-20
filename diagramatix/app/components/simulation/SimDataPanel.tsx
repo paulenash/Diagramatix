@@ -219,7 +219,7 @@ function Section({ title, cols, children }: { title: string; cols: string[]; chi
     <div>
       <p className="text-green-400/70 uppercase tracking-widest text-[10px] mb-1">{title}</p>
       <div className="flex items-center gap-2 text-green-400/40 pb-0.5 border-b border-green-500/20">
-        {cols.map((c, i) => <span key={i} className={i === 1 ? "flex-1" : ""}>{c}</span>)}
+        {cols.map((c, i) => <span key={i} className={i === 1 ? "w-44 shrink-0" : ""}>{c}</span>)}
       </div>
       {children}
     </div>
@@ -228,6 +228,9 @@ function Section({ title, cols, children }: { title: string; cols: string[]; chi
 function Row({ children }: { children: React.ReactNode }) {
   return <div className="flex items-center gap-2 py-0.5 border-b border-green-500/10">{children}</div>;
 }
+// `grow` is the name column — a FIXED width sitting directly beside its
+// settings (not a flex-1 stretch that pushes the controls to the far edge), so
+// each element's name + its parameters read together.
 function Cell({ children, grow }: { children: React.ReactNode; grow?: boolean }) {
-  return <span className={grow ? "flex-1 text-green-300 truncate" : ""}>{children}</span>;
+  return <span className={grow ? "w-44 shrink-0 text-green-300 truncate" : ""}>{children}</span>;
 }
