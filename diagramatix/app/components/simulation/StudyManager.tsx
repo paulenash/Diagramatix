@@ -10,6 +10,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { MatrixButton } from "./matrix/MatrixChrome";
+import { ResultsReport } from "./results/ResultsReport";
+import { ScenarioCompare } from "./results/ScenarioCompare";
 import {
   DEFAULT_RUN_CONFIG,
   type ScenarioRunConfig,
@@ -149,6 +151,7 @@ function RootPicker({ diagrams, roots, onToggle }: { diagrams: DiagramLite[]; ro
 function ScenarioList({ projectId, detail, onChanged }: { projectId: string; detail: StudyDetail; onChanged: () => void }) {
   const [newName, setNewName] = useState("");
   const [openId, setOpenId] = useState<string | null>(null);
+  const [comparing, setComparing] = useState(false);
 
   const base = `/api/projects/${projectId}/simulation/studies/${detail.id}/scenarios`;
 
@@ -175,7 +178,19 @@ function ScenarioList({ projectId, detail, onChanged }: { projectId: string; det
 
   return (
     <div>
-      <p className="text-green-400/70 uppercase tracking-widest text-[10px] mb-1">Scenarios</p>
+      <div className="flex items-center justify-between mb-1">
+        <p className="text-green-400/70 uppercase tracking-widest text-[10px]">Scenarios</p>
+        {detail.scenarios.length >= 2 && (
+          <button onClick={() => setComparing((v) => !v)} className="text-green-400/70 hover:text-green-300 text-[10px]">
+            {comparing ? "▾ hide compare" : "⇄ compare scenarios"}
+          </button>
+        )}
+      </div>
+      {comparing && detail.scenarios.length >= 2 && (
+        <div className="border border-green-500/30 rounded p-2 mb-2">
+          <ScenarioCompare scenarios={detail.scenarios} runUrlFor={(sid) => `${base}/${sid}/run`} />
+        </div>
+      )}
       {detail.scenarios.length === 0 && <p className="text-green-400/40">No scenarios — add one below.</p>}
       <div className="flex flex-col gap-1">
         {detail.scenarios.map((s) => (
@@ -225,6 +240,8 @@ function ScenarioEditor({ scenario, runUrl, onSave }: { scenario: ScenarioRow; r
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<RunSummary | null>(null);
   const [runErr, setRunErr] = useState<string | null>(null);
+  const [showReport, setShowReport] = useState(false);
+  const [ran, setRan] = useState(0); // bump to refetch the report after a run
 
   async function runScenario() {
     setRunning(true); setRunErr(null); setResult(null);
@@ -244,6 +261,7 @@ function ScenarioEditor({ scenario, runUrl, onSave }: { scenario: ScenarioRow; r
         topBottleneck: top,
         topUtil: top ? stats?.perTeam?.[top]?.utilization?.mean ?? 0 : 0,
       });
+      setRan((n) => n + 1); // force the report to refetch the new run
     } catch (e) {
       setRunErr(e instanceof Error ? e.message : "Run failed");
     } finally { setRunning(false); }
@@ -322,7 +340,14 @@ function ScenarioEditor({ scenario, runUrl, onSave }: { scenario: ScenarioRow; r
               ? <span className="text-green-200">{result.topBottleneck} ({(result.topUtil * 100).toFixed(0)}% util)</span>
               : <span className="text-green-400/50">no resource pools</span>}
           </div>
-          <div className="text-green-400/40">Full heatmap + scenario comparison land next.</div>
+          <button onClick={() => setShowReport((v) => !v)} className="text-green-400/70 hover:text-green-300 self-start mt-0.5">
+            {showReport ? "▾ hide full results" : "▸ full results"}
+          </button>
+        </div>
+      )}
+      {showReport && (
+        <div className="border border-green-500/30 rounded p-2 mt-1">
+          <ResultsReport key={ran} runUrl={runUrl} />
         </div>
       )}
     </div>

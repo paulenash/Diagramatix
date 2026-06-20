@@ -106,7 +106,11 @@ export async function POST(_req: Request, { params }: Params) {
     const bottlenecks = Object.entries(stats.perTeam)
       .sort((a, b) => b[1].utilization.mean - a[1].utilization.mean)
       .map(([teamId]) => teamId);
-    const metrics = { stats, bottlenecks };
+    // Node labels (+ kind) so the results report reads cleanly instead of
+    // showing namespaced ids.
+    const nodeLabels: Record<string, { label: string; kind: string }> = {};
+    for (const n of net.nodes) nodeLabels[n.id] = { label: n.label ?? n.id.split("::").pop() ?? n.id, kind: n.kind };
+    const metrics = { stats, bottlenecks, nodeLabels, clockUnit: cfg.clockUnit };
 
     const finished = await prisma.simulationRun.update({
       where: { id: run.id },
