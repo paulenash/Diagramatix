@@ -3483,6 +3483,7 @@ export function DiagramEditor({
               setData(filled);
               return count;
             }}
+            onApplyData={(next) => setData(next)}
           />
         )}
 

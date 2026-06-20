@@ -15,13 +15,13 @@ import { ReplayView } from "./replay/ReplayView";
 import { SimulationHeatmap } from "./results/SimulationHeatmap";
 import { TeamLibraryManager } from "./TeamLibraryManager";
 import { StudyManager } from "./StudyManager";
+import { SimDataPanel } from "./SimDataPanel";
 import { defaultReplayConfig } from "@/app/lib/simulation/replaySource";
 
-export function SimulatorConsole({ data, projectId, isAdmin, diagramName, onClose, onFillTestData }: {
-  data: DiagramData; projectId: string | null; isAdmin?: boolean; diagramName?: string; onClose: () => void; onFillTestData?: () => number;
+export function SimulatorConsole({ data, projectId, isAdmin, diagramName, onClose, onFillTestData, onApplyData }: {
+  data: DiagramData; projectId: string | null; isAdmin?: boolean; diagramName?: string; onClose: () => void; onFillTestData?: () => number; onApplyData?: (next: DiagramData) => void;
 }) {
   const [mode, setMode] = useState<"home" | "replay" | "heatmap">("home");
-  const [fillMsg, setFillMsg] = useState<string | null>(null);
   const [teamCapacities, setTeamCapacities] = useState<Record<string, number>>({});
 
   return (
@@ -54,20 +54,11 @@ export function SimulatorConsole({ data, projectId, isAdmin, diagramName, onClos
                 <MatrixButton onClick={() => setMode("heatmap")}>▦ Heatmap</MatrixButton>
               </div>
             </MatrixPanel>
-            {onFillTestData && (
-              <MatrixPanel title="Test data" className="md:col-span-3">
-                <p className="text-xs text-green-400/60 mb-3">
-                  Populate any MISSING simulation values (arrival rates, cycle times, lane teams,
-                  decision branch %) so a partially-modelled process can be run. Existing values are kept.
-                </p>
-                <div className="flex items-center gap-3">
-                  <MatrixButton onClick={() => { const n = onFillTestData(); setFillMsg(`Filled ${n} attribute(s).`); }}>
-                    ⚙ Fill missing simulation data
-                  </MatrixButton>
-                  {fillMsg && <span className="text-green-300 text-xs">{fillMsg}</span>}
-                </div>
-              </MatrixPanel>
-            )}
+            <MatrixPanel title="Simulation Data — see, edit, fill & clear" className="md:col-span-3">
+              {onApplyData
+                ? <SimDataPanel data={data} onApplyData={onApplyData} onFillMissing={onFillTestData} />
+                : <p className="text-xs text-green-400/60">Open this diagram from its editor to edit simulation data here.</p>}
+            </MatrixPanel>
             <MatrixPanel title="Engine status" className="md:col-span-3">
               <p className="text-xs text-green-400/70 leading-relaxed">
                 Discrete-event core <span className="text-green-300">ONLINE</span> · resumable · M/M/1-verified ·
