@@ -54,6 +54,35 @@ export const DEFAULT_RUN_CONFIG: SimRunConfig = {
   collectQueues: true,
 };
 
+/** A planned (timed) intervention — the deterministic, reproducible subset of
+ *  the Operator's levers, scheduled onto the calendar before the run. `t` is
+ *  in the scenario's clockUnit. `target` is a teamId / nodeId / edgeId per
+ *  kind; `value` is the new capacity / arrival multiplier / probability /
+ *  inject count; `duration` (capacity & outage) reverts the change after that
+ *  many clockUnits. */
+export type PlannedInterventionKind =
+  | "capacity"    // target=teamId, value=new capacity (duration → temporary surge/cut)
+  | "arrival"     // target=nodeId (source), value=rate multiplier
+  | "branchProb"  // target=edgeId, value=new probability 0..1
+  | "inject"      // target=nodeId, value=token count injected at t
+  | "outage";     // target=teamId, value=capacity during the outage (duration)
+
+export interface PlannedIntervention {
+  id: string;
+  t: number;
+  kind: PlannedInterventionKind;
+  target: string;
+  value: number;
+  duration?: number;
+  note?: string;
+}
+
+/** A scenario's run configuration = the base SimRunConfig plus any planned
+ *  interventions. Stored as JSON on SimulationScenario.runConfig. */
+export interface ScenarioRunConfig extends SimRunConfig {
+  interventions?: PlannedIntervention[];
+}
+
 /** A scheduled future event on the engine's calendar. `seq` is a monotonic
  *  insertion counter used purely as a deterministic tie-break for events at
  *  the same `time`. `payload` is engine-defined. */

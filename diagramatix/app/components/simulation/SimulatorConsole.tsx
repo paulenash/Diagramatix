@@ -13,6 +13,7 @@ import { MatrixRain } from "./matrix/MatrixRain";
 import { MatrixButton, MatrixPanel } from "./matrix/MatrixChrome";
 import { ReplayView } from "./replay/ReplayView";
 import { TeamLibraryManager } from "./TeamLibraryManager";
+import { StudyManager } from "./StudyManager";
 import { defaultReplayConfig } from "@/app/lib/simulation/replaySource";
 
 export function SimulatorConsole({ data, projectId, diagramName, onClose, onFillTestData }: {
@@ -42,8 +43,8 @@ export function SimulatorConsole({ data, projectId, diagramName, onClose, onFill
             <MatrixPanel title="Teams" className="md:col-span-2">
               <TeamLibraryManager projectId={projectId} onCapacities={setTeamCapacities} />
             </MatrixPanel>
-            <MatrixPanel title="Studies & Scenarios">
-              <p className="text-xs text-green-400/60">Portfolios + what-if scenarios — coming online.</p>
+            <MatrixPanel title="Studies & Scenarios" className="md:col-span-3">
+              <StudyManager projectId={projectId} />
             </MatrixPanel>
             <MatrixPanel title="Run / Replay">
               <p className="text-xs text-green-400/60 mb-3">Watch tokens flow through the process; intervene live.</p>
