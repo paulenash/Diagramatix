@@ -3474,6 +3474,7 @@ export function DiagramEditor({
         {showSimulator && (
           <SimulatorOverlay
             data={data}
+            projectId={projectId}
             diagramName={diagramName}
             onClose={() => setShowSimulator(false)}
             onFillTestData={() => {

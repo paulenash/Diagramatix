@@ -48,9 +48,10 @@ export function SimulationSection({
 
   const isEP = element.type === "subprocess-expanded";
   const isEventEP = isEP && element.properties?.subprocessType === "event";
+  const isLane = element.type === "lane" || element.type === "pool";
   const isSource = SOURCE_TYPES.has(element.type);
   const isTask = TASK_TYPES.has(element.type) && !isEventEP; // event subs use their own controls
-  const applicable = isSource || isTask || isEventEP;
+  const applicable = isSource || isTask || isEventEP || isLane;
 
   return (
     <div className="border-t border-gray-200">
@@ -144,6 +145,18 @@ export function SimulationSection({
                   </div>
                 )}
               </div>
+            </Field>
+          )}
+
+          {isLane && (
+            <Field label="Team for this lane (tasks inside inherit it)">
+              <input
+                type="text"
+                className="w-full px-1.5 py-0.5 text-[11px] border border-gray-300 rounded"
+                placeholder="e.g. analysts"
+                value={sim.teamId ?? ""}
+                onChange={(e) => patch({ teamId: e.target.value || undefined })}
+              />
             </Field>
           )}
 

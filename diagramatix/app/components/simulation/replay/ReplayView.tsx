@@ -21,8 +21,8 @@ const SIM_TYPES = new Set(["start-event", "end-event", "task", "subprocess", "su
 interface NodePos { id: string; cx: number; cy: number; x: number; y: number; w: number; h: number; label: string }
 interface Frame { t: number; nodeId: string }
 
-export function ReplayView({ data, config, onClose }: { data: DiagramData; config: SimRunConfig; onClose?: () => void }) {
-  const [replay, setReplay] = useState<ReplayData>(() => buildReplay(data, config));
+export function ReplayView({ data, config, teamCapacities, onClose }: { data: DiagramData; config: SimRunConfig; teamCapacities?: Record<string, number>; onClose?: () => void }) {
+  const [replay, setReplay] = useState<ReplayData>(() => buildReplay(data, config, teamCapacities));
   const [simT, setSimT] = useState(0);
   const [playing, setPlaying] = useState(true);
   const [speed, setSpeed] = useState(20);
@@ -101,16 +101,16 @@ export function ReplayView({ data, config, onClose }: { data: DiagramData; confi
 
   function forkCapacity() {
     if (!forkTeam) return;
-    setReplay(forkReplay(data, config, simT, { kind: "capacity", teamId: forkTeam, capacity: forkCap }));
+    setReplay(forkReplay(data, config, simT, { kind: "capacity", teamId: forkTeam, capacity: forkCap }, teamCapacities));
     setForked(true); setPlaying(true);
   }
   function forkInject() {
     const src = data.elements.find((e) => e.type === "start-event");
     if (!src) return;
-    setReplay(forkReplay(data, config, simT, { kind: "inject", nodeId: src.id, count: 10 }));
+    setReplay(forkReplay(data, config, simT, { kind: "inject", nodeId: src.id, count: 10 }, teamCapacities));
     setForked(true); setPlaying(true);
   }
-  function resetRun() { setReplay(buildReplay(data, config)); setSimT(0); setForked(false); setPlaying(true); }
+  function resetRun() { setReplay(buildReplay(data, config, teamCapacities)); setSimT(0); setForked(false); setPlaying(true); }
 
   return (
     <div className="flex flex-col h-full gap-2">

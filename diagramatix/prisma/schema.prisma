@@ -86,6 +86,7 @@ model Org {
   diagramRules        DiagramRules[]
   collaborationGroups CollaborationGroup[]
   entityLists         EntityList[]
+  simulationTeams     SimulationTeam[]
 }
 
 model OrgMember {
@@ -236,6 +237,7 @@ model Project {
   // Entity Lists (External Participants, Org Structure, IT Systems) — a
   // project's own copy, adopted from an org master and edited independently.
   entityLists EntityList[]
+  simulationTeams SimulationTeam[]
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
@@ -901,4 +903,31 @@ model EntityNode {
   updatedAt DateTime        @updatedAt
 
   @@index([listId, parentId, sortOrder])
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Simulation — a shared team (resource pool) the process Simulator draws on.
+// Mirrors the EntityList org-master → project-copy pattern: exactly one of
+// orgId / projectId is set; sourceTeamId tracks the org master a project copy
+// was cloned from. capacity is the pool size N (what makes queues form).
+// ────────────────────────────────────────────────────────────────────────────
+model SimulationTeam {
+  id           String   @id @default(cuid())
+  name         String
+  orgId        String?
+  org          Org?     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  projectId    String?
+  project      Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  sourceTeamId String?
+  sourceTeam   SimulationTeam?  @relation("SimulationTeamClone", fields: [sourceTeamId], references: [id], onDelete: SetNull)
+  clones       SimulationTeam[] @relation("SimulationTeamClone")
+  capacity     Int      @default(1)
+  costPerHour  Float?
+  efficiency   Float    @default(1.0)
+  calendar     Json     @default("{}")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([orgId])
+  @@index([projectId])
 }

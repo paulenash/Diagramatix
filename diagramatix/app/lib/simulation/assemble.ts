@@ -71,6 +71,20 @@ export function assembleFromDiagram(
     if (e.parentId) (childrenOf.get(e.parentId) ?? childrenOf.set(e.parentId, []).get(e.parentId)!).push(e);
   }
   const firstOutTarget = (id: string) => data.connectors.find((c) => c.sourceId === id)?.targetId;
+  /** Nearest ancestor lane/pool team — a task with no own team inherits it. */
+  const laneTeamOf = (el: DiagramElement): string | undefined => {
+    let cur = el.parentId ? byId.get(el.parentId) : undefined;
+    const seen = new Set<string>();
+    while (cur && !seen.has(cur.id)) {
+      seen.add(cur.id);
+      if (cur.type === "lane" || cur.type === "pool") {
+        const tid = getSimParams(cur).teamId;
+        if (tid) return tid;
+      }
+      cur = cur.parentId ? byId.get(cur.parentId) : undefined;
+    }
+    return undefined;
+  };
   /** Nearest ancestor EP — the scope a body node belongs to. */
   const scopeOf = (el: DiagramElement): string | undefined => {
     let cur = el.parentId ? byId.get(el.parentId) : undefined;
@@ -121,9 +135,10 @@ export function assembleFromDiagram(
       node.cycleTime = sim.cycleTime ?? DEFAULT_CYCLE;
       node.setupTime = sim.setupTime;
       node.waitTime = sim.waitTime;
-      node.teamId = sim.teamId;
+      const teamId = sim.teamId ?? laneTeamOf(el); // inherit the lane's team if none set
+      node.teamId = teamId;
       node.units = sim.resourceUnits ?? 1;
-      if (sim.teamId) teamIds.add(sim.teamId);
+      if (teamId) teamIds.add(teamId);
     } else if (kind === "delay") {
       node.delay = sim.delay ?? { kind: "fixed", value: 0 };
     } else if (kind === "gateway") {

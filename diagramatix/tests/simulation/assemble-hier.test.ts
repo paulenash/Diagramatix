@@ -80,3 +80,22 @@ describe("hierarchical assembler", () => {
     expect(r.perNode.ev_task.count).toBe(1); // event sub fired during the body
   });
 });
+
+describe("lane → team inheritance", () => {
+  it("a teamless task inherits its lane's team; explicit team wins", () => {
+    const laneData: DiagramData = {
+      viewport: { x: 0, y: 0, zoom: 1 },
+      elements: [
+        el("L1", "lane", { sim: { teamId: "ops" } }),
+        el("t1", "task", { sim: { cycleTime: { kind: "fixed", value: 1 } } }, { parentId: "L1" }),
+        el("t2", "task", { sim: { cycleTime: { kind: "fixed", value: 1 }, teamId: "special" } }, { parentId: "L1" }),
+      ],
+      connectors: [],
+    };
+    const n = assembleFromDiagram(laneData, { teamCapacities: { ops: 4, special: 2 } });
+    expect(n.nodes.find((x) => x.id === "t1")?.teamId).toBe("ops");      // inherited
+    expect(n.nodes.find((x) => x.id === "t2")?.teamId).toBe("special");  // own team kept
+    expect(n.teams.map((t) => t.id).sort()).toEqual(["ops", "special"]);
+    expect(n.teams.find((t) => t.id === "ops")?.capacity).toBe(4);      // real capacity
+  });
+});

@@ -38,6 +38,10 @@ const SCOPED_OMITTED = new Set<string>([
   "CollaborationGroup", "CollaborationGroupMember", "DiagramReview", "DiagramReviewer",
   "OwnershipTransfer", "ScannerRule", "SubscriptionLevel", "Feature", "BubbleHelp",
   "DiagramTypeStyle",
+  // Simulator: project/org-scoped teams. The full SuperAdmin backup carries
+  // these (catalog-driven); they join the SCOPED backups when Study/Scenario
+  // persistence lands (Phase 4) and project backups need to round-trip a sim.
+  "SimulationTeam",
 ]);
 
 describe("backup coverage", () => {

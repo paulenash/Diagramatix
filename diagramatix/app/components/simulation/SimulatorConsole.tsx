@@ -12,13 +12,15 @@ import type { DiagramData } from "@/app/lib/diagram/types";
 import { MatrixRain } from "./matrix/MatrixRain";
 import { MatrixButton, MatrixPanel } from "./matrix/MatrixChrome";
 import { ReplayView } from "./replay/ReplayView";
+import { TeamLibraryManager } from "./TeamLibraryManager";
 import { defaultReplayConfig } from "@/app/lib/simulation/replaySource";
 
-export function SimulatorConsole({ data, diagramName, onClose, onFillTestData }: {
-  data: DiagramData; diagramName?: string; onClose: () => void; onFillTestData?: () => number;
+export function SimulatorConsole({ data, projectId, diagramName, onClose, onFillTestData }: {
+  data: DiagramData; projectId: string | null; diagramName?: string; onClose: () => void; onFillTestData?: () => number;
 }) {
   const [mode, setMode] = useState<"home" | "replay">("home");
   const [fillMsg, setFillMsg] = useState<string | null>(null);
+  const [teamCapacities, setTeamCapacities] = useState<Record<string, number>>({});
 
   return (
     <div className="fixed inset-0 z-[60] bg-black text-green-400 font-mono overflow-hidden">
@@ -37,8 +39,8 @@ export function SimulatorConsole({ data, diagramName, onClose, onFillTestData }:
 
         {mode === "home" ? (
           <main className="flex-1 overflow-auto p-6 grid gap-4 md:grid-cols-3 content-start">
-            <MatrixPanel title="Teams">
-              <p className="text-xs text-green-400/60">Shared capacity pools — coming online.</p>
+            <MatrixPanel title="Teams" className="md:col-span-2">
+              <TeamLibraryManager projectId={projectId} onCapacities={setTeamCapacities} />
             </MatrixPanel>
             <MatrixPanel title="Studies & Scenarios">
               <p className="text-xs text-green-400/60">Portfolios + what-if scenarios — coming online.</p>
@@ -71,7 +73,7 @@ export function SimulatorConsole({ data, diagramName, onClose, onFillTestData }:
           </main>
         ) : (
           <main className="flex-1 overflow-hidden p-4">
-            <ReplayView data={data} config={defaultReplayConfig()} onClose={() => setMode("home")} />
+            <ReplayView data={data} config={defaultReplayConfig()} teamCapacities={teamCapacities} onClose={() => setMode("home")} />
           </main>
         )}
       </div>
