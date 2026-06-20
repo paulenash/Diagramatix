@@ -214,6 +214,8 @@ model User {
   publicationBundleAudience     PublicationBundleAudience[] @relation("PublicationBundleAudienceMember")
   publicationBundleGrantsMade   PublicationBundleAudience[] @relation("PublicationBundleAudienceAdder")
   pendingBundleInvitesSent      PendingBundleAudience[]    @relation("PendingBundleAudienceInviter")
+  // Simulator (Phase 4) — studies this user created.
+  simulationStudiesCreated      SimulationStudy[]          @relation("SimulationStudyAuthor")
 }
 
 model Project {
@@ -238,6 +240,7 @@ model Project {
   // project's own copy, adopted from an org master and edited independently.
   entityLists EntityList[]
   simulationTeams SimulationTeam[]
+  simulationStudies SimulationStudy[]
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
@@ -308,6 +311,8 @@ model Diagram {
   // (as a root or pulled in via link closure). Used by the access check
   // and the stale-closure detector.
   bundleMemberships             PublicationBundleDiagram[]
+  // Simulator (Phase 4) — studies that pick this diagram as a root.
+  simulationStudyRoots          SimulationStudyRoot[]
   nextReviewDate                DateTime?
   reviewCadenceMonths           Int?
   lastReviewDueNotifiedAt       DateTime?
@@ -930,4 +935,77 @@ model SimulationTeam {
 
   @@index([orgId])
   @@index([projectId])
+}
+
+// A simulation Study (the portfolio) — a named set of root diagrams whose
+// forward-link closure the engine assembles into one process network. Mirrors
+// PublicationBundle / PublicationBundleDiagram: project-scoped, the root set
+// frozen as join rows, the closure recomputed at assembly time.
+model SimulationStudy {
+  id          String                @id @default(cuid())
+  name        String
+  projectId   String
+  project     Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  // Nullable + SetNull (audit DATA-01) — the study outlives its author.
+  createdById String?
+  createdBy   User?                 @relation("SimulationStudyAuthor", fields: [createdById], references: [id], onDelete: SetNull)
+  roots       SimulationStudyRoot[]
+  scenarios   SimulationScenario[]
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+
+  @@index([projectId])
+  @@index([createdById])
+}
+
+// One row per root diagram the study expands. The engine walks each root's
+// forward-link closure at assembly; the stored set is just the picked roots.
+model SimulationStudyRoot {
+  id        String          @id @default(cuid())
+  studyId   String
+  study     SimulationStudy @relation(fields: [studyId], references: [id], onDelete: Cascade)
+  diagramId String
+  diagram   Diagram         @relation(fields: [diagramId], references: [id], onDelete: Cascade)
+  addedAt   DateTime        @default(now())
+
+  @@unique([studyId, diagramId])
+  @@index([diagramId])
+}
+
+// A what-if scenario inside a study (≙ BPSim Scenario). `runConfig` is the
+// SimRunConfig + planned interventions; `overrides` is the sparse OverrideSet
+// deep-merged over the assembled baseline (≙ BPSim `Scenario inherits`).
+// `status` is DRAFT | QUEUED | RUNNING | DONE | FAILED (String, not a DB enum,
+// so adding states stays a code change, not a migration).
+model SimulationScenario {
+  id         String          @id @default(cuid())
+  name       String
+  studyId    String
+  study      SimulationStudy @relation(fields: [studyId], references: [id], onDelete: Cascade)
+  isBaseline Boolean         @default(false)
+  runConfig  Json            @default("{}")
+  overrides  Json            @default("{}")
+  status     String          @default("DRAFT")
+  runs       SimulationRun[]
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+
+  @@index([studyId])
+}
+
+// One execution of a scenario — run history for comparison. Snapshots the
+// resolved config + assembled network so a run reproduces even if the model
+// later changes; `metrics` holds the aggregated results.
+model SimulationRun {
+  id              String             @id @default(cuid())
+  scenarioId      String
+  scenario        SimulationScenario @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
+  configSnapshot  Json               @default("{}")
+  networkSnapshot Json               @default("{}")
+  metrics         Json               @default("{}")
+  error           String?
+  startedAt       DateTime           @default(now())
+  finishedAt      DateTime?
+
+  @@index([scenarioId])
 }
