@@ -18,11 +18,15 @@ import { makeRng, type Rng } from "./rng";
 import { sample } from "./distributions";
 import { compileExpr, type CompiledExpr, type Value } from "./expr";
 import type { SimNetwork, SimNode, SimEdge, EventSub } from "./model";
-import type { SimRunConfig } from "./types";
+import type { SimRunConfig, PlannedIntervention } from "./types";
 import type { RepStats, NodeStat } from "./statistics";
 
-type EventType = "GENERATE" | "SERVICE_END" | "RESUME" | "EVENT_TRIGGER";
-interface Ev { type: EventType; nodeId: string; tokenId?: string; scopeInst?: string; esubId?: string }
+type EventType = "GENERATE" | "SERVICE_END" | "RESUME" | "EVENT_TRIGGER" | "INTERVENTION";
+/** Runtime form of a planned intervention carried on an INTERVENTION event.
+ *  A revert event (scheduled after a `duration`) is the same shape with the
+ *  captured prior value and no duration. */
+interface IvPayload { kind: PlannedIntervention["kind"]; target: string; value: number; duration?: number }
+interface Ev { type: EventType; nodeId: string; tokenId?: string; scopeInst?: string; esubId?: string; iv?: IvPayload }
 
 interface Pending { tokenId: string; nodeId: string; units: number; requestedAt: number }
 /** A subprocess scope instance a token is currently inside. `remaining` =
@@ -60,6 +64,9 @@ export interface SimState {
   cancelledTokens: string[];
   inService: Record<string, { teamId: string; units: number }>;
   arrivalsByNode: Record<string, number>;
+  // Applied-intervention state (so an Operator fork preserves timed changes).
+  arrivalMult?: Record<string, number>;
+  edgeProb?: Record<string, number>;
   acc: { arrived: number; completed: number; flowSum: number; flowCount: number; perNode: Record<string, NodeAcc> };
 }
 
@@ -78,6 +85,12 @@ export class Engine {
   private esubById = new Map<string, EventSub>();
   private warmedUp: boolean;
   private arrivalsByNode = new Map<string, number>();
+  // Planned-intervention runtime state (engine-local so the shared network is
+  // never mutated across replications): per-source arrival-rate multiplier and
+  // per-edge branch-probability override consulted during routing.
+  private arrivalMult = new Map<string, number>();
+  private edgeProb = new Map<string, number>();
+  private planned: PlannedIntervention[] = [];
   // accumulators
   private arrived = 0;
   private completed = 0;
@@ -94,10 +107,11 @@ export class Engine {
   private tracing = false;
   private maxTrace = 200000;
 
-  constructor(private network: SimNetwork, private config: SimRunConfig, rng?: Rng, opts?: { trace?: boolean; maxTrace?: number }) {
+  constructor(private network: SimNetwork, private config: SimRunConfig, rng?: Rng, opts?: { trace?: boolean; maxTrace?: number; planned?: PlannedIntervention[] }) {
     this.rng = rng ?? makeRng(config.seed);
     this.tracing = opts?.trace ?? false;
     if (opts?.maxTrace) this.maxTrace = opts.maxTrace;
+    if (opts?.planned) this.planned = opts.planned;
     this.warmedUp = config.warmUp <= 0;
     for (const n of network.nodes) this.nodeById.set(n.id, n);
     for (const e of network.edges) {
@@ -115,12 +129,19 @@ export class Engine {
     for (const t of network.teams) this.pools.set(t.id, new ResourcePool<Pending>(t.capacity, 0));
   }
 
-  /** Seed sources with their first arrival. */
+  /** Seed sources with their first arrival, and schedule any planned
+   *  (timed) interventions onto the calendar. */
   reset(): void {
+    this.arrivalMult.clear();
+    this.edgeProb.clear();
     for (const n of this.network.nodes) {
       if (n.kind === "source" && n.arrival) {
         this.calendar.schedule(this.clock + sample(n.arrival, this.rng), { type: "GENERATE", nodeId: n.id });
       }
+    }
+    for (const iv of this.planned) {
+      if (!Number.isFinite(iv.t) || iv.t < 0) continue;
+      this.calendar.schedule(iv.t, { type: "INTERVENTION", nodeId: iv.target, iv: { kind: iv.kind, target: iv.target, value: iv.value, duration: iv.duration } });
     }
   }
 
@@ -160,6 +181,7 @@ export class Engine {
   // ── Event handlers ──────────────────────────────────────────────────────
   private handle(ev: Ev): void {
     if (ev.type === "GENERATE") return this.onGenerate(ev.nodeId);
+    if (ev.type === "INTERVENTION") return this.applyPlanned(ev.iv!);
     if (ev.type === "EVENT_TRIGGER") return this.onEventTrigger(ev.scopeInst!, ev.esubId!);
     if (ev.tokenId && this.cancelledTokens.has(ev.tokenId)) return; // token was interrupted
     const token = ev.tokenId ? this.tokens.get(ev.tokenId) : undefined;
@@ -185,10 +207,13 @@ export class Engine {
     if (out && out.length > 0) this.enterNode(token, out[0].target, out[0].id);
     else this.completeToken(token);
 
-    // Schedule the next arrival (unless we've hit maxArrivals).
+    // Schedule the next arrival (unless we've hit maxArrivals). A planned
+    // "arrival" intervention scales the rate: multiplier m → interval ÷ m.
     const next = (this.arrivalsByNode.get(nodeId) ?? 0);
     if ((node.maxArrivals === undefined || next < node.maxArrivals) && node.arrival) {
-      this.calendar.schedule(this.clock + sample(node.arrival, this.rng), { type: "GENERATE", nodeId });
+      const mult = this.arrivalMult.get(nodeId) ?? 1;
+      const delay = sample(node.arrival, this.rng) / (mult > 0 ? mult : 1);
+      this.calendar.schedule(this.clock + delay, { type: "GENERATE", nodeId });
     }
   }
 
@@ -440,6 +465,12 @@ export class Engine {
     this.enterNode(token, chosen.target, chosen.id);
   }
 
+  /** Edge branch probability with any planned "branchProb" override applied
+   *  (engine-local, so the shared network edge is never mutated). */
+  private probOf(e: SimEdge): number | undefined {
+    return this.edgeProb.has(e.id) ? this.edgeProb.get(e.id) : e.probability;
+  }
+
   private chooseEdge(token: Token, out: SimEdge[]): SimEdge {
     // 1) first satisfied condition
     for (const e of out) {
@@ -447,10 +478,10 @@ export class Engine {
       if (c && c.evalBool({ props: token.props })) return e;
     }
     // 2) probability roulette (only if any probabilities are set)
-    if (out.some((e) => e.probability !== undefined)) {
+    if (out.some((e) => this.probOf(e) !== undefined)) {
       const r = this.rng.next();
       let acc = 0;
-      for (const e of out) { acc += e.probability ?? 0; if (r < acc) return e; }
+      for (const e of out) { acc += this.probOf(e) ?? 0; if (r < acc) return e; }
     }
     // 3) default / else, then first
     return out.find((e) => e.isDefault) ?? out.find((e) => !this.condCache.has(e.id)) ?? out[0];
@@ -519,6 +550,8 @@ export class Engine {
       cancelledTokens: [...this.cancelledTokens],
       inService: Object.fromEntries(this.inService),
       arrivalsByNode: Object.fromEntries(this.arrivalsByNode),
+      arrivalMult: Object.fromEntries(this.arrivalMult),
+      edgeProb: Object.fromEntries(this.edgeProb),
       acc: { arrived: this.arrived, completed: this.completed, flowSum: this.flowSum, flowCount: this.flowCount, perNode },
     };
   }
@@ -538,6 +571,8 @@ export class Engine {
     e.cancelledTokens = new Set(snap.cancelledTokens ?? []);
     e.inService = new Map(Object.entries(snap.inService ?? {}));
     e.arrivalsByNode = new Map(Object.entries(snap.arrivalsByNode));
+    e.arrivalMult = new Map(Object.entries(snap.arrivalMult ?? {}));
+    e.edgeProb = new Map(Object.entries(snap.edgeProb ?? {}));
     e.arrived = snap.acc.arrived; e.completed = snap.acc.completed;
     e.flowSum = snap.acc.flowSum; e.flowCount = snap.acc.flowCount;
     e.perNode = new Map(Object.entries(snap.acc.perNode).map(([id, a]) => [id, { ...a }]));
@@ -554,6 +589,51 @@ export class Engine {
   /** The recorded token-movement events (empty unless constructed with trace). */
   getTrace(): TraceEvent[] { return this.traceLog; }
   clearTrace(): void { this.traceLog = []; }
+
+  /** Apply a planned (timed) intervention fired off the calendar. `capacity`
+   *  and `outage` set a pool's capacity (and, with a duration, schedule a
+   *  revert to the captured prior value); `arrival` scales a source's rate;
+   *  `branchProb` overrides an edge's probability; `inject` spawns tokens.
+   *  All changes are engine-local so replications stay independent. */
+  private applyPlanned(iv: IvPayload): void {
+    switch (iv.kind) {
+      case "capacity":
+      case "outage": {
+        const pool = this.pools.get(iv.target);
+        if (!pool) return;
+        const prev = pool.currentCapacity;
+        for (const p of pool.setCapacity(this.clock, Math.max(0, Math.round(iv.value)))) {
+          const t = this.tokens.get(p.tokenId), n = this.nodeById.get(p.nodeId);
+          if (t && n) this.startService(t, n, this.clock - p.requestedAt);
+        }
+        if (iv.duration && iv.duration > 0) this.scheduleRevert(iv.target, { kind: "capacity", target: iv.target, value: prev }, iv.duration);
+        break;
+      }
+      case "arrival": {
+        const prev = this.arrivalMult.get(iv.target) ?? 1;
+        this.arrivalMult.set(iv.target, iv.value);
+        if (iv.duration && iv.duration > 0) this.scheduleRevert(iv.target, { kind: "arrival", target: iv.target, value: prev }, iv.duration);
+        break;
+      }
+      case "branchProb": {
+        // A revert carries NaN → drop the override and fall back to the edge's
+        // own probability.
+        if (Number.isNaN(iv.value)) { this.edgeProb.delete(iv.target); break; }
+        const prev = this.edgeProb.has(iv.target) ? this.edgeProb.get(iv.target)! : NaN;
+        this.edgeProb.set(iv.target, iv.value);
+        if (iv.duration && iv.duration > 0) this.scheduleRevert(iv.target, { kind: "branchProb", target: iv.target, value: prev }, iv.duration);
+        break;
+      }
+      case "inject":
+        this.applyIntervention({ kind: "inject", nodeId: iv.target, count: Math.max(0, Math.round(iv.value)) });
+        break;
+    }
+  }
+
+  /** Schedule the revert of a timed change `duration` clock-units from now. */
+  private scheduleRevert(target: string, payload: IvPayload, duration: number): void {
+    this.calendar.schedule(this.clock + duration, { type: "INTERVENTION", nodeId: target, iv: payload });
+  }
 
   /** Apply a live Operator lever at the current clock — mutates running state,
    *  then continues deterministically (the basis of "fork the timeline"). */

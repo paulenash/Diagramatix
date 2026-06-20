@@ -192,7 +192,7 @@ function ScenarioList({ projectId, detail, onChanged }: { projectId: string; det
             </div>
             {openId === s.id && (
               <div className="px-2 pb-2 border-t border-green-500/20 pt-2">
-                <ScenarioEditor scenario={s} onSave={(cfg) => patchScenario(s.id, { runConfig: cfg })} />
+                <ScenarioEditor scenario={s} runUrl={`${base}/${s.id}/run`} onSave={(cfg) => patchScenario(s.id, { runConfig: cfg })} />
               </div>
             )}
           </div>
@@ -210,10 +210,44 @@ function ScenarioList({ projectId, detail, onChanged }: { projectId: string; det
   );
 }
 
-function ScenarioEditor({ scenario, onSave }: { scenario: ScenarioRow; onSave: (cfg: ScenarioRunConfig) => void }) {
+interface RunSummary {
+  completed: number;
+  flowP50: number;
+  flowP95: number;
+  topBottleneck: string | null;
+  topUtil: number;
+}
+
+function ScenarioEditor({ scenario, runUrl, onSave }: { scenario: ScenarioRow; runUrl: string; onSave: (cfg: ScenarioRunConfig) => void }) {
   const initial: ScenarioRunConfig = { ...DEFAULT_RUN_CONFIG, ...(scenario.runConfig ?? {}) };
   const [cfg, setCfg] = useState<ScenarioRunConfig>(initial);
   const [dirty, setDirty] = useState(false);
+  const [running, setRunning] = useState(false);
+  const [result, setResult] = useState<RunSummary | null>(null);
+  const [runErr, setRunErr] = useState<string | null>(null);
+
+  async function runScenario() {
+    setRunning(true); setRunErr(null); setResult(null);
+    try {
+      // Persist the latest config first so the run uses what's on screen.
+      onSave(cfg); setDirty(false);
+      const res = await fetch(runUrl, { method: "POST" });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) { setRunErr(json.error ?? "Run failed"); return; }
+      const stats = json.run?.metrics?.stats;
+      const bottlenecks: string[] = json.run?.metrics?.bottlenecks ?? [];
+      const top = bottlenecks[0] ?? null;
+      setResult({
+        completed: stats?.completed?.mean ?? 0,
+        flowP50: stats?.flowTime?.p50 ?? 0,
+        flowP95: stats?.flowTime?.p95 ?? 0,
+        topBottleneck: top,
+        topUtil: top ? stats?.perTeam?.[top]?.utilization?.mean ?? 0 : 0,
+      });
+    } catch (e) {
+      setRunErr(e instanceof Error ? e.message : "Run failed");
+    } finally { setRunning(false); }
+  }
 
   const set = (patch: Partial<ScenarioRunConfig>) => { setCfg((c) => ({ ...c, ...patch })); setDirty(true); };
   const interventions = cfg.interventions ?? [];
@@ -274,8 +308,23 @@ function ScenarioEditor({ scenario, onSave }: { scenario: ScenarioRow; onSave: (
 
       <div className="flex items-center gap-3 pt-1">
         <MatrixButton onClick={() => { onSave(cfg); setDirty(false); }}>{dirty ? "Save config" : "Saved"}</MatrixButton>
-        <span className="text-green-400/40 text-[10px]">Running the Monte-Carlo + results arrive in Phase 5.</span>
+        <MatrixButton onClick={runScenario}>{running ? "◴ running…" : "▶ Run"}</MatrixButton>
       </div>
+      {runErr && <p className="text-red-400 text-[10px]">{runErr}</p>}
+      {result && (
+        <div className="border border-green-500/30 rounded p-2 mt-1 text-[10px] text-green-300/90 flex flex-col gap-0.5">
+          <div className="text-green-400/60 uppercase tracking-widest">Latest run · {cfg.replications} rep(s)</div>
+          <div>Completed (mean): <span className="text-green-200">{result.completed.toFixed(1)}</span></div>
+          <div>Flow time p50 / p95: <span className="text-green-200">{result.flowP50.toFixed(1)} / {result.flowP95.toFixed(1)}</span> {cfg.clockUnit}s</div>
+          <div>
+            Top bottleneck:{" "}
+            {result.topBottleneck
+              ? <span className="text-green-200">{result.topBottleneck} ({(result.topUtil * 100).toFixed(0)}% util)</span>
+              : <span className="text-green-400/50">no resource pools</span>}
+          </div>
+          <div className="text-green-400/40">Full heatmap + scenario comparison land next.</div>
+        </div>
+      )}
     </div>
   );
 }
