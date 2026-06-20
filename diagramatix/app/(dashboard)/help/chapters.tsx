@@ -4493,7 +4493,7 @@ export const CHAPTERS: HelpChapter[] = [
             <li>For each <strong>start event</strong>, set the <strong>inter-arrival time</strong>.</li>
             <li>For each <strong>task</strong>, set the <strong>cycle time</strong>, the <strong>team</strong> id (e.g. <em>analysts</em>) and <strong>units required</strong>.</li>
             <li>For each <strong>decision</strong>, set the outgoing branch <strong>percentages</strong> so they total 100 (or use conditions).</li>
-            <li>Decide each team&rsquo;s <strong>capacity</strong> (the shared Team library arrives in a later release; for now teams default to capacity 1).</li>
+            <li>In the Simulator console&rsquo;s <strong>Teams</strong> panel, add each team and set its <strong>capacity</strong> (how many can work in parallel) — capacity is what makes queues form.</li>
             <li>Click <strong>◈ Simulator</strong>, then <strong>Run / Replay → Launch replay</strong>.</li>
             <li>Watch the <strong>green tokens</strong> flow; tokens stacking at a task reveal a <strong>bottleneck</strong>. The clock is bottom-right.</li>
           </ol>
@@ -4537,21 +4537,115 @@ export const CHAPTERS: HelpChapter[] = [
         ),
       },
       {
+        heading: "The Team library",
+        body: (
+          <>
+            <p>
+              Teams are <strong>shared resource pools</strong>. In the Simulator
+              console&rsquo;s <strong>Teams</strong> panel, create each team and
+              set its <strong>capacity</strong>. A task uses a team by the{" "}
+              <strong>name</strong> you type in its <strong>◈ Simulation</strong>{" "}
+              section (or it inherits its swim-lane&rsquo;s team). Because the pool
+              is shared, two tasks — even on different diagrams — that name the
+              same team <strong>compete</strong> for it.
+            </p>
+          </>
+        ),
+      },
+      {
+        heading: "Studies, scenarios & what-ifs",
+        body: (
+          <>
+            <p>
+              A <strong>Study</strong> is a portfolio: pick one or more{" "}
+              <strong>root diagrams</strong> and the engine assembles them into a
+              single run that shares the team pools. Inside a study, create{" "}
+              <strong>Scenarios</strong> — each carries its own{" "}
+              <strong>run configuration</strong> (time unit, horizon, warm-up,
+              replications, seed) and a sparse set of <strong>overrides</strong>{" "}
+              (e.g. bump a team&rsquo;s capacity). Mark one scenario the{" "}
+              <strong>baseline</strong>; duplicate it to explore a variation.
+            </p>
+            <p className="mt-2">
+              Scenarios can also schedule <strong>planned interventions</strong> —
+              timed changes applied during the run: add capacity / cause an
+              outage at time <em>t</em>, scale an arrival rate, force a branch
+              probability, or inject a surge of work. These are the deterministic,
+              repeatable cousin of the live Operator.
+            </p>
+          </>
+        ),
+      },
+      {
+        heading: "Running it & reading the results",
+        body: (
+          <>
+            <p>
+              On a scenario, press <strong>▶ Run</strong>. The engine runs the
+              Monte-Carlo replications and shows a compact summary —{" "}
+              <strong>throughput</strong>, <strong>flow-time</strong> p50/p95, and
+              the <strong>top bottleneck</strong> team with its utilisation.
+            </p>
+            <p className="mt-2">
+              Open <strong>▸ full results</strong> for the report: per-team
+              utilisation &amp; queue (ranked by bottleneck), flow-time ranges,
+              and the busiest tasks by wait. With two or more scenarios, use{" "}
+              <strong>⇄ compare scenarios</strong> to see them side by side with{" "}
+              <strong>deltas vs the baseline</strong> — the quickest way to show
+              &ldquo;hiring two more clears the backlog&rdquo;.
+            </p>
+          </>
+        ),
+      },
+      {
+        heading: "The heatmap",
+        body: (
+          <>
+            <p>
+              In the console, <strong>▦ Heatmap</strong> runs a quick simulation
+              of the current diagram and tints each task by its team&rsquo;s{" "}
+              <strong>utilisation</strong> — the brighter the glow, the closer to
+              saturated. A small <strong>⧗ wait</strong> badge sits on each task
+              and the worst-wait task is ringed. It&rsquo;s the at-a-glance
+              &ldquo;where&rsquo;s the heat?&rdquo; view.
+            </p>
+          </>
+        ),
+      },
+      {
+        heading: "Ready-made examples",
+        body: (
+          <>
+            <p>
+              New to simulation? From the Dashboard&rsquo;s <strong>System</strong>{" "}
+              menu open <strong>Simulator Examples</strong> and pick one (single
+              bottleneck, a shared team across two processes, a surge
+              intervention). <strong>Load &amp; open</strong> copies it into a new
+              project of your own and drops you on its diagram — open the{" "}
+              <strong>◈ Simulator</strong> and Run, Replay or compare scenarios
+              straight away. They&rsquo;re a safe place to explore, and a fast way
+              to <strong>demo</strong>.
+            </p>
+          </>
+        ),
+      },
+      {
         heading: "Multiple processes & BPSim",
         body: (
           <>
             <p>
               When you simulate a <strong>set of related processes</strong>, give
-              the same <strong>team id</strong> to tasks across diagrams that
-              draw on the same people — they then share one capacity pool, so the
+              the same <strong>team name</strong> to tasks across diagrams that
+              draw on the same people, then add them all as roots of one{" "}
+              <strong>Study</strong> — they share one capacity pool, so the
               simulation shows whether that team is overloaded <em>across all</em>{" "}
-              the work. Keep one consistent time unit across the set, and make
-              sure sub-process links are in place so the whole chain is included.
+              the work. Keep one consistent time unit across the set.
             </p>
             <p className="mt-2">
               The simulation parameters follow the industry{" "}
               <strong>BPSim</strong> standard, so models can be exchanged with
-              other BPSim-compatible tools.
+              other BPSim-compatible tools, and decision-branch routing is
+              included in the diagram&rsquo;s XML export.
             </p>
           </>
         ),

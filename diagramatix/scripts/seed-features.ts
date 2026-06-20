@@ -21,6 +21,20 @@ import { PrismaPg } from "@prisma/adapter-pg";
 
 const FEATURES: Array<{ name: string; summary: string; details: string }> = [
   {
+    name: "Process Simulator",
+    summary: "Run your BPMN as a discrete-event simulation: see where work queues, who's the bottleneck, and test what-ifs before you change anything.",
+    details: [
+      "- Event-based engine — tokens flow over a simulated clock; tasks compete for limited team capacity, so queues and wait times emerge",
+      "- Shared team pools across processes — one Study assembles several diagrams to reveal cross-process overload",
+      "- Scenarios + sparse overrides — duplicate the baseline, change a capacity or a rate, and compare side by side with deltas",
+      "- Planned interventions — schedule a timed capacity surge, outage, rate change, or work injection",
+      "- Live Operator replay — watch green tokens flow, then 'fork the timeline': intervene mid-run and re-run deterministically",
+      "- Results, ranges & heatmap — Monte-Carlo replications give p50/p95 ranges, a bottleneck ranking, and a utilisation heatmap",
+      "- Ready-made examples — load a worked example into your own project and demo in two clicks",
+      "- BPSim-aligned — parameters follow the OMG/WfMC BPSim standard; import/export for interchange",
+    ].join("\n"),
+  },
+  {
     name: "Multi-Notation Diagramming",
     summary: "One workspace for every diagram type your team needs — from BPMN to ArchiMate to UML.",
     details: [

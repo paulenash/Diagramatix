@@ -219,6 +219,10 @@ const entityTables: Table[] = [
     c("association_name", T.text),
     c("reading_direction", T.text, refFk("ref_reading_direction")),
     c("bottleneck", T.bool),
+    // Simulation (schema 1.25): decision-gateway branch routing. A gateway's
+    // outgoing edge carries a probability (0..100) OR a condition expression;
+    // is_default_flow marks the else edge.
+    c("branch_probability", T.numeric), c("branch_condition", T.text), c("is_default_flow", T.bool),
   ], indexes: [{ name: "idx_connector_diagram", columns: ["diagram_id"] }] },
   { name: "connector_waypoint", columns: [
     c("id", T.bigserial, { pk: true, nn: true, identity: true }),

@@ -48,6 +48,15 @@ describe("full backup round-trip", () => {
       data: { listId: list.id, parentId: root.id, name: "Finance", level: "Team", sortOrder: 0 },
     });
 
+    // Simulator tables (Phase 4–6): a team, a study with a root + scenario, and
+    // a GLOBAL example. The catalog-driven full backup must carry them all.
+    await prisma.simulationTeam.create({ data: { name: "Analysts", projectId: project.id, capacity: 3 } });
+    const study = await prisma.simulationStudy.create({ data: { name: "RT Study", projectId: project.id } });
+    await prisma.simulationStudyRoot.create({ data: { studyId: study.id, diagramId: diagram.id } });
+    await prisma.simulationScenario.create({ data: { name: "Baseline", studyId: study.id, isBaseline: true } });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await prisma.simulationExample.create({ data: { slug: "rt-example", title: "RT Example", published: true, package: { version: 1 } as any } });
+
     const before = {
       org: await prisma.org.count(),
       user: await prisma.user.count(),
@@ -56,6 +65,11 @@ describe("full backup round-trip", () => {
       pv: await prisma.publishedVersion.count(),
       list: await prisma.entityList.count(),
       node: await prisma.entityNode.count(),
+      team: await prisma.simulationTeam.count(),
+      study: await prisma.simulationStudy.count(),
+      studyRoot: await prisma.simulationStudyRoot.count(),
+      scenario: await prisma.simulationScenario.count(),
+      example: await prisma.simulationExample.count(),
     };
 
     const bytes = await buildFullBackup("test@diagramatix.test", "test", undefined);
@@ -75,10 +89,23 @@ describe("full backup round-trip", () => {
     expect(await prisma.publishedVersion.count()).toBe(before.pv);
     expect(await prisma.entityList.count()).toBe(before.list);
     expect(await prisma.entityNode.count()).toBe(before.node);
+    expect(await prisma.simulationTeam.count()).toBe(before.team);
+    expect(await prisma.simulationStudy.count()).toBe(before.study);
+    expect(await prisma.simulationStudyRoot.count()).toBe(before.studyRoot);
+    expect(await prisma.simulationScenario.count()).toBe(before.scenario);
+    expect(await prisma.simulationExample.count()).toBe(before.example);
 
     // Cyclic pointer re-linked (ids are preserved by a wipe restore).
     const restoredDiagram = await prisma.diagram.findUnique({ where: { id: diagram.id } });
     expect(restoredDiagram?.currentPublishedVersionId).toBe(pv.id);
+
+    // Simulator relations + JSON survive: the study root still points at its
+    // diagram, and the example's package JSON round-trips.
+    const restoredRoot = await prisma.simulationStudyRoot.findFirst({ where: { studyId: study.id } });
+    expect(restoredRoot?.diagramId).toBe(diagram.id);
+    const restoredExample = await prisma.simulationExample.findUnique({ where: { slug: "rt-example" } });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((restoredExample?.package as any)?.version).toBe(1);
 
     // Entity tree intact: the child still points at its parent.
     const child = await prisma.entityNode.findFirst({ where: { name: "Finance" } });
