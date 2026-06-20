@@ -79,7 +79,7 @@ export function SimulationSection({
               <Field label="Max arrivals (blank = unlimited)">
                 <input
                   type="number"
-                  className="w-full px-1.5 py-0.5 text-[11px] border border-gray-300 rounded"
+                  className="w-full px-1.5 py-0.5 text-[11px] border border-gray-300 rounded bg-white text-gray-900 [color-scheme:light]"
                   value={sim.maxArrivals ?? ""}
                   onChange={(e) =>
                     patch({ maxArrivals: e.target.value === "" ? undefined : Math.max(0, parseInt(e.target.value, 10) || 0) })
@@ -101,7 +101,7 @@ export function SimulationSection({
                 <Field label="Team / resource id">
                   <input
                     type="text"
-                    className="w-full px-1.5 py-0.5 text-[11px] border border-gray-300 rounded"
+                    className="w-full px-1.5 py-0.5 text-[11px] border border-gray-300 rounded bg-white text-gray-900 [color-scheme:light]"
                     placeholder="e.g. analysts"
                     value={sim.teamId ?? ""}
                     onChange={(e) => patch({ teamId: e.target.value || undefined })}
@@ -111,7 +111,7 @@ export function SimulationSection({
                   <input
                     type="number"
                     min={1}
-                    className="w-full px-1.5 py-0.5 text-[11px] border border-gray-300 rounded"
+                    className="w-full px-1.5 py-0.5 text-[11px] border border-gray-300 rounded bg-white text-gray-900 [color-scheme:light]"
                     value={sim.resourceUnits ?? 1}
                     onChange={(e) => patch({ resourceUnits: Math.max(1, parseInt(e.target.value, 10) || 1) })}
                   />
@@ -124,7 +124,7 @@ export function SimulationSection({
             <Field label="Loop / multi-instance">
               <div className="flex flex-col gap-1">
                 <select
-                  className="w-full px-1.5 py-0.5 text-[11px] border border-gray-300 rounded"
+                  className="w-full px-1.5 py-0.5 text-[11px] border border-gray-300 rounded bg-white text-gray-900 [color-scheme:light]"
                   value={loopKindOf(sim.loop)}
                   onChange={(e) => patch({ loop: makeLoop(e.target.value as LoopKind, loopDist(sim.loop)) })}
                 >
@@ -152,7 +152,7 @@ export function SimulationSection({
             <Field label="Team for this lane (tasks inside inherit it)">
               <input
                 type="text"
-                className="w-full px-1.5 py-0.5 text-[11px] border border-gray-300 rounded"
+                className="w-full px-1.5 py-0.5 text-[11px] border border-gray-300 rounded bg-white text-gray-900 [color-scheme:light]"
                 placeholder="e.g. analysts"
                 value={sim.teamId ?? ""}
                 onChange={(e) => patch({ teamId: e.target.value || undefined })}

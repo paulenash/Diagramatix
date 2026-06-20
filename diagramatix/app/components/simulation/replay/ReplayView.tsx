@@ -131,11 +131,11 @@ export function ReplayView({ data, config, teamCapacities, onClose }: { data: Di
       <div className="flex items-center gap-2 flex-wrap text-[11px] font-mono text-green-400/80 border border-green-500/20 rounded px-2 py-1.5">
         <span className="text-green-300 tracking-widest">OPERATOR ⑂</span>
         <span className="text-green-400/40">fork at t={simT.toFixed(0)}:</span>
-        <select value={forkTeam} onChange={(e) => setForkTeam(e.target.value)} className="bg-black border border-green-500/40 rounded px-1 py-0.5 text-green-300" disabled={teamIds.length === 0}>
+        <select value={forkTeam} onChange={(e) => setForkTeam(e.target.value)} className="bg-black border border-green-500/40 rounded px-1 py-0.5 text-green-200 [color-scheme:dark]" disabled={teamIds.length === 0}>
           {teamIds.length === 0 ? <option>no teams</option> : teamIds.map((t) => <option key={t} value={t}>{t}</option>)}
         </select>
         <span>→ capacity</span>
-        <input type="number" min={1} value={forkCap} onChange={(e) => setForkCap(Math.max(1, parseInt(e.target.value, 10) || 1))} className="w-14 bg-black border border-green-500/40 rounded px-1 py-0.5 text-green-300" />
+        <input type="number" min={1} value={forkCap} onChange={(e) => setForkCap(Math.max(1, parseInt(e.target.value, 10) || 1))} className="w-14 bg-black border border-green-500/40 rounded px-1 py-0.5 text-green-200 [color-scheme:dark]" />
         <MatrixButton onClick={forkCapacity}>Apply</MatrixButton>
         <MatrixButton onClick={forkInject}>Inject surge</MatrixButton>
         {forked && <span className="text-green-300">timeline forked ✓</span>}

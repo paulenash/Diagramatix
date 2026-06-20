@@ -83,7 +83,7 @@ export function TeamLibraryManager({
           <input
             type="number" min={1} value={t.capacity}
             onChange={(e) => setCapacity(t.id, Math.max(1, parseInt(e.target.value, 10) || 1))}
-            className="w-14 bg-black border border-green-500/40 rounded px-1 py-0.5 text-green-300"
+            className="w-14 bg-black border border-green-500/40 rounded px-1 py-0.5 text-green-200 [color-scheme:dark]"
           />
           <button onClick={() => remove(t.id)} className="text-red-400/70 hover:text-red-300 px-1" title="Delete">✕</button>
         </div>
@@ -92,12 +92,12 @@ export function TeamLibraryManager({
         <input
           type="text" value={newName} placeholder="new team (e.g. analysts)"
           onChange={(e) => setNewName(e.target.value)}
-          className="flex-1 bg-black border border-green-500/40 rounded px-1.5 py-0.5 text-green-300"
+          className="flex-1 bg-black border border-green-500/40 rounded px-1.5 py-0.5 text-green-200 [color-scheme:dark]"
         />
         <input
           type="number" min={1} value={newCap}
           onChange={(e) => setNewCap(Math.max(1, parseInt(e.target.value, 10) || 1))}
-          className="w-14 bg-black border border-green-500/40 rounded px-1 py-0.5 text-green-300"
+          className="w-14 bg-black border border-green-500/40 rounded px-1 py-0.5 text-green-200 [color-scheme:dark]"
         />
         <MatrixButton onClick={addTeam}>{busy ? "…" : "+ Add"}</MatrixButton>
       </div>

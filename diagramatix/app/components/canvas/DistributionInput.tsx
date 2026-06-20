@@ -16,8 +16,11 @@ const KINDS: { value: SimDist["kind"]; label: string }[] = [
   { value: "exponential", label: "Exponential" },
 ];
 
+// Explicit bg/text + light color-scheme so the value stays black-on-white even
+// when the OS is in dark mode (otherwise the UA renders the control dark and
+// the numbers become unreadable).
 const inputCls =
-  "w-full px-1.5 py-0.5 text-[11px] border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-400";
+  "w-full px-1.5 py-0.5 text-[11px] border border-gray-300 rounded bg-white text-gray-900 [color-scheme:light] focus:outline-none focus:ring-1 focus:ring-blue-400";
 
 function Num({ label, value, onChange }: { label: string; value: number; onChange: (n: number) => void }) {
   return (

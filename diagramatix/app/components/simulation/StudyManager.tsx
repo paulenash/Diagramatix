@@ -114,7 +114,7 @@ export function StudyManager({ projectId, isAdmin }: { projectId: string | null;
         <input
           type="text" value={newStudy} placeholder="new study (e.g. Q3 workload)"
           onChange={(e) => setNewStudy(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") createStudy(); }}
-          className="flex-1 bg-black border border-green-500/40 rounded px-1.5 py-0.5 text-green-300"
+          className="flex-1 bg-black border border-green-500/40 rounded px-1.5 py-0.5 text-green-200 [color-scheme:dark]"
         />
         <MatrixButton onClick={createStudy}>+ Study</MatrixButton>
       </div>
@@ -218,7 +218,7 @@ function ScenarioList({ projectId, detail, onChanged }: { projectId: string; det
         <input
           type="text" value={newName} placeholder="new scenario (e.g. surge staffing)"
           onChange={(e) => setNewName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addScenario(); }}
-          className="flex-1 bg-black border border-green-500/40 rounded px-1.5 py-0.5 text-green-300"
+          className="flex-1 bg-black border border-green-500/40 rounded px-1.5 py-0.5 text-green-200 [color-scheme:dark]"
         />
         <MatrixButton onClick={() => addScenario()}>+ Scenario</MatrixButton>
       </div>
@@ -287,7 +287,7 @@ function ScenarioEditor({ scenario, runUrl, onSave }: { scenario: ScenarioRow; r
     <div className="flex flex-col gap-2">
       <div className="grid grid-cols-3 gap-2">
         <Labelled label="Clock unit">
-          <select value={cfg.clockUnit} onChange={(e) => set({ clockUnit: e.target.value as ClockUnit })} className="w-full bg-black border border-green-500/40 rounded px-1 py-0.5 text-green-300">
+          <select value={cfg.clockUnit} onChange={(e) => set({ clockUnit: e.target.value as ClockUnit })} className="w-full bg-black border border-green-500/40 rounded px-1 py-0.5 text-green-200 [color-scheme:dark]">
             {CLOCK_UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
           </select>
         </Labelled>
@@ -296,7 +296,7 @@ function ScenarioEditor({ scenario, runUrl, onSave }: { scenario: ScenarioRow; r
         <Labelled label="Replications"><NumIn value={cfg.replications} onChange={(v) => set({ replications: num(v, 1) })} /></Labelled>
         <Labelled label="Seed"><NumIn value={cfg.seed} onChange={(v) => set({ seed: num(v) })} /></Labelled>
         <Labelled label="Queue stats">
-          <select value={cfg.collectQueues ? "y" : "n"} onChange={(e) => set({ collectQueues: e.target.value === "y" })} className="w-full bg-black border border-green-500/40 rounded px-1 py-0.5 text-green-300">
+          <select value={cfg.collectQueues ? "y" : "n"} onChange={(e) => set({ collectQueues: e.target.value === "y" })} className="w-full bg-black border border-green-500/40 rounded px-1 py-0.5 text-green-200 [color-scheme:dark]">
             <option value="y">on</option><option value="n">off</option>
           </select>
         </Labelled>
@@ -313,10 +313,10 @@ function ScenarioEditor({ scenario, runUrl, onSave }: { scenario: ScenarioRow; r
           <div key={iv.id} className="flex items-center gap-1 mt-1">
             <span className="text-green-400/40">@</span>
             <NumIn value={iv.t} onChange={(v) => setIv(i, { t: num(v) })} className="w-12" title="time (clock units)" />
-            <select value={iv.kind} onChange={(e) => setIv(i, { kind: e.target.value as PlannedInterventionKind })} className="bg-black border border-green-500/40 rounded px-1 py-0.5 text-green-300">
+            <select value={iv.kind} onChange={(e) => setIv(i, { kind: e.target.value as PlannedInterventionKind })} className="bg-black border border-green-500/40 rounded px-1 py-0.5 text-green-200 [color-scheme:dark]">
               {INTERVENTION_KINDS.map((k) => <option key={k} value={k}>{k}</option>)}
             </select>
-            <input type="text" value={iv.target} placeholder="target" onChange={(e) => setIv(i, { target: e.target.value })} className="w-20 bg-black border border-green-500/40 rounded px-1 py-0.5 text-green-300" title={KIND_HINT[iv.kind]} />
+            <input type="text" value={iv.target} placeholder="target" onChange={(e) => setIv(i, { target: e.target.value })} className="w-20 bg-black border border-green-500/40 rounded px-1 py-0.5 text-green-200 [color-scheme:dark]" title={KIND_HINT[iv.kind]} />
             <NumIn value={iv.value} onChange={(v) => setIv(i, { value: Number(v) || 0 })} className="w-14" title="value" />
             <NumIn value={iv.duration ?? 0} onChange={(v) => setIv(i, { duration: num(v) || undefined })} className="w-12" title="duration (0 = permanent)" />
             <button onClick={() => removeIv(i)} className="text-red-400/70 hover:text-red-300 px-1">✕</button>
@@ -387,11 +387,11 @@ function SaveAsExample({ projectId, studyId, defaultTitle }: { projectId: string
         <div className="flex flex-col gap-1.5 text-[11px]">
           <span className="text-green-400/70 uppercase tracking-widest text-[10px]">Save as example (admin)</span>
           <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="title"
-            className="bg-black border border-green-500/40 rounded px-1.5 py-0.5 text-green-300" />
+            className="bg-black border border-green-500/40 rounded px-1.5 py-0.5 text-green-200 [color-scheme:dark]" />
           <input value={concept} onChange={(e) => setConcept(e.target.value)} placeholder="one-line concept"
-            className="bg-black border border-green-500/40 rounded px-1.5 py-0.5 text-green-300" />
+            className="bg-black border border-green-500/40 rounded px-1.5 py-0.5 text-green-200 [color-scheme:dark]" />
           <div className="flex items-center gap-2">
-            <select value={difficulty} onChange={(e) => setDifficulty(e.target.value)} className="bg-black border border-green-500/40 rounded px-1 py-0.5 text-green-300">
+            <select value={difficulty} onChange={(e) => setDifficulty(e.target.value)} className="bg-black border border-green-500/40 rounded px-1 py-0.5 text-green-200 [color-scheme:dark]">
               <option value="intro">intro</option><option value="core">core</option><option value="advanced">advanced</option>
             </select>
             <MatrixButton onClick={capture}>{busy ? "…" : "Capture"}</MatrixButton>
@@ -418,7 +418,7 @@ function NumIn({ value, onChange, className = "", title }: { value: number; onCh
     <input
       type="number" value={value} title={title}
       onChange={(e) => onChange(e.target.value)}
-      className={`bg-black border border-green-500/40 rounded px-1 py-0.5 text-green-300 ${className || "w-full"}`}
+      className={`bg-black border border-green-500/40 rounded px-1 py-0.5 text-green-200 [color-scheme:dark] ${className || "w-full"}`}
     />
   );
 }

@@ -39,7 +39,7 @@ function MatrixDist({ value, onChange }: { value?: SimDist; onChange: (d: SimDis
       <select
         value={value?.kind ?? ""}
         onChange={(e) => onChange(e.target.value ? distOfKind(e.target.value as SimDist["kind"]) : undefined)}
-        className="bg-black border border-green-500/40 rounded px-1 py-0.5 text-green-300 text-[10px]"
+        className="bg-black border border-green-500/40 rounded px-1 py-0.5 text-green-200 text-[11px] [color-scheme:dark]"
       >
         <option value="">—</option>
         {DISTRIBUTION_KINDS.map((k) => <option key={k} value={k}>{k}</option>)}
@@ -51,7 +51,7 @@ function MatrixDist({ value, onChange }: { value?: SimDist; onChange: (d: SimDis
           value={(value as any)[f]}
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           onChange={(e) => onChange({ ...(value as any), [f]: Number(e.target.value) })}
-          className="w-12 bg-black border border-green-500/40 rounded px-1 py-0.5 text-green-300 text-[10px]"
+          className="w-14 bg-black border border-green-500/40 rounded px-1 py-0.5 text-green-200 text-[11px] [color-scheme:dark]"
         />
       ))}
     </span>
@@ -209,7 +209,10 @@ export function SimDataPanel({ data, onApplyData, onFillMissing }: {
   );
 }
 
-const inp = "bg-black border border-green-500/40 rounded px-1 py-0.5 text-green-300 text-[10px]";
+// [color-scheme:dark] makes the browser render the control (value text +
+// number spinners) for a dark background, so the green value stays legible
+// regardless of the OS theme.
+const inp = "bg-black border border-green-500/40 rounded px-1 py-0.5 text-green-200 text-[11px] [color-scheme:dark]";
 
 function Section({ title, cols, children }: { title: string; cols: string[]; children: React.ReactNode }) {
   return (
