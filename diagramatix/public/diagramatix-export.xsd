@@ -286,6 +286,25 @@
     the names are simply drawn from a project's adopted/created structure.
     schemaVersion bumped to 1.23 so importers and the User Guide reflect
     the new feature window (same convention as v1.21).
+
+  v1.24 — BPMN process Simulator (BPSim-aligned discrete-event simulation).
+    Per-element baseline simulation parameters (arrival / cycle / wait
+    distributions, team + resource units, loop / multi-instance, event
+    triggers, token property assignments) ride OPAQUELY in
+    element.properties.sim — the open PropertiesType already permits this,
+    so no enumerated schema change. The decision-branch routing fields were
+    added to the Connector data model but the diagram XML/XSD export was
+    left unchanged at 1.24 (deferred to 1.25). Teams, studies, scenarios and
+    runs are application database tables, not part of the diagram export.
+
+  v1.25 — Simulation connector fields now SERIALISED in the diagram XML
+    export. A <dgx:connector> may carry the decision-gateway branch routing as
+    optional attributes: branchProbability (0..100), branchCondition (an
+    expression), isDefaultFlow (the else edge). Previously in-model only —
+    emitted now, the same way the v1.10 fix restored `bottleneck`. Additive +
+    optional; older exports remain valid; export-only (no importer change).
+    (The matching DDL-generator columns + User-Guide/Features notes follow as a
+    separate update.)
 -->
 
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
@@ -934,6 +953,13 @@
     <xs:attribute name="labelAnchor"    type="dgx:LabelAnchorEnum" use="optional"/>
     <xs:attribute name="arrowAtSource"  type="xs:boolean" use="optional"/>
     <xs:attribute name="bottleneck"    type="xs:boolean" use="optional"/>
+    <!-- Simulation (v1.24 model / v1.25 export): decision-gateway branch
+         routing. An outgoing edge of a decision gateway carries EITHER a
+         branchProbability (0..100, BPSim Probability) OR a branchCondition
+         (an expression, BPSim Condition); isDefaultFlow marks the else edge. -->
+    <xs:attribute name="branchProbability" type="xs:decimal" use="optional"/>
+    <xs:attribute name="branchCondition"   type="xs:string"  use="optional"/>
+    <xs:attribute name="isDefaultFlow"     type="xs:boolean" use="optional"/>
   </xs:complexType>
 
   <!-- Waypoints -->

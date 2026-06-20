@@ -684,7 +684,16 @@ export interface TemplateData {
  *             `branchCondition` / `isDefaultFlow`). All optional + additive;
  *             rides the flexible PropertiesType. Simulation parameters
  *             interchange via BPSim XML (see app/lib/simulation/bpsim/*) — the
- *             core diagram XML/XSD export is unchanged; the BPSim mapping +
- *             XSD note land with the BPSim interop slice.
+ *             core diagram XML/XSD export was unchanged at 1.24; the XSD note +
+ *             connector export land at 1.25 (this is that slice).
+ * 1.25      — Simulation connector fields now SERIALISED in the diagram XML
+ *             export. The decision-branch routing fields (`branchProbability` /
+ *             `branchCondition` / `isDefaultFlow`) are emitted as optional
+ *             `<dgx:connector>` attributes (previously in-model only, like the
+ *             v1.10 `bottleneck` fix). Element simulation parameters keep
+ *             riding `element.properties.sim` opaquely (open PropertiesType).
+ *             Export-only — no XML importer change. Additive + optional. The
+ *             matching DDL-generator columns + User-Guide/Features notes are a
+ *             separate follow-up update.
  */
-export const SCHEMA_VERSION = "1.24";
+export const SCHEMA_VERSION = "1.25";
