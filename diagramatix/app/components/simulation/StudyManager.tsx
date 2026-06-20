@@ -35,7 +35,7 @@ const KIND_HINT: Record<PlannedInterventionKind, string> = {
   outage: "team → capacity during outage",
 };
 
-export function StudyManager({ projectId }: { projectId: string | null }) {
+export function StudyManager({ projectId, isAdmin }: { projectId: string | null; isAdmin?: boolean }) {
   const [studies, setStudies] = useState<StudyRow[]>([]);
   const [diagrams, setDiagrams] = useState<DiagramLite[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -125,6 +125,7 @@ export function StudyManager({ projectId }: { projectId: string | null }) {
         <div className="flex flex-col gap-3 pt-2 border-t border-green-500/30">
           <RootPicker diagrams={diagrams} roots={new Set(detail.roots.map((r) => r.diagram.id))} onToggle={toggleRoot} />
           <ScenarioList projectId={projectId} detail={detail} onChanged={() => loadDetail(detail.id)} />
+          {isAdmin && <SaveAsExample projectId={projectId} studyId={detail.id} defaultTitle={detail.name} />}
         </div>
       )}
     </div>
@@ -348,6 +349,55 @@ function ScenarioEditor({ scenario, runUrl, onSave }: { scenario: ScenarioRow; r
       {showReport && (
         <div className="border border-green-500/30 rounded p-2 mt-1">
           <ResultsReport key={ran} runUrl={runUrl} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Admin-only: capture this study into a NEW draft example catalog entry. */
+function SaveAsExample({ projectId, studyId, defaultTitle }: { projectId: string; studyId: string; defaultTitle: string }) {
+  const [open, setOpen] = useState(false);
+  const [title, setTitle] = useState(defaultTitle);
+  const [concept, setConcept] = useState("");
+  const [difficulty, setDifficulty] = useState("core");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  async function capture() {
+    if (!title.trim()) return;
+    setBusy(true); setMsg(null);
+    try {
+      const res = await fetch(`/api/admin/simulation-examples/capture`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId, studyId, title: title.trim(), concept: concept.trim(), difficulty }),
+      });
+      const json = await res.json().catch(() => ({}));
+      setMsg(res.ok ? "Saved as a draft example ✓ — publish it in the Catalog manager." : (json.error ?? "Capture failed"));
+    } finally { setBusy(false); }
+  }
+
+  return (
+    <div className="pt-2 border-t border-green-500/20">
+      {!open ? (
+        <button onClick={() => setOpen(true)} className="text-green-400/70 hover:text-green-300 text-[10px] uppercase tracking-widest">
+          ⎘ Save study as example
+        </button>
+      ) : (
+        <div className="flex flex-col gap-1.5 text-[11px]">
+          <span className="text-green-400/70 uppercase tracking-widest text-[10px]">Save as example (admin)</span>
+          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="title"
+            className="bg-black border border-green-500/40 rounded px-1.5 py-0.5 text-green-300" />
+          <input value={concept} onChange={(e) => setConcept(e.target.value)} placeholder="one-line concept"
+            className="bg-black border border-green-500/40 rounded px-1.5 py-0.5 text-green-300" />
+          <div className="flex items-center gap-2">
+            <select value={difficulty} onChange={(e) => setDifficulty(e.target.value)} className="bg-black border border-green-500/40 rounded px-1 py-0.5 text-green-300">
+              <option value="intro">intro</option><option value="core">core</option><option value="advanced">advanced</option>
+            </select>
+            <MatrixButton onClick={capture}>{busy ? "…" : "Capture"}</MatrixButton>
+            <button onClick={() => setOpen(false)} className="text-green-400/50 hover:text-green-300 text-[10px]">cancel</button>
+          </div>
+          {msg && <span className="text-green-300 text-[10px]">{msg}</span>}
         </div>
       )}
     </div>

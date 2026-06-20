@@ -1535,6 +1535,14 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                     >
                       Deleted Diagrams
                     </a>
+                    <a
+                      href="/dashboard/simulator-examples"
+                      onClick={() => setFileMenuOpen(false)}
+                      className="block w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                      title="Load a ready-made example simulation to explore or demo"
+                    >
+                      Simulator Examples
+                    </a>
                     <div className="border-t border-gray-100" />
                     <button
                       onClick={() => { setFileMenuOpen(false); handleBackupDownload(); }}

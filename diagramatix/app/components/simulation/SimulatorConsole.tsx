@@ -17,8 +17,8 @@ import { TeamLibraryManager } from "./TeamLibraryManager";
 import { StudyManager } from "./StudyManager";
 import { defaultReplayConfig } from "@/app/lib/simulation/replaySource";
 
-export function SimulatorConsole({ data, projectId, diagramName, onClose, onFillTestData }: {
-  data: DiagramData; projectId: string | null; diagramName?: string; onClose: () => void; onFillTestData?: () => number;
+export function SimulatorConsole({ data, projectId, isAdmin, diagramName, onClose, onFillTestData }: {
+  data: DiagramData; projectId: string | null; isAdmin?: boolean; diagramName?: string; onClose: () => void; onFillTestData?: () => number;
 }) {
   const [mode, setMode] = useState<"home" | "replay" | "heatmap">("home");
   const [fillMsg, setFillMsg] = useState<string | null>(null);
@@ -45,7 +45,7 @@ export function SimulatorConsole({ data, projectId, diagramName, onClose, onFill
               <TeamLibraryManager projectId={projectId} onCapacities={setTeamCapacities} />
             </MatrixPanel>
             <MatrixPanel title="Studies & Scenarios" className="md:col-span-3">
-              <StudyManager projectId={projectId} />
+              <StudyManager projectId={projectId} isAdmin={isAdmin} />
             </MatrixPanel>
             <MatrixPanel title="Run / Replay">
               <p className="text-xs text-green-400/60 mb-3">Watch tokens flow through the process; intervene live. Or see where the heat builds up.</p>
