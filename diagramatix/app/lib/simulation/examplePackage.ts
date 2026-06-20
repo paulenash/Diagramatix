@@ -11,7 +11,7 @@
  * element/edge id) and team references (by name) survive intact.
  */
 
-import type { DiagramData } from "@/app/lib/diagram/types";
+import type { DiagramData } from "../diagram/types";
 import type { ScenarioRunConfig } from "./types";
 import type { OverrideSet } from "./overrides";
 
