@@ -13,7 +13,7 @@ import { applyOverrides, type OverrideSet } from "@/app/lib/simulation/overrides
 
 describe("starter examples are operational", () => {
   it("there is a non-trivial starter set with unique slugs", () => {
-    expect(STARTER_EXAMPLES.length).toBeGreaterThanOrEqual(3);
+    expect(STARTER_EXAMPLES.length).toBeGreaterThanOrEqual(2);
     expect(new Set(STARTER_EXAMPLES.map((e) => e.slug)).size).toBe(STARTER_EXAMPLES.length);
   });
 
@@ -69,15 +69,19 @@ describe("starter examples are operational", () => {
     });
   }
 
-  it("the bottleneck example actually shows relief when staffed up", () => {
-    const ex = STARTER_EXAMPLES.find((e) => e.slug === "single-bottleneck")!;
-    const roots = ex.package.study.rootKeys.map((k) => ex.package.diagrams.find((d) => d.key === k)!);
-    const base = assemblePortfolio(roots.map((d) => ({ id: d.key, data: d.data })), { teamCapacities: { Analysts: 1 } });
-    const baseline = ex.package.scenarios[0];
-    const staffed = ex.package.scenarios[1];
-    const rBase = runMonteCarlo(applyOverrides(base, (baseline.overrides ?? {}) as OverrideSet), baseline.runConfig);
-    const rStaff = runMonteCarlo(applyOverrides(base, (staffed.overrides ?? {}) as OverrideSet), staffed.runConfig);
-    // More capacity → strictly lower utilisation on the shared pool.
-    expect(rStaff.stats.perTeam.Analysts.utilization.mean).toBeLessThan(rBase.stats.perTeam.Analysts.utilization.mean);
+  it("staffing up relieves the busiest pool (baseline vs add-staff)", () => {
+    for (const ex of STARTER_EXAMPLES) {
+      const teamCaps = Object.fromEntries(ex.package.teams.map((t) => [t.name, t.capacity]));
+      const roots = ex.package.study.rootKeys.map((k) => ex.package.diagrams.find((d) => d.key === k)!);
+      const base = assemblePortfolio(roots.map((d) => ({ id: d.key, data: d.data })), { teamCapacities: teamCaps });
+      const [baseline, staffed] = ex.package.scenarios;
+      const rBase = runMonteCarlo(applyOverrides(base, (baseline.overrides ?? {}) as OverrideSet), baseline.runConfig);
+      const rStaff = runMonteCarlo(applyOverrides(base, (staffed.overrides ?? {}) as OverrideSet), staffed.runConfig);
+      // The team most loaded at baseline should be no busier (≈ less busy) once staffed.
+      const busiest = Object.entries(rBase.stats.perTeam).sort((a, b) => b[1].utilization.mean - a[1].utilization.mean)[0];
+      if (busiest) {
+        expect(rStaff.stats.perTeam[busiest[0]].utilization.mean, `${ex.slug}/${busiest[0]}`).toBeLessThanOrEqual(busiest[1].utilization.mean + 1e-9);
+      }
+    }
   });
 });

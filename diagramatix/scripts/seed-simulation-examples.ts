@@ -13,7 +13,7 @@
 
 import { PrismaClient } from "../app/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
-import { STARTER_EXAMPLES } from "../app/lib/simulation/exampleSeeds";
+import { STARTER_EXAMPLES, RETIRED_EXAMPLE_SLUGS } from "../app/lib/simulation/exampleSeeds";
 
 async function main() {
   const url = process.env.DATABASE_URL;
@@ -22,6 +22,11 @@ async function main() {
   const prisma = new PrismaClient({ adapter });
 
   try {
+    // Retire superseded starter examples (only the seeded slugs; admin-made
+    // ones are untouched).
+    const retired = await prisma.simulationExample.deleteMany({ where: { slug: { in: RETIRED_EXAMPLE_SLUGS } } });
+    if (retired.count) console.log(`Retired ${retired.count} old example(s).`);
+
     let created = 0, updated = 0;
     for (let i = 0; i < STARTER_EXAMPLES.length; i++) {
       const ex = STARTER_EXAMPLES[i];

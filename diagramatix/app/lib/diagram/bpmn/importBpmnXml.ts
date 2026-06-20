@@ -49,6 +49,9 @@ export interface BpmnImportResult {
   data: DiagramData;
   /** Diagram name resolved from collaboration → process → filename. */
   diagramName: string;
+  /** Original BPMN element/flow id → the minted Diagramatix id. Lets callers
+   *  resolve BPSim elementRefs (which use original BPMN ids). */
+  idMap: Record<string, string>;
   warnings: string[];
   stats: {
     processCount: number;
@@ -998,6 +1001,7 @@ export async function importBpmnXml(
     return {
       data: { elements: [], connectors: [], viewport: { x: 0, y: 0, zoom: 1 } },
       diagramName: fileNameStem,
+      idMap: {},
       warnings: ["No <definitions> root element found — not a BPMN 2.0 file."],
       stats,
     };
@@ -1179,5 +1183,7 @@ export async function importBpmnXml(
     viewport: { x: 0, y: 0, zoom: 1 },
   };
 
-  return { data, diagramName, warnings, stats };
+  // Expose the bpmn-id → minted-id map so callers (e.g. BPSim parameter
+  // mapping) can resolve elementRefs that point at original BPMN ids.
+  return { data, diagramName, warnings, stats, idMap: Object.fromEntries(ctx.idMap) };
 }

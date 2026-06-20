@@ -11,7 +11,7 @@
 
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { STARTER_EXAMPLES } from "../app/lib/simulation/exampleSeeds";
+import { STARTER_EXAMPLES, RETIRED_EXAMPLE_SLUGS } from "../app/lib/simulation/exampleSeeds";
 
 /** Escape a value for a single-quoted SQL literal. */
 const q = (s: string) => `'${s.replace(/'/g, "''")}'`;
@@ -34,10 +34,17 @@ function main() {
     ].join("\n");
   });
 
+  const retire = RETIRED_EXAMPLE_SLUGS.length
+    ? `DELETE FROM "SimulationExample" WHERE "slug" IN (${RETIRED_EXAMPLE_SLUGS.map(q).join(", ")});`
+    : "";
+
   const sql = [
     "-- Diagramatix Simulator example catalog seed (generated).",
     "-- Idempotent: re-runnable; ON CONFLICT(slug) refreshes content.",
     "-- Paste into the Azure Postgres query editor (or any psql client).",
+    "",
+    "-- Retire superseded starter examples.",
+    retire,
     "",
     blocks.join("\n\n"),
     "",
