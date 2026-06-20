@@ -165,6 +165,23 @@ jobs:
         # is swapped — preventing the "new code, old schema" failure.
         run: npx prisma db push --accept-data-loss --url "$DATABASE_URL"
 
+      - name: Seed simulator example catalog
+        working-directory: ./diagramatix
+        # Non-blocking: the catalog is nice-to-have content, never a release
+        # gate. A seed hiccup must not abort the deploy (the app runs fine
+        # with an empty gallery), so failures are logged but tolerated.
+        continue-on-error: true
+        env:
+          DATABASE_URL: ${{ steps.db.outputs.url }}
+        # Idempotent (upsert by slug) — refreshes the published starter
+        # examples on every release so prod's Simulator Examples gallery is
+        # populated without the manual `tsx` step. Runs AFTER the schema push
+        # so the SimulationExample table exists. The TS seeder is the single
+        # source of truth (matches the local workflow); the prisma client was
+        # generated in the Install step, so tsx resolves the imports. tsx is
+        # not a project dep — fetch it pinned + non-interactive (`--yes`).
+        run: npx --yes tsx@4 scripts/seed-simulation-examples.ts
+
       - name: Update App Service container image
         # `az webapp config container set` rewrites the container
         # configuration to point at the new SHA tag. App Service detects
