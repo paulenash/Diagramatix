@@ -25,8 +25,15 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
-input, textarea, select {
-  color: #111827;
+/* Default input text colour. MUST live in @layer base so Tailwind utilities
+ * (@layer utilities) can override it — an UNLAYERED rule beats layered
+ * utilities regardless of specificity, which previously forced this dark-gray
+ * onto dark-themed inputs (e.g. the Matrix simulation fields) and made their
+ * values unreadable on black. Layered, `text-green-200`/`text-gray-900` win. */
+@layer base {
+  input, textarea, select {
+    color: #111827;
+  }
 }
 
 /* Cursor scheme (G05). Inline `style={{ cursor }}` can't reach the
