@@ -21,11 +21,25 @@ interface Step { id: string; label: string; cycle: SimDist; team?: string }
 /** Build a left-to-right linear BPMN process: start → steps… → end, annotated
  *  with arrival + per-task cycle time + team. Element/connector ids are stable
  *  so scenario overrides + interventions survive adopt. */
-function linearProcess(name: string, arrival: SimDist, steps: Step[]): DiagramData {
+function linearProcess(_name: string, arrival: SimDist, steps: Step[]): DiagramData {
   const el = (id: string, type: SymbolType, x: number, label: string, sim?: object): DiagramElement => ({
     id, type, x, y: 140, width: type.endsWith("event") ? 48 : 120, height: type.endsWith("event") ? 48 : 64,
     label, properties: sim ? { sim } : {},
   });
+  // A fully-formed BPMN sequence flow — the editor/canvas needs every field
+  // (notably `waypoints`, which the reducer maps over on load); a bare
+  // {id,source,target} renders fine for the engine but crashes the editor.
+  const mkConn = (id: string, s: string, t: string): Connector => ({
+    id, sourceId: s, targetId: t,
+    sourceSide: "right", targetSide: "left",
+    type: "sequence",
+    directionType: "directed",
+    routingType: "rectilinear",
+    sourceInvisibleLeader: false,
+    targetInvisibleLeader: false,
+    waypoints: [],
+  });
+
   const elements: DiagramElement[] = [];
   const connectors: Connector[] = [];
   let x = 60;
@@ -34,12 +48,12 @@ function linearProcess(name: string, arrival: SimDist, steps: Step[]): DiagramDa
   x += 140;
   for (const s of steps) {
     elements.push(el(s.id, "task", x, s.label, { cycleTime: s.cycle, ...(s.team ? { teamId: s.team } : {}) }));
-    connectors.push({ id: `c_${prev}_${s.id}`, sourceId: prev, targetId: s.id } as Connector);
+    connectors.push(mkConn(`c_${prev}_${s.id}`, prev, s.id));
     prev = s.id; x += 200;
   }
   elements.push(el("end", "end-event", x, "Done"));
-  connectors.push({ id: `c_${prev}_end`, sourceId: prev, targetId: "end" } as Connector);
-  return { viewport: { x: 0, y: 0, zoom: 1 }, elements, connectors, name } as DiagramData;
+  connectors.push(mkConn(`c_${prev}_end`, prev, "end"));
+  return { viewport: { x: 0, y: 0, zoom: 1 }, elements, connectors } as DiagramData;
 }
 
 const exp = (mean: number): SimDist => ({ kind: "exponential", mean });

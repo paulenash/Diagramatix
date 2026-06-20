@@ -17,6 +17,28 @@ describe("starter examples are operational", () => {
     expect(new Set(STARTER_EXAMPLES.map((e) => e.slug)).size).toBe(STARTER_EXAMPLES.length);
   });
 
+  it("every diagram is EDITOR-valid (connectors fully formed, not just engine-valid)", () => {
+    // A bare {id,source,target} connector runs in the engine but crashes the
+    // editor, which maps over connector.waypoints + reads routing fields on
+    // load. Guard against that regression.
+    for (const ex of STARTER_EXAMPLES) {
+      for (const d of ex.package.diagrams) {
+        for (const c of d.data.connectors) {
+          expect(Array.isArray(c.waypoints), `${ex.slug}/${c.id} waypoints`).toBe(true);
+          expect(c.type, `${ex.slug}/${c.id} type`).toBeTruthy();
+          expect(c.sourceSide && c.targetSide).toBeTruthy();
+          expect(c.directionType && c.routingType).toBeTruthy();
+          expect(typeof c.sourceInvisibleLeader).toBe("boolean");
+          expect(typeof c.targetInvisibleLeader).toBe("boolean");
+        }
+        for (const el of d.data.elements) {
+          expect(el.id && el.type).toBeTruthy();
+          expect(Number.isFinite(el.x) && Number.isFinite(el.width)).toBe(true);
+        }
+      }
+    }
+  });
+
   for (const ex of STARTER_EXAMPLES) {
     describe(ex.title, () => {
       const pkg = ex.package;
