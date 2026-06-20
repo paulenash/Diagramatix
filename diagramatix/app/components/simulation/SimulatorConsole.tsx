@@ -12,6 +12,7 @@ import type { DiagramData } from "@/app/lib/diagram/types";
 import { MatrixRain } from "./matrix/MatrixRain";
 import { MatrixButton, MatrixPanel } from "./matrix/MatrixChrome";
 import { ReplayView } from "./replay/ReplayView";
+import { SimulationHeatmap } from "./results/SimulationHeatmap";
 import { TeamLibraryManager } from "./TeamLibraryManager";
 import { StudyManager } from "./StudyManager";
 import { defaultReplayConfig } from "@/app/lib/simulation/replaySource";
@@ -19,7 +20,7 @@ import { defaultReplayConfig } from "@/app/lib/simulation/replaySource";
 export function SimulatorConsole({ data, projectId, diagramName, onClose, onFillTestData }: {
   data: DiagramData; projectId: string | null; diagramName?: string; onClose: () => void; onFillTestData?: () => number;
 }) {
-  const [mode, setMode] = useState<"home" | "replay">("home");
+  const [mode, setMode] = useState<"home" | "replay" | "heatmap">("home");
   const [fillMsg, setFillMsg] = useState<string | null>(null);
   const [teamCapacities, setTeamCapacities] = useState<Record<string, number>>({});
 
@@ -33,7 +34,7 @@ export function SimulatorConsole({ data, projectId, diagramName, onClose, onFill
           <div className="flex items-center gap-3">
             <span className="text-green-300 tracking-[0.3em] text-sm">◈ DIAGRAMATIX SIMULATOR</span>
             {diagramName && <span className="text-green-400/50 text-xs">/ {diagramName}</span>}
-            {mode === "replay" && <button onClick={() => setMode("home")} className="text-green-400/60 text-xs hover:text-green-300">‹ back</button>}
+            {mode !== "home" && <button onClick={() => setMode("home")} className="text-green-400/60 text-xs hover:text-green-300">‹ back</button>}
           </div>
           <MatrixButton variant="danger" onClick={onClose}>✕ EXIT</MatrixButton>
         </header>
@@ -47,8 +48,11 @@ export function SimulatorConsole({ data, projectId, diagramName, onClose, onFill
               <StudyManager projectId={projectId} />
             </MatrixPanel>
             <MatrixPanel title="Run / Replay">
-              <p className="text-xs text-green-400/60 mb-3">Watch tokens flow through the process; intervene live.</p>
-              <MatrixButton onClick={() => setMode("replay")}>▶ Launch replay</MatrixButton>
+              <p className="text-xs text-green-400/60 mb-3">Watch tokens flow through the process; intervene live. Or see where the heat builds up.</p>
+              <div className="flex flex-col gap-2">
+                <MatrixButton onClick={() => setMode("replay")}>▶ Launch replay</MatrixButton>
+                <MatrixButton onClick={() => setMode("heatmap")}>▦ Heatmap</MatrixButton>
+              </div>
             </MatrixPanel>
             {onFillTestData && (
               <MatrixPanel title="Test data" className="md:col-span-3">
@@ -72,9 +76,13 @@ export function SimulatorConsole({ data, projectId, diagramName, onClose, onFill
               </p>
             </MatrixPanel>
           </main>
-        ) : (
+        ) : mode === "replay" ? (
           <main className="flex-1 overflow-hidden p-4">
             <ReplayView data={data} config={defaultReplayConfig()} teamCapacities={teamCapacities} onClose={() => setMode("home")} />
+          </main>
+        ) : (
+          <main className="flex-1 overflow-hidden p-4">
+            <SimulationHeatmap data={data} teamCapacities={teamCapacities} onClose={() => setMode("home")} />
           </main>
         )}
       </div>
