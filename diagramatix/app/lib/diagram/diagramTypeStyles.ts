@@ -31,19 +31,21 @@ export interface DiagramTypeStyle {
 }
 
 /**
- * The seven editable diagram types, in Paul's listed order. `basic` is a
- * legacy alias for `context` and is resolved to the context style — it is
- * deliberately NOT a separately-editable row.
+ * The eight editable diagram types, in the default sort order
+ * (CO, VC, PC, AM, BP, FC, SM, DM). The DB `DiagramTypeStyle.sortOrder` (set
+ * via the Diagram Type Sort Order admin tile) overrides this at runtime.
+ * `basic` is a legacy alias for `context` and is resolved to the context style
+ * — it is deliberately NOT a separately-editable row.
  */
 export const DEFAULT_DIAGRAM_TYPE_STYLES: DiagramTypeStyle[] = [
-  { typeKey: "context",         label: "Context",         code: "CO", bgColor: "#ccfbf1", textColor: "#093e3a", sortOrder: 0 },
-  { typeKey: "process-context", label: "Process Context", code: "PC", bgColor: "#e1feea", textColor: "#748b04", sortOrder: 1 },
-  { typeKey: "state-machine",   label: "State Machine",   code: "SM", bgColor: "#efe6e7", textColor: "#bf6612", sortOrder: 2 },
-  { typeKey: "bpmn",            label: "BPMN",            code: "BP", bgColor: "#dcfefc", textColor: "#19a455", sortOrder: 3 },
-  { typeKey: "domain",          label: "Domain",          code: "DM", bgColor: "#d1fae5", textColor: "#047857", sortOrder: 4 },
-  { typeKey: "value-chain",     label: "Value Chain",     code: "VC", bgColor: "#ffedd5", textColor: "#c2410c", sortOrder: 5 },
-  { typeKey: "archimate",       label: "Archimate",       code: "AM", bgColor: "#fce7f3", textColor: "#be185c", sortOrder: 6 },
-  { typeKey: "flowchart",       label: "Standard Flowchart", code: "FC", bgColor: "#f3f4f6", textColor: "#333333", sortOrder: 7 },
+  { typeKey: "context",         label: "Context",            code: "CO", bgColor: "#ccfbf1", textColor: "#093e3a", sortOrder: 0 },
+  { typeKey: "value-chain",     label: "Value Chain",        code: "VC", bgColor: "#ffedd5", textColor: "#c2410c", sortOrder: 1 },
+  { typeKey: "process-context", label: "Process Context",    code: "PC", bgColor: "#e1feea", textColor: "#748b04", sortOrder: 2 },
+  { typeKey: "archimate",       label: "Archimate",          code: "AM", bgColor: "#fce7f3", textColor: "#be185c", sortOrder: 3 },
+  { typeKey: "bpmn",            label: "BPMN",               code: "BP", bgColor: "#dcfefc", textColor: "#19a455", sortOrder: 4 },
+  { typeKey: "flowchart",       label: "Standard Flowchart", code: "FC", bgColor: "#f3f4f6", textColor: "#333333", sortOrder: 5 },
+  { typeKey: "state-machine",   label: "State Machine",      code: "SM", bgColor: "#efe6e7", textColor: "#bf6612", sortOrder: 6 },
+  { typeKey: "domain",          label: "Domain",             code: "DM", bgColor: "#d1fae5", textColor: "#047857", sortOrder: 7 },
 ];
 
 /** Canonical editable keys (excludes the `basic` alias). */
@@ -75,7 +77,7 @@ export function canonicalDiagramTypeKey(typeKey: string): string {
 
 export type DiagramTypeStyleOverrides = Record<
   string,
-  Partial<Pick<DiagramTypeStyle, "code" | "bgColor" | "textColor">>
+  Partial<Pick<DiagramTypeStyle, "code" | "bgColor" | "textColor" | "sortOrder">>
 >;
 
 /**
@@ -96,6 +98,7 @@ export function resolveDiagramTypeStyle(
     code: ov.code ?? base.code,
     bgColor: ov.bgColor ?? base.bgColor,
     textColor: ov.textColor ?? base.textColor,
+    sortOrder: ov.sortOrder ?? base.sortOrder,
   };
 }
 

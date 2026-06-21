@@ -708,14 +708,16 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
     | "name-asc"
     | "name-desc"
     | "modified-desc"
-    | "modified-asc";
+    | "modified-asc"
+    | "type";
+  const diagramTypeStyle = useDiagramTypeStyles();
   const [diagramSort, setDiagramSort] = useState<DiagramSort>("manual");
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
       const raw = window.localStorage.getItem(`diagram-sort-${project.id}`);
       if (raw === "manual" || raw === "name-asc" || raw === "name-desc"
-          || raw === "modified-asc" || raw === "modified-desc") {
+          || raw === "modified-asc" || raw === "modified-desc" || raw === "type") {
         setDiagramSort(raw);
       }
     } catch { /* ignore */ }
@@ -802,6 +804,11 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
           return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
         case "modified-asc":
           return new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
+        case "type": {
+          // Order by the admin-configured Diagram Type Sort Order, then name.
+          const d = diagramTypeStyle(a.type).sortOrder - diagramTypeStyle(b.type).sortOrder;
+          return d !== 0 ? d : collator.compare(a.name, b.name);
+        }
         default:
           return 0;
       }
@@ -2081,7 +2088,7 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
           {/* Export Owner display hidden 2026-06-06 — kept off the
               project header to match the sidebar. Value still lives on
               project.ownerName and round-trips through exports. */}
-          {version ? <span className="text-[10px] text-gray-400">v{SCHEMA_VERSION}.{version}</span> : null}
+          <span className="text-[10px] text-gray-400 shrink-0" title="Diagramatix version">v{SCHEMA_VERSION}{version ? `.${version}` : ""}</span>
           {/* SuperAdmin shortcut — leftmost item in the header menu
               cluster, SuperAdmin-only. `?from=` carries this project's
               URL so the admin's Back link returns here. Mirrors the
@@ -2363,6 +2370,7 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
               <option value="name-desc">Name ↓ (Z–A)</option>
               <option value="modified-desc">Modified ↓ (newest first)</option>
               <option value="modified-asc">Modified ↑ (oldest first)</option>
+              <option value="type">Diagram Type</option>
             </select>
           </div>
           <ProjectStructureSection projectId={project.id} canEdit={!readOnly} />

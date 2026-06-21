@@ -51,6 +51,12 @@ const CARDS: MenuCard[] = [
     description:
       "Organisation structures, external participants and IT systems used to name BPMN pools and lanes.",
   },
+  {
+    href: "/dashboard/diagram-type-sort-order?from=/dashboard/org-admin",
+    title: "Diagram Type Sort Order",
+    description:
+      "The order diagram types are listed across the app and in the project Diagram Type sort.",
+  },
 ];
 
 /**

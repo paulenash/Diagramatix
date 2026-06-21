@@ -22,8 +22,8 @@ import {
   DEFAULT_DIAGRAM_TYPE_STYLES,
   EDITABLE_DIAGRAM_TYPE_KEYS,
   isHexColor,
-  type DiagramTypeStyle,
 } from "@/app/lib/diagram/diagramTypeStyles";
+import { effectiveDiagramTypeStyles as effectiveStyles } from "@/app/lib/diagram/diagramTypeStyleServer";
 
 interface StyleInput {
   typeKey?: string;
@@ -33,18 +33,6 @@ interface StyleInput {
 }
 
 const EDITABLE = new Set(EDITABLE_DIAGRAM_TYPE_KEYS);
-
-/** Build the effective list: defaults overlaid with DB override rows. */
-async function effectiveStyles(): Promise<DiagramTypeStyle[]> {
-  const rows = await prisma.diagramTypeStyle.findMany();
-  const byKey = new Map(rows.map((r) => [r.typeKey, r]));
-  return DEFAULT_DIAGRAM_TYPE_STYLES.map((d) => {
-    const o = byKey.get(d.typeKey);
-    return o
-      ? { ...d, code: o.code, bgColor: o.bgColor, textColor: o.textColor }
-      : d;
-  }).sort((a, b) => a.sortOrder - b.sortOrder);
-}
 
 export async function GET() {
   const session = await auth();

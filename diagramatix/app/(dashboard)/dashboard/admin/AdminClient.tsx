@@ -731,6 +731,7 @@ const ADMIN_TILES: AdminTile[] = [
   { id: "scanner-rules", title: "BPMN Scanner Rules", description: "Rules used by the diagram issue scanner.", href: "/dashboard/admin/scanner-rules" },
   { id: "bubble-help", title: "Bubble Help", description: "The contextual help-cloud topics shown in the editor.", href: "/dashboard/admin/bubble-help" },
   { id: "diagram-types", title: "Diagram Types", description: "The 2-character codes and pastel colours shown per diagram type.", href: "/dashboard/admin/diagram-types?from=/dashboard/admin" },
+  { id: "diagram-type-sort", title: "Diagram Type Sort Order", description: "The order diagram types are listed across the app and in the project Diagram Type sort.", href: "/dashboard/diagram-type-sort-order?from=/dashboard/admin" },
   { id: "prompts", title: "AI Prompt Maintenance", description: "Maintain your own saved AI generation prompts.", href: "/dashboard/prompts?from=/dashboard/admin" },
   { id: "notifications", title: "Notifications & Feedback", description: "Inspect any user's notification feed — filter by Org & User.", href: "/notifications?from=/dashboard/admin" },
 ];
