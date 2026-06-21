@@ -178,41 +178,65 @@ INSERT INTO "Feature" ("id","name","summary","details","hidden","sortOrder","pub
 UPDATE "Feature" SET "summary"='Connectors that route cleanly around obstacles — no manual zig-zagging.', "details"='- Orthogonal (rectilinear), curvilinear (Bézier), and direct modes per connector
 - Automatic hump-over crossings where sequence flows pass each other
 - Smart endpoint slots on every side with edge-aware routing
-- Waypoint editing for fine-grained control without losing the auto-routing fallback',
+- Waypoint editing for fine-grained control without losing the auto-routing fallback
+- Auto-connect on drop — newly placed activities, gateways and events wire themselves to their natural neighbours (toggle ON / incoming-only / OFF)
+- Group auto-connect — select a cluster of activities, gateways and events and stitch them into a legally-connected process fragment in one action; double-click a gateway to fan a whole group of branches out from it
+- Connections obey BPMN rules — never into a start event or out of an end event, never across a pool boundary, and gateway branches carry their own option labels',
   "publishedName"="name", "publishedSummary"='Connectors that route cleanly around obstacles — no manual zig-zagging.', "publishedDetails"='- Orthogonal (rectilinear), curvilinear (Bézier), and direct modes per connector
 - Automatic hump-over crossings where sequence flows pass each other
 - Smart endpoint slots on every side with edge-aware routing
-- Waypoint editing for fine-grained control without losing the auto-routing fallback',
+- Waypoint editing for fine-grained control without losing the auto-routing fallback
+- Auto-connect on drop — newly placed activities, gateways and events wire themselves to their natural neighbours (toggle ON / incoming-only / OFF)
+- Group auto-connect — select a cluster of activities, gateways and events and stitch them into a legally-connected process fragment in one action; double-click a gateway to fan a whole group of branches out from it
+- Connections obey BPMN rules — never into a start event or out of an end event, never across a pool boundary, and gateway branches carry their own option labels',
   "publishedHidden"="hidden", "publishedSortOrder"="sortOrder", "publishedAt"=now(), "updatedAt"=now()
 WHERE "name"='Smart Connector Routing';
 INSERT INTO "Feature" ("id","name","summary","details","hidden","sortOrder","publishedName","publishedSummary","publishedDetails","publishedHidden","publishedSortOrder","publishedAt","createdAt","updatedAt")
   SELECT gen_random_uuid()::text, 'Smart Connector Routing', 'Connectors that route cleanly around obstacles — no manual zig-zagging.', '- Orthogonal (rectilinear), curvilinear (Bézier), and direct modes per connector
 - Automatic hump-over crossings where sequence flows pass each other
 - Smart endpoint slots on every side with edge-aware routing
-- Waypoint editing for fine-grained control without losing the auto-routing fallback', false, 60, 'Smart Connector Routing', 'Connectors that route cleanly around obstacles — no manual zig-zagging.', '- Orthogonal (rectilinear), curvilinear (Bézier), and direct modes per connector
+- Waypoint editing for fine-grained control without losing the auto-routing fallback
+- Auto-connect on drop — newly placed activities, gateways and events wire themselves to their natural neighbours (toggle ON / incoming-only / OFF)
+- Group auto-connect — select a cluster of activities, gateways and events and stitch them into a legally-connected process fragment in one action; double-click a gateway to fan a whole group of branches out from it
+- Connections obey BPMN rules — never into a start event or out of an end event, never across a pool boundary, and gateway branches carry their own option labels', false, 60, 'Smart Connector Routing', 'Connectors that route cleanly around obstacles — no manual zig-zagging.', '- Orthogonal (rectilinear), curvilinear (Bézier), and direct modes per connector
 - Automatic hump-over crossings where sequence flows pass each other
 - Smart endpoint slots on every side with edge-aware routing
-- Waypoint editing for fine-grained control without losing the auto-routing fallback', false, 60, now(), now(), now()
+- Waypoint editing for fine-grained control without losing the auto-routing fallback
+- Auto-connect on drop — newly placed activities, gateways and events wire themselves to their natural neighbours (toggle ON / incoming-only / OFF)
+- Group auto-connect — select a cluster of activities, gateways and events and stitch them into a legally-connected process fragment in one action; double-click a gateway to fan a whole group of branches out from it
+- Connections obey BPMN rules — never into a start event or out of an end event, never across a pool boundary, and gateway branches carry their own option labels', false, 60, now(), now(), now()
   WHERE NOT EXISTS (SELECT 1 FROM "Feature" WHERE "name"='Smart Connector Routing');
 
 -- Microsoft Visio Round-Trip
 UPDATE "Feature" SET "summary"='Author in Diagramatix, share with Visio users, get edits back — no loss in translation.', "details"='- Export any BPMN diagram as a native `.vsdx` file
 - Dedicated "Diagramatix Shapes" v1.6 stencil with proper BPMN markers
-- Re-import Visio-edited `.vsdx` back into Diagramatix with style preserved
+- Re-import a Visio-edited `.vsdx` back into Diagramatix with style preserved
+- Multi-diagram import — open a multi-page `.vsdx` and turn its pages into separate Diagramatix diagrams; tick exactly which pages you want and send them to a new or existing project under a named folder
+- An import report shows shapes and connectors created, anything skipped, and a per-master breakdown so nothing lands silently
+- Newly-imported diagrams pair with the connector/structure health check and automatic sub-process linking (see those features) so a Visio set arrives properly wired, not just drawn
 - Free downloadable stencil for recipients editing in Visio',
   "publishedName"="name", "publishedSummary"='Author in Diagramatix, share with Visio users, get edits back — no loss in translation.', "publishedDetails"='- Export any BPMN diagram as a native `.vsdx` file
 - Dedicated "Diagramatix Shapes" v1.6 stencil with proper BPMN markers
-- Re-import Visio-edited `.vsdx` back into Diagramatix with style preserved
+- Re-import a Visio-edited `.vsdx` back into Diagramatix with style preserved
+- Multi-diagram import — open a multi-page `.vsdx` and turn its pages into separate Diagramatix diagrams; tick exactly which pages you want and send them to a new or existing project under a named folder
+- An import report shows shapes and connectors created, anything skipped, and a per-master breakdown so nothing lands silently
+- Newly-imported diagrams pair with the connector/structure health check and automatic sub-process linking (see those features) so a Visio set arrives properly wired, not just drawn
 - Free downloadable stencil for recipients editing in Visio',
   "publishedHidden"="hidden", "publishedSortOrder"="sortOrder", "publishedAt"=now(), "updatedAt"=now()
 WHERE "name"='Microsoft Visio Round-Trip';
 INSERT INTO "Feature" ("id","name","summary","details","hidden","sortOrder","publishedName","publishedSummary","publishedDetails","publishedHidden","publishedSortOrder","publishedAt","createdAt","updatedAt")
   SELECT gen_random_uuid()::text, 'Microsoft Visio Round-Trip', 'Author in Diagramatix, share with Visio users, get edits back — no loss in translation.', '- Export any BPMN diagram as a native `.vsdx` file
 - Dedicated "Diagramatix Shapes" v1.6 stencil with proper BPMN markers
-- Re-import Visio-edited `.vsdx` back into Diagramatix with style preserved
+- Re-import a Visio-edited `.vsdx` back into Diagramatix with style preserved
+- Multi-diagram import — open a multi-page `.vsdx` and turn its pages into separate Diagramatix diagrams; tick exactly which pages you want and send them to a new or existing project under a named folder
+- An import report shows shapes and connectors created, anything skipped, and a per-master breakdown so nothing lands silently
+- Newly-imported diagrams pair with the connector/structure health check and automatic sub-process linking (see those features) so a Visio set arrives properly wired, not just drawn
 - Free downloadable stencil for recipients editing in Visio', false, 70, 'Microsoft Visio Round-Trip', 'Author in Diagramatix, share with Visio users, get edits back — no loss in translation.', '- Export any BPMN diagram as a native `.vsdx` file
 - Dedicated "Diagramatix Shapes" v1.6 stencil with proper BPMN markers
-- Re-import Visio-edited `.vsdx` back into Diagramatix with style preserved
+- Re-import a Visio-edited `.vsdx` back into Diagramatix with style preserved
+- Multi-diagram import — open a multi-page `.vsdx` and turn its pages into separate Diagramatix diagrams; tick exactly which pages you want and send them to a new or existing project under a named folder
+- An import report shows shapes and connectors created, anything skipped, and a per-master breakdown so nothing lands silently
+- Newly-imported diagrams pair with the connector/structure health check and automatic sub-process linking (see those features) so a Visio set arrives properly wired, not just drawn
 - Free downloadable stencil for recipients editing in Visio', false, 70, now(), now(), now()
   WHERE NOT EXISTS (SELECT 1 FROM "Feature" WHERE "name"='Microsoft Visio Round-Trip');
 
@@ -712,5 +736,55 @@ INSERT INTO "Feature" ("id","name","summary","details","hidden","sortOrder","pub
 - A brand-new name prompts where it belongs in the hierarchy and is saved to the project structure on the spot
 - Maintained by Project Owners, OrgAdmins and SuperAdmins, with role-appropriate options', false, 280, now(), now(), now()
   WHERE NOT EXISTS (SELECT 1 FROM "Feature" WHERE "name"='Entity Lists — Governed Pool & Lane Naming');
+
+-- Diagram Health Check & Connector Scan
+UPDATE "Feature" SET "summary"='Scan a whole project for BPMN connector and structure problems — especially handy after a Visio import — and fix them one at a time, each highlighted on its own diagram.', "details"='- Project-wide scan against shared BPMN correctness rules: sequence / association connectors illegally attached to pools or lanes, hanging message flows, single-lane pools, duplicate element names and other structural slips
+- Every issue is grouped by diagram and carries the offending element and connector ids, so it lights up directly on the canvas
+- Scan → Fix → Re-scan rhythm: jump to an issue, correct it in the editor, and re-run to confirm it''s cleared — the cycle remembers where you were
+- Purpose-built for cleaning up imported Visio diagrams, where connector attachment is the single most common thing to repair
+- SuperAdmin-editable scanner rules decide which checks run, so the health check matches your house BPMN conventions',
+  "publishedName"="name", "publishedSummary"='Scan a whole project for BPMN connector and structure problems — especially handy after a Visio import — and fix them one at a time, each highlighted on its own diagram.', "publishedDetails"='- Project-wide scan against shared BPMN correctness rules: sequence / association connectors illegally attached to pools or lanes, hanging message flows, single-lane pools, duplicate element names and other structural slips
+- Every issue is grouped by diagram and carries the offending element and connector ids, so it lights up directly on the canvas
+- Scan → Fix → Re-scan rhythm: jump to an issue, correct it in the editor, and re-run to confirm it''s cleared — the cycle remembers where you were
+- Purpose-built for cleaning up imported Visio diagrams, where connector attachment is the single most common thing to repair
+- SuperAdmin-editable scanner rules decide which checks run, so the health check matches your house BPMN conventions',
+  "publishedHidden"="hidden", "publishedSortOrder"="sortOrder", "publishedAt"=now(), "updatedAt"=now()
+WHERE "name"='Diagram Health Check & Connector Scan';
+INSERT INTO "Feature" ("id","name","summary","details","hidden","sortOrder","publishedName","publishedSummary","publishedDetails","publishedHidden","publishedSortOrder","publishedAt","createdAt","updatedAt")
+  SELECT gen_random_uuid()::text, 'Diagram Health Check & Connector Scan', 'Scan a whole project for BPMN connector and structure problems — especially handy after a Visio import — and fix them one at a time, each highlighted on its own diagram.', '- Project-wide scan against shared BPMN correctness rules: sequence / association connectors illegally attached to pools or lanes, hanging message flows, single-lane pools, duplicate element names and other structural slips
+- Every issue is grouped by diagram and carries the offending element and connector ids, so it lights up directly on the canvas
+- Scan → Fix → Re-scan rhythm: jump to an issue, correct it in the editor, and re-run to confirm it''s cleared — the cycle remembers where you were
+- Purpose-built for cleaning up imported Visio diagrams, where connector attachment is the single most common thing to repair
+- SuperAdmin-editable scanner rules decide which checks run, so the health check matches your house BPMN conventions', false, 290, 'Diagram Health Check & Connector Scan', 'Scan a whole project for BPMN connector and structure problems — especially handy after a Visio import — and fix them one at a time, each highlighted on its own diagram.', '- Project-wide scan against shared BPMN correctness rules: sequence / association connectors illegally attached to pools or lanes, hanging message flows, single-lane pools, duplicate element names and other structural slips
+- Every issue is grouped by diagram and carries the offending element and connector ids, so it lights up directly on the canvas
+- Scan → Fix → Re-scan rhythm: jump to an issue, correct it in the editor, and re-run to confirm it''s cleared — the cycle remembers where you were
+- Purpose-built for cleaning up imported Visio diagrams, where connector attachment is the single most common thing to repair
+- SuperAdmin-editable scanner rules decide which checks run, so the health check matches your house BPMN conventions', false, 290, now(), now(), now()
+  WHERE NOT EXISTS (SELECT 1 FROM "Feature" WHERE "name"='Diagram Health Check & Connector Scan');
+
+-- Automatic Diagram Linking
+UPDATE "Feature" SET "summary"='Let Diagramatix wire up the sub-process links across a project for you — match each sub-process to the diagram that details it by name or process number, then confirm in one dialog.', "details"='- Scans every BPMN diagram in the project for un-linked sub-processes and finds the diagram that expands each one
+- Exact-name matches are treated as definite and pre-selected; looser matches are offered as probable for you to confirm
+- Heuristics built for real-world naming: a shared leading process code (e.g. ABC123.45), matching descriptive text after the code, one name contained inside another, or a close edit-distance spelling match
+- Review everything in a single dialog — tick the links to add, untick existing links to remove — then apply in one step
+- Turns a freshly-imported set of diagrams (e.g. a Visio bundle) into a properly drill-down-navigable hierarchy in seconds',
+  "publishedName"="name", "publishedSummary"='Let Diagramatix wire up the sub-process links across a project for you — match each sub-process to the diagram that details it by name or process number, then confirm in one dialog.', "publishedDetails"='- Scans every BPMN diagram in the project for un-linked sub-processes and finds the diagram that expands each one
+- Exact-name matches are treated as definite and pre-selected; looser matches are offered as probable for you to confirm
+- Heuristics built for real-world naming: a shared leading process code (e.g. ABC123.45), matching descriptive text after the code, one name contained inside another, or a close edit-distance spelling match
+- Review everything in a single dialog — tick the links to add, untick existing links to remove — then apply in one step
+- Turns a freshly-imported set of diagrams (e.g. a Visio bundle) into a properly drill-down-navigable hierarchy in seconds',
+  "publishedHidden"="hidden", "publishedSortOrder"="sortOrder", "publishedAt"=now(), "updatedAt"=now()
+WHERE "name"='Automatic Diagram Linking';
+INSERT INTO "Feature" ("id","name","summary","details","hidden","sortOrder","publishedName","publishedSummary","publishedDetails","publishedHidden","publishedSortOrder","publishedAt","createdAt","updatedAt")
+  SELECT gen_random_uuid()::text, 'Automatic Diagram Linking', 'Let Diagramatix wire up the sub-process links across a project for you — match each sub-process to the diagram that details it by name or process number, then confirm in one dialog.', '- Scans every BPMN diagram in the project for un-linked sub-processes and finds the diagram that expands each one
+- Exact-name matches are treated as definite and pre-selected; looser matches are offered as probable for you to confirm
+- Heuristics built for real-world naming: a shared leading process code (e.g. ABC123.45), matching descriptive text after the code, one name contained inside another, or a close edit-distance spelling match
+- Review everything in a single dialog — tick the links to add, untick existing links to remove — then apply in one step
+- Turns a freshly-imported set of diagrams (e.g. a Visio bundle) into a properly drill-down-navigable hierarchy in seconds', false, 300, 'Automatic Diagram Linking', 'Let Diagramatix wire up the sub-process links across a project for you — match each sub-process to the diagram that details it by name or process number, then confirm in one dialog.', '- Scans every BPMN diagram in the project for un-linked sub-processes and finds the diagram that expands each one
+- Exact-name matches are treated as definite and pre-selected; looser matches are offered as probable for you to confirm
+- Heuristics built for real-world naming: a shared leading process code (e.g. ABC123.45), matching descriptive text after the code, one name contained inside another, or a close edit-distance spelling match
+- Review everything in a single dialog — tick the links to add, untick existing links to remove — then apply in one step
+- Turns a freshly-imported set of diagrams (e.g. a Visio bundle) into a properly drill-down-navigable hierarchy in seconds', false, 300, now(), now(), now()
+  WHERE NOT EXISTS (SELECT 1 FROM "Feature" WHERE "name"='Automatic Diagram Linking');
 
 COMMIT;
