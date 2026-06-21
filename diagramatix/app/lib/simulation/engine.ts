@@ -18,7 +18,7 @@ import { makeRng, type Rng } from "./rng";
 import { sample } from "./distributions";
 import { compileExpr, type CompiledExpr, type Value } from "./expr";
 import type { SimNetwork, SimNode, SimEdge, EventSub } from "./model";
-import type { SimRunConfig, PlannedIntervention } from "./types";
+import { SECONDS_PER_UNIT, type SimRunConfig, type PlannedIntervention } from "./types";
 import type { RepStats, NodeStat } from "./statistics";
 
 type EventType = "GENERATE" | "SERVICE_END" | "RESUME" | "EVENT_TRIGGER" | "INTERVENTION";
@@ -91,6 +91,8 @@ export class Engine {
   private arrivalMult = new Map<string, number>();
   private edgeProb = new Map<string, number>();
   private planned: PlannedIntervention[] = [];
+  // teamId → cost per hour; drives per-team cost in finalize (0 if unpriced).
+  private teamCosts: Record<string, number> = {};
   // accumulators
   private arrived = 0;
   private completed = 0;
@@ -107,11 +109,12 @@ export class Engine {
   private tracing = false;
   private maxTrace = 200000;
 
-  constructor(private network: SimNetwork, private config: SimRunConfig, rng?: Rng, opts?: { trace?: boolean; maxTrace?: number; planned?: PlannedIntervention[] }) {
+  constructor(private network: SimNetwork, private config: SimRunConfig, rng?: Rng, opts?: { trace?: boolean; maxTrace?: number; planned?: PlannedIntervention[]; teamCosts?: Record<string, number> }) {
     this.rng = rng ?? makeRng(config.seed);
     this.tracing = opts?.trace ?? false;
     if (opts?.maxTrace) this.maxTrace = opts.maxTrace;
     if (opts?.planned) this.planned = opts.planned;
+    if (opts?.teamCosts) this.teamCosts = opts.teamCosts;
     this.warmedUp = config.warmUp <= 0;
     for (const n of network.nodes) this.nodeById.set(n.id, n);
     for (const e of network.edges) {
@@ -519,7 +522,13 @@ export class Engine {
     const perNode: Record<string, NodeStat> = {};
     for (const [id, a] of this.perNode) perNode[id] = { count: a.count, avgWait: a.count ? a.waitSum / a.count : 0 };
     const perTeam: RepStats["perTeam"] = {};
-    for (const [id, p] of this.pools) perTeam[id] = p.stats(now);
+    // busyTime is in clock units; cost = busy-hours × costPerHour.
+    const hoursPerUnit = SECONDS_PER_UNIT[this.config.clockUnit] / 3600;
+    for (const [id, p] of this.pools) {
+      const s = p.stats(now);
+      const cost = s.busyTime * hoursPerUnit * (this.teamCosts[id] ?? 0);
+      perTeam[id] = { utilization: s.utilization, avgQueue: s.avgQueue, maxQueue: s.maxQueue, cost };
+    }
     return {
       arrived: this.arrived,
       completed: this.completed,

@@ -22,7 +22,7 @@ import {
 
 interface DiagramLite { id: string; name: string }
 interface StudyRow { id: string; name: string; _count?: { roots: number; scenarios: number } }
-interface ScenarioRow { id: string; name: string; isBaseline: boolean; status: string; runConfig: ScenarioRunConfig; overrides: unknown }
+interface ScenarioRow { id: string; name: string; isBaseline: boolean; status: string; runConfig: ScenarioRunConfig; overrides: unknown; variantRootIds?: string[] }
 interface StudyDetail { id: string; name: string; roots: { diagram: DiagramLite }[]; scenarios: ScenarioRow[] }
 
 const CLOCK_UNITS: ClockUnit[] = ["second", "minute", "hour", "day"];
@@ -124,7 +124,7 @@ export function StudyManager({ projectId, isAdmin }: { projectId: string | null;
       {detail && (
         <div className="flex flex-col gap-3 pt-2 border-t border-green-500/30">
           <RootPicker diagrams={diagrams} roots={new Set(detail.roots.map((r) => r.diagram.id))} onToggle={toggleRoot} />
-          <ScenarioList projectId={projectId} detail={detail} onChanged={() => loadDetail(detail.id)} />
+          <ScenarioList projectId={projectId} detail={detail} diagrams={diagrams} onChanged={() => loadDetail(detail.id)} />
           {isAdmin && <SaveAsExample projectId={projectId} studyId={detail.id} defaultTitle={detail.name} />}
         </div>
       )}
@@ -149,10 +149,11 @@ function RootPicker({ diagrams, roots, onToggle }: { diagrams: DiagramLite[]; ro
   );
 }
 
-function ScenarioList({ projectId, detail, onChanged }: { projectId: string; detail: StudyDetail; onChanged: () => void }) {
+function ScenarioList({ projectId, detail, diagrams, onChanged }: { projectId: string; detail: StudyDetail; diagrams: DiagramLite[]; onChanged: () => void }) {
   const [newName, setNewName] = useState("");
   const [openId, setOpenId] = useState<string | null>(null);
   const [comparing, setComparing] = useState(false);
+  const [pairing, setPairing] = useState(false);
 
   const base = `/api/projects/${projectId}/simulation/studies/${detail.id}/scenarios`;
 
@@ -171,6 +172,20 @@ function ScenarioList({ projectId, detail, onChanged }: { projectId: string; det
     onChanged();
   }
 
+  /** Create an "As-is" + "To-be" scenario pair, each pinned to a diagram. */
+  async function createAsIsToBe(asIsId: string, toBeId: string) {
+    const mk = async (name: string, isBaseline: boolean, diagramId: string) => {
+      const res = await fetch(base, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, isBaseline }) });
+      if (!res.ok) return;
+      const id = (await res.json().catch(() => ({})))?.scenario?.id;
+      if (id) await fetch(`${base}/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ variantRootIds: [diagramId] }) });
+    };
+    await mk("As-is", true, asIsId);
+    await mk("To-be", false, toBeId);
+    setPairing(false);
+    onChanged();
+  }
+
   async function deleteScenario(scenarioId: string) {
     await fetch(`${base}/${scenarioId}`, { method: "DELETE" });
     if (openId === scenarioId) setOpenId(null);
@@ -181,12 +196,20 @@ function ScenarioList({ projectId, detail, onChanged }: { projectId: string; det
     <div>
       <div className="flex items-center justify-between mb-1">
         <p className="text-green-400/70 uppercase tracking-widest text-[10px]">Scenarios</p>
-        {detail.scenarios.length >= 2 && (
-          <button onClick={() => setComparing((v) => !v)} className="text-green-400/70 hover:text-green-300 text-[10px]">
-            {comparing ? "▾ hide compare" : "⇄ compare scenarios"}
-          </button>
-        )}
+        <div className="flex items-center gap-3">
+          {diagrams.length >= 2 && (
+            <button onClick={() => setPairing((v) => !v)} className="text-green-400/70 hover:text-green-300 text-[10px]">
+              {pairing ? "▾ hide" : "⇄ set up As-is vs To-be"}
+            </button>
+          )}
+          {detail.scenarios.length >= 2 && (
+            <button onClick={() => setComparing((v) => !v)} className="text-green-400/70 hover:text-green-300 text-[10px]">
+              {comparing ? "▾ hide compare" : "⇄ compare scenarios"}
+            </button>
+          )}
+        </div>
       </div>
+      {pairing && <AsIsToBeSetup diagrams={diagrams} onCreate={createAsIsToBe} />}
       {comparing && detail.scenarios.length >= 2 && (
         <div className="border border-green-500/30 rounded p-2 mb-2">
           <ScenarioCompare scenarios={detail.scenarios} runUrlFor={(sid) => `${base}/${sid}/run`} />
@@ -208,7 +231,11 @@ function ScenarioList({ projectId, detail, onChanged }: { projectId: string; det
             </div>
             {openId === s.id && (
               <div className="px-2 pb-2 border-t border-green-500/20 pt-2">
-                <ScenarioEditor scenario={s} runUrl={`${base}/${s.id}/run`} onSave={(cfg) => patchScenario(s.id, { runConfig: cfg })} />
+                <ScenarioEditor
+                  scenario={s} runUrl={`${base}/${s.id}/run`} diagrams={diagrams}
+                  onSave={(cfg) => patchScenario(s.id, { runConfig: cfg })}
+                  onSetVariant={(ids) => patchScenario(s.id, { variantRootIds: ids })}
+                />
               </div>
             )}
           </div>
@@ -234,8 +261,28 @@ interface RunSummary {
   topUtil: number;
 }
 
-function ScenarioEditor({ scenario, runUrl, onSave }: { scenario: ScenarioRow; runUrl: string; onSave: (cfg: ScenarioRunConfig) => void }) {
+/** Quick "As-is vs To-be" pair builder — pick the two variant diagrams. */
+function AsIsToBeSetup({ diagrams, onCreate }: { diagrams: DiagramLite[]; onCreate: (asIsId: string, toBeId: string) => void }) {
+  const [asIs, setAsIs] = useState(diagrams[0]?.id ?? "");
+  const [toBe, setToBe] = useState(diagrams[1]?.id ?? diagrams[0]?.id ?? "");
+  const sel = "bg-black border border-green-500/40 rounded px-1 py-0.5 text-green-200 text-[11px] [color-scheme:dark]";
+  return (
+    <div className="border border-green-500/30 rounded p-2 mb-2 flex flex-col gap-1.5 text-[11px]">
+      <p className="text-green-400/70">Creates an <span className="text-green-300">As-is</span> (baseline) + <span className="text-green-300">To-be</span> scenario, each pinned to a diagram. Tip: duplicate your process on the project screen, redesign the copy, then pair them here.</p>
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-green-400/50">As-is</span>
+        <select value={asIs} onChange={(e) => setAsIs(e.target.value)} className={sel}>{diagrams.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select>
+        <span className="text-green-400/50">→ To-be</span>
+        <select value={toBe} onChange={(e) => setToBe(e.target.value)} className={sel}>{diagrams.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select>
+        <MatrixButton onClick={() => asIs && toBe && onCreate(asIs, toBe)}>Create pair</MatrixButton>
+      </div>
+    </div>
+  );
+}
+
+function ScenarioEditor({ scenario, runUrl, diagrams, onSave, onSetVariant }: { scenario: ScenarioRow; runUrl: string; diagrams: DiagramLite[]; onSave: (cfg: ScenarioRunConfig) => void; onSetVariant: (ids: string[]) => void }) {
   const initial: ScenarioRunConfig = { ...DEFAULT_RUN_CONFIG, ...(scenario.runConfig ?? {}) };
+  const variantId = scenario.variantRootIds?.[0] ?? "";
   const [cfg, setCfg] = useState<ScenarioRunConfig>(initial);
   const [dirty, setDirty] = useState(false);
   const [running, setRunning] = useState(false);
@@ -285,6 +332,17 @@ function ScenarioEditor({ scenario, runUrl, onSave }: { scenario: ScenarioRow; r
 
   return (
     <div className="flex flex-col gap-2">
+      {/* Process variant (As-is vs To-be): which diagram this scenario runs. */}
+      <Labelled label="Process variant (As-is / To-be)">
+        <select
+          value={variantId}
+          onChange={(e) => onSetVariant(e.target.value ? [e.target.value] : [])}
+          className="w-full bg-black border border-green-500/40 rounded px-1 py-0.5 text-green-200 text-[11px] [color-scheme:dark]"
+        >
+          <option value="">(study process)</option>
+          {diagrams.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+        </select>
+      </Labelled>
       <div className="grid grid-cols-3 gap-2">
         <Labelled label="Clock unit">
           <select value={cfg.clockUnit} onChange={(e) => set({ clockUnit: e.target.value as ClockUnit })} className="w-full bg-black border border-green-500/40 rounded px-1 py-0.5 text-green-200 [color-scheme:dark]">

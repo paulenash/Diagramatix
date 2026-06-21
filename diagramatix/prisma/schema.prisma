@@ -987,6 +987,10 @@ model SimulationScenario {
   isBaseline Boolean         @default(false)
   runConfig  Json            @default("{}")
   overrides  Json            @default("{}")
+  // Optional process VARIANT: diagram ids this scenario runs instead of the
+  // study's roots — the basis of As-is vs To-be comparison (each scenario can
+  // run a structurally different diagram). Empty array = inherit study roots.
+  variantRootIds Json        @default("[]")
   status     String          @default("DRAFT")
   runs       SimulationRun[]
   createdAt  DateTime        @default(now())

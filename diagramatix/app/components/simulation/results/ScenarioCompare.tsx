@@ -7,9 +7,37 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
-import { type RunMetrics, type RunRow, fmtDelta } from "@/app/lib/simulation/results";
+import { type RunMetrics, type RunRow, fmtDelta, fmtMoney } from "@/app/lib/simulation/results";
 
 interface ScenarioLite { id: string; name: string; isBaseline: boolean }
+
+/** One-line As-is→To-be verdict: speed, throughput, cost/case, FTE freed. */
+function verdict(base: RunMetrics, tobe: RunMetrics, name: string): string {
+  const parts: string[] = [];
+  const bFlow = base.stats.flowTime.mean, tFlow = tobe.stats.flowTime.mean;
+  if (bFlow > 0) {
+    const d = ((bFlow - tFlow) / bFlow) * 100;
+    parts.push(`${Math.abs(d).toFixed(0)}% ${d >= 0 ? "faster" : "slower"}`);
+  }
+  const bThru = base.stats.completed.mean, tThru = tobe.stats.completed.mean;
+  if (bThru > 0) {
+    const d = ((tThru - bThru) / bThru) * 100;
+    if (Math.abs(d) >= 1) parts.push(`${d >= 0 ? "+" : ""}${d.toFixed(0)}% throughput`);
+  }
+  const bCpc = base.stats.costPerCase?.mean ?? 0, tCpc = tobe.stats.costPerCase?.mean ?? 0;
+  if (bCpc > 0 || tCpc > 0) {
+    const save = bCpc - tCpc;
+    parts.push(`${fmtMoney(Math.abs(save))} ${save >= 0 ? "less" : "more"} per case`);
+  }
+  // FTE freed on the as-is bottleneck team.
+  const top = base.bottlenecks[0];
+  const cap = top ? base.teamCapacities?.[top] : undefined;
+  if (top && cap) {
+    const fte = ((base.stats.perTeam[top]?.utilization.mean ?? 0) - (tobe.stats.perTeam[top]?.utilization.mean ?? 0)) * cap;
+    if (Math.abs(fte) >= 0.1) parts.push(`frees ≈${fte.toFixed(1)} FTE of ${top}`);
+  }
+  return `${name}: ${parts.join(", ")}.`;
+}
 
 export function ScenarioCompare({ scenarios, runUrlFor }: { scenarios: ScenarioLite[]; runUrlFor: (scenarioId: string) => string }) {
   const [byId, setById] = useState<Record<string, RunMetrics | null>>({});
@@ -42,18 +70,32 @@ export function ScenarioCompare({ scenarios, runUrlFor }: { scenarios: ScenarioL
     return top ? m.stats.perTeam[top]?.utilization.mean : undefined;
   };
 
-  const rows: { label: string; get: (m: RunMetrics | null) => number | undefined; digits: number; pct?: boolean }[] = [
+  const rows: { label: string; get: (m: RunMetrics | null) => number | undefined; digits: number; pct?: boolean; money?: boolean }[] = [
     { label: "Completed", get: (m) => m?.stats.completed.mean, digits: 0 },
     { label: "Flow p50", get: (m) => m?.stats.flowTime.p50, digits: 1 },
     { label: "Flow p95", get: (m) => m?.stats.flowTime.p95, digits: 1 },
     { label: "Top util", get: topUtil, digits: 2, pct: true },
+    { label: "Cost / case", get: (m) => m?.stats.costPerCase?.mean, digits: 0, money: true },
+    { label: "Total cost", get: (m) => m?.stats.totalCost?.mean, digits: 0, money: true },
   ];
 
   const ran = scenarios.filter((s) => byId[s.id]);
   if (loading && ran.length === 0) return <p className="text-green-400/50 text-[10px]">Loading runs…</p>;
   if (ran.length === 0) return <p className="text-green-400/50 text-[10px]">No runs yet — run a scenario or two, then compare.</p>;
 
+  // Verdict lines: each non-baseline (To-be) scenario vs the baseline (As-is).
+  const verdicts = baseM
+    ? scenarios.filter((s) => !s.isBaseline && byId[s.id]).map((s) => verdict(baseM, byId[s.id]!, s.name))
+    : [];
+
   return (
+    <>
+    {verdicts.length > 0 && (
+      <div className="mb-2 border border-green-500/40 rounded bg-green-400/5 px-2 py-1.5">
+        <div className="text-green-400/60 uppercase tracking-widest text-[9px] mb-0.5">As-is → To-be verdict</div>
+        {verdicts.map((v, i) => <div key={i} className="text-green-200 text-[11px]">{v}</div>)}
+      </div>
+    )}
     <table className="w-full border-collapse text-[10px] text-green-300/90">
       <thead>
         <tr className="border-b border-green-500/30">
@@ -75,8 +117,12 @@ export function ScenarioCompare({ scenarios, runUrlFor }: { scenarios: ScenarioL
                 const m = byId[s.id] ?? null;
                 const v = row.get(m);
                 if (v === undefined) return <td key={s.id} className="py-0.5 text-right text-green-400/30">—</td>;
-                const shown = row.pct ? `${(v * 100).toFixed(0)}%` : v.toFixed(row.digits);
-                const delta = s.isBaseline ? "" : fmtDelta(row.pct ? v * 100 : v, baseVal === undefined ? undefined : (row.pct ? baseVal * 100 : baseVal), row.pct ? 0 : row.digits);
+                const shown = row.money ? fmtMoney(v) : row.pct ? `${(v * 100).toFixed(0)}%` : v.toFixed(row.digits);
+                let delta = "";
+                if (!s.isBaseline && baseVal !== undefined) {
+                  if (row.money) { const d = v - baseVal; delta = `${d >= 0 ? "+" : "−"}${fmtMoney(Math.abs(d))}`; }
+                  else delta = fmtDelta(row.pct ? v * 100 : v, row.pct ? baseVal * 100 : baseVal, row.pct ? 0 : row.digits);
+                }
                 return (
                   <td key={s.id} className="py-0.5 text-right tabular-nums">
                     <span className="text-green-200">{shown}</span>
@@ -92,5 +138,6 @@ export function ScenarioCompare({ scenarios, runUrlFor }: { scenarios: ScenarioL
         <tr><td colSpan={scenarios.length + 1} className="pt-1 text-green-400/40">◆ baseline · deltas are vs baseline.</td></tr>
       </tfoot>
     </table>
+    </>
   );
 }

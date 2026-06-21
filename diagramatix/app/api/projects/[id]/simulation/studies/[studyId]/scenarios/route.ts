@@ -33,12 +33,13 @@ export async function POST(req: Request, { params }: Params) {
   // Clone source config/overrides when duplicating, else start from defaults.
   let runConfig: unknown = { ...DEFAULT_RUN_CONFIG };
   let overrides: unknown = {};
+  let variantRootIds: unknown = [];
   if (typeof body.duplicateOf === "string") {
     const src = await prisma.simulationScenario.findFirst({
       where: { id: body.duplicateOf, studyId },
-      select: { runConfig: true, overrides: true },
+      select: { runConfig: true, overrides: true, variantRootIds: true },
     });
-    if (src) { runConfig = src.runConfig; overrides = src.overrides; }
+    if (src) { runConfig = src.runConfig; overrides = src.overrides; variantRootIds = src.variantRootIds; }
   }
 
   const isBaseline = body.isBaseline === true;
@@ -54,6 +55,8 @@ export async function POST(req: Request, { params }: Params) {
       runConfig: runConfig as any,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       overrides: overrides as any,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      variantRootIds: variantRootIds as any,
     },
   });
   return NextResponse.json({ scenario }, { status: 201 });

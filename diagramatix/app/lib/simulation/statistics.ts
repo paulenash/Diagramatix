@@ -11,6 +11,7 @@ export interface TeamStat {
   utilization: number;
   avgQueue: number;
   maxQueue: number;
+  cost: number; // team cost this replication (busy hours × costPerHour)
 }
 
 /** One replication's results. */
@@ -44,8 +45,12 @@ export interface AggregatedStats {
   arrived: Stat;
   completed: Stat;
   flowTime: Stat;
+  /** Total resource cost across all teams (busy hours × rate). */
+  totalCost: Stat;
+  /** Cost per completed case (totalCost / completed). */
+  costPerCase: Stat;
   perNode: Record<string, { count: Stat; wait: Stat }>;
-  perTeam: Record<string, { utilization: Stat; avgQueue: Stat; maxQueue: Stat }>;
+  perTeam: Record<string, { utilization: Stat; avgQueue: Stat; maxQueue: Stat; cost: Stat }>;
 }
 
 /** Aggregate per-replication stats into mean/p5/p50/p95 across replications. */
@@ -68,13 +73,20 @@ export function aggregate(reps: RepStats[]): AggregatedStats {
       utilization: statOf(reps.map((r) => r.perTeam[id]?.utilization ?? 0)),
       avgQueue: statOf(reps.map((r) => r.perTeam[id]?.avgQueue ?? 0)),
       maxQueue: statOf(reps.map((r) => r.perTeam[id]?.maxQueue ?? 0)),
+      cost: statOf(reps.map((r) => r.perTeam[id]?.cost ?? 0)),
     };
   }
+  // Per-replication totals, then aggregate (so percentiles reflect run-to-run
+  // variation, not a sum of percentiles).
+  const totalCostPerRep = reps.map((r) => Object.values(r.perTeam).reduce((s, t) => s + (t.cost ?? 0), 0));
+  const costPerCasePerRep = reps.map((r, i) => (r.completed > 0 ? totalCostPerRep[i] / r.completed : 0));
   return {
     replications: reps.length,
     arrived: statOf(reps.map((r) => r.arrived)),
     completed: statOf(reps.map((r) => r.completed)),
     flowTime: statOf(reps.map((r) => r.avgFlowTime)),
+    totalCost: statOf(totalCostPerRep),
+    costPerCase: statOf(costPerCasePerRep),
     perNode, perTeam,
   };
 }

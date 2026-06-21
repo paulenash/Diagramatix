@@ -27,9 +27,16 @@ export interface MonteCarloResult {
  *  is a fresh Engine on a derived seed; warm-up + horizon come from `cfg`.
  *  `planned` timed interventions (if any) are scheduled onto every
  *  replication's calendar, so they apply reproducibly across the run. */
-export function runMonteCarlo(net: SimNetwork, cfg: SimRunConfig, planned?: PlannedIntervention[]): MonteCarloResult {
+export function runMonteCarlo(
+  net: SimNetwork,
+  cfg: SimRunConfig,
+  planned?: PlannedIntervention[],
+  teamCosts?: Record<string, number>,
+): MonteCarloResult {
   const n = Math.max(1, Math.floor(cfg.replications));
-  const opts = planned && planned.length ? { planned } : undefined;
+  const opts = (planned && planned.length) || teamCosts
+    ? { ...(planned && planned.length ? { planned } : {}), ...(teamCosts ? { teamCosts } : {}) }
+    : undefined;
   const reps: RepStats[] = [];
   for (let r = 0; r < n; r++) {
     const rng = makeRng(deriveSeed(cfg.seed, r));

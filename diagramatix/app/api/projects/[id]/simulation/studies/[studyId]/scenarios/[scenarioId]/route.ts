@@ -42,6 +42,19 @@ export async function PUT(req: Request, { params }: Params) {
   if (body.overrides !== undefined) data.overrides = body.overrides;
   if (typeof body.status === "string") data.status = body.status;
 
+  // Process variant (As-is vs To-be): the diagram ids this scenario runs
+  // instead of the study's roots. Validate each is a BPMN diagram in this
+  // project; [] = inherit the study roots.
+  if (Array.isArray(body.variantRootIds)) {
+    const requested = body.variantRootIds.filter((x: unknown): x is string => typeof x === "string");
+    const valid = await prisma.diagram.findMany({
+      where: { id: { in: requested }, projectId: id, type: "bpmn" },
+      select: { id: true },
+    });
+    const validSet = new Set(valid.map((d) => d.id));
+    data.variantRootIds = requested.filter((x: string) => validSet.has(x));
+  }
+
   if (body.isBaseline === true) {
     await prisma.simulationScenario.updateMany({ where: { studyId, isBaseline: true }, data: { isBaseline: false } });
     data.isBaseline = true;

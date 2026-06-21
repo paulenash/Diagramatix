@@ -20,6 +20,7 @@ export interface PoolStats {
   utilization: number; // busy-unit-time / capacity-unit-time (0..1)
   avgQueue: number;    // time-weighted mean queue length
   maxQueue: number;
+  busyTime: number;    // busy-unit-time in clock units (∑ busyUnits·Δt) — drives cost
 }
 
 export interface PoolState<R> {
@@ -132,6 +133,7 @@ export class ResourcePool<R = unknown> {
       utilization: this.capacityArea > 0 ? this.busyArea / this.capacityArea : 0,
       avgQueue: elapsed > 0 ? this.queueArea / elapsed : 0,
       maxQueue: this.maxQueue,
+      busyTime: this.busyArea,
     };
   }
 

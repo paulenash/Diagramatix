@@ -62,8 +62,19 @@ export async function POST(_req: Request, { params }: Params) {
   if (!scenario) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   // ── Gather inputs ──────────────────────────────────────────────────────
-  const roots = await prisma.simulationStudyRoot.findMany({ where: { studyId }, select: { diagramId: true } });
-  if (roots.length === 0) return NextResponse.json({ error: "Study has no root diagrams" }, { status: 400 });
+  // Process variant (As-is vs To-be): run this scenario's own diagram(s) when
+  // set, otherwise the study's roots.
+  const variantRootIds = Array.isArray(scenario.variantRootIds)
+    ? (scenario.variantRootIds as unknown[]).filter((x): x is string => typeof x === "string")
+    : [];
+  let rootIds: string[];
+  if (variantRootIds.length > 0) {
+    rootIds = variantRootIds;
+  } else {
+    const roots = await prisma.simulationStudyRoot.findMany({ where: { studyId }, select: { diagramId: true } });
+    rootIds = roots.map((r) => r.diagramId);
+  }
+  if (rootIds.length === 0) return NextResponse.json({ error: "Scenario has no diagram to run (set a variant, or add study roots)" }, { status: 400 });
 
   // Every BPMN diagram in the project — feeds the closure + portfolio assembly.
   const projectDiagrams = await prisma.diagram.findMany({
@@ -71,7 +82,6 @@ export async function POST(_req: Request, { params }: Params) {
     select: { id: true, data: true },
   });
   const diagrams = projectDiagrams.map((d) => ({ id: d.id, data: (d.data ?? {}) as unknown as DiagramData }));
-  const rootIds = roots.map((r) => r.diagramId);
   // Closure is informational for now (linked-child splicing is a later phase);
   // the run assembles the ROOT processes, which share the portfolio team pools.
   const closure = portfolioClosure(diagrams, rootIds);
@@ -79,8 +89,10 @@ export async function POST(_req: Request, { params }: Params) {
 
   // Real pool capacities from the project's team library (keyed by name —
   // tasks reference a team by the name stored in sim.teamId).
-  const teams = await prisma.simulationTeam.findMany({ where: { projectId: id }, select: { name: true, capacity: true } });
+  const teams = await prisma.simulationTeam.findMany({ where: { projectId: id }, select: { name: true, capacity: true, costPerHour: true } });
   const teamCapacities = Object.fromEntries(teams.map((t) => [t.name, t.capacity]));
+  // Cost per hour by team name → per-team + total cost in the results.
+  const teamCosts = Object.fromEntries(teams.filter((t) => t.costPerHour != null).map((t) => [t.name, t.costPerHour as number]));
 
   const cfg: ScenarioRunConfig = { ...DEFAULT_RUN_CONFIG, ...((scenario.runConfig ?? {}) as unknown as ScenarioRunConfig) };
   const overrides = (scenario.overrides ?? {}) as unknown as OverrideSet;
@@ -101,7 +113,7 @@ export async function POST(_req: Request, { params }: Params) {
   await prisma.simulationScenario.update({ where: { id: scenarioId }, data: { status: "RUNNING" } });
 
   try {
-    const { stats } = runMonteCarlo(net, cfg, cfg.interventions);
+    const { stats } = runMonteCarlo(net, cfg, cfg.interventions, teamCosts);
     // Bottleneck ranking: teams by mean utilisation (highest first).
     const bottlenecks = Object.entries(stats.perTeam)
       .sort((a, b) => b[1].utilization.mean - a[1].utilization.mean)
@@ -110,7 +122,7 @@ export async function POST(_req: Request, { params }: Params) {
     // showing namespaced ids.
     const nodeLabels: Record<string, { label: string; kind: string }> = {};
     for (const n of net.nodes) nodeLabels[n.id] = { label: n.label ?? n.id.split("::").pop() ?? n.id, kind: n.kind };
-    const metrics = { stats, bottlenecks, nodeLabels, clockUnit: cfg.clockUnit };
+    const metrics = { stats, bottlenecks, nodeLabels, clockUnit: cfg.clockUnit, teamCapacities };
 
     const finished = await prisma.simulationRun.update({
       where: { id: run.id },

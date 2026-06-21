@@ -53,7 +53,8 @@ describe("full backup round-trip", () => {
     await prisma.simulationTeam.create({ data: { name: "Analysts", projectId: project.id, capacity: 3 } });
     const study = await prisma.simulationStudy.create({ data: { name: "RT Study", projectId: project.id } });
     await prisma.simulationStudyRoot.create({ data: { studyId: study.id, diagramId: diagram.id } });
-    await prisma.simulationScenario.create({ data: { name: "Baseline", studyId: study.id, isBaseline: true } });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await prisma.simulationScenario.create({ data: { name: "Baseline", studyId: study.id, isBaseline: true, variantRootIds: [diagram.id] as any } });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await prisma.simulationExample.create({ data: { slug: "rt-example", title: "RT Example", published: true, package: { version: 1 } as any } });
 
@@ -106,6 +107,10 @@ describe("full backup round-trip", () => {
     const restoredExample = await prisma.simulationExample.findUnique({ where: { slug: "rt-example" } });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect((restoredExample?.package as any)?.version).toBe(1);
+    // Scenario variant roots (As-is/To-be) survive.
+    const restoredScenario = await prisma.simulationScenario.findFirst({ where: { studyId: study.id } });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((restoredScenario?.variantRootIds as any)?.[0]).toBe(diagram.id);
 
     // Entity tree intact: the child still points at its parent.
     const child = await prisma.entityNode.findFirst({ where: { name: "Finance" } });

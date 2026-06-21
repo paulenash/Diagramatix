@@ -8,7 +8,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
-import { type RunMetrics, type RunRow, fmtRange, fmtPct } from "@/app/lib/simulation/results";
+import { type RunMetrics, type RunRow, fmtRange, fmtPct, fmtMoney } from "@/app/lib/simulation/results";
 
 export function ResultsReport({ runUrl, initial }: { runUrl: string; initial?: RunMetrics | null }) {
   const [metrics, setMetrics] = useState<RunMetrics | null>(initial ?? null);
@@ -48,16 +48,24 @@ export function ResultsReport({ runUrl, initial }: { runUrl: string; initial?: R
         <Metric label="Replications" value={String(stats.replications)} />
         <Metric label="Completed" value={fmtRange(stats.completed, 0)} />
         <Metric label={`Flow time (${unit})`} value={`p50 ${stats.flowTime.p50.toFixed(1)} · p95 ${stats.flowTime.p95.toFixed(1)}`} />
+        {(stats.totalCost?.mean ?? 0) > 0 && (
+          <>
+            <Metric label="Cost / case" value={fmtMoney(stats.costPerCase?.mean)} />
+            <Metric label="Total cost" value={fmtMoney(stats.totalCost?.mean)} />
+          </>
+        )}
       </div>
 
       {/* Teams / resource pools */}
       <div>
         <Heading>Teams — utilisation &amp; queue</Heading>
         {teamOrder.length === 0 && <p className="text-green-400/40">No resource pools in this portfolio.</p>}
-        {teamOrder.length > 0 && (
+        {teamOrder.length > 0 && (() => {
+          const hasCost = (stats.totalCost?.mean ?? 0) > 0;
+          return (
           <table className="w-full border-collapse">
             <thead>
-              <Tr head><Th>team</Th><Th right>util</Th><Th right>avg queue</Th><Th right>max queue</Th></Tr>
+              <Tr head><Th>team</Th><Th right>util</Th><Th right>avg queue</Th><Th right>max queue</Th>{hasCost && <Th right>cost</Th>}</Tr>
             </thead>
             <tbody>
               {teamOrder.map((id, i) => {
@@ -69,12 +77,14 @@ export function ResultsReport({ runUrl, initial }: { runUrl: string; initial?: R
                     <Td right>{fmtPct(t.utilization.mean)}</Td>
                     <Td right>{t.avgQueue.mean.toFixed(2)}</Td>
                     <Td right>{t.maxQueue.mean.toFixed(0)}</Td>
+                    {hasCost && <Td right>{fmtMoney(t.cost?.mean)}</Td>}
                   </Tr>
                 );
               })}
             </tbody>
           </table>
-        )}
+          );
+        })()}
         {teamOrder.length > 0 && (
           <p className="text-green-400/40 mt-1">▸ top bottleneck. Utilisation near 100% = the pool is the constraint.</p>
         )}
