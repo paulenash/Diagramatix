@@ -164,6 +164,34 @@ describe("translateFlowchartToBpmn", () => {
     expect(JSON.stringify(r1)).toEqual(JSON.stringify(r2));
   });
 
+  it("swimlanes survive layout as pool lanes with the flow spread left-to-right", () => {
+    // Regression: lanes carry `pool` (not just `parentPool`) so layoutBpmnDiagram
+    // attaches them — otherwise every element fell back to a single x=50 column.
+    const d = diagram(
+      [
+        el("l1", "flowchart-vswimlane", { label: "Sales", x: 0, width: 200, height: 600 }),
+        el("l2", "flowchart-vswimlane", { label: "Ops", x: 200, width: 200, height: 600 }),
+        el("s", "flowchart-terminator", { label: "Start", x: 60, width: 80 }),   // lane 1
+        el("a", "flowchart-process", { label: "Take", x: 60, width: 80 }),       // lane 1
+        el("b", "flowchart-process", { label: "Do", x: 260, width: 80 }),        // lane 2
+        el("e", "flowchart-terminator", { label: "End", x: 260, width: 80 }),    // lane 2
+      ],
+      [fl("c1", "s", "a"), fl("c2", "a", "b"), fl("c3", "b", "e")],
+    );
+    const { aiElements, aiConnections } = translateFlowchartToBpmn(d, { processName: "P" });
+    const out = layoutBpmnDiagram(aiElements, aiConnections);
+    const lanes = out.elements.filter((x) => x.type === "lane");
+    expect(lanes.length).toBe(2);
+    // Lanes parented to the single pool.
+    const pool = out.elements.find((x) => x.type === "pool")!;
+    expect(lanes.every((l) => l.parentId === pool.id)).toBe(true);
+    // Flow elements parented to lanes, not stranded at the origin column.
+    const flow = out.elements.filter((x) => ["task", "start-event", "end-event"].includes(x.type));
+    expect(flow.every((f) => f.parentId && f.parentId.startsWith("lane"))).toBe(true);
+    const xs = new Set(flow.map((f) => Math.round(f.x)));
+    expect(xs.size).toBeGreaterThan(1); // spread horizontally, not one column
+  });
+
   it("lays out through the real BPMN engine with non-empty waypoints on every connector", () => {
     const d = diagram(
       [

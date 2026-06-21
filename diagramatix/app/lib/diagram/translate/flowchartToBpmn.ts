@@ -220,7 +220,11 @@ export function translateFlowchartToBpmn(
   // ── 5. Build AiElements ────────────────────────────────────────────────────
   const aiElements: AiElement[] = [];
 
-  // Pool + lanes first.
+  // Pool + lanes first. Lanes carry BOTH `parentPool` and `pool`: layoutBpmnDiagram
+  // matches standalone lane elements to their pool via `lane.pool` (the AI path
+  // normalises parentPool → pool before layout; the translator lays out directly,
+  // so we set it here). Without `pool`, lanes never attach and every element
+  // falls back to an unplaced single column.
   aiElements.push({ id: POOL_ID, type: "pool", label: processName, poolType: "white-box" });
   for (const sw of swimlanes) {
     aiElements.push({
@@ -228,6 +232,7 @@ export function translateFlowchartToBpmn(
       type: "lane",
       label: sw.label || "Lane",
       parentPool: POOL_ID,
+      pool: POOL_ID,
     });
     report.laneCount++;
   }
