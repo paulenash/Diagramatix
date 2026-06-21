@@ -270,6 +270,42 @@ export const FEATURES: Array<{ name: string; summary: string; details: string }>
       "- Preview the linked file embedded in the editor, with a link badge on the shape",
     ].join("\n"),
   },
+  {
+    name: "Project Sharing with Roles",
+    summary: "Share a project with the people who need it — View or Edit, per project, anytime.",
+    details: [
+      "- Owner picks any registered user by name or email and grants View or Edit access",
+      "- View users see the project read-only; Edit users mutate diagrams but cannot delete the project or any of its diagrams",
+      "- Shared projects show up on the recipient's dashboard with an amber tile and the owner's name + email",
+      "- New per-diagram \"Diagram Owner\" field assigns accountability to a specific person without changing access",
+      "- Recipients see who else is in the share — transparency about who's in the room",
+      "- Cross-organisation sharing is allowed or blocked per-organisation by the Org admin",
+    ].join("\n"),
+  },
+  {
+    name: "Organisation Admin & Settings",
+    summary: "Designate organisation administrators with project-share oversight, configurable per-organisation sharing policies, and silent admin membership.",
+    details: [
+      "- New OrgAdmin role for designated organisation administrators",
+      "- Project Sharing oversight page lists every shared project in the organisation with owner, recipients, and inline share-list editing",
+      "- Silent membership: OrgAdmins (and platform SuperAdmins) act as project owners for share management without ever appearing in any share list",
+      "- Open any shared project as a full silent editor — full access without an audit footprint in the share UI",
+      "- Org Settings page toggles whether cross-organisation sharing is allowed",
+      "- SuperAdmin can assign or revoke the OrgAdmin role per user",
+    ].join("\n"),
+  },
+  {
+    name: "Entity Lists — Governed Pool & Lane Naming",
+    summary: "Name BPMN pools and lanes from a maintained Organisation hierarchy, external-participant list and IT-systems list — consistent across every diagram.",
+    details: [
+      "- Maintain three reusable lists per Organisation: External Participants, IT Systems, and an Organisation → Org Unit → Team → Role hierarchy",
+      "- Each Project adopts an org structure as its own editable copy, so projects tailor names without touching the master",
+      "- Renaming a white-box Pool pre-fills the default Organisation name and shows the whole indented structure; type to filter, press Enter to accept, or pick any level",
+      "- Lanes draw from the same hierarchy; black-box pools draw from the External Participants or IT Systems list",
+      "- A brand-new name prompts where it belongs in the hierarchy and is saved to the project structure on the spot",
+      "- Maintained by Project Owners, OrgAdmins and SuperAdmins, with role-appropriate options",
+    ].join("\n"),
+  },
 ];
 
 async function main() {
