@@ -10,6 +10,7 @@ import { LinkScanDialog } from "./LinkScanDialog";
 import { ImpersonationBanner } from "@/app/components/ImpersonationBanner";
 import { SharePointPicker } from "@/app/components/SharePointPicker";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
+import { TranslateToBpmnDialog } from "@/app/components/TranslateToBpmnDialog";
 import { ProjectStructureSection } from "@/app/components/entityLists/ProjectStructureSection";
 import { DiagramTypeBadge } from "@/app/components/DiagramTypeBadge";
 import { useDiagramTypeStyles } from "@/app/hooks/useDiagramTypeStyles";
@@ -1628,6 +1629,20 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
     }
   }
 
+  // Flowchart → BPMN translation: fetch the source flowchart's data, then open
+  // the preview/create dialog. One-way — the flowchart is never mutated.
+  const [translateSrc, setTranslateSrc] = useState<{ name: string; data: DiagramData } | null>(null);
+  async function handleTranslateDiagram(diagramId: string) {
+    try {
+      const res = await fetch(`/api/diagrams/${diagramId}`);
+      if (!res.ok) return;
+      const src = await res.json();
+      setTranslateSrc({ name: src.name, data: src.data as DiagramData });
+    } catch (err) {
+      console.error("Failed to load flowchart for translation:", err);
+    }
+  }
+
   async function handleMoveDiagram(diagramId: string, targetProjectId: string | null) {
     const res = await fetch(`/api/diagrams/${diagramId}`, {
       method: "PUT",
@@ -2459,6 +2474,7 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
                   otherProjects={otherProjects}
                   onDelete={handleDeleteDiagram}
                   onClone={handleCloneDiagram}
+                  onTranslate={handleTranslateDiagram}
                   onMove={handleMoveDiagram}
                   onCardClick={handleDiagramCardClick}
                   selected={selectedDiagramIds.has(d.id)}
@@ -3413,6 +3429,19 @@ export function ProjectDetailClient({ project, otherProjects, version, readOnly,
           onCancel={() => setConfirmDialog(null)}
         />
       )}
+
+      {translateSrc && (
+        <TranslateToBpmnDialog
+          source={translateSrc.data}
+          sourceName={translateSrc.name}
+          projectId={project.id}
+          onClose={() => setTranslateSrc(null)}
+          onCreated={(created) => {
+            setTranslateSrc(null);
+            router.push(`/diagram/${created.id}`);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -3493,6 +3522,7 @@ function DiagramCard({
   otherProjects,
   onDelete,
   onClone,
+  onTranslate,
   onMove,
   onCardClick,
   selected,
@@ -3502,6 +3532,7 @@ function DiagramCard({
   otherProjects: OtherProject[];
   onDelete: (id: string) => void;
   onClone: (id: string) => void;
+  onTranslate: (id: string) => void;
   onMove: (diagramId: string, projectId: string | null) => void;
   onCardClick: (
     diagramId: string,
@@ -3532,6 +3563,15 @@ function DiagramCard({
       <div className="flex items-center justify-between">
         <h3 className="font-medium text-gray-900 text-[11px] leading-tight truncate flex-1" title={diagram.name}>{diagram.name}</h3>
         <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 ml-1 shrink-0">
+          {diagram.type === "flowchart" && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onTranslate(diagram.id); }}
+              className="text-gray-400 hover:text-blue-500 px-0.5 font-semibold text-[10px] leading-none"
+              title="Translate to BPMN"
+            >
+              →BP
+            </button>
+          )}
           <button
             onClick={(e) => { e.stopPropagation(); onClone(diagram.id); }}
             className="text-gray-400 hover:text-blue-500 px-0.5"

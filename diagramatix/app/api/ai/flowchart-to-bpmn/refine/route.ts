@@ -1,0 +1,39 @@
+/**
+ * Optional AI "tidy" pass for the deterministic flowchart→BPMN translation.
+ * Refines labels / sub-types only; structure is locked by mergeRefinement, so
+ * this can never alter the graph. Falls back to the input plan on any failure.
+ */
+import { NextResponse } from "next/server";
+import { auth } from "@/auth";
+import { refineFlowchartBpmnPlan } from "@/app/lib/ai/refineFlowchartBpmn";
+import { gateLimit, recordUsage } from "@/app/lib/subscription-route";
+
+export async function POST(req: Request) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    return NextResponse.json({ error: "AI service not configured." }, { status: 503 });
+  }
+
+  const { elements, connections } = await req.json();
+  if (!Array.isArray(elements) || !Array.isArray(connections)) {
+    return NextResponse.json({ error: "elements and connections arrays are required" }, { status: 400 });
+  }
+
+  const aiBlock = await gateLimit(session.user.id, "aiAttempts");
+  if (aiBlock) return aiBlock;
+
+  const result = await refineFlowchartBpmnPlan({ apiKey, elements, connections });
+  // Only count the attempt when the model actually contributed a refinement.
+  if (result.refined) await recordUsage(session.user.id, "aiAttempts");
+
+  return NextResponse.json({
+    elements: result.elements,
+    connections: result.connections,
+    refined: result.refined,
+  });
+}

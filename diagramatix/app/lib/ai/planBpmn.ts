@@ -11,6 +11,7 @@
  */
 import Anthropic from "@anthropic-ai/sdk";
 import type { AiElement, AiConnection } from "@/app/lib/diagram/bpmnLayout";
+import { renderFlowchartMappingForPrompt } from "@/app/lib/diagram/translate/flowchartBpmnMap";
 
 export type Attachment =
   | { type: "pdf"; data: string; name?: string }
@@ -50,7 +51,7 @@ export function buildSystemPrompt(rules: string): string {
 IMAGE INPUT — when an image of an existing diagram is attached:
 - Treat the image as the source of truth. Reverse-engineer the process from what is drawn, then express it in the BPMN JSON format below.
 - If the image is already a BPMN diagram: copy the structure faithfully. Read pool names, lane names, task labels, gateway labels and event labels off the image. Map every shape to its hyphenated type: rounded rectangle → "task" (or "subprocess" / "subprocess-expanded" if it contains its own sub-flow), diamond → "gateway", circle with thin border → "start-event", circle with thick border → "end-event", circle with double border → "intermediate-event", parallel horizontal lines → "pool" / "lane", dashed-rectangle around tasks → "group", document icon → "data-object", cylinder → "data-store", sticky-note → "text-annotation".
-- If the image is a non-BPMN flowchart: TRANSLATE shapes to BPMN. Rectangle → "task". Diamond with two outgoing branches → exclusive "gateway" (decision); diamond at the join → exclusive "gateway" (merge). Oval / pill at top → "start-event". Oval / pill at bottom → "end-event". Document → "data-object". Database cylinder → "data-store". Off-page connectors and arrow labels become sequence-flow labels. If no pools / lanes are drawn, wrap everything in a single white-box pool named after the process.
+- ${renderFlowchartMappingForPrompt()}
 - Read labels with OCR. Do NOT invent tasks, branches or roles that are not visible in the image. If a label is unreadable, use a short descriptive placeholder rather than guessing.
 - Where the user's text prompt adds detail beyond the image (extra rules, role names, message flows), apply it. Where the prompt CONTRADICTS the image, prefer the image.
 

@@ -28,6 +28,7 @@ import { ImpersonationBanner } from "@/app/components/ImpersonationBanner";
 import { SimulatorOverlay } from "@/app/components/simulation/SimulatorOverlay";
 import { autofillSimulation } from "@/app/lib/simulation/autofill";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
+import { TranslateToBpmnDialog } from "@/app/components/TranslateToBpmnDialog";
 import { InfoDialog } from "@/app/components/InfoDialog";
 import { DiagramTypeBadge } from "@/app/components/DiagramTypeBadge";
 import { useDiagramTypeStyles } from "@/app/hooks/useDiagramTypeStyles";
@@ -603,6 +604,8 @@ export function DiagramEditor({
   // Save As dialog — clone the current diagram (data + colour/display config)
   // into the same project under a new name, then navigate to it.
   const [showSaveAs, setShowSaveAs] = useState(false);
+  // Flowchart → BPMN translation (one-way; flowchart diagrams only).
+  const [showTranslate, setShowTranslate] = useState(false);
   const [saveAsName, setSaveAsName] = useState("");
   const [saveAsBusy, setSaveAsBusy] = useState(false);
   const [saveAsError, setSaveAsError] = useState<string | null>(null);
@@ -3023,6 +3026,20 @@ export function DiagramEditor({
               >
                 Save As&hellip;
               </button>
+              {diagramType === "flowchart" && (
+                <button
+                  onClick={() => {
+                    setFileMenuOpen(false);
+                    setFileSubmenu(null);
+                    setShowTranslate(true);
+                  }}
+                  onMouseEnter={() => setFileSubmenu(null)}
+                  className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                  title="Create a new BPMN diagram from this flowchart (one-way)"
+                >
+                  Translate to BPMN&hellip;
+                </button>
+              )}
               <div className="border-t border-gray-100" />
 
               {(["export", "import"] as const).map((sect) => (
@@ -4087,6 +4104,19 @@ export function DiagramEditor({
             </div>
           </div>
         </div>
+      )}
+
+      {showTranslate && (
+        <TranslateToBpmnDialog
+          source={data}
+          sourceName={diagramName}
+          projectId={projectId}
+          onClose={() => setShowTranslate(false)}
+          onCreated={(created) => {
+            setShowTranslate(false);
+            router.push(`/diagram/${created.id}`);
+          }}
+        />
       )}
 
       {/* Admin: pick the source list to EXPORT (User vs Built-In). */}
