@@ -149,29 +149,33 @@ INSERT INTO "Feature" ("id","name","summary","details","hidden","sortOrder","pub
 UPDATE "Feature" SET "summary"='Snap a whiteboard sketch, a screenshot, or someone else''s flowchart and Diagramatix reverse-engineers it into an editable BPMN or flowchart.', "details"='- Attach a PNG / JPEG / WebP / GIF; AI vision + OCR read the shapes and labels off the picture
 - BPMN images: pools, lanes, tasks, gateways and events are mapped to their proper BPMN types, with labels read from the image
 - Turn a plain flowchart image INTO BPMN — rectangles become tasks, decision diamonds become exclusive gateways, ovals become start/end events, cylinders become data stores, and loose flow is wrapped in a white-box pool
+- Modernise legacy flowcharts: photograph or scan an old hand-drawn or Visio/Word flowchart and convert it straight to BPMN — the fast way to start moving off the legacy flowchart standard onto BPMN
 - The image is the source of truth; add a text prompt to layer on extra detail (rules, roles, message flows)
 - Comes in as a fully editable diagram — for BPMN, as a plan you can review before it''s laid out
-- Available for Flowchart and BPMN diagrams',
+- Available for Flowchart and BPMN diagrams; pairs with Flowchart → BPMN Translation for flowcharts already drawn in Diagramatix',
   "publishedName"="name", "publishedSummary"='Snap a whiteboard sketch, a screenshot, or someone else''s flowchart and Diagramatix reverse-engineers it into an editable BPMN or flowchart.', "publishedDetails"='- Attach a PNG / JPEG / WebP / GIF; AI vision + OCR read the shapes and labels off the picture
 - BPMN images: pools, lanes, tasks, gateways and events are mapped to their proper BPMN types, with labels read from the image
 - Turn a plain flowchart image INTO BPMN — rectangles become tasks, decision diamonds become exclusive gateways, ovals become start/end events, cylinders become data stores, and loose flow is wrapped in a white-box pool
+- Modernise legacy flowcharts: photograph or scan an old hand-drawn or Visio/Word flowchart and convert it straight to BPMN — the fast way to start moving off the legacy flowchart standard onto BPMN
 - The image is the source of truth; add a text prompt to layer on extra detail (rules, roles, message flows)
 - Comes in as a fully editable diagram — for BPMN, as a plan you can review before it''s laid out
-- Available for Flowchart and BPMN diagrams',
+- Available for Flowchart and BPMN diagrams; pairs with Flowchart → BPMN Translation for flowcharts already drawn in Diagramatix',
   "publishedHidden"="hidden", "publishedSortOrder"="sortOrder", "publishedAt"=now(), "updatedAt"=now()
 WHERE "name"='Image to Diagram';
 INSERT INTO "Feature" ("id","name","summary","details","hidden","sortOrder","publishedName","publishedSummary","publishedDetails","publishedHidden","publishedSortOrder","publishedAt","createdAt","updatedAt")
   SELECT gen_random_uuid()::text, 'Image to Diagram', 'Snap a whiteboard sketch, a screenshot, or someone else''s flowchart and Diagramatix reverse-engineers it into an editable BPMN or flowchart.', '- Attach a PNG / JPEG / WebP / GIF; AI vision + OCR read the shapes and labels off the picture
 - BPMN images: pools, lanes, tasks, gateways and events are mapped to their proper BPMN types, with labels read from the image
 - Turn a plain flowchart image INTO BPMN — rectangles become tasks, decision diamonds become exclusive gateways, ovals become start/end events, cylinders become data stores, and loose flow is wrapped in a white-box pool
+- Modernise legacy flowcharts: photograph or scan an old hand-drawn or Visio/Word flowchart and convert it straight to BPMN — the fast way to start moving off the legacy flowchart standard onto BPMN
 - The image is the source of truth; add a text prompt to layer on extra detail (rules, roles, message flows)
 - Comes in as a fully editable diagram — for BPMN, as a plan you can review before it''s laid out
-- Available for Flowchart and BPMN diagrams', false, 50, 'Image to Diagram', 'Snap a whiteboard sketch, a screenshot, or someone else''s flowchart and Diagramatix reverse-engineers it into an editable BPMN or flowchart.', '- Attach a PNG / JPEG / WebP / GIF; AI vision + OCR read the shapes and labels off the picture
+- Available for Flowchart and BPMN diagrams; pairs with Flowchart → BPMN Translation for flowcharts already drawn in Diagramatix', false, 50, 'Image to Diagram', 'Snap a whiteboard sketch, a screenshot, or someone else''s flowchart and Diagramatix reverse-engineers it into an editable BPMN or flowchart.', '- Attach a PNG / JPEG / WebP / GIF; AI vision + OCR read the shapes and labels off the picture
 - BPMN images: pools, lanes, tasks, gateways and events are mapped to their proper BPMN types, with labels read from the image
 - Turn a plain flowchart image INTO BPMN — rectangles become tasks, decision diamonds become exclusive gateways, ovals become start/end events, cylinders become data stores, and loose flow is wrapped in a white-box pool
+- Modernise legacy flowcharts: photograph or scan an old hand-drawn or Visio/Word flowchart and convert it straight to BPMN — the fast way to start moving off the legacy flowchart standard onto BPMN
 - The image is the source of truth; add a text prompt to layer on extra detail (rules, roles, message flows)
 - Comes in as a fully editable diagram — for BPMN, as a plan you can review before it''s laid out
-- Available for Flowchart and BPMN diagrams', false, 50, now(), now(), now()
+- Available for Flowchart and BPMN diagrams; pairs with Flowchart → BPMN Translation for flowcharts already drawn in Diagramatix', false, 50, now(), now(), now()
   WHERE NOT EXISTS (SELECT 1 FROM "Feature" WHERE "name"='Image to Diagram');
 
 -- Smart Connector Routing
@@ -786,5 +790,42 @@ INSERT INTO "Feature" ("id","name","summary","details","hidden","sortOrder","pub
 - Review everything in a single dialog — tick the links to add, untick existing links to remove — then apply in one step
 - Turns a freshly-imported set of diagrams (e.g. a Visio bundle) into a properly drill-down-navigable hierarchy in seconds', false, 300, now(), now(), now()
   WHERE NOT EXISTS (SELECT 1 FROM "Feature" WHERE "name"='Automatic Diagram Linking');
+
+-- Flowchart → BPMN Translation
+UPDATE "Feature" SET "summary"='Modernise legacy Standard Flowcharts into BPMN — translate an existing flowchart diagram into a proper BPMN process map in one step, so teams can move off the old flowchart standard onto the current business-process-modelling standard, BPMN.', "details"='- One-click, deterministic translation of a Diagramatix Standard Flowchart into a brand-new BPMN diagram — the original flowchart is never touched (one-way)
+- Faithful shape mapping: processes → tasks, decisions → exclusive gateways (keeping the Yes/No branch labels), terminators → start/end events, predefined processes → sub-processes, delays → timer events
+- Data shapes become real BPMN artifacts: documents → data objects, databases → data stores, each attached to the right activity by an association rather than left in the control flow
+- Vertical swimlanes become a BPMN pool with one lane per swimlane; on/off-page connectors are followed through and spliced away so the flow stays connected
+- A preview report shows exactly what was mapped, approximated or spliced before the BPMN diagram is created
+- Optional one-click AI tidy refines labels, task types and gateway names — it can never change the structure
+- Pairs with Image to Diagram (snap a photo of a paper/Visio flowchart) so both drawn and scanned legacy flowcharts have a path to BPMN
+- Built to help organisations migrate from the legacy flowchart diagramming standard to BPMN, the current business process mapping standard',
+  "publishedName"="name", "publishedSummary"='Modernise legacy Standard Flowcharts into BPMN — translate an existing flowchart diagram into a proper BPMN process map in one step, so teams can move off the old flowchart standard onto the current business-process-modelling standard, BPMN.', "publishedDetails"='- One-click, deterministic translation of a Diagramatix Standard Flowchart into a brand-new BPMN diagram — the original flowchart is never touched (one-way)
+- Faithful shape mapping: processes → tasks, decisions → exclusive gateways (keeping the Yes/No branch labels), terminators → start/end events, predefined processes → sub-processes, delays → timer events
+- Data shapes become real BPMN artifacts: documents → data objects, databases → data stores, each attached to the right activity by an association rather than left in the control flow
+- Vertical swimlanes become a BPMN pool with one lane per swimlane; on/off-page connectors are followed through and spliced away so the flow stays connected
+- A preview report shows exactly what was mapped, approximated or spliced before the BPMN diagram is created
+- Optional one-click AI tidy refines labels, task types and gateway names — it can never change the structure
+- Pairs with Image to Diagram (snap a photo of a paper/Visio flowchart) so both drawn and scanned legacy flowcharts have a path to BPMN
+- Built to help organisations migrate from the legacy flowchart diagramming standard to BPMN, the current business process mapping standard',
+  "publishedHidden"="hidden", "publishedSortOrder"="sortOrder", "publishedAt"=now(), "updatedAt"=now()
+WHERE "name"='Flowchart → BPMN Translation';
+INSERT INTO "Feature" ("id","name","summary","details","hidden","sortOrder","publishedName","publishedSummary","publishedDetails","publishedHidden","publishedSortOrder","publishedAt","createdAt","updatedAt")
+  SELECT gen_random_uuid()::text, 'Flowchart → BPMN Translation', 'Modernise legacy Standard Flowcharts into BPMN — translate an existing flowchart diagram into a proper BPMN process map in one step, so teams can move off the old flowchart standard onto the current business-process-modelling standard, BPMN.', '- One-click, deterministic translation of a Diagramatix Standard Flowchart into a brand-new BPMN diagram — the original flowchart is never touched (one-way)
+- Faithful shape mapping: processes → tasks, decisions → exclusive gateways (keeping the Yes/No branch labels), terminators → start/end events, predefined processes → sub-processes, delays → timer events
+- Data shapes become real BPMN artifacts: documents → data objects, databases → data stores, each attached to the right activity by an association rather than left in the control flow
+- Vertical swimlanes become a BPMN pool with one lane per swimlane; on/off-page connectors are followed through and spliced away so the flow stays connected
+- A preview report shows exactly what was mapped, approximated or spliced before the BPMN diagram is created
+- Optional one-click AI tidy refines labels, task types and gateway names — it can never change the structure
+- Pairs with Image to Diagram (snap a photo of a paper/Visio flowchart) so both drawn and scanned legacy flowcharts have a path to BPMN
+- Built to help organisations migrate from the legacy flowchart diagramming standard to BPMN, the current business process mapping standard', false, 310, 'Flowchart → BPMN Translation', 'Modernise legacy Standard Flowcharts into BPMN — translate an existing flowchart diagram into a proper BPMN process map in one step, so teams can move off the old flowchart standard onto the current business-process-modelling standard, BPMN.', '- One-click, deterministic translation of a Diagramatix Standard Flowchart into a brand-new BPMN diagram — the original flowchart is never touched (one-way)
+- Faithful shape mapping: processes → tasks, decisions → exclusive gateways (keeping the Yes/No branch labels), terminators → start/end events, predefined processes → sub-processes, delays → timer events
+- Data shapes become real BPMN artifacts: documents → data objects, databases → data stores, each attached to the right activity by an association rather than left in the control flow
+- Vertical swimlanes become a BPMN pool with one lane per swimlane; on/off-page connectors are followed through and spliced away so the flow stays connected
+- A preview report shows exactly what was mapped, approximated or spliced before the BPMN diagram is created
+- Optional one-click AI tidy refines labels, task types and gateway names — it can never change the structure
+- Pairs with Image to Diagram (snap a photo of a paper/Visio flowchart) so both drawn and scanned legacy flowcharts have a path to BPMN
+- Built to help organisations migrate from the legacy flowchart diagramming standard to BPMN, the current business process mapping standard', false, 310, now(), now(), now()
+  WHERE NOT EXISTS (SELECT 1 FROM "Feature" WHERE "name"='Flowchart → BPMN Translation');
 
 COMMIT;
