@@ -99,10 +99,13 @@ Diagramatix is the only one of the four whose AI exposes an **editable intermedi
 | Send a diagram for review with objective + due date | ✅ | Via Governance workflows | Via governance | Via workflows |
 | In-diagram review comments (pink note auto-linked to an element, tagged per reviewer) | ✅ | ✅ Commenting | ✅ Commenting | ✅ |
 | Reviewer status tracking (pending → submitted → approved / declined), re-submit & finish rounds | ✅ Built-in, dashboard-tracked, colour-coded by due date | ✅ Formal BPMN-based approval workflows (Process Governance) | ✅ Governance/release workflows | ✅ |
+| **Versioned publishing** — immutable published versions, current-version pointer, supersedure | ✅ | ✅ | ✅ | ✅ |
+| **Publish to a business-user audience** — read-only viewer + cross-diagram link traversal | ✅ **Publication bundles** to *explicit* audiences, **invite-by-email**, dedicated viewer | ✅ (portal/publishing) | ✅ (publishing) | ✅ |
+| **Scheduled re-review** — review cadence + automated review-due reminders | ✅ owner-set next-review date / cadence; **cron review-due notifications** | ✅ | ✅ | ✅ |
 | Real-time multi-user co-editing | ❌ Single-editor | ✅ | ✅ | ✅ |
-| Formal approval/publishing lifecycle + audit | Basic (review rounds + version history) | ✅ Deep (Process Governance + audit) | ✅ Deep (repository governance + audit) | ✅ |
+| Formal approval-*workflow* engine + enterprise audit log | **Mid** — draft→published lifecycle, versioned + superseded, bundle publishing to audiences, review-cadence reminders; *not* a configurable approval-workflow engine or full audit log | ✅ Deep (Process Governance + audit) | ✅ Deep (repository governance + audit) | ✅ |
 
-**Verdict.** Diagramatix now has a **genuine, lightweight review loop** (send → comment → approve/decline → re-submit → finish), which closes a gap versus the suites for small-team use. The suites still win on **real-time co-editing** and **formal, audited approval/publishing governance**.
+**Verdict.** Diagramatix is **mid-tier, not basic, on review + publishing**: a genuine review loop (send → comment → approve/decline → re-submit → finish) *and* a real publishing lifecycle — draft→published, immutable/superseded versions, **publication bundles published to business-user audiences (invite-by-email) with a read-only viewer**, and **scheduled re-review reminders**. That closes most of the small-team gap versus the suites. They still win on **real-time co-editing**, a **configurable BPMN approval-workflow engine**, and a **full enterprise audit log**.
 
 ---
 
@@ -163,7 +166,7 @@ Diagramatix has moved from "design-time only" to a **built-in event-based (discr
 5. **Multi-notation in one focused tool** — BPMN + 6 other types without enterprise-suite weight.
 6. **Self-hosted, no ecosystem lock-in**, per-seat pricing.
 7. **Visio round-trip** with a purpose-built shapes file, plus the niche **DDL ↔ Domain** round-trip.
-8. **Built-in lightweight review loop** for small teams.
+8. **Review + publishing lifecycle** — send-for-review rounds *plus* draft→published versioning, publication bundles to a business-user audience (invite-by-email + read-only viewer), and scheduled re-review reminders.
 
 ## 9. Where each competitor wins
 
