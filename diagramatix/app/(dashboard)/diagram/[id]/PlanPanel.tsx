@@ -20,6 +20,7 @@ import { ElementsByContainerView } from "./ai-plan/ElementsByContainerView";
 import { ConnectorsByTypeView } from "./ai-plan/ConnectorsByTypeView";
 import { DiagramatixThrobber } from "@/app/components/DiagramatixThrobber";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
+import { AttachmentPreviewDialog } from "@/app/components/AttachmentPreviewDialog";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 declare global {
@@ -104,6 +105,7 @@ export function PlanPanel({
     | { name: string; type: "image"; data: string; mediaType: string }
     | null
   >(null);
+  const [showAttachPreview, setShowAttachPreview] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const IMAGE_TYPES: Record<string, string> = {
@@ -711,12 +713,17 @@ export function PlanPanel({
             </button>
             {attachment && (
               <div className="flex items-center gap-1 flex-1 min-w-0">
-                <span className="text-[10px] text-blue-600 truncate flex-1">{attachment.name}</span>
+                <button onClick={() => setShowAttachPreview(true)} className="text-[10px] text-blue-600 truncate flex-1 text-left hover:underline" title="Preview attachment">{attachment.name}</button>
+                <button onClick={() => setShowAttachPreview(true)} className="text-gray-400 hover:text-blue-500 text-[10px] shrink-0" title="Preview attachment">Preview</button>
                 <button onClick={() => setAttachment(null)} className="text-gray-400 hover:text-red-500 text-[10px] shrink-0" title="Remove attachment">&times;</button>
               </div>
             )}
           </div>
         </div>
+
+        {showAttachPreview && attachment && (
+          <AttachmentPreviewDialog attachment={attachment} onClose={() => setShowAttachPreview(false)} />
+        )}
 
         {isAdmin && (
           <div className="shrink-0 mb-2">

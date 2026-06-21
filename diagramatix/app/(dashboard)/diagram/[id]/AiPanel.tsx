@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { DiagramData, DiagramElement, Connector, DiagramType } from "@/app/lib/diagram/types";
 import { DiagramatixThrobber } from "@/app/components/DiagramatixThrobber";
+import { AttachmentPreviewDialog } from "@/app/components/AttachmentPreviewDialog";
 import { buildPromptFromDiagram } from "@/app/lib/diagram/prompt-from-diagram";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -59,6 +60,7 @@ export function AiPanel({
 
   // File attachment
   const [attachment, setAttachment] = useState<{ name: string; type: string; data: string } | null>(null);
+  const [showAttachPreview, setShowAttachPreview] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function handleFileAttach(file: File) {
@@ -400,12 +402,17 @@ export function AiPanel({
             </button>
             {attachment && (
               <div className="flex items-center gap-1 flex-1 min-w-0">
-                <span className="text-[10px] text-blue-600 truncate flex-1">{attachment.name}</span>
+                <button onClick={() => setShowAttachPreview(true)} className="text-[10px] text-blue-600 truncate flex-1 text-left hover:underline" title="Preview attachment">{attachment.name}</button>
+                <button onClick={() => setShowAttachPreview(true)} className="text-gray-400 hover:text-blue-500 text-[10px] shrink-0" title="Preview attachment">Preview</button>
                 <button onClick={() => setAttachment(null)} className="text-gray-400 hover:text-red-500 text-[10px] shrink-0" title="Remove attachment">&times;</button>
               </div>
             )}
           </div>
         </div>
+
+        {showAttachPreview && attachment && (
+          <AttachmentPreviewDialog attachment={attachment} onClose={() => setShowAttachPreview(false)} />
+        )}
 
         <div className="flex items-center gap-2">
           <label className="flex items-center gap-1 text-[10px] text-gray-600">
