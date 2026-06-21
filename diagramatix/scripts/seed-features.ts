@@ -225,6 +225,18 @@ const FEATURES: Array<{ name: string; summary: string; details: string }> = [
     ].join("\n"),
   },
   {
+    name: "Publishing & Review Lifecycle",
+    summary: "Publish a versioned diagram — or a whole bundle of related diagrams — to a business-user audience, with scheduled re-review reminders so process maps never silently go stale.",
+    details: [
+      "- Draft → Published lifecycle: publishing snapshots an immutable Published Version; readers always see the latest non-superseded version, and the history is kept",
+      "- Publication Bundles: publish a set of related diagrams together (root diagrams plus the sub-processes they link to) as one release, with release notes",
+      "- Business-user audiences: share a bundle with named colleagues, or invite by email — an invitee is promoted into the audience automatically when they sign up",
+      "- Read-only viewer: audience members open a clean, navigable view and drill across linked diagrams, with no edit access",
+      "- Scheduled re-review: set a next-review date or a review cadence; Diagramatix fires an automatic 'review due' reminder when it's time",
+      "- Supersede & revoke: a new version supersedes the previous one; archiving a bundle revokes its audience grants",
+    ].join("\n"),
+  },
+  {
     name: "Diagram-Type Colour Identity",
     summary: "Every diagram type gets a 2-character code and a distinct pastel colour, so you can tell process types apart at a glance.",
     details: [
