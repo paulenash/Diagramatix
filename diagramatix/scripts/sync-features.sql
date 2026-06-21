@@ -116,6 +116,64 @@ INSERT INTO "Feature" ("id","name","summary","details","hidden","sortOrder","pub
 - Powered by Anthropic Claude', false, 30, now(), now(), now()
   WHERE NOT EXISTS (SELECT 1 FROM "Feature" WHERE "name"='AI-Assisted BPMN Generation');
 
+-- Text-to-Diagram for Every Notation
+UPDATE "Feature" SET "summary"='AI generation isn''t BPMN-only — describe it in plain English and generate Value Chain, Process Context, State Machine, Domain, Context and ArchiMate diagrams too.', "details"='- One AI generator across every notation Diagramatix supports — not just BPMN, but Value Chain, Process Context, State Machine, Domain (UML / relational), Context and ArchiMate
+- Particularly strong for Value Chain, Process Context and BPMN
+- Per-diagram-type, admin-editable AI rules so each notation follows your house conventions
+- Process Context generation auto-classifies actors, external systems and timer/hourglass participants
+- Attach a PDF or text file to feed extra context into the prompt
+- Generation history per diagram — try several prompts and keep the best',
+  "publishedName"="name", "publishedSummary"='AI generation isn''t BPMN-only — describe it in plain English and generate Value Chain, Process Context, State Machine, Domain, Context and ArchiMate diagrams too.', "publishedDetails"='- One AI generator across every notation Diagramatix supports — not just BPMN, but Value Chain, Process Context, State Machine, Domain (UML / relational), Context and ArchiMate
+- Particularly strong for Value Chain, Process Context and BPMN
+- Per-diagram-type, admin-editable AI rules so each notation follows your house conventions
+- Process Context generation auto-classifies actors, external systems and timer/hourglass participants
+- Attach a PDF or text file to feed extra context into the prompt
+- Generation history per diagram — try several prompts and keep the best',
+  "publishedHidden"="hidden", "publishedSortOrder"="sortOrder", "publishedAt"=now(), "updatedAt"=now()
+WHERE "name"='Text-to-Diagram for Every Notation';
+INSERT INTO "Feature" ("id","name","summary","details","hidden","sortOrder","publishedName","publishedSummary","publishedDetails","publishedHidden","publishedSortOrder","publishedAt","createdAt","updatedAt")
+  SELECT gen_random_uuid()::text, 'Text-to-Diagram for Every Notation', 'AI generation isn''t BPMN-only — describe it in plain English and generate Value Chain, Process Context, State Machine, Domain, Context and ArchiMate diagrams too.', '- One AI generator across every notation Diagramatix supports — not just BPMN, but Value Chain, Process Context, State Machine, Domain (UML / relational), Context and ArchiMate
+- Particularly strong for Value Chain, Process Context and BPMN
+- Per-diagram-type, admin-editable AI rules so each notation follows your house conventions
+- Process Context generation auto-classifies actors, external systems and timer/hourglass participants
+- Attach a PDF or text file to feed extra context into the prompt
+- Generation history per diagram — try several prompts and keep the best', false, 40, 'Text-to-Diagram for Every Notation', 'AI generation isn''t BPMN-only — describe it in plain English and generate Value Chain, Process Context, State Machine, Domain, Context and ArchiMate diagrams too.', '- One AI generator across every notation Diagramatix supports — not just BPMN, but Value Chain, Process Context, State Machine, Domain (UML / relational), Context and ArchiMate
+- Particularly strong for Value Chain, Process Context and BPMN
+- Per-diagram-type, admin-editable AI rules so each notation follows your house conventions
+- Process Context generation auto-classifies actors, external systems and timer/hourglass participants
+- Attach a PDF or text file to feed extra context into the prompt
+- Generation history per diagram — try several prompts and keep the best', false, 40, now(), now(), now()
+  WHERE NOT EXISTS (SELECT 1 FROM "Feature" WHERE "name"='Text-to-Diagram for Every Notation');
+
+-- Image to Diagram
+UPDATE "Feature" SET "summary"='Snap a whiteboard sketch, a screenshot, or someone else''s flowchart and Diagramatix reverse-engineers it into an editable BPMN or flowchart.', "details"='- Attach a PNG / JPEG / WebP / GIF; AI vision + OCR read the shapes and labels off the picture
+- BPMN images: pools, lanes, tasks, gateways and events are mapped to their proper BPMN types, with labels read from the image
+- Turn a plain flowchart image INTO BPMN — rectangles become tasks, decision diamonds become exclusive gateways, ovals become start/end events, cylinders become data stores, and loose flow is wrapped in a white-box pool
+- The image is the source of truth; add a text prompt to layer on extra detail (rules, roles, message flows)
+- Comes in as a fully editable diagram — for BPMN, as a plan you can review before it''s laid out
+- Available for Flowchart and BPMN diagrams',
+  "publishedName"="name", "publishedSummary"='Snap a whiteboard sketch, a screenshot, or someone else''s flowchart and Diagramatix reverse-engineers it into an editable BPMN or flowchart.', "publishedDetails"='- Attach a PNG / JPEG / WebP / GIF; AI vision + OCR read the shapes and labels off the picture
+- BPMN images: pools, lanes, tasks, gateways and events are mapped to their proper BPMN types, with labels read from the image
+- Turn a plain flowchart image INTO BPMN — rectangles become tasks, decision diamonds become exclusive gateways, ovals become start/end events, cylinders become data stores, and loose flow is wrapped in a white-box pool
+- The image is the source of truth; add a text prompt to layer on extra detail (rules, roles, message flows)
+- Comes in as a fully editable diagram — for BPMN, as a plan you can review before it''s laid out
+- Available for Flowchart and BPMN diagrams',
+  "publishedHidden"="hidden", "publishedSortOrder"="sortOrder", "publishedAt"=now(), "updatedAt"=now()
+WHERE "name"='Image to Diagram';
+INSERT INTO "Feature" ("id","name","summary","details","hidden","sortOrder","publishedName","publishedSummary","publishedDetails","publishedHidden","publishedSortOrder","publishedAt","createdAt","updatedAt")
+  SELECT gen_random_uuid()::text, 'Image to Diagram', 'Snap a whiteboard sketch, a screenshot, or someone else''s flowchart and Diagramatix reverse-engineers it into an editable BPMN or flowchart.', '- Attach a PNG / JPEG / WebP / GIF; AI vision + OCR read the shapes and labels off the picture
+- BPMN images: pools, lanes, tasks, gateways and events are mapped to their proper BPMN types, with labels read from the image
+- Turn a plain flowchart image INTO BPMN — rectangles become tasks, decision diamonds become exclusive gateways, ovals become start/end events, cylinders become data stores, and loose flow is wrapped in a white-box pool
+- The image is the source of truth; add a text prompt to layer on extra detail (rules, roles, message flows)
+- Comes in as a fully editable diagram — for BPMN, as a plan you can review before it''s laid out
+- Available for Flowchart and BPMN diagrams', false, 50, 'Image to Diagram', 'Snap a whiteboard sketch, a screenshot, or someone else''s flowchart and Diagramatix reverse-engineers it into an editable BPMN or flowchart.', '- Attach a PNG / JPEG / WebP / GIF; AI vision + OCR read the shapes and labels off the picture
+- BPMN images: pools, lanes, tasks, gateways and events are mapped to their proper BPMN types, with labels read from the image
+- Turn a plain flowchart image INTO BPMN — rectangles become tasks, decision diamonds become exclusive gateways, ovals become start/end events, cylinders become data stores, and loose flow is wrapped in a white-box pool
+- The image is the source of truth; add a text prompt to layer on extra detail (rules, roles, message flows)
+- Comes in as a fully editable diagram — for BPMN, as a plan you can review before it''s laid out
+- Available for Flowchart and BPMN diagrams', false, 50, now(), now(), now()
+  WHERE NOT EXISTS (SELECT 1 FROM "Feature" WHERE "name"='Image to Diagram');
+
 -- Smart Connector Routing
 UPDATE "Feature" SET "summary"='Connectors that route cleanly around obstacles — no manual zig-zagging.', "details"='- Orthogonal (rectilinear), curvilinear (Bézier), and direct modes per connector
 - Automatic hump-over crossings where sequence flows pass each other
@@ -131,10 +189,10 @@ INSERT INTO "Feature" ("id","name","summary","details","hidden","sortOrder","pub
   SELECT gen_random_uuid()::text, 'Smart Connector Routing', 'Connectors that route cleanly around obstacles — no manual zig-zagging.', '- Orthogonal (rectilinear), curvilinear (Bézier), and direct modes per connector
 - Automatic hump-over crossings where sequence flows pass each other
 - Smart endpoint slots on every side with edge-aware routing
-- Waypoint editing for fine-grained control without losing the auto-routing fallback', false, 40, 'Smart Connector Routing', 'Connectors that route cleanly around obstacles — no manual zig-zagging.', '- Orthogonal (rectilinear), curvilinear (Bézier), and direct modes per connector
+- Waypoint editing for fine-grained control without losing the auto-routing fallback', false, 60, 'Smart Connector Routing', 'Connectors that route cleanly around obstacles — no manual zig-zagging.', '- Orthogonal (rectilinear), curvilinear (Bézier), and direct modes per connector
 - Automatic hump-over crossings where sequence flows pass each other
 - Smart endpoint slots on every side with edge-aware routing
-- Waypoint editing for fine-grained control without losing the auto-routing fallback', false, 40, now(), now(), now()
+- Waypoint editing for fine-grained control without losing the auto-routing fallback', false, 60, now(), now(), now()
   WHERE NOT EXISTS (SELECT 1 FROM "Feature" WHERE "name"='Smart Connector Routing');
 
 -- Microsoft Visio Round-Trip
@@ -152,10 +210,10 @@ INSERT INTO "Feature" ("id","name","summary","details","hidden","sortOrder","pub
   SELECT gen_random_uuid()::text, 'Microsoft Visio Round-Trip', 'Author in Diagramatix, share with Visio users, get edits back — no loss in translation.', '- Export any BPMN diagram as a native `.vsdx` file
 - Dedicated "Diagramatix Shapes" v1.6 stencil with proper BPMN markers
 - Re-import Visio-edited `.vsdx` back into Diagramatix with style preserved
-- Free downloadable stencil for recipients editing in Visio', false, 50, 'Microsoft Visio Round-Trip', 'Author in Diagramatix, share with Visio users, get edits back — no loss in translation.', '- Export any BPMN diagram as a native `.vsdx` file
+- Free downloadable stencil for recipients editing in Visio', false, 70, 'Microsoft Visio Round-Trip', 'Author in Diagramatix, share with Visio users, get edits back — no loss in translation.', '- Export any BPMN diagram as a native `.vsdx` file
 - Dedicated "Diagramatix Shapes" v1.6 stencil with proper BPMN markers
 - Re-import Visio-edited `.vsdx` back into Diagramatix with style preserved
-- Free downloadable stencil for recipients editing in Visio', false, 50, now(), now(), now()
+- Free downloadable stencil for recipients editing in Visio', false, 70, now(), now(), now()
   WHERE NOT EXISTS (SELECT 1 FROM "Feature" WHERE "name"='Microsoft Visio Round-Trip');
 
 -- BPMN 2.0 XML Import
@@ -170,9 +228,9 @@ WHERE "name"='BPMN 2.0 XML Import';
 INSERT INTO "Feature" ("id","name","summary","details","hidden","sortOrder","publishedName","publishedSummary","publishedDetails","publishedHidden","publishedSortOrder","publishedAt","createdAt","updatedAt")
   SELECT gen_random_uuid()::text, 'BPMN 2.0 XML Import', 'Bring diagrams in from any BPMN-compliant tool.', '- Standard BPMN 2.0 XML parser (pools, lanes, tasks, gateways, events, message flows, sub-processes)
 - Layout heuristics auto-position elements when the XML lacks coordinates
-- Validation report flags unsupported BPMN features', false, 60, 'BPMN 2.0 XML Import', 'Bring diagrams in from any BPMN-compliant tool.', '- Standard BPMN 2.0 XML parser (pools, lanes, tasks, gateways, events, message flows, sub-processes)
+- Validation report flags unsupported BPMN features', false, 80, 'BPMN 2.0 XML Import', 'Bring diagrams in from any BPMN-compliant tool.', '- Standard BPMN 2.0 XML parser (pools, lanes, tasks, gateways, events, message flows, sub-processes)
 - Layout heuristics auto-position elements when the XML lacks coordinates
-- Validation report flags unsupported BPMN features', false, 60, now(), now(), now()
+- Validation report flags unsupported BPMN features', false, 80, now(), now(), now()
   WHERE NOT EXISTS (SELECT 1 FROM "Feature" WHERE "name"='BPMN 2.0 XML Import');
 
 -- Cross-Functional Flowcharts (Pools / Lanes / Sub-Lanes)
@@ -190,10 +248,10 @@ INSERT INTO "Feature" ("id","name","summary","details","hidden","sortOrder","pub
   SELECT gen_random_uuid()::text, 'Cross-Functional Flowcharts (Pools / Lanes / Sub-Lanes)', 'Model your organisation as it really works — multi-pool, multi-lane, multi-sub-lane.', '- Drag-drop pools onto the canvas; lanes auto-fit
 - Sub-lanes (lanes within lanes) for matrix orgs
 - Lane-and-pool grow-only on content add (no surprise shrinking)
-- Independent lane font sizes, header widths, and label rotation', false, 70, 'Cross-Functional Flowcharts (Pools / Lanes / Sub-Lanes)', 'Model your organisation as it really works — multi-pool, multi-lane, multi-sub-lane.', '- Drag-drop pools onto the canvas; lanes auto-fit
+- Independent lane font sizes, header widths, and label rotation', false, 90, 'Cross-Functional Flowcharts (Pools / Lanes / Sub-Lanes)', 'Model your organisation as it really works — multi-pool, multi-lane, multi-sub-lane.', '- Drag-drop pools onto the canvas; lanes auto-fit
 - Sub-lanes (lanes within lanes) for matrix orgs
 - Lane-and-pool grow-only on content add (no surprise shrinking)
-- Independent lane font sizes, header widths, and label rotation', false, 70, now(), now(), now()
+- Independent lane font sizes, header widths, and label rotation', false, 90, now(), now(), now()
   WHERE NOT EXISTS (SELECT 1 FROM "Feature" WHERE "name"='Cross-Functional Flowcharts (Pools / Lanes / Sub-Lanes)');
 
 -- Drag-Drop Palette + Smart Editing UX
@@ -217,12 +275,12 @@ INSERT INTO "Feature" ("id","name","summary","details","hidden","sortOrder","pub
 - Insert Space — push everything to the right (or down) to make room
 - Focus-edit zoom — double-click any label and the canvas snaps to centre it for easy typing
 - Drop on a connector to insert an element mid-flow
-- Quick-add menu for one-click element creation at cursor', false, 80, 'Drag-Drop Palette + Smart Editing UX', 'Built for fast iteration — drag, drop, type, done.', '- Per-diagram-type palette (only relevant symbols)
+- Quick-add menu for one-click element creation at cursor', false, 100, 'Drag-Drop Palette + Smart Editing UX', 'Built for fast iteration — drag, drop, type, done.', '- Per-diagram-type palette (only relevant symbols)
 - Snap-to-element alignment guides while dragging
 - Insert Space — push everything to the right (or down) to make room
 - Focus-edit zoom — double-click any label and the canvas snaps to centre it for easy typing
 - Drop on a connector to insert an element mid-flow
-- Quick-add menu for one-click element creation at cursor', false, 80, now(), now(), now()
+- Quick-add menu for one-click element creation at cursor', false, 100, now(), now(), now()
   WHERE NOT EXISTS (SELECT 1 FROM "Feature" WHERE "name"='Drag-Drop Palette + Smart Editing UX');
 
 -- Reusable Templates with Groups
@@ -240,10 +298,10 @@ INSERT INTO "Feature" ("id","name","summary","details","hidden","sortOrder","pub
   SELECT gen_random_uuid()::text, 'Reusable Templates with Groups', 'Save your common patterns once; reuse them across every project.', '- User-defined templates per diagram type
 - Group templates under named, collapsible headers
 - Built-in template library shipped with Diagramatix
-- Per-user collapse state remembered between sessions', false, 90, 'Reusable Templates with Groups', 'Save your common patterns once; reuse them across every project.', '- User-defined templates per diagram type
+- Per-user collapse state remembered between sessions', false, 110, 'Reusable Templates with Groups', 'Save your common patterns once; reuse them across every project.', '- User-defined templates per diagram type
 - Group templates under named, collapsible headers
 - Built-in template library shipped with Diagramatix
-- Per-user collapse state remembered between sessions', false, 90, now(), now(), now()
+- Per-user collapse state remembered between sessions', false, 110, now(), now(), now()
   WHERE NOT EXISTS (SELECT 1 FROM "Feature" WHERE "name"='Reusable Templates with Groups');
 
 -- Drill-Down Navigation
@@ -261,10 +319,10 @@ INSERT INTO "Feature" ("id","name","summary","details","hidden","sortOrder","pub
   SELECT gen_random_uuid()::text, 'Drill-Down Navigation', 'Link diagrams together for true hierarchical process documentation.', '- Sub-processes link to nested BPMN diagrams
 - Chevron-collapsed symbols link to any diagram type
 - One-click drill-back arrow returns to the parent diagram
-- "Linked from" list on every diagram shows its parents (auto-scanned)', false, 100, 'Drill-Down Navigation', 'Link diagrams together for true hierarchical process documentation.', '- Sub-processes link to nested BPMN diagrams
+- "Linked from" list on every diagram shows its parents (auto-scanned)', false, 120, 'Drill-Down Navigation', 'Link diagrams together for true hierarchical process documentation.', '- Sub-processes link to nested BPMN diagrams
 - Chevron-collapsed symbols link to any diagram type
 - One-click drill-back arrow returns to the parent diagram
-- "Linked from" list on every diagram shows its parents (auto-scanned)', false, 100, now(), now(), now()
+- "Linked from" list on every diagram shows its parents (auto-scanned)', false, 120, now(), now(), now()
   WHERE NOT EXISTS (SELECT 1 FROM "Feature" WHERE "name"='Drill-Down Navigation');
 
 -- Project & Folder Organisation
@@ -282,10 +340,10 @@ INSERT INTO "Feature" ("id","name","summary","details","hidden","sortOrder","pub
   SELECT gen_random_uuid()::text, 'Project & Folder Organisation', 'Group diagrams by project, organise within folders, sort however you like.', '- Multiple projects per user
 - Nested folder hierarchy within each project
 - Drag-and-drop reordering, or sort by name / modified date
-- Per-project sort preference remembered', false, 110, 'Project & Folder Organisation', 'Group diagrams by project, organise within folders, sort however you like.', '- Multiple projects per user
+- Per-project sort preference remembered', false, 130, 'Project & Folder Organisation', 'Group diagrams by project, organise within folders, sort however you like.', '- Multiple projects per user
 - Nested folder hierarchy within each project
 - Drag-and-drop reordering, or sort by name / modified date
-- Per-project sort preference remembered', false, 110, now(), now(), now()
+- Per-project sort preference remembered', false, 130, now(), now(), now()
   WHERE NOT EXISTS (SELECT 1 FROM "Feature" WHERE "name"='Project & Folder Organisation');
 
 -- Properties Panel with Per-Element Configuration
@@ -303,10 +361,10 @@ INSERT INTO "Feature" ("id","name","summary","details","hidden","sortOrder","pub
   SELECT gen_random_uuid()::text, 'Properties Panel with Per-Element Configuration', 'Click any element and edit every property without leaving the canvas.', '- Name, type, dimensions, colour
 - Type-specific properties: BPMN task type, gateway role, event trigger
 - UML attribute / operation editor for class diagrams
-- Connector waypoint, label offset, and arrow direction editing', false, 120, 'Properties Panel with Per-Element Configuration', 'Click any element and edit every property without leaving the canvas.', '- Name, type, dimensions, colour
+- Connector waypoint, label offset, and arrow direction editing', false, 140, 'Properties Panel with Per-Element Configuration', 'Click any element and edit every property without leaving the canvas.', '- Name, type, dimensions, colour
 - Type-specific properties: BPMN task type, gateway role, event trigger
 - UML attribute / operation editor for class diagrams
-- Connector waypoint, label offset, and arrow direction editing', false, 120, now(), now(), now()
+- Connector waypoint, label offset, and arrow direction editing', false, 140, now(), now(), now()
   WHERE NOT EXISTS (SELECT 1 FROM "Feature" WHERE "name"='Properties Panel with Per-Element Configuration');
 
 -- Custom Display Modes (Normal + Hand-Drawn)
@@ -324,10 +382,10 @@ INSERT INTO "Feature" ("id","name","summary","details","hidden","sortOrder","pub
   SELECT gen_random_uuid()::text, 'Custom Display Modes (Normal + Hand-Drawn)', 'Switch any diagram between polished and sketchy with one click.', '- Normal mode: clean, presentation-ready output
 - Hand-drawn mode: sketch-style strokes, monochrome
 - Per-diagram setting (some can be polished, others draft)
-- Export reflects the display mode', false, 130, 'Custom Display Modes (Normal + Hand-Drawn)', 'Switch any diagram between polished and sketchy with one click.', '- Normal mode: clean, presentation-ready output
+- Export reflects the display mode', false, 150, 'Custom Display Modes (Normal + Hand-Drawn)', 'Switch any diagram between polished and sketchy with one click.', '- Normal mode: clean, presentation-ready output
 - Hand-drawn mode: sketch-style strokes, monochrome
 - Per-diagram setting (some can be polished, others draft)
-- Export reflects the display mode', false, 130, now(), now(), now()
+- Export reflects the display mode', false, 150, now(), now(), now()
   WHERE NOT EXISTS (SELECT 1 FROM "Feature" WHERE "name"='Custom Display Modes (Normal + Hand-Drawn)');
 
 -- Configurable Colour Themes per Project & per Diagram
@@ -345,10 +403,10 @@ INSERT INTO "Feature" ("id","name","summary","details","hidden","sortOrder","pub
   SELECT gen_random_uuid()::text, 'Configurable Colour Themes per Project & per Diagram', 'Match your brand or process taxonomy with custom colours.', '- Per-symbol-type colour overrides
 - Project-wide theme that all diagrams inherit by default
 - Per-diagram override when a specific diagram needs different colours
-- Black & white "hand-drawn" override', false, 140, 'Configurable Colour Themes per Project & per Diagram', 'Match your brand or process taxonomy with custom colours.', '- Per-symbol-type colour overrides
+- Black & white "hand-drawn" override', false, 160, 'Configurable Colour Themes per Project & per Diagram', 'Match your brand or process taxonomy with custom colours.', '- Per-symbol-type colour overrides
 - Project-wide theme that all diagrams inherit by default
 - Per-diagram override when a specific diagram needs different colours
-- Black & white "hand-drawn" override', false, 140, now(), now(), now()
+- Black & white "hand-drawn" override', false, 160, now(), now(), now()
   WHERE NOT EXISTS (SELECT 1 FROM "Feature" WHERE "name"='Configurable Colour Themes per Project & per Diagram');
 
 -- Bulk Visio Export
@@ -366,10 +424,10 @@ INSERT INTO "Feature" ("id","name","summary","details","hidden","sortOrder","pub
   SELECT gen_random_uuid()::text, 'Bulk Visio Export', 'Export every BPMN diagram in a project as one multi-page `.vsdx` file.', '- One Visio page per diagram, ordered alphabetically
 - Single download for an entire project''s worth of process documentation
 - Non-BPMN diagrams skipped silently
-- Round-trips on bulk import too', false, 150, 'Bulk Visio Export', 'Export every BPMN diagram in a project as one multi-page `.vsdx` file.', '- One Visio page per diagram, ordered alphabetically
+- Round-trips on bulk import too', false, 170, 'Bulk Visio Export', 'Export every BPMN diagram in a project as one multi-page `.vsdx` file.', '- One Visio page per diagram, ordered alphabetically
 - Single download for an entire project''s worth of process documentation
 - Non-BPMN diagrams skipped silently
-- Round-trips on bulk import too', false, 150, now(), now(), now()
+- Round-trips on bulk import too', false, 170, now(), now(), now()
   WHERE NOT EXISTS (SELECT 1 FROM "Feature" WHERE "name"='Bulk Visio Export');
 
 -- Backup & Restore
@@ -384,9 +442,9 @@ WHERE "name"='Backup & Restore';
 INSERT INTO "Feature" ("id","name","summary","details","hidden","sortOrder","publishedName","publishedSummary","publishedDetails","publishedHidden","publishedSortOrder","publishedAt","createdAt","updatedAt")
   SELECT gen_random_uuid()::text, 'Backup & Restore', 'One-click full-account snapshot to a portable `.diag` file.', '- Every project, diagram, template, user preference in one file
 - Restore brings everything back as it was
-- Use for moving between accounts, archival, or "try this on a copy"', false, 160, 'Backup & Restore', 'One-click full-account snapshot to a portable `.diag` file.', '- Every project, diagram, template, user preference in one file
+- Use for moving between accounts, archival, or "try this on a copy"', false, 180, 'Backup & Restore', 'One-click full-account snapshot to a portable `.diag` file.', '- Every project, diagram, template, user preference in one file
 - Restore brings everything back as it was
-- Use for moving between accounts, archival, or "try this on a copy"', false, 160, now(), now(), now()
+- Use for moving between accounts, archival, or "try this on a copy"', false, 180, now(), now(), now()
   WHERE NOT EXISTS (SELECT 1 FROM "Feature" WHERE "name"='Backup & Restore');
 
 -- Diagram Title Block with Version / Authors / Status
@@ -404,10 +462,10 @@ INSERT INTO "Feature" ("id","name","summary","details","hidden","sortOrder","pub
   SELECT gen_random_uuid()::text, 'Diagram Title Block with Version / Authors / Status', 'Professional title block stamp for every diagram.', '- Free-text version string + authors list
 - Status: Draft / Final / Production with visual badge
 - Per-diagram toggle to show or hide
-- Renders in export files too', false, 170, 'Diagram Title Block with Version / Authors / Status', 'Professional title block stamp for every diagram.', '- Free-text version string + authors list
+- Renders in export files too', false, 190, 'Diagram Title Block with Version / Authors / Status', 'Professional title block stamp for every diagram.', '- Free-text version string + authors list
 - Status: Draft / Final / Production with visual badge
 - Per-diagram toggle to show or hide
-- Renders in export files too', false, 170, now(), now(), now()
+- Renders in export files too', false, 190, now(), now(), now()
   WHERE NOT EXISTS (SELECT 1 FROM "Feature" WHERE "name"='Diagram Title Block with Version / Authors / Status');
 
 -- Tiered Subscriptions with Self-Serve Upgrade
@@ -425,10 +483,10 @@ INSERT INTO "Feature" ("id","name","summary","details","hidden","sortOrder","pub
   SELECT gen_random_uuid()::text, 'Tiered Subscriptions with Self-Serve Upgrade', 'Start free, upgrade when you need more — at any time.', '- 30-day free trial covers every feature
 - Three paid tiers (Introductory / Professional / Expert) with progressively higher limits
 - Self-serve checkout (Stripe), self-serve cancellation, no support call required
-- AUD billing; international cards accepted', false, 180, 'Tiered Subscriptions with Self-Serve Upgrade', 'Start free, upgrade when you need more — at any time.', '- 30-day free trial covers every feature
+- AUD billing; international cards accepted', false, 200, 'Tiered Subscriptions with Self-Serve Upgrade', 'Start free, upgrade when you need more — at any time.', '- 30-day free trial covers every feature
 - Three paid tiers (Introductory / Professional / Expert) with progressively higher limits
 - Self-serve checkout (Stripe), self-serve cancellation, no support call required
-- AUD billing; international cards accepted', false, 180, now(), now(), now()
+- AUD billing; international cards accepted', false, 200, now(), now(), now()
   WHERE NOT EXISTS (SELECT 1 FROM "Feature" WHERE "name"='Tiered Subscriptions with Self-Serve Upgrade');
 
 -- Collaboration & Diagram Review
@@ -452,12 +510,12 @@ INSERT INTO "Feature" ("id","name","summary","details","hidden","sortOrder","pub
 - Reviewers comment directly on the diagram — drag a pink Review Comment onto any element; it auto-links and is tagged with the reviewer
 - Dashboard collections for diagrams Received and Sent for review, colour-coded by due date
 - Live reviewer statuses (pending / in-progress / submitted / approved / declined) with Approve, Submit, and Decline actions
-- Owner controls: filter comments by reviewer, re-submit for a fresh approval round, and finish the review when done', false, 190, 'Collaboration & Diagram Review', 'Circulate a diagram to colleagues, gather comments, and track sign-off — all inside Diagramatix.', '- Collaboration Groups: invite teammates by name or email, with in-app notifications, accept/decline, leave, remove, and ownership transfer
+- Owner controls: filter comments by reviewer, re-submit for a fresh approval round, and finish the review when done', false, 210, 'Collaboration & Diagram Review', 'Circulate a diagram to colleagues, gather comments, and track sign-off — all inside Diagramatix.', '- Collaboration Groups: invite teammates by name or email, with in-app notifications, accept/decline, leave, remove, and ownership transfer
 - Send any diagram to one or more groups with an objective and a due date
 - Reviewers comment directly on the diagram — drag a pink Review Comment onto any element; it auto-links and is tagged with the reviewer
 - Dashboard collections for diagrams Received and Sent for review, colour-coded by due date
 - Live reviewer statuses (pending / in-progress / submitted / approved / declined) with Approve, Submit, and Decline actions
-- Owner controls: filter comments by reviewer, re-submit for a fresh approval round, and finish the review when done', false, 190, now(), now(), now()
+- Owner controls: filter comments by reviewer, re-submit for a fresh approval round, and finish the review when done', false, 210, now(), now(), now()
   WHERE NOT EXISTS (SELECT 1 FROM "Feature" WHERE "name"='Collaboration & Diagram Review');
 
 -- Publishing & Review Lifecycle
@@ -481,12 +539,12 @@ INSERT INTO "Feature" ("id","name","summary","details","hidden","sortOrder","pub
 - Business-user audiences: share a bundle with named colleagues, or invite by email — an invitee is promoted into the audience automatically when they sign up
 - Read-only viewer: audience members open a clean, navigable view and drill across linked diagrams, with no edit access
 - Scheduled re-review: set a next-review date or a review cadence; Diagramatix fires an automatic ''review due'' reminder when it''s time
-- Supersede & revoke: a new version supersedes the previous one; archiving a bundle revokes its audience grants', false, 200, 'Publishing & Review Lifecycle', 'Publish a versioned diagram — or a whole bundle of related diagrams — to a business-user audience, with scheduled re-review reminders so process maps never silently go stale.', '- Draft → Published lifecycle: publishing snapshots an immutable Published Version; readers always see the latest non-superseded version, and the history is kept
+- Supersede & revoke: a new version supersedes the previous one; archiving a bundle revokes its audience grants', false, 220, 'Publishing & Review Lifecycle', 'Publish a versioned diagram — or a whole bundle of related diagrams — to a business-user audience, with scheduled re-review reminders so process maps never silently go stale.', '- Draft → Published lifecycle: publishing snapshots an immutable Published Version; readers always see the latest non-superseded version, and the history is kept
 - Publication Bundles: publish a set of related diagrams together (root diagrams plus the sub-processes they link to) as one release, with release notes
 - Business-user audiences: share a bundle with named colleagues, or invite by email — an invitee is promoted into the audience automatically when they sign up
 - Read-only viewer: audience members open a clean, navigable view and drill across linked diagrams, with no edit access
 - Scheduled re-review: set a next-review date or a review cadence; Diagramatix fires an automatic ''review due'' reminder when it''s time
-- Supersede & revoke: a new version supersedes the previous one; archiving a bundle revokes its audience grants', false, 200, now(), now(), now()
+- Supersede & revoke: a new version supersedes the previous one; archiving a bundle revokes its audience grants', false, 220, now(), now(), now()
   WHERE NOT EXISTS (SELECT 1 FROM "Feature" WHERE "name"='Publishing & Review Lifecycle');
 
 -- Diagram-Type Colour Identity
@@ -507,11 +565,11 @@ INSERT INTO "Feature" ("id","name","summary","details","hidden","sortOrder","pub
 - Colour-coded diagram tiles on the dashboard and project screens — for every user, including business viewers
 - The editor''s top bar is tinted to the diagram type, with the type name highlighted in its colour
 - Consistent type chips everywhere a diagram type is shown
-- SuperAdmin-editable: change any code or colour and it flows across the whole app', false, 210, 'Diagram-Type Colour Identity', 'Every diagram type gets a 2-character code and a distinct pastel colour, so you can tell process types apart at a glance.', '- 2-character badges (BP, CO, PC, SM, DM, VC, AM) in the project navigation tree
+- SuperAdmin-editable: change any code or colour and it flows across the whole app', false, 230, 'Diagram-Type Colour Identity', 'Every diagram type gets a 2-character code and a distinct pastel colour, so you can tell process types apart at a glance.', '- 2-character badges (BP, CO, PC, SM, DM, VC, AM) in the project navigation tree
 - Colour-coded diagram tiles on the dashboard and project screens — for every user, including business viewers
 - The editor''s top bar is tinted to the diagram type, with the type name highlighted in its colour
 - Consistent type chips everywhere a diagram type is shown
-- SuperAdmin-editable: change any code or colour and it flows across the whole app', false, 210, now(), now(), now()
+- SuperAdmin-editable: change any code or colour and it flows across the whole app', false, 230, now(), now(), now()
   WHERE NOT EXISTS (SELECT 1 FROM "Feature" WHERE "name"='Diagram-Type Colour Identity');
 
 -- Guided Backups with Live Progress
@@ -532,11 +590,11 @@ INSERT INTO "Feature" ("id","name","summary","details","hidden","sortOrder","pub
 - OrgAdmins pick which members to back up; SuperAdmins scope to All Orgs or a single Org''s selected users
 - Live per-section progress streamed as the backup is built, then a statistical report (rows per section, total, file size)
 - The same guided experience across user, Org, full-system, AI Rules & Prompts, and built-in template exports
-- Restores are additive and fully transactional — all-or-nothing, never a half-restored set', false, 220, 'Guided Backups with Live Progress', 'See exactly what will be backed up, choose who to include, and watch it happen — with a report at the end.', '- Pre-flight preview: a stats table of everything that will be captured before you commit
+- Restores are additive and fully transactional — all-or-nothing, never a half-restored set', false, 240, 'Guided Backups with Live Progress', 'See exactly what will be backed up, choose who to include, and watch it happen — with a report at the end.', '- Pre-flight preview: a stats table of everything that will be captured before you commit
 - OrgAdmins pick which members to back up; SuperAdmins scope to All Orgs or a single Org''s selected users
 - Live per-section progress streamed as the backup is built, then a statistical report (rows per section, total, file size)
 - The same guided experience across user, Org, full-system, AI Rules & Prompts, and built-in template exports
-- Restores are additive and fully transactional — all-or-nothing, never a half-restored set', false, 220, now(), now(), now()
+- Restores are additive and fully transactional — all-or-nothing, never a half-restored set', false, 240, now(), now(), now()
   WHERE NOT EXISTS (SELECT 1 FROM "Feature" WHERE "name"='Guided Backups with Live Progress');
 
 -- SharePoint & OneDrive Integration
@@ -560,12 +618,12 @@ INSERT INTO "Feature" ("id","name","summary","details","hidden","sortOrder","pub
 - Open those files back from SharePoint / OneDrive into Diagramatix
 - Browse your SharePoint sites, document libraries and OneDrive with a built-in file picker
 - Link a Data Object or Data Store to a SharePoint / OneDrive file
-- Preview the linked file embedded in the editor, with a link badge on the shape', false, 230, 'SharePoint & OneDrive Integration', 'Sign in with Microsoft, save and open diagrams in SharePoint or OneDrive, and link Data Objects to live documents.', '- Sign in with your Microsoft (Entra) account alongside email / password
+- Preview the linked file embedded in the editor, with a link badge on the shape', false, 250, 'SharePoint & OneDrive Integration', 'Sign in with Microsoft, save and open diagrams in SharePoint or OneDrive, and link Data Objects to live documents.', '- Sign in with your Microsoft (Entra) account alongside email / password
 - Save a diagram''s data files — XML + matching XSD + JSON (and Visio .vsdx for BPMN) — straight into a SharePoint or OneDrive folder
 - Open those files back from SharePoint / OneDrive into Diagramatix
 - Browse your SharePoint sites, document libraries and OneDrive with a built-in file picker
 - Link a Data Object or Data Store to a SharePoint / OneDrive file
-- Preview the linked file embedded in the editor, with a link badge on the shape', false, 230, now(), now(), now()
+- Preview the linked file embedded in the editor, with a link badge on the shape', false, 250, now(), now(), now()
   WHERE NOT EXISTS (SELECT 1 FROM "Feature" WHERE "name"='SharePoint & OneDrive Integration');
 
 -- Project Sharing with Roles
@@ -589,12 +647,12 @@ INSERT INTO "Feature" ("id","name","summary","details","hidden","sortOrder","pub
 - Shared projects show up on the recipient''s dashboard with an amber tile and the owner''s name + email
 - New per-diagram "Diagram Owner" field assigns accountability to a specific person without changing access
 - Recipients see who else is in the share — transparency about who''s in the room
-- Cross-organisation sharing is allowed or blocked per-organisation by the Org admin', false, 240, 'Project Sharing with Roles', 'Share a project with the people who need it — View or Edit, per project, anytime.', '- Owner picks any registered user by name or email and grants View or Edit access
+- Cross-organisation sharing is allowed or blocked per-organisation by the Org admin', false, 260, 'Project Sharing with Roles', 'Share a project with the people who need it — View or Edit, per project, anytime.', '- Owner picks any registered user by name or email and grants View or Edit access
 - View users see the project read-only; Edit users mutate diagrams but cannot delete the project or any of its diagrams
 - Shared projects show up on the recipient''s dashboard with an amber tile and the owner''s name + email
 - New per-diagram "Diagram Owner" field assigns accountability to a specific person without changing access
 - Recipients see who else is in the share — transparency about who''s in the room
-- Cross-organisation sharing is allowed or blocked per-organisation by the Org admin', false, 240, now(), now(), now()
+- Cross-organisation sharing is allowed or blocked per-organisation by the Org admin', false, 260, now(), now(), now()
   WHERE NOT EXISTS (SELECT 1 FROM "Feature" WHERE "name"='Project Sharing with Roles');
 
 -- Organisation Admin & Settings
@@ -618,12 +676,12 @@ INSERT INTO "Feature" ("id","name","summary","details","hidden","sortOrder","pub
 - Silent membership: OrgAdmins (and platform SuperAdmins) act as project owners for share management without ever appearing in any share list
 - Open any shared project as a full silent editor — full access without an audit footprint in the share UI
 - Org Settings page toggles whether cross-organisation sharing is allowed
-- SuperAdmin can assign or revoke the OrgAdmin role per user', false, 250, 'Organisation Admin & Settings', 'Designate organisation administrators with project-share oversight, configurable per-organisation sharing policies, and silent admin membership.', '- New OrgAdmin role for designated organisation administrators
+- SuperAdmin can assign or revoke the OrgAdmin role per user', false, 270, 'Organisation Admin & Settings', 'Designate organisation administrators with project-share oversight, configurable per-organisation sharing policies, and silent admin membership.', '- New OrgAdmin role for designated organisation administrators
 - Project Sharing oversight page lists every shared project in the organisation with owner, recipients, and inline share-list editing
 - Silent membership: OrgAdmins (and platform SuperAdmins) act as project owners for share management without ever appearing in any share list
 - Open any shared project as a full silent editor — full access without an audit footprint in the share UI
 - Org Settings page toggles whether cross-organisation sharing is allowed
-- SuperAdmin can assign or revoke the OrgAdmin role per user', false, 250, now(), now(), now()
+- SuperAdmin can assign or revoke the OrgAdmin role per user', false, 270, now(), now(), now()
   WHERE NOT EXISTS (SELECT 1 FROM "Feature" WHERE "name"='Organisation Admin & Settings');
 
 -- Entity Lists — Governed Pool & Lane Naming
@@ -647,12 +705,12 @@ INSERT INTO "Feature" ("id","name","summary","details","hidden","sortOrder","pub
 - Renaming a white-box Pool pre-fills the default Organisation name and shows the whole indented structure; type to filter, press Enter to accept, or pick any level
 - Lanes draw from the same hierarchy; black-box pools draw from the External Participants or IT Systems list
 - A brand-new name prompts where it belongs in the hierarchy and is saved to the project structure on the spot
-- Maintained by Project Owners, OrgAdmins and SuperAdmins, with role-appropriate options', false, 260, 'Entity Lists — Governed Pool & Lane Naming', 'Name BPMN pools and lanes from a maintained Organisation hierarchy, external-participant list and IT-systems list — consistent across every diagram.', '- Maintain three reusable lists per Organisation: External Participants, IT Systems, and an Organisation → Org Unit → Team → Role hierarchy
+- Maintained by Project Owners, OrgAdmins and SuperAdmins, with role-appropriate options', false, 280, 'Entity Lists — Governed Pool & Lane Naming', 'Name BPMN pools and lanes from a maintained Organisation hierarchy, external-participant list and IT-systems list — consistent across every diagram.', '- Maintain three reusable lists per Organisation: External Participants, IT Systems, and an Organisation → Org Unit → Team → Role hierarchy
 - Each Project adopts an org structure as its own editable copy, so projects tailor names without touching the master
 - Renaming a white-box Pool pre-fills the default Organisation name and shows the whole indented structure; type to filter, press Enter to accept, or pick any level
 - Lanes draw from the same hierarchy; black-box pools draw from the External Participants or IT Systems list
 - A brand-new name prompts where it belongs in the hierarchy and is saved to the project structure on the spot
-- Maintained by Project Owners, OrgAdmins and SuperAdmins, with role-appropriate options', false, 260, now(), now(), now()
+- Maintained by Project Owners, OrgAdmins and SuperAdmins, with role-appropriate options', false, 280, now(), now(), now()
   WHERE NOT EXISTS (SELECT 1 FROM "Feature" WHERE "name"='Entity Lists — Governed Pool & Lane Naming');
 
 COMMIT;

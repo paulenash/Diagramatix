@@ -63,6 +63,30 @@ export const FEATURES: Array<{ name: string; summary: string; details: string }>
     ].join("\n"),
   },
   {
+    name: "Text-to-Diagram for Every Notation",
+    summary: "AI generation isn't BPMN-only — describe it in plain English and generate Value Chain, Process Context, State Machine, Domain, Context and ArchiMate diagrams too.",
+    details: [
+      "- One AI generator across every notation Diagramatix supports — not just BPMN, but Value Chain, Process Context, State Machine, Domain (UML / relational), Context and ArchiMate",
+      "- Particularly strong for Value Chain, Process Context and BPMN",
+      "- Per-diagram-type, admin-editable AI rules so each notation follows your house conventions",
+      "- Process Context generation auto-classifies actors, external systems and timer/hourglass participants",
+      "- Attach a PDF or text file to feed extra context into the prompt",
+      "- Generation history per diagram — try several prompts and keep the best",
+    ].join("\n"),
+  },
+  {
+    name: "Image to Diagram",
+    summary: "Snap a whiteboard sketch, a screenshot, or someone else's flowchart and Diagramatix reverse-engineers it into an editable BPMN or flowchart.",
+    details: [
+      "- Attach a PNG / JPEG / WebP / GIF; AI vision + OCR read the shapes and labels off the picture",
+      "- BPMN images: pools, lanes, tasks, gateways and events are mapped to their proper BPMN types, with labels read from the image",
+      "- Turn a plain flowchart image INTO BPMN — rectangles become tasks, decision diamonds become exclusive gateways, ovals become start/end events, cylinders become data stores, and loose flow is wrapped in a white-box pool",
+      "- The image is the source of truth; add a text prompt to layer on extra detail (rules, roles, message flows)",
+      "- Comes in as a fully editable diagram — for BPMN, as a plan you can review before it's laid out",
+      "- Available for Flowchart and BPMN diagrams",
+    ].join("\n"),
+  },
+  {
     name: "Smart Connector Routing",
     summary: "Connectors that route cleanly around obstacles — no manual zig-zagging.",
     details: [

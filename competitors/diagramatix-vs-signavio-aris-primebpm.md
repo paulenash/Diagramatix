@@ -26,8 +26,9 @@ This is the headline. All four products now do "describe a process → get a BPM
 | Capability | **Diagramatix** | **SAP Signavio** | **ARIS (AI Companion)** | **PRIME BPM (MapAI)** |
 |---|---|---|---|---|
 | Natural-language → BPMN | ✅ Two-phase: Plan (Sonnet) → editable plan → Apply layout | ✅ "Text to Process" (V2 experimental: larger inputs, more complex processes) | ✅ Text description → structured model | ✅ "Generate a BPMN map in minutes from text" |
-| Target notations from AI | BPMN (2-phase) + one-shot for State Machine, Domain, Context, Process Context, Value Chain | BPMN | **EPC or BPMN** | BPMN-compliant maps |
-| Other input modalities | PDF + text-file attachments fed into the prompt | Text | Text | **Excel, text, audio, video, even a conversation** |
+| Target notations from AI | ✅ **Text → 7 notations**: BPMN (2-phase) + one-shot State Machine, Domain, Context, **Process Context**, **Value Chain**, ArchiMate | BPMN only | **EPC or BPMN** (2) | BPMN-compliant maps only |
+| Other input modalities | PDF, text-file, **and image / screenshot** attachments fed into the prompt | Text | Text | **Excel, text, audio, video, even a conversation** |
+| **Image / sketch → diagram** (reverse-engineer) | ✅ **Attach a picture — whiteboard sketch, screenshot, or someone else's flowchart — and AI vision + OCR rebuild it as an editable diagram; *translates a plain flowchart image into BPMN* (Flowchart + BPMN)** | — | — | — (audio/video/Excel capture, not image→BPMN) |
 | Editable *intermediate plan* before layout | ✅ **Unique** — 4 live-synced tabs (Pools/Lanes, Elements, Connectors, Raw JSON); nothing is positioned until you Apply | ❌ Output drops onto the canvas; you edit the diagram | ❌ Generates the model; you edit it | ❌ Generates the map; you edit it |
 | Re-plan / iterate before committing | ✅ Re-send to the model freely; plan is the source of truth | Re-prompt regenerates | Re-prompt regenerates | Re-generate |
 | Saved prompts (with the plan persisted) | ✅ Prompt + last plan JSON saved together | Not documented | Not documented | Not documented |
@@ -40,7 +41,7 @@ This is the headline. All four products now do "describe a process → get a BPM
 
 ### What each one is really good at
 
-**Diagramatix — control + clean layout.** The defining difference is the **two-phase flow**: the model returns a *structured plan* (pools, lanes, tasks, gateways, connections) that you can inspect and edit across four synchronised tabs *before any geometry is computed*. When you hit **Apply Layout**, a deterministic engine of 50+ rules positions everything for a publish-ready result. Generation behaviour is **governed by admin-editable rules** split into "green" (sent to the model to steer structure) and "red" (enforced locally by the layout engine), so an organisation can encode its own conventions. Recent additions include first-class **event-based gateways** (the AI emits them and the engine wires them like an exclusive split/merge) and the **Admin → AI Plan Format** viewer that shows the exact prompt the model receives. Trade-off: generation is **batch**, not an inline "assist-as-you-type" companion, and there's no external best-practice content library.
+**Diagramatix — control + clean layout.** The defining difference is the **two-phase flow**: the model returns a *structured plan* (pools, lanes, tasks, gateways, connections) that you can inspect and edit across four synchronised tabs *before any geometry is computed*. When you hit **Apply Layout**, a deterministic engine of 50+ rules positions everything for a publish-ready result. Generation behaviour is **governed by admin-editable rules** split into "green" (sent to the model to steer structure) and "red" (enforced locally by the layout engine), so an organisation can encode its own conventions. Two breadth advantages the others don't match: AI generation spans **seven notations** — not just BPMN but **Value Chain, Process Context**, State Machine, Domain, Context and ArchiMate (Signavio and PRIME are BPMN-only; ARIS adds just EPC) — and a distinctive **image-to-diagram** path: attach a whiteboard photo, a screenshot, or a *competitor's* flowchart and Claude's vision + OCR reverse-engineer it into an editable diagram, even **translating a plain flowchart image into BPMN** (rectangle→task, decision diamond→gateway, …). Recent additions include first-class **event-based gateways** (the AI emits them and the engine wires them like an exclusive split/merge) and the **Admin → AI Plan Format** viewer that shows the exact prompt the model receives. Trade-off: generation is **batch**, not an inline "assist-as-you-type" companion, and there's no external best-practice content library.
 
 **SAP Signavio — enterprise grounding.** "Text to Process" turns a written description into BPMN, and its standout is **grounding in 5,000 SAP best-practice models** plus Process AI recommendations — useful when you're modelling standard ERP-adjacent processes. **Joule** adds natural-language search across diagrams and the dictionary. The AI output goes straight to the canvas (no editable intermediate-plan step is documented), and customisation of generation rules is limited to its recommendation engine.
 
@@ -55,7 +56,7 @@ This is the headline. All four products now do "describe a process → get a BPM
 - Pick **ARIS** if you need **EPC as well as BPMN** and AI that also works over a **process-mining/repository** backend.
 - Pick **PRIME BPM** if your starting point is **messy real-world capture** (interviews, recordings, spreadsheets) and you want the AI to also drive **process improvement**.
 
-Diagramatix is the only one of the four whose AI exposes an **editable intermediate plan** and whose **layout of AI output is governed by an explicit, user-editable rule set**.
+Diagramatix is the only one of the four whose AI exposes an **editable intermediate plan** and whose **layout of AI output is governed by an explicit, user-editable rule set** — and the only one that generates **all of its notations** from text (not just BPMN) and turns an **image / sketch into an editable diagram**, including flowchart→BPMN translation.
 
 ---
 
@@ -164,7 +165,7 @@ Diagramatix has moved from "design-time only" to a **built-in event-based (discr
 
 ## 8. Where Diagramatix wins
 
-1. **Editable-plan AI generation** — the only one of the four that lets you inspect and edit the AI's structured plan *before* layout, then re-plan freely. The plan JSON is the source of truth.
+1. **Editable-plan AI generation** — the only one of the four that lets you inspect and edit the AI's structured plan *before* layout, then re-plan freely (the plan JSON is the source of truth) — plus AI breadth no rival matches: **text → all 7 notations** (not just BPMN) and **image/sketch → editable BPMN** (including flowchart-photo → BPMN translation).
 2. **Rules-governed, publish-ready layout** — 50+ codified rules produce clean diagrams from AI output with no manual tidy-up; the generation rules are admin-editable.
 3. **Built-in discrete-event Simulator** — capacity planning + **as-is vs to-be cost comparison with a plain-language verdict**, a live "fork-the-timeline" Operator, planned interventions, Monte-Carlo ranges, and **BPSim** import/export — all self-hosted, in the same tool, with no separate enterprise simulation module.
 4. **Interaction polish** — drop-on-connector split, insert-space marker, smart auto-connect, force-connect, hand-drawn mode.
