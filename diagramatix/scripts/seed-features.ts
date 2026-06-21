@@ -19,7 +19,7 @@
 import { PrismaClient } from "../app/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 
-const FEATURES: Array<{ name: string; summary: string; details: string }> = [
+export const FEATURES: Array<{ name: string; summary: string; details: string }> = [
   {
     name: "Process Simulator",
     summary: "Run your BPMN as a discrete-event simulation — see where work queues, who the bottleneck is, and prove the cost case for a redesign before you change anything.",
@@ -307,7 +307,11 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+// Only run when invoked directly (not when imported, e.g. by sync-features.ts
+// which reuses the FEATURES list).
+if (process.argv[1]?.endsWith("seed-features.ts")) {
+  main().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}
