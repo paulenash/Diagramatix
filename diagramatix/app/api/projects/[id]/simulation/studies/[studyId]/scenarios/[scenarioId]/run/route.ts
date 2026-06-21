@@ -6,6 +6,7 @@ import { isReadOnlyImpersonation } from "@/app/lib/superuser";
 import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext";
 import type { DiagramData } from "@/app/lib/diagram/types";
 import { assemblePortfolio, portfolioClosure } from "@/app/lib/simulation/network";
+import { spliceLinkedSubprocesses } from "@/app/lib/simulation/spliceLinks";
 import { applyOverrides, type OverrideSet } from "@/app/lib/simulation/overrides";
 import { runMonteCarlo } from "@/app/lib/simulation/runner";
 import { DEFAULT_RUN_CONFIG, type ScenarioRunConfig } from "@/app/lib/simulation/types";
@@ -82,10 +83,14 @@ export async function POST(_req: Request, { params }: Params) {
     select: { id: true, data: true },
   });
   const diagrams = projectDiagrams.map((d) => ({ id: d.id, data: (d.data ?? {}) as unknown as DiagramData }));
-  // Closure is informational for now (linked-child splicing is a later phase);
-  // the run assembles the ROOT processes, which share the portfolio team pools.
   const closure = portfolioClosure(diagrams, rootIds);
-  const rootDiagrams = diagrams.filter((d) => rootIds.includes(d.id));
+  // Roll up linked subprocesses: flatten each root's `linkedDiagramId`
+  // subprocesses into inline expanded subprocesses (drill-down), so the linked
+  // child diagrams' tasks/teams/times simulate as part of the run.
+  const byId = new Map(diagrams.map((d) => [d.id, d.data]));
+  const rootDiagrams = rootIds
+    .map((rid) => { const d = byId.get(rid); return d ? { id: rid, data: spliceLinkedSubprocesses(d, rid, byId) } : null; })
+    .filter((x): x is { id: string; data: DiagramData } => x !== null);
 
   // Real pool capacities from the project's team library (keyed by name —
   // tasks reference a team by the name stored in sim.teamId).
