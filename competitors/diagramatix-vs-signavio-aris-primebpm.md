@@ -1,6 +1,6 @@
 # Diagramatix vs SAP Signavio, ARIS & PRIME BPM — Feature & AI Comparison
 
-*Compiled: May 2026. Diagramatix data from the current codebase (export schema v1.15; BPMN + 6 other diagram types + Collaboration & Review). Competitor data from public product pages and documentation accessed May 2026 — see Sources. Competitor AI features in particular are evolving rapidly; verify against the live product pages before quoting externally.*
+*Compiled: June 2026. Diagramatix data from the current codebase (export schema v1.25; BPMN + 6 other diagram types + Collaboration & Review + a built-in discrete-event **Process Simulator**). Competitor data from public product pages and documentation accessed May–June 2026 — see Sources. Competitor AI and simulation features in particular are evolving rapidly; verify against the live product pages before quoting externally.*
 
 > Supersedes `diagramatix-vs-sap-signavio.md` (Signavio-only, written at Diagramatix v1.8.x).
 
@@ -10,12 +10,12 @@
 
 | | Positioning |
 |---|---|
-| **Diagramatix** | A focused, self-hostable **authoring + AI generation** tool for BPMN, Value Chain, State Machine, Domain, Context, Process Context and Basic diagrams. Differentiators: an opinionated **rules-based layout engine**, a unique **two-phase AI generation** (edit the plan, *then* lay it out), admin-tunable AI rules, and a built-in **Collaboration & Review** workflow. |
+| **Diagramatix** | A focused, self-hostable **authoring + AI generation** tool for BPMN, Value Chain, State Machine, Domain, Context, Process Context and Basic diagrams. Differentiators: an opinionated **rules-based layout engine**, a unique **two-phase AI generation** (edit the plan, *then* lay it out), admin-tunable AI rules, a built-in **Collaboration & Review** workflow, and a built-in **discrete-event Process Simulator** (capacity planning, **as-is vs to-be cost comparison**, live "fork-the-timeline" Operator interventions, BPSim-aligned). |
 | **SAP Signavio** | The process-design tier of SAP's **Business Process Transformation Suite**. Modelling plus process mining, governance, publishing, simulation, and **SAP Business AI** (Joule + Text-to-Process), grounded in 5,000 SAP best-practice models. Enterprise, SAP-ecosystem. |
 | **ARIS** (Software AG) | A long-established enterprise **BPA / EA suite**. Signature **EPC** notation plus BPMN, deep repository/governance, process mining, and the **ARIS AI Companion** (text-to-model, NL search, GenAI mining insights). Enterprise. |
 | **PRIME BPM** | A cloud BPM suite (Australian) in two editions — **PRIME Modeller** and **PRIME Improver** — with a strong improvement/analysis angle (cycle time, cost, VA/NVA) and a set of **AI add-on agents** (MapAI, AI Procedure Writer, Digital Process Analyst, PrimeGPT). |
 
-**The short version.** Diagramatix competes head-on with all three on the *authoring + AI-generation* experience, where its editable-plan + rules-governed deterministic layout is genuinely distinctive. The three enterprise suites each win decisively on what surrounds modelling — Signavio on the SAP ecosystem + mining, ARIS on EA breadth + EPC + repository governance, PRIME BPM on built-in process-improvement analytics. None of the three is self-hostable per-seat the way Diagramatix is.
+**The short version.** Diagramatix competes head-on with all three on the *authoring + AI-generation* experience, where its editable-plan + rules-governed deterministic layout is genuinely distinctive. **New since the last edition: a built-in discrete-event Simulator** moves Diagramatix into a category — process simulation, with as-is/to-be cost cases — that was previously the enterprise suites' alone, and adds touches they don't combine (a live, interactive "fork-the-timeline" Operator, a plain-language cost/FTE verdict, BPSim import/export, all self-hosted). The three enterprise suites still each win on what *surrounds* modelling — Signavio on the SAP ecosystem + mining, ARIS on EA breadth + EPC + repository governance + a deeper, more mature simulation engine, PRIME BPM on built-in process-improvement analytics. None of the three is self-hostable per-seat the way Diagramatix is. Process **mining** (real event-log discovery) remains a suite-only capability.
 
 ---
 
@@ -110,12 +110,34 @@ Diagramatix is the only one of the four whose AI exposes an **editable intermedi
 
 | Feature | Diagramatix | Signavio | ARIS | PRIME BPM |
 |---|---|---|---|---|
-| Process mining (event-log discovery / conformance) | ❌ | ✅ Process Intelligence | ✅ ARIS Process Mining | Partial (analytics, not log mining) |
-| Simulation (token-flow / scenario) | ❌ | ✅ | ✅ | ✅ (improvement scenarios, future-state) |
-| Built-in process-improvement analytics (cycle time, cost, VA/NVA) | ✅ Value Analysis badges + bottleneck overlay (manual mark-up) | Via mining KPIs | Via mining KPIs | ✅ **Core strength** (Improver edition) |
+| Process **mining** (event-log discovery / conformance) | ❌ | ✅ Process Intelligence | ✅ ARIS Process Mining | Partial (analytics, not log mining) |
+| Discrete-event **simulation** | ✅ **Built-in DES engine — see §6.1** | ✅ | ✅ (mature, animated) | ✅ (future-state / improvement scenarios) |
+| Cost & capacity analysis (cycle time, cost, VA/NVA) | ✅ **Cost-per-case, total cost, utilisation, bottleneck ranking — quantified by the simulator** (+ Value Analysis badges) | Via mining KPIs / simulation | Via simulation / mining KPIs | ✅ **Core strength** (Improver edition) |
 | Transfer to execution / workflow engine | ❌ | ✅ Cloud ALM bridge | ✅ | Limited |
 
-**Verdict.** This is where the suites are in a different category. Diagramatix is design-time only and relies on the modeller to mark up value/bottlenecks; Signavio and ARIS discover the real process from logs; PRIME BPM's Improver edition turns analysis into quantified improvement cases.
+**Verdict.** Process **mining** (discovering the real process from system logs) is still suite-only — Signavio and ARIS lead, and Diagramatix doesn't compete there. But **simulation is no longer a gap**: Diagramatix now ships a full discrete-event engine that quantifies cost, capacity and the case for a redesign (§6.1). ARIS retains the deepest, most mature simulation (animation, advanced resource/calendar models); Diagramatix's edge is *accessibility + distinctive touches* in the same tool you author and AI-generate in.
+
+### 6.1 Simulation — detailed
+
+Diagramatix has moved from "design-time only" to a **built-in event-based (discrete-event) Process Simulator**: work items flow over a simulated clock, tasks seize limited team capacity so realistic queues and wait times *emerge from contention*, and Monte-Carlo replications give ranges (mean / p50 / p95), not a single misleading number. It runs in the same tool, with no separate enterprise module.
+
+| Simulation capability | **Diagramatix** | **Signavio** | **ARIS** | **PRIME BPM** |
+|---|---|---|---|---|
+| Engine | Discrete-event, token-flow, resource contention; Monte-Carlo ranges (p5/p50/p95) | Token-based | Discrete-event (mature, animated) | Scenario / future-state analysis |
+| Shared resource pools across *multiple* processes (portfolio) | ✅ One team pool shared across diagrams → genuine cross-process capacity planning | Partial | ✅ | — |
+| **As-is vs To-be** comparison with a cost **verdict** | ✅ **Pin scenarios to different process variants; plain-language verdict** (e.g. "28% faster, +12% throughput, $4.2k less per case, frees ~1.4 FTE") | Via scenarios | Via scenarios | ✅ future-state cost/time |
+| Cost modelling (cost/hour → cost-per-case, total cost, savings) | ✅ | ✅ | ✅ | ✅ |
+| **Live, interactive replay with mid-run intervention** | ✅ **"Fork the timeline" Operator** — add capacity / inject a surge *mid-run* and re-run deterministically; animated token replay + utilisation heatmap | — | ✅ animation (not an interactive fork) | — |
+| Subprocess roll-up incl. **linked diagrams** | ✅ inline *and* linked drill-down (nested + parallel instances isolated) | ✅ | ✅ | partial |
+| Planned timed interventions (capacity surge, outage, demand spike, work injection) | ✅ | — | partial | — |
+| Standards-based interchange (**BPSim**) | ✅ **OMG/WfMC BPSim import + export** | — | — | — |
+| Worked-example library to learn / demo from (one-click load) | ✅ | — | — | — |
+| Working-hours **calendars** / shift models | ⏳ roadmap | ✅ | ✅ | ✅ |
+| Self-hosted, per-seat, *no separate simulation module* | ✅ | ❌ | ❌ | ❌ |
+
+**What's distinctive about Diagramatix's simulation.** Three things the suites don't combine: (1) an **as-is vs to-be** comparison that pins each scenario to a *structurally different* process variant and returns a **plain-language cost verdict** (% faster, throughput, $/case, FTE freed) — turning "X% faster" into a business case; (2) a **live, interactive Operator** that lets you intervene *during* a slowed-clock replay ("fork the timeline") and watch a backlog clear or build, deterministically; (3) **BPSim** (the OMG/WfMC standard) import/export, so simulation parameters interchange with other tools. All of it is **self-hosted** and integrated with authoring + AI — no enterprise contract, no separate module.
+
+**Where the suites still lead on simulation.** ARIS in particular has a **deeper, more mature** engine — richer resource models, working-time **calendars/shifts**, and long-established animation. Diagramatix's calendar/shift modelling is on the roadmap (it currently treats capacity as continuously available). And neither Diagramatix nor a single simulation run substitutes for **process mining**, where the suites discover the *actual* as-is process from event logs rather than relying on modeller-entered estimates.
 
 ---
 
@@ -136,26 +158,28 @@ Diagramatix is the only one of the four whose AI exposes an **editable intermedi
 
 1. **Editable-plan AI generation** — the only one of the four that lets you inspect and edit the AI's structured plan *before* layout, then re-plan freely. The plan JSON is the source of truth.
 2. **Rules-governed, publish-ready layout** — 50+ codified rules produce clean diagrams from AI output with no manual tidy-up; the generation rules are admin-editable.
-3. **Interaction polish** — drop-on-connector split, insert-space marker, smart auto-connect, force-connect, hand-drawn mode.
-4. **Multi-notation in one focused tool** — BPMN + 6 other types without enterprise-suite weight.
-5. **Self-hosted, no ecosystem lock-in**, per-seat pricing.
-6. **Visio round-trip** with a purpose-built shapes file, plus the niche **DDL ↔ Domain** round-trip.
-7. **Built-in lightweight review loop** for small teams.
+3. **Built-in discrete-event Simulator** — capacity planning + **as-is vs to-be cost comparison with a plain-language verdict**, a live "fork-the-timeline" Operator, planned interventions, Monte-Carlo ranges, and **BPSim** import/export — all self-hosted, in the same tool, with no separate enterprise simulation module.
+4. **Interaction polish** — drop-on-connector split, insert-space marker, smart auto-connect, force-connect, hand-drawn mode.
+5. **Multi-notation in one focused tool** — BPMN + 6 other types without enterprise-suite weight.
+6. **Self-hosted, no ecosystem lock-in**, per-seat pricing.
+7. **Visio round-trip** with a purpose-built shapes file, plus the niche **DDL ↔ Domain** round-trip.
+8. **Built-in lightweight review loop** for small teams.
 
 ## 9. Where each competitor wins
 
-- **Signavio:** SAP best-practice grounding for AI, process mining, simulation, formal governance/publishing, Cloud ALM execution bridge, CMMN/DMN.
-- **ARIS:** EPC + broad notation set, enterprise repository & EA breadth, process mining, AI Companion that also works over mining data, governance/audit depth.
+- **Signavio:** SAP best-practice grounding for AI, **process mining**, formal governance/publishing, Cloud ALM execution bridge, CMMN/DMN. (Simulation exists, but Diagramatix now competes here.)
+- **ARIS:** EPC + broad notation set, enterprise repository & EA breadth, **process mining**, a **deeper/more mature simulation engine** (calendars, advanced resource models, animation), AI Companion that also works over mining data, governance/audit depth.
 - **PRIME BPM:** multi-modal AI capture (audio/video/Excel/conversation → map), built-in improvement analytics (cost/time/VA-NVA, future-state simulation), SOP generation.
 
 ## 10. Positioning Diagramatix
 
 - "Describe your process — then **edit the plan before it's drawn**. AI generation you actually control."
 - "**Publish-ready BPMN in seconds**, laid out by 50+ rules you can tune — no manual clean-up."
-- "Round-trips **Visio** and BPMN XML; **self-hosted**, per-seat — no enterprise contract."
-- "All the authoring, AI and review a team needs — none of the suite bloat."
+- "Model it, then **simulate it** — capacity, bottlenecks, and the **cost case for a redesign** (as-is vs to-be), without a separate enterprise tool."
+- "Round-trips **Visio**, BPMN XML and **BPSim**; **self-hosted**, per-seat — no enterprise contract."
+- "All the authoring, AI, review **and simulation** a team needs — none of the suite bloat."
 
-Where **not** to compete: process mining / real event-log analysis, formal enterprise governance lifecycle, SAP-ecosystem execution, and (for ARIS) EPC + EA repository breadth.
+Where **not** to compete: **process mining / real event-log analysis** (the suites discover the actual process from logs; Diagramatix simulates modeller-entered estimates), formal enterprise governance lifecycle, SAP-ecosystem execution, deep/mature simulation with shift calendars (ARIS), and (for ARIS) EPC + EA repository breadth.
 
 ---
 
