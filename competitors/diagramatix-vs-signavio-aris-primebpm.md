@@ -1,6 +1,6 @@
 # Diagramatix vs SAP Signavio, ARIS & PRIME BPM — Feature & AI Comparison
 
-*Compiled: June 2026. Diagramatix data from the current codebase (export schema v1.25; BPMN + 6 other diagram types + Collaboration & Review + a built-in discrete-event **Process Simulator**). Competitor data from public product pages and documentation accessed May–June 2026 — see Sources. Competitor AI and simulation features in particular are evolving rapidly; verify against the live product pages before quoting externally.*
+*Compiled: June 2026. Diagramatix data from the current codebase (export schema v1.25; BPMN + 6 other diagram types, plus a built-in discrete-event **Process Simulator**, a **publishing & review lifecycle**, **Microsoft 365 (SharePoint/OneDrive) integration**, **governed pool/lane naming** and **role-based sharing / org admin**). Competitor data from public product pages and documentation accessed May–June 2026 — see Sources. Competitor AI and simulation features in particular are evolving rapidly; verify against the live product pages before quoting externally.*
 
 > Supersedes `diagramatix-vs-sap-signavio.md` (Signavio-only, written at Diagramatix v1.8.x).
 
@@ -15,7 +15,7 @@
 | **ARIS** (Software AG) | A long-established enterprise **BPA / EA suite**. Signature **EPC** notation plus BPMN, deep repository/governance, process mining, and the **ARIS AI Companion** (text-to-model, NL search, GenAI mining insights). Enterprise. |
 | **PRIME BPM** | A cloud BPM suite (Australian) in two editions — **PRIME Modeller** and **PRIME Improver** — with a strong improvement/analysis angle (cycle time, cost, VA/NVA) and a set of **AI add-on agents** (MapAI, AI Procedure Writer, Digital Process Analyst, PrimeGPT). |
 
-**The short version.** Diagramatix competes head-on with all three on the *authoring + AI-generation* experience, where its editable-plan + rules-governed deterministic layout is genuinely distinctive. **New since the last edition: a built-in discrete-event Simulator** moves Diagramatix into a category — process simulation, with as-is/to-be cost cases — that was previously the enterprise suites' alone, and adds touches they don't combine (a live, interactive "fork-the-timeline" Operator, a plain-language cost/FTE verdict, BPSim import/export, all self-hosted). The three enterprise suites still each win on what *surrounds* modelling — Signavio on the SAP ecosystem + mining, ARIS on EA breadth + EPC + repository governance + a deeper, more mature simulation engine, PRIME BPM on built-in process-improvement analytics. None of the three is self-hostable per-seat the way Diagramatix is. Process **mining** (real event-log discovery) remains a suite-only capability.
+**The short version.** Diagramatix competes head-on with all three on the *authoring + AI-generation* experience, where its editable-plan + rules-governed deterministic layout is genuinely distinctive. **New since the last edition: a built-in discrete-event Simulator** moves Diagramatix into a category — process simulation, with as-is/to-be cost cases — that was previously the enterprise suites' alone, and adds touches they don't combine (a live, interactive "fork-the-timeline" Operator, a plain-language cost/FTE verdict, BPSim import/export, all self-hosted). Alongside it, Diagramatix has filled in the *operational* layer that small-and-mid teams need — a **publishing & review lifecycle**, **role-based project sharing + an org-admin tier**, **governed pool/lane naming** (its lightweight answer to an enterprise glossary), and **Microsoft 365 (SharePoint/OneDrive)** integration — so it's no longer "just an editor." The three enterprise suites still each win on what *surrounds* modelling at scale — Signavio on the SAP ecosystem + mining, ARIS on EA breadth + EPC + repository governance + a deeper, more mature simulation engine, PRIME BPM on built-in process-improvement analytics. None of the three is self-hostable per-seat the way Diagramatix is. Process **mining** (real event-log discovery) remains a suite-only capability.
 
 ---
 
@@ -71,8 +71,9 @@ Diagramatix is the only one of the four whose AI exposes an **editable intermedi
 | EPC (event-driven process chains) | ❌ | ❌ | ✅ **Signature notation** | ❌ |
 | Validation / modelling conventions | Gateway matching + layout-rule constraints | ✅ Real-time syntax + configurable rule packs | ✅ Repository-level conventions | ✅ Methodology checks |
 | Best-practice / reusable content library | Templates (built-in + personal) | ✅ 5,000+ models | ✅ Reference models | ✅ Methodology + frameworks |
+| Glossary / **governed naming** (reusable term dictionary) | ✅ **Entity Lists** — pools/lanes named from a maintained Org → Unit → Team → Role hierarchy + External-Participant + IT-Systems lists (org-master → editable project copy) | ✅ **Dictionary** (central glossary of reusable terms) | ✅ Repository-level naming governance | Partial |
 
-**Verdict.** The three suites have deeper formal notation coverage (CMMN/DMN; EPC for ARIS) and more formal validation. Diagramatix covers the BPMN you'll use day-to-day and pairs it with layout/AI features the others don't.
+**Verdict.** The three suites have deeper formal notation coverage (CMMN/DMN; EPC for ARIS) and more formal validation. Diagramatix covers the BPMN you'll use day-to-day, adds **governed pool/lane naming** (Entity Lists — its lightweight take on Signavio's Dictionary / an ARIS repository), and pairs it all with layout/AI features the others don't.
 
 ---
 
@@ -91,11 +92,13 @@ Diagramatix is the only one of the four whose AI exposes an **editable intermedi
 
 ---
 
-## 5. Collaboration & Review
+## 5. Collaboration, Review & Access
 
 | Feature | Diagramatix | Signavio | ARIS | PRIME BPM |
 |---|---|---|---|---|
 | Collaboration Groups (invite by name/email, accept/decline, transfer ownership) | ✅ | ✅ (enterprise users/teams) | ✅ | ✅ |
+| **Role-based project sharing** (View / Edit, per project) | ✅ owner grants View/Edit by name/email; per-diagram "Diagram Owner" accountability | ✅ enterprise RBAC | ✅ enterprise RBAC | ✅ |
+| **Organisation admin** + sharing policy | ✅ **OrgAdmin role** with share oversight, per-org cross-org-sharing toggle, and silent admin membership | ✅ enterprise admin/governance | ✅ enterprise admin/governance | ✅ |
 | Send a diagram for review with objective + due date | ✅ | Via Governance workflows | Via governance | Via workflows |
 | In-diagram review comments (pink note auto-linked to an element, tagged per reviewer) | ✅ | ✅ Commenting | ✅ Commenting | ✅ |
 | Reviewer status tracking (pending → submitted → approved / declined), re-submit & finish rounds | ✅ Built-in, dashboard-tracked, colour-coded by due date | ✅ Formal BPMN-based approval workflows (Process Governance) | ✅ Governance/release workflows | ✅ |
@@ -105,7 +108,7 @@ Diagramatix is the only one of the four whose AI exposes an **editable intermedi
 | Real-time multi-user co-editing | ❌ Single-editor | ✅ | ✅ | ✅ |
 | Formal approval-*workflow* engine + enterprise audit log | **Mid** — draft→published lifecycle, versioned + superseded, bundle publishing to audiences, review-cadence reminders; *not* a configurable approval-workflow engine or full audit log | ✅ Deep (Process Governance + audit) | ✅ Deep (repository governance + audit) | ✅ |
 
-**Verdict.** Diagramatix is **mid-tier, not basic, on review + publishing**: a genuine review loop (send → comment → approve/decline → re-submit → finish) *and* a real publishing lifecycle — draft→published, immutable/superseded versions, **publication bundles published to business-user audiences (invite-by-email) with a read-only viewer**, and **scheduled re-review reminders**. That closes most of the small-team gap versus the suites. They still win on **real-time co-editing**, a **configurable BPMN approval-workflow engine**, and a **full enterprise audit log**.
+**Verdict.** Diagramatix is **mid-tier, not basic, on collaboration / governance**: a genuine review loop (send → comment → approve/decline → re-submit → finish), a real publishing lifecycle (draft→published, immutable/superseded versions, **publication bundles to business-user audiences with a read-only viewer**, scheduled re-review reminders), *and* an access layer — **role-based project sharing plus an OrgAdmin tier with share oversight and per-org sharing policy**. That closes most of the small-and-mid-team gap. The suites still win on **real-time co-editing**, a **configurable BPMN approval-workflow engine**, and a **full enterprise audit log**.
 
 ---
 
@@ -150,8 +153,10 @@ Diagramatix has moved from "design-time only" to a **built-in event-based (discr
 |---|---|---|---|---|
 | PDF / SVG export | ✅ (scalable PDF) | ✅ | ✅ | ✅ |
 | Visio (.vsdx) round-trip | ✅ **Import + export** (custom Visio Shapes file or standard BPMN stencil) | Import/export | Import/export | Import (varies) |
-| BPMN XML round-trip | ✅ (versioned XSD, schema v1.15) | ✅ | ✅ | ✅ |
+| BPMN XML round-trip | ✅ (versioned XSD, schema v1.25) | ✅ | ✅ | ✅ |
 | DDL ↔ Domain-model round-trip | ✅ (PostgreSQL / MySQL / SQL Server) | ❌ | ❌ | ❌ |
+| **Microsoft 365 (SharePoint / OneDrive)** integration | ✅ **Sign in with Microsoft; save / open diagram files in SharePoint or OneDrive; link Data Objects/Stores to live documents with an embedded preview** | Via SAP + MS ecosystem (varies) | Via integrations | Varies |
+| **Full-account portable backup / restore** | ✅ **one `.diag` file = every project, diagram, template + prefs; restore anywhere** (with live-progress guided backups) | ❌ (SaaS-managed) | Enterprise export | ❌ (SaaS-managed) |
 | Deployment | **Self-hosted** (Next.js + Postgres) or hosted | SaaS (SAP BTP) | SaaS / on-prem (enterprise) | Cloud SaaS |
 | Pricing model | Per-seat / self-host; free for internal use | Enterprise contract | Enterprise contract | Per-user subscription + AI add-ons |
 
@@ -164,9 +169,11 @@ Diagramatix has moved from "design-time only" to a **built-in event-based (discr
 3. **Built-in discrete-event Simulator** — capacity planning + **as-is vs to-be cost comparison with a plain-language verdict**, a live "fork-the-timeline" Operator, planned interventions, Monte-Carlo ranges, and **BPSim** import/export — all self-hosted, in the same tool, with no separate enterprise simulation module.
 4. **Interaction polish** — drop-on-connector split, insert-space marker, smart auto-connect, force-connect, hand-drawn mode.
 5. **Multi-notation in one focused tool** — BPMN + 6 other types without enterprise-suite weight.
-6. **Self-hosted, no ecosystem lock-in**, per-seat pricing.
+6. **Self-hosted, no ecosystem lock-in**, per-seat pricing — with a **full-account portable backup** (one `.diag` file, restore anywhere) the SaaS suites can't match.
 7. **Visio round-trip** with a purpose-built shapes file, plus the niche **DDL ↔ Domain** round-trip.
-8. **Review + publishing lifecycle** — send-for-review rounds *plus* draft→published versioning, publication bundles to a business-user audience (invite-by-email + read-only viewer), and scheduled re-review reminders.
+8. **Collaboration, publishing & access lifecycle** — send-for-review rounds, draft→published versioning, publication bundles to a business-user audience (invite-by-email + read-only viewer), scheduled re-review reminders, **role-based sharing and an OrgAdmin tier**.
+9. **Microsoft 365 integration** — Microsoft sign-in plus SharePoint/OneDrive save-open and Data-Object file links with embedded preview.
+10. **Governed naming** — consistent pool/lane names drawn from a maintained Org/Participant/IT-Systems library (Entity Lists), adopted per project.
 
 ## 9. Where each competitor wins
 
@@ -179,8 +186,9 @@ Diagramatix has moved from "design-time only" to a **built-in event-based (discr
 - "Describe your process — then **edit the plan before it's drawn**. AI generation you actually control."
 - "**Publish-ready BPMN in seconds**, laid out by 50+ rules you can tune — no manual clean-up."
 - "Model it, then **simulate it** — capacity, bottlenecks, and the **cost case for a redesign** (as-is vs to-be), without a separate enterprise tool."
-- "Round-trips **Visio**, BPMN XML and **BPSim**; **self-hosted**, per-seat — no enterprise contract."
-- "All the authoring, AI, review **and simulation** a team needs — none of the suite bloat."
+- "Round-trips **Visio**, BPMN XML and **BPSim**; saves to **SharePoint/OneDrive**; **self-hosted**, per-seat — no enterprise contract."
+- "**Governed naming**, **role-based sharing** and an **org-admin tier** — the operational layer, not just an editor."
+- "All the authoring, AI, review, publishing **and simulation** a team needs — none of the suite bloat."
 
 Where **not** to compete: **process mining / real event-log analysis** (the suites discover the actual process from logs; Diagramatix simulates modeller-entered estimates), formal enterprise governance lifecycle, SAP-ecosystem execution, deep/mature simulation with shift calendars (ARIS), and (for ARIS) EPC + EA repository breadth.
 
@@ -188,7 +196,7 @@ Where **not** to compete: **process mining / real event-log analysis** (the suit
 
 ## Sources
 
-- Diagramatix codebase audit — `c:\Git\Diagramatix\diagramatix\` (current branch, May 2026; export schema v1.15).
+- Diagramatix codebase audit — `c:\Git\Diagramatix\diagramatix\` (current branch, June 2026; export schema v1.25; 26 published feature-catalog entries).
 - [SAP Signavio launches AI-assisted Process Modeler, Text-to-Process (SAP News, Mar 2025)](https://news.sap.com/2025/03/sap-signavio-launches-ai-process-modeler-text-to-process/)
 - [SAP Business AI release highlights Q1 2026 (SAP News)](https://news.sap.com/2026/04/sap-business-ai-release-highlights-q1-2026/)
 - [Text to Process V2 in SAP Signavio (SAP Community)](https://community.sap.com/t5/technology-blog-posts-by-sap/ai-powered-modeling-gets-an-upgrade-text-to-process-v2-in-sap-signavio-lab/ba-p/14263094)
