@@ -45,6 +45,12 @@ body {
 .dgx-pan:active  { cursor: grabbing; }
 .dgx-connect-target { cursor: crosshair; }
 
+/* Dramatic background dim while Claude Sonnet is generating — a vignette that
+ * fades in behind the throbber so the canvas recedes and the AI "thinking"
+ * moment takes centre stage. */
+@keyframes dgxAiDim { from { opacity: 0; } to { opacity: 1; } }
+.dgx-ai-dim { animation: dgxAiDim 0.45s ease-out both; }
+
 /* Dashboard background — a faint connected-nodes "process flow" pattern
  * tiled over gray-50. On-brand for a diagramming tool, deliberately
  * low-contrast (~7-9% blue) so the white cards stay crisp. Inline SVG

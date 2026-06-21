@@ -3647,6 +3647,15 @@ export function DiagramEditor({
             className="fixed inset-0 z-40 flex flex-col items-center justify-center"
             style={{ pointerEvents: "none" }}
           >
+            {/* Dramatic vignette dim — only while Claude Sonnet is thinking
+                (not the fast, local layout "apply"). pointer-events:none is
+                inherited, so the user can still pan/zoom underneath. */}
+            {aiBusy !== "apply" && (
+              <div
+                className="dgx-ai-dim absolute inset-0"
+                style={{ background: "radial-gradient(ellipse at center, rgba(0,0,0,0.30) 0%, rgba(0,0,0,0.64) 100%)" }}
+              />
+            )}
             <DiagramatixThrobber size={120} auraRadius={110} />
             <p className="mt-3 text-sm font-medium text-blue-800 bg-white/85 backdrop-blur-sm px-4 py-2 rounded-lg shadow-md">
               {aiBusy === "apply"
