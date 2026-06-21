@@ -42,9 +42,10 @@ IMAGE INPUT — when an image of an existing flowchart is attached:
 
 ${rules ? `USER RULES AND PREFERENCES (follow these strictly):\n${rules}\n\n` : ""}CRITICAL FORMAT RULES — follow exactly:
 - Output ONLY a JSON object with two arrays: "elements" and "connections".
-- Each element: { "id": string, "type": one of [${TYPE_LIST.map((t) => `"${t}"`).join(", ")}], "label": string }.
+- Each element: { "id": string, "type": one of [${TYPE_LIST.map((t) => `"${t}"`).join(", ")}], "label": string, "lane"?: string }.
 - Each connection: { "sourceId": string, "targetId": string, "label"?: string }.
 - Use "label" (not "name") everywhere. Give every element a unique short id (e.g. "n1", "n2").
+- SWIMLANES: if the process spans multiple actors / roles / systems, set each element's "lane" to the responsible actor's name (e.g. "Customer", "Sales", "Billing System"). The layout draws lanes as vertical swimlane columns left-to-right in first-appearance order, and the flow zig-zags between them as responsibility hands off. If there is only one actor, OMIT "lane" entirely. Do NOT emit swimlane shapes yourself — just tag elements with a "lane".
 - Start the flow with exactly one "terminator" labelled "Start" and finish with one or more "terminator" elements labelled "End"/"Stop".
 - Model the MAIN sequence as a single top-to-bottom chain of "process" steps.
 - A "decision" MUST have two or more outgoing connections, each carrying a branch "label" (e.g. "Yes" / "No"). Decision labels should be phrased as a question ending in "?".
