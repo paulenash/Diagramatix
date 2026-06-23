@@ -4536,8 +4536,16 @@ export function Canvas({
         onDragLeave={() => { if (poolDropPreview) setPoolDropPreview(null); }}
         onKeyDown={handleKeyDown}
         onContextMenu={(e) => {
-          if (readOnly || (diagramType !== "bpmn" && diagramType !== "state-machine" && diagramType !== "value-chain")) return;
+          // Diagramatix owns right-click on the canvas: never show the native
+          // browser menu here. EXCEPTION — an editable target (inline label /
+          // rich-text edit) keeps its copy/paste menu so text editing isn't
+          // crippled.
+          const tgt = e.target as Element | null;
+          if (tgt?.closest?.("input, textarea, select, [contenteditable]:not([contenteditable='false'])")) return;
           e.preventDefault();
+          // Beyond suppressing the native menu, the Diagramatix quick-add /
+          // element menus only apply to these diagram types.
+          if (readOnly || (diagramType !== "bpmn" && diagramType !== "state-machine" && diagramType !== "value-chain")) return;
           const rect = svgRef.current?.getBoundingClientRect();
           if (!rect) return;
           // If 2+ process elements selected, show theme picker instead of quick-add

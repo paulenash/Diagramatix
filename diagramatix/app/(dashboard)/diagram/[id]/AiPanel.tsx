@@ -84,24 +84,25 @@ export function AiPanel({
       : `I have attached a document, ${file.name}`);
   }
 
-  // Speech-to-text dictation
+  // Speech-to-text dictation. The Web Speech API ends a session on silence /
+  // its internal timeout (firing `onend`); to keep dictation going through
+  // natural pauses we track the user's intent and AUTO-RESTART on end until
+  // they explicitly stop.
   const [listening, setListening] = useState(false);
   const recognitionRef = useRef<any>(null);
+  const wantListeningRef = useRef(false);
+  const restartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const promptRef = useRef(prompt);
   promptRef.current = prompt;
   const speechSupported = typeof window !== "undefined"
     && !!(window.SpeechRecognition || window.webkitSpeechRecognition);
 
-  function toggleDictation() {
-    if (listening && recognitionRef.current) {
-      recognitionRef.current.stop();
-      return;
-    }
+  function startRecognition() {
     const SR = (window as any).SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) return;
     const recognition = new SR();
     recognition.continuous = true;
-    recognition.interimResults = false;
+    recognition.interimResults = true;   // keep the engine actively listening
     recognition.lang = "en-AU";
 
     recognition.onresult = (event: any) => {
@@ -115,16 +116,49 @@ export function AiPanel({
         }
       }
     };
-    recognition.onend = () => setListening(false);
-    recognition.onerror = () => setListening(false);
+    recognition.onend = () => {
+      // Silence / timeout ended the session — restart if the user is still
+      // dictating, so a pause doesn't stop them. Otherwise really stop.
+      if (wantListeningRef.current) {
+        restartTimerRef.current = setTimeout(() => {
+          if (wantListeningRef.current) startRecognition();
+        }, 200);
+      } else {
+        setListening(false);
+      }
+    };
+    recognition.onerror = (e: any) => {
+      // Fatal (no mic / blocked) → stop. Transient (no-speech / aborted /
+      // network) → let onend restart us.
+      if (e?.error === "not-allowed" || e?.error === "service-not-allowed") {
+        wantListeningRef.current = false;
+        setListening(false);
+      }
+    };
     recognitionRef.current = recognition;
-    recognition.start();
+    try { recognition.start(); } catch { /* already starting */ }
+  }
+
+  function toggleDictation() {
+    if (listening) {
+      wantListeningRef.current = false;
+      if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
+      recognitionRef.current?.stop();
+      setListening(false);
+      return;
+    }
+    wantListeningRef.current = true;
     setListening(true);
+    startRecognition();
   }
 
   // Stop dictation on unmount
   useEffect(() => {
-    return () => { recognitionRef.current?.stop(); };
+    return () => {
+      wantListeningRef.current = false;
+      if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
+      recognitionRef.current?.stop();
+    };
   }, []);
 
   /** Admin-only — reverse-engineer the current diagram into a

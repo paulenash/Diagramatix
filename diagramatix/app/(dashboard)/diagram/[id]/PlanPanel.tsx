@@ -148,19 +148,17 @@ export function PlanPanel({
   const [listening, setListening] = useState(false);
   const [dictateMsg, setDictateMsg] = useState<string | null>(null);
   const recognitionRef = useRef<any>(null);
+  const wantListeningRef = useRef(false);
+  const restartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const speechSupported = typeof window !== "undefined"
     && !!(window.SpeechRecognition || window.webkitSpeechRecognition);
 
-  function toggleDictation() {
-    if (listening && recognitionRef.current) {
-      recognitionRef.current.stop();
-      return;
-    }
+  function startRecognition() {
     const SR = (window as any).SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) return;
     const recognition = new SR();
     recognition.continuous = true;
-    recognition.interimResults = false;
+    recognition.interimResults = true;   // keep the engine actively listening
     recognition.lang = "en-AU";
     recognition.onresult = (event: any) => {
       for (let i = event.resultIndex; i < event.results.length; i++) {
@@ -173,30 +171,59 @@ export function PlanPanel({
         }
       }
     };
-    recognition.onend = () => setListening(false);
+    recognition.onend = () => {
+      // Silence / timeout ended the session — restart so a pause doesn't stop
+      // the user mid-dictation. Only really stop when they toggle off.
+      if (wantListeningRef.current) {
+        restartTimerRef.current = setTimeout(() => {
+          if (wantListeningRef.current) startRecognition();
+        }, 200);
+      } else {
+        setListening(false);
+      }
+    };
     recognition.onerror = (ev: any) => {
-      // ev.error is one of: "no-speech", "audio-capture", "not-allowed",
-      // "network", "aborted", "service-not-allowed", "language-not-supported".
-      // Surface it — the user otherwise has no feedback that something failed.
-      const map: Record<string, string> = {
-        "no-speech": "No speech detected. Check the mic with Test below.",
+      // "no-speech" / "aborted" are the normal pause/timeout signals — let
+      // onend restart us. Only surface + stop on a genuinely fatal error.
+      const fatal: Record<string, string> = {
         "audio-capture": "No microphone found. Pick one in Chrome → Settings → Site settings → Mic.",
         "not-allowed": "Mic access blocked for this site. Click the padlock in the address bar to allow it.",
         "network": "Speech-recognition service unreachable (network error).",
         "service-not-allowed": "Speech recognition blocked by the browser / OS.",
         "language-not-supported": "Language en-AU not supported by this browser.",
       };
-      setDictateMsg(map[ev?.error] ?? `Speech error: ${ev?.error ?? "unknown"}`);
-      setListening(false);
+      const msg = fatal[ev?.error];
+      if (msg) {
+        setDictateMsg(msg);
+        wantListeningRef.current = false;
+        setListening(false);
+      }
     };
     recognitionRef.current = recognition;
+    try { recognition.start(); } catch { /* already starting */ }
+  }
+
+  function toggleDictation() {
+    if (listening) {
+      wantListeningRef.current = false;
+      if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
+      recognitionRef.current?.stop();
+      setListening(false);
+      return;
+    }
+    if (!speechSupported) return;
     setDictateMsg(null);
-    recognition.start();
+    wantListeningRef.current = true;
     setListening(true);
+    startRecognition();
   }
 
   useEffect(() => {
-    return () => { recognitionRef.current?.stop(); };
+    return () => {
+      wantListeningRef.current = false;
+      if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
+      recognitionRef.current?.stop();
+    };
   }, []);
 
   // ── Mic test ──────────────────────────────────────────────────────────────

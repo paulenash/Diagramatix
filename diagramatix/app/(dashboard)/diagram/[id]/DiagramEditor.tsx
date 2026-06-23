@@ -2265,7 +2265,19 @@ export function DiagramEditor({
   const headerTint = isImpersonating ? undefined : lightenHex(typeStyle.bgColor, 0.55);
 
   return (
-    <div className={`flex flex-col h-screen ${isImpersonating ? "bg-orange-50" : "bg-white"}`}>
+    <div
+      className={`flex flex-col h-screen ${isImpersonating ? "bg-orange-50" : "bg-white"}`}
+      onContextMenu={(e) => {
+        // Suppress the native browser context menu across the editor wherever
+        // Diagramatix defines no right-click action. Carefully preserve it where
+        // normal operations need it: editable fields (copy/paste), links and
+        // images (open / copy / save), and any active text selection (copy).
+        const t = e.target as Element | null;
+        if (t?.closest?.("input, textarea, select, [contenteditable]:not([contenteditable='false']), a[href], img")) return;
+        if (window.getSelection?.()?.toString()) return;
+        e.preventDefault();
+      }}
+    >
       {isImpersonating && viewingAsName !== undefined && viewingAsEmail !== undefined && (
         <ImpersonationBanner viewingAsName={viewingAsName ?? ""} viewingAsEmail={viewingAsEmail ?? ""} mode={impersonationMode} currentDiagramId={diagramId} />
       )}
