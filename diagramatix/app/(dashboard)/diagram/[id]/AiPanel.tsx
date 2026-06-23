@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import type { DiagramData, DiagramElement, Connector, DiagramType } from "@/app/lib/diagram/types";
 import { DiagramatixThrobber } from "@/app/components/DiagramatixThrobber";
 import { AttachmentPreviewDialog } from "@/app/components/AttachmentPreviewDialog";
+import { startDictation, type DictationHandle } from "@/app/lib/dictation";
 import { buildPromptFromDiagram } from "@/app/lib/diagram/prompt-from-diagram";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -84,96 +85,36 @@ export function AiPanel({
       : `I have attached a document, ${file.name}`);
   }
 
-  // Speech-to-text dictation. The Web Speech API ends a session on silence /
-  // its internal timeout (firing `onend`); to keep dictation going through
-  // natural pauses we track the user's intent and AUTO-RESTART on end until
-  // they explicitly stop.
+  // Speech-to-text dictation — Deepgram streaming (with browser fallback),
+  // managed by the shared dictation client.
   const [listening, setListening] = useState(false);
-  const recognitionRef = useRef<any>(null);
-  const wantListeningRef = useRef(false);
-  const restartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const dictFailuresRef = useRef(0);   // consecutive transient (network) failures
-  const promptRef = useRef(prompt);
-  promptRef.current = prompt;
+  const dictRef = useRef<DictationHandle | null>(null);
   const speechSupported = typeof window !== "undefined"
-    && !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+    && (!!navigator.mediaDevices?.getUserMedia || !!(window.SpeechRecognition || window.webkitSpeechRecognition));
 
-  function startRecognition() {
-    const SR = (window as any).SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) return;
-    const recognition = new SR();
-    recognition.continuous = true;
-    recognition.interimResults = true;   // keep the engine actively listening
-    recognition.lang = "en-AU";
-
-    recognition.onresult = (event: any) => {
-      dictFailuresRef.current = 0;   // the service is responding — reset backoff
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        if (event.results[i].isFinal) {
-          const text = event.results[i][0].transcript;
-          setPrompt(prev => {
-            const base = prev && !prev.endsWith(" ") && !prev.endsWith("\n") ? prev + " " : prev;
-            return base + text;
-          });
-        }
-      }
-    };
-    recognition.onend = () => {
-      // Silence / timeout / a transient hiccup ended the session — restart if
-      // the user is still dictating, so pauses don't stop them. Back off on
-      // repeated transient failures and only give up after several in a row.
-      if (!wantListeningRef.current) { setListening(false); return; }
-      if (dictFailuresRef.current >= 6) {
-        wantListeningRef.current = false;
-        dictFailuresRef.current = 0;
-        setListening(false);
-        setError("Dictation keeps dropping out. Try again, or check the mic / connection.");
-        return;
-      }
-      const delay = dictFailuresRef.current > 0 ? Math.min(2000, 300 * dictFailuresRef.current) : 200;
-      restartTimerRef.current = setTimeout(() => {
-        if (wantListeningRef.current) startRecognition();
-      }, delay);
-    };
-    recognition.onerror = (e: any) => {
-      const err = e?.error;
-      // Genuinely fatal → stop immediately. Everything else (incl. Chrome's
-      // spurious "network" on quick restarts, and "no-speech"/"aborted") is
-      // transient: count it and let onend restart with backoff.
-      if (err === "not-allowed" || err === "service-not-allowed" || err === "audio-capture") {
-        wantListeningRef.current = false;
-        setListening(false);
-        setError("Microphone unavailable or blocked. Allow mic access for this site and try again.");
-        return;
-      }
-      if (err === "network") dictFailuresRef.current += 1;
-    };
-    recognitionRef.current = recognition;
-    try { recognition.start(); } catch { /* already starting */ }
-  }
-
-  function toggleDictation() {
+  async function toggleDictation() {
     if (listening) {
-      wantListeningRef.current = false;
-      if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
-      recognitionRef.current?.stop();
+      dictRef.current?.stop();
+      dictRef.current = null;
       setListening(false);
       return;
     }
-    wantListeningRef.current = true;
-    dictFailuresRef.current = 0;
     setListening(true);
-    startRecognition();
+    setError(null);
+    const handle = await startDictation({
+      onText: (text) => setPrompt(prev => {
+        const base = prev && !prev.endsWith(" ") && !prev.endsWith("\n") ? prev + " " : prev;
+        return base + text;
+      }),
+      onError: (msg) => setError(msg),
+      onEnd: () => { dictRef.current = null; setListening(false); },
+    });
+    if (!handle) { setListening(false); return; }
+    dictRef.current = handle;
   }
 
   // Stop dictation on unmount
-  useEffect(() => {
-    return () => {
-      wantListeningRef.current = false;
-      if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
-      recognitionRef.current?.stop();
-    };
-  }, []);
+  useEffect(() => () => { dictRef.current?.stop(); }, []);
 
   /** Admin-only — reverse-engineer the current diagram into a
    *  structured Technical Description and drop it into the prompt

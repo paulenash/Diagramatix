@@ -21,6 +21,7 @@ import { ConnectorsByTypeView } from "./ai-plan/ConnectorsByTypeView";
 import { DiagramatixThrobber } from "@/app/components/DiagramatixThrobber";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 import { AttachmentPreviewDialog } from "@/app/components/AttachmentPreviewDialog";
+import { startDictation, type DictationHandle } from "@/app/lib/dictation";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 declare global {
@@ -144,100 +145,37 @@ export function PlanPanel({
     setError(null);
   }
 
-  // Speech-to-text dictation (Chrome / Edge only).
+  // Speech-to-text dictation — Deepgram streaming (with browser fallback),
+  // managed by the shared dictation client.
   const [listening, setListening] = useState(false);
   const [dictateMsg, setDictateMsg] = useState<string | null>(null);
-  const recognitionRef = useRef<any>(null);
-  const wantListeningRef = useRef(false);
-  const restartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const dictFailuresRef = useRef(0);   // consecutive transient (network) failures
+  const dictRef = useRef<DictationHandle | null>(null);
   const speechSupported = typeof window !== "undefined"
-    && !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+    && (!!navigator.mediaDevices?.getUserMedia || !!(window.SpeechRecognition || window.webkitSpeechRecognition));
 
-  function startRecognition() {
-    const SR = (window as any).SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) return;
-    const recognition = new SR();
-    recognition.continuous = true;
-    recognition.interimResults = true;   // keep the engine actively listening
-    recognition.lang = "en-AU";
-    recognition.onresult = (event: any) => {
-      dictFailuresRef.current = 0;   // the service is responding — reset backoff
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        if (event.results[i].isFinal) {
-          const text = event.results[i][0].transcript;
-          setPrompt(prev => {
-            const base = prev && !prev.endsWith(" ") && !prev.endsWith("\n") ? prev + " " : prev;
-            return base + text;
-          });
-        }
-      }
-    };
-    recognition.onend = () => {
-      // Silence / timeout / a transient hiccup ended the session — restart so a
-      // pause doesn't stop the user mid-dictation. Back off on repeated
-      // transient failures and only give up after several in a row.
-      if (!wantListeningRef.current) { setListening(false); return; }
-      if (dictFailuresRef.current >= 6) {
-        wantListeningRef.current = false;
-        dictFailuresRef.current = 0;
-        setListening(false);
-        setDictateMsg("Dictation keeps dropping out — the browser's speech service is flaky right now. Try again in a moment, or check your connection.");
-        return;
-      }
-      const delay = dictFailuresRef.current > 0 ? Math.min(2000, 300 * dictFailuresRef.current) : 200;
-      restartTimerRef.current = setTimeout(() => {
-        if (wantListeningRef.current) startRecognition();
-      }, delay);
-    };
-    recognition.onerror = (ev: any) => {
-      const err = ev?.error;
-      // Genuinely fatal → surface + stop. Chrome's "network" fires spuriously
-      // on quick restarts (it is usually NOT a real outage), and "no-speech" /
-      // "aborted" are the normal pause signals — count them and let onend
-      // restart with backoff rather than killing the session.
-      const fatal: Record<string, string> = {
-        "audio-capture": "No microphone found. Pick one in Chrome → Settings → Site settings → Mic.",
-        "not-allowed": "Mic access blocked for this site. Click the padlock in the address bar to allow it.",
-        "service-not-allowed": "Speech recognition blocked by the browser / OS.",
-        "language-not-supported": "Language en-AU not supported by this browser.",
-      };
-      const msg = fatal[err];
-      if (msg) {
-        setDictateMsg(msg);
-        wantListeningRef.current = false;
-        setListening(false);
-        return;
-      }
-      if (err === "network") dictFailuresRef.current += 1;
-    };
-    recognitionRef.current = recognition;
-    try { recognition.start(); } catch { /* already starting */ }
-  }
-
-  function toggleDictation() {
+  async function toggleDictation() {
     if (listening) {
-      wantListeningRef.current = false;
-      if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
-      recognitionRef.current?.stop();
+      dictRef.current?.stop();
+      dictRef.current = null;
       setListening(false);
       return;
     }
     if (!speechSupported) return;
     setDictateMsg(null);
-    wantListeningRef.current = true;
-    dictFailuresRef.current = 0;
     setListening(true);
-    startRecognition();
+    const handle = await startDictation({
+      onText: (text) => setPrompt(prev => {
+        const base = prev && !prev.endsWith(" ") && !prev.endsWith("\n") ? prev + " " : prev;
+        return base + text;
+      }),
+      onError: (msg) => setDictateMsg(msg),
+      onEnd: () => { dictRef.current = null; setListening(false); },
+    });
+    if (!handle) { setListening(false); return; }
+    dictRef.current = handle;
   }
 
-  useEffect(() => {
-    return () => {
-      wantListeningRef.current = false;
-      if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
-      recognitionRef.current?.stop();
-    };
-  }, []);
+  useEffect(() => () => { dictRef.current?.stop(); }, []);
 
   // ── Mic test ──────────────────────────────────────────────────────────────
   // Independent of the SpeechRecognition API: just grabs the raw audio
