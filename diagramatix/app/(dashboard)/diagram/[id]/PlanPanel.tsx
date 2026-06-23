@@ -148,6 +148,7 @@ export function PlanPanel({
   // Speech-to-text dictation — Deepgram streaming (with browser fallback),
   // managed by the shared dictation client.
   const [listening, setListening] = useState(false);
+  const [dictEngine, setDictEngine] = useState<"deepgram" | "browser" | null>(null);
   const [dictateMsg, setDictateMsg] = useState<string | null>(null);
   const dictRef = useRef<DictationHandle | null>(null);
   const speechSupported = typeof window !== "undefined"
@@ -158,6 +159,7 @@ export function PlanPanel({
       dictRef.current?.stop();
       dictRef.current = null;
       setListening(false);
+      setDictEngine(null);
       return;
     }
     if (!speechSupported) return;
@@ -169,9 +171,10 @@ export function PlanPanel({
         return base + text;
       }),
       onError: (msg) => setDictateMsg(msg),
-      onEnd: () => { dictRef.current = null; setListening(false); },
+      onEngine: (e) => setDictEngine(e),
+      onEnd: () => { dictRef.current = null; setListening(false); setDictEngine(null); },
     });
-    if (!handle) { setListening(false); return; }
+    if (!handle) { setListening(false); setDictEngine(null); return; }
     dictRef.current = handle;
   }
 
@@ -635,10 +638,14 @@ export function PlanPanel({
                   onClick={toggleDictation}
                   className={`flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border ${
                     listening
-                      ? "text-red-600 border-red-300 bg-red-50 hover:bg-red-100"
+                      ? (dictEngine === "deepgram"
+                          ? "text-blue-700 border-blue-400 bg-blue-50 hover:bg-blue-100"
+                          : "text-red-600 border-red-300 bg-red-50 hover:bg-red-100")
                       : "text-gray-500 border-gray-300 hover:bg-gray-50"
                   }`}
-                  title={listening ? "Stop dictation" : "Dictate prompt"}
+                  title={listening
+                    ? `Stop dictation — ${dictEngine === "deepgram" ? "Deepgram (high quality)" : "browser fallback"}`
+                    : "Dictate prompt"}
                 >
                   <svg width={10} height={10} viewBox="0 0 16 16" fill="currentColor">
                     <path d="M8 11a3 3 0 0 0 3-3V4a3 3 0 1 0-6 0v4a3 3 0 0 0 3 3z" />
@@ -665,12 +672,13 @@ export function PlanPanel({
             onChange={e => setPrompt(e.target.value)}
             placeholder="A customer places an order. The warehouse checks stock. If in stock, it ships the order. Otherwise it notifies the customer."
             className={`flex-1 w-full px-2 py-1.5 text-[11px] border rounded resize-none focus:outline-none focus:ring-1 focus:ring-blue-500 ${
-              listening ? "border-red-300 bg-red-50/30" : "border-gray-300"
+              listening ? (dictEngine === "deepgram" ? "border-blue-400 bg-blue-50/30" : "border-red-300 bg-red-50/30") : "border-gray-300"
             }`}
           />
           {listening && (
-            <p className="text-[9px] text-red-500 mt-0.5 animate-pulse shrink-0">Listening…</p>
-          )}
+            dictEngine === "deepgram"
+              ? <p className="text-[9px] text-blue-600 mt-0.5 animate-pulse shrink-0">Listening — Deepgram (high quality)…</p>
+              : <p className="text-[9px] text-red-500 mt-0.5 animate-pulse shrink-0">Listening — browser fallback…</p>)}
           {dictateMsg && !listening && (
             <p className="text-[10px] text-orange-700 bg-orange-50 border border-orange-200 rounded px-1.5 py-0.5 mt-0.5 shrink-0">
               {dictateMsg}

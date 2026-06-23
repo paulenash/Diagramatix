@@ -27,21 +27,26 @@ const LANG = "en-AU";
  *  start (e.g. mic blocked, or no engine available). */
 export async function startDictation(cb: DictationCallbacks): Promise<DictationHandle | null> {
   let token: string | null = null;
+  let scheme = "token";   // "bearer" for grant tokens, "token" for API keys
   try {
     const r = await fetch("/api/ai/dictation/token", { method: "POST" });
-    if (r.ok) token = (await r.json())?.token ?? null;
+    if (r.ok) {
+      const data = await r.json();
+      token = data?.token ?? null;
+      if (data?.scheme) scheme = data.scheme;
+    }
   } catch { /* offline / not configured → fall back below */ }
 
   if (token) {
     cb.onEngine?.("deepgram");
-    return startDeepgram(token, cb);
+    return startDeepgram(token, scheme, cb);
   }
   cb.onEngine?.("browser");
   return startBrowserSpeech(cb);
 }
 
 // ── Deepgram streaming ──────────────────────────────────────────────────────
-async function startDeepgram(token: string, cb: DictationCallbacks): Promise<DictationHandle | null> {
+async function startDeepgram(token: string, scheme: string, cb: DictationCallbacks): Promise<DictationHandle | null> {
   let stream: MediaStream;
   try {
     stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -63,7 +68,7 @@ async function startDeepgram(token: string, cb: DictationCallbacks): Promise<Dic
     punctuate: "true",
     language: "en",
   });
-  const ws = new WebSocket(`wss://api.deepgram.com/v1/listen?${params.toString()}`, ["token", token]);
+  const ws = new WebSocket(`wss://api.deepgram.com/v1/listen?${params.toString()}`, [scheme, token]);
   ws.binaryType = "arraybuffer";
 
   const source = ctx.createMediaStreamSource(stream);

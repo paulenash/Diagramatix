@@ -88,6 +88,7 @@ export function AiPanel({
   // Speech-to-text dictation — Deepgram streaming (with browser fallback),
   // managed by the shared dictation client.
   const [listening, setListening] = useState(false);
+  const [dictEngine, setDictEngine] = useState<"deepgram" | "browser" | null>(null);
   const dictRef = useRef<DictationHandle | null>(null);
   const speechSupported = typeof window !== "undefined"
     && (!!navigator.mediaDevices?.getUserMedia || !!(window.SpeechRecognition || window.webkitSpeechRecognition));
@@ -97,6 +98,7 @@ export function AiPanel({
       dictRef.current?.stop();
       dictRef.current = null;
       setListening(false);
+      setDictEngine(null);
       return;
     }
     setListening(true);
@@ -107,9 +109,10 @@ export function AiPanel({
         return base + text;
       }),
       onError: (msg) => setError(msg),
-      onEnd: () => { dictRef.current = null; setListening(false); },
+      onEngine: (e) => setDictEngine(e),
+      onEnd: () => { dictRef.current = null; setListening(false); setDictEngine(null); },
     });
-    if (!handle) { setListening(false); return; }
+    if (!handle) { setListening(false); setDictEngine(null); return; }
     dictRef.current = handle;
   }
 
@@ -354,10 +357,14 @@ export function AiPanel({
                 onClick={toggleDictation}
                 className={`flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border ${
                   listening
-                    ? "text-red-600 border-red-300 bg-red-50 hover:bg-red-100"
+                    ? (dictEngine === "deepgram"
+                        ? "text-blue-700 border-blue-400 bg-blue-50 hover:bg-blue-100"
+                        : "text-red-600 border-red-300 bg-red-50 hover:bg-red-100")
                     : "text-gray-500 border-gray-300 hover:bg-gray-50"
                 }`}
-                title={listening ? "Stop dictation" : "Dictate prompt"}
+                title={listening
+                  ? `Stop dictation — ${dictEngine === "deepgram" ? "Deepgram (high quality)" : "browser fallback"}`
+                  : "Dictate prompt"}
               >
                 <svg width={10} height={10} viewBox="0 0 16 16" fill="currentColor">
                   <path d="M8 11a3 3 0 0 0 3-3V4a3 3 0 1 0-6 0v4a3 3 0 0 0 3 3z" />
@@ -370,10 +377,12 @@ export function AiPanel({
           <textarea value={prompt} onChange={e => setPrompt(e.target.value)} rows={10}
             placeholder="e.g. A customer places an order. The Sales Team checks the order..."
             className={`w-full text-xs border rounded px-2 py-1.5 resize-y focus:outline-none focus:ring-1 focus:ring-blue-500 leading-relaxed ${
-              listening ? "border-red-300 bg-red-50/30" : "border-gray-300"
+              listening ? (dictEngine === "deepgram" ? "border-blue-400 bg-blue-50/30" : "border-red-300 bg-red-50/30") : "border-gray-300"
             }`} />
           {listening && (
-            <p className="text-[9px] text-red-500 mt-0.5 animate-pulse">Listening...</p>
+            dictEngine === "deepgram"
+              ? <p className="text-[9px] text-blue-600 mt-0.5 animate-pulse">Listening — Deepgram (high quality)…</p>
+              : <p className="text-[9px] text-red-500 mt-0.5 animate-pulse">Listening — browser fallback…</p>
           )}
 
           {/* File attachment */}

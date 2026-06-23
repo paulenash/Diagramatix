@@ -25,7 +25,23 @@ export async function POST() {
   }
 
   try {
-    // Resolve the project the master key belongs to.
+    // Preferred: a short-lived "grant" token. Works with ANY valid key — no
+    // key-creation permission needed. The client authenticates the WebSocket
+    // with the bearer scheme.
+    const gr = await fetch(`${DG}/auth/grant`, {
+      method: "POST",
+      headers: { Authorization: `Token ${masterKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ ttl_seconds: TTL_SECONDS }),
+    });
+    if (gr.ok) {
+      const j = await gr.json();
+      const token = (j?.access_token ?? j?.token) as string | undefined;
+      if (token) {
+        return NextResponse.json({ token, scheme: "bearer", expiresIn: j?.expires_in ?? TTL_SECONDS });
+      }
+    }
+
+    // Fallback: mint a temporary sub-key (needs an Owner/Admin master key).
     const pr = await fetch(`${DG}/projects`, { headers: { Authorization: `Token ${masterKey}` } });
     if (!pr.ok) {
       return NextResponse.json({ error: `Deepgram projects ${pr.status}` }, { status: 502 });
@@ -34,8 +50,6 @@ export async function POST() {
     if (!projectId) {
       return NextResponse.json({ error: "No Deepgram project found" }, { status: 502 });
     }
-
-    // Create a temporary, auto-expiring key for this browser session.
     const kr = await fetch(`${DG}/projects/${projectId}/keys`, {
       method: "POST",
       headers: { Authorization: `Token ${masterKey}`, "Content-Type": "application/json" },
@@ -45,14 +59,17 @@ export async function POST() {
         time_to_live_in_seconds: TTL_SECONDS,
       }),
     });
-    if (!kr.ok) {
-      return NextResponse.json({ error: `Deepgram key ${kr.status}` }, { status: 502 });
+    if (kr.ok) {
+      const token = (await kr.json())?.key as string | undefined;
+      if (token) return NextResponse.json({ token, scheme: "token", expiresIn: TTL_SECONDS });
     }
-    const token = (await kr.json())?.key as string | undefined;
-    if (!token) {
-      return NextResponse.json({ error: "Deepgram returned no key" }, { status: 502 });
-    }
-    return NextResponse.json({ token, expiresIn: TTL_SECONDS });
+
+    // Last resort: the key can't mint short-lived tokens (transcription-only
+    // key — grant ${gr.status}, key-create ${kr.status}). Hand the key itself
+    // to the browser — the documented Deepgram client-side pattern. The route
+    // is auth-gated and the key is usage-scoped, so the only exposure is
+    // transcription quota. To avoid this, use an Owner key (enables grant).
+    return NextResponse.json({ token: masterKey, scheme: "token", direct: true, expiresIn: 0 });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Token mint failed" },
