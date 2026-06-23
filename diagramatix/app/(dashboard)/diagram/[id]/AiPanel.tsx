@@ -92,6 +92,7 @@ export function AiPanel({
   const recognitionRef = useRef<any>(null);
   const wantListeningRef = useRef(false);
   const restartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dictFailuresRef = useRef(0);   // consecutive transient (network) failures
   const promptRef = useRef(prompt);
   promptRef.current = prompt;
   const speechSupported = typeof window !== "undefined"
@@ -106,6 +107,7 @@ export function AiPanel({
     recognition.lang = "en-AU";
 
     recognition.onresult = (event: any) => {
+      dictFailuresRef.current = 0;   // the service is responding — reset backoff
       for (let i = event.resultIndex; i < event.results.length; i++) {
         if (event.results[i].isFinal) {
           const text = event.results[i][0].transcript;
@@ -117,23 +119,34 @@ export function AiPanel({
       }
     };
     recognition.onend = () => {
-      // Silence / timeout ended the session — restart if the user is still
-      // dictating, so a pause doesn't stop them. Otherwise really stop.
-      if (wantListeningRef.current) {
-        restartTimerRef.current = setTimeout(() => {
-          if (wantListeningRef.current) startRecognition();
-        }, 200);
-      } else {
+      // Silence / timeout / a transient hiccup ended the session — restart if
+      // the user is still dictating, so pauses don't stop them. Back off on
+      // repeated transient failures and only give up after several in a row.
+      if (!wantListeningRef.current) { setListening(false); return; }
+      if (dictFailuresRef.current >= 6) {
+        wantListeningRef.current = false;
+        dictFailuresRef.current = 0;
         setListening(false);
+        setError("Dictation keeps dropping out. Try again, or check the mic / connection.");
+        return;
       }
+      const delay = dictFailuresRef.current > 0 ? Math.min(2000, 300 * dictFailuresRef.current) : 200;
+      restartTimerRef.current = setTimeout(() => {
+        if (wantListeningRef.current) startRecognition();
+      }, delay);
     };
     recognition.onerror = (e: any) => {
-      // Fatal (no mic / blocked) → stop. Transient (no-speech / aborted /
-      // network) → let onend restart us.
-      if (e?.error === "not-allowed" || e?.error === "service-not-allowed") {
+      const err = e?.error;
+      // Genuinely fatal → stop immediately. Everything else (incl. Chrome's
+      // spurious "network" on quick restarts, and "no-speech"/"aborted") is
+      // transient: count it and let onend restart with backoff.
+      if (err === "not-allowed" || err === "service-not-allowed" || err === "audio-capture") {
         wantListeningRef.current = false;
         setListening(false);
+        setError("Microphone unavailable or blocked. Allow mic access for this site and try again.");
+        return;
       }
+      if (err === "network") dictFailuresRef.current += 1;
     };
     recognitionRef.current = recognition;
     try { recognition.start(); } catch { /* already starting */ }
@@ -148,6 +161,7 @@ export function AiPanel({
       return;
     }
     wantListeningRef.current = true;
+    dictFailuresRef.current = 0;
     setListening(true);
     startRecognition();
   }

@@ -150,6 +150,7 @@ export function PlanPanel({
   const recognitionRef = useRef<any>(null);
   const wantListeningRef = useRef(false);
   const restartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dictFailuresRef = useRef(0);   // consecutive transient (network) failures
   const speechSupported = typeof window !== "undefined"
     && !!(window.SpeechRecognition || window.webkitSpeechRecognition);
 
@@ -161,6 +162,7 @@ export function PlanPanel({
     recognition.interimResults = true;   // keep the engine actively listening
     recognition.lang = "en-AU";
     recognition.onresult = (event: any) => {
+      dictFailuresRef.current = 0;   // the service is responding — reset backoff
       for (let i = event.resultIndex; i < event.results.length; i++) {
         if (event.results[i].isFinal) {
           const text = event.results[i][0].transcript;
@@ -172,32 +174,42 @@ export function PlanPanel({
       }
     };
     recognition.onend = () => {
-      // Silence / timeout ended the session — restart so a pause doesn't stop
-      // the user mid-dictation. Only really stop when they toggle off.
-      if (wantListeningRef.current) {
-        restartTimerRef.current = setTimeout(() => {
-          if (wantListeningRef.current) startRecognition();
-        }, 200);
-      } else {
+      // Silence / timeout / a transient hiccup ended the session — restart so a
+      // pause doesn't stop the user mid-dictation. Back off on repeated
+      // transient failures and only give up after several in a row.
+      if (!wantListeningRef.current) { setListening(false); return; }
+      if (dictFailuresRef.current >= 6) {
+        wantListeningRef.current = false;
+        dictFailuresRef.current = 0;
         setListening(false);
+        setDictateMsg("Dictation keeps dropping out — the browser's speech service is flaky right now. Try again in a moment, or check your connection.");
+        return;
       }
+      const delay = dictFailuresRef.current > 0 ? Math.min(2000, 300 * dictFailuresRef.current) : 200;
+      restartTimerRef.current = setTimeout(() => {
+        if (wantListeningRef.current) startRecognition();
+      }, delay);
     };
     recognition.onerror = (ev: any) => {
-      // "no-speech" / "aborted" are the normal pause/timeout signals — let
-      // onend restart us. Only surface + stop on a genuinely fatal error.
+      const err = ev?.error;
+      // Genuinely fatal → surface + stop. Chrome's "network" fires spuriously
+      // on quick restarts (it is usually NOT a real outage), and "no-speech" /
+      // "aborted" are the normal pause signals — count them and let onend
+      // restart with backoff rather than killing the session.
       const fatal: Record<string, string> = {
         "audio-capture": "No microphone found. Pick one in Chrome → Settings → Site settings → Mic.",
         "not-allowed": "Mic access blocked for this site. Click the padlock in the address bar to allow it.",
-        "network": "Speech-recognition service unreachable (network error).",
         "service-not-allowed": "Speech recognition blocked by the browser / OS.",
         "language-not-supported": "Language en-AU not supported by this browser.",
       };
-      const msg = fatal[ev?.error];
+      const msg = fatal[err];
       if (msg) {
         setDictateMsg(msg);
         wantListeningRef.current = false;
         setListening(false);
+        return;
       }
+      if (err === "network") dictFailuresRef.current += 1;
     };
     recognitionRef.current = recognition;
     try { recognition.start(); } catch { /* already starting */ }
@@ -214,6 +226,7 @@ export function PlanPanel({
     if (!speechSupported) return;
     setDictateMsg(null);
     wantListeningRef.current = true;
+    dictFailuresRef.current = 0;
     setListening(true);
     startRecognition();
   }
@@ -235,6 +248,9 @@ export function PlanPanel({
   const [micDevice, setMicDevice] = useState<string | null>(null);
   const [micErr, setMicErr] = useState<string | null>(null);
   const micCleanupRef = useRef<(() => void) | null>(null);
+  // Record the test audio so the user can replay it and hear what the mic captured.
+  const [micRecordingUrl, setMicRecordingUrl] = useState<string | null>(null);
+  const micRecorderRef = useRef<MediaRecorder | null>(null);
 
   function stopMicTest() {
     micCleanupRef.current?.();
@@ -247,6 +263,8 @@ export function PlanPanel({
     setMicErr(null);
     setMicLevel(0);
     setMicDevice(null);
+    // Clear any previous recording.
+    setMicRecordingUrl((old) => { if (old) URL.revokeObjectURL(old); return null; });
     if (!navigator.mediaDevices?.getUserMedia) {
       setMicErr("This browser doesn't expose getUserMedia (mic access).");
       return;
@@ -267,6 +285,24 @@ export function PlanPanel({
     }
     const track = stream.getAudioTracks()[0];
     setMicDevice(track?.label || "(unnamed device)");
+
+    // Record the stream so it can be replayed afterwards.
+    let recorder: MediaRecorder | null = null;
+    const chunks: BlobPart[] = [];
+    if (typeof MediaRecorder !== "undefined") {
+      try {
+        recorder = new MediaRecorder(stream);
+        recorder.ondataavailable = (ev) => { if (ev.data && ev.data.size > 0) chunks.push(ev.data); };
+        recorder.onstop = () => {
+          if (chunks.length === 0) return;
+          const blob = new Blob(chunks, { type: recorder?.mimeType || "audio/webm" });
+          setMicRecordingUrl((old) => { if (old) URL.revokeObjectURL(old); return URL.createObjectURL(blob); });
+        };
+        recorder.start();
+        micRecorderRef.current = recorder;
+      } catch { recorder = null; }
+    }
+
     const AC: typeof AudioContext = (window as any).AudioContext || (window as any).webkitAudioContext;
     const ctx = new AC();
     const src = ctx.createMediaStreamSource(stream);
@@ -295,6 +331,10 @@ export function PlanPanel({
     const cleanup = () => {
       stopped = true;
       cancelAnimationFrame(raf);
+      // Stop the recorder first (its onstop builds the replay clip), then
+      // release the audio graph + mic.
+      try { if (recorder && recorder.state !== "inactive") recorder.stop(); } catch {}
+      micRecorderRef.current = null;
       try { src.disconnect(); } catch {}
       try { ctx.close(); } catch {}
       stream.getTracks().forEach(t => t.stop());
@@ -305,6 +345,8 @@ export function PlanPanel({
   }
 
   useEffect(() => () => { micCleanupRef.current?.(); }, []);
+  // Release the recorded-clip blob URL when it's replaced or on unmount.
+  useEffect(() => () => { if (micRecordingUrl) URL.revokeObjectURL(micRecordingUrl); }, [micRecordingUrl]);
 
   // Resizable sections — Saved Prompts + Tabs. The Description textarea
   // takes whatever's left (flex-1). Dragging the horizontal handles between
@@ -696,12 +738,12 @@ export function PlanPanel({
               {dictateMsg}
             </p>
           )}
-          {(testingMic || micErr || micDevice) && (
+          {(testingMic || micErr || micDevice || micRecordingUrl) && (
             <div className="mt-1 shrink-0">
               {testingMic && (
                 <>
                   <p className="text-[10px] text-green-700 mb-0.5">
-                    Listening on: <span className="font-medium">{micDevice}</span> — talk now
+                    Listening on: <span className="font-medium">{micDevice}</span> — talk now (it&apos;s recording)
                   </p>
                   <div className="h-2 bg-gray-100 rounded overflow-hidden">
                     <div
@@ -710,7 +752,7 @@ export function PlanPanel({
                     />
                   </div>
                   <p className="text-[9px] text-gray-400 mt-0.5">
-                    Bar should jump when you speak. If it stays flat the browser isn't hearing this mic.
+                    Bar should jump when you speak. Stop the test, then replay below to hear what was captured.
                   </p>
                 </>
               )}
@@ -718,6 +760,13 @@ export function PlanPanel({
                 <p className="text-[10px] text-gray-500">
                   Last test mic: <span className="font-medium">{micDevice}</span>
                 </p>
+              )}
+              {!testingMic && micRecordingUrl && (
+                <div className="mt-1">
+                  <p className="text-[9px] text-gray-400 mb-0.5">Replay your test recording:</p>
+                  {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+                  <audio controls src={micRecordingUrl} className="w-full h-8" />
+                </div>
               )}
               {micErr && (
                 <p className="text-[10px] text-red-700 bg-red-50 border border-red-200 rounded px-1.5 py-0.5">
