@@ -285,6 +285,8 @@ export const ALL_SYMBOLS: SymbolDefinition[] = [
   { type: "flowchart-onpage",       label: "On-page Connector",  defaultWidth: 44,  defaultHeight: 44, description: "Continues flow elsewhere on the same page (circle)" },
   { type: "flowchart-offpage",      label: "Off-page Connector", defaultWidth: 60,  defaultHeight: 56, description: "Continues flow on another page (pentagon)" },
   { type: "flowchart-merge",        label: "Merge",              defaultWidth: 70,  defaultHeight: 56, description: "Combines multiple flows into one (down-triangle)" },
+  { type: "flowchart-parallel",     label: "Parallel",           defaultWidth: 120, defaultHeight: 8,  description: "Fork/join bar — concurrent branches start or re-join (flip for vertical)" },
+  { type: "flowchart-comment",      label: "Comment",            defaultWidth: 120, defaultHeight: 60, description: "A note attached to an element by a dotted association (rounded rectangle)" },
   { type: "flowchart-vswimlane",    label: "Swimlane",           defaultWidth: 220, defaultHeight: 480, description: "A vertical swimlane column; drop again to add another column to the right" },
 ];
 
@@ -319,6 +321,7 @@ export const PALETTE_BY_DIAGRAM_TYPE: Record<DiagramType, SymbolType[]> = {
     "flowchart-document", "flowchart-multidoc", "flowchart-predefined", "flowchart-preparation",
     "flowchart-manual-input", "flowchart-manual-op", "flowchart-display", "flowchart-delay",
     "flowchart-database", "flowchart-onpage", "flowchart-offpage", "flowchart-merge",
+    "flowchart-parallel", "flowchart-comment",
     "flowchart-vswimlane",
   ],
 };

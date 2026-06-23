@@ -464,6 +464,8 @@ const FALLBACK_SIZE: Record<SymbolType, { w: number; h: number }> = {
   "flowchart-onpage":       { w: 44,  h: 44 },
   "flowchart-offpage":      { w: 60,  h: 56 },
   "flowchart-merge":        { w: 70,  h: 56 },
+  "flowchart-parallel":     { w: 120, h: 8 },
+  "flowchart-comment":      { w: 120, h: 60 },
   "flowchart-vswimlane":    { w: 220, h: 480 },
 };
 

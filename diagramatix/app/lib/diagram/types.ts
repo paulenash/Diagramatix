@@ -55,6 +55,8 @@ export type SymbolType =
   | "flowchart-onpage"
   | "flowchart-offpage"
   | "flowchart-merge"
+  | "flowchart-parallel"
+  | "flowchart-comment"
   | "flowchart-vswimlane";
 
 export type BpmnTaskType =
@@ -98,7 +100,7 @@ export type ArchimateConnectorType =
 
 export type ConnectorType =
   | "sequence" | "message" | "association" | "transition"
-  | "associationBPMN" | "messageBPMN" | "flow" | "flowline"
+  | "associationBPMN" | "messageBPMN" | "flow" | "flowline" | "flowchart-association"
   | "uml-association" | "uml-aggregation" | "uml-composition" | "uml-generalisation"
   | "review-comment-link"
   | ArchimateConnectorType;

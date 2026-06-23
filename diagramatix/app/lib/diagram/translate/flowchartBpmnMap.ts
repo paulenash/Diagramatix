@@ -73,6 +73,20 @@ export const FLOWCHART_TO_BPMN_MAP: Record<string, FlowchartBpmnMapping> = {
     gatewayType: "exclusive",
     promptText: 'Merge / junction symbol → exclusive "gateway"',
   },
+  "flowchart-parallel": {
+    flowchart: "flowchart-parallel",
+    bpmn: "gateway",
+    kind: "control",
+    gatewayType: "parallel",
+    promptText:
+      'Parallel (fork/join) bar → parallel "gateway" — a fork bar and a join bar become the matching pair',
+  },
+  "flowchart-comment": {
+    flowchart: "flowchart-comment",
+    bpmn: "text-annotation",
+    kind: "artifact",
+    promptText: 'Comment / note (rounded rectangle) → "text-annotation" (attached by association)',
+  },
   "flowchart-predefined": {
     flowchart: "flowchart-predefined",
     bpmn: "subprocess",

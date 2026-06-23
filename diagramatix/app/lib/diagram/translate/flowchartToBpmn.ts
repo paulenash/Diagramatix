@@ -67,6 +67,10 @@ export function translateFlowchartToBpmn(
 ): TranslateResult {
   const processName = opts.processName?.trim() || "Process";
   const elements = data.elements ?? [];
+  // All connectors feed the graph. A Comment's flowchart-association edge stays
+  // in so the artifact path can find the activity it annotates; because the
+  // Comment is kind "artifact" the edge is spliced out of the sequence and
+  // re-emitted as a BPMN association (never control flow).
   const flowlines = (data.connectors ?? []).filter((c) => c.sourceId && c.targetId);
 
   const byId = new Map(elements.map((e) => [e.id, e]));

@@ -558,6 +558,7 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
 
   const isMessage = connector.type === "message";
   const isAssocBPMN = connector.type === "associationBPMN";
+  const isFlowchartAssoc = connector.type === "flowchart-association";
   const isMessageBPMN = connector.type === "messageBPMN";
   const isReviewLink = connector.type === "review-comment-link";
   const isBottleneck = connector.type === "sequence" && !!connector.bottleneck && !!showBottleneck;
@@ -567,6 +568,7 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
     : isBottleneck ? "#9333ea"
     : isMessageBPMN ? "#b0b7c3"
     : isAssocBPMN ? "#9ca3af"
+    : isFlowchartAssoc ? "#9333ea"   // dotted comment association (purple)
     : isReviewLink ? "#ec4899"   // pink-500, matches the note
     : "#6b7280";
   const isUmlConn = connector.type === "uml-association" || connector.type === "uml-aggregation"
@@ -845,8 +847,8 @@ export function ConnectorRenderer({ connector, selected, onSelect, svgToWorld, o
         fill="none"
         stroke={strokeColor}
         strokeWidth={highlight && !selected ? 2.5 : isAssocBPMN ? (selected ? 2.5 : 2) : (selected ? 2 : 1.5)}
-        strokeDasharray={isMessageBPMN ? "10 5" : isAssocBPMN ? "0.5 3" : isReviewLink ? "4 3" : (isMessage ? "6 3" : undefined)}
-        strokeLinecap={isAssocBPMN ? "round" : undefined}
+        strokeDasharray={isMessageBPMN ? "10 5" : isAssocBPMN ? "0.5 3" : isFlowchartAssoc ? "1 3" : isReviewLink ? "4 3" : (isMessage ? "6 3" : undefined)}
+        strokeLinecap={isAssocBPMN || isFlowchartAssoc ? "round" : undefined}
         markerStart={(displayMode === "hand-drawn" && !isMessageBPMN) ? undefined :
           isMessageBPMN ? `url(#msg-start-${connector.id})`
           : (connector.type === "uml-aggregation" || connector.type === "uml-composition") ? `url(#${umlDiamondId})`

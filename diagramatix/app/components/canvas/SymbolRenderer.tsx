@@ -1659,6 +1659,17 @@ function FlowchartMergeShape({ el }: { el: DiagramElement }) {
   const { x, y, width: w, height: h } = el;
   return <polygon points={`${x},${y} ${x + w},${y} ${x + w / 2},${y + h}`} fill={fcFill(el, colors)} stroke={FC_STROKE} strokeWidth={FC_SW} strokeLinejoin="round" />;
 }
+/** Parallel (fork/join) bar — a solid monochrome bar, like the State Machine
+ *  fork-join. Horizontal by default; flip swaps width↔height. No label. */
+function FlowchartParallelShape({ el }: { el: DiagramElement }) {
+  return <rect x={el.x} y={el.y} width={el.width} height={el.height} rx={2} ry={2} fill={FC_STROKE} />;
+}
+/** Comment / note — a rounded rectangle; its text is drawn by the shared label
+ *  path. Attached to an element by a dotted flowchart-association connector. */
+function FlowchartCommentShape({ el }: { el: DiagramElement }) {
+  const colors = useContext(SymbolColorCtx);
+  return <rect x={el.x} y={el.y} width={el.width} height={el.height} rx={8} ry={8} fill={fcFill(el, colors)} stroke={FC_STROKE} strokeWidth={FC_SW} />;
+}
 /** Vertical swimlane column: white body, black border, a top header strip with
  *  a horizontal (un-rotated) centred label. Columns snap into a band and share
  *  one height — that coordination lives in the reducer, not here. */
@@ -1752,6 +1763,8 @@ function SymbolShape({ el }: { el: DiagramElement }) {
       case "flowchart-onpage":       return <FlowchartOnPageShape el={el} />;
       case "flowchart-offpage":      return <FlowchartOffPageShape el={el} />;
       case "flowchart-merge":        return <FlowchartMergeShape el={el} />;
+      case "flowchart-parallel":     return <FlowchartParallelShape el={el} />;
+      case "flowchart-comment":      return <FlowchartCommentShape el={el} />;
       case "flowchart-vswimlane":    return <FlowchartVSwimlaneShape el={el} />;
       default:                  return <TaskShape el={el} />;
     }
@@ -1790,6 +1803,10 @@ function getLabelPos(el: DiagramElement, archimateDepth: number = 0): { x: numbe
   }
   if (el.type === "uml-enumeration") {
     return { x: el.x + el.width / 2, y: el.y + HEADER_H / 2 + 6, baseline: "middle" };
+  }
+  // Merge (down-triangle): nudge the label 20px up out of the narrow point.
+  if (el.type === "flowchart-merge") {
+    return { x: el.x + el.width / 2, y: el.y + el.height / 2 - 20, baseline: "middle" };
   }
   return { x: el.x + el.width / 2, y: el.y + el.height / 2, baseline: "middle" };
 }
@@ -2206,7 +2223,7 @@ export function SymbolRenderer({
   const canResize = element.type !== "lane" && element.type !== "flowchart-vswimlane"; // lanes + vertical swimlanes use custom boundary handles
   const isBoundaryStartOrEnd = !!element.boundaryHostId &&
     (element.type === "start-event" || element.type === "end-event");
-  const showLabel = element.type !== "initial-state" && element.type !== "final-state" && element.type !== "fork-join" && element.type !== "flowchart-decision" && element.type !== "flowchart-vswimlane" && !isBoundaryStartOrEnd;
+  const showLabel = element.type !== "initial-state" && element.type !== "final-state" && element.type !== "fork-join" && element.type !== "flowchart-parallel" && element.type !== "flowchart-decision" && element.type !== "flowchart-vswimlane" && !isBoundaryStartOrEnd;
 
   // Events / gateways / data objects render a SEPARATE external label below
   // the shape, edited inline via the isEditingGatewayLabel foreignObject.

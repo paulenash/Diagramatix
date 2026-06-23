@@ -37,6 +37,15 @@ const MIN_BOUNDARY_H = HEADER_H + 40;
 
 const DATA_ELEMENT_TYPES = new Set<SymbolType>(["data-object", "data-store", "text-annotation"]);
 
+// Flowchart symbols that take part in auto-connect (flowline). Excludes the
+// Comment (association only) and the swimlane container.
+const FC_AUTO_CONNECT_TYPES = new Set<SymbolType>([
+  "flowchart-terminator", "flowchart-process", "flowchart-decision", "flowchart-io",
+  "flowchart-document", "flowchart-multidoc", "flowchart-predefined", "flowchart-preparation",
+  "flowchart-manual-input", "flowchart-manual-op", "flowchart-display", "flowchart-delay",
+  "flowchart-database", "flowchart-merge", "flowchart-parallel", "flowchart-onpage", "flowchart-offpage",
+]);
+
 // Context-Diagram flow rule: connectors only go entity ↔ process.
 // entity → entity or process → process is invalid in a Context Diagram.
 // Used to filter drop targets when dragging a new connector from one of the
@@ -352,6 +361,15 @@ function getClosestSide(pos: Point, el: DiagramElement): Side {
 
 function pointToBoundaryOffset(p: Point, el: DiagramElement): { side: Side; offsetAlong: number } {
   const clamp = (v: number) => Math.max(0, Math.min(1, v));
+  // Parallel (fork/join) bar: flowlines may only attach to the LONG faces, never
+  // the narrow ends — horizontal bar → top/bottom, vertical → left/right.
+  if (el.type === "flowchart-parallel") {
+    const cx = el.x + el.width / 2, cy = el.y + el.height / 2;
+    if (el.width >= el.height) {
+      return { side: p.y < cy ? "top" : "bottom", offsetAlong: clamp((p.x - el.x) / el.width) };
+    }
+    return { side: p.x < cx ? "left" : "right", offsetAlong: clamp((p.y - el.y) / el.height) };
+  }
   // Gateways: snap to nearest diamond vertex if within 3px.
   // Each vertex is at offset 0.5 of its corresponding side.
   if (el.type === "gateway") {
@@ -1484,7 +1502,12 @@ export function Canvas({
             connType = "associationBPMN"; connRouting = "direct";
             connDirection = isAnnotationConn ? "non-directed" : "open-directed";
           } else if (diagramType === "flowchart") {
-            connType = "flowline"; connRouting = defaultRoutingType; connDirection = defaultDirectionType;
+            // A connector touching a Comment is a dotted association, not a flowline.
+            if (sourceEl?.type === "flowchart-comment" || targetEl.type === "flowchart-comment") {
+              connType = "flowchart-association"; connRouting = "direct"; connDirection = "non-directed";
+            } else {
+              connType = "flowline"; connRouting = defaultRoutingType; connDirection = defaultDirectionType;
+            }
           } else if (diagramType === "domain") {
             connType = "uml-association"; connRouting = defaultRoutingType; connDirection = "non-directed";
           } else if ((diagramType === "context" || diagramType === "basic") && defaultRoutingType === "curvilinear") {
@@ -2244,7 +2267,8 @@ export function Canvas({
     const SM_AUTO_CONNECT = new Set<SymbolType>([
       "state", "initial-state", "final-state", "composite-state", "gateway",
     ]);
-    const AUTO_CONNECT_TYPES = diagramType === "state-machine" ? SM_AUTO_CONNECT : BPMN_AUTO_CONNECT;
+    const AUTO_CONNECT_TYPES = diagramType === "state-machine" ? SM_AUTO_CONNECT
+      : diagramType === "flowchart" ? FC_AUTO_CONNECT_TYPES : BPMN_AUTO_CONNECT;
 
     // Walk an element's parent chain and return the id of the nearest
     // subprocess-expanded ANCESTOR (excluding the element itself) — or null
@@ -2579,7 +2603,8 @@ export function Canvas({
     const SM_AUTO_CONNECT = new Set<SymbolType>([
       "state", "submachine", "final-state", "composite-state", "gateway", "fork-join",
     ]);
-    const AUTO_CONNECT_TYPES = diagramType === "state-machine" ? SM_AUTO_CONNECT : BPMN_AUTO_CONNECT;
+    const AUTO_CONNECT_TYPES = diagramType === "state-machine" ? SM_AUTO_CONNECT
+      : diagramType === "flowchart" ? FC_AUTO_CONNECT_TYPES : BPMN_AUTO_CONNECT;
 
     function expandedParentOf(el: DiagramElement): string | null {
       let cur: DiagramElement | undefined = el.parentId
@@ -2788,7 +2813,7 @@ export function Canvas({
       if (cycle >= TOTAL_CYCLES) {
         setAutoConnectFlash(null);
         if (!autoConnectAbortRef.current) {
-          const autoConnType: ConnectorType = diagramType === "state-machine" ? "transition" : "sequence";
+          const autoConnType: ConnectorType = diagramType === "state-machine" ? "transition" : diagramType === "flowchart" ? "flowline" : "sequence";
           onAddConnector(
             sourceId, targetId,
             autoConnType, defaultDirectionType, defaultRoutingType,
@@ -2935,7 +2960,8 @@ export function Canvas({
     const SM_AUTO_CONNECT_TYPES = new Set<SymbolType>([
       "state", "submachine", "initial-state", "final-state", "composite-state", "gateway", "fork-join",
     ]);
-    const AUTO_CONNECT_TYPES = diagramType === "state-machine" ? SM_AUTO_CONNECT_TYPES : BPMN_AUTO_CONNECT_TYPES;
+    const AUTO_CONNECT_TYPES = diagramType === "state-machine" ? SM_AUTO_CONNECT_TYPES
+      : diagramType === "flowchart" ? FC_AUTO_CONNECT_TYPES : BPMN_AUTO_CONNECT_TYPES;
 
     // Mirror useDiagram's boundary-snap thresholds so we can predict if the
     // new element will become an edge-mounted (boundary) event in the reducer.
@@ -2972,7 +2998,7 @@ export function Canvas({
       return false;
     }
 
-    const supportsAutoConnect = diagramType === "bpmn" || diagramType === "state-machine";
+    const supportsAutoConnect = diagramType === "bpmn" || diagramType === "state-machine" || diagramType === "flowchart";
     // State-machine rules: never auto-connect TO an initial-state or final-state
     const skipAutoConnect = diagramType === "state-machine" && (symbolType === "initial-state" || symbolType === "final-state");
     if (supportsAutoConnect && AUTO_CONNECT_TYPES.has(symbolType) && !willBeBoundaryEvent() && !skipAutoConnect) {
@@ -2998,7 +3024,7 @@ export function Canvas({
         const existingDirect = data.connectors.some(c =>
           c.sourceId === srcFound.source.id &&
           c.targetId === tgtFound.target.id &&
-          (c.type === "sequence" || c.type === "transition")
+          (c.type === "sequence" || c.type === "transition" || c.type === "flowline")
         );
         if (existingDirect) dualEligible = false;
         // Also: if src and tgt are the same element (shouldn't happen
@@ -5852,19 +5878,28 @@ export function Canvas({
             );
           })()}
 
-          {/* Rubber-band line during connector drag */}
-          {draggingConnector && (
-            <line data-interactive
-              x1={draggingConnector.fromPos.x}
-              y1={draggingConnector.fromPos.y}
-              x2={draggingConnector.currentPos.x}
-              y2={draggingConnector.currentPos.y}
-              stroke="#2563eb"
-              strokeWidth={1.5}
-              strokeDasharray="6 3"
-              style={{ pointerEvents: "none" }}
-            />
-          )}
+          {/* Rubber-band line during connector drag. Purple when a Comment is
+              involved (source or hovered target) — a dotted association will be
+              drawn, not a flowline. */}
+          {draggingConnector && (() => {
+            const cp = draggingConnector.currentPos;
+            const willAssoc =
+              draggingSourceEl?.type === "flowchart-comment" ||
+              data.elements.some((e) => e.type === "flowchart-comment" && e.id !== draggingConnector.fromId
+                && cp.x >= e.x && cp.x <= e.x + e.width && cp.y >= e.y && cp.y <= e.y + e.height);
+            return (
+              <line data-interactive
+                x1={draggingConnector.fromPos.x}
+                y1={draggingConnector.fromPos.y}
+                x2={cp.x}
+                y2={cp.y}
+                stroke={willAssoc ? "#9333ea" : "#2563eb"}
+                strokeWidth={1.5}
+                strokeDasharray="6 3"
+                style={{ pointerEvents: "none" }}
+              />
+            );
+          })()}
 
           {/* Group-connect flash: red for to-be-deleted, green for to-be-created */}
           {groupFlash && groupFlash.visible && (

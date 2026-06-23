@@ -2582,7 +2582,7 @@ export function PropertiesPanel({
         </div>
       )}
 
-      {element.type === "fork-join" && onFlipForkJoin && (
+      {(element.type === "fork-join" || element.type === "flowchart-parallel") && onFlipForkJoin && (
         <div className="flex items-center gap-1">
           <label className="text-[10px] text-gray-500 whitespace-nowrap w-14 shrink-0">Orient.</label>
           <button

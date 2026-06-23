@@ -28,7 +28,7 @@ const DEFAULT_MODEL = "claude-sonnet-4-6";
 const TYPE_LIST = [
   "terminator", "process", "decision", "io", "document", "multidoc",
   "predefined", "preparation", "manual-input", "manual-op", "display",
-  "delay", "database", "onpage", "offpage", "merge",
+  "delay", "database", "onpage", "offpage", "merge", "parallel", "comment",
 ];
 
 export function buildFlowchartSystemPrompt(rules: string): string {
@@ -36,7 +36,7 @@ export function buildFlowchartSystemPrompt(rules: string): string {
 
 IMAGE INPUT — when an image of an existing flowchart is attached:
 - Treat the image as the source of truth. Reverse-engineer the flow from what is drawn, then express it in the JSON format below.
-- Map drawn shapes to types: rounded pill / stadium → "terminator"; rectangle → "process"; diamond → "decision"; parallelogram → "io"; document (wavy bottom) → "document"; stacked documents → "multidoc"; double-bar rectangle → "predefined"; hexagon → "preparation"; sloped-top box → "manual-input"; inverted trapezoid → "manual-op"; curved-base box → "display"; D-shape → "delay"; cylinder → "database"; circle → "onpage"; pentagon / home-plate → "offpage"; down-triangle → "merge".
+- Map drawn shapes to types: rounded pill / stadium → "terminator"; rectangle → "process"; diamond → "decision"; parallelogram → "io"; document (wavy bottom) → "document"; stacked documents → "multidoc"; double-bar rectangle → "predefined"; hexagon → "preparation"; sloped-top box → "manual-input"; inverted trapezoid → "manual-op"; curved-base box → "display"; D-shape → "delay"; cylinder → "database"; circle → "onpage"; pentagon / home-plate → "offpage"; down-triangle → "merge"; thick solid bar (fork/join) → "parallel"; rounded rectangle note attached by a dotted line → "comment".
 - Read labels with OCR. Do NOT invent steps or branches that are not visible. Use a short placeholder if a label is unreadable.
 - Where the user's text prompt adds detail beyond the image, apply it. Where it contradicts the image, prefer the image.
 

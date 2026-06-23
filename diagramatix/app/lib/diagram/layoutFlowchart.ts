@@ -54,6 +54,8 @@ function mapType(raw: string): DiagramElement["type"] {
   if (/(database|db|datastore|store)/.test(k)) return "flowchart-database";
   if (/(offpage)/.test(k)) return "flowchart-offpage";
   if (/(onpage|connector)/.test(k)) return "flowchart-onpage";
+  if (/(parallel|fork|synchron)/.test(k)) return "flowchart-parallel";
+  if (/(comment|note|annotation|callout)/.test(k)) return "flowchart-comment";
   if (/(merge|join)/.test(k)) return "flowchart-merge";
   if (/(inputoutput|^io$|input|output|data)/.test(k)) return "flowchart-io";
   // process / action / task / operation / activity / step / anything else

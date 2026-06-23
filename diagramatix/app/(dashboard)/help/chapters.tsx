@@ -1180,11 +1180,11 @@ export const CHAPTERS: HelpChapter[] = [
       {
         body: (
           <p>
-            When you add a new element to a <strong>BPMN</strong> or{" "}
-            <strong>State Machine</strong> diagram (by dragging from the
-            palette or using right-click quick-add), Diagramatix
-            automatically connects it to nearby existing elements. This
-            dramatically speeds up modelling.
+            When you add a new element to a <strong>BPMN</strong>,{" "}
+            <strong>State Machine</strong> or <strong>Flowchart</strong> diagram
+            (by dragging from the palette or using right-click quick-add),
+            Diagramatix automatically connects it to nearby existing elements.
+            This dramatically speeds up modelling.
           </p>
         ),
       },

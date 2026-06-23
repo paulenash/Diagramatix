@@ -395,6 +395,20 @@ export function PaletteSymbolPreview({ type, colorConfig }: { type: SymbolType; 
           <polygon points="2,2 30,2 16,24" fill="#fff" stroke="#111" strokeWidth={1.6} strokeLinejoin="round" />
         </svg>
       );
+    case "flowchart-parallel":
+      return (
+        <svg width={36} height={12} viewBox="0 0 48 16">
+          <rect x={2} y={5} width={44} height={6} rx={2} ry={2} fill="#111" />
+        </svg>
+      );
+    case "flowchart-comment":
+      return (
+        <svg width={36} height={21} viewBox="0 0 48 28">
+          <rect x={2} y={2} width={44} height={24} rx={6} ry={6} fill="#fff" stroke="#111" strokeWidth={1.6} />
+          <line x1={9} y1={11} x2={39} y2={11} stroke="#999" strokeWidth={1.2} />
+          <line x1={9} y1={17} x2={31} y2={17} stroke="#999" strokeWidth={1.2} />
+        </svg>
+      );
     case "flowchart-vswimlane":
       return (
         <svg width={30} height={26} viewBox="0 0 36 32">

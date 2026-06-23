@@ -82,6 +82,23 @@ function boundaryEdgeOf(
                        return { side: "right",  frac: (evCenter.y - y) / height };
 }
 
+/** Constrain a connector endpoint on a Parallel (fork/join) bar to one of its
+ *  LONG faces so the line is perpendicular to the bar — horizontal bar → top /
+ *  bottom, vertical → left / right. A side that's already a long face is kept
+ *  (with its free offset, so it can slide along the face); a narrow-end side is
+ *  flipped to the long face nearest the other endpoint and centred. */
+function clampParallelFace(
+  par: DiagramElement, other: DiagramElement, side: Side, off: number | undefined,
+): [Side, number | undefined] {
+  const horizontal = par.width >= par.height;
+  const longFaces: Side[] = horizontal ? ["top", "bottom"] : ["left", "right"];
+  if (longFaces.includes(side)) return [side, off];
+  const pcx = par.x + par.width / 2, pcy = par.y + par.height / 2;
+  const ocx = other.x + other.width / 2, ocy = other.y + other.height / 2;
+  if (horizontal) return [ocy >= pcy ? "bottom" : "top", 0.5];
+  return [ocx >= pcx ? "right" : "left", 0.5];
+}
+
 function messageBpmnWaypoints(
   source: DiagramElement, target: DiagramElement,
   sourceSide: Side, targetSide: Side, sourceOffset: number, _targetOffset?: number
@@ -2867,10 +2884,14 @@ function validateConnectorsAgainstObstacles(connectors: Connector[], elements: D
       // sides off the same delta vector (avoiding self-clip through the
       // source / target body) and overrides with `pickBoundaryEventSide`
       // for boundary-event endpoints (issues 2 + 8).
-      const { src: newSrcSide, tgt: newTgtSide } = safeSidePair(source, target, elements);
-      const r2 = computeWaypoints(source, target, elements, newSrcSide, newTgtSide, conn.routingType, 0.5, 0.5);
+      let { src: newSrcSide, tgt: newTgtSide } = safeSidePair(source, target, elements);
+      let newSrcOff = 0.5, newTgtOff = 0.5;
+      // A parallel bar stays perpendicular even when obstacle-avoidance re-sides.
+      if (source.type === "flowchart-parallel") [newSrcSide, newSrcOff] = clampParallelFace(source, target, newSrcSide, newSrcOff) as [Side, number];
+      if (target.type === "flowchart-parallel") [newTgtSide, newTgtOff] = clampParallelFace(target, source, newTgtSide, newTgtOff) as [Side, number];
+      const r2 = computeWaypoints(source, target, elements, newSrcSide, newTgtSide, conn.routingType, newSrcOff, newTgtOff);
       return { ...conn, waypoints: r2.waypoints, sourceInvisibleLeader: r2.sourceInvisibleLeader, targetInvisibleLeader: r2.targetInvisibleLeader,
-        sourceSide: newSrcSide, targetSide: newTgtSide, sourceOffsetAlong: 0.5, targetOffsetAlong: 0.5,
+        sourceSide: newSrcSide, targetSide: newTgtSide, sourceOffsetAlong: newSrcOff, targetOffsetAlong: newTgtOff,
         ...endLabelResets };
     });
     if (!anyChanged) break;
@@ -3595,6 +3616,11 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       } else if (action.payload.symbolType === "process-system") {
         const count = state.elements.filter((e) => e.type === "process-system").length;
         label = `Process ${count + 1}`;
+      } else if (action.payload.symbolType === "flowchart-process") {
+        const count = state.elements.filter((e) => e.type === "flowchart-process").length;
+        label = `Process ${count + 1}`;
+      } else if (action.payload.symbolType === "flowchart-decision") {
+        label = "Decision?";
       } else if (action.payload.symbolType === "gateway") {
         // Exclusive/Inclusive get "Decision?", Parallel/Event-based get no label
         label = "Decision?";
@@ -4979,7 +5005,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
     case "FLIP_FORK_JOIN": {
       const { id } = action.payload;
       const el = state.elements.find(e => e.id === id);
-      if (!el || el.type !== "fork-join") return state;
+      if (!el || (el.type !== "fork-join" && el.type !== "flowchart-parallel")) return state;
 
       // Swap width ↔ height, keeping the centre fixed
       const cx = el.x + el.width / 2;
@@ -5023,6 +5049,13 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       // eslint-disable-next-line prefer-const
       let { x: newX, y: newY, width: newW, height: rawNewH } = action.payload;
       const target = state.elements.find((e) => e.id === id);
+      // Parallel (fork/join) bar: it can only be LENGTHENED, never thickened —
+      // lock the short (thickness) dimension and pin that edge so a corner /
+      // thickness drag is ignored. Orientation = current long axis.
+      if (target?.type === "flowchart-parallel") {
+        if (target.width >= target.height) { rawNewH = target.height; newY = target.y; }
+        else { newW = target.width; newX = target.x; }
+      }
       // Task / Sub-Process floor — clamp width/height to the type's default
       // size. If the user dragged a top/left handle (rawX > target.x or
       // rawY > target.y), pin the opposite edge so the element doesn't
@@ -6079,10 +6112,23 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
     }
 
     case "ADD_CONNECTOR": {
-      const { sourceId, targetId, connectorType, directionType, routingType, sourceSide, targetSide, sourceOffsetAlong, targetOffsetAlong, force, initialLabel } = action.payload;
+      const { sourceId, targetId, connectorType, directionType, routingType, force, initialLabel } = action.payload;
+      // eslint-disable-next-line prefer-const
+      let { sourceSide, targetSide, sourceOffsetAlong, targetOffsetAlong } = action.payload;
       const source = state.elements.find((el) => el.id === sourceId);
       const target = state.elements.find((el) => el.id === targetId);
       if (!source || !target) return state;
+
+      // Parallel (fork/join) bar: an endpoint on it MUST sit on a long face so
+      // the connector leaves/arrives perpendicular — never on the narrow ends.
+      // Keep a free offset when the side is already a long face (so it can slide
+      // anywhere along it); otherwise flip to the long face toward the other end.
+      if (source.type === "flowchart-parallel") {
+        [sourceSide, sourceOffsetAlong] = clampParallelFace(source, target, sourceSide, sourceOffsetAlong);
+      }
+      if (target.type === "flowchart-parallel") {
+        [targetSide, targetOffsetAlong] = clampParallelFace(target, source, targetSide, targetOffsetAlong);
+      }
 
       // ── Review Comments ────────────────────────────────────────────────
       // A connector from OR to a Review Comment is ALWAYS a non-directed
@@ -6504,12 +6550,21 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       const { connectorId, endpoint, newElementId, newSide, newOffsetAlong } = action.payload;
       const connectors = state.connectors.map((conn) => {
         if (conn.id !== connectorId) return conn;
+        // Clamp a parallel-bar endpoint to a long face (perpendicular only).
+        let side = newSide;
+        let off = newOffsetAlong ?? 0.5;
+        const movedEl = state.elements.find((e) => e.id === newElementId);
+        const otherEl = state.elements.find((e) => e.id === (endpoint === "source" ? conn.targetId : conn.sourceId));
+        if (movedEl?.type === "flowchart-parallel" && otherEl) {
+          const [s, o] = clampParallelFace(movedEl, otherEl, side, off);
+          side = s; off = o ?? 0.5;
+        }
         const updated = endpoint === "source"
-          ? { ...conn, sourceId: newElementId, sourceSide: newSide, sourceOffsetAlong: newOffsetAlong ?? 0.5,
+          ? { ...conn, sourceId: newElementId, sourceSide: side, sourceOffsetAlong: off,
               sourceRoleOffset: undefined, sourceMultOffset: undefined,
               sourceConstraintOffset: undefined, sourceUniqueOffset: undefined,
               associationNameOffset: undefined }
-          : { ...conn, targetId: newElementId, targetSide: newSide, targetOffsetAlong: newOffsetAlong ?? 0.5,
+          : { ...conn, targetId: newElementId, targetSide: side, targetOffsetAlong: off,
               targetRoleOffset: undefined, targetMultOffset: undefined,
               targetConstraintOffset: undefined, targetUniqueOffset: undefined,
               associationNameOffset: undefined };
@@ -6711,11 +6766,19 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
           (endpoint === "source" ? conn.sourceOffsetAlong : conn.targetOffsetAlong) ?? 0.5,
           endpoint === "source" ? conn.sourceId : conn.targetId,
         );
+        // Keep a parallel-bar endpoint on a long face (perpendicular only).
+        let rSide = r.side, rOff = r.offset;
+        const movedElN = state.elements.find((e) => e.id === (endpoint === "source" ? conn.sourceId : conn.targetId));
+        const otherElN = state.elements.find((e) => e.id === (endpoint === "source" ? conn.targetId : conn.sourceId));
+        if (movedElN?.type === "flowchart-parallel" && otherElN) {
+          const [s, o] = clampParallelFace(movedElN, otherElN, rSide, rOff);
+          rSide = s; rOff = o ?? 0.5;
+        }
         const updated = endpoint === "source"
-          ? { ...conn, sourceSide: r.side, sourceOffsetAlong: r.offset,
+          ? { ...conn, sourceSide: rSide, sourceOffsetAlong: rOff,
               sourceRoleOffset: undefined, sourceMultOffset: undefined,
               sourceConstraintOffset: undefined, sourceUniqueOffset: undefined }
-          : { ...conn, targetSide: r.side, targetOffsetAlong: r.offset,
+          : { ...conn, targetSide: rSide, targetOffsetAlong: rOff,
               targetRoleOffset: undefined, targetMultOffset: undefined,
               targetConstraintOffset: undefined, targetUniqueOffset: undefined };
         const source = state.elements.find((el) => el.id === updated.sourceId);
