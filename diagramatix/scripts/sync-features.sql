@@ -828,4 +828,37 @@ INSERT INTO "Feature" ("id","name","summary","details","hidden","sortOrder","pub
 - Built to help organisations migrate from the legacy flowchart diagramming standard to BPMN, the current business process mapping standard', false, 310, now(), now(), now()
   WHERE NOT EXISTS (SELECT 1 FROM "Feature" WHERE "name"='Flowchart → BPMN Translation');
 
+-- Voice Dictation (Speech-to-Text)
+UPDATE "Feature" SET "summary"='Describe your process out loud — high-accuracy voice dictation feeds straight into AI Generate for every diagram type, so you can talk a diagram into existence instead of typing.', "details"='- Dictate the prompt by voice in the AI Generate panel of EVERY notation — BPMN, Flowchart, Context, Process Context, State Machine, Domain, Value Chain and ArchiMate
+- Real-time, high-accuracy transcription via Deepgram streaming — words appear as you speak
+- Continuous: it keeps listening through natural pauses and doesn''t drop words between phrases
+- A live indicator shows which engine is running — bright blue for the high-quality Deepgram service, red if it has fallen back to the browser''s built-in recogniser
+- Automatic fallback to the browser speech engine when the premium service isn''t available, so dictation always works
+- Built-in microphone test that records a few seconds and lets you replay it, so you can confirm your mic is clear before relying on it
+- Your key is never exposed: the browser streams through a short-lived, server-issued token',
+  "publishedName"="name", "publishedSummary"='Describe your process out loud — high-accuracy voice dictation feeds straight into AI Generate for every diagram type, so you can talk a diagram into existence instead of typing.', "publishedDetails"='- Dictate the prompt by voice in the AI Generate panel of EVERY notation — BPMN, Flowchart, Context, Process Context, State Machine, Domain, Value Chain and ArchiMate
+- Real-time, high-accuracy transcription via Deepgram streaming — words appear as you speak
+- Continuous: it keeps listening through natural pauses and doesn''t drop words between phrases
+- A live indicator shows which engine is running — bright blue for the high-quality Deepgram service, red if it has fallen back to the browser''s built-in recogniser
+- Automatic fallback to the browser speech engine when the premium service isn''t available, so dictation always works
+- Built-in microphone test that records a few seconds and lets you replay it, so you can confirm your mic is clear before relying on it
+- Your key is never exposed: the browser streams through a short-lived, server-issued token',
+  "publishedHidden"="hidden", "publishedSortOrder"="sortOrder", "publishedAt"=now(), "updatedAt"=now()
+WHERE "name"='Voice Dictation (Speech-to-Text)';
+INSERT INTO "Feature" ("id","name","summary","details","hidden","sortOrder","publishedName","publishedSummary","publishedDetails","publishedHidden","publishedSortOrder","publishedAt","createdAt","updatedAt")
+  SELECT gen_random_uuid()::text, 'Voice Dictation (Speech-to-Text)', 'Describe your process out loud — high-accuracy voice dictation feeds straight into AI Generate for every diagram type, so you can talk a diagram into existence instead of typing.', '- Dictate the prompt by voice in the AI Generate panel of EVERY notation — BPMN, Flowchart, Context, Process Context, State Machine, Domain, Value Chain and ArchiMate
+- Real-time, high-accuracy transcription via Deepgram streaming — words appear as you speak
+- Continuous: it keeps listening through natural pauses and doesn''t drop words between phrases
+- A live indicator shows which engine is running — bright blue for the high-quality Deepgram service, red if it has fallen back to the browser''s built-in recogniser
+- Automatic fallback to the browser speech engine when the premium service isn''t available, so dictation always works
+- Built-in microphone test that records a few seconds and lets you replay it, so you can confirm your mic is clear before relying on it
+- Your key is never exposed: the browser streams through a short-lived, server-issued token', false, 320, 'Voice Dictation (Speech-to-Text)', 'Describe your process out loud — high-accuracy voice dictation feeds straight into AI Generate for every diagram type, so you can talk a diagram into existence instead of typing.', '- Dictate the prompt by voice in the AI Generate panel of EVERY notation — BPMN, Flowchart, Context, Process Context, State Machine, Domain, Value Chain and ArchiMate
+- Real-time, high-accuracy transcription via Deepgram streaming — words appear as you speak
+- Continuous: it keeps listening through natural pauses and doesn''t drop words between phrases
+- A live indicator shows which engine is running — bright blue for the high-quality Deepgram service, red if it has fallen back to the browser''s built-in recogniser
+- Automatic fallback to the browser speech engine when the premium service isn''t available, so dictation always works
+- Built-in microphone test that records a few seconds and lets you replay it, so you can confirm your mic is clear before relying on it
+- Your key is never exposed: the browser streams through a short-lived, server-issued token', false, 320, now(), now(), now()
+  WHERE NOT EXISTS (SELECT 1 FROM "Feature" WHERE "name"='Voice Dictation (Speech-to-Text)');
+
 COMMIT;

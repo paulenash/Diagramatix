@@ -373,6 +373,19 @@ export const FEATURES: Array<{ name: string; summary: string; details: string }>
       "- Built to help organisations migrate from the legacy flowchart diagramming standard to BPMN, the current business process mapping standard",
     ].join("\n"),
   },
+  {
+    name: "Voice Dictation (Speech-to-Text)",
+    summary: "Describe your process out loud — high-accuracy voice dictation feeds straight into AI Generate for every diagram type, so you can talk a diagram into existence instead of typing.",
+    details: [
+      "- Dictate the prompt by voice in the AI Generate panel of EVERY notation — BPMN, Flowchart, Context, Process Context, State Machine, Domain, Value Chain and ArchiMate",
+      "- Real-time, high-accuracy transcription via Deepgram streaming — words appear as you speak",
+      "- Continuous: it keeps listening through natural pauses and doesn't drop words between phrases",
+      "- A live indicator shows which engine is running — bright blue for the high-quality Deepgram service, red if it has fallen back to the browser's built-in recogniser",
+      "- Automatic fallback to the browser speech engine when the premium service isn't available, so dictation always works",
+      "- Built-in microphone test that records a few seconds and lets you replay it, so you can confirm your mic is clear before relying on it",
+      "- Your key is never exposed: the browser streams through a short-lived, server-issued token",
+    ].join("\n"),
+  },
 ];
 
 async function main() {
