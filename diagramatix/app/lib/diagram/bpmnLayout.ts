@@ -2164,6 +2164,84 @@ export function layoutBpmnDiagram(
     }
   }
 
+  // ── R6.25: a merge/join gateway sits to the RIGHT of every element feeding it ──
+  // After EP wrapping, a wide parallel branch (e.g. an EP) can extend past the
+  // merge gateway's column, stranding the merge inside / left of a branch. Move
+  // each merge (a gateway that is the target of ≥2 sequence flows) to the right
+  // of its rightmost source, then shift the merge AND everything downstream of
+  // it (forward-reachable, with descendants + boundary events) by the same delta
+  // so its outgoing flow and successors follow. Sources are upstream, so they're
+  // never moved. Runs before routing, so connectors are drawn to the final spot.
+  {
+    const R625_GAP = 60;
+    const pushArr = (m: Map<string, string[]>, k: string, v: string) => {
+      const a = m.get(k); if (a) a.push(v); else m.set(k, [v]);
+    };
+    const incoming = new Map<string, string[]>();
+    const outById = new Map<string, string[]>();
+    for (const c of [...aiConnections, ...autoConns]) {
+      if (c.type === "message") continue;
+      pushArr(incoming, c.targetId, c.sourceId);
+      pushArr(outById, c.sourceId, c.targetId);
+    }
+    const elById = new Map(elements.map(e => [e.id, e]));
+    const kidsByParent = new Map<string, DiagramElement[]>();
+    for (const e of elements) { if (e.parentId) pushArr2(kidsByParent, e.parentId, e); }
+    function pushArr2(m: Map<string, DiagramElement[]>, k: string, v: DiagramElement) {
+      const a = m.get(k); if (a) a.push(v); else m.set(k, [v]);
+    }
+    const descendantsOf = (rootId: string): string[] => {
+      const out: string[] = []; const stack = [rootId];
+      while (stack.length) { const cur = stack.pop()!; for (const k of kidsByParent.get(cur) ?? []) { out.push(k.id); stack.push(k.id); } }
+      return out;
+    };
+    // Merges processed left-to-right so a cascade settles in one pass.
+    const merges = elements
+      .filter(e => e.type === "gateway"
+        && (incoming.get(e.id)?.length ?? 0) >= 2
+        // Skip gateways INSIDE an EP — the single-row EP layout already places
+        // them, and moving one would break the EP's wrap.
+        && elById.get(e.parentId ?? "")?.type !== "subprocess-expanded")
+      .sort((a, b) => a.x - b.x);
+    for (const g of merges) {
+      let maxRight = -Infinity;
+      for (const sid of incoming.get(g.id) ?? []) {
+        const s = elById.get(sid);
+        if (s) maxRight = Math.max(maxRight, s.x + s.width);
+      }
+      if (!isFinite(maxRight)) continue;
+      const delta = (maxRight + R625_GAP) - g.x;
+      if (delta <= 0.5) continue;
+      // Shift the merge + everything downstream of it (forward-reachable),
+      // plus those elements' descendants and boundary events.
+      const shiftSet = new Set<string>();
+      const stack = [g.id];
+      while (stack.length) {
+        const n = stack.pop()!;
+        if (shiftSet.has(n)) continue;
+        shiftSet.add(n);
+        for (const t of outById.get(n) ?? []) stack.push(t);
+      }
+      for (const id of [...shiftSet]) for (const d of descendantsOf(id)) shiftSet.add(d);
+      for (const e of elements) if (e.boundaryHostId && shiftSet.has(e.boundaryHostId)) shiftSet.add(e.id);
+      for (const e of elements) if (shiftSet.has(e.id)) e.x += delta;
+    }
+    // Grow lanes / pools to cover any element pushed past their right edge.
+    const rightOfDescendants = (cont: DiagramElement): number => {
+      let r = cont.x + 50;
+      for (const e of elements) {
+        let p: string | undefined = e.parentId, guard = 0;
+        while (p && guard++ < 20) { if (p === cont.id) { r = Math.max(r, e.x + e.width); break; } p = elById.get(p)?.parentId; }
+      }
+      return r;
+    };
+    for (const cont of elements) {
+      if (cont.type !== "lane" && cont.type !== "pool") continue;
+      const need = rightOfDescendants(cont) - cont.x + 30;
+      if (need > cont.width) cont.width = need;
+    }
+  }
+
   // R6.12/R7.03: Drop ANY connector (sequence OR message) that touches an Event
   // Expanded Subprocess. Event subs are triggered by events, not by any kind
   // of flow — the rule is broader than R6.12's original sequence-only scope.
