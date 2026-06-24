@@ -4064,18 +4064,10 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       const descendantIds = movingIsContainer ? getAllDescendantIds(state.elements, id) : new Set<string>();
       const attachedBoundaryIds = new Set(state.elements.filter(e => e.boundaryHostId === id).map(e => e.id));
 
-      // Event proximity snap (free events only — not already boundary-mounted)
-      let snapResult: { hostId: string; cx: number; cy: number } | null = null;
-      if (BOUNDARY_EVENT_TYPES.has(el.type) && !el.boundaryHostId) {
-        const centre = { x: x + el.width / 2, y: y + el.height / 2 };
-        let bestDist = BOUNDARY_SNAP_THRESHOLD;
-        for (const candidate of state.elements) {
-          if (!BOUNDARY_HOST_TYPES.has(candidate.type) || candidate.id === id) continue;
-          const pt = nearestPointOnRectBoundary(candidate, centre);
-          const dist = Math.hypot(pt.x - centre.x, pt.y - centre.y);
-          if (dist < bestDist) { bestDist = dist; snapResult = { hostId: candidate.id, cx: pt.x, cy: pt.y }; }
-        }
-      }
+      // Event boundary-attach is deferred to MOVE_END (drop) — a free event
+      // must glide over activities while dragging and attach ONLY to the
+      // boundary it is released on, not to whatever it passes over (user
+      // report). No mid-drag snap here.
 
       // Skip parent re-detection during MOVE_ELEMENT when the current
       // parent is a subprocess-expanded — keeping the moved element
@@ -4093,14 +4085,6 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
 
       let elements = state.elements.map((e) => {
         if (e.id === id) {
-          if (snapResult) {
-            const host = state.elements.find(h => h.id === snapResult!.hostId)!;
-            return {
-              ...e, width: BOUNDARY_W, height: BOUNDARY_H,
-              x: snapResult.cx - BOUNDARY_W / 2, y: snapResult.cy - BOUNDARY_H / 2,
-              boundaryHostId: snapResult.hostId, parentId: host.parentId,
-            };
-          }
           let parentId = e.parentId;
           if (!lockParentToEP) {
             const cx = effectiveX + e.width / 2;
@@ -7372,6 +7356,36 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       const { id } = action.payload;
       const initialEl = state.elements.find(e => e.id === id);
       if (!initialEl) return state;
+
+      // Boundary-event attach happens at DROP only (mid-drag attach was
+      // removed from MOVE_ELEMENT so events glide freely). If a free event
+      // is released with its centre within the snap threshold of an
+      // activity's edge, mount it on that boundary; otherwise it stays a
+      // free-floating event exactly where it was dropped.
+      if (BOUNDARY_EVENT_TYPES.has(initialEl.type) && !initialEl.boundaryHostId) {
+        const centre = { x: initialEl.x + initialEl.width / 2, y: initialEl.y + initialEl.height / 2 };
+        let bestDist = BOUNDARY_SNAP_THRESHOLD;
+        let snap: { hostId: string; cx: number; cy: number } | null = null;
+        for (const candidate of state.elements) {
+          if (!BOUNDARY_HOST_TYPES.has(candidate.type) || candidate.id === id) continue;
+          const pt = nearestPointOnRectBoundary(candidate, centre);
+          const dist = Math.hypot(pt.x - centre.x, pt.y - centre.y);
+          if (dist < bestDist) { bestDist = dist; snap = { hostId: candidate.id, cx: pt.x, cy: pt.y }; }
+        }
+        if (snap) {
+          const host = state.elements.find(h => h.id === snap!.hostId)!;
+          const attachedEls = state.elements.map(e => e.id === id ? {
+            ...e, width: BOUNDARY_W, height: BOUNDARY_H,
+            x: snap!.cx - BOUNDARY_W / 2, y: snap!.cy - BOUNDARY_H / 2,
+            boundaryHostId: snap!.hostId, parentId: host.parentId,
+          } : e);
+          const reconns = state.connectors.map(conn =>
+            (conn.sourceId === id || conn.targetId === id)
+              ? recomputeAllConnectors([conn], attachedEls)[0] ?? conn
+              : conn);
+          return { ...state, elements: updatePoolTypes(attachedEls), connectors: reconns };
+        }
+      }
 
       // Step 0: Final parent re-detection. During the drag (MOVE_ELEMENT)
       // we lock parentId to the moved element's containing EP so sibling
