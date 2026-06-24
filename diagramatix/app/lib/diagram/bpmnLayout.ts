@@ -2267,6 +2267,49 @@ export function layoutBpmnDiagram(
     }
   }
 
+  // ── R5.08 + pool over-width: every generated pool is the SAME width, tight to
+  // content (left + right aligned) ──
+  // Pool widths start from a generous column estimate and the enclose passes
+  // only ever GROW, so a white-box pool can end up far wider than its content
+  // (test 5: 526 px of empty pool past the last element). Set every top-level
+  // pool to a single uniform width = rightmost content across ALL pools + pad,
+  // all sharing the same left x. Runs before routing so messages attach to the
+  // final edges (the message pass recomputes offsetAlong against the partner).
+  {
+    const POOL_PAD = 50;
+    const topPools = elements.filter(e => e.type === "pool" && !e.parentId);
+    if (topPools.length > 0) {
+      const byId = new Map(elements.map(e => [e.id, e]));
+      const descRight = (poolId: string): number => {
+        let r = -Infinity;
+        for (const e of elements) {
+          if (e.type === "pool" || e.type === "lane") continue;
+          let p: string | undefined = e.parentId, g = 0;
+          while (p && g++ < 20) { if (p === poolId) { r = Math.max(r, e.x + e.width); break; } p = byId.get(p)?.parentId; }
+        }
+        return r;
+      };
+      let maxRight = -Infinity;
+      for (const p of topPools) { const r = descRight(p.id); if (isFinite(r)) maxRight = Math.max(maxRight, r); }
+      if (isFinite(maxRight)) {
+        const leftX = Math.min(...topPools.map(p => p.x));
+        const targetRight = maxRight + POOL_PAD;
+        const syncLaneWidth = (parentId: string, innerLeft: number, innerWidth: number) => {
+          for (const lane of elements.filter(e => (e.type === "lane" || e.type === "sublane") && e.parentId === parentId)) {
+            lane.x = innerLeft;
+            lane.width = innerWidth;
+            syncLaneWidth(lane.id, innerLeft, innerWidth); // recurse into sub-lanes
+          }
+        };
+        for (const p of topPools) {
+          p.x = leftX;
+          p.width = targetRight - leftX;
+          syncLaneWidth(p.id, leftX + POOL_HEADER_W, p.width - POOL_HEADER_W);
+        }
+      }
+    }
+  }
+
   // R6.12/R7.03: Drop ANY connector (sequence OR message) that touches an Event
   // Expanded Subprocess. Event subs are triggered by events, not by any kind
   // of flow — the rule is broader than R6.12's original sequence-only scope.
