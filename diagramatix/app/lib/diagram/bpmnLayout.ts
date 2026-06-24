@@ -846,6 +846,14 @@ export function layoutBpmnDiagram(
     const normalChildren = isEventSub ? children : children.filter(ai => !isChildEventSub(ai));
     const eventSubChildren = isEventSub ? [] : children.filter(ai => isChildEventSub(ai));
 
+    // A plain linear EP (a normal subprocess with NO embedded event subs) lays
+    // its children out as a single left-to-right flow row — start at the far
+    // left, end at the far right, tasks evenly spaced between — exactly like an
+    // event subprocess. The 5-column grid is reserved for the (rarer) case of
+    // an outer sub that hosts embedded event subprocesses; using it for a plain
+    // sub wrapped the internal end event onto a second row (user report).
+    const singleRowFlow = !isEventSub && eventSubChildren.length === 0;
+
     // R8.01: when the outer has event subs, internal Start/End events are
     // reserved for the top row; the rest fill the grid from row 1.
     const hasEventSubs = eventSubChildren.length > 0;
@@ -868,6 +876,10 @@ export function layoutBpmnDiagram(
       const sz = eventSubSize(children.length);
       neededW = sz.w;
       neededH = sz.h;
+    } else if (singleRowFlow) {
+      // Single-row flow: width grows with the child count; height is one row.
+      neededW = Math.max(2, normalChildren.length) * CHILD_COL_SPACING + EXPANDED_PAD_X * 2;
+      neededH = CHILD_ROW_SPACING + EXPANDED_PAD_Y * 2;
     } else {
       // Content-driven: grow with the actual child grid, with a small 2×2
       // floor (was a rigid 5×4, which bloated small subprocesses with empty
@@ -929,17 +941,16 @@ export function layoutBpmnDiagram(
         }
       }
     }
-    if (isEventSub) {
-      // Event subprocess: lay children out left-to-right in a single row —
-      // Start first, End last, any middle elements (tasks/gateways) evenly
-      // spaced between them, all vertically centred. The previous rule put
-      // EVERY non-start/end child at the centre x, so two or more middle
-      // elements overlapped. Even distribution + the content-driven width
-      // above keeps them readable however many there are.
+    if (isEventSub || singleRowFlow) {
+      // Single-row flow (event subprocess OR a plain linear EP): lay children
+      // out left-to-right — Start first, End last, any middle elements
+      // (tasks/gateways) evenly spaced between them, all vertically centred.
+      // Even distribution + the content-driven width keeps them readable
+      // however many there are, and the End never wraps to a second row.
       const ordered = [
-        ...children.filter(c => c.type === "start-event"),
-        ...children.filter(c => c.type !== "start-event" && c.type !== "end-event"),
-        ...children.filter(c => c.type === "end-event"),
+        ...normalChildren.filter(c => c.type === "start-event"),
+        ...normalChildren.filter(c => c.type !== "start-event" && c.type !== "end-event"),
+        ...normalChildren.filter(c => c.type === "end-event"),
       ];
       const cyCentre = spEl.height / 2;
       const n = ordered.length;
