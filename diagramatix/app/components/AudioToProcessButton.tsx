@@ -11,6 +11,8 @@ interface Props {
   onNote?: (message: string) => void;
   /** Reports record/transcribe/tidy activity so the host can disable Generate. */
   onBusyChange?: (busy: boolean) => void;
+  /** Reports the current processing phase so the host can show a throbber. */
+  onPhaseChange?: (phase: null | "transcribing" | "reading" | "tidying") => void;
   /** Target notation, passed to the AI tidy pass for better phrasing. */
   diagramType?: string;
   disabled?: boolean;
@@ -23,9 +25,9 @@ interface Props {
  * raw transcript is cleaned into an ordered process description first (and any
  * open questions are surfaced). The result is handed back via onTranscript.
  */
-export function AudioToProcessButton({ onTranscript, onError, onNote, onBusyChange, diagramType, disabled }: Props) {
+export function AudioToProcessButton({ onTranscript, onError, onNote, onBusyChange, onPhaseChange, diagramType, disabled }: Props) {
   const [recording, setRecording] = useState(false);
-  const [phase, setPhase] = useState<null | "transcribing" | "tidying">(null);
+  const [phase, setPhase] = useState<null | "transcribing" | "reading" | "tidying">(null);
   const [tidy, setTidy] = useState(true);
   const [secs, setSecs] = useState(0);
   const recorderRef = useRef<MediaRecorder | null>(null);
@@ -35,6 +37,7 @@ export function AudioToProcessButton({ onTranscript, onError, onNote, onBusyChan
 
   const busy = phase !== null;
   useEffect(() => onBusyChange?.(recording || busy), [recording, busy, onBusyChange]);
+  useEffect(() => onPhaseChange?.(phase), [phase, onPhaseChange]);
   useEffect(() => () => {
     if (timerRef.current) clearInterval(timerRef.current);
     try { recorderRef.current?.stream.getTracks().forEach((t) => t.stop()); } catch { /* */ }
@@ -44,9 +47,9 @@ export function AudioToProcessButton({ onTranscript, onError, onNote, onBusyChan
     && typeof MediaRecorder !== "undefined";
 
   // Transcribe/parse → optionally AI-tidy → deliver to the prompt.
-  async function process(getRaw: () => Promise<string>) {
+  async function process(getRaw: () => Promise<string>, firstPhase: "transcribing" | "reading") {
     onError?.("");
-    setPhase("transcribing");
+    setPhase(firstPhase);
     try {
       const raw = (await getRaw()).trim();
       if (!raw) { onError?.("No usable speech / transcript found."); return; }
@@ -77,7 +80,7 @@ export function AudioToProcessButton({ onTranscript, onError, onNote, onBusyChan
     rec.onstop = () => {
       stream.getTracks().forEach((t) => t.stop());
       const blob = new Blob(chunksRef.current, { type: rec.mimeType || "audio/webm" });
-      void process(() => transcribeAudioBlob(blob));
+      void process(() => transcribeAudioBlob(blob), "transcribing");
     };
     rec.start();
     recorderRef.current = rec;
@@ -93,13 +96,16 @@ export function AudioToProcessButton({ onTranscript, onError, onNote, onBusyChan
   }
 
   function handleFile(file: File) {
-    if (isVttFile(file)) void process(async () => parseVtt(await file.text()));
-    else void process(() => transcribeAudioBlob(file));
+    if (isVttFile(file)) void process(async () => parseVtt(await file.text()), "reading");
+    else void process(() => transcribeAudioBlob(file), "transcribing");
   }
 
   const mmss = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")}`;
   const btn = "flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border disabled:opacity-50";
-  const uploadLabel = phase === "transcribing" ? "Transcribing…" : phase === "tidying" ? "Tidying…" : "Audio / VTT";
+  const uploadLabel = phase === "transcribing" ? "Transcribing…"
+    : phase === "reading" ? "Reading…"
+    : phase === "tidying" ? "Tidying…"
+    : "Audio / VTT";
 
   return (
     <>

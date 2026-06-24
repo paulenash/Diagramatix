@@ -50,6 +50,7 @@ export function AiPanel({
   useEffect(() => { onNarrativeGeneratingChange?.(narrativeGenerating); }, [narrativeGenerating, onNarrativeGeneratingChange]);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+  const [audioPhase, setAudioPhase] = useState<null | "transcribing" | "reading" | "tidying">(null);
   const [mode, setMode] = useState<"replace" | "add">("replace");
 
   // Saved prompts
@@ -402,6 +403,7 @@ export function AiPanel({
             <AudioToProcessButton
               disabled={generating}
               diagramType={diagramType}
+              onPhaseChange={setAudioPhase}
               onError={(m) => { if (m) setError(m); }}
               onNote={(m) => setStatus(m)}
               onTranscript={(text) => setPrompt(prev => prev.trim()
@@ -443,6 +445,18 @@ export function AiPanel({
               {narrativeGenerating
                 ? "Asking Sonnet for a staff narrative — this usually takes 15–30 s…"
                 : "Asking Sonnet — this usually takes 15–30 s…"}
+            </span>
+          </div>
+        )}
+        {audioPhase && (
+          <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded px-2 py-1.5">
+            <DiagramatixThrobber size={28} />
+            <span className="text-[11px] text-blue-800 font-medium">
+              {audioPhase === "transcribing"
+                ? "Transcribing your recording — this can take a little while…"
+                : audioPhase === "reading"
+                  ? "Reading the meeting transcript…"
+                  : "Tidying the discussion into an ordered process…"}
             </span>
           </div>
         )}

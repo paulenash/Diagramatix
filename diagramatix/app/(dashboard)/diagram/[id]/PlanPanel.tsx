@@ -151,6 +151,7 @@ export function PlanPanel({
   const [listening, setListening] = useState(false);
   const [dictEngine, setDictEngine] = useState<"deepgram" | "browser" | null>(null);
   const [dictateMsg, setDictateMsg] = useState<string | null>(null);
+  const [audioPhase, setAudioPhase] = useState<null | "transcribing" | "reading" | "tidying">(null);
   const dictRef = useRef<DictationHandle | null>(null);
   const speechSupported = typeof window !== "undefined"
     && (!!navigator.mediaDevices?.getUserMedia || !!(window.SpeechRecognition || window.webkitSpeechRecognition));
@@ -743,6 +744,7 @@ export function PlanPanel({
             <AudioToProcessButton
               disabled={!!busy}
               diagramType={diagramType}
+              onPhaseChange={setAudioPhase}
               onError={(m) => setDictateMsg(m || null)}
               onNote={(m) => setDictateMsg(m || null)}
               onTranscript={(text) => setPrompt(prev => prev.trim()
@@ -866,6 +868,18 @@ export function PlanPanel({
             triangle + throbbing aura); "apply" stays on the generic
             spinner because layout-engine work is computationally
             different and isn't tied to the AI brand. */}
+        {audioPhase && (
+          <div className="shrink-0 mb-2 flex items-center gap-2 bg-blue-50 border border-blue-200 rounded px-2 py-1.5">
+            <DiagramatixThrobber size={28} />
+            <span className="text-[11px] text-blue-800 font-medium">
+              {audioPhase === "transcribing"
+                ? "Transcribing your recording — this can take a little while…"
+                : audioPhase === "reading"
+                  ? "Reading the meeting transcript…"
+                  : "Tidying the discussion into an ordered process…"}
+            </span>
+          </div>
+        )}
         {(busy === "plan" || busy === "apply" || busy === "narrative") && (
           <div className="shrink-0 mb-2 flex items-center gap-2 bg-blue-50 border border-blue-200 rounded px-2 py-1.5">
             {busy === "apply"
