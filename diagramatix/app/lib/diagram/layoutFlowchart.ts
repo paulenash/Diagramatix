@@ -81,6 +81,9 @@ function decisionSize(label: string): { w: number; h: number } {
 function sizeFor(type: DiagramElement["type"], label: string): { w: number; h: number } {
   if (type === "flowchart-decision") return decisionSize(label);
   const def = getSymbolDefinition(type);
+  // F4.06 — the Parallel (fork/join) bar keeps its creation thickness; it has
+  // no label so the label-growth below must not inflate it.
+  if (type === "flowchart-parallel") return { w: def.defaultWidth, h: def.defaultHeight };
   // Grow process-like boxes a little for long labels so text isn't clipped.
   const lines = wrapText(label || "", def.defaultWidth - 16, 12);
   const neededH = Math.max(def.defaultHeight, lines.length * 16 + 20);
@@ -124,6 +127,20 @@ export function layoutFlowchartDiagram(plan: AiFcPlan): DiagramData {
   for (const id of ids) incoming.set(id, []);
   for (const c of edges) incoming.get(c.targetId)!.push(c.sourceId);
 
+  // F4.08 — Database elements sit ORTHOGONAL to the flow: beside the element
+  // that connects to them, reached by a horizontal flowline — not stacked in
+  // the vertical spine. Anchor each db to the element that writes to it (its
+  // in-neighbour) or, failing that, reads from it. Anchored dbs are pulled out
+  // of the rank layout and placed beside their anchor afterwards.
+  const dbIds = new Set(aiElements.filter((e) => mapType(e.type) === "flowchart-database").map((e) => e.id));
+  const dbAnchor = new Map<string, string>();
+  for (const dbId of dbIds) {
+    const inN = (incoming.get(dbId) ?? []).find((n) => !dbIds.has(n));
+    const outN = (outgoing.get(dbId) ?? []).find((n) => !dbIds.has(n));
+    const anchor = inN ?? outN;
+    if (anchor) dbAnchor.set(dbId, anchor);
+  }
+
   // DFS pre-order from sources — a stable starting order that keeps a decision's
   // branches adjacent in x before the crossing-minimisation pass refines it.
   const order = new Map<string, number>();
@@ -138,10 +155,12 @@ export function layoutFlowchartDiagram(plan: AiFcPlan): DiagramData {
   for (const s of sources) dfs(s);
   for (const id of ids) if (!visited.has(id)) { order.set(id, orderCounter++); } // strays last
 
-  // Group elements by rank (y-layer).
+  // Group elements by rank (y-layer). Anchored databases are excluded — they
+  // are positioned beside their anchor after the spine is laid out (F4.08).
   const aiById = new Map(aiElements.map((e) => [e.id, e]));
   const byRank = new Map<number, string[]>();
   for (const e of aiElements) {
+    if (dbAnchor.has(e.id)) continue;
     const r = rank.get(e.id) ?? 0;
     if (!byRank.has(r)) byRank.set(r, []);
     byRank.get(r)!.push(e.id);
@@ -291,6 +310,33 @@ export function layoutFlowchartDiagram(plan: AiFcPlan): DiagramData {
     }
   }
 
+  // F4.08 — place each anchored Database beside its anchor (orthogonal to the
+  // flow), vertically centred on it, in the same lane. Multiple dbs on one
+  // anchor stack to the right.
+  {
+    const placedById = new Map(elements.map((e) => [e.id, e]));
+    const DB_GAP = 50;
+    const perAnchor = new Map<string, number>();
+    for (const [dbId, anchorId] of dbAnchor) {
+      const a = placedById.get(anchorId);
+      if (!a) continue;
+      const s = sizeById.get(dbId)!;
+      const e = aiById.get(dbId)!;
+      const n = perAnchor.get(anchorId) ?? 0;
+      perAnchor.set(anchorId, n + 1);
+      const el: DiagramElement = {
+        id: dbId, type: "flowchart-database",
+        x: Math.round(a.x + a.width + DB_GAP + n * (s.w + 24)),
+        y: Math.round(a.y + a.height / 2 - s.h / 2),
+        width: s.w, height: s.h,
+        label: e.label ?? e.name ?? "", properties: {},
+        ...(a.parentId ? { parentId: a.parentId } : {}),
+      };
+      elements.push(el);
+      placedById.set(dbId, el);
+    }
+  }
+
   // Connectors — flowlines, rectilinear, source→target arrowheads.
   const elMap = new Map(elements.map((e) => [e.id, e]));
   const outCount = new Map<string, number>();
@@ -331,6 +377,30 @@ export function layoutFlowchartDiagram(plan: AiFcPlan): DiagramData {
       if (!srcIsBranchingDecision) srcSide = "bottom";
     }
 
+    // F4.07 — flowlines attach only to a Parallel bar's LONG faces (never its
+    // narrow ends), so they leave / arrive perpendicular to the bar.
+    if (src.type === "flowchart-parallel") {
+      srcSide = src.width >= src.height
+        ? (tgtCy >= srcCy ? "bottom" : "top")
+        : (tgtCx >= srcCx ? "right" : "left");
+    }
+    if (tgt.type === "flowchart-parallel") {
+      tgtSide = tgt.width >= tgt.height
+        ? (srcCy <= tgtCy ? "top" : "bottom")
+        : (srcCx <= tgtCx ? "left" : "right");
+    }
+
+    // F4.08 — Database connectors run HORIZONTALLY (orthogonal to the vertical
+    // spine): attach to the left / right faces depending on which side the db
+    // sits relative to the other element.
+    if (tgt.type === "flowchart-database") {
+      tgtSide = tgtCx >= srcCx ? "left" : "right";
+      srcSide = tgtCx >= srcCx ? "right" : "left";
+    } else if (src.type === "flowchart-database") {
+      srcSide = srcCx >= tgtCx ? "left" : "right";
+      tgtSide = srcCx >= tgtCx ? "right" : "left";
+    }
+
     const hasLabel = !!(c.label && c.label.trim().length > 0);
     const conn: Connector = {
       id: `conn-${c.sourceId}-${c.targetId}`,
@@ -366,7 +436,11 @@ export function layoutFlowchartDiagram(plan: AiFcPlan): DiagramData {
       const sa = elMap.get(a.sourceId)!, sb = elMap.get(b.sourceId)!;
       return (sa.x + sa.width / 2) - (sb.x + sb.width / 2);
     });
-    group.forEach((conn, i) => { conn.targetOffsetAlong = (i + 1) / (group.length + 1); });
+    // Slightly separated, clustered around the centre of the top edge (rather
+    // than spread corner-to-corner), ordered left→right by source x.
+    const n = group.length;
+    const step = Math.min(0.14, 0.7 / n);
+    group.forEach((conn, i) => { conn.targetOffsetAlong = 0.5 + (i - (n - 1) / 2) * step; });
   }
 
   // Swimlane columns must NOT act as routing obstacles — flowlines cross lane
