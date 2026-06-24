@@ -6992,8 +6992,9 @@ export function Canvas({
           create a connector" cloud each time an element is single-
           selected (auto-dismiss after 10 s or next mousedown). OFF =
           never show. Persists across reloads. Editing-only — hidden in
-          the read-only published viewer. */}
-      {!readOnly && (
+          the read-only published viewer, and hidden entirely for diagram
+          types that have no bubble-help entries configured. */}
+      {!readOnly && bubbleHelpMap.size > 0 && (
       <button
         onClick={toggleBubbleHelp}
         style={{ right: "calc(0.5rem + 156px + 6px)" }}

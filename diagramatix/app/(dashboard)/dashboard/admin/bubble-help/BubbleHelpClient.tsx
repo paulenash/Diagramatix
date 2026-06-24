@@ -16,12 +16,12 @@ interface BubbleHelpRow {
 
 const DIAGRAM_TYPES: { value: DiagramType; label: string }[] = [
   { value: "bpmn",            label: "BPMN Process" },
+  { value: "flowchart",       label: "Standard Flowchart" },
   { value: "state-machine",   label: "State Machine" },
   { value: "value-chain",     label: "Value Chain" },
   { value: "domain",          label: "Domain Model" },
   { value: "context",         label: "Context Diagram" },
   { value: "process-context", label: "Process Context" },
-  { value: "basic",           label: "Basic" },
   { value: "archimate",       label: "ArchiMate" },
 ];
 
