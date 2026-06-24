@@ -21,6 +21,7 @@ import { ConnectorsByTypeView } from "./ai-plan/ConnectorsByTypeView";
 import { DiagramatixThrobber } from "@/app/components/DiagramatixThrobber";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 import { AttachmentPreviewDialog } from "@/app/components/AttachmentPreviewDialog";
+import { AudioToProcessButton } from "@/app/components/AudioToProcessButton";
 import { startDictation, type DictationHandle } from "@/app/lib/dictation";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -733,6 +734,13 @@ export function PlanPanel({
               </svg>
               Attach
             </button>
+            <AudioToProcessButton
+              disabled={!!busy}
+              onError={(m) => setDictateMsg(m || null)}
+              onTranscript={(text) => setPrompt(prev => prev.trim()
+                ? prev.trimEnd() + "\n" + text
+                : "Build the BPMN process from this meeting transcript. Treat each distinct speaker as a role / lane, and ignore small talk.\n\n" + text)}
+            />
             {attachment && (
               <div className="flex items-center gap-1 flex-1 min-w-0">
                 <button onClick={() => setShowAttachPreview(true)} className="text-[10px] text-blue-600 truncate flex-1 text-left hover:underline" title="Preview attachment">{attachment.name}</button>

@@ -5,6 +5,7 @@ import type { DiagramData, DiagramElement, Connector, DiagramType } from "@/app/
 import { DiagramatixThrobber } from "@/app/components/DiagramatixThrobber";
 import { AttachmentPreviewDialog } from "@/app/components/AttachmentPreviewDialog";
 import { startDictation, type DictationHandle } from "@/app/lib/dictation";
+import { AudioToProcessButton } from "@/app/components/AudioToProcessButton";
 import { buildPromptFromDiagram } from "@/app/lib/diagram/prompt-from-diagram";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -398,6 +399,13 @@ export function AiPanel({
               </svg>
               Attach
             </button>
+            <AudioToProcessButton
+              disabled={generating}
+              onError={(m) => { if (m) setError(m); }}
+              onTranscript={(text) => setPrompt(prev => prev.trim()
+                ? prev.trimEnd() + "\n" + text
+                : "Generate the diagram from this discussion transcript; ignore small talk.\n\n" + text)}
+            />
             {attachment && (
               <div className="flex items-center gap-1 flex-1 min-w-0">
                 <button onClick={() => setShowAttachPreview(true)} className="text-[10px] text-blue-600 truncate flex-1 text-left hover:underline" title="Preview attachment">{attachment.name}</button>
