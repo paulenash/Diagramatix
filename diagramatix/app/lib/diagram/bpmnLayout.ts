@@ -665,6 +665,41 @@ export function layoutBpmnDiagram(
 
   phase(`pool/lane placement done (${elements.length} elements placed)`);
 
+  // ── Re-parent boundary-crossing gateways out of expanded subprocesses ──
+  // A parallel / inclusive SPLIT or JOIN that forks to — or merges from — an
+  // expanded subprocess as ONE OF ITS BRANCHES must sit at the EP's own level
+  // (same lane), never inside it. The AI plan sometimes marks such a gateway
+  // with parentSubprocess = the EP; if the gateway connects to the EP itself
+  // or to any element outside that EP, it is boundary-crossing — strip the
+  // parentSubprocess so it lays out as a SIBLING of the EP (inheriting the
+  // EP's lane / pool, or the EP's own parent EP when nested). Genuine in-EP
+  // gateways connect only to in-EP elements and are left untouched. Without
+  // this the EP wrongly grows to swallow the outer join (user report).
+  {
+    const insideEp = new Map<string, string>(); // elId -> the EP id it's declared inside
+    for (const ai of aiElements) if (ai.parentSubprocess) insideEp.set(ai.id, ai.parentSubprocess);
+    const epById = new Map(aiElements.filter(a => a.type === "subprocess-expanded").map(a => [a.id, a]));
+    for (const ai of aiElements) {
+      if (ai.type !== "gateway" || !ai.parentSubprocess) continue;
+      const spId = ai.parentSubprocess;
+      const crosses = aiConnections.some((c) => {
+        if (c.sourceId !== ai.id && c.targetId !== ai.id) return false;
+        const other = c.sourceId === ai.id ? c.targetId : c.sourceId;
+        if (other === spId) return true;            // connects to the EP itself → EP is a branch
+        return insideEp.get(other) !== spId;        // endpoint is outside this EP
+      });
+      if (crosses) {
+        const ep = epById.get(spId);
+        if (ep?.parentSubprocess) {
+          ai.parentSubprocess = ep.parentSubprocess; // nested: hop up to the EP's own parent EP
+        } else {
+          ai.parentSubprocess = undefined;
+          if (ep) { ai.lane = ep.lane; ai.pool = ep.pool; }
+        }
+      }
+    }
+  }
+
   // ── Handle children of expanded subprocesses and edge-mounted boundary events ──
   // Find all expanded subprocesses that have declared children
   const subprocessChildren = new Map<string, AiElement[]>();
@@ -1177,6 +1212,48 @@ export function layoutBpmnDiagram(
     }
   }
 
+  // ── Ensure every expanded subprocess encloses its own children ──
+  // The parentSubprocess-based sizing above sizes each EP for the children
+  // it places, but in an order where an OUTER EP can be measured BEFORE an
+  // inner EP grows — leaving the outer too small to contain the inner EP and
+  // its contents. (Any EP whose children carry only parentId, not
+  // parentSubprocess, is never sized at all.) Mirror the move-time enclose
+  // (ensureContainersEncloseChildren) using parentId so a freshly generated
+  // EP looks identical to one the user has nudged. Deepest-first: inner EPs
+  // settle before their outer EP measures them. Artifacts (data objects /
+  // stores / annotations) and the EP's own boundary events are inert and
+  // never force growth — matching the move-time rule exactly.
+  {
+    const EP_ARTIFACT_TYPES = new Set(["data-object", "data-store", "text-annotation"]);
+    const depthOf = (start: typeof elements[number]) => {
+      let d = 0;
+      let cur: typeof elements[number] | undefined = start;
+      while (cur?.parentId) { d++; cur = elements.find(e => e.id === cur!.parentId); if (d > 12) break; }
+      return d;
+    };
+    const eps = elements
+      .filter(e => e.type === "subprocess-expanded")
+      .sort((a, b) => depthOf(b) - depthOf(a));
+    for (const ep of eps) {
+      const kids = elements.filter(c =>
+        c.parentId === ep.id &&
+        !EP_ARTIFACT_TYPES.has(c.type) &&
+        c.boundaryHostId !== ep.id);
+      if (kids.length === 0) continue;
+      const padFor = (c: typeof elements[number]) =>
+        (c.type === "subprocess-expanded" ? 10 : 8);
+      const minLeft   = Math.min(ep.x,              ...kids.map(c => c.x - padFor(c)));
+      const minTop    = Math.min(ep.y,              ...kids.map(c => c.y - padFor(c)));
+      const maxRight  = Math.max(ep.x + ep.width,   ...kids.map(c => c.x + c.width + padFor(c)));
+      const maxBottom = Math.max(ep.y + ep.height,  ...kids.map(c => c.y + c.height + padFor(c)));
+      // Grow up / left without moving children (only the box expands).
+      if (minLeft < ep.x) { ep.width += ep.x - minLeft; ep.x = minLeft; }
+      if (minTop  < ep.y) { ep.height += ep.y - minTop; ep.y = minTop; }
+      if (maxRight  > ep.x + ep.width)  ep.width  = maxRight  - ep.x;
+      if (maxBottom > ep.y + ep.height) ep.height = maxBottom - ep.y;
+    }
+  }
+
   // Grow lanes to fit their children first
   for (const el of elements) {
     if (el.type === "lane") expandContainerToFitChildren(el.id, "lane");
@@ -1279,6 +1356,46 @@ export function layoutBpmnDiagram(
 
   // ── Create connectors ──
   const elMap = new Map(elements.map(e => [e.id, e]));
+
+  // ── Snap each generated text annotation next to its associated element ──
+  // A text annotation otherwise keeps the default flow position it was given,
+  // which can sit a long way from the element it documents. Place it just
+  // ABOVE the associated element (centred, small gap); if that would escape
+  // the top of its containing lane / pool, flip it directly BELOW instead.
+  // The "_ai_gen_annotation" is positioned by R56 and left alone here. Runs
+  // before connector waypoints are computed so the association routes short.
+  {
+    const ANNOT_GAP = 20;
+    const containerOf = (el: DiagramElement): DiagramElement | null => {
+      let cur: DiagramElement | undefined = el;
+      let guard = 0;
+      while (cur && guard++ < 32) {
+        const parent: DiagramElement | undefined = cur.parentId ? elMap.get(cur.parentId) : undefined;
+        if (!parent) break;
+        if (parent.type === "lane" || parent.type === "pool" || parent.type === "subprocess-expanded") return parent;
+        cur = parent;
+      }
+      return null;
+    };
+    for (const a of elements) {
+      if (a.type !== "text-annotation" || a.id === "_ai_gen_annotation") continue;
+      let target: DiagramElement | undefined;
+      for (const c of aiConnections) {
+        const other = c.sourceId === a.id ? c.targetId : c.targetId === a.id ? c.sourceId : null;
+        if (!other) continue;
+        const t = elMap.get(other);
+        if (t && t.type !== "text-annotation") { target = t; break; }
+      }
+      if (!target) continue;
+      a.x = target.x + target.width / 2 - a.width / 2;
+      let ay = target.y - a.height - ANNOT_GAP;          // prefer above
+      const container = containerOf(target);
+      if (container && ay < container.y + 4) {
+        ay = target.y + target.height + ANNOT_GAP;       // would escape the top → flip below
+      }
+      a.y = ay;
+    }
+  }
 
   // Helper: check if element is a gateway
   const isGateway = (el: DiagramElement) => el.type === "gateway";
