@@ -406,7 +406,7 @@ export function AiPanel({
               onNote={(m) => setStatus(m)}
               onTranscript={(text) => setPrompt(prev => prev.trim()
                 ? prev.trimEnd() + "\n" + text
-                : "Generate the diagram from this discussion transcript; ignore small talk.\n\n" + text)}
+                : "Generate the diagram from this discussion transcript; use people's roles or job functions rather than their personal names (in any actor, role, activity or annotation labels), and ignore small talk.\n\n" + text)}
             />
             {attachment && (
               <div className="flex items-center gap-1 flex-1 min-w-0">

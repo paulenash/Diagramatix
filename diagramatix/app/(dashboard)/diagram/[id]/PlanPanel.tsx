@@ -747,7 +747,7 @@ export function PlanPanel({
               onNote={(m) => setDictateMsg(m || null)}
               onTranscript={(text) => setPrompt(prev => prev.trim()
                 ? prev.trimEnd() + "\n" + text
-                : "Build the BPMN process from this meeting transcript. Treat each distinct speaker as a role / lane, and ignore small talk.\n\n" + text)}
+                : "Build the BPMN process from this meeting transcript. Treat each distinct speaker as a role / lane, and use roles or job functions — never an individual person's name — in pool, lane, task and annotation names. Ignore small talk.\n\n" + text)}
             />
             {attachment && (
               <div className="flex items-center gap-1 flex-1 min-w-0">

@@ -12,7 +12,11 @@ import { auth } from "@/auth";
 
 const MODEL = "claude-sonnet-4-6";
 
-const SYSTEM = `You clean up a transcript of a SPOKEN discussion about a business process so it can be turned into a diagram. Rewrite it as a clear, concise, ORDERED description of the process: who does what, in what sequence, the decisions and their branches, and any systems / data involved. Use the speaker labels to attribute steps to roles. Remove filler, repetition, tangents and small talk. Do NOT invent steps, roles or branches that were not discussed. Output ONLY JSON: {"description": string, "openQuestions": string[]} — openQuestions lists anything ambiguous, contradictory or missing that a modeller should clarify (empty array if none). No markdown, no commentary.`;
+const SYSTEM = `You clean up a transcript of a SPOKEN discussion about a business process so it can be turned into a diagram. Rewrite it as a clear, concise, ORDERED description of the process: who does what, in what sequence, the decisions and their branches, and any systems / data involved. Remove filler, repetition, tangents and small talk. Do NOT invent steps, roles or branches that were not discussed.
+
+IMPORTANT — anonymise people: replace every individual person's name with their ROLE or job function (e.g. "Kerry" → "Accounts Officer", "Greg said he approves it" → "the Approver approves it"). Speakers and any people mentioned become roles, never personal names. If a person's role is genuinely unknown, infer a sensible functional role from what they do, or use a generic role such as "Officer" / "Reviewer" / "Manager". Personal/given names must NOT appear in role names, pool or lane names, activity / task names, or annotations. Keep organisation, team, system and product names as-is — only individual people's names are anonymised.
+
+Output ONLY JSON: {"description": string, "openQuestions": string[]} — openQuestions lists anything ambiguous, contradictory or missing that a modeller should clarify (empty array if none). No markdown, no commentary.`;
 
 export async function POST(req: Request) {
   const session = await auth();
