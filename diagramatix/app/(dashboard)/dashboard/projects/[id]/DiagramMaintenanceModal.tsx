@@ -20,8 +20,8 @@ const FONT_DEFAULTS: Required<FontConfig> = {
   fontSize: 12,
   connectorFontSize: 10,
   titleFontSize: 14,
-  poolFontSize: 12,
-  laneFontSize: 12,
+  poolFontSize: 16,
+  laneFontSize: 14,
 };
 
 interface FontRow {

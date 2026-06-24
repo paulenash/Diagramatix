@@ -27,7 +27,7 @@ export interface DiagramLike {
   connectors: Connector[];
   /** Optional per-diagram font sizes for the pool/lane header labels.
    *  The label-overrun check (B32) uses them to estimate text width;
-   *  every other rule ignores them. Defaults: poolFontSize 12, laneFontSize 12. */
+   *  every other rule ignores them. Defaults: poolFontSize 16, laneFontSize 14. */
   poolFontSize?: number;
   laneFontSize?: number;
 }
@@ -1372,8 +1372,8 @@ export function checkHangingMessage(d: DiagramLike): Violation[] {
  * (Correction #3) will usually fix it on the next text edit.
  */
 export function checkPoolHeaderLabelOverrun(d: DiagramLike): Violation[] {
-  const poolFs = d.poolFontSize ?? 12;
-  const laneFs = d.laneFontSize ?? 12;
+  const poolFs = d.poolFontSize ?? 16;
+  const laneFs = d.laneFontSize ?? 14;
   const out: Violation[] = [];
   for (const el of d.elements) {
     if (el.type !== "pool" && el.type !== "lane") continue;

@@ -1466,7 +1466,7 @@ function PoolShape({ el }: { el: DiagramElement }) {
       <rect x={x} y={y} width={w} height={h} fill={poolBodyTint} stroke="#374151" strokeWidth={1.5} />
       <rect x={x} y={y} width={LW} height={h} fill={poolHeaderColour} stroke="#374151" strokeWidth={1.5}
         style={isWhiteBox ? { cursor: "pointer" } : undefined} />
-      <text textAnchor="middle" fontSize={fontSize} fill="#3b1a08" fontWeight="bold"
+      <text textAnchor="middle" fontSize={fontSize} fill="#3b1a08"
             transform={`rotate(-90,${cx},${cy})`}
             textRendering="geometricPrecision"
             style={{
@@ -1518,7 +1518,7 @@ function LaneShape({ el, isSublane }: { el: DiagramElement; isSublane?: boolean 
     <g>
       <rect x={x} y={y} width={w} height={h} fill={bodyTint} stroke="#374151" strokeWidth={1} />
       <rect x={x} y={y} width={LW} height={h} fill={headerFill} stroke="#374151" strokeWidth={1} />
-      <text textAnchor="middle" fontSize={fontSize} fill="#3b1a08" fontWeight="bold"
+      <text textAnchor="middle" fontSize={fontSize} fill="#3b1a08"
             transform={`rotate(-90,${cx},${cy})`}
             textRendering="geometricPrecision"
             style={{

@@ -3205,7 +3205,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
           const lanes = state.elements
             .filter((e) => e.type === "lane" && e.parentId === targetPool.id)
             .sort((a, b) => a.y - b.y);
-          const laneFs = state.laneFontSize ?? 12;
+          const laneFs = state.laneFontSize ?? 14;
           const totalLaneCount = state.elements.filter((e) => e.type === "lane").length;
           const NEW_LANE_H = 80;
           const TOP_BOTTOM_THRESHOLD = 20;
@@ -5082,8 +5082,8 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         });
         return { ...state, elements, connectors };
       }
-      const poolFs = state.poolFontSize ?? 12;
-      const laneFs = state.laneFontSize ?? 12;
+      const poolFs = state.poolFontSize ?? 16;
+      const laneFs = state.laneFontSize ?? 14;
       // Clamp the resize height so labels (own + descendants') can never
       // be clipped past the container boundary.
       const labelMinH = target && (target.type === "pool" || target.type === "lane")
@@ -5475,7 +5475,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       // multi-line) label at the current poolFontSize. Both grow AND
       // shrink with the label.
       if (labelEl && labelEl.type === "pool") {
-        const fontSize = state.poolFontSize ?? 12;
+        const fontSize = state.poolFontSize ?? 16;
         const { minHeight, headerWidth } = poolMetrics(action.payload.label, fontSize);
         const updated = resizePoolForLabel(elements, state.connectors, labelEl.id, minHeight, headerWidth);
         return { ...state, ...updated };
@@ -5483,7 +5483,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       // Lane / sublane label edited: grow lane height if needed and
       // sync header widths across siblings.
       if (labelEl && labelEl.type === "lane") {
-        const fontSize = state.laneFontSize ?? 12;
+        const fontSize = state.laneFontSize ?? 14;
         const updated = resizeLaneForLabel(elements, state.connectors, labelEl.id, fontSize);
         return { ...state, ...updated };
       }
@@ -6001,7 +6001,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
             (e) => e.type === "lane" && e.parentId === parent.id,
           );
           if (survivingSibling) {
-            const fontSize = state.laneFontSize ?? 12;
+            const fontSize = state.laneFontSize ?? 14;
             const synced = resizeLaneForLabel(
               elements,
               state.connectors,
@@ -7640,7 +7640,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         .filter((e) => e.type === "lane" && e.parentId === poolId)
         .sort((a, b) => a.y - b.y);
       const laneCount = state.elements.filter((e) => e.type === "lane").length;
-      const laneFs = state.laneFontSize ?? 12;
+      const laneFs = state.laneFontSize ?? 14;
       // Use the pool's actual header width — if the user (or auto-grow)
       // has widened it past the default 36, child lanes must start at
       // the wider boundary or their headers overlap the pool header.
@@ -7758,7 +7758,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
           });
         }
         let next = { elements, connectors: state.connectors };
-        const laneFs = state.laneFontSize ?? 12;
+        const laneFs = state.laneFontSize ?? 14;
         next = resizeLaneForLabel(next.elements, next.connectors, newSublane.id, laneFs);
         // 100px pool-below-shift: a sublane add can grow the containing
         // pool too. Reuse the same rule that ADD_LANE applies.
@@ -7798,7 +7798,7 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
           return e;
         });
         let next = { elements: [...elements, sublane1, sublane2], connectors: state.connectors };
-        const laneFs = state.laneFontSize ?? 12;
+        const laneFs = state.laneFontSize ?? 14;
         next = resizeLaneForLabel(next.elements, next.connectors, sublane1.id, laneFs);
         next = resizeLaneForLabel(next.elements, next.connectors, sublane2.id, laneFs);
         // resizeLaneForLabel can grow the parent lane (and the pool)

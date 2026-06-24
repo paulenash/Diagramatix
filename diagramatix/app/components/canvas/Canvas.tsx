@@ -4397,8 +4397,8 @@ export function Canvas({
       <FontScaleCtx.Provider value={((data.fontSize ?? ((diagramType === "context" || diagramType === "basic" || diagramType === "archimate") ? 14 : 12)) / 12) * (displayMode === "hand-drawn" ? 1.3 : 1)}>
       <ConnectorFontScaleCtx.Provider value={((data.connectorFontSize ?? ((diagramType === "context" || diagramType === "basic") ? 12 : 10)) / 10) * (displayMode === "hand-drawn" ? 1.3 : 1)}>
       <TitleFontSizeCtx.Provider value={data.titleFontSize ?? 14}>
-      <PoolFontSizeCtx.Provider value={(data.poolFontSize ?? 12) * (displayMode === "hand-drawn" ? 1.3 : 1)}>
-      <LaneFontSizeCtx.Provider value={(data.laneFontSize ?? 12) * (displayMode === "hand-drawn" ? 1.3 : 1)}>
+      <PoolFontSizeCtx.Provider value={(data.poolFontSize ?? 16) * (displayMode === "hand-drawn" ? 1.3 : 1)}>
+      <LaneFontSizeCtx.Provider value={(data.laneFontSize ?? 14) * (displayMode === "hand-drawn" ? 1.3 : 1)}>
       <ValueChainFontSizeCtx.Provider value={(data.valueChainFontSize ?? 16) * (displayMode === "hand-drawn" ? 1.3 : 1)}>
       <DescriptionFontSizeCtx.Provider value={(data.descriptionFontSize ?? 14) * (displayMode === "hand-drawn" ? 1.3 : 1)}>
       <ProcessFontSizeCtx.Provider value={(data.processFontSize ?? 16) * (displayMode === "hand-drawn" ? 1.3 : 1)}>

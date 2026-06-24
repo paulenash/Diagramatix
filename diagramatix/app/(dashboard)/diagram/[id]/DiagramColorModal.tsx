@@ -105,8 +105,8 @@ export function DiagramColorModal({
   const [workingFontSize, setWorkingFontSize] = useState(fontSize ?? defaultElementFontSize);
   const [workingConnectorFontSize, setWorkingConnectorFontSize] = useState(connectorFontSize ?? defaultConnectorFontSize);
   const [workingTitleFontSize, setWorkingTitleFontSize] = useState(titleFontSize ?? 14);
-  const [workingPoolFontSize, setWorkingPoolFontSize] = useState(poolFontSize ?? 12);
-  const [workingLaneFontSize, setWorkingLaneFontSize] = useState(laneFontSize ?? 12);
+  const [workingPoolFontSize, setWorkingPoolFontSize] = useState(poolFontSize ?? 16);
+  const [workingLaneFontSize, setWorkingLaneFontSize] = useState(laneFontSize ?? 14);
   const [workingProcessFontSize, setWorkingProcessFontSize] = useState(processFontSize ?? defaultProcessFontSize);
   const [workingValueChainFontSize, setWorkingValueChainFontSize] = useState(valueChainFontSize ?? 16);
   const [workingDescriptionFontSize, setWorkingDescriptionFontSize] = useState(descriptionFontSize ?? 14);
