@@ -2685,6 +2685,75 @@ export function layoutBpmnDiagram(
     } as Connector);
   }
 
+  // ── R5.06 / R5.07: message connection-point + label de-overlap ──
+  // R5.06 — two or more message flows attaching to the SAME element on the same
+  // side must not share a connection point: spread their attachment x's so
+  // they're ≥10px apart (the classic case is one element that both SENDS and
+  // RECEIVES a message — both would otherwise land on its centre). The vertical
+  // message line is driven by the NON-pool endpoint's x, so we spread that
+  // endpoint's offsetAlong and re-align the pool partner to match.
+  // R5.07 — message labels that would stack at a similar x are offset vertically
+  // in ½-label-height steps so they don't overlap.
+  {
+    const MIN_SEP = 12;   // ≥10px between attachment points
+    const LABEL_H = 14;   // message label line height (½ → 7px step)
+    const msgs = connectors.filter(c => c.type === "messageBPMN");
+    // The endpoint that drives the vertical line = the non-pool element.
+    const anchorOf = (c: Connector) => {
+      const s = elMap.get(c.sourceId), t = elMap.get(c.targetId);
+      if (s && s.type !== "pool") return { elId: c.sourceId, side: c.sourceSide, isSource: true, el: s };
+      if (t && t.type !== "pool") return { elId: c.targetId, side: c.targetSide, isSource: false, el: t };
+      return null;
+    };
+    // R5.06
+    const groups = new Map<string, { c: Connector; a: NonNullable<ReturnType<typeof anchorOf>> }[]>();
+    for (const c of msgs) {
+      const a = anchorOf(c);
+      if (!a) continue;
+      const k = `${a.elId}|${a.side}`;
+      const g = groups.get(k); if (g) g.push({ c, a }); else groups.set(k, [{ c, a }]);
+    }
+    for (const grp of groups.values()) {
+      if (grp.length < 2) continue;
+      const el = grp[0].a.el;
+      const stepFrac = MIN_SEP / Math.max(1, el.width);
+      grp.forEach((g, i) => {
+        const off = Math.max(0.08, Math.min(0.92, 0.5 + (i - (grp.length - 1) / 2) * stepFrac));
+        const attachX = el.x + off * el.width;
+        if (g.a.isSource) g.c.sourceOffsetAlong = off; else g.c.targetOffsetAlong = off;
+        // Re-align the pool partner so its attachment sits at the same x.
+        const partnerId = g.a.isSource ? g.c.targetId : g.c.sourceId;
+        const partner = elMap.get(partnerId);
+        if (partner && partner.type === "pool" && partner.width > 0) {
+          const poolOff = Math.max(0.02, Math.min(0.98, (attachX - partner.x) / partner.width));
+          if (g.a.isSource) g.c.targetOffsetAlong = poolOff; else g.c.sourceOffsetAlong = poolOff;
+        }
+      });
+    }
+    // R5.07 — stagger labels that share a similar x bucket.
+    const labelX = (c: Connector): number | null => {
+      const a = anchorOf(c); if (!a) return null;
+      const off = a.isSource ? (c.sourceOffsetAlong ?? 0.5) : (c.targetOffsetAlong ?? 0.5);
+      return a.el.x + off * a.el.width;
+    };
+    const labelled = msgs.filter(c => c.label && c.labelOffsetX !== undefined);
+    const buckets = new Map<number, Connector[]>();
+    for (const c of labelled) {
+      const x = labelX(c); if (x === null) continue;
+      const key = Math.round(x / 90);   // ~label-width bucket
+      const b = buckets.get(key); if (b) b.push(c); else buckets.set(key, [c]);
+    }
+    for (const grp of buckets.values()) {
+      if (grp.length < 2) continue;
+      grp.forEach((c, i) => {
+        if (i === 0) return;
+        const tier = Math.ceil(i / 2);
+        const dir = (i % 2) ? -1 : 1;   // alternate above / below
+        c.labelOffsetY = (c.labelOffsetY ?? 0) + dir * tier * (LABEL_H / 2);
+      });
+    }
+  }
+
   phase(`connectors built (${connectors.length})`);
 
   // Compute waypoints for all connectors
