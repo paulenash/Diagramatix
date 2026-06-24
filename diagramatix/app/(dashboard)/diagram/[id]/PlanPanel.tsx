@@ -54,6 +54,9 @@ interface Props {
    *  itself — the sidebar banner alone is easy to miss while the
    *  user's eyes are on the diagram. */
   onBusyChange?: (busy: "plan" | "apply" | "save" | "load" | "narrative" | null) => void;
+  /** Reports the audio/transcript acquisition phase so the parent can show
+   *  the big canvas throbber overlay (same as plan generation). */
+  onAudioPhaseChange?: (phase: null | "transcribing" | "reading" | "tidying") => void;
 }
 
 interface SavedPrompt { id: string; name: string; text: string; }
@@ -68,6 +71,7 @@ export function PlanPanel({
   currentElements,
   currentConnectors,
   onBusyChange,
+  onAudioPhaseChange,
 }: Props) {
   const [prompt, setPrompt] = useState("");
   // Flowcharts use their own 2-phase endpoints + a deterministic top-down
@@ -744,7 +748,7 @@ export function PlanPanel({
             <AudioToProcessButton
               disabled={!!busy}
               diagramType={diagramType}
-              onPhaseChange={setAudioPhase}
+              onPhaseChange={(p) => { setAudioPhase(p); onAudioPhaseChange?.(p); }}
               onError={(m) => setDictateMsg(m || null)}
               onNote={(m) => setDictateMsg(m || null)}
               onTranscript={(text) => setPrompt(prev => prev.trim()

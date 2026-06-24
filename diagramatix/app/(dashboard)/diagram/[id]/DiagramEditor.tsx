@@ -950,6 +950,10 @@ export function DiagramEditor({
   // wait indicator on the canvas while Sonnet plans. Sidebar banner
   // alone is easy to miss when the user's eyes are on the diagram.
   const [aiBusy, setAiBusy] = useState<"plan" | "apply" | "save" | "load" | "narrative" | null>(null);
+  // Audio / transcript acquisition phase (from either AI panel) — drives the
+  // same big canvas throbber overlay as plan generation, so the wait cue is
+  // just as visible while a recording / file is transcribed or tidied.
+  const [audioPhase, setAudioPhase] = useState<null | "transcribing" | "reading" | "tidying">(null);
   const [showHistoryPanel, setShowHistoryPanel] = useState(false);
   const [debugMode, setDebugMode] = useState(false);
   // Value Display and Bottleneck Display are ON by default. The user can
@@ -3497,6 +3501,7 @@ export function DiagramEditor({
             currentElements={data.elements}
             currentConnectors={data.connectors}
             onNarrativeGeneratingChange={setAiPanelNarrativeGenerating}
+            onAudioPhaseChange={setAudioPhase}
           />
         )}
 
@@ -3539,6 +3544,7 @@ export function DiagramEditor({
             }}
             onClose={() => setShowPlanPanel(false)}
             onBusyChange={setAiBusy}
+            onAudioPhaseChange={setAudioPhase}
           />
         )}
 
@@ -3671,7 +3677,7 @@ export function DiagramEditor({
             just a tiny sidebar banner they might miss. Pointer events
             pass through (style.pointerEvents = "none") so the user can
             still pan / zoom underneath if they want. */}
-        {(aiBusy === "plan" || aiBusy === "apply" || aiBusy === "narrative" || aiPanelGenerating || aiPanelNarrativeGenerating) && (
+        {(aiBusy === "plan" || aiBusy === "apply" || aiBusy === "narrative" || aiPanelGenerating || aiPanelNarrativeGenerating || audioPhase) && (
           <div
             className="fixed inset-0 z-40 flex flex-col items-center justify-center"
             style={{ pointerEvents: "none" }}
@@ -3687,11 +3693,17 @@ export function DiagramEditor({
             )}
             <DiagramatixThrobber size={120} auraRadius={110} />
             <p className="mt-3 text-sm font-medium text-blue-800 bg-white/85 backdrop-blur-sm px-4 py-2 rounded-lg shadow-md">
-              {aiBusy === "apply"
-                ? "Running the layout engine…"
-                : (aiBusy === "narrative" || aiPanelNarrativeGenerating)
-                  ? "Asking Sonnet for a staff narrative — this usually takes 15–30 seconds…"
-                  : "Asking Sonnet for a plan — this usually takes 15–30 seconds…"}
+              {audioPhase === "transcribing"
+                ? "Transcribing your recording — this can take a little while…"
+                : audioPhase === "reading"
+                  ? "Reading the meeting transcript…"
+                  : audioPhase === "tidying"
+                    ? "Tidying the discussion into an ordered process…"
+                    : aiBusy === "apply"
+                      ? "Running the layout engine…"
+                      : (aiBusy === "narrative" || aiPanelNarrativeGenerating)
+                        ? "Asking Sonnet for a staff narrative — this usually takes 15–30 seconds…"
+                        : "Asking Sonnet for a plan — this usually takes 15–30 seconds…"}
             </p>
           </div>
         )}

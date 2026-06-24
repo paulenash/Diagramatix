@@ -36,11 +36,15 @@ interface Props {
    *  flip the full-canvas overlay copy to "Asking Sonnet for a staff
    *  narrative…" while the call is in-flight. */
   onNarrativeGeneratingChange?: (generating: boolean) => void;
+  /** Reports the audio/transcript acquisition phase so the parent can show
+   *  the big canvas throbber overlay (same as plan generation). */
+  onAudioPhaseChange?: (phase: null | "transcribing" | "reading" | "tidying") => void;
 }
 
 export function AiPanel({
   diagramType, onApplyDiagram, onAddToDiagram, onClose, onGeneratingChange,
   isAdmin, currentElements, currentConnectors, onNarrativeGeneratingChange,
+  onAudioPhaseChange,
 }: Props) {
   const [prompt, setPrompt] = useState("");
   const [generating, setGenerating] = useState(false);
@@ -403,7 +407,7 @@ export function AiPanel({
             <AudioToProcessButton
               disabled={generating}
               diagramType={diagramType}
-              onPhaseChange={setAudioPhase}
+              onPhaseChange={(p) => { setAudioPhase(p); onAudioPhaseChange?.(p); }}
               onError={(m) => { if (m) setError(m); }}
               onNote={(m) => setStatus(m)}
               onTranscript={(text) => setPrompt(prev => prev.trim()
