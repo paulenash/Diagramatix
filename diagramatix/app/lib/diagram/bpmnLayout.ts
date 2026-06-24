@@ -113,6 +113,27 @@ export function layoutBpmnDiagram(
   };
   phase("start");
 
+  // ── Start/End events can never be boundary (edge-mounted) events ──
+  // BPMN only allows INTERMEDIATE events on an activity boundary. The AI plan
+  // sometimes tags an expanded subprocess's own start/end with boundaryHost =
+  // the EP, which edge-mounts them (start → left edge, end → right edge) and
+  // leaves the EP positioned around those events instead of wrapping its real
+  // flow (the tasks then strand in the lane). Repair it: a start/end whose
+  // boundaryHost is an EP becomes that EP's INTERNAL start/end
+  // (parentSubprocess); on any other host the stray boundaryHost is dropped.
+  {
+    const epIdSet = new Set(
+      aiElements.filter(e => e.type === "subprocess-expanded").map(e => e.id),
+    );
+    for (const ai of aiElements) {
+      if ((ai.type === "start-event" || ai.type === "end-event") && ai.boundaryHost) {
+        if (epIdSet.has(ai.boundaryHost)) ai.parentSubprocess = ai.boundaryHost;
+        ai.boundaryHost = undefined;
+        ai.boundarySide = undefined;
+      }
+    }
+  }
+
   // ── R6.07/R6.10/R6.11: Event Subprocess handling ──
   // - Auto-detect event subprocesses
   // - Ensure they are wrapped in a Normal Expanded Subprocess
@@ -197,6 +218,67 @@ export function layoutBpmnDiagram(
   aiElements = [...aiElements, ...injected];
 
   phase("event-sub-injection done");
+
+  // ── Pull each EP's flow span inside the EP ──
+  // After the start/end repair (and injection), an EP has internal start/end
+  // events but the tasks BETWEEN them may still be tagged at lane level (the
+  // plan never marked them). Tag every node that lies on a sequence path from
+  // one of the EP's internal start events to one of its internal end events —
+  // forward-reachable from a start AND backward-reachable from an end, so the
+  // span is bounded and we never pull in unrelated downstream flow. Nodes
+  // already inside another container, boundary events, and pools / lanes /
+  // data artifacts are never reassigned.
+  {
+    const NONFLOW = new Set(["pool", "lane", "data-object", "data-store", "text-annotation", "group"]);
+    const pushMap = (m: Map<string, string[]>, k: string, v: string) => {
+      const a = m.get(k); if (a) a.push(v); else m.set(k, [v]);
+    };
+    const out = new Map<string, string[]>();
+    const inc = new Map<string, string[]>();
+    for (const c of aiConnections) {
+      if (c.type === "message") continue;
+      pushMap(out, c.sourceId, c.targetId);
+      pushMap(inc, c.targetId, c.sourceId);
+    }
+    const byId = new Map(aiElements.map(e => [e.id, e]));
+    for (const ep of aiElements.filter(e => e.type === "subprocess-expanded")) {
+      const startIds = aiElements
+        .filter(e => e.parentSubprocess === ep.id && e.type === "start-event").map(e => e.id);
+      const endIds = aiElements
+        .filter(e => e.parentSubprocess === ep.id && e.type === "end-event").map(e => e.id);
+      if (startIds.length === 0 || endIds.length === 0) continue;
+      const startSet = new Set(startIds);
+      const endSet = new Set(endIds);
+      // Forward from starts, stopping AT ends (include the end, don't cross it).
+      const fwd = new Set<string>();
+      const fstack = [...startIds];
+      while (fstack.length) {
+        const n = fstack.pop()!;
+        for (const t of out.get(n) ?? []) {
+          if (fwd.has(t)) continue;
+          fwd.add(t);
+          if (!endSet.has(t)) fstack.push(t);
+        }
+      }
+      // Backward from ends, stopping AT starts.
+      const bwd = new Set<string>();
+      const bstack = [...endIds];
+      while (bstack.length) {
+        const n = bstack.pop()!;
+        for (const s of inc.get(n) ?? []) {
+          if (bwd.has(s)) continue;
+          bwd.add(s);
+          if (!startSet.has(s)) bstack.push(s);
+        }
+      }
+      for (const id of fwd) {
+        if (!bwd.has(id) || startSet.has(id) || endSet.has(id)) continue;
+        const el = byId.get(id);
+        if (!el || NONFLOW.has(el.type) || el.parentSubprocess || el.boundaryHost) continue;
+        el.parentSubprocess = ep.id;
+      }
+    }
+  }
 
   // Separate pools from other elements
   const pools = aiElements.filter(e => e.type === "pool");
