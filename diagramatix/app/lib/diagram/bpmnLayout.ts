@@ -2203,28 +2203,53 @@ export function layoutBpmnDiagram(
         // them, and moving one would break the EP's wrap.
         && elById.get(e.parentId ?? "")?.type !== "subprocess-expanded")
       .sort((a, b) => a.x - b.x);
+    // Move a whole element + its descendants + boundary events by (dx, dy).
+    const shiftBy = (rootId: string, dx: number, dy: number) => {
+      const set = new Set<string>([rootId, ...descendantsOf(rootId)]);
+      for (const e of elements) if (e.boundaryHostId && set.has(e.boundaryHostId)) set.add(e.id);
+      for (const e of elements) if (set.has(e.id)) { e.x += dx; e.y += dy; }
+    };
     for (const g of merges) {
       let maxRight = -Infinity;
       for (const sid of incoming.get(g.id) ?? []) {
         const s = elById.get(sid);
         if (s) maxRight = Math.max(maxRight, s.x + s.width);
       }
-      if (!isFinite(maxRight)) continue;
-      const delta = (maxRight + R625_GAP) - g.x;
-      if (delta <= 0.5) continue;
-      // Shift the merge + everything downstream of it (forward-reachable),
-      // plus those elements' descendants and boundary events.
-      const shiftSet = new Set<string>();
-      const stack = [g.id];
-      while (stack.length) {
-        const n = stack.pop()!;
-        if (shiftSet.has(n)) continue;
-        shiftSet.add(n);
-        for (const t of outById.get(n) ?? []) stack.push(t);
+      if (isFinite(maxRight)) {
+        const delta = (maxRight + R625_GAP) - g.x;
+        if (delta > 0.5) {
+          // Shift the merge + everything downstream of it (forward-reachable).
+          const shiftSet = new Set<string>();
+          const stack = [g.id];
+          while (stack.length) {
+            const n = stack.pop()!;
+            if (shiftSet.has(n)) continue;
+            shiftSet.add(n);
+            for (const t of outById.get(n) ?? []) stack.push(t);
+          }
+          for (const id of [...shiftSet]) for (const d of descendantsOf(id)) shiftSet.add(d);
+          for (const e of elements) if (e.boundaryHostId && shiftSet.has(e.boundaryHostId)) shiftSet.add(e.id);
+          for (const e of elements) if (shiftSet.has(e.id)) e.x += delta;
+        }
       }
-      for (const id of [...shiftSet]) for (const d of descendantsOf(id)) shiftSet.add(d);
-      for (const e of elements) if (e.boundaryHostId && shiftSet.has(e.boundaryHostId)) shiftSet.add(e.id);
-      for (const e of elements) if (shiftSet.has(e.id)) e.x += delta;
+      // Align the post-merge flow to the merge's Y so the exit is a straight
+      // line (the merge sits at the branch midpoint; its successor would
+      // otherwise still be on the top flow row, forcing the connector to jog).
+      // Walk the single-in / single-out chain after the merge and pull each
+      // element onto the merge's centre Y; stop at the next join or branch.
+      const mergeCy = g.y + g.height / 2;
+      const seenY = new Set<string>([g.id]);
+      let curId: string | undefined = (() => { const o = outById.get(g.id) ?? []; return o.length === 1 ? o[0] : undefined; })();
+      while (curId && !seenY.has(curId)) {
+        seenY.add(curId);
+        if ((incoming.get(curId)?.length ?? 0) !== 1) break;     // a join — leave it
+        const el = elById.get(curId);
+        if (!el || el.parentId !== g.parentId) break;             // changed lane/container
+        const dy = mergeCy - (el.y + el.height / 2);
+        if (Math.abs(dy) > 0.5) shiftBy(el.id, 0, dy);
+        const o = outById.get(curId) ?? [];
+        curId = o.length === 1 ? o[0] : undefined;
+      }
     }
     // Grow lanes / pools to cover any element pushed past their right edge.
     const rightOfDescendants = (cont: DiagramElement): number => {
