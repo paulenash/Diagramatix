@@ -812,9 +812,34 @@ export function computeWaypoints(
     .filter(el => el.type === "pool")
     .map(getBounds);
 
+  // Descendant sets — a connector terminating ON a container (e.g. an EP) must
+  // NOT be blocked by that container's OWN contents. The route only reaches the
+  // container's edge; a child hugging that edge (e.g. the EP's internal start
+  // event) would otherwise "graze" the approach within clearance and force a
+  // needless detour right around the diagram (Test 4: gwSplit → Plan Discussions
+  // dived below everything to avoid the target EP's own start event).
+  const childrenByParent = new Map<string, string[]>();
+  for (const e of allElements) {
+    if (!e.parentId) continue;
+    const a = childrenByParent.get(e.parentId);
+    if (a) a.push(e.id); else childrenByParent.set(e.parentId, [e.id]);
+  }
+  const collectDesc = (rootId: string): Set<string> => {
+    const out = new Set<string>(); const stack = [rootId];
+    while (stack.length) {
+      const cur = stack.pop()!;
+      for (const k of childrenByParent.get(cur) ?? []) { if (!out.has(k)) { out.add(k); stack.push(k); } }
+    }
+    return out;
+  };
+  const srcDescendants = collectDesc(source.id);
+  const tgtDescendants = collectDesc(target.id);
+
   const obstacles = allElements
     .filter((el) => {
       if (el.id === source.id || el.id === target.id) return false;
+      // Own contents of the source/target container are not obstacles.
+      if (srcDescendants.has(el.id) || tgtDescendants.has(el.id)) return false;
       // Don't treat boundary events on source or target as obstacles
       if (el.boundaryHostId === source.id || el.boundaryHostId === target.id) return false;
       // Edge-mounted (boundary) events on ANY host are excluded so connectors
