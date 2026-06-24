@@ -1,0 +1,925 @@
+{
+  "schemaVersion": "1.25",
+  "appVersion": "1.25.1249",
+  "exportedAt": "2026-06-24T06:37:35.600Z",
+  "project": {
+    "name": "(single diagram)",
+    "description": "",
+    "ownerName": "",
+    "colorConfig": {}
+  },
+  "diagrams": [
+    {
+      "originalId": "cmqrmnnvc000101mv4jaujk1m",
+      "name": "Meeting Process test 3",
+      "type": "bpmn",
+      "data": {
+        "elements": [
+          {
+            "id": "p1",
+            "type": "pool",
+            "x": 50,
+            "y": 27,
+            "width": 2146,
+            "height": 486.5,
+            "label": "Meeting Planning",
+            "properties": {
+              "poolType": "white-box"
+            }
+          },
+          {
+            "id": "l1",
+            "type": "lane",
+            "x": 86,
+            "y": 27,
+            "width": 2110,
+            "height": 486.5,
+            "label": "Meeting Planner",
+            "properties": {},
+            "parentId": "p1"
+          },
+          {
+            "id": "e1",
+            "type": "start-event",
+            "x": 140,
+            "y": 167,
+            "width": 36,
+            "height": 36,
+            "label": "Week Begins",
+            "properties": {},
+            "parentId": "l1"
+          },
+          {
+            "id": "gw1",
+            "type": "gateway",
+            "x": 300,
+            "y": 165,
+            "width": 40,
+            "height": 40,
+            "label": "Begin Parallel Planning",
+            "properties": {
+              "gatewayRole": "decision",
+              "labelOffsetX": -60,
+              "labelOffsetY": -55,
+              "labelWidth": 80
+            },
+            "parentId": "l1",
+            "gatewayType": "parallel"
+          },
+          {
+            "id": "sp1",
+            "type": "subprocess-expanded",
+            "x": 458,
+            "y": 47,
+            "width": 924,
+            "height": 123,
+            "label": "Plan Meetings",
+            "properties": {},
+            "parentId": "l1"
+          },
+          {
+            "id": "sp2",
+            "type": "subprocess-expanded",
+            "x": 1408,
+            "y": 200,
+            "width": 644,
+            "height": 123,
+            "label": "Plan Discussions",
+            "properties": {},
+            "parentId": "l1"
+          },
+          {
+            "id": "gw2",
+            "type": "gateway",
+            "x": 1410,
+            "y": 165,
+            "width": 40,
+            "height": 40,
+            "label": "Both Sub-processes Complete",
+            "properties": {
+              "gatewayRole": "merge"
+            },
+            "parentId": "l1",
+            "gatewayType": "parallel"
+          },
+          {
+            "id": "e2",
+            "type": "end-event",
+            "x": 2080,
+            "y": 167,
+            "width": 36,
+            "height": 36,
+            "label": "Planning Complete",
+            "properties": {},
+            "parentId": "l1"
+          },
+          {
+            "id": "sp1_start",
+            "type": "start-event",
+            "x": 482,
+            "y": 139,
+            "width": 36,
+            "height": 36,
+            "label": "Start",
+            "properties": {},
+            "parentId": "sp1"
+          },
+          {
+            "id": "t1",
+            "type": "task",
+            "x": 617,
+            "y": 124.5,
+            "width": 102,
+            "height": 65,
+            "label": "Find Available Room",
+            "properties": {},
+            "parentId": "sp1",
+            "taskType": "user"
+          },
+          {
+            "id": "t2",
+            "type": "task",
+            "x": 785,
+            "y": 124.5,
+            "width": 102,
+            "height": 65,
+            "label": "Check Participant Availability",
+            "properties": {},
+            "parentId": "sp1",
+            "taskType": "user"
+          },
+          {
+            "id": "t3",
+            "type": "task",
+            "x": 953,
+            "y": 124.5,
+            "width": 102,
+            "height": 65,
+            "label": "Settle Meeting Time and Room",
+            "properties": {},
+            "parentId": "sp1",
+            "taskType": "user"
+          },
+          {
+            "id": "t4",
+            "type": "task",
+            "x": 1121,
+            "y": 124.5,
+            "width": 102,
+            "height": 65,
+            "label": "Notify Participants of Details",
+            "properties": {},
+            "parentId": "sp1",
+            "taskType": "send"
+          },
+          {
+            "id": "sp1_end",
+            "type": "end-event",
+            "x": 1322,
+            "y": 139,
+            "width": 36,
+            "height": 36,
+            "label": "End",
+            "properties": {},
+            "parentId": "sp1"
+          },
+          {
+            "id": "sp2_start",
+            "type": "start-event",
+            "x": 1432,
+            "y": 359,
+            "width": 36,
+            "height": 36,
+            "label": "Start",
+            "properties": {},
+            "parentId": "sp2"
+          },
+          {
+            "id": "t5",
+            "type": "task",
+            "x": 1585.6666666666667,
+            "y": 344.5,
+            "width": 102,
+            "height": 65,
+            "label": "Prepare Meeting Agenda",
+            "properties": {},
+            "parentId": "sp2",
+            "taskType": "user"
+          },
+          {
+            "id": "t6",
+            "type": "task",
+            "x": 1772.3333333333333,
+            "y": 344.5,
+            "width": 102,
+            "height": 65,
+            "label": "Attach Agenda to Invitation",
+            "properties": {},
+            "parentId": "sp2",
+            "taskType": "user"
+          },
+          {
+            "id": "sp2_end",
+            "type": "end-event",
+            "x": 1992,
+            "y": 359,
+            "width": 36,
+            "height": 36,
+            "label": "End",
+            "properties": {},
+            "parentId": "sp2"
+          },
+          {
+            "id": "_ai_gen_annotation",
+            "type": "text-annotation",
+            "x": 78,
+            "y": -37,
+            "width": 160,
+            "height": 44,
+            "label": "AI Generated\nEP Containment Issue Prompt",
+            "properties": {}
+          }
+        ],
+        "fontSize": 12,
+        "viewport": {
+          "x": 0,
+          "y": 0,
+          "zoom": 0.6
+        },
+        "connectors": [
+          {
+            "id": "conn-e1-gw1",
+            "sourceId": "e1",
+            "targetId": "gw1",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 158,
+                "y": 185
+              },
+              {
+                "x": 176,
+                "y": 185
+              },
+              {
+                "x": 194,
+                "y": 185
+              },
+              {
+                "x": 280,
+                "y": 185
+              },
+              {
+                "x": 300,
+                "y": 185
+              },
+              {
+                "x": 320,
+                "y": 185
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-gw1-sp1",
+            "sourceId": "gw1",
+            "targetId": "sp1",
+            "sourceSide": "top",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 320,
+                "y": 185
+              },
+              {
+                "x": 320,
+                "y": 165
+              },
+              {
+                "x": 320,
+                "y": 145
+              },
+              {
+                "x": 320,
+                "y": 75.5
+              },
+              {
+                "x": 434,
+                "y": 75.5
+              },
+              {
+                "x": 434,
+                "y": 108.5
+              },
+              {
+                "x": 458,
+                "y": 108.5
+              },
+              {
+                "x": 920,
+                "y": 108.5
+              }
+            ],
+            "label": "Plan Meetings",
+            "labelOffsetX": 51,
+            "labelOffsetY": -24,
+            "labelWidth": 60,
+            "labelAnchor": "source"
+          },
+          {
+            "id": "conn-gw1-sp2",
+            "sourceId": "gw1",
+            "targetId": "sp2",
+            "sourceSide": "bottom",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 320,
+                "y": 185
+              },
+              {
+                "x": 320,
+                "y": 205
+              },
+              {
+                "x": 320,
+                "y": 261.5
+              },
+              {
+                "x": 1408,
+                "y": 261.5
+              },
+              {
+                "x": 1730,
+                "y": 261.5
+              }
+            ],
+            "label": "Plan Discussions",
+            "labelOffsetX": 60,
+            "labelOffsetY": 10,
+            "labelWidth": 60,
+            "labelAnchor": "source"
+          },
+          {
+            "id": "conn-sp1_start-t1",
+            "sourceId": "sp1_start",
+            "targetId": "t1",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 500,
+                "y": 157
+              },
+              {
+                "x": 518,
+                "y": 157
+              },
+              {
+                "x": 536,
+                "y": 157
+              },
+              {
+                "x": 593,
+                "y": 157
+              },
+              {
+                "x": 617,
+                "y": 157
+              },
+              {
+                "x": 668,
+                "y": 157
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-t1-t2",
+            "sourceId": "t1",
+            "targetId": "t2",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 668,
+                "y": 157
+              },
+              {
+                "x": 719,
+                "y": 157
+              },
+              {
+                "x": 743,
+                "y": 157
+              },
+              {
+                "x": 761,
+                "y": 157
+              },
+              {
+                "x": 785,
+                "y": 157
+              },
+              {
+                "x": 836,
+                "y": 157
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-t2-t3",
+            "sourceId": "t2",
+            "targetId": "t3",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 836,
+                "y": 157
+              },
+              {
+                "x": 887,
+                "y": 157
+              },
+              {
+                "x": 911,
+                "y": 157
+              },
+              {
+                "x": 929,
+                "y": 157
+              },
+              {
+                "x": 953,
+                "y": 157
+              },
+              {
+                "x": 1004,
+                "y": 157
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-t3-t4",
+            "sourceId": "t3",
+            "targetId": "t4",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 1004,
+                "y": 157
+              },
+              {
+                "x": 1055,
+                "y": 157
+              },
+              {
+                "x": 1079,
+                "y": 157
+              },
+              {
+                "x": 1097,
+                "y": 157
+              },
+              {
+                "x": 1121,
+                "y": 157
+              },
+              {
+                "x": 1172,
+                "y": 157
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-t4-sp1_end",
+            "sourceId": "t4",
+            "targetId": "sp1_end",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 1172,
+                "y": 157
+              },
+              {
+                "x": 1223,
+                "y": 157
+              },
+              {
+                "x": 1247,
+                "y": 157
+              },
+              {
+                "x": 1304,
+                "y": 157
+              },
+              {
+                "x": 1322,
+                "y": 157
+              },
+              {
+                "x": 1340,
+                "y": 157
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-sp2_start-t5",
+            "sourceId": "sp2_start",
+            "targetId": "t5",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 1450,
+                "y": 377
+              },
+              {
+                "x": 1468,
+                "y": 377
+              },
+              {
+                "x": 1486,
+                "y": 377
+              },
+              {
+                "x": 1561.6666666666667,
+                "y": 377
+              },
+              {
+                "x": 1585.6666666666667,
+                "y": 377
+              },
+              {
+                "x": 1636.6666666666667,
+                "y": 377
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-t5-t6",
+            "sourceId": "t5",
+            "targetId": "t6",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 1636.6666666666667,
+                "y": 377
+              },
+              {
+                "x": 1687.6666666666667,
+                "y": 377
+              },
+              {
+                "x": 1711.6666666666667,
+                "y": 377
+              },
+              {
+                "x": 1748.3333333333333,
+                "y": 377
+              },
+              {
+                "x": 1772.3333333333333,
+                "y": 377
+              },
+              {
+                "x": 1823.3333333333333,
+                "y": 377
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-t6-sp2_end",
+            "sourceId": "t6",
+            "targetId": "sp2_end",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 1823.3333333333333,
+                "y": 377
+              },
+              {
+                "x": 1874.3333333333333,
+                "y": 377
+              },
+              {
+                "x": 1898.3333333333333,
+                "y": 377
+              },
+              {
+                "x": 1974,
+                "y": 377
+              },
+              {
+                "x": 1992,
+                "y": 377
+              },
+              {
+                "x": 2010,
+                "y": 377
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-sp1-gw2",
+            "sourceId": "sp1",
+            "targetId": "gw2",
+            "sourceSide": "right",
+            "targetSide": "top",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 920,
+                "y": 108.5
+              },
+              {
+                "x": 1382,
+                "y": 108.5
+              },
+              {
+                "x": 1406,
+                "y": 108.5
+              },
+              {
+                "x": 1463,
+                "y": 108.5
+              },
+              {
+                "x": 1463,
+                "y": 145
+              },
+              {
+                "x": 1430,
+                "y": 145
+              },
+              {
+                "x": 1430,
+                "y": 165
+              },
+              {
+                "x": 1430,
+                "y": 185
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-sp2-gw2",
+            "sourceId": "sp2",
+            "targetId": "gw2",
+            "sourceSide": "right",
+            "targetSide": "bottom",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 1730,
+                "y": 261.5
+              },
+              {
+                "x": 2052,
+                "y": 261.5
+              },
+              {
+                "x": 2076,
+                "y": 261.5
+              },
+              {
+                "x": 1430,
+                "y": 261.5
+              },
+              {
+                "x": 1430,
+                "y": 225
+              },
+              {
+                "x": 1430,
+                "y": 225
+              },
+              {
+                "x": 1430,
+                "y": 205
+              },
+              {
+                "x": 1430,
+                "y": 185
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-gw2-e2",
+            "sourceId": "gw2",
+            "targetId": "e2",
+            "sourceSide": "right",
+            "targetSide": "left",
+            "type": "sequence",
+            "directionType": "directed",
+            "routingType": "rectilinear",
+            "sourceInvisibleLeader": true,
+            "targetInvisibleLeader": true,
+            "waypoints": [
+              {
+                "x": 1430,
+                "y": 185
+              },
+              {
+                "x": 1450,
+                "y": 185
+              },
+              {
+                "x": 1470,
+                "y": 185
+              },
+              {
+                "x": 2095,
+                "y": 185
+              },
+              {
+                "x": 2095,
+                "y": 185
+              },
+              {
+                "x": 2062,
+                "y": 185
+              },
+              {
+                "x": 2080,
+                "y": 185
+              },
+              {
+                "x": 2098,
+                "y": 185
+              }
+            ],
+            "label": ""
+          },
+          {
+            "id": "conn-_ai_gen_annotation-e1",
+            "sourceId": "_ai_gen_annotation",
+            "targetId": "e1",
+            "sourceSide": "bottom",
+            "targetSide": "top",
+            "type": "associationBPMN",
+            "directionType": "non-directed",
+            "routingType": "direct",
+            "sourceInvisibleLeader": false,
+            "targetInvisibleLeader": false,
+            "waypoints": [
+              {
+                "x": 158,
+                "y": 7
+              },
+              {
+                "x": 158,
+                "y": 167
+              }
+            ],
+            "label": ""
+          }
+        ],
+        "laneFontSize": 16,
+        "poolFontSize": 18,
+        "titleFontSize": 14,
+        "processFontSize": 16,
+        "connectorFontSize": 10,
+        "valueChainFontSize": 16,
+        "descriptionFontSize": 14
+      },
+      "colorConfig": {
+        "lane": "#e8c4a0",
+        "pool": "#d4a382",
+        "task": "#fef9c3",
+        "team": "#374151",
+        "actor": "#374151",
+        "group": "#374151",
+        "state": "#dbeafe",
+        "system": "#f8fafc",
+        "chevron": "#fbd7bb",
+        "gateway": "#f3e8ff",
+        "sublane": "#faf0e6",
+        "use-case": "#fef9c3",
+        "end-event": "#fca5a5",
+        "fork-join": "#1f2937",
+        "hourglass": "#ffffff",
+        "uml-class": "#fed7aa",
+        "data-store": "#60a5fa",
+        "submachine": "#bfdbfe",
+        "subprocess": "#fef08a",
+        "data-object": "#bfdbfe",
+        "final-state": "#374151",
+        "start-event": "#dcfce7",
+        "flowchart-io": "#ffffff",
+        "initial-state": "#374151",
+        "process-group": "#fcebdd",
+        "process-system": "#e9d5ff",
+        "review-comment": "#ec4899",
+        "archimate-shape": "#ffffff",
+        "composite-state": "#ede9fe",
+        "external-entity": "#bfdbfe",
+        "flowchart-delay": "#ffffff",
+        "flowchart-merge": "#ffffff",
+        "system-boundary": "#dbeafe",
+        "text-annotation": "#374151",
+        "uml-enumeration": "#bbf7d0",
+        "flowchart-onpage": "#ffffff",
+        "chevron-collapsed": "#fbd7bb",
+        "flowchart-comment": "#ffffff",
+        "flowchart-display": "#ffffff",
+        "flowchart-offpage": "#ffffff",
+        "flowchart-process": "#ffffff",
+        "flowchart-database": "#ffffff",
+        "flowchart-decision": "#ffffff",
+        "flowchart-document": "#ffffff",
+        "flowchart-multidoc": "#ffffff",
+        "flowchart-parallel": "#ffffff",
+        "intermediate-event": "#fed7aa",
+        "flowchart-manual-op": "#ffffff",
+        "flowchart-vswimlane": "#ffffff",
+        "subprocess-expanded": "#fef4a7",
+        "composite-state-body": "#ede9fe",
+        "flowchart-predefined": "#ffffff",
+        "flowchart-terminator": "#ffffff",
+        "system-boundary-body": "#dbeafe",
+        "flowchart-preparation": "#ffffff",
+        "flowchart-manual-input": "#ffffff"
+      },
+      "displayMode": "normal"
+    }
+  ]
+}
