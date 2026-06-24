@@ -2683,15 +2683,17 @@ function layoutFlat(
     } catch { return conn; }
   });
 
-  // ── Grow EPs to wrap their INTERNAL connector routes ──
-  // Now that connectors have waypoints, an orthogonal route between two
-  // elements inside an EP can bow slightly past the snug element box. Expand
-  // each EP (box only — nothing moves) to include the waypoints of connectors
-  // whose BOTH endpoints are descendants of that EP, then nudge the directly
-  // containing lane / pool right & bottom so the grown EP stays enclosed (no
-  // restack, so existing element + connector positions are untouched).
+  // ── Final EP box re-wrap (after ALL positioning + routing) ──
+  // An earlier parallel-branch / lane vertical pass can shift an EP's box off
+  // its own row, leaving the box floating above (or below) its contents. This
+  // runs LAST, against the FINAL child positions: it re-wraps each EP snugly
+  // around its children (plus the routes of its internal connectors), re-snaps
+  // its boundary events, then re-routes the EP's EXTERNAL connectors to the
+  // corrected box and grows ancestor lanes / pools so the box stays enclosed.
   {
-    const WP_PAD = 12;
+    const EP_ARTIFACT = new Set(["data-object", "data-store", "text-annotation"]);
+    const SIDE_PAD = 24, TOP_PAD = 34, WP_PAD = 12;
+    const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
     const kidsByParent = new Map<string, DiagramElement[]>();
     for (const e of elements) {
       if (!e.parentId) continue;
@@ -2717,31 +2719,75 @@ function layoutFlat(
     const eps = elements
       .filter(e => e.type === "subprocess-expanded")
       .sort((a, b) => depthOf2(b) - depthOf2(a)); // inner first
+    const changed = new Set<string>();
     for (const ep of eps) {
+      const kids = elements.filter(c =>
+        c.parentId === ep.id && !EP_ARTIFACT.has(c.type) && c.boundaryHostId !== ep.id);
+      if (kids.length === 0) continue;
+      let minX = Math.min(...kids.map(c => c.x));
+      let minY = Math.min(...kids.map(c => c.y));
+      let maxX = Math.max(...kids.map(c => c.x + c.width));
+      let maxY = Math.max(...kids.map(c => c.y + c.height));
       const inside = descendantsOf(ep.id);
-      if (inside.size === 0) continue;
-      let grew = false;
       for (const conn of computed) {
         if (!inside.has(conn.sourceId) || !inside.has(conn.targetId)) continue;
         for (const wp of conn.waypoints ?? []) {
-          if (wp.x - WP_PAD < ep.x)             { ep.width  += ep.x - (wp.x - WP_PAD); ep.x = wp.x - WP_PAD; grew = true; }
-          if (wp.y - WP_PAD < ep.y)             { ep.height += ep.y - (wp.y - WP_PAD); ep.y = wp.y - WP_PAD; grew = true; }
-          if (wp.x + WP_PAD > ep.x + ep.width)  { ep.width  = (wp.x + WP_PAD) - ep.x;  grew = true; }
-          if (wp.y + WP_PAD > ep.y + ep.height) { ep.height = (wp.y + WP_PAD) - ep.y;  grew = true; }
+          minX = Math.min(minX, wp.x - WP_PAD); minY = Math.min(minY, wp.y - WP_PAD);
+          maxX = Math.max(maxX, wp.x + WP_PAD); maxY = Math.max(maxY, wp.y + WP_PAD);
         }
       }
-      if (!grew) continue;
-      // Keep ancestors enclosing the grown EP (right / bottom only — safe).
-      let cur: DiagramElement | undefined = elements.find(e => e.id === ep.parentId);
-      let guard = 0;
-      while (cur && guard++ < 16) {
-        if (cur.type === "lane" || cur.type === "sublane" || cur.type === "pool" || cur.type === "subprocess-expanded") {
-          const needR = ep.x + ep.width + 20 - cur.x;
-          const needB = ep.y + ep.height + 20 - cur.y;
-          if (needR > cur.width)  cur.width = needR;
-          if (needB > cur.height) cur.height = needB;
+      const nx = minX - SIDE_PAD, ny = minY - TOP_PAD;
+      const nw = (maxX + SIDE_PAD) - nx, nh = (maxY + SIDE_PAD) - ny;
+      if (Math.abs(nx - ep.x) <= 0.5 && Math.abs(ny - ep.y) <= 0.5
+        && Math.abs(nw - ep.width) <= 0.5 && Math.abs(nh - ep.height) <= 0.5) continue;
+      ep.x = nx; ep.y = ny; ep.width = nw; ep.height = nh;
+      changed.add(ep.id);
+      // Re-snap this EP's boundary events onto the new rim.
+      for (const be of elements) {
+        if (be.boundaryHostId !== ep.id) continue;
+        const cx = be.x + be.width / 2, cy = be.y + be.height / 2;
+        const dl = Math.abs(cx - nx), dr = Math.abs(nx + nw - cx);
+        const dt = Math.abs(cy - ny), db = Math.abs(ny + nh - cy);
+        const m = Math.min(dl, dr, dt, db);
+        let px: number, py: number;
+        if (m === dl)      { px = nx;      py = clamp(cy, ny, ny + nh); }
+        else if (m === dr) { px = nx + nw; py = clamp(cy, ny, ny + nh); }
+        else if (m === dt) { px = clamp(cx, nx, nx + nw); py = ny; }
+        else               { px = clamp(cx, nx, nx + nw); py = ny + nh; }
+        be.x = px - be.width / 2; be.y = py - be.height / 2;
+      }
+    }
+    if (changed.size > 0) {
+      // Re-route connectors that attach to a moved EP box (internal connectors
+      // join children — unmoved — so they're left alone).
+      for (let i = 0; i < computed.length; i++) {
+        const conn = computed[i];
+        if (!changed.has(conn.sourceId) && !changed.has(conn.targetId)) continue;
+        const src = elements.find(e => e.id === conn.sourceId);
+        const tgt = elements.find(e => e.id === conn.targetId);
+        if (!src || !tgt) continue;
+        try {
+          const r = computeWaypoints(src, tgt, elements, conn.sourceSide, conn.targetSide,
+            conn.routingType, conn.sourceOffsetAlong ?? 0.5, conn.targetOffsetAlong ?? 0.5);
+          computed[i] = { ...conn, waypoints: r.waypoints,
+            sourceInvisibleLeader: r.sourceInvisibleLeader, targetInvisibleLeader: r.targetInvisibleLeader };
+        } catch { /* keep the existing route */ }
+      }
+      // Keep ancestor lanes / pools enclosing each re-wrapped EP (right/bottom).
+      for (const epId of changed) {
+        const ep = elements.find(e => e.id === epId);
+        if (!ep) continue;
+        let cur: DiagramElement | undefined = ep.parentId ? elements.find(e => e.id === ep.parentId) : undefined;
+        let guard = 0;
+        while (cur && guard++ < 16) {
+          if (cur.type === "lane" || cur.type === "sublane" || cur.type === "pool" || cur.type === "subprocess-expanded") {
+            const needR = ep.x + ep.width + 20 - cur.x;
+            const needB = ep.y + ep.height + 20 - cur.y;
+            if (needR > cur.width)  cur.width = needR;
+            if (needB > cur.height) cur.height = needB;
+          }
+          cur = cur.parentId ? elements.find(e => e.id === cur!.parentId) : undefined;
         }
-        cur = cur.parentId ? elements.find(e => e.id === cur!.parentId) : undefined;
       }
     }
   }
