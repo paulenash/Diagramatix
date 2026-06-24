@@ -41,6 +41,30 @@ describe("parseVtt", () => {
     expect(parseVtt(vtt)).toBe("Sales: Take the order.\nOps: Pick the stock.");
   });
 
+  it("parses a Zoom cloud-recording transcript (WebVTT, 'Name:' prefix + indices)", () => {
+    // Zoom's audio_transcript.vtt: numeric index, timestamp, then "Speaker: text".
+    const vtt = [
+      "WEBVTT",
+      "",
+      "1",
+      "00:00:01.520 --> 00:00:04.880",
+      "Paul Nash: Okay, let's walk through the order process.",
+      "",
+      "2",
+      "00:00:05.000 --> 00:00:08.120",
+      "Paul Nash: The customer submits the order first.",
+      "",
+      "3",
+      "00:00:08.500 --> 00:00:11.000",
+      "Greg Nash: Then we check stock and ship it.",
+      "",
+    ].join("\n");
+    expect(parseVtt(vtt)).toBe(
+      "Paul Nash: Okay, let's walk through the order process. The customer submits the order first.\n" +
+      "Greg Nash: Then we check stock and ship it.",
+    );
+  });
+
   it("strips stray markup and keeps unlabelled lines", () => {
     const vtt = "WEBVTT\n\n00:00:00.000 --> 00:00:02.000\nplain <b>text</b> here\n";
     expect(parseVtt(vtt)).toBe("plain text here");

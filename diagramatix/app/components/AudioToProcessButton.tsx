@@ -1,32 +1,39 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { transcribeAudioBlob, parseVtt, isVttFile } from "@/app/lib/dictation/audioInput";
+import { transcribeAudioBlob, parseVtt, isVttFile, refineTranscript } from "@/app/lib/dictation/audioInput";
 
 interface Props {
-  /** Called with the speaker-labelled transcript once ready. */
+  /** Called with the transcript (or AI-tidied description) for the prompt. */
   onTranscript: (text: string) => void;
   onError?: (message: string) => void;
-  /** Reports record/transcribe activity so the host can disable Generate. */
+  /** Surfaces AI-noted open questions the recording left ambiguous. */
+  onNote?: (message: string) => void;
+  /** Reports record/transcribe/tidy activity so the host can disable Generate. */
   onBusyChange?: (busy: boolean) => void;
+  /** Target notation, passed to the AI tidy pass for better phrasing. */
+  diagramType?: string;
   disabled?: boolean;
 }
 
 /**
  * Turn a meeting into a diagram: record audio in-browser, upload an audio file,
  * or upload a Microsoft Teams .vtt transcript. Audio is transcribed via the
- * server (Deepgram, diarized); .vtt is parsed locally. The resulting transcript
- * is handed back via onTranscript for the AI Generate prompt.
+ * server (Deepgram, diarized); .vtt is parsed locally. With "AI tidy" on, the
+ * raw transcript is cleaned into an ordered process description first (and any
+ * open questions are surfaced). The result is handed back via onTranscript.
  */
-export function AudioToProcessButton({ onTranscript, onError, onBusyChange, disabled }: Props) {
+export function AudioToProcessButton({ onTranscript, onError, onNote, onBusyChange, diagramType, disabled }: Props) {
   const [recording, setRecording] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const [phase, setPhase] = useState<null | "transcribing" | "tidying">(null);
+  const [tidy, setTidy] = useState(true);
   const [secs, setSecs] = useState(0);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<BlobPart[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  const busy = phase !== null;
   useEffect(() => onBusyChange?.(recording || busy), [recording, busy, onBusyChange]);
   useEffect(() => () => {
     if (timerRef.current) clearInterval(timerRef.current);
@@ -35,6 +42,25 @@ export function AudioToProcessButton({ onTranscript, onError, onBusyChange, disa
 
   const canRecord = typeof navigator !== "undefined" && !!navigator.mediaDevices?.getUserMedia
     && typeof MediaRecorder !== "undefined";
+
+  // Transcribe/parse → optionally AI-tidy → deliver to the prompt.
+  async function process(getRaw: () => Promise<string>) {
+    onError?.("");
+    setPhase("transcribing");
+    try {
+      const raw = (await getRaw()).trim();
+      if (!raw) { onError?.("No usable speech / transcript found."); return; }
+      if (!tidy) { onTranscript(raw); return; }
+      setPhase("tidying");
+      const { description, openQuestions } = await refineTranscript(raw, diagramType);
+      onTranscript(description);
+      if (openQuestions.length) onNote?.("AI noted open questions to resolve:\n• " + openQuestions.join("\n• "));
+    } catch (e) {
+      onError?.(e instanceof Error ? e.message : "Could not process the audio.");
+    } finally {
+      setPhase(null);
+    }
+  }
 
   async function startRecording() {
     onError?.("");
@@ -48,10 +74,10 @@ export function AudioToProcessButton({ onTranscript, onError, onBusyChange, disa
     chunksRef.current = [];
     const rec = new MediaRecorder(stream);
     rec.ondataavailable = (e) => { if (e.data && e.data.size > 0) chunksRef.current.push(e.data); };
-    rec.onstop = async () => {
+    rec.onstop = () => {
       stream.getTracks().forEach((t) => t.stop());
       const blob = new Blob(chunksRef.current, { type: rec.mimeType || "audio/webm" });
-      await runTranscription(() => transcribeAudioBlob(blob));
+      void process(() => transcribeAudioBlob(blob));
     };
     rec.start();
     recorderRef.current = rec;
@@ -66,36 +92,14 @@ export function AudioToProcessButton({ onTranscript, onError, onBusyChange, disa
     try { recorderRef.current?.stop(); } catch { /* */ }
   }
 
-  async function handleFile(file: File) {
-    onError?.("");
-    if (isVttFile(file)) {
-      try {
-        const text = parseVtt(await file.text());
-        if (!text.trim()) { onError?.("That .vtt had no readable transcript."); return; }
-        onTranscript(text);
-      } catch (e) {
-        onError?.(e instanceof Error ? e.message : "Could not read the .vtt file.");
-      }
-      return;
-    }
-    await runTranscription(() => transcribeAudioBlob(file));
-  }
-
-  async function runTranscription(fn: () => Promise<string>) {
-    setBusy(true);
-    try {
-      const text = await fn();
-      if (text) onTranscript(text);
-      else onError?.("No speech detected.");
-    } catch (e) {
-      onError?.(e instanceof Error ? e.message : "Transcription failed.");
-    } finally {
-      setBusy(false);
-    }
+  function handleFile(file: File) {
+    if (isVttFile(file)) void process(async () => parseVtt(await file.text()));
+    else void process(() => transcribeAudioBlob(file));
   }
 
   const mmss = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")}`;
   const btn = "flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border disabled:opacity-50";
+  const uploadLabel = phase === "transcribing" ? "Transcribing…" : phase === "tidying" ? "Tidying…" : "Audio / VTT";
 
   return (
     <>
@@ -124,10 +128,15 @@ export function AudioToProcessButton({ onTranscript, onError, onBusyChange, disa
         onClick={() => fileRef.current?.click()}
         disabled={disabled || busy || recording}
         className={`${btn} text-gray-500 border-gray-300 hover:bg-gray-50`}
-        title="Upload an audio file or a Microsoft Teams .vtt transcript to turn into a diagram"
+        title="Upload an audio file or a Microsoft Teams / Zoom .vtt transcript to turn into a diagram"
       >
-        {busy ? "Transcribing…" : "Audio / VTT"}
+        {uploadLabel}
       </button>
+      <label className="flex items-center gap-0.5 text-[10px] text-gray-500 select-none cursor-pointer"
+        title="Clean the transcript into an ordered process description before generating (recommended for meeting recordings)">
+        <input type="checkbox" checked={tidy} onChange={(e) => setTidy(e.target.checked)} disabled={busy} className="w-3 h-3" />
+        AI tidy
+      </label>
     </>
   );
 }

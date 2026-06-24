@@ -22,9 +22,10 @@ export async function transcribeAudioBlob(blob: Blob): Promise<string> {
 
 /**
  * Parse a WebVTT transcript into speaker-labelled plain text. Microsoft Teams
- * marks the speaker with a `<v Name>…</v>` voice tag; a leading "Name:" is also
- * handled. Cue timestamps / indices / NOTE blocks are stripped, and consecutive
- * cues from the same speaker are merged into one line.
+ * marks the speaker with a `<v Name>…</v>` voice tag; Zoom (and many others) use
+ * a leading "Name:" inside the cue — both are handled. Cue timestamps / indices /
+ * NOTE blocks are stripped, and consecutive cues from the same speaker are merged
+ * into one line.
  */
 export function parseVtt(vtt: string): string {
   const lines = vtt.replace(/\r/g, "").split("\n");
@@ -67,4 +68,29 @@ function stripTags(s: string): string {
 /** True for files we treat as a WebVTT transcript. */
 export function isVttFile(file: File): boolean {
   return /\.vtt$/i.test(file.name) || file.type === "text/vtt";
+}
+
+/**
+ * Clean a raw discussion transcript into an ordered process description (+ any
+ * open questions) via the server (Claude). Falls back to the raw transcript on
+ * any failure, so the caller can always proceed.
+ */
+export async function refineTranscript(
+  transcript: string,
+  diagramType?: string,
+): Promise<{ description: string; openQuestions: string[] }> {
+  try {
+    const res = await fetch("/api/ai/audio/refine-transcript", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ transcript, diagramType }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (typeof data?.description === "string" && data.description.trim()) {
+        return { description: data.description, openQuestions: Array.isArray(data.openQuestions) ? data.openQuestions : [] };
+      }
+    }
+  } catch { /* fall through */ }
+  return { description: transcript, openQuestions: [] };
 }

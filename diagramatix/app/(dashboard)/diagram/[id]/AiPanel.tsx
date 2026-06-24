@@ -401,7 +401,9 @@ export function AiPanel({
             </button>
             <AudioToProcessButton
               disabled={generating}
+              diagramType={diagramType}
               onError={(m) => { if (m) setError(m); }}
+              onNote={(m) => setStatus(m)}
               onTranscript={(text) => setPrompt(prev => prev.trim()
                 ? prev.trimEnd() + "\n" + text
                 : "Generate the diagram from this discussion transcript; ignore small talk.\n\n" + text)}
@@ -490,7 +492,7 @@ export function AiPanel({
           Your BPMN rules are included automatically. Edit rules from the Dashboard.
         </p>
 
-        {status && <p className="text-[10px] text-green-600">{status}</p>}
+        {status && <p className="text-[10px] text-green-600 whitespace-pre-wrap">{status}</p>}
         {error && <p className="text-[10px] text-red-600">{error}</p>}
       </div>
     </div>

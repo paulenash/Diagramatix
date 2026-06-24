@@ -386,6 +386,19 @@ export const FEATURES: Array<{ name: string; summary: string; details: string }>
       "- Your key is never exposed: the browser streams through a short-lived, server-issued token",
     ].join("\n"),
   },
+  {
+    name: "Meeting → Diagram (Audio & Transcript)",
+    summary: "Turn a recorded discussion into a diagram. Record or upload a conversation, or drop in a Microsoft Teams or Zoom transcript, and Diagramatix transcribes it, tidies it into an ordered process, and feeds it straight into AI Generate.",
+    details: [
+      "- Three ways in — record a conversation live in the browser, upload an audio file (mp3, m4a, wav, webm…), or drop a Microsoft Teams or Zoom .vtt transcript",
+      "- High-accuracy, speaker-separated transcription via Deepgram — each voice is labelled, so distinct speakers can become distinct roles / lanes",
+      "- Meeting transcripts are read locally — a Teams or Zoom .vtt keeps everyone's real names and costs nothing to process",
+      "- AI tidy pass — the raw, rambling transcript is cleaned into a clear, ordered process description (filler, repetition and small talk removed) before the diagram is built, so messy meetings still produce a sensible result",
+      "- Open questions surfaced — if the discussion left something ambiguous or unfinished, the AI flags it for you to resolve rather than guessing",
+      "- Flows into the same AI Generate pipeline for every notation — review and edit the plan (BPMN, Flowchart) or generate directly (Context, State Machine, Domain, Value Chain, ArchiMate)",
+      "- Nothing is sent until you choose: the transcript lands in the prompt box for you to read and refine first",
+    ].join("\n"),
+  },
 ];
 
 async function main() {

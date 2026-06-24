@@ -681,7 +681,7 @@ export function PlanPanel({
               ? <p className="text-[9px] text-blue-600 mt-0.5 animate-pulse shrink-0">Listening — Deepgram (high quality)…</p>
               : <p className="text-[9px] text-red-500 mt-0.5 animate-pulse shrink-0">Listening — browser fallback…</p>)}
           {dictateMsg && !listening && (
-            <p className="text-[10px] text-orange-700 bg-orange-50 border border-orange-200 rounded px-1.5 py-0.5 mt-0.5 shrink-0">
+            <p className="text-[10px] text-orange-700 bg-orange-50 border border-orange-200 rounded px-1.5 py-0.5 mt-0.5 shrink-0 whitespace-pre-wrap">
               {dictateMsg}
             </p>
           )}
@@ -736,7 +736,9 @@ export function PlanPanel({
             </button>
             <AudioToProcessButton
               disabled={!!busy}
+              diagramType={diagramType}
               onError={(m) => setDictateMsg(m || null)}
+              onNote={(m) => setDictateMsg(m || null)}
               onTranscript={(text) => setPrompt(prev => prev.trim()
                 ? prev.trimEnd() + "\n" + text
                 : "Build the BPMN process from this meeting transcript. Treat each distinct speaker as a role / lane, and ignore small talk.\n\n" + text)}
