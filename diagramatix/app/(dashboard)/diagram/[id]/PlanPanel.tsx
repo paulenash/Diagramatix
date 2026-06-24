@@ -681,9 +681,15 @@ export function PlanPanel({
               ? <p className="text-[9px] text-blue-600 mt-0.5 animate-pulse shrink-0">Listening — Deepgram (high quality)…</p>
               : <p className="text-[9px] text-red-500 mt-0.5 animate-pulse shrink-0">Listening — browser fallback…</p>)}
           {dictateMsg && !listening && (
-            <p className="text-[10px] text-orange-700 bg-orange-50 border border-orange-200 rounded px-1.5 py-0.5 mt-0.5 shrink-0 whitespace-pre-wrap">
+            <div className="relative text-[10px] text-orange-700 bg-orange-50 border border-orange-200 rounded pl-1.5 pr-5 py-0.5 mt-0.5 shrink-0 max-h-32 overflow-y-auto whitespace-pre-wrap">
+              <button
+                onClick={() => setDictateMsg(null)}
+                className="absolute top-0.5 right-0.5 text-orange-400 hover:text-orange-700 leading-none"
+                title="Dismiss"
+                aria-label="Dismiss"
+              >&times;</button>
               {dictateMsg}
-            </p>
+            </div>
           )}
           {(testingMic || micErr || micDevice || micRecordingUrl) && (
             <div className="mt-1 shrink-0">

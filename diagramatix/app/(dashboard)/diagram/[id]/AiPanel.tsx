@@ -492,7 +492,17 @@ export function AiPanel({
           Your BPMN rules are included automatically. Edit rules from the Dashboard.
         </p>
 
-        {status && <p className="text-[10px] text-green-600 whitespace-pre-wrap">{status}</p>}
+        {status && (
+          <div className="relative text-[10px] text-green-700 bg-green-50 border border-green-200 rounded pl-1.5 pr-5 py-0.5 max-h-32 overflow-y-auto whitespace-pre-wrap">
+            <button
+              onClick={() => setStatus(null)}
+              className="absolute top-0.5 right-0.5 text-green-400 hover:text-green-700 leading-none"
+              title="Dismiss"
+              aria-label="Dismiss"
+            >&times;</button>
+            {status}
+          </div>
+        )}
         {error && <p className="text-[10px] text-red-600">{error}</p>}
       </div>
     </div>
