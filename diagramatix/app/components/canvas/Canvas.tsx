@@ -4064,6 +4064,17 @@ export function Canvas({
     selectedElementIds.size > 1 && selectedElementIds.has(id);
   const hasActiveGroup = selectedElementIds.size > 1;
 
+  // The single selected container (pool / EP / process-group), if any. Its
+  // edge-resize hit-zones are re-rendered in a TOP overlay (above the
+  // connector layers) so a sequence connector crossing the container can
+  // never swallow the mousedown and make that edge un-resizable.
+  const selectedResizeContainer = (() => {
+    if (selectedElementIds.size !== 1) return null;
+    const el = data.elements.find((e) => e.id === [...selectedElementIds][0]);
+    return el && (el.type === "pool" || el.type === "subprocess-expanded" || el.type === "process-group")
+      ? el : null;
+  })();
+
   // Precompute messageBPMN highlight context
   const BPMN_TRIGGER_TYPES = new Set<string>(["task", "subprocess", "subprocess-expanded", "intermediate-event", "end-event", "pool"]);
   const draggingSourceEl = draggingConnector
@@ -5882,6 +5893,57 @@ export function Canvas({
                   style={{ cursor: "pointer" }}
                   onMouseDown={makeEndpointHandler("target", endpointHandles.target)}
                 />
+              </g>
+            );
+          })()}
+
+          {/* Selected container (pool / EP / process-group) edge-resize
+              overlay. Re-renders the four (pools: three) edge hit-zones ABOVE
+              the connector layers so a connector routed through/across the
+              container can't intercept the mousedown and block resizing.
+              Click-vs-drag (>4 px) disambiguation matches the in-place zone;
+              the original event is passed so the drag starts without a jump. */}
+          {selectedResizeContainer && (() => {
+            const el = selectedResizeContainer;
+            const HW = 10;
+            const edges: { side: ResizeHandle; cursor: string; x: number; y: number; width: number; height: number }[] = [
+              { side: "e", cursor: "ew-resize", x: el.x + el.width - HW, y: el.y, width: HW * 2, height: el.height },
+              { side: "w", cursor: "ew-resize", x: el.x - HW, y: el.y, width: HW * 2, height: el.height },
+              { side: "n", cursor: "ns-resize", x: el.x, y: el.y - HW, width: el.width, height: HW * 2 },
+              { side: "s", cursor: "ns-resize", x: el.x, y: el.y + el.height - HW, width: el.width, height: HW * 2 },
+            ];
+            return (
+              <g data-interactive>
+                {edges
+                  // Pools never move their LEFT boundary — drop the west zone.
+                  .filter((edge) => !(el.type === "pool" && edge.side === "w"))
+                  .map((edge) => (
+                    <rect
+                      key={edge.side}
+                      x={edge.x} y={edge.y} width={edge.width} height={edge.height}
+                      fill="transparent"
+                      style={{ cursor: edge.cursor }}
+                      onMouseDown={(e) => {
+                        const startX = e.clientX, startY = e.clientY;
+                        const reactEvt = e;
+                        let started = false;
+                        const onMove = (ev: MouseEvent) => {
+                          if (started) return;
+                          if (Math.hypot(ev.clientX - startX, ev.clientY - startY) <= 4) return;
+                          started = true;
+                          window.removeEventListener("mousemove", onMove);
+                          window.removeEventListener("mouseup", onUp);
+                          handleResizeDragStart(el.id, edge.side, reactEvt);
+                        };
+                        const onUp = () => {
+                          window.removeEventListener("mousemove", onMove);
+                          window.removeEventListener("mouseup", onUp);
+                        };
+                        window.addEventListener("mousemove", onMove);
+                        window.addEventListener("mouseup", onUp);
+                      }}
+                    />
+                  ))}
               </g>
             );
           })()}
