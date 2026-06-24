@@ -1225,6 +1225,9 @@ export function layoutBpmnDiagram(
   // never force growth — matching the move-time rule exactly.
   {
     const EP_ARTIFACT_TYPES = new Set(["data-object", "data-store", "text-annotation"]);
+    const SIDE_PAD = 24;   // left / right / bottom breathing room
+    const TOP_PAD = 34;    // extra room at the top for the EP label
+    const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
     const depthOf = (start: typeof elements[number]) => {
       let d = 0;
       let cur: typeof elements[number] | undefined = start;
@@ -1240,17 +1243,57 @@ export function layoutBpmnDiagram(
         !EP_ARTIFACT_TYPES.has(c.type) &&
         c.boundaryHostId !== ep.id);
       if (kids.length === 0) continue;
-      const padFor = (c: typeof elements[number]) =>
-        (c.type === "subprocess-expanded" ? 10 : 8);
-      const minLeft   = Math.min(ep.x,              ...kids.map(c => c.x - padFor(c)));
-      const minTop    = Math.min(ep.y,              ...kids.map(c => c.y - padFor(c)));
-      const maxRight  = Math.max(ep.x + ep.width,   ...kids.map(c => c.x + c.width + padFor(c)));
-      const maxBottom = Math.max(ep.y + ep.height,  ...kids.map(c => c.y + c.height + padFor(c)));
-      // Grow up / left without moving children (only the box expands).
-      if (minLeft < ep.x) { ep.width += ep.x - minLeft; ep.x = minLeft; }
-      if (minTop  < ep.y) { ep.height += ep.y - minTop; ep.y = minTop; }
-      if (maxRight  > ep.x + ep.width)  ep.width  = maxRight  - ep.x;
-      if (maxBottom > ep.y + ep.height) ep.height = maxBottom - ep.y;
+      // Tighten the EP to a snug box around its real children — uniform pad on
+      // all sides (extra at the top for the label). This both REMOVES large
+      // empty gaps (notably the top) and GROWS to enclose a nested inner EP,
+      // replacing the previous grow-only logic that left the original slack.
+      const minX = Math.min(...kids.map(c => c.x));
+      const minY = Math.min(...kids.map(c => c.y));
+      const maxX = Math.max(...kids.map(c => c.x + c.width));
+      const maxY = Math.max(...kids.map(c => c.y + c.height));
+      const nx = minX - SIDE_PAD;
+      const ny = minY - TOP_PAD;
+      const nw = (maxX + SIDE_PAD) - nx;
+      const nh = (maxY + SIDE_PAD) - ny;
+      ep.x = nx; ep.y = ny; ep.width = nw; ep.height = nh;
+
+      // Re-snap this EP's edge-mounted boundary events back onto the new rim
+      // (they'd otherwise float off the old, larger box edges).
+      for (const be of elements) {
+        if (be.boundaryHostId !== ep.id) continue;
+        const cx = be.x + be.width / 2, cy = be.y + be.height / 2;
+        const dl = Math.abs(cx - nx), dr = Math.abs(nx + nw - cx);
+        const dt = Math.abs(cy - ny), db = Math.abs(ny + nh - cy);
+        const m = Math.min(dl, dr, dt, db);
+        let px: number, py: number;
+        if (m === dl)      { px = nx;      py = clamp(cy, ny, ny + nh); }
+        else if (m === dr) { px = nx + nw; py = clamp(cy, ny, ny + nh); }
+        else if (m === dt) { px = clamp(cx, nx, nx + nw); py = ny; }
+        else               { px = clamp(cx, nx, nx + nw); py = ny + nh; }
+        be.x = px - be.width / 2; be.y = py - be.height / 2;
+      }
+
+      // Conservative de-overlap: if the (possibly grown) EP now overlaps a
+      // DOWNSTREAM sibling in the same lane/pool, push that sibling just past
+      // the EP's right edge — same right-shift strategy the initial EP sizing
+      // uses. Only siblings whose centre is right of the EP centre move, so
+      // upstream elements are never disturbed.
+      const epCx = nx + nw / 2;
+      for (const sib of elements) {
+        if (sib.id === ep.id || sib.parentId !== ep.parentId) continue;
+        if (sib.type === "lane" || sib.type === "sublane" || sib.type === "pool") continue;
+        if (EP_ARTIFACT_TYPES.has(sib.type) || sib.boundaryHostId) continue;
+        // Only push a LEAF sibling — one that has no children of its own and no
+        // boundary events mounted on it — so a simple x-shift can't orphan a
+        // container's contents or leave a host's events behind.
+        const hasChildren = elements.some(e => e.parentId === sib.id || e.boundaryHostId === sib.id);
+        if (hasChildren) continue;
+        const oX = Math.min(sib.x + sib.width, nx + nw) - Math.max(sib.x, nx);
+        const oY = Math.min(sib.y + sib.height, ny + nh) - Math.max(sib.y, ny);
+        if (oX > 0 && oY > 0 && (sib.x + sib.width / 2) >= epCx) {
+          sib.x = nx + nw + 30;
+        }
+      }
     }
   }
 
@@ -2546,6 +2589,69 @@ function layoutFlat(
       return { ...conn, waypoints: r.waypoints, sourceInvisibleLeader: r.sourceInvisibleLeader, targetInvisibleLeader: r.targetInvisibleLeader };
     } catch { return conn; }
   });
+
+  // ── Grow EPs to wrap their INTERNAL connector routes ──
+  // Now that connectors have waypoints, an orthogonal route between two
+  // elements inside an EP can bow slightly past the snug element box. Expand
+  // each EP (box only — nothing moves) to include the waypoints of connectors
+  // whose BOTH endpoints are descendants of that EP, then nudge the directly
+  // containing lane / pool right & bottom so the grown EP stays enclosed (no
+  // restack, so existing element + connector positions are untouched).
+  {
+    const WP_PAD = 12;
+    const kidsByParent = new Map<string, DiagramElement[]>();
+    for (const e of elements) {
+      if (!e.parentId) continue;
+      const l = kidsByParent.get(e.parentId) ?? [];
+      l.push(e); kidsByParent.set(e.parentId, l);
+    }
+    const descendantsOf = (rootId: string): Set<string> => {
+      const out = new Set<string>();
+      const stack = [rootId];
+      while (stack.length) {
+        const cur = stack.pop()!;
+        for (const k of kidsByParent.get(cur) ?? []) {
+          if (!out.has(k.id)) { out.add(k.id); stack.push(k.id); }
+        }
+      }
+      return out;
+    };
+    const depthOf2 = (start: DiagramElement) => {
+      let d = 0; let cur: DiagramElement | undefined = start;
+      while (cur?.parentId) { d++; cur = elements.find(e => e.id === cur!.parentId); if (d > 12) break; }
+      return d;
+    };
+    const eps = elements
+      .filter(e => e.type === "subprocess-expanded")
+      .sort((a, b) => depthOf2(b) - depthOf2(a)); // inner first
+    for (const ep of eps) {
+      const inside = descendantsOf(ep.id);
+      if (inside.size === 0) continue;
+      let grew = false;
+      for (const conn of computed) {
+        if (!inside.has(conn.sourceId) || !inside.has(conn.targetId)) continue;
+        for (const wp of conn.waypoints ?? []) {
+          if (wp.x - WP_PAD < ep.x)             { ep.width  += ep.x - (wp.x - WP_PAD); ep.x = wp.x - WP_PAD; grew = true; }
+          if (wp.y - WP_PAD < ep.y)             { ep.height += ep.y - (wp.y - WP_PAD); ep.y = wp.y - WP_PAD; grew = true; }
+          if (wp.x + WP_PAD > ep.x + ep.width)  { ep.width  = (wp.x + WP_PAD) - ep.x;  grew = true; }
+          if (wp.y + WP_PAD > ep.y + ep.height) { ep.height = (wp.y + WP_PAD) - ep.y;  grew = true; }
+        }
+      }
+      if (!grew) continue;
+      // Keep ancestors enclosing the grown EP (right / bottom only — safe).
+      let cur: DiagramElement | undefined = elements.find(e => e.id === ep.parentId);
+      let guard = 0;
+      while (cur && guard++ < 16) {
+        if (cur.type === "lane" || cur.type === "sublane" || cur.type === "pool" || cur.type === "subprocess-expanded") {
+          const needR = ep.x + ep.width + 20 - cur.x;
+          const needB = ep.y + ep.height + 20 - cur.y;
+          if (needR > cur.width)  cur.width = needR;
+          if (needB > cur.height) cur.height = needB;
+        }
+        cur = cur.parentId ? elements.find(e => e.id === cur!.parentId) : undefined;
+      }
+    }
+  }
 
   return {
     elements, connectors: computed,
