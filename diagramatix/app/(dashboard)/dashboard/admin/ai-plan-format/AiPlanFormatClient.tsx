@@ -82,7 +82,7 @@ export function AiPlanFormatClient() {
   }
 
   const supportedTypes = data?.supportedTypes
-    ?? ["bpmn", "state-machine", "value-chain", "domain", "context", "process-context"];
+    ?? ["bpmn", "flowchart", "state-machine", "value-chain", "domain", "context", "process-context"];
 
   return (
     <div className="min-h-screen dgx-dashboard-bg">

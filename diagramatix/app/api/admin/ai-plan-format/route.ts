@@ -19,13 +19,16 @@ import { auth } from "@/auth";
 import { isSuperuser } from "@/app/lib/superuser";
 import { prisma } from "@/app/lib/db";
 import { buildSystemPrompt as buildBpmnSystemPrompt } from "@/app/lib/ai/planBpmn";
+import { buildFlowchartSystemPrompt } from "@/app/lib/ai/planFlowchart";
 import {
   buildGenericSystemPrompt,
   DIAGRAM_PROMPTS,
 } from "@/app/lib/ai/generateDiagramPrompt";
 import { splitRulesByEnforcement } from "@/app/lib/ai/splitRules";
 
-const SUPPORTED_TYPES = ["bpmn", ...Object.keys(DIAGRAM_PROMPTS)] as const;
+// BPMN and Flowchart use their own dedicated two-phase planners (planBpmn /
+// planFlowchart); every other type uses the shared generic prompt builder.
+const SUPPORTED_TYPES = ["bpmn", "flowchart", ...Object.keys(DIAGRAM_PROMPTS)] as const;
 type SupportedType = (typeof SUPPORTED_TYPES)[number];
 
 function isSupported(t: string | null): t is SupportedType {
@@ -56,12 +59,12 @@ export async function GET(req: Request) {
   }
 
   const { aiRules, layoutRules } = splitRulesByEnforcement(fullRules);
-  const assembledPrompt = diagramType === "bpmn"
-    ? buildBpmnSystemPrompt(aiRules)
-    : buildGenericSystemPrompt(diagramType, aiRules);
-  const promptTemplate = diagramType === "bpmn"
-    ? buildBpmnSystemPrompt("")
-    : buildGenericSystemPrompt(diagramType, "");
+  const buildFor = (rulesArg: string) =>
+    diagramType === "bpmn" ? buildBpmnSystemPrompt(rulesArg)
+    : diagramType === "flowchart" ? buildFlowchartSystemPrompt(rulesArg)
+    : buildGenericSystemPrompt(diagramType, rulesArg);
+  const assembledPrompt = buildFor(aiRules);
+  const promptTemplate = buildFor("");
 
   return NextResponse.json({
     diagramType,

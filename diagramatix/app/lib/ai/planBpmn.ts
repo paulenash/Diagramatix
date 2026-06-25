@@ -107,23 +107,6 @@ ${rules ? `USER RULES AND PREFERENCES (follow these strictly):\n${rules}\n\n` : 
   * Start events → "left" (default: middle of left edge)
   * End events → "right" (default: middle of right edge)
   * Intermediate events (timers, interrupts, escalations) → "top" or "bottom" near right corner
-- A boundary INTERMEDIATE event MUST carry the correct trigger in its "eventType" field — pick from the prompt's wording. Valid values and when to use each:
-  * "timer" — a deadline / timeout / "after X minutes/hours/days" / "if not done by …"
-  * "message" — an incoming message / request / reply arrives
-  * "error" — an error / exception / failure is raised by the activity
-  * "escalation" — the work is escalated to a higher level
-  * "signal" — a broadcast signal is caught
-  * "conditional" — a data condition becomes true
-  * "cancel" — the activity is CANCELLED. ONLY valid on a transaction sub-process; always interrupting. If the user says "cancel" / "cancellation" of a (sub)process, use eventType "cancel".
-  * "compensation" — a compensation / undo handler
-  If the user names a trigger (e.g. "a Cancel event", "an error boundary event", "a timeout"), set eventType to the matching value above — do NOT default it to "timer" or leave it "none".
-  Boundary events are interrupting by default; set properties.interruptionType = "non-interrupting" only when the event fires WITHOUT stopping the host activity (the host keeps running).
-- IN-LINE "wait for …" intermediate events: when the prompt describes the process WAITING / PAUSING for something between two steps ("then wait for …", "wait until …", "after … then …", "pause until …"), insert an intermediate CATCH event ON THE SEQUENCE FLOW between the preceding and following elements — NOT a boundary event (it has NO boundaryHost). It is a normal flow node with an incoming sequence flow from the previous element and an outgoing sequence flow to the next element, a descriptive label (e.g. "Wait 2 hours", "Email received"), and an "eventType" set to what is being waited on:
-  * "timer" — a duration or clock time: "wait 2 hours", "after 3 days", "pause for 30 minutes", "at month end"
-  * "message" — waiting for an incoming message: "wait for an email / reply / document / order to arrive"
-  * "signal" — waiting for a broadcast signal: "wait for the go-ahead signal"
-  * "conditional" — waiting until a data condition becomes true: "wait until stock ≥ 10"
-  Do NOT set flowType on these (catch is the default). Example: "do A, do B, then wait 2 hrs, then do C" → A→B, B→(intermediate-event eventType "timer" label "Wait 2 hours"), that event→C. Prefer an in-line message intermediate event when the prompt frames it as WAITING ("wait for the email"); use a Receive Task only when it frames it as an activity ("receive and log the email").
 - CRITICAL: Every diverging gateway (with 2+ outgoing flows) MUST have a corresponding merge gateway downstream where ALL branches reconnect BEFORE any subsequent task. The merge gateway must have the same gatewayType as the diverging gateway. Even if one branch has only one task and the other has multiple, both MUST flow into the merge gateway.
 - Connections use: sourceId, targetId, and optionally label and type ("sequence" or "message")
 - Use "sequence" for flows within the same pool, "message" for flows between different pools
