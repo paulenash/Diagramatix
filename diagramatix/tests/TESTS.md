@@ -2,8 +2,8 @@
 
 Auto-generated inventory of the automated test suite (Vitest). Regenerate with `npm run test:list`.
 
-- **Total tests:** 187
-- **Test files:** 34
+- **Total tests:** 192
+- **Test files:** 35
 - **Last generated:** 2026-06-25
 
 > Run all: `npm test`. Run one file: `npx vitest run <path>`.
@@ -46,6 +46,7 @@ Auto-generated inventory of the automated test suite (Vitest). Regenerate with `
 - [tests/translate/flowchartToBpmn.test.ts](#tests-translate-flowcharttobpmn-test-ts) — 9 tests
 - [tests/translate/prompt-mapping.test.ts](#tests-translate-prompt-mapping-test-ts) — 4 tests
 - [tests/translate/refine-merge.test.ts](#tests-translate-refine-merge-test-ts) — 4 tests
+- [tests/visio/export-matrix.test.ts](#tests-visio-export-matrix-test-ts) — 5 tests
 
 ---
 
@@ -530,3 +531,15 @@ _4 tests_
 - ignores attempts to change id / type / pool
 - ignores added or removed elements and connections (count is preserved)
 - is a no-op when the model returns nothing useful
+
+## tests/visio/export-matrix.test.ts
+
+_5 tests_
+
+### Visio export — BPMN structure matrix
+
+- linear flow — exports a structurally valid VSDX
+- pool with two lanes — exports a structurally valid VSDX
+- gateways + events — exports a structurally valid VSDX
+- expanded subprocess with internals — exports a structurally valid VSDX
+- data objects, store + cross-pool message — exports a structurally valid VSDX
