@@ -9,6 +9,9 @@ interface Props {
   onError?: (message: string) => void;
   /** Surfaces AI-noted open questions the recording left ambiguous. */
   onNote?: (message: string) => void;
+  /** Hands the AI's open questions to the host so it can offer "Ask for
+   *  Clarification". Takes precedence over onNote when provided. */
+  onFeedback?: (questions: string[]) => void;
   /** Reports record/transcribe/tidy activity so the host can disable Generate. */
   onBusyChange?: (busy: boolean) => void;
   /** Reports the current processing phase so the host can show a throbber. */
@@ -25,7 +28,7 @@ interface Props {
  * raw transcript is cleaned into an ordered process description first (and any
  * open questions are surfaced). The result is handed back via onTranscript.
  */
-export function AudioToProcessButton({ onTranscript, onError, onNote, onBusyChange, onPhaseChange, diagramType, disabled }: Props) {
+export function AudioToProcessButton({ onTranscript, onError, onNote, onFeedback, onBusyChange, onPhaseChange, diagramType, disabled }: Props) {
   const [recording, setRecording] = useState(false);
   const [phase, setPhase] = useState<null | "transcribing" | "reading" | "tidying">(null);
   const [tidy, setTidy] = useState(true);
@@ -57,7 +60,10 @@ export function AudioToProcessButton({ onTranscript, onError, onNote, onBusyChan
       setPhase("tidying");
       const { description, openQuestions } = await refineTranscript(raw, diagramType);
       onTranscript(description);
-      if (openQuestions.length) onNote?.("AI noted open questions to resolve:\n• " + openQuestions.join("\n• "));
+      if (openQuestions.length) {
+        if (onFeedback) onFeedback(openQuestions);
+        else onNote?.("AI noted open questions to resolve:\n• " + openQuestions.join("\n• "));
+      }
     } catch (e) {
       onError?.(e instanceof Error ? e.message : "Could not process the audio.");
     } finally {

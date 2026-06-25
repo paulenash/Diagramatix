@@ -267,11 +267,24 @@ export interface DiagramData {
   /** Per-diagram process owner — shown in the Diagram Properties panel
    *  alongside Title / Authors. Both fields optional and free-text. */
   processOwner?: ProcessOwner;
+  /** AI-generated feedback for this diagram — the "open questions" the AI
+   *  raised while building it (e.g. from a recorded meeting / transcript via
+   *  the AI-tidy pass). Preserved so the user can revisit and answer them
+   *  later; answering them feeds a clarification round back into generation. */
+  aiFeedback?: AiFeedback;
 }
 
 export interface ProcessOwner {
   name?: string;
   email?: string;
+}
+
+/** A persisted set of AI clarification questions + the user's answers. */
+export interface AiFeedback {
+  /** Each open question the AI raised, with the user's answer (if given). */
+  questions: { q: string; a?: string }[];
+  /** ISO timestamp of when the feedback was generated. */
+  createdAt: string;
 }
 
 export const EMPTY_DIAGRAM: DiagramData = {
@@ -697,5 +710,10 @@ export interface TemplateData {
  *             Export-only — no XML importer change. Additive + optional. The
  *             matching DDL-generator columns + User-Guide/Features notes are a
  *             separate follow-up update.
+ *
+ *  v1.26 (2026-06-25): DiagramData gains optional `aiFeedback` — the AI's open
+ *             questions for the diagram (+ the user's answers), preserved for a
+ *             clarification round. App-metadata only; lives in the saved JSON,
+ *             NOT the BPMN XML interchange, so no BPMN-XSD shape change.
  */
-export const SCHEMA_VERSION = "1.25";
+export const SCHEMA_VERSION = "1.26";

@@ -740,6 +740,7 @@ export function DiagramEditor({
     setDescriptionFontSize,
     setDatabase,
     setProcessOwner,
+    setAiFeedback,
     elementMoveEnd,
     flipForkJoin,
     convertTaskSubprocess,
@@ -3502,6 +3503,8 @@ export function DiagramEditor({
             currentConnectors={data.connectors}
             onNarrativeGeneratingChange={setAiPanelNarrativeGenerating}
             onAudioPhaseChange={setAudioPhase}
+            aiFeedback={data.aiFeedback}
+            onAiFeedback={setAiFeedback}
           />
         )}
 
@@ -3545,6 +3548,8 @@ export function DiagramEditor({
             onClose={() => setShowPlanPanel(false)}
             onBusyChange={setAiBusy}
             onAudioPhaseChange={setAudioPhase}
+            aiFeedback={data.aiFeedback}
+            onAiFeedback={setAiFeedback}
           />
         )}
 

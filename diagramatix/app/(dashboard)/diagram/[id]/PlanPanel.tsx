@@ -22,7 +22,10 @@ import { DiagramatixThrobber } from "@/app/components/DiagramatixThrobber";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 import { AttachmentPreviewDialog } from "@/app/components/AttachmentPreviewDialog";
 import { AudioToProcessButton } from "@/app/components/AudioToProcessButton";
+import { ClarificationDialog } from "@/app/components/ClarificationDialog";
 import { startDictation, type DictationHandle } from "@/app/lib/dictation";
+import { appendClarifications } from "@/app/lib/diagram/clarifications";
+import type { AiFeedback } from "@/app/lib/diagram/types";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 declare global {
@@ -57,6 +60,10 @@ interface Props {
   /** Reports the audio/transcript acquisition phase so the parent can show
    *  the big canvas throbber overlay (same as plan generation). */
   onAudioPhaseChange?: (phase: null | "transcribing" | "reading" | "tidying") => void;
+  /** Persisted AI feedback (open questions + answers) for this diagram. */
+  aiFeedback?: AiFeedback;
+  /** Persist the AI feedback on the diagram. */
+  onAiFeedback?: (feedback: AiFeedback | undefined) => void;
 }
 
 interface SavedPrompt { id: string; name: string; text: string; }
@@ -72,8 +79,11 @@ export function PlanPanel({
   currentConnectors,
   onBusyChange,
   onAudioPhaseChange,
+  aiFeedback,
+  onAiFeedback,
 }: Props) {
   const [prompt, setPrompt] = useState("");
+  const [clarifyOpen, setClarifyOpen] = useState(false);
   // Flowcharts use their own 2-phase endpoints + a deterministic top-down
   // layout. The structured Pools/Elements/Connectors tabs are BPMN-plan
   // shaped, so flowcharts edit the plan via the generic Raw JSON tab.
@@ -442,7 +452,8 @@ export function PlanPanel({
     } catch { /* ignore */ }
   }, [editingPromptId, loadPromptList]);
 
-  const executePlanCall = useCallback(async () => {
+  const executePlanCall = useCallback(async (promptOverride?: string) => {
+    const effPrompt = (promptOverride ?? prompt).trim();
     setBusy("plan");
     setError(null);
     setIssues(null);
@@ -451,7 +462,7 @@ export function PlanPanel({
       const res = await fetch(`${apiBase}/plan`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: prompt.trim(), attachment: attachment ?? undefined }),
+        body: JSON.stringify({ prompt: effPrompt, attachment: attachment ?? undefined }),
       });
       const json = await res.json();
       if (!res.ok) {
@@ -750,11 +761,41 @@ export function PlanPanel({
               diagramType={diagramType}
               onPhaseChange={(p) => { setAudioPhase(p); onAudioPhaseChange?.(p); }}
               onError={(m) => setDictateMsg(m || null)}
-              onNote={(m) => setDictateMsg(m || null)}
+              onFeedback={(questions) => onAiFeedback?.({
+                questions: questions.map(q => ({ q })),
+                createdAt: new Date().toISOString(),
+              })}
               onTranscript={(text) => setPrompt(prev => prev.trim()
                 ? prev.trimEnd() + "\n" + text
                 : "Build the BPMN process from this meeting transcript. Treat each distinct speaker as a role / lane, and use roles or job functions — never an individual person's name — in pool, lane, task and annotation names. Ignore small talk.\n\n" + text)}
             />
+            {aiFeedback && aiFeedback.questions.length > 0 && (
+              <button
+                onClick={() => setClarifyOpen(true)}
+                className="flex items-center gap-1 text-[10px] text-amber-700 border border-amber-300 bg-amber-50 rounded px-1.5 py-0.5 hover:bg-amber-100"
+                title="Answer the AI's open questions and regenerate the plan"
+              >
+                Ask for Clarification ({aiFeedback.questions.length})
+              </button>
+            )}
+            {clarifyOpen && aiFeedback && (
+              <ClarificationDialog
+                questions={aiFeedback.questions.map(x => x.q)}
+                initialAnswers={aiFeedback.questions.map(x => x.a ?? "")}
+                onCancel={() => setClarifyOpen(false)}
+                onSubmit={(answers) => {
+                  const updated: AiFeedback = {
+                    questions: aiFeedback.questions.map((x, i) => ({ q: x.q, a: answers[i]?.trim() || undefined })),
+                    createdAt: aiFeedback.createdAt,
+                  };
+                  onAiFeedback?.(updated);
+                  const newPrompt = appendClarifications(prompt, updated);
+                  setPrompt(newPrompt);
+                  setClarifyOpen(false);
+                  void executePlanCall(newPrompt);
+                }}
+              />
+            )}
             {attachment && (
               <div className="flex items-center gap-1 flex-1 min-w-0">
                 <button onClick={() => setShowAttachPreview(true)} className="text-[10px] text-blue-600 truncate flex-1 text-left hover:underline" title="Preview attachment">{attachment.name}</button>

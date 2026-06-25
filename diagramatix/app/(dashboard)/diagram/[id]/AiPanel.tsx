@@ -1,11 +1,13 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import type { DiagramData, DiagramElement, Connector, DiagramType } from "@/app/lib/diagram/types";
+import type { DiagramData, DiagramElement, Connector, DiagramType, AiFeedback } from "@/app/lib/diagram/types";
 import { DiagramatixThrobber } from "@/app/components/DiagramatixThrobber";
 import { AttachmentPreviewDialog } from "@/app/components/AttachmentPreviewDialog";
+import { ClarificationDialog } from "@/app/components/ClarificationDialog";
 import { startDictation, type DictationHandle } from "@/app/lib/dictation";
 import { AudioToProcessButton } from "@/app/components/AudioToProcessButton";
+import { appendClarifications } from "@/app/lib/diagram/clarifications";
 import { buildPromptFromDiagram } from "@/app/lib/diagram/prompt-from-diagram";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -39,13 +41,18 @@ interface Props {
   /** Reports the audio/transcript acquisition phase so the parent can show
    *  the big canvas throbber overlay (same as plan generation). */
   onAudioPhaseChange?: (phase: null | "transcribing" | "reading" | "tidying") => void;
+  /** Persisted AI feedback (open questions + answers) for this diagram. */
+  aiFeedback?: AiFeedback;
+  /** Persist the AI feedback on the diagram. */
+  onAiFeedback?: (feedback: AiFeedback | undefined) => void;
 }
 
 export function AiPanel({
   diagramType, onApplyDiagram, onAddToDiagram, onClose, onGeneratingChange,
   isAdmin, currentElements, currentConnectors, onNarrativeGeneratingChange,
-  onAudioPhaseChange,
+  onAudioPhaseChange, aiFeedback, onAiFeedback,
 }: Props) {
+  const [clarifyOpen, setClarifyOpen] = useState(false);
   const [prompt, setPrompt] = useState("");
   const [generating, setGenerating] = useState(false);
   const [narrativeGenerating, setNarrativeGenerating] = useState(false);
@@ -200,8 +207,9 @@ export function AiPanel({
 
   useEffect(() => { loadPrompts(); }, [loadPrompts]);
 
-  async function handleGenerate() {
-    if (!prompt.trim()) return;
+  async function handleGenerate(promptOverride?: string) {
+    const effPrompt = (promptOverride ?? prompt).trim();
+    if (!effPrompt) return;
     setGenerating(true);
     setError(null);
     setStatus("Generating diagram (this may take 15-30 seconds)...");
@@ -210,8 +218,8 @@ export function AiPanel({
       // Use BPMN-specific endpoint (with layout engine) for BPMN, generic for others
       const endpoint = diagramType === "bpmn" ? "/api/ai/generate-bpmn" : "/api/ai/generate-diagram";
       const body = diagramType === "bpmn"
-        ? { prompt: prompt.trim(), mode: "generate", attachment: attachment ?? undefined }
-        : { prompt: prompt.trim(), diagramType, attachment: attachment ?? undefined };
+        ? { prompt: effPrompt, mode: "generate", attachment: attachment ?? undefined }
+        : { prompt: effPrompt, diagramType, attachment: attachment ?? undefined };
 
       const res = await fetch(endpoint, {
         method: "POST",
@@ -409,11 +417,23 @@ export function AiPanel({
               diagramType={diagramType}
               onPhaseChange={(p) => { setAudioPhase(p); onAudioPhaseChange?.(p); }}
               onError={(m) => { if (m) setError(m); }}
-              onNote={(m) => setStatus(m)}
+              onFeedback={(questions) => onAiFeedback?.({
+                questions: questions.map(q => ({ q })),
+                createdAt: new Date().toISOString(),
+              })}
               onTranscript={(text) => setPrompt(prev => prev.trim()
                 ? prev.trimEnd() + "\n" + text
                 : "Generate the diagram from this discussion transcript; use people's roles or job functions rather than their personal names (in any actor, role, activity or annotation labels), and ignore small talk.\n\n" + text)}
             />
+            {aiFeedback && aiFeedback.questions.length > 0 && (
+              <button
+                onClick={() => setClarifyOpen(true)}
+                className="flex items-center gap-1 text-[10px] text-amber-700 border border-amber-300 bg-amber-50 rounded px-1.5 py-0.5 hover:bg-amber-100"
+                title="Answer the AI's open questions and regenerate"
+              >
+                Ask for Clarification ({aiFeedback.questions.length})
+              </button>
+            )}
             {attachment && (
               <div className="flex items-center gap-1 flex-1 min-w-0">
                 <button onClick={() => setShowAttachPreview(true)} className="text-[10px] text-blue-600 truncate flex-1 text-left hover:underline" title="Preview attachment">{attachment.name}</button>
@@ -465,8 +485,27 @@ export function AiPanel({
           </div>
         )}
 
+        {clarifyOpen && aiFeedback && (
+          <ClarificationDialog
+            questions={aiFeedback.questions.map(x => x.q)}
+            initialAnswers={aiFeedback.questions.map(x => x.a ?? "")}
+            onCancel={() => setClarifyOpen(false)}
+            onSubmit={(answers) => {
+              const updated: AiFeedback = {
+                questions: aiFeedback.questions.map((x, i) => ({ q: x.q, a: answers[i]?.trim() || undefined })),
+                createdAt: aiFeedback.createdAt,
+              };
+              onAiFeedback?.(updated);
+              const newPrompt = appendClarifications(prompt, updated);
+              setPrompt(newPrompt);
+              setClarifyOpen(false);
+              void handleGenerate(newPrompt);
+            }}
+          />
+        )}
+
         <div className="flex gap-1.5">
-          <button onClick={handleGenerate} disabled={generating || !prompt.trim()}
+          <button onClick={() => handleGenerate()} disabled={generating || !prompt.trim()}
             className="flex-1 px-3 py-1.5 text-xs text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-1.5">
             {generating && (
               <svg className="animate-spin w-3 h-3" viewBox="0 0 24 24" fill="none" aria-hidden>

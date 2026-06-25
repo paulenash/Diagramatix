@@ -13,6 +13,7 @@ import type {
   DiagramData,
   DiagramElement,
   DiagramTitle,
+  AiFeedback,
   DirectionType,
   Point,
   RoutingType,
@@ -381,6 +382,7 @@ type Action =
   | { type: "SET_DESCRIPTION_FONT_SIZE"; payload: number }
   | { type: "SET_DATABASE"; payload: string }
   | { type: "SET_PROCESS_OWNER"; payload: { name?: string; email?: string } }
+  | { type: "SET_AI_FEEDBACK"; payload: AiFeedback | undefined }
   | { type: "CORRECT_ALL_CONNECTORS" }
   | { type: "INSERT_SPACE"; payload: { markerX: number; markerY: number; dx: number; dy: number } }
   | { type: "REMOVE_SPACE"; payload: { zone: { x: number; y: number; width: number; height: number }; preserveIds?: string[]; extraDeleteIds?: string[]; leaveAloneIds?: string[] } }
@@ -6931,6 +6933,12 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
       };
     }
 
+    case "SET_AI_FEEDBACK":
+      return {
+        ...state,
+        aiFeedback: action.payload && action.payload.questions.length > 0 ? action.payload : undefined,
+      };
+
     case "INSERT_SPACE": {
       const { markerX, markerY, dx, dy } = action.payload;
 
@@ -8874,6 +8882,12 @@ export function useDiagram(initialData: DiagramData) {
       (owner: { name?: string; email?: string }) => {
         pushHistory(snapshotData());
         dispatch({ type: "SET_PROCESS_OWNER", payload: owner });
+      }, []
+    ),
+    setAiFeedback: useCallback(
+      (feedback: AiFeedback | undefined) => {
+        pushHistory(snapshotData());
+        dispatch({ type: "SET_AI_FEEDBACK", payload: feedback });
       }, []
     ),
     convertTaskSubprocess: useCallback((id: string) => {
