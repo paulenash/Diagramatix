@@ -107,6 +107,17 @@ ${rules ? `USER RULES AND PREFERENCES (follow these strictly):\n${rules}\n\n` : 
   * Start events → "left" (default: middle of left edge)
   * End events → "right" (default: middle of right edge)
   * Intermediate events (timers, interrupts, escalations) → "top" or "bottom" near right corner
+- A boundary INTERMEDIATE event MUST carry the correct trigger in its "eventType" field — pick from the prompt's wording. Valid values and when to use each:
+  * "timer" — a deadline / timeout / "after X minutes/hours/days" / "if not done by …"
+  * "message" — an incoming message / request / reply arrives
+  * "error" — an error / exception / failure is raised by the activity
+  * "escalation" — the work is escalated to a higher level
+  * "signal" — a broadcast signal is caught
+  * "conditional" — a data condition becomes true
+  * "cancel" — the activity is CANCELLED. ONLY valid on a transaction sub-process; always interrupting. If the user says "cancel" / "cancellation" of a (sub)process, use eventType "cancel".
+  * "compensation" — a compensation / undo handler
+  If the user names a trigger (e.g. "a Cancel event", "an error boundary event", "a timeout"), set eventType to the matching value above — do NOT default it to "timer" or leave it "none".
+  Boundary events are interrupting by default; set properties.interruptionType = "non-interrupting" only when the event fires WITHOUT stopping the host activity (the host keeps running).
 - CRITICAL: Every diverging gateway (with 2+ outgoing flows) MUST have a corresponding merge gateway downstream where ALL branches reconnect BEFORE any subsequent task. The merge gateway must have the same gatewayType as the diverging gateway. Even if one branch has only one task and the other has multiple, both MUST flow into the merge gateway.
 - Connections use: sourceId, targetId, and optionally label and type ("sequence" or "message")
 - Use "sequence" for flows within the same pool, "message" for flows between different pools

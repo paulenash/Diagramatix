@@ -2704,8 +2704,9 @@ export function layoutBpmnDiagram(
   // R5.07 — message labels that would stack at a similar x are offset vertically
   // in ½-label-height steps so they don't overlap.
   {
-    const MIN_SEP = 24;   // 2× the original ≥10px point separation (Paul)
-    const LABEL_H = 28;   // 2× the label step (½ of this = 14px per tier)
+    const MIN_SEP = 24;   // ≥10px point separation, doubled (Paul)
+    const LABEL_H = 22;   // per-tier vertical label stagger — clears the ~16-18px
+                          // rendered message-label height with a small gap
     const msgs = connectors.filter(c => c.type === "messageBPMN");
     // The endpoint that drives the vertical line = the non-pool element.
     const anchorOf = (c: Connector) => {
@@ -2739,28 +2740,39 @@ export function layoutBpmnDiagram(
         }
       });
     }
-    // R5.07 — stagger labels that share a similar x bucket.
+    // R5.07 — vertically stagger message labels whose horizontal spans would
+    // overlap. The label x ≈ its connector's attachment x; two labels overlap
+    // when their x's are within LABEL_W of each other. Use a SLIDING-WINDOW
+    // grouping (not fixed buckets — those split an overlapping pair that
+    // straddles a boundary), then offset each member by a full label-height
+    // step (alternating above / below) so the labels clear each other.
     const labelX = (c: Connector): number | null => {
       const a = anchorOf(c); if (!a) return null;
       const off = a.isSource ? (c.sourceOffsetAlong ?? 0.5) : (c.targetOffsetAlong ?? 0.5);
       return a.el.x + off * a.el.width;
     };
-    const labelled = msgs.filter(c => c.label && c.labelOffsetX !== undefined);
-    const buckets = new Map<number, Connector[]>();
-    for (const c of labelled) {
-      const x = labelX(c); if (x === null) continue;
-      const key = Math.round(x / 90);   // ~label-width bucket
-      const b = buckets.get(key); if (b) b.push(c); else buckets.set(key, [c]);
-    }
-    for (const grp of buckets.values()) {
-      if (grp.length < 2) continue;
-      grp.forEach((c, i) => {
+    const LABEL_W = 100;      // labels within this x distance can overlap
+    const STEP = LABEL_H;     // per-tier vertical step (= a full label height)
+    const labelled = msgs
+      .filter(c => c.label && c.labelOffsetX !== undefined)
+      .map(c => ({ c, x: labelX(c) }))
+      .filter((o): o is { c: Connector; x: number } => o.x !== null)
+      .sort((a, b) => a.x - b.x);
+    const stagger = (grp: { c: Connector; x: number }[]) => {
+      if (grp.length < 2) return;
+      grp.forEach((o, i) => {
         if (i === 0) return;
         const tier = Math.ceil(i / 2);
         const dir = (i % 2) ? -1 : 1;   // alternate above / below
-        c.labelOffsetY = (c.labelOffsetY ?? 0) + dir * tier * (LABEL_H / 2);
+        o.c.labelOffsetY = (o.c.labelOffsetY ?? 0) + dir * tier * STEP;
       });
+    };
+    let group: { c: Connector; x: number }[] = [];
+    for (const o of labelled) {
+      if (group.length === 0 || o.x - group[group.length - 1].x < LABEL_W) group.push(o);
+      else { stagger(group); group = [o]; }
     }
+    stagger(group);
   }
 
   phase(`connectors built (${connectors.length})`);
