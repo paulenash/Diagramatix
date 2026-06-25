@@ -6,7 +6,7 @@
 import type { DiagramData, DiagramElement, Connector, Point } from "./types";
 import { getSymbolDefinition } from "./symbols/definitions";
 import { computeWaypoints } from "./routing";
-import { autoSizeForType, type AutosizeType } from "./textMetrics";
+import { autoSizeForType, wrapText, type AutosizeType } from "./textMetrics";
 
 /** Word-wrap a black-box pool name into multiple lines, then size the pool
  *  FROM the wrapped result: the rotated label runs along the pool HEIGHT, so
@@ -2894,13 +2894,23 @@ export function layoutBpmnDiagram(
     }
   }
 
-  // ── R5.09: keep gateway labels clear of surrounding elements + connectors ──
-  // Gateway labels sit top-left of the diamond (R6.22 / R5.09). After routing,
-  // nudge any label that overlaps a nearby flow element or connector segment
-  // further UP — then LEFT — in small steps, so it stays top-left and as close
-  // as possible while clearing whatever's around it.
+  // ── R5.09: place gateway labels top-left, close, and clear of obstacles ─────
+  // The label rides an ARC around the gateway centre at the nearest-clearing
+  // radius. It STARTS up-and-slightly-left (≈68° above horizontal — steeper than
+  // a 45° diagonal, which reads better and keeps clear of the upstream element
+  // usually sitting directly left) and, if the label box overlaps a nearby flow
+  // element or connector, sweeps DOWN THE LEFT SIDE (toward straight-left, then
+  // bottom-left) until it finds a clear angle — staying as close to the gateway
+  // as possible. Sweeping left/down avoids the incoming connector (which usually
+  // arrives from the left at the gateway's vertical centre) and the branch
+  // labels (which sit out along the outgoing connectors to the right).
   {
-    const LH = 14, CHAR_W = 6, GAP = 6, STEP = 8, MAX_STEPS = 16, NEAR = 320;
+    const LH = 14, GAP = 8, NEAR = 360;
+    const START_DEG = -22;   // 0° = straight up; negative = tilted left (≈68° from horizontal)
+    // Sweep stops at straight-DOWN (-180°): up-left → left → bottom-left → down.
+    // It must never cross onto the gateway's RIGHT, where the outgoing branches
+    // and their labels sit, so the arc stays in the left hemisphere + below.
+    const STEP_DEG = 13, SWEEP_DEG = 158;
     const OBST = new Set(["task", "subprocess", "subprocess-expanded", "start-event",
       "end-event", "intermediate-event", "gateway", "data-object", "data-store"]);
     const segs: { vx?: number; hy?: number; a: number; b: number }[] = [];
@@ -2921,25 +2931,33 @@ export function layoutBpmnDiagram(
     for (const g of elements) {
       if (g.type !== "gateway" || !g.label || !g.label.trim()) continue;
       const lw = (g.properties.labelWidth as number) ?? 80;
-      let ox = (g.properties.labelOffsetX as number) ?? 0;
-      let oy = (g.properties.labelOffsetY as number) ?? 7;
-      const maxChars = Math.max(1, Math.floor(lw / CHAR_W));
-      const lh = Math.max(1, Math.ceil(g.label.trim().length / maxChars)) * LH;
+      const lh = Math.max(1, wrapText(g.label.trim(), lw).length) * LH;
+      const cx = g.x + g.width / 2, cy = g.y + g.height / 2;
       const near = elements.filter(e => e.id !== g.id && OBST.has(e.type)
-        && Math.abs((e.x + e.width / 2) - (g.x + g.width / 2)) < NEAR
-        && Math.abs((e.y + e.height / 2) - (g.y + g.height / 2)) < NEAR);
-      const box = () => ({
-        x: g.x + g.width / 2 + ox - lw / 2 - GAP,
-        y: g.y + g.height + oy - GAP,
-        w: lw + 2 * GAP, h: lh + 2 * GAP,
-      });
-      const overlaps = () => { const r = box(); return near.some(b => hitsBox(r, b)) || segs.some(s => hitsSeg(r, s)); };
-      let steps = 0;
-      while (overlaps() && steps < MAX_STEPS) {
-        if (steps % 2 === 0) oy -= STEP; else ox -= STEP;  // up first, then left
-        steps++;
+        && Math.abs((e.x + e.width / 2) - cx) < NEAR && Math.abs((e.y + e.height / 2) - cy) < NEAR);
+      // Label-centre position + box for a given clock angle (deg, clockwise from up).
+      const place = (deg: number) => {
+        const r = deg * Math.PI / 180, s = Math.sin(r), c = Math.cos(r);
+        // Nearest-clearing radius: gateway + label half-extents projected onto the
+        // angle, plus the gap — so the label hugs the gateway whatever the angle.
+        const R = (g.width / 2 * Math.abs(s) + g.height / 2 * Math.abs(c))
+          + GAP + (lw / 2 * Math.abs(s) + lh / 2 * Math.abs(c));
+        const lcx = cx + R * s, lcy = cy - R * c;
+        return { lcx, lcy, box: { x: lcx - lw / 2, y: lcy - lh / 2, w: lw, h: lh } };
+      };
+      const clear = (b: { x: number; y: number; w: number; h: number }) =>
+        !near.some(e => hitsBox(b, e)) && !segs.some(s => hitsSeg(b, s));
+      let chosen = place(START_DEG);
+      for (let d = 0; d <= SWEEP_DEG; d += STEP_DEG) {
+        const cand = place(START_DEG - d);  // sweep down the left side (up-left → left → bottom-left)
+        if (clear(cand.box)) { chosen = cand; break; }
       }
-      if (steps > 0) g.properties = { ...g.properties, labelOffsetX: ox, labelOffsetY: oy };
+      g.properties = {
+        ...g.properties,
+        labelWidth: lw,
+        labelOffsetX: Math.round(chosen.lcx - cx),
+        labelOffsetY: Math.round(chosen.lcy - lh / 2 - (g.y + g.height)),
+      };
     }
   }
 
