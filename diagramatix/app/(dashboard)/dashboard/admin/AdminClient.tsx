@@ -779,7 +779,7 @@ function SuperAdminToolsGrid({ onShowUsers }: { onShowUsers: () => void }) {
         <h2 className="text-sm font-semibold text-gray-900">SuperAdmin Tools</h2>
         <span className="text-[11px] text-gray-400">Drag tiles to reorder</span>
       </div>
-      <div className="max-h-[55vh] overflow-y-auto pr-1">
+      <div className="pr-1">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
           {tiles.map(t => (
             <div

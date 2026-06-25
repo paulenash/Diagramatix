@@ -98,10 +98,12 @@ export async function previewFullBackup(): Promise<BackupPreview> {
   for (const o of orgsRaw) {
     orgs.push({ orgId: o.id, name: o.name, users: await membersWithCounts(o.id) });
   }
-  const [totalUsers, totalProjects, totalDiagrams] = await Promise.all([
+  const [totalUsers, totalProjects, totalDiagrams, aiRules, scanRules] = await Promise.all([
     prisma.user.count(),
     prisma.project.count(),
     prisma.diagram.count(),
+    prisma.diagramRules.count(),   // AI generation rule catalogs (per category)
+    prisma.scannerRule.count(),    // BPMN scanner rule registry
   ]);
   return {
     scope: "full",
@@ -112,6 +114,8 @@ export async function previewFullBackup(): Promise<BackupPreview> {
       { label: "Users", count: totalUsers },
       { label: "Projects", count: totalProjects },
       { label: "Diagrams", count: totalDiagrams },
+      { label: "AI Rules", count: aiRules },
+      { label: "Scan Rules", count: scanRules },
     ],
   };
 }
