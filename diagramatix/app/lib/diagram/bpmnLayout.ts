@@ -2233,12 +2233,18 @@ export function layoutBpmnDiagram(
         }
       }
       // Align the post-merge flow to the merge's Y so the exit is a straight
-      // line (the merge sits at the branch midpoint; its successor would
-      // otherwise still be on the top flow row, forcing the connector to jog).
-      // Walk the single-in / single-out chain after the merge and pull each
-      // element onto the merge's centre Y; stop at the next join or branch.
+      // line, AND pull it back to normal spacing in X. The column layout placed
+      // the merge's successor far to the right (the gap survives R6.25's shift),
+      // leaving a very long merge → end-event connector. Walk the single-in /
+      // single-out chain after the merge: pull each element onto the merge's
+      // centre Y and snug it up to normal spacing after its predecessor (X is
+      // only ever pulled LEFT, never pushed right). Stop at the next join /
+      // branch / lane change. The pool-tighten pass below then reclaims the
+      // freed width.
+      const POST_MERGE_GAP = 90;   // edge gap merge→successor (≈ normal flow)
       const mergeCy = g.y + g.height / 2;
       const seenY = new Set<string>([g.id]);
+      let prevRight = g.x + g.width;
       let curId: string | undefined = (() => { const o = outById.get(g.id) ?? []; return o.length === 1 ? o[0] : undefined; })();
       while (curId && !seenY.has(curId)) {
         seenY.add(curId);
@@ -2246,7 +2252,10 @@ export function layoutBpmnDiagram(
         const el = elById.get(curId);
         if (!el || el.parentId !== g.parentId) break;             // changed lane/container
         const dy = mergeCy - (el.y + el.height / 2);
-        if (Math.abs(dy) > 0.5) shiftBy(el.id, 0, dy);
+        const targetX = prevRight + POST_MERGE_GAP;
+        const dx = el.x > targetX + 0.5 ? targetX - el.x : 0;    // only snug leftwards
+        if (Math.abs(dy) > 0.5 || dx !== 0) shiftBy(el.id, dx, dy);
+        prevRight = el.x + el.width;
         const o = outById.get(curId) ?? [];
         curId = o.length === 1 ? o[0] : undefined;
       }
@@ -2695,8 +2704,8 @@ export function layoutBpmnDiagram(
   // R5.07 — message labels that would stack at a similar x are offset vertically
   // in ½-label-height steps so they don't overlap.
   {
-    const MIN_SEP = 12;   // ≥10px between attachment points
-    const LABEL_H = 14;   // message label line height (½ → 7px step)
+    const MIN_SEP = 24;   // 2× the original ≥10px point separation (Paul)
+    const LABEL_H = 28;   // 2× the label step (½ of this = 14px per tier)
     const msgs = connectors.filter(c => c.type === "messageBPMN");
     // The endpoint that drives the vertical line = the non-pool element.
     const anchorOf = (c: Connector) => {
