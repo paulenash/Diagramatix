@@ -284,6 +284,117 @@ const BPMN_LAYOUT_RULES: LayoutRule[] = [
       expect(widths.length, `pool widths differ: ${pools.map((p) => Math.round(p.width)).join(", ")}`).toBe(1);
     },
   },
+  {
+    id: "R6.18",
+    title: "event-based gateway branches enter the target event on its LEFT face",
+    check: () => {
+      const out = layout(
+        [
+          { id: "s", type: "start-event", label: "S" },
+          { id: "g", type: "gateway", label: "", gatewayType: "event-based" },
+          { id: "ev1", type: "intermediate-event", label: "Message", eventType: "message" },
+          { id: "ev2", type: "intermediate-event", label: "Timeout", eventType: "timer" },
+          { id: "t1", type: "task", label: "A" },
+          { id: "t2", type: "task", label: "B" },
+          { id: "e", type: "end-event", label: "E" },
+        ],
+        [
+          { sourceId: "s", targetId: "g" },
+          { sourceId: "g", targetId: "ev1" },
+          { sourceId: "g", targetId: "ev2" },
+          { sourceId: "ev1", targetId: "t1" },
+          { sourceId: "ev2", targetId: "t2" },
+          { sourceId: "t1", targetId: "e" },
+          { sourceId: "t2", targetId: "e" },
+        ],
+      );
+      const branches = out.connectors.filter((c) => c.sourceId === "g");
+      expect(branches.length, "expected two event branches").toBe(2);
+      for (const b of branches) {
+        expect(b.targetSide, `branch into ${b.targetId} entered ${b.targetSide}`).toBe("left");
+      }
+    },
+  },
+  {
+    id: "R6.17",
+    title: "a decision gateway's top/bottom branches map to its top/bottom-most targets",
+    check: () => {
+      const out = layout(
+        [
+          { id: "s", type: "start-event", label: "S" },
+          { id: "g", type: "gateway", label: "Route?" },
+          { id: "a", type: "task", label: "A" },
+          { id: "b", type: "task", label: "B" },
+          { id: "c", type: "task", label: "C" },
+          { id: "e", type: "end-event", label: "E" },
+        ],
+        [
+          { sourceId: "s", targetId: "g" },
+          { sourceId: "g", targetId: "a" },
+          { sourceId: "g", targetId: "b" },
+          { sourceId: "g", targetId: "c" },
+          { sourceId: "a", targetId: "e" },
+          { sourceId: "b", targetId: "e" },
+          { sourceId: "c", targetId: "e" },
+        ],
+      );
+      const branches = out.connectors.filter((c) => c.sourceId === "g");
+      const cy = (id: string) => { const el = out.elements.find((e) => e.id === id)!; return el.y + el.height / 2; };
+      const top = branches.reduce((m, c) => (cy(c.targetId) < cy(m.targetId) ? c : m));
+      const bot = branches.reduce((m, c) => (cy(c.targetId) > cy(m.targetId) ? c : m));
+      expect(top.sourceSide, "top-most branch should exit the gateway TOP").toBe("top");
+      expect(bot.sourceSide, "bottom-most branch should exit the gateway BOTTOM").toBe("bottom");
+    },
+  },
+  {
+    id: "R8.02",
+    title: "an input Data Object is placed to the LEFT of its associated element",
+    check: () => {
+      const out = layout(
+        [
+          { id: "s", type: "start-event", label: "S" },
+          { id: "t", type: "task", label: "Process" },
+          { id: "e", type: "end-event", label: "E" },
+          { id: "d", type: "data-object", label: "Form" },
+        ],
+        [
+          { sourceId: "s", targetId: "t" },
+          { sourceId: "t", targetId: "e" },
+          { sourceId: "d", targetId: "t" }, // data → element ⇒ INPUT
+        ],
+      );
+      const t = out.elements.find((e) => e.id === "t")!;
+      const d = out.elements.find((e) => e.id === "d")!;
+      expect(d.x + d.width, "input data object should sit left of its element").toBeLessThanOrEqual(t.x);
+      expect(d.properties?.role, "input data object should be tagged role=input").toBe("input");
+    },
+  },
+  {
+    id: "R8.03",
+    title: "a single-link Data Store is centred above/below its element, not beside it",
+    check: () => {
+      const out = layout(
+        [
+          { id: "s", type: "start-event", label: "S" },
+          { id: "t", type: "task", label: "Lookup" },
+          { id: "e", type: "end-event", label: "E" },
+          { id: "ds", type: "data-store", label: "Records" },
+        ],
+        [
+          { sourceId: "s", targetId: "t" },
+          { sourceId: "t", targetId: "e" },
+          { sourceId: "t", targetId: "ds" },
+        ],
+      );
+      const t = out.elements.find((e) => e.id === "t")!;
+      const ds = out.elements.find((e) => e.id === "ds")!;
+      const tcx = t.x + t.width / 2, dscx = ds.x + ds.width / 2;
+      expect(Math.abs(dscx - tcx), "data store should be horizontally centred on its element").toBeLessThan(t.width);
+      const above = ds.y + ds.height <= t.y;
+      const below = ds.y >= t.y + t.height;
+      expect(above || below, "data store should sit above or below the element").toBe(true);
+    },
+  },
 ];
 
 describe("BPMN layout rules (code-enforced)", () => {

@@ -2,8 +2,8 @@
 
 Auto-generated inventory of the automated test suite (Vitest). Regenerate with `npm run test:list`.
 
-- **Total tests:** 171
-- **Test files:** 32
+- **Total tests:** 180
+- **Test files:** 33
 - **Last generated:** 2026-06-25
 
 > Run all: `npm test`. Run one file: `npx vitest run <path>`.
@@ -15,7 +15,8 @@ Auto-generated inventory of the automated test suite (Vitest). Regenerate with `
 - [tests/_setup/infrastructure.test.ts](#tests-setup-infrastructure-test-ts) — 4 tests
 - [tests/backup/coverage.test.ts](#tests-backup-coverage-test-ts) — 4 tests
 - [tests/backup/roundtrip.test.ts](#tests-backup-roundtrip-test-ts) — 1 test
-- [tests/bpmn/layout-rules.test.ts](#tests-bpmn-layout-rules-test-ts) — 12 tests
+- [tests/bpmn/layout-rules.test.ts](#tests-bpmn-layout-rules-test-ts) — 16 tests
+- [tests/bpmn/structural-rules.test.ts](#tests-bpmn-structural-rules-test-ts) — 5 tests
 - [tests/bpmn/type-coverage.test.ts](#tests-bpmn-type-coverage-test-ts) — 5 tests
 - [tests/diagram-type-styles/order.test.ts](#tests-diagram-type-styles-order-test-ts) — 3 tests
 - [tests/dictation/parse-vtt.test.ts](#tests-dictation-parse-vtt-test-ts) — 5 tests
@@ -79,7 +80,7 @@ _1 test_
 
 ## tests/bpmn/layout-rules.test.ts
 
-_12 tests_
+_16 tests_
 
 ### BPMN layout rules (code-enforced)
 
@@ -95,6 +96,22 @@ _12 tests_
 - R8.10 — a boundary intermediate event emits from its OUTER face (away from the host)
 - R5.06 — two message flows on the same pool/task face don't share a connection point
 - R5.08 — every generated pool is rendered at the same (uniform) width
+- R6.18 — event-based gateway branches enter the target event on its LEFT face
+- R6.17 — a decision gateway's top/bottom branches map to its top/bottom-most targets
+- R8.02 — an input Data Object is placed to the LEFT of its associated element
+- R8.03 — a single-link Data Store is centred above/below its element, not beside it
+
+## tests/bpmn/structural-rules.test.ts
+
+_5 tests_
+
+### BPMN structural rules (generative)
+
+- registry is pinned — every rule has a unique id and an executable check
+- R6.13 — a white-box pool with no start/end event gets a process-level start + end injected
+- R6.23 — a label-less exclusive decision gateway defaults to a "Decision?" question
+- R3.08 — a process start event is forced into the pool's topmost lane
+- R6.12 — a connector pointing at a non-existent element is dropped
 
 ## tests/bpmn/type-coverage.test.ts
 

@@ -58,6 +58,21 @@ gateway case), then #3 as a fast follow-up once the #1 invariants are trusted.
 
 ---
 
+## Remaining untested BPMN red rules
+
+Most geometric + generative red rules are now pinned (`tests/bpmn/layout-rules.test.ts`
+and `tests/bpmn/structural-rules.test.ts`). Still uncovered — mostly because they're
+fiddly to assert robustly with a synthetic layout (label placement / sizing):
+
+- **Label placement (geometric):** R3.07 (decision outgoing label per-side), R6.20
+  (decision label anchor), R6.21 (message label sits in the inter-pool gap), R5.07
+  (message labels stagger vertically when they'd collide). Need a robust way to read
+  a label's effective box and assert non-overlap rather than exact offsets.
+- **Alignment (geometric):** R3.09 (nested-decision Y alignment).
+- **Generative / sizing:** R6.01 (black-box pool height scales with its rotated name),
+  R6.11 (an expanded subprocess gets an internal start/end event), R7.04 (embedded
+  event sub-processes stack at the bottom of the outer EP).
+
 ## Other ideas
 
 _(add here)_
