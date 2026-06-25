@@ -2497,21 +2497,28 @@ export function layoutBpmnDiagram(
         tgtSide = "left";
       }
 
-      // R8.04 (loop-back routing): when the target sits to the LEFT — or
-      // LOWER-LEFT — of the source, this sequence flow is a rework / loop
-      // edge. The default right→left (or gateway-branch) sides would drag it
-      // back ACROSS the forward flow. Route it UNDER instead: exit the
-      // source's bottom and enter the target's bottom, so the implied loop
-      // reads clearly below the main path and the SOUTH-detour machinery in
-      // computeWaypoints keeps it clear of the intervening elements. Events
-      // keep their own facing rule (assigned just above); skip them here.
+      // R8.04 / R8.13 (loop-back routing): a right-to-left (rework / loop) edge
+      // must never drag back ACROSS the forward flow on the left face — route it
+      // AROUND, via the TOP or BOTTOM of BOTH ends. Prefer UNDER (bottom) so the
+      // implied loop reads below the main path; switch to OVER (top) when the
+      // target sits above the source, OR when a boundary event occupies the
+      // bottom of either end (routing under would collide with it). Events keep
+      // their own facing rule (assigned just above); skip them here.
       if (
         connType === "sequence" &&
-        _tgtCx < _srcCx - 4 && _tgtCy >= _srcCy - 4 &&
+        _tgtCx < _srcCx - 4 &&
         !EVENT_TYPES.has(src.type) && !EVENT_TYPES.has(tgt.type)
       ) {
-        srcSide = "bottom";
-        tgtSide = "bottom";
+        const boundaryOn = (host: DiagramElement, want: string) =>
+          elements.some((e) => e.boundaryHostId === host.id
+            && ((e.properties?.boundarySide as string | undefined)
+                ?? (e as { boundarySide?: string }).boundarySide) === want);
+        const bottomBlocked = boundaryOn(src, "bottom") || boundaryOn(tgt, "bottom");
+        const topBlocked    = boundaryOn(src, "top")    || boundaryOn(tgt, "top");
+        const goOver = _tgtCy < _srcCy - 4 || (bottomBlocked && !topBlocked);
+        const side: "top" | "bottom" = goOver ? "top" : "bottom";
+        srcSide = side;
+        tgtSide = side;
       }
     }
 
@@ -2776,6 +2783,60 @@ export function layoutBpmnDiagram(
       else { stagger(group); group = [o]; }
     }
     stagger(group);
+  }
+
+  // ── R8.11 / R8.12: sequence connection-point de-overlap ─────────────────────
+  // SEQUENCE connectors that attach to the SAME element on the SAME side must
+  // not share a connection point (R8.11), and must also stay ≥10px clear of any
+  // MESSAGE point already on that side (R8.12). Spread the sequence attachment
+  // offsets so every point is ≥10px from its neighbours; a lone sequence end
+  // with nothing to clash with is left centred so straight flows stay straight.
+  {
+    const MIN_PX = 10;
+    type SeqEnd = { c: Connector; isSource: boolean };
+    const seqEnds = new Map<string, SeqEnd[]>();   // `elId|side` → sequence ends there
+    const msgPts  = new Map<string, number[]>();   // `elId|side` → message offsets there
+    const addSeq = (k: string, v: SeqEnd) => { const a = seqEnds.get(k); if (a) a.push(v); else seqEnds.set(k, [v]); };
+    const addMsg = (k: string, v: number) => { const a = msgPts.get(k); if (a) a.push(v); else msgPts.set(k, [v]); };
+    for (const c of connectors) {
+      if (c.type === "sequence") {
+        addSeq(`${c.sourceId}|${c.sourceSide}`, { c, isSource: true });
+        addSeq(`${c.targetId}|${c.targetSide}`, { c, isSource: false });
+      } else if (c.type === "messageBPMN") {
+        addMsg(`${c.sourceId}|${c.sourceSide}`, c.sourceOffsetAlong ?? 0.5);
+        addMsg(`${c.targetId}|${c.targetSide}`, c.targetOffsetAlong ?? 0.5);
+      }
+    }
+    for (const [key, ends] of seqEnds) {
+      const bar = key.indexOf("|");
+      const el = elMap.get(key.slice(0, bar));
+      const side = key.slice(bar + 1);
+      if (!el) continue;
+      const faceLen = (side === "top" || side === "bottom") ? el.width : el.height;
+      if (faceLen <= 1) continue;
+      const occupied = msgPts.get(key) ?? [];
+      if (ends.length < 2 && occupied.length === 0) continue;   // nothing to separate
+      const minFrac = MIN_PX / faceLen;
+      const horiz = side === "top" || side === "bottom";
+      // Order by the OTHER endpoint's position along the face, so the points run
+      // in the same order as the elements they reach (no crossed connectors).
+      const otherCoord = (e: SeqEnd) => {
+        const o = elMap.get(e.isSource ? e.c.targetId : e.c.sourceId);
+        if (!o) return 0;
+        return horiz ? o.x + o.width / 2 : o.y + o.height / 2;
+      };
+      const sorted = [...ends].sort((a, b) => otherCoord(a) - otherCoord(b));
+      const n = sorted.length;
+      const stepFrac = Math.max(minFrac, n > 1 ? 1 / (n + 1) : 0);
+      sorted.forEach((e, i) => {
+        let off = 0.5 + (i - (n - 1) / 2) * stepFrac;
+        for (const m of occupied) {   // keep ≥10px clear of message points (R8.12)
+          if (Math.abs(off - m) < minFrac) off = off >= m ? m + minFrac : m - minFrac;
+        }
+        off = Math.max(0.1, Math.min(0.9, off));
+        if (e.isSource) e.c.sourceOffsetAlong = off; else e.c.targetOffsetAlong = off;
+      });
+    }
   }
 
   phase(`connectors built (${connectors.length})`);
