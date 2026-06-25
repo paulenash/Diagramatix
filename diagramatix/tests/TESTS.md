@@ -2,7 +2,7 @@
 
 Auto-generated inventory of the automated test suite (Vitest). Regenerate with `npm run test:list`.
 
-- **Total tests:** 163
+- **Total tests:** 171
 - **Test files:** 32
 - **Last generated:** 2026-06-25
 
@@ -15,7 +15,7 @@ Auto-generated inventory of the automated test suite (Vitest). Regenerate with `
 - [tests/_setup/infrastructure.test.ts](#tests-setup-infrastructure-test-ts) — 4 tests
 - [tests/backup/coverage.test.ts](#tests-backup-coverage-test-ts) — 4 tests
 - [tests/backup/roundtrip.test.ts](#tests-backup-roundtrip-test-ts) — 1 test
-- [tests/bpmn/layout-rules.test.ts](#tests-bpmn-layout-rules-test-ts) — 4 tests
+- [tests/bpmn/layout-rules.test.ts](#tests-bpmn-layout-rules-test-ts) — 12 tests
 - [tests/bpmn/type-coverage.test.ts](#tests-bpmn-type-coverage-test-ts) — 5 tests
 - [tests/diagram-type-styles/order.test.ts](#tests-diagram-type-styles-order-test-ts) — 3 tests
 - [tests/dictation/parse-vtt.test.ts](#tests-dictation-parse-vtt-test-ts) — 5 tests
@@ -79,7 +79,7 @@ _1 test_
 
 ## tests/bpmn/layout-rules.test.ts
 
-_4 tests_
+_12 tests_
 
 ### BPMN layout rules (code-enforced)
 
@@ -87,6 +87,14 @@ _4 tests_
 - R5.09 — gateway labels sit top-left of the diamond, never on the right
 - R8.04 — right-to-left loop-back flows route via top/bottom, never the left face
 - R8.11 — sequence connectors on the same element+face never share a connection point
+- R3.06 — a flow to/from an Event attaches on the event's facing side
+- R6.16 — a decision gateway takes its incoming flow on the LEFT face
+- R3.10 — a decision gateway's branches fan out across distinct faces
+- R6.19 — a merge gateway emits its outgoing flow from the RIGHT face
+- R6.25 — a merge gateway is placed to the RIGHT of all its source elements
+- R8.10 — a boundary intermediate event emits from its OUTER face (away from the host)
+- R5.06 — two message flows on the same pool/task face don't share a connection point
+- R5.08 — every generated pool is rendered at the same (uniform) width
 
 ## tests/bpmn/type-coverage.test.ts
 
