@@ -5,6 +5,7 @@
  */
 import { prisma } from "./db";
 import { ARCHIVE_PROJECT_NAME } from "./archive";
+import { getBackupSchema, delegateName } from "./backupSchema";
 
 export interface BackupSection {
   label: string;
@@ -98,24 +99,36 @@ export async function previewFullBackup(): Promise<BackupPreview> {
   for (const o of orgsRaw) {
     orgs.push({ orgId: o.id, name: o.name, users: await membersWithCounts(o.id) });
   }
-  const [totalUsers, totalProjects, totalDiagrams, aiRules, scanRules] = await Promise.all([
-    prisma.user.count(),
-    prisma.project.count(),
-    prisma.diagram.count(),
-    prisma.diagramRules.count(),   // AI generation rule catalogs (per category)
-    prisma.scannerRule.count(),    // BPMN scanner rule registry
-  ]);
+  // Per-table breakdown, derived from the SAME catalog the backup itself uses
+  // (getBackupSchema) — so the summary lists every table that will be backed up
+  // and a newly-added table appears automatically, with no edit here. Friendly
+  // labels for the well-known headline tables; the raw model name for the rest.
+  const schema = await getBackupSchema();
+  const FRIENDLY: Record<string, string> = {
+    Org: "Orgs", User: "Users", Project: "Projects", Diagram: "Diagrams",
+    DiagramRules: "AI Rules", ScannerRule: "Scan Rules",
+  };
+  const HEADLINE = ["Org", "User", "Project", "Diagram", "DiagramRules", "ScannerRule"];
+  const delegates = prisma as unknown as Record<string, { count?: () => Promise<number> }>;
+  const counts = new Map<string, number>();
+  await Promise.all(schema.insertOrder.map(async (table) => {
+    const delegate = delegates[delegateName(table)];
+    if (delegate?.count) counts.set(table, await delegate.count());
+  }));
+  // Headline tables first (in a fixed, friendly order), then every remaining
+  // table in catalog (dependency) order — the full breakdown.
+  const ordered = [
+    ...HEADLINE.filter((t) => counts.has(t)),
+    ...schema.insertOrder.filter((t) => !HEADLINE.includes(t) && counts.has(t)),
+  ];
+  const sections: BackupSection[] = ordered.map((t) => ({
+    label: FRIENDLY[t] ?? t,
+    count: counts.get(t) ?? 0,
+  }));
   return {
     scope: "full",
     selectable: "orgs",
     orgs,
-    sections: [
-      { label: "Orgs", count: orgs.length },
-      { label: "Users", count: totalUsers },
-      { label: "Projects", count: totalProjects },
-      { label: "Diagrams", count: totalDiagrams },
-      { label: "AI Rules", count: aiRules },
-      { label: "Scan Rules", count: scanRules },
-    ],
+    sections,
   };
 }
