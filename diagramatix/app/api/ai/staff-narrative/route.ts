@@ -15,6 +15,7 @@ import { prisma } from "@/app/lib/db";
 import {
   generateStaffNarrative,
   DEFAULT_STAFF_NARRATIVE_BRIEFING,
+  buildStaffNarrativeBriefing,
 } from "@/app/lib/ai/staffNarrative";
 import { gateLimit, recordUsage } from "@/app/lib/subscription-route";
 
@@ -40,28 +41,18 @@ export async function POST(req: Request) {
   const aiBlock = await gateLimit(session.user.id, "aiAttempts");
   if (aiBlock) return aiBlock;
 
-  // Load + idempotently seed the briefing. If the row doesn't yet
-  // exist (first install), insert the default so admins see editable
-  // text the first time they open /dashboard/rules → Staff Narrative.
+  // Assemble the briefing: the built-in default (managed in code) PLUS any
+  // additional house-style rules the admin saved in the staff-narrative row.
+  // The row stores only the additions now; a legacy row that still holds the
+  // whole briefing is used verbatim (buildStaffNarrativeBriefing handles both).
+  // No seeding — the row is created only when an admin saves additional rules.
   let briefing = DEFAULT_STAFF_NARRATIVE_BRIEFING;
   try {
     const dr = await prisma.diagramRules.findFirst({
       where: { category: "staff-narrative", isDefault: true },
       select: { rules: true },
     });
-    if (dr?.rules?.trim()) {
-      briefing = dr.rules;
-    } else {
-      await prisma.diagramRules
-        .create({
-          data: {
-            category: "staff-narrative",
-            rules: DEFAULT_STAFF_NARRATIVE_BRIEFING,
-            isDefault: true,
-          },
-        })
-        .catch(() => { /* race-safe: another request may have seeded first */ });
-    }
+    briefing = buildStaffNarrativeBriefing(dr?.rules);
   } catch { /* proceed with hard-coded default */ }
 
   const result = await generateStaffNarrative({

@@ -2,6 +2,19 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { isSuperuser } from "@/app/lib/superuser";
+import { DEFAULT_STAFF_NARRATIVE_BRIEFING, extractAdditionalRules } from "@/app/lib/ai/staffNarrative";
+
+/** The Staff Narrative briefing is split into a read-only built-in (managed in
+ *  code) and the editable "Additional Rules" stored in the row. Decorate that
+ *  category's payload so the editor can show both; for every other category the
+ *  row is returned unchanged (builtin = null). */
+type RuleRow = { id: string | null; category: string; rules: string; isDefault: boolean; updatedAt?: Date };
+function decorate(row: RuleRow): RuleRow & { builtin: string | null } {
+  if (row.category === "staff-narrative") {
+    return { ...row, rules: extractAdditionalRules(row.rules), builtin: DEFAULT_STAFF_NARRATIVE_BRIEFING };
+  }
+  return { ...row, builtin: null };
+}
 
 /** GET /api/bpmn-rules?category=bpmn — return default rules for a category */
 export async function GET(req: Request) {
@@ -16,7 +29,7 @@ export async function GET(req: Request) {
     select: { id: true, category: true, rules: true, isDefault: true, updatedAt: true },
   });
 
-  return NextResponse.json(rules ?? { id: null, category, rules: "", isDefault: true });
+  return NextResponse.json(decorate(rules ?? { id: null, category, rules: "", isDefault: true }));
 }
 
 export async function POST(req: Request) {
@@ -35,7 +48,7 @@ export async function POST(req: Request) {
         where: { category: cat, isDefault: true },
         select: { id: true, category: true, rules: true, isDefault: true, updatedAt: true },
       });
-      result.push(found ?? { id: null, category: cat, rules: "", isDefault: true });
+      result.push(decorate(found ?? { id: null, category: cat, rules: "", isDefault: true }));
     }
 
     return NextResponse.json(result);

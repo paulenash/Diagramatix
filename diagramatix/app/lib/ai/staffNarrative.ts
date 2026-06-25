@@ -49,6 +49,36 @@ OUTPUT FORMAT
 INPUT
 The user message contains a structured Technical Description of the process diagram, generated automatically. Treat that as a faithful account of what happens. Rewrite it as a Staff Narrative following the rules above. Do not invent steps or roles that are not in the description, but you may add small bits of plausible workplace colour (e.g. "usually takes me half a morning") to keep the voice natural.`;
 
+/** A stored row whose text starts with this opening is a LEGACY full-briefing
+ *  row (pre-restructure) — its whole content is the briefing. New rows store
+ *  ONLY the green "Additional Rules"; the built-in default lives in code. */
+const FULL_BRIEFING_SIGNATURE = "You are a long-serving staff member";
+
+/** True when a stored staff-narrative row holds the whole (legacy) briefing
+ *  rather than just the additional house-style rules. */
+export function isLegacyFullBriefing(stored: string): boolean {
+  return stored.trim().startsWith(FULL_BRIEFING_SIGNATURE);
+}
+
+/** The editable ADDITIONAL-rules portion of a stored row. Legacy full-briefing
+ *  rows have no separable additions, so this returns "" for them (their content
+ *  IS the built-in, now shown read-only in Group #1). */
+export function extractAdditionalRules(stored: string | null | undefined): string {
+  const s = (stored ?? "").trim();
+  return s && !isLegacyFullBriefing(s) ? s : "";
+}
+
+/** Assemble the system prompt the model actually receives: the built-in default
+ *  briefing (Group #1) followed by the admin's additional house-style rules
+ *  (Group #2). A legacy full-briefing row is used verbatim so any hand edits
+ *  survive until it's re-saved through the restructured editor. */
+export function buildStaffNarrativeBriefing(stored: string | null | undefined): string {
+  const s = (stored ?? "").trim();
+  if (!s) return DEFAULT_STAFF_NARRATIVE_BRIEFING;
+  if (isLegacyFullBriefing(s)) return s;
+  return `${DEFAULT_STAFF_NARRATIVE_BRIEFING}\n\n## Additional Rules — house style\n${s}`;
+}
+
 export type StaffNarrativeResult =
   | { ok: true; narrative: string; model: string }
   | { ok: false; status: number; error: string };

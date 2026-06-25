@@ -17,6 +17,9 @@ interface RuleSet {
   rules: string;
   isDefault: boolean;
   updatedAt?: string;
+  /** Read-only built-in text for split categories (Staff Narrative); null
+   *  for the numbered diagram-type rule sets. */
+  builtin?: string | null;
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -359,6 +362,13 @@ export function RulesEditor({ isAdmin: _isAdmin }: { isAdmin: boolean }) {
   }
 
   async function handleSave() {
+    // Staff Narrative is freeform prose, not numbered rules — its row holds
+    // only the green "Additional Rules" (the red built-in lives in code). Save
+    // the textarea verbatim, skipping the numbering / red-rule guard.
+    if (activeCategory === "staff-narrative") {
+      await persistText(editText, "Additional rules saved");
+      return;
+    }
     // Diff against the last saved version (read from state) BEFORE
     // numbering — autoNumberRules only knows about new rules so it
     // would miss body changes to existing ones. Tag any Red rule whose
@@ -543,13 +553,20 @@ export function RulesEditor({ isAdmin: _isAdmin }: { isAdmin: boolean }) {
               <h2 className="text-sm font-semibold text-gray-900">
                 {CATEGORY_LABELS[activeCategory] ?? activeCategory} Rules
               </h2>
-              <p className="text-[10px] text-gray-400">
-                {ruleCount} rules
-                {aiCount > 0 && <> &middot; <span className="text-green-600">{aiCount} AI-enforced</span></>}
-                {codeCount > 0 && <> &middot; <span className="text-red-500">{codeCount} code-backed</span></>}
-                {proposedCount > 0 && <> &middot; <span className="text-orange-600">{proposedCount} proposed</span></>}
-                {modifiedCount > 0 && <> &middot; <span className="text-amber-600">{modifiedCount} modified</span></>}
-              </p>
+              {activeCategory === "staff-narrative" ? (
+                <p className="text-[10px] text-gray-400">
+                  <span className="text-red-500">Built-in</span> (read-only) + your{" "}
+                  <span className="text-green-600">Additional Rules</span>
+                </p>
+              ) : (
+                <p className="text-[10px] text-gray-400">
+                  {ruleCount} rules
+                  {aiCount > 0 && <> &middot; <span className="text-green-600">{aiCount} AI-enforced</span></>}
+                  {codeCount > 0 && <> &middot; <span className="text-red-500">{codeCount} code-backed</span></>}
+                  {proposedCount > 0 && <> &middot; <span className="text-orange-600">{proposedCount} proposed</span></>}
+                  {modifiedCount > 0 && <> &middot; <span className="text-amber-600">{modifiedCount} modified</span></>}
+                </p>
+              )}
             </div>
             <div className="flex gap-2 items-center">
               <label className="flex items-center gap-1 text-[10px] text-gray-500 cursor-pointer">
@@ -583,6 +600,15 @@ export function RulesEditor({ isAdmin: _isAdmin }: { isAdmin: boolean }) {
             </div>
           </div>
 
+          {activeCategory === "staff-narrative" && (
+            <StaffNarrativeEditor
+              builtin={ruleSets.find(r => r.category === "staff-narrative")?.builtin ?? ""}
+              value={editText}
+              onChange={setEditText}
+            />
+          )}
+
+          {activeCategory !== "staff-narrative" && (
           <div className={`flex-1 flex ${showPreview ? "gap-3" : ""}`}>
             {/* Textarea editor */}
             <textarea
@@ -677,6 +703,7 @@ export function RulesEditor({ isAdmin: _isAdmin }: { isAdmin: boolean }) {
               </div>
             )}
           </div>
+          )}
 
           {message && (
             <p className={`mt-2 text-xs ${message.ok ? "text-green-600" : "text-red-600"}`}>
@@ -684,12 +711,20 @@ export function RulesEditor({ isAdmin: _isAdmin }: { isAdmin: boolean }) {
             </p>
           )}
 
-          <p className="mt-2 text-[10px] text-gray-400">
-            Format: <code>## Group N: Name</code> for sections; rule IDs are group-scoped, e.g. <code>R3.01:</code> (BPMN group 3, rule 1).
-            New rules can be typed without a number — they will be appended at the end of their section and
-            numbered on Save. Rules in <span className="text-red-600">layout</span> groups start as
-            <span className="text-orange-600"> proposed</span> until you mark them implemented.
-          </p>
+          {activeCategory === "staff-narrative" ? (
+            <p className="mt-2 text-[10px] text-gray-400">
+              The <span className="text-red-600">Built-in Rules</span> are the core briefing, managed in code and
+              always applied. Your <span className="text-green-600">Additional Rules</span> are appended to it when a
+              Staff Narrative is generated — use them for house style, naming, or tone.
+            </p>
+          ) : (
+            <p className="mt-2 text-[10px] text-gray-400">
+              Format: <code>## Group N: Name</code> for sections; rule IDs are group-scoped, e.g. <code>R3.01:</code> (BPMN group 3, rule 1).
+              New rules can be typed without a number — they will be appended at the end of their section and
+              numbered on Save. Rules in <span className="text-red-600">layout</span> groups start as
+              <span className="text-orange-600"> proposed</span> until you mark them implemented.
+            </p>
+          )}
         </main>
       </div>
 
@@ -731,6 +766,39 @@ export function RulesEditor({ isAdmin: _isAdmin }: { isAdmin: boolean }) {
           onConfirm={performReset}
         />
       )}
+    </div>
+  );
+}
+
+/** Staff Narrative briefing editor: a read-only RED "Built-in Rules" panel (the
+ *  core briefing, managed in code) above a GREEN editable "Additional Rules"
+ *  textarea (house style, appended to the briefing at generation time). */
+function StaffNarrativeEditor({ builtin, value, onChange }: {
+  builtin: string; value: string; onChange: (v: string) => void;
+}) {
+  return (
+    <div className="flex-1 flex flex-col gap-3 min-h-0">
+      {/* Group #1 — Built-in Rules (red, read-only) */}
+      <div className="border border-red-200 rounded flex flex-col min-h-0">
+        <div className="px-3 py-1.5 bg-red-50 border-b border-red-200 flex items-center justify-between shrink-0">
+          <span className="text-xs font-semibold text-red-700">Group&nbsp;#1: Built-in Rules</span>
+          <span className="text-[9px] text-red-400">read-only · managed in code · always applied</span>
+        </div>
+        <pre className="text-[11px] text-gray-600 whitespace-pre-wrap p-3 max-h-64 overflow-y-auto font-mono leading-relaxed">{builtin}</pre>
+      </div>
+      {/* Group #2 — Additional Rules (green, editable) */}
+      <div className="border border-green-300 rounded flex flex-col flex-1 min-h-[140px]">
+        <div className="px-3 py-1.5 bg-green-50 border-b border-green-200 flex items-center justify-between shrink-0">
+          <span className="text-xs font-semibold text-green-700">Group&nbsp;#2: Additional Rules</span>
+          <span className="text-[9px] text-green-500">your house style · appended to the briefing</span>
+        </div>
+        <textarea
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="Add your own house-style rules here (plain prose) — naming, tone, things to always/never say. They're appended to the built-in briefing when a Staff Narrative is generated. Leave blank to use the built-in briefing alone."
+          className="flex-1 min-h-[120px] font-mono text-xs p-3 resize-none focus:outline-none rounded-b leading-relaxed"
+        />
+      </div>
     </div>
   );
 }

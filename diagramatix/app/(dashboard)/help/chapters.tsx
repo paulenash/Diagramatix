@@ -2139,6 +2139,15 @@ export const CHAPTERS: HelpChapter[] = [
               (tiers, features, bubble-help, diagram-type styles) so it can be
               restored into a fresh system on its own.
             </li>
+            <li>
+              <strong>Staff Narrative Briefing</strong> (in{" "}
+              <strong>Dashboard → AI Rules</strong>) is split into a read-only{" "}
+              <span className="text-red-600">Built-in Rules</span> block (the
+              core briefing, managed in code and always applied) and an editable{" "}
+              <span className="text-green-600">Additional Rules</span> box for
+              your own house style — those additions are appended to the briefing
+              whenever a Staff Narrative is generated.
+            </li>
           </ul>
         ),
       },
