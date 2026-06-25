@@ -1,12 +1,12 @@
 # Diagramatix — Test Suite
 
-Auto-generated inventory of the automated test suite (Vitest). Regenerate with `npx vitest list`.
+Auto-generated inventory of the automated test suite (Vitest). Regenerate with `npm run test:list`.
 
 - **Total tests:** 153
 - **Test files:** 30
 - **Last generated:** 2026-06-25
 
-> Run all: `npx vitest run tests/`. Run one file: `npx vitest run <path>`.
+> Run all: `npm test`. Run one file: `npx vitest run <path>`.
 
 ---
 

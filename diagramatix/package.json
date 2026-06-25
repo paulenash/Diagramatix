@@ -13,7 +13,8 @@
     "go": "next build && next start",
     "kill": "npx kill-port 3000",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:list": "node scripts/gen-tests-md.cjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "0.88.0",
