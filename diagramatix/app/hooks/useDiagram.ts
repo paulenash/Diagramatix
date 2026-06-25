@@ -8220,6 +8220,44 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         const tgtInSet = idSet.has(c.targetId);
         if (!srcInSet && !tgtInSet) return c;
 
+        // Straighten mutual sequence/flowline connectors. When both endpoints
+        // are in the aligned set they're now collinear on one axis, so recentre
+        // the attachment points on the FACING faces (offset 0.5) — the connector
+        // then runs perfectly straight along the alignment axis. The axis is
+        // read from the post-alignment geometry, so this works for every mode
+        // (and per-pair for smart align: row-mates → horizontal, column-mates →
+        // vertical). Connectors not collinear on either axis fall through to the
+        // normal recompute below.
+        if (srcInSet && tgtInSet && c.sourceId !== c.targetId
+            && (c.type === "sequence" || c.type === "flowline")) {
+          const src = elMap.get(c.sourceId);
+          const tgt = elMap.get(c.targetId);
+          if (src && tgt) {
+            const dx = (tgt.x + tgt.width / 2) - (src.x + src.width / 2);
+            const dy = (tgt.y + tgt.height / 2) - (src.y + src.height / 2);
+            const TOL = 1.5;
+            let srcSide: Side | null = null, tgtSide: Side | null = null;
+            if (Math.abs(dy) <= TOL && Math.abs(dx) > TOL) {        // collinear row → horizontal
+              srcSide = dx >= 0 ? "right" : "left";
+              tgtSide = dx >= 0 ? "left" : "right";
+            } else if (Math.abs(dx) <= TOL && Math.abs(dy) > TOL) { // collinear column → vertical
+              srcSide = dy >= 0 ? "bottom" : "top";
+              tgtSide = dy >= 0 ? "top" : "bottom";
+            }
+            if (srcSide && tgtSide) {
+              const r = computeWaypoints(src, tgt, newElements, srcSide, tgtSide, c.routingType, 0.5, 0.5);
+              return {
+                ...c,
+                sourceSide: srcSide, targetSide: tgtSide,
+                sourceOffsetAlong: 0.5, targetOffsetAlong: 0.5,
+                waypoints: r.waypoints,
+                sourceInvisibleLeader: r.sourceInvisibleLeader,
+                targetInvisibleLeader: r.targetInvisibleLeader,
+              };
+            }
+          }
+        }
+
         const dSrc = dxyMap.get(c.sourceId) ?? { dx: 0, dy: 0 };
         const dTgt = dxyMap.get(c.targetId) ?? { dx: 0, dy: 0 };
 
