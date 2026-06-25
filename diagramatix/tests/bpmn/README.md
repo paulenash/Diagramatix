@@ -30,6 +30,23 @@ live means **code + a pinned test**. Do all of this:
 4. **Regenerate the inventory:** `npm run test:list` → updates `../TESTS.md`.
 5. Flip the catalog rule `[PROPOSED]` → live.
 
+## Compound rules — split independent facets into sub-ids
+
+Many red rules assert more than one thing. How you encode that matters, because a
+green `✓` should mean the *whole* rule is covered — not half of it.
+
+- **Two faces of one behaviour** → multiple `expect()`s in a single `check()`,
+  one id. (E.g. R5.09 "top-left" = *left* **and** *above*; R8.04 = *source* **and**
+  *target* side.)
+- **Genuinely independent facets** → **one registry entry per facet, with a
+  sub-id**: `R8.02-input` / `R8.02-output`, `R8.03-single` / `R8.03-multi`, etc.
+  Each facet then gets its own green/red, so a half-tested rule can't hide behind
+  one checkmark.
+
+The meta-guard enforces *"every registered entry has a check"* but **cannot**
+detect *"you only tested one of three facets"* — so splitting is the only way to
+make compound coverage honest.
+
 ## Running
 
 ```

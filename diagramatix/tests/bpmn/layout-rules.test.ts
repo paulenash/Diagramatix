@@ -346,9 +346,11 @@ const BPMN_LAYOUT_RULES: LayoutRule[] = [
       expect(bot.sourceSide, "bottom-most branch should exit the gateway BOTTOM").toBe("bottom");
     },
   },
+  // R8.02 is compound (input → left, output → right). Two INDEPENDENT facets,
+  // so they're split into sub-ids — each gets its own green/red (see README).
   {
-    id: "R8.02",
-    title: "an input Data Object is placed to the LEFT of its associated element",
+    id: "R8.02-input",
+    title: "an INPUT data object (data → element) is placed to the LEFT of its element",
     check: () => {
       const out = layout(
         [
@@ -367,6 +369,29 @@ const BPMN_LAYOUT_RULES: LayoutRule[] = [
       const d = out.elements.find((e) => e.id === "d")!;
       expect(d.x + d.width, "input data object should sit left of its element").toBeLessThanOrEqual(t.x);
       expect(d.properties?.role, "input data object should be tagged role=input").toBe("input");
+    },
+  },
+  {
+    id: "R8.02-output",
+    title: "an OUTPUT data object (element → data) is placed to the RIGHT of its element",
+    check: () => {
+      const out = layout(
+        [
+          { id: "s", type: "start-event", label: "S" },
+          { id: "t", type: "task", label: "Process" },
+          { id: "e", type: "end-event", label: "E" },
+          { id: "d", type: "data-object", label: "Receipt" },
+        ],
+        [
+          { sourceId: "s", targetId: "t" },
+          { sourceId: "t", targetId: "e" },
+          { sourceId: "t", targetId: "d" }, // element → data ⇒ OUTPUT
+        ],
+      );
+      const t = out.elements.find((e) => e.id === "t")!;
+      const d = out.elements.find((e) => e.id === "d")!;
+      expect(d.x, "output data object should sit right of its element").toBeGreaterThanOrEqual(t.x + t.width);
+      expect(d.properties?.role, "output data object should be tagged role=output").toBe("output");
     },
   },
   {

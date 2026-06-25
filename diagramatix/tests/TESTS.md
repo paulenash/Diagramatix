@@ -2,7 +2,7 @@
 
 Auto-generated inventory of the automated test suite (Vitest). Regenerate with `npm run test:list`.
 
-- **Total tests:** 186
+- **Total tests:** 187
 - **Test files:** 34
 - **Last generated:** 2026-06-25
 
@@ -16,7 +16,7 @@ Auto-generated inventory of the automated test suite (Vitest). Regenerate with `
 - [tests/backup/coverage.test.ts](#tests-backup-coverage-test-ts) — 4 tests
 - [tests/backup/roundtrip.test.ts](#tests-backup-roundtrip-test-ts) — 1 test
 - [tests/bpmn/clean-layout.test.ts](#tests-bpmn-clean-layout-test-ts) — 6 tests
-- [tests/bpmn/layout-rules.test.ts](#tests-bpmn-layout-rules-test-ts) — 16 tests
+- [tests/bpmn/layout-rules.test.ts](#tests-bpmn-layout-rules-test-ts) — 17 tests
 - [tests/bpmn/structural-rules.test.ts](#tests-bpmn-structural-rules-test-ts) — 5 tests
 - [tests/bpmn/type-coverage.test.ts](#tests-bpmn-type-coverage-test-ts) — 5 tests
 - [tests/diagram-type-styles/order.test.ts](#tests-diagram-type-styles-order-test-ts) — 3 tests
@@ -94,7 +94,7 @@ _6 tests_
 
 ## tests/bpmn/layout-rules.test.ts
 
-_16 tests_
+_17 tests_
 
 ### BPMN layout rules (code-enforced)
 
@@ -112,7 +112,8 @@ _16 tests_
 - R5.08 — every generated pool is rendered at the same (uniform) width
 - R6.18 — event-based gateway branches enter the target event on its LEFT face
 - R6.17 — a decision gateway's top/bottom branches map to its top/bottom-most targets
-- R8.02 — an input Data Object is placed to the LEFT of its associated element
+- R8.02-input — an INPUT data object (data → element) is placed to the LEFT of its element
+- R8.02-output — an OUTPUT data object (element → data) is placed to the RIGHT of its element
 - R8.03 — a single-link Data Store is centred above/below its element, not beside it
 
 ## tests/bpmn/structural-rules.test.ts
