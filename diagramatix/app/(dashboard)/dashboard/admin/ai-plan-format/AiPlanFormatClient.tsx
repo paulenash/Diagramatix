@@ -10,6 +10,7 @@ interface PlanFormat {
   promptTemplate: string;
   aiRules: string;
   layoutRules: string;
+  jsonSchema: string | null;
   counts: {
     fullRulesChars: number;
     aiRulesChars: number;
@@ -18,13 +19,14 @@ interface PlanFormat {
   };
 }
 
-type Tab = "assembled" | "template" | "green" | "red";
+type Tab = "assembled" | "template" | "green" | "red" | "schema";
 
 const TABS: Array<{ key: Tab; label: string; hint: string }> = [
   { key: "assembled", label: "Assembled prompt", hint: "Exactly what the model receives — template + green rules injected." },
   { key: "template", label: "Prompt template", hint: "The hard-coded format spec with no rules injected." },
   { key: "green", label: "Green rules (sent to AI)", hint: "Rules the model is told to follow." },
   { key: "red", label: "Red rules (layout code)", hint: "Code-backed rules NOT sent to the model — enforced by the layout engine." },
+  { key: "schema", label: "JSON Schema", hint: "The validation schema for the plan JSON — every element/connector type and field, derived live from the Zod model." },
 ];
 
 // Display labels for the type selector. Falls back to the slug if a
@@ -70,6 +72,8 @@ export function AiPlanFormatClient() {
     ? tab === "assembled" ? data.assembledPrompt
     : tab === "template" ? data.promptTemplate
     : tab === "green" ? data.aiRules
+    : tab === "schema" ? (data.jsonSchema
+        ?? "A formal JSON schema is currently defined for BPMN only. This diagram type's plan is guided by the prompt template and examples above; a standalone schema for it hasn't been wired yet.")
     : data.layoutRules
     : "";
 

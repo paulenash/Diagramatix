@@ -15,9 +15,11 @@
  */
 
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { auth } from "@/auth";
 import { isSuperuser } from "@/app/lib/superuser";
 import { prisma } from "@/app/lib/db";
+import { AiPlanSchema } from "@/app/lib/ai/planSchema";
 import { buildSystemPrompt as buildBpmnSystemPrompt } from "@/app/lib/ai/planBpmn";
 import { buildFlowchartSystemPrompt } from "@/app/lib/ai/planFlowchart";
 import {
@@ -66,6 +68,17 @@ export async function GET(req: Request) {
   const assembledPrompt = buildFor(aiRules);
   const promptTemplate = buildFor("");
 
+  // Read-only JSON Schema for the plan the model returns. Derived live from the
+  // same Zod model that validates the response (zod 4's native z.toJSONSchema),
+  // so it can never drift from the validator. A formal plan schema exists only
+  // for BPMN today; other types return null and the UI explains that.
+  let jsonSchema: string | null = null;
+  if (diagramType === "bpmn") {
+    try {
+      jsonSchema = JSON.stringify(z.toJSONSchema(AiPlanSchema), null, 2);
+    } catch { jsonSchema = null; }
+  }
+
   return NextResponse.json({
     diagramType,
     supportedTypes: SUPPORTED_TYPES,
@@ -73,6 +86,7 @@ export async function GET(req: Request) {
     promptTemplate,
     aiRules,
     layoutRules,
+    jsonSchema,
     counts: {
       fullRulesChars: fullRules.length,
       aiRulesChars: aiRules.length,
