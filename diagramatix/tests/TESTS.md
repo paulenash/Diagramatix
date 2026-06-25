@@ -2,8 +2,8 @@
 
 Auto-generated inventory of the automated test suite (Vitest). Regenerate with `npm run test:list`.
 
-- **Total tests:** 154
-- **Test files:** 30
+- **Total tests:** 163
+- **Test files:** 32
 - **Last generated:** 2026-06-25
 
 > Run all: `npm test`. Run one file: `npx vitest run <path>`.
@@ -15,6 +15,8 @@ Auto-generated inventory of the automated test suite (Vitest). Regenerate with `
 - [tests/_setup/infrastructure.test.ts](#tests-setup-infrastructure-test-ts) — 4 tests
 - [tests/backup/coverage.test.ts](#tests-backup-coverage-test-ts) — 4 tests
 - [tests/backup/roundtrip.test.ts](#tests-backup-roundtrip-test-ts) — 1 test
+- [tests/bpmn/layout-rules.test.ts](#tests-bpmn-layout-rules-test-ts) — 4 tests
+- [tests/bpmn/type-coverage.test.ts](#tests-bpmn-type-coverage-test-ts) — 5 tests
 - [tests/diagram-type-styles/order.test.ts](#tests-diagram-type-styles-order-test-ts) — 3 tests
 - [tests/dictation/parse-vtt.test.ts](#tests-dictation-parse-vtt-test-ts) — 5 tests
 - [tests/flowchart/layout-decision-merge.test.ts](#tests-flowchart-layout-decision-merge-test-ts) — 3 tests
@@ -74,6 +76,29 @@ _1 test_
 ### full backup round-trip
 
 - restores every table, re-links the publish cycle, and rebuilds an entity tree
+
+## tests/bpmn/layout-rules.test.ts
+
+_4 tests_
+
+### BPMN layout rules (code-enforced)
+
+- registry is pinned — every rule has a unique id and an executable check
+- R5.09 — gateway labels sit top-left of the diamond, never on the right
+- R8.04 — right-to-left loop-back flows route via top/bottom, never the left face
+- R8.11 — sequence connectors on the same element+face never share a connection point
+
+## tests/bpmn/type-coverage.test.ts
+
+_5 tests_
+
+### BPMN type coverage
+
+- every BPMN palette + AI element type has a symbol definition (size/label)
+- every BPMN palette type is the AI schema can emit (or consciously palette-only)
+- every BPMN element type is handled by the renderer
+- every BPMN element type has an XSD export mapping (or a conscious exclusion)
+- every BPMN event-trigger type is handled by the renderer (the Cancel-bug guard)
 
 ## tests/diagram-type-styles/order.test.ts
 

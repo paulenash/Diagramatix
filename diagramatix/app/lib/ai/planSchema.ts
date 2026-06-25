@@ -9,7 +9,7 @@
  */
 import { z } from "zod";
 
-const ELEMENT_TYPES = [
+export const ELEMENT_TYPES = [
   "pool",
   "lane",
   "start-event",
