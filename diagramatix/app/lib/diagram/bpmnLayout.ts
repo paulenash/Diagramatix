@@ -1587,11 +1587,14 @@ export function layoutBpmnDiagram(
       }
     } else if (isMergeGateway(el)) {
       const t = (el.properties.gatewayType as string | undefined) ?? el.gatewayType ?? "exclusive";
+      // R5.09: merge-gateway labels are placed top-left of the diamond too (when
+      // the gateway actually carries a label) — same as decision gateways.
+      const mergePlacement = el.label && el.label.trim() ? decisionLabelPlacement : {};
       if (t === "exclusive" || t === "none") {
-        el.properties = { ...el.properties, gatewayType: "none", gatewayRole: "merge" };
+        el.properties = { ...el.properties, gatewayType: "none", gatewayRole: "merge", ...mergePlacement };
         el.gatewayType = "none";
       } else {
-        el.properties = { ...el.properties, gatewayRole: "merge" };
+        el.properties = { ...el.properties, gatewayRole: "merge", ...mergePlacement };
       }
     }
   }
@@ -2888,6 +2891,55 @@ export function layoutBpmnDiagram(
         ],
         label: "",
       } as Connector);
+    }
+  }
+
+  // ── R5.09: keep gateway labels clear of surrounding elements + connectors ──
+  // Gateway labels sit top-left of the diamond (R6.22 / R5.09). After routing,
+  // nudge any label that overlaps a nearby flow element or connector segment
+  // further UP — then LEFT — in small steps, so it stays top-left and as close
+  // as possible while clearing whatever's around it.
+  {
+    const LH = 14, CHAR_W = 6, GAP = 6, STEP = 8, MAX_STEPS = 16, NEAR = 320;
+    const OBST = new Set(["task", "subprocess", "subprocess-expanded", "start-event",
+      "end-event", "intermediate-event", "gateway", "data-object", "data-store"]);
+    const segs: { vx?: number; hy?: number; a: number; b: number }[] = [];
+    for (const c of finalConnectors) {
+      const w = c.waypoints ?? [];
+      for (let i = 1; i < w.length; i++) {
+        const p = w[i - 1], q = w[i];
+        if (Math.abs(p.x - q.x) < 0.5) segs.push({ vx: p.x, a: Math.min(p.y, q.y), b: Math.max(p.y, q.y) });
+        else if (Math.abs(p.y - q.y) < 0.5) segs.push({ hy: p.y, a: Math.min(p.x, q.x), b: Math.max(p.x, q.x) });
+      }
+    }
+    const hitsBox = (r: { x: number; y: number; w: number; h: number }, b: DiagramElement) =>
+      r.x < b.x + b.width && r.x + r.w > b.x && r.y < b.y + b.height && r.y + r.h > b.y;
+    const hitsSeg = (r: { x: number; y: number; w: number; h: number }, s: typeof segs[number]) =>
+      s.vx !== undefined
+        ? s.vx >= r.x && s.vx <= r.x + r.w && s.b >= r.y && s.a <= r.y + r.h
+        : s.hy! >= r.y && s.hy! <= r.y + r.h && s.b >= r.x && s.a <= r.x + r.w;
+    for (const g of elements) {
+      if (g.type !== "gateway" || !g.label || !g.label.trim()) continue;
+      const lw = (g.properties.labelWidth as number) ?? 80;
+      let ox = (g.properties.labelOffsetX as number) ?? 0;
+      let oy = (g.properties.labelOffsetY as number) ?? 7;
+      const maxChars = Math.max(1, Math.floor(lw / CHAR_W));
+      const lh = Math.max(1, Math.ceil(g.label.trim().length / maxChars)) * LH;
+      const near = elements.filter(e => e.id !== g.id && OBST.has(e.type)
+        && Math.abs((e.x + e.width / 2) - (g.x + g.width / 2)) < NEAR
+        && Math.abs((e.y + e.height / 2) - (g.y + g.height / 2)) < NEAR);
+      const box = () => ({
+        x: g.x + g.width / 2 + ox - lw / 2 - GAP,
+        y: g.y + g.height + oy - GAP,
+        w: lw + 2 * GAP, h: lh + 2 * GAP,
+      });
+      const overlaps = () => { const r = box(); return near.some(b => hitsBox(r, b)) || segs.some(s => hitsSeg(r, s)); };
+      let steps = 0;
+      while (overlaps() && steps < MAX_STEPS) {
+        if (steps % 2 === 0) oy -= STEP; else ox -= STEP;  // up first, then left
+        steps++;
+      }
+      if (steps > 0) g.properties = { ...g.properties, labelOffsetX: ox, labelOffsetY: oy };
     }
   }
 
