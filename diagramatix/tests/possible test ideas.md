@@ -15,22 +15,22 @@ Every layout-rule check we have so far proves a rule **in isolation**
 **interact** — so they need a different kind of test. Three approaches,
 weakest-to-strongest at finding the unknown:
 
-### 1. Global "clean layout" invariants — the emergent-conflict catcher (highest value)
+### 1. Global "clean layout" invariants — the emergent-conflict catcher ✅ BUILT
 
-A single reusable `assertCleanLayout(out)` helper asserting post-conditions that
-must hold **no matter which rules fired**:
+Built as `findLayoutViolations()` in `tests/bpmn/_helpers/cleanLayout.ts`, run
+over a spread of diagrams in `tests/bpmn/clean-layout.test.ts`. Checks: every
+connector has waypoints; no two ruled connectors share an attachment point
+(generalises R5.06 / R8.11 / R8.12); no gateway label overlaps a flow node or
+connector (generalises R5.09), with a small penetration tolerance so boundary
+touches don't count.
 
-- **No two connectors share an attachment point** on any element (generalises
-  R5.06 / R8.11 / R8.12 across the *whole* diagram).
-- **No gateway label box overlaps** an element or connector (R5.09, globally).
-- Every connector has waypoints; no endpoint lands inside another element's body;
-  no two siblings overlap within a lane.
-
-Run it on **every** registry case plus a few deliberately dense "interaction"
-diagrams. If e.g. R8.04 routes a loop-back onto the same bottom-centre point
-R6.19 gave a merge's outgoing flow, the shared-point invariant fails — the
-conflict surfaces as an emergent failure even though neither rule knows about the
-other. Most likely to actually catch something in a busy diagram.
+It immediately earned its keep: a dense diagram (3-way decision + merge +
+boundary event + loop-back) surfaced a real R5.09 limitation — the gateway label
+fell back onto a task because the sweep used a fixed radius. Fixed by adding
+radius-growth to R5.09 (push the label further out when the whole left arc is
+blocked). **Still TODO:** extend the invariants (element-vs-element overlap
+within a lane; connector-vs-element body crossings) and run them over the real
+golden test JSONs.
 
 ### 2. Explicit precedence pins — for the known conflicts
 

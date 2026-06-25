@@ -2996,22 +2996,29 @@ export function layoutBpmnDiagram(
       const cx = g.x + g.width / 2, cy = g.y + g.height / 2;
       const near = elements.filter(e => e.id !== g.id && OBST.has(e.type)
         && Math.abs((e.x + e.width / 2) - cx) < NEAR && Math.abs((e.y + e.height / 2) - cy) < NEAR);
-      // Label-centre position + box for a given clock angle (deg, clockwise from up).
-      const place = (deg: number) => {
+      // Label-centre position + box for a given clock angle (deg, clockwise from
+      // up) and an optional outward push (pad) added to the snug radius.
+      const place = (deg: number, pad = 0) => {
         const r = deg * Math.PI / 180, s = Math.sin(r), c = Math.cos(r);
         // Nearest-clearing radius: gateway + label half-extents projected onto the
         // angle, plus the gap — so the label hugs the gateway whatever the angle.
         const R = (g.width / 2 * Math.abs(s) + g.height / 2 * Math.abs(c))
-          + GAP + (lw / 2 * Math.abs(s) + lh / 2 * Math.abs(c));
+          + GAP + (lw / 2 * Math.abs(s) + lh / 2 * Math.abs(c)) + pad;
         const lcx = cx + R * s, lcy = cy - R * c;
         return { lcx, lcy, box: { x: lcx - lw / 2, y: lcy - lh / 2, w: lw, h: lh } };
       };
       const clear = (b: { x: number; y: number; w: number; h: number }) =>
         !near.some(e => hitsBox(b, e)) && !segs.some(s => hitsSeg(b, s));
+      // Sweep the left arc at the snug radius first; if the WHOLE arc is blocked
+      // (dense gateway), push the label progressively further out and re-sweep,
+      // so it never falls back onto an overlapping spot when a clear one exists.
       let chosen = place(START_DEG);
-      for (let d = 0; d <= SWEEP_DEG; d += STEP_DEG) {
-        const cand = place(START_DEG - d);  // sweep down the left side (up-left → left → bottom-left)
-        if (clear(cand.box)) { chosen = cand; break; }
+      let placed = false;
+      for (let pad = 0; pad <= 100 && !placed; pad += 20) {
+        for (let d = 0; d <= SWEEP_DEG; d += STEP_DEG) {
+          const cand = place(START_DEG - d, pad);  // down the left side (up-left → left → bottom-left)
+          if (clear(cand.box)) { chosen = cand; placed = true; break; }
+        }
       }
       g.properties = {
         ...g.properties,

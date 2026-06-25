@@ -2,8 +2,8 @@
 
 Auto-generated inventory of the automated test suite (Vitest). Regenerate with `npm run test:list`.
 
-- **Total tests:** 180
-- **Test files:** 33
+- **Total tests:** 186
+- **Test files:** 34
 - **Last generated:** 2026-06-25
 
 > Run all: `npm test`. Run one file: `npx vitest run <path>`.
@@ -15,6 +15,7 @@ Auto-generated inventory of the automated test suite (Vitest). Regenerate with `
 - [tests/_setup/infrastructure.test.ts](#tests-setup-infrastructure-test-ts) — 4 tests
 - [tests/backup/coverage.test.ts](#tests-backup-coverage-test-ts) — 4 tests
 - [tests/backup/roundtrip.test.ts](#tests-backup-roundtrip-test-ts) — 1 test
+- [tests/bpmn/clean-layout.test.ts](#tests-bpmn-clean-layout-test-ts) — 6 tests
 - [tests/bpmn/layout-rules.test.ts](#tests-bpmn-layout-rules-test-ts) — 16 tests
 - [tests/bpmn/structural-rules.test.ts](#tests-bpmn-structural-rules-test-ts) — 5 tests
 - [tests/bpmn/type-coverage.test.ts](#tests-bpmn-type-coverage-test-ts) — 5 tests
@@ -77,6 +78,19 @@ _1 test_
 ### full backup round-trip
 
 - restores every table, re-links the publish cycle, and rebuilds an entity tree
+
+## tests/bpmn/clean-layout.test.ts
+
+_6 tests_
+
+### BPMN clean-layout global invariants
+
+- linear flow — lays out with no global-invariant breaches
+- decision split + merge with labels — lays out with no global-invariant breaches
+- rework loop-back (R8.04) under a forward flow — lays out with no global-invariant breaches
+- two pools + bidirectional messages — lays out with no global-invariant breaches
+- data objects + store around a task — lays out with no global-invariant breaches
+- dense — 3-way decision, merge, boundary event, loop-back — lays out with no global-invariant breaches
 
 ## tests/bpmn/layout-rules.test.ts
 
