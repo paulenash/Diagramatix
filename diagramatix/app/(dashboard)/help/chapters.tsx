@@ -2297,13 +2297,22 @@ export const CHAPTERS: HelpChapter[] = [
               <li>
                 <strong>Full &amp; Selective Restore</strong> — opens a
                 tree where you choose which Orgs / Users / Projects /
-                Diagrams / Templates to restore. Two modes available:{" "}
+                Diagrams / Templates to restore. Three modes available:{" "}
                 <em>WIPE</em> (TRUNCATE every table then re-insert from
                 the file — requires typing &ldquo;WIPE&rdquo; to
-                confirm) and <em>Additive</em> (insert rows that
-                don&apos;t already exist, key Users by email).
+                confirm); <em>Additive</em> (insert rows that
+                don&apos;t already exist, key Users by email); and{" "}
+                <em>Per-table</em> (tick whole tables — e.g. just
+                Templates or AI Rules — and each ticked table&apos;s rows
+                are upserted by primary key: existing rows updated,
+                missing rows re-inserted, nothing deleted. Requires
+                typing &ldquo;RESTORE&rdquo; to confirm).
               </li>
             </ul>
+            <p className="mt-1 text-xs text-gray-500">
+              Per-table restore is a recovery power-tool — it&apos;s
+              SuperAdmin-only and never offered on the OrgAdmin backup.
+            </p>
           </>
         ),
       },

@@ -83,7 +83,7 @@ export function DatabaseClient() {
     meta: { exportedAt: string; exportedBy: string; schemaVersion: string; counts: Record<string, number> };
     orgs: InspectOrg[];
   };
-  type RestoreMode = "wipe" | "additive";
+  type RestoreMode = "wipe" | "additive" | "tables";
 
   const [restoreFile, setRestoreFile] = useState<File | null>(null);
   const [restoreMode, setRestoreMode] = useState<RestoreMode>("wipe");
@@ -94,6 +94,8 @@ export function DatabaseClient() {
     { mode: string; inserted: Record<string, number>; log: string[] } | null
   >(null);
   const [showRestoreModal, setShowRestoreModal] = useState(false);
+  // Per-table restore: which tables (from the snapshot) to additively upsert.
+  const [selectedTables, setSelectedTables] = useState<Set<string>>(new Set());
 
   // ── Rules + Prompts transfer (.diag-rules) ──
   // GET downloads, POST upserts. Used to migrate AI rules + saved
@@ -365,6 +367,38 @@ export function DatabaseClient() {
     }
   }
 
+  async function runTablesRestore() {
+    if (!restoreFile) return;
+    if (selectedTables.size === 0) {
+      setRestoreError("Tick at least one table.");
+      return;
+    }
+    if (restoreConfirm !== "RESTORE") {
+      setRestoreError("Type RESTORE (uppercase) to confirm.");
+      return;
+    }
+    setRestoreRunning(true);
+    setRestoreError(null);
+    setRestoreResult(null);
+    try {
+      const fd = new FormData();
+      fd.set("file", restoreFile);
+      fd.set("mode", "tables");
+      fd.set("confirmPhrase", "RESTORE");
+      fd.set("tables", JSON.stringify([...selectedTables]));
+      const res = await fetch("/api/admin/full-backup", { method: "POST", body: fd });
+      const data = await res.json();
+      if (!res.ok) { setRestoreError(data.error ?? `HTTP ${res.status}`); return; }
+      setRestoreResult(data.result);
+      const r = await fetch("/api/admin/database");
+      if (r.ok) setSchemaData(await r.json());
+    } catch (err) {
+      setRestoreError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setRestoreRunning(false);
+    }
+  }
+
   useEffect(() => {
     fetch("/api/admin/database")
       .then((r) => r.ok ? r.json() : null)
@@ -547,7 +581,7 @@ export function DatabaseClient() {
               setRestoreResult(null);
             }}
             className="text-xs text-red-700 border border-red-300 hover:bg-red-50 rounded px-2.5 py-1"
-            title="Full system restore from a .diag-full snapshot \u2014 wipe or selective"
+            title="Full system restore from a .diag-full snapshot \u2014 wipe, selective, or per-table"
           >
             Full &amp; Selective Restore
           </button>
@@ -897,13 +931,17 @@ export function DatabaseClient() {
       )}
 
       {/* ── FULL Restore modal ─────────────────────────────────────────
-          Two modes:
+          Three modes:
           • Wipe & Reload (destructive) — TRUNCATE then re-insert
             every row. Requires typed WIPE confirm.
           • Selective (Additive) — admin ticks orgs / users / projects /
             diagrams in a server-built tree; only ticked rows are
             inserted, additively. Email-matching users are re-parented
-            onto the live row to avoid unique-email collisions. */}
+            onto the live row to avoid unique-email collisions.
+          • Per-table — admin ticks whole tables; each ticked table's rows
+            are upserted by PK (update existing, insert missing; nothing
+            deleted). Requires typed RESTORE confirm. SuperAdmin only —
+            never exposed on the OrgAdmin backup. */}
       {showRestoreModal && (
         <div
           className="fixed inset-0 bg-black/20 flex items-center justify-center z-50"
@@ -943,6 +981,18 @@ export function DatabaseClient() {
               >
                 Selective (Additive)
               </button>
+              <button
+                onClick={() => {
+                  setRestoreMode("tables"); setRestoreError(null); setRestoreResult(null);
+                  if (restoreFile && !inspectTree && !inspecting) void inspectUpload(restoreFile);
+                }}
+                disabled={restoreRunning}
+                className={`px-3 py-1.5 text-xs rounded-t border-b-2 ${restoreMode === "tables"
+                  ? "border-amber-600 text-amber-700 font-semibold"
+                  : "border-transparent text-gray-500 hover:text-gray-700"}`}
+              >
+                Per-table
+              </button>
             </div>
 
             <div className="px-4 py-4 space-y-3 overflow-y-auto">
@@ -962,8 +1012,10 @@ export function DatabaseClient() {
     setExpandedProjects(new Set());
                     setRestoreError(null);
                     setRestoreResult(null);
-                    // Auto-inspect in additive mode so the tree appears immediately.
-                    if (f && restoreMode === "additive") void inspectUpload(f);
+                    setSelectedTables(new Set());
+                    // Auto-inspect for additive / per-table so the tree + table
+                    // counts appear immediately.
+                    if (f && (restoreMode === "additive" || restoreMode === "tables")) void inspectUpload(f);
                   }}
                   disabled={restoreRunning}
                   className="block w-full text-xs file:mr-3 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200"
@@ -1209,6 +1261,64 @@ export function DatabaseClient() {
                 </>
               )}
 
+              {restoreMode === "tables" && (
+                <>
+                  <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+                    <span className="font-semibold">Power tool.</span> Tick the tables to restore. Each ticked
+                    table&rsquo;s rows are <span className="font-semibold">upserted</span> by primary key — existing
+                    rows updated, missing rows re-inserted. Nothing is deleted, so rows not in the snapshot are
+                    left untouched. Rows whose foreign keys can&rsquo;t be satisfied are skipped (see the log).
+                  </p>
+                  {inspecting && <p className="text-xs text-gray-500">Reading snapshot…</p>}
+                  {inspectTree && (
+                    <>
+                      <div className="text-[10px] text-gray-500">
+                        Snapshot from <span className="font-mono">{inspectTree.meta.exportedAt}</span> by {inspectTree.meta.exportedBy}
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] text-gray-600">{selectedTables.size} of {Object.keys(inspectTree.meta.counts).length} tables ticked</span>
+                        <span className="flex gap-2">
+                          <button type="button" className="text-blue-600 hover:underline text-[11px]"
+                            onClick={() => setSelectedTables(new Set(Object.keys(inspectTree.meta.counts)))}>All</button>
+                          <button type="button" className="text-blue-600 hover:underline text-[11px]"
+                            onClick={() => setSelectedTables(new Set())}>None</button>
+                        </span>
+                      </div>
+                      <div className="border border-gray-200 rounded max-h-64 overflow-y-auto divide-y divide-gray-100">
+                        {Object.entries(inspectTree.meta.counts).sort((a, b) => a[0].localeCompare(b[0])).map(([table, n]) => (
+                          <label key={table} className="flex items-center gap-2 px-2 py-1 hover:bg-gray-50 cursor-pointer text-xs">
+                            <input
+                              type="checkbox"
+                              checked={selectedTables.has(table)}
+                              onChange={() => setSelectedTables((prev) => {
+                                const s = new Set(prev);
+                                if (s.has(table)) s.delete(table); else s.add(table);
+                                return s;
+                              })}
+                            />
+                            <span className="flex-1 truncate text-gray-700">{table}</span>
+                            <span className="text-[10px] text-gray-400 font-mono shrink-0">{n} row{n === 1 ? "" : "s"}</span>
+                          </label>
+                        ))}
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-700 mb-1">
+                          Type <span className="font-mono font-semibold">RESTORE</span> to confirm
+                        </label>
+                        <input
+                          type="text"
+                          value={restoreConfirm}
+                          onChange={(e) => setRestoreConfirm(e.target.value)}
+                          disabled={restoreRunning}
+                          placeholder="RESTORE"
+                          className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-amber-500 font-mono"
+                        />
+                      </div>
+                    </>
+                  )}
+                </>
+              )}
+
               {restoreError && (
                 <div className="text-[11px] text-red-700 bg-red-50 border border-red-200 rounded px-3 py-2">
                   {restoreError}
@@ -1256,6 +1366,16 @@ export function DatabaseClient() {
                   className="px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {restoreRunning ? "Restoring…" : "Restore Selected"}
+                </button>
+              )}
+              {!restoreResult && restoreMode === "tables" && (
+                <button
+                  onClick={runTablesRestore}
+                  disabled={restoreRunning || !restoreFile || !inspectTree
+                    || selectedTables.size === 0 || restoreConfirm !== "RESTORE"}
+                  className="px-3 py-1.5 text-xs font-semibold text-white bg-amber-600 rounded hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {restoreRunning ? "Restoring…" : `Restore ${selectedTables.size} Table${selectedTables.size === 1 ? "" : "s"}`}
                 </button>
               )}
             </div>

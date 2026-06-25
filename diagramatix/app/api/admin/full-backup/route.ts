@@ -23,6 +23,7 @@ import {
   parseFullBackup,
   restoreFullBackupWipe,
   restoreFullBackupAdditive,
+  restoreFullBackupTables,
   inspectFullBackup,
   type AdditiveSelection,
 } from "@/app/lib/full-backup";
@@ -211,8 +212,40 @@ export async function POST(req: Request) {
     }
   }
 
+  if (mode === "tables") {
+    // Per-table additive upsert of a chosen subset. SuperAdmin-only (this whole
+    // route is gated above); NOT exposed on the OrgAdmin backup flow.
+    if (confirmPhrase !== "RESTORE") {
+      return NextResponse.json(
+        { error: "Per-table restore requires confirmPhrase = \"RESTORE\"" },
+        { status: 400 },
+      );
+    }
+    let tables: string[];
+    try {
+      const parsed = JSON.parse(String(form.get("tables") ?? "[]"));
+      tables = Array.isArray(parsed) ? parsed.map(String) : [];
+    } catch {
+      return NextResponse.json(
+        { error: "Per-table restore requires a JSON `tables` array of table names" },
+        { status: 400 },
+      );
+    }
+    if (tables.length === 0) {
+      return NextResponse.json({ error: "Nothing selected — tick at least one table" }, { status: 400 });
+    }
+    try {
+      const result = await restoreFullBackupTables(payload, tables);
+      return NextResponse.json({ ok: true, result });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error("[admin/full-backup] POST tables error:", message);
+      return NextResponse.json({ error: message }, { status: 500 });
+    }
+  }
+
   return NextResponse.json(
-    { error: `Unknown mode: ${mode || "(empty)"} — expected "inspect" / "wipe" / "additive"` },
+    { error: `Unknown mode: ${mode || "(empty)"} — expected "inspect" / "wipe" / "additive" / "tables"` },
     { status: 400 },
   );
 }

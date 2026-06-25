@@ -159,7 +159,7 @@ export async function parseFullBackup(
 // ──────────────────────────────────────────────────────────────────────────
 
 export interface FullRestoreResult {
-  mode: "wipe" | "additive";
+  mode: "wipe" | "additive" | "tables";
   inserted: Record<string, number>;
   log: string[];
 }
@@ -302,6 +302,104 @@ export async function restoreFullBackupWipe(
 
   log.push("✔ Wipe-and-reload restore complete");
   return { mode: "wipe", inserted, log };
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Restore — per-table (additive upsert of a chosen subset of tables)
+// ──────────────────────────────────────────────────────────────────────────
+
+/** Restore ONLY the named tables, additively: every row is upserted by its
+ *  primary key (existing rows updated, missing rows inserted). NOTHING is
+ *  truncated or deleted, so rows not present in the backup are left untouched.
+ *  Tables are processed in dependency order; rows whose foreign keys can't be
+ *  satisfied (e.g. a referenced row that was neither selected nor already live)
+ *  are skipped-with-warning rather than aborting the batch. Deferred cyclic FK
+ *  pointers are re-linked at the end, best-effort.
+ *
+ *  Power-user / recovery tool — the caller MUST gate on superuser and warn.
+ *  Selecting a parent table without its children (or vice-versa) is allowed;
+ *  the per-row skip log shows anything that couldn't land. */
+export async function restoreFullBackupTables(
+  payload: FullBackupPayload,
+  selectedTables: string[],
+): Promise<FullRestoreResult> {
+  const schema = await getBackupSchema();
+  _timestampColumns = schema.timestampColumns;
+  const valid = new Set(schema.tables);
+  const wanted = new Set(selectedTables.filter((t) => valid.has(t)));
+  const inserted: Record<string, number> = {};
+  const log: string[] = [];
+  log.push(`Full backup created ${payload.exportedAt} by ${payload.exportedBy}`);
+  log.push(`Per-table additive restore of ${wanted.size} table(s): ${[...wanted].join(", ") || "(none)"}`);
+
+  // Deferred cyclic-FK columns by child table (insert/upsert with them NULL,
+  // re-link after every selected table has landed).
+  const deferByChild = new Map<string, Set<string>>();
+  for (const d of schema.deferred) {
+    const set = deferByChild.get(d.child) ?? new Set<string>();
+    d.columns.forEach((c) => set.add(c));
+    deferByChild.set(d.child, set);
+  }
+  /* eslint-disable @typescript-eslint/no-explicit-any */
+  const relinks: Array<{ table: string; where: any; data: Record<string, unknown> }> = [];
+
+  // Forward dependency order so a selected parent lands before a selected child.
+  for (const table of schema.insertOrder) {
+    if (!wanted.has(table)) continue;
+    const rows = (payload.tables[table] ?? []) as Record<string, unknown>[];
+    const delegate = (prisma as any)[delegateName(table)];
+    if (!delegate?.upsert) { log.push(`  ${table}: no client delegate — skipped`); continue; }
+    const pkCols = schema.primaryKey[table] ?? ["id"];
+    const deferCols = deferByChild.get(table);
+    let ins = 0, upd = 0, skp = 0;
+
+    for (const raw of rows) {
+      const row = convertDates(table, raw);
+      // Null any deferred FK columns on write; capture them for the re-link pass.
+      let writeRow: Record<string, unknown> = row;
+      if (deferCols && deferCols.size > 0) {
+        const captured: Record<string, unknown> = {};
+        let hasVal = false;
+        for (const c of deferCols) if (row[c] != null) { captured[c] = row[c]; hasVal = true; }
+        writeRow = { ...row };
+        for (const c of deferCols) writeRow[c] = null;
+        if (hasVal && pkCols.length === 1) {
+          relinks.push({ table, where: { [pkCols[0]]: row[pkCols[0]] }, data: captured });
+        }
+      }
+      // PK-based where: single column, or Prisma's compound-key input (a_b).
+      const where = pkCols.length === 1
+        ? { [pkCols[0]]: writeRow[pkCols[0]] }
+        : { [pkCols.join("_")]: Object.fromEntries(pkCols.map((c) => [c, writeRow[c]])) };
+      // Update payload excludes the PK columns (identity stays put).
+      const updateData = { ...writeRow };
+      for (const c of pkCols) delete updateData[c];
+      try {
+        const existing = await delegate.findUnique({ where });
+        await delegate.upsert({ where, create: writeRow as any, update: updateData as any });
+        if (existing) upd++; else ins++;
+      } catch (e) {
+        skp++;
+        const msg = e instanceof Error ? e.message.split("\n").slice(-1)[0].trim() : String(e);
+        log.push(`    skipped ${table} ${JSON.stringify(where)}: ${msg}`);
+      }
+    }
+    inserted[table] = ins;
+    log.push(`  ${table}: ${ins} inserted, ${upd} updated${skp ? `, ${skp} skipped` : ""}`);
+  }
+
+  // Re-link deferred FK pointers now the selected parents exist (best-effort;
+  // a pointer to a non-restored, non-live target simply stays NULL).
+  let relinked = 0;
+  for (const r of relinks) {
+    try { await (prisma as any)[delegateName(r.table)].update({ where: r.where, data: r.data }); relinked++; }
+    catch { /* target absent — leave the column NULL */ }
+  }
+  if (relinks.length > 0) log.push(`  Re-linked ${relinked}/${relinks.length} deferred FK pointer(s)`);
+  /* eslint-enable @typescript-eslint/no-explicit-any */
+
+  log.push("✔ Per-table restore complete");
+  return { mode: "tables", inserted, log };
 }
 
 // ──────────────────────────────────────────────────────────────────────────
