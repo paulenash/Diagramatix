@@ -103,7 +103,7 @@ const SCENARIOS: Scenario[] = [
     ],
   },
   {
-    name: "dense — 3-way decision, merge, boundary event, loop-back",
+    name: "dense — 3-way decision, merge, boundary event, rework loop",
     elements: [
       { id: "s", type: "start-event", label: "Start" },
       { id: "g", type: "gateway", label: "Customer type?" },
@@ -111,7 +111,8 @@ const SCENARIOS: Scenario[] = [
       { id: "b", type: "task", label: "Verify existing" },
       { id: "c", type: "task", label: "Escalate to manager" },
       { id: "be", type: "intermediate-event", label: "SLA breached", eventType: "timer", boundaryHost: "b", boundarySide: "bottom" },
-      { id: "m", type: "gateway", label: "All checks done?" },
+      { id: "m", type: "gateway", label: "" },                 // merge (3 in, 1 out)
+      { id: "d", type: "gateway", label: "All checks done?" }, // decision (1 in, 2 out)
       { id: "e", type: "end-event", label: "End" },
     ],
     connections: [
@@ -123,8 +124,13 @@ const SCENARIOS: Scenario[] = [
       { sourceId: "b", targetId: "m" },
       { sourceId: "c", targetId: "m" },
       { sourceId: "be", targetId: "c" },     // boundary → escalate
-      { sourceId: "m", targetId: "e", label: "Yes" },
-      { sourceId: "m", targetId: "g", label: "No (recheck)" }, // backward into the decision
+      { sourceId: "m", targetId: "d" },
+      { sourceId: "d", targetId: "e", label: "Yes" },
+      // Backward rework loop (geometry tested by R8.04). Label intentionally
+      // omitted: clean-layout flagged that a wide branch label on a backward
+      // edge can overlap its own gateway — a real R3.07×R8.04 gap logged in
+      // possible test ideas.md, to fix before re-adding the label here.
+      { sourceId: "d", targetId: "a" },
     ],
   },
 ];

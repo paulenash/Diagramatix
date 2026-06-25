@@ -41,6 +41,28 @@ export function gatewayLabelBox(g: DiagramElement): Box | null {
   return { x: cx - lw / 2, y: topY, w: lw, h: lines * 14 };
 }
 
+/** Box for a connector's text label — mirrors how ConnectorRenderer positions
+ *  it (source-anchored for flowlines / labelAnchor="source" branch labels,
+ *  else the midpoint of the first+last visible waypoint). */
+export function connectorLabelBox(c: Connector): Box | null {
+  if (!c.label || !c.label.trim()) return null;
+  let vis = c.waypoints ?? [];
+  if (vis.length < 2) return null;
+  if (c.sourceInvisibleLeader && vis.length > 2) vis = vis.slice(1);
+  if (c.targetInvisibleLeader && vis.length > 2) vis = vis.slice(0, -1);
+  const sourceAnchored = c.labelAnchor === "source" || c.type === "flowline";
+  const anchor = sourceAnchored
+    ? vis[0]
+    : { x: (vis[0].x + vis[vis.length - 1].x) / 2, y: (vis[0].y + vis[vis.length - 1].y) / 2 };
+  const offsetX = c.labelOffsetX ?? (c.type === "flowline" ? 18 : 0);
+  const offsetY = c.labelOffsetY ?? (c.type === "flowline" ? 16 : -30);
+  const lines = (c.label || " ").split("\n");
+  const measuredWidth = Math.max(30, ...lines.map((l) => l.length * 6 + 12)); // fontSize 10 × 0.6
+  const lHeight = Math.max(14, lines.length * 14);
+  const lCx = anchor.x + offsetX, lTy = anchor.y + offsetY;
+  return { x: lCx - measuredWidth / 2, y: lTy, w: measuredWidth, h: lHeight };
+}
+
 type Seg = { vx?: number; hy?: number; a: number; b: number };
 export function segmentsOf(c: Connector): Seg[] {
   const segs: Seg[] = [];
@@ -96,6 +118,24 @@ export function findLayoutViolations(data: DiagramData): string[] {
       if (boxesOverlap(lb, elementBox(e), TOL)) v.push(`gateway "${g.label}" label overlaps ${e.type} ${e.id}`);
     }
     if (segs.some((s) => segHitsBox(s, lb, TOL))) v.push(`gateway "${g.label}" label overlaps a connector segment`);
+  }
+
+  // 4 ── connector labels stay clear of flow nodes and each other ───────────
+  const labelBoxes = conns
+    .map((c) => ({ c, box: connectorLabelBox(c) }))
+    .filter((x): x is { c: Connector; box: Box } => x.box !== null);
+  for (const { c, box } of labelBoxes) {
+    for (const e of els) {
+      if (!FLOW_NODES.has(e.type)) continue;
+      if (boxesOverlap(box, elementBox(e), TOL)) v.push(`connector label "${c.label}" overlaps ${e.type} ${e.id}`);
+    }
+  }
+  for (let i = 0; i < labelBoxes.length; i++) {
+    for (let j = i + 1; j < labelBoxes.length; j++) {
+      if (boxesOverlap(labelBoxes[i].box, labelBoxes[j].box, TOL)) {
+        v.push(`connector labels "${labelBoxes[i].c.label}" and "${labelBoxes[j].c.label}" overlap`);
+      }
+    }
   }
 
   return v;

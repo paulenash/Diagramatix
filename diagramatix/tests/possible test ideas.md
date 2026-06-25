@@ -73,6 +73,24 @@ fiddly to assert robustly with a synthetic layout (label placement / sizing):
   R6.11 (an expanded subprocess gets an internal start/end event), R7.04 (embedded
   event sub-processes stack at the bottom of the outer EP).
 
+## Known gaps found by the clean-layout invariant
+
+Real overlaps surfaced by `findLayoutViolations` that aren't fixed yet:
+
+- **R3.07 × R8.04 — backward-edge decision branch labels.** A decision branch
+  whose connector is a backward (loop-back) edge can have its source-anchored
+  label overlap its OWN gateway: the stored `srcSide` (e.g. "bottom") can
+  disagree with the routed exit (it actually leaves the side face at centre
+  height), so R3.07 anchors a wide label at the wrong edge and it extends back
+  over the diamond. Reproduce by re-adding a label to the `d → a` loop-back in
+  `clean-layout.test.ts`'s dense scenario. Fix R3.07 to key off the real exit
+  geometry / clear the gateway box, then restore the label + assertion.
+- **Loop-back INTO a decision gateway de-classifies it.** A gateway with a
+  branch AND an incoming loop-back has 2 incomings, so `isDecisionGateway`
+  (requires ≤1 incoming) returns false → its branch labels fall back to the
+  sequence default (midpoint) instead of being source-anchored. Edge case;
+  normal rework loops return to a task.
+
 ## Other ideas
 
 _(add here)_

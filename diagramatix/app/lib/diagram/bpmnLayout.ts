@@ -2770,12 +2770,13 @@ export function layoutBpmnDiagram(
       .sort((a, b) => a.x - b.x);
     const stagger = (grp: { c: Connector; x: number }[]) => {
       if (grp.length < 2) return;
-      grp.forEach((o, i) => {
-        if (i === 0) return;
-        const tier = Math.ceil(i / 2);
-        const dir = (i % 2) ? -1 : 1;   // alternate above / below
-        o.c.labelOffsetY = (o.c.labelOffsetY ?? 0) + dir * tier * STEP;
-      });
+      // ASSIGN a centred spread (don't ADD to each base): adding could overshoot
+      // when the bases already differ and net a gap smaller than a label height,
+      // leaving the labels overlapping. Centring on the group's mean base keeps
+      // them in the inter-pool gap while guaranteeing a full STEP between rows.
+      const baseY = grp.reduce((sum, o) => sum + (o.c.labelOffsetY ?? 0), 0) / grp.length;
+      const n = grp.length;
+      grp.forEach((o, i) => { o.c.labelOffsetY = baseY + (i - (n - 1) / 2) * STEP; });
     };
     let group: { c: Connector; x: number }[] = [];
     for (const o of labelled) {

@@ -90,7 +90,7 @@ _6 tests_
 - rework loop-back (R8.04) under a forward flow — lays out with no global-invariant breaches
 - two pools + bidirectional messages — lays out with no global-invariant breaches
 - data objects + store around a task — lays out with no global-invariant breaches
-- dense — 3-way decision, merge, boundary event, loop-back — lays out with no global-invariant breaches
+- dense — 3-way decision, merge, boundary event, rework loop — lays out with no global-invariant breaches
 
 ## tests/bpmn/layout-rules.test.ts
 
