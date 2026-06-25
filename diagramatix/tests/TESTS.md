@@ -2,7 +2,7 @@
 
 Auto-generated inventory of the automated test suite (Vitest). Regenerate with `npm run test:list`.
 
-- **Total tests:** 153
+- **Total tests:** 154
 - **Test files:** 30
 - **Last generated:** 2026-06-25
 
@@ -13,7 +13,7 @@ Auto-generated inventory of the automated test suite (Vitest). Regenerate with `
 ## Contents
 
 - [tests/_setup/infrastructure.test.ts](#tests-setup-infrastructure-test-ts) — 4 tests
-- [tests/backup/coverage.test.ts](#tests-backup-coverage-test-ts) — 3 tests
+- [tests/backup/coverage.test.ts](#tests-backup-coverage-test-ts) — 4 tests
 - [tests/backup/roundtrip.test.ts](#tests-backup-roundtrip-test-ts) — 1 test
 - [tests/diagram-type-styles/order.test.ts](#tests-diagram-type-styles-order-test-ts) — 3 tests
 - [tests/dictation/parse-vtt.test.ts](#tests-dictation-parse-vtt-test-ts) — 5 tests
@@ -58,13 +58,14 @@ _4 tests_
 
 ## tests/backup/coverage.test.ts
 
-_3 tests_
+_4 tests_
 
 ### backup coverage
 
 - the full backup enumerates every catalog table with a working delegate
 - orders all tables and defers the Diagram↔PublishedVersion cycle
 - scoped backups account for every catalog table (covered or consciously omitted)
+- deliberately omits the Simulator tables from scoped backups (asserted, not just commented)
 
 ## tests/backup/roundtrip.test.ts
 

@@ -28,24 +28,28 @@ const SCOPED_COVERED = new Set<string>([
   "EntityList", "EntityNode",
 ]);
 
+// Simulator tables: project/org-scoped teams + project-scoped studies /
+// scenarios / runs, plus the global example catalog. The full SuperAdmin backup
+// carries these (catalog-driven); wiring them into the SCOPED org/user backups
+// so a project backup round-trips a whole simulation is a deliberate follow-up.
+// Single-sourced here and PINNED by the "deliberately omits the Simulator
+// tables" test below, so the omission is an asserted decision, not a comment.
+const SIMULATOR_TABLES = [
+  "SimulationTeam", "SimulationStudy", "SimulationStudyRoot",
+  "SimulationScenario", "SimulationRun", "SimulationExample",
+] as const;
+
 // Tables the scoped backups deliberately DON'T carry — publish lineage,
-// review workflow, cross-tenant config, notifications. Only the SuperAdmin
-// full backup carries these. A new table lands here only as a conscious
-// decision.
+// review workflow, cross-tenant config, notifications, and (for now) the
+// Simulator. Only the SuperAdmin full backup carries these. A new table lands
+// here only as a conscious decision.
 const SCOPED_OMITTED = new Set<string>([
   "ProjectShare", "PublishedVersion", "PublicationBundle", "PublicationBundleDiagram",
   "PublicationBundleAudience", "PendingBundleAudience", "DiagramFeedback", "Notification",
   "CollaborationGroup", "CollaborationGroupMember", "DiagramReview", "DiagramReviewer",
   "OwnershipTransfer", "ScannerRule", "SubscriptionLevel", "Feature", "BubbleHelp",
   "DiagramTypeStyle",
-  // Simulator: project/org-scoped teams + project-scoped studies/scenarios/
-  // runs. The full SuperAdmin backup carries these (catalog-driven); wiring
-  // them into the SCOPED org/user backups so a project backup round-trips a
-  // whole simulation is a deliberate follow-up.
-  "SimulationTeam", "SimulationStudy", "SimulationStudyRoot",
-  "SimulationScenario", "SimulationRun",
-  // Global example catalog (not org/project-scoped, like Feature).
-  "SimulationExample",
+  ...SIMULATOR_TABLES,
 ]);
 
 describe("backup coverage", () => {
@@ -78,5 +82,23 @@ describe("backup coverage", () => {
       unaccounted,
       `New table(s) not wired into the org/user backup — cover them or add to SCOPED_OMITTED: ${unaccounted.join(", ")}`,
     ).toEqual([]);
+  });
+
+  it("deliberately omits the Simulator tables from scoped backups (asserted, not just commented)", async () => {
+    const schema = await getBackupSchema();
+    for (const t of SIMULATOR_TABLES) {
+      // Still a real catalog table — a rename / removal trips this so the pin
+      // can't quietly reference a table that no longer exists.
+      expect(schema.tables, `${t} is no longer a catalog table — update SIMULATOR_TABLES`).toContain(t);
+      // Pinned as a CONSCIOUS scoped-backup omission.
+      expect(SCOPED_OMITTED.has(t), `${t} must be a conscious scoped-backup omission`).toBe(true);
+      // The tripwire for the follow-up: the day the Simulator is wired into the
+      // scoped org/user backup, move the table to SCOPED_COVERED — and THIS
+      // fails, reminding you to drop it from the pin and add round-trip coverage.
+      expect(
+        SCOPED_COVERED.has(t),
+        `${t} is now scoped-covered — remove it from SIMULATOR_TABLES and add round-trip coverage`,
+      ).toBe(false);
+    }
   });
 });
