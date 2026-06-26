@@ -47,6 +47,14 @@ export interface BackupSchema {
   timestampColumns: Record<string, string[]>;
   /** table → its primary-key column(s) (used to re-link deferred edges). */
   primaryKey: Record<string, string[]>;
+  /** table → list of UNIQUE column-sets (excluding the primary key). Used by the
+   *  per-table restore to fall back to a natural key when a row arrives with a
+   *  fresh PK but collides on a secondary unique (e.g. User.email). (DATA-27) */
+  uniqueKeys: Record<string, string[][]>;
+  /** table → its nullable FK column names. Used by the per-table restore to
+   *  null-and-retry a row whose nullable cross-table FK points at an absent
+   *  target, instead of dropping the row. (DATA-28) */
+  nullableFkColumns: Record<string, string[]>;
 }
 
 /** Map a PascalCase table/model name to its Prisma client delegate (camelCase
@@ -120,6 +128,32 @@ async function fetchForeignKeys(): Promise<FkEdge[]> {
     columns: (r.columns ?? "").split(",").filter(Boolean),
     nullable: !r.all_notnull,
   }));
+}
+
+/** Unique column-sets per table (excludes the primary key). Reads pg_index so it
+ *  catches both Prisma `@unique` (unique index) and `@@unique` constraints. */
+async function fetchUniqueKeys(): Promise<Record<string, string[][]>> {
+  const { rows } = await pgPool.query<{
+    table_name: string; index_name: string; column_name: string; ord: string;
+  }>(
+    `SELECT c.relname AS table_name, i.relname AS index_name, a.attname AS column_name, k.ord
+       FROM pg_index ix
+       JOIN pg_class c ON c.oid = ix.indrelid
+       JOIN pg_class i ON i.oid = ix.indexrelid
+       JOIN pg_namespace n ON n.oid = c.relnamespace
+       JOIN unnest(ix.indkey) WITH ORDINALITY AS k(attnum, ord) ON true
+       JOIN pg_attribute a ON a.attrelid = ix.indrelid AND a.attnum = k.attnum
+      WHERE ix.indisunique AND NOT ix.indisprimary AND n.nspname = 'public'
+      ORDER BY i.relname, k.ord`,
+  );
+  const byIndex: Record<string, { table: string; cols: string[] }> = {};
+  for (const r of rows) {
+    const e = (byIndex[r.index_name] ??= { table: r.table_name, cols: [] });
+    e.cols.push(r.column_name);
+  }
+  const map: Record<string, string[][]> = {};
+  for (const { table, cols } of Object.values(byIndex)) (map[table] ??= []).push(cols);
+  return map;
 }
 
 /**
@@ -204,14 +238,23 @@ let cached: BackupSchema | null = null;
  *  Cached for the process lifetime (the schema doesn't change at runtime). */
 export async function getBackupSchema(): Promise<BackupSchema> {
   if (cached) return cached;
-  const [tables, timestampColumns, primaryKey, fks] = await Promise.all([
+  const [tables, timestampColumns, primaryKey, fks, uniqueKeys] = await Promise.all([
     fetchTables(),
     fetchTimestampColumns(),
     fetchPrimaryKeys(),
     fetchForeignKeys(),
+    fetchUniqueKeys(),
   ]);
   const { insertOrder, deferred } = planOrder(tables, fks);
-  cached = { tables, insertOrder, deferred, timestampColumns, primaryKey };
+  // table → nullable FK columns (dedup) for the per-table restore's null-and-retry.
+  const nullableFkColumns: Record<string, string[]> = {};
+  for (const e of fks) {
+    if (!e.nullable || e.child === e.parent) continue;
+    const set = new Set(nullableFkColumns[e.child] ?? []);
+    e.columns.forEach((c) => set.add(c));
+    nullableFkColumns[e.child] = [...set];
+  }
+  cached = { tables, insertOrder, deferred, timestampColumns, primaryKey, uniqueKeys, nullableFkColumns };
   return cached;
 }
 

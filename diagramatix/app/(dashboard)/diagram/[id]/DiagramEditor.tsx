@@ -804,7 +804,11 @@ export function DiagramEditor({
     originalData: DiagramData;
   } | null>(null);
 
-  const { saveStatus, lastSavedAt, saveNow } = useAutoSave(diagramId, data, 1500, templateEditState !== null || !!readOnly);
+  // UI-02: gates the autosave timer while previewing a history snapshot;
+  // prePreviewDataRef holds the real diagram so a discard reverts the canvas.
+  const [historyPreviewActive, setHistoryPreviewActive] = useState(false);
+  const prePreviewDataRef = useRef<DiagramData | null>(null);
+  const { saveStatus, lastSavedAt, saveNow } = useAutoSave(diagramId, data, 1500, templateEditState !== null || !!readOnly || historyPreviewActive);
   saveNowRef.current = saveNow;
   saveStatusRef.current = saveStatus;
   const effectiveUpdatedAt = lastSavedAt ?? updatedAt;
@@ -835,7 +839,11 @@ export function DiagramEditor({
       }
       if ((e.ctrlKey || e.metaKey) && e.key === "s") {
         e.preventDefault();
-        saveNow();
+        // UI-01: this effect's deps are [undo, redo] (both stable), so it runs
+        // once on mount and would capture the FIRST-render saveNow — which closes
+        // over the original initialData and overwrites edits. Use the ref, which
+        // always points at the latest saveNow.
+        void saveNowRef.current?.();
       }
     }
     window.addEventListener("keydown", handleKeyDown);
@@ -3885,7 +3893,11 @@ export function DiagramEditor({
             diagramId={diagramId}
             hasUnsavedChanges={saveStatus === "unsaved"}
             onPreview={(previewData) => {
-              // Load the snapshot into the canvas but do NOT save — user can save/discard
+              // Load the snapshot into the canvas but do NOT save — user can save/discard.
+              // UI-02: remember the real diagram on entering preview, and pause
+              // autosave, so the previewed snapshot can't be silently persisted.
+              if (!historyPreviewActive) prePreviewDataRef.current = data;
+              setHistoryPreviewActive(true);
               setData({
                 ...data,
                 elements: previewData.elements,
@@ -3907,9 +3919,22 @@ export function DiagramEditor({
                   setData(fresh.data);
                 }
               } catch { /* ignore */ }
+              // UI-02: server applied the restore — preview is over, resume autosave.
+              setHistoryPreviewActive(false);
+              prePreviewDataRef.current = null;
               setShowHistoryPanel(false);
             }}
-            onClose={() => setShowHistoryPanel(false)}
+            onClose={() => {
+              // UI-02: discard — revert the canvas to the real diagram we stashed
+              // on entering preview, then resume autosave. Without this the
+              // previewed snapshot would linger and get saved on the next edit/nav.
+              if (historyPreviewActive && prePreviewDataRef.current) {
+                setData(prePreviewDataRef.current);
+              }
+              setHistoryPreviewActive(false);
+              prePreviewDataRef.current = null;
+              setShowHistoryPanel(false);
+            }}
           />
         )}
       </div>

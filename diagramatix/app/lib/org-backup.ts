@@ -314,6 +314,9 @@ export async function restoreOrgBackupAdditive(
   }
 
   const userIdMap = new Map<string, string>();
+  // DATA-13: users this restore actually CREATES (vs. email-matched existing
+  // live users). Only created users may be auto-added to the target org.
+  const createdUserIds = new Set<string>();
   const projectIdMap = new Map<string, string>();
   const diagramIdMap = new Map<string, string>();
   for (const id of projectSet) projectIdMap.set(id, shortCuid());
@@ -331,20 +334,26 @@ export async function restoreOrgBackupAdditive(
         }
         const newId = shortCuid();
         userIdMap.set(String(u.id), newId);
+        createdUserIds.add(newId);
         await tx.user.create({
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           data: { ...convertDates("User", u), id: newId } as any,
         });
         inserted.User = (inserted.User ?? 0) + 1;
       }
-      // Ensure every involved user is a member of the target Org.
+      // DATA-13: only auto-add users this restore CREATED to the target org.
+      // Force-joining an email-matched EXISTING live user (who belongs to some
+      // other tenant) is cross-tenant membership injection — skip them.
+      let skippedMembership = 0;
       for (const [, liveUserId] of userIdMap) {
+        if (!createdUserIds.has(liveUserId)) { skippedMembership++; continue; }
         const exists = await tx.orgMember.findFirst({ where: { orgId: targetOrgId, userId: liveUserId }, select: { id: true } });
         if (!exists) {
           await tx.orgMember.create({ data: { id: shortCuid(), orgId: targetOrgId, userId: liveUserId, role: "Viewer" } });
           inserted.OrgMember = (inserted.OrgMember ?? 0) + 1;
         }
       }
+      if (skippedMembership > 0) log.push(`${skippedMembership} email-matched existing user(s) NOT auto-added to the org (cross-tenant guard)`);
       // Projects → target org, remapped owner.
       for (const p of (payload.tables.Project as AnyRow[]).filter(p => projectSet.has(String(p.id)))) {
         await tx.project.create({

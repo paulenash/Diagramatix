@@ -76,19 +76,11 @@ export async function archiveDiagram(
 ) {
   const archive = await getArchiveProject();
 
-  // Read current diagram data
-  const diagram = await prisma.diagram.findFirst({
-    where: { id: diagramId },
-  });
-  if (!diagram) throw new Error("Diagram not found");
-
   // Look up the diagram's folder inside its source project so the
   // archived-diagrams UI can group by user → project → folder.
   const folderInfo = await lookupOriginalFolder(originalProjectId, diagramId);
 
-  // Inject archive metadata into the data JSON
-  const data = (diagram.data as Record<string, unknown>) ?? {};
-  data._archive = {
+  const archiveMeta = {
     _archived: true,
     _archivedAt: new Date().toISOString(),
     _archivedFromUserId: originalUserId,
@@ -99,11 +91,19 @@ export async function archiveDiagram(
     _archivedFromFolderName: folderInfo.name,
   };
 
-  // Move diagram to archive project under admin's userId via raw SQL
-  await pgPool.query(
-    'UPDATE "Diagram" SET "data" = $1::jsonb, "userId" = $2, "projectId" = $3, "updatedAt" = NOW() WHERE id = $4',
-    [JSON.stringify(data), archive.adminId, archive.id, diagramId]
+  // DATA-05: merge ONLY the _archive key via jsonb_set in a single statement.
+  // Previously this read the whole `data` JSON in JS and wrote it all back, so a
+  // concurrent autosave landing between read and write was silently clobbered.
+  // jsonb_set re-reads the row's current data at write time, preserving any
+  // concurrent edits to elements/connectors. rowCount==0 ⇒ the diagram is gone.
+  const res = await pgPool.query(
+    `UPDATE "Diagram"
+        SET "data" = jsonb_set(COALESCE("data", '{}'::jsonb), '{_archive}', $1::jsonb, true),
+            "userId" = $2, "projectId" = $3, "updatedAt" = NOW()
+      WHERE id = $4`,
+    [JSON.stringify(archiveMeta), archive.adminId, archive.id, diagramId]
   );
+  if (res.rowCount === 0) throw new Error("Diagram not found");
 }
 
 /** Restore a diagram from the archive to its original owner/project */
@@ -137,12 +137,13 @@ export async function restoreDiagram(diagramId: string): Promise<{ success: bool
     if (project) targetProjectId = originalProjectId;
   }
 
-  // Remove archive metadata from data
-  delete data._archive;
-
+  // DATA-05: strip ONLY the _archive key with the jsonb `-` operator in a single
+  // statement (was: write the whole data blob back, clobbering concurrent edits).
   await pgPool.query(
-    'UPDATE "Diagram" SET "data" = $1::jsonb, "userId" = $2, "projectId" = $3, "updatedAt" = NOW() WHERE id = $4',
-    [JSON.stringify(data), originalUserId, targetProjectId, diagramId]
+    `UPDATE "Diagram"
+        SET "data" = "data" - '_archive', "userId" = $1, "projectId" = $2, "updatedAt" = NOW()
+      WHERE id = $3`,
+    [originalUserId, targetProjectId, diagramId]
   );
 
   return { success: true };

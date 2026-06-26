@@ -32,6 +32,7 @@ import { NextResponse } from "next/server";
 import type Stripe from "stripe";
 import { prisma } from "@/app/lib/db";
 import { stripe } from "@/app/lib/stripe";
+import { monthlyPeriodKey } from "@/app/lib/subscription";
 
 // Stripe SDK uses Node APIs (crypto for HMAC). Edge runtime would
 // break signature verification.
@@ -147,7 +148,24 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
 async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   const userId = await userIdForSubscription(subscription);
   if (!userId) return;
-  await applySubscriptionToUser(userId, subscription, { reassignTrial: false });
+  // DATA-04: Stripe does NOT guarantee webhook delivery order — a stale `updated`
+  // event can arrive AFTER a `deleted` and resurrect a canceled subscription (or a
+  // late downgrade can clobber a newer upgrade). Re-fetch the CANONICAL current
+  // state from Stripe and apply that, so out-of-order delivery always converges to
+  // the truth instead of whatever the (possibly stale) event payload says.
+  let canonical = subscription;
+  try {
+    canonical = await stripe.subscriptions.retrieve(subscription.id);
+  } catch (e) {
+    console.error(`[stripe/webhook] could not re-fetch subscription ${subscription.id}; applying event payload`, e);
+  }
+  // If the live subscription is actually terminal, don't resurrect it — mirror the
+  // deletion path (sets the grace marker) instead of writing an "active" tier back.
+  if (canonical.status === "canceled" || canonical.status === "incomplete_expired" || canonical.status === "unpaid") {
+    await handleSubscriptionDeleted(canonical);
+    return;
+  }
+  await applySubscriptionToUser(userId, canonical, { reassignTrial: false });
 }
 
 /**
@@ -221,7 +239,7 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
   if (!subscriptionId) return;
   const user = await prisma.user.findUnique({
     where: { stripeSubscriptionId: subscriptionId },
-    select: { id: true, subscriptionAssignedAt: true },
+    select: { id: true, subscriptionAssignedAt: true, createdAt: true },
   });
   if (!user) return;
 
@@ -230,13 +248,20 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
     data: { stripeSubscriptionStatus: "active" },
   });
 
-  // Reset monthly counters. Lifetime metrics (periodKey = "all-time")
-  // are intentionally left alone — those are Free-tier counters that
-  // don't reset across periods.
+  // DATA-17: clear only PRIOR monthly periods, never the current one. The old
+  // code deleted ALL non-"all-time" counters every time this event was seen, so a
+  // Stripe redelivery / late delivery (after the user had already consumed quota
+  // in the new period) wiped that consumption and handed out a fresh allowance.
+  // periodKey is the monthly-anniversary date ("YYYY-MM-DD"); a lexical `<` is
+  // chronological, so this clears stale periods and is idempotent on replay while
+  // leaving the current period's usage intact. (New periods get fresh rows on
+  // their own key, so an explicit "reset to zero" isn't actually needed.)
+  const currentPeriodKey = monthlyPeriodKey(user.subscriptionAssignedAt ?? user.createdAt);
   await prisma.usageCounter.deleteMany({
     where: {
       userId: user.id,
       NOT: { periodKey: "all-time" },
+      periodKey: { lt: currentPeriodKey },
     },
   });
 }

@@ -253,6 +253,19 @@ export async function DELETE(req: Request, { params }: Params) {
     }
   }
 
-  await prisma.project.delete({ where: { id } });
-  return NextResponse.json({ success: true, archived });
+  // DATA-16: deleting the project SetNull-s its diagrams to Unorganised AND
+  // cascade-deletes its PublicationBundles. A still-PUBLISHED child would become
+  // an invisible orphan — unfiled, no bundle membership, unreachable by business
+  // users, yet lifecycle=PUBLISHED with a live currentPublishedVersionId. Demote
+  // any published child to DRAFT (clearing the pointer) first, in one transaction
+  // with the delete, so they land as normal editable Unorganised drafts.
+  const delResult = await prisma.$transaction(async (tx) => {
+    const demoted = await tx.diagram.updateMany({
+      where: { projectId: id, orgId, lifecycle: "PUBLISHED" },
+      data: { lifecycle: "DRAFT", currentPublishedVersionId: null },
+    });
+    await tx.project.delete({ where: { id } });
+    return { demoted: demoted.count };
+  });
+  return NextResponse.json({ success: true, archived, unpublished: delResult.demoted });
 }

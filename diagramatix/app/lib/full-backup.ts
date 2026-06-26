@@ -360,6 +360,8 @@ export async function restoreFullBackupTables(
       if (!delegate?.upsert) { log.push(`  ${table}: no client delegate — skipped`); continue; }
       const pkCols = schema.primaryKey[table] ?? ["id"];
       const deferCols = deferByChild.get(table);
+      const uniqueSets = schema.uniqueKeys[table] ?? [];          // DATA-27
+      const nullableFks = schema.nullableFkColumns[table] ?? [];  // DATA-28
       let ins = 0, upd = 0, skp = 0;
 
       for (const raw of rows) {
@@ -389,18 +391,64 @@ export async function restoreFullBackupTables(
         // Omit them from the UPDATE payload (so the live pointer is preserved);
         // the re-link pass re-applies the backup's value when its target exists.
         if (deferCols) for (const c of deferCols) delete updateData[c];
+
+        const idWhereOf = (r2: Record<string, unknown>) => pkCols.length === 1
+          ? { [pkCols[0]]: r2[pkCols[0]] }
+          : { [pkCols.join("_")]: Object.fromEntries(pkCols.map((c) => [c, r2[c]])) };
+        // Resolve an existing row by PK, then (DATA-27) by any secondary unique
+        // key — so a row with a fresh PK that collides on e.g. User.email or
+        // DiagramRules(category,userId,orgId) UPDATES the live row instead of
+        // throwing a unique-violation and being silently skipped.
+        const findExisting = async (): Promise<Record<string, unknown> | null> => {
+          const byPk = await delegate.findUnique({ where });
+          if (byPk) return byPk;
+          for (const cols of uniqueSets) {
+            if (cols.some((c) => writeRow[c] == null)) continue;
+            const m = await delegate.findFirst({ where: Object.fromEntries(cols.map((c) => [c, writeRow[c]])) });
+            if (m) return m;
+          }
+          return null;
+        };
+        // One write attempt. nullFks=true nulls every nullable cross-table FK
+        // first (DATA-28) so a row whose optional FK points at an absent target
+        // still lands (empty slot) rather than being dropped.
+        const attempt = async (nullFks: boolean): Promise<"ins" | "upd"> => {
+          const cr: Record<string, unknown> = nullFks ? { ...writeRow } : writeRow;
+          const up: Record<string, unknown> = nullFks ? { ...updateData } : updateData;
+          if (nullFks) for (const c of nullableFks) { cr[c] = null; up[c] = null; }
+          const existing = await findExisting();
+          if (existing) { await delegate.update({ where: idWhereOf(existing), data: up as any }); return "upd"; }
+          await delegate.create({ data: cr as any });
+          return "ins";
+        };
+
         await tx.$executeRawUnsafe("SAVEPOINT dgx_row");
         try {
-          const existing = await delegate.findUnique({ where });
-          await delegate.upsert({ where, create: writeRow as any, update: updateData as any });
+          const r = await attempt(false);
           await tx.$executeRawUnsafe("RELEASE SAVEPOINT dgx_row");
-          if (existing) upd++; else ins++;
+          if (r === "upd") upd++; else ins++;
         } catch (e) {
           await tx.$executeRawUnsafe("ROLLBACK TO SAVEPOINT dgx_row");
-          await tx.$executeRawUnsafe("RELEASE SAVEPOINT dgx_row");
-          skp++;
-          const msg = e instanceof Error ? e.message.split("\n").slice(-1)[0].trim() : String(e);
-          log.push(`    skipped ${table} ${JSON.stringify(where)}: ${msg}`);
+          let recovered = false;
+          if (nullableFks.length > 0) {
+            try {
+              const r = await attempt(true);
+              await tx.$executeRawUnsafe("RELEASE SAVEPOINT dgx_row");
+              if (r === "upd") upd++; else ins++;
+              recovered = true;
+              log.push(`    ${table} ${JSON.stringify(where)}: nulled absent FK(s) [${nullableFks.join(",")}] and restored`);
+            } catch {
+              await tx.$executeRawUnsafe("ROLLBACK TO SAVEPOINT dgx_row");
+              await tx.$executeRawUnsafe("RELEASE SAVEPOINT dgx_row");
+            }
+          } else {
+            await tx.$executeRawUnsafe("RELEASE SAVEPOINT dgx_row");
+          }
+          if (!recovered) {
+            skp++;
+            const msg = e instanceof Error ? e.message.split("\n").slice(-1)[0].trim() : String(e);
+            log.push(`    skipped ${table} ${JSON.stringify(where)}: ${msg}`);
+          }
         }
       }
       inserted[table] = ins;
@@ -663,7 +711,8 @@ export async function restoreFullBackupAdditive(
     if (!d) continue;
     userSet.add(String(d.userId));
     orgSet.add(String(d.orgId));
-    if (d.projectId) projectSet.add(String(d.projectId));
+    // DATA-12: only follow a projectId that resolves to a real backup row.
+    if (d.projectId && projectsById.has(String(d.projectId))) projectSet.add(String(d.projectId));
   }
   for (const pid of projectSet) {
     const p = projectsById.get(pid);
@@ -700,7 +749,10 @@ export async function restoreFullBackupAdditive(
   const diagramIdMap = new Map<string, string>();
 
   for (const id of orgSet) orgIdMap.set(id, shortCuid());
-  for (const id of projectSet) projectIdMap.set(id, shortCuid());
+  // DATA-12: only allocate a remapped id for project ids that resolve to a real
+  // backup row. Otherwise the diagram's `projectId ? map.get() ?? null` below
+  // would receive a freshly-minted cuid that never gets inserted → dangling FK.
+  for (const id of projectSet) if (projectsById.has(id)) projectIdMap.set(id, shortCuid());
   for (const id of diagramSet) diagramIdMap.set(id, shortCuid());
   let usersReused = 0;
   for (const u of selectedUsers) {
@@ -709,6 +761,11 @@ export async function restoreFullBackupAdditive(
     if (live) {
       userIdMap.set(String(u.id), live);
       usersReused++;
+      // DATA-11: additive restore identifies users by EMAIL ALONE (a global-
+      // identity assumption) and re-parents the backup user's data onto the
+      // matched live row. Audit every reuse so an admin can catch data attached
+      // to an unintended account in another context.
+      log.push(`  reused live user for ${email} → ${live} (data re-parented onto existing row)`);
     } else {
       userIdMap.set(String(u.id), shortCuid());
     }

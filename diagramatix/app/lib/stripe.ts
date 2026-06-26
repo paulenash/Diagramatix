@@ -53,21 +53,50 @@ export async function getOrCreateStripeCustomer(user: {
 }): Promise<string> {
   if (user.stripeCustomerId) return user.stripeCustomerId;
 
-  const customer = await stripe.customers.create({
-    email: user.email,
-    name: user.name ?? undefined,
-    // Embed our user ID so the webhook can correlate back from Stripe
-    // events that don't include client_reference_id (e.g. invoice.*
-    // events from automatic renewals).
-    metadata: { diagramatixUserId: user.id },
-  });
+  // DATA-31: customer-create and the DB persist below are two non-atomic steps.
+  // If a previous call created the Stripe customer but the persist failed, the
+  // customer exists in Stripe yet User.stripeCustomerId is still null — and the
+  // old code would then create a SECOND customer, leaking duplicates (and
+  // detaching the first one's payment method / subscription history). Before
+  // creating, look for a customer already tagged with our user id and reuse it.
+  // (customers.list is immediately consistent; customers.search lags ~1 min.)
+  let customerId: string | null = null;
+  try {
+    const existing = await stripe.customers.list({ email: user.email, limit: 100 });
+    const match = existing.data.find(
+      (c) => !c.deleted && c.metadata?.diagramatixUserId === user.id,
+    );
+    if (match) customerId = match.id;
+  } catch (e) {
+    console.error(`[stripe] customer lookup failed for user ${user.id}; will create a new one`, e);
+  }
 
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { stripeCustomerId: customer.id },
-  });
+  if (!customerId) {
+    const customer = await stripe.customers.create({
+      email: user.email,
+      name: user.name ?? undefined,
+      // Embed our user ID so the webhook can correlate back from Stripe
+      // events that don't include client_reference_id (e.g. invoice.*
+      // events from automatic renewals) — and so the reuse lookup above works.
+      metadata: { diagramatixUserId: user.id },
+    });
+    customerId = customer.id;
+  }
 
-  return customer.id;
+  try {
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { stripeCustomerId: customerId },
+    });
+  } catch (e) {
+    // The customer is tagged with diagramatixUserId, so the reuse lookup above
+    // will pick it up on the next call rather than creating a duplicate — no
+    // compensating delete needed (and safer, since it may hold a subscription).
+    console.error(`[stripe] failed to persist stripeCustomerId=${customerId} for user ${user.id}; it will be reused on retry`, e);
+    throw e;
+  }
+
+  return customerId;
 }
 
 /**
