@@ -2,8 +2,8 @@
 
 Auto-generated inventory of the automated test suite (Vitest). Regenerate with `npm run test:list`.
 
-- **Total tests:** 197
-- **Test files:** 37
+- **Total tests:** 203
+- **Test files:** 39
 - **Last generated:** 2026-06-26
 
 > Run all: `npm test`. Run one file: `npx vitest run <path>`.
@@ -21,6 +21,8 @@ Auto-generated inventory of the automated test suite (Vitest). Regenerate with `
 - [tests/bpmn/type-coverage.test.ts](#tests-bpmn-type-coverage-test-ts) — 5 tests
 - [tests/diagram-type-styles/order.test.ts](#tests-diagram-type-styles-order-test-ts) — 3 tests
 - [tests/dictation/parse-vtt.test.ts](#tests-dictation-parse-vtt-test-ts) — 5 tests
+- [tests/editor/edit-sequence.test.ts](#tests-editor-edit-sequence-test-ts) — 1 test
+- [tests/editor/edits.test.ts](#tests-editor-edits-test-ts) — 5 tests
 - [tests/editor/obstacle-sweep.test.ts](#tests-editor-obstacle-sweep-test-ts) — 1 test
 - [tests/editor/routing.test.ts](#tests-editor-routing-test-ts) — 4 tests
 - [tests/flowchart/layout-decision-merge.test.ts](#tests-flowchart-layout-decision-merge-test-ts) — 3 tests
@@ -164,6 +166,32 @@ _5 tests_
 - parses a Zoom cloud-recording transcript (WebVTT, 'Name:' prefix + indices)
 - strips stray markup and keeps unlabelled lines
 - isVttFile recognises .vtt by name or mime
+
+## tests/editor/edit-sequence.test.ts
+
+_1 test_
+
+### editor — random edit-sequence sweep
+
+- orthogonality + attachment hold across all random edit sequences
+
+## tests/editor/edits.test.ts
+
+_5 tests_
+
+### editor edits — alignment
+
+- align top makes the selection share a top edge and keeps routing clean
+- smart align keeps routing clean
+
+### editor edits — insert space
+
+- inserting horizontal space shifts only the elements past the marker, routing clean
+
+### editor edits — pool / lane
+
+- adding a lane grows the pool's lane set, routing clean
+- swapping two lanes keeps children with their lane and routing clean
 
 ## tests/editor/obstacle-sweep.test.ts
 
