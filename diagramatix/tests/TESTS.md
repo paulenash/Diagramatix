@@ -2,9 +2,9 @@
 
 Auto-generated inventory of the automated test suite (Vitest). Regenerate with `npm run test:list`.
 
-- **Total tests:** 192
-- **Test files:** 35
-- **Last generated:** 2026-06-25
+- **Total tests:** 197
+- **Test files:** 37
+- **Last generated:** 2026-06-26
 
 > Run all: `npm test`. Run one file: `npx vitest run <path>`.
 
@@ -21,6 +21,8 @@ Auto-generated inventory of the automated test suite (Vitest). Regenerate with `
 - [tests/bpmn/type-coverage.test.ts](#tests-bpmn-type-coverage-test-ts) — 5 tests
 - [tests/diagram-type-styles/order.test.ts](#tests-diagram-type-styles-order-test-ts) — 3 tests
 - [tests/dictation/parse-vtt.test.ts](#tests-dictation-parse-vtt-test-ts) — 5 tests
+- [tests/editor/obstacle-sweep.test.ts](#tests-editor-obstacle-sweep-test-ts) — 1 test
+- [tests/editor/routing.test.ts](#tests-editor-routing-test-ts) — 4 tests
 - [tests/flowchart/layout-decision-merge.test.ts](#tests-flowchart-layout-decision-merge-test-ts) — 3 tests
 - [tests/flowchart/layout-parallel-database.test.ts](#tests-flowchart-layout-parallel-database-test-ts) — 5 tests
 - [tests/flowchart/layout-swimlane-crossing.test.ts](#tests-flowchart-layout-swimlane-crossing-test-ts) — 5 tests
@@ -162,6 +164,25 @@ _5 tests_
 - parses a Zoom cloud-recording transcript (WebVTT, 'Name:' prefix + indices)
 - strips stray markup and keeps unlabelled lines
 - isVttFile recognises .vtt by name or mime
+
+## tests/editor/obstacle-sweep.test.ts
+
+_1 test_
+
+### editor routing — obstacle-avoidance sweep
+
+- re-route never produces a non-crossing violation, and crossings stay ≤ 10
+
+## tests/editor/routing.test.ts
+
+_4 tests_
+
+### editor routing — characterisation
+
+- baseline — fresh layouts route cleanly
+- re-route — moving a task DOWN keeps its connectors clean
+- re-route — moving a task UP and back keeps its connectors clean
+- obstacle — moving a branch task across the diagram re-routes around obstacles
 
 ## tests/flowchart/layout-decision-merge.test.ts
 

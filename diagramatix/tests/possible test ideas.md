@@ -91,6 +91,24 @@ Real overlaps surfaced by `findLayoutViolations` that aren't fixed yet:
   sequence default (midpoint) instead of being source-anchored. Edge case;
   normal rework loops return to a task.
 
+## Editor (manual-edit) characterisation net — IN PROGRESS
+
+Foundation built (`tests/editor/`): the reducer is exported, `findRoutingViolations`
+(`_helpers/routing.ts`) checks orthogonality / endpoint attachment / **no connector
+crosses a flow node**, and `routing.test.ts` pins clean re-route cases.
+
+- **Known gap, isolated + ratcheted:** `obstacle-sweep.test.ts` found **10 genuine
+  obstacle-avoidance gaps** — a *valid* element move (not onto another element) can
+  leave a connector crossing a flow node, because the editor re-route doesn't
+  re-validate the path against all obstacles. The sweep ratchets crossings at ≤10;
+  **drive `KNOWN_CROSSING_BASELINE` down to 0** by improving the re-route's obstacle
+  avoidance (`validateConnectorsAgainstObstacles` / the MOVE_ELEMENT path).
+- **TODO:** lift the routing helper into a full `assertCleanDiagram`; add per-area
+  registries — Pool/Lane (`ADD_LANE`/`RESIZE`/`SWAP_LANES_VERTICAL`/membership),
+  Insert Space (`INSERT_SPACE`), Alignment (`ALIGN_ELEMENTS`); then a property-based
+  random-edit-sequence net asserting `assertCleanDiagram` after each step (catches
+  undo/redo + state-corruption bugs).
+
 ## Other ideas
 
 _(add here)_

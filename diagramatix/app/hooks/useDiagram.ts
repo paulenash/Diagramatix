@@ -312,7 +312,7 @@ function adjustMsgLabelOffset(
   return { labelOffsetX: newLabelOX, labelOffsetY: newLabelOY };
 }
 
-type Action =
+export type Action =
   | { type: "SET_DATA"; payload: DiagramData }
   | { type: "ADD_ELEMENT"; payload: { symbolType: SymbolType; position: Point; taskType?: BpmnTaskType; eventType?: EventType; id?: string; initial?: { properties?: Record<string, unknown>; width?: number; height?: number; label?: string } } }
   | { type: "MOVE_ELEMENT"; payload: { id: string; x: number; y: number; unconstrained?: boolean } }
@@ -3158,7 +3158,10 @@ function tracePerActionRouteDiff(
   }
 }
 
-function reducer(state: DiagramData, action: Action): DiagramData {
+/** The diagram editor's pure state transition. Exported so tests can drive
+ *  editor actions (move / align / insert-space / re-route …) without React and
+ *  assert invariants on the result — the characterisation net for manual edits. */
+export function reducer(state: DiagramData, action: Action): DiagramData {
   if (typeof window !== "undefined" && (window as unknown as { __DIAGRAMATIX_TRACE?: boolean }).__DIAGRAMATIX_TRACE) {
     console.log(`[TRACE reducer] action=${action.type}`);
   }
