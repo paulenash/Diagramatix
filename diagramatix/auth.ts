@@ -184,9 +184,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     },
     session({ session, token }) {
       if (token?.id) session.user.id = token.id as string;
-      // Expose Microsoft connection status and access token for server-side API routes
+      // SEC-05: expose ONLY the connection-status boolean to the client. The raw
+      // Graph access token (Files.ReadWrite.All / Sites.Read.All) must NOT be
+      // serialised onto the client-facing session — server routes read it from
+      // the encrypted JWT via getMsAccessToken() instead.
       (session as any).hasMicrosoft = !!token.msAccessToken;
-      (session as any).msAccessToken = token.msAccessToken;
       return session;
     },
   },

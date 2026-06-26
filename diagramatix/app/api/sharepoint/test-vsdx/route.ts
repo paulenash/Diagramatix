@@ -6,7 +6,7 @@ import JSZip from "jszip";
 import * as fs from "fs";
 import * as path from "path";
 import { getElementMasterId, getConnectorMasterId } from "@/app/lib/diagram/visioMasterMap";
-import { getCurrentOrgId, OrgContextError } from "@/app/lib/auth/orgContext";
+import { requireDiagramAccess, OrgContextError } from "@/app/lib/auth/orgContext";
 
 /**
  * GET /api/sharepoint/test-vsdx?diagramId=<id>
@@ -20,9 +20,9 @@ export async function GET(request: Request) {
   const diagramId = searchParams.get("diagramId");
   if (!diagramId) return NextResponse.json({ error: "diagramId required" }, { status: 400 });
 
-  let orgId: string;
+  // SEC-07: authorise against access to THIS diagram, not merely org membership.
   try {
-    orgId = await getCurrentOrgId(session, await cookies());
+    await requireDiagramAccess(session, await cookies(), diagramId, "view");
   } catch (err) {
     if (err instanceof OrgContextError) {
       return NextResponse.json({ error: err.message }, { status: err.status });
@@ -30,7 +30,7 @@ export async function GET(request: Request) {
     throw err;
   }
 
-  const diagram = await prisma.diagram.findFirst({ where: { id: diagramId, orgId } });
+  const diagram = await prisma.diagram.findUnique({ where: { id: diagramId } });
   if (!diagram) return NextResponse.json({ error: "Diagram not found" }, { status: 404 });
 
   const data = diagram.data as any;

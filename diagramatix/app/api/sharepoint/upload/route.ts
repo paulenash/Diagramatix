@@ -1,10 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { uploadToFolder } from "@/app/lib/sharepoint";
-
-function getMsToken(session: any): string | null {
-  return session?.msAccessToken ?? null;
-}
+import { getMsAccessToken } from "@/app/lib/sharepoint-token";
 
 /**
  * POST /api/sharepoint/upload  (multipart/form-data)
@@ -20,7 +17,7 @@ export async function POST(request: Request) {
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const token = getMsToken(session);
+  const token = await getMsAccessToken(request);
   if (!token) {
     return NextResponse.json({ error: "Microsoft account not connected" }, { status: 403 });
   }

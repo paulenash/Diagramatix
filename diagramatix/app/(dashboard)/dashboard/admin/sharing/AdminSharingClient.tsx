@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ProjectShareDialog } from "@/app/(dashboard)/dashboard/ProjectShareDialog";
+import { safeInternalPath } from "@/app/lib/safeRedirect";
 
 export interface SharedProjectRow {
   id: string;
@@ -70,7 +71,7 @@ export function AdminSharingClient({
   // ?from=<url> overrides the default back destination so the user
   // returns to where they came from.
   const fromParam = searchParams.get("from");
-  const safeFrom = fromParam && fromParam.startsWith("/") ? fromParam : null;
+  const safeFrom = safeInternalPath(fromParam);  // SEC-15
   const backHref = safeFrom
     ?? (isSuperAdmin ? "/dashboard/admin" : "/dashboard/org-admin");
   const backLabel = backHref === "/dashboard/admin"

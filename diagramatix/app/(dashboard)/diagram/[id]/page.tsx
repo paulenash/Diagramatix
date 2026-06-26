@@ -10,6 +10,7 @@ import type { DisplayMode } from "@/app/lib/diagram/displayMode";
 import { getEffectiveUserId, isImpersonating, getImpersonationMode, SUPERUSER_EMAILS } from "@/app/lib/superuser";
 import { tryGetCurrentOrgId, getDiagramAccess } from "@/app/lib/auth/orgContext";
 import { isAssignedReviewer } from "@/app/lib/reviewProjects";
+import { safeInternalPath } from "@/app/lib/safeRedirect";
 
 type Props = { params: Promise<{ id: string }>; searchParams: Promise<{ review?: string; from?: string; feedback?: string }> };
 
@@ -38,7 +39,7 @@ export default async function DiagramPage({ params, searchParams }: Props) {
   // dashboard (Published-by-me or Unorganised sections) we want Back to
   // return to the dashboard, not surface the project the diagram happens
   // to live in. Only same-origin absolute paths are honoured.
-  const backFromHref = fromParam && fromParam.startsWith("/") ? fromParam : null;
+  const backFromHref = safeInternalPath(fromParam);  // SEC-15
 
   const orgId = await tryGetCurrentOrgId(session, cookieStore);
   if (!orgId) redirect("/dashboard");

@@ -5,6 +5,7 @@ import { prisma } from "@/app/lib/db";
 import { isSuperuser } from "@/app/lib/superuser";
 import { tryGetCurrentOrgId } from "@/app/lib/auth/orgContext";
 import { NotificationsClient } from "./NotificationsClient";
+import { safeInternalPath } from "@/app/lib/safeRedirect";
 
 // /notifications — full Notifications & Feedback screen.
 //
@@ -23,7 +24,7 @@ export default async function NotificationsPage({ searchParams }: Props) {
   if (!session?.user?.id) redirect("/login");
 
   const { from, visited, asUserId } = await searchParams;
-  const backHref = from && from.startsWith("/") ? from : "/dashboard";
+  const backHref = safeInternalPath(from) ?? "/dashboard";  // SEC-15
 
   // Decide the admin scope so the client knows whether to show pickers.
   let adminScope: "all" | "org" | null = null;

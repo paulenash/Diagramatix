@@ -3,7 +3,8 @@
 | | |
 |---|---|
 | **Audit started** | 2026-06-13 |
-| **Commit audited** | `bbc8716` |
+| **Commit audited** | `bbc8716` (Stages 1–3) |
+| **Re-audited** | 2026-06-26 — Stages 1–3 re-verified against current code (4 findings now fixed, 4 changed, 41 still stand) + Stages 4–7 completed. New findings folded in below. |
 | **Scope** | All hand-written source (~98k lines TS/TSX): API routes, server libraries, diagram engine, canvas/renderers, page clients, import/export, build & config. Excludes `app/generated/`, `node_modules`, binary assets, and the test suite (flagged separately for its own review). |
 | **Method** | Staged multi-agent review. Each stage: 3–5 specialist finder agents with distinct lenses over an explicit file manifest → dedupe → every finding adversarially verified by 2 independent skeptic agents reading the real code. Only findings that survive verification are documented. |
 
@@ -23,10 +24,12 @@
 | 1 | Security & Access Control | ✅ Done — 18 findings (7 High, 7 Medium, 4 Low) |
 | 2 | Data Integrity & Server Libs | ✅ Done — 24 findings (3 Critical, 13 High, 7 Medium, 1 Low) |
 | 3 | Diagram Engine Core | ✅ Done — 13 findings (1 Critical, 2 High, 5 Medium, 5 Low); Critical + both High fixed v1.20 |
-| 4 | Canvas & Renderers | Pending |
-| 5 | Dashboard & Page Clients | Pending |
-| 6 | Import/Export & Interop | Pending |
-| 7 | Build, Config & Dependencies + Remediation Plan | Pending |
+| 4 | Canvas & Renderers | ✅ Done — 9 findings (5 High, 1 Medium, 3 Low) |
+| 5 | Dashboard & Page Clients | ✅ Done — 9 findings (4 High, 4 Medium, 1 Low); 6 are `?from=` open-redirects folded into SEC-15 |
+| 6 | Import/Export & Interop | ✅ Done — 13 findings (4 High, 6 Medium, 3 Low); 3 Visio-export IDORs fold into SEC-07 |
+| 7 | Build, Config & Dependencies | ✅ Done — 14 findings (3 High, 5 Medium, 6 Low); the 1 "Critical" (.env secrets) **downgraded** — `.env` is gitignored/never committed; Graph-token folds into SEC-05 |
+
+**Re-audit of Stages 1–3 (2026-06-26)** — every still-open finding was re-checked against current code. **Now fixed by interim work:** DATA-06, DATA-07, DATA-22, DATA-23. **Changed (still open, code moved):** SEC-03, DATA-08, DATA-20, ENG-07. The fresh-finder pass also re-confirmed many open findings (Visio IDOR↔SEC-07, Graph token↔SEC-05, `?from=`↔SEC-15, Stripe races↔DATA-04/15/17, lane recursion↔ENG-04, swapLane cap↔ENG-10, ancestor O(n²)↔ENG-12) and surfaced genuinely new ones (SEC-19/20/21, DATA-25…31, ENG-14…19) — all listed below.
 
 ---
 
@@ -36,7 +39,7 @@
 |---|---|---|---|---|
 | SEC-01 | High | Access control | VIEW-share recipient can delete an entire project (wrong-org OrgAdmin check) | Open |
 | SEC-02 | High | Access control | Empty `ADMIN_PASSWORD` lets any user edit/delete global built-in templates | Open |
-| SEC-03 | High | Secrets | OrgAdmin backup leaks every member's password hash, reset token, Stripe IDs | Open |
+| SEC-03 | High | Secrets | OrgAdmin backup leaks every member's password hash, reset token, Stripe IDs | Open (re-audit: code restructured, leak intact) |
 | SEC-04 | High | Auth flow | No email verification on register → account pre-hijacking via Entra auto-link | Open |
 | SEC-05 | High | Secrets | Microsoft Graph access token leaked to the client via the session object | Open |
 | SEC-06 | High | Auth flow | No rate limiting / lockout on login, register, or password reset | Open |
@@ -57,9 +60,9 @@
 | DATA-03 | Critical | Backup | Wipe-restore re-inserts `Diagram.currentPublishedVersionId` but never backs up `PublishedVersion` → FK abort | ✅ Fixed v1.19 |
 | DATA-04 | High | Races | Stripe webhook has no event-ordering guard → stale event resurrects canceled subs | Open |
 | DATA-05 | High | Races | `archiveDiagram` read-modify-writes `data` across two pools → lost update clobbers saves | Open |
-| DATA-06 | High | Transactions | `restoreUserBackup` runs dozens of writes with no transaction → partial restore | Open |
-| DATA-07 | High | Transactions | Backup phase-2 JSON writes outside the row creates → crash leaves dangling links | Open |
-| DATA-08 | High | Restore | Subprocess link remap only walks `properties.linkedDiagramId` → misses other refs | Needs manual confirmation |
+| DATA-06 | High | Transactions | `restoreUserBackup` runs dozens of writes with no transaction → partial restore | ✅ Fixed (re-audit: now one `$transaction`) |
+| DATA-07 | High | Transactions | Backup phase-2 JSON writes outside the row creates → crash leaves dangling links | ✅ Fixed (re-audit: folded into the transaction) |
+| DATA-08 | High | Restore | Subprocess link remap only walks `properties.linkedDiagramId` → misses other refs | Changed (re-audit: remap moved to `backup.ts:497`; variant remains) |
 | DATA-09 | High | Transactions | Bundle-invite promotion catch-all deletes the pending row on *any* error | Open |
 | DATA-10 | High | Email | Invite email Subject built from unescaped inviter/bundle name → header injection | Needs manual confirmation |
 | DATA-11 | High | Restore | Additive full-restore matches users by bare email → re-parents data onto wrong live user | Open |
@@ -71,10 +74,10 @@
 | DATA-17 | Medium | Races | Monthly counter reset on renewal races concurrent usage / nukes unrelated counters | Open |
 | DATA-18 | Medium | Multi-tenant | `restoreDiagram` trusts archived `userId`, never re-validates org membership | Open |
 | DATA-19 | Medium | Backup | Per-user backup captures cross-org prompts but restore dedups them into one org → loss | Open |
-| DATA-20 | Medium | Email | `sendMail` failures unhandled → DB may record an invite/notification as delivered | Needs manual confirmation |
+| DATA-20 | Medium | Email | `sendMail` failures unhandled → DB may record an invite/notification as delivered | Changed (re-audit: partially remediated; `PendingBundleAudience` variant persists) |
 | DATA-21 | Medium | Restore | `shortCuid()` (Math.random + Date.now) can collide mid-restore → duplicate-PK abort/mis-parent | Open |
-| DATA-22 | Medium | Transactions | `restoreRulesPrefsBundle` upserts in a bare loop, no transaction → partial merge | Open |
-| DATA-23 | Medium | Restore | Rules upsert keyed only by `id` violates `@@unique([category,userId,orgId])` → abort | Open |
+| DATA-22 | Medium | Transactions | `restoreRulesPrefsBundle` upserts in a bare loop, no transaction → partial merge | ✅ Fixed (re-audit: both loops now one `$transaction`) |
+| DATA-23 | Medium | Restore | Rules upsert keyed only by `id` violates `@@unique([category,userId,orgId])` → abort | ✅ Fixed (re-audit: now `findUnique(id) ?? findFirst(natural key)`) |
 | DATA-24 | Low | Architecture | Two independent connection pools (Prisma adapter + raw `pgPool`) can't share a transaction | Open |
 | ENG-01 | Critical | Undo/redo | Undo/redo wipes title, fonts, database, processOwner, parentDiagramIds → auto-saved data loss | ✅ Fixed v1.20 |
 | ENG-02 | High | Reducer | `DELETE_ELEMENT` leaves dangling connectors on the deleted host's boundary events | ✅ Fixed v1.20 |
@@ -82,13 +85,61 @@
 | ENG-04 | Medium | Reducer | `collectCascadeLanes` recurses with no visited guard → stack overflow on cyclic lane chain | Open |
 | ENG-05 | Medium | Space tools | `REMOVE_SPACE` leaves corner elements un-shifted in cross (both-axis) zones | Open |
 | ENG-06 | Medium | Undo/redo | Interleaved second drag overwrites the pre-drag snapshot → first action lost from history | Open |
-| ENG-07 | Medium | Geometry | `offsetAlongFromPoint`/`getOffsetAlong` divide by element w/h with no zero-guard → NaN offset | Open |
+| ENG-07 | Medium | Geometry | `offsetAlongFromPoint`/`getOffsetAlong` divide by element w/h with no zero-guard → NaN offset | Open (re-audit: 0–1 clamp added but divisor still unguarded → NaN survives) |
 | ENG-08 | Medium | Routing | Containment clamp can invert detour lines → route crosses through obstacle | Needs manual confirmation |
 | ENG-09 | Low | Mutation | `SWAP_LANES_VERTICAL` reorders the connectors array → silent draw-order change | Open |
 | ENG-10 | Low | Undo/redo | `swapLane` bypasses the 100-entry history cap | Open |
 | ENG-11 | Low | Space tools | `INSERT_SPACE` pushes a history snapshot every mouse-move frame of a shift-drag | Open |
 | ENG-12 | Low | Performance | `ancestorsOf` does a linear `find()` per hop → O(n²) obstacle setup per recompute | Open |
 | ENG-13 | Low | Mutation | `consolidateWaypoints` returns its input array by reference for short paths (aliasing trap) | Open |
+| SEC-19 | High | Secrets | Deepgram master API key returned to any authenticated client in the dictation-token fallback | Open |
+| SEC-20 | High | Impersonation | Archive (soft-delete) route ignores the read-only impersonation guard | Open |
+| SEC-21 | Low | Impersonation | Prompt routes scope org to the impersonated user but key writes on the superuser's own id | Open |
+| DATA-25 | High | Restore | Per-table restore NULLs live published diagrams' `currentPublishedVersionId` (deferred-FK nulled on UPDATE, best-effort relink) | Open |
+| DATA-26 | High | Transactions | New per-table restore runs all upserts + FK re-links with NO transaction → half-merged DB | Open |
+| DATA-27 | Medium | Restore | Per-table restore silently skips rows colliding on a non-PK unique key (regresses the DATA-23 fix) | Open |
+| DATA-28 | Medium | Restore | Per-table restore drops a Diagram row when nullable `diagramOwnerId` points to a non-restored user (should null it) | Open |
+| DATA-29 | Medium | Races | Wipe-restore data-loss guard runs its COUNT checks outside the TRUNCATE transaction (TOCTOU) | Open |
+| DATA-30 | Low | Robustness | Per-table `inserted` count excludes updates; malformed payload → unguarded TypeError 500 | Open |
+| DATA-31 | Low | Transactions | `getOrCreateStripeCustomer` creates a Stripe customer then persists its id separately → dangling/duplicate customers | Open |
+| ENG-14 | Medium | Undo/redo | `updateLabelLive` mutates persisted label+geometry after an undo without invalidating the redo branch | Needs manual confirmation |
+| ENG-15 | Low | Undo/redo | `correctAllConnectors` rewrites persisted waypoints without `pushHistory`/`invalidateRedo` | Open |
+| ENG-16 | Low | Routing | Rectilinear waypoint-preservation uses a different obstacle set than the main pass (data-object flip-flop) | Open |
+| ENG-17 | Low | Performance | `recomputeAllConnectors([conn])` rebuilds the full element Map per connector, per drag frame | Open |
+| ENG-18 | Low | Performance | `ensureContainersEncloseChildren` recomputes ancestor depth inside the sort comparator (O(n²log n)) | Open |
+| ENG-19 | Low | Performance | `getAllDescendantIds` O(subtree×n) per column inside the vswimlane drag frame | Open |
+| CANVAS-01 | High | XSS | `RichTextEditor` assigns stored `description` to `innerHTML` on init without `sanitizeRichText` (stored XSS) | Open |
+| CANVAS-02 | High | Performance | O(n²) connector-hump computation rebuilt every render (`indexOf` + slice/map per connector) | Open |
+| CANVAS-03 | High | Performance | `nonContainers` sort O(n²log n): comparator calls `elements.find()` in a parent-walk | Open |
+| CANVAS-04 | High | Performance | Domain-diagram obstacle check O(connectors×elements×waypoints), unmemoised, every render | Open |
+| CANVAS-05 | High | Performance | `SymbolRenderer`/`ConnectorRenderer` unmemoised + fresh inline closures → full re-render every pan/zoom frame | Open |
+| CANVAS-06 | Medium | Performance | Connector-drop highlight O(n²) via `getElementPoolId` linear find per element | Open |
+| CANVAS-07 | Low | Listener leak | Pre-drag gesture listeners never cleaned up on unmount | Open |
+| CANVAS-08 | Low | Listener leak | Connector-label focus-clear listener leaks if unmounted before next mousedown | Open |
+| CANVAS-09 | Low | Robustness | Group-drag auto-scroll `setInterval` cleared only on mouseup, not unmount | Open |
+| UI-01 | High | Data loss | Ctrl+S calls a stale `saveNow()` closure → silently overwrites edits with `initialData` | Open |
+| UI-02 | High | Data loss | Previewing a history snapshot auto-saves it over the live diagram | Open |
+| UI-03 | Medium | Data loss | Folder-tree changes lost on navigation (module-level 500 ms debounce, no flush) | Open |
+| IO-01 | High | DoS | No upload size limit before `.vsdx` is fully decompressed in memory (zip-bomb / OOM) | Open |
+| IO-02 | High | Data integrity | DDL importer drops FK relationships when table-name casing differs between definition and reference | Open |
+| IO-03 | Medium | DoS | Unbounded recursion on nested sub-processes / lane sets (no depth guard) | Needs manual confirmation |
+| IO-04 | Medium | Performance | O(n²) element lookups via `ctx.elements.find` during BPMN flow/lane wiring | Open |
+| IO-05 | Medium | Data integrity | BPMN importer discards sequence-flow condition expressions (writes literal `"true"`) | Open |
+| IO-06 | Medium | Data integrity | BPMN importer leaves dangling `boundaryHostId` when the host has no `BPMNShape` | Needs manual confirmation |
+| IO-07 | Medium | Header injection | Unsanitized diagram name interpolated into the `Content-Disposition` export header (v2/v3/test-vsdx) | Open |
+| IO-08 | Low | Proto pollution | DDL parser writes attacker-controlled table names into a plain-object map key | Needs manual confirmation |
+| IO-09 | Low | Data integrity | BPMN importer id minting uses `Math.random()` with no cross-mint collision guard | Open |
+| IO-10 | Low | Data integrity | DDL enum detection case-sensitive on PK column `code` → enum tables imported as plain classes | Open |
+| CFG-01 | Low | Secrets | Live secrets in local `.env` — gitignored/never committed; **rotate** + keep off shared/backup locations (downgraded from Critical) | Open |
+| CFG-02 | High | Secrets | `AUTH_SECRET` is the literal placeholder in local `.env`; no code-side weak-secret guard | Open |
+| CFG-03 | High | Hardening | No CSP / X-Frame-Options / HSTS / X-Content-Type-Options anywhere (no `headers()` block) | Open |
+| CFG-04 | Medium | Config | No env-var validation; security-critical secrets read via non-null assertion only | Open |
+| CFG-05 | Medium | Config | `proxy` matcher misses `(dashboard)` route-group URLs; auth depends on per-page `auth()` | Open |
+| CFG-06 | Medium | Config | `/matrix` is publicly reachable despite a comment asserting route-group auth | Open |
+| CFG-07 | Low | Hardening | `X-Powered-By: Next.js` header not disabled | Open |
+| CFG-08 | Low | Dependencies | Unused PGlite packages remain in production `dependencies` | Open |
+| CFG-09 | Low | Dependencies | Production auth depends on a pre-release (beta) of `next-auth` | Open |
+| CFG-10 | Low | Robustness | Microsoft token refresh computes `NaN` expiry when `expires_in` is absent → refresh silently disabled | Open |
 
 ---
 
@@ -290,12 +341,16 @@ Stripe doesn't guarantee delivery order and retries interleave. `handleSubscript
 #### DATA-06 — `restoreUserBackup` runs dozens of writes with no transaction → partial restore
 **`app/lib/backup.ts:276`**
 
+> **✅ Fixed (re-audit 2026-06-26).** `restoreUserBackup` now wraps the entire additive restore (phase-1 creates + both phase-2 raw-SQL passes) in one interactive `prisma.$transaction(async (tx) => {…}, { timeout: 120_000, maxWait: 15_000 })` — every write routes through `tx`, so a mid-way failure rolls back cleanly. Resolves DATA-07 too.
+
 The entire restore (project/diagram/unfiled-diagram/template/prompt creates, then two phase-2 raw-SQL passes) is a sequence of independent `prisma.create` / `$executeRawUnsafe` calls with **no surrounding `$transaction`**. Any mid-way throw (oversized JSON, connection drop, constraint error, aborted request) leaves every already-created row committed — a half-restored set with no clean undo. Re-running doubles the rows that landed (only prompts dedup; projects/diagrams/templates are purely additive and already suffixed " (restored)").
 
 **Suggested fix:** wrap the whole body through both phase-2 passes in a single `prisma.$transaction(async (tx) => {...})`, routing every create and `$executeRawUnsafe` through `tx` (Prisma 7 interactive transactions expose `$executeRawUnsafe` on the tx client, so the raw JSON writes roll back together). Raise the tx timeout for large backups.
 
 #### DATA-07 — Backup phase-2 JSON writes happen after all rows commit → crash leaves blank config + dangling links
 **`app/lib/backup.ts:389`**
+
+> **✅ Fixed (re-audit 2026-06-26).** Phase 2 now runs inside the same `prisma.$transaction` as phase 1 (see DATA-06) — the two phases commit atomically, so a crash between them no longer leaves blank config + dangling subprocess links.
 
 Projects are created in phase 1 with no `colorConfig`/`folderTree` (default `{}`); diagrams keep their original `data` with **old** `linkedDiagramId` values. The real `colorConfig`, remapped `folderTree`, and remapped subprocess `linkedDiagramId` are written only in the phase-2 raw-SQL loops. With no transaction binding the phases, a server kill/redeploy between them permanently leaves projects with blank config + empty folder tree and every restored subprocess link pointing at backup-era ids that don't exist in this org — a "successful-looking" restore with corrupted cross-references.
 
@@ -404,12 +459,16 @@ A selected diagram's `projectId` is remapped via `projectIdMap.get(...)`, and `p
 #### DATA-22 — `restoreRulesPrefsBundle` upserts in a bare loop, no transaction → partial merge
 **`app/lib/rules-prefs-backup.ts:126`**
 
+> **✅ Fixed (re-audit 2026-06-26).** Both the rules loop and the prompts loop now run inside a single `prisma.$transaction(async (tx) => {…})` — all-or-nothing merge.
+
 The rules and prompts loops issue per-row find+update/create with no enclosing `$transaction`. A mid-batch failure (a JSON `planJson` cast rejected, a connection drop) leaves some rows merged and others not, and the function throws with no result object, so the caller can't tell how far it got. Idempotent on re-run, but a robustness gap for a cross-environment migration tool.
 
 **Suggested fix:** wrap both loops in one interactive `$transaction` (all-or-nothing), or catch per-row errors into `skippedReasons` and continue so the function always returns a complete result.
 
 #### DATA-23 — Rules upsert keyed only by `id` violates `@@unique([category,userId,orgId])` → abort
 **`app/lib/rules-prefs-backup.ts:142`**
+
+> **✅ Fixed (re-audit 2026-06-26).** Each incoming row now resolves `existing = findUnique({id}) ?? findFirst({category,userId,orgId})` and updates that row if either key matches — no more unique-constraint abort when migrating local rules into prod.
 
 `restoreRulesPrefsBundle` upserts `DiagramRules` by `id` only. When migrating local-dev rules into prod (the stated use case), a prod row may already exist with the same `(category, userId, orgId)` tuple but a different `id`; the incoming row has no id match, takes the create branch, and Prisma throws a unique-constraint violation. System-wide rules (`userId`/`orgId` null) are especially prone since only one per category can exist.
 
@@ -541,4 +600,322 @@ Returns the same `wps` reference when `wps.length <= 4` instead of a fresh array
 **Suggested fix:** always return a fresh array — `if (wps.length <= 4) return wps.slice();`.
 
 ---
+
+## Stage 4 — Canvas & Renderers
+
+**Scope:** `app/components/canvas/` — `Canvas.tsx`, `SymbolRenderer.tsx`, `ConnectorRenderer.tsx`, `RichTextEditor.tsx`, and siblings.
+**Method:** 4 finder lenses (SVG/HTML injection, event/leak handling, render performance, geometry math) → verified by 2 skeptics each. The dominant theme is **per-frame render cost on large diagrams** (pan/zoom jank), plus one stored-XSS sink.
+
+### High
+
+#### CANVAS-01 — `RichTextEditor` injects unsanitized stored description into `innerHTML` (stored XSS)
+**`app/components/canvas/RichTextEditor.tsx:26`**
+
+On mount the editor sets `ref.current.innerHTML = isRichText(value) ? value : plainToHtml(value)`. `isRichText` only requires any tag, so a `description` like `<img src=x onerror=...>` is assigned to `innerHTML` **without** passing through `sanitizeRichText`. `value` is `element.properties.description`, which can arrive from imported JSON or AI output that never went through the editor's sanitize path → script runs when a user opens Properties on the offending element. The *display* path (`SymbolRenderer` RichDescriptionBox) is safe because it sanitizes at the call site; only this editor-init path is unguarded.
+
+**Suggested fix:** `ref.current.innerHTML = sanitizeRichText(isRichText(value) ? value : plainToHtml(value ?? ""))`.
+
+#### CANVAS-02 — O(n²) connector-hump computation rebuilt every render
+**`app/components/canvas/Canvas.tsx:5113-5121`** (duplicated at `:5821-5828`)
+
+Inside the per-connector render `.map()`, `otherConnectorWaypoints` is `humpEligible.slice(0, humpEligible.indexOf(conn)).map(...)`. `indexOf` is an O(n) scan per connector (→ O(n²)) and the slice/map allocates up to n waypoint-arrays per connector, all inline with no memoisation — paid on **every** render including every pan/zoom frame.
+
+**Suggested fix:** precompute a `conn → index` Map and the prefix once; memoise on `[connectors]`.
+
+#### CANVAS-03 — `nonContainers` sort runs O(n²log n)
+**`app/components/canvas/Canvas.tsx:4022-4053`**
+
+`nonContainers` is an unmemoised IIFE whose sort comparator calls `getParentDepth`, which walks the parent chain via `data.elements.find(...)` (O(n)) per level → ~O(n²log n) per render, on every pan/zoom/drag frame.
+
+**Suggested fix:** build a `byId` Map + memoised depth map once.
+
+#### CANVAS-04 — Domain-diagram obstacle check is O(connectors×elements×waypoints) and unmemoised
+**`app/components/canvas/Canvas.tsx:4178-4290`**
+
+`obstacleViolationConnIds` runs in render-body code (no `useMemo`): per connector → per element → per segment `segCrossesRect`, on every render even though it only changes when geometry does.
+
+**Suggested fix:** `useMemo` on `[data.elements, data.connectors, diagramType]`.
+
+#### CANVAS-05 — `SymbolRenderer`/`ConnectorRenderer` unmemoised + fresh closures → per-frame re-render storm
+**`app/components/canvas/SymbolRenderer.tsx:1840`, `ConnectorRenderer.tsx:533`** (closures at `Canvas.tsx:5097-5132`)
+
+Neither child is `React.memo`'d, and the parent passes brand-new inline closures (`onSelect`, `onMove`, `onUpdateLabel`, …) every render, so prop identity always changes. Pan/zoom are Canvas `useState` updated on every mousemove (no rAF throttle) → every symbol + connector re-renders on every pan/zoom/drag frame, on top of the O(n²) work above.
+
+**Suggested fix:** `React.memo` the children, stabilise per-item callbacks (or apply the pan/zoom transform on a wrapper so the data subtree doesn't re-render).
+
+### Medium
+
+#### CANVAS-06 — Connector-drop highlighting is O(n²)
+**`app/components/canvas/Canvas.tsx:5138-5226`** (`getElementPoolId` at `:59-79`)
+
+While dragging a connector, `nonContainers.map()` calls `getElementPoolId` (up to three `elements.find` scans) per element, plus extra `find`s per branch — O(n²) per render, fired on every drag-move frame.
+
+**Suggested fix:** precompute `elementById` + `element→poolId` Maps, memoised on `data.elements`.
+
+### Low
+
+#### CANVAS-07 — Pre-drag gesture listeners never cleaned up on unmount
+**`app/components/canvas/SymbolRenderer.tsx:2084-2085`** — window `mousemove`/`mouseup` attached outside any `useEffect`, self-removing only when they fire; an unmount mid-pre-drag leaks them with a stale closure.
+
+#### CANVAS-08 — Connector-label focus-clear listener leaks on unmount
+**`app/components/canvas/ConnectorRenderer.tsx:398-402`** — window `mousedown` listener removes itself only on the next click; unmount-while-focused leaks it.
+
+#### CANVAS-09 — Group-drag auto-scroll `setInterval` cleared only on mouseup
+**`app/components/canvas/SymbolRenderer.tsx:2104-2152`** — `startAutoScroll`'s interval is cleared in `onMouseUp`/`onMouseMove` only; unmount mid-group-drag keeps it firing against stale state.
+
+---
+
+## Stage 5 — Dashboard & Page Clients
+
+**Scope:** `app/(dashboard)/` client components — `DiagramEditor.tsx`, project/admin clients, menus.
+**Method:** 4 lenses (client-side access control, data exposure, async/state correctness, unsafe rendering). The 6 `?from=` open-redirect sites this stage surfaced are all already catalogued under **SEC-15** (which lists exactly these clients) — folded there, not re-numbered. Genuinely new here are two auto-save data-loss races + one debounce-loss.
+
+### High
+
+#### UI-01 — Ctrl+S calls a stale `saveNow()` closure → overwrites edits with `initialData`
+**`app/(dashboard)/diagram/[id]/DiagramEditor.tsx:824-843`** (autosave `:145-176`)
+
+The keydown effect wiring Ctrl+S has deps `[undo, redo]` — both stable `useCallback([])` — so it runs once on mount and captures the first-render `saveNow`, whose closure reads the original `initialData`. After edits (autosave advances `lastSaved.current`), pressing Ctrl+S runs the stale `saveNow`, which PUTs the original `initialData` back, silently discarding everything since load. The editor keeps `saveNowRef.current` precisely to avoid this for navigation, but the keydown path bypasses it.
+
+**Suggested fix:** call `saveNowRef.current()` from the keydown handler (or add `saveNow` to deps).
+
+#### UI-02 — Previewing a history snapshot auto-saves it over the live diagram
+**`app/(dashboard)/diagram/[id]/DiagramEditor.tsx:3887-3900`** (autosave gate `:807`)
+
+`HistoryPanel.onPreview` calls `setData(oldSnapshot)` ("do NOT save"), but autosave is only disabled when `templateEditState!==null || readOnly` — neither holds during preview. So 1.5 s later `saveNow()` PUTs the *previewed historical snapshot* over the user's newer diagram. The save/discard choice never happens.
+
+**Suggested fix:** add a `previewing` flag to the autosave disable condition (and restore on discard).
+
+### Medium
+
+#### UI-03 — Folder-tree changes lost on navigation (module-level debounce, no flush)
+**`app/(dashboard)/dashboard/projects/[id]/ProjectDetailClient.tsx:270-284, 900-906`**
+
+`saveFolderTreeToDb` debounces the PUT 500 ms via a single module-level timer. Navigating away (open a diagram → `router.push`) within 500 ms discards the pending timer before the fetch fires — the folder layout silently reverts. No unmount/`beforeunload` flush; the module-level timer also lets a second project view clear the first's pending save.
+
+**Suggested fix:** per-instance timer + flush on unmount and route change.
+
+---
+
+## Stage 6 — Import/Export & Interop
+
+**Scope:** `app/lib/diagram/v3/` (Visio V3), `exportVisio*`, `bpmn/importBpmnXml.ts`, `ddlImport.ts`, `app/api/export|import/**`, SharePoint.
+**Method:** 4 lenses (parse robustness/zip-bomb/XXE, data integrity, output injection, endpoint authz). The 3 Visio-export IDORs (V3/V2/test-vsdx) are the same defect as **SEC-07** — folded there. Below are the parse-robustness + data-integrity findings.
+
+### High
+
+#### IO-01 — No upload size limit before `.vsdx` is fully decompressed in memory (zip-bomb / OOM)
+**`app/api/import/visio-v3/route.ts`** (also `bulk/route.ts`, `sharepoint/download`)
+
+All Visio import routes do `upload.arrayBuffer()` → `JSZip.loadAsync` → `zip.file(...).async("string")` with no Content-Length / `upload.size` check and no per-entry decompression cap. A few-KB DEFLATE bomb expands to hundreds of MB–GB and `importVisioV3` then runs global regex scans over the giant strings. One authenticated low-tier request can OOM/stall the shared B1 instance. The element-count gate runs only *after* parse.
+
+**Suggested fix:** reject by `upload.size` before reading (hard cap, e.g. 25 MB); cap cumulative uncompressed bytes + entry count during unzip.
+
+#### IO-02 — DDL importer drops FK relationships when table-name casing differs
+**`app/lib/diagram/ddlImport.ts:279, 327-328`**
+
+`elementMap` is keyed by the raw `CREATE TABLE` name; FK lookup uses `elementMap[c.fkTable]` with original case. SQL identifiers are case-insensitive, so `CREATE TABLE Orders` + `REFERENCES orders(id)` misses, and `if (!tgtId) continue;` silently drops the connector — common in cross-dialect dumps.
+
+**Suggested fix:** normalise unquoted identifiers (lowercase) on both insert and lookup.
+
+### Medium
+
+#### IO-03 — Unbounded recursion on nested sub-processes / lane sets *(needs manual confirmation)*
+**`app/lib/diagram/bpmn/importBpmnXml.ts:591`** — `walkProcessBody`/`applyLaneParenting` recurse with no depth limit; a hostile `.bpmn` nesting expanded subprocesses thousands deep overflows the stack. *Confirm how deep the element-cap lets parsing get before the stack blows.* **Fix:** depth guard.
+
+#### IO-04 — O(n²) element lookups during BPMN flow/lane wiring
+**`app/lib/diagram/bpmn/importBpmnXml.ts:751,795,940,949`** — `buildFlows`/`buildDataAssociations`/`applyLaneParenting` resolve elements via `ctx.elements.find(...)` inside loops → O(F·N). **Fix:** `Map<id,element>`.
+
+#### IO-05 — BPMN importer discards sequence-flow condition expressions
+**`app/lib/diagram/bpmn/importBpmnXml.ts:952-974`** — records only `hasCondition` and stamps an off-schema `_condition = "true"`, throwing away the real expression; the schema already has `branchCondition`/`isDefaultFlow` (`types.ts:227`). Gateway branch logic is lost on import. **Fix:** map the expression to `branchCondition` and `default=` to `isDefaultFlow`.
+
+#### IO-06 — BPMN importer leaves dangling `boundaryHostId` when host has no `BPMNShape` *(needs manual confirmation)*
+**`app/lib/diagram/bpmn/importBpmnXml.ts:541-545, 621-642`** — if a boundary event's host task is dropped (no shape) but the event has its own shape, it is pushed with `boundaryHostId` pointing at a non-existent element → renders detached. **Fix:** post-pass validating every `boundaryHostId` resolves; drop/re-anchor otherwise.
+
+#### IO-07 — Unsanitized diagram name in `Content-Disposition` export header
+**`app/api/export/visio-v3/route.ts:89`** (also `visio-v2:70`, `sharepoint/test-vsdx:897`) — raw `diagram.name` interpolated into `filename="..."`; a `"` breaks quoting and injects header params. The bulk route already sanitizes (`replace(/[\\/:*?"<>|]/g,"_")`); the single routes don't. (Node blocks raw CR/LF → Medium.) **Fix:** reuse the bulk sanitizer / RFC 5987 `filename*=`.
+
+### Low
+
+#### IO-08 — DDL parser writes attacker-controlled table names into a plain-object map key *(needs manual confirmation)*
+**`app/lib/diagram/ddlImport.ts:279`** — a table named `__proto__`/`constructor` pollutes the prototype chain. Currently client-only (own session), but the helper is exported. **Fix:** `Map` or `Object.create(null)`.
+
+#### IO-09 — BPMN importer id minting uses `Math.random()` with no collision guard
+**`app/lib/diagram/bpmn/importBpmnXml.ts:191-194, 403-409`** — `mintId` has no `usedIds` set (the Visio importer does), so element/connector/boundary ids can collide and corrupt `find()` lookups. **Fix:** track and re-roll on collision.
+
+#### IO-10 — DDL enum detection case-sensitive on PK column `code`
+**`app/lib/diagram/ddlImport.ts:162-167`** — only `columns[0].name === "code"` (lowercase) triggers enum import; `Code`/`CODE` imports as a plain `uml-class` and drops the enum values. **Fix:** case-insensitive compare.
+
+---
+
+## Stage 7 — Build, Config & Dependencies
+
+**Scope:** `package.json`, `next.config.ts`, `tsconfig.json`, `prisma/schema.prisma`, `proxy.ts`, `auth.ts`, `auth.config.ts`, `app/lib/db.ts`, `.env`.
+**Method:** 4 lenses (secrets/env, security headers, dependency/build hygiene, config correctness). The Graph-token leak this stage found is **SEC-05** (folded). **Note on the downgraded "Critical":** the finder flagged live secrets in `.env`, but `.env` is gitignored and was never committed (only `.env.example` is tracked) — so it is **not** a repo leak; it is reclassified **CFG-01 (Low)**: real production secrets sitting in cleartext on the dev disk that should be rotated and kept out of shared/backed-up copies.
+
+### High
+
+#### CFG-02 — `AUTH_SECRET` is the literal placeholder; no weak-secret guard
+**`.env:3`** (consumed via `auth.config.ts`)
+
+Local `.env` has `AUTH_SECRET="your-secret-key-change-this-in-production"`, the well-known throwaway that signs JWT sessions. If this value is ever replicated to a network-reachable environment, anyone who knows the placeholder can forge a session JWT for any user (incl. superusers). No code rejects a known-weak/short/empty secret. *(Prod sources its own secret from Azure; this is a local-file + missing-guard finding.)*
+
+**Suggested fix:** generate a strong value locally; add a boot assertion that `AUTH_SECRET` is present, ≥ 32 bytes, and not the placeholder.
+
+#### CFG-03 — No CSP / clickjacking / HSTS / nosniff headers anywhere
+**`next.config.ts`** (consolidates 3 near-duplicate findings)
+
+`next.config.ts` defines only `output` + `experimental.staleTimes`; there is no `headers()` block and `proxy.ts` sets no headers. The app ships with **no** Content-Security-Policy, X-Frame-Options/`frame-ancestors`, Strict-Transport-Security, or X-Content-Type-Options. For an SVG-canvas tool rendering user-authored content (and embedding SharePoint preview iframes) on CPS 230 data, that is no defence-in-depth against XSS and no clickjacking protection on authenticated destructive actions.
+
+**Suggested fix:** add an `async headers()` block with a baseline CSP, `frame-ancestors 'self'`/X-Frame-Options, HSTS, `nosniff`, Referrer-Policy.
+
+### Medium
+
+#### CFG-04 — No env-var validation; security secrets via non-null assertion only
+**`app/lib/db.ts:11`** (also `auth.ts:63-64,165-166`) — `process.env.DATABASE_URL!` / `AZURE_*!` are erased at runtime; a missing/weak var surfaces as an opaque crash instead of fail-fast, and a weak/empty `AUTH_SECRET` or missing `STRIPE_WEBHOOK_SECRET` boots happily. **Fix:** a single validated env module (zod) asserting presence + minimum strength at startup.
+
+#### CFG-05 — `proxy` matcher misses `(dashboard)` route-group URLs
+**`proxy.ts:8-10`** (consolidates the matcher duplicate) — matcher is `['/dashboard/:path*','/diagram/:path*']`, but route groups add no URL segment, so `/matrix`, `/processes/[id]`, `/notifications`, `/help` are never seen by the middleware. Most self-gate with `auth()` by accident; there is no `(dashboard)/layout.tsx` gate. Any new group page added without an explicit `auth()` is silently public. **Fix:** widen the matcher or add a `(dashboard)/layout.tsx` gate.
+
+#### CFG-06 — `/matrix` publicly reachable despite a comment asserting route-group auth
+**`app/(dashboard)/matrix/page.tsx:6-9`** — the docstring claims "auth-gated by being inside the (dashboard) route group"; false (no group layout gate, matcher excludes it), and the page does no `auth()` check, so it serves to anonymous visitors. Content is harmless, but the comment propagates the wrong mental model. **Fix:** correct the comment + add a real gate (covered by CFG-05).
+
+### Low
+
+- **CFG-01** — Live secrets in local `.env` (Anthropic/Deepgram/Entra/SMTP). Gitignored/never committed → not a repo leak, but **rotate** them and keep the file off shared/backed-up locations. *(Downgraded from the finder's "Critical".)*
+- **CFG-07** — `poweredByHeader` not disabled → `X-Powered-By: Next.js` fingerprinting. **`next.config.ts`**
+- **CFG-08** — `@electric-sql/pglite*` remain in production `dependencies` though PGlite is no longer used → larger dep tree / audit surface. **`package.json:22-23`**
+- **CFG-09** — `next-auth: ^5.0.0-beta.30` — the auth boundary runs on a beta with a `^` range. **`package.json:31`** **Fix:** pin exactly, track to stable v5.
+- **CFG-10** — `token.msTokenExpires = Date.now() + data.expires_in*1000` is `NaN` when `expires_in` is absent → `Date.now() > NaN` is always false → token never refreshes again. **`auth.ts:171-174`** **Fix:** default (e.g. 3600 s) when absent.
+
+---
+
+## Re-audit additions to Stages 1–3 (new findings, 2026-06-26)
+
+### Stage 1 — Security (new)
+
+#### SEC-19 — Deepgram master API key returned to any authenticated client in the dictation-token fallback
+**`app/api/ai/dictation/token/route.ts:72`**
+
+When both the short-lived grant and the temp sub-key mint fail, the route returns the raw long-lived master key to the browser: `return NextResponse.json({ token: masterKey, scheme: "token", direct: true, expiresIn: 0 })`. Gated only by a logged-in session — no admin/quota check — so any user can trigger the fallback and receive `process.env.DEEPGRAM_API_KEY` in plaintext with no expiry, reusable against the account's quota/billing until rotated.
+
+**Suggested fix:** fail closed (HTTP 503) instead of returning the master key; never send a non-expiring key to a client.
+
+#### SEC-20 — Archive (soft-delete) route ignores the read-only impersonation guard
+**`app/api/diagrams/[id]/archive/route.ts:21`**
+
+POST archives a diagram, gated only by `requireDiagramAccess(..., 'owner')`, which resolves the caller via `getEffectiveUserId` — so under impersonation it archives the *impersonated* user's diagram. It never calls `isReadOnlyImpersonation`, so a SuperAdmin in default read-only "view" mode can soft-delete another user's diagram (the same class as SEC-13/SEC-14, a different route).
+
+**Suggested fix:** add the standard `isReadOnlyImpersonation` 403 guard at the top of POST.
+
+#### SEC-21 — Prompt routes scope org to the impersonated user but key writes on the superuser's own id
+**`app/api/prompts/[id]/route.ts:14,23`** (same split in `prompts/route.ts`)
+
+`orgId` comes from `getCurrentOrgId` (impersonation-aware) but the row guard uses `userId: session.user.id` (the real superuser, not `getEffectiveUserId`). Incoherent under impersonation (org follows the target, ownership follows the caller); no cross-user write occurs, so it's a latent correctness inconsistency rather than an access hole — and these routes also permit writes with no `isReadOnlyImpersonation` guard.
+
+**Suggested fix:** pick one identity consistently (`getEffectiveUserId` for both) and add the read-only guard.
+
+### Stage 2 — Data Integrity (new — the per-table restore path, commit `6206efd`)
+
+> The new **per-table restore** (`restoreFullBackupTables`) lets a SuperAdmin tick individual tables to restore. Unlike its two siblings (wipe + additive), it was written **without a transaction** and **nulls deferred cyclic FKs on UPDATE of live rows** — re-introducing several data-integrity hazards the earlier Criticals had closed. Treat DATA-25/26 as the headline regressions.
+
+#### DATA-25 — Per-table restore NULLs live published diagrams' `currentPublishedVersionId`
+**`app/lib/full-backup.ts`** (deferred-FK null + best-effort relink)
+
+For tables with a deferred cyclic-FK column (`Diagram.currentPublishedVersionId`), every row is written with that column forced to `null`, queued for a best-effort relink. Because it's an **upsert**, the `update` branch applies `currentPublishedVersionId: null` to an **already-live** published Diagram. If the admin selects `Diagram` but not `PublishedVersion` (separate ticks), every matching live published diagram silently loses its current-version pointer; the relink `try/catch` swallows the miss. Combined with DATA-26 a crash makes it permanent.
+
+**Suggested fix:** don't null the deferred FK on the UPDATE branch for rows whose target already exists live; only defer for genuinely new inserts, and skip the column entirely when `PublishedVersion` isn't in the selection.
+
+#### DATA-26 — New per-table restore runs all upserts + FK re-links with NO transaction
+**`app/lib/full-backup.ts:356-397`**
+
+`restoreFullBackupTables` upserts directly on the top-level `prisma` client and runs the deferred-FK relink pass on `prisma` too — no `$transaction` anywhere (the per-row `try/catch` only swallows individual constraint errors). A connection drop / redeploy / non-row error mid-run leaves a half-merged DB and de-linked published diagrams, exactly what the sibling paths were written to prevent.
+
+**Suggested fix:** wrap the whole per-table restore (upserts + relink pass) in one `prisma.$transaction`, routing every write through `tx`.
+
+#### DATA-27 — Per-table restore silently skips rows colliding on a non-PK unique key
+**`app/lib/full-backup.ts:352,371-385`** — upsert keys only on PK (`id`); a backup row with a fresh id but a matching secondary unique (`User.email`, or `DiagramRules (category,userId,orgId)`) throws on create and is merely counted "skipped". This regresses the **DATA-23** fix for the generic path. **Fix:** `findUnique(id) ?? findFirst(natural key)` before upsert, per table.
+
+#### DATA-28 — Per-table restore drops a Diagram row when `diagramOwnerId` points to a non-restored user
+**`app/lib/full-backup.ts`** — `Diagram.diagramOwnerId` (nullable, not a cycle) is written verbatim; if the owner is neither restored nor live, the create throws and the row is skipped. The additive paths null it for exactly this reason; the per-table path doesn't. **Fix:** null nullable cross-table FKs whose target is absent (mirror `full-backup.ts:766`).
+
+#### DATA-29 — Wipe-restore data-loss guard runs its COUNT checks outside the TRUNCATE transaction (TOCTOU)
+**`app/lib/full-backup.ts`** — `restoreFullBackupWipe` runs `SELECT COUNT(*)` on payload-missing tables via `$queryRawUnsafe` *before* entering `$transaction(... TRUNCATE ...)`. Rows inserted into a newer table between the check and the TRUNCATE…CASCADE are silently cascade-deleted. **Fix:** run the guard COUNTs inside the same transaction, before TRUNCATE.
+
+### Low
+
+- **DATA-30** — Per-table `inserted` count returns only inserts (updates excluded), under-reporting writes; and `inspect`/`additive`/`org` restore do `payload.tables.X.map(...)` with no array guard → a malformed/older payload throws an unguarded TypeError 500. **`app/lib/full-backup.ts:151-153,466,628`**
+- **DATA-31** — `getOrCreateStripeCustomer` creates a Stripe customer then persists `stripeCustomerId` in a separate write with no compensation; a failure of the second write leaves a Stripe customer with no DB link, and the next call creates a *second* customer (cross-system analogue of the known double-subscription bug). **`app/lib/stripe.ts`** **Fix:** look up existing customer by `metadata.diagramatixUserId` before create, or roll back the Stripe customer on persist failure.
+
+### Stage 3 — Diagram Engine (new)
+
+#### ENG-14 — `updateLabelLive` mutates persisted label+geometry after an undo without invalidating redo *(needs manual confirmation)*
+**`app/hooks/useDiagram.ts`** — `UPDATE_LABEL_LIVE` applies a real autosize + label change to persisted state, but the setter calls neither `pushHistory` nor `invalidateRedo` (added for ENG-03). After an undo, typing in a label leaves a stale redo branch that Ctrl+Y can replay from a diverged future, until a commit/cancel fires. **Fix:** call `invalidateRedo()` in the setter (mirror the title/font setters).
+
+#### ENG-15 — `correctAllConnectors` rewrites persisted waypoints without `pushHistory`/`invalidateRedo`
+**`app/hooks/useDiagram.ts`** — `CORRECT_ALL_CONNECTORS` rebuilds connector geometry and returns new state, but the exported setter neither snapshots nor invalidates redo. Currently exercised only internally (post-drag, already snapshotted), so Low — but any future direct call reintroduces a stale-redo / non-undoable mutation. **Fix:** route through `pushHistory`/`invalidateRedo`.
+
+#### ENG-16 — Rectilinear waypoint-preservation uses a different obstacle set than the main pass
+**`app/lib/diagram/routing.ts:1408-1412`** — the user-route-preservation branch builds `SEQ_OBS` **including** data-object/data-store, while `computeWaypoints` uses `SEQ_OBSTACLE_TYPES` which **excludes** them (sequence flow may overlap data artifacts). A preserved route grazing a Data Object is judged "blocked" → falls back to a full recompute, discarding the user's custom waypoints. Cosmetic (no data loss). **Fix:** align the two obstacle sets.
+
+#### ENG-17 — `recomputeAllConnectors([conn])` rebuilds the full element Map per connector, per drag frame
+**`app/lib/diagram/routing.ts:1205`** (14 call sites) — `state.connectors.map(conn => recomputeAllConnectors([conn], elements)[0])` rebuilds `new Map(elements...)` for *one* connector each iteration → O(C·E) per frame on drag paths. **Fix:** call once with the full list, or pass a shared prebuilt `elementMap`.
+
+#### ENG-18 — `ensureContainersEncloseChildren` recomputes ancestor depth inside the sort comparator
+**`app/hooks/useDiagram.ts:1990-2002`** — `depthOf` walks ancestors via `elements.find` (O(depth·E)) twice per comparison in a `.sort()` → ~O(n log n·depth·E) on every drop/resize tick; a `byId` map built right after isn't used by `depthOf`. **Fix:** precompute a depth Map before sorting.
+
+#### ENG-19 — `getAllDescendantIds` O(subtree×n) per column inside the vswimlane drag frame
+**`app/hooks/useDiagram.ts:441`** — iterates the full elements array per dequeued node, called per-column inside the vertical-swimlane drag loop → O(columns·subtree·E) per frame. **Fix:** build a `childrenByParent` index once per frame.
+
+---
+
+## Remediation Plan
+
+**Totals:** ~103 findings; **10 fixed** (DATA-01/02/03, ENG-01/02/03, DATA-06/07/22/23), ~93 open. Ordered by risk × effort. Each wave is independently shippable.
+
+> **Single-org caveat:** several "within-org IDOR / elevation" findings (SEC-01, SEC-07) are **not exploitable** in the default single-member personal org — they need a second member in the same org. They still matter for the multi-member CPS 230 tenants the product targets, so they stay High, but they are not a live breach today.
+
+### Wave 1 — High-severity security (do first; mostly small, well-scoped)
+| Finding | Fix | Effort |
+|---|---|---|
+| **SEC-07** Visio export IDOR (v2/v3/test-vsdx) | Replace org-only `findFirst` with `requireDiagramAccess(..., 'view')` | S |
+| **SEC-05** Graph token on client session | Drop `session.msAccessToken`; SharePoint route reads it from the JWT server-side | S |
+| **SEC-19** Deepgram master key to client | Fail closed (503) in the fallback; never return a non-expiring key | XS |
+| **CANVAS-01** RichTextEditor stored XSS | `sanitizeRichText(...)` before `innerHTML` on init | XS |
+| **SEC-15** `?from=` open redirect (~8 sites) | Shared `isSafeInternalPath()` rejecting `//`/`/\`/scheme; use everywhere | S |
+| **SEC-13/14/20** impersonation write guards | Add `isReadOnlyImpersonation` 403 to deleted-delete/restore, scan-links POST, archive POST | S |
+| **SEC-03** OrgAdmin backup leaks hashes/tokens | Strip `password`/`resetToken*`/`stripe*` from User rows before serialising | S |
+| **SEC-02** empty `ADMIN_PASSWORD` fails open | Treat empty secret as elevation-disabled + `timingSafeEqual` | S |
+| **SEC-06 / SEC-04 / SEC-11** auth hardening | Rate-limit/lockout on login+register+forgot; email-verification gate; shared password policy | M |
+| **SEC-16/17** token-at-rest + impersonation cookie | Hash reset token; signed/httpOnly impersonation cookie + audit row | M |
+
+### Wave 2 — High data-integrity / data-loss
+| Finding | Fix | Effort |
+|---|---|---|
+| **DATA-25 / DATA-26** new per-table restore | Wrap in `$transaction`; stop nulling live `currentPublishedVersionId` on UPDATE *(addressed in this pass)* | M |
+| **DATA-27/28** per-table natural-key + null-FK | Natural-key fallback before upsert; null absent nullable FKs | S |
+| **UI-01 / UI-02** Ctrl+S + history-preview auto-save | Call `saveNowRef.current()`; gate autosave during preview | S |
+| **DATA-04 / DATA-17** Stripe webhook ordering + counter reset | Event-recency guard / re-fetch canonical sub; scope counter reset to the renewed period | M |
+| **DATA-05** archive lost-update across two pools | Merge in one DB statement / `SELECT … FOR UPDATE` in a single tx | M |
+| **DATA-11/12/13/16** restore re-parenting + orphans | Confirm email matches; guard `projectIdMap`; require existing membership; re-home published diagrams on project delete | M |
+| **DATA-15** usage-cap TOCTOU | Atomic increment-then-check / per-user lock in the create tx | M |
+| **DATA-31** dangling Stripe customer | Look up by metadata before create / compensate on failure | S |
+
+### Wave 3 — Config & platform hardening
+- **CFG-03** add `headers()`: CSP, `frame-ancestors`/X-Frame-Options, HSTS, nosniff, Referrer-Policy. *(One change, broad protection — high leverage.)*
+- **CFG-02 / CFG-04** boot-time env validation (zod) asserting presence + strength of `AUTH_SECRET`, `STRIPE_WEBHOOK_SECRET`, `DATABASE_URL`, `AZURE_*`; reject the placeholder.
+- **CFG-05/06** add a `(dashboard)/layout.tsx` auth gate (or widen the matcher); fix the `/matrix` comment.
+- **CFG-01** rotate the live `.env` secrets (Anthropic/Deepgram/Entra/SMTP) and keep the file out of shared/backed-up copies.
+- **CFG-07/08/09** `poweredByHeader:false`; move PGlite to devDeps; pin `next-auth` exactly.
+
+### Wave 4 — Medium correctness & robustness
+ENG-04 (lane-cascade visited guard) · ENG-05 (REMOVE_SPACE corners) · ENG-06/14 (drag/label redo) · ENG-07 (NaN offset divisor) · ENG-08 (containment clamp) · IO-01 (zip-bomb cap) · IO-02/05/06/09/10 (DDL/BPMN import fidelity) · IO-03/04 (recursion + O(n²) parse) · IO-07 (Content-Disposition) · SEC-09/10/12 · DATA-09/18/19/21/29/30 · UI-03 (folder-tree flush).
+
+### Wave 5 — Performance (large-diagram pan/zoom)
+CANVAS-02/03/04/05/06 + ENG-12/16/17/18/19 — memoise the render-body computations, `React.memo` the canvas children with stable callbacks, hoist `id→element` maps. Biggest perceived-quality win; ship as one focused pass.
+
+### Wave 6 — Low / cleanup
+Remaining Low items (SEC-18, SEC-21, ENG-09/10/11/13/15, DATA-24, CANVAS-07/08/09, IO-08, CFG-10) — fold into normal maintenance.
+
+**Suggested first commit:** Wave 1's XS/S items (SEC-07, SEC-05, SEC-19, CANVAS-01, SEC-15) + the DATA-25/26 transaction fix — high risk-reduction, low blast radius, all build-verifiable.
 

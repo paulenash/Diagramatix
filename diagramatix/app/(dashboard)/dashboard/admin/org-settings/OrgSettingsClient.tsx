@@ -7,6 +7,7 @@ import { ConfirmDialog } from "@/app/components/ConfirmDialog";
 // Entity Type surface removed 2026-06-08 — Org schema still carries the
 // field for forward-compat but it's no longer presented in the UI.
 import { ORG_ROLE_LABELS } from "@/app/lib/auth/orgRoleLabels";
+import { safeInternalPath } from "@/app/lib/safeRedirect";
 import type { OrgEntityType } from "@/app/generated/prisma/enums";
 
 // ── Public types (shared with page.tsx) ───────────────────────────────────
@@ -221,7 +222,7 @@ export function OrgSettingsClient({ isSuperAdmin, org, admins, orgList, callerUs
   // returns to the page they came from (typically /dashboard/admin for
   // SuperAdmin or /dashboard/org-admin for OrgAdmin).
   const fromParam = searchParams.get("from");
-  const safeFrom = fromParam && fromParam.startsWith("/") ? fromParam : null;
+  const safeFrom = safeInternalPath(fromParam);  // SEC-15
   const backHref = safeFrom
     ?? (isSuperAdmin ? "/dashboard/admin" : "/dashboard/org-admin");
   const backLabel = backHref === "/dashboard/admin"

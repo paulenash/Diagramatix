@@ -23,7 +23,10 @@ export function RichTextEditor({
   // are NOT pushed back into the DOM so the caret never jumps mid-edit.
   useEffect(() => {
     if (ref.current) {
-      ref.current.innerHTML = isRichText(value) ? value : plainToHtml(value ?? "");
+      // CANVAS-01: sanitise on init too. `value` can arrive from imported JSON
+      // or AI output that never passed through commit()'s sanitiser, so an
+      // unsanitised assignment here is a stored-XSS sink (e.g. <img onerror>).
+      ref.current.innerHTML = sanitizeRichText(isRichText(value) ? value : plainToHtml(value ?? ""));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

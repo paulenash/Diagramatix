@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { IMPLEMENTED_BUBBLE_TOPICS } from "@/app/lib/bubbleHelpTopics";
 import type { DiagramType } from "@/app/lib/diagram/types";
+import { safeInternalPath } from "@/app/lib/safeRedirect";
 
 interface BubbleHelpRow {
   id?: string;
@@ -29,7 +30,7 @@ export function BubbleHelpClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const rawFrom = searchParams.get("from");
-  const backHref = rawFrom && rawFrom.startsWith("/") ? rawFrom : "/dashboard/admin";
+  const backHref = safeInternalPath(rawFrom) ?? "/dashboard/admin";  // SEC-15
   const [diagramType, setDiagramType] = useState<DiagramType>("bpmn");
   const [rows, setRows] = useState<BubbleHelpRow[] | null>(null);
   // Snapshot of what's persisted server-side. Cancel restores the row

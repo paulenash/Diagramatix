@@ -1,10 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { listSites, searchSites, listDrives, listDriveRoot, listFolder, getItem, getMyDrive, listMyDriveRoot, listMyDriveFolder, getPreviewUrl } from "@/app/lib/sharepoint";
-
-function getMsToken(session: any): string | null {
-  return session?.msAccessToken ?? null;
-}
+import { getMsAccessToken } from "@/app/lib/sharepoint-token";
 
 /**
  * GET /api/sharepoint?action=sites                          — list all sites
@@ -23,7 +20,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const token = getMsToken(session);
+  const token = await getMsAccessToken(request);
   if (!token) {
     return NextResponse.json({ error: "Microsoft account not connected" }, { status: 403 });
   }

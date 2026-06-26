@@ -1335,7 +1335,7 @@ export function DatabaseClient() {
                   </ul>
                   <details className="mt-1">
                     <summary className="cursor-pointer text-green-700">Log</summary>
-                    <pre className="text-[10px] whitespace-pre-wrap mt-1">{restoreResult.log.join("\n")}</pre>
+                    <pre className="text-[10px] text-green-900 whitespace-pre-wrap mt-1">{restoreResult.log.join("\n")}</pre>
                   </details>
                 </div>
               )}

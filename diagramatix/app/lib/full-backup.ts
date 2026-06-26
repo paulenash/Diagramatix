@@ -343,58 +343,85 @@ export async function restoreFullBackupTables(
   /* eslint-disable @typescript-eslint/no-explicit-any */
   const relinks: Array<{ table: string; where: any; data: Record<string, unknown> }> = [];
 
-  // Forward dependency order so a selected parent lands before a selected child.
-  for (const table of schema.insertOrder) {
-    if (!wanted.has(table)) continue;
-    const rows = (payload.tables[table] ?? []) as Record<string, unknown>[];
-    const delegate = (prisma as any)[delegateName(table)];
-    if (!delegate?.upsert) { log.push(`  ${table}: no client delegate — skipped`); continue; }
-    const pkCols = schema.primaryKey[table] ?? ["id"];
-    const deferCols = deferByChild.get(table);
-    let ins = 0, upd = 0, skp = 0;
+  // DATA-26: run the WHOLE per-table restore (upserts + the deferred-FK re-link
+  // pass) inside ONE interactive transaction, so a mid-batch crash rolls back to
+  // the pre-restore state instead of leaving a half-merged DB — matching the
+  // wipe/additive paths and restoreRulesPrefsBundle. Per-row SAVEPOINTs preserve
+  // the "skip a bad row and continue" behaviour: in Postgres a failed statement
+  // otherwise aborts the entire transaction, so the previous bare try/catch could
+  // not have survived inside a transaction.
+  let relinked = 0;
+  await prisma.$transaction(async (tx) => {
+    // Forward dependency order so a selected parent lands before a selected child.
+    for (const table of schema.insertOrder) {
+      if (!wanted.has(table)) continue;
+      const rows = (payload.tables[table] ?? []) as Record<string, unknown>[];
+      const delegate = (tx as any)[delegateName(table)];
+      if (!delegate?.upsert) { log.push(`  ${table}: no client delegate — skipped`); continue; }
+      const pkCols = schema.primaryKey[table] ?? ["id"];
+      const deferCols = deferByChild.get(table);
+      let ins = 0, upd = 0, skp = 0;
 
-    for (const raw of rows) {
-      const row = convertDates(table, raw);
-      // Null any deferred FK columns on write; capture them for the re-link pass.
-      let writeRow: Record<string, unknown> = row;
-      if (deferCols && deferCols.size > 0) {
-        const captured: Record<string, unknown> = {};
-        let hasVal = false;
-        for (const c of deferCols) if (row[c] != null) { captured[c] = row[c]; hasVal = true; }
-        writeRow = { ...row };
-        for (const c of deferCols) writeRow[c] = null;
-        if (hasVal && pkCols.length === 1) {
-          relinks.push({ table, where: { [pkCols[0]]: row[pkCols[0]] }, data: captured });
+      for (const raw of rows) {
+        const row = convertDates(table, raw);
+        // Null any deferred FK columns on write; capture them for the re-link pass.
+        let writeRow: Record<string, unknown> = row;
+        if (deferCols && deferCols.size > 0) {
+          const captured: Record<string, unknown> = {};
+          let hasVal = false;
+          for (const c of deferCols) if (row[c] != null) { captured[c] = row[c]; hasVal = true; }
+          writeRow = { ...row };
+          for (const c of deferCols) writeRow[c] = null;
+          if (hasVal && pkCols.length === 1) {
+            relinks.push({ table, where: { [pkCols[0]]: row[pkCols[0]] }, data: captured });
+          }
+        }
+        // PK-based where: single column, or Prisma's compound-key input (a_b).
+        const where = pkCols.length === 1
+          ? { [pkCols[0]]: writeRow[pkCols[0]] }
+          : { [pkCols.join("_")]: Object.fromEntries(pkCols.map((c) => [c, writeRow[c]])) };
+        // Update payload excludes the PK columns (identity stays put).
+        const updateData = { ...writeRow };
+        for (const c of pkCols) delete updateData[c];
+        // DATA-25: do NOT overwrite an EXISTING live row's deferred cyclic-FK
+        // columns with NULL — that would strip a live published diagram's
+        // currentPublishedVersionId when PublishedVersion isn't co-selected.
+        // Omit them from the UPDATE payload (so the live pointer is preserved);
+        // the re-link pass re-applies the backup's value when its target exists.
+        if (deferCols) for (const c of deferCols) delete updateData[c];
+        await tx.$executeRawUnsafe("SAVEPOINT dgx_row");
+        try {
+          const existing = await delegate.findUnique({ where });
+          await delegate.upsert({ where, create: writeRow as any, update: updateData as any });
+          await tx.$executeRawUnsafe("RELEASE SAVEPOINT dgx_row");
+          if (existing) upd++; else ins++;
+        } catch (e) {
+          await tx.$executeRawUnsafe("ROLLBACK TO SAVEPOINT dgx_row");
+          await tx.$executeRawUnsafe("RELEASE SAVEPOINT dgx_row");
+          skp++;
+          const msg = e instanceof Error ? e.message.split("\n").slice(-1)[0].trim() : String(e);
+          log.push(`    skipped ${table} ${JSON.stringify(where)}: ${msg}`);
         }
       }
-      // PK-based where: single column, or Prisma's compound-key input (a_b).
-      const where = pkCols.length === 1
-        ? { [pkCols[0]]: writeRow[pkCols[0]] }
-        : { [pkCols.join("_")]: Object.fromEntries(pkCols.map((c) => [c, writeRow[c]])) };
-      // Update payload excludes the PK columns (identity stays put).
-      const updateData = { ...writeRow };
-      for (const c of pkCols) delete updateData[c];
+      inserted[table] = ins;
+      log.push(`  ${table}: ${ins} inserted, ${upd} updated${skp ? `, ${skp} skipped` : ""}`);
+    }
+
+    // Re-link deferred FK pointers now the selected parents exist (best-effort;
+    // a pointer to a non-restored, non-live target simply stays NULL).
+    for (const r of relinks) {
+      await tx.$executeRawUnsafe("SAVEPOINT dgx_relink");
       try {
-        const existing = await delegate.findUnique({ where });
-        await delegate.upsert({ where, create: writeRow as any, update: updateData as any });
-        if (existing) upd++; else ins++;
-      } catch (e) {
-        skp++;
-        const msg = e instanceof Error ? e.message.split("\n").slice(-1)[0].trim() : String(e);
-        log.push(`    skipped ${table} ${JSON.stringify(where)}: ${msg}`);
+        await (tx as any)[delegateName(r.table)].update({ where: r.where, data: r.data });
+        await tx.$executeRawUnsafe("RELEASE SAVEPOINT dgx_relink");
+        relinked++;
+      } catch {
+        await tx.$executeRawUnsafe("ROLLBACK TO SAVEPOINT dgx_relink");
+        await tx.$executeRawUnsafe("RELEASE SAVEPOINT dgx_relink");
+        /* target absent — leave the column NULL */
       }
     }
-    inserted[table] = ins;
-    log.push(`  ${table}: ${ins} inserted, ${upd} updated${skp ? `, ${skp} skipped` : ""}`);
-  }
-
-  // Re-link deferred FK pointers now the selected parents exist (best-effort;
-  // a pointer to a non-restored, non-live target simply stays NULL).
-  let relinked = 0;
-  for (const r of relinks) {
-    try { await (prisma as any)[delegateName(r.table)].update({ where: r.where, data: r.data }); relinked++; }
-    catch { /* target absent — leave the column NULL */ }
-  }
+  }, { timeout: 120_000, maxWait: 15_000 });
   if (relinks.length > 0) log.push(`  Re-linked ${relinked}/${relinks.length} deferred FK pointer(s)`);
   /* eslint-enable @typescript-eslint/no-explicit-any */
 

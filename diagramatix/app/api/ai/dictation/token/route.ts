@@ -64,12 +64,14 @@ export async function POST() {
       if (token) return NextResponse.json({ token, scheme: "token", expiresIn: TTL_SECONDS });
     }
 
-    // Last resort: the key can't mint short-lived tokens (transcription-only
-    // key — grant ${gr.status}, key-create ${kr.status}). Hand the key itself
-    // to the browser — the documented Deepgram client-side pattern. The route
-    // is auth-gated and the key is usage-scoped, so the only exposure is
-    // transcription quota. To avoid this, use an Owner key (enables grant).
-    return NextResponse.json({ token: masterKey, scheme: "token", direct: true, expiresIn: 0 });
+    // SEC-19: the key can't mint short-lived tokens (transcription-only key —
+    // grant ${gr.status}, key-create ${kr.status}). We must NOT hand the
+    // long-lived master key to the browser (non-expiring, reusable against our
+    // Deepgram billing). Fail closed with 503 — the client falls back to the
+    // browser speech engine, exactly as it does when the service is unconfigured.
+    // To enable cloud dictation, use a Deepgram Owner key (supports /auth/grant).
+    console.error(`[dictation] cannot mint a short-lived token (grant ${gr.status}, key-create ${kr.status}); refusing to expose the master key`);
+    return NextResponse.json({ error: "Dictation service unavailable" }, { status: 503 });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Token mint failed" },

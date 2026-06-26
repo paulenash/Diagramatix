@@ -8,7 +8,7 @@ import { exportVisioV3 } from "@/app/lib/diagram/v3/exportVisioV3";
 import { profileByName } from "@/app/lib/diagram/v3/stencilProfile";
 import { DEFAULT_SYMBOL_COLORS, BW_SYMBOL_COLORS } from "@/app/lib/diagram/colors";
 import type { SymbolColorConfig } from "@/app/lib/diagram/colors";
-import { getCurrentOrgId, OrgContextError } from "@/app/lib/auth/orgContext";
+import { requireDiagramAccess, OrgContextError } from "@/app/lib/auth/orgContext";
 import { gateLimit, recordUsage } from "@/app/lib/subscription-route";
 
 /**
@@ -24,9 +24,11 @@ export async function GET(request: Request) {
   const diagramId = searchParams.get("diagramId");
   if (!diagramId) return NextResponse.json({ error: "diagramId required" }, { status: 400 });
 
-  let orgId: string;
+  // SEC-07: authorise against access to THIS diagram (ownership / ProjectShare /
+  // diagramOwner / bundle) — not merely sharing the caller's active org, which
+  // let any org member export another member's unshared diagram.
   try {
-    orgId = await getCurrentOrgId(session, await cookies());
+    await requireDiagramAccess(session, await cookies(), diagramId, "view");
   } catch (err) {
     if (err instanceof OrgContextError) {
       return NextResponse.json({ error: err.message }, { status: err.status });
@@ -34,8 +36,8 @@ export async function GET(request: Request) {
     throw err;
   }
 
-  const diagram = await prisma.diagram.findFirst({
-    where: { id: diagramId, orgId },
+  const diagram = await prisma.diagram.findUnique({
+    where: { id: diagramId },
     include: { project: true },
   });
   if (!diagram) return NextResponse.json({ error: "Diagram not found" }, { status: 404 });

@@ -7,6 +7,7 @@ import { AlertDialog } from "@/app/components/AlertDialog";
 import { UsagePopover } from "@/app/components/UsagePopover";
 import { displayOrgRole } from "@/app/lib/auth/orgRoleLabels";
 import { SCHEMA_VERSION } from "@/app/lib/diagram/types";
+import { safeInternalPath } from "@/app/lib/safeRedirect";
 
 interface UserRow {
   id: string;
@@ -88,7 +89,7 @@ export function AdminClient({ users: initialUsers, currentUserId, commitCount, i
   // project, or a specific diagram). Falls back to /dashboard when
   // the param is absent or unsafe.
   const rawFrom = searchParams.get("from");
-  const backHref = rawFrom && rawFrom.startsWith("/") ? rawFrom : "/dashboard";
+  const backHref = safeInternalPath(rawFrom) ?? "/dashboard";  // SEC-15
   const backLabel = backHref === "/dashboard"
     ? "Dashboard"
     : backHref === "/dashboard/org-admin"

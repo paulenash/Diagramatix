@@ -5734,7 +5734,10 @@ function reducerImpl(state: DiagramData, action: Action): DiagramData {
         const allDeletedLaneIds = new Set<string>([id]);
         function collectCascadeLanes(parentId: string) {
           for (const e of state.elements) {
-            if (e.type === "lane" && e.parentId === parentId) {
+            // ENG-04: visited guard — a cyclic lane parent chain (possible via
+            // imported / AI / SET_DATA JSON, which isn't acyclicity-validated)
+            // would otherwise recurse forever and overflow the stack.
+            if (e.type === "lane" && e.parentId === parentId && !allDeletedLaneIds.has(e.id)) {
               allDeletedLaneIds.add(e.id);
               collectCascadeLanes(e.id);
             }
