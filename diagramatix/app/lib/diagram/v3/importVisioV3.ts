@@ -16,6 +16,7 @@
  *    `warnings`; the rest of the diagram still imports.
  */
 import JSZip from "jszip";
+import { assertZipWithinLimit } from "@/app/lib/uploadLimit";
 import type {
   DiagramData,
   DiagramElement,
@@ -954,6 +955,7 @@ export async function importVisioV3(
 ): Promise<ImportResult> {
   const warnings: string[] = [];
   const zip = await JSZip.loadAsync(buffer);
+  assertZipWithinLimit(zip); // IO-01: refuse zip bombs before decompressing entries
 
   const masters = await loadMasterIndex(zip);
 

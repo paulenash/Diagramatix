@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma, pgPool } from "@/app/lib/db";
+import { uploadSizeError } from "@/app/lib/uploadLimit";
 import { importBpmnXml } from "@/app/lib/diagram/bpmn/importBpmnXml";
 import { isReadOnlyImpersonation } from "@/app/lib/superuser";
 import { gateLimit, gateElementCount, recordUsage } from "@/app/lib/subscription-route";
@@ -132,6 +133,8 @@ export async function POST(request: Request) {
   // Read the file as text. BPMN XML is UTF-8.
   let xmlText: string;
   try {
+    const sizeErr = uploadSizeError(upload); // IO-01
+    if (sizeErr) return NextResponse.json({ error: sizeErr }, { status: 413 });
     const buf = await upload.arrayBuffer();
     xmlText = new TextDecoder("utf-8").decode(buf);
   } catch (err) {

@@ -1,8 +1,18 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/app/lib/db";
+import { rateLimit, clientIp } from "@/app/lib/rateLimit";
 
 export async function POST(req: Request) {
+  // SEC-06: throttle per IP — reset endpoint abuse / token guessing.
+  const rl = rateLimit(`reset:ip:${clientIp(req.headers)}`, 20, 60 * 60_000);
+  if (!rl.ok) {
+    return NextResponse.json(
+      { error: "Too many attempts. Please try again later." },
+      { status: 429, headers: { "Retry-After": String(rl.retryAfterSec) } },
+    );
+  }
+
   const { token, password } = await req.json();
 
   if (!token || !password) {

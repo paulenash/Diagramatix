@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
+import { uploadSizeError } from "@/app/lib/uploadLimit";
 import { isImpersonating, getEffectiveUserId } from "@/app/lib/superuser";
 import { getCurrentOrgId, requireRole, WRITE_ROLES, OrgContextError } from "@/app/lib/auth/orgContext";
 import { buildUserBackup, restoreUserBackup } from "@/app/lib/backup";
@@ -102,6 +103,8 @@ export async function POST(req: Request) {
     if (!file || typeof file === "string") {
       return NextResponse.json({ error: "No file uploaded" }, { status: 400 });
     }
+    const sizeErr = uploadSizeError(file as File); // IO-01
+    if (sizeErr) return NextResponse.json({ error: sizeErr }, { status: 413 });
     bytes = await (file as File).arrayBuffer();
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

@@ -4,12 +4,10 @@ import { auth } from "@/auth";
 import { pgPool } from "@/app/lib/db";
 import { prisma } from "@/app/lib/db";
 import { getEffectiveUserId, isReadOnlyImpersonation, SUPERUSER_EMAILS } from "@/app/lib/superuser";
-
-// Elevation password for non-superuser callers that want to create
-// built-in templates. Sourced from ADMIN_PASSWORD env var (set in Key
-// Vault for prod, in .env locally). Empty fallback disables the
-// elevation path; superuser-email gate still works either way.
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? "";
+import { isAdminPasswordValid } from "@/app/lib/adminPassword";
+// Elevation for non-superuser callers that want to create built-in templates is
+// gated by the ADMIN_PASSWORD env (set in Key Vault for prod). isAdminPasswordValid
+// treats an unset/empty secret as elevation-DISABLED (SEC-02 — it used to fail open).
 
 function cuid() {
   const ts = Date.now().toString(36);
@@ -77,7 +75,7 @@ export async function POST(req: Request) {
   // Admin authorization for built-in templates
   if (templateType === "builtin") {
     const userEmail = await getUserEmail(session.user.id);
-    if ((!userEmail || !SUPERUSER_EMAILS.has(userEmail)) && adminPassword !== ADMIN_PASSWORD) {
+    if ((!userEmail || !SUPERUSER_EMAILS.has(userEmail)) && !isAdminPasswordValid(adminPassword)) {
       return NextResponse.json({ error: "Invalid admin password" }, { status: 403 });
     }
   }

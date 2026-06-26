@@ -4,6 +4,12 @@ import MicrosoftEntraID from "next-auth/providers/microsoft-entra-id";
 import { authConfig } from "./auth.config";
 import { prisma } from "@/app/lib/db";
 import bcrypt from "bcryptjs";
+import { rateLimit, clientIp } from "@/app/lib/rateLimit";
+
+/** SEC-12: a fixed, valid bcrypt hash compared against when the user doesn't
+ *  exist, so authorize() takes ~the same time whether or not the email is
+ *  registered (closes the timing-enumeration oracle). It never matches anything. */
+const DUMMY_BCRYPT_HASH = "$2b$12$qO.Q/cmrOm8qGc98tNpKP.eQ.pkPQmLyocrlAbVqID.fiD9T56GP2";
 
 /**
  * Idempotent: ensures the user has at least one OrgMember row. If none, creates
@@ -36,21 +42,27 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
       },
-      async authorize(credentials) {
+      async authorize(credentials, request) {
         if (!credentials?.email || !credentials?.password) return null;
+        const email = (credentials.email as string).toLowerCase();
+
+        // SEC-06: throttle online password guessing. Per-account (one email under
+        // attack) and per-source IP (credential-stuffing across many accounts).
+        // Over-limit fails like a wrong password — no lockout oracle, no enum.
+        const ip = clientIp((request as Request | undefined)?.headers ?? new Headers());
+        if (!rateLimit(`login:email:${email}`, 10, 15 * 60_000).ok) return null;
+        if (!rateLimit(`login:ip:${ip}`, 50, 15 * 60_000).ok) return null;
 
         const user = await prisma.user.findUnique({
-          where: { email: credentials.email as string },
+          where: { email: email },
         });
 
-        if (!user) return null;
+        // SEC-12: always run a bcrypt compare (against a dummy hash when the user
+        // is missing) so the response time doesn't reveal whether the email exists.
+        const hashToCheck = user?.password || DUMMY_BCRYPT_HASH;
+        const passwordMatch = await bcrypt.compare(credentials.password as string, hashToCheck);
 
-        const passwordMatch = await bcrypt.compare(
-          credentials.password as string,
-          user.password
-        );
-
-        if (!passwordMatch) return null;
+        if (!user || !passwordMatch) return null;
 
         return {
           id: user.id,
@@ -102,6 +114,18 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             await ensureDefaultOrgForUser(created.id, created.name ?? user.email);
           } else {
             user.id = existing.id;
+            // SEC-04: an attacker can register a victim's email + password BEFORE
+            // the victim first signs in with Microsoft; the old code then linked
+            // the SSO identity to that pre-existing row, and the attacker's known
+            // password still authenticated the SAME account (persistent
+            // co-occupation / account pre-hijack). Microsoft has now verified
+            // ownership of this email, so the SSO identity is authoritative —
+            // disable any pre-existing local password so ONLY SSO can sign into
+            // this account. A legitimate user who also had a password can re-set
+            // it via "Forgot password".
+            if (existing.password && existing.password.length > 0) {
+              await prisma.user.update({ where: { id: existing.id }, data: { password: "" } });
+            }
             // Idempotent — only creates an org if the user doesn't already have one
             await ensureDefaultOrgForUser(existing.id, existing.name ?? existing.email);
           }

@@ -2,8 +2,18 @@ import { NextResponse } from "next/server";
 import crypto from "crypto";
 import { prisma } from "@/app/lib/db";
 import { sendPasswordResetEmail } from "@/app/lib/email";
+import { rateLimit, clientIp } from "@/app/lib/rateLimit";
 
 export async function POST(req: Request) {
+  // SEC-06: throttle per IP — prevents reset-email bombing and token churn.
+  const rl = rateLimit(`forgot:ip:${clientIp(req.headers)}`, 10, 60 * 60_000);
+  if (!rl.ok) {
+    return NextResponse.json(
+      { error: "Too many attempts. Please try again later." },
+      { status: 429, headers: { "Retry-After": String(rl.retryAfterSec) } },
+    );
+  }
+
   const { email } = await req.json();
 
   if (!email) {

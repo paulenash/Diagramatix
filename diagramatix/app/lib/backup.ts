@@ -27,6 +27,7 @@
  */
 
 import JSZip from "jszip";
+import { assertZipWithinLimit } from "@/app/lib/uploadLimit";
 import { prisma } from "./db";
 import { ARCHIVE_PROJECT_NAME } from "./archive";
 import { SCHEMA_VERSION } from "./diagram/types";
@@ -303,6 +304,7 @@ export async function restoreUserBackup(
 ): Promise<RestoreResult> {
   // Read the zip
   const zip = await JSZip.loadAsync(bytes);
+  assertZipWithinLimit(zip); // IO-01: refuse zip bombs before decompressing entries
   const entry = zip.file(BACKUP_ENTRY);
   if (!entry) throw new Error(`Backup is missing ${BACKUP_ENTRY}`);
   const text = await entry.async("string");

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
+import { uploadSizeError } from "@/app/lib/uploadLimit";
 import { importVisioV3 } from "@/app/lib/diagram/v3/importVisioV3";
 import { listVisioPages } from "@/app/lib/diagram/v3/visioPages";
 import { isReadOnlyImpersonation } from "@/app/lib/superuser";
@@ -161,6 +162,8 @@ export async function POST(request: Request) {
   if (limitBlock) return limitBlock;
 
   // Load .vsdx into memory once.
+  const sizeErr = uploadSizeError(upload); // IO-01
+  if (sizeErr) return NextResponse.json({ error: sizeErr }, { status: 413 });
   const buf = await upload.arrayBuffer();
 
   // Validate page indices against actual page count.

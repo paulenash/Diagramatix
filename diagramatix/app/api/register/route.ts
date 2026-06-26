@@ -2,14 +2,34 @@ import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/app/lib/db";
 import { promotePendingAudienceMemberships } from "@/app/lib/bundleInvites";
+import { rateLimit, clientIp } from "@/app/lib/rateLimit";
 
 export async function POST(req: Request) {
+  // SEC-06: throttle account creation per source IP (public, unauthenticated).
+  const ip = clientIp(req.headers);
+  const rl = rateLimit(`register:ip:${ip}`, 10, 60 * 60_000);
+  if (!rl.ok) {
+    return NextResponse.json(
+      { error: "Too many attempts. Please try again later." },
+      { status: 429, headers: { "Retry-After": String(rl.retryAfterSec) } },
+    );
+  }
+
   const body = await req.json();
   const { email, name, password } = body;
 
   if (!email || !password) {
     return NextResponse.json(
       { error: "Email and password are required" },
+      { status: 400 }
+    );
+  }
+
+  // SEC-11: enforce a minimum password policy on the primary account-creation
+  // path (reset-password already requires >= 8; register previously had none).
+  if (typeof password !== "string" || password.length < 8) {
+    return NextResponse.json(
+      { error: "Password must be at least 8 characters" },
       { status: 400 }
     );
   }

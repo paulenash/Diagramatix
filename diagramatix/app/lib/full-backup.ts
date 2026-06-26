@@ -30,6 +30,7 @@
  */
 
 import JSZip from "jszip";
+import { assertZipWithinLimit } from "@/app/lib/uploadLimit";
 import { prisma } from "./db";
 import { SCHEMA_VERSION } from "./diagram/types";
 import { getBackupSchema, reviveDates, delegateName } from "./backupSchema";
@@ -136,6 +137,7 @@ export async function parseFullBackup(
   bytes: ArrayBuffer | Uint8Array,
 ): Promise<FullBackupPayload> {
   const zip = await JSZip.loadAsync(bytes);
+  assertZipWithinLimit(zip); // IO-01: refuse zip bombs before decompressing entries
   const entry = zip.file(FULL_BACKUP_ENTRY);
   if (!entry) throw new Error(`Backup is missing ${FULL_BACKUP_ENTRY}`);
   const text = await entry.async("string");

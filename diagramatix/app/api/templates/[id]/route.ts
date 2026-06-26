@@ -3,9 +3,7 @@ import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { pgPool, prisma } from "@/app/lib/db";
 import { getEffectiveUserId, isReadOnlyImpersonation, SUPERUSER_EMAILS } from "@/app/lib/superuser";
-
-// Elevation password from env var. See note in /api/templates/route.ts.
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? "";
+import { isAdminPasswordValid } from "@/app/lib/adminPassword";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -73,7 +71,7 @@ export async function PUT(req: Request, { params }: Params) {
 
     if (isBuiltin) {
       const userEmail = await getUserEmail(session.user.id);
-      if ((!userEmail || !SUPERUSER_EMAILS.has(userEmail)) && adminPassword !== ADMIN_PASSWORD) {
+      if ((!userEmail || !SUPERUSER_EMAILS.has(userEmail)) && !isAdminPasswordValid(adminPassword)) {
         return NextResponse.json({ error: "Invalid admin password" }, { status: 403 });
       }
     }
@@ -161,7 +159,7 @@ export async function DELETE(req: Request, { params }: Params) {
         const body = await req.json();
         adminPassword = body.adminPassword;
       } catch { /* no body */ }
-      if ((!userEmail || !SUPERUSER_EMAILS.has(userEmail)) && adminPassword !== ADMIN_PASSWORD) {
+      if ((!userEmail || !SUPERUSER_EMAILS.has(userEmail)) && !isAdminPasswordValid(adminPassword)) {
         return NextResponse.json({ error: "Invalid admin password" }, { status: 403 });
       }
     }

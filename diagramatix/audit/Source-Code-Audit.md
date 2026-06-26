@@ -5,6 +5,7 @@
 | **Audit started** | 2026-06-13 |
 | **Commit audited** | `bbc8716` (Stages 1–3) |
 | **Re-audited** | 2026-06-26 — Stages 1–3 re-verified against current code (4 findings now fixed, 4 changed, 41 still stand) + Stages 4–7 completed. New findings folded in below. |
+| **Remediation** | **36 of ~103 fixed** (as of 2026-06-26): 6 pre-existing (DATA-01/02/03, ENG-01/02/03) + 4 re-audit interim (DATA-06/07/22/23) + Wave 1 (8) + Wave 2 (12) + urgent batch (6: SEC-02/04/06/11/12, IO-01). ~67 open. ⚠️ Stripe fixes DATA-04/17/31 await Stripe **test-mode** verification; per-table restore (DATA-27/28) warrants a sandbox re-test. |
 | **Scope** | All hand-written source (~98k lines TS/TSX): API routes, server libraries, diagram engine, canvas/renderers, page clients, import/export, build & config. Excludes `app/generated/`, `node_modules`, binary assets, and the test suite (flagged separately for its own review). |
 | **Method** | Staged multi-agent review. Each stage: 3–5 specialist finder agents with distinct lenses over an explicit file manifest → dedupe → every finding adversarially verified by 2 independent skeptic agents reading the real code. Only findings that survive verification are documented. |
 
@@ -38,40 +39,40 @@
 | ID | Severity | Area | Title | Status |
 |---|---|---|---|---|
 | SEC-01 | High | Access control | VIEW-share recipient can delete an entire project (wrong-org OrgAdmin check) | Open |
-| SEC-02 | High | Access control | Empty `ADMIN_PASSWORD` lets any user edit/delete global built-in templates | Open |
+| SEC-02 | High | Access control | Empty `ADMIN_PASSWORD` lets any user edit/delete global built-in templates | ✅ Fixed (urgent batch) |
 | SEC-03 | High | Secrets | OrgAdmin backup leaks every member's password hash, reset token, Stripe IDs | Open (re-audit: code restructured, leak intact) |
-| SEC-04 | High | Auth flow | No email verification on register → account pre-hijacking via Entra auto-link | Open |
-| SEC-05 | High | Secrets | Microsoft Graph access token leaked to the client via the session object | Open |
-| SEC-06 | High | Auth flow | No rate limiting / lockout on login, register, or password reset | Open |
-| SEC-07 | High | IDOR | Visio export endpoints authorise by Org membership, not project access | Open |
+| SEC-04 | High | Auth flow | No email verification on register → account pre-hijacking via Entra auto-link | ✅ Fixed (urgent batch — SSO-link disables pw) |
+| SEC-05 | High | Secrets | Microsoft Graph access token leaked to the client via the session object | ✅ Fixed (Wave 1) |
+| SEC-06 | High | Auth flow | No rate limiting / lockout on login, register, or password reset | ✅ Fixed (urgent batch) |
+| SEC-07 | High | IDOR | Visio export endpoints authorise by Org membership, not project access | ✅ Fixed (Wave 1) |
 | SEC-08 | Medium | Privacy | User search leaks every user's name + email across all tenants | Open |
 | SEC-09 | Medium | Info leak | Raw Postgres/internal error text returned to clients | Open |
 | SEC-10 | Medium | DoS | No size/zip-bomb limit on backup-restore upload | Open |
-| SEC-11 | Medium | Auth flow | No password strength/length check on registration | Open |
-| SEC-12 | Medium | Auth flow | Login `authorize()` skips bcrypt when user missing (timing enumeration) | Open |
+| SEC-11 | Medium | Auth flow | No password strength/length check on registration | ✅ Fixed (urgent batch) |
+| SEC-12 | Medium | Auth flow | Login `authorize()` skips bcrypt when user missing (timing enumeration) | ✅ Fixed (urgent batch) |
 | SEC-13 | Medium | Impersonation | Archived-diagram delete/restore skip the read-only impersonation guard | Open |
 | SEC-14 | Medium | Impersonation | `scan-links` POST mutates diagram JSON without the read-only guard | Open |
-| SEC-15 | Low | Open redirect | `?from=` `startsWith('/')` accepts protocol-relative URLs | Open |
+| SEC-15 | Low | Open redirect | `?from=` `startsWith('/')` accepts protocol-relative URLs | ✅ Fixed (Wave 1) |
 | SEC-16 | Low | Secrets | Password reset token stored in plaintext at rest | Open |
 | SEC-17 | Low | Impersonation | Impersonation identity/mode in unsigned, non-httpOnly cookies | Open |
 | SEC-18 | Low | Correctness | OrgAdmin impersonation is a server-side no-op (misleading UI) | Open |
 | DATA-01 | Critical | Schema/FK | User delete throws (Restrict FK) for anyone who ever published — undeletable | ✅ Fixed v1.19 |
 | DATA-02 | Critical | Backup | Full-backup wipe-restore TRUNCATEs ~15 tables it never re-inserts → permanent loss | ✅ Fixed v1.19 |
 | DATA-03 | Critical | Backup | Wipe-restore re-inserts `Diagram.currentPublishedVersionId` but never backs up `PublishedVersion` → FK abort | ✅ Fixed v1.19 |
-| DATA-04 | High | Races | Stripe webhook has no event-ordering guard → stale event resurrects canceled subs | Open |
-| DATA-05 | High | Races | `archiveDiagram` read-modify-writes `data` across two pools → lost update clobbers saves | Open |
+| DATA-04 | High | Races | Stripe webhook has no event-ordering guard → stale event resurrects canceled subs | ✅ Fixed (Wave 2 — verify in Stripe test mode) |
+| DATA-05 | High | Races | `archiveDiagram` read-modify-writes `data` across two pools → lost update clobbers saves | ✅ Fixed (Wave 2) |
 | DATA-06 | High | Transactions | `restoreUserBackup` runs dozens of writes with no transaction → partial restore | ✅ Fixed (re-audit: now one `$transaction`) |
 | DATA-07 | High | Transactions | Backup phase-2 JSON writes outside the row creates → crash leaves dangling links | ✅ Fixed (re-audit: folded into the transaction) |
 | DATA-08 | High | Restore | Subprocess link remap only walks `properties.linkedDiagramId` → misses other refs | Changed (re-audit: remap moved to `backup.ts:497`; variant remains) |
 | DATA-09 | High | Transactions | Bundle-invite promotion catch-all deletes the pending row on *any* error | Open |
 | DATA-10 | High | Email | Invite email Subject built from unescaped inviter/bundle name → header injection | Needs manual confirmation |
-| DATA-11 | High | Restore | Additive full-restore matches users by bare email → re-parents data onto wrong live user | Open |
-| DATA-12 | High | Restore | Additive restore mints a project id without inserting the project → dangling FK abort | Open |
-| DATA-13 | High | Restore | Org restore silently adds matched live users to the target org as Viewer (cross-tenant) | Open |
+| DATA-11 | High | Restore | Additive full-restore matches users by bare email → re-parents data onto wrong live user | ✅ Fixed (Wave 2 — audit log) |
+| DATA-12 | High | Restore | Additive restore mints a project id without inserting the project → dangling FK abort | ✅ Fixed (Wave 2) |
+| DATA-13 | High | Restore | Org restore silently adds matched live users to the target org as Viewer (cross-tenant) | ✅ Fixed (Wave 2) |
 | DATA-14 | High | Backup | Org backup pulls rules by member `userId` → drops org/admin-default rules (`userId` null) | Needs manual confirmation |
 | DATA-15 | High | Races | `checkLimit`/`recordUsage` TOCTOU lets concurrent requests exceed hard caps | Open |
-| DATA-16 | High | Schema/FK | Project delete `SetNull`s `projectId` but leaves PUBLISHED diagrams as invisible orphans | Open |
-| DATA-17 | Medium | Races | Monthly counter reset on renewal races concurrent usage / nukes unrelated counters | Open |
+| DATA-16 | High | Schema/FK | Project delete `SetNull`s `projectId` but leaves PUBLISHED diagrams as invisible orphans | ✅ Fixed (Wave 2) |
+| DATA-17 | Medium | Races | Monthly counter reset on renewal races concurrent usage / nukes unrelated counters | ✅ Fixed (Wave 2 — verify in Stripe test mode) |
 | DATA-18 | Medium | Multi-tenant | `restoreDiagram` trusts archived `userId`, never re-validates org membership | Open |
 | DATA-19 | Medium | Backup | Per-user backup captures cross-org prompts but restore dedups them into one org → loss | Open |
 | DATA-20 | Medium | Email | `sendMail` failures unhandled → DB may record an invite/notification as delivered | Changed (re-audit: partially remediated; `PendingBundleAudience` variant persists) |
@@ -82,7 +83,7 @@
 | ENG-01 | Critical | Undo/redo | Undo/redo wipes title, fonts, database, processOwner, parentDiagramIds → auto-saved data loss | ✅ Fixed v1.20 |
 | ENG-02 | High | Reducer | `DELETE_ELEMENT` leaves dangling connectors on the deleted host's boundary events | ✅ Fixed v1.20 |
 | ENG-03 | High | Undo/redo | Title/font/database setters mutate persisted state but don't invalidate the redo stack | ✅ Fixed v1.20 |
-| ENG-04 | Medium | Reducer | `collectCascadeLanes` recurses with no visited guard → stack overflow on cyclic lane chain | Open |
+| ENG-04 | Medium | Reducer | `collectCascadeLanes` recurses with no visited guard → stack overflow on cyclic lane chain | ✅ Fixed (Wave 1) |
 | ENG-05 | Medium | Space tools | `REMOVE_SPACE` leaves corner elements un-shifted in cross (both-axis) zones | Open |
 | ENG-06 | Medium | Undo/redo | Interleaved second drag overwrites the pre-drag snapshot → first action lost from history | Open |
 | ENG-07 | Medium | Geometry | `offsetAlongFromPoint`/`getOffsetAlong` divide by element w/h with no zero-guard → NaN offset | Open (re-audit: 0–1 clamp added but divisor still unguarded → NaN survives) |
@@ -92,23 +93,23 @@
 | ENG-11 | Low | Space tools | `INSERT_SPACE` pushes a history snapshot every mouse-move frame of a shift-drag | Open |
 | ENG-12 | Low | Performance | `ancestorsOf` does a linear `find()` per hop → O(n²) obstacle setup per recompute | Open |
 | ENG-13 | Low | Mutation | `consolidateWaypoints` returns its input array by reference for short paths (aliasing trap) | Open |
-| SEC-19 | High | Secrets | Deepgram master API key returned to any authenticated client in the dictation-token fallback | Open |
+| SEC-19 | High | Secrets | Deepgram master API key returned to any authenticated client in the dictation-token fallback | ✅ Fixed (Wave 1) |
 | SEC-20 | High | Impersonation | Archive (soft-delete) route ignores the read-only impersonation guard | Open |
 | SEC-21 | Low | Impersonation | Prompt routes scope org to the impersonated user but key writes on the superuser's own id | Open |
-| DATA-25 | High | Restore | Per-table restore NULLs live published diagrams' `currentPublishedVersionId` (deferred-FK nulled on UPDATE, best-effort relink) | Open |
-| DATA-26 | High | Transactions | New per-table restore runs all upserts + FK re-links with NO transaction → half-merged DB | Open |
-| DATA-27 | Medium | Restore | Per-table restore silently skips rows colliding on a non-PK unique key (regresses the DATA-23 fix) | Open |
-| DATA-28 | Medium | Restore | Per-table restore drops a Diagram row when nullable `diagramOwnerId` points to a non-restored user (should null it) | Open |
+| DATA-25 | High | Restore | Per-table restore NULLs live published diagrams' `currentPublishedVersionId` (deferred-FK nulled on UPDATE, best-effort relink) | ✅ Fixed (Wave 1) |
+| DATA-26 | High | Transactions | New per-table restore runs all upserts + FK re-links with NO transaction → half-merged DB | ✅ Fixed (Wave 1) |
+| DATA-27 | Medium | Restore | Per-table restore silently skips rows colliding on a non-PK unique key (regresses the DATA-23 fix) | ✅ Fixed (Wave 2) |
+| DATA-28 | Medium | Restore | Per-table restore drops a Diagram row when nullable `diagramOwnerId` points to a non-restored user (should null it) | ✅ Fixed (Wave 2) |
 | DATA-29 | Medium | Races | Wipe-restore data-loss guard runs its COUNT checks outside the TRUNCATE transaction (TOCTOU) | Open |
 | DATA-30 | Low | Robustness | Per-table `inserted` count excludes updates; malformed payload → unguarded TypeError 500 | Open |
-| DATA-31 | Low | Transactions | `getOrCreateStripeCustomer` creates a Stripe customer then persists its id separately → dangling/duplicate customers | Open |
+| DATA-31 | Low | Transactions | `getOrCreateStripeCustomer` creates a Stripe customer then persists its id separately → dangling/duplicate customers | ✅ Fixed (Wave 2 — verify in Stripe test mode) |
 | ENG-14 | Medium | Undo/redo | `updateLabelLive` mutates persisted label+geometry after an undo without invalidating the redo branch | Needs manual confirmation |
 | ENG-15 | Low | Undo/redo | `correctAllConnectors` rewrites persisted waypoints without `pushHistory`/`invalidateRedo` | Open |
 | ENG-16 | Low | Routing | Rectilinear waypoint-preservation uses a different obstacle set than the main pass (data-object flip-flop) | Open |
 | ENG-17 | Low | Performance | `recomputeAllConnectors([conn])` rebuilds the full element Map per connector, per drag frame | Open |
 | ENG-18 | Low | Performance | `ensureContainersEncloseChildren` recomputes ancestor depth inside the sort comparator (O(n²log n)) | Open |
 | ENG-19 | Low | Performance | `getAllDescendantIds` O(subtree×n) per column inside the vswimlane drag frame | Open |
-| CANVAS-01 | High | XSS | `RichTextEditor` assigns stored `description` to `innerHTML` on init without `sanitizeRichText` (stored XSS) | Open |
+| CANVAS-01 | High | XSS | `RichTextEditor` assigns stored `description` to `innerHTML` on init without `sanitizeRichText` (stored XSS) | ✅ Fixed (Wave 1) |
 | CANVAS-02 | High | Performance | O(n²) connector-hump computation rebuilt every render (`indexOf` + slice/map per connector) | Open |
 | CANVAS-03 | High | Performance | `nonContainers` sort O(n²log n): comparator calls `elements.find()` in a parent-walk | Open |
 | CANVAS-04 | High | Performance | Domain-diagram obstacle check O(connectors×elements×waypoints), unmemoised, every render | Open |
@@ -117,10 +118,10 @@
 | CANVAS-07 | Low | Listener leak | Pre-drag gesture listeners never cleaned up on unmount | Open |
 | CANVAS-08 | Low | Listener leak | Connector-label focus-clear listener leaks if unmounted before next mousedown | Open |
 | CANVAS-09 | Low | Robustness | Group-drag auto-scroll `setInterval` cleared only on mouseup, not unmount | Open |
-| UI-01 | High | Data loss | Ctrl+S calls a stale `saveNow()` closure → silently overwrites edits with `initialData` | Open |
-| UI-02 | High | Data loss | Previewing a history snapshot auto-saves it over the live diagram | Open |
+| UI-01 | High | Data loss | Ctrl+S calls a stale `saveNow()` closure → silently overwrites edits with `initialData` | ✅ Fixed (Wave 2) |
+| UI-02 | High | Data loss | Previewing a history snapshot auto-saves it over the live diagram | ✅ Fixed (Wave 2) |
 | UI-03 | Medium | Data loss | Folder-tree changes lost on navigation (module-level 500 ms debounce, no flush) | Open |
-| IO-01 | High | DoS | No upload size limit before `.vsdx` is fully decompressed in memory (zip-bomb / OOM) | Open |
+| IO-01 | High | DoS | No upload size limit before `.vsdx` is fully decompressed in memory (zip-bomb / OOM) | ✅ Fixed (urgent batch) |
 | IO-02 | High | Data integrity | DDL importer drops FK relationships when table-name casing differs between definition and reference | Open |
 | IO-03 | Medium | DoS | Unbounded recursion on nested sub-processes / lane sets (no depth guard) | Needs manual confirmation |
 | IO-04 | Medium | Performance | O(n²) element lookups via `ctx.elements.find` during BPMN flow/lane wiring | Open |

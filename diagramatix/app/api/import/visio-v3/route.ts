@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
+import { uploadSizeError } from "@/app/lib/uploadLimit";
 import { importVisioV3 } from "@/app/lib/diagram/v3/importVisioV3";
 import { isReadOnlyImpersonation } from "@/app/lib/superuser";
 import { gateLimit, gateElementCount, recordUsage } from "@/app/lib/subscription-route";
@@ -109,6 +110,8 @@ export async function POST(request: Request) {
 
   let parsed: Awaited<ReturnType<typeof importVisioV3>>;
   try {
+    const sizeErr = uploadSizeError(upload); // IO-01
+    if (sizeErr) return NextResponse.json({ error: sizeErr }, { status: 413 });
     const buf = await upload.arrayBuffer();
     parsed = await importVisioV3(buf);
   } catch (err) {
