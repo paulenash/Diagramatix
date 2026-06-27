@@ -1,0 +1,413 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Visio export — golden structural snapshots > expanded subprocess with internals 1`] = `
+{
+  "byId": [
+    {
+      "geom": {
+        "h": 2.37,
+        "w": 9.02,
+        "x": 5.85,
+        "y": 4.14,
+      },
+      "id": "_default_pool",
+      "master": "300",
+      "nameU": "Process",
+      "type": "pool",
+    },
+    {
+      "geom": {
+        "h": 0,
+        "w": 1.47,
+        "x": 5.28,
+        "y": 3.85,
+      },
+      "id": "conn-is-it",
+      "master": "111",
+      "nameU": "sequence",
+      "type": "connector",
+    },
+    {
+      "geom": {
+        "h": 0,
+        "w": 1.47,
+        "x": 7.81,
+        "y": 3.85,
+      },
+      "id": "conn-it-ien",
+      "master": "111",
+      "nameU": "sequence",
+      "type": "connector",
+    },
+    {
+      "geom": {
+        "h": -0.4,
+        "w": 1.21,
+        "x": 3.25,
+        "y": 4.08,
+      },
+      "id": "conn-s-sp",
+      "master": "111",
+      "nameU": "sequence",
+      "type": "connector",
+    },
+    {
+      "geom": {
+        "h": 0.4,
+        "w": 0.23,
+        "x": 9.34,
+        "y": 4.08,
+      },
+      "id": "conn-sp-e",
+      "master": "111",
+      "nameU": "sequence",
+      "type": "connector",
+    },
+    {
+      "geom": {
+        "h": null,
+        "w": null,
+        "x": 9.65,
+        "y": 4.28,
+      },
+      "id": "e",
+      "master": "1002",
+      "nameU": "End",
+      "type": "end-event",
+    },
+    {
+      "geom": {
+        "h": null,
+        "w": null,
+        "x": 8.73,
+        "y": 3.85,
+      },
+      "id": "ien",
+      "master": "1005",
+      "nameU": "end-event",
+      "type": "end-event",
+    },
+    {
+      "geom": {
+        "h": null,
+        "w": null,
+        "x": 4.36,
+        "y": 3.85,
+      },
+      "id": "is",
+      "master": "1003",
+      "nameU": "start-event",
+      "type": "start-event",
+    },
+    {
+      "geom": {
+        "h": 0.68,
+        "w": 1.06,
+        "x": 6.54,
+        "y": 3.85,
+      },
+      "id": "it",
+      "master": "1004",
+      "nameU": "Assess",
+      "type": "task",
+    },
+    {
+      "geom": {
+        "h": null,
+        "w": null,
+        "x": 2.46,
+        "y": 4.28,
+      },
+      "id": "s",
+      "master": "1000",
+      "nameU": "Start",
+      "type": "start-event",
+    },
+    {
+      "geom": {
+        "h": 1.36,
+        "w": 5.38,
+        "x": 6.54,
+        "y": 3.88,
+      },
+      "id": "sp",
+      "master": "1001",
+      "nameU": "Handle claim",
+      "type": "subprocess-expanded",
+    },
+  ],
+  "summary": {
+    "masters": [
+      "1000",
+      "1001",
+      "1002",
+      "1003",
+      "1004",
+      "1005",
+      "111",
+      "300",
+    ],
+    "subShapes": 92,
+    "taggedShapes": 11,
+    "totalShapes": 103,
+  },
+}
+`;
+
+exports[`Visio export — golden structural snapshots > linear flow 1`] = `
+{
+  "byId": [
+    {
+      "geom": {
+        "h": 2.08,
+        "w": 6.83,
+        "x": 5.85,
+        "y": 4.14,
+      },
+      "id": "_default_pool",
+      "master": "300",
+      "nameU": "Process",
+      "type": "pool",
+    },
+    {
+      "geom": {
+        "h": 0,
+        "w": 1.29,
+        "x": 4.39,
+        "y": 4.14,
+      },
+      "id": "conn-s-t1",
+      "master": "111",
+      "nameU": "sequence",
+      "type": "connector",
+    },
+    {
+      "geom": {
+        "h": 0,
+        "w": 0.6,
+        "x": 6.4,
+        "y": 4.14,
+      },
+      "id": "conn-t1-t2",
+      "master": "111",
+      "nameU": "sequence",
+      "type": "connector",
+    },
+    {
+      "geom": {
+        "h": 0,
+        "w": 0.6,
+        "x": 8.06,
+        "y": 4.14,
+      },
+      "id": "conn-t2-e",
+      "master": "111",
+      "nameU": "sequence",
+      "type": "connector",
+    },
+    {
+      "geom": {
+        "h": null,
+        "w": null,
+        "x": 8.55,
+        "y": 4.14,
+      },
+      "id": "e",
+      "master": "1003",
+      "nameU": "Done",
+      "type": "end-event",
+    },
+    {
+      "geom": {
+        "h": null,
+        "w": null,
+        "x": 3.55,
+        "y": 4.14,
+      },
+      "id": "s",
+      "master": "1000",
+      "nameU": "Start",
+      "type": "start-event",
+    },
+    {
+      "geom": {
+        "h": 0.68,
+        "w": 1.06,
+        "x": 5.56,
+        "y": 4.14,
+      },
+      "id": "t1",
+      "master": "1001",
+      "nameU": "Receive order",
+      "type": "task",
+    },
+    {
+      "geom": {
+        "h": 0.68,
+        "w": 1.06,
+        "x": 7.23,
+        "y": 4.14,
+      },
+      "id": "t2",
+      "master": "1002",
+      "nameU": "Ship order",
+      "type": "task",
+    },
+  ],
+  "summary": {
+    "masters": [
+      "1000",
+      "1001",
+      "1002",
+      "1003",
+      "111",
+      "300",
+    ],
+    "subShapes": 68,
+    "taggedShapes": 8,
+    "totalShapes": 76,
+  },
+}
+`;
+
+exports[`Visio export — golden structural snapshots > pool with two lanes 1`] = `
+{
+  "byId": [
+    {
+      "geom": {
+        "h": 0,
+        "w": 1.29,
+        "x": 4.39,
+        "y": 5.2,
+      },
+      "id": "conn-s-t1",
+      "master": "111",
+      "nameU": "sequence",
+      "type": "connector",
+    },
+    {
+      "geom": {
+        "h": -1.82,
+        "w": 0.6,
+        "x": 6.4,
+        "y": 4.29,
+      },
+      "id": "conn-t1-t2",
+      "master": "111",
+      "nameU": "sequence",
+      "type": "connector",
+    },
+    {
+      "geom": {
+        "h": 0,
+        "w": 0.6,
+        "x": 8.06,
+        "y": 3.38,
+      },
+      "id": "conn-t2-e",
+      "master": "111",
+      "nameU": "sequence",
+      "type": "connector",
+    },
+    {
+      "geom": {
+        "h": null,
+        "w": null,
+        "x": 8.55,
+        "y": 3.38,
+      },
+      "id": "e",
+      "master": "1003",
+      "nameU": "End",
+      "type": "end-event",
+    },
+    {
+      "geom": {
+        "h": 2.03,
+        "w": 6.46,
+        "x": 6.03,
+        "y": 5.31,
+      },
+      "id": "l1",
+      "master": "400",
+      "nameU": "Sales",
+      "type": "lane",
+    },
+    {
+      "geom": {
+        "h": 2.34,
+        "w": 6.46,
+        "x": 6.03,
+        "y": 3.12,
+      },
+      "id": "l2",
+      "master": "700",
+      "nameU": "Warehouse",
+      "type": "lane",
+    },
+    {
+      "geom": {
+        "h": 4.38,
+        "w": 6.83,
+        "x": 5.85,
+        "y": 4.14,
+      },
+      "id": "p",
+      "master": "300",
+      "nameU": "Order Process",
+      "type": "pool",
+    },
+    {
+      "geom": {
+        "h": null,
+        "w": null,
+        "x": 3.55,
+        "y": 5.2,
+      },
+      "id": "s",
+      "master": "1000",
+      "nameU": "Start",
+      "type": "start-event",
+    },
+    {
+      "geom": {
+        "h": 0.68,
+        "w": 1.06,
+        "x": 5.56,
+        "y": 5.2,
+      },
+      "id": "t1",
+      "master": "1001",
+      "nameU": "Take order",
+      "type": "task",
+    },
+    {
+      "geom": {
+        "h": 0.68,
+        "w": 1.06,
+        "x": 7.23,
+        "y": 3.38,
+      },
+      "id": "t2",
+      "master": "1002",
+      "nameU": "Pick goods",
+      "type": "task",
+    },
+  ],
+  "summary": {
+    "masters": [
+      "1000",
+      "1001",
+      "1002",
+      "1003",
+      "111",
+      "300",
+      "400",
+      "700",
+    ],
+    "subShapes": 68,
+    "taggedShapes": 10,
+    "totalShapes": 78,
+  },
+}
+`;

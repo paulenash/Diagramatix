@@ -24,6 +24,11 @@ export interface VsdxShape {
   master: string | null;   // referenced master id (null for inline sub-shapes)
   bpmnId: string | null;   // the diagram element/connector id this shape came from
   nameU: string | null;
+  // Position + size cells (strings as emitted; null if the shape omits them).
+  pinX: string | null;
+  pinY: string | null;
+  width: string | null;
+  height: string | null;
 }
 export interface ParsedVsdx {
   shapes: VsdxShape[];
@@ -57,11 +62,18 @@ export async function exportToVsdx(
     const head = b.slice(0, 500);
     const id = head.match(/\bID='([^']+)'/)?.[1] ?? null;
     if (!id) continue;
+    // First occurrence in the block = this shape's own cell (a parent's geometry
+    // cells precede its nested <Shapes>; sub-shapes are separate blocks).
+    const cellV = (name: string) => b.match(new RegExp(`<Cell N='${name}'[^>]*\\bV='([^']*)'`))?.[1] ?? null;
     shapes.push({
       id,
       master: head.match(/\bMaster='([^']+)'/)?.[1] ?? null,
       nameU: head.match(/\bNameU='([^']*)'/)?.[1] ?? null,
       bpmnId: b.match(/<Row N='BpmnId'><Cell N='Value' V='([^']*)'/)?.[1] ?? null,
+      pinX: cellV("PinX"),
+      pinY: cellV("PinY"),
+      width: cellV("Width"),
+      height: cellV("Height"),
     });
   }
   return { shapes, masterIds, pageXml };
