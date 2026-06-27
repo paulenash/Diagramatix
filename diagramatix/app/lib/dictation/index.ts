@@ -127,8 +127,13 @@ function startBrowserSpeech(cb: DictationCallbacks): DictationHandle | null {
 
   let want = true;
   let failures = 0;
+  let ended = false;
   let recognition: any = null;
   let restartTimer: ReturnType<typeof setTimeout> | null = null;
+  // Fire onEnd EXACTLY ONCE — on a fatal error OR a user Stop. Previously stop()
+  // never called onEnd (and onend bailed early when want=false), so the host UI
+  // stayed stuck in the "listening" state and the Stop button did nothing.
+  function finish() { if (ended) return; ended = true; cb.onEnd?.(); }
 
   function start() {
     recognition = new SR();
@@ -142,15 +147,15 @@ function startBrowserSpeech(cb: DictationCallbacks): DictationHandle | null {
       }
     };
     recognition.onend = () => {
-      if (!want) return;
-      if (failures >= 6) { want = false; cb.onError?.("Dictation keeps dropping out. Try again in a moment."); cb.onEnd?.(); return; }
+      if (!want) { finish(); return; }   // stopped (or done) → reset the host
+      if (failures >= 6) { want = false; cb.onError?.("Dictation keeps dropping out. Try again in a moment."); finish(); return; }
       const delay = failures > 0 ? Math.min(2000, 300 * failures) : 200;
       restartTimer = setTimeout(() => { if (want) start(); }, delay);
     };
     recognition.onerror = (e: any) => {
       const err = e?.error;
       if (err === "not-allowed" || err === "service-not-allowed" || err === "audio-capture") {
-        want = false; cb.onError?.("Microphone unavailable or blocked."); cb.onEnd?.();
+        want = false; cb.onError?.("Microphone unavailable or blocked."); finish();
       } else if (err === "network") { failures += 1; }
     };
     try { recognition.start(); } catch { /* already starting */ }
@@ -162,6 +167,7 @@ function startBrowserSpeech(cb: DictationCallbacks): DictationHandle | null {
       want = false;
       if (restartTimer) clearTimeout(restartTimer);
       try { recognition?.stop(); } catch { /* */ }
+      finish();   // ensure the host UI resets even if `onend` never fires
     },
   };
 }

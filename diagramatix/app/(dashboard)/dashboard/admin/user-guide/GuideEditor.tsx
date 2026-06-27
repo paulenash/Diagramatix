@@ -139,8 +139,8 @@ export function GuideEditor({ value, onChange }: { value: string; onChange: (md:
       {(listening || showMicTest) && (
         <div className="flex flex-wrap items-center gap-3 border-b border-gray-200 bg-gray-50 px-3 py-1.5 text-[11px]">
           {listening && (
-            <span className={`animate-pulse ${dictEngine === "browser" ? "text-red-500" : "text-blue-500"}`}>
-              ● Listening — {dictEngine === "browser" ? "browser fallback" : "Deepgram (high quality)"}…
+            <span className={`animate-pulse ${dictEngine === "browser" ? "text-red-500" : dictEngine === "deepgram" ? "text-blue-500" : "text-gray-500"}`}>
+              ● {dictEngine === null ? "Starting…" : `Listening — ${dictEngine === "browser" ? "browser fallback" : "Deepgram (high quality)"}…`}
             </span>
           )}
           {showMicTest && (
