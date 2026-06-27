@@ -8,6 +8,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { isSuperuser } from "@/app/lib/superuser";
 import { prisma } from "@/app/lib/db";
+import { isAllowedImage, ALLOWED_IMAGE_LABEL } from "@/app/lib/help/imageFormats";
 
 export async function GET() {
   const session = await auth();
@@ -32,10 +33,19 @@ export async function POST(req: Request) {
   const str = (k: string) => { const v = form.get(k); return typeof v === "string" && v.trim() ? v.trim() : null; };
   const num = (k: string) => { const v = form.get(k); const n = v ? parseInt(String(v), 10) : NaN; return Number.isFinite(n) ? n : null; };
   const screenName = str("screenName") || "Screen";
+  const filename = str("filename") || `${screenName}.png`;
+
+  // Only browser-displayable image formats (so a stored image never shows broken).
+  if (!isAllowedImage(file.type, filename)) {
+    return NextResponse.json(
+      { error: `Unsupported image format. Allowed: ${ALLOWED_IMAGE_LABEL}.` },
+      { status: 415 },
+    );
+  }
 
   const created = await prisma.helpImage.create({
     data: {
-      filename: str("filename") || `${screenName}.png`,
+      filename,
       screenName,
       diagramName: str("diagramName"),
       alt: str("alt"),

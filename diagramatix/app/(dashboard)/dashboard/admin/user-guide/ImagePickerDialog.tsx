@@ -7,6 +7,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { ConfirmDialog } from "@/app/components/ConfirmDialog";
+import { IMAGE_ACCEPT, isAllowedImage, ALLOWED_IMAGE_LABEL } from "@/app/lib/help/imageFormats";
 
 type Img = {
   id: string; url: string; filename: string;
@@ -35,6 +36,10 @@ export function ImagePickerDialog({ onPick, onClose }: { onPick: (url: string, a
   useEffect(() => { void load(); }, []);
 
   async function upload(file: File) {
+    if (!isAllowedImage(file.type, file.name)) {
+      setError(`"${file.name}" isn't a supported image format. Allowed: ${ALLOWED_IMAGE_LABEL}.`);
+      return;
+    }
     setUploading(true); setError(null);
     try {
       const fd = new FormData();
@@ -62,7 +67,7 @@ export function ImagePickerDialog({ onPick, onClose }: { onPick: (url: string, a
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
           <h2 className="text-sm font-semibold text-gray-900">Image library</h2>
           <div className="flex items-center gap-2">
-            <input ref={fileRef} type="file" accept="image/*" className="hidden"
+            <input ref={fileRef} type="file" accept={IMAGE_ACCEPT} className="hidden"
               onChange={(e) => { const f = e.target.files?.[0]; if (f) void upload(f); e.target.value = ""; }} />
             <button onClick={() => fileRef.current?.click()} disabled={uploading}
               className="text-xs px-2.5 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50">

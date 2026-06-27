@@ -15,7 +15,15 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const img = await prisma.helpImage.findUnique({ where: { id }, select: { bytes: true, mimeType: true } });
   if (!img) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return new NextResponse(new Uint8Array(img.bytes as Buffer), {
-    headers: { "Content-Type": img.mimeType || "image/png", "Cache-Control": "private, max-age=300" },
+    headers: {
+      "Content-Type": img.mimeType || "image/png",
+      "Cache-Control": "private, max-age=300",
+      // Defence in depth: never sniff a different type, and neutralise scripts
+      // in an SVG if the URL is opened directly as a document (rendered via <img>
+      // these don't run anyway).
+      "X-Content-Type-Options": "nosniff",
+      "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; sandbox",
+    },
   });
 }
 
