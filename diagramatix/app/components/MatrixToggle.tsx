@@ -173,6 +173,7 @@ export function MatrixToggle() {
     <>
       {running && <canvas ref={canvasRef} className="fixed inset-0 z-[60] bg-black" />}
       <button
+        data-no-capture
         onClick={() => setArmed(!armed)}
         className={`fixed bottom-4 left-4 z-[70] w-10 h-10 flex items-center justify-center rounded-full border-2 font-mono font-bold text-lg transition-all bg-black ${
           armed

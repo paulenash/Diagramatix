@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Caveat } from "next/font/google";
 import { SessionProvider } from "@/app/components/SessionProvider";
 import { MatrixToggle } from "@/app/components/MatrixToggle";
+import { ScreenCapture } from "@/app/components/ScreenCapture";
 import "./globals.css";
 
 const geist = Geist({
@@ -30,6 +31,7 @@ export default function RootLayout({
           <SessionProvider>
             {children}
             <MatrixToggle />
+            <ScreenCapture />
           </SessionProvider>
         </body>
     </html>

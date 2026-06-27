@@ -89,7 +89,7 @@ export function EntityListEditor({
               onChange={(e) => setAddVal(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") addNode(null, flatLevel); }}
               placeholder={`Add ${ENTITY_NODE_LEVEL_LABELS[flatLevel]}…`} disabled={busy}
-              className="flex-1 text-xs border border-gray-300 rounded px-1.5 py-0.5" />
+              className="flex-1 text-xs border border-gray-300 rounded px-1.5 py-0.5 placeholder:text-gray-500" />
             <button onClick={() => addNode(null, flatLevel)} disabled={busy || !addVal.trim()}
               className="text-xs text-blue-600 hover:text-blue-800 px-1 disabled:opacity-40">Add</button>
           </div>
@@ -110,7 +110,7 @@ export function EntityListEditor({
       {suggestions.length === 0 && <p className="text-xs text-gray-400 italic">No structure yet.</p>}
       {suggestions.map((n) => (
         <div key={n.id} style={{ paddingLeft: n.depth * 14 }} className="flex items-center gap-1 text-xs group">
-          <span className="text-[9px] text-gray-300 w-14 shrink-0">{ENTITY_NODE_LEVEL_LABELS[n.level]}</span>
+          <span className="text-[9px] text-gray-500 w-14 shrink-0">{ENTITY_NODE_LEVEL_LABELS[n.level]}</span>
           {editId === n.id ? (
             <input autoFocus value={editVal} onChange={(e) => setEditVal(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") rename(n.id); if (e.key === "Escape") setEditId(null); }}
@@ -133,7 +133,7 @@ export function EntityListEditor({
               onKeyDown={(e) => { if (e.key === "Enter") addNode(n.id, childLevelFor(n.level)); if (e.key === "Escape") setAddParent("top"); }}
               onBlur={() => addVal.trim() ? addNode(n.id, childLevelFor(n.level)) : setAddParent("top")}
               placeholder={`New ${ENTITY_NODE_LEVEL_LABELS[childLevelFor(n.level)]}…`}
-              className="flex-1 border border-green-300 rounded px-1.5 py-0.5" />
+              className="flex-1 border border-green-300 rounded px-1.5 py-0.5 placeholder:text-gray-500" />
           )}
         </div>
       ))}
@@ -143,7 +143,7 @@ export function EntityListEditor({
             onChange={(e) => setAddVal(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") addNode(null, "Organisation"); }}
             placeholder="Add Organisation…" disabled={busy}
-            className="flex-1 text-xs border border-gray-300 rounded px-1.5 py-0.5" />
+            className="flex-1 text-xs border border-gray-300 rounded px-1.5 py-0.5 placeholder:text-gray-500" />
           <button onClick={() => addNode(null, "Organisation")} disabled={busy || !addVal.trim()}
             className="text-xs text-blue-600 hover:text-blue-800 px-1 disabled:opacity-40">Add</button>
         </div>

@@ -177,6 +177,30 @@ export function DatabaseClient() {
     }
   }
 
+  // ── User Guide backup / restore (.diag-guide) ──
+  // Backs up the whole User Guide at table level (HelpChapter/HelpSection +
+  // the entire HelpImage library, bytes and all) with ids preserved, so
+  // /api/help/images/<id> references survive a restore into another DB.
+  // Restore REPLACES all three guide tables. Yellow in the toolbar.
+  const ugImportInputRef = useRef<HTMLInputElement | null>(null);
+  const [ugBusy, setUgBusy] = useState(false);
+  async function handleUserGuideRestore(file: File) {
+    setUgBusy(true);
+    setRulesImportStatus(null);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/admin/user-guide/restore", { method: "POST", body: fd });
+      const json = await res.json();
+      if (!res.ok) { setRulesImportStatus(`Error: ${json?.error ?? res.statusText}`); return; }
+      setRulesImportStatus(`User Guide restored: ${json.chapters} chapter(s), ${json.sections} section(s), ${json.images} image(s).`);
+    } catch (err) {
+      setRulesImportStatus(`Error: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setUgBusy(false);
+    }
+  }
+
   // Additive-mode tree + selection.
   const [inspectTree, setInspectTree] = useState<InspectTree | null>(null);
   const [inspecting, setInspecting] = useState(false);
@@ -648,6 +672,39 @@ export function DatabaseClient() {
             onChange={(e) => {
               const f = e.target.files?.[0];
               if (f) handleTemplatesImport(f);
+              e.currentTarget.value = "";
+            }}
+          />
+          {/* User Guide transfer (.diag-guide) — content + whole Image Library,
+              ids preserved. Restore REPLACES the three guide tables. Yellow. */}
+          <button
+            onClick={() => {
+              const a = document.createElement("a");
+              a.href = "/api/admin/user-guide/backup";
+              a.download = "user-guide-backup.diag-guide";
+              document.body.appendChild(a); a.click(); a.remove();
+            }}
+            className="text-xs text-white bg-yellow-500 hover:bg-yellow-600 rounded px-2.5 py-1"
+            title="Download the User Guide (content + entire image library) as a .diag-guide file"
+          >
+            User Guide &darr;
+          </button>
+          <button
+            onClick={() => { setRulesImportStatus(null); ugImportInputRef.current?.click(); }}
+            disabled={ugBusy}
+            className="text-xs text-yellow-700 border border-yellow-300 hover:bg-yellow-50 rounded px-2.5 py-1 disabled:opacity-50"
+            title="Restore the User Guide — REPLACES content + image library — from a .diag-guide file"
+          >
+            {ugBusy ? "Restoring…" : "User Guide ↑"}
+          </button>
+          <input
+            ref={ugImportInputRef}
+            type="file"
+            accept=".diag-guide,application/zip"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) handleUserGuideRestore(f);
               e.currentTarget.value = "";
             }}
           />

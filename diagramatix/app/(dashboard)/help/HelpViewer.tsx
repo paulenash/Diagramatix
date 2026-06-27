@@ -2,27 +2,37 @@
 
 import type { ReactNode } from "react";
 
+/* ── Legacy content types — still used by the seed file `chapters.tsx`
+ *    (kept in-repo as the migration source until the DB guide is trusted). ── */
 export type HelpSection = {
   heading?: string;
   body: ReactNode;
-  /** When true the section is hidden from non-SuperAdmin viewers.
-   *  Use for SuperAdmin-only tools embedded inside an otherwise
-   *  general chapter (Paul's rule, 2026-06-09): SuperAdmin functions
-   *  must not be visible to anyone else; OrgAdmin features stay
-   *  visible to all so users know what their OrgAdmin can do. */
   adminOnly?: boolean;
-  /** Path relative to /public, e.g. "/help/dashboard-overview.png" */
   image?: string;
   imageAlt?: string;
-  /** Optional caption shown below image */
   imageCaption?: string;
 };
-
 export type HelpChapter = {
   slug: string;
   title: string;
   sections: HelpSection[];
   adminOnly?: boolean;
+};
+
+/* ── DB-rendered shape: Markdown already rendered to sanitised HTML server-side. ── */
+export type RenderedSection = {
+  heading?: string | null;
+  bodyHtml: string;
+  adminOnly?: boolean;
+  image?: string | null;
+  imageAlt?: string | null;
+  imageCaption?: string | null;
+};
+export type RenderedChapter = {
+  slug: string;
+  title: string;
+  adminOnly?: boolean;
+  sections: RenderedSection[];
 };
 
 /* ---------- diagram placeholder ---------- */
@@ -37,10 +47,9 @@ function DiagramPlaceholder({ caption }: { caption: string }) {
 }
 
 /* ---------- main viewer ---------- */
-export function HelpViewer({ chapter, isAdmin = false }: { chapter: HelpChapter; isAdmin?: boolean }) {
-  // Filter out SuperAdmin-only sections for non-admins. Chapter-level
-  // adminOnly is already enforced upstream by page.tsx; this guards
-  // the section-level case.
+export function HelpViewer({ chapter, isAdmin = false }: { chapter: RenderedChapter; isAdmin?: boolean }) {
+  // Filter out SuperAdmin-only sections for non-admins. Chapter-level adminOnly
+  // is already enforced upstream by page.tsx; this guards the section-level case.
   const sections = chapter.sections.filter(sec => isAdmin || !sec.adminOnly);
   const chapterAdmin = isAdmin && chapter.adminOnly;
   return (
@@ -61,9 +70,7 @@ export function HelpViewer({ chapter, isAdmin = false }: { chapter: HelpChapter;
       )}
 
       {sections.map((sec, i) => {
-        // In the SuperAdmin (full) view, visually flag SuperAdmin-only sections
-        // embedded in an otherwise general chapter. (Non-admins never reach this
-        // branch — those sections are filtered out above.)
+        // In the SuperAdmin (full) view, visually flag SuperAdmin-only sections.
         const adminSec = isAdmin && sec.adminOnly;
         return (
           <section
@@ -80,9 +87,21 @@ export function HelpViewer({ chapter, isAdmin = false }: { chapter: HelpChapter;
                 {sec.heading}
               </h3>
             )}
-            <div className="text-gray-700 leading-relaxed">{sec.body}</div>
-            {sec.imageCaption && (
-              <DiagramPlaceholder caption={sec.imageCaption} />
+            {/* Body is sanitised HTML rendered from the section's Markdown. */}
+            <div
+              className="text-gray-700 leading-relaxed"
+              dangerouslySetInnerHTML={{ __html: sec.bodyHtml }}
+            />
+            {sec.image ? (
+              <figure className="my-4">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={sec.image} alt={sec.imageAlt ?? ""} className="rounded border border-gray-200 max-w-full" />
+                {sec.imageCaption && (
+                  <figcaption className="text-xs text-gray-500 mt-1">{sec.imageCaption}</figcaption>
+                )}
+              </figure>
+            ) : (
+              sec.imageCaption && <DiagramPlaceholder caption={sec.imageCaption} />
             )}
           </section>
         );

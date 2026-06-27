@@ -15,6 +15,7 @@ import {
   type TemplateData,
 } from "@/app/lib/diagram/types";
 import { BW_SYMBOL_COLORS, DEFAULT_SYMBOL_COLORS, type SymbolColorConfig } from "@/app/lib/diagram/colors";
+import { setCurrentDiagramName } from "@/app/lib/help/currentDiagram";
 import type { DisplayMode } from "@/app/lib/diagram/displayMode";
 import { DiagramColorModal } from "./DiagramColorModal";
 import { TemplateNameModal } from "./TemplateNameModal";
@@ -432,6 +433,13 @@ export function DiagramEditor({
     const top = stack.length > 0 ? stack[stack.length - 1] : null;
     setParentDiagram(top);
   }, []);
+
+  // Publish the open diagram's name to the global screen-capture tool (which
+  // lives in the root layout, above this component in the tree).
+  useEffect(() => {
+    setCurrentDiagramName(diagramName);
+    return () => setCurrentDiagramName(null);
+  }, [diagramName]);
 
   // Sibling diagrams in the same project (for subprocess linking AND for
   // the prev/next folder-mate navigation buttons in the top bar).

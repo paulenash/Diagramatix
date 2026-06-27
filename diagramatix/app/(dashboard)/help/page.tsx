@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
-import { HelpViewer, type HelpChapter } from "./HelpViewer";
-import { CHAPTERS } from "./chapters";
+import { HelpViewer, type RenderedChapter } from "./HelpViewer";
 import { isSuperuser } from "@/app/lib/superuser";
+import { prisma } from "@/app/lib/db";
+import { renderHelpMarkdown } from "@/app/lib/help/renderMarkdown";
 
 export const metadata = { title: "Diagramatix — User Guide" };
 
@@ -17,19 +18,51 @@ export default async function HelpPage({
 
   const realIsAdmin = isSuperuser(session);
   const { c, view } = await searchParams;
-  // SuperAdmin can preview the standard (User / OrgAdmin) view to check what
-  // non-admins see. The standard view is identical for User and OrgAdmin
-  // (2-way model). `isAdmin` is the EFFECTIVE flag used for filtering.
+  // SuperAdmin can preview the standard (User / OrgAdmin) view. `isAdmin` is the
+  // EFFECTIVE flag used for filtering.
   const previewStandard = realIsAdmin && view === "standard";
   const isAdmin = realIsAdmin && !previewStandard;
   const viewQs = previewStandard ? "&view=standard" : "";
 
-  const visibleChapters = isAdmin
-    ? CHAPTERS
-    : CHAPTERS.filter(ch => !ch.adminOnly);
+  // Nav: all chapters (slug/title/adminOnly only). The guide now lives in the DB
+  // (migrated out of chapters.tsx), so SuperAdmins can edit it in-app.
+  const navChapters = await prisma.helpChapter.findMany({
+    orderBy: { sortOrder: "asc" },
+    select: { slug: true, title: true, adminOnly: true },
+  });
+  const visibleChapters = isAdmin ? navChapters : navChapters.filter(ch => !ch.adminOnly);
 
-  const current: HelpChapter =
-    visibleChapters.find(ch => ch.slug === c) ?? visibleChapters[0];
+  if (visibleChapters.length === 0) {
+    return (
+      <div className="min-h-screen dgx-dashboard-bg flex items-center justify-center">
+        <p className="text-sm text-gray-500">
+          The User Guide has no content yet.
+          {realIsAdmin && " Add chapters at SuperAdmin → User Guide."}
+        </p>
+      </div>
+    );
+  }
+
+  const currentSlug = visibleChapters.find(ch => ch.slug === c)?.slug ?? visibleChapters[0].slug;
+
+  // Render only the CURRENT chapter's sections (markdown → sanitised HTML).
+  const dbChapter = await prisma.helpChapter.findUnique({
+    where: { slug: currentSlug },
+    include: { sections: { orderBy: { sortOrder: "asc" } } },
+  });
+  const current: RenderedChapter = {
+    slug: dbChapter!.slug,
+    title: dbChapter!.title,
+    adminOnly: dbChapter!.adminOnly,
+    sections: dbChapter!.sections.map(s => ({
+      heading: s.heading,
+      bodyHtml: renderHelpMarkdown(s.bodyMarkdown),
+      adminOnly: s.adminOnly,
+      image: s.image,
+      imageAlt: s.imageAlt,
+      imageCaption: s.imageCaption,
+    })),
+  };
 
   return (
     <div className="min-h-screen dgx-dashboard-bg">
@@ -78,8 +111,6 @@ export default async function HelpPage({
           <ol className="space-y-1">
             {visibleChapters.map((ch, i) => {
               const active = ch.slug === current.slug;
-              // In the SuperAdmin (full) view, flag chapters that are hidden
-              // from regular users so it's clear what's admin-only.
               const adminOnly = isAdmin && ch.adminOnly;
               return (
                 <li key={ch.slug}>

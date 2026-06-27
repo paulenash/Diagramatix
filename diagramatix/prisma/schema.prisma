@@ -1039,3 +1039,60 @@ model SimulationRun {
 
   @@index([scenarioId])
 }
+
+// ────────────────────────────────────────────────────────────────────────────
+// User Guide — the in-app help, migrated out of hardcoded JSX so SuperAdmins can
+// edit it in-app. Content is stored as Markdown (GFM) per section; rendered to
+// sanitised HTML at view time. `adminOnly` drives the 2-way audience model (a
+// SuperAdmin-only chapter/section is hidden from User/OrgAdmin viewers).
+// ────────────────────────────────────────────────────────────────────────────
+model HelpChapter {
+  id        String        @id @default(cuid())
+  slug      String        @unique
+  title     String
+  sortOrder Int           @default(0)
+  adminOnly Boolean       @default(false)
+  sections  HelpSection[]
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@index([sortOrder])
+}
+
+model HelpSection {
+  id           String      @id @default(cuid())
+  chapterId    String
+  chapter      HelpChapter @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  heading      String?
+  bodyMarkdown String      @db.Text
+  adminOnly    Boolean     @default(false)
+  image        String?
+  imageAlt     String?
+  imageCaption String?
+  sortOrder    Int         @default(0)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@index([chapterId, sortOrder])
+}
+
+// Captured screenshots for the User Guide. Bytes live in the DB (the container's
+// public/ is read-only at runtime), served by GET /api/help/images/[id]. Named by
+// the screen and (if a diagram screen) the diagram. Authored via the global
+// SuperAdmin capture tool; referenced from a HelpSection.image as /api/help/images/<id>.
+model HelpImage {
+  id          String   @id @default(cuid())
+  filename    String
+  screenName  String
+  diagramName String?
+  alt         String?
+  mimeType    String   @default("image/png")
+  bytes       Bytes
+  width       Int?
+  height      Int?
+  // Author's userId — plain field, no FK (audit hint that survives user deletion).
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt])
+}

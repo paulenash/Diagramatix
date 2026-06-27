@@ -305,6 +305,18 @@
     optional; older exports remain valid; export-only (no importer change).
     (The matching DDL-generator columns + User-Guide/Features notes follow as a
     separate update.)
+
+  v1.26 — Application metadata only: DiagramData gains optional `aiFeedback`
+    (the AI's open questions + the user's answers, for a clarification round).
+    Lives in the saved JSON, not the BPMN XML interchange — no XSD shape change.
+
+  v1.27 — DB-backed User Guide (in-app SuperAdmin editor), an image library
+    (screen capture + upload), global voice dictation, Save & View, Markdown
+    export, SharePoint documents, and a table-level User Guide backup/restore
+    (content + the whole image library, ids preserved). Application/admin
+    features only — the diagram data structure and this XSD are UNCHANGED; the
+    version attribute advances with the release window (same convention as
+    v1.10 / v1.21).
 -->
 
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"

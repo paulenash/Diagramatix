@@ -715,5 +715,13 @@ export interface TemplateData {
  *             questions for the diagram (+ the user's answers), preserved for a
  *             clarification round. App-metadata only; lives in the saved JSON,
  *             NOT the BPMN XML interchange, so no BPMN-XSD shape change.
+ *
+ *  v1.27 (2026-06-27): DB-backed User Guide — in-app SuperAdmin editor (TipTap
+ *             WYSIWYG), an image library (screen capture + upload), global voice
+ *             dictation, Save & View, Markdown export, SharePoint documents, and
+ *             a table-level User Guide backup/restore (content + the whole image
+ *             library, ids preserved). All application/admin features — NO diagram
+ *             export or BPMN-XSD shape change; the version advances with the
+ *             release window (same convention as v1.10 / v1.21).
  */
-export const SCHEMA_VERSION = "1.26";
+export const SCHEMA_VERSION = "1.27";
