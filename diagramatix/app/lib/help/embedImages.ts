@@ -12,6 +12,13 @@ const APP_IMG_URL = /(?:\/api\/help\/images\/[A-Za-z0-9_-]+|\/help\/images\/[^\s
 
 const blobToDataUrl = (blob: Blob) =>
   new Promise<string>((res, rej) => {
+    // Browser: FileReader. Node (tests / any non-DOM context): arrayBuffer→base64.
+    if (typeof FileReader === "undefined") {
+      blob.arrayBuffer()
+        .then((ab) => res(`data:${blob.type || "application/octet-stream"};base64,${Buffer.from(ab).toString("base64")}`))
+        .catch(rej);
+      return;
+    }
     const fr = new FileReader();
     fr.onload = () => res(fr.result as string);
     fr.onerror = rej;

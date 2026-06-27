@@ -49,6 +49,11 @@ const SCOPED_OMITTED = new Set<string>([
   "CollaborationGroup", "CollaborationGroupMember", "DiagramReview", "DiagramReviewer",
   "OwnershipTransfer", "ScannerRule", "SubscriptionLevel", "Feature", "BubbleHelp",
   "DiagramTypeStyle",
+  // The DB-backed User Guide is SYSTEM/admin content, not per-user data — it's
+  // deliberately not in the scoped org/user backup. It's carried by the
+  // SuperAdmin full backup (catalog-driven) AND its own dedicated table-level
+  // backup/restore (app/lib/help/guideBackup.ts + tests/help).
+  "HelpChapter", "HelpSection", "HelpImage",
   ...SIMULATOR_TABLES,
 ]);
 
