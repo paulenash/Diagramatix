@@ -76,7 +76,12 @@ export function GuideEditor({ value, onChange }: { value: string; onChange: (md:
           "prose prose-sm prose-gray max-w-none min-h-[200px] focus:outline-none px-3 py-2 " +
           "text-gray-800 [--tw-prose-body:#1f2937] [--tw-prose-headings:#111827] [--tw-prose-bold:#111827] " +
           "[--tw-prose-bullets:#4b5563] [--tw-prose-counters:#4b5563] [--tw-prose-quotes:#374151] [--tw-prose-quote-borders:#d1d5db] " +
-          "[&_ul]:list-disc [&_ol]:list-decimal [&_:is(ul,ol)]:pl-6",
+          "[&_ul]:list-disc [&_ol]:list-decimal [&_:is(ul,ol)]:pl-6 " +
+          // Visible table grid — TipTap/prose otherwise renders borderless cells
+          // (an empty inserted table looks invisible).
+          "[&_table]:w-full [&_table]:my-2 [&_table]:border-collapse " +
+          "[&_th]:border [&_th]:border-gray-300 [&_th]:bg-gray-50 [&_th]:p-1.5 [&_th]:text-left " +
+          "[&_td]:border [&_td]:border-gray-300 [&_td]:p-1.5 [&_td]:min-w-[3rem]",
       },
     },
   });

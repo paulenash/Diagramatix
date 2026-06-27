@@ -53,7 +53,10 @@ export function HelpViewer({ chapter, isAdmin = false }: { chapter: RenderedChap
   const sections = chapter.sections.filter(sec => isAdmin || !sec.adminOnly);
   const chapterAdmin = isAdmin && chapter.adminOnly;
   return (
-    <article className="prose prose-sm prose-gray max-w-none">
+    <article className="prose prose-sm prose-gray max-w-none
+      [&_table]:w-full [&_table]:my-2 [&_table]:border-collapse
+      [&_th]:border [&_th]:border-gray-300 [&_th]:bg-gray-50 [&_th]:p-1.5 [&_th]:text-left
+      [&_td]:border [&_td]:border-gray-300 [&_td]:p-1.5">
       <div className="flex items-center gap-2 mb-4 flex-wrap">
         <h2 className="text-xl font-bold text-gray-900 m-0">{chapter.title}</h2>
         {chapterAdmin && (

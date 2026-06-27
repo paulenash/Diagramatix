@@ -76,7 +76,10 @@ export function GuidePreview({
       {/* Rendered chapter */}
       <article className="bg-white border border-gray-200 rounded-lg p-6 prose prose-sm prose-gray max-w-none
         text-gray-800 [--tw-prose-body:#1f2937] [--tw-prose-headings:#111827] [--tw-prose-bold:#111827]
-        [--tw-prose-bullets:#4b5563] [--tw-prose-links:#1d4ed8] [&_ul]:list-disc [&_ol]:list-decimal [&_:is(ul,ol)]:pl-6">
+        [--tw-prose-bullets:#4b5563] [--tw-prose-links:#1d4ed8] [&_ul]:list-disc [&_ol]:list-decimal [&_:is(ul,ol)]:pl-6
+        [&_table]:w-full [&_table]:my-2 [&_table]:border-collapse
+        [&_th]:border [&_th]:border-gray-300 [&_th]:bg-gray-50 [&_th]:p-1.5 [&_th]:text-left
+        [&_td]:border [&_td]:border-gray-300 [&_td]:p-1.5">
         <h1 className="!mb-6">{ch.title}</h1>
         {ch.sections.map((s, j) => (
           <section key={j} ref={(el) => { secRefs.current[j] = el; }}
