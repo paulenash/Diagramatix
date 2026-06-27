@@ -46,6 +46,7 @@ function Btn({ on, active, title, children }: { on: () => void; active?: boolean
 export function GuideEditor({ value, onChange }: { value: string; onChange: (md: string) => void }) {
   const [linkOpen, setLinkOpen] = useState(false);
   const [imgPickerOpen, setImgPickerOpen] = useState(false);
+  const [, forceTick] = useState(0); // bump on each transaction → live toolbar state
   // Voice dictation straight into the rich-text body (TipTap inserts at the
   // cursor; the toolbar's onMouseDown-preventDefault keeps the editor focused).
   const [listening, setListening] = useState(false);
@@ -59,7 +60,7 @@ export function GuideEditor({ value, onChange }: { value: string; onChange: (md:
     extensions: [
       StarterKit.configure({ heading: { levels: [3, 4] } }),
       Link.configure({ openOnClick: false, autolink: false }),
-      Table.configure({ resizable: false }),
+      Table.configure({ resizable: true }),
       TableRow,
       TableHeader,
       TableCell,
@@ -87,6 +88,17 @@ export function GuideEditor({ value, onChange }: { value: string; onChange: (md:
   });
 
   useEffect(() => () => { dictRef.current?.stop(); }, []);
+
+  // Re-render on every transaction so isActive()/inTable reflect the CURRENT
+  // selection. TipTap v3's useEditor doesn't re-render on selection changes by
+  // itself — without this the table controls (delete/+row/+col) never appear
+  // when you click into a table, and the toolbar highlights go stale.
+  useEffect(() => {
+    if (!editor) return;
+    const tick = () => forceTick((n) => n + 1);
+    editor.on("transaction", tick);
+    return () => { editor.off("transaction", tick); };
+  }, [editor]);
 
   if (!editor) return <div className="min-h-[240px] border border-gray-200 rounded bg-gray-50 animate-pulse" />;
 

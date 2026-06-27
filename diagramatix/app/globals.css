@@ -73,3 +73,16 @@ body {
 .dgx-rich-edit u, .dgx-rich-desc u { text-decoration: underline; }
 .dgx-rich-edit i, .dgx-rich-edit em, .dgx-rich-desc i, .dgx-rich-desc em { font-style: italic; }
 .dgx-rich-edit:empty::before { content: "Add a description…"; color: #9ca3af; }
+
+/* User Guide editor (TipTap) — resizable table columns. `table-layout: fixed`
+ * lets the column widths be dragged; the blue handle marks the draggable edge.
+ * (Widths are an editing convenience; they don't persist through the Markdown
+ * round-trip on save — GFM tables don't store column widths.) */
+.ProseMirror table { table-layout: fixed; width: 100%; }
+.ProseMirror .tableWrapper { overflow-x: auto; }
+.ProseMirror th, .ProseMirror td { position: relative; }
+.ProseMirror .column-resize-handle {
+  position: absolute; right: -2px; top: 0; bottom: -2px; width: 4px;
+  background-color: #60a5fa; pointer-events: none;
+}
+.ProseMirror.resize-cursor { cursor: col-resize; }

@@ -1,14 +1,29 @@
 import { Extension } from "@tiptap/core";
 import { Plugin } from "@tiptap/pm/state";
 import { canJoin } from "@tiptap/pm/transform";
+import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 
 /**
- * Heals split lists. When you delete an item out of a numbered list, ProseMirror
- * can leave two adjacent <ol> nodes — and the second restarts at 1. This plugin
- * merges any two adjacent same-type lists after each change, so numbering stays
- * continuous (and bullet lists don't fragment either).
+ * Heals split lists LIVE. Deleting an item out of a numbered list can leave two
+ * adjacent <ol> nodes — and the second restarts at 1. After every change this
+ * plugin merges any two adjacent same-type lists so numbering stays continuous
+ * immediately (no wait for a save/markdown round-trip). Bullet lists too.
  */
 const isList = (name: string) => name === "orderedList" || name === "bulletList";
+
+// Walk from the document root (its direct children are where top-level lists
+// live) and collect the boundary position between any two adjacent same-type
+// lists, recursing into children for nested lists.
+function collectJoinPositions(node: ProseMirrorNode, pos: number, out: number[]) {
+  node.forEach((child, offset, index) => {
+    const childPos = pos + 1 + offset; // absolute position of `child`'s start
+    if (index > 0) {
+      const before = node.child(index - 1);
+      if (isList(child.type.name) && before.type === child.type) out.push(childPos);
+    }
+    if (child.childCount > 0) collectJoinPositions(child, childPos, out);
+  });
+}
 
 export const JoinAdjacentLists = Extension.create({
   name: "joinAdjacentLists",
@@ -17,17 +32,8 @@ export const JoinAdjacentLists = Extension.create({
       new Plugin({
         appendTransaction: (transactions, _oldState, newState) => {
           if (!transactions.some((t) => t.docChanged)) return null;
-          // Collect boundary positions where a list follows a same-type list.
           const positions: number[] = [];
-          newState.doc.descendants((node, pos) => {
-            node.forEach((child, offset, index) => {
-              if (index === 0) return;
-              const before = node.child(index - 1);
-              if (isList(child.type.name) && before.type === child.type) {
-                positions.push(pos + 1 + offset); // boundary at the start of `child`
-              }
-            });
-          });
+          collectJoinPositions(newState.doc, -1, positions); // doc content starts at 0
           if (positions.length === 0) return null;
           const tr = newState.tr;
           let joined = false;
