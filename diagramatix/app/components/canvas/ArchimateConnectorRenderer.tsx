@@ -20,6 +20,11 @@ import { useContext, useState } from "react";
 import type { ArchimateConnectorType, Connector, Point } from "@/app/lib/diagram/types";
 import { DisplayModeCtx, ConnectorFontScaleCtx, sketchyFilter } from "@/app/lib/diagram/displayMode";
 import { waypointsToSvgPath, waypointsToRoundedPath } from "@/app/lib/diagram/routing";
+import {
+  styleFor,
+  type ArchimateMarkerKind as MarkerKind,
+  type ArchimateStyle as Style,
+} from "@/app/lib/diagram/archimateConnectorStyle";
 
 interface Props {
   connector: Connector;
@@ -88,52 +93,9 @@ function MarkerCircleFilled({ id, color }: { id: string; color: string }) {
 }
 
 // ────────────────────────────────────────────────────────────────────
-// Style resolution per type. Dash patterns + markers + routing hints.
+// Style resolution per type lives in app/lib/diagram/archimateConnectorStyle
+// (pure + unit-tested). The renderer just renders what styleFor returns.
 // ────────────────────────────────────────────────────────────────────
-type MarkerKind = "arrow-filled" | "arrow-open" | "triangle-open" | "diamond-filled" | "diamond-open" | "circle-filled";
-
-interface Style {
-  dash?: string;
-  strokeColor: string;
-  startMarker: MarkerKind | null;
-  endMarker: MarkerKind | null;
-  strokeWidth: number;
-  label?: string; // small overlay label (e.g., "+" for influence) — future use
-}
-
-function styleFor(type: ArchimateConnectorType, selected: boolean): Style {
-  const color = selected ? "#2563eb" : "#333333";
-  const base: Style = { strokeColor: color, startMarker: null, endMarker: null, strokeWidth: selected ? 1.8 : 1.4 };
-  switch (type) {
-    // Structural — diamond sits at the target (whole) end
-    case "archi-composition":
-      return { ...base, startMarker: null, endMarker: "diamond-filled" };
-    case "archi-aggregation":
-      return { ...base, startMarker: null, endMarker: "diamond-open" };
-    case "archi-assignment":
-      return { ...base, startMarker: "circle-filled", endMarker: "arrow-filled" };
-    case "archi-realisation":
-      return { ...base, endMarker: "triangle-open", dash: "5 3" };
-    // Dependency
-    case "archi-serving":
-      return { ...base, endMarker: "arrow-open" };
-    case "archi-access":
-      return { ...base, endMarker: "arrow-open", dash: "2 3" };
-    case "archi-influence":
-      return { ...base, endMarker: "arrow-open", dash: "2 3" };
-    case "archi-association":
-      return { ...base, endMarker: null };
-    // Dynamic
-    case "archi-triggering":
-      return { ...base, endMarker: "arrow-filled", dash: "6 3" };
-    case "archi-flow":
-      return { ...base, endMarker: "arrow-open", dash: "8 3 2 3" };
-    // Other
-    case "archi-specialisation":
-      return { ...base, endMarker: "triangle-open" };
-  }
-}
-
 function renderMarker(kind: Style["startMarker"] | Style["endMarker"], id: string, color: string) {
   switch (kind) {
     case "arrow-filled":    return <MarkerArrowFilled id={id} color={color} />;
