@@ -11,7 +11,10 @@ import { buildBpsimData } from "@/app/lib/simulation/bpsim/exportBpsim";
 import type { BpsimScenario } from "@/app/lib/simulation/bpsim/types";
 import { isoToUnit } from "@/app/lib/simulation/duration";
 
-const EX = "new features/BPsim/Examples";
+// Fixtures live in the tracked test tree — the source `new features/BPsim/Examples`
+// folder is gitignored, so it isn't present in a CI checkout. Copy new fixtures
+// here when adding cases.
+const EX = "tests/simulation/fixtures";
 const read = (f: string) => readFileSync(join(process.cwd(), EX, f), "utf8");
 const richest = (ss: BpsimScenario[]) => ss.reduce((a, b) => (Object.keys(b.elements).length > Object.keys(a.elements).length ? b : a));
 const elems = (s: BpsimScenario) => Object.values(s.elements);
