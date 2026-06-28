@@ -18,6 +18,7 @@ import JSZip from "jszip";
 import type { DiagramData } from "@/app/lib/diagram/types";
 import type { AiElement } from "@/app/lib/diagram/bpmnLayout";
 import { exportVisioV3 } from "@/app/lib/diagram/v3/exportVisioV3";
+import { importVisioV3 } from "@/app/lib/diagram/v3/importVisioV3";
 import { DEFAULT_PROFILE, type StencilProfile } from "@/app/lib/diagram/v3/stencilProfile";
 
 export interface VsdxShape {
@@ -37,14 +38,35 @@ export interface ParsedVsdx {
   pageXml: string;
 }
 
+/** Run the real export and return the raw .vsdx bytes (feeds both the structural
+ *  parse and the import round-trip). */
+export async function buildVsdxBytes(
+  data: DiagramData,
+  profile: StencilProfile = DEFAULT_PROFILE,
+): Promise<Uint8Array> {
+  const pub = path.join(process.cwd(), "public");
+  const stencil = fs.readFileSync(path.join(pub, profile.stencilFile));
+  const template = fs.readFileSync(path.join(pub, profile.templateFile));
+  const out = await exportVisioV3(data, "Test", stencil.buffer, template.buffer, "normal", undefined, profile);
+  return out instanceof Uint8Array ? out : new Uint8Array(out as ArrayBuffer);
+}
+
+/** export → importVisioV3 round-trip (layer 5). Returns the import result so a
+ *  test can assert the diagram survives the .vsdx and back. */
+export async function roundTrip(
+  data: DiagramData,
+  profile: StencilProfile = DEFAULT_PROFILE,
+) {
+  const bytes = await buildVsdxBytes(data, profile);
+  const ab = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+  return importVisioV3(ab);
+}
+
 export async function exportToVsdx(
   data: DiagramData,
   profile: StencilProfile = DEFAULT_PROFILE,
 ): Promise<ParsedVsdx> {
-  const pub = path.join(process.cwd(), "public");
-  const stencil = fs.readFileSync(path.join(pub, profile.stencilFile));
-  const template = fs.readFileSync(path.join(pub, profile.templateFile));
-  const bytes = await exportVisioV3(data, "Test", stencil.buffer, template.buffer, "normal", undefined, profile);
+  const bytes = await buildVsdxBytes(data, profile);
   const zip = await JSZip.loadAsync(bytes);
 
   // Valid master IDs come from masters.xml (<Master ID='111' …>), NOT the file
