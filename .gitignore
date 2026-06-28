@@ -1,0 +1,8 @@
+# The actual Next.js app lives in diagramatix/. These root-level npm artifacts
+# are STRAYS — leftovers from packages once installed here instead of in
+# diagramatix/. They must never be committed, and untracked they flood the IDE's
+# git view (~1600 node_modules files). Anchored with a leading "/" so this only
+# matches the repo-root copies, NOT diagramatix/package.json (which is tracked).
+/node_modules/
+/package.json
+/package-lock.json
