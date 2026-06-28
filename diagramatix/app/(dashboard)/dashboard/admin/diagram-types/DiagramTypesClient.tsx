@@ -106,8 +106,8 @@ export function DiagramTypesClient() {
   }
 
   return (
-    <div className="min-h-screen dgx-dashboard-bg">
-      <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+    <div className="h-screen dgx-dashboard-bg flex flex-col overflow-hidden">
+      <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
           <button
             onClick={() => router.push(backHref)}
@@ -147,7 +147,7 @@ export function DiagramTypesClient() {
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto p-6">
+      <main className="flex-1 min-h-0 overflow-y-auto max-w-4xl mx-auto p-6">
         <div className="bg-white border border-gray-200 rounded p-4">
           <p className="text-xs text-gray-500 mb-4">
             The 2-character code and pastel colours shown for each diagram type — in the project

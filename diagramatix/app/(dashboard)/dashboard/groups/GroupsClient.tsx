@@ -264,8 +264,8 @@ export function GroupsClient({ currentUserId }: { currentUserId: string }) {
   }
 
   return (
-    <div className="min-h-screen dgx-dashboard-bg">
-      <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+    <div className="h-screen dgx-dashboard-bg flex flex-col overflow-hidden">
+      <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
           <button onClick={() => router.push("/dashboard")} className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1">
             <span style={{ fontSize: "1.5em", lineHeight: 1 }}>{"←"}</span>
@@ -278,7 +278,7 @@ export function GroupsClient({ currentUserId }: { currentUserId: string }) {
         </button>
       </header>
 
-      <main className="max-w-7xl mx-auto px-6 py-6 grid grid-cols-12 gap-4">
+      <main className="flex-1 min-h-0 overflow-y-auto max-w-7xl mx-auto px-6 py-6 grid grid-cols-12 gap-4">
         {/* Left rail */}
         <aside className="col-span-4 bg-white border border-gray-200 rounded">
           {groups === null ? (

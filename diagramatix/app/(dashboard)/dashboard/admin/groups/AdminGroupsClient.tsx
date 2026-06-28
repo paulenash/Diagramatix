@@ -81,8 +81,8 @@ export function AdminGroupsClient() {
   }
 
   return (
-    <div className="min-h-screen dgx-dashboard-bg">
-      <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+    <div className="h-screen dgx-dashboard-bg flex flex-col overflow-hidden">
+      <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
           <button onClick={() => router.push("/dashboard/admin")} className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1">
             <span style={{ fontSize: "1.5em", lineHeight: 1 }}>{"←"}</span>
@@ -92,7 +92,7 @@ export function AdminGroupsClient() {
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-6 py-6">
+      <div className="flex-1 min-h-0 overflow-y-auto max-w-7xl mx-auto px-6 py-6">
         {groups === null ? (
           <p className="text-xs text-gray-400 italic">Loading…</p>
         ) : groups.length === 0 ? (

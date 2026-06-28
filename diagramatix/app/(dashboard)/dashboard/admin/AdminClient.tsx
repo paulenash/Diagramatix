@@ -243,8 +243,8 @@ export function AdminClient({ users: initialUsers, currentUserId, commitCount, i
   }
 
   return (
-    <div className="min-h-screen dgx-dashboard-bg">
-      <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+    <div className="h-screen dgx-dashboard-bg flex flex-col overflow-hidden">
+      <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
           <button
             onClick={() => {
@@ -277,7 +277,7 @@ export function AdminClient({ users: initialUsers, currentUserId, commitCount, i
           on columns have room to breathe. Per-column min-widths declared
           on the <th> stops the smaller numeric / date columns from
           starving the text-heavy ones. */}
-      <div className="max-w-screen-2xl mx-auto px-6 py-8">
+      <div className="flex-1 min-h-0 overflow-y-auto max-w-screen-2xl mx-auto px-6 py-8">
         {isSuperAdmin && !showUsers && <SuperAdminToolsGrid onShowUsers={() => setShowUsers(true)} />}
         {showUsers && (
         <table className="w-full bg-white rounded-lg border border-gray-200 overflow-hidden table-fixed">
@@ -724,7 +724,7 @@ const ADMIN_TILES: AdminTile[] = [
   { id: "archive", title: "System Archive", description: "Archived projects and diagrams across the system.", href: "/dashboard/admin/archive" },
   { id: "subscriptions", title: "Subscription Prices & Limits", description: "Tier pricing and per-tier feature limits.", href: "/dashboard/admin/subscriptions" },
   { id: "features", title: "Features Catalog", description: "Edit the public feature catalog (draft / publish).", href: "/dashboard/admin/features" },
-  { id: "groups", title: "Groups", description: "Every Collaboration Group in the system.", href: "/dashboard/admin/groups" },
+  { id: "groups", title: "Collaboration Groups", description: "Every Collaboration Group in the system.", href: "/dashboard/admin/groups" },
   { id: "ai-plan", title: "AI Plan Formats", description: "Saved AI two-phase plan format templates.", href: "/dashboard/admin/ai-plan-format" },
   { id: "org-settings", title: "Org Settings", description: "Manage Orgs, OrgAdmins, and cross-Org sharing.", href: "/dashboard/admin/org-settings" },
   { id: "entity-lists", title: "Entity Lists", description: "Org structures, external participants and IT systems for BPMN pool/lane naming.", href: "/dashboard/admin/entity-lists" },

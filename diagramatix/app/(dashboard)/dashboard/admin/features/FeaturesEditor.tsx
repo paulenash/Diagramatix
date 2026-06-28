@@ -194,8 +194,8 @@ export function FeaturesEditor({ initial }: { initial: FeatureRow[] }) {
   const busy = saving || publishing;
 
   return (
-    <div className="min-h-screen dgx-dashboard-bg flex flex-col">
-      <header className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between flex-shrink-0">
+    <div className="h-screen dgx-dashboard-bg flex flex-col overflow-hidden">
+      <header className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
           <a href="/dashboard/admin" className="text-sm text-blue-600 hover:text-blue-800 inline-flex items-center gap-1">
             <span>&larr;</span>
@@ -232,7 +232,7 @@ export function FeaturesEditor({ initial }: { initial: FeatureRow[] }) {
         </div>
       </header>
 
-      <main className="flex-1 overflow-auto p-6">
+      <main className="flex-1 min-h-0 overflow-y-auto p-6">
         <div className="max-w-5xl mx-auto">
           <p className="text-xs text-gray-500 mb-4">
             Draft edits stay local until you click <strong>Publish all</strong>.

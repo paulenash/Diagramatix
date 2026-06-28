@@ -1438,7 +1438,7 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
                 className="text-xs font-medium rounded px-2 py-1 border text-gray-600 border-gray-300 hover:bg-gray-50"
                 title="Manage Collaboration Groups"
               >
-                Groups
+                Collaboration Groups
               </button>
 
               {/* In-app notifications — opens the panel as a modal over

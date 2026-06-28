@@ -45,8 +45,8 @@ export function EntityListsClient({
   const byKind = (k: EntityListKind) => lists.filter(l => l.kind === k);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-3xl mx-auto px-4 py-6">
+    <div className="h-screen bg-gray-50 flex flex-col overflow-hidden">
+      <div className="flex-1 min-h-0 overflow-y-auto max-w-3xl mx-auto px-4 py-6">
         <div className="flex items-center justify-between mb-4">
           <div>
             <Link href={backHref} className="text-xs text-gray-500 hover:text-gray-800">← Back</Link>

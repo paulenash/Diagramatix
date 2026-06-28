@@ -67,8 +67,8 @@ export function OrgAdminClient({ orgName }: { orgName: string }) {
   const router = useRouter();
 
   return (
-    <div className="min-h-screen dgx-dashboard-bg">
-      <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center gap-3">
+    <div className="h-screen dgx-dashboard-bg flex flex-col overflow-hidden">
+      <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center gap-3 shrink-0">
         <button
           onClick={() => router.push("/dashboard")}
           className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1"
@@ -84,7 +84,7 @@ export function OrgAdminClient({ orgName }: { orgName: string }) {
         </h1>
       </header>
 
-      <main className="max-w-4xl mx-auto px-6 py-8">
+      <main className="flex-1 min-h-0 overflow-y-auto max-w-4xl mx-auto px-6 py-8">
         <p className="text-sm text-gray-600 mb-6">
           Pick a management surface. Each option opens its own page; the
           back link there returns you here.

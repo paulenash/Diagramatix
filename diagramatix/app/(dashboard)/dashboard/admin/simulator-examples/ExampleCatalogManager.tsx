@@ -62,7 +62,8 @@ export function ExampleCatalogManager() {
   const update = (id: string, k: keyof Row, v: unknown) => setRows((rs) => rs.map((r) => (r.id === id ? { ...r, [k]: v } : r)));
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8">
+    <div className="h-screen flex flex-col overflow-hidden">
+      <div className="flex-1 min-h-0 overflow-y-auto max-w-4xl mx-auto px-4 py-8 w-full">
       <div className="flex items-center justify-between mb-1">
         <h1 className="text-2xl font-semibold text-gray-900">Simulator Example Catalog</h1>
         <a href="/dashboard/simulator-examples" className="text-sm text-gray-500 hover:text-gray-700">View gallery →</a>
@@ -109,6 +110,7 @@ export function ExampleCatalogManager() {
             </div>
           </div>
         ))}
+      </div>
       </div>
 
       {confirmDelete && (

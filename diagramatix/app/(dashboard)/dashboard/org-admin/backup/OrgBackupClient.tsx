@@ -87,8 +87,8 @@ export function OrgBackupClient({ orgName }: { orgName: string }) {
   const selectedCount = diagramIds.size + projectIds.size + templateIds.size;
 
   return (
-    <div className="min-h-screen dgx-dashboard-bg">
-      <header className="bg-white border-b border-gray-200 px-6 py-3 flex items-center gap-3">
+    <div className="h-screen dgx-dashboard-bg flex flex-col overflow-hidden">
+      <header className="bg-white border-b border-gray-200 px-6 py-3 flex items-center gap-3 shrink-0">
         <button onClick={() => router.push("/dashboard/org-admin")} className="text-sm text-orange-600 hover:text-orange-800">
           ← OrgAdmin
         </button>
@@ -96,7 +96,7 @@ export function OrgBackupClient({ orgName }: { orgName: string }) {
         <h1 className="text-base font-semibold text-gray-900">Backup &amp; Restore — {orgName}</h1>
       </header>
 
-      <main className="max-w-4xl mx-auto px-6 py-6 space-y-6">
+      <main className="flex-1 min-h-0 overflow-y-auto max-w-4xl mx-auto px-6 py-6 space-y-6">
         {/* Download */}
         <section className="bg-white border border-orange-200 rounded-lg p-4">
           <h2 className="text-sm font-semibold text-orange-700 mb-1">Download Org backup</h2>
