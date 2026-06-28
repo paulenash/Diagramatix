@@ -1,6 +1,6 @@
 # Diagramatix — Tests Summary
 
-**As at:** 2026-06-28  ·  **Document version:** 1.0  ·  **Suite:** 65 test files · 431 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`
+**As at:** 2026-06-29  ·  **Document version:** 1.1  ·  **Suite:** 66 test files · 436 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`
 
 ---
 
@@ -43,7 +43,7 @@ A test going red is not a problem with the test; it's the net catching a change.
 | 2. App-flow data integrity | Delete/publish/bundle/billing/backup data effects | 10 |
 | 3. Export & interchange | JSON / XML / DDL / Visio / translation round-trips | 11 |
 | 4. Diagram structure & layout | BPMN/flowchart layout rules, type coverage, ArchiMate notation | 10 |
-| 5. Connector routing & editor | Orthogonal routing + manual-edit re-routing | 5 |
+| 5. Connector routing & editor | Orthogonal routing, manual-edit re-routing, archi re-attach | 6 |
 | 6. AI generation pipeline | Rule-filtering, plan validation, normalisation | 5 |
 | 7. Process Simulator | Engine correctness, determinism, hierarchy, BPSim interop | 17 |
 | 8. Help content & dictation | Guide rendering/images, transcript parsing | 5 |
@@ -450,6 +450,16 @@ One area is deliberately **ratcheted, not closed**: the editor's obstacle-avoida
 |---|---|---|
 | re-route never produces a non-crossing violation, and crossings stay ≤ 10 | A valid drag breaking orthogonality/attachment, or obstacle crossings getting worse | If any non-crossing violation appears, or the obstacle-crossing count exceeds the baseline of 10 |
 
+### `tests/archimate/connector-rerouting.test.ts` — ArchiMate connectors re-attach on move so they never cross the element
+
+| Test | Protects you against | How it would break (go red) |
+|---|---|---|
+| re-attaches an end whose stored side now faces AWAY (the through-the-body bug) | A connector cutting straight through the element you just moved | If a side facing away from the partner weren't re-picked to face it |
+| leaves a facing attachment untouched — keeps the user's exact click offset | A move needlessly snapping a still-valid attachment back to the side-centre | If a side already facing the partner had its offset reset or its side changed |
+| re-attaches only the offending end (the facing end keeps its offset) | Both ends being disturbed when only one needed re-routing | If the facing end's side/offset changed, or the offending end wasn't re-picked |
+| never leaves a side facing away across a spread of relative placements | Any element position / stored-side combo leaving a connector through a body | If, for any of the 8 placements × 16 side combos, a recomputed side still faced away |
+| AI-generated archimate connectors (real layoutGenericDiagram path) also re-attach after a move | AI-generated diagrams' connectors crossing elements on move (not just manual ones) | If a connector from the real archimate AI-layout faced away after the elements moved |
+
 ---
 
 ## Layer 6 — AI generation pipeline
@@ -786,4 +796,4 @@ One area is deliberately **ratcheted, not closed**: the editor's obstacle-avoida
 
 ---
 
-*Generated 2026-06-28. Regenerate this document whenever test files are added or their behaviour changes — it is a hand-maintained companion to the suite, not auto-generated.*
+*Generated 2026-06-28, updated 2026-06-29. Regenerate this document whenever test files are added or their behaviour changes — it is a hand-maintained companion to the suite, not auto-generated.*
