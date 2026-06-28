@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { getEffectiveUserId, isReadOnlyImpersonation, isSuperuser } from "@/app/lib/superuser";
-import { archiveDiagram } from "@/app/lib/archive";
+import { deleteProjectCascade, type ProjectDeleteMode } from "@/app/lib/projects/deleteProject";
 import {
   requireRole,
   requireProjectAccess,
@@ -218,54 +218,18 @@ export async function DELETE(req: Request, { params }: Params) {
   }
   const orgId = projectOrgId;
 
-  // ?hardDelete=true → admin-only destructive path. Permanently deletes
-  // every diagram in the project (NOT archived — gone forever) and then
-  // the project itself. DiagramHistory rows cascade-delete via the
-  // Prisma onDelete: Cascade on DiagramHistory.diagram. Wrapped in a
-  // transaction so partial failures leave nothing behind.
-  if (hardDelete) {
-    const result = await prisma.$transaction(async (tx) => {
-      const purged = await tx.diagram.deleteMany({ where: { projectId: id, orgId } });
-      await tx.project.delete({ where: { id } });
-      return { purged: purged.count };
-    });
-    return NextResponse.json({ success: true, hardDeleted: true, purged: result.purged });
-  }
-
-  // ?cascade=archive → move every diagram in this project into the system
-  // archive (recoverable from /dashboard/deleted-diagrams) BEFORE deleting
-  // the project row. Default behaviour (no query param) leaves diagrams
-  // orphaned, preserving the existing "move to Unorganised" semantics.
-  let archived = 0;
-  if (cascade === "archive") {
-    const userEmail = session.user.email ?? "";
-    const diagrams = await prisma.diagram.findMany({
-      where: { projectId: id, orgId },
-      select: { id: true },
-    });
-    for (const d of diagrams) {
-      try {
-        await archiveDiagram(d.id, session.user.id, userEmail, id, existing.name);
-        archived++;
-      } catch {
-        // If a single diagram fails to archive, skip it and continue.
-      }
-    }
-  }
-
-  // DATA-16: deleting the project SetNull-s its diagrams to Unorganised AND
-  // cascade-deletes its PublicationBundles. A still-PUBLISHED child would become
-  // an invisible orphan — unfiled, no bundle membership, unreachable by business
-  // users, yet lifecycle=PUBLISHED with a live currentPublishedVersionId. Demote
-  // any published child to DRAFT (clearing the pointer) first, in one transaction
-  // with the delete, so they land as normal editable Unorganised drafts.
-  const delResult = await prisma.$transaction(async (tx) => {
-    const demoted = await tx.diagram.updateMany({
-      where: { projectId: id, orgId, lifecycle: "PUBLISHED" },
-      data: { lifecycle: "DRAFT", currentPublishedVersionId: null },
-    });
-    await tx.project.delete({ where: { id } });
-    return { demoted: demoted.count };
-  });
-  return NextResponse.json({ success: true, archived, unpublished: delResult.demoted });
+  // Data effects (purge / archive / SetNull-to-Unorganised + demote-published)
+  // live in app/lib/projects/deleteProject.ts so the cascade is unit-tested
+  // directly. The auth + tier gates above stay here.
+  const mode: ProjectDeleteMode = hardDelete ? "hard" : cascade === "archive" ? "archive" : "unorganise";
+  const result = await deleteProjectCascade(
+    id, orgId, mode,
+    { id: session.user.id, email: session.user.email ?? "" },
+    existing.name,
+  );
+  return NextResponse.json(
+    mode === "hard"
+      ? { success: true, hardDeleted: true, purged: result.purged }
+      : { success: true, archived: result.archived, unpublished: result.unpublished },
+  );
 }
