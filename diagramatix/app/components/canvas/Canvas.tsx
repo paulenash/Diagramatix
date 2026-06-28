@@ -1545,21 +1545,15 @@ export function Canvas({
           } else if (diagramType === "archimate") {
             // Defer to the picker — the user chooses the relationship type
             // from a popup. Do NOT create the connector yet.
-            // Attach at the boundary point on each element NEAREST the other
-            // element (toward its centre), not the side-midpoint the user
-            // happened to grab/release at — this gives clean, natural
-            // ArchiMate connections instead of always meeting the middle of a
-            // side. Endpoints stay draggable + nudgeable for manual override.
-            let archiSrcSide = seqSourceSide, archiTgtSide = seqTargetSide;
-            let archiSrcOffset = seqSourceOffsetAlong, archiTgtOffset = seqTargetOffsetAlong;
-            if (sourceEl) {
-              const srcCenter = { x: sourceEl.x + sourceEl.width / 2, y: sourceEl.y + sourceEl.height / 2 };
-              const tgtCenter = { x: targetEl.x + targetEl.width / 2, y: targetEl.y + targetEl.height / 2 };
-              const sBound = pointToBoundaryOffset(tgtCenter, sourceEl);
-              const tBound = pointToBoundaryOffset(srcCenter, targetEl);
-              archiSrcSide = sBound.side; archiSrcOffset = sBound.offsetAlong;
-              archiTgtSide = tBound.side; archiTgtOffset = tBound.offsetAlong;
-            }
+            // Attach each end at the boundary point CLOSEST TO WHERE THE USER
+            // DRAGGED — the initiation click on the source and the release point
+            // on the target. The seq* values are exactly pointToBoundaryOffset()
+            // of those two points, so reuse them directly. The previous
+            // facing-the-other-centre approach snapped diagonal connections to a
+            // corner; this puts each end where the user aimed. Endpoints stay
+            // draggable + nudgeable for manual override.
+            const archiSrcSide = seqSourceSide, archiTgtSide = seqTargetSide;
+            const archiSrcOffset = seqSourceOffsetAlong, archiTgtOffset = seqTargetOffsetAlong;
             setPendingArchiConn({
               sourceId: elementId,
               targetId: targetEl.id,
