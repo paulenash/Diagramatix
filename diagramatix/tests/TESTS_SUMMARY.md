@@ -29,12 +29,16 @@ Each test file has its own section below, grouped into layers. Within each secti
 
 | Column | Meaning |
 |---|---|
-| **Ref** | A stable `Tnnnn` reference, numbered sequentially from the top of the document to the bottom. Use it to cite a specific check (e.g. "T0123"). |
+| **Ref** | A stable `Tnnnn` reference. The initial set was numbered top-to-bottom; thereafter every new test takes the next number after the current highest (see below), so a ref never changes. Use it to cite a check (e.g. "T0123"). |
 | **Test** | The exact name of the individual check. |
 | **Protects you against** | In plain terms, the real-world problem that would occur if this behaviour regressed. |
 | **How it would break (go red)** | The kind of code or data change that would make this specific test fail — i.e. what the test is watching. |
 
-**Maintaining the `Tnnnn` numbers:** they run in document order and are **append-only** — when tests are added, give the new rows the next free numbers (continuing from the current highest) and **never renumber existing rows**, so a given `Tnnnn` always refers to the same check. A few rows cover a *parameterised family* of tests (e.g. "one per scenario"), so the highest `Tnnnn` (currently T0376) is lower than the headline test count (436).
+**Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T0377**, the one after **T0378**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
+
+> **Highest ref allocated: `T0376`.** Update this line whenever you add tests (e.g. to `T0379` after adding three), so the next continuation point is always obvious.
+
+A few rows cover a *parameterised family* of tests (e.g. "one per scenario"), so the highest `Tnnnn` is lower than the headline test count (436).
 
 A test going red is not a problem with the test; it's the net catching a change. If the change was intentional, the test is updated to match; if not, the net just prevented a regression from shipping.
 
