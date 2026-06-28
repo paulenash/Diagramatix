@@ -16,6 +16,21 @@ import { findRoutingViolations } from "./_helpers/routing";
 
 // Genuine obstacle-avoidance gaps in the editor re-route today. GOAL: 0.
 // Lower this each time the re-route's obstacle avoidance is improved.
+//
+// Diagnosed breakdown of the 10 (2026-06-28), so the next fix knows the target:
+//   • 6 are GATEWAY crossings. Gateways are DELIBERATELY excluded from the
+//     sequence-flow obstacle set (`SEQ_OBS` in routing.ts) — merge/split
+//     junctions sit on the path by design. Closing these means deciding to
+//     treat gateways as obstacles, a separate trade-off (risks over-detour on
+//     normal split/merge layouts).
+//   • 4 are TASK crossings = 2 symmetric cases (a→m and b→m) where source and
+//     target are VERTICALLY ALIGNED and a task sits in the channel between
+//     them. computeWaypoints emits a vertical jog straight through it. The
+//     final-validation re-route only re-picks endpoint SIDES, and safeSidePair
+//     keeps top/bottom for vertically-aligned boxes — so a recompute reproduces
+//     the same jog. The real fix is a mid-channel DETOUR in
+//     buildOrthogonalPath/computeWaypoints (bow the route around the obstacle),
+//     NOT a side re-pick. That's the deep router work, deliberately not rushed.
 const KNOWN_CROSSING_BASELINE = 10;
 
 const DIAGRAMS: { name: string; elements: AiElement[]; connections: AiConnection[] }[] = [
