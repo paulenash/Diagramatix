@@ -7,6 +7,7 @@ import {
   requireDiagramAccess,
   OrgContextError,
 } from "@/app/lib/auth/orgContext";
+import { publishDiagramVersion } from "@/app/lib/diagram/publishVersion";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -87,63 +88,17 @@ export async function POST(req: Request, { params }: Params) {
     return NextResponse.json({ error: "Invalid nextReviewDate" }, { status: 400 });
   }
 
-  // Compute next version number (per-diagram). Cheap MAX query — the
-  // unique constraint on (diagramId, versionNumber) prevents races even if
-  // two clicks land at the same instant (the second wins/fails distinctly).
-  const last = await prisma.publishedVersion.findFirst({
-    where: { diagramId: id },
-    select: { versionNumber: true },
-    orderBy: { versionNumber: "desc" },
-  });
-  const versionNumber = (last?.versionNumber ?? 0) + 1;
-
-  // Capture the user id outside the transaction closure so TypeScript
-  // keeps the narrowing from the `if (!session?.user?.id)` guard above.
+  // Capture the user id outside the closure so TypeScript keeps the
+  // narrowing from the `if (!session?.user?.id)` guard above.
   const publisherId: string = session.user.id;
 
-  // Snapshot the live diagram. Cast Json fields per the repo's Prisma 7
-  // workaround (see CLAUDE.md). Wrapped in a transaction so an exception
-  // mid-flight leaves the diagram untouched.
+  // Delegate the data effects (version snapshot + lifecycle flip) to the lib.
+  // Wrapped in try/catch so a DB error surfaces as a 500, behaviour unchanged.
   try {
-    const result = await prisma.$transaction(async (tx) => {
-      // Stamp the previous current version as superseded.
-      if (diagram.currentPublishedVersionId) {
-        await tx.publishedVersion.update({
-          where: { id: diagram.currentPublishedVersionId },
-          data: { supersededAt: new Date() },
-        });
-      }
-      // Create the new PublishedVersion with a frozen snapshot.
-      const created = await tx.publishedVersion.create({
-        data: {
-          diagramId: id,
-          versionNumber,
-          publishedById: publisherId,
-          name: diagram.name,
-          type: diagram.type,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          data: diagram.data as any,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          colorConfig: diagram.colorConfig as any,
-          displayMode: diagram.displayMode,
-          releaseNotes,
-          nextReviewDateAtPublish: nextReviewDate ?? diagram.nextReviewDate ?? null,
-        },
-      });
-      // Flip the Diagram's pointers / lifecycle.
-      await tx.diagram.update({
-        where: { id },
-        data: {
-          currentPublishedVersionId: created.id,
-          lifecycle: "PUBLISHED",
-          nextReviewDate: nextReviewDate ?? diagram.nextReviewDate,
-          reviewCadenceMonths: reviewCadenceMonths ?? diagram.reviewCadenceMonths,
-          // New publish resets the cron-idempotency guard so a future
-          // nextReviewDate can fire its own notification.
-          lastReviewDueNotifiedAt: null,
-        },
-      });
-      return created;
+    const result = await publishDiagramVersion(id, publisherId, {
+      releaseNotes,
+      nextReviewDate,
+      reviewCadenceMonths,
     });
     return NextResponse.json({ ok: true, version: result });
   } catch (err) {

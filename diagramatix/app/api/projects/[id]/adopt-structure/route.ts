@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { isReadOnlyImpersonation } from "@/app/lib/superuser";
 import { requireProjectAccess, OrgContextError } from "@/app/lib/auth/orgContext";
+import { adoptStructure, AdoptStructureError } from "@/app/lib/entityLists/adoptStructure";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -59,52 +60,16 @@ export async function POST(req: Request, { params }: Params) {
   if (!orgListId) return NextResponse.json({ error: "orgListId required" }, { status: 400 });
   const replace = new URL(req.url).searchParams.get("replace") === "true";
 
-  // The master must belong to the project's org.
-  const master = await prisma.entityList.findFirst({
-    where: { id: orgListId, orgId: access.projectOrgId },
-    include: { nodes: true },
-  });
-  if (!master) return NextResponse.json({ error: "Org structure not found" }, { status: 404 });
-
-  const existing = await prisma.entityList.findFirst({
-    where: { projectId: id, kind: master.kind }, select: { id: true },
-  });
-  if (existing && !replace) {
-    return NextResponse.json(
-      { error: `This project already has a ${master.kind} list. Pass ?replace=true to overwrite.` },
-      { status: 409 },
-    );
+  let created;
+  try {
+    created = await adoptStructure(id, access.projectOrgId, orgListId, { replace });
+  } catch (err) {
+    if (err instanceof AdoptStructureError) return NextResponse.json({ error: err.message }, { status: err.status });
+    throw err;
   }
 
-  const created = await prisma.$transaction(async (tx) => {
-    if (existing) await tx.entityList.delete({ where: { id: existing.id } });
-    const copy = await tx.entityList.create({
-      data: { name: master.name, kind: master.kind, projectId: id, sourceListId: master.id },
-    });
-    // Insert nodes parents-first, remapping ids so parentId references resolve.
-    const idMap = new Map<string, string>();
-    const remaining = [...master.nodes];
-    let guard = remaining.length + 1;
-    while (remaining.length && guard-- > 0) {
-      for (let i = remaining.length - 1; i >= 0; i--) {
-        const n = remaining[i];
-        if (n.parentId && !idMap.has(n.parentId)) continue; // wait for parent
-        const newNode = await tx.entityNode.create({
-          data: {
-            listId: copy.id,
-            parentId: n.parentId ? idMap.get(n.parentId)! : null,
-            name: n.name, level: n.level, sortOrder: n.sortOrder,
-          },
-        });
-        idMap.set(n.id, newNode.id);
-        remaining.splice(i, 1);
-      }
-    }
-    return copy;
-  });
-
   const list = await prisma.entityList.findUnique({
-    where: { id: created.id },
+    where: { id: created.listId },
     include: { nodes: { orderBy: [{ parentId: "asc" }, { sortOrder: "asc" }] } },
   });
   return NextResponse.json({ list }, { status: 201 });
