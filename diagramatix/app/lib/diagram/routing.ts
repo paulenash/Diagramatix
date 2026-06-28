@@ -1359,6 +1359,38 @@ export function recomputeAllConnectors(
       };
     }
 
+    // ArchiMate connectors: keep the user's chosen attachment (the click/release
+    // side + offset) EXCEPT when that side now faces AWAY from the other element
+    // — a straight line from it would then cut back THROUGH this element's own
+    // body (which happens when the element is dragged to the far side). In that
+    // case re-pick the side facing the other element so the connector never
+    // travels through the moving element. Each end is judged independently; a
+    // side that still faces the other element keeps its exact click-time offset.
+    if (conn.type.startsWith("archi-")) {
+      const srcCx = source.x + source.width / 2, srcCy = source.y + source.height / 2;
+      const tgtCx = target.x + target.width / 2, tgtCy = target.y + target.height / 2;
+      let aSrcSide = conn.sourceSide, aTgtSide = conn.targetSide;
+      let aSrcOff = conn.sourceOffsetAlong ?? 0.5, aTgtOff = conn.targetOffsetAlong ?? 0.5;
+      const sN = sideNormalDir(aSrcSide), tN = sideNormalDir(aTgtSide);
+      if (sN.dx * (tgtCx - srcCx) + sN.dy * (tgtCy - srcCy) < 0) {
+        // source side points away from the target → re-attach toward it
+        aSrcSide = getClosestSideOfElement(tgtCx, tgtCy, source);
+        aSrcOff = getOffsetAlong(source, aSrcSide, { x: tgtCx, y: tgtCy });
+      }
+      if (tN.dx * (srcCx - tgtCx) + tN.dy * (srcCy - tgtCy) < 0) {
+        // target side points away from the source → re-attach toward it
+        aTgtSide = getClosestSideOfElement(srcCx, srcCy, target);
+        aTgtOff = getOffsetAlong(target, aTgtSide, { x: srcCx, y: srcCy });
+      }
+      const aRes = computeWaypoints(source, target, elements,
+        aSrcSide, aTgtSide, conn.routingType, aSrcOff, aTgtOff);
+      return { ...conn, waypoints: aRes.waypoints,
+        sourceInvisibleLeader: aRes.sourceInvisibleLeader,
+        targetInvisibleLeader: aRes.targetInvisibleLeader,
+        sourceSide: aSrcSide, targetSide: aTgtSide,
+        sourceOffsetAlong: aSrcOff, targetOffsetAlong: aTgtOff };
+    }
+
     // For rectilinear connectors with USER-CUSTOMISED interior routing,
     // try to preserve their waypoints. Auto-generated routes (single L-shape
     // = 7 waypoints, single vertical jog = 8 waypoints) are NOT preserved —
