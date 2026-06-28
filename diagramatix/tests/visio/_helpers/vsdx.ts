@@ -16,6 +16,7 @@ import fs from "fs";
 import path from "path";
 import JSZip from "jszip";
 import type { DiagramData } from "@/app/lib/diagram/types";
+import type { AiElement } from "@/app/lib/diagram/bpmnLayout";
 import { exportVisioV3 } from "@/app/lib/diagram/v3/exportVisioV3";
 import { DEFAULT_PROFILE, type StencilProfile } from "@/app/lib/diagram/v3/stencilProfile";
 
@@ -106,5 +107,67 @@ export function findVsdxViolations(parsed: ParsedVsdx, data: DiagramData): strin
     else if (n > 1) v.push(`element ${el.id} (${el.type}) maps to ${n} shapes — replication?`);
   }
 
+  return v;
+}
+
+// ── Layer 4 — Pool/Lane invariant registry ──────────────────────────────────
+
+/**
+ * Pool/Lane structural invariants — the registry that pins the rules a Pool/Lane
+ * change must not break (the Phase-3 rollback "replicated pools onto tasks").
+ * Reads the EXPECTED structure from the source AiElements and checks the VSDX:
+ *   • each pool → exactly 1 container shape, with a master + cached PinX/PinY,
+ *   • a white-box pool's N lanes → exactly N shapes, each with a master + position,
+ *   • a black-box pool → NO lanes and NO contained elements (a solid box).
+ */
+export function findPoolLaneViolations(parsed: ParsedVsdx, elements: AiElement[]): string[] {
+  const v: string[] = [];
+  const byBpmn = new Map<string, VsdxShape[]>();
+  for (const s of parsed.shapes) if (s.bpmnId) {
+    const arr = byBpmn.get(s.bpmnId) ?? [];
+    arr.push(s);
+    byBpmn.set(s.bpmnId, arr);
+  }
+  const hasPos = (s: VsdxShape) => s.pinX != null && s.pinY != null;
+
+  for (const pool of elements.filter((e) => e.type === "pool")) {
+    const ps = byBpmn.get(pool.id) ?? [];
+    if (ps.length !== 1) { v.push(`pool ${pool.id} → ${ps.length} shape(s), expected exactly 1 container`); continue; }
+    if (!ps[0].master) v.push(`pool ${pool.id} container has no master`);
+    if (!hasPos(ps[0])) v.push(`pool ${pool.id} container missing cached PinX/PinY (cached-V trap)`);
+
+    const lanes = pool.lanes ?? [];
+    if (pool.poolType === "black-box") {
+      if (lanes.length > 0) v.push(`black-box pool ${pool.id} declares ${lanes.length} lane(s) — a black box has none`);
+      const inside = elements.filter((e) => e.id !== pool.id && e.pool === pool.id);
+      if (inside.length > 0) v.push(`black-box pool ${pool.id} contains ${inside.map((e) => e.id).join(", ")} — should be empty`);
+    } else {
+      for (const lane of lanes) {
+        const ls = byBpmn.get(lane.id) ?? [];
+        if (ls.length !== 1) { v.push(`lane ${lane.id} (pool ${pool.id}) → ${ls.length} shape(s), expected exactly 1`); continue; }
+        if (!ls[0].master) v.push(`lane ${lane.id} has no master`);
+        if (!hasPos(ls[0])) v.push(`lane ${lane.id} missing cached PinX/PinY (cached-V trap)`);
+      }
+    }
+  }
+  return v;
+}
+
+/**
+ * Geometry-row integrity: within every Geometry section, an X cell must be paired
+ * with a Y cell — a half-specified path point renders in the wrong place (a
+ * symptom of the cached-V / rescale trap).
+ */
+export function findGeometryViolations(parsed: ParsedVsdx): string[] {
+  const v: string[] = [];
+  for (const sec of parsed.pageXml.matchAll(/<Section N='Geometry'[^>]*>([\s\S]*?)<\/Section>/g)) {
+    let i = 0;
+    for (const row of sec[1].matchAll(/<Row\b[^>]*>([\s\S]*?)<\/Row>/g)) {
+      i++;
+      const hasX = /<Cell N='X'/.test(row[1]);
+      const hasY = /<Cell N='Y'/.test(row[1]);
+      if (hasX !== hasY) v.push(`a geometry row (#${i}) has ${hasX ? "X but no Y" : "Y but no X"} cell`);
+    }
+  }
   return v;
 }
