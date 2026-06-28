@@ -13,6 +13,10 @@
   The xs:schema version attribute carries the schemaVersion.
   The appVersion is recorded as an annotation below and injected at runtime via /api/schema.
 
+  MAINTENANCE: when you add a version entry below, ALSO add it to /Version History.md
+  (the human-readable changelog) and to the SCHEMA_VERSION history comment in
+  app/lib/diagram/types.ts. Keep all three in sync.
+
   v1.10 — round-trip serialisation completeness bump.
     No schema shape change. The v1.9 fields below were declared in this
     XSD but the XML serialiser previously dropped them; they are now

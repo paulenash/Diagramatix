@@ -8,6 +8,8 @@ Extracted from the canonical history block in [`public/diagramatix-export.xsd`](
 
 **Current version:** `1.27`. The XSD's own history block starts at **v1.10**; the earlier **v1.2–v1.9** entries below are reconstructed from the `SCHEMA_VERSION` history in [`app/lib/diagram/types.ts`](app/lib/diagram/types.ts). **Schema versioning began at v1.2** (the initial XSD release) — **v1.0–v1.1** predate the export schema (early MVP "boxes + arrows", before a formal/versioned export existed).
 
+> **Maintenance:** keep this file in sync with the schema. On every `SCHEMA_VERSION` bump, update **all three together** — `app/lib/diagram/types.ts` (the constant + its history comment), `public/diagramatix-export.xsd` (its history block + any actual shape change), and **this file** (add a summary-table row *and* a detail section).
+
 > "Schema shape change?" below means the actual **XSD/XML data structure** changed (a new field/element/enum). Most releases bump the version to mark a *feature window* without changing the export shape — the version still advances so importers and the User Guide can detect the release.
 
 ---
