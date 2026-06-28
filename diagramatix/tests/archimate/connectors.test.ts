@@ -91,17 +91,98 @@ describe("ArchiMate connector registry", () => {
     expect(visualKey(inf)).not.toBe(visualKey(acc));
   });
 
-  it("structural relationships carry their canonical diamonds/triangle", () => {
-    expect(styleFor("archi-composition", false).endMarker).toBe("diamond-filled");
-    expect(styleFor("archi-aggregation", false).endMarker).toBe("diamond-open");
-    expect(styleFor("archi-realisation", false).endMarker).toBe("triangle-open");
-    expect(styleFor("archi-specialisation", false).endMarker).toBe("triangle-open");
-    // assignment has a ball at the source and a filled arrow at the target.
-    const asg = styleFor("archi-assignment", false);
-    expect(asg.startMarker).toBe("circle-filled");
-    expect(asg.endMarker).toBe("arrow-filled");
-    // association has no end decoration.
-    expect(styleFor("archi-association", false).endMarker).toBeNull();
+  // ── Authoritative ArchiMate 3.x notation, per type ──────────────────
+  // (source-end / line / target-end). Dash convention: dotted = "2 3",
+  // dashed = "6 3", solid = no dash array.
+  const SOLID = undefined; // styleFor leaves dash undefined for solid lines
+  const DOTTED = "2 3";
+  const DASHED = "6 3";
+
+  it("composition — filled diamond at source, solid line, no target head", () => {
+    const s = styleFor("archi-composition", false);
+    expect(s.startMarker).toBe("diamond-filled");
+    expect(s.endMarker).toBeNull();
+    expect(s.dash).toBe(SOLID);
+  });
+
+  it("aggregation — open diamond at source, solid line, no target head", () => {
+    const s = styleFor("archi-aggregation", false);
+    expect(s.startMarker).toBe("diamond-open");
+    expect(s.endMarker).toBeNull();
+    expect(s.dash).toBe(SOLID);
+  });
+
+  it("assignment — filled ball at source, solid line, filled arrow at target", () => {
+    const s = styleFor("archi-assignment", false);
+    expect(s.startMarker).toBe("circle-filled");
+    expect(s.endMarker).toBe("arrow-filled");
+    expect(s.dash).toBe(SOLID);
+  });
+
+  it("serving — solid line, open arrowhead at target", () => {
+    const s = styleFor("archi-serving", false);
+    expect(s.startMarker).toBeNull();
+    expect(s.endMarker).toBe("arrow-open");
+    expect(s.dash).toBe(SOLID);
+  });
+
+  it("access — dotted line, open arrowhead at target", () => {
+    const s = styleFor("archi-access", false);
+    expect(s.startMarker).toBeNull();
+    expect(s.endMarker).toBe("arrow-open");
+    expect(s.dash).toBe(DOTTED);
+  });
+
+  it("triggering — SOLID line, filled arrowhead at target (not dashed)", () => {
+    const s = styleFor("archi-triggering", false);
+    expect(s.startMarker).toBeNull();
+    expect(s.endMarker).toBe("arrow-filled");
+    // Regression guard: triggering must NOT be dashed.
+    expect(s.dash).toBe(SOLID);
+  });
+
+  it("flow — DASHED line, filled arrowhead at target (not dash-dot / open)", () => {
+    const s = styleFor("archi-flow", false);
+    expect(s.startMarker).toBeNull();
+    expect(s.endMarker).toBe("arrow-filled");
+    expect(s.dash).toBe(DASHED);
+  });
+
+  it("specialisation — solid line, hollow triangle at target", () => {
+    const s = styleFor("archi-specialisation", false);
+    expect(s.startMarker).toBeNull();
+    expect(s.endMarker).toBe("triangle-open");
+    expect(s.dash).toBe(SOLID);
+  });
+
+  it("realisation — dotted line, hollow triangle at target", () => {
+    const s = styleFor("archi-realisation", false);
+    expect(s.startMarker).toBeNull();
+    expect(s.endMarker).toBe("triangle-open");
+    expect(s.dash).toBe(DOTTED);
+  });
+
+  it("association — solid line, no arrowhead", () => {
+    const s = styleFor("archi-association", false);
+    expect(s.startMarker).toBeNull();
+    expect(s.endMarker).toBeNull();
+    expect(s.dash).toBe(SOLID);
+  });
+
+  it("triggering vs flow differ ONLY by line style (both filled arrow)", () => {
+    const trg = styleFor("archi-triggering", false);
+    const flw = styleFor("archi-flow", false);
+    expect(trg.endMarker).toBe("arrow-filled");
+    expect(flw.endMarker).toBe("arrow-filled");
+    expect(trg.dash).not.toBe(flw.dash); // solid vs dashed
+  });
+
+  it("specialisation vs realisation differ ONLY by line style (both hollow triangle)", () => {
+    const spec = styleFor("archi-specialisation", false);
+    const real = styleFor("archi-realisation", false);
+    expect(spec.endMarker).toBe("triangle-open");
+    expect(real.endMarker).toBe("triangle-open");
+    expect(spec.dash).not.toBe(real.dash); // solid vs dotted
   });
 
   it("selection only changes cosmetics (colour/width), never the visual identity", () => {

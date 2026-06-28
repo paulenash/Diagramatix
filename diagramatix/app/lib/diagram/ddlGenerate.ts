@@ -398,6 +398,16 @@ export function generateDiagramatixDDL(dbType: string): string {
       }
     }
 
+    // SQL Server: FK as table-level constraints with bracket-quoted ids
+    // (matches the round-trippable form the importer parses).
+    if (d === "mssql") {
+      for (const col of table.columns) {
+        if (col.fk) {
+          colLines.push(`    FOREIGN KEY ([${col.name}]) REFERENCES [${col.fk.table}]([${col.fk.column}])${col.fk.onDelete ? " ON DELETE " + col.fk.onDelete : ""}`);
+        }
+      }
+    }
+
     if (hasCPK) {
       colLines.push(`    PRIMARY KEY (${table.compositePK!.join(", ")})`);
     }

@@ -24,12 +24,17 @@ interface ParsedTable {
 
 // ── Identifier helpers ──────────────────────────────────────────────
 
-/** Strip quotes/backticks/brackets: "foo" → foo, `foo` → foo, [foo] → foo, dbo.foo → foo */
+/**
+ * Strip quotes/backticks/brackets and any schema prefix:
+ *   "foo" → foo, `foo` → foo, [foo] → foo,
+ *   dbo.foo → foo, [dbo].[foo] → foo, "public"."foo" → foo
+ */
 function unquoteId(s: string): string {
   let id = s.trim();
-  // Strip schema prefix (dbo.TableName, public.table_name)
+  // Strip schema prefix. lastIndexOf(".") is safe even for a bracketed schema
+  // ([dbo].[foo]) because identifiers themselves never contain a top-level dot.
   const dotIdx = id.lastIndexOf(".");
-  if (dotIdx >= 0) id = id.substring(dotIdx + 1);
+  if (dotIdx >= 0) id = id.substring(dotIdx + 1).trim();
   // Strip delimiters
   if ((id.startsWith('"') && id.endsWith('"')) ||
       (id.startsWith('`') && id.endsWith('`'))) return id.slice(1, -1);
@@ -37,8 +42,11 @@ function unquoteId(s: string): string {
   return id;
 }
 
-/** Match a possibly-quoted identifier: word | "word" | `word` | [word] | schema.word */
-const ID = `(?:[\\w]+\\.)?(?:\\w+|"[^"]+"|` + "`[^`]+" + "`|\\[[^\\]]+\\])";
+// A single (optionally-quoted) name part: word | "word" | `word` | [word]
+const NAME = `(?:\\w+|"[^"]+"|` + "`[^`]+" + "`|\\[[^\\]]+\\])";
+/** Match a possibly-quoted identifier with an optional (also possibly-quoted)
+ *  schema prefix: foo | "foo" | `foo` | [foo] | dbo.foo | [dbo].[foo] */
+const ID = `(?:${NAME}\\.)?${NAME}`;
 
 // ── Parser ──────────────────────────────────────────────────────────
 
@@ -138,9 +146,32 @@ export function parseDDL(sql: string): ParsedTable[] {
     tables.push({ name: tableName, columns, isEnum: false, enumValues: [] });
   }
 
-  // Detect enumeration tables: single PK "code" column + INSERT values
+  // Deferred / out-of-line foreign keys declared via
+  //   ALTER TABLE <t> ADD [CONSTRAINT <name>] FOREIGN KEY (<col>) REFERENCES <r>(<rcol>)
+  // SQL Server emits the element self-FKs and a few cross-table FKs this way
+  // (with bracket-quoted ids). Postgres/MySQL never do, so this is additive.
+  const byName = new Map<string, ParsedTable>();
+  for (const t of tables) byName.set(t.name, t);
+  const alterFkRe = new RegExp(
+    `ALTER\\s+TABLE\\s+(${ID})\\s+ADD\\s+(?:CONSTRAINT\\s+\\S+\\s+)?FOREIGN\\s+KEY\\s*\\((${ID})\\)\\s*REFERENCES\\s+(${ID})\\s*\\((${ID})\\)`,
+    "gi"
+  );
+  while ((m = alterFkRe.exec(text)) !== null) {
+    const tbl = byName.get(unquoteId(m[1]));
+    if (!tbl) continue;
+    const colName = unquoteId(m[2]);
+    const col = tbl.columns.find((c) => c.name === colName);
+    if (!col) continue;
+    col.foreignKey = true;
+    col.fkTable = unquoteId(m[3]);
+    col.fkColumn = unquoteId(m[4]);
+  }
+
+  // Detect enumeration tables: single PK "code" column + INSERT values.
+  // Terminate on ";" (Postgres/MySQL) OR "GO"/end-of-input (SQL Server, which
+  // uses GO batch separators rather than statement terminators).
   const insertRe = new RegExp(
-    `INSERT\\s+INTO\\s+(${ID})\\s*\\([^)]*\\)\\s*VALUES\\s*([\\s\\S]*?);`,
+    `INSERT\\s+INTO\\s+(${ID})\\s*\\([^)]*\\)\\s*VALUES\\s*([\\s\\S]*?)(?:;|\\bGO\\b|$)`,
     "gi"
   );
   const inserts = new Map<string, string[]>();

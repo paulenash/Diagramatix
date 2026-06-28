@@ -6,27 +6,40 @@
  * We round-trip the canonical BPMN scenarios and assert the structure survives
  * (element count + per-type histogram, connector count, labels).
  *
- * XSD NOTE (reduced from the brief): there is NO XML-schema validator in the
- * dependency tree (no libxmljs / xmllint / xsd-schema-validator; fast-xml-parser
- * isn't even installed). The brief says: do NOT add a dependency — instead
- * assert WELL-FORMEDNESS (parses without error) + that the root element and
- * namespace match the XSD, and flag that strict XSD validation needs a
- * validator. That is exactly what the "schema sanity" block below does.
- * >>> FOLLOW-UP: to enforce the full XSD, add a validator (e.g. libxmljs2) and
- *     validate exported XML against public/diagramatix-export.xsd.
+ * XSD VALIDATION: the exported XML is validated against the REAL schema in
+ * public/diagramatix-export.xsd using xmllint-wasm (a pure-WASM libxml2 build,
+ * devDependency only — it never reaches the prod `npm ci --omit=dev` Docker
+ * image). The XSD ships with `{{SCHEMA_VERSION}}` / `{{APP_VERSION}}`
+ * placeholders that /api/schema substitutes at runtime; we do the same here
+ * before validating.
+ *
+ * NB: validating surfaced a real XSD bug — PoolTypeEnum, SubprocessTypeEnum and
+ * GatewayRoleEnum were each declared TWICE (a global simpleType cannot be
+ * redefined), so the schema failed to compile under any conformant validator.
+ * The duplicate definitions were removed from the XSD (the exporter was fine).
  *
  * DOMParser NOTE: parseDiagramatixXml is browser-only (uses DOMParser). The Node
- * test env has none and we can't add a dep, so _helpers/domParserShim wraps the
- * already-present htmlparser2 in just enough DOM surface to run the REAL parser
- * unmodified.
+ * test env has none, so _helpers/domParserShim wraps the already-present
+ * htmlparser2 in just enough DOM surface to run the REAL parser unmodified.
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { parseDocument } from "htmlparser2";
+import { validateXML } from "xmllint-wasm";
 import { SCENARIOS, build } from "../visio/_helpers/scenarios";
 import { buildSingleDiagramXml, parseDiagramatixXml, NS } from "@/app/lib/diagram/xmlExport";
 import { SCHEMA_VERSION } from "@/app/lib/diagram/types";
 import type { DiagramData } from "@/app/lib/diagram/types";
 import { installDomParser } from "./_helpers/domParserShim";
+
+// The XSD as /api/schema would serve it: placeholders resolved to real versions.
+const XSD = readFileSync(resolve(__dirname, "../../public/diagramatix-export.xsd"), "utf8")
+  .replace(/\{\{SCHEMA_VERSION\}\}/g, SCHEMA_VERSION)
+  .replace(/\{\{APP_VERSION\}\}/g, `${SCHEMA_VERSION}.0`);
+
+/** Validate an exported XML string against the resolved XSD. */
+const validateAgainstXsd = (xml: string) => validateXML({ xml, schema: XSD });
 
 type El = { type: string; label?: string };
 const typeHist = (els: El[]) => {
@@ -51,7 +64,7 @@ let restore: () => void;
 beforeAll(() => { restore = installDomParser(); });
 afterAll(() => { restore(); });
 
-describe("Diagramatix XML — schema sanity (no XSD validator available)", () => {
+describe("Diagramatix XML — XSD validation (xmllint-wasm)", () => {
   const xml = exportXml("linear flow", build(SCENARIOS[0]));
 
   it("is well-formed XML (parses without error)", () => {
@@ -60,6 +73,23 @@ describe("Diagramatix XML — schema sanity (no XSD validator available)", () =>
     try { doc = parseDocument(xml, { xmlMode: true }); } catch { threw = true; }
     expect(threw).toBe(false);
     expect(doc!.children.length).toBeGreaterThan(0);
+  });
+
+  it("the XSD itself compiles (no duplicate global type definitions)", async () => {
+    // Guards the duplicate-simpleType regression: if a global type is declared
+    // twice, libxml2 fails to compile the schema and reports it here as an
+    // error rather than a validation failure.
+    const res = await validateAgainstXsd(xml);
+    const compileErrors = res.errors.filter((e) =>
+      /already exist|failed to compile|Schemas parser error/i.test(e.rawMessage),
+    );
+    expect(compileErrors, compileErrors.map((e) => e.rawMessage).join("\n")).toEqual([]);
+  });
+
+  it("validates against public/diagramatix-export.xsd", async () => {
+    const res = await validateAgainstXsd(xml);
+    expect(res.errors.map((e) => e.message)).toEqual([]);
+    expect(res.valid).toBe(true);
   });
 
   it("declares the XSD's root element + target namespace", () => {
@@ -80,6 +110,17 @@ describe("Diagramatix XML — schema sanity (no XSD validator available)", () =>
     expect(xml).toContain("<dgx:element");
     expect(xml).toContain("<dgx:connector");
   });
+});
+
+describe("Diagramatix XML — every exported scenario validates against the XSD", () => {
+  for (const sc of SCENARIOS) {
+    it(`${sc.name} — exported XML is XSD-valid`, async () => {
+      const xml = exportXml(sc.name, build(sc));
+      const res = await validateAgainstXsd(xml);
+      expect(res.errors.map((e) => e.message), `${sc.name} XSD errors`).toEqual([]);
+      expect(res.valid).toBe(true);
+    });
+  }
 });
 
 describe("Diagramatix XML export → import round-trip", () => {

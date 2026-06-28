@@ -65,6 +65,7 @@
     "@types/react-dom": "^19",
     "tailwindcss": "^4",
     "typescript": "^5",
-    "vitest": "^4.1.7"
+    "vitest": "^4.1.7",
+    "xmllint-wasm": "^5.2.0"
   }
 }

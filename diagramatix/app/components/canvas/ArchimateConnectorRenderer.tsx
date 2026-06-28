@@ -55,19 +55,20 @@ function MarkerArrowOpen({ id, color }: { id: string; color: string }) {
     </marker>
   );
 }
-// Diamond markers used as marker-END: refX=15 places the right tip at
-// the target boundary so the diamond sits just before the element with
-// its point touching the edge.
+// Diamond markers used as marker-START (the ArchiMate "whole" end sits at the
+// SOURCE per the 3.x spec). orient="auto" points the marker's +x along the path
+// (toward the target); refX=1 places the diamond's left tip on the source
+// boundary so the body extends outward along the line, away from the element.
 function MarkerDiamondFilled({ id, color }: { id: string; color: string }) {
   return (
-    <marker id={id} markerWidth={16} markerHeight={10} refX={15} refY={5} orient="auto" overflow="visible">
+    <marker id={id} markerWidth={16} markerHeight={10} refX={1} refY={5} orient="auto" overflow="visible">
       <polygon points="1,5 8,1 15,5 8,9" fill={color} stroke={color} strokeWidth={1.2} strokeLinejoin="miter" />
     </marker>
   );
 }
 function MarkerDiamondOpen({ id, color }: { id: string; color: string }) {
   return (
-    <marker id={id} markerWidth={16} markerHeight={10} refX={15} refY={5} orient="auto" overflow="visible">
+    <marker id={id} markerWidth={16} markerHeight={10} refX={1} refY={5} orient="auto" overflow="visible">
       <polygon points="1,5 8,1 15,5 8,9" fill="white" stroke={color} strokeWidth={1.2} strokeLinejoin="miter" />
     </marker>
   );

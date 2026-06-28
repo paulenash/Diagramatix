@@ -7,18 +7,22 @@
  * behavioural change versus the previous inline switch.
  *
  * Each of the 11 ArchiMate relationship types maps to a DISTINCT visual per the
- * ArchiMate 3.x notation:
- *   composition    — solid line, filled diamond at the whole end
- *   aggregation    — solid line, open diamond at the whole end
- *   assignment     — solid line, filled ball at source + filled arrow at target
- *   realisation    — dotted line, hollow (open) triangle at target
- *   serving        — solid line, open arrowhead
- *   access         — dotted line, open arrowhead
- *   influence      — dashed line, open arrowhead          (dashed ≠ access's dotted)
- *   association    — solid line, no markers
- *   triggering     — dashed line, filled arrowhead
- *   flow           — dash-dot line, open arrowhead
- *   specialisation — solid line, hollow (open) triangle at target
+ * authoritative ArchiMate 3.x notation (source-end / line / target-end):
+ *   composition    — filled diamond at SOURCE,  solid line, no target head
+ *   aggregation    — open  diamond at SOURCE,  solid line, no target head
+ *   assignment     — filled ball  at SOURCE,  solid line, filled arrow at target
+ *   serving        —                           solid line, open  arrow  at target
+ *   access         —                           dotted line, open  arrow  at target
+ *   influence      —                           dashed line, open  arrow  at target
+ *   triggering     —                           solid line, filled arrow at target
+ *   flow           —                           dashed line, filled arrow at target
+ *   specialisation —                           solid line, hollow triangle at target
+ *   realisation    —                           dotted line, hollow triangle at target
+ *   association    —                           solid line, no arrowhead
+ *
+ * Dash convention used by this module: dotted ≈ "2 3", dashed ≈ "6 3"; solid =
+ * no dash array. The structural diamonds sit at the SOURCE (the "whole" end) per
+ * the spec — the renderer's diamond marker is source-oriented.
  */
 import type { ArchimateConnectorType } from "./types";
 
@@ -48,34 +52,43 @@ export function styleFor(type: ArchimateConnectorType, selected: boolean): Archi
     strokeWidth: selected ? 1.8 : 1.4,
   };
   switch (type) {
-    // Structural — diamond sits at the target (whole) end
+    // Structural — the diamond/ball sits at the SOURCE ("whole") end; no
+    // target arrowhead. SOLID line.
     case "archi-composition":
-      return { ...base, startMarker: null, endMarker: "diamond-filled" };
+      return { ...base, startMarker: "diamond-filled", endMarker: null };
     case "archi-aggregation":
-      return { ...base, startMarker: null, endMarker: "diamond-open" };
+      return { ...base, startMarker: "diamond-open", endMarker: null };
     case "archi-assignment":
+      // Filled ball at source + filled (solid) arrowhead at target, solid line.
       return { ...base, startMarker: "circle-filled", endMarker: "arrow-filled" };
     case "archi-realisation":
-      return { ...base, endMarker: "triangle-open", dash: "5 3" };
+      // DOTTED line + hollow (open) triangle at target.
+      return { ...base, endMarker: "triangle-open", dash: "2 3" };
     // Dependency
     case "archi-serving":
+      // SOLID line + open (line) arrowhead.
       return { ...base, endMarker: "arrow-open" };
     case "archi-access":
-      // Access — dotted line + open arrowhead.
+      // DOTTED line + open arrowhead.
       return { ...base, endMarker: "arrow-open", dash: "2 3" };
     case "archi-influence":
-      // Influence — DASHED line + open arrowhead. Distinct from access's
-      // dotted line (the two previously collapsed to the same rendering).
+      // DASHED line + open arrowhead. Distinct from access's dotted line
+      // (the two previously collapsed to the same rendering).
       return { ...base, endMarker: "arrow-open", dash: "6 3" };
     case "archi-association":
+      // SOLID line, no arrowhead.
       return { ...base, endMarker: null };
     // Dynamic
     case "archi-triggering":
-      return { ...base, endMarker: "arrow-filled", dash: "6 3" };
+      // SOLID line + filled (solid) arrowhead. (Previously wrongly dashed.)
+      return { ...base, endMarker: "arrow-filled" };
     case "archi-flow":
-      return { ...base, endMarker: "arrow-open", dash: "8 3 2 3" };
+      // DASHED line + filled (solid) arrowhead. (Previously wrongly dash-dot
+      // + open arrow.)
+      return { ...base, endMarker: "arrow-filled", dash: "6 3" };
     // Other
     case "archi-specialisation":
+      // SOLID line + hollow (open) triangle at target.
       return { ...base, endMarker: "triangle-open" };
   }
 }

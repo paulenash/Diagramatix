@@ -1,33 +1,31 @@
 /**
  * DDL round-trip — generate → parse → import back to a Domain diagram.
  *
- * TWO REDUCTIONS FROM THE BRIEF (called out so they're not mistaken for full
+ * ONE REDUCTION FROM THE BRIEF (called out so it's not mistaken for full
  * coverage):
  *
- *  1. There is NO data-driven "DiagramData → DDL" path. generateDiagramatixDDL
- *     emits a FIXED, hardcoded relational schema (the Diagramatix app's own DB),
- *     not a schema derived from a diagram. So the honest round-trip is:
- *         generateDiagramatixDDL(dialect)  →  SQL text
- *           → parseDDL(sql)                →  ParsedTable[]
- *           → generateDiagramFromDDL(...)  →  DiagramData (a Domain diagram)
+ *  - There is NO data-driven "DiagramData → DDL" path. generateDiagramatixDDL
+ *    emits a FIXED, hardcoded relational schema (the Diagramatix app's own DB),
+ *    not a schema derived from a diagram. So the honest round-trip is:
+ *        generateDiagramatixDDL(dialect)  →  SQL text
+ *          → parseDDL(sql)                →  ParsedTable[]
+ *          → generateDiagramFromDDL(...)  →  DiagramData (a Domain diagram)
  *
- *  2. The DDL IMPORTER faithfully round-trips POSTGRES and MYSQL (24 entity
- *     tables, ~70 FK connectors each). It does NOT faithfully import the
- *     generator's SQL SERVER output — bracket-quoted identifiers + the
- *     generator's REFERENCES placement defeat the regex parser, yielding spurious
- *     "tables" and ZERO FK connectors. Per the brief ("if import only supports
- *     one dialect, round-trip those and assert the others just generate"), we
- *     fully round-trip pg + mysql and assert mssql only GENERATES without error.
- *     >>> FOLLOW-UP: make parseDDL handle the mssql generator output (bracketed
- *         ids across multi-line REFERENCES) to lift mssql to a full round-trip.
+ * ALL THREE dialects (Postgres, MySQL, SQL Server) now round-trip FULLY:
+ * 24 entity tables + the FK connectors survive in every case. SQL Server was
+ * previously lossy (bracket-quoted ids + the generator omitting in-table FK
+ * constraints + GO-terminated INSERTs defeating enum detection → 0 FK
+ * connectors). Fixed by: emitting mssql FKs as bracket-quoted table-level
+ * constraints in the generator, teaching parseDDL to read GO-terminated
+ * INSERT blocks and out-of-line `ALTER TABLE … ADD … FOREIGN KEY` statements.
  */
 import { describe, it, expect } from "vitest";
 import { generateDiagramatixDDL } from "@/app/lib/diagram/ddlGenerate";
 import { parseDDL, generateDiagramFromDDL } from "@/app/lib/diagram/ddlImport";
 import type { DiagramData, UmlAttribute } from "@/app/lib/diagram/types";
 
-// Dialects that round-trip cleanly through the importer today.
-const ROUNDTRIP_DIALECTS = ["postgres", "mysql"] as const;
+// Every dialect now round-trips cleanly through the importer.
+const ROUNDTRIP_DIALECTS = ["postgres", "mysql", "mssql"] as const;
 const ALL_DIALECTS = ["postgres", "mysql", "mssql"] as const;
 
 const importDDL = (sql: string, dialect: string): DiagramData =>
@@ -68,7 +66,7 @@ describe("DDL generation — all dialects produce SQL without error", () => {
   });
 });
 
-describe("DDL round-trip — Diagramatix schema (postgres + mysql)", () => {
+describe("DDL round-trip — Diagramatix schema (postgres + mysql + mssql)", () => {
   for (const dialect of ROUNDTRIP_DIALECTS) {
     it(`${dialect} — round-trips into a Domain diagram (tables + FKs survive)`, () => {
       const sql = generateDiagramatixDDL(dialect);
@@ -109,13 +107,27 @@ describe("DDL round-trip — Diagramatix schema (postgres + mysql)", () => {
     });
   }
 
-  it("mssql import is known-lossy (documented reduction, not a silent pass)", () => {
-    // Pins the current limitation so a future parseDDL fix is noticed: the mssql
-    // generator output yields ZERO FK connectors today. When this starts
-    // producing FKs, flip mssql into ROUNDTRIP_DIALECTS above.
-    const data = importDDL(generateDiagramatixDDL("mssql"), "mssql");
-    const fkConns = data.connectors.filter((c) => c.type === "uml-association");
-    expect(fkConns.length).toBe(0);
+  it("all three dialects yield the SAME table set + comparable FK counts", () => {
+    // The schema is identical across dialects, so the imported Domain diagram
+    // must reconstruct the same 24 entity tables and a similar number of FK
+    // connectors for every dialect (was: mssql produced 0 — the bug this fix
+    // closes).
+    const counts = ALL_DIALECTS.map((dialect) => {
+      const data = importDDL(generateDiagramatixDDL(dialect), dialect);
+      return {
+        dialect,
+        tables: tableNames(data),
+        fks: data.connectors.filter((c) => c.type === "uml-association").length,
+      };
+    });
+    const [pg, ...rest] = counts;
+    for (const r of rest) {
+      expect(r.tables, `${r.dialect} table set differs from postgres`).toEqual(pg.tables);
+      // FK counts must be substantial and within a small band of each other
+      // (dialects differ only in self-FK emission, dropped by design).
+      expect(r.fks, `${r.dialect} produced too few FK connectors`).toBeGreaterThan(60);
+      expect(Math.abs(r.fks - pg.fks)).toBeLessThanOrEqual(2);
+    }
   });
 });
 
@@ -171,11 +183,6 @@ describe("DDL round-trip — hand-authored two-table model", () => {
   });
 
   it("the same model parses in MySQL syntax (backtick ids)", () => {
-    // NOTE: SQL Server's bracket-quoted form is intentionally omitted here — a
-    // table-level FK whose REFERENCES carries a (col) list truncates the
-    // CREATE TABLE body in parseDDL's regex (the same gap that makes the mssql
-    // generator round-trip lossy above). MySQL + Postgres are the reliable
-    // import dialects.
     const mysql = `
       CREATE TABLE \`customers\` (
         \`id\` INT NOT NULL PRIMARY KEY,
@@ -195,5 +202,64 @@ describe("DDL round-trip — hand-authored two-table model", () => {
     const customers = data.elements.find((e) => e.label === "customers")!;
     expect(fkConns[0].sourceId).toBe(orders.id);
     expect(fkConns[0].targetId).toBe(customers.id);
+  });
+
+  it("the same model parses in SQL Server syntax (bracket-quoted ids, GO, schema prefixes)", () => {
+    // SQL Server uses [bracket] ids, GO batch separators, [schema].[table]
+    // references and out-of-line ALTER TABLE … ADD … FOREIGN KEY — all of
+    // which previously defeated the parser. This pins them as supported.
+    const mssql = `
+      CREATE TABLE [dbo].[customers] (
+        [id]   INT NOT NULL PRIMARY KEY,
+        [name] NVARCHAR(255) NOT NULL
+      )
+      GO
+      CREATE TABLE [dbo].[orders] (
+        [id]          INT NOT NULL PRIMARY KEY,
+        [customer_id] INT NOT NULL,
+        FOREIGN KEY ([customer_id]) REFERENCES [dbo].[customers]([id])
+      )
+      GO
+    `;
+    const data = importDDL(mssql, "mssql");
+    expect(tableNames(data)).toEqual(["customers", "orders"]);
+
+    // Columns + PK/FK flags survive.
+    const orderCols = attrs(data, "orders");
+    expect(orderCols.map((c) => c.name)).toEqual(["id", "customer_id"]);
+    expect(orderCols.find((c) => c.name === "id")?.primaryKey).toBe(true);
+    const fkCol = orderCols.find((c) => c.name === "customer_id")!;
+    expect(fkCol.foreignKey).toBe(true);
+    expect(fkCol.fkTable).toBe("customers");
+    expect(fkCol.fkColumn).toBe("id");
+
+    // FK connector materialises orders → customers.
+    const fkConns = data.connectors.filter((c) => c.type === "uml-association");
+    expect(fkConns.length).toBe(1);
+    const orders = data.elements.find((e) => e.label === "orders")!;
+    const customers = data.elements.find((e) => e.label === "customers")!;
+    expect(fkConns[0].sourceId).toBe(orders.id);
+    expect(fkConns[0].targetId).toBe(customers.id);
+  });
+
+  it("SQL Server out-of-line ALTER TABLE … ADD … FOREIGN KEY is honoured", () => {
+    const mssql = `
+      CREATE TABLE [customers] ( [id] INT NOT NULL PRIMARY KEY )
+      GO
+      CREATE TABLE [orders] (
+        [id]          INT NOT NULL PRIMARY KEY,
+        [customer_id] INT NOT NULL
+      )
+      GO
+      ALTER TABLE [orders] ADD CONSTRAINT fk_orders_customer
+        FOREIGN KEY ([customer_id]) REFERENCES [customers]([id]) ON DELETE CASCADE
+      GO
+    `;
+    const data = importDDL(mssql, "mssql");
+    const fkCol = attrs(data, "orders").find((c) => c.name === "customer_id")!;
+    expect(fkCol.foreignKey).toBe(true);
+    expect(fkCol.fkTable).toBe("customers");
+    const fkConns = data.connectors.filter((c) => c.type === "uml-association");
+    expect(fkConns.length).toBe(1);
   });
 });
