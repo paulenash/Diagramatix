@@ -16,8 +16,9 @@ import { BPMN_PROMPTS } from "./ai-conformance/AI_TEST_HARNESS_PROMPTS";
  * model outputs can be inspected side by side. Manual / real model calls.
  */
 const MODELS = [
-  { id: "claude-sonnet-4-6", label: "Sonnet 4.6" },
+  // { id: "claude-fable-5", label: "Fable 5" }, // access-gated — 404 "not available, use Opus 4.8" for this org (anthropic.com/news/fable-mythos-access)
   { id: "claude-opus-4-8", label: "Opus 4.8" },
+  { id: "claude-sonnet-4-6", label: "Sonnet 4.6" },
   { id: "claude-haiku-4-5-20251001", label: "Haiku 4.5" },
 ];
 const PROJECT = "AI Model Comparison (18-20)";
