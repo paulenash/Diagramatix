@@ -1,6 +1,6 @@
 # Diagramatix — Tests Summary
 
-**As at:** 2026-06-29  ·  **Document version:** 1.5  ·  **Suite:** 75 test files · 564 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`
+**As at:** 2026-06-29  ·  **Document version:** 1.6  ·  **Suite:** 78 test files · 592 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`
 
 ---
 
@@ -36,9 +36,9 @@ Each test file has its own section below, grouped into layers. Within each secti
 
 **Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T0377**, the one after **T0378**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
 
-> **Highest ref allocated: `T0476`.** Update this line whenever you add tests (e.g. to `T0479` after adding three), so the next continuation point is always obvious.
+> **Highest ref allocated: `T0504`.** Update this line whenever you add tests (e.g. to `T0507` after adding three), so the next continuation point is always obvious.
 
-A few rows cover a *parameterised family* of tests (e.g. "one per scenario", or "all role combinations"), so the highest `Tnnnn` is lower than the headline test count (564).
+A few rows cover a *parameterised family* of tests (e.g. "one per scenario", or "all role combinations"), so the highest `Tnnnn` is lower than the headline test count (592).
 
 A test going red is not a problem with the test; it's the net catching a change. If the change was intentional, the test is updated to match; if not, the net just prevented a regression from shipping.
 
@@ -47,7 +47,7 @@ A test going red is not a problem with the test; it's the net catching a change.
 | Layer | What it guards | Files |
 |---|---|---|
 | 1. Access control, auth & sharing | Who can see/edit projects + diagrams; login, registration, password reset, impersonation, org-admin mgmt | 5 |
-| 2. App-flow data integrity | Delete/publish/bundle/billing/backup effects + delete authz + Stripe webhook/checkout | 13 |
+| 2. App-flow data integrity | Delete/publish/bundle/billing/backup effects + delete authz + Stripe webhook/checkout + notifications/groups/entity-nodes | 16 |
 | 3. Export & interchange | JSON / XML / DDL / Visio / translation round-trips + SharePoint link | 12 |
 | 4. Diagram structure & layout | BPMN/flowchart layout rules, type coverage, ArchiMate notation | 10 |
 | 5. Connector routing & editor | Orthogonal routing, manual-edit re-routing, archi re-attach | 6 |
@@ -293,6 +293,49 @@ One area is deliberately **ratcheted, not closed**: the editor's obstacle-avoida
 | T0440 | (getOrCreateStripeCustomer) null id + a tagged customer in the list → REUSES it, create NOT called | Duplicate customers (DATA-31) when a prior create persisted only partially | If a metadata-tagged customer wasn't reused and a second was created |
 | T0441 | (getOrCreateStripeCustomer) null id + empty list → CREATES a new customer, persists it to the DB | A new payer not getting a Stripe customer, or it not being saved | If no customer was created, or the new id wasn't persisted |
 | T0442 | (getOrCreateStripeCustomer) a soft-deleted customer with our tag is NOT reused | Re-attaching to a deleted Stripe customer | If a `deleted:true` tagged customer was reused |
+
+### `tests/notifications/read.test.ts` — Marking notifications read (recipient-scoped)
+
+| Ref | Test | Protects you against | How it would break (go red) |
+|------|------|----------------------|------------------------------|
+| T0477 | a recipient marks their own notification read → readAt set | A user's "mark read" not working | If marking own notification didn't set readAt |
+| T0478 | a second mark is idempotent → readAt unchanged | A re-mark overwriting the original read time | If a second mark changed readAt |
+| T0479 | a DIFFERENT user cannot mark it → 404 AND it stays unread | One user marking (or peeking at) another user's notification | If a non-recipient could mark it, or it didn't 404 |
+| T0480 | a missing notification → 404 | A confusing error on a non-existent notification | If a missing id didn't 404 |
+| T0481 | mark-all marks ONLY the caller's unread | Mark-all touching other users' notifications | If mark-all read another user's notifications |
+
+### `tests/groups/membership.test.ts` — Collaboration-group membership (owner-scoped + notifications)
+
+| Ref | Test | Protects you against | How it would break (go red) |
+|------|------|----------------------|------------------------------|
+| T0482 | owner invites a user → invited member row + a group-invite notification on the invitee | An invite not creating membership or not notifying | If invite didn't create the member row or the group-invite notification |
+| T0483 | a NON-owner inviting → 403 and NO member created | A non-owner adding people to someone else's group | If a non-owner's invite succeeded or created a row |
+| T0484 | owner inviting THEMSELVES → skipped (no row, no notification) | The owner being added as a member of their own group | If self-invite created a member/notification |
+| T0485 | invitee ACCEPTS → status accepted + the owner gets a group-invite-accepted notification | An accept not registering or not notifying the owner | If accept didn't set status accepted or notify the owner |
+| T0486 | invitee DECLINES → status declined + the owner is notified | A decline not registering or not notifying | If decline didn't set status declined or notify the owner |
+| T0487 | owner REMOVES a member → soft-removed (status=removed) + the removed user notified | A removal not taking effect or not notifying the removed user | If remove didn't set status removed or send group-removed |
+| T0488 | a non-owner trying to remove a different member → 403 (Owner only) | A member removing other members | If a non-owner could remove someone else |
+| T0489 | an action on a non-member → 404 | A confusing error acting on a non-member | If an action on a non-member didn't 404 |
+
+### `tests/entity-lists/node-ops.test.ts` — Entity-list node create/update/delete validation
+
+| Ref | Test | Protects you against | How it would break (go red) |
+|------|------|----------------------|------------------------------|
+| T0490 | (createNode) empty name → 400 | A nameless node being created | If an empty name was accepted |
+| T0491 | (createNode) invalid level → 400 | A node with an out-of-range hierarchy level | If an invalid level was accepted |
+| T0492 | (createNode) parentId not in this list → 400 | A node parented to a node from a different list | If a foreign-list parent was accepted |
+| T0493 | (createNode) valid → creates a top-level node in the list | Node creation not working | If a valid top-level create failed |
+| T0494 | (createNode) valid with a parent → creates the node under that parent | Child-node creation not working | If a valid child create failed or mis-parented |
+| T0495 | (updateNode) unknown node → 404 | A confusing error updating a non-existent node | If an unknown node didn't 404 |
+| T0496 | (updateNode) empty name → 400 | Renaming a node to blank | If an empty name was accepted on update |
+| T0497 | (updateNode) invalid level → 400 | Setting an out-of-range level on update | If an invalid level was accepted |
+| T0498 | (updateNode) parentId === nodeId (self-parent) → 400 | A node becoming its own parent (a cycle) | If self-parenting was accepted |
+| T0499 | (updateNode) parentId not in list → 400 | Reparenting to a node from another list | If a foreign-list parent was accepted on update |
+| T0500 | (updateNode) valid rename applies | A rename not taking effect | If a valid rename failed |
+| T0501 | (updateNode) valid reparent applies (move child to top level) | A reparent not taking effect | If a valid reparent failed |
+| T0502 | (deleteNode) unknown node → 404 | A confusing error deleting a non-existent node | If an unknown node didn't 404 |
+| T0503 | (deleteNode) valid leaf delete → the node is gone | Node deletion not working | If a valid delete didn't remove the node |
+| T0504 | (deleteNode) deleting a parent cascades to its children | Orphaned child nodes after a parent delete | If deleting a parent left its children behind |
 
 ---
 
