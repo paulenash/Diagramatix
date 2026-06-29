@@ -276,6 +276,12 @@ model Diagram {
   data        Json             @default("{}")
   colorConfig Json             @default("{}")
   displayMode String           @default("normal")
+  // SuperAdmin "AI Comparison Results": the persisted multi-model generation
+  // matrix for this diagram (Opus 4.8 / Sonnet 4.6 / Haiku 4.5 — per-model
+  // conformance + the saved per-model diagram IDs). The current diagram's `data`
+  // is filled with the Opus 4.8 output. {} = no comparison. A column (not in
+  // `data`) so it survives editor save round-trips.
+  aiComparison Json            @default("{}")
   userId      String
   user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   projectId   String?
