@@ -1,6 +1,6 @@
 # Diagramatix — Tests Summary
 
-**As at:** 2026-06-29  ·  **Document version:** 1.4  ·  **Suite:** 73 test files · 530 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`
+**As at:** 2026-06-29  ·  **Document version:** 1.5  ·  **Suite:** 75 test files · 564 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`
 
 ---
 
@@ -36,9 +36,9 @@ Each test file has its own section below, grouped into layers. Within each secti
 
 **Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T0377**, the one after **T0378**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
 
-> **Highest ref allocated: `T0447`.** Update this line whenever you add tests (e.g. to `T0450` after adding three), so the next continuation point is always obvious.
+> **Highest ref allocated: `T0476`.** Update this line whenever you add tests (e.g. to `T0479` after adding three), so the next continuation point is always obvious.
 
-A few rows cover a *parameterised family* of tests (e.g. "one per scenario", or "all role combinations"), so the highest `Tnnnn` is lower than the headline test count (530).
+A few rows cover a *parameterised family* of tests (e.g. "one per scenario", or "all role combinations"), so the highest `Tnnnn` is lower than the headline test count (564).
 
 A test going red is not a problem with the test; it's the net catching a change. If the change was intentional, the test is updated to match; if not, the net just prevented a regression from shipping.
 
@@ -46,12 +46,12 @@ A test going red is not a problem with the test; it's the net catching a change.
 
 | Layer | What it guards | Files |
 |---|---|---|
-| 1. Access control, auth & sharing | Who can see/edit projects + diagrams; login, registration, password reset, impersonation | 4 |
+| 1. Access control, auth & sharing | Who can see/edit projects + diagrams; login, registration, password reset, impersonation, org-admin mgmt | 5 |
 | 2. App-flow data integrity | Delete/publish/bundle/billing/backup effects + delete authz + Stripe webhook/checkout | 13 |
 | 3. Export & interchange | JSON / XML / DDL / Visio / translation round-trips + SharePoint link | 12 |
 | 4. Diagram structure & layout | BPMN/flowchart layout rules, type coverage, ArchiMate notation | 10 |
 | 5. Connector routing & editor | Orthogonal routing, manual-edit re-routing, archi re-attach | 6 |
-| 6. AI generation pipeline | Rule-filtering, plan validation, normalisation | 5 |
+| 6. AI generation pipeline | Rule-filtering, plan validation, normalisation, prompt assembly | 6 |
 | 7. Process Simulator | Engine correctness, determinism, hierarchy, BPSim interop | 17 |
 | 8. Help content & dictation | Guide rendering/images, transcript parsing | 5 |
 | 9. Test infrastructure | The harness itself | 1 |
@@ -130,6 +130,27 @@ One area is deliberately **ratcheted, not closed**: the editor's obstacle-avoida
 | T0430 | (isReadOnlyImpersonation) superuser impersonating in edit mode → false | An edit-mode impersonation wrongly blocked from writing | If edit-mode impersonation was flagged read-only |
 | T0431 | (isReadOnlyImpersonation) not impersonating (even with mode=view) → false | A normal session wrongly treated as read-only | If a non-impersonating session was flagged read-only |
 | T0432 | (isReadOnlyImpersonation) non-superuser with both cookies → false | A forged cookie putting a normal user into a (mis-scoped) impersonation state | If a non-superuser's cookies produced a read-only impersonation |
+
+### `tests/orgs/member-management.test.ts` — Org admin management (gate + cross-tenant + last-admin)
+
+| Ref | Test | Protects you against | How it would break (go red) |
+|------|------|----------------------|------------------------------|
+| T0461 | (requireOrgAdminFor) null session → 401 | An anonymous caller managing org admins | If a null session resolved the gate |
+| T0462 | (requireOrgAdminFor) SuperAdmin passes everywhere with isSuperAdmin:true (even a foreign org) | A SuperAdmin being blocked from org administration | If a superuser didn't pass, or wasn't flagged isSuperAdmin |
+| T0463 | (requireOrgAdminFor) an Owner of the org passes with isSuperAdmin:false | A legitimate Owner being blocked | If an Owner of the org was denied |
+| T0464 | (requireOrgAdminFor) an Admin member of the org passes | A legitimate Admin being blocked | If an Admin of the org was denied |
+| T0465 | (requireOrgAdminFor) a Viewer member of the org → 403 | A plain member managing org admins | If a Viewer passed the gate |
+| T0466 | (requireOrgAdminFor) a non-member of the org → 403 | An outsider managing another org's admins | If a non-member passed the gate |
+| T0467 | (promoteToAdmin) promotes an existing Viewer member to Admin (200) | An admin promotion not taking effect | If promoting an existing member didn't set role Admin |
+| T0468 | (promoteToAdmin) resolves the target by EMAIL (key lowercased to match the stored email) | Promotion-by-email failing on casing | If the email key wasn't lowercased to resolve the user |
+| T0469 | (promoteToAdmin) SuperAdmin promoting a NON-member CREATES an Admin OrgMember (201) | A SuperAdmin unable to add a user to an org in one step | If a SuperAdmin's promote of a non-member didn't create the Admin membership |
+| T0470 | (promoteToAdmin) a non-superadmin OrgAdmin promoting a NON-member is REJECTED (400, cross-tenant) | An OrgAdmin pulling an outsider into their org (tenant-isolation breach) | If a non-superadmin could promote a non-member |
+| T0471 | (promoteToAdmin) an unknown target → 404 | A confusing failure promoting a non-existent user | If an unknown target didn't 404 |
+| T0472 | (promoteToAdmin) an empty userIdOrEmail → 400 | A malformed promote request being mishandled | If an empty key didn't 400 |
+| T0473 | (demoteAdmin) demotes one of two admins to Viewer | A demotion not taking effect | If demoting an admin didn't set role Viewer |
+| T0474 | (demoteAdmin) refuses to demote the LAST OrgAdmin (org keeps an admin) → 400 | Orphaning an org with no admin (nobody can manage it) | If demoting the last admin were allowed |
+| T0475 | (demoteAdmin) demoting a non-admin member (Viewer) → 400 | A nonsensical demote of a non-admin | If demoting a non-admin didn't 400 |
+| T0476 | (demoteAdmin) demoting a non-member → 404 | A confusing failure demoting a non-member | If demoting a non-member didn't 404 |
 
 ---
 
@@ -654,6 +675,24 @@ One area is deliberately **ratcheted, not closed**: the editor's obstacle-avoida
 | T0249 | appends additional rules to the built-in default | User house-style rules not being added on top of the default | If additions weren't appended after the default under an "Additional Rules" heading |
 | T0250 | treats a legacy full-briefing row as the whole briefing (no doubling) | A legacy briefing being concatenated with a second copy of the default | If a legacy full-briefing row were appended rather than used as-is |
 | T0251 | extractAdditionalRules hides legacy full briefings but keeps real additions | Legacy briefings shown as editable additions, or real additions hidden | If extraction stopped distinguishing legacy briefings from real additions |
+
+### `tests/ai/prompt-assembly.test.ts` — AI prompt builders (green rules in, diagram described out)
+
+| Ref | Test | Protects you against | How it would break (go red) |
+|------|------|----------------------|------------------------------|
+| T0448 | (buildSystemPrompt / BPMN) embeds the rules marker verbatim and keeps the BPMN element vocabulary | Admin GREEN rules not reaching the model, or the BPMN vocabulary being dropped | If the rules weren't included verbatim or the BPMN structure was lost |
+| T0449 | (buildSystemPrompt) omits the USER RULES block entirely when no rules are supplied | An empty rules set leaving a stray/confusing rules heading | If an empty rules set still emitted a USER RULES block |
+| T0450 | (buildFlowchartSystemPrompt) embeds the rules marker verbatim and keeps the flowchart vocabulary | Green rules not reaching the flowchart prompt | If the rules weren't included or the flowchart vocabulary was dropped |
+| T0451 | (buildFlowchartSystemPrompt) omits the USER RULES block when no rules are supplied | A stray rules heading on an empty set | If empty rules still emitted the block |
+| T0452 | (buildGenericSystemPrompt) appends the rules marker for every diagram type and keeps the base prompt | A diagram type silently not receiving the green rules | If any type's prompt dropped the rules or its base prompt |
+| T0453 | (buildGenericSystemPrompt) returns a sane fallback (no crash, no marker leak) for an unknown type | A crash / leaked rules on an unrecognised diagram type | If an unknown type crashed or leaked the marker into a non-prompt |
+| T0454 | (buildGenericSystemPrompt) omits the rules block when rules is empty | A stray rules heading on an empty set | If empty rules still emitted the block |
+| T0455 | (buildBpmnPrompt) emits the canonical narrative sections | The "describe this diagram" prompt losing its canonical structure | If the canonical sections (Trigger / What happens / …) weren't emitted |
+| T0456 | (buildBpmnPrompt) mentions the task labels, the gateway and its branch labels | A re-generation prompt omitting the actual activities/decisions | If task or gateway/branch labels were missing from the prompt |
+| T0457 | (buildBpmnPrompt) describes the trigger, the external participant and the structure | The prompt dropping the start trigger / external pools | If the trigger, external sender, or pool/lane structure was missing |
+| T0458 | (buildPromptFromDiagram) routes a BPMN diagram to the BPMN builder | The generic entry point not dispatching BPMN to the BPMN describer | If a BPMN diagram wasn't routed to buildBpmnPrompt |
+| T0459 | (buildBpmnPrompt) describes a plain linear flow (the engine wraps it in an auto-pool) | A poolless flow producing an empty/garbled description | If a laid-out linear flow wasn't described |
+| T0460 | (buildBpmnPrompt) emits the explicit 'No pools' fallback when there are genuinely no pools | A genuinely poolless raw diagram producing no structure note | If the no-pools fallback branch stopped emitting |
 
 ---
 
