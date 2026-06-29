@@ -1,0 +1,208 @@
+{
+  "elements": [
+    {
+      "id": "p1",
+      "type": "pool",
+      "label": "Company"
+    },
+    {
+      "id": "e1",
+      "type": "start-event",
+      "label": "Trip Booking Started",
+      "pool": "p1"
+    },
+    {
+      "id": "sp_transaction",
+      "type": "subprocess-expanded",
+      "label": "Book Trip",
+      "pool": "p1"
+    },
+    {
+      "id": "t_cancel_flight",
+      "type": "task",
+      "label": "Cancel Flight Reservation",
+      "taskType": "none",
+      "pool": "p1"
+    },
+    {
+      "id": "t_cancel_hotel",
+      "type": "task",
+      "label": "Cancel Hotel Reservation",
+      "taskType": "none",
+      "pool": "p1"
+    },
+    {
+      "id": "gw_comp_split",
+      "type": "gateway",
+      "label": "Cancel Both Reservations",
+      "gatewayType": "parallel",
+      "pool": "p1"
+    },
+    {
+      "id": "e3",
+      "type": "end-event",
+      "label": "Trip Booked",
+      "pool": "p1"
+    },
+    {
+      "id": "gw_comp_join",
+      "type": "gateway",
+      "label": "Cancellations Complete",
+      "gatewayType": "parallel",
+      "pool": "p1"
+    },
+    {
+      "id": "e2",
+      "type": "end-event",
+      "label": "Booking Undone",
+      "pool": "p1"
+    },
+    {
+      "id": "sp_start",
+      "type": "start-event",
+      "label": "Start",
+      "parentSubprocess": "sp_transaction"
+    },
+    {
+      "id": "gw_split",
+      "type": "gateway",
+      "label": "Start Parallel Reservations",
+      "gatewayType": "parallel",
+      "parentSubprocess": "sp_transaction"
+    },
+    {
+      "id": "t_flight",
+      "type": "task",
+      "label": "Reserve Flight",
+      "taskType": "none",
+      "parentSubprocess": "sp_transaction"
+    },
+    {
+      "id": "t_hotel",
+      "type": "task",
+      "label": "Reserve Hotel",
+      "taskType": "none",
+      "parentSubprocess": "sp_transaction"
+    },
+    {
+      "id": "gw_join",
+      "type": "gateway",
+      "label": "All Reservations Done",
+      "gatewayType": "parallel",
+      "parentSubprocess": "sp_transaction"
+    },
+    {
+      "id": "t_confirm",
+      "type": "task",
+      "label": "Confirm Trip Booking",
+      "taskType": "none",
+      "parentSubprocess": "sp_transaction"
+    },
+    {
+      "id": "sp_end_success",
+      "type": "end-event",
+      "label": "Booking Confirmed",
+      "parentSubprocess": "sp_transaction"
+    },
+    {
+      "id": "be_cancel",
+      "type": "intermediate-event",
+      "label": "Reservation Failed",
+      "eventType": "cancel",
+      "boundarySide": "bottom",
+      "boundaryHost": "sp_transaction"
+    }
+  ],
+  "connections": [
+    {
+      "sourceId": "e1",
+      "targetId": "sp_transaction",
+      "label": "",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "sp_start",
+      "targetId": "gw_split",
+      "label": "",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "gw_split",
+      "targetId": "t_flight",
+      "label": "",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "gw_split",
+      "targetId": "t_hotel",
+      "label": "",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "t_flight",
+      "targetId": "gw_join",
+      "label": "",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "t_hotel",
+      "targetId": "gw_join",
+      "label": "",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "gw_join",
+      "targetId": "t_confirm",
+      "label": "",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "t_confirm",
+      "targetId": "sp_end_success",
+      "label": "",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "sp_transaction",
+      "targetId": "e3",
+      "label": "",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "be_cancel",
+      "targetId": "gw_comp_split",
+      "label": "",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "gw_comp_split",
+      "targetId": "t_cancel_flight",
+      "label": "",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "gw_comp_split",
+      "targetId": "t_cancel_hotel",
+      "label": "",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "t_cancel_flight",
+      "targetId": "gw_comp_join",
+      "label": "",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "t_cancel_hotel",
+      "targetId": "gw_comp_join",
+      "label": "",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "gw_comp_join",
+      "targetId": "e2",
+      "label": "",
+      "type": "sequence"
+    }
+  ]
+}

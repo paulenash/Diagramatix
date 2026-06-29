@@ -14,6 +14,7 @@ import {
   MAX_AUTO_WAYPOINTS,
 } from "@/app/lib/diagram/checks/connectorConformance";
 import type { Connector } from "@/app/lib/diagram/types";
+import bookTripCompensation from "./fixtures/book-trip-compensation.json";
 
 const conn = (over: Partial<Connector>): Connector =>
   ({
@@ -102,5 +103,17 @@ describe("connector conformance", () => {
         expect(issues, `conformance issues: ${JSON.stringify(summariseConformance(issues))}`).toEqual([]);
       });
     }
+
+    // Regression: the AI harness's book-trip-allornothing — a transaction with a
+    // compensation fan-out where the "Cancel All" gateway has a target sitting
+    // LEVEL to its right. The 2-way decision-gateway side rule forced top→top by
+    // index, so the route jogged into the target body (sequence-clips-own-endpoint).
+    // The fix makes the gateway side position-based (level target → exit right).
+    it("book-trip compensation fan-out (real AI plan): clean wiring", () => {
+      const f = bookTripCompensation as { elements: AiElement[]; connections: AiConnection[] };
+      const data = layoutBpmnDiagram(f.elements, f.connections);
+      const issues = findConnectorConformance(data);
+      expect(issues, `conformance issues: ${JSON.stringify(summariseConformance(issues))}`).toEqual([]);
+    });
   });
 });

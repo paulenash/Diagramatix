@@ -2425,7 +2425,17 @@ export function layoutBpmnDiagram(
           const idx = list.indexOf(c);
           const n = list.length;
           if (idx < 0 || n <= 1) srcSide = "right";
-          else if (n === 2) srcSide = idx === 0 ? "top" : "bottom";
+          else if (n === 2) {
+            // idx 0 = topmost target, idx 1 = bottommost — but only exit
+            // top/bottom when the target is ACTUALLY above/below the gateway.
+            // A target sitting level with the gateway (mainly to the side, e.g.
+            // a compensation fan-out) exits "right" so the route doesn't jog
+            // up/down INTO the target body (sequence-clips-own-endpoint).
+            // Surfaced by the AI harness: book-trip-allornothing.
+            srcSide = tgtCy < src.y - 10 ? "top"
+              : tgtCy > src.y + src.height + 10 ? "bottom"
+              : "right";
+          }
           else if (idx === 0) srcSide = "top";
           else if (idx === 1) srcSide = "right";
           else srcSide = "bottom";
