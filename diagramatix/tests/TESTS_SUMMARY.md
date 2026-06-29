@@ -1,6 +1,6 @@
 # Diagramatix — Tests Summary
 
-**As at:** 2026-06-29  ·  **Document version:** 1.6  ·  **Suite:** 78 test files · 592 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`
+**As at:** 2026-06-29  ·  **Document version:** 1.7  ·  **Suite:** 79 test files · 597 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`
 
 ---
 
@@ -36,7 +36,7 @@ Each test file has its own section below, grouped into layers. Within each secti
 
 **Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T0377**, the one after **T0378**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
 
-> **Highest ref allocated: `T0504`.** Update this line whenever you add tests (e.g. to `T0507` after adding three), so the next continuation point is always obvious.
+> **Highest ref allocated: `T0509`.** Update this line whenever you add tests (e.g. to `T0507` after adding three), so the next continuation point is always obvious.
 
 A few rows cover a *parameterised family* of tests (e.g. "one per scenario", or "all role combinations"), so the highest `Tnnnn` is lower than the headline test count (592).
 
@@ -336,6 +336,18 @@ One area is deliberately **ratcheted, not closed**: the editor's obstacle-avoida
 | T0502 | (deleteNode) unknown node → 404 | A confusing error deleting a non-existent node | If an unknown node didn't 404 |
 | T0503 | (deleteNode) valid leaf delete → the node is gone | Node deletion not working | If a valid delete didn't remove the node |
 | T0504 | (deleteNode) deleting a parent cascades to its children | Orphaned child nodes after a parent delete | If deleting a parent left its children behind |
+
+### `tests/conformance/connector-conformance.test.ts` — Connector conformance on layout output
+
+Pins the deterministic connector-quality checks behind the AI-connector complaints ("too many segments", "endpoints not moveable"). The same `findConnectorConformance` net is reused by the AI conformance harness (`npm run ai:report`). The over-segmentation rule keys off the editor's ≥9-waypoint "user-customised, stop re-routing" lock.
+
+| Ref | Test | Plain-English risk it heads off | Goes red if… |
+|---|---|---|---|
+| T0505 | over-segmentation detector flags a routed connector with > 8 waypoints | An auto/AI connector silently treated as user-customised — locked + too many segments | If a >8-waypoint routed connector wasn't flagged |
+| T0506 | detector passes an auto route (≤ 8 waypoints) | False positives on normal L-shape / vertical-jog routes | If a 7 or 8-waypoint route was wrongly flagged |
+| T0507 | detector ignores non-routed types (a message flow's fixed waypoints) | Message flows wrongly flagged as over-segmented | If a 12-waypoint message flow was flagged |
+| T0508 | `layoutBpmnDiagram` linear flow → clean wiring (no crossing/over-segmented/non-moveable) | The layout emitting non-conformant connectors on a basic flow | If a linear layout had any conformance issue |
+| T0509 | `layoutBpmnDiagram` gateway split + merge → clean wiring | The layout emitting crossings/over-segmentation on branching | If a gateway layout had any conformance issue |
 
 ---
 
