@@ -19,7 +19,8 @@
     "e2e": "playwright test",
     "e2e:headed": "playwright test --headed",
     "e2e:ui": "playwright test --ui",
-    "ai:report": "npx --yes tsx@4 scripts/ai-conformance-report.ts"
+    "ai:report": "npx --yes tsx@4 scripts/ai-conformance-report.ts",
+    "ai:compare": "npx --yes tsx@4 scripts/ai-model-compare.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "0.88.0",
