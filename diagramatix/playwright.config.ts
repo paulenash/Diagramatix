@@ -33,7 +33,9 @@ export default defineConfig({
     { name: "setup", testMatch: /auth\.setup\.ts/ },
     {
       name: "chromium",
-      use: { ...devices["Desktop Chrome"] },
+      // Reuse the session saved by the setup project — specs start authenticated.
+      // (auth-smoke.spec overrides this back to an empty session.)
+      use: { ...devices["Desktop Chrome"], storageState: "e2e/.auth/user.json" },
       dependencies: ["setup"],
     },
   ],
