@@ -28,6 +28,11 @@ function step(label, command) {
 // registerUser's `subscriptionLevelId: "free"` references).
 step("applying schema to diagramatix_test", `npx prisma db push --accept-data-loss --url "${env.DATABASE_URL}"`);
 step("seeding subscription levels", "npx --yes tsx@4 scripts/seed-subscriptions.ts");
+
+// Lift the Free-tier caps in the TEST DB ONLY so the e2e account (a Free user)
+// can create ArchiMate diagrams + many diagrams + AI attempts. Never touches prod.
+step("lifting Free-tier caps (test DB only)", "npx --yes tsx@4 scripts/e2e-lift-caps.ts");
+
 step("building (non-standalone)", "npx next build");
 
 console.log("[e2e-server] starting http://localhost:3001 against diagramatix_test");
