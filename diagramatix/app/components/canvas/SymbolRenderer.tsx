@@ -2278,6 +2278,8 @@ export function SymbolRenderer({
     <SymbolColorCtx.Provider value={colorConfig}>
     <ShowValueDisplayCtx.Provider value={!!showValueDisplay}>
     <g
+      data-element-id={element.id}
+      data-element-type={element.type}
       opacity={isFaded ? 0.2 : undefined}
       onMouseDown={handleMouseDown}
       onDoubleClick={(e) => {
