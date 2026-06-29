@@ -1,6 +1,6 @@
 # Diagramatix — Tests Summary
 
-**As at:** 2026-06-29  ·  **Document version:** 1.2  ·  **Suite:** 69 test files · 489 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`
+**As at:** 2026-06-29  ·  **Document version:** 1.3  ·  **Suite:** 71 test files · 515 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`
 
 ---
 
@@ -36,9 +36,9 @@ Each test file has its own section below, grouped into layers. Within each secti
 
 **Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T0377**, the one after **T0378**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
 
-> **Highest ref allocated: `T0406`.** Update this line whenever you add tests (e.g. to `T0409` after adding three), so the next continuation point is always obvious.
+> **Highest ref allocated: `T0432`.** Update this line whenever you add tests (e.g. to `T0435` after adding three), so the next continuation point is always obvious.
 
-A few rows cover a *parameterised family* of tests (e.g. "one per scenario", or "all role combinations"), so the highest `Tnnnn` is lower than the headline test count (489).
+A few rows cover a *parameterised family* of tests (e.g. "one per scenario", or "all role combinations"), so the highest `Tnnnn` is lower than the headline test count (515).
 
 A test going red is not a problem with the test; it's the net catching a change. If the change was intentional, the test is updated to match; if not, the net just prevented a regression from shipping.
 
@@ -46,7 +46,7 @@ A test going red is not a problem with the test; it's the net catching a change.
 
 | Layer | What it guards | Files |
 |---|---|---|
-| 1. Access control, auth & sharing | Who can see/edit projects + diagrams; login + registration | 2 |
+| 1. Access control, auth & sharing | Who can see/edit projects + diagrams; login, registration, password reset, impersonation | 4 |
 | 2. App-flow data integrity | Delete/publish/bundle/billing/backup effects + delete authz + Stripe webhook | 12 |
 | 3. Export & interchange | JSON / XML / DDL / Visio / translation round-trips | 11 |
 | 4. Diagram structure & layout | BPMN/flowchart layout rules, type coverage, ArchiMate notation | 10 |
@@ -94,6 +94,42 @@ One area is deliberately **ratcheted, not closed**: the editor's obstacle-avoida
 | T0383 | (registerUser) rejects a password under the 8-char minimum (400) | Weak passwords being accepted | If a <8-char password registered instead of 400 |
 | T0384 | (registerUser) rejects a missing email or password (400) | A malformed registration creating a broken account | If a missing field didn't return 400 |
 | T0385 | (registerUser) a registered user can then log in via verifyCredentials | Registration + login drifting apart (hash-format mismatch) | If a freshly-registered user couldn't authenticate |
+
+### `tests/auth/password-reset.test.ts` — Forgot-password token mint + reset redemption
+
+| Ref | Test | Protects you against | How it would break (go red) |
+|------|------|----------------------|------------------------------|
+| T0407 | (createPasswordResetToken) sets a token + future (1h) expiry for a real user and returns a reset url | A reset request not producing a usable, time-limited link | If minting didn't store the token + ~1h expiry or didn't return the url |
+| T0408 | (createPasswordResetToken) an UNKNOWN email returns null and writes no token (no enumeration) | Attackers learning which emails are registered from reset behaviour | If an unknown email wrote a token or behaved differently from a known one |
+| T0409 | (resetPasswordWithToken) a valid token changes the password AND clears resetToken/resetTokenExpiry | A reset not actually changing the password, or leaving the token live | If the new password wasn't stored (bcrypt) or the token/expiry weren't cleared |
+| T0410 | (resetPasswordWithToken) an EXPIRED token → 400 and the password is UNCHANGED | An old reset link still working after it should have expired | If an expired token reset the password instead of 400 |
+| T0411 | (resetPasswordWithToken) an unknown token → 400 | A guessed/invalid token resetting an account | If an unknown token was accepted |
+| T0412 | (resetPasswordWithToken) a <8-char password → 400 | A weak password being set via reset | If a <8-char password was accepted |
+| T0413 | (resetPasswordWithToken) a missing token or password → 400 | A malformed reset request being mishandled | If a missing field didn't return 400 |
+| T0414 | (resetPasswordWithToken) a token cannot be reused — second attempt → 400 | A reset link working more than once | If a used (cleared) token still worked |
+
+### `tests/auth/impersonation.test.ts` — SuperAdmin "view as" + effective-user resolution
+
+| Ref | Test | Protects you against | How it would break (go red) |
+|------|------|----------------------|------------------------------|
+| T0415 | (isSuperuser) a SUPERUSER_EMAILS email → true | A real admin not being recognised as SuperAdmin | If a superuser email resolved to false |
+| T0416 | (isSuperuser) a normal email → false | A normal user being treated as SuperAdmin | If a non-superuser email resolved to true |
+| T0417 | (isSuperuser) a null session → false | An anonymous caller treated as SuperAdmin | If a null session resolved to true |
+| T0418 | (isSuperuser) matching is CASE-SENSITIVE (pinned as-is) | Silent drift in how the superuser allow-list is matched | If the case-sensitivity of the email match changed (a known sharp edge) |
+| T0419 | (getViewAsUserId) superuser + impersonate cookie set → that value | A SuperAdmin's "view as" target not resolving | If the cookie value wasn't returned for a superuser |
+| T0420 | (getViewAsUserId) NON-superuser + cookie set → null | A normal user impersonating someone by forging the cookie (privilege escalation) | If a non-superuser's cookie returned a target id |
+| T0421 | (getViewAsUserId) superuser + no cookie → null | A superuser treated as impersonating when they aren't | If no-cookie returned a value |
+| T0422 | (getEffectiveUserId) superuser impersonating → the impersonated id | "View as" not scoping data to the target user | If it returned the superuser's own id while impersonating |
+| T0423 | (getEffectiveUserId) non-superuser with the cookie → their OWN id (cookie inert) | A normal user's data scope hijacked by a forged cookie | If a non-superuser's cookie changed their effective id |
+| T0424 | (getEffectiveUserId) nobody impersonating → own id | The normal path resolving the wrong user | If a plain session didn't resolve to its own id |
+| T0425 | (getEffectiveUserId) null session → empty string | A crash / ambiguous id for an anonymous caller | If a null session didn't resolve to "" |
+| T0426 | (isImpersonating) true only when a superuser has the cookie | Mis-detecting impersonation state (banner / read-only) | If it reported impersonating for a non-superuser or without the cookie |
+| T0427 | (getImpersonationMode) the "edit" cookie → edit mode | An edit-mode impersonation not being recognised | If an "edit" cookie didn't return edit |
+| T0428 | (getImpersonationMode) absent / "view" / other → view mode (default) | Defaulting to the wrong (less safe) mode | If the default wasn't the read-only "view" mode |
+| T0429 | (isReadOnlyImpersonation) superuser impersonating in view mode → true | A view-only "view as" session being allowed to write | If view-mode impersonation wasn't flagged read-only |
+| T0430 | (isReadOnlyImpersonation) superuser impersonating in edit mode → false | An edit-mode impersonation wrongly blocked from writing | If edit-mode impersonation was flagged read-only |
+| T0431 | (isReadOnlyImpersonation) not impersonating (even with mode=view) → false | A normal session wrongly treated as read-only | If a non-impersonating session was flagged read-only |
+| T0432 | (isReadOnlyImpersonation) non-superuser with both cookies → false | A forged cookie putting a normal user into a (mis-scoped) impersonation state | If a non-superuser's cookies produced a read-only impersonation |
 
 ---
 
