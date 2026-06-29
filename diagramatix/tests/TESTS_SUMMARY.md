@@ -115,7 +115,7 @@ One area is deliberately **ratcheted, not closed**: the editor's obstacle-avoida
 | T0415 | (isSuperuser) a SUPERUSER_EMAILS email → true | A real admin not being recognised as SuperAdmin | If a superuser email resolved to false |
 | T0416 | (isSuperuser) a normal email → false | A normal user being treated as SuperAdmin | If a non-superuser email resolved to true |
 | T0417 | (isSuperuser) a null session → false | An anonymous caller treated as SuperAdmin | If a null session resolved to true |
-| T0418 | (isSuperuser) matching is CASE-SENSITIVE (pinned as-is) | Silent drift in how the superuser allow-list is matched | If the case-sensitivity of the email match changed (a known sharp edge) |
+| T0418 | (isSuperuser) matching is case-INSENSITIVE (an uppercase variant still matches; a non-admin never does) | A SuperAdmin losing admin because their stored email casing differs | If the email match became case-sensitive again, or matched a non-allow-listed email |
 | T0419 | (getViewAsUserId) superuser + impersonate cookie set → that value | A SuperAdmin's "view as" target not resolving | If the cookie value wasn't returned for a superuser |
 | T0420 | (getViewAsUserId) NON-superuser + cookie set → null | A normal user impersonating someone by forging the cookie (privilege escalation) | If a non-superuser's cookie returned a target id |
 | T0421 | (getViewAsUserId) superuser + no cookie → null | A superuser treated as impersonating when they aren't | If no-cookie returned a value |
