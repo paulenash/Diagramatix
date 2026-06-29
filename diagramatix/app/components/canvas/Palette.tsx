@@ -686,6 +686,7 @@ export function Palette({ diagramType, onDragStart, disabledSymbols = [], colorC
                 key={sym.type}
                 draggable={!disabled}
                 onDragStart={disabled ? undefined : () => onDragStart(sym.type)}
+                data-testid={`palette-item-${sym.type}`}
                 title={sym.label}
                 className={`flex items-center justify-center px-1 py-1 rounded select-none ${
                   disabled
@@ -721,6 +722,7 @@ export function Palette({ diagramType, onDragStart, disabledSymbols = [], colorC
               key={sym.type}
               draggable={!disabled}
               onDragStart={disabled ? undefined : () => onDragStart(sym.type)}
+              data-testid={`palette-item-${sym.type}`}
               className={`flex items-center gap-2 px-2 py-1 rounded select-none ${
                 disabled
                   ? "opacity-40 cursor-not-allowed"
