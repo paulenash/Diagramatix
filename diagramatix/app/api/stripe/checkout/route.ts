@@ -23,10 +23,8 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { isSuperuser } from "@/app/lib/superuser";
-import { createCheckoutSession, stripe } from "@/app/lib/stripe";
+import { createCheckoutSession, stripe, PAID_TIER_IDS, originFromRequest } from "@/app/lib/stripe";
 import { hasBlockingActiveSubscription } from "@/app/lib/stripe/subscriptionGuard";
-
-const PAID_TIER_IDS = new Set(["introductory", "professional", "expert"]);
 
 export async function POST(req: Request) {
   const session = await auth();
@@ -123,11 +121,7 @@ export async function POST(req: Request) {
   // resolve to the internal bind address (`http://0.0.0.0:3000/...`)
   // because Next.js standalone doesn't know it's behind a proxy, and
   // Stripe would redirect users to a URL their browser can't reach.
-  const fwdHost = req.headers.get("x-forwarded-host");
-  const fwdProto = req.headers.get("x-forwarded-proto");
-  const origin = fwdHost
-    ? `${fwdProto ?? "https"}://${fwdHost}`
-    : new URL(req.url).origin;
+  const origin = originFromRequest(req);
   const successUrl = `${origin}/dashboard?checkout=success`;
   const cancelUrl = `${origin}/dashboard?checkout=cancel`;
 

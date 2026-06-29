@@ -36,6 +36,34 @@ export const stripe = new Stripe(STRIPE_SECRET_KEY ?? "sk_test_missing", {
 });
 
 /**
+ * The paid tier ids that POST /api/stripe/checkout accepts. Free / unknown /
+ * missing tier ids are rejected with a 400 by the route. Extracted here (with
+ * isPaidTierId) so the validation can be unit-tested without the route.
+ */
+export const PAID_TIER_IDS = new Set(["introductory", "professional", "expert"]);
+
+/** True iff `id` is one of the paid tiers Checkout accepts. */
+export function isPaidTierId(id: string | undefined | null): boolean {
+  return id != null && PAID_TIER_IDS.has(id);
+}
+
+/**
+ * Build the public origin for a request, preferring the X-Forwarded-* headers
+ * that Azure App Service sets when proxying to the Next.js standalone server.
+ * Without these, `req.url` would resolve to the internal bind address
+ * (`http://0.0.0.0:3000/...`) because Next.js standalone doesn't know it's
+ * behind a proxy, and Stripe would redirect users to a URL their browser can't
+ * reach. Extracted from the checkout + portal routes (identical inline logic).
+ */
+export function originFromRequest(req: Request): string {
+  const fwdHost = req.headers.get("x-forwarded-host");
+  const fwdProto = req.headers.get("x-forwarded-proto");
+  return fwdHost
+    ? `${fwdProto ?? "https"}://${fwdHost}`
+    : new URL(req.url).origin;
+}
+
+/**
  * Find-or-create the Stripe Customer for an app user. Stores the new
  * customer.id on `User.stripeCustomerId` so we don't create duplicates
  * on subsequent Checkout / Portal calls.
@@ -45,12 +73,18 @@ export const stripe = new Stripe(STRIPE_SECRET_KEY ?? "sk_test_missing", {
  * unique constraint). The `User.stripeCustomerId` column IS unique on
  * our side, which is the actual source of truth.
  */
-export async function getOrCreateStripeCustomer(user: {
-  id: string;
-  email: string;
-  name?: string | null;
-  stripeCustomerId: string | null;
-}): Promise<string> {
+export async function getOrCreateStripeCustomer(
+  user: {
+    id: string;
+    email: string;
+    name?: string | null;
+    stripeCustomerId: string | null;
+  },
+  // Injected Stripe customers client (trailing optional param defaulting to the
+  // module singleton) so the DATA-31 dedup logic is testable with a fake client.
+  // Module/route callers are unchanged.
+  client: { customers: Pick<Stripe["customers"], "list" | "create"> } = stripe,
+): Promise<string> {
   if (user.stripeCustomerId) return user.stripeCustomerId;
 
   // DATA-31: customer-create and the DB persist below are two non-atomic steps.
@@ -62,7 +96,7 @@ export async function getOrCreateStripeCustomer(user: {
   // (customers.list is immediately consistent; customers.search lags ~1 min.)
   let customerId: string | null = null;
   try {
-    const existing = await stripe.customers.list({ email: user.email, limit: 100 });
+    const existing = await client.customers.list({ email: user.email, limit: 100 });
     const match = existing.data.find(
       (c) => !c.deleted && c.metadata?.diagramatixUserId === user.id,
     );
@@ -72,7 +106,7 @@ export async function getOrCreateStripeCustomer(user: {
   }
 
   if (!customerId) {
-    const customer = await stripe.customers.create({
+    const customer = await client.customers.create({
       email: user.email,
       name: user.name ?? undefined,
       // Embed our user ID so the webhook can correlate back from Stripe

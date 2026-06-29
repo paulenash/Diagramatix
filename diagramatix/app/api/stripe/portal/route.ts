@@ -16,7 +16,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
-import { createPortalSession } from "@/app/lib/stripe";
+import { createPortalSession, originFromRequest } from "@/app/lib/stripe";
 
 export async function POST(req: Request) {
   const session = await auth();
@@ -40,11 +40,7 @@ export async function POST(req: Request) {
 
   // Prefer X-Forwarded-* headers so the return URL works behind
   // Azure App Service's proxy (see equivalent comment in checkout/route.ts).
-  const fwdHost = req.headers.get("x-forwarded-host");
-  const fwdProto = req.headers.get("x-forwarded-proto");
-  const origin = fwdHost
-    ? `${fwdProto ?? "https"}://${fwdHost}`
-    : new URL(req.url).origin;
+  const origin = originFromRequest(req);
   const returnUrl = `${origin}/dashboard`;
 
   try {
