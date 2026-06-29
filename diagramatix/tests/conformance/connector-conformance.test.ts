@@ -70,6 +70,29 @@ describe("connector conformance", () => {
           { sourceId: "r", targetId: "m" }, { sourceId: "m", targetId: "e" },
         ],
       },
+      {
+        // Regression: the AI conformance harness surfaced this back-edge case —
+        // the loop-back t3→t2 picked top→top, but a sibling (pub) stacked above
+        // t3 blocked the top exit, so the route fell back and clipped t3's body
+        // (sequence-clips-own-endpoint). The side picker now detects the stacked
+        // sibling and routes the loop UNDER (bottom→bottom). See bpmnLayout.ts.
+        name: "rework loop (back-edge, sibling stacked above source)",
+        elements: [
+          { id: "s", type: "start-event", label: "Start" },
+          { id: "t1", type: "task", label: "Draft" },
+          { id: "t2", type: "task", label: "Review" },
+          { id: "g", type: "gateway", label: "Approved?" },
+          { id: "t3", type: "task", label: "Revise" },
+          { id: "pub", type: "task", label: "Publish" },
+          { id: "e", type: "end-event", label: "End" },
+        ],
+        connections: [
+          { sourceId: "s", targetId: "t1" }, { sourceId: "t1", targetId: "t2" },
+          { sourceId: "t2", targetId: "g" }, { sourceId: "g", targetId: "pub", label: "Yes" },
+          { sourceId: "g", targetId: "t3", label: "No" }, { sourceId: "t3", targetId: "t2" },
+          { sourceId: "pub", targetId: "e" },
+        ],
+      },
     ];
 
     for (const c of CASES) {

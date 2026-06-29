@@ -2513,9 +2513,30 @@ export function layoutBpmnDiagram(
           elements.some((e) => e.boundaryHostId === host.id
             && ((e.properties?.boundarySide as string | undefined)
                 ?? (e as { boundarySide?: string }).boundarySide) === want);
-        const bottomBlocked = boundaryOn(src, "bottom") || boundaryOn(tgt, "bottom");
-        const topBlocked    = boundaryOn(src, "top")    || boundaryOn(tgt, "top");
-        const goOver = _tgtCy < _srcCy - 4 || (bottomBlocked && !topBlocked);
+        // A sibling flow-node stacked directly above/below an end (same column,
+        // within a routing gap) blocks that vertical exit just as a boundary
+        // event does: the top→top / bottom→bottom staple can't climb past it,
+        // so it falls back to the generic router which clips the source body.
+        // (Reproduced live by the AI conformance harness: rework-loop back-edge.)
+        const STACK_GAP = 90;
+        const stackedOn = (host: DiagramElement, want: "top" | "bottom") =>
+          elements.some((e) => {
+            if (e.id === src.id || e.id === tgt.id || e.id === host.id) return false;
+            if (e.type === "pool" || e.type === "lane" || e.boundaryHostId) return false;
+            if (!(e.x < host.x + host.width && e.x + e.width > host.x)) return false; // x-overlap
+            return want === "top"
+              ? e.y + e.height <= host.y && host.y - (e.y + e.height) < STACK_GAP
+              : e.y >= host.y + host.height && e.y - (host.y + host.height) < STACK_GAP;
+          });
+        const bottomBlocked = boundaryOn(src, "bottom") || boundaryOn(tgt, "bottom")
+          || stackedOn(src, "bottom") || stackedOn(tgt, "bottom");
+        const topBlocked    = boundaryOn(src, "top")    || boundaryOn(tgt, "top")
+          || stackedOn(src, "top")    || stackedOn(tgt, "top");
+        // Force the clear side when exactly one is blocked; otherwise route by
+        // vertical position (target above source → over) as before.
+        const goOver = topBlocked && !bottomBlocked ? false
+          : bottomBlocked && !topBlocked ? true
+          : _tgtCy < _srcCy - 4;
         const side: "top" | "bottom" = goOver ? "top" : "bottom";
         srcSide = side;
         tgtSide = side;

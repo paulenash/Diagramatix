@@ -1,6 +1,6 @@
 # Diagramatix — Tests Summary
 
-**As at:** 2026-06-29  ·  **Document version:** 1.7  ·  **Suite:** 79 test files · 597 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`
+**As at:** 2026-06-29  ·  **Document version:** 1.8  ·  **Suite:** 79 test files · 598 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`
 
 ---
 
@@ -36,7 +36,7 @@ Each test file has its own section below, grouped into layers. Within each secti
 
 **Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T0377**, the one after **T0378**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
 
-> **Highest ref allocated: `T0509`.** Update this line whenever you add tests (e.g. to `T0507` after adding three), so the next continuation point is always obvious.
+> **Highest ref allocated: `T0510`.** Update this line whenever you add tests (e.g. to `T0507` after adding three), so the next continuation point is always obvious.
 
 A few rows cover a *parameterised family* of tests (e.g. "one per scenario", or "all role combinations"), so the highest `Tnnnn` is lower than the headline test count (592).
 
@@ -348,6 +348,7 @@ Pins the deterministic connector-quality checks behind the AI-connector complain
 | T0507 | detector ignores non-routed types (a message flow's fixed waypoints) | Message flows wrongly flagged as over-segmented | If a 12-waypoint message flow was flagged |
 | T0508 | `layoutBpmnDiagram` linear flow → clean wiring (no crossing/over-segmented/non-moveable) | The layout emitting non-conformant connectors on a basic flow | If a linear layout had any conformance issue |
 | T0509 | `layoutBpmnDiagram` gateway split + merge → clean wiring | The layout emitting crossings/over-segmentation on branching | If a gateway layout had any conformance issue |
+| T0510 | rework loop (back-edge with a sibling stacked above the source) → clean wiring | The loop-back connector clipping through its own source body (the AI harness's `rework-loop` defect) | If the back-edge routed top→top into the blocking sibling and clipped the source |
 
 ---
 
