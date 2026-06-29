@@ -3,12 +3,11 @@ import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { getEffectiveUserId, isReadOnlyImpersonation, isSuperuser } from "@/app/lib/superuser";
-import { deleteProjectCascade, type ProjectDeleteMode } from "@/app/lib/projects/deleteProject";
+import { deleteProjectCascade, authorizeProjectDelete, type ProjectDeleteMode } from "@/app/lib/projects/deleteProject";
 import {
   requireRole,
   requireProjectAccess,
   OrgContextError,
-  type OrgRole,
 } from "@/app/lib/auth/orgContext";
 
 type Params = { params: Promise<{ id: string }> };
@@ -174,42 +173,24 @@ export async function DELETE(req: Request, { params }: Params) {
   }
   const isProjectOwner = projectRole === "owner";
 
-  if (hardDelete) {
-    // x++ — SuperAdmin AND project Owner. The SuperAdmin must own the
-    // project they're nuking; we deliberately don't let SuperAdmin
-    // hard-delete OTHER people's projects from this surface.
-    if (!su || !isProjectOwner) {
-      return NextResponse.json(
-        { error: "Hard delete requires SuperAdmin who owns the project" },
-        { status: 403 },
-      );
-    }
-  } else if (cascade === "archive") {
-    // x+ — OrgAdmin (any project in the Org). SuperAdmin who isn't also
-    // an OrgAdmin does not see this option in the UI; the server check
-    // mirrors that.
-    const allowedRoles: OrgRole[] = ["Owner", "Admin"];
-    try {
-      await requireRole(session, await cookies(), allowedRoles);
-    } catch (err) {
-      if (err instanceof OrgContextError) {
-        return NextResponse.json({ error: err.message }, { status: err.status });
-      }
-      throw err;
-    }
-  } else {
-    // x — project Owner OR OrgAdmin OR SuperAdmin.
-    if (!isProjectOwner && !su) {
-      const allowedRoles: OrgRole[] = ["Owner", "Admin"];
-      try {
-        await requireRole(session, await cookies(), allowedRoles);
-      } catch (err) {
-        if (err instanceof OrgContextError) {
-          return NextResponse.json({ error: err.message }, { status: err.status });
-        }
-        throw err;
-      }
-    }
+  // Three-tier authorization (extracted to authorizeProjectDelete so the rules
+  // are unit-tested directly). Compute "is this caller an OrgAdmin in the
+  // project's Org?" via a requireRole probe, then ask the lib for the verdict.
+  let isOrgAdmin = false;
+  try {
+    await requireRole(session, await cookies(), ["Owner", "Admin"]);
+    isOrgAdmin = true;
+  } catch (e) {
+    if (e instanceof OrgContextError) isOrgAdmin = false;
+    else throw e;
+  }
+
+  const decision = authorizeProjectDelete(
+    hardDelete ? "hard" : cascade === "archive" ? "archive" : "unorganise",
+    { isProjectOwner, isSuperuser: su, isOrgAdmin },
+  );
+  if (!decision.allowed) {
+    return NextResponse.json({ error: decision.message }, { status: 403 });
   }
 
   const existing = await prisma.project.findUnique({ where: { id } });

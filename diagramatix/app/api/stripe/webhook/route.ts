@@ -43,7 +43,7 @@ const WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
 /** Map a Stripe Price ID back to one of our SubscriptionLevel rows.
  *  Single query, cached lookup is unnecessary — webhooks are
  *  infrequent and the table has 4 rows. */
-async function tierIdForStripePriceId(stripePriceId: string): Promise<string | null> {
+export async function tierIdForStripePriceId(stripePriceId: string): Promise<string | null> {
   const tier = await prisma.subscriptionLevel.findFirst({
     where: { stripePriceId },
     select: { id: true },
@@ -176,7 +176,7 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
  * downgrades the user to Free on next access. Clear stripeSubscriptionId
  * so a future upgrade creates a fresh subscription.
  */
-async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
+export async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   const userId = await userIdForSubscription(subscription);
   if (!userId) return;
 
@@ -213,7 +213,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
  * the user. If retries ultimately fail, we'll receive a
  * customer.subscription.deleted event later.
  */
-async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
+export async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
   const subscriptionId = subscriptionIdFromInvoice(invoice);
   if (!subscriptionId) return;
   const user = await prisma.user.findUnique({
@@ -234,7 +234,7 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
  * clear past_due if it was set, and reset this user's monthly
  * UsageCounter rows so the new period starts at zero.
  */
-async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
+export async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
   const subscriptionId = subscriptionIdFromInvoice(invoice);
   if (!subscriptionId) return;
   const user = await prisma.user.findUnique({
@@ -276,7 +276,7 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
  * `getOrCreateStripeCustomer`); falls back to a DB lookup by
  * `stripeCustomerId` if the metadata isn't there for some reason.
  */
-async function userIdForSubscription(
+export async function userIdForSubscription(
   subscription: Stripe.Subscription,
 ): Promise<string | null> {
   const customerId =
@@ -311,7 +311,7 @@ function subscriptionIdFromInvoice(invoice: Stripe.Invoice): string | null {
  * Checkout completion does (start of paid period); routine updates
  * don't (we'd unfairly reset the monthly counter anniversary).
  */
-async function applySubscriptionToUser(
+export async function applySubscriptionToUser(
   userId: string,
   subscription: Stripe.Subscription,
   options: { reassignTrial: boolean },

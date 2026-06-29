@@ -3,13 +3,8 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import MicrosoftEntraID from "next-auth/providers/microsoft-entra-id";
 import { authConfig } from "./auth.config";
 import { prisma } from "@/app/lib/db";
-import bcrypt from "bcryptjs";
 import { rateLimit, clientIp } from "@/app/lib/rateLimit";
-
-/** SEC-12: a fixed, valid bcrypt hash compared against when the user doesn't
- *  exist, so authorize() takes ~the same time whether or not the email is
- *  registered (closes the timing-enumeration oracle). It never matches anything. */
-const DUMMY_BCRYPT_HASH = "$2b$12$qO.Q/cmrOm8qGc98tNpKP.eQ.pkPQmLyocrlAbVqID.fiD9T56GP2";
+import { verifyCredentials } from "@/app/lib/auth/credentials";
 
 /**
  * Idempotent: ensures the user has at least one OrgMember row. If none, creates
@@ -53,22 +48,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         if (!rateLimit(`login:email:${email}`, 10, 15 * 60_000).ok) return null;
         if (!rateLimit(`login:ip:${ip}`, 50, 15 * 60_000).ok) return null;
 
-        const user = await prisma.user.findUnique({
-          where: { email: email },
-        });
-
-        // SEC-12: always run a bcrypt compare (against a dummy hash when the user
-        // is missing) so the response time doesn't reveal whether the email exists.
-        const hashToCheck = user?.password || DUMMY_BCRYPT_HASH;
-        const passwordMatch = await bcrypt.compare(credentials.password as string, hashToCheck);
-
-        if (!user || !passwordMatch) return null;
-
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-        };
+        // SEC-12 timing-safe credential check (lowercase + lookup + dummy-hash
+        // compare) lives in the extracted lib; rate-limiting stays here.
+        return verifyCredentials(email, credentials.password as string);
       },
     }),
     MicrosoftEntraID({

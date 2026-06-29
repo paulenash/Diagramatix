@@ -18,6 +18,34 @@ import { archiveDiagram } from "@/app/lib/archive";
 
 export type ProjectDeleteMode = "unorganise" | "archive" | "hard";
 
+/**
+ * Per-tier authorization decision for a project delete, extracted verbatim from
+ * the DELETE /api/projects/[id] route so the three-tier rules can be unit-tested
+ * directly. The route computes the three booleans (from requireProjectAccess +
+ * isSuperuser + a requireRole probe) and asks this for the verdict.
+ *
+ * Rules (Paul's three-tier delete model, 2026-06-08):
+ *   - hard       — SuperAdmin who owns the project.
+ *   - archive    — OrgAdmin (Owner/Admin in the project's Org).
+ *   - unorganise — project Owner OR SuperAdmin OR OrgAdmin.
+ */
+export function authorizeProjectDelete(
+  mode: ProjectDeleteMode,
+  ctx: { isProjectOwner: boolean; isSuperuser: boolean; isOrgAdmin: boolean },
+): { allowed: boolean; message?: string } {
+  if (mode === "hard") {
+    if (ctx.isSuperuser && ctx.isProjectOwner) return { allowed: true };
+    return { allowed: false, message: "Hard delete requires SuperAdmin who owns the project" };
+  }
+  if (mode === "archive") {
+    if (ctx.isOrgAdmin) return { allowed: true };
+    return { allowed: false, message: "Not an OrgAdmin for this org" };
+  }
+  // unorganise (default)
+  if (ctx.isProjectOwner || ctx.isSuperuser || ctx.isOrgAdmin) return { allowed: true };
+  return { allowed: false, message: "No access to this project" };
+}
+
 export interface ProjectDeleteResult {
   mode: ProjectDeleteMode;
   archived: number;    // diagrams moved to the archive (archive mode)
