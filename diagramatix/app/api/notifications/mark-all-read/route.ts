@@ -5,16 +5,13 @@
 
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { prisma } from "@/app/lib/db";
+import { markAllNotificationsRead } from "@/app/lib/notifications/markRead";
 
 export async function POST() {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const result = await prisma.notification.updateMany({
-    where: { userId: session.user.id, readAt: null },
-    data: { readAt: new Date() },
-  });
+  const result = await markAllNotificationsRead(session.user.id);
   return NextResponse.json({ ok: true, markedRead: result.count });
 }

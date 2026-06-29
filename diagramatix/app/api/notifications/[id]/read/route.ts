@@ -5,7 +5,7 @@
 
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { prisma } from "@/app/lib/db";
+import { markNotificationRead } from "@/app/lib/notifications/markRead";
 
 export async function POST(
   _req: Request,
@@ -17,15 +17,9 @@ export async function POST(
   }
   const { id } = await context.params;
 
-  const notification = await prisma.notification.findUnique({ where: { id } });
-  if (!notification || notification.userId !== session.user.id) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
-  if (notification.readAt == null) {
-    await prisma.notification.update({
-      where: { id },
-      data: { readAt: new Date() },
-    });
+  const result = await markNotificationRead(id, session.user.id);
+  if (!result.ok) {
+    return NextResponse.json({ error: "Not found" }, { status: result.status });
   }
   return NextResponse.json({ ok: true });
 }
