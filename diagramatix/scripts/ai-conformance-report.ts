@@ -1,0 +1,122 @@
+import "dotenv/config";
+import { writeFileSync } from "node:fs";
+import { prisma } from "../app/lib/db";
+import { planBpmn } from "../app/lib/ai/planBpmn";
+import { splitRulesByEnforcement } from "../app/lib/ai/splitRules";
+import { layoutBpmnDiagram } from "../app/lib/diagram/bpmnLayout";
+import {
+  findConnectorConformance,
+  summariseConformance,
+} from "../app/lib/diagram/checks/connectorConformance";
+import type { Violation } from "../app/lib/diagram/checks/diagramChecks";
+import { BPMN_PROMPTS } from "./ai-conformance/prompts";
+
+/**
+ * AI conformance harness (#3) — sends each canonical BPMN prompt to the LIVE
+ * model (planBpmn), lays it out (layoutBpmnDiagram), and runs the SAME
+ * findConnectorConformance net as tests/conformance/connector-conformance.test.ts.
+ * Writes a markdown performance log so you can see WHICH prompts produce
+ * non-conformant wiring (over-segmented / non-moveable / crossing connectors)
+ * and how generation time / size trend.
+ *
+ * This is a MANUAL / scheduled tool — it makes real model calls (costs tokens)
+ * and is non-deterministic, so it is NOT part of the CI gate. Run with:
+ *   ANTHROPIC_API_KEY=sk-... npm run ai:report
+ */
+type Row = {
+  name: string;
+  ok: boolean;
+  ms: number;
+  model?: string;
+  elements?: number;
+  connections?: number;
+  issues?: Violation[];
+  error?: string;
+};
+
+/** Same green-rule loading as the generate-bpmn route, so the harness is faithful. */
+async function loadGreenRules(): Promise<string> {
+  let rules = "";
+  for (const category of ["general", "bpmn"]) {
+    const dr = await prisma.diagramRules.findFirst({
+      where: { category, isDefault: true },
+      select: { rules: true },
+    });
+    if (dr?.rules) rules += (rules ? "\n\n" : "") + dr.rules;
+  }
+  return splitRulesByEnforcement(rules).aiRules;
+}
+
+function renderReport(rows: Row[], stampedAt: string): string {
+  const L: string[] = [];
+  L.push(`# AI BPMN conformance report`, ``, `_Generated ${stampedAt} by scripts/ai-conformance-report.ts._`, ``);
+  L.push(
+    `Each prompt is sent to the live model, laid out by \`layoutBpmnDiagram\`, and checked with the SAME \`findConnectorConformance\` net as the unit suite. Use this to see which prompts produce non-conformant wiring.`,
+    ``,
+  );
+  L.push(`| Prompt | Model | ms | Elements | Connectors | Conformance |`, `|---|---|--:|--:|--:|---|`);
+  for (const r of rows) {
+    if (!r.ok) {
+      L.push(`| ${r.name} | — | ${r.ms} | — | — | ❌ ${r.error} |`);
+      continue;
+    }
+    const n = r.issues!.length;
+    const detail = n === 0
+      ? "✅ clean"
+      : `⚠️ ${n} (${Object.entries(summariseConformance(r.issues!)).map(([k, v]) => `${k}×${v}`).join(", ")})`;
+    L.push(`| ${r.name} | ${r.model} | ${r.ms} | ${r.elements} | ${r.connections} | ${detail} |`);
+  }
+  const ok = rows.filter((r) => r.ok);
+  const totalIssues = ok.reduce((s, r) => s + r.issues!.length, 0);
+  L.push(``, `**Totals:** ${ok.length}/${rows.length} generated · ${totalIssues} conformance issue(s) across all prompts.`, ``);
+  for (const r of rows) {
+    if (!r.ok || r.issues!.length === 0) continue;
+    L.push(`## ${r.name} — ${r.issues!.length} issue(s)`, ``);
+    for (const v of r.issues!) L.push(`- **${v.rule}** (${v.severity}) [${v.ids.join(", ")}] — ${v.message}`);
+    L.push(``);
+  }
+  return L.join("\n");
+}
+
+async function main() {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    console.error("Set ANTHROPIC_API_KEY to run the AI conformance harness (it makes real model calls).");
+    process.exit(2);
+  }
+
+  const aiRules = await loadGreenRules().catch(() => "");
+  console.log(`[ai-report] ${BPMN_PROMPTS.length} prompts · green rules ${aiRules.length} chars`);
+
+  const rows: Row[] = [];
+  for (const { name, prompt } of BPMN_PROMPTS) {
+    const t0 = Date.now();
+    try {
+      const res = await planBpmn({ apiKey, prompt, rules: aiRules });
+      const ms = Date.now() - t0;
+      if (!res.ok) {
+        rows.push({ name, ok: false, ms, error: res.error });
+        console.log(`[ai-report] ${name}: FAILED — ${res.error}`);
+        continue;
+      }
+      const data = layoutBpmnDiagram(res.plan.elements, res.plan.connections);
+      const issues = findConnectorConformance(data);
+      rows.push({ name, ok: true, ms, model: res.model, elements: res.plan.elements.length, connections: res.plan.connections.length, issues });
+      console.log(`[ai-report] ${name}: ${issues.length} issue(s) · ${res.plan.elements.length} el / ${res.plan.connections.length} conn · ${ms}ms`);
+    } catch (e) {
+      rows.push({ name, ok: false, ms: Date.now() - t0, error: e instanceof Error ? e.message : String(e) });
+      console.log(`[ai-report] ${name}: ERROR — ${e}`);
+    }
+  }
+
+  const md = renderReport(rows, new Date().toISOString());
+  writeFileSync("ai-conformance-report.md", md);
+  console.log(`\n[ai-report] wrote ai-conformance-report.md`);
+  await prisma.$disconnect();
+  process.exit(0);
+}
+
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

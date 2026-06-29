@@ -18,7 +18,8 @@
     "test:list": "node scripts/gen-tests-md.cjs",
     "e2e": "playwright test",
     "e2e:headed": "playwright test --headed",
-    "e2e:ui": "playwright test --ui"
+    "e2e:ui": "playwright test --ui",
+    "ai:report": "npx --yes tsx@4 scripts/ai-conformance-report.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "0.88.0",
