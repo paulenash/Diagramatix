@@ -1,0 +1,535 @@
+{
+  "elements": [
+    {
+      "id": "payer_pool",
+      "type": "pool",
+      "label": "Payer"
+    },
+    {
+      "id": "p1",
+      "type": "pool",
+      "label": "Medical Practice"
+    },
+    {
+      "id": "l_coding",
+      "type": "lane",
+      "label": "Coding",
+      "pool": "p1"
+    },
+    {
+      "id": "e_start",
+      "type": "start-event",
+      "label": "Encounter Received",
+      "lane": "l_coding",
+      "pool": "p1"
+    },
+    {
+      "id": "t_code_encounter",
+      "type": "task",
+      "label": "Code Encounter",
+      "taskType": "user",
+      "lane": "l_coding",
+      "pool": "p1"
+    },
+    {
+      "id": "sp_submission",
+      "type": "subprocess-expanded",
+      "label": "Claim Submission",
+      "lane": "l_coding",
+      "pool": "p1"
+    },
+    {
+      "id": "gw_payer_response",
+      "type": "gateway",
+      "label": "Payer Response?",
+      "gatewayType": "event-based",
+      "lane": "l_coding",
+      "pool": "p1"
+    },
+    {
+      "id": "ie_payment_received",
+      "type": "intermediate-event",
+      "label": "Payment Received",
+      "eventType": "message",
+      "lane": "l_coding",
+      "pool": "p1"
+    },
+    {
+      "id": "ie_denial_received",
+      "type": "intermediate-event",
+      "label": "Denial Received",
+      "eventType": "message",
+      "lane": "l_coding",
+      "pool": "p1"
+    },
+    {
+      "id": "ie_timely_filing",
+      "type": "intermediate-event",
+      "label": "Timely Filing Window Expires",
+      "eventType": "timer",
+      "lane": "l_coding",
+      "pool": "p1"
+    },
+    {
+      "id": "t_reconcile_payment",
+      "type": "task",
+      "label": "Reconcile Payment",
+      "taskType": "user",
+      "lane": "l_coding",
+      "pool": "p1"
+    },
+    {
+      "id": "sp_appeals",
+      "type": "subprocess-expanded",
+      "label": "Appeals Process",
+      "lane": "l_coding",
+      "pool": "p1"
+    },
+    {
+      "id": "t_escalate_claim",
+      "type": "task",
+      "label": "Escalate Claim",
+      "taskType": "user",
+      "lane": "l_coding",
+      "pool": "p1"
+    },
+    {
+      "id": "gw_response_merge",
+      "type": "gateway",
+      "label": "Response Merge",
+      "gatewayType": "event-based",
+      "lane": "l_coding",
+      "pool": "p1"
+    },
+    {
+      "id": "gw_patient_balance",
+      "type": "gateway",
+      "label": "Patient Balance?",
+      "gatewayType": "none",
+      "lane": "l_coding",
+      "pool": "p1"
+    },
+    {
+      "id": "l_billing",
+      "type": "lane",
+      "label": "Billing",
+      "pool": "p1"
+    },
+    {
+      "id": "l_collections",
+      "type": "lane",
+      "label": "Collections",
+      "pool": "p1"
+    },
+    {
+      "id": "t_move_to_collections",
+      "type": "task",
+      "label": "Move to Collections",
+      "taskType": "user",
+      "lane": "l_collections",
+      "pool": "p1"
+    },
+    {
+      "id": "gw_balance_merge",
+      "type": "gateway",
+      "label": "Balance Merge",
+      "gatewayType": "none",
+      "lane": "l_collections",
+      "pool": "p1"
+    },
+    {
+      "id": "e_end",
+      "type": "end-event",
+      "label": "Claim Closed",
+      "lane": "l_collections",
+      "pool": "p1"
+    },
+    {
+      "id": "sp_sub_start",
+      "type": "start-event",
+      "label": "Submission Start",
+      "parentSubprocess": "sp_submission"
+    },
+    {
+      "id": "sp_scrub",
+      "type": "subprocess-expanded",
+      "label": "Claim Scrubbing",
+      "parentSubprocess": "sp_submission"
+    },
+    {
+      "id": "t_check_eligibility",
+      "type": "task",
+      "label": "Check Eligibility",
+      "taskType": "user",
+      "parentSubprocess": "sp_submission"
+    },
+    {
+      "id": "t_submit_claim",
+      "type": "task",
+      "label": "Submit Claim",
+      "taskType": "send",
+      "parentSubprocess": "sp_submission"
+    },
+    {
+      "id": "sp_sub_end",
+      "type": "end-event",
+      "label": "Submission End",
+      "parentSubprocess": "sp_submission"
+    },
+    {
+      "id": "scrub_start",
+      "type": "start-event",
+      "label": "Scrubbing Start",
+      "parentSubprocess": "sp_scrub"
+    },
+    {
+      "id": "t_validate_codes",
+      "type": "task",
+      "label": "Validate Codes",
+      "taskType": "user",
+      "parentSubprocess": "sp_scrub"
+    },
+    {
+      "id": "t_catch_edits",
+      "type": "task",
+      "label": "Catch Edits",
+      "taskType": "user",
+      "parentSubprocess": "sp_scrub"
+    },
+    {
+      "id": "gw_edit_check",
+      "type": "gateway",
+      "label": "Edit Failed?",
+      "gatewayType": "none",
+      "parentSubprocess": "sp_scrub"
+    },
+    {
+      "id": "t_correct_edit",
+      "type": "task",
+      "label": "Correct Edit Errors",
+      "taskType": "user",
+      "parentSubprocess": "sp_scrub"
+    },
+    {
+      "id": "gw_edit_merge",
+      "type": "gateway",
+      "label": "Edit Merge",
+      "gatewayType": "none",
+      "parentSubprocess": "sp_scrub"
+    },
+    {
+      "id": "scrub_end",
+      "type": "end-event",
+      "label": "Scrubbing Complete",
+      "parentSubprocess": "sp_scrub"
+    },
+    {
+      "id": "ap_start",
+      "type": "start-event",
+      "label": "Appeals Start",
+      "parentSubprocess": "sp_appeals"
+    },
+    {
+      "id": "t_review_denial",
+      "type": "task",
+      "label": "Review Denial",
+      "taskType": "user",
+      "parentSubprocess": "sp_appeals"
+    },
+    {
+      "id": "t_prepare_rebuttal",
+      "type": "task",
+      "label": "Prepare Rebuttal",
+      "taskType": "user",
+      "parentSubprocess": "sp_appeals"
+    },
+    {
+      "id": "t_resubmit_claim",
+      "type": "task",
+      "label": "Resubmit Claim",
+      "taskType": "send",
+      "parentSubprocess": "sp_appeals"
+    },
+    {
+      "id": "gw_appeal_outcome",
+      "type": "gateway",
+      "label": "Appeal Outcome?",
+      "gatewayType": "none",
+      "parentSubprocess": "sp_appeals"
+    },
+    {
+      "id": "t_writeoff",
+      "type": "task",
+      "label": "Write Off Claim",
+      "taskType": "user",
+      "parentSubprocess": "sp_appeals"
+    },
+    {
+      "id": "gw_appeal_loop",
+      "type": "gateway",
+      "label": "Retry Appeal",
+      "gatewayType": "none",
+      "parentSubprocess": "sp_appeals"
+    },
+    {
+      "id": "ap_end_paid",
+      "type": "end-event",
+      "label": "Appeal Paid",
+      "parentSubprocess": "sp_appeals"
+    },
+    {
+      "id": "ap_end_writtenoff",
+      "type": "end-event",
+      "label": "Claim Written Off",
+      "parentSubprocess": "sp_appeals"
+    }
+  ],
+  "connections": [
+    {
+      "sourceId": "e_start",
+      "targetId": "t_code_encounter",
+      "label": "",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "t_code_encounter",
+      "targetId": "sp_submission",
+      "label": "",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "sp_sub_start",
+      "targetId": "sp_scrub",
+      "label": "",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "scrub_start",
+      "targetId": "gw_edit_merge",
+      "label": "",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "gw_edit_merge",
+      "targetId": "t_validate_codes",
+      "label": "",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "t_validate_codes",
+      "targetId": "t_catch_edits",
+      "label": "",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "t_catch_edits",
+      "targetId": "gw_edit_check",
+      "label": "",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "gw_edit_check",
+      "targetId": "t_correct_edit",
+      "label": "Edit Failed",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "t_correct_edit",
+      "targetId": "gw_edit_merge",
+      "label": "",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "gw_edit_check",
+      "targetId": "scrub_end",
+      "label": "Edit Passed",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "sp_scrub",
+      "targetId": "t_check_eligibility",
+      "label": "",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "t_check_eligibility",
+      "targetId": "t_submit_claim",
+      "label": "",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "t_submit_claim",
+      "targetId": "sp_sub_end",
+      "label": "",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "t_submit_claim",
+      "targetId": "payer_pool",
+      "label": "Claim Submitted",
+      "type": "message"
+    },
+    {
+      "sourceId": "sp_submission",
+      "targetId": "gw_payer_response",
+      "label": "",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "gw_payer_response",
+      "targetId": "ie_payment_received",
+      "label": "",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "gw_payer_response",
+      "targetId": "ie_denial_received",
+      "label": "",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "gw_payer_response",
+      "targetId": "ie_timely_filing",
+      "label": "",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "payer_pool",
+      "targetId": "ie_payment_received",
+      "label": "Payment Received",
+      "type": "message"
+    },
+    {
+      "sourceId": "payer_pool",
+      "targetId": "ie_denial_received",
+      "label": "Denial Notice",
+      "type": "message"
+    },
+    {
+      "sourceId": "ie_payment_received",
+      "targetId": "t_reconcile_payment",
+      "label": "",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "t_reconcile_payment",
+      "targetId": "gw_response_merge",
+      "label": "",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "ie_denial_received",
+      "targetId": "sp_appeals",
+      "label": "",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "ap_start",
+      "targetId": "gw_appeal_loop",
+      "label": "",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "gw_appeal_loop",
+      "targetId": "t_review_denial",
+      "label": "",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "t_review_denial",
+      "targetId": "t_prepare_rebuttal",
+      "label": "",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "t_prepare_rebuttal",
+      "targetId": "t_resubmit_claim",
+      "label": "",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "t_resubmit_claim",
+      "targetId": "payer_pool",
+      "label": "Appeal Submitted",
+      "type": "message"
+    },
+    {
+      "sourceId": "t_resubmit_claim",
+      "targetId": "gw_appeal_outcome",
+      "label": "",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "gw_appeal_outcome",
+      "targetId": "ap_end_paid",
+      "label": "Paid",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "gw_appeal_outcome",
+      "targetId": "t_writeoff",
+      "label": "Write Off",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "gw_appeal_outcome",
+      "targetId": "gw_appeal_loop",
+      "label": "Denied Again",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "t_writeoff",
+      "targetId": "ap_end_writtenoff",
+      "label": "",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "sp_appeals",
+      "targetId": "gw_response_merge",
+      "label": "",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "ie_timely_filing",
+      "targetId": "t_escalate_claim",
+      "label": "",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "t_escalate_claim",
+      "targetId": "gw_response_merge",
+      "label": "",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "gw_response_merge",
+      "targetId": "gw_patient_balance",
+      "label": "",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "gw_patient_balance",
+      "targetId": "t_move_to_collections",
+      "label": "Balance Owed",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "gw_patient_balance",
+      "targetId": "gw_balance_merge",
+      "label": "No Balance",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "t_move_to_collections",
+      "targetId": "gw_balance_merge",
+      "label": "",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "gw_balance_merge",
+      "targetId": "e_end",
+      "label": "",
+      "type": "sequence"
+    }
+  ]
+}

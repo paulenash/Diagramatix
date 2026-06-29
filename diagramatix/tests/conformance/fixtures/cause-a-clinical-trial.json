@@ -1,0 +1,399 @@
+{
+  "elements": [
+    {
+      "id": "p1",
+      "type": "pool",
+      "label": "Research Site"
+    },
+    {
+      "id": "l1",
+      "type": "lane",
+      "label": "Recruitment",
+      "pool": "p1"
+    },
+    {
+      "id": "e_start",
+      "type": "start-event",
+      "label": "Candidate Identified",
+      "lane": "l1",
+      "pool": "p1"
+    },
+    {
+      "id": "t_prescreen",
+      "type": "task",
+      "label": "Pre-Screen Candidate",
+      "taskType": "user",
+      "lane": "l1",
+      "pool": "p1"
+    },
+    {
+      "id": "l2",
+      "type": "lane",
+      "label": "Clinical",
+      "pool": "p1"
+    },
+    {
+      "id": "l2a",
+      "type": "lane",
+      "label": "Coordinators",
+      "pool": "p1"
+    },
+    {
+      "id": "sp_eligibility",
+      "type": "subprocess-expanded",
+      "label": "Eligibility Assessment",
+      "lane": "l2a",
+      "pool": "p1"
+    },
+    {
+      "id": "e_withdrawn",
+      "type": "end-event",
+      "label": "Candidate Withdrawn",
+      "lane": "l2a",
+      "pool": "p1"
+    },
+    {
+      "id": "t_withdraw",
+      "type": "task",
+      "label": "Withdraw Candidate",
+      "taskType": "user",
+      "lane": "l2a",
+      "pool": "p1"
+    },
+    {
+      "id": "t_enrol",
+      "type": "task",
+      "label": "Enrol Participant",
+      "taskType": "user",
+      "lane": "l2a",
+      "pool": "p1"
+    },
+    {
+      "id": "e_enrolled",
+      "type": "end-event",
+      "label": "Participant Enrolled",
+      "lane": "l2a",
+      "pool": "p1"
+    },
+    {
+      "id": "t_screen_fail",
+      "type": "task",
+      "label": "Record Screen Failure",
+      "taskType": "user",
+      "lane": "l2a",
+      "pool": "p1"
+    },
+    {
+      "id": "e_screen_failed",
+      "type": "end-event",
+      "label": "Candidate Screen Failed",
+      "lane": "l2a",
+      "pool": "p1"
+    },
+    {
+      "id": "gw_waiver_merge",
+      "type": "gateway",
+      "label": "Post Waiver Merge",
+      "gatewayType": "exclusive",
+      "lane": "l2a",
+      "pool": "p1"
+    },
+    {
+      "id": "l2b",
+      "type": "lane",
+      "label": "Investigators",
+      "pool": "p1"
+    },
+    {
+      "id": "gw_eligibility",
+      "type": "gateway",
+      "label": "Eligibility Decision",
+      "gatewayType": "none",
+      "lane": "l2b",
+      "pool": "p1"
+    },
+    {
+      "id": "l3",
+      "type": "lane",
+      "label": "Regulatory",
+      "pool": "p1"
+    },
+    {
+      "id": "t_waiver_request",
+      "type": "task",
+      "label": "Submit Waiver Request",
+      "taskType": "user",
+      "lane": "l3",
+      "pool": "p1"
+    },
+    {
+      "id": "t_waiver_decision",
+      "type": "task",
+      "label": "Review Waiver Decision",
+      "taskType": "user",
+      "lane": "l3",
+      "pool": "p1"
+    },
+    {
+      "id": "gw_waiver",
+      "type": "gateway",
+      "label": "Waiver Granted?",
+      "gatewayType": "none",
+      "lane": "l3",
+      "pool": "p1"
+    },
+    {
+      "id": "e_waiver_denied",
+      "type": "end-event",
+      "label": "Waiver Denied",
+      "lane": "l3",
+      "pool": "p1"
+    },
+    {
+      "id": "sp_elig_start",
+      "type": "start-event",
+      "label": "Begin Eligibility",
+      "parentSubprocess": "sp_eligibility"
+    },
+    {
+      "id": "t_consent",
+      "type": "task",
+      "label": "Obtain Informed Consent",
+      "taskType": "user",
+      "parentSubprocess": "sp_eligibility"
+    },
+    {
+      "id": "sp_screening",
+      "type": "subprocess-expanded",
+      "label": "Screening Tests",
+      "parentSubprocess": "sp_eligibility"
+    },
+    {
+      "id": "t_inv_review",
+      "type": "task",
+      "label": "Review Eligibility",
+      "taskType": "user",
+      "parentSubprocess": "sp_eligibility"
+    },
+    {
+      "id": "sp_elig_end",
+      "type": "end-event",
+      "label": "Eligibility Assessed",
+      "parentSubprocess": "sp_eligibility"
+    },
+    {
+      "id": "sp_screen_start",
+      "type": "start-event",
+      "label": "Begin Tests",
+      "parentSubprocess": "sp_screening"
+    },
+    {
+      "id": "t_run_tests",
+      "type": "task",
+      "label": "Conduct Screening Tests",
+      "taskType": "user",
+      "parentSubprocess": "sp_screening"
+    },
+    {
+      "id": "gw_result",
+      "type": "gateway",
+      "label": "Result In Range?",
+      "gatewayType": "none",
+      "parentSubprocess": "sp_screening"
+    },
+    {
+      "id": "t_retest",
+      "type": "task",
+      "label": "Perform Confirmatory Re-Test",
+      "taskType": "user",
+      "parentSubprocess": "sp_screening"
+    },
+    {
+      "id": "gw_retest_merge",
+      "type": "gateway",
+      "label": "Test Results Resolved",
+      "gatewayType": "none",
+      "parentSubprocess": "sp_screening"
+    },
+    {
+      "id": "sp_screen_end",
+      "type": "end-event",
+      "label": "Tests Complete",
+      "parentSubprocess": "sp_screening"
+    },
+    {
+      "id": "be_consent_timer",
+      "type": "intermediate-event",
+      "label": "Screening Window\nExpired",
+      "eventType": "timer",
+      "boundarySide": "bottom",
+      "boundaryHost": "t_consent"
+    },
+    {
+      "id": "be_protocol_dev",
+      "type": "intermediate-event",
+      "label": "Protocol Deviation\nDetected",
+      "eventType": "error",
+      "boundarySide": "bottom",
+      "boundaryHost": "t_inv_review"
+    }
+  ],
+  "connections": [
+    {
+      "sourceId": "e_start",
+      "targetId": "t_prescreen",
+      "label": "",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "t_prescreen",
+      "targetId": "sp_eligibility",
+      "label": "",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "sp_elig_start",
+      "targetId": "t_consent",
+      "label": "",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "t_consent",
+      "targetId": "sp_screening",
+      "label": "",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "sp_screen_start",
+      "targetId": "t_run_tests",
+      "label": "",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "t_run_tests",
+      "targetId": "gw_result",
+      "label": "",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "gw_result",
+      "targetId": "t_retest",
+      "label": "Out of Range",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "gw_result",
+      "targetId": "gw_retest_merge",
+      "label": "In Range",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "t_retest",
+      "targetId": "gw_retest_merge",
+      "label": "",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "gw_retest_merge",
+      "targetId": "sp_screen_end",
+      "label": "",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "sp_screening",
+      "targetId": "t_inv_review",
+      "label": "",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "t_inv_review",
+      "targetId": "sp_elig_end",
+      "label": "",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "be_protocol_dev",
+      "targetId": "t_inv_review",
+      "label": "Protocol Deviation Loops Back",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "be_consent_timer",
+      "targetId": "t_withdraw",
+      "label": "Screening Window Expired",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "t_withdraw",
+      "targetId": "e_withdrawn",
+      "label": "",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "sp_eligibility",
+      "targetId": "gw_eligibility",
+      "label": "",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "gw_eligibility",
+      "targetId": "t_enrol",
+      "label": "Eligible",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "t_enrol",
+      "targetId": "e_enrolled",
+      "label": "",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "gw_eligibility",
+      "targetId": "t_screen_fail",
+      "label": "Not Eligible",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "t_screen_fail",
+      "targetId": "e_screen_failed",
+      "label": "",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "gw_eligibility",
+      "targetId": "t_waiver_request",
+      "label": "Borderline - Refer for Waiver",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "t_waiver_request",
+      "targetId": "t_waiver_decision",
+      "label": "",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "t_waiver_decision",
+      "targetId": "gw_waiver",
+      "label": "",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "gw_waiver",
+      "targetId": "gw_waiver_merge",
+      "label": "Waiver Granted",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "gw_waiver",
+      "targetId": "e_waiver_denied",
+      "label": "Waiver Denied",
+      "type": "sequence"
+    },
+    {
+      "sourceId": "gw_waiver_merge",
+      "targetId": "t_enrol",
+      "label": "",
+      "type": "sequence"
+    }
+  ]
+}
