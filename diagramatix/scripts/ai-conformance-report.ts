@@ -16,6 +16,27 @@ import { BPMN_PROMPTS } from "./ai-conformance/AI_TEST_HARNESS_PROMPTS";
  *  they can be opened and inspected in the app. */
 const HARNESS_PROJECT = "Latest AI Generation Test Harness";
 
+/** Persist the prompt WITH the diagram so it can be read in the app: drop a
+ *  text-annotation note carrying the prompt above the diagram content. Added to
+ *  the SAVED copy only (after the conformance check runs on the real wiring). */
+function withPromptNote(data: DiagramData, prompt: string): DiagramData {
+  const els = data.elements ?? [];
+  const minX = els.length ? Math.min(...els.map((e) => e.x)) : 0;
+  const minY = els.length ? Math.min(...els.map((e) => e.y)) : 0;
+  const note = {
+    id: "__ai_prompt_note",
+    type: "text-annotation",
+    x: minX,
+    y: minY - 200,
+    width: 920,
+    height: 170,
+    label: `AI PROMPT: ${prompt}`,
+    properties: {},
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as any;
+  return { ...data, elements: [note, ...els] };
+}
+
 /**
  * AI conformance harness (#3) — sends each canonical BPMN prompt to the LIVE
  * model (planBpmn), lays it out (layoutBpmnDiagram), and runs the SAME
@@ -166,7 +187,7 @@ async function main() {
       }
       const data = layoutBpmnDiagram(res.plan.elements, res.plan.connections);
       const issues = findConnectorConformance(data);
-      rows.push({ name, ok: true, ms, model: res.model, elements: res.plan.elements.length, connections: res.plan.connections.length, issues, data });
+      rows.push({ name, ok: true, ms, model: res.model, elements: res.plan.elements.length, connections: res.plan.connections.length, issues, data: withPromptNote(data, prompt) });
       console.log(`[ai-report] ${name}: ${issues.length} issue(s) · ${res.plan.elements.length} el / ${res.plan.connections.length} conn · ${ms}ms`);
     } catch (e) {
       rows.push({ name, ok: false, ms: Date.now() - t0, error: e instanceof Error ? e.message : String(e) });
