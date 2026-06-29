@@ -1,6 +1,6 @@
 # Diagramatix — Tests Summary
 
-**As at:** 2026-06-29  ·  **Document version:** 1.3  ·  **Suite:** 71 test files · 515 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`
+**As at:** 2026-06-29  ·  **Document version:** 1.4  ·  **Suite:** 73 test files · 530 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`
 
 ---
 
@@ -36,9 +36,9 @@ Each test file has its own section below, grouped into layers. Within each secti
 
 **Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T0377**, the one after **T0378**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
 
-> **Highest ref allocated: `T0432`.** Update this line whenever you add tests (e.g. to `T0435` after adding three), so the next continuation point is always obvious.
+> **Highest ref allocated: `T0447`.** Update this line whenever you add tests (e.g. to `T0450` after adding three), so the next continuation point is always obvious.
 
-A few rows cover a *parameterised family* of tests (e.g. "one per scenario", or "all role combinations"), so the highest `Tnnnn` is lower than the headline test count (515).
+A few rows cover a *parameterised family* of tests (e.g. "one per scenario", or "all role combinations"), so the highest `Tnnnn` is lower than the headline test count (530).
 
 A test going red is not a problem with the test; it's the net catching a change. If the change was intentional, the test is updated to match; if not, the net just prevented a regression from shipping.
 
@@ -47,8 +47,8 @@ A test going red is not a problem with the test; it's the net catching a change.
 | Layer | What it guards | Files |
 |---|---|---|
 | 1. Access control, auth & sharing | Who can see/edit projects + diagrams; login, registration, password reset, impersonation | 4 |
-| 2. App-flow data integrity | Delete/publish/bundle/billing/backup effects + delete authz + Stripe webhook | 12 |
-| 3. Export & interchange | JSON / XML / DDL / Visio / translation round-trips | 11 |
+| 2. App-flow data integrity | Delete/publish/bundle/billing/backup effects + delete authz + Stripe webhook/checkout | 13 |
+| 3. Export & interchange | JSON / XML / DDL / Visio / translation round-trips + SharePoint link | 12 |
 | 4. Diagram structure & layout | BPMN/flowchart layout rules, type coverage, ArchiMate notation | 10 |
 | 5. Connector routing & editor | Orthogonal routing, manual-edit re-routing, archi re-attach | 6 |
 | 6. AI generation pipeline | Rule-filtering, plan validation, normalisation | 5 |
@@ -258,6 +258,21 @@ One area is deliberately **ratcheted, not closed**: the editor's obstacle-avoida
 | T0405 | (authorizeProjectDelete) all combinations — hard=SuperAdmin+owner, archive=OrgAdmin, unorganise=owner/SuperAdmin/OrgAdmin | The wrong person being allowed (or denied) to hard-delete / archive / unfile a project | If any of the 3 booleans × 3 modes returned the wrong verdict |
 | T0406 | (authorizeProjectDelete) hard denial carries the SuperAdmin-owner message | A confusing error when a non-SuperAdmin attempts a hard delete | If the hard-delete denial lost its specific message |
 
+### `tests/stripe/checkout-wiring.test.ts` — Checkout/portal URL building, tier validation, customer dedup
+
+| Ref | Test | Protects you against | How it would break (go red) |
+|------|------|----------------------|------------------------------|
+| T0433 | (originFromRequest) forwarded host + proto → proto://host | Stripe redirecting users to an unreachable internal address behind the proxy | If the X-Forwarded host/proto weren't used to build the origin |
+| T0434 | (originFromRequest) forwarded host, no proto → defaults to https://host | A forwarded host without a proto producing a broken redirect URL | If the proto didn't default to https |
+| T0435 | (originFromRequest) a non-https forwarded proto is honoured | A local/proxy http setup being forced to https incorrectly | If a provided proto were ignored |
+| T0436 | (originFromRequest) no forwarded headers → new URL(req.url).origin | A direct (non-proxied) request building the wrong origin | If the fallback to the request's own origin broke |
+| T0437 | (paid-tier validation) each paid tier id is accepted | A real plan being rejected at checkout | If a valid paid tier id failed validation |
+| T0438 | (paid-tier validation) free / unknown / empty / missing are rejected | A checkout for Free or a bogus tier proceeding | If a non-paid/unknown tier passed validation |
+| T0439 | (getOrCreateStripeCustomer) existing stripeCustomerId → returns it, Stripe never queried | A duplicate Stripe customer being created for an existing one | If an existing id triggered a Stripe lookup/create |
+| T0440 | (getOrCreateStripeCustomer) null id + a tagged customer in the list → REUSES it, create NOT called | Duplicate customers (DATA-31) when a prior create persisted only partially | If a metadata-tagged customer wasn't reused and a second was created |
+| T0441 | (getOrCreateStripeCustomer) null id + empty list → CREATES a new customer, persists it to the DB | A new payer not getting a Stripe customer, or it not being saved | If no customer was created, or the new id wasn't persisted |
+| T0442 | (getOrCreateStripeCustomer) a soft-deleted customer with our tag is NOT reused | Re-attaching to a deleted Stripe customer | If a `deleted:true` tagged customer was reused |
+
 ---
 
 ## Layer 3 — Export & interchange
@@ -364,6 +379,16 @@ One area is deliberately **ratcheted, not closed**: the editor's obstacle-avoida
 | T0101 | ignores attempts to change id / type / pool | The AI silently re-typing or re-homing a node and corrupting the plan | If the merge let the model change an element's type or pool |
 | T0102 | ignores added or removed elements and connections (count is preserved) | The AI adding ghost nodes or deleting real ones from the plan | If element/connection counts changed or a ghost node leaked through |
 | T0103 | is a no-op when the model returns nothing useful | An empty AI response wiping or altering the deterministic plan | If an empty refinement changed the elements or connections |
+
+### `tests/sharepoint/link-roundtrip.test.ts` — SharePoint file link on a Data Object survives save/load
+
+| Ref | Test | Protects you against | How it would break (go red) |
+|------|------|----------------------|------------------------------|
+| T0443 | (JSON path) data-object sharepointLink (all four fields) round-trips intact | A linked SharePoint file silently unlinking after a JSON save/reload | If JSON export/import dropped or mangled `properties.sharepointLink` |
+| T0444 | (JSON path) data-store sharepointLink (all four fields) round-trips intact | A Data Store's linked file unlinking on save/reload | If the data-store's sharepointLink didn't survive JSON |
+| T0445 | (XML path) data-object sharepointLink round-trips intact via XML | A linked file unlinking through the XML export/import path | If the XML path dropped the data-object's link |
+| T0446 | (XML path) data-store sharepointLink round-trips intact via XML | A Data Store's link unlinking through XML | If the XML path dropped the data-store's link |
+| T0447 | the exported XML actually contains the serialised link (not silently dropped) | The XML carrying no link data, so import couldn't restore it | If the exported XML omitted the serialised sharepointLink |
 
 ---
 
