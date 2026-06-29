@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
-import { prisma } from "@/app/lib/db";
 import { isReadOnlyImpersonation } from "@/app/lib/superuser";
 import { requireOrgAdminFor, OrgContextError } from "@/app/lib/auth/orgContext";
+import { demoteAdmin, isManageAdminsError } from "@/app/lib/orgs/manageAdmins";
 
 type Params = { params: Promise<{ id: string; userId: string }> };
 
@@ -39,38 +39,9 @@ export async function DELETE(_req: Request, { params }: Params) {
     throw err;
   }
 
-  const member = await prisma.orgMember.findFirst({
-    where: { orgId: id, userId },
-    select: { id: true, role: true },
-  });
-  if (!member) {
-    return NextResponse.json({ error: "Not an OrgMember of this Org" }, { status: 404 });
+  const result = await demoteAdmin(id, userId);
+  if (isManageAdminsError(result)) {
+    return NextResponse.json({ error: result.error }, { status: result.status });
   }
-  if (member.role !== "Owner" && member.role !== "Admin") {
-    return NextResponse.json(
-      { error: "User is not currently an OrgAdmin of this Org" },
-      { status: 400 },
-    );
-  }
-
-  // Last-admin guard.
-  const adminCount = await prisma.orgMember.count({
-    where: { orgId: id, role: { in: ["Owner", "Admin"] } },
-  });
-  if (adminCount <= 1) {
-    return NextResponse.json(
-      {
-        error:
-          "Cannot demote the last OrgAdmin in this Org. Promote someone else first.",
-      },
-      { status: 400 },
-    );
-  }
-
-  const updated = await prisma.orgMember.update({
-    where: { id: member.id },
-    data: { role: "Viewer" },
-    select: { id: true, userId: true, role: true, orgId: true },
-  });
-  return NextResponse.json(updated);
+  return NextResponse.json(result);
 }

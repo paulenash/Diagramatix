@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/app/lib/db";
 import { isReadOnlyImpersonation } from "@/app/lib/superuser";
 import { requireOrgAdminFor, OrgContextError } from "@/app/lib/auth/orgContext";
+import { promoteToAdmin, isManageAdminsError } from "@/app/lib/orgs/manageAdmins";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -85,73 +86,14 @@ export async function POST(req: Request, { params }: Params) {
   }
 
   const body = (await req.json().catch(() => ({}))) as { userIdOrEmail?: string };
-  const key = (body.userIdOrEmail ?? "").trim();
-  if (!key) {
-    return NextResponse.json({ error: "userIdOrEmail is required" }, { status: 400 });
-  }
 
-  // Resolve recipient. Try literal cuid first (cheap), then lowercased
-  // email — matches the resolution order used by ProjectShare POST.
-  const target =
-    (await prisma.user.findUnique({
-      where: { id: key },
-      select: { id: true, name: true, email: true },
-    })) ??
-    (await prisma.user.findUnique({
-      where: { email: key.toLowerCase() },
-      select: { id: true, name: true, email: true },
-    }));
-  if (!target) {
-    return NextResponse.json({ error: "User not found" }, { status: 404 });
-  }
-
-  const existing = await prisma.orgMember.findFirst({
-    where: { orgId: id, userId: target.id },
-    select: { id: true, role: true },
+  const result = await promoteToAdmin(id, body.userIdOrEmail ?? "", {
+    isSuperAdmin,
+    actorUserId,
   });
-
-  if (!existing && !isSuperAdmin) {
-    // OrgAdmin trying to add a non-member — rejected. The error
-    // message tells them to ask a SuperAdmin if they need to bring an
-    // outsider in.
-    return NextResponse.json(
-      {
-        error:
-          "Only a SuperAdmin can add a user who isn't already an OrgMember. Ask a SuperAdmin to add this user to your Org first.",
-      },
-      { status: 400 },
-    );
+  if (isManageAdminsError(result)) {
+    return NextResponse.json({ error: result.error }, { status: result.status });
   }
 
-  const row = existing
-    ? await prisma.orgMember.update({
-        where: { id: existing.id },
-        data: { role: "Admin" },
-        select: {
-          id: true,
-          userId: true,
-          role: true,
-          createdAt: true,
-          createdBy: true,
-          user: { select: { id: true, name: true, email: true } },
-        },
-      })
-    : await prisma.orgMember.create({
-        data: {
-          orgId: id,
-          userId: target.id,
-          role: "Admin",
-          createdBy: actorUserId,
-        },
-        select: {
-          id: true,
-          userId: true,
-          role: true,
-          createdAt: true,
-          createdBy: true,
-          user: { select: { id: true, name: true, email: true } },
-        },
-      });
-
-  return NextResponse.json(row, { status: existing ? 200 : 201 });
+  return NextResponse.json(result.row, { status: result.created ? 201 : 200 });
 }
