@@ -52,11 +52,15 @@ async function saveDiagrams(rows: Row[]): Promise<string> {
     (await prisma.user.findFirst({ orderBy: { createdAt: "asc" }, select: { id: true, name: true } }));
   if (!owner) return "no user to own the harness project — skipped saving";
 
-  // orgId: reuse one of the owner's existing projects, else their oldest membership.
-  const existing = await prisma.project.findFirst({ where: { userId: owner.id }, select: { orgId: true } });
-  const orgId =
-    existing?.orgId ??
-    (await prisma.orgMember.findFirst({ where: { userId: owner.id }, select: { orgId: true } }))?.orgId;
+  // orgId: the owner's DEFAULT org — the oldest membership, which is what
+  // getCurrentOrgId() falls back to, so the project shows in their default
+  // dashboard view (not a secondary org the dashboard hides).
+  const member = await prisma.orgMember.findFirst({
+    where: { userId: owner.id },
+    select: { orgId: true },
+    orderBy: { createdAt: "asc" },
+  });
+  const orgId = member?.orgId;
   if (!orgId) return "owner has no org — skipped saving";
 
   let project = await prisma.project.findFirst({ where: { userId: owner.id, name: HARNESS_PROJECT }, select: { id: true } });
