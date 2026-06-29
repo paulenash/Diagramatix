@@ -87,3 +87,71 @@ jobs:
         # main — e.g. a dependency present in the root package.json but missing
         # from diagramatix/package.json. No DB needed for the build itself.
         run: npm run build
+
+  # Browser/e2e layer (Playwright) — the journeys the unit suite can't reach.
+  # Separate job so the fast unit `test` job isn't slowed; its own Postgres
+  # service (jobs don't share services). The webServer (scripts/e2e-server.cjs)
+  # db-pushes, seeds the SubscriptionLevel catalog, builds non-standalone, and
+  # serves on :3001 against this service — so the job only needs deps + a browser.
+  e2e:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: diagramatix_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      # No .env on the runner — credentials auth needs a JWT secret + trusted host.
+      # Dummy values only; the e2e flows use email/password, not these integrations.
+      AUTH_SECRET: e2e-ci-secret-not-for-production
+      AUTH_TRUST_HOST: 'true'
+      AZURE_CLIENT_ID: e2e-dummy
+      AZURE_CLIENT_SECRET: e2e-dummy
+      AZURE_TENANT_ID: e2e-dummy
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: diagramatix/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./diagramatix
+        run: npm ci
+
+      - name: Generate Prisma client
+        working-directory: ./diagramatix
+        run: npx prisma generate
+
+      - name: Install Playwright Chromium
+        working-directory: ./diagramatix
+        run: npx playwright install --with-deps chromium
+
+      - name: Run e2e (Playwright)
+        working-directory: ./diagramatix
+        # CI=true → no server reuse, retries flaky tests once. e2e-server.cjs is
+        # the webServer (db push + seed + non-standalone build + next start).
+        run: npm run e2e
+
+      - name: Upload Playwright report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: diagramatix/playwright-report/
+          retention-days: 7
