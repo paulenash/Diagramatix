@@ -1,6 +1,6 @@
 # Diagramatix — Tests Summary
 
-**As at:** 2026-06-29  ·  **Document version:** 1.1  ·  **Suite:** 66 test files · 436 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`
+**As at:** 2026-06-29  ·  **Document version:** 1.2  ·  **Suite:** 69 test files · 489 tests (all green)  ·  **Runner:** Vitest  ·  **CI:** enforced on every PR + push to `main`
 
 ---
 
@@ -36,9 +36,9 @@ Each test file has its own section below, grouped into layers. Within each secti
 
 **Maintaining the `Tnnnn` numbers — append-only from the highest.** When ANY test is added — including one slotted into an existing file's table — give it the **next number after the current highest ref**, and **never renumber or reuse** an existing one. So the next test added anywhere becomes **T0377**, the one after **T0378**, and so on. A consequence: after the first pass the numbers are **no longer in strict document order** (a new row in an early section may carry a high number) — that is deliberate, because a given `Tnnnn` must always point at the same check forever.
 
-> **Highest ref allocated: `T0376`.** Update this line whenever you add tests (e.g. to `T0379` after adding three), so the next continuation point is always obvious.
+> **Highest ref allocated: `T0406`.** Update this line whenever you add tests (e.g. to `T0409` after adding three), so the next continuation point is always obvious.
 
-A few rows cover a *parameterised family* of tests (e.g. "one per scenario"), so the highest `Tnnnn` is lower than the headline test count (436).
+A few rows cover a *parameterised family* of tests (e.g. "one per scenario", or "all role combinations"), so the highest `Tnnnn` is lower than the headline test count (489).
 
 A test going red is not a problem with the test; it's the net catching a change. If the change was intentional, the test is updated to match; if not, the net just prevented a regression from shipping.
 
@@ -46,8 +46,8 @@ A test going red is not a problem with the test; it's the net catching a change.
 
 | Layer | What it guards | Files |
 |---|---|---|
-| 1. Access control & sharing | Who can see/edit which projects and diagrams | 1 |
-| 2. App-flow data integrity | Delete/publish/bundle/billing/backup data effects | 10 |
+| 1. Access control, auth & sharing | Who can see/edit projects + diagrams; login + registration | 2 |
+| 2. App-flow data integrity | Delete/publish/bundle/billing/backup effects + delete authz + Stripe webhook | 12 |
 | 3. Export & interchange | JSON / XML / DDL / Visio / translation round-trips | 11 |
 | 4. Diagram structure & layout | BPMN/flowchart layout rules, type coverage, ArchiMate notation | 10 |
 | 5. Connector routing & editor | Orthogonal routing, manual-edit re-routing, archi re-attach | 6 |
@@ -61,7 +61,7 @@ One area is deliberately **ratcheted, not closed**: the editor's obstacle-avoida
 
 ---
 
-## Layer 1 — Access control & sharing
+## Layer 1 — Access control, auth & sharing
 
 ### `tests/sharing/access-guards.test.ts` — Sharing permission matrix and cross-user diagram/project isolation
 
@@ -80,6 +80,20 @@ One area is deliberately **ratcheted, not closed**: the editor's obstacle-avoida
 | T0011 | (cross-user isolation) a user in a DIFFERENT org with no share cannot reach the project or its diagram | One org's data leaking to an unrelated org | If a foreign-org user was granted access to a project/diagram |
 | T0012 | (cross-user isolation) a VIEW share never escalates to edit (downgrade enforced on project AND diagram) | A view-only user quietly gaining edit rights | If a VIEW role escalated to edit on either project or diagram |
 | T0013 | (cross-user isolation) a cross-org share is INERT without allowCrossOrgSharing — a sharee outside the project's org is still denied | A share to an outside-org user leaking access when cross-org sharing is off | If cross-org shares granted access without the org opt-in flag |
+
+### `tests/auth/credentials.test.ts` — Login credential check + account registration
+
+| Ref | Test | Protects you against | How it would break (go red) |
+|------|------|----------------------|------------------------------|
+| T0377 | (verifyCredentials) correct password → the user record | A valid login being rejected | If a correct email+password didn't return the user |
+| T0378 | (verifyCredentials) wrong password → null | A wrong password being accepted | If an incorrect password returned a user |
+| T0379 | (verifyCredentials) non-existent email → null (dummy hash never matches) | Login on a non-existent account, or timing-based account enumeration | If a missing email skipped the bcrypt compare or returned a user |
+| T0380 | (verifyCredentials) email is matched case-insensitively | A user locked out by email casing | If the lookup became case-sensitive |
+| T0381 | (registerUser) creates a new user with a HASHED password (not plaintext) + default Org/Owner | Passwords stored in plaintext, or a new user with no organisation | If the stored password was plaintext, or the Org/Owner membership wasn't created |
+| T0382 | (registerUser) rejects a duplicate email (409) | Two accounts sharing one email | If a duplicate email created a second account instead of 409 |
+| T0383 | (registerUser) rejects a password under the 8-char minimum (400) | Weak passwords being accepted | If a <8-char password registered instead of 400 |
+| T0384 | (registerUser) rejects a missing email or password (400) | A malformed registration creating a broken account | If a missing field didn't return 400 |
+| T0385 | (registerUser) a registered user can then log in via verifyCredentials | Registration + login drifting apart (hash-format mismatch) | If a freshly-registered user couldn't authenticate |
 
 ---
 
@@ -176,6 +190,37 @@ One area is deliberately **ratcheted, not closed**: the editor's obstacle-avoida
 | T0053 | restores content + the whole image library with ids (and image refs) preserved | A guide restore that loses chapters/sections/images, corrupts image bytes, or breaks image links | If restore lost rows, changed image bytes, dropped ids/refs, or lost adminOnly/metadata |
 | T0054 | is idempotent — restoring twice yields one set, not duplicates | Re-running a restore creating duplicate chapters/images | If restoring twice produced more than the original row counts |
 | T0055 | rejects a non-guide / garbage upload before touching the DB | A bad upload wiping the live guide tables before failing | If a garbage upload didn't throw before the destructive wipe |
+
+### `tests/stripe/webhook.test.ts` — Stripe webhook subscription state machine (grant / revert / dunning)
+
+| Ref | Test | Protects you against | How it would break (go red) |
+|------|------|----------------------|------------------------------|
+| T0386 | (tierIdForStripePriceId) maps a known price id to its tier; unknown → null | A paid price resolving to the wrong plan, or crashing on an unknown price | If the price→tier lookup returned the wrong tier or didn't null an unknown price |
+| T0387 | (userIdForSubscription) resolves by stripeCustomerId; unknown customer → null | A webhook updating the wrong user, or erroring on an unknown customer | If the customer→user lookup mis-resolved or didn't null an unknown customer |
+| T0388 | (applySubscriptionToUser) maps priceId → tier and stamps subscription fields | A completed payment not granting the tier / sub id / status | If applying a subscription didn't set the tier, stripeSubscriptionId, status, or hasChosenTier |
+| T0389 | (applySubscriptionToUser) cancel_at_period_end:true sets subscriptionEndsAt to current_period_end | A scheduled cancellation not recording its end date | If a cancel-at-period-end sub didn't store subscriptionEndsAt |
+| T0390 | (applySubscriptionToUser) reassignTrial:true restamps subscriptionAssignedAt; false leaves it | The monthly usage anniversary resetting at the wrong moment | If reassignTrial didn't restamp on checkout, or restamped on a routine update |
+| T0391 | (applySubscriptionToUser) unknown priceId is a no-op (no tier written) | An unrecognised price corrupting the user's tier | If an unknown price wrote a tier/sub id instead of a no-op |
+| T0392 | (handleSubscriptionDeleted) sets status canceled + grace end and KEEPS stripeSubscriptionId | A cancelled sub not entering grace, or losing the id needed to re-subscribe | If deletion didn't set canceled + end date, or cleared stripeSubscriptionId |
+| T0393 | (handleSubscriptionDeleted) unknown customer → no-op | A deletion for an unknown customer crashing or mutating data | If an unknown customer caused an error or a write |
+| T0394 | (handleInvoicePaymentFailed) sets status past_due | A failed payment not flagging the account for the warning UI | If a payment failure didn't set past_due |
+| T0395 | (handleInvoicePaymentFailed) unknown subscription → no-op | A failure event for an unknown sub mutating data | If an unknown sub caused a write |
+| T0396 | (handleInvoicePaymentFailed) no subscription on invoice → no-op | A non-subscription invoice being mishandled | If an invoice without a subscription caused a write or crash |
+| T0397 | (handleInvoicePaymentSucceeded) sets status active and clears ONLY prior-period UsageCounter rows | A renewal wiping the CURRENT period's usage (free quota), or not clearing stale periods | If it cleared the current period / all-time row, or didn't set active |
+| T0398 | (handleInvoicePaymentSucceeded) unknown subscription → no-op | A success event for an unknown sub mutating data | If an unknown sub caused a write |
+| T0399 | (lazy downgrade via getEffectiveSubscriptionLevelId) past end date → Free; future → still paid | A cancelled user keeping paid access past their end date, or losing it early | If the effective level didn't drop to Free after the end date, or dropped before it |
+
+### `tests/projects/delete-authorization.test.ts` — Project-delete tier authorization (requireRole + the verdict)
+
+| Ref | Test | Protects you against | How it would break (go red) |
+|------|------|----------------------|------------------------------|
+| T0400 | (requireRole) null session → 401 | An anonymous caller performing an org-admin action | If a null session resolved a role instead of 401 |
+| T0401 | (requireRole) a user with no org membership cannot resolve an org → throws | A non-member being treated as having a role | If a membership-less user resolved a role instead of throwing |
+| T0402 | (requireRole) a member whose role is NOT in allowedRoles → 403 | A Viewer/Editor performing an Owner/Admin-only action | If a disallowed role passed the gate |
+| T0403 | (requireRole) an allowed role → returns { role } | A legitimate Owner/Admin being blocked | If an allowed role was denied |
+| T0404 | (requireRole) an Admin member also passes when Admin is allowed | Admins being excluded from admin actions | If Admin failed when Admin was in the allowed set |
+| T0405 | (authorizeProjectDelete) all combinations — hard=SuperAdmin+owner, archive=OrgAdmin, unorganise=owner/SuperAdmin/OrgAdmin | The wrong person being allowed (or denied) to hard-delete / archive / unfile a project | If any of the 3 booleans × 3 modes returned the wrong verdict |
+| T0406 | (authorizeProjectDelete) hard denial carries the SuperAdmin-owner message | A confusing error when a non-SuperAdmin attempts a hard delete | If the hard-delete denial lost its specific message |
 
 ---
 
