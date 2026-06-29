@@ -9,8 +9,9 @@
  * the cookie present — getViewAsUserId / isImpersonating gate on isSuperuser
  * first, so the cookie is inert for normal users.
  *
- * Pinned-as-is behaviour: superuser matching is CASE-SENSITIVE (SUPERUSER_EMAILS
- * is a Set checked with `.has(session.user.email)` — no normalisation).
+ * Superuser matching is case-INSENSITIVE: the session email is lowercased before
+ * the SUPERUSER_EMAILS lookup, so a superuser whose stored email differs only in
+ * casing is still recognised.
  */
 import { describe, it, expect } from "vitest";
 import {
@@ -48,8 +49,11 @@ describe("isSuperuser", () => {
   it("a null session → false", () => {
     expect(isSuperuser(null)).toBe(false);
   });
-  it("matching is CASE-SENSITIVE (pinned as-is)", () => {
-    expect(isSuperuser({ user: { id: "x", email: SUPER_EMAIL.toUpperCase() } })).toBe(false);
+  it("matching is case-INSENSITIVE (an uppercase variant of a superuser email still matches)", () => {
+    expect(isSuperuser({ user: { id: "x", email: SUPER_EMAIL.toUpperCase() } })).toBe(true);
+    expect(isSuperuser({ user: { id: "x", email: "Paul@NashCC.com.AU" } })).toBe(true);
+    // a non-superuser is still not matched, regardless of casing
+    expect(isSuperuser({ user: { id: "x", email: "NotAnAdmin@Example.com" } })).toBe(false);
   });
 });
 

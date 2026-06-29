@@ -22,9 +22,13 @@ interface CookieStore {
   get(name: string): { value: string } | undefined;
 }
 
-/** Check whether the authenticated session belongs to a superuser */
+/** Check whether the authenticated session belongs to a superuser.
+ *  Case-INSENSITIVE: SUPERUSER_EMAILS are lowercase and the session email is
+ *  lowercased before the lookup, so a superuser whose stored email differs only
+ *  in casing (registration does not normalise it) is still recognised. */
 export function isSuperuser(session: { user?: { email?: string | null } } | null): boolean {
-  return !!session?.user?.email && SUPERUSER_EMAILS.has(session.user.email);
+  const email = session?.user?.email;
+  return !!email && SUPERUSER_EMAILS.has(email.toLowerCase());
 }
 
 /** If the superuser is impersonating another user, return that user's ID; otherwise null */
