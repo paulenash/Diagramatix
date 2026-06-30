@@ -29,10 +29,15 @@ export function DiagramatixThrobber({
   /** @deprecated The throbbing blue aura was removed; this prop is kept
    *  only so existing call sites keep compiling. It has no effect. */
   auraRadius: _auraRadius,
+  /** Icon colour. "red" is used for the SuperAdmin model-comparison overlay. */
+  tone = "blue",
 }: {
   size?: number;
   auraRadius?: number;
+  tone?: "blue" | "red";
 }) {
+  const strokeColor = tone === "red" ? "#DC2626" : "#2E5BD6";
+  const dotColor = tone === "red" ? "#991B1B" : "#1B3A95";
   // No aura — the icon fills its native 0 0 100 100 viewBox so it
   // renders at the requested `size`. Only the triangle rotates; there
   // is no throbbing blue circle behind it any more.
@@ -54,7 +59,7 @@ export function DiagramatixThrobber({
       <path
         d="M 5.5 5.5 L 50 5.5 A 44.5 44.5 0 0 1 50 94.5 L 5.5 94.5 Z"
         fill="white"
-        stroke="#2E5BD6"
+        stroke={strokeColor}
         strokeWidth="11"
         strokeLinejoin="round"
       />
@@ -64,12 +69,12 @@ export function DiagramatixThrobber({
           centroid (38.64, 50.92). */}
       <g transform="translate(10 0)">
         <g>
-          <g stroke="#2E5BD6" strokeWidth="2.5" strokeLinecap="round">
+          <g stroke={strokeColor} strokeWidth="2.5" strokeLinecap="round">
             <line x1="26.03" y1="30.62" x2="61.48" y2="50" />
             <line x1="61.48" y1="50" x2="28.40" y2="72.14" />
             <line x1="26.03" y1="30.62" x2="28.40" y2="72.14" />
           </g>
-          <g fill="#1B3A95">
+          <g fill={dotColor}>
             <circle cx="26.03" cy="30.62" r="5.5" />
             <circle cx="61.48" cy="50" r="5.5" />
             <circle cx="28.40" cy="72.14" r="5.5" />

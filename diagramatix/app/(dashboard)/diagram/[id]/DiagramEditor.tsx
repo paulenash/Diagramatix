@@ -980,7 +980,7 @@ export function DiagramEditor({
   // Mirror of PlanPanel's `busy` state so we can overlay a centred
   // wait indicator on the canvas while Sonnet plans. Sidebar banner
   // alone is easy to miss when the user's eyes are on the diagram.
-  const [aiBusy, setAiBusy] = useState<"plan" | "apply" | "save" | "load" | "narrative" | null>(null);
+  const [aiBusy, setAiBusy] = useState<"plan" | "apply" | "save" | "load" | "narrative" | "compare" | null>(null);
   // Audio / transcript acquisition phase (from either AI panel) — drives the
   // same big canvas throbber overlay as plan generation, so the wait cue is
   // just as visible while a recording / file is transcribed or tidied.
@@ -3733,7 +3733,7 @@ export function DiagramEditor({
             just a tiny sidebar banner they might miss. Pointer events
             pass through (style.pointerEvents = "none") so the user can
             still pan / zoom underneath if they want. */}
-        {(aiBusy === "plan" || aiBusy === "apply" || aiBusy === "narrative" || aiPanelGenerating || aiPanelNarrativeGenerating || audioPhase) && (
+        {(aiBusy === "plan" || aiBusy === "apply" || aiBusy === "narrative" || aiBusy === "compare" || aiPanelGenerating || aiPanelNarrativeGenerating || audioPhase) && (
           <div
             className="fixed inset-0 z-40 flex flex-col items-center justify-center"
             style={{ pointerEvents: "none" }}
@@ -3747,9 +3747,11 @@ export function DiagramEditor({
                 style={{ background: "radial-gradient(ellipse at center, rgba(0,0,0,0.30) 0%, rgba(0,0,0,0.64) 100%)" }}
               />
             )}
-            <DiagramatixThrobber size={120} auraRadius={110} />
-            <p className="mt-3 text-sm font-medium text-blue-800 bg-white/85 backdrop-blur-sm px-4 py-2 rounded-lg shadow-md">
-              {audioPhase === "transcribing"
+            <DiagramatixThrobber size={120} auraRadius={110} tone={aiBusy === "compare" ? "red" : "blue"} />
+            <p className={`mt-3 text-sm font-medium ${aiBusy === "compare" ? "text-red-800" : "text-blue-800"} bg-white/85 backdrop-blur-sm px-4 py-2 rounded-lg shadow-md`}>
+              {aiBusy === "compare"
+                ? "Comparing models — Opus 4.8, Sonnet 4.6 and Haiku 4.5. This takes 1-2 minutes…"
+                : audioPhase === "transcribing"
                 ? "Transcribing your recording — this can take a little while…"
                 : audioPhase === "reading"
                   ? "Reading the meeting transcript…"

@@ -58,7 +58,7 @@ interface Props {
    *  parent (DiagramEditor) overlay a wait indicator on the canvas
    *  itself — the sidebar banner alone is easy to miss while the
    *  user's eyes are on the diagram. */
-  onBusyChange?: (busy: "plan" | "apply" | "save" | "load" | "narrative" | null) => void;
+  onBusyChange?: (busy: "plan" | "apply" | "save" | "load" | "narrative" | "compare" | null) => void;
   /** Reports the audio/transcript acquisition phase so the parent can show
    *  the big canvas throbber overlay (same as plan generation). */
   onAudioPhaseChange?: (phase: null | "transcribing" | "reading" | "tidying") => void;
@@ -105,7 +105,7 @@ export function PlanPanel({
   const apiBase = isFlowchart ? "/api/ai/flowchart" : "/api/ai/bpmn";
   const { plan, setPlan, updateElement, deleteElement, updateConnection, deleteConnection, moveElementRelativeTo, asJson } = usePlanState();
   const [activeTab, setActiveTab] = useState<Tab>(isFlowchart ? "json" : "pools");
-  const [busy, setBusy] = useState<"plan" | "apply" | "save" | "load" | "narrative" | null>(null);
+  const [busy, setBusy] = useState<"plan" | "apply" | "save" | "load" | "narrative" | "compare" | null>(null);
   // Propagate busy transitions up so DiagramEditor can overlay a wait
   // indicator on the canvas.
   useEffect(() => { onBusyChange?.(busy); }, [busy, onBusyChange]);
@@ -118,6 +118,7 @@ export function PlanPanel({
     const effPrompt = prompt.trim();
     if (!effPrompt || !diagramId) return;
     setComparing(true);
+    setBusy("compare"); // drives the red full-canvas throbber overlay
     setError(null);
     setCompareStatus("Comparing Opus 4.8 / Sonnet 4.6 / Haiku 4.5 — this takes 1-2 minutes…");
     try {
@@ -141,6 +142,7 @@ export function PlanPanel({
       setCompareStatus(null);
     } finally {
       setComparing(false);
+      setBusy(null);
     }
   }
   const [issues, setIssues] = useState<string[] | null>(null);
