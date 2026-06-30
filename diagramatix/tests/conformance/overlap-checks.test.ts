@@ -15,6 +15,8 @@ import {
   checkElementOverlap,
   checkEventLabelOverlap,
   checkLaneTiling,
+  checkDataArtifactDistance,
+  checkDataObjectRole,
 } from "@/app/lib/diagram/checks/diagramChecks";
 import type { DiagramElement } from "@/app/lib/diagram/types";
 
@@ -137,5 +139,47 @@ describe("B35 — lane tiling (R8.17-adjacent)", () => {
       ]),
     );
     expect(v, "contiguous lanes should not be flagged").toEqual([]);
+  });
+});
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const assoc = (id: string, sourceId: string, targetId: string): any => ({ id, type: "associationBPMN", sourceId, targetId });
+
+describe("B36 — data-artifact distance (R8.02 / R8.03)", () => {
+  it("T0533 — fires when a data object is far from its associated element", () => {
+    const v = checkDataArtifactDistance({
+      elements: [mk("t", "task", 1000, 100, 100, 60, { label: "Verify" }), mk("d", "data-object", 100, 100, 40, 50, { label: "Docs" })],
+      connectors: [assoc("a", "d", "t")],
+    });
+    expect(v.length, "far data object should be flagged").toBeGreaterThan(0);
+    expect(v[0].rule).toBe("data-artifact-distance");
+  });
+
+  it("T0534 — clean when the data object is adjacent to its element", () => {
+    const v = checkDataArtifactDistance({
+      elements: [mk("t", "task", 200, 100, 100, 60, { label: "Verify" }), mk("d", "data-object", 130, 30, 40, 50, { label: "Docs" })],
+      connectors: [assoc("a", "d", "t")],
+    });
+    expect(v, "adjacent data object should not be flagged").toEqual([]);
+  });
+});
+
+describe("B37 — data-object input/output role (R8.02)", () => {
+  it("T0535 — fires when an input (outward-only) data object has no role", () => {
+    const v = checkDataObjectRole({
+      elements: [mk("t", "task", 200, 100, 100, 60, { label: "Verify" }), mk("d", "data-object", 130, 100, 40, 50, { label: "Docs" })],
+      connectors: [assoc("a", "d", "t")], // d → t = outward = should be input
+    });
+    expect(v.length, "missing input role should be flagged").toBeGreaterThan(0);
+    expect(v[0].rule).toBe("data-object-role");
+    expect(v[0].message).toContain("input");
+  });
+
+  it("T0536 — clean when an output (inward-only) data object is tagged role=output", () => {
+    const v = checkDataObjectRole({
+      elements: [mk("t", "task", 200, 100, 100, 60, { label: "Verify" }), mk("d", "data-object", 350, 100, 40, 50, { label: "Report", properties: { role: "output" } })],
+      connectors: [assoc("a", "t", "d")], // t → d = inward = output
+    });
+    expect(v, "correctly-tagged output should not be flagged").toEqual([]);
   });
 });

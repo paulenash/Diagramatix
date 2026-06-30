@@ -1813,14 +1813,14 @@ export function layoutBpmnDiagram(
   const usedQuadrants = new Map<string, Set<"UL" | "LL" | "UR" | "LR">>();
   for (const el of elements) {
     if (el.type !== "data-object") continue;
-    // Find the FIRST associationBPMN-eligible connector touching this
-    // data object. aiConnections is the AI's intent; we look at both
-    // directions to determine input vs output.
+    // Find the FIRST connector touching this data object. ANY connector
+    // touching a data object IS an association — BPMN forbids real sequence /
+    // message flow on data artifacts, and the layout re-types them to
+    // associationBPMN later. The AI plan can only emit "sequence" / "message"
+    // types (planBpmn), so it sends data links as "sequence"; matching by
+    // ENDPOINT (not by excluding those types) is what lets R8.02 find them.
     const conn = aiConnections.find(
-      (c) =>
-        (c.sourceId === el.id || c.targetId === el.id) &&
-        c.type !== "message" &&
-        c.type !== "sequence",
+      (c) => c.sourceId === el.id || c.targetId === el.id,
     );
     if (!conn) continue;
     const isOutput = conn.sourceId !== el.id; // element → data → output
@@ -1873,12 +1873,11 @@ export function layoutBpmnDiagram(
   const DATA_STORE_VGAP = 40;
   for (const el of elements) {
     if (el.type !== "data-store") continue;
-    // Find every association touching this data store.
+    // Every connector touching a data store is an association (see R8.02 note);
+    // match by ENDPOINT, not by excluding "sequence"/"message", so the AI's
+    // sequence-typed data links are found.
     const conns = aiConnections.filter(
-      (c) =>
-        (c.sourceId === el.id || c.targetId === el.id) &&
-        c.type !== "message" &&
-        c.type !== "sequence",
+      (c) => c.sourceId === el.id || c.targetId === el.id,
     );
     if (conns.length === 0) continue;
 

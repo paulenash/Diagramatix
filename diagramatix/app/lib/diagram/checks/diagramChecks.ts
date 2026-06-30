@@ -1581,6 +1581,78 @@ export function checkLaneTiling(d: DiagramLike): Violation[] {
   return out;
 }
 
+/** Edge-to-edge distance between two element rects (0 if they touch / overlap). */
+function rectGap(a: DiagramElement, b: DiagramElement): number {
+  const dx = Math.max(0, a.x - (b.x + b.width), b.x - (a.x + a.width));
+  const dy = Math.max(0, a.y - (b.y + b.height), b.y - (a.y + a.height));
+  return Math.hypot(dx, dy);
+}
+
+const DATA_ARTIFACT = new Set<string>(["data-object", "data-store"]);
+
+/** B36 — a Data Object / Data Store must sit ADJACENT to the element it
+ *  associates with. Flags an artifact whose NEAREST associated element is far
+ *  away. (The AI's data links arrive as sequence flows; before the R8.02/R8.03
+ *  fix that left the artifact stranded in the flow column.) */
+export function checkDataArtifactDistance(d: DiagramLike): Violation[] {
+  const MAX_GAP = 150; // px edge-to-edge — the intended placement is ~30px
+  const byId = new Map(d.elements.map((e) => [e.id, e]));
+  const out: Violation[] = [];
+  for (const da of d.elements) {
+    if (!DATA_ARTIFACT.has(da.type)) continue;
+    const assoc = d.connectors.filter(
+      (c) => c.type === "associationBPMN" && (c.sourceId === da.id || c.targetId === da.id),
+    );
+    let minGap = Infinity;
+    let nearest: DiagramElement | undefined;
+    for (const c of assoc) {
+      const other = byId.get(c.sourceId === da.id ? c.targetId : c.sourceId);
+      if (!other) continue;
+      const gap = rectGap(da, other);
+      if (gap < minGap) { minGap = gap; nearest = other; }
+    }
+    if (nearest && minGap > MAX_GAP) {
+      out.push({
+        rule: "data-artifact-distance",
+        severity: "warning",
+        ids: [da.id, nearest.id],
+        message: `${da.type === "data-store" ? "Data Store" : "Data Object"} "${nameOf(da)}" sits ${Math.round(minGap)}px from its associated "${nameOf(nearest)}" — data objects/stores must be placed adjacent to the element they associate with (R8.02 / R8.03).`,
+      });
+    }
+  }
+  return out;
+}
+
+/** B37 — a Data Object whose associations all point OUTWARD (data → element) is
+ *  an INPUT and must carry role="input"; all INWARD (element → data) is an
+ *  OUTPUT (role="output"). Flags a missing / mismatched role marker (R8.02). */
+export function checkDataObjectRole(d: DiagramLike): Violation[] {
+  const out: Violation[] = [];
+  for (const da of d.elements) {
+    if (da.type !== "data-object") continue;
+    const assoc = d.connectors.filter(
+      (c) => c.type === "associationBPMN" && (c.sourceId === da.id || c.targetId === da.id),
+    );
+    if (assoc.length === 0) continue;
+    const allOut = assoc.every((c) => c.sourceId === da.id); // data is source → outward → input
+    const allIn = assoc.every((c) => c.targetId === da.id);  // data is target → inward → output
+    let expected: "input" | "output" | null = null;
+    if (allOut && !allIn) expected = "input";
+    else if (allIn && !allOut) expected = "output";
+    if (!expected) continue; // mixed directions — no single required role
+    const role = da.properties?.role as string | undefined;
+    if (role !== expected) {
+      out.push({
+        rule: "data-object-role",
+        severity: "warning",
+        ids: [da.id],
+        message: `Data Object "${nameOf(da)}" has only ${expected === "input" ? "outward (data → element)" : "inward (element → data)"} associations, so its role marker should be "${expected}" but is "${role ?? "unset"}" (R8.02).`,
+      });
+    }
+  }
+  return out;
+}
+
 // ── Registry ─────────────────────────────────────────────────────────────────
 
 export const RULES: Rule[] = [
@@ -1874,6 +1946,24 @@ export const RULES: Rule[] = [
     severity: "error",
     category: "bpmn-structure",
     check: checkLaneTiling,
+  },
+  {
+    code: "B36",
+    id: "data-artifact-distance",
+    title: "Data Object / Store far from its associated element",
+    description: "A Data Object or Data Store sits a long way from the element it associates with. Per R8.02 / R8.03 they must be placed adjacent to their associated element (input objects upper/lower-left, output objects upper/lower-right, stores centred above/below).",
+    severity: "warning",
+    category: "bpmn-structure",
+    check: checkDataArtifactDistance,
+  },
+  {
+    code: "B37",
+    id: "data-object-role",
+    title: "Data Object input/output role doesn't match its associations",
+    description: "A Data Object with only outward associations (data → element) is an input and should carry role=\"input\"; one with only inward associations (element → data) is an output (role=\"output\"). The role marker is missing or mismatched (R8.02).",
+    severity: "warning",
+    category: "bpmn-structure",
+    check: checkDataObjectRole,
   },
 ];
 
