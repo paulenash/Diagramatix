@@ -2921,6 +2921,15 @@ export function layoutBpmnDiagram(
     }
   }
 
+  // Re-tile lanes after the late EP-wrapping + merge passes. Those run AFTER the
+  // earlier fitLanesToChildren and can GROW a lane (to enclose a re-wrapped EP)
+  // without pushing the lanes below it down — leaving them overlapping. An
+  // overlapping lane stack breaks the editor's boundary drag-handles (placed at
+  // lane.y + lane.height) and scrambles the on-screen lane order, so re-stack the
+  // lanes contiguously and re-stack the pools one final time. (Guarded by B35.)
+  fitLanesToChildren();
+  restackPoolsR52();
+
   // ── R8.14 / R8.15 / R8.18: Start & End event placement + connector length ──
   // Tighten the flow's two ends so the Start/End events hug their neighbours.
   //   R8.14 — the PROCESS-level Start (parent Pool/Lane, not an EP) clears its

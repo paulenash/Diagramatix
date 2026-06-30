@@ -1545,6 +1545,42 @@ export function checkEventLabelOverlap(d: DiagramLike): Violation[] {
   return out;
 }
 
+/** B35 — lanes (and sub-lanes) within a container must tile CONTIGUOUSLY: no
+ *  lane may overlap the next. A lane that grew to fit tall content (e.g. an
+ *  Expanded Subprocess) without pushing the lanes below it down leaves them
+ *  overlapping, which breaks the editor's boundary drag-handles and scrambles
+ *  the on-screen lane order. The net for that. */
+export function checkLaneTiling(d: DiagramLike): Violation[] {
+  const TOL = 2;
+  const byId = new Map(d.elements.map((e) => [e.id, e]));
+  const byParent = new Map<string, DiagramElement[]>();
+  for (const e of d.elements) {
+    if ((e.type !== "lane" && e.type !== "sublane") || !e.parentId) continue;
+    const arr = byParent.get(e.parentId) ?? [];
+    arr.push(e);
+    byParent.set(e.parentId, arr);
+  }
+  const out: Violation[] = [];
+  for (const [parentId, lanes] of byParent) {
+    if (lanes.length < 2) continue;
+    const sorted = [...lanes].sort((a, b) => a.y - b.y);
+    for (let i = 0; i < sorted.length - 1; i++) {
+      const a = sorted[i], b = sorted[i + 1];
+      const overlap = a.y + a.height - b.y;
+      if (overlap > TOL) {
+        const parent = byId.get(parentId);
+        out.push({
+          rule: "lane-tiling",
+          severity: "error",
+          ids: [a.id, b.id, parentId],
+          message: `Lanes "${nameOf(a)}" and "${nameOf(b)}"${parent ? ` in "${nameOf(parent)}"` : ""} overlap by ${Math.round(overlap)}px — lanes must tile contiguously (each lane's bottom flush to the next lane's top).`,
+        });
+      }
+    }
+  }
+  return out;
+}
+
 // ── Registry ─────────────────────────────────────────────────────────────────
 
 export const RULES: Rule[] = [
@@ -1829,6 +1865,15 @@ export const RULES: Rule[] = [
     severity: "error",
     category: "bpmn-structure",
     check: checkElementOverlap,
+  },
+  {
+    code: "B35",
+    id: "lane-tiling",
+    title: "Lanes overlap / do not tile contiguously",
+    description: "Two lanes (or sub-lanes) in the same container overlap vertically. A lane that grew to fit tall content (e.g. an Expanded Subprocess) must push the lanes below it down so the stack stays contiguous — otherwise the on-screen lane order scrambles and the boundary drag-handles land in the wrong place.",
+    severity: "error",
+    category: "bpmn-structure",
+    check: checkLaneTiling,
   },
 ];
 

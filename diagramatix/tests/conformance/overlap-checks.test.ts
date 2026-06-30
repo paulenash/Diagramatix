@@ -14,6 +14,7 @@ import { describe, it, expect } from "vitest";
 import {
   checkElementOverlap,
   checkEventLabelOverlap,
+  checkLaneTiling,
 } from "@/app/lib/diagram/checks/diagramChecks";
 import type { DiagramElement } from "@/app/lib/diagram/types";
 
@@ -110,5 +111,31 @@ describe("B33 — event label overlap (R8.16)", () => {
       ]),
     );
     expect(v, "label inside its own container is legitimate").toEqual([]);
+  });
+});
+
+describe("B35 — lane tiling (R8.17-adjacent)", () => {
+  it("T0528 — fires when two lanes in a pool overlap", () => {
+    const v = checkLaneTiling(
+      data([
+        mk("p", "pool", 0, 0, 400, 400, { label: "P" }),
+        mk("l1", "lane", 0, 0, 400, 200, { parentId: "p", label: "L1" }),
+        mk("l2", "lane", 0, 160, 400, 200, { parentId: "p", label: "L2" }), // overlaps L1 by 40
+      ]),
+    );
+    expect(v.length, "overlapping lanes should be flagged").toBeGreaterThan(0);
+    expect(v[0].rule).toBe("lane-tiling");
+    expect(v[0].ids).toEqual(expect.arrayContaining(["l1", "l2"]));
+  });
+
+  it("T0529 — clean when lanes tile contiguously", () => {
+    const v = checkLaneTiling(
+      data([
+        mk("p", "pool", 0, 0, 400, 400, { label: "P" }),
+        mk("l1", "lane", 0, 0, 400, 200, { parentId: "p", label: "L1" }),
+        mk("l2", "lane", 0, 200, 400, 200, { parentId: "p", label: "L2" }),
+      ]),
+    );
+    expect(v, "contiguous lanes should not be flagged").toEqual([]);
   });
 });
