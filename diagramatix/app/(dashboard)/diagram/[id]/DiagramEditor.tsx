@@ -35,6 +35,7 @@ import { DiagramTypeBadge } from "@/app/components/DiagramTypeBadge";
 import { useDiagramTypeStyles } from "@/app/hooks/useDiagramTypeStyles";
 import { lightenHex } from "@/app/lib/diagram/diagramTypeStyles";
 import { AiPanel } from "./AiPanel";
+import { AiComparisonModal, type AiComparison } from "@/app/components/AiComparisonModal";
 import { toSuggestions, type ProjectEntityStructure, type EntityListDTO, type EntityNodeLevel } from "@/app/lib/entityLists/types";
 import { PlanPanel } from "./PlanPanel";
 import { SendForReviewDialog } from "./SendForReviewDialog";
@@ -70,6 +71,9 @@ interface VisioImportResult {
 
 interface Props {
   diagramId: string;
+  /** The saved SuperAdmin model-comparison matrix for this diagram (or {} if
+   *  none). Drives the "AI Comparison Results" button on load. */
+  initialAiComparison?: unknown;
   diagramName: string;
   diagramType: DiagramType;
   initialData: DiagramData;
@@ -355,6 +359,7 @@ async function exportPdf(svgEl: SVGSVGElement, name: string, data: DiagramData, 
 
 export function DiagramEditor({
   diagramId,
+  initialAiComparison,
   diagramName,
   diagramType,
   initialData,
@@ -869,10 +874,15 @@ export function DiagramEditor({
   const [displayMode, setDisplayMode] = useState<DisplayMode>(initialDisplayMode ?? "normal");
   const [showDiagramMaintenance, setShowDiagramMaintenance] = useState(false);
   const [showAiPanel, setShowAiPanel] = useState(false);
-  // SuperAdmin model-comparison matrix for this diagram (set after "Compare all
-  // models"; slice 3 renders the "AI Comparison Results" button + modal from it).
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [aiComparison, setAiComparison] = useState<unknown>(null);
+  // SuperAdmin model-comparison matrix for this diagram — seeded from the saved
+  // column on load, updated after a fresh "Compare all models". Drives the
+  // "AI Comparison Results" button + modal.
+  const [aiComparison, setAiComparison] = useState<unknown>(
+    initialAiComparison && typeof initialAiComparison === "object"
+      && (initialAiComparison as { models?: unknown }).models
+      ? initialAiComparison : null,
+  );
+  const [showComparisonModal, setShowComparisonModal] = useState(false);
   const [aiPanelGenerating, setAiPanelGenerating] = useState(false);
   const [aiPanelNarrativeGenerating, setAiPanelNarrativeGenerating] = useState(false);
   const [showPlanPanel, setShowPlanPanel] = useState(false);
@@ -2930,6 +2940,15 @@ export function DiagramEditor({
             AI Generate
           </button>
         )}
+        {isAdmin && aiComparison ? (
+          <button
+            onClick={() => setShowComparisonModal(true)}
+            className="px-2 py-0.5 text-[11px] rounded border border-red-400 text-red-700 hover:bg-red-50"
+            title="SuperAdmin: view the multi-model AI comparison for this diagram"
+          >
+            AI Comparison Results
+          </button>
+        ) : null}
         {!readOnly && supportsSimulator && (
           <button
             onClick={() => setShowSimulator(true)}
@@ -3530,6 +3549,14 @@ export function DiagramEditor({
           />
         )}
 
+        {isAdmin && showComparisonModal && aiComparison ? (
+          <AiComparisonModal
+            comparison={aiComparison as AiComparison}
+            currentDiagramId={diagramId}
+            onClose={() => setShowComparisonModal(false)}
+          />
+        ) : null}
+
         {showSimulator && (
           <SimulatorOverlay
             data={data}
@@ -3572,6 +3599,8 @@ export function DiagramEditor({
             onAudioPhaseChange={setAudioPhase}
             aiFeedback={data.aiFeedback}
             onAiFeedback={setAiFeedback}
+            diagramId={diagramId}
+            onComparison={setAiComparison}
           />
         )}
 

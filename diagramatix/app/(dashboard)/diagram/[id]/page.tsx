@@ -242,6 +242,7 @@ export default async function DiagramPage({ params, searchParams }: Props) {
         diagramName={diagram.name}
         diagramType={diagram.type as DiagramType}
         initialData={data}
+        initialAiComparison={diagram.aiComparison}
         projectId={diagram.projectId ?? null}
         initialDiagramColorConfig={diagramColorConfig}
         initialDisplayMode={(diagram.displayMode as DisplayMode) ?? "normal"}
