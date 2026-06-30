@@ -21,6 +21,7 @@
  * in-app scan, and shows up in the admin viewer automatically.
  */
 import type { DiagramElement, Connector } from "../types";
+import { wrapText } from "../textMetrics";
 
 export interface DiagramLike {
   elements: DiagramElement[];
@@ -1418,6 +1419,132 @@ export function checkPoolHeaderLabelOverrun(d: DiagramLike): Violation[] {
   return out;
 }
 
+// ── Geometry helpers for the overlap rules (B33, B34) ───────────────────────
+
+type Rect = { x: number; y: number; w: number; h: number };
+const elRect = (e: DiagramElement): Rect => ({ x: e.x, y: e.y, w: e.width, h: e.height });
+
+/** True when two rectangles genuinely overlap — i.e. penetrate each other by
+ *  more than `tol` px on BOTH axes. Edges that merely touch (or sub-pixel
+ *  slivers) are not flagged. */
+function rectsOverlapBy(a: Rect, b: Rect, tol: number): boolean {
+  const ox = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x);
+  const oy = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
+  return ox > tol && oy > tol;
+}
+
+/** Walk `node`'s parentId + boundaryHostId chain — is `maybeAncestor` on it?
+ *  Used so an element/label legitimately sitting INSIDE (or mounted ON) a
+ *  container is never flagged as "overlapping" that container. */
+function isAncestorOf(byId: Map<string, DiagramElement>, maybeAncestor: DiagramElement, node: DiagramElement): boolean {
+  let cur: DiagramElement | undefined = node;
+  for (let i = 0; i < 32 && cur; i++) {
+    const nextId = cur.boundaryHostId ?? cur.parentId;
+    if (!nextId) return false;
+    if (nextId === maybeAncestor.id) return true;
+    cur = byId.get(nextId);
+  }
+  return false;
+}
+
+/** Leaf flow-node shapes that must never sit on top of one another. Container
+ *  types (pool / lane / sublane / subprocess-expanded) are excluded — they
+ *  legitimately enclose other elements. */
+const OVERLAP_LEAF_TYPES = new Set<string>([
+  "task", "subprocess", "start-event", "end-event", "intermediate-event",
+  "gateway", "data-object", "data-store",
+]);
+
+const EVENT_TYPES = new Set<string>(["start-event", "end-event", "intermediate-event"]);
+
+/** External label box for an event — mirrors how SymbolRenderer positions it
+ *  (centre below the shape, offset by labelOffsetX/Y, width labelWidth). */
+function eventLabelRect(e: DiagramElement): Rect | null {
+  if (!EVENT_TYPES.has(e.type)) return null;
+  const label = (e.label ?? "").trim();
+  if (!label) return null;
+  const lw = (e.properties?.labelWidth as number | undefined) ?? 80;
+  const ox = (e.properties?.labelOffsetX as number | undefined) ?? 0;
+  const oy = (e.properties?.labelOffsetY as number | undefined) ?? 7;
+  const cx = e.x + e.width / 2 + ox;
+  const topY = e.y + e.height + oy;
+  const lines = Math.max(1, wrapText(label, lw).length);
+  return { x: cx - lw / 2, y: topY, w: lw, h: lines * 14 };
+}
+
+/** B34 — no two leaf flow-nodes may be placed on top of one another. Catches
+ *  the layout "coincidence" failure where sibling branch terminals collapse
+ *  onto the same (x,y). Container nesting and boundary mounts are exempt. */
+export function checkElementOverlap(d: DiagramLike): Violation[] {
+  const TOL = 2;
+  const byId = new Map(d.elements.map((e) => [e.id, e]));
+  const nodes = d.elements.filter((e) => OVERLAP_LEAF_TYPES.has(e.type));
+  const out: Violation[] = [];
+  for (let i = 0; i < nodes.length; i++) {
+    for (let j = i + 1; j < nodes.length; j++) {
+      const a = nodes[i], b = nodes[j];
+      if (a.boundaryHostId === b.id || b.boundaryHostId === a.id) continue;
+      if (isAncestorOf(byId, a, b) || isAncestorOf(byId, b, a)) continue;
+      if (!rectsOverlapBy(elRect(a), elRect(b), TOL)) continue;
+      const ox = Math.round(Math.min(rightOf(a), rightOf(b)) - Math.max(a.x, b.x));
+      const oy = Math.round(Math.min(bottomOf(a), bottomOf(b)) - Math.max(a.y, b.y));
+      out.push({
+        rule: "element-overlap",
+        severity: "error",
+        ids: [a.id, b.id],
+        message: `"${nameOf(a)}" (${a.type}) and "${nameOf(b)}" (${b.type}) overlap by ${ox}×${oy}px — elements must never be placed on top of one another.`,
+      });
+    }
+  }
+  return out;
+}
+
+/** B33 — event labels (especially edge-mounted/boundary events) must not
+ *  overlap another element's body or another event's label. The event's own
+ *  container ancestors are exempt (a label sitting inside its pool/lane/EP is
+ *  fine). */
+export function checkEventLabelOverlap(d: DiagramLike): Violation[] {
+  const TOL = 2;
+  const byId = new Map(d.elements.map((e) => [e.id, e]));
+  const labels = d.elements
+    .map((e) => ({ e, box: eventLabelRect(e) }))
+    .filter((x): x is { e: DiagramElement; box: Rect } => x.box !== null);
+  // Bodies any event label could collide with: every leaf flow-node plus
+  // expanded subprocess bodies (a label straying into a foreign EP is a defect).
+  const bodies = d.elements.filter(
+    (e) => OVERLAP_LEAF_TYPES.has(e.type) || e.type === "subprocess-expanded",
+  );
+  const out: Violation[] = [];
+  for (const { e, box } of labels) {
+    for (const ob of bodies) {
+      if (ob.id === e.id) continue;
+      // Skip the event's own host / container ancestors (label inside them is fine).
+      if (isAncestorOf(byId, ob, e)) continue;
+      if (!rectsOverlapBy(box, elRect(ob), TOL)) continue;
+      out.push({
+        rule: "event-label-overlap",
+        severity: "warning",
+        ids: [e.id, ob.id],
+        message: `Event label "${nameOf(e)}" overlaps ${ob.type} "${nameOf(ob)}" — event labels must stay clear of other elements.`,
+      });
+      break;
+    }
+  }
+  // Label-vs-label.
+  for (let i = 0; i < labels.length; i++) {
+    for (let j = i + 1; j < labels.length; j++) {
+      if (!rectsOverlapBy(labels[i].box, labels[j].box, TOL)) continue;
+      out.push({
+        rule: "event-label-overlap",
+        severity: "warning",
+        ids: [labels[i].e.id, labels[j].e.id],
+        message: `Event labels "${nameOf(labels[i].e)}" and "${nameOf(labels[j].e)}" overlap.`,
+      });
+    }
+  }
+  return out;
+}
+
 // ── Registry ─────────────────────────────────────────────────────────────────
 
 export const RULES: Rule[] = [
@@ -1684,6 +1811,24 @@ export const RULES: Rule[] = [
     severity: "warning",
     category: "bpmn-structure",
     check: checkPoolHeaderLabelOverrun,
+  },
+  {
+    code: "B33",
+    id: "event-label-overlap",
+    title: "Event label overlaps another element or label",
+    description: "An event's label (especially an edge-mounted/boundary event) overlaps another element's body or another event's label. Event labels must be placed on a side with free space and nudged clear of other elements and labels. (R8.16)",
+    severity: "warning",
+    category: "bpmn-structure",
+    check: checkEventLabelOverlap,
+  },
+  {
+    code: "B34",
+    id: "element-overlap",
+    title: "Two elements placed on top of one another",
+    description: "Two flow elements occupy overlapping space. Elements must never be placed on top of one another; where placement would overlap, the elements are separated and the Pool is extended to make room. (R8.17)",
+    severity: "error",
+    category: "bpmn-structure",
+    check: checkElementOverlap,
   },
 ];
 
