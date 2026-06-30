@@ -725,5 +725,13 @@ export interface TemplateData {
  *             library, ids preserved). All application/admin features — NO diagram
  *             export or BPMN-XSD shape change; the version advances with the
  *             release window (same convention as v1.10 / v1.21).
+ *
+ *  v1.28 (2026-06-30): BPMN layout-geometry rules — Start/End event placement +
+ *             connector length (R8.14/R8.15/R8.18), element de-overlap (R8.17),
+ *             event-label nudge (R8.16); new scanner checks B33 (event-label
+ *             overlap), B34 (element overlap), B35 (lane tiling); a lane-tiling
+ *             re-stack fix and an EP boundary-resize drift fix. Layout / validation
+ *             / editor-interaction only — NO diagram export or BPMN-XSD shape
+ *             change; the version advances with the release window (as v1.27).
  */
-export const SCHEMA_VERSION = "1.27";
+export const SCHEMA_VERSION = "1.28";

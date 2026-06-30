@@ -321,6 +321,14 @@
     features only — the diagram data structure and this XSD are UNCHANGED; the
     version attribute advances with the release window (same convention as
     v1.10 / v1.21).
+
+  v1.28 — BPMN layout-geometry rules: Start/End event placement + connector
+    length (R8.14/R8.15/R8.18), element de-overlap (R8.17), event-label nudge
+    (R8.16); new scanner checks B33/B34/B35 (event-label / element / lane
+    overlap); a lane-tiling re-stack fix and an EP boundary-resize drift fix.
+    Layout, validation and editor-interaction only — the diagram data structure
+    and this XSD are UNCHANGED; the version attribute advances with the release
+    window (same convention as v1.27).
 -->
 
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
