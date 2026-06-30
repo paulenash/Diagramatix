@@ -869,6 +869,10 @@ export function DiagramEditor({
   const [displayMode, setDisplayMode] = useState<DisplayMode>(initialDisplayMode ?? "normal");
   const [showDiagramMaintenance, setShowDiagramMaintenance] = useState(false);
   const [showAiPanel, setShowAiPanel] = useState(false);
+  // SuperAdmin model-comparison matrix for this diagram (set after "Compare all
+  // models"; slice 3 renders the "AI Comparison Results" button + modal from it).
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [aiComparison, setAiComparison] = useState<unknown>(null);
   const [aiPanelGenerating, setAiPanelGenerating] = useState(false);
   const [aiPanelNarrativeGenerating, setAiPanelNarrativeGenerating] = useState(false);
   const [showPlanPanel, setShowPlanPanel] = useState(false);
@@ -3521,6 +3525,8 @@ export function DiagramEditor({
             onAudioPhaseChange={setAudioPhase}
             aiFeedback={data.aiFeedback}
             onAiFeedback={setAiFeedback}
+            diagramId={diagramId}
+            onComparison={setAiComparison}
           />
         )}
 

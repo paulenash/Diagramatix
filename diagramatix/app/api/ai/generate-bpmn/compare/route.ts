@@ -125,5 +125,6 @@ export async function POST(req: Request) {
     },
   });
 
-  return NextResponse.json({ comparison, filled: !!chosenData });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return NextResponse.json({ comparison, filled: !!chosenData, diagramData: (chosenData as any) ?? undefined });
 }

@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useSession } from "next-auth/react";
+import { SUPERUSER_EMAILS } from "@/app/lib/superuser";
 import type { DiagramData, DiagramElement, Connector, DiagramType, AiFeedback } from "@/app/lib/diagram/types";
 import { DiagramatixThrobber } from "@/app/components/DiagramatixThrobber";
 import { AttachmentPreviewDialog } from "@/app/components/AttachmentPreviewDialog";
@@ -45,13 +47,23 @@ interface Props {
   aiFeedback?: AiFeedback;
   /** Persist the AI feedback on the diagram. */
   onAiFeedback?: (feedback: AiFeedback | undefined) => void;
+  /** The current diagram's id — needed by the SuperAdmin "Compare all models"
+   *  action (the server fills this diagram with the Opus 4.8 output). */
+  diagramId?: string;
+  /** Notifies the parent when a model comparison was produced, so it can show
+   *  the "AI Comparison Results" button. */
+  onComparison?: (comparison: unknown) => void;
 }
 
 export function AiPanel({
   diagramType, onApplyDiagram, onAddToDiagram, onClose, onGeneratingChange,
   isAdmin, currentElements, currentConnectors, onNarrativeGeneratingChange,
-  onAudioPhaseChange, aiFeedback, onAiFeedback,
+  onAudioPhaseChange, aiFeedback, onAiFeedback, diagramId, onComparison,
 }: Props) {
+  const { data: authSession } = useSession();
+  const isSuperuser = !!authSession?.user?.email
+    && SUPERUSER_EMAILS.has(authSession.user.email.toLowerCase());
+  const [comparing, setComparing] = useState(false);
   const [clarifyOpen, setClarifyOpen] = useState(false);
   const [prompt, setPrompt] = useState("");
   const [generating, setGenerating] = useState(false);
@@ -262,6 +274,44 @@ export function AiPanel({
       setError(err instanceof Error ? err.message : "Network error");
       setStatus(null);
     } finally {
+      setGenerating(false);
+    }
+  }
+
+  /** SuperAdmin: generate this prompt across Opus 4.8 / Sonnet 4.6 / Haiku 4.5,
+   *  fill the current diagram with the Opus 4.8 output, and save a diagram per
+   *  model. Three live calls — slow. */
+  async function handleCompare() {
+    const effPrompt = prompt.trim();
+    if (!effPrompt || !diagramId) return;
+    setComparing(true);
+    setGenerating(true); // drives the full-canvas overlay
+    setError(null);
+    setStatus("Comparing models — Opus 4.8, Sonnet 4.6, Haiku 4.5 (this takes 1-2 minutes)…");
+    try {
+      const res = await fetch("/api/ai/generate-bpmn/compare", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: effPrompt, diagramId }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Failed" }));
+        setError(err.error ?? "Comparison failed");
+        setStatus(null);
+        return;
+      }
+      const result = await res.json();
+      if (result.diagramData?.elements) {
+        onApplyDiagram(result.diagramData); // fill with the Opus 4.8 output
+      }
+      onComparison?.(result.comparison);
+      const chosen = result.comparison?.chosenModel ?? "Opus 4.8";
+      setStatus(`Filled with ${chosen}. All 3 model diagrams saved — open "AI Comparison Results" to compare.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Network error");
+      setStatus(null);
+    } finally {
+      setComparing(false);
       setGenerating(false);
     }
   }
@@ -531,6 +581,21 @@ export function AiPanel({
               title="Save this prompt">Save</button>
           )}
         </div>
+
+        {isSuperuser && diagramType === "bpmn" && (
+          <button onClick={() => handleCompare()}
+            disabled={generating || comparing || !prompt.trim() || !diagramId}
+            className="w-full px-3 py-1.5 text-xs text-white bg-red-600 rounded hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-1.5"
+            title="SuperAdmin: generate with Opus 4.8, Sonnet 4.6 and Haiku 4.5, fill this diagram with the Opus 4.8 result, and save one diagram per model">
+            {comparing && (
+              <svg className="animate-spin w-3 h-3" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" strokeOpacity="0.25" />
+                <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+              </svg>
+            )}
+            {comparing ? "Comparing models…" : "Compare all models (SuperAdmin)"}
+          </button>
+        )}
 
         {showSave && (
           <div className="flex gap-1">
