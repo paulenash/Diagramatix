@@ -2019,6 +2019,35 @@ export function SymbolRenderer({
         }
       }
       e.stopPropagation();
+    } else if (element.type === "subprocess-expanded") {
+      // Expanded Subprocess: clicks on (or within ±10 px of) ANY of the four
+      // edges belong to the edge resize hit-zone. The zone deliberately doesn't
+      // stopPropagation (so a plain click still selects), so without this branch
+      // the mousedown ALSO starts a MOVE drag — and dragging an edge then
+      // TRANSLATES the whole EP instead of resizing it (Paul's "boundary drift":
+      // a top drag moves the bottom too; a side drag moves the whole box).
+      // Select only; the resize hit-zone owns the drag. Mirrors the pool /
+      // process-group branches above (EPs resize on all four edges).
+      if (!(multiSelected && onGroupMove) && svgToWorld) {
+        const wp = svgToWorld(e.clientX, e.clientY);
+        if (wp) {
+          const TOL = 10;
+          const px = wp.x, py = wp.y;
+          const inX = px >= element.x - TOL && px <= element.x + element.width + TOL;
+          const inY = py >= element.y - TOL && py <= element.y + element.height + TOL;
+          const onLeft   = Math.abs(px - element.x) <= TOL;
+          const onRight  = Math.abs(px - (element.x + element.width)) <= TOL;
+          const onTop    = Math.abs(py - element.y) <= TOL;
+          const onBottom = Math.abs(py - (element.y + element.height)) <= TOL;
+          if (inX && inY && (onLeft || onRight || onTop || onBottom)) {
+            e.stopPropagation();
+            if (selected) onSelect();
+            else onSelect(e);
+            return;
+          }
+        }
+      }
+      e.stopPropagation();
     } else {
       e.stopPropagation();
     }

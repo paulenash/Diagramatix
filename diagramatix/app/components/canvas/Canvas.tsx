@@ -5918,6 +5918,13 @@ export function Canvas({
                       fill="transparent"
                       style={{ cursor: edge.cursor }}
                       onMouseDown={(e) => {
+                        // This overlay edge zone (shown only when the container is
+                        // SELECTED) OWNS the resize drag. Stop the mousedown
+                        // bubbling to the canvas selection-move handler — otherwise
+                        // it translates the whole element while we resize one edge
+                        // (the EP "boundary drift": a top drag drags the bottom too,
+                        // a side drag moves the whole box).
+                        e.stopPropagation();
                         const startX = e.clientX, startY = e.clientY;
                         const reactEvt = e;
                         let started = false;

@@ -60,8 +60,21 @@ const epOf = (d: any, id: string) => d.elements.find((e: any) => e.id === id) as
 /** Drag the EP's edge hit-zone outward; capture the rendered box BEFORE and
  *  HALFWAY through the drag (screen coords) for the mid-drag visual check. */
 async function dragEdge(page: Page, epId: string, edge: Edge, delta: number): Promise<{ beforeDom: Box; midDom: Box }> {
+  const loc = page.locator(`[data-element-id="${epId}"]`);
+  const dom = async (): Promise<Box> => {
+    let b = await loc.boundingBox();
+    for (let i = 0; i < 12 && !b; i++) { await page.waitForTimeout(80); b = await loc.boundingBox(); }
+    if (!b) throw new Error(`no boundingBox for ${epId}`);
+    return b;
+  };
+  // SELECT the EP first (click its top-left body, clear of children + edge
+  // zones). When selected, the editor overlays a SECOND set of edge hit-zones
+  // (Canvas selectedResizeContainer, above connectors) — the path a user
+  // actually drags through.
+  const body0 = await dom();
+  await page.mouse.click(body0.x + 20, body0.y + 22);
+  await page.waitForTimeout(200);
   const h = await boxOf(page, `[data-resize-handle="${epId}-${SIDE[edge]}"]`);
-  const dom = () => page.locator(`[data-element-id="${epId}"]`).boundingBox() as Promise<Box>;
   const beforeDom = await dom();
   const from: Pt = { x: h.x + h.width / 2, y: h.y + h.height / 2 };
   const to: Pt = { ...from };
