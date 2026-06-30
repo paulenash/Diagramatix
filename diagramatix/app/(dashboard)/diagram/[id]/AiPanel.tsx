@@ -184,7 +184,7 @@ export function AiPanel({
     }
     setNarrativeGenerating(true);
     setError(null);
-    setStatus("Asking Sonnet for a staff narrative (15–30 s)…");
+    setStatus("Generating the staff narrative (15–30 s)…");
     try {
       const res = await fetch("/api/ai/staff-narrative", {
         method: "POST",
@@ -406,7 +406,7 @@ export function AiPanel({
                 onClick={callStaffNarrative}
                 disabled={generating || narrativeGenerating}
                 className="flex-1 px-2 py-1 text-[11px] font-medium text-red-700 bg-red-50/60 border border-red-300 rounded hover:bg-red-100 disabled:opacity-50"
-                title="Admin only — ask Sonnet to rewrite the diagram as a Staff Narrative (uses the editable briefing in /dashboard/rules → Staff Narrative Briefing)"
+                title="Admin only — ask the AI to rewrite the diagram as a Staff Narrative (uses the editable briefing in /dashboard/rules → Staff Narrative Briefing)"
               >
                 Staff Narrative
               </button>
@@ -517,8 +517,8 @@ export function AiPanel({
             <DiagramatixThrobber size={28} />
             <span className="text-[11px] text-blue-800 font-medium">
               {narrativeGenerating
-                ? "Asking Sonnet for a staff narrative — this usually takes 15–30 s…"
-                : "Asking Sonnet — this usually takes 15–30 s…"}
+                ? "Generating the staff narrative — this usually takes 15–30 s…"
+                : "Generating — this usually takes 15–30 s…"}
             </span>
           </div>
         )}

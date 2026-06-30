@@ -38,7 +38,7 @@ export type PlanBpmnResult =
   | { ok: true; plan: { elements: AiElement[]; connections: AiConnection[] }; model: string }
   | { ok: false; status: number; error: string; raw?: string };
 
-const DEFAULT_MODEL = "claude-sonnet-4-6";
+const DEFAULT_MODEL = "claude-opus-4-8";
 
 /**
  * Build the system prompt instructing Sonnet to return normalised BPMN JSON.

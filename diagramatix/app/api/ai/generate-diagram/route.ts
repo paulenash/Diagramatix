@@ -55,7 +55,7 @@ export async function POST(req: Request) {
     userContent.push({ type: "text", text: prompt.trim() });
 
     const message = await client.messages.create({
-      model: "claude-sonnet-4-6",
+      model: "claude-opus-4-8",
       max_tokens: 8192,
       system: systemPrompt,
       messages: [{ role: "user", content: userContent }],

@@ -22,7 +22,7 @@ export type PlanFlowchartResult =
   | { ok: true; plan: { elements: AiFcElement[]; connections: AiFcConnection[] }; model: string }
   | { ok: false; status: number; error: string; raw?: string };
 
-const DEFAULT_MODEL = "claude-sonnet-4-6";
+const DEFAULT_MODEL = "claude-opus-4-8";
 
 /** Canonical flowchart element types the model may emit. */
 const TYPE_LIST = [

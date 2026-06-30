@@ -9,7 +9,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { AiElement, AiConnection } from "@/app/lib/diagram/bpmnLayout";
 
-const DEFAULT_MODEL = "claude-sonnet-4-6";
+const DEFAULT_MODEL = "claude-opus-4-8";
 
 export interface RefineResult {
   elements: AiElement[];

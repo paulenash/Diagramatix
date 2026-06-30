@@ -3760,8 +3760,8 @@ export function DiagramEditor({
                     : aiBusy === "apply"
                       ? "Running the layout engine…"
                       : (aiBusy === "narrative" || aiPanelNarrativeGenerating)
-                        ? "Asking Sonnet for a staff narrative — this usually takes 15–30 seconds…"
-                        : "Asking Sonnet for a plan — this usually takes 15–30 seconds…"}
+                        ? "Generating the staff narrative — this usually takes 15–30 seconds…"
+                        : "Generating your diagram — this usually takes 15–30 seconds…"}
             </p>
           </div>
         )}
