@@ -18,8 +18,8 @@ exports[`Visio export — golden structural snapshots > expanded subprocess with
     {
       "geom": {
         "h": 0,
-        "w": 1.47,
-        "x": 5.28,
+        "w": 0.73,
+        "x": 4.43,
         "y": 3.85,
       },
       "id": "conn-is-it",
@@ -30,8 +30,8 @@ exports[`Visio export — golden structural snapshots > expanded subprocess with
     {
       "geom": {
         "h": 0,
-        "w": 1.47,
-        "x": 7.81,
+        "w": 0.73,
+        "x": 6.22,
         "y": 3.85,
       },
       "id": "conn-it-ien",
@@ -42,8 +42,8 @@ exports[`Visio export — golden structural snapshots > expanded subprocess with
     {
       "geom": {
         "h": -0.4,
-        "w": 1.21,
-        "x": 3.25,
+        "w": 0.73,
+        "x": 3.01,
         "y": 4.08,
       },
       "id": "conn-s-sp",
@@ -54,8 +54,8 @@ exports[`Visio export — golden structural snapshots > expanded subprocess with
     {
       "geom": {
         "h": 0.4,
-        "w": 0.23,
-        "x": 9.34,
+        "w": 0.71,
+        "x": 9.11,
         "y": 4.08,
       },
       "id": "conn-sp-e",
@@ -79,7 +79,7 @@ exports[`Visio export — golden structural snapshots > expanded subprocess with
       "geom": {
         "h": null,
         "w": null,
-        "x": 8.73,
+        "x": 6.77,
         "y": 3.85,
       },
       "id": "ien",
@@ -91,7 +91,7 @@ exports[`Visio export — golden structural snapshots > expanded subprocess with
       "geom": {
         "h": null,
         "w": null,
-        "x": 4.36,
+        "x": 3.88,
         "y": 3.85,
       },
       "id": "is",
@@ -103,7 +103,7 @@ exports[`Visio export — golden structural snapshots > expanded subprocess with
       "geom": {
         "h": 0.68,
         "w": 1.06,
-        "x": 6.54,
+        "x": 5.32,
         "y": 3.85,
       },
       "id": "it",
@@ -127,7 +127,7 @@ exports[`Visio export — golden structural snapshots > expanded subprocess with
       "geom": {
         "h": 1.36,
         "w": 5.38,
-        "x": 6.54,
+        "x": 6.06,
         "y": 3.88,
       },
       "id": "sp",
@@ -172,8 +172,8 @@ exports[`Visio export — golden structural snapshots > linear flow 1`] = `
     {
       "geom": {
         "h": 0,
-        "w": 1.29,
-        "x": 4.39,
+        "w": 0.73,
+        "x": 4.11,
         "y": 4.14,
       },
       "id": "conn-s-t1",
@@ -184,8 +184,8 @@ exports[`Visio export — golden structural snapshots > linear flow 1`] = `
     {
       "geom": {
         "h": 0,
-        "w": 0.6,
-        "x": 6.4,
+        "w": 1.17,
+        "x": 6.12,
         "y": 4.14,
       },
       "id": "conn-t1-t2",
@@ -233,7 +233,7 @@ exports[`Visio export — golden structural snapshots > linear flow 1`] = `
       "geom": {
         "h": 0.68,
         "w": 1.06,
-        "x": 5.56,
+        "x": 5,
         "y": 4.14,
       },
       "id": "t1",
@@ -276,8 +276,8 @@ exports[`Visio export — golden structural snapshots > pool with two lanes 1`] 
     {
       "geom": {
         "h": 0,
-        "w": 1.29,
-        "x": 4.39,
+        "w": 0.73,
+        "x": 4.29,
         "y": 5.2,
       },
       "id": "conn-s-t1",
@@ -288,8 +288,8 @@ exports[`Visio export — golden structural snapshots > pool with two lanes 1`] 
     {
       "geom": {
         "h": -1.82,
-        "w": 0.6,
-        "x": 6.4,
+        "w": 0.98,
+        "x": 6.21,
         "y": 4.29,
       },
       "id": "conn-t1-t2",
@@ -361,7 +361,7 @@ exports[`Visio export — golden structural snapshots > pool with two lanes 1`] 
       "geom": {
         "h": null,
         "w": null,
-        "x": 3.55,
+        "x": 3.74,
         "y": 5.2,
       },
       "id": "s",
@@ -373,7 +373,7 @@ exports[`Visio export — golden structural snapshots > pool with two lanes 1`] 
       "geom": {
         "h": 0.68,
         "w": 1.06,
-        "x": 5.56,
+        "x": 5.19,
         "y": 5.2,
       },
       "id": "t1",

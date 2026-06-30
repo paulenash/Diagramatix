@@ -2921,6 +2921,89 @@ export function layoutBpmnDiagram(
     }
   }
 
+  // ── R8.14 / R8.15 / R8.18: Start & End event placement + connector length ──
+  // Tighten the flow's two ends so the Start/End events hug their neighbours.
+  //   R8.14 — the PROCESS-level Start (parent Pool/Lane, not an EP) clears its
+  //           container's INNER boundary (past the lane/pool header strip) by
+  //           ≥ 1 event width. The Start is moved right to that floor only.
+  //   R8.15 — the first connector is ≤ 70% of a task width, shortened by moving
+  //           the FIRST ELEMENT left toward the start. In the main pool just the
+  //           first element (+ its own contents) moves; inside an EP the WHOLE
+  //           inner flow slides left so the inner spacing stays uniform.
+  //   R8.18 — the End event is pulled left to hug its last element by the same
+  //           ≤ 70% gap, in both the main pool and inside EPs.
+  {
+    const byIdSE = new Map(elements.map((e) => [e.id, e]));
+    const MAX_CONN = 0.7 * TASK_W; // 70px
+    const shiftX = (ids: Iterable<string>, dx: number) => {
+      for (const id of ids) { const e = byIdSE.get(id); if (e) e.x += dx; }
+    };
+    // An element's subtree PLUS any Data Object/Store associated with it (those
+    // are parented to the lane, not the element, so they don't ride along on a
+    // plain subtree shift — without this they'd be left behind, e.g. an input
+    // data object would end up on top of / right of its moved element).
+    const movableWith = (rootId: string): Set<string> => {
+      const ids = new Set<string>([rootId, ...collectSubtreeIds(rootId)]);
+      let grew = true;
+      while (grew) {
+        grew = false;
+        for (const c of connectors) {
+          const oa = byIdSE.get(c.sourceId), ob = byIdSE.get(c.targetId);
+          if (ids.has(c.sourceId) && ob && (ob.type === "data-object" || ob.type === "data-store") && !ids.has(ob.id)) { ids.add(ob.id); grew = true; }
+          if (ids.has(c.targetId) && oa && (oa.type === "data-object" || oa.type === "data-store") && !ids.has(oa.id)) { ids.add(oa.id); grew = true; }
+        }
+      }
+      return ids;
+    };
+
+    // R8.14 — clearance floor for the process-level start.
+    for (const s of elements) {
+      if (s.type !== "start-event" || s.boundaryHostId) continue;
+      const parent = s.parentId ? byIdSE.get(s.parentId) : undefined;
+      if (!parent || (parent.type !== "pool" && parent.type !== "lane")) continue;
+      const headerW = parent.type === "lane"
+        ? ((parent.properties?.laneHeaderWidth as number | undefined) || 36)
+        : POOL_HEADER_W;
+      const floor = parent.x + headerW + s.width;
+      if (s.x < floor) s.x = floor;
+    }
+
+    // R8.15 — shorten the first connector by bringing the first element to it.
+    for (const s of elements) {
+      if (s.type !== "start-event" || s.boundaryHostId) continue;
+      const outs = connectors.filter((c) => c.type === "sequence" && c.sourceId === s.id);
+      if (outs.length !== 1) continue;
+      const t = byIdSE.get(outs[0].targetId);
+      if (!t) continue;
+      const gap = t.x - (s.x + s.width);
+      if (gap <= MAX_CONN) continue;
+      const dx = gap - MAX_CONN;
+      const parent = s.parentId ? byIdSE.get(s.parentId) : undefined;
+      if (parent && parent.type === "subprocess-expanded") {
+        // slide the whole inner flow (every EP descendant except the start) left
+        const ids = [...collectSubtreeIds(parent.id)].filter((id) => id !== s.id);
+        shiftX(ids, -dx);
+      } else {
+        // main pool: move just the first element (+ its own contents and any
+        // associated data objects/stores) left
+        shiftX(movableWith(t.id), -dx);
+      }
+    }
+
+    // R8.18 — pull each End event left to hug its last element (pool + EP).
+    for (const e of elements) {
+      if (e.type !== "end-event" || e.boundaryHostId) continue;
+      const ins = connectors.filter((c) => c.type === "sequence" && c.targetId === e.id);
+      let maxRight = -Infinity;
+      for (const c of ins) {
+        const src = byIdSE.get(c.sourceId);
+        if (src && src.id !== e.id) maxRight = Math.max(maxRight, src.x + src.width);
+      }
+      if (!isFinite(maxRight)) continue;
+      if (e.x - maxRight > MAX_CONN) e.x = maxRight + MAX_CONN;
+    }
+  }
+
   phase(`connectors built (${connectors.length})`);
 
   // Compute waypoints for all connectors
