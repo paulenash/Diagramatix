@@ -1,0 +1,441 @@
+{
+ "elements": [
+  {
+   "x": 55.755843196413025,
+   "y": 233.84286603398323,
+   "id": "yqlnygs5",
+   "type": "subprocess-expanded",
+   "label": "Main Subprocess",
+   "width": 584.8349197531976,
+   "height": 379.5285536463191,
+   "properties": {
+    "subprocessType": "normal"
+   },
+   "repeatType": "none"
+  },
+  {
+   "x": 157.33688742793555,
+   "y": 291.7248479474971,
+   "id": "eiit3l8t",
+   "type": "task",
+   "label": "Task 1",
+   "width": 102,
+   "height": 65,
+   "parentId": "yqlnygs5",
+   "taskType": "user",
+   "properties": {}
+  },
+  {
+   "x": 37.755843196413025,
+   "y": 306.2248479474971,
+   "id": "i5j3qr9o",
+   "type": "start-event",
+   "label": "Start",
+   "width": 36,
+   "height": 36,
+   "parentId": "yqlnygs5",
+   "properties": {},
+   "boundaryHostId": "yqlnygs5"
+  },
+  {
+   "x": 319.58042253766735,
+   "y": 291.7248479474971,
+   "id": "Rti_HggKAObWM76dIKxkJ",
+   "type": "task",
+   "label": "Task 2",
+   "width": 102,
+   "height": 65,
+   "parentId": "yqlnygs5",
+   "properties": {}
+  },
+  {
+   "x": 477.58042253766723,
+   "y": 291.7248479474971,
+   "id": "PqbtQmDlS6k7zr3aI-X8V",
+   "type": "task",
+   "label": "Task 3",
+   "width": 102,
+   "height": 65,
+   "parentId": "yqlnygs5",
+   "properties": {}
+  },
+  {
+   "x": 622.5907629496106,
+   "y": 306.2248479474971,
+   "id": "v4f5embq",
+   "type": "end-event",
+   "label": "End",
+   "width": 36,
+   "height": 36,
+   "parentId": "yqlnygs5",
+   "properties": {},
+   "boundaryHostId": "yqlnygs5"
+  },
+  {
+   "x": 191.43756539481018,
+   "y": 408.5690242222378,
+   "id": "Dj-_bngQmBXR_2jNqd760",
+   "type": "subprocess-expanded",
+   "label": "Handle Event in  Parallel",
+   "width": 334.2857142857143,
+   "height": 149.42857142857142,
+   "parentId": "yqlnygs5",
+   "properties": {
+    "subprocessType": "event"
+   }
+  },
+  {
+   "x": 220.75372561067937,
+   "y": 458.53330993652344,
+   "id": "3j9gx9wu",
+   "type": "start-event",
+   "label": "Event\nHappens",
+   "width": 36,
+   "height": 36,
+   "parentId": "Dj-_bngQmBXR_2jNqd760",
+   "properties": {
+    "interruptionType": "non-interrupting"
+   }
+  },
+  {
+   "x": 307.7537256106794,
+   "y": 446.89045279366627,
+   "id": "qmaaaKlwtED6VNGYkTBYZ",
+   "type": "task",
+   "label": "Carry out\nTask to Handle Event",
+   "width": 102,
+   "height": 65,
+   "parentId": "Dj-_bngQmBXR_2jNqd760",
+   "properties": {}
+  },
+  {
+   "x": 456.46801132496506,
+   "y": 461.39045279366627,
+   "id": "Z6xJf6P4i6aoGgkuSnkPg",
+   "type": "end-event",
+   "label": "Event\nHandled",
+   "width": 36,
+   "height": 36,
+   "parentId": "Dj-_bngQmBXR_2jNqd760",
+   "properties": {}
+  },
+  {
+   "x": 35.89658275353651,
+   "y": 80.81902422223769,
+   "id": "9814dwrh",
+   "type": "text-annotation",
+   "label": "Here is a pattern for when a main process needs to handle an event without being interrupted",
+   "width": 132.1428571428571,
+   "height": 106,
+   "properties": {
+    "userResizedAnnotation": true
+   }
+  }
+ ],
+ "connectors": [
+  {
+   "id": "1yjf1nvk",
+   "type": "sequence",
+   "label": "",
+   "sourceId": "i5j3qr9o",
+   "targetId": "eiit3l8t",
+   "waypoints": [
+    {
+     "x": 55.755843196413025,
+     "y": 324.2248479474971
+    },
+    {
+     "x": 73.75584319641302,
+     "y": 324.2248479474971
+    },
+    {
+     "x": 91.75584319641302,
+     "y": 324.2248479474971
+    },
+    {
+     "x": 133.33688742793555,
+     "y": 324.2248479474971
+    },
+    {
+     "x": 157.33688742793555,
+     "y": 324.2248479474971
+    },
+    {
+     "x": 208.33688742793555,
+     "y": 324.2248479474971
+    }
+   ],
+   "labelWidth": 80,
+   "sourceSide": "right",
+   "targetSide": "left",
+   "routingType": "rectilinear",
+   "labelOffsetX": 0,
+   "labelOffsetY": -20,
+   "directionType": "directed",
+   "sourceOffsetAlong": 0.5,
+   "targetOffsetAlong": 0.5,
+   "sourceInvisibleLeader": true,
+   "targetInvisibleLeader": true
+  },
+  {
+   "id": "wbwi8bb7",
+   "type": "sequence",
+   "label": "",
+   "sourceId": "eiit3l8t",
+   "targetId": "Rti_HggKAObWM76dIKxkJ",
+   "waypoints": [
+    {
+     "x": 208.33688742793555,
+     "y": 324.2248479474971
+    },
+    {
+     "x": 259.33688742793555,
+     "y": 324.2248479474971
+    },
+    {
+     "x": 283.33688742793555,
+     "y": 324.2248479474971
+    },
+    {
+     "x": 295.58042253766735,
+     "y": 324.2248479474971
+    },
+    {
+     "x": 319.58042253766735,
+     "y": 324.2248479474971
+    },
+    {
+     "x": 370.58042253766735,
+     "y": 324.2248479474971
+    }
+   ],
+   "labelWidth": 80,
+   "sourceSide": "right",
+   "targetSide": "left",
+   "routingType": "rectilinear",
+   "labelOffsetX": 0,
+   "labelOffsetY": -20,
+   "directionType": "directed",
+   "sourceOffsetAlong": 0.5,
+   "targetOffsetAlong": 0.5,
+   "sourceInvisibleLeader": true,
+   "targetInvisibleLeader": true
+  },
+  {
+   "id": "z58yod9s",
+   "type": "sequence",
+   "label": "",
+   "sourceId": "Rti_HggKAObWM76dIKxkJ",
+   "targetId": "PqbtQmDlS6k7zr3aI-X8V",
+   "waypoints": [
+    {
+     "x": 370.58042253766735,
+     "y": 324.2248479474971
+    },
+    {
+     "x": 421.58042253766735,
+     "y": 324.2248479474971
+    },
+    {
+     "x": 445.58042253766735,
+     "y": 324.2248479474971
+    },
+    {
+     "x": 453.58042253766723,
+     "y": 324.2248479474971
+    },
+    {
+     "x": 477.58042253766723,
+     "y": 324.2248479474971
+    },
+    {
+     "x": 528.5804225376672,
+     "y": 324.2248479474971
+    }
+   ],
+   "labelWidth": 80,
+   "sourceSide": "right",
+   "targetSide": "left",
+   "routingType": "rectilinear",
+   "labelOffsetX": 0,
+   "labelOffsetY": -20,
+   "directionType": "directed",
+   "sourceOffsetAlong": 0.5,
+   "targetOffsetAlong": 0.5,
+   "sourceInvisibleLeader": true,
+   "targetInvisibleLeader": true
+  },
+  {
+   "id": "5xb7g1yx",
+   "type": "sequence",
+   "label": "",
+   "sourceId": "PqbtQmDlS6k7zr3aI-X8V",
+   "targetId": "v4f5embq",
+   "waypoints": [
+    {
+     "x": 528.5804225376672,
+     "y": 324.2248479474971
+    },
+    {
+     "x": 579.5804225376672,
+     "y": 324.2248479474971
+    },
+    {
+     "x": 598.5804225376672,
+     "y": 324.2248479474971
+    },
+    {
+     "x": 604.5907629496106,
+     "y": 324.2248479474971
+    },
+    {
+     "x": 622.5907629496106,
+     "y": 324.2248479474971
+    },
+    {
+     "x": 640.5907629496106,
+     "y": 324.2248479474971
+    }
+   ],
+   "labelWidth": 80,
+   "sourceSide": "right",
+   "targetSide": "left",
+   "routingType": "rectilinear",
+   "labelOffsetX": 0,
+   "labelOffsetY": -20,
+   "directionType": "directed",
+   "sourceOffsetAlong": 0.5,
+   "targetOffsetAlong": 0.5,
+   "sourceInvisibleLeader": true,
+   "targetInvisibleLeader": true
+  },
+  {
+   "id": "h0l2ubst",
+   "type": "sequence",
+   "label": "",
+   "sourceId": "3j9gx9wu",
+   "targetId": "qmaaaKlwtED6VNGYkTBYZ",
+   "waypoints": [
+    {
+     "x": 238.75372561067937,
+     "y": 476.53330993652344
+    },
+    {
+     "x": 256.75372561067934,
+     "y": 476.53330993652344
+    },
+    {
+     "x": 274.75372561067934,
+     "y": 476.53330993652344
+    },
+    {
+     "x": 279.75372561067934,
+     "y": 476.53330993652344
+    },
+    {
+     "x": 279.75372561067934,
+     "y": 479.39045279366627
+    },
+    {
+     "x": 284.7537256106794,
+     "y": 479.39045279366627
+    },
+    {
+     "x": 307.7537256106794,
+     "y": 479.39045279366627
+    },
+    {
+     "x": 358.7537256106794,
+     "y": 479.39045279366627
+    }
+   ],
+   "labelWidth": 80,
+   "sourceSide": "right",
+   "targetSide": "left",
+   "routingType": "rectilinear",
+   "labelOffsetX": 0,
+   "labelOffsetY": -20,
+   "directionType": "directed",
+   "sourceOffsetAlong": 0.5,
+   "targetOffsetAlong": 0.5,
+   "sourceInvisibleLeader": true,
+   "targetInvisibleLeader": true
+  },
+  {
+   "id": "ymvlny2g",
+   "type": "sequence",
+   "label": "",
+   "sourceId": "qmaaaKlwtED6VNGYkTBYZ",
+   "targetId": "Z6xJf6P4i6aoGgkuSnkPg",
+   "waypoints": [
+    {
+     "x": 358.7537256106794,
+     "y": 479.39045279366627
+    },
+    {
+     "x": 409.7537256106794,
+     "y": 479.39045279366627
+    },
+    {
+     "x": 430.7537256106794,
+     "y": 479.39045279366627
+    },
+    {
+     "x": 438.46801132496506,
+     "y": 479.39045279366627
+    },
+    {
+     "x": 456.46801132496506,
+     "y": 479.39045279366627
+    },
+    {
+     "x": 474.46801132496506,
+     "y": 479.39045279366627
+    }
+   ],
+   "labelWidth": 80,
+   "sourceSide": "right",
+   "targetSide": "left",
+   "routingType": "rectilinear",
+   "labelOffsetX": 0,
+   "labelOffsetY": -20,
+   "directionType": "directed",
+   "sourceOffsetAlong": 0.5,
+   "targetOffsetAlong": 0.5,
+   "sourceInvisibleLeader": true,
+   "targetInvisibleLeader": true
+  },
+  {
+   "id": "platwgw3",
+   "type": "associationBPMN",
+   "sourceId": "9814dwrh",
+   "targetId": "yqlnygs5",
+   "waypoints": [
+    {
+     "x": 101.96801132496506,
+     "y": 133.8190242222377
+    },
+    {
+     "x": 146.99705021073922,
+     "y": 186.8190242222377
+    },
+    {
+     "x": 186.94871816356155,
+     "y": 233.84286603398323
+    },
+    {
+     "x": 348.1733030730118,
+     "y": 423.6071428571428
+    }
+   ],
+   "sourceSide": "bottom",
+   "targetSide": "top",
+   "routingType": "direct",
+   "directionType": "non-directed",
+   "sourceOffsetAlong": 0.8407602942707234,
+   "targetOffsetAlong": 0.22432462655019367,
+   "sourceInvisibleLeader": true,
+   "targetInvisibleLeader": true
+  }
+ ]
+}

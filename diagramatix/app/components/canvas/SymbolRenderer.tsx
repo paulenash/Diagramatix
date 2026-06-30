@@ -3043,6 +3043,7 @@ export function SymbolRenderer({
               .map((edge) => (
               <g key={edge.side}>
                 <rect
+                  data-resize-handle={`${element.id}-${edge.side}`}
                   x={edge.hit.x} y={edge.hit.y}
                   width={edge.hit.width} height={edge.hit.height}
                   fill="transparent"
