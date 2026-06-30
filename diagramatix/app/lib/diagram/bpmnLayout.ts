@@ -3013,6 +3013,75 @@ export function layoutBpmnDiagram(
     }
   }
 
+  // ── R8.16: nudge event labels clear of other elements + other event labels ──
+  // Event labels (especially edge-mounted/boundary events) default to a fixed
+  // offset; when that lands the label on top of a neighbouring element or another
+  // event's label, slide it to the first candidate offset that is clear. Only
+  // labelOffsetX/Y change — labels don't affect routing — so this is safe, and a
+  // label that already clears is left untouched. Guarded by B33.
+  {
+    const LH = 14; // label line height (matches SymbolRenderer + B33)
+    const EVT = new Set(["start-event", "end-event", "intermediate-event"]);
+    const BODY = new Set([
+      "task", "subprocess", "subprocess-expanded", "start-event", "end-event",
+      "intermediate-event", "gateway", "data-object", "data-store",
+    ]);
+    const byIdLbl = new Map(elements.map((e) => [e.id, e]));
+    const isAncestor = (anc: DiagramElement, node: DiagramElement): boolean => {
+      let cur: DiagramElement | undefined = node;
+      for (let i = 0; i < 32 && cur; i++) {
+        const nid = cur.boundaryHostId ?? cur.parentId;
+        if (!nid) return false;
+        if (nid === anc.id) return true;
+        cur = byIdLbl.get(nid);
+      }
+      return false;
+    };
+    type R = { x: number; y: number; w: number; h: number };
+    const hit = (a: R, b: R, tol: number) =>
+      Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x) > tol &&
+      Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y) > tol;
+    const bodies = elements.filter((e) => BODY.has(e.type));
+    const labelRect = (e: DiagramElement, ox: number, oy: number, lw: number, lh: number): R => ({
+      x: e.x + e.width / 2 + ox - lw / 2, y: e.y + e.height + oy, w: lw, h: lh,
+    });
+    const placed: R[] = [];
+    const TOL = 2;
+    for (const e of elements) {
+      const label = (e.label ?? "").trim();
+      if (!EVT.has(e.type) || !label) continue;
+      const lw = (e.properties?.labelWidth as number | undefined) ?? 80;
+      const lh = Math.max(1, wrapText(label, lw).length) * LH;
+      const curOx = (e.properties?.labelOffsetX as number | undefined) ?? 0;
+      const curOy = (e.properties?.labelOffsetY as number | undefined) ?? 7;
+      // Preference order: keep current, then below / above / right / left / far-below.
+      const candidates: [number, number][] = [
+        [curOx, curOy],
+        [0, e.height + 10],
+        [0, -(e.height + lh + 6)],
+        [e.width / 2 + lw / 2 + 6, -(e.height / 2 + lh / 2)],
+        [-(e.width / 2 + lw / 2 + 6), -(e.height / 2 + lh / 2)],
+        [0, e.height + lh + 18],
+      ];
+      const clears = (ox: number, oy: number): boolean => {
+        const box = labelRect(e, ox, oy, lw, lh);
+        for (const ob of bodies) {
+          if (ob.id === e.id || isAncestor(ob, e) || e.boundaryHostId === ob.id) continue;
+          if (hit(box, { x: ob.x, y: ob.y, w: ob.width, h: ob.height }, TOL)) return false;
+        }
+        for (const p of placed) if (hit(box, p, TOL)) return false;
+        return true;
+      };
+      let chosen = candidates[0];
+      if (!clears(chosen[0], chosen[1])) {
+        const found = candidates.find(([ox, oy]) => clears(ox, oy));
+        if (found) chosen = found;
+      }
+      e.properties = { ...e.properties, labelOffsetX: chosen[0], labelOffsetY: chosen[1] };
+      placed.push(labelRect(e, chosen[0], chosen[1], lw, lh));
+    }
+  }
+
   phase(`connectors built (${connectors.length})`);
 
   // Compute waypoints for all connectors
