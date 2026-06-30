@@ -1390,6 +1390,56 @@ export function layoutBpmnDiagram(
     }
   }
 
+  // ── R8.17: Separate any leaf elements that landed on top of one another ──
+  // Sibling branch terminals can collapse onto the same (x,y) when their row/Y
+  // assignment coincides (the "Cause A" defect). Push the lower-priority of
+  // each near-coincident pair straight down (carrying its subtree) until it
+  // clears; the lane/pool-fit passes below then grow the container to make
+  // room, and connectors route around the new positions. Conservative by
+  // design — only acts on SUBSTANTIAL overlap (>50% of the smaller element on
+  // BOTH axes) so normally-spaced layouts are never disturbed.
+  {
+    const OVERLAP_LEAF = new Set<string>([
+      "task", "subprocess", "start-event", "end-event",
+      "intermediate-event", "gateway", "data-object", "data-store",
+    ]);
+    const byIdDO = new Map(elements.map((e) => [e.id, e]));
+    const ancestorOf = (anc: DiagramElement, node: DiagramElement): boolean => {
+      let cur: DiagramElement | undefined = node;
+      for (let i = 0; i < 32 && cur; i++) {
+        const nid = cur.boundaryHostId ?? cur.parentId;
+        if (!nid) return false;
+        if (nid === anc.id) return true;
+        cur = byIdDO.get(nid);
+      }
+      return false;
+    };
+    const leaves = elements.filter((e) => OVERLAP_LEAF.has(e.type));
+    const GAP = 30;
+    for (let pass = 0; pass < 6; pass++) {
+      let moved = false;
+      for (let i = 0; i < leaves.length; i++) {
+        for (let k = i + 1; k < leaves.length; k++) {
+          const a = leaves[i], b = leaves[k];
+          if (a.boundaryHostId === b.id || b.boundaryHostId === a.id) continue;
+          if (ancestorOf(a, b) || ancestorOf(b, a)) continue;
+          const ox = Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x);
+          const oy = Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y);
+          if (ox <= 0 || oy <= 0) continue;
+          const minW = Math.min(a.width, b.width), minH = Math.min(a.height, b.height);
+          if (ox <= minW * 0.5 || oy <= minH * 0.5) continue; // only near-coincident
+          // Yield the lower-priority element: the one further right (later in
+          // flow); ties broken by the lower one, then by array order.
+          let mover = b, anchor = a;
+          if (a.x > b.x || (a.x === b.x && (a.y > b.y || (a.y === b.y && i > k)))) { mover = a; anchor = b; }
+          const dy = (anchor.y + anchor.height + GAP) - mover.y;
+          if (dy > 0) { shiftSubtree(mover.id, dy); moved = true; }
+        }
+      }
+      if (!moved) break;
+    }
+  }
+
   // Grow lanes to fit their children first
   for (const el of elements) {
     if (el.type === "lane") expandContainerToFitChildren(el.id, "lane");
