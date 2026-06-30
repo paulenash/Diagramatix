@@ -203,14 +203,23 @@ export async function DELETE(req: Request, { params }: Params) {
   // live in app/lib/projects/deleteProject.ts so the cascade is unit-tested
   // directly. The auth + tier gates above stay here.
   const mode: ProjectDeleteMode = hardDelete ? "hard" : cascade === "archive" ? "archive" : "unorganise";
-  const result = await deleteProjectCascade(
-    id, orgId, mode,
-    { id: session.user.id, email: session.user.email ?? "" },
-    existing.name,
-  );
-  return NextResponse.json(
-    mode === "hard"
-      ? { success: true, hardDeleted: true, purged: result.purged }
-      : { success: true, archived: result.archived, unpublished: result.unpublished },
-  );
+  try {
+    const result = await deleteProjectCascade(
+      id, orgId, mode,
+      { id: session.user.id, email: session.user.email ?? "" },
+      existing.name,
+    );
+    return NextResponse.json(
+      mode === "hard"
+        ? { success: true, hardDeleted: true, purged: result.purged }
+        : { success: true, archived: result.archived, unpublished: result.unpublished },
+    );
+  } catch (err) {
+    // A foreign-key violation or other DB error here would otherwise surface as
+    // an unhandled 500 (HTML), which the client swallows silently. Return a
+    // clean JSON message so the UI's "Delete failed" dialog can show the cause.
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`[DELETE /api/projects/${id}] ${mode} cascade error:`, message);
+    return NextResponse.json({ error: `Delete failed: ${message}` }, { status: 500 });
+  }
 }

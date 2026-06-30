@@ -1135,7 +1135,15 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
         const orphanedDiagrams = (projData?.diagrams ?? []) as DiagramSummary[];
 
         const res = await fetch(`/api/projects/${id}`, { method: "DELETE" });
-        if (!res.ok) return;
+        if (!res.ok) {
+          const txt = await res.text().catch(() => "");
+          setConfirmDialog({
+            title: "Delete failed",
+            message: `The server could not delete this project: ${txt || res.statusText || res.status}`,
+            onConfirm: () => setConfirmDialog(null),
+          });
+          return;
+        }
         setProjects((prev) => prev.filter((p) => p.id !== id));
         if (selectedProjectId === id) setSelectedProjectId(null);
         // Add orphaned diagrams to unorganised list
@@ -1214,7 +1222,15 @@ export function DashboardClient({ projects: initialProjects, unorganized: initia
       onConfirm: async () => {
         setConfirmDialog(null);
         const res = await fetch(`/api/projects/${id}?cascade=archive`, { method: "DELETE" });
-        if (!res.ok) return;
+        if (!res.ok) {
+          const txt = await res.text().catch(() => "");
+          setConfirmDialog({
+            title: "Delete failed",
+            message: `The server could not delete this project: ${txt || res.statusText || res.status}`,
+            onConfirm: () => setConfirmDialog(null),
+          });
+          return;
+        }
         setProjects((prev) => prev.filter((p) => p.id !== id));
         if (selectedProjectId === id) setSelectedProjectId(null);
         // Diagrams went to the archive — they don't reappear in Unorganised.
