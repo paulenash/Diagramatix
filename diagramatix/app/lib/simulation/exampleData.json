@@ -3264,7 +3264,7 @@
             "isBaseline": true,
             "runConfig": {
               "clockUnit": "minute",
-              "horizon": 3600,
+              "horizon": 10080,
               "warmUp": 360,
               "replications": 6,
               "seed": 1,
@@ -3275,7 +3275,7 @@
             "name": "Add staff",
             "runConfig": {
               "clockUnit": "minute",
-              "horizon": 3600,
+              "horizon": 10080,
               "warmUp": 360,
               "replications": 6,
               "seed": 1,
