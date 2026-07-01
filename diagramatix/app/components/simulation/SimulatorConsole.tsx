@@ -98,7 +98,7 @@ export function SimulatorConsole({ data = EMPTY_DIAGRAM, diagramId, projectId, i
             <span className="text-green-300 tracking-[0.3em] text-sm">◈ DIAGRAMATIX SIMULATOR</span>
             {projectMode ? (
               <>
-                {projectName && <span className="text-green-300 text-xs">/ {projectName}</span>}
+                {projectName && <span className="text-green-300 text-xs">{projectName}</span>}
                 {diagramList.length > 0 && (
                   <label className="flex items-center gap-1 text-green-400/60 text-xs" title="Which process the panels below act on">
                     process
@@ -114,7 +114,7 @@ export function SimulatorConsole({ data = EMPTY_DIAGRAM, diagramId, projectId, i
                 )}
               </>
             ) : diagramName ? (
-              <span className="text-green-400/50 text-xs">/ {diagramName}</span>
+              <span className="text-green-400/50 text-xs">{diagramName}</span>
             ) : null}
             {mode !== "home" && <button onClick={() => setMode("home")} className="text-green-400/60 text-xs hover:text-green-300">‹ back</button>}
           </div>

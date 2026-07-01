@@ -51,6 +51,9 @@ export function ReplayView({ data, config, teamCapacities, onClose }: { data: Di
   const [forkTeam, setForkTeam] = useState(teamIds[0] ?? "");
   const [forkCap, setForkCap] = useState(3);
   const [forked, setForked] = useState(false);
+  const [zoomBox, setZoomBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
+  const zoomedRef = useRef(false);
   const raf = useRef(0);
   const last = useRef(0);
 
@@ -101,6 +104,29 @@ export function ReplayView({ data, config, teamCapacities, onClose }: { data: Di
   // Stable element so the heavy read-only diagram isn't re-rendered every
   // animation frame — only when `data` changes (never during a run).
   const backdrop = useMemo(() => <ReplayDiagramBackdrop data={data} />, [data]);
+
+  // Click-to-zoom: each click zooms further into the clicked point; Esc resets.
+  const view = zoomBox ?? vb;
+  useEffect(() => { zoomedRef.current = !!zoomBox; }, [zoomBox]);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && zoomedRef.current) { e.stopPropagation(); e.preventDefault(); setZoomBox(null); }
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, []);
+  function zoomInAt(e: React.MouseEvent) {
+    const svg = svgRef.current; if (!svg) return;
+    const pt = svg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY;
+    const ctm = svg.getScreenCTM(); if (!ctm) return;
+    const w = pt.matrixTransform(ctm.inverse());
+    setZoomBox((prev) => {
+      const cur = prev ?? vb;
+      const nw = Math.max(vb.w * 0.06, cur.w * 0.6);
+      const nh = Math.max(vb.h * 0.06, cur.h * 0.6);
+      return { x: w.x - nw / 2, y: w.y - nh / 2, w: nw, h: nh };
+    });
+  }
 
   useEffect(() => {
     function loop(ts: number) {
@@ -187,7 +213,9 @@ export function ReplayView({ data, config, teamCapacities, onClose }: { data: Di
       </div>
 
       <div className="relative flex-1 border border-green-500/30 rounded overflow-hidden bg-black min-h-[240px]">
-        <svg viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`} className="w-full h-full" preserveAspectRatio="xMidYMid meet">
+        <svg ref={svgRef} viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`} className="w-full h-full cursor-zoom-in" preserveAspectRatio="xMidYMid meet" onClick={zoomInAt}>
+          {/* Transparent hit layer so clicks anywhere (incl. empty space) zoom. */}
+          <rect x={vb.x} y={vb.y} width={vb.w} height={vb.h} fill="transparent" />
           {/* The real diagram (read-only) as the backdrop. */}
           {backdrop}
           {liveTokens.map((tk) => (
@@ -196,6 +224,11 @@ export function ReplayView({ data, config, teamCapacities, onClose }: { data: Di
         </svg>
         <div className="absolute top-3 right-3">
           <LiveStatsTable timeline={statTimeline} simT={simT} teamCapacities={teamCapacities} unit={config.clockUnit} />
+        </div>
+        <div className="absolute top-3 left-3 font-mono text-[10px] text-green-400/60 bg-black/70 border border-green-500/40 rounded px-2 py-1 flex items-center gap-2">
+          {zoomBox ? (
+            <>🔍 zoomed<button onClick={(e) => { e.stopPropagation(); setZoomBox(null); }} className="text-green-300 hover:text-green-200">reset · Esc</button></>
+          ) : <span>click to zoom in</span>}
         </div>
         <div className="absolute bottom-3 right-3 font-mono text-green-300 text-sm bg-black/70 border border-green-500/40 rounded px-3 py-1.5 tabular-nums">
           t = {simT.toFixed(1)} <span className="text-green-500/60 text-xs">/ {replay.durationSim.toFixed(0)}</span>

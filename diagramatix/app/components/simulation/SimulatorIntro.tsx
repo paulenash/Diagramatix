@@ -37,7 +37,7 @@ export function SimulatorIntro({ onEnter }: { onEnter: () => void }) {
             className="text-lg sm:text-2xl drop-shadow-[0_0_10px_rgba(74,222,128,0.6)]"
           />
         ) : (
-          <span className="font-mono text-green-400/80 text-sm tracking-widest">// initialising engine</span>
+          <span className="font-mono text-green-400/80 text-sm tracking-widest">initialising engine</span>
         )}
         <p className="mt-8 text-[10px] text-green-400/40 font-mono">click or press any key to skip</p>
       </div>
