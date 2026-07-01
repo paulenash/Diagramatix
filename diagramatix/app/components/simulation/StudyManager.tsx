@@ -38,7 +38,7 @@ const KIND_HINT: Record<PlannedInterventionKind, string> = {
   outage: "team → capacity during outage",
 };
 
-export function StudyManager({ projectId, isAdmin }: { projectId: string | null; isAdmin?: boolean }) {
+export function StudyManager({ projectId, isAdmin, onRan }: { projectId: string | null; isAdmin?: boolean; onRan?: (cfg: ScenarioRunConfig) => void }) {
   const [studies, setStudies] = useState<StudyRow[]>([]);
   const [diagrams, setDiagrams] = useState<DiagramLite[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -127,7 +127,7 @@ export function StudyManager({ projectId, isAdmin }: { projectId: string | null;
       {detail && (
         <div className="flex flex-col gap-3 pt-2 border-t border-green-500/30">
           <RootPicker diagrams={diagrams} roots={new Set(detail.roots.map((r) => r.diagram.id))} onToggle={toggleRoot} />
-          <ScenarioList projectId={projectId} detail={detail} diagrams={diagrams} onChanged={() => loadDetail(detail.id)} />
+          <ScenarioList projectId={projectId} detail={detail} diagrams={diagrams} onChanged={() => loadDetail(detail.id)} onRan={onRan} />
           {isAdmin && <SaveAsExample projectId={projectId} studyId={detail.id} defaultTitle={detail.name} />}
         </div>
       )}
@@ -152,7 +152,7 @@ function RootPicker({ diagrams, roots, onToggle }: { diagrams: DiagramLite[]; ro
   );
 }
 
-function ScenarioList({ projectId, detail, diagrams, onChanged }: { projectId: string; detail: StudyDetail; diagrams: DiagramLite[]; onChanged: () => void }) {
+function ScenarioList({ projectId, detail, diagrams, onChanged, onRan }: { projectId: string; detail: StudyDetail; diagrams: DiagramLite[]; onChanged: () => void; onRan?: (cfg: ScenarioRunConfig) => void }) {
   const [newName, setNewName] = useState("");
   const [openId, setOpenId] = useState<string | null>(null);
   const [comparing, setComparing] = useState(false);
@@ -240,6 +240,7 @@ function ScenarioList({ projectId, detail, diagrams, onChanged }: { projectId: s
                   assessUrl={`/api/projects/${projectId}/simulation/studies/${detail.id}/assess`}
                   onSave={(cfg) => patchScenario(s.id, { runConfig: cfg })}
                   onSetVariant={(ids) => patchScenario(s.id, { variantRootIds: ids })}
+                  onRan={onRan}
                 />
               </div>
             )}
@@ -285,7 +286,7 @@ function AsIsToBeSetup({ diagrams, onCreate }: { diagrams: DiagramLite[]; onCrea
   );
 }
 
-function ScenarioEditor({ scenario, runUrl, runItemUrl, assessUrl, diagrams, onSave, onSetVariant }: { scenario: ScenarioRow; runUrl: string; runItemUrl: (rid: string) => string; assessUrl: string; diagrams: DiagramLite[]; onSave: (cfg: ScenarioRunConfig) => void; onSetVariant: (ids: string[]) => void }) {
+function ScenarioEditor({ scenario, runUrl, runItemUrl, assessUrl, diagrams, onSave, onSetVariant, onRan }: { scenario: ScenarioRow; runUrl: string; runItemUrl: (rid: string) => string; assessUrl: string; diagrams: DiagramLite[]; onSave: (cfg: ScenarioRunConfig) => void; onSetVariant: (ids: string[]) => void; onRan?: (cfg: ScenarioRunConfig) => void }) {
   const initial: ScenarioRunConfig = { ...DEFAULT_RUN_CONFIG, ...(scenario.runConfig ?? {}) };
   const variantId = scenario.variantRootIds?.[0] ?? "";
   const [cfg, setCfg] = useState<ScenarioRunConfig>(initial);
@@ -323,6 +324,7 @@ function ScenarioEditor({ scenario, runUrl, runItemUrl, assessUrl, diagrams, onS
         topUtil: top ? stats?.perTeam?.[top]?.utilization?.mean ?? 0 : 0,
       });
       setRan((n) => n + 1); // force the report to refetch the new run
+      onRan?.(cfg); // tell the console the config of the run just completed (for the replay)
     } catch (e) {
       setRunErr(e instanceof Error ? e.message : "Run failed");
     } finally { setRunning(false); }

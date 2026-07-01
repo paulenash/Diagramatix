@@ -17,12 +17,19 @@ import { TeamLibraryManager } from "./TeamLibraryManager";
 import { StudyManager } from "./StudyManager";
 import { SimDataPanel } from "./SimDataPanel";
 import { defaultReplayConfig } from "@/app/lib/simulation/replaySource";
+import type { ScenarioRunConfig } from "@/app/lib/simulation/types";
 
 export function SimulatorConsole({ data, projectId, isAdmin, diagramName, onClose, onFillTestData, onApplyData }: {
   data: DiagramData; projectId: string | null; isAdmin?: boolean; diagramName?: string; onClose: () => void; onFillTestData?: () => number; onApplyData?: (next: DiagramData) => void;
 }) {
   const [mode, setMode] = useState<"home" | "replay" | "heatmap">("home");
   const [teamCapacities, setTeamCapacities] = useState<Record<string, number>>({});
+  // Config of the LAST scenario that ran (from Studies & Scenarios), so "Launch
+  // replay" animates that run — its full horizon → the real volume of tokens —
+  // rather than a short default window. One replication + no warm-up so every
+  // token is shown from t=0.
+  const [lastRunCfg, setLastRunCfg] = useState<ScenarioRunConfig | null>(null);
+  const replayCfg = lastRunCfg ? { ...defaultReplayConfig(lastRunCfg.seed ?? 1), ...lastRunCfg, replications: 1, warmUp: 0 } : defaultReplayConfig();
 
   return (
     <div className="fixed inset-0 z-[60] bg-black text-green-400 font-mono overflow-hidden">
@@ -49,14 +56,19 @@ export function SimulatorConsole({ data, projectId, isAdmin, diagramName, onClos
                 <TeamLibraryManager projectId={projectId} onCapacities={setTeamCapacities} />
               </MatrixPanel>
               <MatrixPanel title="Run / Replay">
-                <p className="text-xs text-green-400/60 mb-3">Watch tokens flow through the process; intervene live. Or see where the heat builds up.</p>
+                <p className="text-xs text-green-400/60 mb-3">
+                  Watch tokens flow through the process; intervene live. Or see where the heat builds up.
+                  {lastRunCfg
+                    ? <span className="text-green-300"> Replay uses your last scenario run ({lastRunCfg.horizon} {lastRunCfg.clockUnit}s).</span>
+                    : <span className="text-green-400/40"> Run a scenario first for a full replay; otherwise a short sample runs.</span>}
+                </p>
                 <div className="flex flex-col gap-2">
                   <MatrixButton onClick={() => setMode("replay")}>▶ Launch replay</MatrixButton>
                   <MatrixButton onClick={() => setMode("heatmap")}>▦ Heatmap</MatrixButton>
                 </div>
               </MatrixPanel>
               <MatrixPanel title="Studies & Scenarios" className="md:col-span-3">
-                <StudyManager projectId={projectId} isAdmin={isAdmin} />
+                <StudyManager projectId={projectId} isAdmin={isAdmin} onRan={setLastRunCfg} />
               </MatrixPanel>
               <MatrixPanel title="Simulation Data — see, edit, fill & clear" className="md:col-span-3">
                 {onApplyData
@@ -77,7 +89,7 @@ export function SimulatorConsole({ data, projectId, isAdmin, diagramName, onClos
           </main>
         ) : mode === "replay" ? (
           <main className="flex-1 overflow-hidden p-4">
-            <ReplayView data={data} config={defaultReplayConfig()} teamCapacities={teamCapacities} onClose={() => setMode("home")} />
+            <ReplayView data={data} config={replayCfg} teamCapacities={teamCapacities} onClose={() => setMode("home")} />
           </main>
         ) : (
           <main className="flex-1 overflow-hidden p-4">
