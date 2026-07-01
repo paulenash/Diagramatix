@@ -40,9 +40,12 @@ function verdict(base: RunMetrics, tobe: RunMetrics, name: string): string {
   return `${name}: ${parts.join(", ")}.`;
 }
 
-export function ScenarioCompare({ scenarios, runUrlFor }: { scenarios: ScenarioLite[]; runUrlFor: (scenarioId: string) => string }) {
+export function ScenarioCompare({ scenarios, runUrlFor, assessUrl }: { scenarios: ScenarioLite[]; runUrlFor: (scenarioId: string) => string; assessUrl?: string }) {
   const [byId, setById] = useState<Record<string, RunMetrics | null>>({});
   const [loading, setLoading] = useState(false);
+  const [assessment, setAssessment] = useState<string | null>(null);
+  const [assessing, setAssessing] = useState(false);
+  const [assessErr, setAssessErr] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -64,6 +67,25 @@ export function ScenarioCompare({ scenarios, runUrlFor }: { scenarios: ScenarioL
 
   const baseline = scenarios.find((s) => s.isBaseline);
   const baseM = baseline ? byId[baseline.id] : null;
+  const firstCompare = scenarios.find((s) => !s.isBaseline && byId[s.id]);
+
+  // Reset a stale assessment when the underlying runs change.
+  useEffect(() => { setAssessment(null); setAssessErr(null); }, [byId]);
+
+  async function runAssessment() {
+    if (!assessUrl || !baseline || !firstCompare) return;
+    setAssessing(true); setAssessErr(null);
+    try {
+      const res = await fetch(assessUrl, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ baselineScenarioId: baseline.id, compareScenarioId: firstCompare.id }),
+      });
+      const json = await res.json();
+      if (!res.ok) { setAssessErr(json.error || "Assessment failed"); return; }
+      setAssessment(json.assessment);
+    } catch { setAssessErr("Assessment failed — check the connection and try again."); }
+    finally { setAssessing(false); }
+  }
 
   const topUtil = (m: RunMetrics | null): number | undefined => {
     if (!m) return undefined;
@@ -97,6 +119,34 @@ export function ScenarioCompare({ scenarios, runUrlFor }: { scenarios: ScenarioL
       <div className="mb-2 border border-green-500/40 rounded bg-green-400/5 px-2 py-1.5">
         <div className="text-green-400/60 uppercase tracking-widest text-[9px] mb-0.5">As-is → To-be verdict</div>
         {verdicts.map((v, i) => <div key={i} className="text-green-200 text-[11px]">{v}</div>)}
+      </div>
+    )}
+
+    {/* Grounded AI assessment — computed deltas, written up in plain English. */}
+    {assessUrl && baseline && firstCompare && (
+      <div className="mb-2">
+        {!assessment && (
+          <button
+            onClick={runAssessment}
+            disabled={assessing}
+            className="text-[10px] px-2 py-1 rounded border border-green-500/40 text-green-200 hover:bg-green-400/10 disabled:opacity-50"
+          >
+            {assessing ? "Assessing…" : "✨ Explain these results"}
+          </button>
+        )}
+        {assessErr && <p className="text-amber-400/80 text-[10px] mt-1">{assessErr}</p>}
+        {assessment && (
+          <div className="border border-green-500/40 rounded bg-green-400/5 px-2 py-1.5">
+            <div className="flex items-center justify-between mb-0.5">
+              <span className="text-green-400/60 uppercase tracking-widest text-[9px]">AI assessment</span>
+              <button onClick={runAssessment} disabled={assessing} className="text-green-400/50 hover:text-green-200 text-[9px] disabled:opacity-50">
+                {assessing ? "…" : "↻ regenerate"}
+              </button>
+            </div>
+            <p className="text-green-200/90 text-[11px] leading-relaxed whitespace-pre-line">{assessment}</p>
+            <p className="text-green-400/40 text-[9px] mt-1">Generated from the computed figures above — the numbers are not AI-invented.</p>
+          </div>
+        )}
       </div>
     )}
     <table className="w-full border-collapse text-[10px] text-green-300/90">

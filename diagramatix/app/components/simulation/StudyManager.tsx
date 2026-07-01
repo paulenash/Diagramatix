@@ -213,7 +213,7 @@ function ScenarioList({ projectId, detail, diagrams, onChanged }: { projectId: s
       {pairing && <AsIsToBeSetup diagrams={diagrams} onCreate={createAsIsToBe} />}
       {comparing && detail.scenarios.length >= 2 && (
         <div className="border border-green-500/30 rounded p-2 mb-2">
-          <ScenarioCompare scenarios={detail.scenarios} runUrlFor={(sid) => `${base}/${sid}/run`} />
+          <ScenarioCompare scenarios={detail.scenarios} runUrlFor={(sid) => `${base}/${sid}/run`} assessUrl={`/api/projects/${projectId}/simulation/studies/${detail.id}/assess`} />
         </div>
       )}
       {detail.scenarios.length === 0 && <p className="text-green-400/40">No scenarios — add one below.</p>}
