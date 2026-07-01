@@ -3560,6 +3560,7 @@ export function DiagramEditor({
         {showSimulator && (
           <SimulatorOverlay
             data={data}
+            diagramId={diagramId}
             projectId={projectId}
             isAdmin={isAdmin}
             diagramName={diagramName}

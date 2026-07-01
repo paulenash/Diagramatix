@@ -7,7 +7,7 @@
  * phases.
  */
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { DiagramData } from "@/app/lib/diagram/types";
 import { MatrixRain } from "./matrix/MatrixRain";
 import { MatrixButton, MatrixPanel } from "./matrix/MatrixChrome";
@@ -17,10 +17,11 @@ import { TeamLibraryManager } from "./TeamLibraryManager";
 import { StudyManager } from "./StudyManager";
 import { SimDataPanel } from "./SimDataPanel";
 import { defaultReplayConfig } from "@/app/lib/simulation/replaySource";
+import { autofillSimulation } from "@/app/lib/simulation/autofill";
 import type { ScenarioRunConfig } from "@/app/lib/simulation/types";
 
-export function SimulatorConsole({ data, projectId, isAdmin, diagramName, onClose, onFillTestData, onApplyData }: {
-  data: DiagramData; projectId: string | null; isAdmin?: boolean; diagramName?: string; onClose: () => void; onFillTestData?: () => number; onApplyData?: (next: DiagramData) => void;
+export function SimulatorConsole({ data, diagramId, projectId, isAdmin, diagramName, onClose, onFillTestData, onApplyData }: {
+  data: DiagramData; diagramId?: string; projectId: string | null; isAdmin?: boolean; diagramName?: string; onClose: () => void; onFillTestData?: () => number; onApplyData?: (next: DiagramData) => void;
 }) {
   const [mode, setMode] = useState<"home" | "replay" | "heatmap">("home");
   const [teamCapacities, setTeamCapacities] = useState<Record<string, number>>({});
@@ -31,6 +32,49 @@ export function SimulatorConsole({ data, projectId, isAdmin, diagramName, onClos
   const [lastRunCfg, setLastRunCfg] = useState<ScenarioRunConfig | null>(null);
   const replayCfg = lastRunCfg ? { ...defaultReplayConfig(lastRunCfg.seed ?? 1), ...lastRunCfg, replications: 1, warmUp: 0 } : defaultReplayConfig();
 
+  // ── Variant selector ─────────────────────────────────────────────────────
+  // For a comparison study the panels (Simulation Data, missing-data highlight,
+  // heatmap, replay) should follow the chosen As-is/To-be diagram, not just the
+  // one open in the editor. Pick any project BPMN diagram; the open one edits
+  // live through the editor, others load + save via the diagram API.
+  const [diagramList, setDiagramList] = useState<{ id: string; name: string }[]>([]);
+  const [activeId, setActiveId] = useState<string | null>(diagramId ?? null);
+  const [variantData, setVariantData] = useState<DiagramData | null>(null);
+  const [loadingVariant, setLoadingVariant] = useState(false);
+
+  useEffect(() => {
+    if (!projectId) return;
+    fetch(`/api/projects/${projectId}/simulation/studies`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => { if (j?.diagrams) setDiagramList(j.diagrams); })
+      .catch(() => {});
+  }, [projectId]);
+
+  const isOpen = !activeId || activeId === diagramId;
+  useEffect(() => {
+    if (isOpen || !activeId) { setVariantData(null); return; }
+    let cancelled = false;
+    setLoadingVariant(true);
+    fetch(`/api/diagrams/${activeId}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => { if (!cancelled) setVariantData((j?.data ?? null) as DiagramData | null); })
+      .finally(() => { if (!cancelled) setLoadingVariant(false); });
+    return () => { cancelled = true; };
+  }, [activeId, isOpen]);
+
+  const activeData = isOpen ? data : (variantData ?? data);
+  const applyActive = useCallback((next: DiagramData) => {
+    if (isOpen) { onApplyData?.(next); return; }
+    setVariantData(next);
+    fetch(`/api/diagrams/${activeId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ data: next }) }).catch(() => {});
+  }, [isOpen, activeId, onApplyData]);
+  const fillActive = useCallback(() => {
+    const { data: filled, filled: n } = autofillSimulation(activeData);
+    applyActive(filled);
+    return n;
+  }, [activeData, applyActive]);
+  const canEditActive = isOpen ? !!onApplyData : !!variantData;
+
   return (
     <div className="fixed inset-0 z-[60] bg-black text-green-400 font-mono overflow-hidden">
       <div className="absolute inset-0 opacity-15 pointer-events-none">
@@ -40,7 +84,21 @@ export function SimulatorConsole({ data, projectId, isAdmin, diagramName, onClos
         <header className="flex items-center justify-between px-5 py-3 border-b border-green-500/40">
           <div className="flex items-center gap-3">
             <span className="text-green-300 tracking-[0.3em] text-sm">◈ DIAGRAMATIX SIMULATOR</span>
-            {diagramName && <span className="text-green-400/50 text-xs">/ {diagramName}</span>}
+            {diagramList.length > 1 ? (
+              <label className="flex items-center gap-1 text-green-400/60 text-xs" title="Which diagram the panels below act on (As-is / To-be)">
+                variant
+                <select
+                  value={activeId ?? ""}
+                  onChange={(e) => setActiveId(e.target.value)}
+                  className="bg-black border border-green-500/40 rounded px-1 py-0.5 text-green-200 text-xs [color-scheme:dark]"
+                >
+                  {diagramList.map((d) => <option key={d.id} value={d.id}>{d.name}{d.id === diagramId ? " (open)" : ""}</option>)}
+                </select>
+                {loadingVariant && <span className="text-green-400/40">loading…</span>}
+              </label>
+            ) : diagramName ? (
+              <span className="text-green-400/50 text-xs">/ {diagramName}</span>
+            ) : null}
             {mode !== "home" && <button onClick={() => setMode("home")} className="text-green-400/60 text-xs hover:text-green-300">‹ back</button>}
           </div>
           <MatrixButton variant="danger" onClick={onClose}>✕ EXIT</MatrixButton>
@@ -70,10 +128,11 @@ export function SimulatorConsole({ data, projectId, isAdmin, diagramName, onClos
               <MatrixPanel title="Studies & Scenarios" className="md:col-span-3">
                 <StudyManager projectId={projectId} isAdmin={isAdmin} onRan={setLastRunCfg} />
               </MatrixPanel>
-              <MatrixPanel title="Simulation Data — see, edit, fill & clear" className="md:col-span-3">
-                {onApplyData
-                  ? <SimDataPanel data={data} onApplyData={onApplyData} onFillMissing={onFillTestData} />
-                  : <p className="text-xs text-green-400/60">Open this diagram from its editor to edit simulation data here.</p>}
+              <MatrixPanel title={`Simulation Data — see, edit, fill & clear${!isOpen ? ` · ${diagramList.find((d) => d.id === activeId)?.name ?? "variant"}` : ""}`} className="md:col-span-3">
+                {!isOpen && <p className="text-[10px] text-green-400/50 mb-1">Editing the <span className="text-green-300">{diagramList.find((d) => d.id === activeId)?.name ?? "selected"}</span> variant — changes save straight to that diagram.</p>}
+                {canEditActive
+                  ? <SimDataPanel data={activeData} onApplyData={applyActive} onFillMissing={fillActive} />
+                  : <p className="text-xs text-green-400/60">{loadingVariant ? "Loading variant…" : "Open this diagram from its editor to edit simulation data here."}</p>}
               </MatrixPanel>
               <MatrixPanel title="Engine status" className="md:col-span-3">
                 <p className="text-xs text-green-400/70 leading-relaxed">
@@ -89,11 +148,11 @@ export function SimulatorConsole({ data, projectId, isAdmin, diagramName, onClos
           </main>
         ) : mode === "replay" ? (
           <main className="flex-1 overflow-hidden p-4">
-            <ReplayView data={data} config={replayCfg} teamCapacities={teamCapacities} onClose={() => setMode("home")} />
+            <ReplayView data={activeData} config={replayCfg} teamCapacities={teamCapacities} onClose={() => setMode("home")} />
           </main>
         ) : (
           <main className="flex-1 overflow-hidden p-4">
-            <SimulationHeatmap data={data} teamCapacities={teamCapacities} onClose={() => setMode("home")} />
+            <SimulationHeatmap data={activeData} teamCapacities={teamCapacities} onClose={() => setMode("home")} />
           </main>
         )}
       </div>

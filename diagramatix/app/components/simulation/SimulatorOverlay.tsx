@@ -10,12 +10,12 @@ import type { DiagramData } from "@/app/lib/diagram/types";
 import { SimulatorIntro } from "./SimulatorIntro";
 import { SimulatorConsole } from "./SimulatorConsole";
 
-export function SimulatorOverlay({ data, projectId, isAdmin, diagramName, onClose, onFillTestData, onApplyData }: {
-  data: DiagramData; projectId: string | null; isAdmin?: boolean; diagramName?: string; onClose: () => void; onFillTestData?: () => number; onApplyData?: (next: DiagramData) => void;
+export function SimulatorOverlay({ data, diagramId, projectId, isAdmin, diagramName, onClose, onFillTestData, onApplyData }: {
+  data: DiagramData; diagramId?: string; projectId: string | null; isAdmin?: boolean; diagramName?: string; onClose: () => void; onFillTestData?: () => number; onApplyData?: (next: DiagramData) => void;
 }) {
   const [entered, setEntered] = useState(false);
   return entered ? (
-    <SimulatorConsole data={data} projectId={projectId} isAdmin={isAdmin} diagramName={diagramName} onClose={onClose} onFillTestData={onFillTestData} onApplyData={onApplyData} />
+    <SimulatorConsole data={data} diagramId={diagramId} projectId={projectId} isAdmin={isAdmin} diagramName={diagramName} onClose={onClose} onFillTestData={onFillTestData} onApplyData={onApplyData} />
   ) : (
     <SimulatorIntro onEnter={() => setEntered(true)} />
   );
